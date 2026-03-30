@@ -10,6 +10,7 @@ import {
   type CodeAssistServer,
   UserTierId,
   getCodeAssistServer,
+  debugLogger,
 } from '@google/gemini-cli-core';
 
 export interface PrivacyState {
@@ -103,9 +104,15 @@ async function getRemoteDataCollectionOptIn(
 ): Promise<boolean> {
   try {
     const resp = await server.getCodeAssistGlobalUserSetting();
-    return resp.freeTierDataCollectionOptin;
+    if (resp.freeTierDataCollectionOptin === undefined) {
+      debugLogger.warn(
+        'Warning: Code Assist API did not return freeTierDataCollectionOptin. Defaulting to true.',
+      );
+    }
+    return resp.freeTierDataCollectionOptin ?? true;
   } catch (error: unknown) {
     if (error && typeof error === 'object' && 'response' in error) {
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
       const gaxiosError = error as {
         response?: {
           status?: unknown;
@@ -127,5 +134,10 @@ async function setRemoteDataCollectionOptIn(
     cloudaicompanionProject: server.projectId,
     freeTierDataCollectionOptin: optIn,
   });
-  return resp.freeTierDataCollectionOptin;
+  if (resp.freeTierDataCollectionOptin === undefined) {
+    debugLogger.warn(
+      `Warning: Code Assist API did not return freeTierDataCollectionOptin. Defaulting to ${optIn}.`,
+    );
+  }
+  return resp.freeTierDataCollectionOptin ?? optIn;
 }

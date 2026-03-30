@@ -1,5 +1,11 @@
 {
   "experimental": {
-    "skills": true
+    "plan": true,
+    "extensionReloading": true,
+    "modelSteering": true,
+    "memoryManager": true
+  },
+  "general": {
+    "devtools": true
   }
 }

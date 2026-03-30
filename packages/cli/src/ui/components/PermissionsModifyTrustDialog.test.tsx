@@ -4,8 +4,15 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import type { Mock } from 'vitest';
+import {
+  describe,
+  it,
+  expect,
+  vi,
+  beforeEach,
+  afterEach,
+  type Mock,
+} from 'vitest';
 import { renderWithProviders } from '../../test-utils/render.js';
 import { waitFor } from '../../test-utils/async.js';
 import { PermissionsModifyTrustDialog } from './PermissionsModifyTrustDialog.js';
@@ -65,7 +72,7 @@ describe('PermissionsModifyTrustDialog', () => {
   });
 
   it('should render the main dialog with current trust level', async () => {
-    const { lastFrame } = renderWithProviders(
+    const { lastFrame, unmount } = await renderWithProviders(
       <PermissionsModifyTrustDialog onExit={vi.fn()} addItem={vi.fn()} />,
     );
 
@@ -74,6 +81,7 @@ describe('PermissionsModifyTrustDialog', () => {
       expect(lastFrame()).toContain('Folder: /test/dir');
       expect(lastFrame()).toContain('Current Level: DO_NOT_TRUST');
     });
+    unmount();
   });
 
   it('should display the inherited trust note from parent', async () => {
@@ -87,7 +95,7 @@ describe('PermissionsModifyTrustDialog', () => {
       commitTrustLevelChange: mockCommitTrustLevelChange,
       isFolderTrustEnabled: true,
     });
-    const { lastFrame } = renderWithProviders(
+    const { lastFrame, unmount } = await renderWithProviders(
       <PermissionsModifyTrustDialog onExit={vi.fn()} addItem={vi.fn()} />,
     );
 
@@ -96,6 +104,7 @@ describe('PermissionsModifyTrustDialog', () => {
         'Note: This folder behaves as a trusted folder because one of the parent folders is trusted.',
       );
     });
+    unmount();
   });
 
   it('should display the inherited trust note from IDE', async () => {
@@ -109,7 +118,7 @@ describe('PermissionsModifyTrustDialog', () => {
       commitTrustLevelChange: mockCommitTrustLevelChange,
       isFolderTrustEnabled: true,
     });
-    const { lastFrame } = renderWithProviders(
+    const { lastFrame, unmount } = await renderWithProviders(
       <PermissionsModifyTrustDialog onExit={vi.fn()} addItem={vi.fn()} />,
     );
 
@@ -118,10 +127,11 @@ describe('PermissionsModifyTrustDialog', () => {
         'Note: This folder behaves as a trusted folder because the connected IDE workspace is trusted.',
       );
     });
+    unmount();
   });
 
   it('should render the labels with folder names', async () => {
-    const { lastFrame } = renderWithProviders(
+    const { lastFrame, unmount } = await renderWithProviders(
       <PermissionsModifyTrustDialog onExit={vi.fn()} addItem={vi.fn()} />,
     );
 
@@ -129,23 +139,30 @@ describe('PermissionsModifyTrustDialog', () => {
       expect(lastFrame()).toContain('Trust this folder (dir)');
       expect(lastFrame()).toContain('Trust parent folder (test)');
     });
+    unmount();
   });
 
   it('should call onExit when escape is pressed', async () => {
     const onExit = vi.fn();
-    const { stdin, lastFrame } = renderWithProviders(
-      <PermissionsModifyTrustDialog onExit={onExit} addItem={vi.fn()} />,
-    );
+    const { stdin, lastFrame, waitUntilReady, unmount } =
+      await renderWithProviders(
+        <PermissionsModifyTrustDialog onExit={onExit} addItem={vi.fn()} />,
+      );
 
     await waitFor(() => expect(lastFrame()).not.toContain('Loading...'));
 
-    act(() => {
+    await act(async () => {
       stdin.write('\u001b[27u'); // Kitty escape key
+    });
+    // Escape key has a 50ms timeout in KeypressContext, so we need to wrap waitUntilReady in act
+    await act(async () => {
+      await waitUntilReady();
     });
 
     await waitFor(() => {
       expect(onExit).toHaveBeenCalled();
     });
+    unmount();
   });
 
   it('should commit and restart `r` keypress', async () => {
@@ -165,13 +182,17 @@ describe('PermissionsModifyTrustDialog', () => {
     });
 
     const onExit = vi.fn();
-    const { stdin, lastFrame } = renderWithProviders(
-      <PermissionsModifyTrustDialog onExit={onExit} addItem={vi.fn()} />,
-    );
+    const { stdin, lastFrame, waitUntilReady, unmount } =
+      await renderWithProviders(
+        <PermissionsModifyTrustDialog onExit={onExit} addItem={vi.fn()} />,
+      );
 
     await waitFor(() => expect(lastFrame()).not.toContain('Loading...'));
 
-    act(() => stdin.write('r')); // Press 'r' to restart
+    await act(async () => {
+      stdin.write('r'); // Press 'r' to restart
+    });
+    await waitUntilReady();
 
     await waitFor(() => {
       expect(mockCommitTrustLevelChange).toHaveBeenCalled();
@@ -179,6 +200,7 @@ describe('PermissionsModifyTrustDialog', () => {
     });
 
     mockRelaunchApp.mockRestore();
+    unmount();
   });
 
   it('should not commit when escape is pressed during restart prompt', async () => {
@@ -194,17 +216,24 @@ describe('PermissionsModifyTrustDialog', () => {
     });
 
     const onExit = vi.fn();
-    const { stdin, lastFrame } = renderWithProviders(
-      <PermissionsModifyTrustDialog onExit={onExit} addItem={vi.fn()} />,
-    );
+    const { stdin, lastFrame, waitUntilReady, unmount } =
+      await renderWithProviders(
+        <PermissionsModifyTrustDialog onExit={onExit} addItem={vi.fn()} />,
+      );
 
     await waitFor(() => expect(lastFrame()).not.toContain('Loading...'));
 
-    act(() => stdin.write('\u001b[27u')); // Press kitty escape key
+    await act(async () => {
+      stdin.write('\u001b[27u'); // Press kitty escape key
+    });
+    await act(async () => {
+      await waitUntilReady();
+    });
 
     await waitFor(() => {
       expect(mockCommitTrustLevelChange).not.toHaveBeenCalled();
       expect(onExit).toHaveBeenCalled();
     });
+    unmount();
   });
 });

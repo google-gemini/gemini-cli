@@ -231,28 +231,23 @@ describe('DebugProfiler Component', () => {
       showDebugProfiler: false,
       constrainHeight: false,
     } as unknown as UIState);
-
-    // Mock process.stdin and stdout
-    // We need to be careful not to break the test runner's own output
-    // So we might want to skip mocking them if they are not strictly needed for the simple render test
-    // or mock them safely.
-    // For now, let's assume the component uses them in useEffect.
   });
 
   afterEach(() => {
     vi.restoreAllMocks();
   });
 
-  it('should return null when showDebugProfiler is false', () => {
+  it('should return null when showDebugProfiler is false', async () => {
     vi.mocked(useUIState).mockReturnValue({
       showDebugProfiler: false,
       constrainHeight: false,
     } as unknown as UIState);
-    const { lastFrame } = render(<DebugProfiler />);
-    expect(lastFrame()).toBe('');
+    const { lastFrame, unmount } = await render(<DebugProfiler />);
+    expect(lastFrame({ allowEmpty: true })).toBe('');
+    unmount();
   });
 
-  it('should render stats when showDebugProfiler is true', () => {
+  it('should render stats when showDebugProfiler is true', async () => {
     vi.mocked(useUIState).mockReturnValue({
       showDebugProfiler: true,
       constrainHeight: false,
@@ -261,12 +256,13 @@ describe('DebugProfiler Component', () => {
     profiler.totalIdleFrames = 5;
     profiler.totalFlickerFrames = 2;
 
-    const { lastFrame } = render(<DebugProfiler />);
+    const { lastFrame, unmount } = await render(<DebugProfiler />);
     const output = lastFrame();
 
     expect(output).toContain('Renders: 10 (total)');
     expect(output).toContain('5 (idle)');
     expect(output).toContain('2 (flicker)');
+    unmount();
   });
 
   it('should report an action when a CoreEvent is emitted', async () => {
@@ -277,11 +273,12 @@ describe('DebugProfiler Component', () => {
 
     const reportActionSpy = vi.spyOn(profiler, 'reportAction');
 
-    const { unmount } = render(<DebugProfiler />);
+    const { waitUntilReady, unmount } = await render(<DebugProfiler />);
 
-    act(() => {
+    await act(async () => {
       coreEvents.emitModelChanged('new-model');
     });
+    await waitUntilReady();
 
     expect(reportActionSpy).toHaveBeenCalled();
     unmount();
@@ -295,11 +292,12 @@ describe('DebugProfiler Component', () => {
 
     const reportActionSpy = vi.spyOn(profiler, 'reportAction');
 
-    const { unmount } = render(<DebugProfiler />);
+    const { waitUntilReady, unmount } = await render(<DebugProfiler />);
 
-    act(() => {
+    await act(async () => {
       appEvents.emit(AppEvent.SelectionWarning);
     });
+    await waitUntilReady();
 
     expect(reportActionSpy).toHaveBeenCalled();
     unmount();

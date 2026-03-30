@@ -11,7 +11,7 @@ import { bugCommand } from './bugCommand.js';
 import { createMockCommandContext } from '../../test-utils/mockCommandContext.js';
 import { getVersion } from '@google/gemini-cli-core';
 import { GIT_COMMIT_INFO } from '../../generated/git-commit.js';
-import { formatMemoryUsage } from '../utils/formatters.js';
+import { formatBytes } from '../utils/formatters.js';
 
 // Mock dependencies
 vi.mock('open');
@@ -68,7 +68,7 @@ vi.mock('../utils/terminalCapabilityManager.js', () => ({
 describe('bugCommand', () => {
   beforeEach(() => {
     vi.mocked(getVersion).mockResolvedValue('0.1.0');
-    vi.mocked(formatMemoryUsage).mockReturnValue('100 MB');
+    vi.mocked(formatBytes).mockReturnValue('100 MB');
     vi.stubEnv('SANDBOX', 'gemini-test');
     vi.useFakeTimers();
     vi.setSystemTime(new Date('2024-01-01T00:00:00Z'));
@@ -83,15 +83,18 @@ describe('bugCommand', () => {
   it('should generate the default GitHub issue URL', async () => {
     const mockContext = createMockCommandContext({
       services: {
-        config: {
-          getModel: () => 'gemini-pro',
-          getBugCommand: () => undefined,
-          getIdeMode: () => true,
-          getGeminiClient: () => ({
+        agentContext: {
+          config: {
+            getModel: () => 'gemini-pro',
+            getBugCommand: () => undefined,
+            getIdeMode: () => true,
+            getContentGeneratorConfig: () => ({ authType: 'oauth-personal' }),
+          },
+          geminiClient: {
             getChat: () => ({
               getHistory: () => [],
             }),
-          }),
+          },
         },
       },
     });
@@ -106,6 +109,7 @@ describe('bugCommand', () => {
 * **Operating System:** test-platform v20.0.0
 * **Sandbox Environment:** test
 * **Model Version:** gemini-pro
+* **Auth Type:** oauth-personal
 * **Memory Usage:** 100 MB
 * **Terminal Name:** Test Terminal
 * **Terminal Background:** #000000
@@ -124,17 +128,20 @@ describe('bugCommand', () => {
     ];
     const mockContext = createMockCommandContext({
       services: {
-        config: {
-          getModel: () => 'gemini-pro',
-          getBugCommand: () => undefined,
-          getIdeMode: () => true,
-          getGeminiClient: () => ({
+        agentContext: {
+          config: {
+            getModel: () => 'gemini-pro',
+            getBugCommand: () => undefined,
+            getIdeMode: () => true,
+            getContentGeneratorConfig: () => ({ authType: 'vertex-ai' }),
+            storage: {
+              getProjectTempDir: () => '/tmp/gemini',
+            },
+          },
+          geminiClient: {
             getChat: () => ({
               getHistory: () => history,
             }),
-          }),
-          storage: {
-            getProjectTempDir: () => '/tmp/gemini',
           },
         },
       },
@@ -169,15 +176,18 @@ describe('bugCommand', () => {
       'https://internal.bug-tracker.com/new?desc={title}&details={info}';
     const mockContext = createMockCommandContext({
       services: {
-        config: {
-          getModel: () => 'gemini-pro',
-          getBugCommand: () => ({ urlTemplate: customTemplate }),
-          getIdeMode: () => true,
-          getGeminiClient: () => ({
+        agentContext: {
+          config: {
+            getModel: () => 'gemini-pro',
+            getBugCommand: () => ({ urlTemplate: customTemplate }),
+            getIdeMode: () => true,
+            getContentGeneratorConfig: () => ({ authType: 'vertex-ai' }),
+          },
+          geminiClient: {
             getChat: () => ({
               getHistory: () => [],
             }),
-          }),
+          },
         },
       },
     });
@@ -192,6 +202,7 @@ describe('bugCommand', () => {
 * **Operating System:** test-platform v20.0.0
 * **Sandbox Environment:** test
 * **Model Version:** gemini-pro
+* **Auth Type:** vertex-ai
 * **Memory Usage:** 100 MB
 * **Terminal Name:** Test Terminal
 * **Terminal Background:** #000000

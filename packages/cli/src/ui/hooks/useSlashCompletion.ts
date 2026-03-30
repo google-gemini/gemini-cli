@@ -1,6 +1,6 @@
 /**
  * @license
- * Copyright 2025 Google LLC
+ * Copyright 2026 Google LLC
  * SPDX-License-Identifier: Apache-2.0
  */
 
@@ -54,7 +54,6 @@ interface CommandParserResult {
   partial: string;
   currentLevel: readonly SlashCommand[] | undefined;
   leafCommand: SlashCommand | null;
-  exactMatchAsParent: SlashCommand | undefined;
   isArgumentCompletion: boolean;
 }
 
@@ -70,7 +69,6 @@ function useCommandParser(
         partial: '',
         currentLevel: slashCommands,
         leafCommand: null,
-        exactMatchAsParent: undefined,
         isArgumentCompletion: false,
       };
     }
@@ -112,34 +110,6 @@ function useCommandParser(
       }
     }
 
-    let exactMatchAsParent: SlashCommand | undefined;
-    if (!hasTrailingSpace && currentLevel) {
-      exactMatchAsParent = currentLevel.find(
-        (cmd) => matchesCommand(cmd, partial) && cmd.subCommands,
-      );
-
-      if (exactMatchAsParent) {
-        // Only descend if there are NO other matches for the partial at this level.
-        // This ensures that typing "/memory" still shows "/memory-leak" if it exists.
-        const otherMatches = currentLevel.filter(
-          (cmd) =>
-            cmd !== exactMatchAsParent &&
-            (cmd.name.toLowerCase().startsWith(partial.toLowerCase()) ||
-              cmd.altNames?.some((alt) =>
-                alt.toLowerCase().startsWith(partial.toLowerCase()),
-              )),
-        );
-
-        if (otherMatches.length === 0) {
-          leafCommand = exactMatchAsParent;
-          currentLevel = exactMatchAsParent.subCommands as
-            | readonly SlashCommand[]
-            | undefined;
-          partial = '';
-        }
-      }
-    }
-
     const depth = commandPathParts.length;
     const isArgumentCompletion = !!(
       leafCommand?.completion &&
@@ -153,7 +123,6 @@ function useCommandParser(
       partial,
       currentLevel,
       leafCommand,
-      exactMatchAsParent,
       isArgumentCompletion,
     };
   }, [query, slashCommands]);
@@ -271,6 +240,7 @@ function useCommandSuggestions(
           const fzfInstance = getFzfForCommands(commandsToSearch);
           if (fzfInstance) {
             try {
+              // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
               const fzfResults = await fzfInstance.fzf.find(partial);
               if (signal.aborted) return;
               const uniqueCommands = new Set<SlashCommand>();
@@ -302,21 +272,84 @@ function useCommandSuggestions(
         }
 
         if (!signal.aborted) {
-          // Sort potentialSuggestions so that exact match (by name or altName) comes first
+          // Sort potentialSuggestions so that exact name/prefix match comes first,
+          // prioritizing primary name over altNames.
+          const lowerPartial = partial.toLowerCase();
           const sortedSuggestions = [...potentialSuggestions].sort((a, b) => {
-            const aIsExact = matchesCommand(a, partial);
-            const bIsExact = matchesCommand(b, partial);
-            if (aIsExact && !bIsExact) return -1;
-            if (!aIsExact && bIsExact) return 1;
-            return 0;
+            // 1. Exact name match
+            const aNameExact = a.name.toLowerCase() === lowerPartial;
+            const bNameExact = b.name.toLowerCase() === lowerPartial;
+            if (aNameExact && !bNameExact) return -1;
+            if (!aNameExact && bNameExact) return 1;
+
+            // 2. Exact altName match
+            const aAltExact =
+              a.altNames?.some((alt) => alt.toLowerCase() === lowerPartial) ||
+              false;
+            const bAltExact =
+              b.altNames?.some((alt) => alt.toLowerCase() === lowerPartial) ||
+              false;
+            if (aAltExact && !bAltExact) return -1;
+            if (!aAltExact && bAltExact) return 1;
+
+            // 3. Prefix name match
+            const aNamePrefix = a.name.toLowerCase().startsWith(lowerPartial);
+            const bNamePrefix = b.name.toLowerCase().startsWith(lowerPartial);
+            if (aNamePrefix && !bNamePrefix) return -1;
+            if (!aNamePrefix && bNamePrefix) return 1;
+
+            // 4. Prefix altName match
+            const aAltPrefix =
+              a.altNames?.some((alt) =>
+                alt.toLowerCase().startsWith(lowerPartial),
+              ) || false;
+            const bAltPrefix =
+              b.altNames?.some((alt) =>
+                alt.toLowerCase().startsWith(lowerPartial),
+              ) || false;
+            if (aAltPrefix && !bAltPrefix) return -1;
+            if (!aAltPrefix && bAltPrefix) return 1;
+
+            return 0; // Maintain FZF score order for other matches
           });
 
-          const finalSuggestions = sortedSuggestions.map((cmd) => ({
-            label: cmd.name,
-            value: cmd.name,
-            description: cmd.description,
-            commandKind: cmd.kind,
-          }));
+          const finalSuggestions = sortedSuggestions.map((cmd) => {
+            const suggestion: Suggestion = {
+              label: cmd.name,
+              value: cmd.name,
+              description: cmd.description,
+              commandKind: cmd.kind,
+            };
+
+            if (cmd.suggestionGroup) {
+              suggestion.sectionTitle = cmd.suggestionGroup;
+            }
+
+            return suggestion;
+          });
+
+          const isTopLevelChatOrResumeContext = !!(
+            leafCommand &&
+            (leafCommand.name === 'chat' || leafCommand.name === 'resume') &&
+            (commandPathParts.length === 0 ||
+              (commandPathParts.length === 1 &&
+                matchesCommand(leafCommand, commandPathParts[0])))
+          );
+
+          if (isTopLevelChatOrResumeContext) {
+            const canonicalParentName = leafCommand.name;
+            const autoSectionSuggestion: Suggestion = {
+              label: 'list',
+              value: 'list',
+              insertValue: canonicalParentName,
+              description: 'Browse auto-saved chats',
+              commandKind: CommandKind.BUILT_IN,
+              sectionTitle: 'auto',
+              submitValue: `/${canonicalParentName}`,
+            };
+            setSuggestions([autoSectionSuggestion, ...finalSuggestions]);
+            return;
+          }
 
           setSuggestions(finalSuggestions);
         }
@@ -355,10 +388,10 @@ function useCompletionPositions(
       return { start: -1, end: -1 };
     }
 
-    const { hasTrailingSpace, partial, exactMatchAsParent } = parserResult;
+    const { hasTrailingSpace, partial } = parserResult;
 
     // Set completion start/end positions
-    if (hasTrailingSpace || exactMatchAsParent) {
+    if (hasTrailingSpace) {
       return { start: query.length, end: query.length };
     } else if (partial) {
       if (parserResult.isArgumentCompletion) {

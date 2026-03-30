@@ -11,13 +11,22 @@ import {
   CommandKind,
 } from './types.js';
 import {
-  MessageType,
-  type HistoryItemSkillsList,
   type HistoryItemInfo,
+  type HistoryItemSkillsList,
+  MessageType,
 } from '../types.js';
+import { disableSkill, enableSkill } from '../../utils/skillSettings.js';
+
+import { getAdminErrorMessage, getErrorMessage } from '@google/gemini-cli-core';
+import {
+  linkSkill,
+  renderSkillActionFeedback,
+} from '../../utils/skillUtils.js';
 import { SettingScope } from '../../config/settings.js';
-import { enableSkill, disableSkill } from '../../utils/skillSettings.js';
-import { renderSkillActionFeedback } from '../../utils/skillUtils.js';
+import {
+  requestConsentInteractive,
+  skillsConsentString,
+} from '../../config/extensions/consent.js';
 
 async function listAction(
   context: CommandContext,
@@ -37,7 +46,7 @@ async function listAction(
     }
   }
 
-  const skillManager = context.services.config?.getSkillManager();
+  const skillManager = context.services.agentContext?.config.getSkillManager();
   if (!skillManager) {
     context.ui.addItem({
       type: MessageType.ERROR,
@@ -66,6 +75,69 @@ async function listAction(
   context.ui.addItem(skillsListItem);
 }
 
+async function linkAction(
+  context: CommandContext,
+  args: string,
+): Promise<void | SlashCommandActionReturn> {
+  const parts = args.trim().split(/\s+/);
+  const sourcePath = parts[0];
+
+  if (!sourcePath) {
+    context.ui.addItem({
+      type: MessageType.ERROR,
+      text: 'Usage: /skills link <path> [--scope user|workspace]',
+    });
+    return;
+  }
+
+  let scopeArg = 'user';
+  if (parts.length >= 3 && parts[1] === '--scope') {
+    scopeArg = parts[2];
+  } else if (parts.length >= 2 && parts[1].startsWith('--scope=')) {
+    scopeArg = parts[1].split('=')[1];
+  }
+
+  const scope = scopeArg === 'workspace' ? 'workspace' : 'user';
+
+  try {
+    await linkSkill(
+      sourcePath,
+      scope,
+      (msg) =>
+        context.ui.addItem({
+          type: MessageType.INFO,
+          text: msg,
+        }),
+      async (skills, targetDir) => {
+        const consentString = await skillsConsentString(
+          skills,
+          sourcePath,
+          targetDir,
+          true,
+        );
+        return requestConsentInteractive(
+          consentString,
+          context.ui.setConfirmationRequest.bind(context.ui),
+        );
+      },
+    );
+
+    context.ui.addItem({
+      type: MessageType.INFO,
+      text: `Successfully linked skills from "${sourcePath}" (${scope}).`,
+    });
+
+    if (context.services.agentContext?.config) {
+      await context.services.agentContext.config.reloadSkills();
+    }
+  } catch (error) {
+    context.ui.addItem({
+      type: MessageType.ERROR,
+      text: `Failed to link skills: ${getErrorMessage(error)}`,
+    });
+  }
+}
+
 async function disableAction(
   context: CommandContext,
   args: string,
@@ -78,12 +150,15 @@ async function disableAction(
     });
     return;
   }
-  const skillManager = context.services.config?.getSkillManager();
+  const skillManager = context.services.agentContext?.config.getSkillManager();
   if (skillManager?.isAdminEnabled() === false) {
     context.ui.addItem(
       {
         type: MessageType.ERROR,
-        text: 'Agent skills are disabled by your admin.',
+        text: getAdminErrorMessage(
+          'Agent skills',
+          context.services.agentContext?.config ?? undefined,
+        ),
       },
       Date.now(),
     );
@@ -136,12 +211,15 @@ async function enableAction(
     return;
   }
 
-  const skillManager = context.services.config?.getSkillManager();
+  const skillManager = context.services.agentContext?.config.getSkillManager();
   if (skillManager?.isAdminEnabled() === false) {
     context.ui.addItem(
       {
         type: MessageType.ERROR,
-        text: 'Agent skills are disabled by your admin.',
+        text: getAdminErrorMessage(
+          'Agent skills',
+          context.services.agentContext?.config ?? undefined,
+        ),
       },
       Date.now(),
     );
@@ -168,7 +246,7 @@ async function enableAction(
 async function reloadAction(
   context: CommandContext,
 ): Promise<void | SlashCommandActionReturn> {
-  const config = context.services.config;
+  const config = context.services.agentContext?.config;
   if (!config) {
     context.ui.addItem({
       type: MessageType.ERROR,
@@ -255,7 +333,7 @@ function disableCompletion(
   context: CommandContext,
   partialArg: string,
 ): string[] {
-  const skillManager = context.services.config?.getSkillManager();
+  const skillManager = context.services.agentContext?.config.getSkillManager();
   if (!skillManager) {
     return [];
   }
@@ -269,7 +347,7 @@ function enableCompletion(
   context: CommandContext,
   partialArg: string,
 ): string[] {
-  const skillManager = context.services.config?.getSkillManager();
+  const skillManager = context.services.agentContext?.config.getSkillManager();
   if (!skillManager) {
     return [];
   }
@@ -278,6 +356,8 @@ function enableCompletion(
     .filter((s) => s.disabled && s.name.startsWith(partialArg))
     .map((s) => s.name);
 }
+
+import { parseSlashCommand } from '../../utils/commands.js';
 
 export const skillsCommand: SlashCommand = {
   name: 'skills',
@@ -292,6 +372,13 @@ export const skillsCommand: SlashCommand = {
         'List available agent skills. Usage: /skills list [nodesc] [all]',
       kind: CommandKind.BUILT_IN,
       action: listAction,
+    },
+    {
+      name: 'link',
+      description:
+        'Link an agent skill from a local path. Usage: /skills link <path> [--scope user|workspace]',
+      kind: CommandKind.BUILT_IN,
+      action: linkAction,
     },
     {
       name: 'disable',
@@ -310,11 +397,20 @@ export const skillsCommand: SlashCommand = {
     },
     {
       name: 'reload',
+      altNames: ['refresh'],
       description:
         'Reload the list of discovered skills. Usage: /skills reload',
       kind: CommandKind.BUILT_IN,
       action: reloadAction,
     },
   ],
-  action: listAction,
+  action: async (context, args) => {
+    if (args) {
+      const parsed = parseSlashCommand(`/${args}`, skillsCommand.subCommands!);
+      if (parsed.commandToExecute?.action) {
+        return parsed.commandToExecute.action(context, parsed.args);
+      }
+    }
+    return listAction(context, args);
+  },
 };

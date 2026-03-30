@@ -14,7 +14,7 @@ import type { ToolCallRequestInfo } from '../scheduler/types.js';
 
 export interface ToolCallData<HistoryType = unknown, ArgsType = unknown> {
   history?: HistoryType;
-  clientHistory?: Content[];
+  clientHistory?: readonly Content[];
   commitHash?: string;
   toolCall: {
     name: string;
@@ -49,6 +49,7 @@ export function generateCheckpointFileName(
   toolCall: ToolCallRequestInfo,
 ): string | null {
   const toolArgs = toolCall.args;
+  // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
   const toolFilePath = toolArgs['file_path'] as string;
 
   if (!toolFilePath) {
@@ -167,6 +168,7 @@ export function getCheckpointInfoList(
 
   for (const [file, content] of checkpointFiles) {
     try {
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
       const toolCallData = JSON.parse(content) as ToolCallData;
       if (toolCallData.messageId) {
         checkpointInfoList.push({

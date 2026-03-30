@@ -13,6 +13,7 @@ import type {
 import { getResponseText } from './partUtils.js';
 import { supportsMultimodalFunctionResponse } from '../config/models.js';
 import { debugLogger } from './debugLogger.js';
+import type { Config } from '../config/config.js';
 
 /**
  * Formats tool output for a Gemini FunctionResponse.
@@ -48,6 +49,7 @@ export function convertToFunctionResponse(
   callId: string,
   llmContent: PartListUnion,
   model: string,
+  config?: Config,
 ): Part[] {
   if (typeof llmContent === 'string') {
     return [createFunctionResponsePart(callId, toolName, llmContent)];
@@ -96,12 +98,16 @@ export function convertToFunctionResponse(
     },
   };
 
-  const isMultimodalFRSupported = supportsMultimodalFunctionResponse(model);
+  const isMultimodalFRSupported = supportsMultimodalFunctionResponse(
+    model,
+    config,
+  );
   const siblingParts: Part[] = [...fileDataParts];
 
   if (inlineDataParts.length > 0) {
     if (isMultimodalFRSupported) {
       // Nest inlineData if supported by the model
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
       (part.functionResponse as unknown as { parts: Part[] }).parts =
         inlineDataParts;
     } else {
@@ -151,6 +157,7 @@ export function getFunctionCalls(
   }
   const functionCallParts = parts
     .filter((part) => !!part.functionCall)
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
     .map((part) => part.functionCall as FunctionCall);
   return functionCallParts.length > 0 ? functionCallParts : undefined;
 }
@@ -163,6 +170,7 @@ export function getFunctionCallsFromParts(
   }
   const functionCallParts = parts
     .filter((part) => !!part.functionCall)
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
     .map((part) => part.functionCall as FunctionCall);
   return functionCallParts.length > 0 ? functionCallParts : undefined;
 }

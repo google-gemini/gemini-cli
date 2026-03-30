@@ -1,6 +1,6 @@
 /**
  * @license
- * Copyright 2025 Google LLC
+ * Copyright 2026 Google LLC
  * SPDX-License-Identifier: Apache-2.0
  */
 
@@ -20,17 +20,33 @@ import {
   useCommandCompletion,
   CompletionMode,
 } from './useCommandCompletion.js';
-import type { CommandContext } from '../commands/types.js';
+import type { CommandContext, SlashCommand } from '../commands/types.js';
 import type { Config } from '@google/gemini-cli-core';
 import { useTextBuffer } from '../components/shared/text-buffer.js';
 import type { Suggestion } from '../components/SuggestionsDisplay.js';
-import type { UseAtCompletionProps } from './useAtCompletion.js';
-import { useAtCompletion } from './useAtCompletion.js';
-import type { UseSlashCompletionProps } from './useSlashCompletion.js';
-import { useSlashCompletion } from './useSlashCompletion.js';
+import {
+  useAtCompletion,
+  type UseAtCompletionProps,
+} from './useAtCompletion.js';
+import {
+  useSlashCompletion,
+  type UseSlashCompletionProps,
+} from './useSlashCompletion.js';
+import { useShellCompletion } from './useShellCompletion.js';
 
 vi.mock('./useAtCompletion', () => ({
   useAtCompletion: vi.fn(),
+}));
+
+vi.mock('./usePromptCompletion', () => ({
+  usePromptCompletion: vi.fn(() => ({
+    text: '',
+    isLoading: false,
+    isActive: false,
+    accept: vi.fn(),
+    clear: vi.fn(),
+    markSelected: vi.fn(),
+  })),
 }));
 
 vi.mock('./useSlashCompletion', () => ({
@@ -40,19 +56,52 @@ vi.mock('./useSlashCompletion', () => ({
   })),
 }));
 
+vi.mock('./useShellCompletion', () => ({
+  useShellCompletion: vi.fn(() => ({
+    completionStart: 0,
+    completionEnd: 0,
+    query: '',
+    activeStart: 0,
+  })),
+}));
+
 // Helper to set up mocks in a consistent way for both child hooks
 const setupMocks = ({
   atSuggestions = [],
   slashSuggestions = [],
+  shellSuggestions = [],
   isLoading = false,
   isPerfectMatch = false,
-  slashCompletionRange = { completionStart: 0, completionEnd: 0 },
+  slashCompletionRange = {
+    completionStart: 0,
+    completionEnd: 0,
+    getCommandFromSuggestion: () => undefined,
+  },
+  shellCompletionRange = {
+    completionStart: 0,
+    completionEnd: 0,
+    query: '',
+    activeStart: 0,
+  },
 }: {
   atSuggestions?: Suggestion[];
   slashSuggestions?: Suggestion[];
+  shellSuggestions?: Suggestion[];
   isLoading?: boolean;
   isPerfectMatch?: boolean;
-  slashCompletionRange?: { completionStart: number; completionEnd: number };
+  slashCompletionRange?: {
+    completionStart: number;
+    completionEnd: number;
+    getCommandFromSuggestion: (
+      suggestion: Suggestion,
+    ) => SlashCommand | undefined;
+  };
+  shellCompletionRange?: {
+    completionStart: number;
+    completionEnd: number;
+    query: string;
+    activeStart?: number;
+  };
 }) => {
   // Mock for @-completions
   (useAtCompletion as Mock).mockImplementation(
@@ -89,6 +138,22 @@ const setupMocks = ({
       return slashCompletionRange;
     },
   );
+
+  // Mock for shell completions
+  (useShellCompletion as Mock).mockImplementation(
+    ({ enabled, setSuggestions, setIsLoadingSuggestions }) => {
+      useEffect(() => {
+        if (enabled) {
+          setIsLoadingSuggestions(isLoading);
+          setSuggestions(shellSuggestions);
+        }
+      }, [enabled, setSuggestions, setIsLoadingSuggestions]);
+      return {
+        ...shellCompletionRange,
+        activeStart: shellCompletionRange.activeStart ?? 0,
+      };
+    },
+  );
 };
 
 describe('useCommandCompletion', () => {
@@ -105,41 +170,61 @@ describe('useCommandCompletion', () => {
       initialText: text,
       initialCursorOffset: cursorOffset ?? text.length,
       viewport: { width: 80, height: 20 },
-      isValidPath: () => false,
       onChange: () => {},
     });
   }
 
-  const renderCommandCompletionHook = (
+  let hookResult: ReturnType<typeof useCommandCompletion> & {
+    textBuffer: ReturnType<typeof useTextBuffer>;
+  };
+
+  function TestComponent({
+    initialText,
+    cursorOffset,
+    shellModeActive,
+    active,
+  }: {
+    initialText: string;
+    cursorOffset?: number;
+    shellModeActive: boolean;
+    active: boolean;
+  }) {
+    const textBuffer = useTextBufferForTest(initialText, cursorOffset);
+    const completion = useCommandCompletion({
+      buffer: textBuffer,
+      cwd: testRootDir,
+      slashCommands: [],
+      commandContext: mockCommandContext,
+      reverseSearchActive: false,
+      shellModeActive,
+      config: mockConfig,
+      active,
+    });
+    hookResult = { ...completion, textBuffer };
+    return null;
+  }
+
+  const renderCommandCompletionHook = async (
     initialText: string,
     cursorOffset?: number,
     shellModeActive = false,
+    active = true,
   ) => {
-    let hookResult: ReturnType<typeof useCommandCompletion> & {
-      textBuffer: ReturnType<typeof useTextBuffer>;
-    };
-
-    function TestComponent() {
-      const textBuffer = useTextBufferForTest(initialText, cursorOffset);
-      const completion = useCommandCompletion(
-        textBuffer,
-        testRootDir,
-        [],
-        mockCommandContext,
-        false,
-        shellModeActive,
-        mockConfig,
-      );
-      hookResult = { ...completion, textBuffer };
-      return null;
-    }
-    renderWithProviders(<TestComponent />);
+    const renderResult = await renderWithProviders(
+      <TestComponent
+        initialText={initialText}
+        cursorOffset={cursorOffset}
+        shellModeActive={shellModeActive}
+        active={active}
+      />,
+    );
     return {
       result: {
         get current() {
           return hookResult;
         },
       },
+      ...renderResult,
     };
   };
 
@@ -155,8 +240,8 @@ describe('useCommandCompletion', () => {
 
   describe('Core Hook Behavior', () => {
     describe('State Management', () => {
-      it('should initialize with default state', () => {
-        const { result } = renderCommandCompletionHook('');
+      it('should initialize with default state', async () => {
+        const { result } = await renderCommandCompletionHook('');
 
         expect(result.current.suggestions).toEqual([]);
         expect(result.current.activeSuggestionIndex).toBe(-1);
@@ -171,7 +256,7 @@ describe('useCommandCompletion', () => {
           atSuggestions: [{ label: 'src/file.txt', value: 'src/file.txt' }],
         });
 
-        const { result } = renderCommandCompletionHook('@file');
+        const { result } = await renderCommandCompletionHook('@file');
 
         await waitFor(() => {
           expect(result.current.suggestions).toHaveLength(1);
@@ -192,12 +277,11 @@ describe('useCommandCompletion', () => {
         });
       });
 
-      it('should reset all state to default values', () => {
-        const { result } = renderCommandCompletionHook('@files');
+      it('should reset all state to default values', async () => {
+        const { result } = await renderCommandCompletionHook('@files');
 
         act(() => {
           result.current.setActiveSuggestionIndex(5);
-          result.current.setShowSuggestions(true);
         });
 
         act(() => {
@@ -211,7 +295,7 @@ describe('useCommandCompletion', () => {
 
       it('should call useAtCompletion with the correct query for an escaped space', async () => {
         const text = '@src/a\\ file.txt';
-        const { result } = renderCommandCompletionHook(text);
+        const { result } = await renderCommandCompletionHook(text);
 
         await waitFor(() => {
           expect(useAtCompletion).toHaveBeenLastCalledWith(
@@ -228,7 +312,7 @@ describe('useCommandCompletion', () => {
         const text = '@file1 @file2';
         const cursorOffset = 3; // @fi|le1 @file2
 
-        renderCommandCompletionHook(text, cursorOffset);
+        await renderCommandCompletionHook(text, cursorOffset);
 
         await waitFor(() => {
           expect(useAtCompletion).toHaveBeenLastCalledWith(
@@ -266,7 +350,7 @@ describe('useCommandCompletion', () => {
             slashSuggestions: [{ label: 'clear', value: 'clear' }],
           });
 
-          const { result } = renderCommandCompletionHook(
+          const { result } = await renderCommandCompletionHook(
             '/',
             undefined,
             shellModeActive,
@@ -298,10 +382,10 @@ describe('useCommandCompletion', () => {
         setupMocks({ slashSuggestions: mockSuggestions });
       });
 
-      it('should handle navigateUp with no suggestions', () => {
+      it('should handle navigateUp with no suggestions', async () => {
         setupMocks({ slashSuggestions: [] });
 
-        const { result } = renderCommandCompletionHook('/');
+        const { result } = await renderCommandCompletionHook('/');
 
         act(() => {
           result.current.navigateUp();
@@ -310,9 +394,9 @@ describe('useCommandCompletion', () => {
         expect(result.current.activeSuggestionIndex).toBe(-1);
       });
 
-      it('should handle navigateDown with no suggestions', () => {
+      it('should handle navigateDown with no suggestions', async () => {
         setupMocks({ slashSuggestions: [] });
-        const { result } = renderCommandCompletionHook('/');
+        const { result } = await renderCommandCompletionHook('/');
 
         act(() => {
           result.current.navigateDown();
@@ -322,7 +406,7 @@ describe('useCommandCompletion', () => {
       });
 
       it('should navigate up through suggestions with wrap-around', async () => {
-        const { result } = renderCommandCompletionHook('/');
+        const { result } = await renderCommandCompletionHook('/');
 
         await waitFor(() => {
           expect(result.current.suggestions.length).toBe(5);
@@ -338,7 +422,7 @@ describe('useCommandCompletion', () => {
       });
 
       it('should navigate down through suggestions with wrap-around', async () => {
-        const { result } = renderCommandCompletionHook('/');
+        const { result } = await renderCommandCompletionHook('/');
 
         await waitFor(() => {
           expect(result.current.suggestions.length).toBe(5);
@@ -357,7 +441,7 @@ describe('useCommandCompletion', () => {
       });
 
       it('should handle navigation with multiple suggestions', async () => {
-        const { result } = renderCommandCompletionHook('/');
+        const { result } = await renderCommandCompletionHook('/');
 
         await waitFor(() => {
           expect(result.current.suggestions.length).toBe(5);
@@ -384,7 +468,7 @@ describe('useCommandCompletion', () => {
       it('should automatically select the first item when suggestions are available', async () => {
         setupMocks({ slashSuggestions: mockSuggestions });
 
-        const { result } = renderCommandCompletionHook('/');
+        const { result } = await renderCommandCompletionHook('/');
 
         await waitFor(() => {
           expect(result.current.suggestions.length).toBe(
@@ -397,13 +481,18 @@ describe('useCommandCompletion', () => {
   });
 
   describe('handleAutocomplete', () => {
-    it('should complete a partial command', async () => {
+    it('should complete a partial command and NOT add a space if it has an action', async () => {
       setupMocks({
         slashSuggestions: [{ label: 'memory', value: 'memory' }],
-        slashCompletionRange: { completionStart: 1, completionEnd: 4 },
+        slashCompletionRange: {
+          completionStart: 1,
+          completionEnd: 4,
+          getCommandFromSuggestion: () =>
+            ({ action: vi.fn() }) as unknown as SlashCommand,
+        },
       });
 
-      const { result } = renderCommandCompletionHook('/mem');
+      const { result } = await renderCommandCompletionHook('/mem');
 
       await waitFor(() => {
         expect(result.current.suggestions.length).toBe(1);
@@ -413,15 +502,43 @@ describe('useCommandCompletion', () => {
         result.current.handleAutocomplete(0);
       });
 
-      expect(result.current.textBuffer.text).toBe('/memory ');
+      expect(result.current.textBuffer.text).toBe('/memory');
+    });
+
+    it('should complete a partial command and ADD a space if it has NO action (e.g. just a parent)', async () => {
+      setupMocks({
+        slashSuggestions: [{ label: 'chat', value: 'chat' }],
+        slashCompletionRange: {
+          completionStart: 1,
+          completionEnd: 5,
+          getCommandFromSuggestion: () => ({}) as unknown as SlashCommand, // No action
+        },
+      });
+
+      const { result } = await renderCommandCompletionHook('/chat');
+
+      await waitFor(() => {
+        expect(result.current.suggestions.length).toBe(1);
+      });
+
+      act(() => {
+        result.current.handleAutocomplete(0);
+      });
+
+      expect(result.current.textBuffer.text).toBe('/chat ');
     });
 
     it('should complete a file path', async () => {
       setupMocks({
         atSuggestions: [{ label: 'src/file1.txt', value: 'src/file1.txt' }],
+        slashCompletionRange: {
+          completionStart: 0,
+          completionEnd: 0,
+          getCommandFromSuggestion: () => undefined,
+        },
       });
 
-      const { result } = renderCommandCompletionHook('@src/fi');
+      const { result } = await renderCommandCompletionHook('@src/fi');
 
       await waitFor(() => {
         expect(result.current.suggestions.length).toBe(1);
@@ -434,15 +551,49 @@ describe('useCommandCompletion', () => {
       expect(result.current.textBuffer.text).toBe('@src/file1.txt ');
     });
 
+    it('should insert canonical slash command text when suggestion provides insertValue', async () => {
+      setupMocks({
+        slashSuggestions: [
+          {
+            label: 'list',
+            value: 'list',
+            insertValue: 'resume list',
+          },
+        ],
+        slashCompletionRange: {
+          completionStart: 1,
+          completionEnd: 5,
+          getCommandFromSuggestion: () => undefined,
+        },
+      });
+
+      const { result } = await renderCommandCompletionHook('/resu');
+
+      await waitFor(() => {
+        expect(result.current.suggestions.length).toBe(1);
+      });
+
+      act(() => {
+        result.current.handleAutocomplete(0);
+      });
+
+      expect(result.current.textBuffer.text).toBe('/resume list ');
+    });
+
     it('should complete a file path when cursor is not at the end of the line', async () => {
       const text = '@src/fi is a good file';
       const cursorOffset = 7; // after "i"
 
       setupMocks({
         atSuggestions: [{ label: 'src/file1.txt', value: 'src/file1.txt' }],
+        slashCompletionRange: {
+          completionStart: 0,
+          completionEnd: 0,
+          getCommandFromSuggestion: () => undefined,
+        },
       });
 
-      const { result } = renderCommandCompletionHook(text, cursorOffset);
+      const { result } = await renderCommandCompletionHook(text, cursorOffset);
 
       await waitFor(() => {
         expect(result.current.suggestions.length).toBe(1);
@@ -460,9 +611,14 @@ describe('useCommandCompletion', () => {
     it('should complete a directory path ending with / without a trailing space', async () => {
       setupMocks({
         atSuggestions: [{ label: 'src/components/', value: 'src/components/' }],
+        slashCompletionRange: {
+          completionStart: 0,
+          completionEnd: 0,
+          getCommandFromSuggestion: () => undefined,
+        },
       });
 
-      const { result } = renderCommandCompletionHook('@src/comp');
+      const { result } = await renderCommandCompletionHook('@src/comp');
 
       await waitFor(() => {
         expect(result.current.suggestions.length).toBe(1);
@@ -480,9 +636,14 @@ describe('useCommandCompletion', () => {
         atSuggestions: [
           { label: 'src\\components\\', value: 'src\\components\\' },
         ],
+        slashCompletionRange: {
+          completionStart: 0,
+          completionEnd: 0,
+          getCommandFromSuggestion: () => undefined,
+        },
       });
 
-      const { result } = renderCommandCompletionHook('@src\\comp');
+      const { result } = await renderCommandCompletionHook('@src\\comp');
 
       await waitFor(() => {
         expect(result.current.suggestions.length).toBe(1);
@@ -493,6 +654,156 @@ describe('useCommandCompletion', () => {
       });
 
       expect(result.current.textBuffer.text).toBe('@src\\components\\');
+    });
+
+    it('should ADD a space for AT completion even if name matches a command with an action', async () => {
+      // Setup a mock where getCommandFromSuggestion WOULD return a command with an action
+      // if it were in SLASH mode.
+      setupMocks({
+        atSuggestions: [{ label: 'memory', value: 'memory' }],
+        slashCompletionRange: {
+          completionStart: 0,
+          completionEnd: 0,
+          getCommandFromSuggestion: () =>
+            ({ action: vi.fn() }) as unknown as SlashCommand,
+        },
+      });
+
+      const { result } = await renderCommandCompletionHook('@mem');
+
+      await waitFor(() => {
+        expect(result.current.suggestions.length).toBe(1);
+      });
+
+      act(() => {
+        result.current.handleAutocomplete(0);
+      });
+
+      // Should have a space because it's AT mode, not SLASH mode
+      expect(result.current.textBuffer.text).toBe('@memory ');
+    });
+
+    it('should show ghost text for a single shell completion', async () => {
+      const text = 'l';
+      setupMocks({
+        shellSuggestions: [{ label: 'ls', value: 'ls' }],
+        shellCompletionRange: {
+          completionStart: 0,
+          completionEnd: 1,
+          query: 'l',
+          activeStart: 0,
+        },
+      });
+
+      const { result } = await renderCommandCompletionHook(
+        text,
+        text.length,
+        true, // shellModeActive
+      );
+
+      await waitFor(() => {
+        expect(result.current.isLoadingSuggestions).toBe(false);
+      });
+
+      // Should show "ls " as ghost text (including trailing space)
+      expect(result.current.promptCompletion.text).toBe('ls ');
+    });
+
+    it('should not show ghost text if there are multiple completions', async () => {
+      const text = 'l';
+      setupMocks({
+        shellSuggestions: [
+          { label: 'ls', value: 'ls' },
+          { label: 'ln', value: 'ln' },
+        ],
+        shellCompletionRange: {
+          completionStart: 0,
+          completionEnd: 1,
+          query: 'l',
+          activeStart: 0,
+        },
+      });
+
+      const { result } = await renderCommandCompletionHook(
+        text,
+        text.length,
+        true, // shellModeActive
+      );
+
+      await waitFor(() => {
+        expect(result.current.isLoadingSuggestions).toBe(false);
+      });
+
+      expect(result.current.promptCompletion.text).toBe('');
+    });
+
+    it('should not show ghost text if the typed text extends past the completion', async () => {
+      // "ls " is already typed.
+      const text = 'ls ';
+      const cursorOffset = text.length;
+
+      const { result } = await renderCommandCompletionHook(
+        text,
+        cursorOffset,
+        true, // shellModeActive
+      );
+
+      await waitFor(() => {
+        expect(result.current.isLoadingSuggestions).toBe(false);
+      });
+
+      expect(result.current.promptCompletion.text).toBe('');
+    });
+
+    it('should clear ghost text after user types a space when exact match ghost text was showing', async () => {
+      const textWithoutSpace = 'ls';
+
+      setupMocks({
+        shellSuggestions: [{ label: 'ls', value: 'ls' }],
+        shellCompletionRange: {
+          completionStart: 0,
+          completionEnd: 2,
+          query: 'ls',
+          activeStart: 0,
+        },
+      });
+
+      const { result } = await renderCommandCompletionHook(
+        textWithoutSpace,
+        textWithoutSpace.length,
+        true, // shellModeActive
+      );
+
+      await waitFor(() => {
+        expect(result.current.isLoadingSuggestions).toBe(false);
+      });
+
+      // Initially no ghost text because "ls" perfectly matches "ls"
+      expect(result.current.promptCompletion.text).toBe('');
+
+      // Now simulate typing a space.
+      // In the real app, shellCompletionRange.completionStart would change immediately to 3,
+      // but suggestions (and activeStart) would still be from the previous token for a few ms.
+      setupMocks({
+        shellSuggestions: [{ label: 'ls', value: 'ls' }], // Stale suggestions
+        shellCompletionRange: {
+          completionStart: 3, // New token position
+          completionEnd: 3,
+          query: '',
+          activeStart: 0, // Stale active start
+        },
+      });
+
+      act(() => {
+        result.current.textBuffer.setText('ls ', 'end');
+      });
+
+      await waitFor(() => {
+        expect(result.current.isLoadingSuggestions).toBe(false);
+      });
+
+      // Should STILL be empty because completionStart (3) !== activeStart (0)
+      expect(result.current.promptCompletion.text).toBe('');
     });
   });
 
@@ -509,22 +820,25 @@ describe('useCommandCompletion', () => {
 
       function TestComponent() {
         const textBuffer = useTextBufferForTest('// This is a line comment');
-        const completion = useCommandCompletion(
-          textBuffer,
-          testRootDir,
-          [],
-          mockCommandContext,
-          false,
-          false,
-          mockConfig,
-        );
+        const completion = useCommandCompletion({
+          buffer: textBuffer,
+          cwd: testRootDir,
+          slashCommands: [],
+          commandContext: mockCommandContext,
+          reverseSearchActive: false,
+          shellModeActive: false,
+          config: mockConfig,
+          active: true,
+        });
         hookResult = { ...completion, textBuffer };
         return null;
       }
-      renderWithProviders(<TestComponent />);
+      await renderWithProviders(<TestComponent />);
 
       // Should not trigger prompt completion for comments
-      expect(hookResult!.suggestions.length).toBe(0);
+      await waitFor(() => {
+        expect(hookResult!.suggestions.length).toBe(0);
+      });
     });
 
     it('should not trigger prompt completion for block comments', async () => {
@@ -541,22 +855,25 @@ describe('useCommandCompletion', () => {
         const textBuffer = useTextBufferForTest(
           '/* This is a block comment */',
         );
-        const completion = useCommandCompletion(
-          textBuffer,
-          testRootDir,
-          [],
-          mockCommandContext,
-          false,
-          false,
-          mockConfig,
-        );
+        const completion = useCommandCompletion({
+          buffer: textBuffer,
+          cwd: testRootDir,
+          slashCommands: [],
+          commandContext: mockCommandContext,
+          reverseSearchActive: false,
+          shellModeActive: false,
+          config: mockConfig,
+          active: true,
+        });
         hookResult = { ...completion, textBuffer };
         return null;
       }
-      renderWithProviders(<TestComponent />);
+      await renderWithProviders(<TestComponent />);
 
       // Should not trigger prompt completion for comments
-      expect(hookResult!.suggestions.length).toBe(0);
+      await waitFor(() => {
+        expect(hookResult!.suggestions.length).toBe(0);
+      });
     });
 
     it('should trigger prompt completion for regular text when enabled', async () => {
@@ -573,24 +890,27 @@ describe('useCommandCompletion', () => {
         const textBuffer = useTextBufferForTest(
           'This is regular text that should trigger completion',
         );
-        const completion = useCommandCompletion(
-          textBuffer,
-          testRootDir,
-          [],
-          mockCommandContext,
-          false,
-          false,
-          mockConfig,
-        );
+        const completion = useCommandCompletion({
+          buffer: textBuffer,
+          cwd: testRootDir,
+          slashCommands: [],
+          commandContext: mockCommandContext,
+          reverseSearchActive: false,
+          shellModeActive: false,
+          config: mockConfig,
+          active: true,
+        });
         hookResult = { ...completion, textBuffer };
         return null;
       }
-      renderWithProviders(<TestComponent />);
+      await renderWithProviders(<TestComponent />);
 
       // This test verifies that comments are filtered out while regular text is not
-      expect(hookResult!.textBuffer.text).toBe(
-        'This is regular text that should trigger completion',
-      );
+      await waitFor(() => {
+        expect(hookResult!.textBuffer.text).toBe(
+          'This is regular text that should trigger completion',
+        );
+      });
     });
   });
 
@@ -603,7 +923,7 @@ describe('useCommandCompletion', () => {
       const text = '/mycommand @src/fi';
       const cursorOffset = text.length;
 
-      renderCommandCompletionHook(text, cursorOffset);
+      await renderCommandCompletionHook(text, cursorOffset);
 
       await waitFor(() => {
         expect(useAtCompletion).toHaveBeenLastCalledWith(
@@ -623,7 +943,7 @@ describe('useCommandCompletion', () => {
       const text = '/mycom';
       const cursorOffset = text.length;
 
-      const { result } = renderCommandCompletionHook(text, cursorOffset);
+      const { result } = await renderCommandCompletionHook(text, cursorOffset);
 
       await waitFor(() => {
         expect(result.current.suggestions).toHaveLength(1);
@@ -639,7 +959,7 @@ describe('useCommandCompletion', () => {
       const text = '/command @';
       const cursorOffset = text.length;
 
-      renderCommandCompletionHook(text, cursorOffset);
+      await renderCommandCompletionHook(text, cursorOffset);
 
       await waitFor(() => {
         expect(useAtCompletion).toHaveBeenLastCalledWith(
@@ -659,7 +979,7 @@ describe('useCommandCompletion', () => {
       const text = '/diff @src/foo.ts @src/ba';
       const cursorOffset = text.length;
 
-      renderCommandCompletionHook(text, cursorOffset);
+      await renderCommandCompletionHook(text, cursorOffset);
 
       await waitFor(() => {
         expect(useAtCompletion).toHaveBeenLastCalledWith(
@@ -674,9 +994,14 @@ describe('useCommandCompletion', () => {
     it('should complete file path and add trailing space', async () => {
       setupMocks({
         atSuggestions: [{ label: 'src/file.txt', value: 'src/file.txt' }],
+        slashCompletionRange: {
+          completionStart: 0,
+          completionEnd: 0,
+          getCommandFromSuggestion: () => undefined,
+        },
       });
 
-      const { result } = renderCommandCompletionHook('/cmd @src/fi');
+      const { result } = await renderCommandCompletionHook('/cmd @src/fi');
 
       await waitFor(() => {
         expect(result.current.suggestions.length).toBe(1);
@@ -695,7 +1020,7 @@ describe('useCommandCompletion', () => {
       });
 
       const text = '/help ';
-      renderCommandCompletionHook(text);
+      await renderCommandCompletionHook(text);
 
       await waitFor(() => {
         expect(useSlashCompletion).toHaveBeenLastCalledWith(

@@ -13,6 +13,7 @@ import { mkdir, readdir, rm } from 'node:fs/promises';
 import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { canUseRipgrep } from '../packages/core/src/tools/ripGrep.js';
+import { disableMouseTracking } from '@google/gemini-cli-core';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const rootDir = join(__dirname, '..');
@@ -72,6 +73,11 @@ export async function setup() {
 }
 
 export async function teardown() {
+  // Disable mouse tracking
+  if (process.stdout.isTTY) {
+    disableMouseTracking();
+  }
+
   // Cleanup the test run directory unless KEEP_OUTPUT is set
   if (process.env['KEEP_OUTPUT'] !== 'true' && runDir) {
     try {

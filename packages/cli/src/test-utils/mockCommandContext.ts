@@ -6,8 +6,7 @@
 
 import { vi } from 'vitest';
 import type { CommandContext } from '../ui/commands/types.js';
-import type { LoadedSettings } from '../config/settings.js';
-import { mergeSettings } from '../config/settings.js';
+import { mergeSettings, type LoadedSettings } from '../config/settings.js';
 import type { GitService } from '@google/gemini-cli-core';
 import type { SessionStatsState } from '../ui/contexts/SessionContext.js';
 
@@ -37,7 +36,7 @@ export const createMockCommandContext = (
       args: '',
     },
     services: {
-      config: null,
+      agentContext: null,
       settings: {
         merged: defaultMergedSettings,
         setValue: vi.fn(),
@@ -60,6 +59,7 @@ export const createMockCommandContext = (
       setPendingItem: vi.fn(),
       loadHistory: vi.fn(),
       toggleCorgiMode: vi.fn(),
+      toggleShortcutsHelp: vi.fn(),
       toggleVimEnabled: vi.fn(),
       openAgentConfigDialog: vi.fn(),
       closeAgentConfigDialog: vi.fn(),

@@ -12,6 +12,7 @@ import type {
   RoutingDecision,
   RoutingStrategy,
 } from '../routingStrategy.js';
+import type { LocalLiteRtLmClient } from '../../core/localLiteRtLmClient.js';
 
 /**
  * Handles cases where the user explicitly specifies a model (override).
@@ -23,17 +24,25 @@ export class OverrideStrategy implements RoutingStrategy {
     context: RoutingContext,
     config: Config,
     _baseLlmClient: BaseLlmClient,
+    _localLiteRtLmClient: LocalLiteRtLmClient,
   ): Promise<RoutingDecision | null> {
     const overrideModel = context.requestedModel ?? config.getModel();
 
     // If the model is 'auto' we should pass to the next strategy.
-    if (isAutoModel(overrideModel)) {
+    if (isAutoModel(overrideModel, config)) {
       return null;
     }
 
     // Return the overridden model name.
     return {
-      model: resolveModel(overrideModel, config.getPreviewFeatures()),
+      model: resolveModel(
+        overrideModel,
+        config.getGemini31LaunchedSync?.() ?? false,
+        config.getGemini31FlashLiteLaunchedSync?.() ?? false,
+        false,
+        config.getHasAccessToPreviewModel?.() ?? true,
+        config,
+      ),
       metadata: {
         source: this.name,
         latencyMs: 0,

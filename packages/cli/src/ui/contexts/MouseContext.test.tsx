@@ -4,11 +4,10 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { renderHook } from '../../test-utils/render.js';
+import { renderHookWithProviders } from '../../test-utils/render.js';
 import { act } from 'react';
-import { MouseProvider, useMouseContext, useMouse } from './MouseContext.js';
+import { useMouseContext, useMouse } from './MouseContext.js';
 import { vi, type Mock } from 'vitest';
-import type React from 'react';
 import { useStdin } from 'ink';
 import { EventEmitter } from 'node:events';
 import { appEvents, AppEvent } from '../../utils/events.js';
@@ -49,7 +48,6 @@ class MockStdin extends EventEmitter {
 
 describe('MouseContext', () => {
   let stdin: MockStdin;
-  let wrapper: React.FC<{ children: React.ReactNode }>;
 
   beforeEach(() => {
     stdin = new MockStdin();
@@ -57,9 +55,6 @@ describe('MouseContext', () => {
       stdin,
       setRawMode: vi.fn(),
     });
-    wrapper = ({ children }: { children: React.ReactNode }) => (
-      <MouseProvider mouseEventsEnabled={true}>{children}</MouseProvider>
-    );
     vi.mocked(appEvents.emit).mockClear();
   });
 
@@ -67,9 +62,11 @@ describe('MouseContext', () => {
     vi.restoreAllMocks();
   });
 
-  it('should subscribe and unsubscribe a handler', () => {
+  it('should subscribe and unsubscribe a handler', async () => {
     const handler = vi.fn();
-    const { result } = renderHook(() => useMouseContext(), { wrapper });
+    const { result } = await renderHookWithProviders(() => useMouseContext(), {
+      mouseEventsEnabled: true,
+    });
 
     act(() => {
       result.current.subscribe(handler);
@@ -92,11 +89,14 @@ describe('MouseContext', () => {
     expect(handler).toHaveBeenCalledTimes(1);
   });
 
-  it('should not call handler if not active', () => {
+  it('should not call handler if not active', async () => {
     const handler = vi.fn();
-    renderHook(() => useMouse(handler, { isActive: false }), {
-      wrapper,
-    });
+    await renderHookWithProviders(
+      () => useMouse(handler, { isActive: false }),
+      {
+        mouseEventsEnabled: true,
+      },
+    );
 
     act(() => {
       stdin.write('\x1b[<0;10;20M');
@@ -105,8 +105,10 @@ describe('MouseContext', () => {
     expect(handler).not.toHaveBeenCalled();
   });
 
-  it('should emit SelectionWarning when move event is unhandled and has coordinates', () => {
-    renderHook(() => useMouseContext(), { wrapper });
+  it('should emit SelectionWarning when move event is unhandled and has coordinates', async () => {
+    await renderHookWithProviders(() => useMouseContext(), {
+      mouseEventsEnabled: true,
+    });
 
     act(() => {
       // Move event (32) at 10, 20
@@ -116,9 +118,11 @@ describe('MouseContext', () => {
     expect(appEvents.emit).toHaveBeenCalledWith(AppEvent.SelectionWarning);
   });
 
-  it('should not emit SelectionWarning when move event is handled', () => {
+  it('should not emit SelectionWarning when move event is handled', async () => {
     const handler = vi.fn().mockReturnValue(true);
-    const { result } = renderHook(() => useMouseContext(), { wrapper });
+    const { result } = await renderHookWithProviders(() => useMouseContext(), {
+      mouseEventsEnabled: true,
+    });
 
     act(() => {
       result.current.subscribe(handler);
@@ -216,9 +220,14 @@ describe('MouseContext', () => {
       }, // Shift + scroll up
     ])(
       'should recognize sequence "$sequence" as $expected.name',
-      ({ sequence, expected }) => {
+      async ({ sequence, expected }) => {
         const mouseHandler = vi.fn();
-        const { result } = renderHook(() => useMouseContext(), { wrapper });
+        const { result } = await renderHookWithProviders(
+          () => useMouseContext(),
+          {
+            mouseEventsEnabled: true,
+          },
+        );
         act(() => result.current.subscribe(mouseHandler));
 
         act(() => stdin.write(sequence));
@@ -228,5 +237,95 @@ describe('MouseContext', () => {
         );
       },
     );
+  });
+
+  it('should emit a double-click event when two left-presses occur quickly at the same position', async () => {
+    const handler = vi.fn();
+    const { result } = await renderHookWithProviders(() => useMouseContext(), {
+      mouseEventsEnabled: true,
+    });
+
+    act(() => {
+      result.current.subscribe(handler);
+    });
+
+    // First click
+    act(() => {
+      stdin.write('\x1b[<0;10;20M');
+    });
+
+    expect(handler).toHaveBeenCalledTimes(1);
+    expect(handler).toHaveBeenLastCalledWith(
+      expect.objectContaining({ name: 'left-press', col: 10, row: 20 }),
+    );
+
+    // Second click (within threshold)
+    act(() => {
+      stdin.write('\x1b[<0;10;20M');
+    });
+
+    // Should have called for the second left-press AND the double-click
+    expect(handler).toHaveBeenCalledTimes(3);
+    expect(handler).toHaveBeenCalledWith(
+      expect.objectContaining({ name: 'double-click', col: 10, row: 20 }),
+    );
+  });
+
+  it('should NOT emit a double-click event if clicks are too far apart', async () => {
+    const handler = vi.fn();
+    const { result } = await renderHookWithProviders(() => useMouseContext(), {
+      mouseEventsEnabled: true,
+    });
+
+    act(() => {
+      result.current.subscribe(handler);
+    });
+
+    // First click
+    act(() => {
+      stdin.write('\x1b[<0;10;20M');
+    });
+
+    // Second click (too far)
+    act(() => {
+      stdin.write('\x1b[<0;15;25M');
+    });
+
+    expect(handler).toHaveBeenCalledTimes(2);
+    expect(handler).not.toHaveBeenCalledWith(
+      expect.objectContaining({ name: 'double-click' }),
+    );
+  });
+
+  it('should NOT emit a double-click event if too much time passes', async () => {
+    vi.useFakeTimers();
+    const handler = vi.fn();
+    const { result } = await renderHookWithProviders(() => useMouseContext(), {
+      mouseEventsEnabled: true,
+    });
+
+    act(() => {
+      result.current.subscribe(handler);
+    });
+
+    // First click
+    act(() => {
+      stdin.write('\x1b[<0;10;20M');
+    });
+
+    await act(async () => {
+      vi.advanceTimersByTime(500); // Threshold is 400ms
+    });
+
+    // Second click
+    act(() => {
+      stdin.write('\x1b[<0;10;20M');
+    });
+
+    expect(handler).toHaveBeenCalledTimes(2);
+    expect(handler).not.toHaveBeenCalledWith(
+      expect.objectContaining({ name: 'double-click' }),
+    );
+    vi.useRealTimers();
   });
 });

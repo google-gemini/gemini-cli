@@ -75,6 +75,9 @@ describe('Telemetry SDK', () => {
       getSessionId: () => 'test-session',
       getTelemetryUseCliAuth: () => false,
       isInteractive: () => false,
+      getExperiments: () => undefined,
+      getExperimentsAsync: async () => undefined,
+      getContentGeneratorConfig: () => undefined,
     } as unknown as Config;
   });
 
@@ -110,13 +113,13 @@ describe('Telemetry SDK', () => {
     await initializeTelemetry(mockConfig);
 
     expect(OTLPTraceExporterHttp).toHaveBeenCalledWith({
-      url: 'http://localhost:4318/',
+      url: 'http://localhost:4318/v1/traces',
     });
     expect(OTLPLogExporterHttp).toHaveBeenCalledWith({
-      url: 'http://localhost:4318/',
+      url: 'http://localhost:4318/v1/logs',
     });
     expect(OTLPMetricExporterHttp).toHaveBeenCalledWith({
-      url: 'http://localhost:4318/',
+      url: 'http://localhost:4318/v1/metrics',
     });
     expect(NodeSDK.prototype.start).toHaveBeenCalled();
   });
@@ -138,7 +141,7 @@ describe('Telemetry SDK', () => {
     );
     await initializeTelemetry(mockConfig);
     expect(OTLPTraceExporterHttp).toHaveBeenCalledWith(
-      expect.objectContaining({ url: 'https://my-collector.com/' }),
+      expect.objectContaining({ url: 'https://my-collector.com/v1/traces' }),
     );
   });
 
@@ -353,6 +356,7 @@ describe('Telemetry SDK', () => {
       expect(callback).not.toHaveBeenCalled();
 
       await initializeTelemetry(mockConfig);
+      await new Promise((resolve) => setTimeout(resolve, 10));
       expect(callback).toHaveBeenCalled();
     });
   });

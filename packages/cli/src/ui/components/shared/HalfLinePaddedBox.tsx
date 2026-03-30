@@ -6,14 +6,15 @@
 
 import type React from 'react';
 import { useMemo } from 'react';
-import { Box, Text } from 'ink';
+import { Box, Text, useIsScreenReaderEnabled } from 'ink';
 import { useUIState } from '../../contexts/UIStateContext.js';
+import { theme } from '../../semantic-colors.js';
 import {
   interpolateColor,
   resolveColor,
   getSafeLowColorBackground,
 } from '../../themes/color-utils.js';
-import { isLowColorDepth } from '../../utils/terminalUtils.js';
+import { isLowColorDepth, isITerm2 } from '../../utils/terminalUtils.js';
 
 export interface HalfLinePaddedBoxProps {
   /**
@@ -39,7 +40,8 @@ export interface HalfLinePaddedBoxProps {
  * at the top and bottom using block characters (▀/▄).
  */
 export const HalfLinePaddedBox: React.FC<HalfLinePaddedBoxProps> = (props) => {
-  if (props.useBackgroundColor === false) {
+  const isScreenReaderEnabled = useIsScreenReaderEnabled();
+  if (props.useBackgroundColor === false || isScreenReaderEnabled) {
     return <>{props.children}</>;
   }
 
@@ -51,8 +53,8 @@ const HalfLinePaddedBoxInternal: React.FC<HalfLinePaddedBoxProps> = ({
   backgroundOpacity,
   children,
 }) => {
-  const { terminalWidth, terminalBackgroundColor } = useUIState();
-  const terminalBg = terminalBackgroundColor || 'black';
+  const { terminalWidth } = useUIState();
+  const terminalBg = theme.background.primary || 'black';
 
   const isLowColor = isLowColorDepth();
 
@@ -75,6 +77,35 @@ const HalfLinePaddedBoxInternal: React.FC<HalfLinePaddedBoxProps> = ({
 
   if (!backgroundColor) {
     return <>{children}</>;
+  }
+
+  const isITerm = isITerm2();
+
+  if (isITerm) {
+    return (
+      <Box
+        width={terminalWidth}
+        flexDirection="column"
+        alignItems="stretch"
+        minHeight={1}
+        flexShrink={0}
+      >
+        <Box width={terminalWidth} flexDirection="row">
+          <Text color={backgroundColor}>{'▄'.repeat(terminalWidth)}</Text>
+        </Box>
+        <Box
+          width={terminalWidth}
+          flexDirection="column"
+          alignItems="stretch"
+          backgroundColor={backgroundColor}
+        >
+          {children}
+        </Box>
+        <Box width={terminalWidth} flexDirection="row">
+          <Text color={backgroundColor}>{'▀'.repeat(terminalWidth)}</Text>
+        </Box>
+      </Box>
+    );
   }
 
   return (

@@ -6,8 +6,10 @@
 
 import type { IdeInfo } from '@google/gemini-cli-core';
 import { Box, Text } from 'ink';
-import type { RadioSelectItem } from './components/shared/RadioButtonSelect.js';
-import { RadioButtonSelect } from './components/shared/RadioButtonSelect.js';
+import {
+  RadioButtonSelect,
+  type RadioSelectItem,
+} from './components/shared/RadioButtonSelect.js';
 import { useKeypress } from './hooks/useKeypress.js';
 import { theme } from './semantic-colors.js';
 
@@ -32,7 +34,9 @@ export function IdeIntegrationNudge({
           userSelection: 'no',
           isExtensionPreInstalled: false,
         });
+        return true;
       }
+      return false;
     },
     { isActive: true },
   );

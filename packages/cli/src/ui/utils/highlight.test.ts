@@ -134,6 +134,14 @@ describe('parseInputForHighlighting', () => {
       { text: '@/my\\ path/file.txt', type: 'file' },
     ]);
   });
+
+  it('should highlight a file path with narrow non-breaking spaces (NNBSP)', () => {
+    const text = 'cat @/my\u202Fpath/file.txt';
+    expect(parseInputForHighlighting(text, 0)).toEqual([
+      { text: 'cat ', type: 'default' },
+      { text: '@/my\u202Fpath/file.txt', type: 'file' },
+    ]);
+  });
 });
 
 describe('parseInputForHighlighting with Transformations', () => {

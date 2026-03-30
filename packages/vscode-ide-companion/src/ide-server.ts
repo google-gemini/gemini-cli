@@ -112,6 +112,11 @@ function sendIdeContextUpdateNotification(
   transport.send(notification);
 }
 
+function getSessionId(req: Request): string | undefined {
+  const header = req.headers[MCP_SESSION_ID_HEADER];
+  return Array.isArray(header) ? header[0] : header;
+}
+
 export class IDEServer {
   private server: HTTPServer | undefined;
   private context: vscode.ExtensionContext | undefined;
@@ -206,9 +211,7 @@ export class IDEServer {
       context.subscriptions.push(onDidChangeDiffSubscription);
 
       app.post('/mcp', async (req: Request, res: Response) => {
-        const sessionId = req.headers[MCP_SESSION_ID_HEADER] as
-          | string
-          | undefined;
+        const sessionId = getSessionId(req);
         let transport: StreamableHTTPServerTransport;
 
         if (sessionId && this.transports[sessionId]) {
@@ -290,9 +293,7 @@ export class IDEServer {
       });
 
       const handleSessionRequest = async (req: Request, res: Response) => {
-        const sessionId = req.headers[MCP_SESSION_ID_HEADER] as
-          | string
-          | undefined;
+        const sessionId = getSessionId(req);
         if (!sessionId || !this.transports[sessionId]) {
           this.log('Invalid or missing session ID');
           res.status(400).send('Invalid or missing session ID');
@@ -337,7 +338,7 @@ export class IDEServer {
       });
 
       this.server = app.listen(0, '127.0.0.1', async () => {
-        const address = (this.server as HTTPServer).address();
+        const address = this.server?.address();
         if (address && typeof address !== 'string') {
           this.port = address.port;
           this.log(`IDE server listening on http://127.0.0.1:${this.port}`);

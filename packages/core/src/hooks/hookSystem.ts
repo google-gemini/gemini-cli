@@ -5,25 +5,26 @@
  */
 
 import type { Config } from '../config/config.js';
-import { HookRegistry } from './hookRegistry.js';
+import { HookRegistry, type HookRegistryEntry } from './hookRegistry.js';
 import { HookRunner } from './hookRunner.js';
-import { HookAggregator } from './hookAggregator.js';
+import { HookAggregator, type AggregatedHookResult } from './hookAggregator.js';
 import { HookPlanner } from './hookPlanner.js';
 import { HookEventHandler } from './hookEventHandler.js';
-import type { HookRegistryEntry } from './hookRegistry.js';
 import { debugLogger } from '../utils/debugLogger.js';
-import type {
-  SessionStartSource,
-  SessionEndReason,
-  PreCompressTrigger,
-  DefaultHookOutput,
-  BeforeModelHookOutput,
-  AfterModelHookOutput,
-  BeforeToolSelectionHookOutput,
-  McpToolContext,
+import {
+  NotificationType,
+  type SessionStartSource,
+  type SessionEndReason,
+  type PreCompressTrigger,
+  type DefaultHookOutput,
+  type BeforeModelHookOutput,
+  type AfterModelHookOutput,
+  type BeforeToolSelectionHookOutput,
+  type McpToolContext,
+  type HookConfig,
+  type HookEventName,
+  type ConfigSource,
 } from './types.js';
-import { NotificationType } from './types.js';
-import type { AggregatedHookResult } from './hookAggregator.js';
 import type {
   GenerateContentParameters,
   GenerateContentResponse,
@@ -203,6 +204,17 @@ export class HookSystem {
   }
 
   /**
+   * Register a new hook programmatically
+   */
+  registerHook(
+    config: HookConfig,
+    eventName: HookEventName,
+    options?: { matcher?: string; sequential?: boolean; source?: ConfigSource },
+  ): void {
+    this.hookRegistry.registerHook(config, eventName, options);
+  }
+
+  /**
    * Fire hook events directly
    */
   async fireSessionStartEvent(
@@ -262,6 +274,7 @@ export class HookSystem {
 
       const blockingError = hookOutput?.getBlockingError();
       if (blockingError?.blocked) {
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
         const beforeModelOutput = hookOutput as BeforeModelHookOutput;
         const syntheticResponse = beforeModelOutput.getSyntheticResponse();
         return {
@@ -273,6 +286,7 @@ export class HookSystem {
       }
 
       if (hookOutput) {
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
         const beforeModelOutput = hookOutput as BeforeModelHookOutput;
         const modifiedRequest =
           beforeModelOutput.applyLLMRequestModifications(llmRequest);
@@ -319,6 +333,7 @@ export class HookSystem {
       }
 
       if (hookOutput) {
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
         const afterModelOutput = hookOutput as AfterModelHookOutput;
         const modifiedResponse = afterModelOutput.getModifiedResponse();
         if (modifiedResponse) {
@@ -365,12 +380,14 @@ export class HookSystem {
     toolName: string,
     toolInput: Record<string, unknown>,
     mcpContext?: McpToolContext,
+    originalRequestName?: string,
   ): Promise<DefaultHookOutput | undefined> {
     try {
       const result = await this.hookEventHandler.fireBeforeToolEvent(
         toolName,
         toolInput,
         mcpContext,
+        originalRequestName,
       );
       return result.finalOutput;
     } catch (error) {
@@ -388,6 +405,7 @@ export class HookSystem {
       error: unknown;
     },
     mcpContext?: McpToolContext,
+    originalRequestName?: string,
   ): Promise<DefaultHookOutput | undefined> {
     try {
       const result = await this.hookEventHandler.fireAfterToolEvent(
@@ -395,6 +413,7 @@ export class HookSystem {
         toolInput,
         toolResponse as Record<string, unknown>,
         mcpContext,
+        originalRequestName,
       );
       return result.finalOutput;
     } catch (error) {

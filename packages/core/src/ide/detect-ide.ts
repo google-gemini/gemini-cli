@@ -14,6 +14,7 @@ export const IDE_DEFINITIONS = {
   trae: { name: 'trae', displayName: 'Trae' },
   vscode: { name: 'vscode', displayName: 'VS Code' },
   vscodefork: { name: 'vscodefork', displayName: 'IDE' },
+  positron: { name: 'positron', displayName: 'Positron' },
   antigravity: { name: 'antigravity', displayName: 'Antigravity' },
   sublimetext: { name: 'sublimetext', displayName: 'Sublime Text' },
   jetbrains: { name: 'jetbrains', displayName: 'JetBrains IDE' },
@@ -26,6 +27,8 @@ export const IDE_DEFINITIONS = {
   rustrover: { name: 'rustrover', displayName: 'RustRover' },
   datagrip: { name: 'datagrip', displayName: 'DataGrip' },
   phpstorm: { name: 'phpstorm', displayName: 'PhpStorm' },
+  zed: { name: 'zed', displayName: 'Zed' },
+  xcode: { name: 'xcode', displayName: 'XCode' },
 } as const;
 
 export interface IdeInfo {
@@ -37,7 +40,7 @@ export function isCloudShell(): boolean {
   return !!(process.env['EDITOR_IN_CLOUD_SHELL'] || process.env['CLOUD_SHELL']);
 }
 
-export function isJetBrains(): boolean {
+function isJetBrains(): boolean {
   return !!process.env['TERMINAL_EMULATOR']
     ?.toLowerCase()
     .includes('jetbrains');
@@ -68,8 +71,17 @@ export function detectIdeFromEnv(): IdeInfo {
   if (process.env['MONOSPACE_ENV']) {
     return IDE_DEFINITIONS.firebasestudio;
   }
+  if (process.env['POSITRON'] === '1') {
+    return IDE_DEFINITIONS.positron;
+  }
   if (process.env['TERM_PROGRAM'] === 'sublime') {
     return IDE_DEFINITIONS.sublimetext;
+  }
+  if (process.env['ZED_SESSION_ID'] || process.env['TERM_PROGRAM'] === 'Zed') {
+    return IDE_DEFINITIONS.zed;
+  }
+  if (process.env['XCODE_VERSION_ACTUAL']) {
+    return IDE_DEFINITIONS.xcode;
   }
   if (isJetBrains()) {
     return IDE_DEFINITIONS.jetbrains;
@@ -143,10 +155,13 @@ export function detectIde(
     };
   }
 
-  // Only VS Code, Sublime Text and JetBrains integrations are currently supported.
+  // Only VS Code, Sublime Text, JetBrains, Zed, and XCode integrations are currently supported.
   if (
     process.env['TERM_PROGRAM'] !== 'vscode' &&
     process.env['TERM_PROGRAM'] !== 'sublime' &&
+    process.env['TERM_PROGRAM'] !== 'Zed' &&
+    !process.env['ZED_SESSION_ID'] &&
+    !process.env['XCODE_VERSION_ACTUAL'] &&
     !isJetBrains()
   ) {
     return undefined;

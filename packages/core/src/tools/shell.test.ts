@@ -18,8 +18,13 @@ import {
 const mockPlatform = vi.hoisted(() => vi.fn());
 
 const mockShellExecutionService = vi.hoisted(() => vi.fn());
+const mockShellBackground = vi.hoisted(() => vi.fn());
+
 vi.mock('../services/shellExecutionService.js', () => ({
-  ShellExecutionService: { execute: mockShellExecutionService },
+  ShellExecutionService: {
+    execute: mockShellExecutionService,
+    background: mockShellBackground,
+  },
 }));
 
 vi.mock('node:os', async (importOriginal) => {
@@ -37,21 +42,22 @@ vi.mock('crypto');
 vi.mock('../utils/summarizer.js');
 
 import { initializeShellParsers } from '../utils/shell-utils.js';
-import { ShellTool } from './shell.js';
+import { ShellTool, OUTPUT_UPDATE_INTERVAL_MS } from './shell.js';
+import { debugLogger } from '../index.js';
 import { type Config } from '../config/config.js';
+import { NoopSandboxManager } from '../services/sandboxManager.js';
 import {
   type ShellExecutionResult,
   type ShellOutputEvent,
 } from '../services/shellExecutionService.js';
 import * as fs from 'node:fs';
 import * as os from 'node:os';
-import { EOL } from 'node:os';
 import * as path from 'node:path';
+import { isSubpath } from '../utils/paths.js';
 import * as crypto from 'node:crypto';
 import * as summarizer from '../utils/summarizer.js';
 import { ToolErrorType } from './tool-error.js';
 import { ToolConfirmationOutcome } from './tools.js';
-import { OUTPUT_UPDATE_INTERVAL_MS } from './shell.js';
 import { SHELL_TOOL_NAME } from './tool-names.js';
 import { WorkspaceContext } from '../utils/workspaceContext.js';
 import {
@@ -89,6 +95,13 @@ describe('ShellTool', () => {
     fs.mkdirSync(path.join(tempRootDir, 'subdir'));
 
     mockConfig = {
+      get config() {
+        return this;
+      },
+      geminiClient: {
+        stripThoughtsFromHistory: vi.fn(),
+      },
+
       getAllowedTools: vi.fn().mockReturnValue([]),
       getApprovalMode: vi.fn().mockReturnValue('strict'),
       getCoreTools: vi.fn().mockReturnValue([]),
@@ -99,10 +112,35 @@ describe('ShellTool', () => {
       getWorkspaceContext: vi
         .fn()
         .mockReturnValue(new WorkspaceContext(tempRootDir)),
-      getGeminiClient: vi.fn(),
+      storage: {
+        getProjectTempDir: vi.fn().mockReturnValue('/tmp/project'),
+      },
+      isPathAllowed(this: Config, absolutePath: string): boolean {
+        const workspaceContext = this.getWorkspaceContext();
+        if (workspaceContext.isPathWithinWorkspace(absolutePath)) {
+          return true;
+        }
+
+        const projectTempDir = this.storage.getProjectTempDir();
+        return isSubpath(path.resolve(projectTempDir), absolutePath);
+      },
+      validatePathAccess(this: Config, absolutePath: string): string | null {
+        if (this.isPathAllowed(absolutePath)) {
+          return null;
+        }
+
+        const workspaceDirs = this.getWorkspaceContext().getDirectories();
+        const projectTempDir = this.storage.getProjectTempDir();
+        return `Path not in workspace: Attempted path "${absolutePath}" resolves outside the allowed workspace directories: ${workspaceDirs.join(', ')} or the project temp directory: ${projectTempDir}`;
+      },
+      getGeminiClient: vi.fn().mockReturnValue({}),
+      getShellToolInactivityTimeout: vi.fn().mockReturnValue(1000),
       getEnableInteractiveShell: vi.fn().mockReturnValue(false),
-      isInteractive: vi.fn().mockReturnValue(true),
-      getShellToolInactivityTimeout: vi.fn().mockReturnValue(300000),
+      getShellBackgroundCompletionBehavior: vi.fn().mockReturnValue('silent'),
+      getEnableShellOutputEfficiency: vi.fn().mockReturnValue(true),
+      getSandboxEnabled: vi.fn().mockReturnValue(false),
+      sanitizationConfig: {},
+      sandboxManager: new NoopSandboxManager(),
     } as unknown as Config;
 
     const bus = createMockMessageBus();
@@ -146,6 +184,20 @@ describe('ShellTool', () => {
         }),
       };
     });
+
+    mockShellBackground.mockImplementation(() => {
+      resolveExecutionPromise({
+        output: '',
+        rawOutput: Buffer.from(''),
+        exitCode: null,
+        signal: null,
+        error: null,
+        aborted: false,
+        pid: 12345,
+        executionMethod: 'child_process',
+        backgrounded: true,
+      });
+    });
   });
 
   afterEach(() => {
@@ -183,9 +235,7 @@ describe('ShellTool', () => {
       const outsidePath = path.resolve(tempRootDir, '../outside');
       expect(() =>
         shellTool.build({ command: 'ls', dir_path: outsidePath }),
-      ).toThrow(
-        `Directory '${outsidePath}' is not within any of the registered workspace directories.`,
-      );
+      ).toThrow(/Path not in workspace/);
     });
 
     it('should return an invocation for a valid absolute directory path', () => {
@@ -224,22 +274,62 @@ describe('ShellTool', () => {
 
       // Simulate pgrep output file creation by the shell command
       const tmpFile = path.join(os.tmpdir(), 'shell_pgrep_abcdef.tmp');
-      fs.writeFileSync(tmpFile, `54321${EOL}54322${EOL}`);
+      fs.writeFileSync(tmpFile, `54321${os.EOL}54322${os.EOL}`);
 
       const result = await promise;
 
-      const wrappedCommand = `{ my-command & }; __code=$?; pgrep -g 0 >${tmpFile} 2>&1; exit $__code;`;
+      const wrappedCommand = `(\n${'my-command &'}\n); __code=$?; pgrep -g 0 >${tmpFile} 2>&1; exit $__code;`;
       expect(mockShellExecutionService).toHaveBeenCalledWith(
         wrappedCommand,
         tempRootDir,
         expect.any(Function),
         expect.any(AbortSignal),
         false,
-        { pager: 'cat' },
+        expect.objectContaining({
+          pager: 'cat',
+          sanitizationConfig: {},
+          sandboxManager: expect.any(Object),
+        }),
       );
       expect(result.llmContent).toContain('Background PIDs: 54322');
       // The file should be deleted by the tool
       expect(fs.existsSync(tmpFile)).toBe(false);
+    });
+
+    it('should add a space when command ends with a backslash to prevent escaping newline', async () => {
+      const invocation = shellTool.build({ command: 'ls\\' });
+      const promise = invocation.execute(mockAbortSignal);
+      resolveShellExecution();
+      await promise;
+
+      const tmpFile = path.join(os.tmpdir(), 'shell_pgrep_abcdef.tmp');
+      const wrappedCommand = `(\nls\\ \n); __code=$?; pgrep -g 0 >${tmpFile} 2>&1; exit $__code;`;
+      expect(mockShellExecutionService).toHaveBeenCalledWith(
+        wrappedCommand,
+        tempRootDir,
+        expect.any(Function),
+        expect.any(AbortSignal),
+        false,
+        expect.any(Object),
+      );
+    });
+
+    it('should handle trailing comments correctly by placing them on their own line', async () => {
+      const invocation = shellTool.build({ command: 'ls # comment' });
+      const promise = invocation.execute(mockAbortSignal);
+      resolveShellExecution();
+      await promise;
+
+      const tmpFile = path.join(os.tmpdir(), 'shell_pgrep_abcdef.tmp');
+      const wrappedCommand = `(\nls # comment\n); __code=$?; pgrep -g 0 >${tmpFile} 2>&1; exit $__code;`;
+      expect(mockShellExecutionService).toHaveBeenCalledWith(
+        wrappedCommand,
+        tempRootDir,
+        expect.any(Function),
+        expect.any(AbortSignal),
+        false,
+        expect.any(Object),
+      );
     });
 
     it('should use the provided absolute directory as cwd', async () => {
@@ -253,14 +343,18 @@ describe('ShellTool', () => {
       await promise;
 
       const tmpFile = path.join(os.tmpdir(), 'shell_pgrep_abcdef.tmp');
-      const wrappedCommand = `{ ls; }; __code=$?; pgrep -g 0 >${tmpFile} 2>&1; exit $__code;`;
+      const wrappedCommand = `(\n${'ls'}\n); __code=$?; pgrep -g 0 >${tmpFile} 2>&1; exit $__code;`;
       expect(mockShellExecutionService).toHaveBeenCalledWith(
         wrappedCommand,
         subdir,
         expect.any(Function),
         expect.any(AbortSignal),
         false,
-        { pager: 'cat' },
+        expect.objectContaining({
+          pager: 'cat',
+          sanitizationConfig: {},
+          sandboxManager: expect.any(Object),
+        }),
       );
     });
 
@@ -274,15 +368,38 @@ describe('ShellTool', () => {
       await promise;
 
       const tmpFile = path.join(os.tmpdir(), 'shell_pgrep_abcdef.tmp');
-      const wrappedCommand = `{ ls; }; __code=$?; pgrep -g 0 >${tmpFile} 2>&1; exit $__code;`;
+      const wrappedCommand = `(\n${'ls'}\n); __code=$?; pgrep -g 0 >${tmpFile} 2>&1; exit $__code;`;
       expect(mockShellExecutionService).toHaveBeenCalledWith(
         wrappedCommand,
         path.join(tempRootDir, 'subdir'),
         expect.any(Function),
         expect.any(AbortSignal),
         false,
-        { pager: 'cat' },
+        expect.objectContaining({
+          pager: 'cat',
+          sanitizationConfig: {},
+          sandboxManager: expect.any(Object),
+        }),
       );
+    });
+
+    it('should handle is_background parameter by calling ShellExecutionService.background', async () => {
+      vi.useFakeTimers();
+      const invocation = shellTool.build({
+        command: 'sleep 10',
+        is_background: true,
+      });
+      const promise = invocation.execute(mockAbortSignal);
+
+      // We need to provide a PID for the background logic to trigger
+      resolveShellExecution({ pid: 12345 });
+
+      // Advance time to trigger the background timeout
+      await vi.advanceTimersByTimeAsync(250);
+
+      expect(mockShellBackground).toHaveBeenCalledWith(12345);
+
+      await promise;
     });
 
     itWindowsOnly(
@@ -308,7 +425,11 @@ describe('ShellTool', () => {
           expect.any(Function),
           expect.any(AbortSignal),
           false,
-          { pager: 'cat' },
+          {
+            pager: 'cat',
+            sanitizationConfig: {},
+            sandboxManager: new NoopSandboxManager(),
+          },
         );
       },
       20000,
@@ -383,7 +504,7 @@ describe('ShellTool', () => {
         mockConfig,
         { model: 'summarizer-shell' },
         expect.any(String),
-        mockConfig.getGeminiClient(),
+        mockConfig.geminiClient,
         mockAbortSignal,
       );
       expect(result.llmContent).toBe('summarized output');
@@ -410,8 +531,6 @@ describe('ShellTool', () => {
       // We can also verify that setTimeout was NOT called for the inactivity timeout.
       // However, since we don't have direct access to the internal `resetTimeout`,
       // we can infer success by the fact it didn't abort.
-
-      vi.useRealTimers();
     });
 
     it('should clean up the temp file on synchronous execution error', async () => {
@@ -430,10 +549,28 @@ describe('ShellTool', () => {
       expect(fs.existsSync(tmpFile)).toBe(false);
     });
 
+    it('should not log "missing pgrep output" when process is backgrounded', async () => {
+      vi.useFakeTimers();
+      const debugErrorSpy = vi.spyOn(debugLogger, 'error');
+
+      const invocation = shellTool.build({
+        command: 'sleep 10',
+        is_background: true,
+      });
+      const promise = invocation.execute(mockAbortSignal);
+
+      // Advance time to trigger backgrounding
+      await vi.advanceTimersByTimeAsync(200);
+
+      await promise;
+
+      expect(debugErrorSpy).not.toHaveBeenCalledWith('missing pgrep output');
+    });
+
     describe('Streaming to `updateOutput`', () => {
       let updateOutputMock: Mock;
       beforeEach(() => {
-        vi.useFakeTimers({ toFake: ['Date'] });
+        vi.useFakeTimers({ toFake: ['Date', 'setTimeout', 'clearTimeout'] });
         updateOutputMock = vi.fn();
       });
       afterEach(() => {
@@ -481,6 +618,27 @@ describe('ShellTool', () => {
           pid: 12345,
           executionMethod: 'child_process',
         });
+        await promise;
+      });
+
+      it('should NOT call updateOutput if the command is backgrounded', async () => {
+        const invocation = shellTool.build({
+          command: 'sleep 10',
+          is_background: true,
+        });
+        const promise = invocation.execute(mockAbortSignal, updateOutputMock);
+
+        mockShellOutputCallback({ type: 'data', chunk: 'some output' });
+        expect(updateOutputMock).not.toHaveBeenCalled();
+
+        // We need to provide a PID for the background logic to trigger
+        resolveShellExecution({ pid: 12345 });
+
+        // Advance time to trigger the background timeout
+        await vi.advanceTimersByTimeAsync(250);
+
+        expect(mockShellBackground).toHaveBeenCalledWith(12345);
+
         await promise;
       });
     });
@@ -536,6 +694,48 @@ describe('ShellTool', () => {
       mockPlatform.mockReturnValue('linux');
       const shellTool = new ShellTool(mockConfig, createMockMessageBus());
       expect(shellTool.description).toMatchSnapshot();
+    });
+
+    it('should not include efficiency guidelines when disabled', () => {
+      mockPlatform.mockReturnValue('linux');
+      vi.mocked(mockConfig.getEnableShellOutputEfficiency).mockReturnValue(
+        false,
+      );
+      const shellTool = new ShellTool(mockConfig, createMockMessageBus());
+      expect(shellTool.description).not.toContain('Efficiency Guidelines:');
+    });
+  });
+
+  describe('getDisplayTitle and getExplanation', () => {
+    it('should return only the command for getDisplayTitle', () => {
+      const invocation = shellTool.build({
+        command: 'echo hello',
+        description: 'prints hello',
+        dir_path: 'foo/bar',
+        is_background: true,
+      });
+      expect(invocation.getDisplayTitle?.()).toBe('echo hello');
+    });
+
+    it('should return the context for getExplanation', () => {
+      const invocation = shellTool.build({
+        command: 'echo hello',
+        description: 'prints hello',
+        dir_path: 'foo/bar',
+        is_background: true,
+      });
+      expect(invocation.getExplanation?.()).toBe(
+        '[in foo/bar] (prints hello) [background]',
+      );
+    });
+
+    it('should construct explanation without optional parameters', () => {
+      const invocation = shellTool.build({
+        command: 'echo hello',
+      });
+      expect(invocation.getExplanation?.()).toBe(
+        `[current working directory ${process.cwd()}]`,
+      );
     });
   });
 
@@ -717,6 +917,21 @@ describe('ShellTool', () => {
       if (details && details.type === 'exec') {
         expect(details.rootCommand).toBe('ls, grep');
       }
+    });
+  });
+
+  describe('getSchema', () => {
+    it('should return the base schema when no modelId is provided', () => {
+      const schema = shellTool.getSchema();
+      expect(schema.name).toBe(SHELL_TOOL_NAME);
+      expect(schema.description).toMatchSnapshot();
+    });
+
+    it('should return the schema from the resolver when modelId is provided', () => {
+      const modelId = 'gemini-2.0-flash';
+      const schema = shellTool.getSchema(modelId);
+      expect(schema.name).toBe(SHELL_TOOL_NAME);
+      expect(schema.description).toMatchSnapshot();
     });
   });
 });

@@ -5,59 +5,118 @@
  */
 
 import {
-  loadGlobalMemory,
-  loadEnvironmentMemory,
   loadJitSubdirectoryMemory,
   concatenateInstructions,
+  getGlobalMemoryPaths,
+  getExtensionMemoryPaths,
+  getEnvironmentMemoryPaths,
+  readGeminiMdFiles,
+  categorizeAndConcatenate,
+  type GeminiFileContent,
+  deduplicatePathsByFileIdentity,
 } from '../utils/memoryDiscovery.js';
 import type { Config } from '../config/config.js';
 import { coreEvents, CoreEvent } from '../utils/events.js';
 
 export class ContextManager {
   private readonly loadedPaths: Set<string> = new Set();
+  private readonly loadedFileIdentities: Set<string> = new Set();
   private readonly config: Config;
   private globalMemory: string = '';
-  private environmentMemory: string = '';
+  private extensionMemory: string = '';
+  private projectMemory: string = '';
 
   constructor(config: Config) {
     this.config = config;
   }
 
   /**
-   * Refreshes the memory by reloading global and environment memory.
+   * Refreshes the memory by reloading global, extension, and project memory.
    */
   async refresh(): Promise<void> {
     this.loadedPaths.clear();
-    await this.loadGlobalMemory();
-    await this.loadEnvironmentMemory();
+    this.loadedFileIdentities.clear();
+
+    const paths = await this.discoverMemoryPaths();
+    const contentsMap = await this.loadMemoryContents(paths);
+
+    this.categorizeMemoryContents(paths, contentsMap);
     this.emitMemoryChanged();
   }
 
-  private async loadGlobalMemory(): Promise<void> {
-    const result = await loadGlobalMemory(this.config.getDebugMode());
-    this.markAsLoaded(result.files.map((f) => f.path));
-    this.globalMemory = concatenateInstructions(
-      result.files.map((f) => ({ filePath: f.path, content: f.content })),
-      this.config.getWorkingDir(),
-    );
+  private async discoverMemoryPaths() {
+    const [global, extension, project] = await Promise.all([
+      getGlobalMemoryPaths(),
+      Promise.resolve(
+        getExtensionMemoryPaths(this.config.getExtensionLoader()),
+      ),
+      this.config.isTrustedFolder()
+        ? getEnvironmentMemoryPaths(
+            [...this.config.getWorkspaceContext().getDirectories()],
+            this.config.getMemoryBoundaryMarkers(),
+          )
+        : Promise.resolve([]),
+    ]);
+
+    return { global, extension, project };
   }
 
-  private async loadEnvironmentMemory(): Promise<void> {
-    const result = await loadEnvironmentMemory(
-      [...this.config.getWorkspaceContext().getDirectories()],
-      this.config.getExtensionLoader(),
-      this.config.getDebugMode(),
+  private async loadMemoryContents(paths: {
+    global: string[];
+    extension: string[];
+    project: string[];
+  }) {
+    const allPathsStringDeduped = Array.from(
+      new Set([...paths.global, ...paths.extension, ...paths.project]),
     );
-    this.markAsLoaded(result.files.map((f) => f.path));
-    const envMemory = concatenateInstructions(
-      result.files.map((f) => ({ filePath: f.path, content: f.content })),
-      this.config.getWorkingDir(),
+
+    // deduplicate by file identity to handle case-insensitive filesystems
+    const { paths: allPaths, identityMap: pathIdentityMap } =
+      await deduplicatePathsByFileIdentity(allPathsStringDeduped);
+
+    const allContents = await readGeminiMdFiles(
+      allPaths,
+      this.config.getImportFormat(),
+      this.config.getMemoryBoundaryMarkers(),
     );
+
+    const loadedFilePaths = allContents
+      .filter((c) => c.content !== null)
+      .map((c) => c.filePath);
+    this.markAsLoaded(loadedFilePaths);
+
+    // Cache file identities for performance optimization
+    for (const filePath of loadedFilePaths) {
+      const identity = pathIdentityMap.get(filePath);
+      if (identity) {
+        this.loadedFileIdentities.add(identity);
+      }
+    }
+
+    return new Map(allContents.map((c) => [c.filePath, c]));
+  }
+
+  private categorizeMemoryContents(
+    paths: { global: string[]; extension: string[]; project: string[] },
+    contentsMap: Map<string, GeminiFileContent>,
+  ) {
+    const hierarchicalMemory = categorizeAndConcatenate(paths, contentsMap);
+
+    this.globalMemory = hierarchicalMemory.global || '';
+    this.extensionMemory = hierarchicalMemory.extension || '';
+
     const mcpInstructions =
       this.config.getMcpClientManager()?.getMcpInstructions() || '';
-    this.environmentMemory = [envMemory, mcpInstructions.trimStart()]
+    const projectMemoryWithMcp = [
+      hierarchicalMemory.project,
+      mcpInstructions.trimStart(),
+    ]
       .filter(Boolean)
       .join('\n\n');
+
+    this.projectMemory = this.config.isTrustedFolder()
+      ? projectMemoryWithMcp
+      : '';
   }
 
   /**
@@ -68,21 +127,32 @@ export class ContextManager {
     accessedPath: string,
     trustedRoots: string[],
   ): Promise<string> {
+    if (!this.config.isTrustedFolder()) {
+      return '';
+    }
     const result = await loadJitSubdirectoryMemory(
       accessedPath,
       trustedRoots,
       this.loadedPaths,
-      this.config.getDebugMode(),
+      this.loadedFileIdentities,
+      this.config.getMemoryBoundaryMarkers(),
     );
 
     if (result.files.length === 0) {
       return '';
     }
 
-    this.markAsLoaded(result.files.map((f) => f.path));
+    const newFilePaths = result.files.map((f) => f.path);
+    this.markAsLoaded(newFilePaths);
+
+    // Cache identities for newly loaded files
+    if (result.fileIdentities) {
+      for (const identity of result.fileIdentities) {
+        this.loadedFileIdentities.add(identity);
+      }
+    }
     return concatenateInstructions(
       result.files.map((f) => ({ filePath: f.path, content: f.content })),
-      this.config.getWorkingDir(),
     );
   }
 
@@ -96,14 +166,16 @@ export class ContextManager {
     return this.globalMemory;
   }
 
+  getExtensionMemory(): string {
+    return this.extensionMemory;
+  }
+
   getEnvironmentMemory(): string {
-    return this.environmentMemory;
+    return this.projectMemory;
   }
 
   private markAsLoaded(paths: string[]): void {
-    for (const p of paths) {
-      this.loadedPaths.add(p);
-    }
+    paths.forEach((p) => this.loadedPaths.add(p));
   }
 
   getLoadedPaths(): ReadonlySet<string> {

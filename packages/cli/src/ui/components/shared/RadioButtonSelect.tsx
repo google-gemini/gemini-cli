@@ -5,7 +5,7 @@
  */
 
 import type React from 'react';
-import { Text } from 'ink';
+import { Text, Box } from 'ink';
 import { theme } from '../../semantic-colors.js';
 import {
   BaseSelectionList,
@@ -19,6 +19,7 @@ import type { SelectionListItem } from '../../hooks/useSelectionList.js';
  */
 export interface RadioSelectItem<T> extends SelectionListItem<T> {
   label: string;
+  sublabel?: string;
   themeNameDisplay?: string;
   themeTypeDisplay?: string;
 }
@@ -44,6 +45,8 @@ export interface RadioButtonSelectProps<T> {
   maxItemsToShow?: number;
   /** Whether to show numbers next to items. */
   showNumbers?: boolean;
+  /** Whether the hook should have priority over normal subscribers. */
+  priority?: boolean;
   /** Optional custom renderer for items. */
   renderItem?: (
     item: RadioSelectItem<T>,
@@ -66,6 +69,7 @@ export function RadioButtonSelect<T>({
   showScrollArrows = false,
   maxItemsToShow = 10,
   showNumbers = true,
+  priority,
   renderItem,
 }: RadioButtonSelectProps<T>): React.JSX.Element {
   return (
@@ -78,6 +82,7 @@ export function RadioButtonSelect<T>({
       showNumbers={showNumbers}
       showScrollArrows={showScrollArrows}
       maxItemsToShow={maxItemsToShow}
+      priority={priority}
       renderItem={
         renderItem ||
         ((item, { titleColor }) => {
@@ -94,9 +99,16 @@ export function RadioButtonSelect<T>({
           }
           // Regular label display
           return (
-            <Text color={titleColor} wrap="truncate">
-              {item.label}
-            </Text>
+            <Box flexDirection="column">
+              <Text color={titleColor} wrap="truncate">
+                {item.label}
+              </Text>
+              {item.sublabel && (
+                <Text color={theme.text.secondary} wrap="truncate">
+                  {item.sublabel}
+                </Text>
+              )}
+            </Box>
           );
         })
       }

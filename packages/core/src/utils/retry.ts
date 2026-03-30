@@ -4,8 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import type { GenerateContentResponse } from '@google/genai';
-import { ApiError } from '@google/genai';
+import { ApiError, type GenerateContentResponse } from '@google/genai';
 import {
   TerminalQuotaError,
   RetryableQuotaError,
@@ -18,6 +17,7 @@ import { getErrorStatus, ModelNotFoundError } from './httpErrors.js';
 import type { RetryAvailabilityContext } from '../availability/modelPolicy.js';
 
 export type { RetryAvailabilityContext };
+export const DEFAULT_MAX_ATTEMPTS = 10;
 
 export interface RetryOptions {
   maxAttempts: number;
@@ -40,7 +40,7 @@ export interface RetryOptions {
 }
 
 const DEFAULT_RETRY_OPTIONS: RetryOptions = {
-  maxAttempts: 10,
+  maxAttempts: DEFAULT_MAX_ATTEMPTS,
   initialDelayMs: 5000,
   maxDelayMs: 30000, // 30 seconds
   shouldRetryOnError: isRetryableError,
@@ -53,6 +53,12 @@ const RETRYABLE_NETWORK_CODES = [
   'ENOTFOUND',
   'EAI_AGAIN',
   'ECONNREFUSED',
+  // SSL/TLS transient errors
+  'ERR_SSL_SSLV3_ALERT_BAD_RECORD_MAC',
+  'ERR_SSL_WRONG_VERSION_NUMBER',
+  'ERR_SSL_DECRYPTION_FAILED_OR_BAD_RECORD_MAC',
+  'ERR_SSL_BAD_RECORD_MAC',
+  'EPROTO', // Generic protocol error (often SSL-related)
 ];
 
 function getNetworkErrorCode(error: unknown): string | undefined {
@@ -61,6 +67,7 @@ function getNetworkErrorCode(error: unknown): string | undefined {
       return undefined;
     }
     if ('code' in obj && typeof (obj as { code: unknown }).code === 'string') {
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
       return (obj as { code: string }).code;
     }
     return undefined;
@@ -71,14 +78,67 @@ function getNetworkErrorCode(error: unknown): string | undefined {
     return directCode;
   }
 
-  if (typeof error === 'object' && error !== null && 'cause' in error) {
-    return getCode((error as { cause: unknown }).cause);
+  // Traverse the cause chain to find error codes (SSL errors are often nested)
+  let current: unknown = error;
+  const maxDepth = 5; // Prevent infinite loops in case of circular references
+  for (let depth = 0; depth < maxDepth; depth++) {
+    if (
+      typeof current !== 'object' ||
+      current === null ||
+      !('cause' in current)
+    ) {
+      break;
+    }
+    current = (current as { cause: unknown }).cause;
+    const code = getCode(current);
+    if (code) {
+      return code;
+    }
   }
 
   return undefined;
 }
 
-const FETCH_FAILED_MESSAGE = 'fetch failed';
+export const FETCH_FAILED_MESSAGE = 'fetch failed';
+export const INCOMPLETE_JSON_MESSAGE = 'incomplete json segment';
+
+/**
+ * Categorizes an error for retry telemetry purposes.
+ * Returns a safe string without PII.
+ */
+export function getRetryErrorType(error: unknown): string {
+  if (error === 'Invalid content') {
+    return 'INVALID_CONTENT';
+  }
+
+  const errorCode = getNetworkErrorCode(error);
+  if (errorCode && RETRYABLE_NETWORK_CODES.includes(errorCode)) {
+    return errorCode;
+  }
+
+  if (error instanceof Error) {
+    const lowerMessage = error.message.toLowerCase();
+    if (lowerMessage.includes(FETCH_FAILED_MESSAGE)) {
+      return 'FETCH_FAILED';
+    }
+    if (lowerMessage.includes(INCOMPLETE_JSON_MESSAGE)) {
+      return 'INCOMPLETE_JSON';
+    }
+  }
+
+  const status = getErrorStatus(error);
+  if (status !== undefined) {
+    if (status === 429) return 'QUOTA_EXCEEDED';
+    if (status >= 500 && status < 600) return 'SERVER_ERROR';
+    return `HTTP_${status}`;
+  }
+
+  if (error instanceof Error) {
+    return error.name;
+  }
+
+  return 'UNKNOWN';
+}
 
 /**
  * Default predicate function to determine if a retry should be attempted.
@@ -98,8 +158,12 @@ export function isRetryableError(
   }
 
   if (retryFetchErrors && error instanceof Error) {
-    // Check for generic fetch failed message (case-insensitive)
-    if (error.message.toLowerCase().includes(FETCH_FAILED_MESSAGE)) {
+    const lowerMessage = error.message.toLowerCase();
+    // Check for generic fetch failed message or incomplete JSON segment (common stream error)
+    if (
+      lowerMessage.includes(FETCH_FAILED_MESSAGE) ||
+      lowerMessage.includes(INCOMPLETE_JSON_MESSAGE)
+    ) {
       return true;
     }
   }
@@ -108,13 +172,17 @@ export function isRetryableError(
   if (error instanceof ApiError) {
     // Explicitly do not retry 400 (Bad Request)
     if (error.status === 400) return false;
-    return error.status === 429 || (error.status >= 500 && error.status < 600);
+    return (
+      error.status === 429 ||
+      error.status === 499 ||
+      (error.status >= 500 && error.status < 600)
+    );
   }
 
   // Check for status using helper (handles other error shapes)
   const status = getErrorStatus(error);
   if (status !== undefined) {
-    return status === 429 || (status >= 500 && status < 600);
+    return status === 429 || status === 499 || (status >= 500 && status < 600);
   }
 
   return false;
@@ -175,6 +243,7 @@ export async function retryWithBackoff<T>(
 
       if (
         shouldRetryOnContent &&
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
         shouldRetryOnContent(result as GenerateContentResponse)
       ) {
         const jitter = currentDelay * 0.3 * (Math.random() * 2 - 1);
@@ -279,13 +348,18 @@ export async function retryWithBackoff<T>(
           classifiedError instanceof RetryableQuotaError &&
           classifiedError.retryDelayMs !== undefined
         ) {
+          currentDelay = Math.max(currentDelay, classifiedError.retryDelayMs);
+          // Positive jitter up to +20% while respecting server minimum delay
+          const jitter = currentDelay * 0.2 * Math.random();
+          const delayWithJitter = currentDelay + jitter;
           debugLogger.warn(
-            `Attempt ${attempt} failed: ${classifiedError.message}. Retrying after ${classifiedError.retryDelayMs}ms...`,
+            `Attempt ${attempt} failed: ${classifiedError.message}. Retrying after ${Math.round(delayWithJitter)}ms...`,
           );
           if (onRetry) {
-            onRetry(attempt, error, classifiedError.retryDelayMs);
+            onRetry(attempt, error, delayWithJitter);
           }
-          await delay(classifiedError.retryDelayMs, signal);
+          await delay(delayWithJitter, signal);
+          currentDelay = Math.min(maxDelayMs, currentDelay * 2);
           continue;
         } else {
           const errorStatus = getErrorStatus(error);
@@ -306,6 +380,7 @@ export async function retryWithBackoff<T>(
       // Generic retry logic for other errors
       if (
         attempt >= maxAttempts ||
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
         !shouldRetryOnError(error as Error, retryFetchErrors)
       ) {
         throw error;

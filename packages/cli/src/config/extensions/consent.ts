@@ -28,14 +28,19 @@ export async function skillsConsentString(
   skills: SkillDefinition[],
   source: string,
   targetDir?: string,
+  isLink = false,
 ): Promise<string> {
+  const action = isLink ? 'Linking' : 'Installing';
   const output: string[] = [];
-  output.push(`Installing agent skill(s) from "${source}".`);
-  output.push('\nThe following agent skill(s) will be installed:\n');
+  output.push(`${action} agent skill(s) from "${source}".`);
+  output.push(
+    `\nThe following agent skill(s) will be ${action.toLowerCase()}:\n`,
+  );
   output.push(...(await renderSkillsList(skills)));
 
   if (targetDir) {
-    output.push(`Install Destination: ${targetDir}`);
+    const destLabel = isLink ? 'Link' : 'Install';
+    output.push(`${destLabel} Destination: ${targetDir}`);
   }
   output.push('\n' + SKILLS_WARNING_MESSAGE);
 
@@ -86,10 +91,12 @@ export async function requestConsentInteractive(
  * This should not be called from interactive mode as it will break the CLI.
  *
  * @param prompt A yes/no prompt to ask the user
- * @returns Whether or not the user answers 'y' (yes). Defaults to 'yes' on enter.
+ * @param defaultValue Whether to resolve as true or false on enter.
+ * @returns Whether or not the user answers 'y' (yes).
  */
-async function promptForConsentNonInteractive(
+export async function promptForConsentNonInteractive(
   prompt: string,
+  defaultValue = true,
 ): Promise<boolean> {
   const readline = await import('node:readline');
   const rl = readline.createInterface({
@@ -100,7 +107,12 @@ async function promptForConsentNonInteractive(
   return new Promise((resolve) => {
     rl.question(prompt, (answer) => {
       rl.close();
-      resolve(['y', ''].includes(answer.trim().toLowerCase()));
+      const trimmedAnswer = answer.trim().toLowerCase();
+      if (trimmedAnswer === '') {
+        resolve(defaultValue);
+      } else {
+        resolve(['y', 'yes'].includes(trimmedAnswer));
+      }
     });
   });
 }
@@ -136,11 +148,30 @@ async function extensionConsentString(
   extensionConfig: ExtensionConfig,
   hasHooks: boolean,
   skills: SkillDefinition[] = [],
+  previousName?: string,
+  wasMigrated?: boolean,
 ): Promise<string> {
   const sanitizedConfig = escapeAnsiCtrlCodes(extensionConfig);
   const output: string[] = [];
   const mcpServerEntries = Object.entries(sanitizedConfig.mcpServers || {});
-  output.push(`Installing extension "${sanitizedConfig.name}".`);
+
+  if (wasMigrated) {
+    if (previousName && previousName !== sanitizedConfig.name) {
+      output.push(
+        `Migrating extension "${previousName}" to a new repository, renaming to "${sanitizedConfig.name}", and installing updates.`,
+      );
+    } else {
+      output.push(
+        `Migrating extension "${sanitizedConfig.name}" to a new repository and installing updates.`,
+      );
+    }
+  } else if (previousName && previousName !== sanitizedConfig.name) {
+    output.push(
+      `Renaming extension "${previousName}" to "${sanitizedConfig.name}" and installing updates.`,
+    );
+  } else {
+    output.push(`Installing extension "${sanitizedConfig.name}".`);
+  }
 
   if (mcpServerEntries.length) {
     output.push('This extension will run the following MCP servers:');
@@ -219,11 +250,14 @@ export async function maybeRequestConsentOrFail(
   previousHasHooks?: boolean,
   skills: SkillDefinition[] = [],
   previousSkills: SkillDefinition[] = [],
+  isMigrating: boolean = false,
 ) {
   const extensionConsent = await extensionConsentString(
     extensionConfig,
     hasHooks,
     skills,
+    previousExtensionConfig?.name,
+    isMigrating,
   );
   if (previousExtensionConfig) {
     const previousExtensionConsent = await extensionConsentString(

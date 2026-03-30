@@ -20,7 +20,8 @@ exports[`<VirtualizedList /> > with 10px height and 100 items > mounts only visi
 │Item 3                                                                                            │
 │                                                                                                  │
 │                                                                                                  │
-╰──────────────────────────────────────────────────────────────────────────────────────────────────╯"
+╰──────────────────────────────────────────────────────────────────────────────────────────────────╯
+"
 `;
 
 exports[`<VirtualizedList /> > with 10px height and 100 items > mounts only visible items with 1000 items and 10px height (scroll: 500) 1`] = `
@@ -43,7 +44,8 @@ exports[`<VirtualizedList /> > with 10px height and 100 items > mounts only visi
 │Item 503                                                                                          │
 │                                                                                                  │
 │                                                                                                  │
-╰──────────────────────────────────────────────────────────────────────────────────────────────────╯"
+╰──────────────────────────────────────────────────────────────────────────────────────────────────╯
+"
 `;
 
 exports[`<VirtualizedList /> > with 10px height and 100 items > mounts only visible items with 1000 items and 10px height (scroll: 999) 1`] = `
@@ -66,7 +68,8 @@ exports[`<VirtualizedList /> > with 10px height and 100 items > mounts only visi
 │                                                                                                  │
 │                                                                                                  │
 │                                                                                                 █│
-╰──────────────────────────────────────────────────────────────────────────────────────────────────╯"
+╰──────────────────────────────────────────────────────────────────────────────────────────────────╯
+"
 `;
 
 exports[`<VirtualizedList /> > with 10px height and 100 items > renders only visible items ('scrolled to bottom') 1`] = `
@@ -79,7 +82,8 @@ exports[`<VirtualizedList /> > with 10px height and 100 items > renders only vis
 │Item 97                                                                                           │
 │Item 98                                                                                           │
 │Item 99                                                                                          █│
-╰──────────────────────────────────────────────────────────────────────────────────────────────────╯"
+╰──────────────────────────────────────────────────────────────────────────────────────────────────╯
+"
 `;
 
 exports[`<VirtualizedList /> > with 10px height and 100 items > renders only visible items ('top') 1`] = `
@@ -92,5 +96,6 @@ exports[`<VirtualizedList /> > with 10px height and 100 items > renders only vis
 │Item 5                                                                                            │
 │Item 6                                                                                            │
 │Item 7                                                                                            │
-╰──────────────────────────────────────────────────────────────────────────────────────────────────╯"
+╰──────────────────────────────────────────────────────────────────────────────────────────────────╯
+"
 `;

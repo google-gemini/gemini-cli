@@ -17,7 +17,9 @@ export const GeminiPrivacyNotice = ({ onExit }: GeminiPrivacyNoticeProps) => {
     (key) => {
       if (key.name === 'escape') {
         onExit();
+        return true;
       }
+      return false;
     },
     { isActive: true },
   );

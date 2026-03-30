@@ -5,13 +5,12 @@
  */
 
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { SettingScope } from '../config/settings.js';
-import type { LoadedSettings } from '../config/settings.js';
+import { SettingScope, type LoadedSettings } from '../config/settings.js';
 import {
   getScopeItems,
   getScopeMessageForSetting,
 } from './dialogScopeUtils.js';
-import { settingExistsInScope } from './settingsUtils.js';
+import { isInSettingsScope } from './settingsUtils.js';
 
 vi.mock('../config/settings', () => ({
   SettingScope: {
@@ -24,7 +23,7 @@ vi.mock('../config/settings', () => ({
 }));
 
 vi.mock('./settingsUtils', () => ({
-  settingExistsInScope: vi.fn(),
+  isInSettingsScope: vi.fn(),
 }));
 
 describe('dialogScopeUtils', () => {
@@ -53,7 +52,7 @@ describe('dialogScopeUtils', () => {
     });
 
     it('should return empty string if not modified in other scopes', () => {
-      vi.mocked(settingExistsInScope).mockReturnValue(false);
+      vi.mocked(isInSettingsScope).mockReturnValue(false);
       const message = getScopeMessageForSetting(
         'key',
         SettingScope.User,
@@ -63,7 +62,7 @@ describe('dialogScopeUtils', () => {
     });
 
     it('should return message indicating modification in other scopes', () => {
-      vi.mocked(settingExistsInScope).mockReturnValue(true);
+      vi.mocked(isInSettingsScope).mockReturnValue(true);
 
       const message = getScopeMessageForSetting(
         'key',
@@ -88,7 +87,7 @@ describe('dialogScopeUtils', () => {
         return { settings: {} };
       });
 
-      vi.mocked(settingExistsInScope).mockImplementation(
+      vi.mocked(isInSettingsScope).mockImplementation(
         (_key, settings: unknown) => {
           if (settings === workspaceSettings) return true;
           if (settings === systemSettings) return false;

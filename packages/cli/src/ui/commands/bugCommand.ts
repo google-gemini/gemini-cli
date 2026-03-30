@@ -13,7 +13,7 @@ import {
 } from './types.js';
 import { MessageType } from '../types.js';
 import { GIT_COMMIT_INFO } from '../../generated/git-commit.js';
-import { formatMemoryUsage } from '../utils/formatters.js';
+import { formatBytes } from '../utils/formatters.js';
 import {
   IdeClient,
   sessionId,
@@ -32,8 +32,8 @@ export const bugCommand: SlashCommand = {
   autoExecute: false,
   action: async (context: CommandContext, args?: string): Promise<void> => {
     const bugDescription = (args || '').trim();
-    const { config } = context.services;
-
+    const agentContext = context.services.agentContext;
+    const config = agentContext?.config;
     const osVersion = `${process.platform} ${process.version}`;
     let sandboxEnv = 'no sandbox';
     if (process.env['SANDBOX'] && process.env['SANDBOX'] !== 'sandbox-exec') {
@@ -45,7 +45,7 @@ export const bugCommand: SlashCommand = {
     }
     const modelVersion = config?.getModel() || 'Unknown';
     const cliVersion = await getVersion();
-    const memoryUsage = formatMemoryUsage(process.memoryUsage().rss);
+    const memoryUsage = formatBytes(process.memoryUsage().rss);
     const ideClient = await getIdeClientName(context);
     const terminalName =
       terminalCapabilityManager.getTerminalName() || 'Unknown';
@@ -54,6 +54,7 @@ export const bugCommand: SlashCommand = {
     const kittyProtocol = terminalCapabilityManager.isKittyProtocolEnabled()
       ? 'Supported'
       : 'Unsupported';
+    const authType = config?.getContentGeneratorConfig()?.authType || 'Unknown';
 
     let info = `
 * **CLI Version:** ${cliVersion}
@@ -62,6 +63,7 @@ export const bugCommand: SlashCommand = {
 * **Operating System:** ${osVersion}
 * **Sandbox Environment:** ${sandboxEnv}
 * **Model Version:** ${modelVersion}
+* **Auth Type:** ${authType}
 * **Memory Usage:** ${memoryUsage}
 * **Terminal Name:** ${terminalName}
 * **Terminal Background:** ${terminalBgColor}
@@ -71,7 +73,7 @@ export const bugCommand: SlashCommand = {
       info += `* **IDE Client:** ${ideClient}\n`;
     }
 
-    const chat = config?.getGeminiClient()?.getChat();
+    const chat = agentContext?.geminiClient?.getChat();
     const history = chat?.getHistory() || [];
     let historyFileMessage = '';
     let problemValue = bugDescription;
@@ -132,7 +134,7 @@ export const bugCommand: SlashCommand = {
 };
 
 async function getIdeClientName(context: CommandContext) {
-  if (!context.services.config?.getIdeMode()) {
+  if (!context.services.agentContext?.config.getIdeMode()) {
     return '';
   }
   const ideClient = await IdeClient.getInstance();

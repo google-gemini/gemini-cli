@@ -11,6 +11,7 @@ import {
   useCallback,
   useContext,
   useEffect,
+  useMemo,
   useRef,
 } from 'react';
 import { ESC } from '../utils/input.js';
@@ -22,7 +23,10 @@ import {
   type MouseEvent,
   type MouseEventName,
   type MouseHandler,
+  DOUBLE_CLICK_THRESHOLD_MS,
+  DOUBLE_CLICK_DISTANCE_TOLERANCE,
 } from '../utils/mouse.js';
+import { useSettingsStore } from './SettingsContext.js';
 
 export type { MouseEvent, MouseEventName, MouseHandler };
 
@@ -59,14 +63,20 @@ export function useMouse(handler: MouseHandler, { isActive = true } = {}) {
 export function MouseProvider({
   children,
   mouseEventsEnabled,
-  debugKeystrokeLogging,
 }: {
   children: React.ReactNode;
   mouseEventsEnabled?: boolean;
-  debugKeystrokeLogging?: boolean;
 }) {
+  const { settings } = useSettingsStore();
+  const debugKeystrokeLogging = settings.merged.general.debugKeystrokeLogging;
+
   const { stdin } = useStdin();
   const subscribers = useRef<Set<MouseHandler>>(new Set()).current;
+  const lastClickRef = useRef<{
+    time: number;
+    col: number;
+    row: number;
+  } | null>(null);
 
   const subscribe = useCallback(
     (handler: MouseHandler) => {
@@ -96,6 +106,30 @@ export function MouseProvider({
           handled = true;
         }
       }
+
+      if (event.name === 'left-press') {
+        const now = Date.now();
+        const lastClick = lastClickRef.current;
+        if (
+          lastClick &&
+          now - lastClick.time < DOUBLE_CLICK_THRESHOLD_MS &&
+          Math.abs(event.col - lastClick.col) <=
+            DOUBLE_CLICK_DISTANCE_TOLERANCE &&
+          Math.abs(event.row - lastClick.row) <= DOUBLE_CLICK_DISTANCE_TOLERANCE
+        ) {
+          const doubleClickEvent: MouseEvent = {
+            ...event,
+            name: 'double-click',
+          };
+          for (const handler of subscribers) {
+            handler(doubleClickEvent);
+          }
+          lastClickRef.current = null;
+        } else {
+          lastClickRef.current = { time: now, col: event.col, row: event.row };
+        }
+      }
+
       if (
         !handled &&
         event.name === 'move' &&
@@ -158,8 +192,13 @@ export function MouseProvider({
     };
   }, [stdin, mouseEventsEnabled, subscribers, debugKeystrokeLogging]);
 
+  const contextValue = useMemo(
+    () => ({ subscribe, unsubscribe }),
+    [subscribe, unsubscribe],
+  );
+
   return (
-    <MouseContext.Provider value={{ subscribe, unsubscribe }}>
+    <MouseContext.Provider value={contextValue}>
       {children}
     </MouseContext.Provider>
   );

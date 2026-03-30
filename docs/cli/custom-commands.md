@@ -30,6 +30,11 @@ separator (`/` or `\`) being converted to a colon (`:`).
 - A file at `<project>/.gemini/commands/git/commit.toml` becomes the namespaced
   command `/git:commit`.
 
+<!-- prettier-ignore -->
+> [!TIP]
+> After creating or modifying `.toml` command files, run
+> `/commands reload` to pick up your changes without restarting the CLI.
+
 ## TOML file format (v1)
 
 Your command definition files must be written in the TOML format and use the
@@ -174,10 +179,10 @@ ensure that only intended commands can be run.
     automatically shell-escaped (see
     [Context-Aware Injection](#1-context-aware-injection-with-args) above).
 3.  **Robust parsing:** The parser correctly handles complex shell commands that
-    include nested braces, such as JSON payloads. **Note:** The content inside
-    `!{...}` must have balanced braces (`{` and `}`). If you need to execute a
-    command containing unbalanced braces, consider wrapping it in an external
-    script file and calling the script within the `!{...}` block.
+    include nested braces, such as JSON payloads. The content inside `!{...}`
+    must have balanced braces (`{` and `}`). If you need to execute a command
+    containing unbalanced braces, consider wrapping it in an external script
+    file and calling the script within the `!{...}` block.
 4.  **Security check and confirmation:** The CLI performs a security check on
     the final, resolved command (after arguments are escaped and substituted). A
     dialog will appear showing the exact command(s) to be executed.
@@ -275,9 +280,18 @@ Let's create a global command that asks the model to refactor a piece of code.
 First, ensure the user commands directory exists, then create a `refactor`
 subdirectory for organization and the final TOML file.
 
+**macOS/Linux**
+
 ```bash
 mkdir -p ~/.gemini/commands/refactor
 touch ~/.gemini/commands/refactor/pure.toml
+```
+
+**Windows (PowerShell)**
+
+```powershell
+New-Item -ItemType Directory -Force -Path "$env:USERPROFILE\.gemini\commands\refactor"
+New-Item -ItemType File -Force -Path "$env:USERPROFILE\.gemini\commands\refactor\pure.toml"
 ```
 
 **2. Add the content to the file:**

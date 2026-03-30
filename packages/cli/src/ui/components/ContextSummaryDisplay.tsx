@@ -8,8 +8,6 @@ import type React from 'react';
 import { Box, Text } from 'ink';
 import { theme } from '../semantic-colors.js';
 import { type IdeContext, type MCPServerConfig } from '@google/gemini-cli-core';
-import { useTerminalSize } from '../hooks/useTerminalSize.js';
-import { isNarrowWidth } from '../utils/isNarrowWidth.js';
 
 interface ContextSummaryDisplayProps {
   geminiMdFileCount: number;
@@ -18,6 +16,7 @@ interface ContextSummaryDisplayProps {
   blockedMcpServers?: Array<{ name: string; extensionName: string }>;
   ideContext?: IdeContext;
   skillCount: number;
+  backgroundProcessCount?: number;
 }
 
 export const ContextSummaryDisplay: React.FC<ContextSummaryDisplayProps> = ({
@@ -27,9 +26,8 @@ export const ContextSummaryDisplay: React.FC<ContextSummaryDisplayProps> = ({
   blockedMcpServers,
   ideContext,
   skillCount,
+  backgroundProcessCount = 0,
 }) => {
-  const { columns: terminalWidth } = useTerminalSize();
-  const isNarrow = isNarrowWidth(terminalWidth);
   const mcpServerCount = Object.keys(mcpServers || {}).length;
   const blockedMcpServerCount = blockedMcpServers?.length || 0;
   const openFileCount = ideContext?.workspaceState?.openFiles?.length ?? 0;
@@ -39,9 +37,10 @@ export const ContextSummaryDisplay: React.FC<ContextSummaryDisplayProps> = ({
     mcpServerCount === 0 &&
     blockedMcpServerCount === 0 &&
     openFileCount === 0 &&
-    skillCount === 0
+    skillCount === 0 &&
+    backgroundProcessCount === 0
   ) {
-    return <Text> </Text>; // Render an empty space to reserve height
+    return null;
   }
 
   const openFilesText = (() => {
@@ -93,25 +92,31 @@ export const ContextSummaryDisplay: React.FC<ContextSummaryDisplayProps> = ({
     return `${skillCount} skill${skillCount > 1 ? 's' : ''}`;
   })();
 
-  const summaryParts = [openFilesText, geminiMdText, mcpText, skillText].filter(
-    Boolean,
-  );
+  const backgroundText = (() => {
+    if (backgroundProcessCount === 0) {
+      return '';
+    }
+    return `${backgroundProcessCount} Background process${
+      backgroundProcessCount > 1 ? 'es' : ''
+    }`;
+  })();
 
-  if (isNarrow) {
-    return (
-      <Box flexDirection="column" paddingX={1}>
-        {summaryParts.map((part, index) => (
-          <Text key={index} color={theme.text.secondary}>
-            - {part}
-          </Text>
-        ))}
-      </Box>
-    );
-  }
+  const summaryParts = [
+    openFilesText,
+    geminiMdText,
+    mcpText,
+    skillText,
+    backgroundText,
+  ].filter(Boolean);
 
   return (
-    <Box paddingX={1}>
-      <Text color={theme.text.secondary}>{summaryParts.join(' | ')}</Text>
+    <Box paddingX={1} flexDirection="row" flexWrap="wrap">
+      {summaryParts.map((part, index) => (
+        <Box key={index} flexDirection="row">
+          {index > 0 && <Text color={theme.text.secondary}>{' · '}</Text>}
+          <Text color={theme.text.secondary}>{part}</Text>
+        </Box>
+      ))}
     </Box>
   );
 };

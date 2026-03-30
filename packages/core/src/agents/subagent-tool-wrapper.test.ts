@@ -56,6 +56,11 @@ describe('SubagentToolWrapper', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mockConfig = makeFakeConfig();
+    // .config is already set correctly by the getter on the instance.
+    Object.defineProperty(mockConfig, 'promptId', {
+      get: () => 'test-prompt-id',
+      configurable: true,
+    });
     mockMessageBus = createMockMessageBus();
   });
 
@@ -70,7 +75,7 @@ describe('SubagentToolWrapper', () => {
       expect(wrapper.name).toBe(mockDefinition.name);
       expect(wrapper.displayName).toBe(mockDefinition.displayName);
       expect(wrapper.description).toBe(mockDefinition.description);
-      expect(wrapper.kind).toBe(Kind.Think);
+      expect(wrapper.kind).toBe(Kind.Agent);
       expect(wrapper.isOutputMarkdown).toBe(true);
       expect(wrapper.canUpdateOutput).toBe(true);
     });
@@ -98,9 +103,19 @@ describe('SubagentToolWrapper', () => {
 
       expect(schema.name).toBe(mockDefinition.name);
       expect(schema.description).toBe(mockDefinition.description);
-      expect(schema.parametersJsonSchema).toEqual(
-        mockDefinition.inputConfig.inputSchema,
-      );
+      expect(schema.parametersJsonSchema).toEqual({
+        ...(mockDefinition.inputConfig.inputSchema as Record<string, unknown>),
+        properties: {
+          ...((
+            mockDefinition.inputConfig.inputSchema as Record<string, unknown>
+          )['properties'] as Record<string, unknown>),
+          wait_for_previous: {
+            type: 'boolean',
+            description:
+              'Set to true to wait for all previously requested tools in this turn to complete before starting. Set to false (or omit) to run in parallel. Use true when this tool depends on the output of previous tools.',
+          },
+        },
+      });
     });
   });
 

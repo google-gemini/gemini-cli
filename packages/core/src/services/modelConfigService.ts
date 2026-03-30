@@ -5,6 +5,7 @@
  */
 
 import type { GenerateContentConfig } from '@google/genai';
+import type { ModelPolicy } from '../availability/modelPolicy.js';
 
 // The primary key for the ModelConfig is the model string. However, we also
 // support a secondary key to limit the override scope, typically an agent name.
@@ -26,6 +27,10 @@ export interface ModelConfigKey {
   // This allows overrides to specify different settings (e.g., higher temperature)
   // specifically for retry scenarios.
   isRetry?: boolean;
+
+  // Indicates whether this request originates from the primary interactive chat model.
+  // Enables the default fallback configuration to `chat-base` when unknown.
+  isChatModel?: boolean;
 }
 
 export interface ModelConfig {
@@ -47,11 +52,69 @@ export interface ModelConfigAlias {
   modelConfig: ModelConfig;
 }
 
+// A model definition is a mapping from a model name to a list of features
+// that the model supports. Model names can be either direct model IDs
+// (gemini-2.5-pro) or aliases (auto).
+export interface ModelDefinition {
+  displayName?: string;
+  tier?: string; // 'pro' | 'flash' | 'flash-lite' | 'custom' | 'auto'
+  family?: string; // The gemini family, e.g. 'gemini-3' | 'gemini-2'
+  isPreview?: boolean;
+  // Specifies whether the model should be visible in the dialog.
+  isVisible?: boolean;
+  /** A short description of the model for the dialog. */
+  dialogDescription?: string;
+  features?: {
+    // Whether the model supports thinking.
+    thinking?: boolean;
+    // Whether the model supports mutlimodal function responses. This is
+    // supported in Gemini 3.
+    multimodalToolUse?: boolean;
+  };
+}
+
+// A model resolution is a mapping from a model name to a list of conditions
+// that can be used to resolve the model to a model ID.
+export interface ModelResolution {
+  // The default model ID to use when no conditions are met.
+  default: string;
+  // A list of conditions that can be used to resolve the model.
+  contexts?: Array<{
+    // The condition to check for.
+    condition: ResolutionCondition;
+    // The model ID to use when the condition is met.
+    target: string;
+  }>;
+}
+
+/** The actual state of the current session. */
+export interface ResolutionContext {
+  useGemini3_1?: boolean;
+  useGemini3_1FlashLite?: boolean;
+  useCustomTools?: boolean;
+  hasAccessToPreview?: boolean;
+  requestedModel?: string;
+}
+
+/** The requirements defined in the registry. */
+export interface ResolutionCondition {
+  useGemini3_1?: boolean;
+  useGemini3_1FlashLite?: boolean;
+  useCustomTools?: boolean;
+  hasAccessToPreview?: boolean;
+  /** Matches if the current model is in this list. */
+  requestedModels?: string[];
+}
+
 export interface ModelConfigServiceConfig {
   aliases?: Record<string, ModelConfigAlias>;
   customAliases?: Record<string, ModelConfigAlias>;
   overrides?: ModelConfigOverride[];
   customOverrides?: ModelConfigOverride[];
+  modelDefinitions?: Record<string, ModelDefinition>;
+  modelIdResolutions?: Record<string, ModelResolution>;
+  classifierIdResolutions?: Record<string, ModelResolution>;
+  modelChains?: Record<string, ModelPolicy[]>;
 }
 
 const MAX_ALIAS_CHAIN_DEPTH = 100;
@@ -71,6 +134,121 @@ export class ModelConfigService {
 
   // TODO(12597): Process config to build a typed alias hierarchy.
   constructor(private readonly config: ModelConfigServiceConfig) {}
+
+  getModelDefinition(modelId: string): ModelDefinition | undefined {
+    const definition = this.config.modelDefinitions?.[modelId];
+    if (definition) {
+      return definition;
+    }
+
+    // For unknown models, return an implicit custom definition to match legacy behavior.
+    if (!modelId.startsWith('gemini-')) {
+      return {
+        tier: 'custom',
+        family: 'custom',
+        features: {},
+      };
+    }
+
+    return undefined;
+  }
+
+  getModelDefinitions(): Record<string, ModelDefinition> {
+    return this.config.modelDefinitions ?? {};
+  }
+
+  private matches(
+    condition: ResolutionCondition,
+    context: ResolutionContext,
+  ): boolean {
+    return Object.entries(condition).every(([key, value]) => {
+      if (value === undefined) return true;
+
+      switch (key) {
+        case 'useGemini3_1':
+          return value === context.useGemini3_1;
+        case 'useGemini3_1FlashLite':
+          return value === context.useGemini3_1FlashLite;
+        case 'useCustomTools':
+          return value === context.useCustomTools;
+        case 'hasAccessToPreview':
+          return value === context.hasAccessToPreview;
+        case 'requestedModels':
+          return (
+            Array.isArray(value) &&
+            !!context.requestedModel &&
+            value.includes(context.requestedModel)
+          );
+        default:
+          return false;
+      }
+    });
+  }
+
+  // Resolves a model ID to a concrete model ID based on the provided context.
+  resolveModelId(
+    requestedName: string,
+    context: ResolutionContext = {},
+  ): string {
+    const resolution = this.config.modelIdResolutions?.[requestedName];
+    if (!resolution) {
+      return requestedName;
+    }
+
+    for (const ctx of resolution.contexts ?? []) {
+      if (this.matches(ctx.condition, context)) {
+        return ctx.target;
+      }
+    }
+
+    return resolution.default;
+  }
+
+  // Resolves a classifier model ID to a concrete model ID based on the provided context.
+  resolveClassifierModelId(
+    tier: string,
+    requestedModel: string,
+    context: ResolutionContext = {},
+  ): string {
+    const resolution = this.config.classifierIdResolutions?.[tier];
+    const fullContext: ResolutionContext = { ...context, requestedModel };
+
+    if (!resolution) {
+      // Fallback to regular model resolution if no classifier-specific rule exists
+      return this.resolveModelId(tier, fullContext);
+    }
+
+    for (const ctx of resolution.contexts ?? []) {
+      if (this.matches(ctx.condition, fullContext)) {
+        return ctx.target;
+      }
+    }
+
+    return resolution.default;
+  }
+
+  getModelChain(chainName: string): ModelPolicy[] | undefined {
+    return this.config.modelChains?.[chainName];
+  }
+
+  /**
+   * Fetches a chain template and resolves all model IDs within it
+   * based on the provided context.
+   */
+  resolveChain(
+    chainName: string,
+    context: ResolutionContext = {},
+  ): ModelPolicy[] | undefined {
+    const template = this.config.modelChains?.[chainName];
+    if (!template) {
+      return undefined;
+    }
+    // Map through the template and resolve each model ID
+    return template.map((policy) => ({
+      ...policy,
+      model: this.resolveModelId(policy.model, context),
+    }));
+  }
 
   registerRuntimeModelConfig(aliasName: string, alias: ModelConfigAlias): void {
     this.runtimeAliases[aliasName] = alias;
@@ -122,6 +300,7 @@ export class ModelConfigService {
     const { aliasChain, baseModel, resolvedConfig } = this.resolveAliasChain(
       context.model,
       allAliases,
+      context.isChatModel,
     );
 
     const modelToLevel = this.buildModelLevelMap(aliasChain, baseModel);
@@ -159,6 +338,7 @@ export class ModelConfigService {
   private resolveAliasChain(
     requestedModel: string,
     allAliases: Record<string, ModelConfigAlias>,
+    isChatModel?: boolean,
   ): {
     aliasChain: string[];
     baseModel: string | undefined;
@@ -206,6 +386,21 @@ export class ModelConfigService {
       };
     }
 
+    if (isChatModel) {
+      const fallbackAlias = 'chat-base';
+      if (allAliases[fallbackAlias]) {
+        const fallbackResolution = this.resolveAliasChain(
+          fallbackAlias,
+          allAliases,
+        );
+        return {
+          aliasChain: [...fallbackResolution.aliasChain, requestedModel],
+          baseModel: requestedModel,
+          resolvedConfig: fallbackResolution.resolvedConfig,
+        };
+      }
+    }
+
     return {
       aliasChain: [requestedModel],
       baseModel: requestedModel,
@@ -245,6 +440,7 @@ export class ModelConfigService {
         let matchedLevel = 0; // Default to Global
         const isMatch = matchEntries.every(([key, value]) => {
           if (key === 'model') {
+            // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
             const level = modelToLevel.get(value as string);
             if (level === undefined) return false;
             matchedLevel = level;
@@ -253,6 +449,7 @@ export class ModelConfigService {
           if (key === 'overrideScope' && value === 'core') {
             return context.overrideScope === 'core' || !context.overrideScope;
           }
+          // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
           return context[key as keyof ModelConfigKey] === value;
         });
 
@@ -291,6 +488,7 @@ export class ModelConfigService {
       );
     }
 
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
     return {
       model: resolved.model,
       generateContentConfig: resolved.generateContentConfig,
@@ -321,7 +519,9 @@ export class ModelConfigService {
     config2: GenerateContentConfig | undefined,
   ): GenerateContentConfig {
     return ModelConfigService.genericDeepMerge(
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
       config1 as Record<string, unknown> | undefined,
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
       config2 as Record<string, unknown> | undefined,
     ) as GenerateContentConfig;
   }

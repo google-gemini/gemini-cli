@@ -14,34 +14,50 @@ vi.mock('../../utils/commandUtils.js', () => ({
 }));
 
 describe('UserMessage', () => {
-  it('renders normal user message with correct prefix', () => {
-    const { lastFrame } = renderWithProviders(
+  it('renders normal user message with correct prefix', async () => {
+    const { lastFrame, unmount } = await renderWithProviders(
       <UserMessage text="Hello Gemini" width={80} />,
       { width: 80 },
     );
     const output = lastFrame();
 
     expect(output).toMatchSnapshot();
+    unmount();
   });
 
-  it('renders slash command message', () => {
-    const { lastFrame } = renderWithProviders(
+  it('renders slash command message', async () => {
+    const { lastFrame, unmount } = await renderWithProviders(
       <UserMessage text="/help" width={80} />,
       { width: 80 },
     );
     const output = lastFrame();
 
     expect(output).toMatchSnapshot();
+    unmount();
   });
 
-  it('renders multiline user message', () => {
+  it('renders multiline user message', async () => {
     const message = 'Line 1\nLine 2';
-    const { lastFrame } = renderWithProviders(
+    const { lastFrame, unmount } = await renderWithProviders(
       <UserMessage text={message} width={80} />,
       { width: 80 },
     );
     const output = lastFrame();
 
     expect(output).toMatchSnapshot();
+    unmount();
+  });
+
+  it('transforms image paths in user message', async () => {
+    const message = 'Check out this image: @/path/to/my-image.png';
+    const { lastFrame, unmount } = await renderWithProviders(
+      <UserMessage text={message} width={80} />,
+      { width: 80 },
+    );
+    const output = lastFrame();
+
+    expect(output).toContain('[Image my-image.png]');
+    expect(output).toMatchSnapshot();
+    unmount();
   });
 });

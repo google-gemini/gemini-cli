@@ -83,6 +83,27 @@ describe('SettingsSchema', () => {
       ).toBe('boolean');
     });
 
+    it('should have loadingPhrases enum property', () => {
+      const definition = getSettingsSchema().ui?.properties?.loadingPhrases;
+      expect(definition).toBeDefined();
+      expect(definition?.type).toBe('enum');
+      expect(definition?.default).toBe('tips');
+      expect(definition?.options?.map((o) => o.value)).toEqual([
+        'tips',
+        'witty',
+        'all',
+        'off',
+      ]);
+    });
+
+    it('should have errorVerbosity enum property', () => {
+      const definition = getSettingsSchema().ui?.properties?.errorVerbosity;
+      expect(definition).toBeDefined();
+      expect(definition?.type).toBe('enum');
+      expect(definition?.default).toBe('low');
+      expect(definition?.options?.map((o) => o.value)).toEqual(['low', 'full']);
+    });
+
     it('should have checkpointing nested properties', () => {
       expect(
         getSettingsSchema().general?.properties?.checkpointing.properties
@@ -92,6 +113,16 @@ describe('SettingsSchema', () => {
         getSettingsSchema().general?.properties?.checkpointing.properties
           ?.enabled.type,
       ).toBe('boolean');
+    });
+
+    it('should have plan nested properties', () => {
+      expect(
+        getSettingsSchema().general?.properties?.plan?.properties?.directory,
+      ).toBeDefined();
+      expect(
+        getSettingsSchema().general?.properties?.plan?.properties?.directory
+          .type,
+      ).toBe('string');
     });
 
     it('should have fileFiltering nested properties', () => {
@@ -107,6 +138,14 @@ describe('SettingsSchema', () => {
         getSettingsSchema().context.properties.fileFiltering.properties
           ?.enableRecursiveFileSearch,
       ).toBeDefined();
+      expect(
+        getSettingsSchema().context.properties.fileFiltering.properties
+          ?.customIgnoreFilePaths,
+      ).toBeDefined();
+      expect(
+        getSettingsSchema().context.properties.fileFiltering.properties
+          ?.customIgnoreFilePaths.type,
+      ).toBe('array');
     });
 
     it('should have unique categories', () => {
@@ -178,6 +217,9 @@ describe('SettingsSchema', () => {
       expect(getSettingsSchema().ui.properties.hideTips.showInDialog).toBe(
         true,
       );
+      expect(
+        getSettingsSchema().ui.properties.showShortcutsHint.showInDialog,
+      ).toBe(true);
       expect(getSettingsSchema().ui.properties.hideBanner.showInDialog).toBe(
         true,
       );
@@ -216,7 +258,7 @@ describe('SettingsSchema', () => {
       expect(
         getSettingsSchema().advanced.properties.autoConfigureMemory
           .showInDialog,
-      ).toBe(false);
+      ).toBe(true);
     });
 
     it('should infer Settings type correctly', () => {
@@ -286,7 +328,7 @@ describe('SettingsSchema', () => {
       expect(
         getSettingsSchema().security.properties.folderTrust.properties.enabled
           .default,
-      ).toBe(false);
+      ).toBe(true);
       expect(
         getSettingsSchema().security.properties.folderTrust.properties.enabled
           .showInDialog,
@@ -320,28 +362,37 @@ describe('SettingsSchema', () => {
       ).toBe('Enable debug logging of keystrokes to the console.');
     });
 
-    it('should have previewFeatures setting in schema', () => {
-      expect(
-        getSettingsSchema().general.properties.previewFeatures,
-      ).toBeDefined();
-      expect(getSettingsSchema().general.properties.previewFeatures.type).toBe(
+    it('should have showShortcutsHint setting in schema', () => {
+      expect(getSettingsSchema().ui.properties.showShortcutsHint).toBeDefined();
+      expect(getSettingsSchema().ui.properties.showShortcutsHint.type).toBe(
         'boolean',
       );
+      expect(getSettingsSchema().ui.properties.showShortcutsHint.category).toBe(
+        'UI',
+      );
+      expect(getSettingsSchema().ui.properties.showShortcutsHint.default).toBe(
+        true,
+      );
       expect(
-        getSettingsSchema().general.properties.previewFeatures.category,
-      ).toBe('General');
-      expect(
-        getSettingsSchema().general.properties.previewFeatures.default,
+        getSettingsSchema().ui.properties.showShortcutsHint.requiresRestart,
       ).toBe(false);
       expect(
-        getSettingsSchema().general.properties.previewFeatures.requiresRestart,
-      ).toBe(false);
-      expect(
-        getSettingsSchema().general.properties.previewFeatures.showInDialog,
+        getSettingsSchema().ui.properties.showShortcutsHint.showInDialog,
       ).toBe(true);
       expect(
-        getSettingsSchema().general.properties.previewFeatures.description,
-      ).toBe('Enable preview features (e.g., preview models).');
+        getSettingsSchema().ui.properties.showShortcutsHint.description,
+      ).toBe('Show the "? for shortcuts" hint above the input.');
+    });
+
+    it('should have enableNotifications setting in schema', () => {
+      const setting =
+        getSettingsSchema().general.properties.enableNotifications;
+      expect(setting).toBeDefined();
+      expect(setting.type).toBe('boolean');
+      expect(setting.category).toBe('General');
+      expect(setting.default).toBe(false);
+      expect(setting.requiresRestart).toBe(false);
+      expect(setting.showInDialog).toBe(true);
     });
 
     it('should have enableAgents setting in schema', () => {
@@ -349,12 +400,10 @@ describe('SettingsSchema', () => {
       expect(setting).toBeDefined();
       expect(setting.type).toBe('boolean');
       expect(setting.category).toBe('Experimental');
-      expect(setting.default).toBe(false);
+      expect(setting.default).toBe(true);
       expect(setting.requiresRestart).toBe(true);
       expect(setting.showInDialog).toBe(false);
-      expect(setting.description).toBe(
-        'Enable local and remote subagents. Warning: Experimental feature, uses YOLO mode for subagents',
-      );
+      expect(setting.description).toBe('Enable local and remote subagents.');
     });
 
     it('should have skills setting enabled by default', () => {
@@ -373,26 +422,10 @@ describe('SettingsSchema', () => {
       expect(setting).toBeDefined();
       expect(setting.type).toBe('boolean');
       expect(setting.category).toBe('Experimental');
-      expect(setting.default).toBe(false);
-      expect(setting.requiresRestart).toBe(true);
-      expect(setting.showInDialog).toBe(true);
-      expect(setting.description).toBe(
-        'Enable planning features (Plan Mode and tools).',
-      );
-    });
-
-    it('should have enableEventDrivenScheduler setting in schema', () => {
-      const setting =
-        getSettingsSchema().experimental.properties.enableEventDrivenScheduler;
-      expect(setting).toBeDefined();
-      expect(setting.type).toBe('boolean');
-      expect(setting.category).toBe('Experimental');
       expect(setting.default).toBe(true);
       expect(setting.requiresRestart).toBe(true);
-      expect(setting.showInDialog).toBe(false);
-      expect(setting.description).toBe(
-        'Enables event-driven scheduler within the CLI session.',
-      );
+      expect(setting.showInDialog).toBe(true);
+      expect(setting.description).toBe('Enable Plan Mode.');
     });
 
     it('should have hooksConfig.notifications setting in schema', () => {
@@ -414,6 +447,60 @@ describe('SettingsSchema', () => {
       expect(hookItemProperties.name.type).toBe('string');
       expect(hookItemProperties.description).toBeDefined();
       expect(hookItemProperties.description.type).toBe('string');
+    });
+
+    it('should have gemmaModelRouter setting in schema', () => {
+      const gemmaModelRouter =
+        getSettingsSchema().experimental.properties.gemmaModelRouter;
+      expect(gemmaModelRouter).toBeDefined();
+      expect(gemmaModelRouter.type).toBe('object');
+      expect(gemmaModelRouter.category).toBe('Experimental');
+      expect(gemmaModelRouter.default).toEqual({});
+      expect(gemmaModelRouter.requiresRestart).toBe(true);
+      expect(gemmaModelRouter.showInDialog).toBe(false);
+      expect(gemmaModelRouter.description).toBe(
+        'Enable Gemma model router (experimental).',
+      );
+
+      const enabled = gemmaModelRouter.properties.enabled;
+      expect(enabled).toBeDefined();
+      expect(enabled.type).toBe('boolean');
+      expect(enabled.category).toBe('Experimental');
+      expect(enabled.default).toBe(false);
+      expect(enabled.requiresRestart).toBe(true);
+      expect(enabled.showInDialog).toBe(false);
+      expect(enabled.description).toBe(
+        'Enable the Gemma Model Router (experimental). Requires a local endpoint serving Gemma via the Gemini API using LiteRT-LM shim.',
+      );
+
+      const classifier = gemmaModelRouter.properties.classifier;
+      expect(classifier).toBeDefined();
+      expect(classifier.type).toBe('object');
+      expect(classifier.category).toBe('Experimental');
+      expect(classifier.default).toEqual({});
+      expect(classifier.requiresRestart).toBe(true);
+      expect(classifier.showInDialog).toBe(false);
+      expect(classifier.description).toBe('Classifier configuration.');
+
+      const host = classifier.properties.host;
+      expect(host).toBeDefined();
+      expect(host.type).toBe('string');
+      expect(host.category).toBe('Experimental');
+      expect(host.default).toBe('http://localhost:9379');
+      expect(host.requiresRestart).toBe(true);
+      expect(host.showInDialog).toBe(false);
+      expect(host.description).toBe('The host of the classifier.');
+
+      const model = classifier.properties.model;
+      expect(model).toBeDefined();
+      expect(model.type).toBe('string');
+      expect(model.category).toBe('Experimental');
+      expect(model.default).toBe('gemma3-1b-gpu-custom');
+      expect(model.requiresRestart).toBe(true);
+      expect(model.showInDialog).toBe(false);
+      expect(model.description).toBe(
+        'The model to use for the classifier. Only tested on `gemma3-1b-gpu-custom`.',
+      );
     });
   });
 
@@ -451,7 +538,31 @@ describe('SettingsSchema', () => {
       }
     };
 
+    const visitJsonSchema = (jsonSchema: Record<string, unknown>) => {
+      const ref = jsonSchema['ref'];
+      if (typeof ref === 'string') {
+        referenced.add(ref);
+      }
+      const properties = jsonSchema['properties'];
+      if (
+        properties &&
+        typeof properties === 'object' &&
+        !Array.isArray(properties)
+      ) {
+        Object.values(properties as Record<string, unknown>).forEach((prop) =>
+          visitJsonSchema(prop as Record<string, unknown>),
+        );
+      }
+      const items = jsonSchema['items'];
+      if (items && typeof items === 'object' && !Array.isArray(items)) {
+        visitJsonSchema(items as Record<string, unknown>);
+      }
+    };
+
     Object.values(schema).forEach(visitDefinition);
+
+    // Also visit all definitions to find nested references
+    Object.values(SETTINGS_SCHEMA_DEFINITIONS).forEach(visitJsonSchema);
 
     // Ensure definitions map doesn't accumulate stale entries.
     Object.keys(SETTINGS_SCHEMA_DEFINITIONS).forEach((key) => {

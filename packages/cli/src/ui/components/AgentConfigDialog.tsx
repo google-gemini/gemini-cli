@@ -8,17 +8,18 @@ import type React from 'react';
 import { useState, useEffect, useMemo, useCallback } from 'react';
 import { Text } from 'ink';
 import { theme } from '../semantic-colors.js';
-import type {
-  LoadableSettingScope,
-  LoadedSettings,
+import {
+  SettingScope,
+  type LoadableSettingScope,
+  type LoadedSettings,
 } from '../../config/settings.js';
-import { SettingScope } from '../../config/settings.js';
 import type { AgentDefinition, AgentOverride } from '@google/gemini-cli-core';
 import { getCachedStringWidth } from '../utils/textUtils.js';
 import {
   BaseSettingsDialog,
   type SettingsDialogItem,
 } from './shared/BaseSettingsDialog.js';
+import { getNestedValue, isRecord } from '../../utils/settingsUtils.js';
 
 /**
  * Configuration field definition for agent settings
@@ -109,33 +110,16 @@ interface AgentConfigDialogProps {
   settings: LoadedSettings;
   onClose: () => void;
   onSave?: () => void;
-}
-
-/**
- * Get a nested value from an object using a path array
- */
-function getNestedValue(
-  obj: Record<string, unknown> | undefined,
-  path: string[],
-): unknown {
-  if (!obj) return undefined;
-  let current: unknown = obj;
-  for (const key of path) {
-    if (current === null || current === undefined) return undefined;
-    if (typeof current !== 'object') return undefined;
-    current = (current as Record<string, unknown>)[key];
-  }
-  return current;
+  /** Available terminal height for dynamic windowing */
+  availableTerminalHeight?: number;
 }
 
 /**
  * Set a nested value in an object using a path array, creating intermediate objects as needed
  */
-function setNestedValue(
-  obj: Record<string, unknown>,
-  path: string[],
-  value: unknown,
-): Record<string, unknown> {
+function setNestedValue(obj: unknown, path: string[], value: unknown): unknown {
+  if (!isRecord(obj)) return obj;
+
   const result = { ...obj };
   let current = result;
 
@@ -143,10 +127,17 @@ function setNestedValue(
     const key = path[i];
     if (current[key] === undefined || current[key] === null) {
       current[key] = {};
-    } else {
-      current[key] = { ...(current[key] as Record<string, unknown>) };
+    } else if (isRecord(current[key])) {
+      current[key] = { ...current[key] };
     }
-    current = current[key] as Record<string, unknown>;
+
+    const next = current[key];
+    if (isRecord(next)) {
+      current = next;
+    } else {
+      // Cannot traverse further through non-objects
+      return result;
+    }
   }
 
   const finalKey = path[path.length - 1];
@@ -203,6 +194,7 @@ export function AgentConfigDialog({
   settings,
   onClose,
   onSave,
+  availableTerminalHeight,
 }: AgentConfigDialogProps): React.JSX.Element {
   // Scope selector state (User by default)
   const [selectedScope, setSelectedScope] = useState<LoadableSettingScope>(
@@ -264,10 +256,7 @@ export function AgentConfigDialog({
   const items: SettingsDialogItem[] = useMemo(
     () =>
       AGENT_CONFIG_FIELDS.map((field) => {
-        const currentValue = getNestedValue(
-          pendingOverride as Record<string, unknown>,
-          field.path,
-        );
+        const currentValue = getNestedValue(pendingOverride, field.path);
         const defaultValue = getFieldDefaultFromDefinition(field, definition);
         const effectiveValue =
           currentValue !== undefined ? currentValue : defaultValue;
@@ -300,6 +289,7 @@ export function AgentConfigDialog({
           displayValue,
           isGreyedOut: currentValue === undefined,
           scopeMessage: undefined,
+          // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
           rawValue: rawValue as string | number | boolean | undefined,
         };
       }),
@@ -319,21 +309,18 @@ export function AgentConfigDialog({
       const field = AGENT_CONFIG_FIELDS.find((f) => f.key === key);
       if (!field || field.type !== 'boolean') return;
 
-      const currentValue = getNestedValue(
-        pendingOverride as Record<string, unknown>,
-        field.path,
-      );
+      const currentValue = getNestedValue(pendingOverride, field.path);
       const defaultValue = getFieldDefaultFromDefinition(field, definition);
       const effectiveValue =
         currentValue !== undefined ? currentValue : defaultValue;
       const newValue = !effectiveValue;
 
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
       const newOverride = setNestedValue(
-        pendingOverride as Record<string, unknown>,
+        pendingOverride,
         field.path,
         newValue,
       ) as AgentOverride;
-
       setPendingOverride(newOverride);
       setModifiedFields((prev) => new Set(prev).add(key));
 
@@ -368,8 +355,9 @@ export function AgentConfigDialog({
       }
 
       // Update pending override locally
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
       const newOverride = setNestedValue(
-        pendingOverride as Record<string, unknown>,
+        pendingOverride,
         field.path,
         parsed,
       ) as AgentOverride;
@@ -390,8 +378,9 @@ export function AgentConfigDialog({
       if (!field) return;
 
       // Remove the override (set to undefined)
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
       const newOverride = setNestedValue(
-        pendingOverride as Record<string, unknown>,
+        pendingOverride,
         field.path,
         undefined,
       ) as AgentOverride;
@@ -409,12 +398,6 @@ export function AgentConfigDialog({
     [pendingOverride, saveFieldValue],
   );
 
-  // Footer content
-  const footerContent =
-    modifiedFields.size > 0 ? (
-      <Text color={theme.text.secondary}>Changes saved automatically.</Text>
-    ) : null;
-
   return (
     <BaseSettingsDialog
       title={`Configure: ${displayName}`}
@@ -424,12 +407,24 @@ export function AgentConfigDialog({
       selectedScope={selectedScope}
       onScopeChange={handleScopeChange}
       maxItemsToShow={maxItemsToShow}
+      availableHeight={availableTerminalHeight}
       maxLabelWidth={maxLabelWidth}
       onItemToggle={handleItemToggle}
       onEditCommit={handleEditCommit}
       onItemClear={handleItemClear}
       onClose={onClose}
-      footerContent={footerContent}
+      footer={
+        modifiedFields.size > 0
+          ? {
+              content: (
+                <Text color={theme.text.secondary}>
+                  Changes saved automatically.
+                </Text>
+              ),
+              height: 1,
+            }
+          : undefined
+      }
     />
   );
 }

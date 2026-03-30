@@ -1,6 +1,6 @@
 /**
  * @license
- * Copyright 2025 Google LLC
+ * Copyright 2026 Google LLC
  * SPDX-License-Identifier: Apache-2.0
  */
 
@@ -8,6 +8,7 @@ import {
   renderWithProviders,
   persistentStateMock,
 } from '../../test-utils/render.js';
+import type { LoadedSettings } from '../../config/settings.js';
 import { AppHeader } from './AppHeader.js';
 import { describe, it, expect, vi } from 'vitest';
 import { makeFakeConfig } from '@google/gemini-cli-core';
@@ -18,8 +19,7 @@ vi.mock('../utils/terminalSetup.js', () => ({
 }));
 
 describe('<AppHeader />', () => {
-  it('should render the banner with default text', () => {
-    const mockConfig = makeFakeConfig();
+  it('should render the banner with default text', async () => {
     const uiState = {
       history: [],
       bannerData: {
@@ -29,10 +29,9 @@ describe('<AppHeader />', () => {
       bannerVisible: true,
     };
 
-    const { lastFrame, unmount } = renderWithProviders(
+    const { lastFrame, unmount } = await renderWithProviders(
       <AppHeader version="1.0.0" />,
       {
-        config: mockConfig,
         uiState,
       },
     );
@@ -42,8 +41,7 @@ describe('<AppHeader />', () => {
     unmount();
   });
 
-  it('should render the banner with warning text', () => {
-    const mockConfig = makeFakeConfig();
+  it('should render the banner with warning text', async () => {
     const uiState = {
       history: [],
       bannerData: {
@@ -53,10 +51,9 @@ describe('<AppHeader />', () => {
       bannerVisible: true,
     };
 
-    const { lastFrame, unmount } = renderWithProviders(
+    const { lastFrame, unmount } = await renderWithProviders(
       <AppHeader version="1.0.0" />,
       {
-        config: mockConfig,
         uiState,
       },
     );
@@ -66,8 +63,7 @@ describe('<AppHeader />', () => {
     unmount();
   });
 
-  it('should not render the banner when no flags are set', () => {
-    const mockConfig = makeFakeConfig();
+  it('should not render the banner when no flags are set', async () => {
     const uiState = {
       history: [],
       bannerData: {
@@ -76,10 +72,9 @@ describe('<AppHeader />', () => {
       },
     };
 
-    const { lastFrame, unmount } = renderWithProviders(
+    const { lastFrame, unmount } = await renderWithProviders(
       <AppHeader version="1.0.0" />,
       {
-        config: mockConfig,
         uiState,
       },
     );
@@ -89,55 +84,7 @@ describe('<AppHeader />', () => {
     unmount();
   });
 
-  it('should render the banner when previewFeatures is disabled', () => {
-    const mockConfig = makeFakeConfig({ previewFeatures: false });
-    const uiState = {
-      history: [],
-      bannerData: {
-        defaultText: 'This is the default banner',
-        warningText: '',
-      },
-      bannerVisible: true,
-    };
-
-    const { lastFrame, unmount } = renderWithProviders(
-      <AppHeader version="1.0.0" />,
-      {
-        config: mockConfig,
-        uiState,
-      },
-    );
-
-    expect(lastFrame()).toContain('This is the default banner');
-    expect(lastFrame()).toMatchSnapshot();
-    unmount();
-  });
-
-  it('should not render the banner when previewFeatures is enabled', () => {
-    const mockConfig = makeFakeConfig({ previewFeatures: true });
-    const uiState = {
-      history: [],
-      bannerData: {
-        defaultText: 'This is the default banner',
-        warningText: '',
-      },
-    };
-
-    const { lastFrame, unmount } = renderWithProviders(
-      <AppHeader version="1.0.0" />,
-      {
-        config: mockConfig,
-        uiState,
-      },
-    );
-
-    expect(lastFrame()).not.toContain('This is the default banner');
-    expect(lastFrame()).toMatchSnapshot();
-    unmount();
-  });
-
-  it('should not render the default banner if shown count is 5 or more', () => {
-    const mockConfig = makeFakeConfig();
+  it('should not render the default banner if shown count is 5 or more', async () => {
     const uiState = {
       history: [],
       bannerData: {
@@ -155,10 +102,9 @@ describe('<AppHeader />', () => {
       },
     });
 
-    const { lastFrame, unmount } = renderWithProviders(
+    const { lastFrame, unmount } = await renderWithProviders(
       <AppHeader version="1.0.0" />,
       {
-        config: mockConfig,
         uiState,
       },
     );
@@ -168,8 +114,7 @@ describe('<AppHeader />', () => {
     unmount();
   });
 
-  it('should increment the version count when default banner is displayed', () => {
-    const mockConfig = makeFakeConfig();
+  it('should increment the version count when default banner is displayed', async () => {
     const uiState = {
       history: [],
       bannerData: {
@@ -182,10 +127,12 @@ describe('<AppHeader />', () => {
     // and interfering with the expected persistentState.set call.
     persistentStateMock.setData({ tipsShown: 10 });
 
-    const { unmount } = renderWithProviders(<AppHeader version="1.0.0" />, {
-      config: mockConfig,
-      uiState,
-    });
+    const { unmount } = await renderWithProviders(
+      <AppHeader version="1.0.0" />,
+      {
+        uiState,
+      },
+    );
 
     expect(persistentStateMock.set).toHaveBeenCalledWith(
       'defaultBannerShownCount',
@@ -199,8 +146,7 @@ describe('<AppHeader />', () => {
     unmount();
   });
 
-  it('should render banner text with unescaped newlines', () => {
-    const mockConfig = makeFakeConfig();
+  it('should render banner text with unescaped newlines', async () => {
     const uiState = {
       history: [],
       bannerData: {
@@ -210,10 +156,9 @@ describe('<AppHeader />', () => {
       bannerVisible: true,
     };
 
-    const { lastFrame, unmount } = renderWithProviders(
+    const { lastFrame, unmount } = await renderWithProviders(
       <AppHeader version="1.0.0" />,
       {
-        config: mockConfig,
         uiState,
       },
     );
@@ -222,8 +167,7 @@ describe('<AppHeader />', () => {
     unmount();
   });
 
-  it('should render Tips when tipsShown is less than 10', () => {
-    const mockConfig = makeFakeConfig();
+  it('should render Tips when tipsShown is less than 10', async () => {
     const uiState = {
       history: [],
       bannerData: {
@@ -235,10 +179,9 @@ describe('<AppHeader />', () => {
 
     persistentStateMock.setData({ tipsShown: 5 });
 
-    const { lastFrame, unmount } = renderWithProviders(
+    const { lastFrame, unmount } = await renderWithProviders(
       <AppHeader version="1.0.0" />,
       {
-        config: mockConfig,
         uiState,
       },
     );
@@ -248,15 +191,20 @@ describe('<AppHeader />', () => {
     unmount();
   });
 
-  it('should NOT render Tips when tipsShown is 10 or more', () => {
-    const mockConfig = makeFakeConfig();
+  it('should NOT render Tips when tipsShown is 10 or more', async () => {
+    const uiState = {
+      bannerData: {
+        defaultText: '',
+        warningText: '',
+      },
+    };
 
     persistentStateMock.setData({ tipsShown: 10 });
 
-    const { lastFrame, unmount } = renderWithProviders(
+    const { lastFrame, unmount } = await renderWithProviders(
       <AppHeader version="1.0.0" />,
       {
-        config: mockConfig,
+        uiState,
       },
     );
 
@@ -264,10 +212,9 @@ describe('<AppHeader />', () => {
     unmount();
   });
 
-  it('should show tips until they have been shown 10 times (persistence flow)', () => {
+  it('should show tips until they have been shown 10 times (persistence flow)', async () => {
     persistentStateMock.setData({ tipsShown: 9 });
 
-    const mockConfig = makeFakeConfig();
     const uiState = {
       history: [],
       bannerData: {
@@ -278,8 +225,7 @@ describe('<AppHeader />', () => {
     };
 
     // First session
-    const session1 = renderWithProviders(<AppHeader version="1.0.0" />, {
-      config: mockConfig,
+    const session1 = await renderWithProviders(<AppHeader version="1.0.0" />, {
       uiState,
     });
 
@@ -288,11 +234,54 @@ describe('<AppHeader />', () => {
     session1.unmount();
 
     // Second session - state is persisted in the fake
-    const session2 = renderWithProviders(<AppHeader version="1.0.0" />, {
-      config: mockConfig,
-    });
+    const session2 = await renderWithProviders(
+      <AppHeader version="1.0.0" />,
+      {},
+    );
 
     expect(session2.lastFrame()).not.toContain('Tips');
     session2.unmount();
+  });
+
+  it('should render the full logo when logged out', async () => {
+    const mockConfig = makeFakeConfig();
+    vi.spyOn(mockConfig, 'getContentGeneratorConfig').mockReturnValue({
+      authType: undefined,
+    } as any); // eslint-disable-line @typescript-eslint/no-explicit-any
+
+    const { lastFrame, waitUntilReady, unmount } = await renderWithProviders(
+      <AppHeader version="1.0.0" />,
+      {
+        config: mockConfig,
+        uiState: {
+          terminalWidth: 120,
+        },
+      },
+    );
+    await waitUntilReady();
+
+    // Check for block characters from the logo
+    expect(lastFrame()).toContain('▗█▀▀▜▙');
+    expect(lastFrame()).toMatchSnapshot();
+    unmount();
+  });
+
+  it('should NOT render Tips when ui.hideTips is true', async () => {
+    const mockConfig = makeFakeConfig();
+    const { lastFrame, waitUntilReady, unmount } = await renderWithProviders(
+      <AppHeader version="1.0.0" />,
+      {
+        config: mockConfig,
+        settings: {
+          merged: {
+            ui: { hideTips: true },
+          },
+        } as unknown as LoadedSettings,
+      },
+    );
+    await waitUntilReady();
+
+    expect(lastFrame()).not.toContain('Tips');
+    unmount();
   });
 });

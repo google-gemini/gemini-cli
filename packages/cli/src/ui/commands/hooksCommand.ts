@@ -4,23 +4,31 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import type { SlashCommand, CommandContext } from './types.js';
+import { createElement } from 'react';
+import type {
+  SlashCommand,
+  CommandContext,
+  OpenCustomDialogActionReturn,
+} from './types.js';
 import { CommandKind } from './types.js';
-import { MessageType, type HistoryItemHooksList } from '../types.js';
 import type {
   HookRegistryEntry,
   MessageActionReturn,
 } from '@google/gemini-cli-core';
 import { getErrorMessage } from '@google/gemini-cli-core';
-import { SettingScope } from '../../config/settings.js';
+import { SettingScope, isLoadableSettingScope } from '../../config/settings.js';
+import { enableHook, disableHook } from '../../utils/hookSettings.js';
+import { renderHookActionFeedback } from '../../utils/hookUtils.js';
+import { HooksDialog } from '../components/HooksDialog.js';
 
 /**
- * Display a formatted list of hooks with their status
+ * Display a formatted list of hooks with their status in a dialog
  */
-async function panelAction(
+function panelAction(
   context: CommandContext,
-): Promise<void | MessageActionReturn> {
-  const { config } = context.services;
+): MessageActionReturn | OpenCustomDialogActionReturn {
+  const agentContext = context.services.agentContext;
+  const config = agentContext?.config;
   if (!config) {
     return {
       type: 'message',
@@ -32,12 +40,13 @@ async function panelAction(
   const hookSystem = config.getHookSystem();
   const allHooks = hookSystem?.getAllHooks() || [];
 
-  const hooksListItem: HistoryItemHooksList = {
-    type: MessageType.HOOKS_LIST,
-    hooks: allHooks,
+  return {
+    type: 'custom_dialog',
+    component: createElement(HooksDialog, {
+      hooks: allHooks,
+      onClose: () => context.ui.removeComponent(),
+    }),
   };
-
-  context.ui.addItem(hooksListItem);
 }
 
 /**
@@ -47,7 +56,8 @@ async function enableAction(
   context: CommandContext,
   args: string,
 ): Promise<void | MessageActionReturn> {
-  const { config } = context.services;
+  const agentContext = context.services.agentContext;
+  const config = agentContext?.config;
   if (!config) {
     return {
       type: 'message',
@@ -74,39 +84,23 @@ async function enableAction(
     };
   }
 
-  // Get current disabled hooks from settings
   const settings = context.services.settings;
-  const disabledHooks = settings.merged.hooksConfig.disabled;
-  // Remove from disabled list if present
-  const newDisabledHooks = disabledHooks.filter(
-    (name: string) => name !== hookName,
+  const result = enableHook(settings, hookName);
+
+  if (result.status === 'success') {
+    hookSystem.setHookEnabled(hookName, true);
+  }
+
+  const feedback = renderHookActionFeedback(
+    result,
+    (label, path) => `${label} (${path})`,
   );
 
-  // Update settings (setValue automatically saves)
-  try {
-    const scope = settings.workspace
-      ? SettingScope.Workspace
-      : SettingScope.User;
-    settings.setValue(scope, 'hooksConfig.disabled', newDisabledHooks);
-
-    // Update core config so re-initialization (e.g. extension reload) respects the change
-    config.updateDisabledHooks(settings.merged.hooksConfig.disabled);
-
-    // Enable in hook system
-    hookSystem.setHookEnabled(hookName, true);
-
-    return {
-      type: 'message',
-      messageType: 'info',
-      content: `Hook "${hookName}" enabled successfully.`,
-    };
-  } catch (error) {
-    return {
-      type: 'message',
-      messageType: 'error',
-      content: `Failed to enable hook: ${getErrorMessage(error)}`,
-    };
-  }
+  return {
+    type: 'message',
+    messageType: result.status === 'error' ? 'error' : 'info',
+    content: feedback,
+  };
 }
 
 /**
@@ -116,7 +110,8 @@ async function disableAction(
   context: CommandContext,
   args: string,
 ): Promise<void | MessageActionReturn> {
-  const { config } = context.services;
+  const agentContext = context.services.agentContext;
+  const config = agentContext?.config;
   if (!config) {
     return {
       type: 'message',
@@ -143,56 +138,67 @@ async function disableAction(
     };
   }
 
-  // Get current disabled hooks from settings
   const settings = context.services.settings;
-  const disabledHooks = settings.merged.hooksConfig.disabled;
-  // Add to disabled list if not already present
-  try {
-    if (!disabledHooks.includes(hookName)) {
-      const newDisabledHooks = [...disabledHooks, hookName];
+  const scope = settings.workspace ? SettingScope.Workspace : SettingScope.User;
 
-      const scope = settings.workspace
-        ? SettingScope.Workspace
-        : SettingScope.User;
-      settings.setValue(scope, 'hooksConfig.disabled', newDisabledHooks);
-    }
+  const result = disableHook(settings, hookName, scope);
 
-    // Update core config so re-initialization (e.g. extension reload) respects the change
-    config.updateDisabledHooks(settings.merged.hooksConfig.disabled);
-
-    // Always disable in hook system to ensure in-memory state matches settings
+  if (result.status === 'success') {
     hookSystem.setHookEnabled(hookName, false);
-
-    return {
-      type: 'message',
-      messageType: 'info',
-      content: `Hook "${hookName}" disabled successfully.`,
-    };
-  } catch (error) {
-    return {
-      type: 'message',
-      messageType: 'error',
-      content: `Failed to disable hook: ${getErrorMessage(error)}`,
-    };
   }
+
+  const feedback = renderHookActionFeedback(
+    result,
+    (label, path) => `${label} (${path})`,
+  );
+
+  return {
+    type: 'message',
+    messageType: result.status === 'error' ? 'error' : 'info',
+    content: feedback,
+  };
 }
 
 /**
- * Completion function for hook names
+ * Completion function for enabled hook names (to be disabled)
  */
-function completeHookNames(
+function completeEnabledHookNames(
   context: CommandContext,
   partialArg: string,
 ): string[] {
-  const { config } = context.services;
+  const agentContext = context.services.agentContext;
+  const config = agentContext?.config;
   if (!config) return [];
 
   const hookSystem = config.getHookSystem();
   if (!hookSystem) return [];
 
   const allHooks = hookSystem.getAllHooks();
-  const hookNames = allHooks.map((hook) => getHookDisplayName(hook));
-  return hookNames.filter((name) => name.startsWith(partialArg));
+  return allHooks
+    .filter((hook) => hook.enabled)
+    .map((hook) => getHookDisplayName(hook))
+    .filter((name) => name.startsWith(partialArg));
+}
+
+/**
+ * Completion function for disabled hook names (to be enabled)
+ */
+function completeDisabledHookNames(
+  context: CommandContext,
+  partialArg: string,
+): string[] {
+  const agentContext = context.services.agentContext;
+  const config = agentContext?.config;
+  if (!config) return [];
+
+  const hookSystem = config.getHookSystem();
+  if (!hookSystem) return [];
+
+  const allHooks = hookSystem.getAllHooks();
+  return allHooks
+    .filter((hook) => !hook.enabled)
+    .map((hook) => getHookDisplayName(hook))
+    .filter((name) => name.startsWith(partialArg));
 }
 
 /**
@@ -208,7 +214,8 @@ function getHookDisplayName(hook: HookRegistryEntry): string {
 async function enableAllAction(
   context: CommandContext,
 ): Promise<void | MessageActionReturn> {
-  const { config } = context.services;
+  const agentContext = context.services.agentContext;
+  const config = agentContext?.config;
   if (!config) {
     return {
       type: 'message',
@@ -247,13 +254,12 @@ async function enableAllAction(
   }
 
   try {
-    const scope = settings.workspace
-      ? SettingScope.Workspace
-      : SettingScope.User;
-    settings.setValue(scope, 'hooksConfig.disabled', []);
-
-    // Update core config so re-initialization (e.g. extension reload) respects the change
-    config.updateDisabledHooks(settings.merged.hooksConfig.disabled);
+    const scopes = [SettingScope.Workspace, SettingScope.User];
+    for (const scope of scopes) {
+      if (isLoadableSettingScope(scope)) {
+        settings.setValue(scope, 'hooksConfig.disabled', []);
+      }
+    }
 
     for (const hook of disabledHooks) {
       const hookName = getHookDisplayName(hook);
@@ -280,7 +286,8 @@ async function enableAllAction(
 async function disableAllAction(
   context: CommandContext,
 ): Promise<void | MessageActionReturn> {
-  const { config } = context.services;
+  const agentContext = context.services.agentContext;
+  const config = agentContext?.config;
   if (!config) {
     return {
       type: 'message',
@@ -325,9 +332,6 @@ async function disableAllAction(
       : SettingScope.User;
     settings.setValue(scope, 'hooksConfig.disabled', allHookNames);
 
-    // Update core config so re-initialization (e.g. extension reload) respects the change
-    config.updateDisabledHooks(settings.merged.hooksConfig.disabled);
-
     for (const hook of enabledHooks) {
       const hookName = getHookDisplayName(hook);
       hookSystem.setHookEnabled(hookName, false);
@@ -352,6 +356,7 @@ const panelCommand: SlashCommand = {
   altNames: ['list', 'show'],
   description: 'Display all registered hooks with their status',
   kind: CommandKind.BUILT_IN,
+  autoExecute: true,
   action: panelAction,
 };
 
@@ -361,7 +366,7 @@ const enableCommand: SlashCommand = {
   kind: CommandKind.BUILT_IN,
   autoExecute: true,
   action: enableAction,
-  completion: completeHookNames,
+  completion: completeDisabledHookNames,
 };
 
 const disableCommand: SlashCommand = {
@@ -370,7 +375,7 @@ const disableCommand: SlashCommand = {
   kind: CommandKind.BUILT_IN,
   autoExecute: true,
   action: disableAction,
-  completion: completeHookNames,
+  completion: completeEnabledHookNames,
 };
 
 const enableAllCommand: SlashCommand = {
@@ -402,5 +407,5 @@ export const hooksCommand: SlashCommand = {
     enableAllCommand,
     disableAllCommand,
   ],
-  action: async (context: CommandContext) => panelCommand.action!(context, ''),
+  action: (context: CommandContext) => panelCommand.action!(context, ''),
 };

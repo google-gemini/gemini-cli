@@ -1,31 +1,8 @@
-# Gemini CLI hooks (experimental)
+# Gemini CLI hooks
 
 Hooks are scripts or programs that Gemini CLI executes at specific points in the
 agentic loop, allowing you to intercept and customize behavior without modifying
 the CLI's source code.
-
-## Availability
-
-> **Experimental Feature**: Hooks are currently enabled by default only in the
-> **Preview** and **Nightly** release channels.
-
-If you are on the Stable channel, you must explicitly enable the hooks system in
-your `settings.json`:
-
-```json
-{
-  "hooksConfig": {
-    "enabled": true
-  }
-}
-```
-
-- **[Writing hooks guide](/docs/hooks/writing-hooks)**: A tutorial on creating
-  your first hook with comprehensive examples.
-- **[Hooks reference](/docs/hooks/reference)**: The definitive technical
-  specification of I/O schemas and exit codes.
-- **[Best practices](/docs/hooks/best-practices)**: Guidelines on security,
-  performance, and debugging.
 
 ## What are hooks?
 
@@ -42,6 +19,15 @@ With hooks, you can:
 - **Log interactions:** Track tool usage and model responses for auditing.
 - **Optimize behavior:** Dynamically filter available tools or adjust model
   parameters.
+
+### Getting started
+
+- **[Writing hooks guide](../hooks/writing-hooks)**: A tutorial on creating your
+  first hook with comprehensive examples.
+- **[Best practices](../hooks/best-practices)**: Guidelines on security,
+  performance, and debugging.
+- **[Hooks reference](../hooks/reference)**: The definitive technical
+  specification of I/O schemas and exit codes.
 
 ## Core concepts
 
@@ -157,7 +143,9 @@ Hooks are executed with a sanitized environment.
 
 ## Security and risks
 
-> **Warning: Hooks execute arbitrary code with your user privileges.** By
+<!-- prettier-ignore -->
+> [!WARNING]
+> Hooks execute arbitrary code with your user privileges. By
 > configuring hooks, you are allowing scripts to run shell commands on your
 > machine.
 
@@ -166,8 +154,8 @@ Gemini CLI **fingerprints** project hooks. If a hook's name or command changes
 (e.g., via `git pull`), it is treated as a **new, untrusted hook** and you will
 be warned before it executes.
 
-See [Security Considerations](/docs/hooks/best-practices#using-hooks-securely)
-for a detailed threat model.
+See [Security Considerations](../hooks/best-practices#using-hooks-securely) for
+a detailed threat model.
 
 ## Managing hooks
 

@@ -5,20 +5,18 @@
  */
 
 import { describe, it, expect } from 'vitest';
-import type { CaGenerateContentResponse } from './converter.js';
 import {
   toGenerateContentRequest,
   fromGenerateContentResponse,
   toContents,
+  type CaGenerateContentResponse,
 } from './converter.js';
-import type {
-  ContentListUnion,
-  GenerateContentParameters,
-} from '@google/genai';
 import {
   GenerateContentResponse,
   FinishReason,
   BlockedReason,
+  type ContentListUnion,
+  type GenerateContentParameters,
   type Part,
 } from '@google/genai';
 
@@ -246,7 +244,7 @@ describe('converter', () => {
       };
       const genaiRes = fromGenerateContentResponse(codeAssistRes);
       expect(genaiRes).toBeInstanceOf(GenerateContentResponse);
-      expect(genaiRes.candidates).toEqual(codeAssistRes.response.candidates);
+      expect(genaiRes.candidates).toEqual(codeAssistRes.response!.candidates);
     });
 
     it('should handle prompt feedback and usage metadata', () => {
@@ -266,10 +264,10 @@ describe('converter', () => {
       };
       const genaiRes = fromGenerateContentResponse(codeAssistRes);
       expect(genaiRes.promptFeedback).toEqual(
-        codeAssistRes.response.promptFeedback,
+        codeAssistRes.response!.promptFeedback,
       );
       expect(genaiRes.usageMetadata).toEqual(
-        codeAssistRes.response.usageMetadata,
+        codeAssistRes.response!.usageMetadata,
       );
     });
 
@@ -296,7 +294,7 @@ describe('converter', () => {
       };
       const genaiRes = fromGenerateContentResponse(codeAssistRes);
       expect(genaiRes.automaticFunctionCallingHistory).toEqual(
-        codeAssistRes.response.automaticFunctionCallingHistory,
+        codeAssistRes.response!.automaticFunctionCallingHistory,
       );
     });
 
@@ -330,6 +328,16 @@ describe('converter', () => {
       };
       const genaiRes = fromGenerateContentResponse(codeAssistRes);
       expect(genaiRes.responseId).toBeUndefined();
+    });
+
+    it('should handle missing response property gracefully', () => {
+      const invalidRes = {
+        traceId: 'some-trace-id',
+      } as unknown as CaGenerateContentResponse;
+
+      const genaiRes = fromGenerateContentResponse(invalidRes);
+      expect(genaiRes.responseId).toEqual('some-trace-id');
+      expect(genaiRes.candidates).toEqual([]);
     });
   });
 
