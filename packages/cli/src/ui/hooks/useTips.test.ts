@@ -14,6 +14,7 @@ import { useTips } from './useTips.js';
 describe('useTips()', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    persistentStateMock.setData({ tipsShown: undefined });
   });
 
   it('should return false and call set(1) if state is undefined', async () => {
@@ -43,5 +44,14 @@ describe('useTips()', () => {
     expect(result.current.showTips).toBe(false);
     expect(persistentStateMock.set).not.toHaveBeenCalled();
     expect(persistentStateMock.get('tipsShown')).toBe(10);
+  });
+
+  it('should NOT increment if isVisible is false', async () => {
+    const { result } = await renderHookWithProviders(() =>
+      useTips({ isVisible: false }),
+    );
+
+    expect(result.current.showTips).toBe(true);
+    expect(persistentStateMock.set).not.toHaveBeenCalled();
   });
 });

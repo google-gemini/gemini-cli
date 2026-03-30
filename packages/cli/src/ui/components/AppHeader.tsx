@@ -62,7 +62,10 @@ export const AppHeader = ({ version, showDetails = true }: AppHeaderProps) => {
   const { terminalWidth, bannerData, bannerVisible, updateInfo } = useUIState();
 
   const { bannerText } = useBanner(bannerData);
-  const { showTips } = useTips();
+  const isTipsVisible = !(
+    settings.merged.ui.hideTips || config.getScreenReader()
+  );
+  const { showTips } = useTips({ isVisible: isTipsVisible });
 
   const authType = config.getContentGeneratorConfig()?.authType;
   const loggedOut = !authType;
@@ -159,8 +162,7 @@ export const AppHeader = ({ version, showDetails = true }: AppHeaderProps) => {
         />
       )}
 
-      {!(settings.merged.ui.hideTips || config.getScreenReader()) &&
-        showTips && <Tips config={config} />}
+      {isTipsVisible && showTips && <Tips config={config} />}
     </Box>
   );
 };

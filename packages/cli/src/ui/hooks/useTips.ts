@@ -11,16 +11,21 @@ interface UseTipsResult {
   showTips: boolean;
 }
 
-export function useTips(): UseTipsResult {
+interface UseTipsOptions {
+  isVisible?: boolean;
+}
+
+export function useTips(options: UseTipsOptions = {}): UseTipsResult {
+  const { isVisible = true } = options;
   const [tipsCount] = useState(() => persistentState.get('tipsShown') ?? 0);
 
   const showTips = tipsCount < 10;
 
   useEffect(() => {
-    if (showTips) {
+    if (showTips && isVisible) {
       persistentState.set('tipsShown', tipsCount + 1);
     }
-  }, [tipsCount, showTips]);
+  }, [tipsCount, showTips, isVisible]);
 
   return { showTips };
 }
