@@ -348,10 +348,9 @@ describe('LocalAgentExecutor', () => {
       get: () => 'test-prompt-id',
       configurable: true,
     });
-    parentToolRegistry = new ToolRegistry(mockConfig, mockConfig.messageBus);
-    parentToolRegistry.registerTool(
-      new LSTool(mockConfig, mockConfig.messageBus),
-    );
+    const { messageBus } = mockConfig as unknown as { messageBus: MessageBus };
+    parentToolRegistry = new ToolRegistry(mockConfig, messageBus);
+    parentToolRegistry.registerTool(new LSTool(mockConfig, messageBus));
     parentToolRegistry.registerTool(
       new MockTool({ name: READ_FILE_TOOL_NAME }),
     );
@@ -778,6 +777,25 @@ describe('LocalAgentExecutor', () => {
 
       // Assert that there is exactly ONE schema for this tool
       expect(foundSchemas).toHaveLength(1);
+    });
+
+    it('should provide tools to the model when toolConfig is OMITTED (default to all tools)', async () => {
+      const fullDefinition = createTestDefinition();
+      const { toolConfig: _, ...definition } = fullDefinition;
+
+      const executor = await LocalAgentExecutor.create(
+        definition as LocalAgentDefinition,
+        mockConfig,
+        onActivity,
+      );
+
+      const toolsList = (
+        executor as unknown as { prepareToolsList: () => FunctionDeclaration[] }
+      ).prepareToolsList();
+
+      // Verify that LS_TOOL_NAME is in the list (since LS was registered in beforeEach)
+      const toolNames = toolsList.map((t) => t.name);
+      expect(toolNames).toContain(LS_TOOL_NAME);
     });
   });
 
