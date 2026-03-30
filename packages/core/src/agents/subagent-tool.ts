@@ -181,6 +181,7 @@ class SubAgentInvocation extends BaseToolInvocation<AgentInputs, ToolResult> {
     return runInDevTraceSpan(
       {
         operation: GeminiCliOperation.AgentCall,
+        logPrompts: this.context.config.getTelemetryLogPromptsEnabled(),
         attributes: {
           [GEN_AI_AGENT_NAME]: this.definition.name,
           [GEN_AI_AGENT_DESCRIPTION]: this.definition.description,

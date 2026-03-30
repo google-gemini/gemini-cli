@@ -13,6 +13,9 @@ import { TestRig } from '@google/gemini-cli-test-utils';
 import {
   createUnauthorizedToolError,
   parseAgentMarkdown,
+  Storage,
+  getProjectHash,
+  SESSION_FILE_PREFIX,
 } from '@google/gemini-cli-core';
 
 export * from '@google/gemini-cli-test-utils';
@@ -36,89 +39,89 @@ export * from '@google/gemini-cli-test-utils';
 export type EvalPolicy = 'ALWAYS_PASSES' | 'USUALLY_PASSES';
 
 export function evalTest(policy: EvalPolicy, evalCase: EvalCase) {
-  const fn = async () => {
+  runEval(
+    policy,
+    evalCase.name,
+    () => internalEvalTest(evalCase),
+    evalCase.timeout,
+  );
+}
+
+export async function internalEvalTest(evalCase: EvalCase) {
+  const maxRetries = 3;
+  let attempt = 0;
+
+  while (attempt <= maxRetries) {
     const rig = new TestRig();
     const { logDir, sanitizedName } = await prepareLogDir(evalCase.name);
     const activityLogFile = path.join(logDir, `${sanitizedName}.jsonl`);
     const logFile = path.join(logDir, `${sanitizedName}.log`);
     let isSuccess = false;
+
     try {
       rig.setup(evalCase.name, evalCase.params);
 
-      // Symlink node modules to reduce the amount of time needed to
-      // bootstrap test projects.
-      symlinkNodeModules(rig.testDir || '');
+      if (evalCase.setup) {
+        await evalCase.setup(rig);
+      }
 
       if (evalCase.files) {
-        const acknowledgedAgents: Record<string, Record<string, string>> = {};
-        const projectRoot = fs.realpathSync(rig.testDir!);
+        await setupTestFiles(rig, evalCase.files);
+      }
 
-        for (const [filePath, content] of Object.entries(evalCase.files)) {
-          const fullPath = path.join(rig.testDir!, filePath);
-          fs.mkdirSync(path.dirname(fullPath), { recursive: true });
-          fs.writeFileSync(fullPath, content);
+      symlinkNodeModules(rig.testDir || '');
 
-          // If it's an agent file, calculate hash for acknowledgement
-          if (
-            filePath.startsWith('.gemini/agents/') &&
-            filePath.endsWith('.md')
-          ) {
-            const hash = crypto
-              .createHash('sha256')
-              .update(content)
-              .digest('hex');
+      // If messages are provided, write a session file so --resume can load it.
+      let sessionId: string | undefined;
+      if (evalCase.messages) {
+        sessionId =
+          evalCase.sessionId ||
+          `test-session-${crypto.randomUUID().slice(0, 8)}`;
 
-            try {
-              const agentDefs = await parseAgentMarkdown(fullPath, content);
-              if (agentDefs.length > 0) {
-                const agentName = agentDefs[0].name;
-                if (!acknowledgedAgents[projectRoot]) {
-                  acknowledgedAgents[projectRoot] = {};
-                }
-                acknowledgedAgents[projectRoot][agentName] = hash;
-              }
-            } catch (error) {
-              console.warn(
-                `Failed to parse agent for test acknowledgement: ${filePath}`,
-                error,
-              );
-            }
+        // Temporarily set GEMINI_CLI_HOME so Storage writes to the same
+        // directory the CLI subprocess will use (rig.homeDir).
+        const originalGeminiHome = process.env['GEMINI_CLI_HOME'];
+        process.env['GEMINI_CLI_HOME'] = rig.homeDir!;
+        try {
+          const storage = new Storage(fs.realpathSync(rig.testDir!));
+          await storage.initialize();
+          const chatsDir = path.join(storage.getProjectTempDir(), 'chats');
+          fs.mkdirSync(chatsDir, { recursive: true });
+
+          const conversation = {
+            sessionId,
+            projectHash: getProjectHash(fs.realpathSync(rig.testDir!)),
+            startTime: new Date().toISOString(),
+            lastUpdated: new Date().toISOString(),
+            messages: evalCase.messages,
+          };
+
+          const timestamp = new Date()
+            .toISOString()
+            .slice(0, 16)
+            .replace(/:/g, '-');
+          const filename = `${SESSION_FILE_PREFIX}${timestamp}-${sessionId.slice(0, 8)}.json`;
+          fs.writeFileSync(
+            path.join(chatsDir, filename),
+            JSON.stringify(conversation, null, 2),
+          );
+        } catch (e) {
+          // Storage initialization may fail in some environments; log and continue.
+          console.warn('Failed to write session history:', e);
+        } finally {
+          // Restore original GEMINI_CLI_HOME.
+          if (originalGeminiHome === undefined) {
+            delete process.env['GEMINI_CLI_HOME'];
+          } else {
+            process.env['GEMINI_CLI_HOME'] = originalGeminiHome;
           }
         }
-
-        // Write acknowledged_agents.json to the home directory
-        if (Object.keys(acknowledgedAgents).length > 0) {
-          const ackPath = path.join(
-            rig.homeDir!,
-            '.gemini',
-            'acknowledgments',
-            'agents.json',
-          );
-          fs.mkdirSync(path.dirname(ackPath), { recursive: true });
-          fs.writeFileSync(
-            ackPath,
-            JSON.stringify(acknowledgedAgents, null, 2),
-          );
-        }
-
-        const execOptions = { cwd: rig.testDir!, stdio: 'inherit' as const };
-        execSync('git init', execOptions);
-        execSync('git config user.email "test@example.com"', execOptions);
-        execSync('git config user.name "Test User"', execOptions);
-
-        // Temporarily disable the interactive editor and git pager
-        // to avoid hanging the tests. It seems the the agent isn't
-        // consistently honoring the instructions to avoid interactive
-        // commands.
-        execSync('git config core.editor "true"', execOptions);
-        execSync('git config core.pager "cat"', execOptions);
-        execSync('git config commit.gpgsign false', execOptions);
-        execSync('git add .', execOptions);
-        execSync('git commit --allow-empty -m "Initial commit"', execOptions);
       }
 
       const result = await rig.run({
-        args: evalCase.prompt,
+        args: sessionId
+          ? ['--resume', sessionId, evalCase.prompt]
+          : evalCase.prompt,
         approvalMode: evalCase.approvalMode ?? 'yolo',
         timeout: evalCase.timeout,
         env: {
@@ -136,6 +139,37 @@ export function evalTest(policy: EvalPolicy, evalCase: EvalCase) {
 
       await evalCase.assert(rig, result);
       isSuccess = true;
+      return; // Success! Exit the retry loop.
+    } catch (error: unknown) {
+      const errorMessage =
+        error instanceof Error ? error.message : String(error);
+      const errorCode = getApiErrorCode(errorMessage);
+
+      if (errorCode) {
+        const status = attempt < maxRetries ? 'RETRY' : 'SKIP';
+        logReliabilityEvent(
+          evalCase.name,
+          attempt,
+          status,
+          errorCode,
+          errorMessage,
+        );
+
+        if (attempt < maxRetries) {
+          attempt++;
+          console.warn(
+            `[Eval] Attempt ${attempt} failed with ${errorCode} Error. Retrying...`,
+          );
+          continue; // Retry
+        }
+
+        console.warn(
+          `[Eval] '${evalCase.name}' failed after ${maxRetries} retries due to persistent API errors. Skipping failure to avoid blocking PR.`,
+        );
+        return; // Gracefully exit without failing the test
+      }
+
+      throw error; // Real failure
     } finally {
       if (isSuccess) {
         await fs.promises.unlink(activityLogFile).catch((err) => {
@@ -154,9 +188,131 @@ export function evalTest(policy: EvalPolicy, evalCase: EvalCase) {
       );
       await rig.cleanup();
     }
+  }
+}
+
+function getApiErrorCode(message: string): '500' | '503' | undefined {
+  if (
+    message.includes('status: UNAVAILABLE') ||
+    message.includes('code: 503') ||
+    message.includes('Service Unavailable')
+  ) {
+    return '503';
+  }
+  if (
+    message.includes('status: INTERNAL') ||
+    message.includes('code: 500') ||
+    message.includes('Internal error encountered')
+  ) {
+    return '500';
+  }
+  return undefined;
+}
+
+/**
+ * Log reliability event for later harvesting.
+ *
+ * Note: Uses synchronous file I/O to ensure the log is persisted even if the
+ * test process is abruptly terminated by a timeout or CI crash. Performance
+ * impact is negligible compared to long-running evaluation tests.
+ */
+function logReliabilityEvent(
+  testName: string,
+  attempt: number,
+  status: 'RETRY' | 'SKIP',
+  errorCode: '500' | '503',
+  errorMessage: string,
+) {
+  const reliabilityLog = {
+    timestamp: new Date().toISOString(),
+    testName,
+    model: process.env.GEMINI_MODEL || 'unknown',
+    attempt,
+    status,
+    errorCode,
+    error: errorMessage,
   };
 
-  runEval(policy, evalCase.name, fn, evalCase.timeout);
+  try {
+    const relDir = path.resolve(process.cwd(), 'evals/logs');
+    fs.mkdirSync(relDir, { recursive: true });
+    fs.appendFileSync(
+      path.join(relDir, 'api-reliability.jsonl'),
+      JSON.stringify(reliabilityLog) + '\n',
+    );
+  } catch (logError) {
+    console.error('Failed to write reliability log:', logError);
+  }
+}
+
+/**
+ * Helper to setup test files and git repository.
+ *
+ * Note: While this is an async function (due to parseAgentMarkdown), it
+ * intentionally uses synchronous filesystem and child_process operations
+ * for simplicity and to ensure sequential environment preparation.
+ */
+async function setupTestFiles(rig: TestRig, files: Record<string, string>) {
+  const acknowledgedAgents: Record<string, Record<string, string>> = {};
+  const projectRoot = fs.realpathSync(rig.testDir!);
+
+  for (const [filePath, content] of Object.entries(files)) {
+    if (filePath.includes('..') || path.isAbsolute(filePath)) {
+      throw new Error(`Invalid file path in test case: ${filePath}`);
+    }
+    const fullPath = path.join(projectRoot, filePath);
+    if (!fullPath.startsWith(projectRoot)) {
+      throw new Error(`Path traversal detected: ${filePath}`);
+    }
+
+    fs.mkdirSync(path.dirname(fullPath), { recursive: true });
+    fs.writeFileSync(fullPath, content);
+
+    if (filePath.startsWith('.gemini/agents/') && filePath.endsWith('.md')) {
+      const hash = crypto.createHash('sha256').update(content).digest('hex');
+      try {
+        const agentDefs = await parseAgentMarkdown(fullPath, content);
+        if (agentDefs.length > 0) {
+          const agentName = agentDefs[0].name;
+          if (!acknowledgedAgents[projectRoot]) {
+            acknowledgedAgents[projectRoot] = {};
+          }
+          acknowledgedAgents[projectRoot][agentName] = hash;
+        }
+      } catch (error) {
+        console.warn(
+          `Failed to parse agent for test acknowledgement: ${filePath}`,
+          error,
+        );
+      }
+    }
+  }
+
+  if (Object.keys(acknowledgedAgents).length > 0) {
+    const ackPath = path.join(
+      rig.homeDir!,
+      '.gemini',
+      'acknowledgments',
+      'agents.json',
+    );
+    fs.mkdirSync(path.dirname(ackPath), { recursive: true });
+    fs.writeFileSync(ackPath, JSON.stringify(acknowledgedAgents, null, 2));
+  }
+
+  const execOptions = { cwd: rig.testDir!, stdio: 'inherit' as const };
+  execSync('git init --initial-branch=main', execOptions);
+  execSync('git config user.email "test@example.com"', execOptions);
+  execSync('git config user.name "Test User"', execOptions);
+
+  // Temporarily disable the interactive editor and git pager
+  // to avoid hanging the tests. It seems the the agent isn't
+  // consistently honoring the instructions to avoid interactive
+  // commands.
+  execSync('git config core.editor "true"', execOptions);
+  execSync('git config core.pager "cat"', execOptions);
+  execSync('git config commit.gpgsign false', execOptions);
+  execSync('git add .', execOptions);
+  execSync('git commit --allow-empty -m "Initial commit"', execOptions);
 }
 
 /**
@@ -219,6 +375,11 @@ export interface EvalCase {
   prompt: string;
   timeout?: number;
   files?: Record<string, string>;
+  setup?: (rig: TestRig) => Promise<void> | void;
+  /** Conversation history to pre-load via --resume. Each entry is a message object with type, content, etc. */
+  messages?: Record<string, unknown>[];
+  /** Session ID for the resumed session. Auto-generated if not provided. */
+  sessionId?: string;
   approvalMode?: 'default' | 'auto_edit' | 'yolo' | 'plan';
   assert: (rig: TestRig, result: string) => Promise<void>;
 }

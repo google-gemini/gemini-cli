@@ -145,7 +145,6 @@ const mockRunInDevTraceSpan = vi.hoisted(() =>
     };
     return await fn({
       metadata,
-      endSpan: vi.fn(),
     });
   }),
 );
@@ -180,11 +179,18 @@ vi.mock('./useKeypress.js', () => ({
   useKeypress: vi.fn(),
 }));
 
-vi.mock('./shellCommandProcessor.js', () => ({
-  useShellCommandProcessor: vi.fn().mockReturnValue({
+vi.mock('./useExecutionLifecycle.js', () => ({
+  useExecutionLifecycle: vi.fn().mockReturnValue({
     handleShellCommand: vi.fn(),
     activeShellPtyId: null,
     lastShellOutputTime: 0,
+    backgroundTaskCount: 0,
+    isBackgroundTaskVisible: false,
+    toggleBackgroundTasks: vi.fn(),
+    backgroundCurrentExecution: vi.fn(),
+    backgroundTasks: new Map(),
+    dismissBackgroundTask: vi.fn(),
+    registerBackgroundTask: vi.fn(),
   }),
 }));
 
@@ -889,7 +895,7 @@ describe('useGeminiStream', () => {
     const fn = spanArgs[1];
     const metadata = { attributes: {} };
     await act(async () => {
-      await fn({ metadata, endSpan: vi.fn() });
+      await fn({ metadata });
     });
     expect(metadata).toMatchObject({
       input: sentParts,
@@ -4037,7 +4043,7 @@ describe('useGeminiStream', () => {
 
     const spanMetadata = {} as SpanMetadata;
     await act(async () => {
-      await userPromptCall![1]({ metadata: spanMetadata, endSpan: vi.fn() });
+      await userPromptCall![1]({ metadata: spanMetadata });
     });
     expect(spanMetadata.input).toBe('telemetry test query');
   });

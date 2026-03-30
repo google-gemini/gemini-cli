@@ -26,6 +26,7 @@ import {
   type ScheduledToolCall,
 } from './types.js';
 import { ToolErrorType } from '../tools/tool-error.js';
+import { UPDATE_TOPIC_TOOL_NAME } from '../tools/tool-names.js';
 import { PolicyDecision, type ApprovalMode } from '../policy/types.js';
 import {
   ToolConfirmationOutcome,
@@ -77,7 +78,7 @@ const createErrorResponse = (
     {
       functionResponse: {
         id: request.callId,
-        name: request.name,
+        name: request.originalRequestName ?? request.name,
         response: { error: error.message },
       },
     },
@@ -193,7 +194,10 @@ export class Scheduler {
     signal: AbortSignal,
   ): Promise<CompletedToolCall[]> {
     return runInDevTraceSpan(
-      { operation: GeminiCliOperation.ScheduleToolCalls },
+      {
+        operation: GeminiCliOperation.ScheduleToolCalls,
+        logPrompts: this.context.config.getTelemetryLogPromptsEnabled(),
+      },
       async ({ metadata: spanMetadata }) => {
         const requests = Array.isArray(request) ? request : [request];
 
@@ -299,9 +303,16 @@ export class Scheduler {
     this.state.clearBatch();
     const currentApprovalMode = this.config.getApprovalMode();
 
+    // Sort requests to ensure Topic changes happen before actions in the same batch.
+    const sortedRequests = [...requests].sort((a, b) => {
+      if (a.name === UPDATE_TOPIC_TOOL_NAME) return -1;
+      if (b.name === UPDATE_TOPIC_TOOL_NAME) return 1;
+      return 0;
+    });
+
     try {
       const toolRegistry = this.context.toolRegistry;
-      const newCalls: ToolCall[] = requests.map((request) => {
+      const newCalls: ToolCall[] = sortedRequests.map((request) => {
         const enrichedRequest: ToolCallRequestInfo = {
           ...request,
           schedulerId: this.schedulerId,
@@ -763,6 +774,8 @@ export class Scheduler {
         name: tailRequest.name,
         args: tailRequest.args,
         originalRequestName,
+        originalRequestArgs:
+          result.request.originalRequestArgs ?? result.request.args,
         isClientInitiated: result.request.isClientInitiated,
         prompt_id: result.request.prompt_id,
         schedulerId: this.schedulerId,
@@ -787,6 +800,110 @@ export class Scheduler {
 
       // Loop continues, picking up the new tail call at the front of the queue.
       return true;
+    }
+
+    let isSandboxError = false;
+    let sandboxDetailsStr = '';
+
+    if (
+      result.status === CoreToolCallStatus.Error &&
+      result.response.errorType === 'sandbox_expansion_required'
+    ) {
+      isSandboxError = true;
+      sandboxDetailsStr = result.response.error?.message || '';
+    }
+
+    if (isSandboxError) {
+      try {
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
+        const parsedError = JSON.parse(sandboxDetailsStr) as {
+          rootCommand: string;
+          additionalPermissions: import('../services/sandboxManager.js').SandboxPermissions;
+        };
+
+        const confirmationDetails: SerializableConfirmationDetails = {
+          type: 'sandbox_expansion',
+          title: 'Sandbox Expansion Request',
+          command: String(
+            activeCall.request.args['command'] ?? parsedError.rootCommand,
+          ),
+          rootCommand: parsedError.rootCommand,
+          additionalPermissions: parsedError.additionalPermissions,
+        };
+
+        const correlationId = crypto.randomUUID();
+
+        // Mutate the active call so resolveConfirmation generates the correct Sandbox Expansion details
+        activeCall.request.args['additional_permissions'] =
+          parsedError.additionalPermissions;
+        activeCall.invocation = activeCall.tool.build(activeCall.request.args);
+
+        // CRITICAL: We must push the new args and invocation into the state manager
+        // before calling resolveConfirmation, because resolveConfirmation fetches
+        // the tool call directly from the state manager!
+        this.state.updateArgs(
+          callId,
+          activeCall.request.args,
+          activeCall.invocation,
+        );
+
+        this.state.updateStatus(callId, CoreToolCallStatus.AwaitingApproval, {
+          confirmationDetails,
+          correlationId,
+        });
+
+        const validatingCall = {
+          ...activeCall,
+          status: CoreToolCallStatus.Validating,
+        } as ValidatingToolCall;
+
+        const confResult = await resolveConfirmation(validatingCall, signal, {
+          config: this.config,
+          messageBus: this.messageBus,
+          state: this.state,
+          modifier: this.modifier,
+          getPreferredEditor: this.getPreferredEditor,
+          schedulerId: this.schedulerId,
+          onWaitingForConfirmation: this.onWaitingForConfirmation,
+        });
+
+        if (confResult.outcome === ToolConfirmationOutcome.Cancel) {
+          type LegacyHack = ToolCallResponseInfo & {
+            llmContent?: string;
+            returnDisplay?: string;
+          };
+          const errorResponse = { ...result.response } as LegacyHack;
+          errorResponse.llmContent =
+            'User cancelled sandbox expansion. The command failed with a sandbox denial. Shell output:\n' +
+            String(errorResponse.returnDisplay);
+
+          this.state.updateStatus(
+            callId,
+            CoreToolCallStatus.Error,
+            errorResponse,
+          );
+          return false;
+        }
+
+        activeCall.request.args['additional_permissions'] =
+          parsedError.additionalPermissions;
+
+        // Reset the output stream visual so it replaces the error text
+        this.state.updateStatus(callId, CoreToolCallStatus.Executing, {
+          liveOutput: undefined,
+        });
+
+        // Call _execute synchronously and properly return its promise to loop internally!
+        return await this._execute(
+          {
+            ...activeCall,
+            status: CoreToolCallStatus.Scheduled,
+          } as ScheduledToolCall,
+          signal,
+        );
+      } catch (_e) {
+        // Fallback to normal error handling if parsing/looping fails
+      }
     }
 
     if (result.status === CoreToolCallStatus.Success) {
