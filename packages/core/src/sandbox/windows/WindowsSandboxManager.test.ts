@@ -125,7 +125,9 @@ describe('WindowsSandboxManager', () => {
   });
 
   it('should handle persistent permissions from policyManager', async () => {
-    const persistentPath = path.resolve('/persistent/path');
+    const persistentPath = path.join(testCwd, 'persistent_path');
+    fs.mkdirSync(persistentPath, { recursive: true });
+
     const mockPolicyManager = {
       getCommandPermissions: vi.fn().mockReturnValue({
         fileSystem: { write: [persistentPath] },

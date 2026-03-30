@@ -293,24 +293,26 @@ export class WindowsSandboxManager implements SandboxManager {
     for (const allowedPath of allowedPaths) {
       const resolved = await tryRealpath(allowedPath);
       if (!fs.existsSync(resolved)) {
-        // If the path doesn't exist, we still want to allow access to its parent
-        // if it's explicitly allowed, to enable creating it.
-        try {
-          const resolvedParent = await tryRealpath(path.dirname(resolved));
-          await this.grantLowIntegrityAccess(resolvedParent);
-        } catch {
-          // Ignore
-        }
-      } else {
-        await this.grantLowIntegrityAccess(resolved);
+        throw new Error(
+          `Sandbox request rejected: Allowed path does not exist: ${resolved}. ` +
+            'On Windows, granular sandbox access can only be granted to existing paths to avoid broad parent directory permissions.',
+        );
       }
+      await this.grantLowIntegrityAccess(resolved);
     }
 
     // Grant "Low Mandatory Level" write access to additional permissions write paths.
     const additionalWritePaths =
       sanitizePaths(mergedAdditional.fileSystem?.write) || [];
     for (const writePath of additionalWritePaths) {
-      await this.grantLowIntegrityAccess(writePath);
+      const resolved = await tryRealpath(writePath);
+      if (!fs.existsSync(resolved)) {
+        throw new Error(
+          `Sandbox request rejected: Additional write path does not exist: ${resolved}. ` +
+            'On Windows, granular sandbox access can only be granted to existing paths to avoid broad parent directory permissions.',
+        );
+      }
+      await this.grantLowIntegrityAccess(resolved);
     }
 
     // 2. Collect secret files and apply protective ACLs
