@@ -229,7 +229,7 @@ export class BrowserManager {
 
     // Hard enforcement of per-action rate limit
     if (shouldCount) {
-      if (this.actionCounter > this.maxActionsPerTask) {
+      if (this.actionCounter >= this.maxActionsPerTask) {
         const error = new Error(
           `Browser agent reached maximum action limit (${this.maxActionsPerTask}). ` +
             `Task terminated to prevent runaway execution. To config the limit, use maxActionsPerTask in the settings.`,
