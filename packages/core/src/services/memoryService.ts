@@ -99,11 +99,36 @@ function isConversationRecord(value: unknown): value is ConversationRecord {
   );
 }
 
+function isExtractionRun(value: unknown): value is ExtractionRun {
+  return (
+    typeof value === 'object' &&
+    value !== null &&
+    'runAt' in value &&
+    typeof value.runAt === 'string' &&
+    'sessionIds' in value &&
+    Array.isArray(value.sessionIds) &&
+    'skillsCreated' in value &&
+    Array.isArray(value.skillsCreated)
+  );
+}
+
+function isExtractionState(value: unknown): value is { runs: unknown[] } {
+  return (
+    typeof value === 'object' &&
+    value !== null &&
+    'runs' in value &&
+    Array.isArray(value.runs)
+  );
+}
+
 /**
  * Attempts to acquire an exclusive lock file using O_CREAT | O_EXCL.
  * Returns true if the lock was acquired, false if another instance owns it.
  */
-export async function tryAcquireLock(lockPath: string): Promise<boolean> {
+export async function tryAcquireLock(
+  lockPath: string,
+  retries = 1,
+): Promise<boolean> {
   const lockInfo: LockInfo = {
     pid: process.pid,
     startedAt: new Date().toISOString(),
@@ -115,17 +140,19 @@ export async function tryAcquireLock(lockPath: string): Promise<boolean> {
       lockPath,
       fsConstants.O_CREAT | fsConstants.O_EXCL | fsConstants.O_WRONLY,
     );
-    await fd.writeFile(JSON.stringify(lockInfo));
-    await fd.close();
+    try {
+      await fd.writeFile(JSON.stringify(lockInfo));
+    } finally {
+      await fd.close();
+    }
     return true;
   } catch (error: unknown) {
     if (isNodeError(error) && error.code === 'EEXIST') {
       // Lock exists — check if it's stale
-      if (await isLockStale(lockPath)) {
+      if (retries > 0 && (await isLockStale(lockPath))) {
         debugLogger.debug('[MemoryService] Cleaning up stale lock file');
         await releaseLock(lockPath);
-        // Retry once after cleaning stale lock
-        return tryAcquireLock(lockPath);
+        return tryAcquireLock(lockPath, retries - 1);
       }
       debugLogger.debug(
         '[MemoryService] Lock held by another instance, skipping',
@@ -194,46 +221,30 @@ export async function readExtractionState(
   try {
     const content = await fs.readFile(statePath, 'utf-8');
     const parsed: unknown = JSON.parse(content);
-    if (typeof parsed !== 'object' || parsed === null) {
+    if (!isExtractionState(parsed)) {
       return { runs: [] };
     }
 
     const runs: ExtractionRun[] = [];
-    if ('runs' in parsed && Array.isArray(parsed.runs)) {
-      for (const run of parsed.runs) {
-        if (
-          typeof run === 'object' &&
-          run !== null &&
-          'runAt' in run &&
-          typeof run.runAt === 'string' &&
-          'sessionIds' in run &&
-          Array.isArray(run.sessionIds) &&
-          'skillsCreated' in run &&
-          Array.isArray(run.skillsCreated)
-        ) {
-          const sessionIds: string[] = [];
-          for (const sid of run.sessionIds) {
-            if (typeof sid === 'string') {
-              sessionIds.push(sid);
-            }
-          }
-          const skillsCreated: string[] = [];
-          for (const sk of run.skillsCreated) {
-            if (typeof sk === 'string') {
-              skillsCreated.push(sk);
-            }
-          }
-          runs.push({
-            runAt: String(run.runAt),
-            sessionIds,
-            skillsCreated,
-          });
-        }
-      }
+    for (const run of parsed.runs) {
+      if (!isExtractionRun(run)) continue;
+      runs.push({
+        runAt: run.runAt,
+        sessionIds: run.sessionIds.filter(
+          (sid): sid is string => typeof sid === 'string',
+        ),
+        skillsCreated: run.skillsCreated.filter(
+          (sk): sk is string => typeof sk === 'string',
+        ),
+      });
     }
 
     return { runs };
-  } catch {
+  } catch (error) {
+    debugLogger.debug(
+      '[MemoryService] Failed to read extraction state:',
+      error,
+    );
     return { runs: [] };
   }
 }
@@ -251,6 +262,28 @@ export async function writeExtractionState(
 }
 
 /**
+ * Determines if a conversation record should be considered for processing.
+ * Filters out subagent sessions, sessions that haven't been idle long enough,
+ * and sessions with too few user messages.
+ */
+function shouldProcessConversation(parsed: ConversationRecord): boolean {
+  // Skip subagent sessions
+  if (parsed.kind === 'subagent') return false;
+
+  // Skip sessions that are still active (not idle for 3+ hours)
+  const lastUpdated = new Date(parsed.lastUpdated).getTime();
+  if (Date.now() - lastUpdated < MIN_IDLE_MS) return false;
+
+  // Skip sessions with too few user messages
+  const userMessageCount = parsed.messages.filter(
+    (m) => m.type === 'user',
+  ).length;
+  if (userMessageCount < MIN_USER_MESSAGES) return false;
+
+  return true;
+}
+
+/**
  * Scans the chats directory for unprocessed session files.
  */
 export async function getUnprocessedSessions(
@@ -262,7 +295,8 @@ export async function getUnprocessedSessions(
   let allFiles: string[];
   try {
     allFiles = await fs.readdir(chatsDir);
-  } catch {
+  } catch (error) {
+    debugLogger.debug('[MemoryService] Failed to read chats directory:', error);
     return [];
   }
 
@@ -285,21 +319,13 @@ export async function getUnprocessedSessions(
       if (!isConversationRecord(parsed)) {
         continue;
       }
-      const conversation = parsed;
 
-      // Skip subagent sessions
-      if (conversation.kind === 'subagent') continue;
+      if (!shouldProcessConversation(parsed)) continue;
 
       // Skip already processed
-      if (processedSet.has(conversation.sessionId)) continue;
+      if (processedSet.has(parsed.sessionId)) continue;
 
-      // Skip sessions with too few user messages
-      const userMessageCount = conversation.messages.filter(
-        (m) => m.type === 'user',
-      ).length;
-      if (userMessageCount < MIN_USER_MESSAGES) continue;
-
-      sessions.push(conversation);
+      sessions.push(parsed);
     } catch {
       debugLogger.debug(`[MemoryService] Failed to read session file: ${file}`);
     }
@@ -398,20 +424,11 @@ export async function buildSessionIndex(
       const content = await fs.readFile(filePath, 'utf-8');
       const parsed: unknown = JSON.parse(content);
       if (!isConversationRecord(parsed)) continue;
+      if (!shouldProcessConversation(parsed)) continue;
 
-      // Skip subagent sessions
-      if (parsed.kind === 'subagent') continue;
-
-      // Skip sessions that are still active (not idle for 3+ hours)
-      const lastUpdated = new Date(parsed.lastUpdated).getTime();
-      if (Date.now() - lastUpdated < MIN_IDLE_MS) continue;
-
-      // Skip sessions with too few user messages
       const userMessageCount = parsed.messages.filter(
         (m) => m.type === 'user',
       ).length;
-      if (userMessageCount < MIN_USER_MESSAGES) continue;
-
       const isNew = !processedSet.has(parsed.sessionId);
       if (isNew) {
         newSessionIds.push(parsed.sessionId);
@@ -534,7 +551,10 @@ async function buildExistingSkillsSummary(
 /**
  * Builds an AgentLoopContext from a Config for background agent execution.
  */
-function buildAgentLoopContext(config: Config): {
+function buildAgentLoopContext(
+  config: Config,
+  skillsDir: string,
+): {
   context: AgentLoopContext;
   restoreConfig: () => void;
 } {
@@ -551,11 +571,9 @@ function buildAgentLoopContext(config: Config): {
   });
   const autoApproveBus = new MessageBus(autoApprovePolicy);
 
-  // Create a scoped config proxy that restricts the agent's view to ~/.gemini/ only.
-  // This prevents the executor from injecting the full workspace directory tree
-  // and project GEMINI.md content into the system prompt.
-  const geminiDir = Storage.getGlobalGeminiDir();
-  const scopedWorkspace = new WorkspaceContext(geminiDir);
+  // Scope the workspace context to the skills directory so the agent only
+  // sees the extraction target, not the full project tree.
+  const scopedWorkspace = new WorkspaceContext(skillsDir);
   // Override methods that inject workspace context into the agent's prompt.
   // We bind directly to avoid restricted patterns (Object.create, Proxy, Reflect).
   const scopedConfig = config;
@@ -564,6 +582,8 @@ function buildAgentLoopContext(config: Config): {
   const origGetEnvMemory = config.getEnvironmentMemory.bind(config);
   const origGetSesMemory = config.getSessionMemory.bind(config);
   scopedConfig.getWorkspaceContext = () => scopedWorkspace;
+  // Return empty strings to prevent project GEMINI.md and session/environment
+  // memory from being injected into the extraction agent's system prompt.
   scopedConfig.getSystemInstructionMemory = () => '';
   scopedConfig.getEnvironmentMemory = () => '';
   scopedConfig.getSessionMemory = () => '';
@@ -685,7 +705,7 @@ export async function startMemoryService(config: Config): Promise<void> {
       existingSkillsSummary,
     );
 
-    const agentLoopResult = buildAgentLoopContext(config);
+    const agentLoopResult = buildAgentLoopContext(config, skillsDir);
     const context = agentLoopResult.context;
     restoreConfig = agentLoopResult.restoreConfig;
 
