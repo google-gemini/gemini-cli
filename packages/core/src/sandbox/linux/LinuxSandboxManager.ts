@@ -40,6 +40,7 @@ import {
   isDangerousCommand,
 } from '../utils/commandSafety.js';
 import { parsePosixSandboxDenials } from '../utils/sandboxDenialUtils.js';
+import { handleReadWriteCommands } from '../utils/sandboxReadWriteUtils.js';
 
 let cachedBpfPath: string | undefined;
 
@@ -211,21 +212,12 @@ export class LinuxSandboxManager implements SandboxManager {
         false,
     };
 
-    let finalCommand = req.command;
-    let finalArgs = req.args;
-
-    if (req.command === '__read') {
-      finalCommand = '/bin/cat';
-      if (req.args[0]) {
-        mergedAdditional.fileSystem!.read!.push(req.args[0]);
-      }
-    } else if (req.command === '__write') {
-      finalCommand = '/bin/sh';
-      finalArgs = ['-c', 'cat > "$1"', '_', ...req.args];
-      if (req.args[0]) {
-        mergedAdditional.fileSystem!.write!.push(req.args[0]);
-      }
-    }
+    const { command: finalCommand, args: finalArgs } = handleReadWriteCommands(
+      req,
+      mergedAdditional,
+      this.options.workspace,
+      req.policy?.allowedPaths,
+    );
 
     const sanitizationConfig = getSecureSanitizationConfig(
       req.policy?.sanitizationConfig,
@@ -295,14 +287,7 @@ export class LinuxSandboxManager implements SandboxManager {
       if (!fs.existsSync(resolved)) continue;
       const normalizedAllowedPath = normalize(resolved).replace(/\/$/, '');
       if (normalizedAllowedPath !== normalizedWorkspace) {
-        if (
-          !workspaceWrite &&
-          normalizedAllowedPath.startsWith(normalizedWorkspace + '/')
-        ) {
-          bwrapArgs.push('--ro-bind-try', resolved, resolved);
-        } else {
-          bwrapArgs.push('--bind-try', resolved, resolved);
-        }
+        bwrapArgs.push('--bind-try', resolved, resolved);
       }
     }
 

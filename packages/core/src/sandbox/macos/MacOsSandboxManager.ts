@@ -29,6 +29,7 @@ import {
 } from '../utils/commandSafety.js';
 import { verifySandboxOverrides } from '../utils/commandUtils.js';
 import { parsePosixSandboxDenials } from '../utils/sandboxDenialUtils.js';
+import { handleReadWriteCommands } from '../utils/sandboxReadWriteUtils.js';
 
 /**
  * A SandboxManager implementation for macOS that uses Seatbelt.
@@ -105,21 +106,12 @@ export class MacOsSandboxManager implements SandboxManager {
         false,
     };
 
-    let finalCommand = req.command;
-    let finalArgs = req.args;
-
-    if (req.command === '__read') {
-      finalCommand = '/bin/cat';
-      if (req.args[0]) {
-        mergedAdditional.fileSystem!.read!.push(req.args[0]);
-      }
-    } else if (req.command === '__write') {
-      finalCommand = '/bin/sh';
-      finalArgs = ['-c', 'cat > "$1"', '_', ...req.args];
-      if (req.args[0]) {
-        mergedAdditional.fileSystem!.write!.push(req.args[0]);
-      }
-    }
+    const { command: finalCommand, args: finalArgs } = handleReadWriteCommands(
+      req,
+      mergedAdditional,
+      this.options.workspace,
+      req.policy?.allowedPaths,
+    );
 
     const sandboxArgs = buildSeatbeltArgs({
       workspace: this.options.workspace,
