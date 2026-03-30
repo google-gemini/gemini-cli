@@ -36,6 +36,7 @@ import { StreamingState } from './ui/types.js';
 import { computeTerminalTitle } from './utils/windowTitle.js';
 
 import { SessionStatsProvider } from './ui/contexts/SessionContext.js';
+import { SessionTraceProvider } from './ui/contexts/SessionTraceContext.js';
 import { VimModeProvider } from './ui/contexts/VimModeContext.js';
 import { KeyMatchersProvider } from './ui/hooks/useKeyMatchers.js';
 import { loadKeyMatchers } from './ui/key/keyMatchers.js';
@@ -106,17 +107,19 @@ export async function startInteractiveUI(
               <TerminalProvider>
                 <ScrollProvider>
                   <OverflowProvider>
-                    <SessionStatsProvider>
-                      <VimModeProvider>
-                        <AppContainer
-                          config={config}
-                          startupWarnings={startupWarnings}
-                          version={version}
-                          resumedSessionData={resumedSessionData}
-                          initializationResult={initializationResult}
-                        />
-                      </VimModeProvider>
-                    </SessionStatsProvider>
+                    <SessionTraceProvider>
+                      <SessionStatsProvider>
+                        <VimModeProvider>
+                          <AppContainer
+                            config={config}
+                            startupWarnings={startupWarnings}
+                            version={version}
+                            resumedSessionData={resumedSessionData}
+                            initializationResult={initializationResult}
+                          />
+                        </VimModeProvider>
+                      </SessionStatsProvider>
+                    </SessionTraceProvider>
                   </OverflowProvider>
                 </ScrollProvider>
               </TerminalProvider>
