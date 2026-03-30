@@ -6,7 +6,7 @@
 
 import fs from 'node:fs';
 import fsp from 'node:fs/promises';
-import { debugLogger } from '../utils/terminal.js';
+import { debugLogger } from '../utils/debugLogger.js';
 
 /**
  * Service for asynchronously reading and watching prompt files.
