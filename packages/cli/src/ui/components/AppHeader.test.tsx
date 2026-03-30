@@ -11,7 +11,7 @@ import {
 import { createMockSettings } from '../../test-utils/settings.js';
 import type { LoadedSettings } from '../../config/settings.js';
 import { AppHeader } from './AppHeader.js';
-import { describe, it, expect, vi } from 'vitest';
+import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { makeFakeConfig } from '@google/gemini-cli-core';
 import crypto from 'node:crypto';
 
@@ -20,6 +20,11 @@ vi.mock('../utils/terminalSetup.js', () => ({
 }));
 
 describe('<AppHeader />', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    persistentStateMock.setData({ tipsShown: undefined });
+  });
+
   it('should render the banner with default text', async () => {
     const uiState = {
       history: [],
@@ -34,12 +39,33 @@ describe('<AppHeader />', () => {
       <AppHeader version="1.0.0" />,
       {
         uiState,
-        settings: createMockSettings({ ui: { hideTips: false } }),
       },
     );
 
     expect(lastFrame()).toContain('This is the default banner');
+    expect(lastFrame()).not.toContain('Tips for getting started');
     expect(lastFrame()).toMatchSnapshot();
+    unmount();
+  });
+
+  it('should render tips when hideTips is explicitly set to false', async () => {
+    const uiState = {
+      history: [],
+      bannerData: {
+        defaultText: 'This is the default banner',
+        warningText: '',
+      },
+      bannerVisible: true,
+    };
+
+    const { lastFrame, unmount } = await renderWithProviders(
+      <AppHeader version="1.0.0" />,
+      {
+        uiState,
+      },
+    );
+
+    expect(lastFrame()).not.toContain('Tips for getting started');
     unmount();
   });
 
@@ -57,11 +83,11 @@ describe('<AppHeader />', () => {
       <AppHeader version="1.0.0" />,
       {
         uiState,
-        settings: createMockSettings({ ui: { hideTips: false } }),
       },
     );
 
     expect(lastFrame()).toContain('There are capacity issues');
+    expect(lastFrame()).not.toContain('Tips for getting started');
     expect(lastFrame()).toMatchSnapshot();
     unmount();
   });
@@ -79,11 +105,11 @@ describe('<AppHeader />', () => {
       <AppHeader version="1.0.0" />,
       {
         uiState,
-        settings: createMockSettings({ ui: { hideTips: false } }),
       },
     );
 
     expect(lastFrame()).not.toContain('Banner');
+    expect(lastFrame()).not.toContain('Tips for getting started');
     expect(lastFrame()).toMatchSnapshot();
     unmount();
   });
@@ -110,11 +136,11 @@ describe('<AppHeader />', () => {
       <AppHeader version="1.0.0" />,
       {
         uiState,
-        settings: createMockSettings({ ui: { hideTips: false } }),
       },
     );
 
     expect(lastFrame()).not.toContain('This is the default banner');
+    expect(lastFrame()).not.toContain('Tips for getting started');
     expect(lastFrame()).toMatchSnapshot();
     unmount();
   });
@@ -127,10 +153,6 @@ describe('<AppHeader />', () => {
         warningText: '',
       },
     };
-
-    // Set tipsShown to 10 or more to prevent Tips from incrementing its count
-    // and interfering with the expected persistentState.set call.
-    persistentStateMock.setData({ tipsShown: 10 });
 
     const { unmount } = await renderWithProviders(
       <AppHeader version="1.0.0" />,
@@ -165,7 +187,6 @@ describe('<AppHeader />', () => {
       <AppHeader version="1.0.0" />,
       {
         uiState,
-        settings: createMockSettings({ ui: { hideTips: false } }),
       },
     );
 
@@ -173,7 +194,7 @@ describe('<AppHeader />', () => {
     unmount();
   });
 
-  it('should render Tips when tipsShown is less than 10', async () => {
+  it('should render Tips when tipsShown is less than 10 and hideTips is false', async () => {
     const uiState = {
       history: [],
       bannerData: {
@@ -198,6 +219,30 @@ describe('<AppHeader />', () => {
     unmount();
   });
 
+  it('should NOT render Tips when tipsShown is less than 10 but hideTips is true (default)', async () => {
+    const uiState = {
+      history: [],
+      bannerData: {
+        defaultText: 'First line\\nSecond line',
+        warningText: '',
+      },
+      bannerVisible: true,
+    };
+
+    persistentStateMock.setData({ tipsShown: 5 });
+
+    const { lastFrame, unmount } = await renderWithProviders(
+      <AppHeader version="1.0.0" />,
+      {
+        uiState,
+      },
+    );
+
+    expect(lastFrame()).not.toContain('Tips');
+    expect(persistentStateMock.set).not.toHaveBeenCalledWith('tipsShown', 6);
+    unmount();
+  });
+
   it('should NOT render Tips when tipsShown is 10 or more', async () => {
     const uiState = {
       bannerData: {
@@ -212,7 +257,6 @@ describe('<AppHeader />', () => {
       <AppHeader version="1.0.0" />,
       {
         uiState,
-        settings: createMockSettings({ ui: { hideTips: false } }),
       },
     );
 
@@ -221,7 +265,7 @@ describe('<AppHeader />', () => {
   });
 
   it('should show tips until they have been shown 10 times (persistence flow)', async () => {
-    persistentStateMock.setData({ tipsShown: 9 });
+    persistentStateMock.set('tipsShown', 0);
 
     const uiState = {
       history: [],
@@ -239,7 +283,7 @@ describe('<AppHeader />', () => {
     });
 
     expect(session1.lastFrame()).toContain('Tips');
-    expect(persistentStateMock.get('tipsShown')).toBe(10);
+    expect(persistentStateMock.get('tipsShown')).toBe(1);
     session1.unmount();
 
     // Second session - state is persisted in the fake
@@ -247,7 +291,8 @@ describe('<AppHeader />', () => {
       settings: createMockSettings({ ui: { hideTips: false } }),
     });
 
-    expect(session2.lastFrame()).not.toContain('Tips');
+    expect(session2.lastFrame()).toContain('Tips');
+    expect(persistentStateMock.get('tipsShown')).toBe(2);
     session2.unmount();
   });
 
