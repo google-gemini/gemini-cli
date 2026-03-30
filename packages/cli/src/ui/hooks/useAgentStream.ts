@@ -31,7 +31,7 @@ import type {
 import { StreamingState, MessageType } from '../types.js';
 import { findLastSafeSplitPoint } from '../utils/markdownUtilities.js';
 import { getToolGroupBorderAppearance } from '../utils/borderStyles.js';
-import { type BackgroundShell } from './shellCommandProcessor.js';
+import { type BackgroundTask } from './useExecutionLifecycle.js';
 import type { UseHistoryManagerReturn } from './useHistoryManager.js';
 import { useSessionStats } from '../contexts/SessionContext.js';
 import { useStateAndRef } from './useStateAndRef.js';
@@ -80,15 +80,12 @@ export const useAgentStream = ({
   const { startNewPrompt } = useSessionStats();
 
   const activePtyId = undefined;
-  const backgroundShellCount = 0;
-  const isBackgroundShellVisible = false;
-  const toggleBackgroundShell = useCallback(() => {}, []);
-  const backgroundCurrentShell = undefined;
-  const backgroundShells = useMemo(
-    () => new Map<number, BackgroundShell>(),
-    [],
-  );
-  const dismissBackgroundShell = useCallback(async (_pid: number) => {}, []);
+  const backgroundTaskCount = 0;
+  const isBackgroundTaskVisible = false;
+  const toggleBackgroundTasks = useCallback(() => {}, []);
+  const backgroundCurrentExecution = undefined;
+  const backgroundTasks = useMemo(() => new Map<number, BackgroundTask>(), []);
+  const dismissBackgroundTask = useCallback(async (_pid: number) => {}, []);
 
   // Use the trackedTools to mock pendingToolCalls for inactivity monitors
   const pendingToolCalls = useMemo(
@@ -386,7 +383,7 @@ export const useAgentStream = ({
         activePtyId,
         !!isShellFocused,
         [],
-        backgroundShells,
+        backgroundTasks,
       );
 
       const historyItem: HistoryItemToolGroup = {
@@ -410,7 +407,7 @@ export const useAgentStream = ({
     addItem,
     activePtyId,
     isShellFocused,
-    backgroundShells,
+    backgroundTasks,
   ]);
 
   const pendingToolGroupItems = useMemo((): HistoryItemWithoutId[] => {
@@ -425,7 +422,7 @@ export const useAgentStream = ({
       activePtyId,
       !!isShellFocused,
       [],
-      backgroundShells,
+      backgroundTasks,
     );
 
     if (remainingTools.length > 0) {
@@ -474,7 +471,7 @@ export const useAgentStream = ({
     pushedToolCallIds,
     activePtyId,
     isShellFocused,
-    backgroundShells,
+    backgroundTasks,
   ]);
 
   const pendingHistoryItems = useMemo(
@@ -497,12 +494,12 @@ export const useAgentStream = ({
     activePtyId,
     loopDetectionConfirmationRequest,
     lastOutputTime,
-    backgroundShellCount,
-    isBackgroundShellVisible,
-    toggleBackgroundShell,
-    backgroundCurrentShell,
-    backgroundShells,
+    backgroundTaskCount,
+    isBackgroundTaskVisible,
+    toggleBackgroundTasks,
+    backgroundCurrentExecution,
+    backgroundTasks,
     retryStatus,
-    dismissBackgroundShell,
+    dismissBackgroundTask,
   };
 };
