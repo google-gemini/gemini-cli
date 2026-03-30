@@ -132,19 +132,63 @@ export async function isPrivateIpAsync(url: string): Promise<boolean> {
     const hostname = parsedUrl.hostname;
 
     if (isLoopbackHost(hostname)) {
-      return false;
+      return true;
     }
 
     const addresses = await lookup(hostname, { all: true });
     return addresses.some((addr) => isAddressPrivate(addr.address));
   } catch (error) {
     if (error instanceof TypeError) {
-      return false;
+      // Malformed URLs are a security risk - treat as private/blocked (fail-closed)
+      return true;
     }
     throw new Error('Failed to verify if URL resolves to private IP', {
       cause: error,
     });
   }
+}
+
+/**
+ * Resolves a URL to a safe endpoint for fetching, addressing DNS rebinding TOCTOU.
+ * Returns the resolved IP (for direct connection) and the original hostname (for Host header).
+ * Throws if the resolved IP is private/blocked.
+ */
+export async function resolveUrlForSafeFetch(
+  url: string,
+): Promise<{ resolvedUrl: string; hostHeader: string }> {
+  const parsedUrl = new URL(url);
+  const hostname = parsedUrl.hostname;
+
+  // Check for loopback first (no DNS needed)
+  if (isLoopbackHost(hostname)) {
+    throw new PrivateIpError(`Access to loopback host ${hostname} is blocked`);
+  }
+
+  // Perform DNS resolution once
+  const addresses = await lookup(hostname, { all: true });
+
+  // Find first non-private IP
+  const safeAddress = addresses.find((addr) => !isAddressPrivate(addr.address));
+
+  if (!safeAddress) {
+    throw new PrivateIpError(
+      `All resolved IPs for ${hostname} are private/blocked`,
+    );
+  }
+
+  // Build URL with resolved IP but preserve original hostname for Host header
+  const resolvedUrl = new URL(url);
+  // Use the resolved IP address directly
+  const ipAddr = safeAddress.address;
+  // For IPv6, wrap in brackets
+  resolvedUrl.hostname = ipaddr.isValid(ipAddr) && ipaddr.parse(ipAddr).kind() === 'ipv6'
+    ? `[${ipAddr}]`
+    : ipAddr;
+
+  return {
+    resolvedUrl: resolvedUrl.href,
+    hostHeader: hostname,
+  };
 }
 
 /**
