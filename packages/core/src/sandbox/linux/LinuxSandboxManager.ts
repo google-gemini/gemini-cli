@@ -211,6 +211,22 @@ export class LinuxSandboxManager implements SandboxManager {
         false,
     };
 
+    let finalCommand = req.command;
+    let finalArgs = req.args;
+
+    if (req.command === '__read') {
+      finalCommand = '/bin/cat';
+      if (req.args[0]) {
+        mergedAdditional.fileSystem!.read!.push(req.args[0]);
+      }
+    } else if (req.command === '__write') {
+      finalCommand = '/bin/sh';
+      finalArgs = ['-c', 'cat > "$1"', '_', ...req.args];
+      if (req.args[0]) {
+        mergedAdditional.fileSystem!.write!.push(req.args[0]);
+      }
+    }
+
     const sanitizationConfig = getSecureSanitizationConfig(
       req.policy?.sanitizationConfig,
     );
@@ -360,16 +376,6 @@ export class LinuxSandboxManager implements SandboxManager {
     );
 
     const bpfPath = getSeccompBpfPath();
-
-    let finalCommand = req.command;
-    let finalArgs = req.args;
-
-    if (req.command === '__read') {
-      finalCommand = '/bin/cat';
-    } else if (req.command === '__write') {
-      finalCommand = '/bin/sh';
-      finalArgs = ['-c', 'cat > "$1"', '_', ...req.args];
-    }
 
     bwrapArgs.push('--seccomp', '9');
     bwrapArgs.push('--', finalCommand, ...finalArgs);

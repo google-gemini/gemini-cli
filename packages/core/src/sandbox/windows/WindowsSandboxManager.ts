@@ -236,6 +236,12 @@ export class WindowsSandboxManager implements SandboxManager {
         false,
     };
 
+    if (req.command === '__read' && req.args[0]) {
+      mergedAdditional.fileSystem!.read!.push(req.args[0]);
+    } else if (req.command === '__write' && req.args[0]) {
+      mergedAdditional.fileSystem!.write!.push(req.args[0]);
+    }
+
     // 1. Handle filesystem permissions for Low Integrity
     // Grant "Low Mandatory Level" write access to the workspace.
     // If not in readonly mode OR it's a strictly approved pipeline, allow workspace writes
