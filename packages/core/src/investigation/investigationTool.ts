@@ -305,15 +305,15 @@ export class InvestigationExecutor extends EventEmitter {
     this.emit('progress', 'Taking 3 heap snapshots for leak detection...');
     const [snap1, snap2, snap3] = await client.threeSnapshotCapture(intervalMs);
 
-    const parsed2: unknown = JSON.parse(snap1);
+    const parsed1: unknown = JSON.parse(snap1);
     // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
-    const analyzer1 = new HeapSnapshotAnalyzer(parsed2 as RawHeapSnapshot);
-    const parsed3: unknown = JSON.parse(snap2);
+    const analyzer1 = new HeapSnapshotAnalyzer(parsed1 as RawHeapSnapshot);
+    const parsed2: unknown = JSON.parse(snap2);
     // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
-    const analyzer2 = new HeapSnapshotAnalyzer(parsed3 as RawHeapSnapshot);
-    const parsed4: unknown = JSON.parse(snap3);
+    const analyzer2 = new HeapSnapshotAnalyzer(parsed2 as RawHeapSnapshot);
+    const parsed3: unknown = JSON.parse(snap3);
     // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
-    const analyzer3 = new HeapSnapshotAnalyzer(parsed4 as RawHeapSnapshot);
+    const analyzer3 = new HeapSnapshotAnalyzer(parsed3 as RawHeapSnapshot);
 
     const report = HeapSnapshotAnalyzer.detectLeaks(
       analyzer1,

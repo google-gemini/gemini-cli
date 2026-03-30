@@ -6,7 +6,7 @@
  * @module investigation/llmExplainer
  */
 
-import { GoogleGenAI, type GenerateContentConfig } from '@google/genai';
+import { GoogleGenAI, type GenerateContentConfig, type Content } from '@google/genai';
 
 import type {
   ClassSummary,
@@ -1099,9 +1099,13 @@ export class GeminiExplainer {
         temperature: 0.2,
       };
 
+      const contents: Content[] = [
+        { role: 'user', parts: [{ text: prompt }] },
+      ];
+
       const response = await this.client.models.generateContent({
         model: this.model,
-        contents: prompt,
+        contents,
         config,
       });
 
@@ -1130,9 +1134,13 @@ export class GeminiExplainer {
     );
 
     try {
+      const contents: Content[] = [
+        { role: 'user', parts: [{ text: prompt }] },
+      ];
+
       const response = await this.client.models.generateContent({
         model: this.model,
-        contents: prompt,
+        contents,
         config: { maxOutputTokens: 512, temperature: 0.2 },
       });
 

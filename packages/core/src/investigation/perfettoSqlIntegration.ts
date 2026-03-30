@@ -85,7 +85,7 @@ export interface TraceMetadata {
  *
  * @internal
  */
-class SqlParser {
+export class SqlParser {
   /**
    * Parse a SQL query string into a structured query object.
    * Supports basic SELECT...FROM...WHERE...GROUP BY...ORDER BY...LIMIT
@@ -204,7 +204,7 @@ class SqlParser {
  * Executes parsed SQL queries against in-memory trace data.
  * @internal
  */
-class QueryExecutor {
+export class QueryExecutor {
   /**
    * Execute a parsed query against trace data.
    */
