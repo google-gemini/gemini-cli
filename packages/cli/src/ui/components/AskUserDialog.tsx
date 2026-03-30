@@ -856,10 +856,14 @@ const ChoiceQuestionView: React.FC<ChoiceQuestionViewProps> = ({
         : Math.min(15, Math.max(1, listHeight - Math.min(selectionItems.length, 5) * 2))
       : undefined;
 
-  const maxItemsToShow =
-    listHeight && questionHeightLimit
-      ? Math.max(1, Math.floor((listHeight - questionHeightLimit) / 2))
-      : selectionItems.length;
+  let maxItemsToShow = selectionItems.length;
+  if (listHeight && questionHeightLimit) {
+    if (selectionItems.length <= 5) {
+      maxItemsToShow = selectionItems.length;
+    } else {
+      maxItemsToShow = Math.max(1, Math.floor((listHeight - questionHeightLimit) / 2));
+    }
+  }
 
   return (
     <Box flexDirection="column">
