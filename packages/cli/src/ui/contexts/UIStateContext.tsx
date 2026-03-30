@@ -29,7 +29,8 @@ import type {
   AgentDefinition,
   FolderDiscoveryResults,
   PolicyUpdateConfirmationRequest,
- type ScheduledTask } from '@google/gemini-cli-core';
+  ScheduledTask,
+} from '@google/gemini-cli-core';
 import { type TransientMessageType } from '../../utils/events.js';
 import type { DOMElement } from 'ink';
 import type { SessionStatsState } from '../contexts/SessionContext.js';
