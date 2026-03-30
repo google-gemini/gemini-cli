@@ -17,12 +17,6 @@ const mockLegacyAgentProtocol = vi.hoisted(() => ({
   abort: vi.fn().mockResolvedValue(undefined),
 }));
 
-vi.mock('./useLogger.js', () => ({
-  useLogger: vi.fn().mockReturnValue({
-    logMessage: vi.fn().mockResolvedValue(undefined),
-  }),
-}));
-
 vi.mock('../contexts/SessionContext.js', async (importOriginal) => {
   const actual = await importOriginal<Record<string, unknown>>();
   return {
@@ -74,7 +68,7 @@ describe('useAgentStream', () => {
     });
 
     expect(mockLegacyAgentProtocol.send).toHaveBeenCalledWith({
-      message: [{ type: 'text', text: 'hello' }],
+      message: { content: [{ type: 'text', text: 'hello' }] },
     });
     expect(mockAddItem).toHaveBeenCalledWith(
       expect.objectContaining({ type: MessageType.USER, text: 'hello' }),

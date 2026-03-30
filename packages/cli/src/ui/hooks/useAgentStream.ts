@@ -20,6 +20,7 @@ import {
   type RetryAttemptPayload,
   type AgentEvent,
   type AgentProtocol,
+  type Logger,
 } from '@google/gemini-cli-core';
 import type {
   HistoryItemWithoutId,
@@ -32,10 +33,8 @@ import { findLastSafeSplitPoint } from '../utils/markdownUtilities.js';
 import { getToolGroupBorderAppearance } from '../utils/borderStyles.js';
 import { type BackgroundShell } from './shellCommandProcessor.js';
 import type { UseHistoryManagerReturn } from './useHistoryManager.js';
-import { useLogger } from './useLogger.js';
 import { useSessionStats } from '../contexts/SessionContext.js';
 import { useStateAndRef } from './useStateAndRef.js';
-import { useConfig } from '../contexts/ConfigContext.js';
 import { type MinimalTrackedToolCall } from './useTurnActivityMonitor.js';
 
 export interface UseAgentStreamOptions {
@@ -43,6 +42,7 @@ export interface UseAgentStreamOptions {
   addItem: UseHistoryManagerReturn['addItem'];
   onCancelSubmit: (shouldRestorePrompt?: boolean) => void;
   isShellFocused?: boolean;
+  logger?: Logger | null;
 }
 
 /**
@@ -54,8 +54,8 @@ export const useAgentStream = ({
   addItem,
   onCancelSubmit,
   isShellFocused,
+  logger,
 }: UseAgentStreamOptions) => {
-  const config = useConfig();
   const [initError] = useState<string | null>(null);
   const [retryStatus] = useState<RetryAttemptPayload | null>(null);
   const [streamingState, setStreamingState] = useState<StreamingState>(
@@ -78,7 +78,6 @@ export const useAgentStream = ({
     useStateAndRef<boolean>(true);
 
   const { startNewPrompt } = useSessionStats();
-  const logger = useLogger(config?.storage);
 
   const activePtyId = undefined;
   const backgroundShellCount = 0;
@@ -320,7 +319,7 @@ export const useAgentStream = ({
 
       try {
         const { streamId } = await agent.send({
-          message: parts,
+          message: { content: parts },
         });
         currentStreamIdRef.current = streamId;
       } catch (err) {
