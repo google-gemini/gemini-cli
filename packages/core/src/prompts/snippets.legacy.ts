@@ -153,12 +153,12 @@ ${renderFinalReminder(options.finalReminder)}
 export function renderFinalShell(
   basePrompt: string,
   userMemory?: string | HierarchicalMemory,
-  contextFilenames?: string[],
+  _contextFilenames?: string[],
 ): string {
   return `
 ${basePrompt.trim()}
 
-${renderUserMemory(userMemory, contextFilenames)}
+${renderUserMemory(userMemory, _contextFilenames)}
 `.trim();
 }
 
@@ -380,16 +380,14 @@ Your core function is efficient and safe assistance. Balance extreme conciseness
 
 export function renderUserMemory(
   memory?: string | HierarchicalMemory,
-  contextFilenames?: string[],
+  _contextFilenames?: string[],
 ): string {
   if (!memory) return '';
   if (typeof memory === 'string') {
     const trimmed = memory.trim();
     if (trimmed.length === 0) return '';
-    const filenames = (contextFilenames && contextFilenames.length > 0) ? contextFilenames : ['GEMINI.md'];
-    const formattedHeader = filenames.join(', ');
     return `
-# Contextual Instructions (${formattedHeader})
+# Contextual Instructions (GEMINI.md)
 The following content is loaded from local and global configuration files.
 **Context Precedence:**
 - **Global (~/.gemini/):** foundational user preferences. Apply these broadly.
@@ -526,8 +524,8 @@ As you work, the user follows along by reading topic updates that you publish wi
 - The typical user message should call ${UPDATE_TOPIC_TOOL_NAME} 3 or more times. Each corresponds to a distinct phase of the task, such as "Researching X", "Researching Y", "Implementing Z with X", and "Testing Z".
 - Remember to call ${UPDATE_TOPIC_TOOL_NAME} when you experience an unexpected event (e.g., a test failure, compilation error, environment issue, or unexpected learning) that requires a strategic detour.
 - **Examples:**
-  - ' + UPDATE_TOPIC_TOOL_NAME + '(' + TOPIC_PARAM_TITLE + '="Researching Parser", ' + TOPIC_PARAM_SUMMARY + '="I am starting an investigation into the parser timeout bug. My goal is to first understand the current test coverage and then attempt to reproduce the failure. This phase will focus on identifying the bottleneck in the main loop before we move to implementation.")
-  - ' + UPDATE_TOPIC_TOOL_NAME + '(' + TOPIC_PARAM_TITLE + '="Implementing Buffer Fix", ' + TOPIC_PARAM_SUMMARY + '="I have completed the research phase and identified a race condition in the tokenizer\'s buffer management. I am now transitioning to implementation. This new chapter will focus on refactoring the buffer logic to handle async chunks safely, followed by unit testing the fix.")',
+  - ${UPDATE_TOPIC_TOOL_NAME}(${TOPIC_PARAM_TITLE}="Researching Parser", ${TOPIC_PARAM_SUMMARY}="I am starting an investigation into the parser timeout bug. My goal is to first understand the current test coverage and then attempt to reproduce the failure. This phase will focus on identifying the bottleneck in the main loop before we move to implementation.")
+  - ${UPDATE_TOPIC_TOOL_NAME}(${TOPIC_PARAM_TITLE}="Implementing Buffer Fix", ${TOPIC_PARAM_SUMMARY}="I have completed the research phase and identified a race condition in the tokenizer's buffer management. I am now transitioning to implementation. This new chapter will focus on refactoring the buffer logic to handle async chunks safely, followed by unit testing the fix.")
 
 `;
 }
@@ -716,17 +714,7 @@ function gitRepoKeepUserInformed(interactive: boolean): string {
 /**
  * Provides the system prompt for history compression.
  */
-export function getCompressionPrompt(approvedPlanPath?: string): string {
-  const planPreservation = approvedPlanPath
-    ? `
-
-### APPROVED PLAN PRESERVATION
-An approved implementation plan exists at ${approvedPlanPath}. You MUST preserve the following in your snapshot:
-- The plan's file path in <key_knowledge>
-- Completion status of each plan step in <task_state> (mark as [DONE], [IN PROGRESS], or [TODO])
-- Any user feedback or modifications to the plan in <active_constraints>`
-    : '';
-
+export function getCompressionPrompt(_approvedPlanPath?: string): string {
   return `
 You are a specialized system component responsible for distilling chat history into a structured XML <state_snapshot>.
 
@@ -742,7 +730,7 @@ When the conversation history grows too large, you will be invoked to distill th
 
 First, you will think through the entire history in a private <scratchpad>. Review the user's overall goal, the agent's actions, tool outputs, file modifications, and any unresolved questions. Identify every piece of information for future actions.
 
-After your reasoning is complete, generate the final <state_snapshot> XML object. Be incredibly dense with information. Omit any irrelevant conversational filler.${planPreservation}
+After your reasoning is complete, generate the final <state_snapshot> XML object. Be incredibly dense with information. Omit any irrelevant conversational filler.
 
 The structure MUST be as follows:
 
