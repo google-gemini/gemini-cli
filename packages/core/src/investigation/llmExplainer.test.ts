@@ -3,8 +3,8 @@
  * Copyright 2026 Google LLC
  * SPDX-License-Identifier: Apache-2.0
  */
-import { describe, it, expect, beforeEach } from 'vitest';
-import { LLMExplainer } from './llmExplainer.js';
+import { describe, it, expect, beforeEach, vi } from 'vitest';
+import { LLMExplainer, GeminiExplainer } from './llmExplainer.js';
 import type { RetainerChain, ClassSummary } from './heapSnapshotAnalyzer.js';
 import type { RootCauseReport } from './rootCauseAnalyzer.js';
 
@@ -496,6 +496,191 @@ describe('LLMExplainer', () => {
       expect(prompt).toContain('UserSession');
       expect(prompt).toContain('100 → 200 → 300');
       expect(prompt).toContain('high');
+    });
+  });
+});
+
+// ─── GeminiExplainer Tests ────────────────────────────────────────────────
+
+// Mock @google/genai at the module level
+vi.mock('@google/genai', () => {
+  const generateContent = vi.fn();
+  return {
+    GoogleGenAI: vi.fn().mockImplementation(() => ({
+      models: { generateContent },
+    })),
+    // Re-export the mock so tests can access it
+    __mockGenerateContent: generateContent,
+  };
+});
+
+describe('GeminiExplainer', () => {
+  let mockGenerateContent: ReturnType<typeof vi.fn>;
+
+  beforeEach(async () => {
+    const mod = await import('@google/genai');
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    mockGenerateContent = (mod as any).__mockGenerateContent;
+    mockGenerateContent.mockReset();
+  });
+
+  function createTestReport(): RootCauseReport {
+    return {
+      timestamp: new Date().toISOString(),
+      summary: 'Test summary',
+      findings: [
+        {
+          category: 'unbounded_collection',
+          title: 'Large Map',
+          description: 'Map retaining 50 MB.',
+          confidence: 'high',
+          evidence: ['50 MB'],
+          recommendations: ['Add LRU eviction'],
+          involvedClasses: ['Map'],
+          estimatedImpact: 50_000_000,
+        },
+      ],
+      recommendations: ['Add LRU eviction'],
+      healthScore: 45,
+      totalEstimatedImpact: 50_000_000,
+    };
+  }
+
+  function createTestSummaries(): ClassSummary[] {
+    return [
+      {
+        className: 'Map',
+        count: 5,
+        shallowSize: 1000,
+        retainedSize: 50_000_000,
+        instances: [1, 2, 3, 4, 5],
+      },
+    ];
+  }
+
+  it('should construct with an API key and model', () => {
+    const explainer = new GeminiExplainer('test-key', 'gemini-2.0-flash');
+    expect(explainer).toBeDefined();
+  });
+
+  it('should construct with default model', () => {
+    const explainer = new GeminiExplainer('test-key');
+    expect(explainer).toBeDefined();
+  });
+
+  describe('explainReport()', () => {
+    it('should return parsed narrative on successful API call', async () => {
+      const geminiResponse = JSON.stringify({
+        executiveSummary: 'Memory health is poor — 50 MB leaked via unbounded Map.',
+        narrative: 'The heap shows 5 Map instances retaining 50 MB total.',
+        actionItems: [
+          {
+            priority: 'P0',
+            title: 'Add LRU eviction',
+            description: 'Cap the Map size',
+            effort: 'small',
+            estimatedSavings: 50_000_000,
+          },
+        ],
+        nextSteps: ['Take a second snapshot'],
+      });
+
+      mockGenerateContent.mockResolvedValueOnce({ text: geminiResponse });
+
+      const explainer = new GeminiExplainer('test-key');
+      const result = await explainer.explainReport(
+        createTestReport(),
+        createTestSummaries(),
+      );
+
+      expect(result.executiveSummary).toContain('50 MB');
+      expect(result.actionItems).toHaveLength(1);
+      expect(result.actionItems[0].priority).toBe('P0');
+      expect(mockGenerateContent).toHaveBeenCalledTimes(1);
+    });
+
+    it('should fall back to local narrative on API error', async () => {
+      mockGenerateContent.mockRejectedValueOnce(new Error('API key invalid'));
+
+      const explainer = new GeminiExplainer('bad-key');
+      const result = await explainer.explainReport(
+        createTestReport(),
+        createTestSummaries(),
+      );
+
+      // Local fallback still produces a valid narrative
+      expect(result.executiveSummary).toBeDefined();
+      expect(result.narrative).toBeDefined();
+      expect(result.generationPrompt).toBe('(generated locally without LLM)');
+    });
+
+    it('should fall back to local narrative on empty response', async () => {
+      mockGenerateContent.mockResolvedValueOnce({ text: '' });
+
+      const explainer = new GeminiExplainer('test-key');
+      const result = await explainer.explainReport(
+        createTestReport(),
+        createTestSummaries(),
+      );
+
+      expect(result.generationPrompt).toBe('(generated locally without LLM)');
+    });
+  });
+
+  describe('explainRetainerChain()', () => {
+    const chain: RetainerChain = {
+      nodeId: 42,
+      nodeName: 'UserSession',
+      nodeType: 'object',
+      selfSize: 1024,
+      retainedSize: 5_000_000,
+      chain: [
+        {
+          edgeName: '_cache',
+          edgeType: 'property',
+          nodeName: 'Map',
+          nodeType: 'object',
+          nodeId: 10,
+        },
+      ],
+    };
+
+    it('should return parsed explanation on success', async () => {
+      const geminiResponse = JSON.stringify({
+        whyRetained: 'Stored in a cache Map.',
+        likelyCause: 'Unbounded cache without eviction.',
+        suggestedFixes: [
+          {
+            description: 'Use LRU cache',
+            findPattern: 'new Map\\(',
+            replaceWith: 'new LRUCache({ max: 1000 })',
+            searchHint: 'cache modules',
+            confidence: 'high',
+          },
+        ],
+        followUpQuestions: ['How many entries in the Map?'],
+        severity: 'critical',
+      });
+
+      mockGenerateContent.mockResolvedValueOnce({ text: geminiResponse });
+
+      const explainer = new GeminiExplainer('test-key');
+      const result = await explainer.explainRetainerChain(chain);
+
+      expect(result.whyRetained).toContain('cache');
+      expect(result.suggestedFixes).toHaveLength(1);
+      expect(result.severity).toBe('critical');
+    });
+
+    it('should fall back to local heuristics on API error', async () => {
+      mockGenerateContent.mockRejectedValueOnce(new Error('timeout'));
+
+      const explainer = new GeminiExplainer('test-key');
+      const result = await explainer.explainRetainerChain(chain);
+
+      // Local heuristic should detect cache pattern from _cache edge
+      expect(result.whyRetained).toBeDefined();
+      expect(result.chain).toBe(chain);
     });
   });
 });

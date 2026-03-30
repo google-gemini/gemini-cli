@@ -53,6 +53,7 @@ export {
 
 export {
   LLMExplainer,
+  GeminiExplainer,
   type RetainerExplanation,
   type CodeFix,
   type InvestigationNarrative,

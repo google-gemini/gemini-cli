@@ -6,6 +6,8 @@
  * @module investigation/llmExplainer
  */
 
+import { GoogleGenAI, type GenerateContentConfig } from '@google/genai';
+
 import type {
   ClassSummary,
   RetainerChain,
@@ -1052,4 +1054,96 @@ function formatBytes(bytes: number): string {
   );
   const value = abs / Math.pow(1024, i);
   return `${sign}${value.toFixed(i > 0 ? 1 : 0)} ${units[i]}`;
+}
+
+// ─── Gemini API Integration (MVP) ──────────────────────────────────────────
+
+/**
+ * Thin MVP that wires the existing prompt/parse pipeline to the Gemini API
+ * via the `@google/genai` SDK — the same SDK used throughout Gemini CLI.
+ *
+ * This proves end-to-end capability: heap data → structured prompt →
+ * Gemini API → parsed diagnostic. Full production hardening (streaming,
+ * multi-turn, retry, token budgets) is planned for GSoC weeks 7-8.
+ */
+export class GeminiExplainer {
+  private readonly client: GoogleGenAI;
+  private readonly model: string;
+  private readonly explainer: LLMExplainer;
+
+  constructor(apiKey: string, model: string = 'gemini-2.0-flash') {
+    this.client = new GoogleGenAI({ apiKey });
+    this.model = model;
+    this.explainer = new LLMExplainer();
+  }
+
+  /**
+   * Send a root-cause report + class summaries to Gemini and get back
+   * a structured InvestigationNarrative.
+   *
+   * Falls back to the local heuristic narrative on any API error so the
+   * investigation pipeline never blocks on network availability.
+   */
+  async explainReport(
+    report: RootCauseReport,
+    classSummaries: ClassSummary[],
+  ): Promise<InvestigationNarrative> {
+    const prompt = this.explainer.generateNarrativePrompt(
+      report,
+      classSummaries,
+    );
+
+    try {
+      const config: GenerateContentConfig = {
+        maxOutputTokens: 1024,
+        temperature: 0.2,
+      };
+
+      const response = await this.client.models.generateContent({
+        model: this.model,
+        contents: prompt,
+        config,
+      });
+
+      const text = response.text ?? '';
+      if (!text) {
+        return this.explainer.generateLocalNarrative(report, classSummaries);
+      }
+
+      return this.explainer.parseNarrative(text, prompt);
+    } catch {
+      // Graceful degradation: local heuristics still produce a useful report
+      return this.explainer.generateLocalNarrative(report, classSummaries);
+    }
+  }
+
+  /**
+   * Explain a retainer chain via Gemini, falling back to local heuristics.
+   */
+  async explainRetainerChain(
+    chain: RetainerChain,
+    context?: string,
+  ): Promise<RetainerExplanation> {
+    const prompt = this.explainer.generateRetainerExplanationPrompt(
+      chain,
+      context,
+    );
+
+    try {
+      const response = await this.client.models.generateContent({
+        model: this.model,
+        contents: prompt,
+        config: { maxOutputTokens: 512, temperature: 0.2 },
+      });
+
+      const text = response.text ?? '';
+      if (!text) {
+        return this.explainer.explainRetainerChainLocally(chain);
+      }
+
+      return this.explainer.parseRetainerExplanation(chain, text);
+    } catch {
+      return this.explainer.explainRetainerChainLocally(chain);
+    }
+  }
 }

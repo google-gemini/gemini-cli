@@ -46,7 +46,7 @@ memory-investigation SKILL.md ──> Built-in Skill ──> activate_skill
 | Module | Lines | Purpose |
 |--------|------:|---------|
 | `heapSnapshotAnalyzer` | 1,043 | Parse V8 `.heapsnapshot`, extract class summaries, detect leaks, build dominator trees |
-| `llmExplainer` | 1,055 | Generate structured prompts for Gemini, parse responses, local heuristic fallback |
+| `llmExplainer` | 1,149 | Generate structured prompts for Gemini, parse responses, local heuristic fallback, **Gemini API MVP** |
 | `gcPressureAnalyzer` | 896 | Analyze GC events, detect thrashing/long pauses, V8 tuning recommendations |
 | `allocationHotspotProfiler` | 826 | Identify allocation hotspots, storm detection, flamegraph generation |
 | `rootCauseAnalyzer` | 822 | 9 pattern detectors with confidence scoring (closures, DOM detach, timers, etc.) |
@@ -61,9 +61,9 @@ memory-investigation SKILL.md ──> Built-in Skill ──> activate_skill
 | `perfettoExporter` | 489 | Export leak reports, class summaries, CPU profiles to Perfetto format |
 | `streamingHeapParser` | 420 | Streaming JSON parser for large (>50MB) V8 heap snapshots — 10-15% peak memory |
 | `index` | 158 | Public API barrel exports |
-| **Source Total** | **10,908** | |
-| **Tests (16 files)** | **7,226** | |
-| **Grand Total** | **18,134** | |
+| **Source Total** | **11,002** | |
+| **Tests (16 files)** | **7,411** | |
+| **Grand Total** | **18,413** | |
 
 ---
 
@@ -179,6 +179,26 @@ Compression:        85,106x
 ```
 
 This means a full memory investigation fits comfortably within a single LLM context window, enabling the Gemini agent to reason about heap state without token budget issues.
+
+### Gemini API Integration (MVP)
+
+The `GeminiExplainer` class provides end-to-end integration with the Gemini API via `@google/genai` — the same SDK used throughout Gemini CLI. It sends structured investigation prompts to Gemini and parses responses, with graceful fallback to local heuristics on any API error:
+
+```typescript
+import { GeminiExplainer } from './investigation';
+
+const explainer = new GeminiExplainer(process.env.GEMINI_API_KEY!);
+
+// Sends root-cause report to Gemini, returns structured narrative
+const narrative = await explainer.explainReport(rootCauseReport, classSummaries);
+console.log(narrative.executiveSummary);
+console.log(narrative.actionItems);
+
+// Explain a retainer chain via Gemini (falls back to local heuristics on error)
+const explanation = await explainer.explainRetainerChain(chain);
+```
+
+> **Note:** Full production hardening (streaming, multi-turn, retry, token budgets) is planned for GSoC weeks 7-8. This MVP proves the integration pattern.
 
 ### GC Pressure Analysis
 
