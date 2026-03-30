@@ -105,6 +105,7 @@ export interface CliArgs {
   rawOutput: boolean | undefined;
   acceptRawOutputRisk: boolean | undefined;
   isCommand: boolean | undefined;
+  channels: string[] | undefined;
 }
 
 /**
@@ -442,6 +443,12 @@ export async function parseArguments(
         .option('accept-raw-output-risk', {
           type: 'boolean',
           description: 'Suppress the security warning when using --raw-output.',
+        })
+        .option('channels', {
+          type: 'string',
+          array: true,
+          description: 'Enable channel message delivery from named MCP servers',
+          coerce: coerceCommaSeparated,
         }),
     )
     .version(await getVersion()) // This will enable the --version flag based on package.json
@@ -1040,6 +1047,7 @@ export async function loadCliConfig(
       };
     },
     enableConseca: settings.security?.enableConseca,
+    channels: argv.channels,
   });
 }
 

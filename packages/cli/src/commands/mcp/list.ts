@@ -115,6 +115,7 @@ async function testMCPConnection(
       }
     },
     isTrustedFolder: () => isTrusted,
+    getChannels: () => [],
   };
 
   let transport;

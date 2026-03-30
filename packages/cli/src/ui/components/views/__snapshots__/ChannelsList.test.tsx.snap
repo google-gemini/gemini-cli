@@ -1,0 +1,17 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`<ChannelsList /> > renders correctly with active channels 1`] = `
+"Active channels:
+
+  - Telegram (telegram)
+    Direction: two-way
+  - minimal-channel (minimal-channel)
+    Direction: one-way
+"
+`;
+
+exports[`<ChannelsList /> > renders correctly with no active channels 1`] = `
+"No active channels.
+Use --channels <name> to listen for channel messages from MCP servers.
+"
+`;
