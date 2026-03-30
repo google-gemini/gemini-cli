@@ -69,7 +69,7 @@ investigate(action="capture_memory_report", port=9229)
 
 ## Interpreting Results
 
-- **Confidence scores**: CRITICAL / HIGH / MEDIUM / LOW — focus on CRITICAL and HIGH first
+- **Confidence scores**: HIGH / MEDIUM / LOW — focus on HIGH findings first
 - **Retainer chains**: The `retainedBy` path shows exactly which objects prevent GC
 - **Token efficiency**: Snapshots are compressed ~85,000x before being sent to Gemini, so even 300MB heap files are safe to analyze
 - **Class breakdown**: Look for classes growing across snapshots — these are your leak candidates

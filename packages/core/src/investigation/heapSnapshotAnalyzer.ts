@@ -802,9 +802,8 @@ export class HeapSnapshotAnalyzer {
       }
 
       // Confidence: high if both intervals show similar growth
-      const ratio =
-        Math.min(growth12.countDelta, growth23.countDelta) /
-        Math.max(growth12.countDelta, growth23.countDelta);
+      const maxDelta = Math.max(growth12.countDelta, growth23.countDelta);
+      const ratio = maxDelta === 0 ? 0 : Math.min(growth12.countDelta, growth23.countDelta) / maxDelta;
       const confidence = ratio > 0.5 ? 'high' : ratio > 0.2 ? 'medium' : 'low';
 
       leakCandidates.push({

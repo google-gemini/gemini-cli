@@ -113,8 +113,8 @@ const rca = new RootCauseAnalyzer();
 const causes = rca.analyzeSnapshot(classSummaries, snapshot.nodeCount);
 
 // Returns: [
-//   { pattern: 'unbounded-collection', confidence: 0.92, evidence: {...} },
-//   { pattern: 'closure-capture', confidence: 0.78, evidence: {...} },
+//   { pattern: 'unbounded-collection', confidence: 'high', evidence: {...} },
+//   { pattern: 'closure-capture', confidence: 'medium', evidence: {...} },
 //   ...
 // ]
 ```
@@ -292,6 +292,7 @@ npx vitest run packages/core/src/investigation/heapSnapshotAnalyzer.test.ts
 | memoryRegressionGuard | 20 | Fingerprinting, regression detection, CI output |
 | tokenEfficiencyBenchmark | 18 | Compression ratios, benchmark validation |
 | flameGraphGenerator | 15 | SVG generation, folded stacks |
+| streamingHeapParser | 14 | Streaming parse, chunk boundaries, Unicode escapes |
 | perfettoSqlIntegration | 14 | SQL queries, trace loading |
 | investigationTool | 12 | Orchestration, end-to-end flows |
 | real-integration | 14 | Cross-module integration scenarios |

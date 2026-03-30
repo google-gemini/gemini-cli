@@ -496,7 +496,12 @@ export class StreamingHeapParser extends EventEmitter {
           // Parse remaining numbers in this section
           const remaining = numberLeftover + buffer.substring(processed, endIdx);
           numberLeftover = '';
-          extractIntegers(remaining, target);
+          const leftover = extractIntegers(remaining, target);
+          // Parse any trailing number that had no delimiter after it
+          if (leftover) {
+            const val = Number(leftover);
+            if (!Number.isNaN(val)) target.push(val);
+          }
           processed = endIdx + 1;
           currentSection = null;
         } else {
