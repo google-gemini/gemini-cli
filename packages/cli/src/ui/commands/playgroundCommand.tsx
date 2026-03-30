@@ -4,11 +4,22 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { render, Box, Text } from 'ink';
+import { render, Box, Text, useApp } from 'ink';
 import { useState, useEffect, useReducer, useRef, useCallback } from 'react';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 import { useKeypress } from '../hooks/useKeypress.js';
+import { useTerminalSize } from '../hooks/useTerminalSize.js';
+
+import { SettingsContext } from '../contexts/SettingsContext.js';
+import { KeypressProvider } from '../contexts/KeypressContext.js';
+import { loadSettings } from '../../config/settings.js';
+import { loadCliConfig } from '../../config/config.js';
+
+import { ConsolePatcher } from '../utils/ConsolePatcher.js';
+import { 
+  createWorkingStdio
+} from '@google/gemini-cli-core';
 
 const EVAL_CASES = [
   "Missing dependency lodash",
@@ -23,6 +34,8 @@ function selectedIndexReducer(state: number, action: 'UP' | 'DOWN'): number {
 }
 
 export const PlaygroundApp = () => {
+  const { exit } = useApp();
+  const { rows } = useTerminalSize();
   const [promptContent, setPromptContent] = useState<string>('Loading prompt...');
   const [executionStream, setExecutionStream] = useState<string[]>([]);
   const [selectedIndex, dispatchIndex] = useReducer(selectedIndexReducer, 0);
@@ -34,6 +47,10 @@ export const PlaygroundApp = () => {
   }, [selectedIndex]);
 
   const handleKeypress = useCallback((key: any) => {
+    if (key.name === 'escape' || (key.name === 'c' && key.ctrl)) {
+      exit();
+      return true;
+    }
     if (key.name === 'up') {
       dispatchIndex('UP');
       return true;
@@ -49,7 +66,7 @@ export const PlaygroundApp = () => {
       return true;
     }
     return false;
-  }, []);
+  }, [exit]);
 
   useKeypress(handleKeypress, { isActive: true });
 
@@ -57,9 +74,7 @@ export const PlaygroundApp = () => {
     const fileToWatch = path.resolve(process.cwd(), 'packages/core/src/prompts/snippets.ts');
     try {
       if (fs.existsSync(fileToWatch)) {
-        const content = fs.readFileSync(fileToWatch, 'utf8');
-        const lines = content.split('\n');
-        setPromptContent(lines.slice(0, 13).join('\n') + (lines.length > 13 ? '\\n\\n(Truncated for display)' : ''));
+        setPromptContent(fs.readFileSync(fileToWatch, 'utf8'));
       } else {
         setPromptContent(`File not found: ${fileToWatch}`);
       }
@@ -71,9 +86,7 @@ export const PlaygroundApp = () => {
     try {
       watcher = fs.watch(fileToWatch, (eventType) => {
         if (eventType === 'change') {
-          const content = fs.readFileSync(fileToWatch, 'utf8');
-          const lines = content.split('\n');
-          setPromptContent(lines.slice(0, 13).join('\n') + (lines.length > 13 ? '\\n\\n(Truncated for display)' : ''));
+          setPromptContent(fs.readFileSync(fileToWatch, 'utf8'));
         }
       });
     } catch (e) {}
@@ -97,8 +110,7 @@ export const PlaygroundApp = () => {
       "> Success! Eval case passed."
     ];
     
-    let currentLine = 1; // skip initializing line
-    
+    let currentLine = 1;
     const interval = setInterval(() => {
       if (currentLine >= script.length) {
         clearInterval(interval);
@@ -113,34 +125,40 @@ export const PlaygroundApp = () => {
     return () => clearInterval(interval);
   }, [activeCase]);
 
+  // Dynamically calculate visible vertical space with a 1-row safety margin
+  // to prevent bottom-edge overprinting and PowerShell reflow distortion.
+  const maxLines = Math.max(3, rows - 13);
+  const promptLines = promptContent.split('\n');
+  const truncatedPrompt = promptLines.slice(0, maxLines).join('\n') + (promptLines.length > maxLines ? '\n...(Truncated for display)' : '');
+
   return (
-    <Box flexDirection="column" width="100%" height={30} borderStyle="round" padding={0}>
-      <Box paddingX={2} paddingY={1} borderStyle="single" borderTop={false} borderLeft={false} borderRight={false} borderBottom={true}>
+    <Box flexDirection="column" width="100%" height={rows - 1} borderStyle="single" padding={0}>
+      <Box paddingX={1} borderStyle="single" borderTop={false} borderLeft={false} borderRight={false} borderBottom={true}>
         <Text bold color="cyan">Gemini CLI - Local Prompt Playground</Text>
       </Box>
-      <Box flexGrow={1} flexDirection="row">
-        <Box width="50%" padding={1} paddingX={2} flexDirection="column" borderStyle="single" borderTop={false} borderBottom={false} borderLeft={false} borderRight={true}>
+      <Box flexDirection="row" flexGrow={1}>
+        <Box width="50%" paddingX={1} paddingY={0} flexDirection="column" borderStyle="single" borderTop={false} borderBottom={false} borderLeft={false} borderRight={true}>
           <Text bold color="green">System Prompt Definition</Text>
-          <Box marginTop={1} overflowY="hidden">
-            <Text dimColor>{promptContent}</Text>
+          <Box marginTop={0}>
+            <Text dimColor>{truncatedPrompt}</Text>
           </Box>
         </Box>
-        <Box width="50%" padding={1} paddingX={2} flexDirection="column">
+        <Box width="50%" paddingX={1} paddingY={0} flexDirection="column">
           <Text bold color="yellow">Live Execution Stream</Text>
-          <Box marginTop={1} overflowY="hidden" flexDirection="column">
+          <Box marginTop={0} flexDirection="column">
             {executionStream.length === 0 ? (
               <Text dimColor>Please select an eval case to begin...</Text>
             ) : (
-              executionStream.map((line, i) => (
+              executionStream.slice(-maxLines).map((line, i) => (
                 <Text key={i} dimColor>{line}</Text>
               ))
             )}
           </Box>
         </Box>
       </Box>
-      <Box paddingX={2} paddingY={1} flexDirection="column" borderStyle="single" borderTop={true} borderBottom={false} borderLeft={false} borderRight={false}>
-        <Text bold color="magenta">Eval Cases (Use Up/Down Arrows, press Enter to Run):</Text>
-        <Box flexDirection="column" marginTop={1}>
+      <Box paddingX={1} flexDirection="column" borderStyle="single" borderTop={true} borderBottom={false} borderLeft={false} borderRight={false}>
+        <Text bold color="magenta">Eval Cases (Up/Down Arrows, Enter to Run, ESC to Quit):</Text>
+        <Box flexDirection="column" marginTop={0}>
           {EVAL_CASES.map((evalCase, index) => (
             <Text key={evalCase} color={index === selectedIndex ? 'cyan' : undefined}>
               {index === selectedIndex ? '> ' : '  '}
@@ -154,10 +172,7 @@ export const PlaygroundApp = () => {
   );
 };
 
-import { SettingsContext } from '../contexts/SettingsContext.js';
-import { KeypressProvider } from '../contexts/KeypressContext.js';
-import { loadSettings } from '../../config/settings.js';
-import { loadCliConfig } from '../../config/config.js';
+
 
 export async function startPlayground() {
   const workspaceDir = process.cwd();
@@ -169,12 +184,56 @@ export async function startPlayground() {
     { cwd: workspaceDir }
   );
 
-  const { waitUntilExit } = render(
-    <SettingsContext.Provider value={settings}>
-      <KeypressProvider config={config}>
-        <PlaygroundApp />
-      </KeypressProvider>
-    </SettingsContext.Provider>
-  );
-  await waitUntilExit();
+  const consolePatcher = new ConsolePatcher({
+    onNewMessage: (msg: any) => {
+      // Background logs are ignored in playground or could be routed to stream
+    },
+    debugMode: config.getDebugMode(),
+  });
+  consolePatcher.patch();
+
+  const { stdout: inkStdout, stderr: inkStderr } = createWorkingStdio();
+
+  // Enter alternate screen and clear. We use raw stdout flushes to ensure
+  // consistent TTY behavior on Windows Terminal.
+  process.stdout.write('\x1b[?1049h\x1b[?25l\x1b[2J\x1b[H'); 
+
+  // Stabilization window to prevent flicker during buffer swap.
+  await new Promise(resolve => setTimeout(resolve, 200));
+
+  let inkInstance: any;
+
+  try {
+    inkInstance = render(
+      <SettingsContext.Provider value={settings}>
+        <KeypressProvider config={config}>
+          <PlaygroundApp />
+        </KeypressProvider>
+      </SettingsContext.Provider>,
+      {
+        stdout: inkStdout,
+        stderr: inkStderr,
+        stdin: process.stdin,
+        exitOnCtrlC: false,
+        alternateBuffer: false, // We've already swapped buffers above
+      }
+    );
+
+    await inkInstance.waitUntilExit();
+    inkInstance.unmount();
+    await new Promise(resolve => setTimeout(resolve, 100));
+  } catch (e) {
+    // Ignore unmount errors if already closed
+  } finally {
+    consolePatcher.cleanup();
+
+    // Restore TTY state: drain stdin, exit alternate screen, and reset cursor.
+    if (process.stdin.isTTY) {
+      process.stdin.resume().removeAllListeners('data').on('data', () => {});
+      process.stdin.setRawMode(false);
+      await new Promise(resolve => setTimeout(resolve, 100));
+    }
+
+    process.stdout.write('\x1b[H\x1b[J\x1b[?1049l\x1b[1G\x1b[K\x1b[?25h');
+  }
 }
