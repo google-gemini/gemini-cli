@@ -8,6 +8,11 @@ import { expect, describe } from 'vitest';
 import { evalTest } from './test-helper.js';
 
 describe('botched replace eval', () => {
+  /**
+   * Encourages the agent to do an unsafe parallel write to the same file in a single
+   * turn and checks that it does not do so. This is a regression test for a bug fix
+   * that corrects a case where the agent would fail to write the file.
+   */
   evalTest('ALWAYS_PASSES', {
     name: 'should perform multiple edits to the same file sequentially across turns',
     files: {
