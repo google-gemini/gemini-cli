@@ -347,6 +347,8 @@ export interface BrowserAgentCustomConfig {
   headless?: boolean;
   /** Path to Chrome profile directory for session persistence. */
   profilePath?: string;
+  /** Remote Chrome DevTools browser URL (for example, http://host:9222). Only used with sessionMode='existing'. */
+  browserUrl?: string;
   /** Model override for the visual agent. */
   visualModel?: string;
   /** List of allowed domains for the browser agent (e.g., ["github.com", "*.google.com"]). */
@@ -3300,6 +3302,7 @@ export class Config implements McpContext, AgentLoopContext {
         sessionMode: customConfig.sessionMode ?? 'persistent',
         headless: customConfig.headless ?? false,
         profilePath: customConfig.profilePath,
+        browserUrl: customConfig.browserUrl,
         visualModel: customConfig.visualModel,
         allowedDomains: customConfig.allowedDomains,
         disableUserInput: customConfig.disableUserInput,

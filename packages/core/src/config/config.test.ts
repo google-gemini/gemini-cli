@@ -1443,6 +1443,7 @@ describe('Server Config (config.ts)', () => {
       expect(browserConfig.customConfig.sessionMode).toBe('persistent');
       expect(browserConfig.customConfig.headless).toBe(false);
       expect(browserConfig.customConfig.profilePath).toBeUndefined();
+      expect(browserConfig.customConfig.browserUrl).toBeUndefined();
       expect(browserConfig.customConfig.visualModel).toBeUndefined();
     });
 
@@ -1460,6 +1461,7 @@ describe('Server Config (config.ts)', () => {
             sessionMode: 'existing',
             headless: true,
             profilePath: '/path/to/profile',
+            browserUrl: 'http://remote-browser:9222',
             visualModel: 'custom-visual-model',
           },
         },
@@ -1472,6 +1474,9 @@ describe('Server Config (config.ts)', () => {
       expect(browserConfig.customConfig.sessionMode).toBe('existing');
       expect(browserConfig.customConfig.headless).toBe(true);
       expect(browserConfig.customConfig.profilePath).toBe('/path/to/profile');
+      expect(browserConfig.customConfig.browserUrl).toBe(
+        'http://remote-browser:9222',
+      );
       expect(browserConfig.customConfig.visualModel).toBe(
         'custom-visual-model',
       );
@@ -1514,6 +1519,7 @@ describe('Server Config (config.ts)', () => {
       expect(browserConfig.customConfig.headless).toBe(true);
       // Defaults for unspecified fields
       expect(browserConfig.customConfig.sessionMode).toBe('persistent');
+      expect(browserConfig.customConfig.browserUrl).toBeUndefined();
     });
   });
 
