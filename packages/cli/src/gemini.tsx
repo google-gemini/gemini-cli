@@ -33,6 +33,7 @@ import {
   type AdminControlsSettings,
   debugLogger,
   isHeadlessMode,
+  startMemoryService,
 } from '@google/gemini-cli-core';
 
 import { loadCliConfig, parseArguments } from './config/config.js';
@@ -637,6 +638,13 @@ export async function main() {
 
     await config.initialize();
     startupProfiler.flush(config);
+
+    // Fire-and-forget memory service (skill extraction from past sessions)
+    if (config.isMemoryManagerEnabled()) {
+      startMemoryService(config).catch((e) => {
+        debugLogger.error('Failed to start memory service:', e);
+      });
+    }
 
     // If not a TTY, read from stdin
     // This is for cases where the user pipes input directly into the command

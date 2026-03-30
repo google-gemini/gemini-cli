@@ -1,0 +1,769 @@
+/**
+ * @license
+ * Copyright 2026 Google LLC
+ * SPDX-License-Identifier: Apache-2.0
+ */
+
+import * as fs from 'node:fs/promises';
+import * as path from 'node:path';
+import { constants as fsConstants } from 'node:fs';
+import { randomUUID } from 'node:crypto';
+import type { Config } from '../config/config.js';
+import {
+  SESSION_FILE_PREFIX,
+  type ConversationRecord,
+  type MessageRecord,
+} from './chatRecordingService.js';
+import { partListUnionToString } from '../core/geminiRequest.js';
+import { debugLogger } from '../utils/debugLogger.js';
+import { isNodeError } from '../utils/errors.js';
+import { LocalAgentExecutor } from '../agents/local-executor.js';
+import { SkillExtractionAgent } from '../agents/skill-extraction-agent.js';
+import { getModelConfigAlias } from '../agents/registry.js';
+import { ExecutionLifecycleService } from './executionLifecycleService.js';
+import { PromptRegistry } from '../prompts/prompt-registry.js';
+import { ResourceRegistry } from '../resources/resource-registry.js';
+import { PolicyEngine } from '../policy/policy-engine.js';
+import { PolicyDecision } from '../policy/types.js';
+import { MessageBus } from '../confirmation-bus/message-bus.js';
+import { WorkspaceContext } from '../utils/workspaceContext.js';
+import { Storage } from '../config/storage.js';
+import type { AgentLoopContext } from '../config/agent-loop-context.js';
+
+const LOCK_FILENAME = '.extraction.lock';
+const STATE_FILENAME = '.extraction-state.json';
+const LOCK_STALE_MS = 35 * 60 * 1000; // 35 minutes (exceeds agent's 30-min time limit)
+const MIN_USER_MESSAGES = 3;
+const MAX_SESSION_INDEX_SIZE = 50;
+
+/**
+ * Lock file content for coordinating across CLI instances.
+ */
+interface LockInfo {
+  pid: number;
+  startedAt: string;
+}
+
+/**
+ * Metadata for a single extraction run.
+ */
+export interface ExtractionRun {
+  runAt: string;
+  sessionIds: string[];
+  skillsCreated: string[];
+}
+
+/**
+ * Tracks extraction history with per-run metadata.
+ */
+export interface ExtractionState {
+  runs: ExtractionRun[];
+}
+
+/**
+ * Returns all session IDs that have been processed across all runs.
+ */
+export function getProcessedSessionIds(state: ExtractionState): Set<string> {
+  const ids = new Set<string>();
+  for (const run of state.runs) {
+    for (const id of run.sessionIds) {
+      ids.add(id);
+    }
+  }
+  return ids;
+}
+
+function isLockInfo(value: unknown): value is LockInfo {
+  return (
+    typeof value === 'object' &&
+    value !== null &&
+    'pid' in value &&
+    typeof value.pid === 'number' &&
+    'startedAt' in value &&
+    typeof value.startedAt === 'string'
+  );
+}
+
+function isConversationRecord(value: unknown): value is ConversationRecord {
+  return (
+    typeof value === 'object' &&
+    value !== null &&
+    'sessionId' in value &&
+    typeof value.sessionId === 'string' &&
+    'messages' in value &&
+    Array.isArray(value.messages) &&
+    'projectHash' in value &&
+    'startTime' in value &&
+    'lastUpdated' in value
+  );
+}
+
+/**
+ * Attempts to acquire an exclusive lock file using O_CREAT | O_EXCL.
+ * Returns true if the lock was acquired, false if another instance owns it.
+ */
+export async function tryAcquireLock(lockPath: string): Promise<boolean> {
+  const lockInfo: LockInfo = {
+    pid: process.pid,
+    startedAt: new Date().toISOString(),
+  };
+
+  try {
+    // Atomic create-if-not-exists
+    const fd = await fs.open(
+      lockPath,
+      fsConstants.O_CREAT | fsConstants.O_EXCL | fsConstants.O_WRONLY,
+    );
+    await fd.writeFile(JSON.stringify(lockInfo));
+    await fd.close();
+    return true;
+  } catch (error: unknown) {
+    if (isNodeError(error) && error.code === 'EEXIST') {
+      // Lock exists — check if it's stale
+      if (await isLockStale(lockPath)) {
+        debugLogger.debug('[MemoryService] Cleaning up stale lock file');
+        await releaseLock(lockPath);
+        // Retry once after cleaning stale lock
+        return tryAcquireLock(lockPath);
+      }
+      debugLogger.debug(
+        '[MemoryService] Lock held by another instance, skipping',
+      );
+      return false;
+    }
+    throw error;
+  }
+}
+
+/**
+ * Checks if a lock file is stale (owner PID is dead or lock is too old).
+ */
+export async function isLockStale(lockPath: string): Promise<boolean> {
+  try {
+    const content = await fs.readFile(lockPath, 'utf-8');
+    const parsed: unknown = JSON.parse(content);
+    if (!isLockInfo(parsed)) {
+      return true; // Invalid lock data — treat as stale
+    }
+    const lockInfo = parsed;
+
+    // Check if PID is still alive
+    try {
+      process.kill(lockInfo.pid, 0);
+    } catch {
+      // PID is dead — lock is stale
+      return true;
+    }
+
+    // Check if lock is too old
+    const lockAge = Date.now() - new Date(lockInfo.startedAt).getTime();
+    if (lockAge > LOCK_STALE_MS) {
+      return true;
+    }
+
+    return false;
+  } catch {
+    // Can't read lock — treat as stale
+    return true;
+  }
+}
+
+/**
+ * Releases the lock file.
+ */
+export async function releaseLock(lockPath: string): Promise<void> {
+  try {
+    await fs.unlink(lockPath);
+  } catch (error: unknown) {
+    if (isNodeError(error) && error.code === 'ENOENT') {
+      return; // Already removed
+    }
+    debugLogger.warn(
+      `[MemoryService] Failed to release lock: ${error instanceof Error ? error.message : String(error)}`,
+    );
+  }
+}
+
+/**
+ * Reads the extraction state file, or returns a default state.
+ */
+export async function readExtractionState(
+  statePath: string,
+): Promise<ExtractionState> {
+  try {
+    const content = await fs.readFile(statePath, 'utf-8');
+    const parsed: unknown = JSON.parse(content);
+    if (typeof parsed !== 'object' || parsed === null) {
+      return { runs: [] };
+    }
+
+    const runs: ExtractionRun[] = [];
+    if ('runs' in parsed && Array.isArray(parsed.runs)) {
+      for (const run of parsed.runs) {
+        if (
+          typeof run === 'object' &&
+          run !== null &&
+          'runAt' in run &&
+          typeof run.runAt === 'string' &&
+          'sessionIds' in run &&
+          Array.isArray(run.sessionIds) &&
+          'skillsCreated' in run &&
+          Array.isArray(run.skillsCreated)
+        ) {
+          const sessionIds: string[] = [];
+          for (const sid of run.sessionIds) {
+            if (typeof sid === 'string') {
+              sessionIds.push(sid);
+            }
+          }
+          const skillsCreated: string[] = [];
+          for (const sk of run.skillsCreated) {
+            if (typeof sk === 'string') {
+              skillsCreated.push(sk);
+            }
+          }
+          runs.push({
+            runAt: String(run.runAt),
+            sessionIds,
+            skillsCreated,
+          });
+        }
+      }
+    }
+
+    return { runs };
+  } catch {
+    return { runs: [] };
+  }
+}
+
+/**
+ * Writes the extraction state atomically (temp file + rename).
+ */
+export async function writeExtractionState(
+  statePath: string,
+  state: ExtractionState,
+): Promise<void> {
+  const tmpPath = `${statePath}.tmp`;
+  await fs.writeFile(tmpPath, JSON.stringify(state, null, 2));
+  await fs.rename(tmpPath, statePath);
+}
+
+/**
+ * Scans the chats directory for unprocessed session files.
+ */
+export async function getUnprocessedSessions(
+  chatsDir: string,
+  state: ExtractionState,
+): Promise<ConversationRecord[]> {
+  const processedSet = getProcessedSessionIds(state);
+
+  let allFiles: string[];
+  try {
+    allFiles = await fs.readdir(chatsDir);
+  } catch {
+    return [];
+  }
+
+  const sessionFiles = allFiles.filter(
+    (f) => f.startsWith(SESSION_FILE_PREFIX) && f.endsWith('.json'),
+  );
+
+  // Sort by filename descending (most recent first)
+  sessionFiles.sort((a, b) => b.localeCompare(a));
+
+  const sessions: ConversationRecord[] = [];
+
+  for (const file of sessionFiles) {
+    if (sessions.length >= MAX_SESSION_INDEX_SIZE) break;
+
+    const filePath = path.join(chatsDir, file);
+    try {
+      const content = await fs.readFile(filePath, 'utf-8');
+      const parsed: unknown = JSON.parse(content);
+      if (!isConversationRecord(parsed)) {
+        continue;
+      }
+      const conversation = parsed;
+
+      // Skip subagent sessions
+      if (conversation.kind === 'subagent') continue;
+
+      // Skip already processed
+      if (processedSet.has(conversation.sessionId)) continue;
+
+      // Skip sessions with too few user messages
+      const userMessageCount = conversation.messages.filter(
+        (m) => m.type === 'user',
+      ).length;
+      if (userMessageCount < MIN_USER_MESSAGES) continue;
+
+      sessions.push(conversation);
+    } catch {
+      debugLogger.debug(`[MemoryService] Failed to read session file: ${file}`);
+    }
+  }
+
+  return sessions;
+}
+
+/**
+ * Serializes a conversation record into a text representation for the extraction agent.
+ * Caps messages per session and excludes binary/metadata content.
+ */
+export function serializeSessionForExtraction(
+  conversation: ConversationRecord,
+): string {
+  const parts: string[] = [];
+
+  parts.push(`## Session: ${conversation.sessionId}`);
+  if (conversation.summary) {
+    parts.push(`Summary: ${conversation.summary}`);
+  }
+  parts.push(`Started: ${conversation.startTime}`);
+  parts.push('');
+
+  // Select messages: first 10 + last 20 for long conversations
+  const maxMessages = 30;
+  const firstWindow = 10;
+  let selectedMessages: MessageRecord[];
+  if (conversation.messages.length <= maxMessages) {
+    selectedMessages = conversation.messages;
+  } else {
+    const lastWindowSize = maxMessages - firstWindow;
+    const first = conversation.messages.slice(0, firstWindow);
+    const last = conversation.messages.slice(-lastWindowSize);
+    selectedMessages = [...first, ...last];
+  }
+
+  for (const msg of selectedMessages) {
+    if (msg.type === 'user' || msg.type === 'gemini') {
+      const role = msg.type === 'user' ? 'User' : 'Assistant';
+      const text = partListUnionToString(msg.content);
+      if (text.trim()) {
+        parts.push(`**${role}:** ${text}`);
+      }
+
+      // Include tool call summaries for gemini messages
+      if (msg.type === 'gemini' && 'toolCalls' in msg && msg.toolCalls) {
+        for (const tc of msg.toolCalls) {
+          const desc = tc.description ? ` — ${tc.description}` : '';
+          parts.push(`  [Tool: ${tc.displayName ?? tc.name}${desc}]`);
+        }
+      }
+      parts.push('');
+    }
+  }
+
+  return parts.join('\n');
+}
+
+/**
+ * Builds a session index for the extraction agent: a compact listing of all
+ * eligible sessions with their summary, file path, and new/previously-processed status.
+ * The agent can use read_file on paths to inspect sessions that look promising.
+ *
+ * Returns the index text and the list of new (unprocessed) session IDs.
+ */
+export async function buildSessionIndex(
+  chatsDir: string,
+  state: ExtractionState,
+): Promise<{ sessionIndex: string; newSessionIds: string[] }> {
+  const processedSet = getProcessedSessionIds(state);
+
+  let allFiles: string[];
+  try {
+    allFiles = await fs.readdir(chatsDir);
+  } catch {
+    return { sessionIndex: '', newSessionIds: [] };
+  }
+
+  const sessionFiles = allFiles.filter(
+    (f) => f.startsWith(SESSION_FILE_PREFIX) && f.endsWith('.json'),
+  );
+
+  // Sort by filename descending (most recent first)
+  sessionFiles.sort((a, b) => b.localeCompare(a));
+
+  const lines: string[] = [];
+  const newSessionIds: string[] = [];
+  let count = 0;
+
+  for (const file of sessionFiles) {
+    if (count >= MAX_SESSION_INDEX_SIZE) break;
+
+    const filePath = path.join(chatsDir, file);
+    try {
+      const content = await fs.readFile(filePath, 'utf-8');
+      const parsed: unknown = JSON.parse(content);
+      if (!isConversationRecord(parsed)) continue;
+
+      // Skip subagent sessions
+      if (parsed.kind === 'subagent') continue;
+
+      // Skip sessions with too few user messages
+      const userMessageCount = parsed.messages.filter(
+        (m) => m.type === 'user',
+      ).length;
+      if (userMessageCount < MIN_USER_MESSAGES) continue;
+
+      const isNew = !processedSet.has(parsed.sessionId);
+      if (isNew) {
+        newSessionIds.push(parsed.sessionId);
+      }
+
+      const status = isNew ? '[NEW]' : '[old]';
+      const summary = parsed.summary ?? '(no summary)';
+      lines.push(
+        `${status} ${summary} (${userMessageCount} user msgs) — ${filePath}`,
+      );
+      count++;
+    } catch {
+      // Skip unreadable files
+    }
+  }
+
+  return { sessionIndex: lines.join('\n'), newSessionIds };
+}
+
+/**
+ * Builds a summary of all existing skills — both memory-extracted skills
+ * in the skillsDir and globally/workspace-discovered skills from the SkillManager.
+ * This prevents the extraction agent from duplicating already-available skills.
+ */
+async function buildExistingSkillsSummary(
+  skillsDir: string,
+  config: Config,
+): Promise<string> {
+  const sections: string[] = [];
+
+  // 1. Memory-extracted skills (from previous runs)
+  const memorySkills: string[] = [];
+  try {
+    const entries = await fs.readdir(skillsDir, { withFileTypes: true });
+    for (const entry of entries) {
+      if (!entry.isDirectory()) continue;
+
+      const skillPath = path.join(skillsDir, entry.name, 'SKILL.md');
+      try {
+        const content = await fs.readFile(skillPath, 'utf-8');
+        const frontmatterMatch = content.match(/^---\s*\n([\s\S]*?)\n---/);
+        if (frontmatterMatch) {
+          const nameMatch = frontmatterMatch[1].match(/^name:\s*(.+)$/m);
+          const descMatch = frontmatterMatch[1].match(/^description:\s*(.+)$/m);
+          const name = nameMatch ? nameMatch[1].trim() : entry.name;
+          const desc = descMatch ? descMatch[1].trim() : '';
+          memorySkills.push(`- **${name}**: ${desc}`);
+        } else {
+          memorySkills.push(`- **${entry.name}**`);
+        }
+      } catch {
+        // Skill directory without SKILL.md, skip
+      }
+    }
+  } catch {
+    // Skills directory doesn't exist yet
+  }
+
+  if (memorySkills.length > 0) {
+    sections.push(
+      `## Previously Extracted Skills (in ${skillsDir})\n${memorySkills.join('\n')}`,
+    );
+  }
+
+  // 2. Discovered skills — categorize by source location
+  try {
+    const discoveredSkills = config.getSkillManager().getSkills();
+    if (discoveredSkills.length > 0) {
+      const userSkillsDir = Storage.getUserSkillsDir();
+      const globalSkills: string[] = [];
+      const workspaceSkills: string[] = [];
+      const extensionSkills: string[] = [];
+      const builtinSkills: string[] = [];
+
+      for (const s of discoveredSkills) {
+        const entry = `- **${s.name}**: ${s.description}`;
+        const loc = s.location;
+        if (loc.includes('/bundle/') || loc.includes('\\bundle\\')) {
+          builtinSkills.push(entry);
+        } else if (loc.startsWith(userSkillsDir)) {
+          globalSkills.push(entry);
+        } else if (
+          loc.includes('/extensions/') ||
+          loc.includes('\\extensions\\')
+        ) {
+          extensionSkills.push(entry);
+        } else {
+          workspaceSkills.push(entry);
+        }
+      }
+
+      if (globalSkills.length > 0) {
+        sections.push(
+          `## Global Skills (~/.gemini/skills — do NOT duplicate)\n${globalSkills.join('\n')}`,
+        );
+      }
+      if (workspaceSkills.length > 0) {
+        sections.push(
+          `## Workspace Skills (.gemini/skills — do NOT duplicate)\n${workspaceSkills.join('\n')}`,
+        );
+      }
+      if (extensionSkills.length > 0) {
+        sections.push(
+          `## Extension Skills (from installed extensions — do NOT duplicate)\n${extensionSkills.join('\n')}`,
+        );
+      }
+      if (builtinSkills.length > 0) {
+        sections.push(
+          `## Builtin Skills (bundled with CLI — do NOT duplicate)\n${builtinSkills.join('\n')}`,
+        );
+      }
+    }
+  } catch {
+    // SkillManager not available
+  }
+
+  return sections.join('\n\n');
+}
+
+/**
+ * Builds an AgentLoopContext from a Config for background agent execution.
+ */
+function buildAgentLoopContext(config: Config): {
+  context: AgentLoopContext;
+  restoreConfig: () => void;
+} {
+  // Create a PolicyEngine that auto-approves all tool calls so the
+  // background sub-agent never prompts the user for confirmation.
+  const autoApprovePolicy = new PolicyEngine({
+    rules: [
+      {
+        toolName: '*',
+        decision: PolicyDecision.ALLOW,
+        priority: 100,
+      },
+    ],
+  });
+  const autoApproveBus = new MessageBus(autoApprovePolicy);
+
+  // Create a scoped config proxy that restricts the agent's view to ~/.gemini/ only.
+  // This prevents the executor from injecting the full workspace directory tree
+  // and project GEMINI.md content into the system prompt.
+  const geminiDir = Storage.getGlobalGeminiDir();
+  const scopedWorkspace = new WorkspaceContext(geminiDir);
+  // Override methods that inject workspace context into the agent's prompt.
+  // We bind directly to avoid restricted patterns (Object.create, Proxy, Reflect).
+  const scopedConfig = config;
+  const origGetWorkspace = config.getWorkspaceContext.bind(config);
+  const origGetSysMemory = config.getSystemInstructionMemory.bind(config);
+  const origGetEnvMemory = config.getEnvironmentMemory.bind(config);
+  const origGetSesMemory = config.getSessionMemory.bind(config);
+  scopedConfig.getWorkspaceContext = () => scopedWorkspace;
+  scopedConfig.getSystemInstructionMemory = () => '';
+  scopedConfig.getEnvironmentMemory = () => '';
+  scopedConfig.getSessionMemory = () => '';
+
+  // Restore original methods after agent finishes (best-effort cleanup)
+  const restoreConfig = () => {
+    config.getWorkspaceContext = origGetWorkspace;
+    config.getSystemInstructionMemory = origGetSysMemory;
+    config.getEnvironmentMemory = origGetEnvMemory;
+    config.getSessionMemory = origGetSesMemory;
+  };
+
+  return {
+    context: {
+      config: scopedConfig,
+      promptId: `skill-extraction-${randomUUID().slice(0, 8)}`,
+      toolRegistry: config.getToolRegistry(),
+      promptRegistry: new PromptRegistry(),
+      resourceRegistry: new ResourceRegistry(),
+      messageBus: autoApproveBus,
+      geminiClient: config.getGeminiClient(),
+      sandboxManager: config.sandboxManager,
+    },
+    restoreConfig,
+  };
+}
+
+/**
+ * Main entry point for the skill extraction background task.
+ * Designed to be called fire-and-forget on session startup.
+ *
+ * Coordinates across multiple CLI instances via a lock file,
+ * scans past sessions for reusable patterns, and runs a sub-agent
+ * to extract and write SKILL.md files.
+ */
+export async function startMemoryService(config: Config): Promise<void> {
+  const memoryDir = config.storage.getProjectMemoryDir();
+  const skillsDir = config.storage.getProjectSkillsMemoryDir();
+  const lockPath = path.join(memoryDir, LOCK_FILENAME);
+  const statePath = path.join(memoryDir, STATE_FILENAME);
+  const chatsDir = path.join(config.storage.getProjectTempDir(), 'chats');
+
+  // Ensure directories exist
+  await fs.mkdir(skillsDir, { recursive: true });
+
+  debugLogger.log(`[MemoryService] Starting. Skills dir: ${skillsDir}`);
+
+  // Try to acquire exclusive lock
+  if (!(await tryAcquireLock(lockPath))) {
+    debugLogger.log('[MemoryService] Skipped: lock held by another instance');
+    return;
+  }
+  debugLogger.log('[MemoryService] Lock acquired');
+
+  // Register with ExecutionLifecycleService for background tracking
+  const abortController = new AbortController();
+  const handle = ExecutionLifecycleService.createExecution(
+    '', // no initial output
+    () => abortController.abort(), // onKill
+    'none',
+    undefined, // no format injection
+    'Skill extraction',
+    'silent',
+  );
+  const executionId = handle.pid;
+
+  const startTime = Date.now();
+  let restoreConfig: (() => void) | undefined;
+  try {
+    // Read extraction state
+    const state = await readExtractionState(statePath);
+    const previousRuns = state.runs.length;
+    const previouslyProcessed = getProcessedSessionIds(state).size;
+    debugLogger.log(
+      `[MemoryService] State loaded: ${previousRuns} previous run(s), ${previouslyProcessed} session(s) already processed`,
+    );
+
+    // Build session index: all eligible sessions with summaries + file paths.
+    // The agent decides which to read in full via read_file.
+    const { sessionIndex, newSessionIds } = await buildSessionIndex(
+      chatsDir,
+      state,
+    );
+
+    const totalInIndex = sessionIndex ? sessionIndex.split('\n').length : 0;
+    debugLogger.log(
+      `[MemoryService] Session scan: ${totalInIndex} eligible session(s) found, ${newSessionIds.length} new`,
+    );
+
+    if (newSessionIds.length === 0) {
+      debugLogger.log('[MemoryService] Skipped: no new sessions to process');
+      return;
+    }
+
+    // Snapshot existing skill directories before extraction
+    const skillsBefore = new Set<string>();
+    try {
+      const entries = await fs.readdir(skillsDir);
+      for (const e of entries) {
+        skillsBefore.add(e);
+      }
+    } catch {
+      // Empty skills dir
+    }
+    debugLogger.log(
+      `[MemoryService] ${skillsBefore.size} existing skill(s) in memory`,
+    );
+
+    // Read existing skills for context (memory-extracted + global/workspace)
+    const existingSkillsSummary = await buildExistingSkillsSummary(
+      skillsDir,
+      config,
+    );
+
+    // Build agent definition and context
+    const agentDefinition = SkillExtractionAgent(
+      skillsDir,
+      sessionIndex,
+      existingSkillsSummary,
+    );
+
+    const agentLoopResult = buildAgentLoopContext(config);
+    const context = agentLoopResult.context;
+    restoreConfig = agentLoopResult.restoreConfig;
+
+    // Register the agent's model config since it's not going through AgentRegistry.
+    // This resolves 'inherit' to the parent session's model and creates the
+    // model config alias that the executor uses for API calls.
+    const modelAlias = getModelConfigAlias(agentDefinition);
+    const modelToUse = config.getModel();
+    config.modelConfigService.registerRuntimeModelConfig(modelAlias, {
+      modelConfig: {
+        ...agentDefinition.modelConfig,
+        model: modelToUse,
+      },
+    });
+    debugLogger.log(
+      `[MemoryService] Starting extraction agent (model: ${modelToUse}, maxTurns: 30, maxTime: 30min)`,
+    );
+
+    // Create and run the extraction agent
+    const executor = await LocalAgentExecutor.create(agentDefinition, context);
+
+    await executor.run(
+      { request: 'Extract skills from the provided sessions.' },
+      abortController.signal,
+    );
+
+    const elapsed = ((Date.now() - startTime) / 1000).toFixed(1);
+
+    // Diff skills directory to find newly created skills
+    const skillsCreated: string[] = [];
+    try {
+      const entriesAfter = await fs.readdir(skillsDir);
+      for (const e of entriesAfter) {
+        if (!skillsBefore.has(e)) {
+          skillsCreated.push(e);
+        }
+      }
+    } catch {
+      // Skills dir read failed
+    }
+
+    // Record the run with full metadata
+    const run: ExtractionRun = {
+      runAt: new Date().toISOString(),
+      sessionIds: newSessionIds,
+      skillsCreated,
+    };
+    const updatedState: ExtractionState = {
+      runs: [...state.runs, run],
+    };
+    await writeExtractionState(statePath, updatedState);
+
+    if (skillsCreated.length > 0) {
+      debugLogger.log(
+        `[MemoryService] Completed in ${elapsed}s. Created ${skillsCreated.length} skill(s): ${skillsCreated.join(', ')}`,
+      );
+    } else {
+      debugLogger.log(
+        `[MemoryService] Completed in ${elapsed}s. No new skills created (processed ${newSessionIds.length} session(s))`,
+      );
+    }
+  } catch (error) {
+    const elapsed = ((Date.now() - startTime) / 1000).toFixed(1);
+    if (abortController.signal.aborted) {
+      debugLogger.log(`[MemoryService] Cancelled after ${elapsed}s`);
+    } else {
+      debugLogger.log(
+        `[MemoryService] Failed after ${elapsed}s: ${error instanceof Error ? error.message : String(error)}`,
+      );
+    }
+    if (executionId !== undefined) {
+      ExecutionLifecycleService.completeExecution(executionId, {
+        error: error instanceof Error ? error : new Error(String(error)),
+      });
+    }
+    return;
+  } finally {
+    restoreConfig?.();
+    await releaseLock(lockPath);
+    debugLogger.log('[MemoryService] Lock released');
+  }
+
+  if (executionId !== undefined) {
+    ExecutionLifecycleService.completeExecution(executionId);
+  }
+}
