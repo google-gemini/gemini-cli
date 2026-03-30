@@ -18,6 +18,9 @@ The system follows a layered pipeline design:
 Heap Snapshot (.heapsnapshot)
     |
     v
+StreamingHeapParser ──> RawHeapSnapshot (64KB chunks, <50MB auto-fallback)
+    |
+    v
 HeapSnapshotAnalyzer ──> ClassSummary[], LeakReport, DominatorTree
     |                         |                |
     v                         v                v
@@ -28,6 +31,12 @@ LLMExplainer ──────> Structured Prompts ──> Gemini (weeks 7-8)
     |
     v
 PerfettoExporter ──> Chrome Trace Events ──> Perfetto UI / SQL
+    |
+    v
+InvestigationTool ──> BaseDeclarativeTool ──> Gemini CLI Tool Registry
+    |
+    v
+memory-investigation SKILL.md ──> Built-in Skill ──> activate_skill
 ```
 
 ---
@@ -50,10 +59,11 @@ PerfettoExporter ──> Chrome Trace Events ──> Perfetto UI / SQL
 | `flameGraphGenerator` | 548 | Generate interactive flamegraphs from allocation profiles |
 | `tokenEfficiencyBenchmark` | 514 | Measure token compression ratios for LLM context efficiency |
 | `perfettoExporter` | 489 | Export leak reports, class summaries, CPU profiles to Perfetto format |
-| `index` | 151 | Public API barrel exports |
-| **Source Total** | **10,488** | |
-| **Tests (15 files)** | **6,926** | |
-| **Grand Total** | **17,414** | |
+| `streamingHeapParser` | 420 | Streaming JSON parser for large (>50MB) V8 heap snapshots — 10-15% peak memory |
+| `index` | 158 | Public API barrel exports |
+| **Source Total** | **10,908** | |
+| **Tests (16 files)** | **7,226** | |
+| **Grand Total** | **18,134** | |
 
 ---
 
@@ -104,6 +114,23 @@ const causes = rca.analyzeSnapshot(classSummaries, snapshot.nodeCount);
 ```
 
 **Detectors:** Event Listener Leaks, Unbounded Collections, Closure Captures, String Accumulation, Buffer Accumulation, Large Retained Trees, Excessive Allocations, Detached DOM, Timer Leaks
+
+### Streaming Heap Snapshot Parser
+
+For production heap snapshots that can exceed 300MB, the streaming parser processes the file in 64KB chunks using a state machine, keeping peak memory to ~10-15% of file size. Files under 50MB automatically fall back to `JSON.parse` for speed.
+
+```typescript
+import { StreamingHeapParser, parseHeapSnapshot } from './investigation';
+
+// Auto-selects streaming vs JSON.parse based on file size
+const snapshot = await parseHeapSnapshot('/path/to/huge.heapsnapshot', (progress) => {
+  console.log(`${progress.phase}: ${progress.percent}%`);
+});
+
+// Or use the class directly for custom chunk sizes
+const parser = new StreamingHeapParser({ chunkSize: 128 * 1024 });
+const snapshot2 = await parser.parseFile('/path/to/huge.heapsnapshot');
+```
 
 ### Perfetto Trace Integration
 
@@ -187,11 +214,31 @@ const annotations = guard.toGitHubAnnotations(result);
 const ciReport = guard.toCIReport(result);
 ```
 
+### Built-in Skill & Tool Integration
+
+The investigation module is fully integrated into Gemini CLI's skill and tool systems:
+
+**Tool Registration:** The `investigate` tool is registered as a `BaseDeclarativeTool` in the tool registry (`tools/investigation-tool.ts`), making it available to the LLM as a first-class function call with all 6 actions.
+
+**Skill Scaffold:** A built-in skill at `skills/builtin/memory-investigation/` provides the LLM with workflow guidance:
+
+```
+skills/builtin/memory-investigation/
+├── SKILL.md                            # Trigger keywords + action table + workflow examples
+├── references/
+│   ├── advanced-workflows.md           # TrendForecaster, RegressionGuard, AllocationProfiler
+│   └── perfetto-sql.md                 # SQL query reference for Perfetto traces
+└── scripts/
+    └── launch-with-inspector.cjs       # Helper to launch Node.js with --inspect
+```
+
+When the user mentions "memory leak", "heap", "OOM", etc., the skill is automatically activated, giving the LLM contextual instructions on which `investigate` action to call and how to interpret results.
+
 ---
 
 ## Test Coverage
 
-All 15 test files pass with **410+ tests** covering every public API:
+All 16 test files pass with **420+ tests** covering every public API:
 
 <p align="center">
   <img src="./docs/images/screenshot-tests-v3.png" alt="Test Results" width="680"/>

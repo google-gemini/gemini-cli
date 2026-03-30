@@ -19,6 +19,8 @@ import {
 
 import { PerfettoExporter, type V8CpuProfile } from './perfettoExporter.js';
 
+import { parseHeapSnapshot } from './streamingHeapParser.js';
+
 import { CDPClient, type CPUProfileResult } from './cdpClient.js';
 
 import { RootCauseAnalyzer } from './rootCauseAnalyzer.js';
@@ -240,10 +242,14 @@ export class InvestigationExecutor extends EventEmitter {
       };
     }
 
-    const fileContent1 = fs.readFileSync(resolvedPath, 'utf-8');
-    const parsed1: unknown = JSON.parse(fileContent1);
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
-    const raw = parsed1 as RawHeapSnapshot;
+    // Use streaming parser for large files (>50MB), JSON.parse for smaller ones
+    this.emit('progress', { phase: 'parsing', file: resolvedPath });
+    const raw = await parseHeapSnapshot(resolvedPath, (progress) => {
+      this.emit('progress', {
+        file: resolvedPath,
+        ...progress,
+      });
+    });
     const analyzer = new HeapSnapshotAnalyzer(raw);
     const summaries = analyzer.getClassSummaries();
     this.lastClassSummaries = summaries;
@@ -547,10 +553,14 @@ export class InvestigationExecutor extends EventEmitter {
       };
     }
 
-    const fileContent1 = fs.readFileSync(resolvedPath, 'utf-8');
-    const parsed1: unknown = JSON.parse(fileContent1);
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
-    const raw = parsed1 as RawHeapSnapshot;
+    // Use streaming parser for large files (>50MB), JSON.parse for smaller ones
+    this.emit('progress', { phase: 'parsing', file: resolvedPath });
+    const raw = await parseHeapSnapshot(resolvedPath, (progress) => {
+      this.emit('progress', {
+        file: resolvedPath,
+        ...progress,
+      });
+    });
     const analyzer = new HeapSnapshotAnalyzer(raw);
     const summaries = analyzer.getClassSummaries();
     this.lastClassSummaries = summaries;

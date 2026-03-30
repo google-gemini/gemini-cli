@@ -140,6 +140,13 @@ export {
 } from './tokenEfficiencyBenchmark.js';
 
 export {
+  StreamingHeapParser,
+  parseHeapSnapshot,
+  type StreamingParseProgress,
+  type StreamingParserOptions,
+} from './streamingHeapParser.js';
+
+export {
   PerfettoSqlIntegration,
   SqlParser,
   QueryExecutor,
