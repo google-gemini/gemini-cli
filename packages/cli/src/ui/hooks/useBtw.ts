@@ -80,6 +80,7 @@ export const useBtw = (
   const [state, dispatch] = useReducer(btwReducer, initialState);
 
   const abortControllerRef = useRef<AbortController | null>(null);
+  const requestIdRef = useRef<number>(0);
 
   const dismissBtw = useCallback(() => {
     if (abortControllerRef.current) {
@@ -100,6 +101,7 @@ export const useBtw = (
 
       const abortController = new AbortController();
       abortControllerRef.current = abortController;
+      const requestId = ++requestIdRef.current;
 
       dispatch({ type: 'SUBMIT', query: newQuery });
 
@@ -108,7 +110,7 @@ export const useBtw = (
       let flushTimer: NodeJS.Timeout | null = null;
 
       const flushResponse = () => {
-        if (abortControllerRef.current !== abortController) return;
+        if (requestIdRef.current !== requestId) return;
         dispatch({ type: 'SET_RESPONSE', content: accumulatedResponse });
         lastDispatchTime = Date.now();
       };
@@ -185,7 +187,7 @@ export const useBtw = (
 
         if (err instanceof Error && err.name === 'AbortError') {
           // Ignore aborts
-        } else if (abortControllerRef.current === abortController) {
+        } else if (requestIdRef.current === requestId) {
           dispatch({
             type: 'ERROR',
             error: err instanceof Error ? err.message : String(err),
@@ -195,7 +197,7 @@ export const useBtw = (
         if (flushTimer) clearTimeout(flushTimer);
         flushResponse();
 
-        if (abortControllerRef.current === abortController) {
+        if (requestIdRef.current === requestId) {
           dispatch({ type: 'FINISHED' });
         }
       }
