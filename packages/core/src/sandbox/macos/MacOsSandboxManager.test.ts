@@ -41,12 +41,9 @@ describe('MacOsSandboxManager', () => {
     });
 
     // Mock the seatbelt args builder to isolate manager tests
-    vi.spyOn(seatbeltArgsBuilder, 'buildSeatbeltArgs').mockReturnValue([
-      '-p',
+    vi.spyOn(seatbeltArgsBuilder, 'buildSeatbeltProfile').mockReturnValue(
       '(mock profile)',
-      '-D',
-      'MOCK_VAR=value',
-    ]);
+    );
   });
 
   afterEach(() => {
@@ -67,7 +64,7 @@ describe('MacOsSandboxManager', () => {
         policy: mockPolicy,
       });
 
-      expect(seatbeltArgsBuilder.buildSeatbeltArgs).toHaveBeenCalledWith({
+      expect(seatbeltArgsBuilder.buildSeatbeltProfile).toHaveBeenCalledWith({
         workspace: mockWorkspace,
         allowedPaths: mockAllowedPaths,
         networkAccess: mockNetworkAccess,
@@ -83,15 +80,17 @@ describe('MacOsSandboxManager', () => {
       });
 
       expect(result.program).toBe('/usr/bin/sandbox-exec');
-      expect(result.args).toEqual([
-        '-p',
-        '(mock profile)',
-        '-D',
-        'MOCK_VAR=value',
-        '--',
-        'echo',
-        'hello',
-      ]);
+      expect(result.args[0]).toBe('-f');
+      expect(result.args[1]).toMatch(/gemini-seatbelt-.*\.sb$/);
+      expect(result.args.slice(2)).toEqual(['--', 'echo', 'hello']);
+
+      // Verify temp file was written
+      const tempFile = result.args[1];
+      expect(fs.existsSync(tempFile)).toBe(true);
+      expect(fs.readFileSync(tempFile, 'utf8')).toBe('(mock profile)');
+
+      // Clean up the temp file
+      fs.unlinkSync(tempFile);
     });
 
     it('should correctly pass through the cwd to the resulting command', async () => {
@@ -104,6 +103,7 @@ describe('MacOsSandboxManager', () => {
       });
 
       expect(result.cwd).toBe('/test/different/cwd');
+      fs.unlinkSync(result.args[1]);
     });
 
     it('should apply environment sanitization via the default mechanisms', async () => {
@@ -123,10 +123,11 @@ describe('MacOsSandboxManager', () => {
 
       expect(result.env['SAFE_VAR']).toBe('1');
       expect(result.env['GITHUB_TOKEN']).toBeUndefined();
+      fs.unlinkSync(result.args[1]);
     });
 
     it('should allow network when networkAccess is true', async () => {
-      await manager.prepareCommand({
+      const result = await manager.prepareCommand({
         command: 'echo',
         args: ['hello'],
         cwd: mockWorkspace,
@@ -134,14 +135,15 @@ describe('MacOsSandboxManager', () => {
         policy: { ...mockPolicy, networkAccess: true },
       });
 
-      expect(seatbeltArgsBuilder.buildSeatbeltArgs).toHaveBeenCalledWith(
+      expect(seatbeltArgsBuilder.buildSeatbeltProfile).toHaveBeenCalledWith(
         expect.objectContaining({ networkAccess: true }),
       );
+      fs.unlinkSync(result.args[1]);
     });
 
     describe('governance files', () => {
       it('should ensure governance files exist', async () => {
-        await manager.prepareCommand({
+        const result = await manager.prepareCommand({
           command: 'echo',
           args: [],
           cwd: mockWorkspace,
@@ -151,15 +153,16 @@ describe('MacOsSandboxManager', () => {
 
         // The seatbelt builder internally handles governance files, so we simply verify
         // it is invoked correctly with the right workspace.
-        expect(seatbeltArgsBuilder.buildSeatbeltArgs).toHaveBeenCalledWith(
+        expect(seatbeltArgsBuilder.buildSeatbeltProfile).toHaveBeenCalledWith(
           expect.objectContaining({ workspace: mockWorkspace }),
         );
+        fs.unlinkSync(result.args[1]);
       });
     });
 
     describe('allowedPaths', () => {
       it('should parameterize allowed paths and normalize them', async () => {
-        await manager.prepareCommand({
+        const result = await manager.prepareCommand({
           command: 'echo',
           args: [],
           cwd: mockWorkspace,
@@ -170,11 +173,12 @@ describe('MacOsSandboxManager', () => {
           },
         });
 
-        expect(seatbeltArgsBuilder.buildSeatbeltArgs).toHaveBeenCalledWith(
+        expect(seatbeltArgsBuilder.buildSeatbeltProfile).toHaveBeenCalledWith(
           expect.objectContaining({
             allowedPaths: ['/tmp/allowed1', '/tmp/allowed2'],
           }),
         );
+        fs.unlinkSync(result.args[1]);
       });
     });
 
@@ -184,7 +188,7 @@ describe('MacOsSandboxManager', () => {
           workspace: mockWorkspace,
           forbiddenPaths: ['/tmp/forbidden1'],
         });
-        await managerWithForbidden.prepareCommand({
+        const result = await managerWithForbidden.prepareCommand({
           command: 'echo',
           args: [],
           cwd: mockWorkspace,
@@ -192,11 +196,12 @@ describe('MacOsSandboxManager', () => {
           policy: mockPolicy,
         });
 
-        expect(seatbeltArgsBuilder.buildSeatbeltArgs).toHaveBeenCalledWith(
+        expect(seatbeltArgsBuilder.buildSeatbeltProfile).toHaveBeenCalledWith(
           expect.objectContaining({
             forbiddenPaths: ['/tmp/forbidden1'],
           }),
         );
+        fs.unlinkSync(result.args[1]);
       });
 
       it('explicitly denies non-existent forbidden paths to prevent creation', async () => {
@@ -204,7 +209,7 @@ describe('MacOsSandboxManager', () => {
           workspace: mockWorkspace,
           forbiddenPaths: ['/tmp/does-not-exist'],
         });
-        await managerWithForbidden.prepareCommand({
+        const result = await managerWithForbidden.prepareCommand({
           command: 'echo',
           args: [],
           cwd: mockWorkspace,
@@ -212,11 +217,12 @@ describe('MacOsSandboxManager', () => {
           policy: mockPolicy,
         });
 
-        expect(seatbeltArgsBuilder.buildSeatbeltArgs).toHaveBeenCalledWith(
+        expect(seatbeltArgsBuilder.buildSeatbeltProfile).toHaveBeenCalledWith(
           expect.objectContaining({
             forbiddenPaths: ['/tmp/does-not-exist'],
           }),
         );
+        fs.unlinkSync(result.args[1]);
       });
 
       it('should override allowed paths if a path is also in forbidden paths', async () => {
@@ -224,7 +230,7 @@ describe('MacOsSandboxManager', () => {
           workspace: mockWorkspace,
           forbiddenPaths: ['/tmp/conflict'],
         });
-        await managerWithForbidden.prepareCommand({
+        const result = await managerWithForbidden.prepareCommand({
           command: 'echo',
           args: [],
           cwd: mockWorkspace,
@@ -235,12 +241,13 @@ describe('MacOsSandboxManager', () => {
           },
         });
 
-        expect(seatbeltArgsBuilder.buildSeatbeltArgs).toHaveBeenCalledWith(
+        expect(seatbeltArgsBuilder.buildSeatbeltProfile).toHaveBeenCalledWith(
           expect.objectContaining({
             allowedPaths: ['/tmp/conflict'],
             forbiddenPaths: ['/tmp/conflict'],
           }),
         );
+        fs.unlinkSync(result.args[1]);
       });
     });
   });

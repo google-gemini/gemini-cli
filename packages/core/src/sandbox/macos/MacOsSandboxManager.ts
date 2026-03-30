@@ -4,6 +4,9 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+import fs from 'node:fs';
+import os from 'node:os';
+import path from 'node:path';
 import {
   type SandboxManager,
   type SandboxRequest,
@@ -17,7 +20,7 @@ import {
   sanitizeEnvironment,
   getSecureSanitizationConfig,
 } from '../../services/environmentSanitization.js';
-import { buildSeatbeltArgs } from './seatbeltArgsBuilder.js';
+import { buildSeatbeltProfile } from './seatbeltArgsBuilder.js';
 import {
   initializeShellParsers,
   getCommandName,
@@ -29,6 +32,9 @@ import {
 } from '../utils/commandSafety.js';
 import { verifySandboxOverrides } from '../utils/commandUtils.js';
 import { parsePosixSandboxDenials } from '../utils/sandboxDenialUtils.js';
+
+let registeredCleanup = false;
+const filesToCleanup: string[] = [];
 
 /**
  * A SandboxManager implementation for macOS that uses Seatbelt.
@@ -105,7 +111,7 @@ export class MacOsSandboxManager implements SandboxManager {
         false,
     };
 
-    const sandboxArgs = buildSeatbeltArgs({
+    const profile = buildSeatbeltProfile({
       workspace: this.options.workspace,
       allowedPaths: [...(req.policy?.allowedPaths || [])],
       forbiddenPaths: this.options.forbiddenPaths,
@@ -114,9 +120,29 @@ export class MacOsSandboxManager implements SandboxManager {
       additionalPermissions: mergedAdditional,
     });
 
+    const tempFile = path.join(
+      os.tmpdir(),
+      `gemini-seatbelt-${Date.now()}-${Math.random().toString(36).slice(2)}.sb`,
+    );
+    fs.writeFileSync(tempFile, profile);
+    filesToCleanup.push(tempFile);
+
+    if (!registeredCleanup) {
+      process.on('exit', () => {
+        for (const file of filesToCleanup) {
+          try {
+            fs.rmSync(file, { force: true });
+          } catch {
+            // Ignore cleanup errors
+          }
+        }
+      });
+      registeredCleanup = true;
+    }
+
     return {
       program: '/usr/bin/sandbox-exec',
-      args: [...sandboxArgs, '--', req.command, ...req.args],
+      args: ['-f', tempFile, '--', req.command, ...req.args],
       env: sanitizedEnv,
       cwd: req.cwd,
     };
