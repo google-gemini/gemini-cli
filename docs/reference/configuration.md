@@ -115,7 +115,7 @@ their corresponding top-level category object in your `settings.json` file.
   - **Description:** The default approval mode for tool execution. 'default'
     prompts for approval, 'auto_edit' auto-approves edit tools, and 'plan' is
     read-only mode. YOLO mode (auto-approve all actions) can only be enabled via
-    command line (--yolo or --approval-mode=yolo).
+    command line (`--yolo` or `--approval-mode=yolo`).
   - **Default:** `"default"`
   - **Values:** `"default"`, `"auto_edit"`, `"plan"`
 
@@ -406,7 +406,7 @@ their corresponding top-level category object in your `settings.json` file.
 
 - **`model.maxSessionTurns`** (number):
   - **Description:** Maximum number of user/model/tool turns to keep in a
-    session. -1 means unlimited.
+    session. `-1` means unlimited.
   - **Default:** `-1`
 
 - **`model.summarizeToolOutput`** (object):

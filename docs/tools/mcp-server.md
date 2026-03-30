@@ -1054,11 +1054,13 @@ gemini mcp add [options] <name> <commandOrUrl> [args...]
 
 **Options (flags):**
 
-- `-s, --scope`: Configuration scope (user or project). [default: "project"]
-- `-t, --transport`: Transport type (stdio, sse, http). [default: "stdio"]
-- `-e, --env`: Set environment variables (e.g. -e KEY=value).
-- `-H, --header`: Set HTTP headers for SSE and HTTP transports (e.g. -H
-  "X-Api-Key: abc123" -H "Authorization: Bearer abc123").
+- `-s, --scope`: Configuration scope (`user` or `project`). [default:
+  `"project"`]
+- `-t, --transport`: Transport type (`stdio`, `sse`, `http`). [default:
+  `"stdio"`]
+- `-e, --env`: Set environment variables (e.g. `-e KEY=value`).
+- `-H, --header`: Set HTTP headers for SSE and HTTP transports (e.g.
+  `-H "X-Api-Key: abc123" -H "Authorization: Bearer abc123"`).
 - `--timeout`: Set connection timeout in milliseconds.
 - `--trust`: Trust the server (bypass all tool call confirmation prompts).
 - `--description`: Set the description for the server.
@@ -1141,8 +1143,8 @@ gemini mcp list
 
 To minimize noise during startup, MCP connection errors for background servers
 are "silent by default." If issues are detected during startup, a single
-informational hint will be shown: _"MCP issues detected. Run /mcp list for
-status."_
+informational hint will be shown:
+`MCP issues detected. Run /mcp list for status.`
 
 Detailed, actionable diagnostics for a specific server are automatically
 re-enabled when:
@@ -1167,7 +1169,7 @@ gemini mcp remove <name>
 
 **Options (flags):**
 
-- `-s, --scope`: Configuration scope (user or project). [default: "project"]
+- `-s, --scope`: Configuration scope (user or project). [default: `"project"`]
 
 **Example:**
 
