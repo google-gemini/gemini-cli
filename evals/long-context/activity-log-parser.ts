@@ -15,6 +15,7 @@ interface ActivityLogEntry {
   role?: 'user' | 'assistant';
   content?: string;
   tool_name?: string;
+  tool_id?: string;
   parameters?: Record<string, unknown>;
   stats?: {
     total_tokens?: number;
@@ -26,6 +27,7 @@ interface ActivityLogEntry {
 
 interface StreamJsonEvent {
   type?: string;
+  timestamp?: string;
   role?: 'user' | 'assistant';
   tool_name?: string;
   tool_id?: string;
@@ -249,6 +251,47 @@ function recordToolParameters(
     fileWriteIncrement,
     searchToolIncrement,
   };
+}
+
+function sanitizeForFingerprint(value: unknown): unknown {
+  if (Array.isArray(value)) {
+    return value.map((item) => sanitizeForFingerprint(item));
+  }
+  if (value && typeof value === 'object') {
+    const sortedEntries = Object.entries(value as Record<string, unknown>)
+      .sort(([a], [b]) => a.localeCompare(b))
+      .map(([key, nestedValue]) => [key, sanitizeForFingerprint(nestedValue)]);
+    return Object.fromEntries(sortedEntries);
+  }
+  return value;
+}
+
+function buildEventFingerprint(event: {
+  type?: string;
+  timestamp?: string | number;
+  role?: string;
+  tool_name?: string;
+  tool_id?: string;
+  status?: string;
+  content?: string;
+  parameters?: Record<string, unknown>;
+  stats?: Record<string, unknown>;
+}): string | null {
+  if (!event.type) {
+    return null;
+  }
+
+  return JSON.stringify({
+    type: event.type,
+    timestamp: event.timestamp ?? null,
+    role: event.role ?? null,
+    tool_name: event.tool_name ?? null,
+    tool_id: event.tool_id ?? null,
+    status: event.status ?? null,
+    content: event.content ?? null,
+    parameters: sanitizeForFingerprint(event.parameters ?? null),
+    stats: sanitizeForFingerprint(event.stats ?? null),
+  });
 }
 
 export async function parseActivityLog(

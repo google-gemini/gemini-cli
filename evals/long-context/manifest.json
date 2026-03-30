@@ -41,6 +41,10 @@
     {
       "id": "benchmark-clone-executable-oracle",
       "file": "tasks/benchmark-clone-executable-oracle.json"
+    },
+    {
+      "id": "benchmark-local-executable-oracle",
+      "file": "tasks/benchmark-local-executable-oracle.json"
     }
   ]
 }

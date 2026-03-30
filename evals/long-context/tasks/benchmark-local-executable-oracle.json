@@ -1,0 +1,103 @@
+{
+  "id": "benchmark-local-executable-oracle",
+  "repositoryId": "gemini-cli-local",
+  "title": "Local executable-oracle benchmark slice",
+  "description": "Exercises the proposal-aligned executable oracle path on a local multi-directory workspace with docs, config, and artifact files.",
+  "prompt": "Inspect docs/overview.txt and config/task.conf, then write the exact token LOCAL_BENCHMARK_SUCCESS followed by a newline into artifacts/result.txt.",
+  "timeoutMs": 30000,
+  "runner": {
+    "mode": "local_workspace",
+    "cwd": "evals/long-context/fixtures/benchmark-workspace",
+    "fakeResponsesPath": "evals/long-context/fixtures/benchmark-local.responses",
+    "outputFormat": "stream-json",
+    "approvalMode": "yolo",
+    "cliArgs": []
+  },
+  "validation": {
+    "type": "executable_oracle",
+    "failToPass": [
+      {
+        "label": "fail-to-pass local artifact check",
+        "command": "python3",
+        "args": [
+          "-c",
+          "from pathlib import Path; print(Path('artifacts/result.txt').read_text())"
+        ],
+        "expectedExitCode": 0,
+        "stdoutIncludes": ["LOCAL_BENCHMARK_SUCCESS"],
+        "stderrIncludes": []
+      }
+    ],
+    "passToPass": [
+      {
+        "label": "pass-to-pass overview seed check",
+        "command": "python3",
+        "args": [
+          "-c",
+          "from pathlib import Path; print(Path('docs/overview.txt').read_text())"
+        ],
+        "expectedExitCode": 0,
+        "stdoutIncludes": ["benchmark seed"],
+        "stderrIncludes": []
+      },
+      {
+        "label": "pass-to-pass baseline artifact check",
+        "command": "python3",
+        "args": [
+          "-c",
+          "from pathlib import Path; print(Path('artifacts/baseline.txt').read_text())"
+        ],
+        "expectedExitCode": 0,
+        "stdoutIncludes": ["keep-me"],
+        "stderrIncludes": []
+      }
+    ],
+    "build": {
+      "label": "build-style config target check",
+      "command": "python3",
+      "args": [
+        "-c",
+        "from pathlib import Path; print('artifacts/result.txt' if 'artifacts/result.txt' in Path('config/task.conf').read_text() else 'missing')"
+      ],
+      "expectedExitCode": 0,
+      "stdoutIncludes": ["artifacts/result.txt"],
+      "stderrIncludes": []
+    },
+    "augmented": [
+      {
+        "label": "augmented local artifact exact token check",
+        "command": "python3",
+        "args": [
+          "-c",
+          "from pathlib import Path; content = Path('artifacts/result.txt').read_text().strip(); print('ok' if content == 'LOCAL_BENCHMARK_SUCCESS' else content)"
+        ],
+        "expectedExitCode": 0,
+        "stdoutIncludes": ["ok"],
+        "stderrIncludes": []
+      }
+    ]
+  },
+  "tags": ["benchmark", "local-workspace", "executable-oracle"],
+  "taskType": "dependency_chain_resolution",
+  "difficulty": {
+    "filesInvolved": 4,
+    "directoriesCrossed": 3,
+    "architecturalReasoningDepth": 2
+  },
+  "goldenPatchPath": "evals/long-context/fixtures/local-benchmark-golden.patch",
+  "antiContamination": {
+    "promptMutated": true,
+    "humanValidated": true,
+    "reviewers": ["long-context-scaffold", "proposal-mvp"],
+    "sourceCommitDate": "2026-03-30T00:00:00.000Z"
+  },
+  "expectedScope": {
+    "criticalFiles": [
+      "docs/overview.txt",
+      "config/task.conf",
+      "artifacts/result.txt",
+      "artifacts/baseline.txt"
+    ],
+    "minFilesTouched": 1
+  }
+}

@@ -99,6 +99,25 @@ describe('long-context schema', () => {
     }
   });
 
+  it('supports a second benchmark executable-oracle task', () => {
+    const taskPath = path.join(
+      __dirname,
+      'tasks',
+      'benchmark-local-executable-oracle.json',
+    );
+    const task = TaskSchema.parse(
+      JSON.parse(fs.readFileSync(taskPath, 'utf8')),
+    );
+
+    expect(task.validation.type).toBe('executable_oracle');
+    expect(task.difficulty?.filesInvolved).toBe(4);
+    expect(task.expectedScope?.criticalFiles).toContain('config/task.conf');
+    if (task.validation.type === 'executable_oracle') {
+      expect(task.validation.passToPass).toHaveLength(2);
+      expect(task.validation.augmented).toHaveLength(1);
+    }
+  });
+
   it('exports json schema definitions', () => {
     expect(LongContextJsonSchemas.manifest).toHaveProperty('$schema');
     expect(LongContextJsonSchemas.task).toHaveProperty('definitions');
@@ -309,6 +328,36 @@ describe('long-context runner', () => {
     });
   });
 
+  it('executes the benchmark local executable-oracle task', async () => {
+    const outputDir = path.join(
+      fixturesDir,
+      'tmp-run',
+      `benchmark-local-${Date.now()}-${Math.random().toString(16).slice(2)}`,
+    );
+
+    const result = await runTask({
+      manifestPath,
+      taskId: 'benchmark-local-executable-oracle',
+      outputDir,
+    });
+
+    expect(result.status).toBe('passed');
+    expect(result.processMetrics.filesRead).toContain('docs/overview.txt');
+    expect(result.processMetrics.filesRead).toContain('config/task.conf');
+    expect(result.processMetrics.filesWritten).toContain(
+      'artifacts/result.txt',
+    );
+    expect(result.validationBreakdown).toEqual({
+      failToPassPassed: 1,
+      failToPassTotal: 1,
+      passToPassPassed: 2,
+      passToPassTotal: 2,
+      augmentedPassed: 1,
+      augmentedTotal: 1,
+      buildPassed: true,
+    });
+  });
+
   it('accepts equals-style task args via runTask entrypoint parsing path', async () => {
     const outputDir = path.join(
       fixturesDir,
@@ -324,6 +373,25 @@ describe('long-context runner', () => {
 
     expect(result.taskId).toBe('benchmark-clone-executable-oracle');
     expect(result.status).toBe('passed');
+  });
+
+  it('does not double count overlapping stream-json metrics across stdout and activity sources', async () => {
+    const outputDir = path.join(
+      fixturesDir,
+      'tmp-run',
+      `dedupe-${Date.now()}-${Math.random().toString(16).slice(2)}`,
+    );
+
+    const result = await runTask({
+      manifestPath,
+      taskId: 'benchmark-clone-executable-oracle',
+      outputDir,
+    });
+
+    expect(result.processMetrics.toolCallCount).toBe(2);
+    expect(result.processMetrics.fileReadCount).toBe(1);
+    expect(result.processMetrics.fileWriteCount).toBe(1);
+    expect(result.processMetrics.assistantMessageCount).toBe(3);
   });
 
   it('runs the manifest and writes a summary artifact', async () => {
@@ -343,15 +411,18 @@ describe('long-context runner', () => {
       JSON.parse(fs.readFileSync(storedSummaryPath, 'utf8')),
     );
 
-    expect(summary.totalTasks).toBe(5);
+    expect(summary.totalTasks).toBe(6);
     expect(summary.failedTasks).toBe(0);
-    expect(summary.passedTasks).toBe(5);
-    expect(summary.taskResults).toHaveLength(5);
+    expect(summary.passedTasks).toBe(6);
+    expect(summary.taskResults).toHaveLength(6);
     expect(summary.aggregatedMetrics.toolCallCount).toBeGreaterThan(0);
     expect(summary.aggregatedMetrics.fileWriteCount).toBeGreaterThan(0);
-    expect(storedSummary.totalTasks).toBe(5);
+    expect(storedSummary.totalTasks).toBe(6);
     expect(storedSummary.taskResults.map((task) => task.taskId)).toContain(
       'benchmark-clone-executable-oracle',
+    );
+    expect(storedSummary.taskResults.map((task) => task.taskId)).toContain(
+      'benchmark-local-executable-oracle',
     );
   });
 });

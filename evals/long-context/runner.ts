@@ -9,6 +9,11 @@ import path from 'node:path';
 import { spawn, spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import {
+  extractStreamJsonFingerprints,
+  mergePathLists,
+  mergeProcessMetrics,
+} from './metric-merge.js';
+import {
   ManifestRunSummarySchema,
   ManifestSchema,
   RunResultSchema,
@@ -573,77 +578,6 @@ function buildVitestCompatibleReport(
   };
 }
 
-function mergeMetricValue(
-  primary: number | undefined,
-  secondary: number | undefined,
-): number | undefined {
-  if (primary === undefined) {
-    return secondary;
-  }
-  if (secondary === undefined) {
-    return primary;
-  }
-  return Math.max(primary, secondary);
-}
-
-function mergePathLists(primary: string[], secondary: string[]): string[] {
-  return Array.from(new Set([...primary, ...secondary]));
-}
-
-function mergeProcessMetrics(
-  primary: ProcessMetrics,
-  secondary: ProcessMetrics,
-): ProcessMetrics {
-  return {
-    toolCallCount: Math.max(primary.toolCallCount, secondary.toolCallCount),
-    toolNames: Array.from(
-      new Set([...primary.toolNames, ...secondary.toolNames]),
-    ),
-    apiRequestCount: Math.max(
-      primary.apiRequestCount,
-      secondary.apiRequestCount,
-    ),
-    apiErrorCount: Math.max(primary.apiErrorCount, secondary.apiErrorCount),
-    chatCompressionCount: Math.max(
-      primary.chatCompressionCount,
-      secondary.chatCompressionCount,
-    ),
-    compressionTokensSavedTotal: Math.max(
-      primary.compressionTokensSavedTotal,
-      secondary.compressionTokensSavedTotal,
-    ),
-    assistantMessageCount: Math.max(
-      primary.assistantMessageCount,
-      secondary.assistantMessageCount,
-    ),
-    delegationCount: Math.max(
-      primary.delegationCount,
-      secondary.delegationCount,
-    ),
-    delegatedAgentNames: mergePathLists(
-      primary.delegatedAgentNames,
-      secondary.delegatedAgentNames,
-    ),
-    filesRead: mergePathLists(primary.filesRead, secondary.filesRead),
-    filesEdited: mergePathLists(primary.filesEdited, secondary.filesEdited),
-    filesWritten: mergePathLists(primary.filesWritten, secondary.filesWritten),
-    fileReadCount: Math.max(primary.fileReadCount, secondary.fileReadCount),
-    fileEditCount: Math.max(primary.fileEditCount, secondary.fileEditCount),
-    fileWriteCount: Math.max(primary.fileWriteCount, secondary.fileWriteCount),
-    searchToolCallCount: Math.max(
-      primary.searchToolCallCount,
-      secondary.searchToolCallCount,
-    ),
-    totalTokens: mergeMetricValue(primary.totalTokens, secondary.totalTokens),
-    inputTokens: mergeMetricValue(primary.inputTokens, secondary.inputTokens),
-    outputTokens: mergeMetricValue(
-      primary.outputTokens,
-      secondary.outputTokens,
-    ),
-    durationMs: Math.max(primary.durationMs, secondary.durationMs),
-  };
-}
-
 function sumMetricValue(
   primary: number | undefined,
   secondary: number | undefined,
@@ -827,10 +761,21 @@ export async function runSingleTask(
     artifacts.activityLogPath,
     durationMs,
   );
+  const stdoutFileContent = fs.existsSync(artifacts.stdoutPath)
+    ? fs.readFileSync(artifacts.stdoutPath, 'utf8')
+    : '';
+  const activityFileContent = fs.existsSync(artifacts.activityLogPath)
+    ? fs.readFileSync(artifacts.activityLogPath, 'utf8')
+    : '';
   const stdoutMetrics = (
     await parseActivityLog(artifacts.stdoutPath, durationMs)
   ).metrics;
-  const mergedMetrics = mergeProcessMetrics(metrics, stdoutMetrics);
+  const mergedMetrics = mergeProcessMetrics(
+    metrics,
+    stdoutMetrics,
+    extractStreamJsonFingerprints(stdoutFileContent),
+    extractStreamJsonFingerprints(activityFileContent),
+  );
   const failureCategory = classifyFailure(task, mergedMetrics, status);
 
   const runResult = RunResultSchema.parse({
