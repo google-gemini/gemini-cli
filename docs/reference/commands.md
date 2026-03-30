@@ -470,6 +470,32 @@ Slash commands provide meta-level control over the CLI itself.
   This lets you upgrade your tier for higher usage limits.
 - **Note:** This command is only available when logged in with Google.
 
+### `/visualize`
+
+- **Description:** Generate and render Mermaid diagrams directly in your
+  terminal.
+- **Usage:** `/visualize <flowchart|sequence|class|erd|deps|git> [prompt]`
+- **Sub-commands:**
+  - **`flowchart <prompt>`**:
+    - **Description:** Prompts the model to create a Mermaid flowchart and
+      render it with the `visualize` tool.
+  - **`sequence <prompt>`**:
+    - **Description:** Prompts the model to create a Mermaid sequence diagram
+      and render it with the `visualize` tool.
+  - **`class <prompt>`**:
+    - **Description:** Prompts the model to create a Mermaid class diagram and
+      render it with the `visualize` tool.
+  - **`erd <prompt>`**:
+    - **Description:** Prompts the model to create a Mermaid ER diagram and
+      render it with the `visualize` tool.
+  - **`deps`**:
+    - **Description:** Auto-detects dependency files (`package.json`,
+      `requirements.txt`, `Cargo.toml`, `go.mod`, `pom.xml`, `pyproject.toml`),
+      parses dependency names, and renders a dependency graph.
+  - **`git`**:
+    - **Description:** Reads recent commit history from `git log` and renders it
+      as a graph.
+
 ### `/vim`
 
 - **Description:** Toggle vim mode on or off. When vim mode is enabled, the

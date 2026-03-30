@@ -14,6 +14,7 @@
   "/docs/get-started/configuration": "/docs/reference/configuration",
   "/docs/get-started/configuration-v1": "/docs/reference/configuration",
   "/docs/index": "/docs",
+  "/docs/visualize": "/docs/cli/visualize",
   "/docs/quota-and-pricing": "/docs/resources/quota-and-pricing",
   "/docs/tos-privacy": "/docs/resources/tos-privacy",
   "/docs/troubleshooting": "/docs/resources/troubleshooting"

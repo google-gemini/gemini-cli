@@ -56,3 +56,8 @@ priority = 50
 toolName = ["codebase_investigator", "cli_help", "get_internal_docs"]
 decision = "allow"
 priority = 50
+
+[[rule]]
+toolName = "visualize"
+decision = "allow"
+priority = 50

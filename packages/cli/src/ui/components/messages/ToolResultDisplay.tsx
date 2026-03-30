@@ -11,6 +11,7 @@ import { MarkdownDisplay } from '../../utils/MarkdownDisplay.js';
 import { AnsiOutputText, AnsiLineText } from '../AnsiOutput.js';
 import { SlicingMaxSizedBox } from '../shared/SlicingMaxSizedBox.js';
 import { theme } from '../../semantic-colors.js';
+import { DiagramDisplay } from '../DiagramDisplay.js';
 import {
   type AnsiOutput,
   type AnsiLine,
@@ -39,6 +40,10 @@ export interface ToolResultDisplayProps {
 interface FileDiffResult {
   fileDiff: string;
   fileName: string;
+}
+
+function isRenderedDiagramText(value: string): boolean {
+  return value.startsWith('Diagram (');
 }
 
 export const ToolResultDisplay: React.FC<ToolResultDisplayProps> = ({
@@ -108,6 +113,11 @@ export const ToolResultDisplay: React.FC<ToolResultDisplayProps> = ({
           terminalWidth={childWidth}
         />
       );
+    } else if (
+      typeof contentData === 'string' &&
+      isRenderedDiagramText(contentData)
+    ) {
+      content = <DiagramDisplay content={contentData} />;
     } else if (typeof contentData === 'string' && renderOutputAsMarkdown) {
       content = (
         <MarkdownDisplay
