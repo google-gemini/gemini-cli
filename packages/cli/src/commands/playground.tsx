@@ -7,9 +7,7 @@
 import type { CommandModule } from 'yargs';
 import { initializeOutputListenersAndFlush } from '../gemini.js';
 
-// We'll define the actual interactive UI runner inside an action
-// but defer it like other commands to avoid heavy imports on CLI startup.
-
+// Defer heavy UI imports to keep CLI startup fast
 export const playgroundCommand: CommandModule = {
   command: 'playground',
   aliases: ['play'],
@@ -20,7 +18,6 @@ export const playgroundCommand: CommandModule = {
       argv['isCommand'] = true;
     }),
   handler: async () => {
-    // Dynamic import to keep CLI startup fast
     const { startPlayground } = await import(
       '../ui/commands/playgroundCommand.js'
     );
