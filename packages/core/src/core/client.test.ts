@@ -21,7 +21,7 @@ import {
   type ContentGenerator,
   type ContentGeneratorConfig,
 } from './contentGenerator.js';
-import { GeminiChat } from './geminiChat.js';
+import { GeminiChat, StreamEventType, type StreamEvent } from './geminiChat.js';
 import type { Config } from '../config/config.js';
 import type { AgentLoopContext } from '../config/agent-loop-context.js';
 import {
@@ -50,6 +50,7 @@ import type {
 import { ClearcutLogger } from '../telemetry/clearcut-logger/clearcut-logger.js';
 import * as policyCatalog from '../availability/policyCatalog.js';
 import { LlmRole, LoopType } from '../telemetry/types.js';
+import { recordBtwUsageMetrics } from '../telemetry/index.js';
 import { partToString } from '../utils/partUtils.js';
 import { coreEvents, CoreEvent } from '../utils/events.js';
 import type { MessageBus } from '../confirmation-bus/message-bus.js';
@@ -130,6 +131,7 @@ vi.mock('../telemetry/index.js', () => ({
   logApiRequest: vi.fn(),
   logApiResponse: vi.fn(),
   logApiError: vi.fn(),
+  recordBtwUsageMetrics: vi.fn(),
 }));
 vi.mock('../ide/ideContext.js');
 vi.mock('../telemetry/uiTelemetry.js', () => ({
@@ -3291,6 +3293,48 @@ ${JSON.stringify(
           'Hi',
         );
       });
+    });
+  });
+
+  describe('sendBtwStream', () => {
+    it('should record telemetry and call chat.sendBtwStream', async () => {
+      // Arrange
+      const request = [{ text: 'btw, how does this work?' }];
+      const abortSignal = new AbortController().signal;
+      const promptId = 'test-prompt-id';
+
+      const mockBtwStream = (async function* (): AsyncGenerator<
+        StreamEvent,
+        void,
+        unknown
+      > {
+        yield {
+          type: StreamEventType.CHUNK,
+          value: {
+            text: () => 'this works fine',
+          } as unknown as GenerateContentResponse,
+        };
+      })();
+
+      const sendBtwStreamSpy = vi
+        .spyOn(client.getChat(), 'sendBtwStream')
+        .mockReturnValue(mockBtwStream);
+
+      // Act
+      const stream = client.sendBtwStream(request, abortSignal, promptId);
+      for await (const _ of stream) {
+        // Consume stream
+      }
+
+      // Assert
+      expect(recordBtwUsageMetrics).toHaveBeenCalledWith(mockConfig);
+      expect(sendBtwStreamSpy).toHaveBeenCalledWith(
+        expect.any(Object), // modelConfigKey
+        request,
+        promptId,
+        abortSignal,
+        LlmRole.MAIN,
+      );
     });
   });
 
