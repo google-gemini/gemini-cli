@@ -7,44 +7,92 @@
 import { act } from 'react';
 import { render } from '../../test-utils/render.js';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import * as fs from 'node:fs';
 import { PlaygroundApp } from './playgroundCommand.js';
 import { useKeypress } from '../hooks/useKeypress.js';
+import { PromptWatcherService } from '@google/gemini-cli-core';
 
-vi.mock('node:fs');
 vi.mock('../hooks/useKeypress.js', () => ({
   useKeypress: vi.fn(),
 }));
 
+vi.mock('../hooks/useTerminalSize.js', () => ({
+  useTerminalSize: vi.fn(() => ({ columns: 100, rows: 40 })),
+}));
+
+vi.mock('@google/gemini-cli-core', async (importOriginal) => {
+  const original = await importOriginal<typeof import('@google/gemini-cli-core')>();
+  return {
+    ...original,
+    PromptWatcherService: vi.fn().mockImplementation(() => ({
+      readPrompt: vi.fn().mockResolvedValue('mock prompt content'),
+      watchPrompt: vi.fn().mockReturnValue(vi.fn()),
+    })),
+  };
+});
+
 describe('PlaygroundApp', () => {
+  let mockPromptWatcherService: any;
+  const mockPath = '/mock/path/snippets.ts';
+
   beforeEach(() => {
-    vi.resetAllMocks();
+    vi.clearAllMocks();
+    mockPromptWatcherService = new PromptWatcherService();
   });
 
   it('renders the initial layout with loading state', async () => {
-    vi.mocked(fs.existsSync).mockReturnValue(false);
-    const { lastFrame } = await render(<PlaygroundApp />);
+    mockPromptWatcherService.readPrompt.mockRejectedValueOnce(new Error('File not found'));
+    const { lastFrame, waitUntilReady } = await render(
+      <PlaygroundApp 
+        promptWatcherService={mockPromptWatcherService} 
+        promptPath={mockPath} 
+        initialPromptContent="Error loading prompt: File not found"
+      />
+    );
+    await waitUntilReady();
     expect(lastFrame()).toContain('Gemini CLI - Local Prompt Playground');
-    expect(lastFrame()).toContain('File not found:');
+    expect(lastFrame()).toContain('Error loading prompt: File not found');
   });
 
   it('loads prompt content and watches for file changes', async () => {
-    vi.mocked(fs.existsSync).mockReturnValue(true);
-    vi.mocked(fs.readFileSync).mockReturnValue('mock prompt content');
-    const { lastFrame } = await render(<PlaygroundApp />);
+    const { lastFrame, waitUntilReady } = await render(
+      <PlaygroundApp 
+        promptWatcherService={mockPromptWatcherService} 
+        promptPath={mockPath} 
+        initialPromptContent="mock prompt content"
+      />
+    );
+    await waitUntilReady();
     expect(lastFrame()).toContain('mock prompt content');
-    expect(fs.watch).toHaveBeenCalled();
+    expect(mockPromptWatcherService.watchPrompt).toHaveBeenCalledWith(mockPath, expect.any(Function));
+  });
+
+  it('matches snapshot', async () => {
+    const { lastFrame, waitUntilReady } = await render(
+      <PlaygroundApp 
+        promptWatcherService={mockPromptWatcherService} 
+        promptPath={mockPath} 
+        initialPromptContent="mock prompt content"
+      />
+    );
+    await waitUntilReady();
+    expect(lastFrame()).toMatchSnapshot();
   });
 
   it('handles keyboard navigation and eval case execution', async () => {
-    vi.mocked(fs.existsSync).mockReturnValue(true);
-    vi.mocked(fs.readFileSync).mockReturnValue('mock prompt content');
     let keyHandler: any = null;
     vi.mocked(useKeypress).mockImplementation((handler: any) => {
       keyHandler = handler;
     });
 
-    const { lastFrame, waitUntilReady } = await render(<PlaygroundApp />);
+    const { lastFrame, waitUntilReady } = await render(
+      <PlaygroundApp 
+        promptWatcherService={mockPromptWatcherService} 
+        promptPath={mockPath} 
+        initialPromptContent="mock prompt content"
+      />
+    );
+    await waitUntilReady();
+
     // Default selection is 0
     expect(lastFrame()).toContain('> Missing dependency lodash');
     
