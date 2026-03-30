@@ -83,7 +83,9 @@ import {
   logBillingEvent,
   ApiKeyUpdatedEvent,
   type InjectionSource,
-} from '@google/gemini-cli-core';
+
+  cronSchedulerService,
+  type ScheduledTask} from '@google/gemini-cli-core';
 import { validateAuthMethod } from '../config/auth.js';
 import process from 'node:process';
 import { useHistory } from './hooks/useHistoryManager.js';
@@ -1210,6 +1212,16 @@ Logging in with Google... Restarting Gemini CLI to continue.
     submitQuery,
     isMcpReady,
   });
+
+  useEffect(() => {
+    const handleTaskDue = (task: ScheduledTask) => {
+      addMessage(task.prompt);
+    };
+    cronSchedulerService.on('task_due', handleTaskDue);
+    return () => {
+      cronSchedulerService.off('task_due', handleTaskDue);
+    };
+  }, [addMessage]);
 
   cancelHandlerRef.current = useCallback(
     (shouldRestorePrompt: boolean = true) => {

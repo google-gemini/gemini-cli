@@ -79,6 +79,11 @@ import type { MCPOAuthConfig } from '../mcp/oauth-provider.js';
 import { ideContextStore } from '../ide/ideContext.js';
 import { WriteTodosTool } from '../tools/write-todos.js';
 import {
+  ScheduleTaskTool,
+  ListTasksTool,
+  CancelTaskTool,
+} from '../tools/cronTools.js';
+import {
   StandardFileSystemService,
   type FileSystemService,
 } from '../services/fileSystemService.js';
@@ -3438,6 +3443,15 @@ export class Config implements McpContext, AgentLoopContext {
     );
     maybeRegister(AskUserTool, () =>
       registry.registerTool(new AskUserTool(this.messageBus)),
+    );
+    maybeRegister(ScheduleTaskTool, () =>
+      registry.registerTool(new ScheduleTaskTool(this.messageBus)),
+    );
+    maybeRegister(ListTasksTool, () =>
+      registry.registerTool(new ListTasksTool(this.messageBus)),
+    );
+    maybeRegister(CancelTaskTool, () =>
+      registry.registerTool(new CancelTaskTool(this.messageBus)),
     );
     if (this.getUseWriteTodos()) {
       maybeRegister(WriteTodosTool, () =>
