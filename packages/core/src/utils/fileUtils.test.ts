@@ -1096,6 +1096,7 @@ describe('fileUtils', () => {
           new StandardFileSystemService(),
         );
 
+        expect(result.error).toBeDefined();
         expect(result.error).toContain('File size exceeds the 20MB limit');
         expect(result.returnDisplay).toContain(
           'File size exceeds the 20MB limit',

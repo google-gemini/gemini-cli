@@ -566,6 +566,7 @@ export class ChatRecordingService {
           'Error writing conversation file in background.',
           error,
         );
+        throw error;
       }
     });
   }
@@ -583,19 +584,11 @@ export class ChatRecordingService {
   }
 
   /**
-   * Saves a summary for the current session.
+   * Waits for all pending background writes to complete.
+   * Useful for ensuring data is on disk before exiting or for testing.
    */
-  saveSummary(summary: string): void {
-    if (!this.conversationFile) return;
-
-    try {
-      this.updateConversation((conversation) => {
-        conversation.summary = summary;
-      });
-    } catch (error) {
-      debugLogger.error('Error saving summary to chat history.', error);
-      // Don't throw - we want graceful degradation
-    }
+  async waitForWrites(): Promise<void> {
+    await this.writePromise;
   }
 
   /**

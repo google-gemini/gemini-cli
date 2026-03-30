@@ -29,7 +29,7 @@ vi.mock('node:fs', async (importOriginal) => {
 });
 
 describe('worktree utilities', () => {
-  const projectRoot = '/mock/project';
+  const projectRoot = 'C:/mock/project';
   const worktreeName = 'test-feature';
   const expectedPath = path.join(
     projectRoot,
@@ -49,25 +49,25 @@ describe('worktree utilities', () => {
         stdout: '.git\n',
       } as never);
 
-      const result = await getProjectRootForWorktree('/mock/project');
-      expect(result).toBe('/mock/project');
+      const result = await getProjectRootForWorktree('C:/mock/project');
+      expect(result).toBe(path.normalize('C:/mock/project'));
       expect(execa).toHaveBeenCalledWith(
         'git',
         ['rev-parse', '--git-common-dir'],
-        { cwd: '/mock/project' },
+        { cwd: 'C:/mock/project' },
       );
     });
 
     it('should resolve absolute git common dir paths (as seen in worktrees)', async () => {
       // Inside a worktree, git-common-dir is usually an absolute path to the main .git folder
       vi.mocked(execa).mockResolvedValue({
-        stdout: '/mock/project/.git\n',
+        stdout: 'C:/mock/project/.git\n',
       } as never);
 
       const result = await getProjectRootForWorktree(
-        '/mock/project/.gemini/worktrees/my-feature',
+        'C:/mock/project/.gemini/worktrees/my-feature',
       );
-      expect(result).toBe('/mock/project');
+      expect(result).toBe('C:/mock/project');
     });
 
     it('should fallback to cwd if git command fails', async () => {
@@ -229,7 +229,7 @@ describe('worktree utilities', () => {
 });
 
 describe('WorktreeService', () => {
-  const projectRoot = '/mock/project';
+  const projectRoot = 'C:/mock/project';
   const service = new WorktreeService(projectRoot);
 
   beforeEach(() => {
@@ -267,7 +267,7 @@ describe('WorktreeService', () => {
   describe('maybeCleanup', () => {
     const info = {
       name: 'feature-x',
-      path: '/mock/project/.gemini/worktrees/feature-x',
+      path: 'C:/mock/project/.gemini/worktrees/feature-x',
       baseSha: 'base-sha',
     };
 

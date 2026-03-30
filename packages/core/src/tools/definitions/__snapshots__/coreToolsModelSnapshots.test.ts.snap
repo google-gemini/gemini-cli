@@ -522,6 +522,10 @@ exports[`coreTools snapshots for specific models > Model: gemini-2.5-pro > snaps
         "description": "If true, the tool will replace all occurrences of \`old_string\`. If false (default), it will only succeed if exactly one occurrence is found.",
         "type": "boolean",
       },
+      "end_line": {
+        "description": "Optional: The 1-based line number to end the replacement at (inclusive).",
+        "type": "number",
+      },
       "file_path": {
         "description": "The path to the file to modify.",
         "type": "string",
@@ -551,6 +555,10 @@ A good instruction should concisely answer:
       "old_string": {
         "description": "The exact literal text to replace, preferably unescaped. For single replacements (default), include at least 3 lines of context BEFORE and AFTER the target text, matching whitespace and indentation precisely. If this string is not the exact literal text (i.e. you escaped it) or does not match exactly, the tool will fail.",
         "type": "string",
+      },
+      "start_line": {
+        "description": "Optional: The 1-based line number to start the replacement at.",
+        "type": "number",
       },
     },
     "required": [
@@ -1330,6 +1338,10 @@ The user has the ability to modify the \`new_string\` content. If modified, this
         "description": "If true, the tool will replace all occurrences of \`old_string\`. If false (default), it will only succeed if exactly one occurrence is found.",
         "type": "boolean",
       },
+      "end_line": {
+        "description": "Optional: The 1-based line number to end the replacement at (inclusive).",
+        "type": "number",
+      },
       "file_path": {
         "description": "The path to the file to modify.",
         "type": "string",
@@ -1345,6 +1357,10 @@ The user has the ability to modify the \`new_string\` content. If modified, this
       "old_string": {
         "description": "The exact literal text to replace, unescaped. If this string is not the exact literal text (i.e. you escaped it) or does not match exactly, the tool will fail.",
         "type": "string",
+      },
+      "start_line": {
+        "description": "Optional: The 1-based line number to start the replacement at.",
+        "type": "number",
       },
     },
     "required": [

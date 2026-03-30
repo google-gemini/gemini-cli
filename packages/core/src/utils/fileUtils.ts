@@ -423,12 +423,10 @@ export async function processSingleFileContent(
   endLine?: number,
 ): Promise<ProcessedFileReadResult> {
   try {
-    const exists = await fsPromises
-      .stat(filePath)
-      .then(() => true)
-      .catch(() => false);
-
-    if (!exists) {
+    let stats: fs.Stats;
+    try {
+      stats = await fsPromises.stat(filePath);
+    } catch (_e) {
       return {
         llmContent:
           'Could not read file because no file was found at the specified path.',
@@ -437,7 +435,7 @@ export async function processSingleFileContent(
         errorType: ToolErrorType.FILE_NOT_FOUND,
       };
     }
-    const stats = await fs.promises.stat(filePath);
+
     if (stats.isDirectory()) {
       return {
         llmContent:
