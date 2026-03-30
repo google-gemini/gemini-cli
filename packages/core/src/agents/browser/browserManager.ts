@@ -221,20 +221,23 @@ export class BrowserManager {
     toolName: string,
     args: Record<string, unknown>,
     signal?: AbortSignal,
+    shouldCount: boolean = true,
   ): Promise<McpToolCallResult> {
     if (signal?.aborted) {
       throw signal.reason ?? new Error('Operation cancelled');
     }
 
     // Hard enforcement of per-action rate limit
-    if (this.actionCounter > this.maxActionsPerTask) {
-      const error = new Error(
-        `Browser agent reached maximum action limit (${this.maxActionsPerTask}). ` +
-          `Task terminated to prevent runaway execution. To config the limit, use maxActionsPerTask in the settings.`,
-      );
-      throw error;
+    if (shouldCount) {
+      if (this.actionCounter > this.maxActionsPerTask) {
+        const error = new Error(
+          `Browser agent reached maximum action limit (${this.maxActionsPerTask}). ` +
+            `Task terminated to prevent runaway execution. To config the limit, use maxActionsPerTask in the settings.`,
+        );
+        throw error;
+      }
+      this.actionCounter++;
     }
-    this.actionCounter++;
 
     const errorMessage = this.checkNavigationRestrictions(toolName, args);
     if (errorMessage) {
@@ -588,6 +591,8 @@ export class BrowserManager {
           debugLogger.log('MCP client connected to chrome-devtools-mcp');
           await this.discoverTools();
           this.registerInputBlockerHandler();
+          // clear the action counter for each connection
+          this.actionCounter = 0;
         })(),
         new Promise<never>((_, reject) => {
           timeoutId = setTimeout(
