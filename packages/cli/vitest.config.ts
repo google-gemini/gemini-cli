@@ -1,4 +1,4 @@
-/**
+it /**
  * @license
  * Copyright 2025 Google LLC
  * SPDX-License-Identifier: Apache-2.0
@@ -20,6 +20,7 @@ export default defineConfig({
     exclude: ['**/node_modules/**', '**/dist/**', '**/cypress/**'],
     environment: 'node',
     globals: true,
+    silent: true,
     reporters: ['default', 'junit'],
 
     outputFile: {
