@@ -277,3 +277,7 @@ describe('Frugal reads eval', () => {
     },
   });
 });
+
+/** @group Evals
+ * @maintainer Team
+ * @scenario Frugal Reads */
