@@ -26,10 +26,12 @@ export const GeneralistAgent = (
   name: 'generalist',
   displayName: 'Generalist Agent',
   get description() {
+    const baseDescription =
+      'A general-purpose AI agent with access to all tools. Highly recommended for tasks that are turn-intensive or involve processing large amounts of data. Use this to keep the main session history lean and efficient. Excellent for: ';
     if (context.config.getApprovalMode() === ApprovalMode.PLAN) {
-      return 'A general-purpose AI agent with access to all tools. Highly recommended for tasks that are turn-intensive or involve processing large amounts of data. Use this to keep the main session history lean and efficient. Excellent for: large-scale investigation and batch planning across multiple files.';
+      return `${baseDescription}large-scale investigation and batch planning across multiple files.`;
     }
-    return 'A general-purpose AI agent with access to all tools. Highly recommended for tasks that are turn-intensive or involve processing large amounts of data. Use this to keep the main session history lean and efficient. Excellent for: batch refactoring/error fixing across multiple files, running commands with high-volume output, and speculative investigations.';
+    return `${baseDescription}batch refactoring/error fixing across multiple files, running commands with high-volume output, and speculative investigations.`;
   },
   inputConfig: {
     inputSchema: {
