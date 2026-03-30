@@ -12,7 +12,7 @@ import { tokenLimit } from '../core/tokenLimits.js';
 import { getCompressionPrompt } from '../core/prompts.js';
 import { getResponseText } from '../utils/partUtils.js';
 import { logChatCompression } from '../telemetry/loggers.js';
-import { makeChatCompressionEvent } from '../telemetry/types.js';
+import { makeChatCompressionEvent, LlmRole } from '../telemetry/types.js';
 import {
   saveTruncatedToolOutput,
   formatTruncatedToolOutput,
@@ -30,9 +30,9 @@ import {
   PREVIEW_GEMINI_MODEL,
   PREVIEW_GEMINI_FLASH_MODEL,
   PREVIEW_GEMINI_3_1_MODEL,
+  PREVIEW_GEMINI_3_1_FLASH_LITE_MODEL,
 } from '../config/models.js';
 import { PreCompressTrigger } from '../hooks/types.js';
-import { LlmRole } from '../telemetry/types.js';
 
 /**
  * Default threshold for compression token count as a fraction of the model's
@@ -106,6 +106,8 @@ export function modelStringToModelConfigAlias(model: string): string {
       return 'chat-compression-3-pro';
     case PREVIEW_GEMINI_FLASH_MODEL:
       return 'chat-compression-3-flash';
+    case PREVIEW_GEMINI_3_1_FLASH_LITE_MODEL:
+      return 'chat-compression-3.1-flash-lite';
     case DEFAULT_GEMINI_MODEL:
       return 'chat-compression-2.5-pro';
     case DEFAULT_GEMINI_FLASH_MODEL:
@@ -131,7 +133,7 @@ export function modelStringToModelConfigAlias(model: string): string {
  * contain massive tool outputs (like large grep results or logs).
  */
 async function truncateHistoryToBudget(
-  history: Content[],
+  history: readonly Content[],
   config: Config,
 ): Promise<Content[]> {
   let functionResponseTokenCounter = 0;
@@ -157,11 +159,13 @@ async function truncateHistoryToBudget(
           } else if (responseObj && typeof responseObj === 'object') {
             if (
               'output' in responseObj &&
+              // eslint-disable-next-line no-restricted-syntax
               typeof responseObj['output'] === 'string'
             ) {
               contentStr = responseObj['output'];
             } else if (
               'content' in responseObj &&
+              // eslint-disable-next-line no-restricted-syntax
               typeof responseObj['content'] === 'string'
             ) {
               contentStr = responseObj['content'];
@@ -195,6 +199,7 @@ async function truncateHistoryToBudget(
 
               newParts.unshift({
                 functionResponse: {
+                  // eslint-disable-next-line @typescript-eslint/no-misused-spread
                   ...part.functionResponse,
                   response: { output: truncatedMessage },
                 },

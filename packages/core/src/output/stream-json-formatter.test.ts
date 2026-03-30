@@ -6,14 +6,14 @@
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { StreamJsonFormatter } from './stream-json-formatter.js';
-import { JsonStreamEventType } from './types.js';
-import type {
-  InitEvent,
-  MessageEvent,
-  ToolUseEvent,
-  ToolResultEvent,
-  ErrorEvent,
-  ResultEvent,
+import {
+  JsonStreamEventType,
+  type InitEvent,
+  type MessageEvent,
+  type ToolUseEvent,
+  type ToolResultEvent,
+  type ErrorEvent,
+  type ResultEvent,
 } from './types.js';
 import type { SessionMetrics } from '../telemetry/uiTelemetry.js';
 import { ToolCallDecision } from '../telemetry/tool-call-decision.js';
@@ -154,6 +154,7 @@ describe('StreamJsonFormatter', () => {
           input: 50,
           duration_ms: 1200,
           tool_calls: 2,
+          models: {},
         },
       };
 
@@ -180,6 +181,7 @@ describe('StreamJsonFormatter', () => {
           input: 50,
           duration_ms: 1200,
           tool_calls: 0,
+          models: {},
         },
       };
 
@@ -304,6 +306,15 @@ describe('StreamJsonFormatter', () => {
         input: 50,
         duration_ms: 1200,
         tool_calls: 2,
+        models: {
+          'gemini-2.0-flash': {
+            total_tokens: 80,
+            input_tokens: 50,
+            output_tokens: 30,
+            cached: 0,
+            input: 50,
+          },
+        },
       });
     });
 
@@ -347,6 +358,22 @@ describe('StreamJsonFormatter', () => {
         input: 150,
         duration_ms: 3000,
         tool_calls: 5,
+        models: {
+          'gemini-pro': {
+            total_tokens: 80,
+            input_tokens: 50,
+            output_tokens: 30,
+            cached: 0,
+            input: 50,
+          },
+          'gemini-ultra': {
+            total_tokens: 170,
+            input_tokens: 100,
+            output_tokens: 70,
+            cached: 0,
+            input: 100,
+          },
+        },
       });
     });
 
@@ -376,6 +403,15 @@ describe('StreamJsonFormatter', () => {
         input: 20,
         duration_ms: 1200,
         tool_calls: 0,
+        models: {
+          'gemini-pro': {
+            total_tokens: 80,
+            input_tokens: 50,
+            output_tokens: 30,
+            cached: 30,
+            input: 20,
+          },
+        },
       });
     });
 
@@ -392,6 +428,7 @@ describe('StreamJsonFormatter', () => {
         input: 0,
         duration_ms: 100,
         tool_calls: 0,
+        models: {},
       });
     });
 
@@ -521,6 +558,7 @@ describe('StreamJsonFormatter', () => {
             input: 0,
             duration_ms: 0,
             tool_calls: 0,
+            models: {},
           },
         } as ResultEvent,
       ];
@@ -544,6 +582,7 @@ describe('StreamJsonFormatter', () => {
           input: 50,
           duration_ms: 1200,
           tool_calls: 2,
+          models: {},
         },
       };
 

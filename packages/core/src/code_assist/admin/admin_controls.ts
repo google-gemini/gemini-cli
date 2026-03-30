@@ -31,6 +31,7 @@ export function sanitizeAdminSettings(
 
   if (sanitized.mcpSetting?.mcpConfigJson) {
     try {
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
       const parsed = JSON.parse(sanitized.mcpSetting.mcpConfigJson);
       const validationResult = McpConfigDefinitionSchema.safeParse(parsed);
 
@@ -39,6 +40,16 @@ export function sanitizeAdminSettings(
         // Sort include/exclude tools for stable comparison
         if (mcpConfig.mcpServers) {
           for (const server of Object.values(mcpConfig.mcpServers)) {
+            if (server.includeTools) {
+              server.includeTools.sort();
+            }
+            if (server.excludeTools) {
+              server.excludeTools.sort();
+            }
+          }
+        }
+        if (mcpConfig.requiredMcpServers) {
+          for (const server of Object.values(mcpConfig.requiredMcpServers)) {
             if (server.includeTools) {
               server.includeTools.sort();
             }
@@ -76,6 +87,7 @@ export function sanitizeAdminSettings(
     mcpSetting: {
       mcpEnabled: sanitized.mcpSetting?.mcpEnabled ?? false,
       mcpConfig: mcpConfig ?? {},
+      requiredMcpConfig: mcpConfig?.requiredMcpServers,
     },
   };
 }

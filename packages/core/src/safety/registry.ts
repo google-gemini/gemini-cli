@@ -9,6 +9,8 @@ import * as fs from 'node:fs';
 import { type InProcessChecker, AllowedPathChecker } from './built-in.js';
 import { InProcessCheckerType } from '../policy/types.js';
 
+import { ConsecaSafetyChecker } from './conseca/conseca.js';
+
 /**
  * Registry for managing safety checker resolution.
  */
@@ -17,10 +19,22 @@ export class CheckerRegistry {
     // No external built-ins for now
   ]);
 
-  private static readonly BUILT_IN_IN_PROCESS_CHECKERS = new Map<
-    string,
-    InProcessChecker
-  >([[InProcessCheckerType.ALLOWED_PATH, new AllowedPathChecker()]]);
+  private static BUILT_IN_IN_PROCESS_CHECKERS:
+    | Map<string, InProcessChecker>
+    | undefined;
+
+  private static getBuiltInInProcessCheckers(): Map<string, InProcessChecker> {
+    if (!CheckerRegistry.BUILT_IN_IN_PROCESS_CHECKERS) {
+      CheckerRegistry.BUILT_IN_IN_PROCESS_CHECKERS = new Map<
+        string,
+        InProcessChecker
+      >([
+        [InProcessCheckerType.ALLOWED_PATH, new AllowedPathChecker()],
+        [InProcessCheckerType.CONSECA, ConsecaSafetyChecker.getInstance()],
+      ]);
+    }
+    return CheckerRegistry.BUILT_IN_IN_PROCESS_CHECKERS;
+  }
 
   // Regex to validate checker names (alphanumeric and hyphens only)
   private static readonly VALID_NAME_PATTERN = /^[a-z0-9-]+$/;
@@ -58,14 +72,14 @@ export class CheckerRegistry {
       throw new Error(`Invalid checker name "${name}".`);
     }
 
-    const checker = CheckerRegistry.BUILT_IN_IN_PROCESS_CHECKERS.get(name);
+    const checker = CheckerRegistry.getBuiltInInProcessCheckers().get(name);
     if (checker) {
       return checker;
     }
 
     throw new Error(
       `Unknown in-process checker "${name}". Available: ${Array.from(
-        CheckerRegistry.BUILT_IN_IN_PROCESS_CHECKERS.keys(),
+        CheckerRegistry.getBuiltInInProcessCheckers().keys(),
       ).join(', ')}`,
     );
   }
@@ -77,7 +91,7 @@ export class CheckerRegistry {
   static getBuiltInCheckers(): string[] {
     return [
       ...Array.from(this.BUILT_IN_EXTERNAL_CHECKERS.keys()),
-      ...Array.from(this.BUILT_IN_IN_PROCESS_CHECKERS.keys()),
+      ...Array.from(this.getBuiltInInProcessCheckers().keys()),
     ];
   }
 }

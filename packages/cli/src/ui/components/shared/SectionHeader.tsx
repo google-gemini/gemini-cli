@@ -8,16 +8,13 @@ import type React from 'react';
 import { Box, Text } from 'ink';
 import { theme } from '../../semantic-colors.js';
 
-export const SectionHeader: React.FC<{ title: string }> = ({ title }) => (
-  <Box width="100%" flexDirection="row" overflow="hidden">
-    <Text color={theme.text.secondary} wrap="truncate-end">
-      {`── ${title}`}
-    </Text>
+export const SectionHeader: React.FC<{ title: string; subtitle?: string }> = ({
+  title,
+  subtitle,
+}) => (
+  <Box width="100%" flexDirection="column" overflow="hidden">
     <Box
-      flexGrow={1}
-      flexShrink={0}
-      minWidth={2}
-      marginLeft={1}
+      width="100%"
       borderStyle="single"
       borderTop
       borderBottom={false}
@@ -25,5 +22,15 @@ export const SectionHeader: React.FC<{ title: string }> = ({ title }) => (
       borderRight={false}
       borderColor={theme.text.secondary}
     />
+    <Box flexDirection="row">
+      <Text color={theme.text.primary} bold wrap="truncate-end">
+        {title}
+      </Text>
+      {subtitle && (
+        <Text color={theme.text.secondary} wrap="truncate-end">
+          {subtitle}
+        </Text>
+      )}
+    </Box>
   </Box>
 );

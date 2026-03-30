@@ -14,3 +14,9 @@
 
 # Docs have a dedicated approver group in addition to maintainers
 /docs/ @google-gemini/gemini-cli-maintainers @google-gemini/gemini-cli-docs
+/README.md @google-gemini/gemini-cli-maintainers @google-gemini/gemini-cli-docs
+
+# Prompt contents, tool definitions, and evals require reviews from prompt approvers
+/packages/core/src/prompts/ @google-gemini/gemini-cli-prompt-approvers
+/packages/core/src/tools/ @google-gemini/gemini-cli-prompt-approvers
+/evals/ @google-gemini/gemini-cli-prompt-approvers

@@ -27,7 +27,40 @@ export function isWindows10(): boolean {
  * Detects if the current terminal is a JetBrains-based IDE terminal.
  */
 export function isJetBrainsTerminal(): boolean {
-  return process.env['TERMINAL_EMULATOR'] === 'JetBrains-JediTerm';
+  const env = process.env;
+  return !!(
+    env['TERMINAL_EMULATOR']?.startsWith('JetBrains') || env['JETBRAINS_IDE']
+  );
+}
+
+/**
+ * Detects if the current terminal is running inside tmux.
+ */
+export function isTmux(): boolean {
+  return !!process.env['TMUX'];
+}
+
+/**
+ * Detects if the current terminal is running inside GNU screen.
+ */
+export function isGnuScreen(): boolean {
+  return !!process.env['STY'];
+}
+
+/**
+ * Detects if the terminal is low-color mode (TERM=screen* with no COLORTERM).
+ */
+export function isLowColorTmux(): boolean {
+  const term = process.env['TERM'] || '';
+  return isTmux() && term.startsWith('screen') && !process.env['COLORTERM'];
+}
+
+/**
+ * Detects if the terminal is a "dumb" terminal.
+ */
+export function isDumbTerminal(): boolean {
+  const term = process.env['TERM'] || '';
+  return term === 'dumb' || term === 'vt100';
 }
 
 /**
@@ -75,9 +108,6 @@ export function supportsTrueColor(): boolean {
   return false;
 }
 
-/**
- * Returns a list of compatibility warnings based on the current environment.
- */
 export enum WarningPriority {
   Low = 'low',
   High = 'high',
@@ -89,7 +119,12 @@ export interface StartupWarning {
   priority: WarningPriority;
 }
 
-export function getCompatibilityWarnings(): StartupWarning[] {
+/**
+ * Returns a list of compatibility warnings based on the current environment.
+ */
+export function getCompatibilityWarnings(options?: {
+  isAlternateBuffer?: boolean;
+}): StartupWarning[] {
   const warnings: StartupWarning[] = [];
 
   if (isWindows10()) {
@@ -101,11 +136,47 @@ export function getCompatibilityWarnings(): StartupWarning[] {
     });
   }
 
-  if (isJetBrainsTerminal()) {
+  if (isJetBrainsTerminal() && options?.isAlternateBuffer) {
     warnings.push({
       id: 'jetbrains-terminal',
       message:
-        'Warning: JetBrains terminal detected. You may experience rendering or scrolling issues. Using an external terminal (e.g., Windows Terminal, iTerm2) is recommended.',
+        'Warning: JetBrains terminal detected — alternate buffer mode may cause scroll wheel issues and rendering artifacts. If you experience problems, disable it in /settings → "Use Alternate Screen Buffer".',
+      priority: WarningPriority.High,
+    });
+  }
+
+  if (isTmux() && options?.isAlternateBuffer) {
+    warnings.push({
+      id: 'tmux-alternate-buffer',
+      message:
+        'Warning: tmux detected — alternate buffer mode may cause unexpected scrollback loss and flickering. If you experience issues, disable it in /settings → "Use Alternate Screen Buffer".\n    Tip: Use Ctrl-b [ to access tmux copy mode for scrolling history.',
+      priority: WarningPriority.High,
+    });
+  }
+
+  if (isLowColorTmux()) {
+    warnings.push({
+      id: 'low-color-tmux',
+      message:
+        'Warning: Limited color support detected (TERM=screen). Some visual elements may not render correctly. For better color support in tmux, add to ~/.tmux.conf:\n      set -g default-terminal "tmux-256color"\n      set -ga terminal-overrides ",*256col*:Tc"',
+      priority: WarningPriority.High,
+    });
+  }
+
+  if (isGnuScreen()) {
+    warnings.push({
+      id: 'gnu-screen',
+      message:
+        'Warning: GNU screen detected. Some keyboard shortcuts and visual features may behave unexpectedly. For the best experience, consider using tmux or running Gemini CLI directly in your terminal.',
+      priority: WarningPriority.Low,
+    });
+  }
+
+  if (isDumbTerminal()) {
+    const term = process.env['TERM'] || 'dumb';
+    warnings.push({
+      id: 'dumb-terminal',
+      message: `Warning: Basic terminal detected (TERM=${term}). Visual rendering will be limited. For the best experience, use a terminal emulator with truecolor support.`,
       priority: WarningPriority.High,
     });
   }

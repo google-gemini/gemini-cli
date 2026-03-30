@@ -10,6 +10,7 @@ import { loadCliConfig, type CliArgs } from './config.js';
 import { createTestMergedSettings } from './settings.js';
 import * as ServerConfig from '@google/gemini-cli-core';
 import { isWorkspaceTrusted } from './trustedFolders.js';
+import * as Policy from './policy.js';
 
 // Mock dependencies
 vi.mock('./trustedFolders.js', () => ({
@@ -53,6 +54,7 @@ describe('Workspace-Level Policy CLI Integration', () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
+    Policy.setDisableWorkspacePolicies(false);
     // Default to MATCH for existing tests
     mockCheckIntegrity.mockResolvedValue({
       status: 'match',
@@ -86,6 +88,8 @@ describe('Workspace-Level Policy CLI Integration', () => {
         ),
       }),
       expect.anything(),
+      undefined,
+      expect.anything(),
     );
   });
 
@@ -104,6 +108,8 @@ describe('Workspace-Level Policy CLI Integration', () => {
       expect.objectContaining({
         workspacePoliciesDir: undefined,
       }),
+      expect.anything(),
+      undefined,
       expect.anything(),
     );
   });
@@ -128,6 +134,8 @@ describe('Workspace-Level Policy CLI Integration', () => {
       expect.objectContaining({
         workspacePoliciesDir: undefined,
       }),
+      expect.anything(),
+      undefined,
       expect.anything(),
     );
   });
@@ -161,10 +169,12 @@ describe('Workspace-Level Policy CLI Integration', () => {
         ),
       }),
       expect.anything(),
+      undefined,
+      expect.anything(),
     );
   });
 
-  it('should set policyUpdateConfirmationRequest if integrity MISMATCH in interactive mode', async () => {
+  it('should automatically accept and load workspacePoliciesDir if integrity MISMATCH in interactive mode when AUTO_ACCEPT is true', async () => {
     vi.mocked(isWorkspaceTrusted).mockReturnValue({
       isTrusted: true,
       source: 'file',
@@ -186,24 +196,25 @@ describe('Workspace-Level Policy CLI Integration', () => {
       cwd: MOCK_CWD,
     });
 
-    expect(config.getPolicyUpdateConfirmationRequest()).toEqual({
-      scope: 'workspace',
-      identifier: MOCK_CWD,
-      policyDir: expect.stringContaining(path.join('.gemini', 'policies')),
-      newHash: 'new-hash',
-    });
-    // In interactive mode without accept flag, it waits for user confirmation (handled by UI),
-    // so it currently DOES NOT pass the directory to createPolicyEngineConfig yet.
-    // The UI will handle the confirmation and reload/update.
+    expect(config.getPolicyUpdateConfirmationRequest()).toBeUndefined();
+    expect(mockAcceptIntegrity).toHaveBeenCalledWith(
+      'workspace',
+      MOCK_CWD,
+      'new-hash',
+    );
     expect(ServerConfig.createPolicyEngineConfig).toHaveBeenCalledWith(
       expect.objectContaining({
-        workspacePoliciesDir: undefined,
+        workspacePoliciesDir: expect.stringContaining(
+          path.join('.gemini', 'policies'),
+        ),
       }),
+      expect.anything(),
+      undefined,
       expect.anything(),
     );
   });
 
-  it('should set policyUpdateConfirmationRequest if integrity is NEW with files (first time seen) in interactive mode', async () => {
+  it('should automatically accept and load workspacePoliciesDir if integrity is NEW in interactive mode when AUTO_ACCEPT is true', async () => {
     vi.mocked(isWorkspaceTrusted).mockReturnValue({
       isTrusted: true,
       source: 'file',
@@ -222,18 +233,69 @@ describe('Workspace-Level Policy CLI Integration', () => {
       cwd: MOCK_CWD,
     });
 
-    expect(config.getPolicyUpdateConfirmationRequest()).toEqual({
-      scope: 'workspace',
-      identifier: MOCK_CWD,
-      policyDir: expect.stringContaining(path.join('.gemini', 'policies')),
-      newHash: 'new-hash',
-    });
+    expect(config.getPolicyUpdateConfirmationRequest()).toBeUndefined();
+    expect(mockAcceptIntegrity).toHaveBeenCalledWith(
+      'workspace',
+      MOCK_CWD,
+      'new-hash',
+    );
 
     expect(ServerConfig.createPolicyEngineConfig).toHaveBeenCalledWith(
       expect.objectContaining({
-        workspacePoliciesDir: undefined,
+        workspacePoliciesDir: expect.stringContaining(
+          path.join('.gemini', 'policies'),
+        ),
       }),
       expect.anything(),
+      undefined,
+      expect.anything(),
     );
+  });
+
+  it('should set policyUpdateConfirmationRequest if integrity MISMATCH in interactive mode when AUTO_ACCEPT is false', async () => {
+    // Monkey patch autoAcceptWorkspacePolicies using setter
+    const originalValue = Policy.autoAcceptWorkspacePolicies;
+    Policy.setAutoAcceptWorkspacePolicies(false);
+
+    try {
+      vi.mocked(isWorkspaceTrusted).mockReturnValue({
+        isTrusted: true,
+        source: 'file',
+      });
+      mockCheckIntegrity.mockResolvedValue({
+        status: 'mismatch',
+        hash: 'new-hash',
+        fileCount: 1,
+      });
+      vi.mocked(ServerConfig.isHeadlessMode).mockReturnValue(false); // Interactive
+
+      const settings = createTestMergedSettings();
+      const argv = {
+        query: 'test',
+        promptInteractive: 'test',
+      } as unknown as CliArgs;
+
+      const config = await loadCliConfig(settings, 'test-session', argv, {
+        cwd: MOCK_CWD,
+      });
+
+      expect(config.getPolicyUpdateConfirmationRequest()).toEqual({
+        scope: 'workspace',
+        identifier: MOCK_CWD,
+        policyDir: expect.stringContaining(path.join('.gemini', 'policies')),
+        newHash: 'new-hash',
+      });
+      expect(ServerConfig.createPolicyEngineConfig).toHaveBeenCalledWith(
+        expect.objectContaining({
+          workspacePoliciesDir: undefined,
+        }),
+        expect.anything(),
+        undefined,
+        expect.anything(),
+      );
+    } finally {
+      // Restore for other tests
+      Policy.setAutoAcceptWorkspacePolicies(originalValue);
+    }
   });
 });

@@ -13,6 +13,7 @@ import type {
 import { isSlashCommand } from './ui/utils/commandUtils.js';
 import type { LoadedSettings } from './config/settings.js';
 import {
+  convertSessionToClientHistory,
   GeminiEventType,
   FatalInputError,
   promptIdContext,
@@ -35,7 +36,6 @@ import type { Content, Part } from '@google/genai';
 import readline from 'node:readline';
 import stripAnsi from 'strip-ansi';
 
-import { convertSessionToHistoryFormats } from './ui/hooks/useSessionBrowser.js';
 import { handleSlashCommand } from './nonInteractiveCliCommands.js';
 import { ConsolePatcher } from './ui/utils/ConsolePatcher.js';
 import { handleAtCommand } from './ui/hooks/atCommandProcessor.js';
@@ -65,6 +65,7 @@ export async function runNonInteractive({
   return promptIdContext.run(prompt_id, async () => {
     const consolePatcher = new ConsolePatcher({
       stderr: true,
+      interactive: false,
       debugMode: config.getDebugMode(),
       onNewMessage: (msg) => {
         coreEvents.emitConsoleLog(msg.type, msg.content);
@@ -211,7 +212,7 @@ export async function runNonInteractive({
 
       const geminiClient = config.getGeminiClient();
       const scheduler = new Scheduler({
-        config,
+        context: config,
         messageBus: config.getMessageBus(),
         getPreferredEditor: () => undefined,
         schedulerId: ROOT_SCHEDULER_ID,
@@ -220,9 +221,9 @@ export async function runNonInteractive({
       // Initialize chat.  Resume if resume data is passed.
       if (resumedSessionData) {
         await geminiClient.resumeChat(
-          convertSessionToHistoryFormats(
+          convertSessionToClientHistory(
             resumedSessionData.conversation.messages,
-          ).clientHistory,
+          ),
           resumedSessionData,
         );
       }
@@ -263,8 +264,8 @@ export async function runNonInteractive({
           onDebugMessage: () => {},
           messageId: Date.now(),
           signal: abortController.signal,
+          escapePastedAtSymbols: false,
         });
-
         if (error || !processedQuery) {
           // An error occurred during @include processing (e.g., file not found).
           // The error message is already logged by handleAtCommand.

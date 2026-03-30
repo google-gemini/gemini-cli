@@ -5,9 +5,11 @@ and managing Gemini CLI in an enterprise environment. By leveraging system-level
 settings, administrators can enforce security policies, manage tool access, and
 ensure a consistent experience for all users.
 
-> **A note on security:** The patterns described in this document are intended
-> to help administrators create a more controlled and secure environment for
-> using Gemini CLI. However, they should not be considered a foolproof security
+<!-- prettier-ignore -->
+> [!WARNING]
+> The patterns described in this document are intended to help
+> administrators create a more controlled and secure environment for using
+> Gemini CLI. However, they should not be considered a foolproof security
 > boundary. A determined user with sufficient privileges on their local machine
 > may still be able to circumvent these configurations. These measures are
 > designed to prevent accidental misuse and enforce corporate policy in a
@@ -203,6 +205,15 @@ with the actual Gemini CLI process, which inherits the environment variable.
 This makes it significantly more difficult for a user to bypass the enforced
 settings.
 
+**PowerShell Profile (Windows alternative):**
+
+On Windows, administrators can achieve similar results by adding the environment
+variable to the system-wide or user-specific PowerShell profile:
+
+```powershell
+Add-Content -Path $PROFILE -Value '$env:GEMINI_CLI_SYSTEM_SETTINGS_PATH="C:\ProgramData\gemini-cli\settings.json"'
+```
+
 ## User isolation in shared environments
 
 In shared compute environments (like ML experiment runners or shared build
@@ -214,9 +225,19 @@ use the `GEMINI_CLI_HOME` environment variable to point to a unique directory
 for a specific user or job. The CLI will create a `.gemini` folder inside the
 specified path.
 
+**macOS/Linux**
+
 ```bash
 # Isolate state for a specific job
 export GEMINI_CLI_HOME="/tmp/gemini-job-123"
+gemini
+```
+
+**Windows (PowerShell)**
+
+```powershell
+# Isolate state for a specific job
+$env:GEMINI_CLI_HOME="C:\temp\gemini-job-123"
 gemini
 ```
 
@@ -225,7 +246,7 @@ gemini
 You can significantly enhance security by controlling which tools the Gemini
 model can use. This is achieved through the `tools.core` setting and the
 [Policy Engine](../reference/policy-engine.md). For a list of available tools,
-see the [Tools documentation](../tools/index.md).
+see the [Tools reference](../reference/tools.md).
 
 ### Allowlisting with `coreTools`
 
@@ -261,10 +282,12 @@ environment to a blocklist.
 }
 ```
 
-**Security note:** Blocklisting with `excludeTools` is less secure than
-allowlisting with `coreTools`, as it relies on blocking known-bad commands, and
-clever users may find ways to bypass simple string-based blocks. **Allowlisting
-is the recommended approach.**
+<!-- prettier-ignore -->
+> [!WARNING]
+> Blocklisting with `excludeTools` is less secure than
+> allowlisting with `coreTools`, as it relies on blocking known-bad commands,
+> and clever users may find ways to bypass simple string-based blocks.
+> **Allowlisting is the recommended approach.**
 
 ### Disabling YOLO mode
 
@@ -289,8 +312,8 @@ unintended tool execution.
 ## Managing custom tools (MCP servers)
 
 If your organization uses custom tools via
-[Model-Context Protocol (MCP) servers](../reference/tools-api.md), it is crucial
-to understand how server configurations are managed to apply security policies
+[Model-Context Protocol (MCP) servers](../tools/mcp-server.md), it is crucial to
+understand how server configurations are managed to apply security policies
 effectively.
 
 ### How MCP server configurations are merged
@@ -475,8 +498,10 @@ other events. For more information, see the
 }
 ```
 
-**Note:** Ensure that `logPrompts` is set to `false` in an enterprise setting to
-avoid collecting potentially sensitive information from user prompts.
+<!-- prettier-ignore -->
+> [!NOTE]
+> Ensure that `logPrompts` is set to `false` in an enterprise setting to
+> avoid collecting potentially sensitive information from user prompts.
 
 ## Authentication
 

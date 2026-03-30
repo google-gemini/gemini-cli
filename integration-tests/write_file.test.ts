@@ -22,8 +22,8 @@ describe('write_file', () => {
 
   afterEach(async () => await rig.cleanup());
 
-  it('should be able to write a file', async () => {
-    await rig.setup('should be able to write a file', {
+  it('should be able to write a joke to a file', async () => {
+    await rig.setup('should be able to write a joke to a file', {
       settings: { tools: { core: ['write_file', 'read_file'] } },
     });
     const prompt = `show me an example of using the write tool. put a dad joke in dad.txt`;
