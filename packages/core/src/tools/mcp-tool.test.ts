@@ -1021,6 +1021,48 @@ describe('DiscoveredMCPTool', () => {
     });
   });
 
+  describe('shouldConfirmExecute with read-only hint', () => {
+    it('should return false if isReadOnly is true', async () => {
+      const bus = createMockMessageBus();
+      getMockMessageBusInstance(bus).defaultToolDecision = 'ask_user';
+      const readOnlyTool = new DiscoveredMCPTool(
+        mockCallableToolInstance,
+        serverName,
+        serverToolName,
+        baseDescription,
+        inputSchema,
+        bus,
+        false, // trust
+        true, // isReadOnly
+      );
+      const invocation = readOnlyTool.build({ param: 'mock' });
+      expect(
+        await invocation.shouldConfirmExecute(new AbortController().signal),
+      ).toBe(false);
+    });
+
+    it('should return confirmation details if isReadOnly is false', async () => {
+      const bus = createMockMessageBus();
+      getMockMessageBusInstance(bus).defaultToolDecision = 'ask_user';
+      const readWriteTool = new DiscoveredMCPTool(
+        mockCallableToolInstance,
+        serverName,
+        serverToolName,
+        baseDescription,
+        inputSchema,
+        bus,
+        false, // trust
+        false, // isReadOnly
+      );
+      const invocation = readWriteTool.build({ param: 'mock' });
+      const confirmation = await invocation.shouldConfirmExecute(
+        new AbortController().signal,
+      );
+      expect(confirmation).not.toBe(false);
+      expect(confirmation).toHaveProperty('type', 'mcp');
+    });
+  });
+
   describe('DiscoveredMCPToolInvocation', () => {
     it('should return the stringified params from getDescription', () => {
       const params = { param: 'testValue', param2: 'anotherOne' };
