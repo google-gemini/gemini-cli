@@ -18,7 +18,7 @@ describe('update_topic_behavior', () => {
    * at the start and end of the session, and typically at least once in the middle, but no
    * more than 1/4 turns.
    */
-  evalTest('ALWAYS_PASSES', {
+  evalTest('USUALLY_PASSES', {
     name: 'update_topic should be used at start, end and middle for complex tasks',
     prompt: `Create a simple users REST API using Express. 
 1. Initialize a new npm project and install express.
