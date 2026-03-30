@@ -2250,10 +2250,6 @@ for that specific session.
     with screen readers.
 - **`--version`**:
   - Displays the version of the CLI.
-- **`--experimental-acp`**:
-  - Starts the agent in ACP mode.
-- **`--allowed-mcp-server-names`**:
-  - Allowed MCP server names.
 - **`--channels <channel1,channel2,...>`**:
   - A comma-separated list of MCP server names to enable as message channels.
   - When specified, the CLI will listen for asynchronous messages from these
