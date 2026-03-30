@@ -29,7 +29,7 @@ export const DetailedMessagesDisplay: React.FC<
 > = ({ maxHeight, width, hasFocus }) => {
   const scrollableListRef = useRef<ScrollableListRef<ConsoleMessageItem>>(null);
 
-  const { consoleMessages } = useConsoleMessages();
+  const consoleMessages = useConsoleMessages();
   const config = useConfig();
 
   const messages = useMemo(() => {
