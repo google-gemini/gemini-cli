@@ -1291,6 +1291,19 @@ const SETTINGS_SCHEMA = {
         description: 'Maximum number of directories to search for memory.',
         showInDialog: true,
       },
+      memoryBoundaryMarkers: {
+        type: 'array',
+        label: 'Memory Boundary Markers',
+        category: 'Context',
+        requiresRestart: true,
+        default: ['.git'] as string[],
+        description:
+          'File or directory names that mark the boundary for GEMINI.md discovery. ' +
+          'The upward traversal stops at the first directory containing any of these markers. ' +
+          'An empty array disables parent traversal.',
+        showInDialog: false,
+        items: { type: 'string' },
+      },
       includeDirectories: {
         type: 'array',
         label: 'Include Directories',
@@ -1444,6 +1457,21 @@ const SETTINGS_SCHEMA = {
               Fallback to child_process still applies.
             `,
             showInDialog: true,
+          },
+          backgroundCompletionBehavior: {
+            type: 'enum',
+            label: 'Background Completion Behavior',
+            category: 'Tools',
+            requiresRestart: false,
+            default: 'silent',
+            description:
+              "Controls what happens when a background shell command finishes. 'silent' (default): quietly exits in background. 'inject': automatically returns output to agent. 'notify': shows brief message in chat.",
+            showInDialog: false,
+            options: [
+              { label: 'Silent', value: 'silent' },
+              { label: 'Inject', value: 'inject' },
+              { label: 'Notify', value: 'notify' },
+            ],
           },
           pager: {
             type: 'string',
@@ -2139,6 +2167,46 @@ const SETTINGS_SCHEMA = {
         default: false,
         description:
           'Replace the built-in save_memory tool with a memory manager subagent that supports adding, removing, de-duplicating, and organizing memories.',
+        showInDialog: true,
+      },
+      agentHistoryTruncation: {
+        type: 'boolean',
+        label: 'Agent History Truncation',
+        category: 'Experimental',
+        requiresRestart: true,
+        default: false,
+        description:
+          'Enable truncation window logic for the Agent History Provider.',
+        showInDialog: true,
+      },
+      agentHistoryTruncationThreshold: {
+        type: 'number',
+        label: 'Agent History Truncation Threshold',
+        category: 'Experimental',
+        requiresRestart: true,
+        default: 30,
+        description:
+          'The maximum number of messages before history is truncated.',
+        showInDialog: true,
+      },
+      agentHistoryRetainedMessages: {
+        type: 'number',
+        label: 'Agent History Retained Messages',
+        category: 'Experimental',
+        requiresRestart: true,
+        default: 15,
+        description:
+          'The number of recent messages to retain after truncation.',
+        showInDialog: true,
+      },
+      agentHistorySummarization: {
+        type: 'boolean',
+        label: 'Agent History Summarization',
+        category: 'Experimental',
+        requiresRestart: true,
+        default: false,
+        description:
+          'Enable summarization of truncated content via a small model for the Agent History Provider.',
         showInDialog: true,
       },
       topicUpdateNarration: {
