@@ -74,8 +74,7 @@ export class SandboxedFileSystemService implements FileSystemService {
             `Sandbox Error: read_file failed for '${filePath}'. Exit code ${code}. ${error ? 'Details: ' + error : ''}`,
           );
           if (isEnoent) {
-            // @ts-expect-error - Adding code property to Error object
-            err.code = 'ENOENT';
+            Object.assign(err, { code: 'ENOENT' });
           }
           reject(err);
         }
