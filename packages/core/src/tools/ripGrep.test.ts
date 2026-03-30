@@ -19,6 +19,7 @@ import {
   ensureRgPath,
   type RipGrepToolParams,
 } from './ripGrep.js';
+import type { GrepResult } from './tools.js';
 import path from 'node:path';
 import { isSubpath } from '../utils/paths.js';
 import fs from 'node:fs/promises';
@@ -447,7 +448,9 @@ describe('RipGrepTool', () => {
         `File: ${path.join('sub', 'fileC.txt')}`,
       );
       expect(result.llmContent).toContain('L1: another world in sub dir');
-      expect(result.returnDisplay).toBe('Found 3 matches');
+      expect((result.returnDisplay as GrepResult).summary).toBe(
+        'Found 3 matches',
+      );
     });
 
     it('should ignore matches that escape the base path', async () => {
@@ -509,7 +512,9 @@ describe('RipGrepTool', () => {
       );
       expect(result.llmContent).toContain('File: fileC.txt'); // Path relative to 'sub'
       expect(result.llmContent).toContain('L1: another world in sub dir');
-      expect(result.returnDisplay).toBe('Found 1 match');
+      expect((result.returnDisplay as GrepResult).summary).toBe(
+        'Found 1 match',
+      );
     });
 
     it('should find matches with an include glob', async () => {
@@ -542,7 +547,9 @@ describe('RipGrepTool', () => {
       expect(result.llmContent).toContain(
         'L2: function baz() { return "hello"; }',
       );
-      expect(result.returnDisplay).toBe('Found 1 match');
+      expect((result.returnDisplay as GrepResult).summary).toBe(
+        'Found 1 match',
+      );
     });
 
     it('should find matches with an include glob and path', async () => {
@@ -579,7 +586,9 @@ describe('RipGrepTool', () => {
       );
       expect(result.llmContent).toContain('File: another.js');
       expect(result.llmContent).toContain('L1: const greeting = "hello";');
-      expect(result.returnDisplay).toBe('Found 1 match');
+      expect((result.returnDisplay as GrepResult).summary).toBe(
+        'Found 1 match',
+      );
     });
 
     it('should return "No matches found" when pattern does not exist', async () => {
@@ -596,7 +605,9 @@ describe('RipGrepTool', () => {
       expect(result.llmContent).toContain(
         'No matches found for pattern "nonexistentpattern" in path ".".',
       );
-      expect(result.returnDisplay).toBe('No matches found');
+      expect((result.returnDisplay as GrepResult).summary).toBe(
+        'No matches found',
+      );
     });
 
     it('should throw error for invalid regex pattern during build', async () => {
@@ -689,7 +700,9 @@ describe('RipGrepTool', () => {
       });
       const result = await invocation.execute(abortSignal);
 
-      expect(result.returnDisplay).toContain('(limited)');
+      expect((result.returnDisplay as GrepResult).summary).toContain(
+        '(limited)',
+      );
     }, 10000);
 
     it('should filter out files based on FileDiscoveryService even if ripgrep returns them', async () => {
@@ -740,7 +753,9 @@ describe('RipGrepTool', () => {
       expect(result.llmContent).toContain('should be kept');
       expect(result.llmContent).not.toContain('ignored.txt');
       expect(result.llmContent).not.toContain('should be ignored');
-      expect(result.returnDisplay).toContain('Found 1 match');
+      expect((result.returnDisplay as GrepResult).summary).toContain(
+        'Found 1 match',
+      );
     });
 
     it('should handle regex special characters correctly', async () => {
@@ -1064,7 +1079,9 @@ describe('RipGrepTool', () => {
       controller.abort();
 
       const result = await invocation.execute(controller.signal);
-      expect(result.returnDisplay).toContain('No matches found');
+      expect((result.returnDisplay as GrepResult).summary).toContain(
+        'No matches found',
+      );
     });
   });
 
@@ -1946,7 +1963,9 @@ describe('RipGrepTool', () => {
       expect(result.llmContent).toContain('L1: match 1');
       expect(result.llmContent).toContain('L2: match 2');
       expect(result.llmContent).not.toContain('L3: match 3');
-      expect(result.returnDisplay).toBe('Found 2 matches (limited)');
+      expect((result.returnDisplay as GrepResult).summary).toBe(
+        'Found 2 matches (limited)',
+      );
     });
 
     it('should return only file paths when names_only is true', async () => {

@@ -6,12 +6,11 @@ AppHeader(full)
 ╭──────────────────────────────────────────────────────────────────────────────────────────────╮
 │ ⊶  Shell Command Running a long command...                                                   │
 │                                                                                              │
-│ Line 10                                                                                      │
 │ Line 11                                                                                      │
 │ Line 12                                                                                      │
 │ Line 13                                                                                      │
 │ Line 14                                                                                      │
-│ Line 15                                                                                    █ │
+│ Line 15                                                                                      │
 │ Line 16                                                                                    █ │
 │ Line 17                                                                                    █ │
 │ Line 18                                                                                    █ │
@@ -27,12 +26,11 @@ AppHeader(full)
 ╭──────────────────────────────────────────────────────────────────────────────────────────────╮
 │ ⊶  Shell Command Running a long command...                                                   │
 │                                                                                              │
-│ Line 10                                                                                      │
 │ Line 11                                                                                      │
 │ Line 12                                                                                      │
 │ Line 13                                                                                      │
 │ Line 14                                                                                      │
-│ Line 15                                                                                    █ │
+│ Line 15                                                                                      │
 │ Line 16                                                                                    █ │
 │ Line 17                                                                                    █ │
 │ Line 18                                                                                    █ │
@@ -47,8 +45,7 @@ exports[`MainContent > MainContent Tool Output Height Logic > 'Normal mode - Con
 ╭──────────────────────────────────────────────────────────────────────────────────────────────╮
 │ ⊶  Shell Command Running a long command...                                                   │
 │                                                                                              │
-│ ... first 10 lines hidden (Ctrl+O to show) ...                                               │
-│ Line 11                                                                                      │
+│ ... first 11 lines hidden (Ctrl+O to show) ...                                               │
 │ Line 12                                                                                      │
 │ Line 13                                                                                      │
 │ Line 14                                                                                      │
