@@ -1291,6 +1291,19 @@ const SETTINGS_SCHEMA = {
         description: 'Maximum number of directories to search for memory.',
         showInDialog: true,
       },
+      memoryBoundaryMarkers: {
+        type: 'array',
+        label: 'Memory Boundary Markers',
+        category: 'Context',
+        requiresRestart: true,
+        default: ['.git'] as string[],
+        description:
+          'File or directory names that mark the boundary for GEMINI.md discovery. ' +
+          'The upward traversal stops at the first directory containing any of these markers. ' +
+          'An empty array disables parent traversal.',
+        showInDialog: false,
+        items: { type: 'string' },
+      },
       includeDirectories: {
         type: 'array',
         label: 'Include Directories',
@@ -1444,6 +1457,21 @@ const SETTINGS_SCHEMA = {
               Fallback to child_process still applies.
             `,
             showInDialog: true,
+          },
+          backgroundCompletionBehavior: {
+            type: 'enum',
+            label: 'Background Completion Behavior',
+            category: 'Tools',
+            requiresRestart: false,
+            default: 'silent',
+            description:
+              "Controls what happens when a background shell command finishes. 'silent' (default): quietly exits in background. 'inject': automatically returns output to agent. 'notify': shows brief message in chat.",
+            showInDialog: false,
+            options: [
+              { label: 'Silent', value: 'silent' },
+              { label: 'Inject', value: 'inject' },
+              { label: 'Notify', value: 'notify' },
+            ],
           },
           pager: {
             type: 'string',
@@ -2141,44 +2169,13 @@ const SETTINGS_SCHEMA = {
           'Replace the built-in save_memory tool with a memory manager subagent that supports adding, removing, de-duplicating, and organizing memories.',
         showInDialog: true,
       },
-      agentHistoryTruncation: {
+      contextManagement: {
         type: 'boolean',
-        label: 'Agent History Truncation',
+        label: 'Enable Context Management',
         category: 'Experimental',
         requiresRestart: true,
         default: false,
-        description:
-          'Enable truncation window logic for the Agent History Provider.',
-        showInDialog: true,
-      },
-      agentHistoryTruncationThreshold: {
-        type: 'number',
-        label: 'Agent History Truncation Threshold',
-        category: 'Experimental',
-        requiresRestart: true,
-        default: 30,
-        description:
-          'The maximum number of messages before history is truncated.',
-        showInDialog: true,
-      },
-      agentHistoryRetainedMessages: {
-        type: 'number',
-        label: 'Agent History Retained Messages',
-        category: 'Experimental',
-        requiresRestart: true,
-        default: 15,
-        description:
-          'The number of recent messages to retain after truncation.',
-        showInDialog: true,
-      },
-      agentHistorySummarization: {
-        type: 'boolean',
-        label: 'Agent History Summarization',
-        category: 'Experimental',
-        requiresRestart: true,
-        default: false,
-        description:
-          'Enable summarization of truncated content via a small model for the Agent History Provider.',
+        description: 'Enable logic for context management.',
         showInDialog: true,
       },
       topicUpdateNarration: {
@@ -2454,6 +2451,118 @@ const SETTINGS_SCHEMA = {
       description:
         'Custom hook event arrays that contain hook definitions for user-defined events',
       mergeStrategy: MergeStrategy.CONCAT,
+    },
+  },
+
+  contextManagement: {
+    type: 'object',
+    label: 'Context Management',
+    category: 'Experimental',
+    requiresRestart: true,
+    default: {},
+    description:
+      'Settings for agent history and tool distillation context management.',
+    showInDialog: false,
+    properties: {
+      historyWindow: {
+        type: 'object',
+        label: 'History Window Settings',
+        category: 'Context Management',
+        requiresRestart: true,
+        default: {},
+        showInDialog: false,
+        properties: {
+          maxTokens: {
+            type: 'number',
+            label: 'Max Tokens',
+            category: 'Context Management',
+            requiresRestart: true,
+            default: 150_000,
+            description:
+              'The number of tokens to allow before triggering compression.',
+            showInDialog: false,
+          },
+          retainedTokens: {
+            type: 'number',
+            label: 'Retained Tokens',
+            category: 'Context Management',
+            requiresRestart: true,
+            default: 40_000,
+            description: 'The number of tokens to always retain.',
+            showInDialog: false,
+          },
+        },
+      },
+      messageLimits: {
+        type: 'object',
+        label: 'Message Limits',
+        category: 'Context Management',
+        requiresRestart: true,
+        default: {},
+        showInDialog: false,
+        properties: {
+          normalMaxTokens: {
+            type: 'number',
+            label: 'Normal Maximum Tokens',
+            category: 'Context Management',
+            requiresRestart: true,
+            default: 2500,
+            description:
+              'The target number of tokens to budget for a normal conversation turn.',
+            showInDialog: false,
+          },
+          retainedMaxTokens: {
+            type: 'number',
+            label: 'Retained Maximum Tokens',
+            category: 'Context Management',
+            requiresRestart: true,
+            default: 12000,
+            description:
+              'The maximum number of tokens a single conversation turn can consume before truncation.',
+            showInDialog: false,
+          },
+          normalizationHeadRatio: {
+            type: 'number',
+            label: 'Normalization Head Ratio',
+            category: 'Context Management',
+            requiresRestart: true,
+            default: 0.25,
+            description:
+              'The ratio of tokens to retain from the beginning of a truncated message (0.0 to 1.0).',
+            showInDialog: false,
+          },
+        },
+      },
+      toolDistillation: {
+        type: 'object',
+        label: 'Tool Distillation',
+        category: 'Context Management',
+        requiresRestart: true,
+        default: {},
+        showInDialog: false,
+        properties: {
+          maxOutputTokens: {
+            type: 'number',
+            label: 'Max Output Tokens',
+            category: 'Context Management',
+            requiresRestart: true,
+            default: 10_000,
+            description:
+              'Maximum tokens to show when truncating large tool outputs.',
+            showInDialog: false,
+          },
+          summarizationThresholdTokens: {
+            type: 'number',
+            label: 'Tool Summarization Threshold',
+            category: 'Context Management',
+            requiresRestart: true,
+            default: 20_000,
+            description:
+              'Threshold above which truncated tool outputs will be summarized by an LLM.',
+            showInDialog: false,
+          },
+        },
+      },
     },
   },
 

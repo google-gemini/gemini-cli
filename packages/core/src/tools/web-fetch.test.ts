@@ -293,6 +293,7 @@ describe('WebFetchTool', () => {
         })),
       },
       isInteractive: () => false,
+      isAutoDistillationEnabled: vi.fn().mockReturnValue(false),
     } as unknown as Config;
   });
 
@@ -1117,6 +1118,41 @@ describe('WebFetchTool', () => {
         'Error: Access to blocked or private host http://localhost/ is not allowed.',
       );
       expect(result.error?.type).toBe(ToolErrorType.WEB_FETCH_PROCESSING_ERROR);
+    });
+
+    it('should bypass truncation if isAutoDistillationEnabled is true', async () => {
+      vi.spyOn(mockConfig, 'isAutoDistillationEnabled').mockReturnValue(true);
+      const largeContent = 'a'.repeat(300000); // Larger than MAX_CONTENT_LENGTH (250000)
+      mockFetch('https://example.com/large-text', {
+        status: 200,
+        headers: new Headers({ 'content-type': 'text/plain' }),
+        text: () => Promise.resolve(largeContent),
+      });
+
+      const tool = new WebFetchTool(mockConfig, bus);
+      const invocation = tool.build({ url: 'https://example.com/large-text' });
+      const result = await invocation.execute(new AbortController().signal);
+
+      expect((result.llmContent as string).length).toBe(300000); // No truncation
+    });
+
+    it('should truncate if isAutoDistillationEnabled is false', async () => {
+      vi.spyOn(mockConfig, 'isAutoDistillationEnabled').mockReturnValue(false);
+      const largeContent = 'a'.repeat(300000); // Larger than MAX_CONTENT_LENGTH (250000)
+      mockFetch('https://example.com/large-text2', {
+        status: 200,
+        headers: new Headers({ 'content-type': 'text/plain' }),
+        text: () => Promise.resolve(largeContent),
+      });
+
+      const tool = new WebFetchTool(mockConfig, bus);
+      const invocation = tool.build({ url: 'https://example.com/large-text2' });
+      const result = await invocation.execute(new AbortController().signal);
+
+      expect((result.llmContent as string).length).toBeLessThan(300000);
+      expect(result.llmContent).toContain(
+        '[Content truncated due to size limit]',
+      );
     });
   });
 });
