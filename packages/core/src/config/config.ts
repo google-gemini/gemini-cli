@@ -1005,7 +1005,7 @@ export class Config implements McpContext, AgentLoopContext {
     }
 
     this.targetDir = path.resolve(params.targetDir);
-    this.folderTrust = params.folderTrust ?? false;
+    this.folderTrust = params.folderTrust ?? true;
     this.workspaceContext = new WorkspaceContext(this.targetDir, []);
     this.pendingIncludeDirectories = params.includeDirectories ?? [];
     this.debugMode = params.debugMode;
@@ -1173,7 +1173,7 @@ export class Config implements McpContext, AgentLoopContext {
     this._enabledExtensions = params.enabledExtensions ?? [];
     this.noBrowser = params.noBrowser ?? false;
     this.summarizeToolOutput = params.summarizeToolOutput;
-    this.folderTrust = params.folderTrust ?? false;
+    this.folderTrust = params.folderTrust ?? true;
     this.ideMode = params.ideMode ?? false;
     this.includeDirectoryTree = params.includeDirectoryTree ?? true;
     this.loadMemoryFromIncludeDirectories =

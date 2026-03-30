@@ -151,15 +151,12 @@ export class HookRegistry {
         const message = `WARNING: The following project-level hooks have been detected in this workspace:
 ${untrusted.map((h) => `  - ${h}`).join('\n')}
 
-These hooks will be executed. If you did not configure these hooks or do not trust this project,
-please review the project settings (.gemini/settings.json) and remove them.`;
+These hooks will NOT be executed until explicitly trusted. If you trust this project,
+you can enable hooks by using the --folder-trust flag or running 'gemini --trust-folder'.`;
         coreEvents.emitFeedback('warning', message);
 
-        // Trust them so we don't warn again
-        trustedHooksManager.trustHooks(
-          this.config.getProjectRoot(),
-          projectHooks,
-        );
+        // Do NOT auto-trust hooks - require explicit user consent
+        // Hooks will remain disabled until user explicitly trusts the folder
       }
     } catch (error) {
       debugLogger.warn('Failed to check project hooks trust', error);
