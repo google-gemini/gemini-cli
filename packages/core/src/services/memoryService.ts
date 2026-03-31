@@ -285,19 +285,16 @@ function shouldProcessConversation(parsed: ConversationRecord): boolean {
 }
 
 /**
- * Scans the chats directory for unprocessed session files.
+ * Scans the chats directory for eligible session files (sorted most-recent-first,
+ * capped at MAX_SESSION_INDEX_SIZE). Shared by buildSessionIndex.
  */
-export async function getUnprocessedSessions(
+async function scanEligibleSessions(
   chatsDir: string,
-  state: ExtractionState,
-): Promise<ConversationRecord[]> {
-  const processedSet = getProcessedSessionIds(state);
-
+): Promise<Array<{ conversation: ConversationRecord; filePath: string }>> {
   let allFiles: string[];
   try {
     allFiles = await fs.readdir(chatsDir);
-  } catch (error) {
-    debugLogger.debug('[MemoryService] Failed to read chats directory:', error);
+  } catch {
     return [];
   }
 
@@ -308,31 +305,25 @@ export async function getUnprocessedSessions(
   // Sort by filename descending (most recent first)
   sessionFiles.sort((a, b) => b.localeCompare(a));
 
-  const sessions: ConversationRecord[] = [];
+  const results: Array<{ conversation: ConversationRecord; filePath: string }> = [];
 
   for (const file of sessionFiles) {
-    if (sessions.length >= MAX_SESSION_INDEX_SIZE) break;
+    if (results.length >= MAX_SESSION_INDEX_SIZE) break;
 
     const filePath = path.join(chatsDir, file);
     try {
       const content = await fs.readFile(filePath, 'utf-8');
       const parsed: unknown = JSON.parse(content);
-      if (!isConversationRecord(parsed)) {
-        continue;
-      }
-
+      if (!isConversationRecord(parsed)) continue;
       if (!shouldProcessConversation(parsed)) continue;
 
-      // Skip already processed
-      if (processedSet.has(parsed.sessionId)) continue;
-
-      sessions.push(parsed);
+      results.push({ conversation: parsed, filePath });
     } catch {
-      debugLogger.debug(`[MemoryService] Failed to read session file: ${file}`);
+      // Skip unreadable files
     }
   }
 
-  return sessions;
+  return results;
 }
 
 /**
@@ -398,52 +389,29 @@ export async function buildSessionIndex(
   state: ExtractionState,
 ): Promise<{ sessionIndex: string; newSessionIds: string[] }> {
   const processedSet = getProcessedSessionIds(state);
+  const eligible = await scanEligibleSessions(chatsDir);
 
-  let allFiles: string[];
-  try {
-    allFiles = await fs.readdir(chatsDir);
-  } catch {
+  if (eligible.length === 0) {
     return { sessionIndex: '', newSessionIds: [] };
   }
 
-  const sessionFiles = allFiles.filter(
-    (f) => f.startsWith(SESSION_FILE_PREFIX) && f.endsWith('.json'),
-  );
-
-  // Sort by filename descending (most recent first)
-  sessionFiles.sort((a, b) => b.localeCompare(a));
-
   const lines: string[] = [];
   const newSessionIds: string[] = [];
-  let count = 0;
 
-  for (const file of sessionFiles) {
-    if (count >= MAX_SESSION_INDEX_SIZE) break;
-
-    const filePath = path.join(chatsDir, file);
-    try {
-      const content = await fs.readFile(filePath, 'utf-8');
-      const parsed: unknown = JSON.parse(content);
-      if (!isConversationRecord(parsed)) continue;
-      if (!shouldProcessConversation(parsed)) continue;
-
-      const userMessageCount = parsed.messages.filter(
-        (m) => m.type === 'user',
-      ).length;
-      const isNew = !processedSet.has(parsed.sessionId);
-      if (isNew) {
-        newSessionIds.push(parsed.sessionId);
-      }
-
-      const status = isNew ? '[NEW]' : '[old]';
-      const summary = parsed.summary ?? '(no summary)';
-      lines.push(
-        `${status} ${summary} (${userMessageCount} user msgs) — ${filePath}`,
-      );
-      count++;
-    } catch {
-      // Skip unreadable files
+  for (const { conversation, filePath } of eligible) {
+    const userMessageCount = conversation.messages.filter(
+      (m) => m.type === 'user',
+    ).length;
+    const isNew = !processedSet.has(conversation.sessionId);
+    if (isNew) {
+      newSessionIds.push(conversation.sessionId);
     }
+
+    const status = isNew ? '[NEW]' : '[old]';
+    const summary = conversation.summary ?? '(no summary)';
+    lines.push(
+      `${status} ${summary} (${userMessageCount} user msgs) — ${filePath}`,
+    );
   }
 
   return { sessionIndex: lines.join('\n'), newSessionIds };
@@ -550,14 +518,17 @@ async function buildExistingSkillsSummary(
 
 /**
  * Builds an AgentLoopContext from a Config for background agent execution.
+ *
+ * Uses Object.create() to produce a prototype-delegating wrapper around the
+ * shared Config instance.  Overridden methods live only on the wrapper —
+ * the original Config is never mutated, avoiding a race condition where the
+ * main agent loop would see empty memory strings while the background
+ * extraction agent is running (up to 30 minutes).
  */
 function buildAgentLoopContext(
   config: Config,
   skillsDir: string,
-): {
-  context: AgentLoopContext;
-  restoreConfig: () => void;
-} {
+): AgentLoopContext {
   // Create a PolicyEngine that auto-approves all tool calls so the
   // background sub-agent never prompts the user for confirmation.
   const autoApprovePolicy = new PolicyEngine({
@@ -574,13 +545,13 @@ function buildAgentLoopContext(
   // Scope the workspace context to the skills directory so the agent only
   // sees the extraction target, not the full project tree.
   const scopedWorkspace = new WorkspaceContext(skillsDir);
-  // Override methods that inject workspace context into the agent's prompt.
-  // We bind directly to avoid restricted patterns (Object.create, Proxy, Reflect).
-  const scopedConfig = config;
-  const origGetWorkspace = config.getWorkspaceContext.bind(config);
-  const origGetSysMemory = config.getSystemInstructionMemory.bind(config);
-  const origGetEnvMemory = config.getEnvironmentMemory.bind(config);
-  const origGetSesMemory = config.getSessionMemory.bind(config);
+
+  // Prototype-delegate: property lookups fall through to the real config,
+  // but the overrides below live only on this wrapper object.
+  // Object.create is the only viable option here — Config is a large class
+  // and we need to override just 4 methods without mutating the shared instance.
+  // eslint-disable-next-line no-restricted-syntax, @typescript-eslint/no-unsafe-type-assertion
+  const scopedConfig = Object.create(config) as Config;
   scopedConfig.getWorkspaceContext = () => scopedWorkspace;
   // Return empty strings to prevent project GEMINI.md and session/environment
   // memory from being injected into the extraction agent's system prompt.
@@ -588,26 +559,15 @@ function buildAgentLoopContext(
   scopedConfig.getEnvironmentMemory = () => '';
   scopedConfig.getSessionMemory = () => '';
 
-  // Restore original methods after agent finishes (best-effort cleanup)
-  const restoreConfig = () => {
-    config.getWorkspaceContext = origGetWorkspace;
-    config.getSystemInstructionMemory = origGetSysMemory;
-    config.getEnvironmentMemory = origGetEnvMemory;
-    config.getSessionMemory = origGetSesMemory;
-  };
-
   return {
-    context: {
-      config: scopedConfig,
-      promptId: `skill-extraction-${randomUUID().slice(0, 8)}`,
-      toolRegistry: config.getToolRegistry(),
-      promptRegistry: new PromptRegistry(),
-      resourceRegistry: new ResourceRegistry(),
-      messageBus: autoApproveBus,
-      geminiClient: config.getGeminiClient(),
-      sandboxManager: config.sandboxManager,
-    },
-    restoreConfig,
+    config: scopedConfig,
+    promptId: `skill-extraction-${randomUUID().slice(0, 8)}`,
+    toolRegistry: config.getToolRegistry(),
+    promptRegistry: new PromptRegistry(),
+    resourceRegistry: new ResourceRegistry(),
+    messageBus: autoApproveBus,
+    geminiClient: config.getGeminiClient(),
+    sandboxManager: config.sandboxManager,
   };
 }
 
@@ -651,7 +611,6 @@ export async function startMemoryService(config: Config): Promise<void> {
   const executionId = handle.pid;
 
   const startTime = Date.now();
-  let restoreConfig: (() => void) | undefined;
   try {
     // Read extraction state
     const state = await readExtractionState(statePath);
@@ -710,9 +669,7 @@ export async function startMemoryService(config: Config): Promise<void> {
       existingSkillsSummary,
     );
 
-    const agentLoopResult = buildAgentLoopContext(config, skillsDir);
-    const context = agentLoopResult.context;
-    restoreConfig = agentLoopResult.restoreConfig;
+    const context = buildAgentLoopContext(config, skillsDir);
 
     // Register the agent's model config since it's not going through AgentRegistry.
     const modelAlias = getModelConfigAlias(agentDefinition);
@@ -782,7 +739,6 @@ export async function startMemoryService(config: Config): Promise<void> {
     }
     return;
   } finally {
-    restoreConfig?.();
     await releaseLock(lockPath);
     debugLogger.log('[MemoryService] Lock released');
   }
