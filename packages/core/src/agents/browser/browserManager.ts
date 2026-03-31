@@ -100,6 +100,7 @@ export interface McpToolCallResult {
 export class BrowserManager {
   // --- Static singleton management ---
   private static instances = new Map<string, BrowserManager>();
+  private static isShuttingDown = false;
 
   /**
    * Returns the cache key for a given config.
@@ -136,19 +137,24 @@ export class BrowserManager {
    * Called on /clear commands and CLI exit.
    */
   static async resetAll(): Promise<void> {
-    const results = await Promise.allSettled(
-      Array.from(BrowserManager.instances.values()).map((instance) =>
-        instance.close(),
-      ),
-    );
-    for (const result of results) {
-      if (result.status === 'rejected') {
-        debugLogger.error(
-          `Error during BrowserManager cleanup: ${result.reason instanceof Error ? result.reason.message : String(result.reason)}`,
-        );
+    BrowserManager.isShuttingDown = true;
+    try {
+      const results = await Promise.allSettled(
+        Array.from(BrowserManager.instances.values()).map((instance) =>
+          instance.close(),
+        ),
+      );
+      for (const result of results) {
+        if (result.status === 'rejected') {
+          debugLogger.error(
+            `Error during BrowserManager cleanup: ${result.reason instanceof Error ? result.reason.message : String(result.reason)}`,
+          );
+        }
       }
+      BrowserManager.instances.clear();
+    } finally {
+      BrowserManager.isShuttingDown = false;
     }
-    BrowserManager.instances.clear();
   }
 
   /**
@@ -164,6 +170,7 @@ export class BrowserManager {
   private mcpTransport: StdioClientTransport | undefined;
   private discoveredTools: McpTool[] = [];
   private disconnected = false;
+  private isClosing = false;
   private connectionPromise: Promise<void> | undefined;
 
   /** State for action rate limiting */
@@ -352,7 +359,7 @@ export class BrowserManager {
    */
   async ensureConnection(): Promise<void> {
     // Already connected and healthy — nothing to do
-    if (this.rawMcpClient && !this.disconnected) {
+    if (this.isConnected()) {
       return;
     }
 
@@ -416,6 +423,8 @@ export class BrowserManager {
    * the transport will terminate the browser.
    */
   async close(): Promise<void> {
+    this.isClosing = true;
+
     // Close MCP client first
     if (this.rawMcpClient) {
       try {
@@ -455,6 +464,7 @@ export class BrowserManager {
    * BrowserManager instance.
    */
   private async connectMcp(): Promise<void> {
+    this.isClosing = false;
     debugLogger.log('Connecting isolated MCP client to chrome-devtools-mcp...');
 
     // Create raw MCP SDK Client (not the wrapper McpClient)
@@ -563,13 +573,19 @@ export class BrowserManager {
     }
 
     this.mcpTransport.onclose = () => {
+      this.disconnected = true;
+      if (this.isClosing || BrowserManager.isShuttingDown) {
+        return;
+      }
       debugLogger.error(
         'chrome-devtools-mcp transport closed unexpectedly. ' +
           'The MCP server process may have crashed.',
       );
-      this.disconnected = true;
     };
     this.mcpTransport.onerror = (error: Error) => {
+      if (this.isClosing || BrowserManager.isShuttingDown) {
+        return;
+      }
       debugLogger.error(
         `chrome-devtools-mcp transport error: ${error.message}`,
       );
