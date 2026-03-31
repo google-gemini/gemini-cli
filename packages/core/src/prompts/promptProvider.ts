@@ -129,6 +129,7 @@ export class PromptProvider {
           hasHierarchicalMemory,
           contextFilenames,
           topicUpdateNarration: context.config.isTopicUpdateNarrationEnabled(),
+          watcherEnabled: context.config.isExperimentalWatcherEnabled(),
         })),
         subAgents: this.withSection('agentContexts', () =>
           context.config

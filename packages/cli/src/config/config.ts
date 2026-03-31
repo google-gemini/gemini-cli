@@ -981,6 +981,16 @@ export async function loadCliConfig(
       enabled: settings.experimental?.contextManagement,
       ...settings?.contextManagement,
     },
+    experimentalAgentHistoryTruncation:
+      settings.experimental?.agentHistoryTruncation,
+    experimentalAgentHistoryTruncationThreshold:
+      settings.experimental?.agentHistoryTruncationThreshold,
+    experimentalAgentHistoryRetainedMessages:
+      settings.experimental?.agentHistoryRetainedMessages,
+    experimentalAgentHistorySummarization:
+      settings.experimental?.agentHistorySummarization,
+    experimentalWatcher: settings.experimental?.watcher,
+    experimentalWatcherInterval: settings.experimental?.watcherInterval,
     modelSteering: settings.experimental?.modelSteering,
     topicUpdateNarration: settings.experimental?.topicUpdateNarration,
     toolOutputMasking: settings.experimental?.toolOutputMasking,
