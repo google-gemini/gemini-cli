@@ -202,7 +202,9 @@ describe('SandboxManager Integration', () => {
       });
 
       it('allows dynamic expansion of permissions after a failure', async () => {
-        const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'expansion-'));
+        const tempDir = fs.mkdtempSync(
+          path.join(workspace, '..', 'expansion-'),
+        );
         const testFile = path.join(tempDir, 'test.txt');
 
         try {
@@ -237,7 +239,9 @@ describe('SandboxManager Integration', () => {
       });
 
       it('grants access to explicitly allowed paths', async () => {
-        const allowedDir = fs.mkdtempSync(path.join(os.tmpdir(), 'allowed-'));
+        const allowedDir = fs.mkdtempSync(
+          path.join(workspace, '..', 'allowed-'),
+        );
         const testFile = path.join(allowedDir, 'test.txt');
 
         try {
