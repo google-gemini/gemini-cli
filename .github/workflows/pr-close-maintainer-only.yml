@@ -1,0 +1,250 @@
+name: '🚫 Close PRs on Maintainer-Only Issues'
+
+on:
+  pull_request:
+    types:
+      - 'opened'
+      - 'reopened'
+      - 'labeled'
+      - 'unlabeled'
+      - 'synchronize'
+
+jobs:
+  check-maintainer-only:
+    runs-on: 'ubuntu-latest'
+    if: |-
+      github.repository == 'google-gemini/gemini-cli' || github.repository == 'google-gemini/maintainers-gemini-cli'
+    permissions:
+      pull-requests: 'write'
+      issues: 'read'
+    steps:
+      - name: 'Generate GitHub App Token'
+        id: 'generate_token'
+        env:
+          APP_ID: '${{ secrets.APP_ID }}'
+        if: |-
+          ${{ env.APP_ID != '' }}
+        uses: 'actions/create-github-app-token@fee1f7d63c2ff003460e3d139729b119787bc349' # ratchet:actions/create-github-app-token@v2
+        with:
+          app-id: '${{ secrets.APP_ID }}'
+          private-key: '${{ secrets.PRIVATE_KEY }}'
+
+      - name: 'Check maintainer-only issues and close if needed'
+        uses: 'actions/github-script@60a0d83039c74a4aee543508d2ffcb1c3799cdea'
+        with:
+          github-token: '${{ steps.generate_token.outputs.token || secrets.GITHUB_TOKEN }}'
+          script: |-
+            const org = context.repo.owner;
+            const repo = context.repo.repo;
+            const prNumber = context.payload.pull_request.number;
+            const prAuthor = context.payload.pull_request.user.login;
+            const prBody = context.payload.pull_request.body || '';
+            const prLabels = context.payload.pull_request.labels.map(l => l.name);
+
+            // Skip if PR already has a label to exempt it from this check
+            const exemptLabels = ['help wanted', 'good first issue'];
+            if (prLabels.some(label => exemptLabels.includes(label))) {
+              core.info(`PR #${prNumber} has exempt label, skipping check.`);
+              return;
+            }
+
+            // 1. Check if the PR author is a maintainer
+            const isMaintainer = async (login, authorAssociation) => {
+              // Check team membership
+              const teams = ['gemini-cli-maintainers', 'gemini-cli-askmode-approvers', 'gemini-cli-docs'];
+              for (const teamSlug of teams) {
+                try {
+                  const members = await github.paginate(github.rest.teams.listMembersInOrg, {
+                    org: org,
+                    team_slug: teamSlug
+                  });
+                  if (members.some(m => m.login.toLowerCase() === login.toLowerCase())) {
+                    core.info(`${login} is a member of ${teamSlug}. Skipping.`);
+                    return true;
+                  }
+                } catch (e) {
+                  core.warning(`Failed to fetch team members from ${teamSlug}: ${e.message}`);
+                }
+              }
+
+              // Check author_association from webhook payload
+              const isRepoMaintainer = ['OWNER', 'MEMBER', 'COLLABORATOR'].includes(authorAssociation);
+              if (isRepoMaintainer) {
+                core.info(`${login} is a repo maintainer (author_association: ${authorAssociation}). Skipping.`);
+                return true;
+              }
+
+              // Check if author is a Googler
+              try {
+                const googleOrgs = ['googlers', 'google'];
+                for (const googleOrg of googleOrgs) {
+                  try {
+                    await github.rest.orgs.checkMembershipForUser({
+                      org: googleOrg,
+                      username: login
+                    });
+                    core.info(`${login} is a member of ${googleOrg}. Skipping.`);
+                    return true;
+                  } catch (e) {
+                    if (e.status !== 404) throw e;
+                  }
+                }
+              } catch (e) {
+                core.warning(`Failed to check org membership for ${login}: ${e.message}`);
+              }
+
+              return false;
+            };
+
+            const authorAssociation = context.payload.pull_request.author_association;
+            if (await isMaintainer(prAuthor, authorAssociation)) {
+              return;
+            }
+
+            // 2. Get all linked issues
+            const linkedIssues = new Set();
+
+            // 2a. Check closingIssuesReferences (linked via GitHub UI)
+            const query = `
+              query($owner:String!, $repo:String!, $number:Int!) {
+                repository(owner:$owner, name:$repo) {
+                  pullRequest(number:$number) {
+                    closingIssuesReferences(first: 50) {
+                      nodes {
+                        number
+                        repository {
+                          name
+                          owner {
+                            login
+                          }
+                        }
+                        labels(first: 50) {
+                          nodes {
+                            name
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            `;
+            const variables = { owner: org, repo: repo, number: prNumber };
+            const result = await github.graphql(query, variables);
+            const closingIssues = result.repository.pullRequest.closingIssuesReferences.nodes || [];
+
+            for (const issue of closingIssues) {
+              // Only check issues in the same repo
+              if (issue.repository.name === repo && issue.repository.owner.login === org) {
+                linkedIssues.add({
+                  number: issue.number,
+                  labels: issue.labels.nodes.map(l => l.name)
+                });
+              }
+            }
+
+            // 2b. Parse PR body for issue references (e.g., "Fixes #123", "Closes #456", "Related to #789")
+            const issueRefRegex = /(?:fixes|fixed|fix|closes|closed|close|resolves|resolved|resolve|related to|see|refs?|references?|blocks?|depends on|part of|part of|child of|parent of)[^#]*#(\d+)/gi;
+            let match;
+            while ((match = issueRefRegex.exec(prBody)) !== null) {
+              const issueNumber = parseInt(match[1], 10);
+              if (!isNaN(issueNumber)) {
+                // Check if we already have this issue
+                const alreadyAdded = Array.from(linkedIssues).some(i => i.number === issueNumber);
+                if (!alreadyAdded) {
+                  // Fetch issue details
+                  try {
+                    const issueData = await github.rest.issues.get({
+                      owner: org,
+                      repo: repo,
+                      issue_number: issueNumber
+                    });
+                    linkedIssues.add({
+                      number: issueNumber,
+                      labels: issueData.data.labels.map(l => l.name)
+                    });
+                  } catch (e) {
+                    core.warning(`Failed to fetch issue #${issueNumber}: ${e.message}`);
+                  }
+                }
+              }
+            }
+
+            // 2c. Check for bare issue references in the body (e.g., "#123")
+            const bareIssueRegex = /(?:^|[^0-9])#(\d+)(?:[^0-9]|$)/g;
+            while ((match = bareIssueRegex.exec(prBody)) !== null) {
+              const issueNumber = parseInt(match[1], 10);
+              if (!isNaN(issueNumber)) {
+                const alreadyAdded = Array.from(linkedIssues).some(i => i.number === issueNumber);
+                if (!alreadyAdded) {
+                  try {
+                    const issueData = await github.rest.issues.get({
+                      owner: org,
+                      repo: repo,
+                      issue_number: issueNumber
+                    });
+                    linkedIssues.add({
+                      number: issueNumber,
+                      labels: issueData.data.labels.map(l => l.name)
+                    });
+                  } catch (e) {
+                    core.warning(`Failed to fetch issue #${issueNumber}: ${e.message}`);
+                  }
+                }
+              }
+            }
+
+            if (linkedIssues.size === 0) {
+              core.info(`No linked issues found for PR #${prNumber}`);
+              return;
+            }
+
+            core.info(`Found ${linkedIssues.size} linked issue(s): ${Array.from(linkedIssues).map(i => `#${i.number}`).join(', ')}`);
+
+            // 3. Check if any linked issue has "🔒 maintainer only" label
+            const maintainerOnlyLabel = '🔒 maintainer only';
+            const maintainerOnlyIssues = [];
+
+            for (const issue of linkedIssues) {
+              if (issue.labels.some(label => label === maintainerOnlyLabel)) {
+                maintainerOnlyIssues.push(issue.number);
+              }
+            }
+
+            if (maintainerOnlyIssues.length === 0) {
+              core.info(`No maintainer-only issues found.`);
+              return;
+            }
+
+            core.info(`PR is linked to maintainer-only issue(s): ${maintainerOnlyIssues.join(', ')}`);
+
+            // 4. Post comment and close PR
+            const issueText = maintainerOnlyIssues.length === 1 ? 'issue' : 'issues';
+            const commentLines = [
+              'Thank you for your contribution to Gemini CLI!',
+              '',
+              `This pull request is linked to ${issueText} ${maintainerOnlyIssues.map(n => '#' + n).join(', ')}, which ${maintainerOnlyIssues.length === 1 ? 'is' : 'are'} labeled as **${maintainerOnlyLabel}**. These issues are reserved for maintainers to work on.`,
+              '',
+              "As such, we'll be closing this PR. We appreciate your understanding and encourage you to explore other issues labeled [**help wanted**](https://github.com/google-gemini/gemini-cli/issues?q=is%3Aissue+is%3Aopen+label%3A%22help+wanted%22) or [**good first issue**](https://github.com/google-gemini/gemini-cli/issues?q=is%3Aissue+is%3Aopen+label%3A%22good+first+issue%22) where community contributions are warmly welcomed!",
+              '',
+              'Thank you again for your interest in improving Gemini CLI.'
+            ];
+            const comment = commentLines.join('\n');
+
+            await github.rest.issues.createComment({
+              owner: org,
+              repo: repo,
+              issue_number: prNumber,
+              body: comment
+            });
+
+            core.info(`Comment posted on PR #${prNumber}`);
+
+            await github.rest.pulls.update({
+              owner: org,
+              repo: repo,
+              pull_number: prNumber,
+              state: 'closed'
+            });
+
+            core.info(`PR #${prNumber} has been closed.`);
