@@ -11,7 +11,6 @@ import path from 'node:path';
 import {
   coreEvents,
   convertSessionToClientHistory,
-  uiTelemetryService,
   type Config,
   type ConversationRecord,
   type ResumedSessionData,
@@ -69,7 +68,6 @@ export const useSessionBrowser = (
           // Use the old session's ID to continue it.
           const existingSessionId = conversation.sessionId;
           config.setSessionId(existingSessionId);
-          uiTelemetryService.hydrate(conversation);
 
           const resumedSessionData = {
             conversation,

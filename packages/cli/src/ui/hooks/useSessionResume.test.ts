@@ -14,8 +14,21 @@ import type {
   ConversationRecord,
   MessageRecord,
 } from '@google/gemini-cli-core';
+import { uiTelemetryService } from '@google/gemini-cli-core';
 import type { UseHistoryManagerReturn } from './useHistoryManager.js';
 import type { HistoryItemWithoutId } from '../types.js';
+
+vi.mock('@google/gemini-cli-core', async (importOriginal) => {
+  const actual =
+    await importOriginal<typeof import('@google/gemini-cli-core')>();
+  return {
+    ...actual,
+    uiTelemetryService: {
+      clear: vi.fn(),
+      hydrate: vi.fn(),
+    },
+  };
+});
 
 describe('useSessionResume', () => {
   // Mock dependencies
@@ -99,6 +112,9 @@ describe('useSessionResume', () => {
       });
 
       expect(mockSetQuittingMessages).toHaveBeenCalledWith(null);
+      expect(uiTelemetryService.hydrate).toHaveBeenCalledWith(
+        resumedData.conversation,
+      );
       expect(mockHistoryManager.clearItems).toHaveBeenCalled();
       expect(mockHistoryManager.addItem).toHaveBeenCalledTimes(2);
       expect(mockHistoryManager.addItem).toHaveBeenNthCalledWith(
@@ -156,6 +172,7 @@ describe('useSessionResume', () => {
       expect(mockHistoryManager.clearItems).not.toHaveBeenCalled();
       expect(mockHistoryManager.addItem).not.toHaveBeenCalled();
       expect(mockGeminiClient.resumeChat).not.toHaveBeenCalled();
+      expect(uiTelemetryService.hydrate).not.toHaveBeenCalled();
     });
 
     it('should handle empty history arrays', async () => {
@@ -182,6 +199,9 @@ describe('useSessionResume', () => {
       expect(mockHistoryManager.addItem).not.toHaveBeenCalled();
       expect(mockRefreshStatic).toHaveBeenCalledTimes(1);
       expect(mockGeminiClient.resumeChat).toHaveBeenCalledWith([], resumedData);
+      expect(uiTelemetryService.hydrate).toHaveBeenCalledWith(
+        resumedData.conversation,
+      );
     });
 
     it('should restore directories from resumed session data', async () => {
@@ -426,6 +446,7 @@ describe('useSessionResume', () => {
       );
       expect(mockRefreshStatic).toHaveBeenCalledTimes(1);
       expect(mockGeminiClient.resumeChat).toHaveBeenCalled();
+      expect(uiTelemetryService.hydrate).toHaveBeenCalledWith(conversation);
     });
 
     it('should only resume once even if props change', async () => {
