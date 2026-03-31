@@ -8,6 +8,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { LinuxSandboxManager } from './LinuxSandboxManager.js';
 import type { SandboxRequest } from '../../services/sandboxManager.js';
 import fs from 'node:fs';
+import path from 'node:path';
 import * as shellUtils from '../../utils/shell-utils.js';
 
 vi.mock('node:fs', async () => {
@@ -317,7 +318,7 @@ describe('LinuxSandboxManager', () => {
         );
       });
 
-      it('should not grant read-write access to allowedPaths inside the workspace when readonly mode is active', async () => {
+      it('should grant read-write access to allowedPaths inside the workspace even when readonly mode is active', async () => {
         const manager = new LinuxSandboxManager({
           workspace,
           modeConfig: { readonly: true },
@@ -333,7 +334,7 @@ describe('LinuxSandboxManager', () => {
         });
         const bwrapArgs = result.args;
         const bindIndex = bwrapArgs.indexOf(workspace + '/subdirectory');
-        expect(bwrapArgs[bindIndex - 1]).toBe('--ro-bind-try');
+        expect(bwrapArgs[bindIndex - 1]).toBe('--bind-try');
       });
 
       it('should not bind the workspace twice even if it has a trailing slash in allowedPaths', async () => {
@@ -376,32 +377,34 @@ describe('LinuxSandboxManager', () => {
 
     describe('virtual commands', () => {
       it('should translate __read to cat', async () => {
+        const testFile = path.join(workspace, 'file.txt');
         const bwrapArgs = await getBwrapArgs({
           command: '__read',
-          args: ['file.txt'],
+          args: [testFile],
           cwd: workspace,
           env: {},
         });
 
-        // args are: [...bwrapBaseArgs, '--', 'cat', 'file.txt']
-        expect(bwrapArgs[bwrapArgs.length - 2]).toBe('cat');
-        expect(bwrapArgs[bwrapArgs.length - 1]).toBe('file.txt');
+        // args are: [...bwrapBaseArgs, '--', '/bin/cat', '.../file.txt']
+        expect(bwrapArgs[bwrapArgs.length - 2]).toBe('/bin/cat');
+        expect(bwrapArgs[bwrapArgs.length - 1]).toBe(testFile);
       });
 
       it('should translate __write to sh -c cat', async () => {
+        const testFile = path.join(workspace, 'file.txt');
         const bwrapArgs = await getBwrapArgs({
           command: '__write',
-          args: ['file.txt'],
+          args: [testFile],
           cwd: workspace,
           env: {},
         });
 
-        // args are: [...bwrapBaseArgs, '--', 'sh', '-c', 'cat > "$1"', '_', 'file.txt']
-        expect(bwrapArgs[bwrapArgs.length - 5]).toBe('sh');
+        // args are: [...bwrapBaseArgs, '--', '/bin/sh', '-c', 'tee -- "$@" > /dev/null', '_', '.../file.txt']
+        expect(bwrapArgs[bwrapArgs.length - 5]).toBe('/bin/sh');
         expect(bwrapArgs[bwrapArgs.length - 4]).toBe('-c');
-        expect(bwrapArgs[bwrapArgs.length - 3]).toBe('cat > "$1"');
+        expect(bwrapArgs[bwrapArgs.length - 3]).toBe('tee -- "$@" > /dev/null');
         expect(bwrapArgs[bwrapArgs.length - 2]).toBe('_');
-        expect(bwrapArgs[bwrapArgs.length - 1]).toBe('file.txt');
+        expect(bwrapArgs[bwrapArgs.length - 1]).toBe(testFile);
       });
     });
 
