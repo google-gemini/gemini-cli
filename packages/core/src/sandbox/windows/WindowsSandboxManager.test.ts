@@ -471,6 +471,7 @@ describe('WindowsSandboxManager', () => {
 
   it('should translate __write to PowerShell safely using environment variables', async () => {
     const filePath = path.join(testCwd, 'test.txt');
+    fs.writeFileSync(filePath, '');
     const req: SandboxRequest = {
       command: '__write',
       args: [filePath],
@@ -492,6 +493,7 @@ describe('WindowsSandboxManager', () => {
 
   it('should safely handle special characters in __write path using environment variables', async () => {
     const maliciousPath = path.join(testCwd, 'foo"; echo bar; ".txt');
+    fs.writeFileSync(maliciousPath, '');
     const req: SandboxRequest = {
       command: '__write',
       args: [maliciousPath],
@@ -512,6 +514,7 @@ describe('WindowsSandboxManager', () => {
 
   it('should translate __read to PowerShell safely using environment variables', async () => {
     const filePath = path.join(testCwd, 'test.txt');
+    fs.writeFileSync(filePath, 'hello');
     const req: SandboxRequest = {
       command: '__read',
       args: [filePath],
