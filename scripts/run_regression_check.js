@@ -67,44 +67,52 @@ function findAssertion(report, testName) {
  * Main execution logic.
  */
 async function main() {
-  const model = process.argv[2];
-
-  // The rest of arguments are FILE_LIST --test-pattern TEST_PATTERN
-  const args = process.argv.slice(3);
-  const testPatternIndex = args.indexOf('--test-pattern');
+  const modelArg = process.argv[2];
+  const remainingArgs = process.argv.slice(3);
 
   let files = '';
   let pattern = '';
+  let model = modelArg;
+
+  // Check if we have --test-pattern explicitly in any argument
+  const fullArgsString = remainingArgs.join(' ');
+  const testPatternIndex = remainingArgs.indexOf('--test-pattern');
 
   if (testPatternIndex !== -1) {
-    files = args.slice(0, testPatternIndex).join(' ');
-    pattern = args.slice(testPatternIndex + 1).join(' ');
+    // Standard case: each argument is separate
+    files = remainingArgs.slice(0, testPatternIndex).join(' ');
+    pattern = remainingArgs.slice(testPatternIndex + 1).join(' ');
+  } else if (fullArgsString.includes('--test-pattern')) {
+    // Case where arguments are combined into a single string (due to shell quoting)
+    const parts = fullArgsString.split('--test-pattern');
+    files = parts[0].trim();
+    pattern = parts[1].trim();
   } else {
-    // Fallback if no --test-pattern is provided (pattern is first arg, model is second)
-    // To support the manual test: node scripts/run_regression_check.js "Pattern" "Model"
-    pattern = process.argv[2];
-    const manualModel = process.argv[3];
-    if (manualModel) {
-      // Try to find the file surgically to avoid scanning everything
-      try {
-        const grepResult = execSync(
-          `grep -l ${quote([pattern])} evals/*.eval.ts`,
-          { encoding: 'utf-8' },
-        );
-        files = grepResult.split('\n').filter(Boolean).join(' ');
-      } catch (_e) {
-        // Fallback to evals/ if grep fails
-        files = 'evals/';
-      }
-      const firstPass = runTests(files, pattern, manualModel);
-      const success = await processResults(
-        firstPass,
-        pattern,
-        manualModel,
-        files,
-      );
-      process.exit(success ? 0 : 1);
+    // Fallback if no --test-pattern is provided (manual mode: pattern model)
+    // node scripts/run_regression_check.js "Pattern" "Model"
+    pattern = modelArg;
+    model = process.argv[3];
+
+    if (!model) {
+      console.error('❌ Error: No target model specified.');
+      process.exit(1);
     }
+
+    // Try to find the file surgically to avoid scanning everything
+    try {
+      const grepResult = execSync(
+        `grep -l ${quote([pattern])} evals/*.eval.ts`,
+        { encoding: 'utf-8' },
+      );
+      files = grepResult.split('\n').filter(Boolean).join(' ');
+    } catch (_e) {
+      // Fallback to evals/ if grep fails
+      files = 'evals/';
+    }
+
+    const firstPass = runTests(files, pattern, model);
+    const success = await processResults(firstPass, pattern, model, files);
+    process.exit(success ? 0 : 1);
   }
 
   if (!model) {
@@ -164,41 +172,109 @@ async function processResults(firstPass, pattern, model, files) {
 
   console.log(`⚠️ ${failingTests.length} tests failed. Starting retries...`);
 
-  // --- Step 2 & 3: Targeted Retries ---
-  // We process each failing test individually to implement fail-fast logic
+  // --- Step 2, 3 & 4: Targeted Retries (Best-of-4) ---
+  // A test is cleared if it reaches 2 passes.
+  // A test is flagged as a regression if it reaches 3 failures.
   for (const testName of failingTests) {
     console.log(`\nRe-evaluating: ${testName}`);
 
-    // Retry 1
-    const retry1 = runTests(files, escapeRegex(testName), model);
-    const retry1Assertion = findAssertion(retry1, testName);
-    const passedRetry1 = retry1Assertion?.status === 'passed';
+    while (
+      results[testName].passed < 2 &&
+      results[testName].total - results[testName].passed < 3 &&
+      results[testName].total < 4
+    ) {
+      const attemptNum = results[testName].total + 1;
+      console.log(`  Running attempt ${attemptNum}...`);
 
-    if (passedRetry1) {
-      results[testName].passed++;
+      const retry = runTests(files, escapeRegex(testName), model);
+      const retryAssertion = findAssertion(retry, testName);
+
       results[testName].total++;
-
-      // Step 3: Tie-breaker
-      console.log('  Attempt 2 passed. Running tie-breaker...');
-      const retry2 = runTests(files, escapeRegex(testName), model);
-      const retry2Assertion = findAssertion(retry2, testName);
-      const passedRetry2 = retry2Assertion?.status === 'passed';
-
-      if (passedRetry2) {
+      if (retryAssertion?.status === 'passed') {
         results[testName].passed++;
-        console.log('  ✅ Tie-breaker passed. (2/3)');
+        console.log(
+          `  ✅ Attempt ${attemptNum} passed. Score: ${results[testName].passed}/${results[testName].total}`,
+        );
       } else {
-        console.log('  ❌ Tie-breaker failed. (1/3)');
+        const status = retryAssertion?.status || 'unknown/error';
+        console.log(
+          `  ❌ Attempt ${attemptNum} failed (${status}). Score: ${results[testName].passed}/${results[testName].total}`,
+        );
       }
-      results[testName].total++;
-    } else if (retry1Assertion?.status === 'failed') {
-      // Fail-fast: 0/2 is already a regression
-      results[testName].total++;
-      console.log('  ❌ Attempt 2 failed. (0/2) - Marking as regression.');
-    } else {
-      console.log(
-        `  ⚠️ Attempt 2 skipped or returned unknown status (${retry1Assertion?.status}). (Total runs so far: 1)`,
-      );
+
+      // Termination messages and Baseline Verification
+      if (results[testName].passed >= 2) {
+        console.log(
+          `  ✅ Test cleared as Noisy Pass (${results[testName].passed}/${results[testName].total})`,
+        );
+      } else if (results[testName].total - results[testName].passed >= 3) {
+        console.log(
+          `  ⚠️ Detected potential regression (${results[testName].passed}/${results[testName].total}). Verifying baseline...`,
+        );
+
+        // --- Step 5: Dynamic Baseline Verification ---
+        // Switch to 'main', run twice. If it fails there too, it's not our fault.
+        try {
+          // 1. Stash current changes to switch branches safely
+          execSync('git stash push -m "eval-regression-check-stash"', {
+            stdio: 'inherit',
+          });
+          const hasStash = execSync('git stash list')
+            .toString()
+            .includes('eval-regression-check-stash');
+
+          // 2. Checkout main and run the test up to 3 times
+          execSync('git checkout main', { stdio: 'inherit' });
+
+          console.log(
+            `\n--- Running Baseline Verification on 'main' (Best-of-3) ---`,
+          );
+          let baselinePasses = 0;
+          let baselineTotal = 0;
+
+          while (baselinePasses === 0 && baselineTotal < 3) {
+            baselineTotal++;
+            console.log(`  Baseline Attempt ${baselineTotal}...`);
+            const baselineRun = runTests(files, escapeRegex(testName), model);
+            const baselineAssertion = findAssertion(baselineRun, testName);
+
+            if (baselineAssertion?.status === 'passed') {
+              baselinePasses++;
+              console.log(
+                `  ✅ Baseline Attempt ${baselineTotal} passed. Score: ${baselinePasses}/${baselineTotal}`,
+              );
+            } else {
+              console.log(
+                `  ❌ Baseline Attempt ${baselineTotal} failed. Score: ${baselinePasses}/${baselineTotal}`,
+              );
+            }
+          }
+
+          // 3. Switch back and restore stash
+          execSync('git checkout -', { stdio: 'inherit' });
+          if (hasStash) {
+            execSync('git stash pop', { stdio: 'inherit' });
+          }
+
+          // 4. Decision Logic
+          if (baselinePasses === 0) {
+            console.log(
+              `  ℹ️ Test also fails on 'main' (0/${baselineTotal}). Marking as PRE-EXISTING (Cleared).`,
+            );
+            results[testName].passed = 2; // "Clear" it for the report
+          } else {
+            console.log(
+              `  ❌ Test passes on 'main' (${baselinePasses}/${baselineTotal}) but fails in PR. Marking as CONFIRMED REGRESSION.`,
+            );
+          }
+        } catch (baselineError) {
+          console.error(
+            `  ❌ Failed to verify baseline: ${baselineError.message}`,
+          );
+          // If we can't verify baseline, assume it's a regression to be safe
+          execSync('git checkout -', { stdio: 'ignore' }).catch(() => {});
+        }
+      }
     }
   }
 

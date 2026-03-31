@@ -10,9 +10,10 @@ import { execSync } from 'node:child_process';
 import os from 'node:os';
 import { findReports, getModelFromPath, escapeRegex } from './eval_utils.js';
 
-const LOOKBACK_COUNT = 4;
-const MIN_VALID_RUNS = 3; // At least 3 out of 4 must be available (non '-')
-const PASS_RATE_THRESHOLD = 0.6;
+const LOOKBACK_COUNT = 6;
+const MIN_VALID_RUNS = 5; // At least 5 out of 6 must be available
+const PASS_RATE_THRESHOLD = 0.6; // Daily floor (e.g., 2/3)
+const AGGREGATE_PASS_RATE_THRESHOLD = 0.8; // Weekly signal (e.g., 15/18)
 
 /**
  * Aggregates stats from a list of report.json files.
@@ -122,7 +123,7 @@ function main() {
   }
 
   // Aggregate results for the target model across all history
-  const testHistories = {}; // { [testName]: { rates: [], file: string } }
+  const testHistories = {}; // { [testName]: { totalPassed: 0, totalRuns: 0, dailyRates: [], file: string } }
 
   for (const item of history) {
     const modelStats = item.stats[targetModel];
@@ -130,9 +131,16 @@ function main() {
 
     for (const [testName, stat] of Object.entries(modelStats)) {
       if (!testHistories[testName]) {
-        testHistories[testName] = { rates: [], file: stat.file };
+        testHistories[testName] = {
+          totalPassed: 0,
+          totalRuns: 0,
+          dailyRates: [],
+          file: stat.file,
+        };
       }
-      testHistories[testName].rates.push(stat.passed / stat.total);
+      testHistories[testName].totalPassed += stat.passed;
+      testHistories[testName].totalRuns += stat.total;
+      testHistories[testName].dailyRates.push(stat.passed / stat.total);
     }
   }
 
@@ -142,22 +150,26 @@ function main() {
   const newTests = [];
 
   for (const [testName, info] of Object.entries(testHistories)) {
-    const rates = info.rates;
-    // 1. Minimum data points required (At least 3/4 must be non '-')
-    const validRuns = rates.length;
-    if (validRuns < MIN_VALID_RUNS) {
+    const dailyRates = info.dailyRates;
+    const aggregateRate = info.totalPassed / info.totalRuns;
+
+    // 1. Minimum data points required
+    if (dailyRates.length < MIN_VALID_RUNS) {
       newTests.push(testName);
       continue;
     }
 
-    // 2. Trustworthy Criterion: Every single available run must score > 60%
-    const isStable = rates.every((rate) => rate > PASS_RATE_THRESHOLD);
+    // 2. Trustworthy Criterion:
+    // - Every single day must be above the floor (e.g. > 60%)
+    // - The overall aggregate must be high-signal (e.g. > 80%)
+    const isDailyStable = dailyRates.every(
+      (rate) => rate > PASS_RATE_THRESHOLD,
+    );
+    const isAggregateHighSignal = aggregateRate > AGGREGATE_PASS_RATE_THRESHOLD;
 
-    if (isStable) {
+    if (isDailyStable && isAggregateHighSignal) {
       trustworthyTests.push(testName);
       if (info.file) {
-        // Normalize file path (it might be absolute or relative from nightly runner)
-        // We want it relative to the workspace root for local vitest
         const match = info.file.match(/evals\/.*\.eval\.ts/);
         if (match) {
           trustworthyFiles.add(match[0]);
