@@ -118,16 +118,21 @@ export async function checkNextSpeaker(
       role: LlmRole.UTILITY_NEXT_SPEAKER,
     });
 
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
-    const parsedResponse = rawResponse as NextSpeakerResponse;
-
+    const responseObj = rawResponse;
     if (
-      parsedResponse &&
-      typeof parsedResponse === 'object' &&
-      'next_speaker' in parsedResponse &&
-      ['user', 'model'].includes(parsedResponse.next_speaker)
+      responseObj &&
+      typeof responseObj === 'object' &&
+      'next_speaker' in responseObj &&
+      ['user', 'model'].includes(String(responseObj['next_speaker']))
     ) {
-      return parsedResponse;
+      const speaker = responseObj['next_speaker'];
+      if (speaker === 'user' || speaker === 'model') {
+        const result: NextSpeakerResponse = {
+          reasoning: String(responseObj['reasoning'] ?? ''),
+          next_speaker: speaker,
+        };
+        return result;
+      }
     }
     return null;
   } catch (error) {

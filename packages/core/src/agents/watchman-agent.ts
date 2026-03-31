@@ -7,15 +7,31 @@
 import { z } from 'zod';
 import type { AgentLoopContext } from '../config/agent-loop-context.js';
 import type { LocalAgentDefinition } from './types.js';
-import { READ_FILE_TOOL_NAME, WRITE_FILE_TOOL_NAME } from '../tools/tool-names.js';
+import {
+  READ_FILE_TOOL_NAME,
+  WRITE_FILE_TOOL_NAME,
+} from '../tools/tool-names.js';
 import { GEMINI_MODEL_ALIAS_FLASH } from '../config/models.js';
 import * as path from 'node:path';
 
-const WatchmanReportSchema = z.object({
-  userDirections: z.string().describe('High level user directions/redirections and any change of plans.'),
-  progressSummary: z.string().describe('Concise summary of the progress made by the agent.'),
-  evaluation: z.string().describe('Evaluation of whether the agent is going in the right direction.'),
-  feedback: z.string().optional().describe('Feedback to the main agent if necessary.'),
+export const WatchmanReportSchema = z.object({
+  userDirections: z
+    .string()
+    .describe(
+      'High level user directions/redirections and any change of plans.',
+    ),
+  progressSummary: z
+    .string()
+    .describe('Concise summary of the progress made by the agent.'),
+  evaluation: z
+    .string()
+    .describe(
+      'Evaluation of whether the agent is going in the right direction.',
+    ),
+  feedback: z
+    .string()
+    .optional()
+    .describe('Feedback to the main agent if necessary.'),
 });
 
 /**
@@ -31,14 +47,16 @@ export const WatchmanAgent = (
     name: 'watchman',
     kind: 'local',
     displayName: 'Watchman Agent',
-    description: 'Specialized agent that monitors the progress and direction of the main agent.',
+    description:
+      'Specialized agent that monitors the progress and direction of the main agent.',
     inputConfig: {
       inputSchema: {
         type: 'object',
         properties: {
           recentHistory: {
             type: 'string',
-            description: 'The transcript of the most recent turns of the conversation.',
+            description:
+              'The transcript of the most recent turns of the conversation.',
           },
         },
         required: ['recentHistory'],

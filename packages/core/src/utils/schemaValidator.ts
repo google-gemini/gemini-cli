@@ -11,14 +11,27 @@ import Ajv2020Pkg from 'ajv/dist/2020.js';
 import * as addFormats from 'ajv-formats';
 import { debugLogger } from './debugLogger.js';
 
-// Ajv's ESM/CJS interop handling: disable strict linting for this section
-/* eslint-disable @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-type-assertion, @typescript-eslint/no-unsafe-assignment */
-const AjvClass = ((AjvPkg as any).default || AjvPkg) as new (
-  options?: any,
-) => Ajv;
-const Ajv2020Class = ((Ajv2020Pkg as any).default || Ajv2020Pkg) as new (
-  options?: any,
-) => Ajv;
+// Ajv's ESM/CJS interop handling. We use helper functions to encapsulate the
+// necessary type handling for these external package structures.
+
+/* eslint-disable @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-type-assertion */
+function getAjvClass(pkg: unknown): new (options?: unknown) => Ajv {
+  if (pkg && typeof pkg === 'object' && 'default' in pkg && pkg.default) {
+    return (pkg as any).default as new (options?: unknown) => Ajv;
+  }
+  return pkg as any as new (options?: unknown) => Ajv;
+}
+
+function getAddFormatsFunc(pkg: unknown): (ajv: Ajv) => void {
+  if (pkg && typeof pkg === 'object' && 'default' in pkg && pkg.default) {
+    return (pkg as any).default as (ajv: Ajv) => void;
+  }
+  return pkg as any as (ajv: Ajv) => void;
+}
+/* eslint-enable @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-type-assertion */
+
+const AjvClass = getAjvClass(AjvPkg);
+const Ajv2020Class = getAjvClass(Ajv2020Pkg);
 
 const ajvOptions = {
   // See: https://ajv.js.org/options.html#strict-mode-options
@@ -37,10 +50,9 @@ const ajvDefault: Ajv = new AjvClass(ajvOptions);
 // Draft-2020-12 validator for MCP servers using rmcp
 const ajv2020: Ajv = new Ajv2020Class(ajvOptions);
 
-const addFormatsFunc = (addFormats as any).default || addFormats;
+const addFormatsFunc = getAddFormatsFunc(addFormats);
 addFormatsFunc(ajvDefault);
 addFormatsFunc(ajv2020);
-/* eslint-enable @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-type-assertion, @typescript-eslint/no-unsafe-assignment */
 
 // Canonical draft-2020-12 meta-schema URI (used by rmcp MCP servers)
 const DRAFT_2020_12_SCHEMA = 'https://json-schema.org/draft/2020-12/schema';

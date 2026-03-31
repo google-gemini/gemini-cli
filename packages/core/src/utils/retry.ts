@@ -373,11 +373,12 @@ export async function retryWithBackoff<T>(
       }
 
       // Generic retry logic for other errors
-      if (
-        attempt >= maxAttempts ||
-        // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
-        !shouldRetryOnError(error as Error, retryFetchErrors)
-      ) {
+      const isRetryable =
+        error instanceof Error
+          ? shouldRetryOnError(error, retryFetchErrors)
+          : false;
+
+      if (attempt >= maxAttempts || !isRetryable) {
         throw error;
       }
 

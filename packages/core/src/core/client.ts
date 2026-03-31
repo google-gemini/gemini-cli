@@ -45,6 +45,7 @@ import { LoopDetectionService } from '../services/loopDetectionService.js';
 import { ChatCompressionService } from '../context/chatCompressionService.js';
 import { AgentHistoryProvider } from '../context/agentHistoryProvider.js';
 import type { WatchmanProgress } from '../agents/types.js';
+import { WatchmanReportSchema } from '../agents/watchman-agent.js';
 import { ideContextStore } from '../ide/ideContext.js';
 import {
   logContentRetryFailure,
@@ -415,18 +416,26 @@ export class GeminiClient {
           m.parts
             ?.map((p) => {
               if (typeof p === 'string') return p;
-              // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
-              const part = p as {
-                text?: string;
-                functionCall?: { name: string; args: unknown };
-                functionResponse?: { name: string; response: unknown };
-              };
-              if (part.text) return part.text;
-              if (part.functionCall) {
-                return `[CALL: ${part.functionCall.name}(${JSON.stringify(part.functionCall.args)})]`;
-              }
-              if (part.functionResponse) {
-                return `[RESULT: ${part.functionResponse.name} -> ${JSON.stringify(part.functionResponse.response)}]`;
+              if (p && typeof p === 'object') {
+                if ('text' in p && typeof p.text === 'string') return p.text;
+                if (
+                  'functionCall' in p &&
+                  p.functionCall &&
+                  typeof p.functionCall === 'object' &&
+                  'name' in p.functionCall &&
+                  'args' in p.functionCall
+                ) {
+                  return `[CALL: ${String(p.functionCall.name)}(${JSON.stringify(p.functionCall.args)})]`;
+                }
+                if (
+                  'functionResponse' in p &&
+                  p.functionResponse &&
+                  typeof p.functionResponse === 'object' &&
+                  'name' in p.functionResponse &&
+                  'response' in p.functionResponse
+                ) {
+                  return `[RESULT: ${String(p.functionResponse.name)} -> ${JSON.stringify(p.functionResponse.response)}]`;
+                }
               }
               return partToString(p, { verbose: true });
             })
@@ -444,12 +453,9 @@ export class GeminiClient {
         try {
           const contentString = partListUnionToString(result.llmContent);
           debugLogger.log(`[Watchman] Raw content response: ${contentString}`);
-          // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
-          const parsed = JSON.parse(
-            contentString,
-          ) as unknown as WatchmanProgress;
+          const parsed = WatchmanReportSchema.parse(JSON.parse(contentString));
           debugLogger.log('[Watchman] Subagent execution complete.');
-          return parsed;
+          return parsed as WatchmanProgress;
         } catch (e) {
           debugLogger.warn('Failed to parse watchman output', e);
           return undefined;
