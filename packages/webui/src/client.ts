@@ -440,7 +440,7 @@ function updateFilesPanel(){
         '<span class="fp-adds"><span class="add">+' + f.lines + '</span></span>' +
         '<span class="fp-path" title="' + esc(f.path) + '">' + esc(f.path) + '</span>' +
         '<div class="fp-actions">' +
-          '<button type="button" class="fp-open-btn" aria-expanded="' + (isOpen ? 'true' : 'false') + '" aria-controls="' + menuId + '" onclick="toggleFileMenu(event, \\'' + escJs(f.path) + '\\', \\'' + menuId + '\\')">Open</button>' +
+          '<button type="button" class="fp-open-btn" aria-expanded="' + (isOpen ? 'true' : 'false') + '" aria-controls="' + menuId + '" onclick="toggleFileMenu(event, \'' + esc(escJs(f.path)) + '\', \'' + menuId + '\')">Open</button>' +
           '<div class="fp-menu' + (isOpen ? ' open' : '') + '" id="' + menuId + '">' +
             '<button type="button" class="fp-menu-item" onclick="openTrackedFile(event, \\'' + escJs(f.path) + '\\', \\'finder\\')">Finder</button>' +
             '<button type="button" class="fp-menu-item" onclick="openTrackedFile(event, \\'' + escJs(f.path) + '\\', \\'cursor\\')">Cursor</button>' +
