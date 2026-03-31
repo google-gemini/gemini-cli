@@ -236,6 +236,12 @@ export class WindowsSandboxManager implements SandboxManager {
         false,
     };
 
+    if (req.command === '__read' && req.args[0]) {
+      mergedAdditional.fileSystem!.read!.push(req.args[0]);
+    } else if (req.command === '__write' && req.args[0]) {
+      mergedAdditional.fileSystem!.write!.push(req.args[0]);
+    }
+
     const defaultNetwork =
       this.options.modeConfig?.network || req.policy?.networkAccess || false;
     const networkAccess = defaultNetwork || mergedAdditional.network;
