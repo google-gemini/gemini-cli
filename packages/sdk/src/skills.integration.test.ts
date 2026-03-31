@@ -8,7 +8,15 @@ import { describe, it, expect } from 'vitest';
 import { GeminiCliAgent } from './agent.js';
 import { skillDir } from './skills.js';
 import * as path from 'node:path';
+import * as fs from 'node:fs/promises';
+import * as os from 'node:os';
 import { fileURLToPath } from 'node:url';
+import {
+  collectResponseText,
+  collectSessionEvents,
+  createManagedSession,
+} from '../test-utils/sessionHarness.js';
+import { expectTestOutput } from '../test-utils/outputControl.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -37,21 +45,13 @@ describe('GeminiCliAgent Skills Integration', () => {
     });
 
     // 1. Ask to activate the skill
-    const events = [];
-    const session = agent.session();
+    const session = createManagedSession(agent);
     // The prompt explicitly asks to activate the skill by name
-    const stream = session.sendStream(
+    const events = await collectSessionEvents(
+      session,
       'Activate the pirate-skill and then tell me a joke.',
     );
-
-    for await (const event of stream) {
-      events.push(event);
-    }
-
-    const textEvents = events.filter((e) => e.type === 'content');
-    const responseText = textEvents
-      .map((e) => (typeof e.value === 'string' ? e.value : ''))
-      .join('');
+    const responseText = collectResponseText(events);
 
     // Expect pirate speak
     expect(responseText.toLowerCase()).toContain('arrr');
@@ -71,22 +71,46 @@ describe('GeminiCliAgent Skills Integration', () => {
     });
 
     // 1. Ask to activate the skill
-    const events = [];
-    const session = agent.session();
-    const stream = session.sendStream(
+    const session = createManagedSession(agent);
+    const events = await collectSessionEvents(
+      session,
       'Activate the pirate-skill and confirm it is active.',
     );
-
-    for await (const event of stream) {
-      events.push(event);
-    }
-
-    const textEvents = events.filter((e) => e.type === 'content');
-    const responseText = textEvents
-      .map((e) => (typeof e.value === 'string' ? e.value : ''))
-      .join('');
+    const responseText = collectResponseText(events);
 
     // Expect confirmation or pirate speak
     expect(responseText.toLowerCase()).toContain('arrr');
   }, 60000);
+
+  it('logs a controlled debug message for a non-skill directory', async () => {
+    const goldenFile = getGoldenPath('agent-static-instructions');
+    const invalidSkillDir = await fs.mkdtemp(
+      path.join(os.tmpdir(), 'gemini-sdk-invalid-skill-'),
+    );
+    await fs.writeFile(path.join(invalidSkillDir, 'README.md'), 'not a skill');
+
+    expectTestOutput({
+      source: 'debugLogger',
+      level: 'debug',
+      pattern:
+        /Failed to load skills from .*The directory is not empty but no valid skills were discovered\./,
+    });
+
+    try {
+      const agent = new GeminiCliAgent({
+        instructions: 'You are a pirate. Respond in pirate speak.',
+        skills: [skillDir(invalidSkillDir)],
+        model: RECORD_MODE ? 'gemini-2.0-flash' : undefined,
+        recordResponses: RECORD_MODE ? goldenFile : undefined,
+        fakeResponses: RECORD_MODE ? undefined : goldenFile,
+      });
+
+      const session = createManagedSession(agent);
+      const events = await collectSessionEvents(session, 'Say hello.');
+
+      expect(collectResponseText(events)).toContain('Ahoy');
+    } finally {
+      await fs.rm(invalidSkillDir, { recursive: true, force: true });
+    }
+  }, 30000);
 });

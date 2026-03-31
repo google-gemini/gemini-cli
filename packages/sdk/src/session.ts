@@ -22,6 +22,7 @@ import {
   ActivateSkillTool,
   type ResumedSessionData,
   PolicyDecision,
+  debugLogger,
 } from '@google/gemini-cli-core';
 
 import { type Tool, SdkTool } from './tool.js';
@@ -43,6 +44,7 @@ export class GeminiCliSession {
   private readonly instructions: SystemInstructions | undefined;
   private client: GeminiClient | undefined;
   private initialized = false;
+  private disposed = false;
 
   constructor(
     options: GeminiCliAgentOptions,
@@ -90,6 +92,14 @@ export class GeminiCliSession {
     return this.sessionId;
   }
 
+  async dispose(): Promise<void> {
+    if (this.disposed) {
+      return;
+    }
+    this.disposed = true;
+    await this.config.dispose();
+  }
+
   async initialize(): Promise<void> {
     if (this.initialized) return;
 
@@ -108,9 +118,7 @@ export class GeminiCliSession {
             return await loadSkillsFromDir(ref.path);
           }
         } catch (e) {
-          // TODO: refactor this to use a proper logger interface
-          // eslint-disable-next-line no-console
-          console.error(`Failed to load skills from ${ref.path}:`, e);
+          debugLogger.error(`Failed to load skills from ${ref.path}:`, e);
         }
         return [];
       });
