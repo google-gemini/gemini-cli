@@ -28,7 +28,8 @@ node <skill_scripts_dir>/parse-heapsnapshot.cjs --input=<file.heapsnapshot> --to
 |--------|---------|-------|--------|
 | `capture-snapshots.cjs` | Capture N heap snapshots from a process via CDP | PID or script path, count, interval | `.heapsnapshot` files in `.gemini/diagnostics/` |
 | `parse-heapsnapshot.cjs` | Summarize a single snapshot | `.heapsnapshot` file | JSON: top constructors, large objects, suspicious patterns |
-| `diff-snapshots.cjs` | 3-snapshot leak detection | Three `.heapsnapshot` files | JSON: leaked constructors, retainer chains, growth stats |
+| `diff-snapshots.cjs` | 3-snapshot leak detection | Three `.heapsnapshot` files | JSON: leaked constructors, leaked IDs, growth stats |
+| `retainer-chains.cjs` | BFS retainer chain analysis | `.heapsnapshot` + leaked IDs | JSON: retention paths, root cause patterns, confidence scores |
 
 All script output is JSON, compact (<5KB), designed to fit in context without truncation.
 

@@ -148,6 +148,14 @@ function diff(s1Path, s2Path, s3Path) {
     verdict = 'intermittent growth — investigate further';
   }
 
+  // Collect leaked node IDs for retainer chain analysis
+  const leakedIds = [];
+  for (const [id, info] of newInS2) {
+    if (m3.has(id) && !INTERNAL_TYPES.has(info.ctor)) {
+      leakedIds.push(id);
+    }
+  }
+
   return {
     technique: '3-snapshot',
     snapshots: {
@@ -165,6 +173,7 @@ function diff(s1Path, s2Path, s3Path) {
     leaked_constructors: userLeaks.length > 0
       ? formatLeaks(userLeaks)
       : [{ note: 'no user-land leaks detected — check internal_noise if suspicious' }],
+    leaked_ids: leakedIds,
     internal_noise_filtered: internalNoise.length > 0
       ? internalNoise.slice(0, 5).map(([n]) => n)
       : 'none',
