@@ -185,9 +185,9 @@ export async function start_sandbox(
           shell: true,
           detached: true,
         });
-        // install handlers to stop proxy on exit/signal
-        // Remove the previous handler by its saved reference, not a new closure
+        // Stop the previous proxy and remove its handlers before registering new ones
         if (previousStopProxy) {
+          previousStopProxy();
           process.off('exit', previousStopProxy);
           process.off('SIGINT', previousStopProxy);
           process.off('SIGTERM', previousStopProxy);
@@ -747,9 +747,9 @@ export async function start_sandbox(
         shell: false, // <-- no shell; args are passed directly
         detached: true,
       });
-      // install handlers to stop proxy on exit/signal
-      // Remove the previous handler by its saved reference, not a new closure
+      // Stop the previous proxy container and remove its handlers before registering new ones
       if (previousContainerStopProxy) {
+        previousContainerStopProxy();
         process.off('exit', previousContainerStopProxy);
         process.off('SIGINT', previousContainerStopProxy);
         process.off('SIGTERM', previousContainerStopProxy);
