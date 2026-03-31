@@ -2093,7 +2093,7 @@ const SETTINGS_SCHEMA = {
         label: 'Model Steering',
         category: 'Experimental',
         requiresRestart: false,
-        default: false,
+        default: true,
         description:
           'Enable model steering (user hints) to guide the model during tool execution.',
         showInDialog: true,
