@@ -10,6 +10,7 @@ import type { Config } from '../config/config.js';
 import { bytesToMB } from '../utils/formatters.js';
 import { isUserActive } from './activity-detector.js';
 import { HighWaterMarkTracker } from './high-water-mark-tracker.js';
+import { initializeDiagnosticBridge } from './diagnostic-bridge.js';
 import {
   recordMemoryUsage,
   MemoryMetricType,
@@ -50,6 +51,12 @@ export class MemoryMonitor {
     // No config stored to avoid multi-session attribution issues
     this.highWaterMarkTracker = new HighWaterMarkTracker(5); // 5% threshold
     this.rateLimiter = new RateLimiter(60000); // 1 minute minimum between recordings
+
+    // Wire up the reactive diagnostic bridge
+    const bridge = initializeDiagnosticBridge();
+    this.highWaterMarkTracker.setDiagnosticCallback((metricType, currentValue, previousWaterMark) => {
+      bridge.onThresholdExceeded(metricType, currentValue, previousWaterMark);
+    });
   }
 
   /**

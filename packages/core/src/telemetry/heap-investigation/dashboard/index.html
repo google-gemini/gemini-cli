@@ -1,0 +1,1265 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Gemini CLI — Memory Investigation Dashboard</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+
+/* ── Theme tokens ─────────────────────────────────── */
+:root{
+  --bg:          #0f1117;
+  --bg2:         #161b22;
+  --bg3:         #1c2128;
+  --border:      #30363d;
+  --border2:     #21262d;
+  --text:        #e6edf3;
+  --text2:       #8b949e;
+  --text3:       #7d8590;
+  --text-inv:    #24292e;
+  --cell-name:   #79c0ff;
+  --hover-row:   #1c2128;
+  --perf-bg:     #0c1e36;
+  --perf-border: #1a3656;
+  --perf-text:   #58a6ff;
+  --det-bg:      #21262d;
+  --trig-bg:     #161b22;
+  --trig-divider:#30363d;
+  --drop-bg:     #0f1117;
+  --drop-hover:  #0c1e36;
+  --btn-bg:      #21262d;
+  --btn-border:  #30363d;
+  --btn-hover:   #2d333b;
+  --scrbar:      #30363d;
+  --sect-line:   #21262d;
+  --arc-track:   #21262d;
+  --micro-track: #21262d;
+  --sidebar-bg:  #161b22;
+  --topbar-bg:   #0f1117;
+  /* pattern chip dark backgrounds */
+  --pat-red-bg:  #2d0f0f; --pat-red-fg: #f85149; --pat-red-br: #5a1e1e;
+  --pat-yel-bg:  #1f1a0e; --pat-yel-fg: #d29922; --pat-yel-br: #3a2e0e;
+  --pat-blu-bg:  #0c1e36; --pat-blu-fg: #58a6ff; --pat-blu-br: #1a3656;
+  --pat-pur-bg:  #1a1330; --pat-pur-fg: #a78bfa; --pat-pur-br: #2e1f56;
+  --pat-ora-bg:  #1f1408; --pat-ora-fg: #fb923c; --pat-ora-br: #4a2a0a;
+  --pat-tea-bg:  #061f1e; --pat-tea-fg: #2dd4bf; --pat-tea-br: #0d3a38;
+}
+html[data-theme="light"]{
+  color-scheme: light;
+  --bg:          #ffffff;
+  --bg2:         #f6f8fa;
+  --bg3:         #eaeef2;
+  --border:      #d0d7de;
+  --border2:     #d8dee4;
+  --text:        #1f2328;
+  --text2:       #57606a;
+  --text3:       #6e7781;
+  --text-inv:    #f6f8fa;
+  --cell-name:   #0550ae;
+  --hover-row:   #f6f8fa;
+  --perf-bg:     #dbeafe;
+  --perf-border: #93c5fd;
+  --perf-text:   #1d4ed8;
+  --det-bg:      #eaeef2;
+  --trig-bg:     #f6f8fa;
+  --trig-divider:#d0d7de;
+  --drop-bg:     #f6f8fa;
+  --drop-hover:  #dbeafe;
+  --btn-bg:      #f6f8fa;
+  --btn-border:  #d0d7de;
+  --btn-hover:   #eaeef2;
+  --scrbar:      #d0d7de;
+  --sect-line:   #d0d7de;
+  --arc-track:   #e2e8f0;
+  --micro-track: #e2e8f0;
+  --sidebar-bg:  #f6f8fa;
+  --topbar-bg:   #ffffff;
+  --pat-red-bg:  #fff0ee; --pat-red-fg: #cf222e; --pat-red-br: #ffc1ba;
+  --pat-yel-bg:  #fff8c5; --pat-yel-fg: #9a6700; --pat-yel-br: #e3b341;
+  --pat-blu-bg:  #dbeafe; --pat-blu-fg: #1d4ed8; --pat-blu-br: #93c5fd;
+  --pat-pur-bg:  #f3f0ff; --pat-pur-fg: #6e40c9; --pat-pur-br: #c4b5fd;
+  --pat-ora-bg:  #fff3e0; --pat-ora-fg: #c2410c; --pat-ora-br: #fdba74;
+  --pat-tea-bg:  #e0faf6; --pat-tea-fg: #0f766e; --pat-tea-br: #99f6e4;
+}
+
+body{background:var(--bg);color:var(--text);font-family:'Inter',system-ui,sans-serif;font-size:14px;line-height:1.5;transition:background .2s,color .2s}
+a{color:#2f81f7;text-decoration:none}
+a:hover{text-decoration:underline}
+code,pre{font-family:'JetBrains Mono',monospace}
+
+/* Layout */
+.shell{display:flex;min-height:100vh}
+.sidebar{width:220px;background:var(--sidebar-bg);border-right:1px solid var(--border);padding:20px 0;flex-shrink:0;position:sticky;top:0;height:100vh;overflow-y:auto;transition:background .2s,border-color .2s}
+.main{flex:1;overflow-x:hidden}
+
+/* Sidebar */
+.sidebar-brand{padding:0 16px 20px;border-bottom:1px solid var(--border);margin-bottom:12px}
+.sidebar-brand .logo{display:flex;align-items:center;gap:10px}
+.sidebar-brand .logo svg{opacity:.85}
+.sidebar-brand .name{font-size:13px;font-weight:600;color:var(--text);display:block}
+.sidebar-brand .sub{font-size:11px;color:var(--text3)}
+.nav-section{padding:8px 8px 4px;font-size:11px;font-weight:600;color:var(--text3);text-transform:uppercase;letter-spacing:.6px}
+.nav-item{display:flex;align-items:center;gap:8px;padding:6px 8px;margin:0 8px 2px;border-radius:6px;font-size:13px;color:var(--text2);cursor:pointer;transition:background .15s,color .15s}
+.nav-item:hover{background:var(--bg3);color:var(--text)}
+.nav-item.active{background:var(--bg3);color:var(--text)}
+.nav-item svg{opacity:.7;flex-shrink:0}
+
+/* Top bar */
+.topbar{height:52px;border-bottom:1px solid var(--border);display:flex;align-items:center;padding:0 24px;gap:12px;background:var(--topbar-bg);position:sticky;top:0;z-index:50;transition:background .2s,border-color .2s}
+.topbar-title{font-size:14px;font-weight:600;color:var(--text)}
+.topbar-sep{color:var(--border);font-size:18px}
+.topbar-sub{font-size:13px;color:var(--text3)}
+.topbar-right{margin-left:auto;display:flex;align-items:center;gap:8px}
+.pill{padding:3px 10px;border-radius:20px;font-size:12px;font-weight:500;display:inline-flex;align-items:center;gap:5px;border:1px solid}
+.pill-green{background:var(--pat-tea-bg);color:#3fb950;border-color:#1a4028}
+html[data-theme="light"] .pill-green{color:#0f766e;border-color:#99f6e4}
+.pill-blue{background:var(--pat-blu-bg);color:#2f81f7;border-color:var(--pat-blu-br)}
+.pill-yellow{background:var(--pat-yel-bg);color:#d29922;border-color:var(--pat-yel-br)}
+html[data-theme="light"] .pill-yellow{color:#9a6700}
+.dot-pulse{width:6px;height:6px;border-radius:50%;background:#3fb950;animation:pulse 2.4s ease-in-out infinite}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.4}}
+/* Theme toggle button */
+.theme-btn{display:flex;align-items:center;gap:6px;padding:5px 11px;background:var(--btn-bg);border:1px solid var(--btn-border);border-radius:6px;color:var(--text2);font-family:inherit;font-size:12px;font-weight:500;cursor:pointer;transition:all .15s;white-space:nowrap}
+.theme-btn:hover{background:var(--btn-hover);color:var(--text);border-color:var(--text3)}
+.theme-btn svg{flex-shrink:0}
+
+/* Content */
+.content{padding:24px}
+
+/* Alert banner */
+.alert{border:1px solid var(--border);border-radius:8px;padding:12px 16px;margin-bottom:20px;display:flex;align-items:flex-start;gap:12px;font-size:13px}
+.alert-warning{background:var(--pat-yel-bg);border-color:var(--pat-yel-br)}
+.alert-icon{flex-shrink:0;margin-top:1px}
+
+/* Meta strip */
+.meta-strip{display:flex;gap:0;border:1px solid var(--border);border-radius:8px;overflow:hidden;margin-bottom:20px;background:var(--bg2)}
+.meta-cell{padding:12px 16px;border-right:1px solid var(--border);flex:1}
+.meta-cell:last-child{border-right:none}
+.meta-label{font-size:11px;color:var(--text3);font-weight:500;text-transform:uppercase;letter-spacing:.5px;margin-bottom:3px}
+.meta-value{font-size:13px;color:var(--text);font-family:'JetBrains Mono',monospace}
+
+/* Grid */
+.grid-4{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:16px}
+.grid-2{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:16px}
+.grid-3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px;margin-bottom:16px}
+
+/* Cards */
+.card{background:var(--bg2);border:1px solid var(--border);border-radius:8px;overflow:hidden}
+.card-header{padding:12px 16px;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:8px}
+.card-header-title{font-size:13px;font-weight:600;color:var(--text)}
+.card-header-sub{font-size:12px;color:var(--text3);margin-left:auto}
+.card-body{padding:16px}
+
+/* Stat cards */
+.stat-card{background:var(--bg2);border:1px solid var(--border);border-radius:8px;padding:16px}
+.stat-label{font-size:11px;font-weight:500;color:var(--text3);text-transform:uppercase;letter-spacing:.5px;margin-bottom:8px;display:flex;align-items:center;gap:6px}
+.stat-value{font-size:24px;font-weight:600;letter-spacing:-.5px;color:var(--text);line-height:1.1}
+.stat-meta{font-size:12px;color:var(--text3);margin-top:4px}
+.stat-badge{display:inline-flex;align-items:center;gap:4px;margin-top:8px;font-size:12px;font-weight:500;padding:2px 8px;border-radius:4px}
+.badge-red{background:var(--pat-red-bg);color:var(--pat-red-fg);border:1px solid var(--pat-red-br)}
+.badge-green{background:var(--pat-tea-bg);color:#3fb950;border:1px solid #1a4028}
+.badge-yellow{background:var(--pat-yel-bg);color:var(--pat-yel-fg);border:1px solid var(--pat-yel-br)}
+.badge-blue{background:var(--pat-blu-bg);color:#2f81f7;border:1px solid var(--pat-blu-br)}
+
+/* Confidence arc */
+.conf-wrap{display:flex;align-items:center;gap:16px;margin-top:4px}
+.conf-arc-wrap{position:relative;width:72px;height:72px;flex-shrink:0}
+.conf-arc-wrap svg{width:72px;height:72px;transform:rotate(-90deg)}
+.arc-bg{fill:none;stroke:var(--arc-track);stroke-width:7}
+.arc-fg{fill:none;stroke-width:7;stroke-linecap:round;transition:stroke-dashoffset 1s ease}
+.conf-label{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;line-height:1}
+.conf-pct{font-size:15px;font-weight:600;color:var(--text)}
+.conf-txt{font-size:9px;color:var(--text3);text-transform:uppercase;letter-spacing:.4px;margin-top:2px}
+
+/* Space bars */
+.space-rows{display:flex;flex-direction:column;gap:12px}
+.space-row{display:flex;flex-direction:column;gap:0}
+.space-row-top{display:flex;justify-content:space-between;margin-bottom:5px;font-size:12px}
+.space-row-name{color:var(--text2)}
+.space-row-val{color:var(--text);font-family:'JetBrains Mono',monospace;font-size:12px}
+.bar-track{height:5px;background:var(--arc-track);border-radius:3px;overflow:hidden}
+.bar-fill{height:100%;border-radius:3px;width:0%;transition:width .9s ease}
+.bar-red{background:#b91c1c}
+.bar-yellow{background:#92400e}
+.bar-blue{background:#1d4ed8}
+.bar-slate{background:#334155}
+
+/* Patterns */
+.pattern-list{display:flex;flex-wrap:wrap;gap:6px}
+.pat{display:inline-flex;align-items:center;gap:5px;padding:4px 10px;border-radius:4px;font-size:12px;font-weight:500;border:1px solid;cursor:default}
+.pat-red{background:var(--pat-red-bg);color:var(--pat-red-fg);border-color:var(--pat-red-br)}
+.pat-yellow{background:var(--pat-yel-bg);color:var(--pat-yel-fg);border-color:var(--pat-yel-br)}
+.pat-blue{background:var(--pat-blu-bg);color:var(--pat-blu-fg);border-color:var(--pat-blu-br)}
+.pat-purple{background:var(--pat-pur-bg);color:var(--pat-pur-fg);border-color:var(--pat-pur-br)}
+.pat-orange{background:var(--pat-ora-bg);color:var(--pat-ora-fg);border-color:var(--pat-ora-br)}
+.pat-teal{background:var(--pat-tea-bg);color:var(--pat-tea-fg);border-color:var(--pat-tea-br)}
+.pat-none{color:var(--text3);font-size:13px;padding:4px 0}
+
+/* Table */
+.data-table{width:100%;border-collapse:collapse}
+.data-table th{font-size:11px;font-weight:600;color:var(--text3);text-transform:uppercase;letter-spacing:.5px;padding:8px 12px;text-align:left;border-bottom:1px solid var(--border2);white-space:nowrap}
+.data-table td{padding:9px 12px;border-bottom:1px solid var(--border2);font-size:13px;vertical-align:middle}
+.data-table tbody tr:hover td{background:var(--hover-row)}
+.data-table tr:last-child td{border-bottom:none}
+.cell-mono{font-family:'JetBrains Mono',monospace;font-size:12px}
+.cell-name{color:var(--cell-name);font-family:'JetBrains Mono',monospace;font-size:12px}
+.cell-delta{color:#f85149;font-family:'JetBrains Mono',monospace;font-size:12px}
+.cell-size{color:var(--text2);font-family:'JetBrains Mono',monospace;font-size:12px}
+.cell-path{color:var(--text3);font-family:'JetBrains Mono',monospace;font-size:11px;max-width:260px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.micro-bar-wrap{width:60px}
+.micro-bar{height:3px;background:var(--micro-track);border-radius:2px;overflow:hidden}
+.micro-bar-fill{height:100%;background:#2f81f7;border-radius:2px;width:0%;transition:width .8s ease}
+.pat-chip{display:inline-flex;padding:2px 7px;border-radius:3px;font-size:11px;font-weight:500}
+
+/* Drop zone */
+.drop-zone{border:1px dashed var(--border);border-radius:8px;padding:48px 24px;text-align:center;cursor:pointer;transition:border-color .2s,background .2s;background:var(--drop-bg)}
+.drop-zone:hover,.drop-zone.dragover{border-color:#2f81f7;background:var(--drop-hover)}
+.drop-icon{margin-bottom:12px}
+.drop-icon svg{opacity:.5}
+.drop-title{font-size:15px;font-weight:600;color:var(--text);margin-bottom:4px}
+.drop-sub{font-size:13px;color:var(--text3)}
+.drop-btn{margin-top:16px;padding:7px 18px;background:var(--btn-bg);border:1px solid var(--btn-border);border-radius:6px;color:var(--text);font-family:inherit;font-size:13px;cursor:pointer;transition:background .15s,border-color .15s}
+.drop-btn:hover{background:var(--btn-hover);border-color:var(--text3)}
+.demo-row{display:flex;justify-content:center;margin-top:14px}
+.demo-btn{padding:6px 14px;background:transparent;border:1px solid var(--btn-border);border-radius:6px;color:var(--text3);font-family:inherit;font-size:12px;cursor:pointer;transition:all .15s;display:flex;align-items:center;gap:6px}
+.demo-btn:hover{border-color:var(--text3);color:var(--text)}
+#file-input{display:none}
+
+/* Detached */
+.det-count{font-size:32px;font-weight:600;color:var(--pat-yel-fg);letter-spacing:-.5px;margin-bottom:4px}
+.det-sub{font-size:12px;color:var(--text3);margin-bottom:12px}
+.det-tags{display:flex;flex-wrap:wrap;gap:6px}
+.det-tag{padding:3px 9px;background:var(--det-bg);border:1px solid var(--border);border-radius:4px;font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--text2)}
+
+/* Perfetto */
+.perf-path{font-family:'JetBrains Mono',monospace;font-size:12px;color:var(--perf-text);background:var(--perf-bg);border:1px solid var(--perf-border);border-radius:4px;padding:8px 12px;margin:8px 0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.perf-link{display:inline-flex;align-items:center;gap:6px;padding:7px 14px;background:var(--btn-bg);border:1px solid var(--btn-border);border-radius:6px;color:var(--text);font-size:13px;transition:all .15s}
+.perf-link:hover{background:var(--btn-hover);border-color:var(--text3);text-decoration:none;color:var(--text)}
+
+/* Section heading */
+.section-h{font-size:13px;font-weight:600;color:var(--text);margin-bottom:12px;display:flex;align-items:center;gap:8px}
+.section-h::after{content:'';flex:1;height:1px;background:var(--sect-line)}
+
+/* Trigger table */
+.trigger-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:1px;background:var(--trig-divider);border-radius:8px;overflow:hidden;border:1px solid var(--border)}
+.trigger-cell{background:var(--trig-bg);padding:14px 16px}
+.trigger-key{font-size:11px;color:var(--text3);font-weight:500;text-transform:uppercase;letter-spacing:.5px;margin-bottom:4px}
+.trigger-val{font-size:14px;color:var(--text);font-family:'JetBrains Mono',monospace;font-weight:500}
+.trigger-val.red{color:#f85149}
+.trigger-val.blue{color:#2f81f7}
+
+/* Empty state */
+.empty-state{text-align:center;padding:32px;color:var(--text3);font-size:13px}
+
+/* Divider */
+.divider{height:1px;background:var(--border2);margin:20px 0}
+
+/* Scrollbar */
+::-webkit-scrollbar{width:6px;height:6px}
+::-webkit-scrollbar-track{background:transparent}
+::-webkit-scrollbar-thumb{background:var(--scrbar);border-radius:3px}
+::-webkit-scrollbar-thumb:hover{background:var(--text3)}
+
+/* Responsive */
+@media(max-width:1100px){.grid-4{grid-template-columns:1fr 1fr}}
+@media(max-width:800px){.grid-2,.grid-3,.grid-4{grid-template-columns:1fr}.sidebar{display:none}.meta-strip{flex-wrap:wrap}.meta-cell{min-width:50%}}
+</style>
+</head>
+<body>
+<div class="shell">
+
+<!-- Sidebar -->
+<aside class="sidebar">
+  <div class="sidebar-brand">
+    <div class="logo">
+      <svg width="28" height="28" viewBox="0 0 28 28" fill="none">
+        <rect width="28" height="28" rx="6" fill="#1c2128"/>
+        <path d="M8 20 L14 8 L20 20" stroke="#2f81f7" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
+        <path d="M10.5 15.5 H17.5" stroke="#2f81f7" stroke-width="1.4" stroke-linecap="round" opacity=".5"/>
+      </svg>
+      <div>
+        <span class="name">Heap Inspector</span>
+        <span class="sub">Gemini CLI Core</span>
+      </div>
+    </div>
+  </div>
+
+  <div class="nav-section">Analysis</div>
+  <div class="nav-item active" id="nav-overview" onclick="showTab('overview')">
+    <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor"><path d="M1 2.5A1.5 1.5 0 0 1 2.5 1h11A1.5 1.5 0 0 1 15 2.5v11a1.5 1.5 0 0 1-1.5 1.5h-11A1.5 1.5 0 0 1 1 13.5Zm1.5-.5a.5.5 0 0 0-.5.5v11a.5.5 0 0 0 .5.5h11a.5.5 0 0 0 .5-.5v-11a.5.5 0 0 0-.5-.5Z"/><path d="M3 6h10v1H3zm0 3h6v1H3zm0 3h8v1H3z"/></svg>
+    Overview
+  </div>
+  <div class="nav-item" id="nav-timeline" onclick="showTab('timeline')">
+    <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor"><path d="M0 0h1v15h15v1H0zm14.817 3.113a.5.5 0 0 1 .07.704l-4.5 5.5a.5.5 0 0 1-.74.037L7.06 6.767l-3.656 5.027a.5.5 0 0 1-.808-.588l4-5.5a.5.5 0 0 1 .758-.06l2.609 2.61 4.15-5.073a.5.5 0 0 1 .704-.07z"/></svg>
+    Memory Timeline
+  </div>
+  <div class="nav-item" id="nav-constructors" onclick="showTab('constructors')">
+    <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor"><path d="M6 9a.5.5 0 0 1 .5-.5h3a.5.5 0 0 1 0 1h-3A.5.5 0 0 1 6 9m-1-4a.5.5 0 0 1 .5-.5h7a.5.5 0 0 1 0 1h-7A.5.5 0 0 1 5 5m3 8a.5.5 0 0 1 .5-.5h5a.5.5 0 0 1 0 1h-5A.5.5 0 0 1 8 13"/><path d="M1.5 2A1.5 1.5 0 0 0 0 3.5v9A1.5 1.5 0 0 0 1.5 14h13a1.5 1.5 0 0 0 1.5-1.5v-9A1.5 1.5 0 0 0 14.5 2zm13 1a.5.5 0 0 1 .5.5v9a.5.5 0 0 1-.5.5h-13a.5.5 0 0 1-.5-.5v-9a.5.5 0 0 1 .5-.5z"/></svg>
+    Constructors
+  </div>
+  <div class="nav-item" id="nav-patterns" onclick="showTab('patterns')">
+    <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor"><path d="M8 16c3.314 0 6-2 6-5.5 0-1.5-.5-4-2.5-6 .25 1.5-1.25 2-1.25 2C11 4 9 .5 6 0c.357 2 .5 4-2 6-1.25 1-2 2.729-2 4.5C2 14 4.686 16 8 16"/></svg>
+    Leak Patterns
+  </div>
+
+  <div class="divider" style="margin:12px 8px"></div>
+  <div class="nav-section">Tools</div>
+  <div class="nav-item" id="nav-cpu" onclick="showTab('cpu')">
+    <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor"><path d="M9.05.435c-.58-.58-1.52-.58-2.1 0L.436 6.95c-.58.58-.58 1.519 0 2.098l6.516 6.516c.58.58 1.519.58 2.098 0l6.516-6.516c.58-.58.58-1.519 0-2.098zM8 .989c.127 0 .253.049.35.145l6.516 6.516a.495.495 0 0 1 0 .7L8.35 14.866a.5.5 0 0 1-.7 0L1.134 8.35a.495.495 0 0 1 0-.7L7.65 1.134A.495.495 0 0 1 8 .989"/></svg>
+    CPU Profiler
+  </div>
+  <div class="nav-item" id="nav-perfetto" onclick="showTab('perfetto')">
+    <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor"><path d="M14.5 3a.5.5 0 0 1 .5.5v9a.5.5 0 0 1-.5.5h-13a.5.5 0 0 1-.5-.5v-9a.5.5 0 0 1 .5-.5zm-13-1A1.5 1.5 0 0 0 0 3.5v9A1.5 1.5 0 0 0 1.5 14h13a1.5 1.5 0 0 0 1.5-1.5v-9A1.5 1.5 0 0 0 14.5 2z"/><path d="M7 5.5a.5.5 0 0 1 .5-.5h5a.5.5 0 0 1 0 1h-5a.5.5 0 0 1-.5-.5m-1.496-.854a.5.5 0 0 1 0 .708l-1.5 1.5a.5.5 0 0 1-.708 0l-.5-.5a.5.5 0 1 1 .708-.708l.146.147 1.146-1.147a.5.5 0 0 1 .708 0M7 9.5a.5.5 0 0 1 .5-.5h5a.5.5 0 0 1 0 1h-5a.5.5 0 0 1-.5-.5m-1.496-.854a.5.5 0 0 1 0 .708l-1.5 1.5a.5.5 0 0 1-.708 0l-.5-.5a.5.5 0 0 1 .708-.708l.146.147 1.146-1.147a.5.5 0 0 1 .708 0"/></svg>
+    Perfetto Traces
+  </div>
+  <div class="nav-item" id="nav-reports" onclick="showTab('reports')">
+    <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor"><path d="M7.5 1.018a7 7 0 0 0-4.79 11.566L7.5 7.793zm1 0V7.5h6.482A7 7 0 0 0 8.5 1.018zM14.982 8.5H8.5v6.482a7 7 0 0 0 6.482-6.482zM7.5 14.982V8.207L2.518 13.19A7 7 0 0 0 7.5 14.982zM0 8a8 8 0 1 1 16 0A8 8 0 0 1 0 8"/></svg>
+    Reports
+  </div>
+</aside>
+
+<!-- Main -->
+<div class="main">
+  <div class="topbar">
+    <span class="topbar-title">Memory Investigation</span>
+    <span class="topbar-sep">/</span>
+    <span class="topbar-sub" id="topbar-id">No report loaded</span>
+    <div class="topbar-right">
+      <span class="pill pill-blue" id="version-pill">HDSL v1.0</span>
+      <span class="pill pill-green" id="status-pill"><span class="dot-pulse"></span>Ready</span>
+      <button class="theme-btn" id="theme-btn" onclick="toggleTheme()" title="Toggle light/dark theme">
+        <svg id="theme-icon" width="13" height="13" viewBox="0 0 16 16" fill="currentColor">
+          <path d="M8 12a4 4 0 1 0 0-8 4 4 0 0 0 0 8M8 0a.5.5 0 0 1 .5.5v2a.5.5 0 0 1-1 0v-2A.5.5 0 0 1 8 0m0 13a.5.5 0 0 1 .5.5v2a.5.5 0 0 1-1 0v-2A.5.5 0 0 1 8 13m8-5a.5.5 0 0 1-.5.5h-2a.5.5 0 0 1 0-1h2a.5.5 0 0 1 .5.5M3 8a.5.5 0 0 1-.5.5h-2a.5.5 0 0 1 0-1h2A.5.5 0 0 1 3 8m10.657-5.657a.5.5 0 0 1 0 .707l-1.414 1.415a.5.5 0 1 1-.707-.708l1.414-1.414a.5.5 0 0 1 .707 0m-9.193 9.193a.5.5 0 0 1 0 .707L3.05 13.657a.5.5 0 0 1-.707-.707l1.414-1.414a.5.5 0 0 1 .707 0m9.193 2.121a.5.5 0 0 1-.707 0l-1.414-1.414a.5.5 0 0 1 .707-.707l1.414 1.414a.5.5 0 0 1 0 .707M4.464 4.465a.5.5 0 0 1-.707 0L2.343 3.05a.5.5 0 1 1 .707-.707l1.414 1.414a.5.5 0 0 1 0 .708"/>
+        </svg>
+        <span id="theme-label">Light</span>
+      </button>
+    </div>
+  </div>
+
+  <div class="content">
+
+    <!-- Upload section -->
+    <div id="upload-section">
+      <div class="drop-zone" id="drop-zone">
+        <div class="drop-icon">
+          <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="#8b949e" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+            <polyline points="17 8 12 3 7 8"/>
+            <line x1="12" y1="3" x2="12" y2="15"/>
+          </svg>
+        </div>
+        <div class="drop-title">Drop HDSL report here</div>
+        <div class="drop-sub">Accepts <code style="color:#79c0ff">.json</code> HDSL reports</div>
+        <button class="drop-btn" onclick="document.getElementById('file-input').click()">Browse file</button>
+        <input type="file" id="file-input" accept=".json">
+      </div>
+      <div class="demo-row">
+        <button class="demo-btn" onclick="loadDemo()">
+          <svg width="12" height="12" viewBox="0 0 16 16" fill="currentColor"><path d="M6.552 6.712c-.19-.23-.162-.58.069-.77l.62-.5a.55.55 0 0 1 .77.07l3.828 4.742a.55.55 0 0 1 0 .697l-3.828 4.742a.55.55 0 0 1-.77.07l-.62-.5a.55.55 0 0 1-.069-.77L9.354 10 6.552 6.712z"/><path d="M1.552 6.712c-.19-.23-.162-.58.069-.77l.62-.5a.55.55 0 0 1 .77.07l3.828 4.742a.55.55 0 0 1 0 .697L3.01 15.213a.55.55 0 0 1-.77.07l-.62-.5a.55.55 0 0 1-.069-.77L4.354 10 1.552 6.712z"/></svg>
+          Load sample report — Gemini CLI dogfood
+        </button>
+      </div>
+    </div>
+
+    <!-- Dashboard -->
+    <div id="dashboard" style="display:none">
+
+      <!-- Alert -->
+      <div class="alert alert-warning" id="alert-bar" style="display:none">
+        <div class="alert-icon">
+          <svg width="14" height="14" viewBox="0 0 16 16" fill="#d29922"><path d="M7.938 2.016A.13.13 0 0 1 8.002 2a.13.13 0 0 1 .063.016.15.15 0 0 1 .054.057l6.857 11.667c.036.06.035.124.002.183a.2.2 0 0 1-.054.06.1.1 0 0 1-.066.017H1.146a.1.1 0 0 1-.066-.017.2.2 0 0 1-.054-.06.18.18 0 0 1 .002-.183L7.884 2.073a.15.15 0 0 1 .054-.057m1.044-.45a1.13 1.13 0 0 0-1.96 0L.165 13.233c-.457.778.091 1.767.98 1.767h13.713c.889 0 1.438-.99.98-1.767z"/><path d="M7.002 12a1 1 0 1 1 2 0 1 1 0 0 1-2 0M7.1 5.995a.905.905 0 1 1 1.8 0l-.35 3.507a.552.552 0 0 1-1.1 0z"/></svg>
+        </div>
+        <span id="alert-text"></span>
+      </div>
+
+      <!-- Meta strip -->
+      <div class="meta-strip">
+        <div class="meta-cell"><div class="meta-label">Investigation ID</div><div class="meta-value" id="m-id">—</div></div>
+        <div class="meta-cell"><div class="meta-label">Timestamp</div><div class="meta-value" id="m-ts">—</div></div>
+        <div class="meta-cell"><div class="meta-label">Duration</div><div class="meta-value" id="m-dur">—</div></div>
+        <div class="meta-cell"><div class="meta-label">HDSL payload</div><div class="meta-value" id="m-payload">—</div></div>
+        <div class="meta-cell"><div class="meta-label">Triggered by</div><div class="meta-value" id="m-trigger">—</div></div>
+      </div>
+
+      <!-- Stat cards -->
+      <div class="grid-4">
+        <div class="stat-card">
+          <div class="stat-label">
+            <svg width="12" height="12" viewBox="0 0 16 16" fill="#f85149"><path d="M8 16c3.314 0 6-2 6-5.5 0-1.5-.5-4-2.5-6 .25 1.5-1.25 2-1.25 2C11 4 9 .5 6 0c.357 2 .5 4-2 6-1.25 1-2 2.729-2 4.5C2 14 4.686 16 8 16"/></svg>
+            Heap Growth
+          </div>
+          <div class="stat-value" id="s-growth">—</div>
+          <div class="stat-meta" id="s-growth-abs">—</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-label">
+            <svg width="12" height="12" viewBox="0 0 16 16" fill="#d29922"><path d="M0 0h1v15h15v1H0zm14.817 3.113a.5.5 0 0 1 .07.704l-4.5 5.5a.5.5 0 0 1-.74.037L7.06 6.767l-3.656 5.027a.5.5 0 0 1-.808-.588l4-5.5a.5.5 0 0 1 .758-.06l2.609 2.61 4.15-5.073a.5.5 0 0 1 .704-.07z"/></svg>
+            Old Space Δ
+          </div>
+          <div class="stat-value" id="s-old">—</div>
+          <div class="stat-meta">Real leak signal (old gen)</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-label">
+            <svg width="12" height="12" viewBox="0 0 16 16" fill="#7d8590"><path d="M9.05.435c-.58-.58-1.52-.58-2.1 0L.436 6.95c-.58.58-.58 1.519 0 2.098l6.516 6.516c.58.58 1.519.58 2.098 0l6.516-6.516c.58-.58.58-1.519 0-2.098z"/></svg>
+            Patterns Found
+          </div>
+          <div class="stat-value" id="s-pcount">—</div>
+          <div class="stat-meta" id="s-plabel">—</div>
+        </div>
+        <div class="stat-card" style="display:flex;flex-direction:column;gap:0">
+          <div class="stat-label">
+            <svg width="12" height="12" viewBox="0 0 16 16" fill="#3fb950"><path d="M10.97 4.97a.75.75 0 0 1 1.07 1.05l-3.99 4.99a.75.75 0 0 1-1.08.02L4.324 8.384a.75.75 0 1 1 1.06-1.06l2.094 2.093 3.473-4.425z"/></svg>
+            Confidence
+          </div>
+          <div class="conf-wrap">
+            <div class="conf-arc-wrap">
+              <svg viewBox="0 0 72 72">
+                <circle class="arc-bg" cx="36" cy="36" r="29"/>
+                <circle class="arc-fg" id="arc-fg" cx="36" cy="36" r="29" stroke-dasharray="182" stroke-dashoffset="182" stroke="#3fb950"/>
+              </svg>
+              <div class="conf-label">
+                <span class="conf-pct" id="conf-pct">0%</span>
+                <span class="conf-txt">conf</span>
+              </div>
+            </div>
+            <div>
+              <div style="font-size:20px;font-weight:600;color:#e6edf3" id="conf-big">—</div>
+              <div style="font-size:12px;color:#7d8590;margin-top:2px" id="conf-label2">—</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Patterns + Space -->
+      <div class="grid-2">
+        <div class="card">
+          <div class="card-header">
+            <svg width="13" height="13" viewBox="0 0 16 16" fill="#8b949e"><path d="M8 16c3.314 0 6-2 6-5.5 0-1.5-.5-4-2.5-6 .25 1.5-1.25 2-1.25 2C11 4 9 .5 6 0c.357 2 .5 4-2 6-1.25 1-2 2.729-2 4.5C2 14 4.686 16 8 16"/></svg>
+            <span class="card-header-title">Detected Patterns</span>
+          </div>
+          <div class="card-body"><div class="pattern-list" id="pattern-list"></div></div>
+        </div>
+        <div class="card">
+          <div class="card-header">
+            <svg width="13" height="13" viewBox="0 0 16 16" fill="#8b949e"><path d="M0 0h1v15h15v1H0zm14.817 3.113a.5.5 0 0 1 .07.704l-4.5 5.5a.5.5 0 0 1-.74.037L7.06 6.767l-3.656 5.027a.5.5 0 0 1-.808-.588l4-5.5a.5.5 0 0 1 .758-.06l2.609 2.61 4.15-5.073a.5.5 0 0 1 .704-.07z"/></svg>
+            <span class="card-header-title">V8 Heap Space Breakdown</span>
+          </div>
+          <div class="card-body"><div class="space-rows" id="space-rows"></div></div>
+        </div>
+      </div>
+
+      <!-- Constructor table -->
+      <div class="card" style="margin-bottom:12px">
+        <div class="card-header">
+          <svg width="13" height="13" viewBox="0 0 16 16" fill="#8b949e"><path d="M0 2a1 1 0 0 1 1-1h14a1 1 0 0 1 1 1v2a1 1 0 0 1-1 1v7.5a2.5 2.5 0 0 1-2.5 2.5h-9A2.5 2.5 0 0 1 1 12.5V5a1 1 0 0 1-1-1zm2 3v7.5A1.5 1.5 0 0 0 3.5 14h9a1.5 1.5 0 0 0 1.5-1.5V5zm13-3H1v2h14zM5 7.5a.5.5 0 0 1 .5-.5h5a.5.5 0 0 1 0 1h-5a.5.5 0 0 1-.5-.5"/></svg>
+          <span class="card-header-title">Top Leaked Constructors</span>
+          <span class="card-header-sub" id="ctor-count">0 entries</span>
+        </div>
+        <div style="overflow-x:auto">
+          <table class="data-table">
+            <thead>
+              <tr>
+                <th>#</th>
+                <th>Constructor</th>
+                <th>Δ Instances</th>
+                <th>Δ Size</th>
+                <th>Retained</th>
+                <th>Pattern</th>
+                <th>Retainer Path</th>
+                <th>Share</th>
+              </tr>
+            </thead>
+            <tbody id="ctor-tbody"></tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- Detached + Perfetto -->
+      <div class="grid-2">
+        <div class="card">
+          <div class="card-header">
+            <svg width="13" height="13" viewBox="0 0 16 16" fill="#8b949e"><path d="M8 1a2.5 2.5 0 0 1 2.5 2.5V4h-5v-.5A2.5 2.5 0 0 1 8 1m3.5 3v-.5a3.5 3.5 0 1 0-7 0V4H1v10h14V4zM2 5h12v8H2z"/></svg>
+            <span class="card-header-title">Detached DOM Nodes</span>
+          </div>
+          <div class="card-body">
+            <div class="det-count" id="det-count">0</div>
+            <div class="det-sub">Ink/React fiber nodes detached from tree</div>
+            <div class="det-tags" id="det-tags"></div>
+          </div>
+        </div>
+        <div class="card">
+          <div class="card-header">
+            <svg width="13" height="13" viewBox="0 0 16 16" fill="#8b949e"><path d="M6 12.5a.5.5 0 0 1 .5-.5h3a.5.5 0 0 1 0 1h-3a.5.5 0 0 1-.5-.5M3 8.062C3 6.76 4.235 5.765 5.53 5.886a26.6 26.6 0 0 0 4.94 0C11.765 5.765 13 6.76 13 8.062v1.157a.93.93 0 0 1-.765.935c-.845.147-2.34.346-4.235.346s-3.39-.2-4.235-.346A.93.93 0 0 1 3 9.219zm4.542-.827a.25.25 0 0 0-.217.068l-.92.9a25 25 0 0 1-1.871-.183.25.25 0 0 0-.068.495c.55.076 1.232.149 2.02.193a.25.25 0 0 0 .189-.071l.754-.736.847 1.71a.25.25 0 0 0 .404.062l.932-.97a25 25 0 0 0 1.922-.188.25.25 0 0 0-.068-.495c-.538.074-1.207.145-1.98.189a.25.25 0 0 0-.166.076l-.754.785-.842-1.7a.25.25 0 0 0-.183-.134z"/></svg>
+            <span class="card-header-title">Perfetto Trace</span>
+          </div>
+          <div class="card-body" id="perf-body">
+            <div style="color:#7d8590;font-size:13px">No trace file generated for this report.</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Trigger -->
+      <div style="margin-bottom:24px">
+        <div class="section-h">Trigger Details</div>
+        <div class="trigger-grid">
+          <div class="trigger-cell"><div class="trigger-key">Metric</div><div class="trigger-val blue" id="t-metric">—</div></div>
+          <div class="trigger-cell"><div class="trigger-key">Growth %</div><div class="trigger-val red" id="t-growth">—</div></div>
+          <div class="trigger-cell"><div class="trigger-key">Prev High-Water Mark</div><div class="trigger-val" id="t-hwm">—</div></div>
+          <div class="trigger-cell"><div class="trigger-key">Session Uptime</div><div class="trigger-val" id="t-uptime">—</div></div>
+        </div>
+      </div>
+
+    </div><!-- /dashboard -->
+
+    <!-- ── TAB: Memory Timeline ─────────────────── -->
+    <div id="tab-timeline" class="tab-panel" style="display:none">
+      <div class="section-h">Memory Timeline</div>
+      <div class="card" style="margin-bottom:16px">
+        <div class="card-header">
+          <svg width="13" height="13" viewBox="0 0 16 16" fill="#8b949e"><path d="M0 0h1v15h15v1H0zm14.817 3.113a.5.5 0 0 1 .07.704l-4.5 5.5a.5.5 0 0 1-.74.037L7.06 6.767l-3.656 5.027a.5.5 0 0 1-.808-.588l4-5.5a.5.5 0 0 1 .758-.06l2.609 2.61 4.15-5.073a.5.5 0 0 1 .704-.07z"/></svg>
+          <span class="card-header-title">Heap Used — 3-Snapshot Timeline</span>
+          <span class="card-header-sub" id="tl-duration"></span>
+        </div>
+        <div class="card-body" style="padding:20px 16px">
+          <canvas id="timeline-canvas" style="width:100%;height:220px;display:block"></canvas>
+        </div>
+      </div>
+      <div class="grid-3">
+        <div class="stat-card">
+          <div class="stat-label">S1 Baseline</div>
+          <div class="stat-value" id="tl-s1">—</div>
+          <div class="stat-meta">Before workload</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-label">S2 Workload</div>
+          <div class="stat-value" id="tl-s2" style="color:#f85149">—</div>
+          <div class="stat-meta">During activity</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-label">S3 Post-GC</div>
+          <div class="stat-value" id="tl-s3">—</div>
+          <div class="stat-meta">After forced GC</div>
+        </div>
+      </div>
+      <div class="card">
+        <div class="card-header"><span class="card-header-title">V8 Space Delta Summary</span></div>
+        <div class="card-body"><div class="space-rows" id="tl-space-rows"></div></div>
+      </div>
+    </div>
+
+    <!-- ── TAB: Constructors ─────────────────────── -->
+    <div id="tab-constructors" class="tab-panel" style="display:none">
+      <div class="section-h">Constructor Analysis</div>
+      <div class="card" style="margin-bottom:16px">
+        <div class="card-header">
+          <svg width="13" height="13" viewBox="0 0 16 16" fill="#8b949e"><path d="M0 2a1 1 0 0 1 1-1h14a1 1 0 0 1 1 1v2a1 1 0 0 1-1 1v7.5a2.5 2.5 0 0 1-2.5 2.5h-9A2.5 2.5 0 0 1 1 12.5V5a1 1 0 0 1-1-1zm2 3v7.5A1.5 1.5 0 0 0 3.5 14h9a1.5 1.5 0 0 0 1.5-1.5V5zm13-3H1v2h14zM5 7.5a.5.5 0 0 1 .5-.5h5a.5.5 0 0 1 0 1h-5a.5.5 0 0 1-.5-.5"/></svg>
+          <span class="card-header-title">All Leaked Constructors</span>
+          <span class="card-header-sub" id="ct-count">—</span>
+        </div>
+        <div style="overflow-x:auto">
+          <table class="data-table">
+            <thead>
+              <tr>
+                <th>#</th><th>Constructor</th><th>S1 Count</th><th>S3 Count</th>
+                <th>Δ Instances</th><th>Δ Size</th><th>Retained</th><th>V8 Space</th><th>Pattern</th><th>Retainer Path</th>
+              </tr>
+            </thead>
+            <tbody id="ct-tbody"></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <!-- ── TAB: Leak Patterns ────────────────────── -->
+    <div id="tab-patterns" class="tab-panel" style="display:none">
+      <div class="section-h">Leak Pattern Analysis</div>
+      <div id="pat-cards" style="display:flex;flex-direction:column;gap:12px;margin-bottom:16px"></div>
+      <div class="card">
+        <div class="card-header"><span class="card-header-title">Pattern Reference Guide</span></div>
+        <div class="card-body">
+          <table class="data-table">
+            <thead><tr><th>Pattern</th><th>Description</th><th>Common Cause in Gemini CLI</th><th>Fix</th></tr></thead>
+            <tbody>
+              <tr><td><span class="pat pat-red" style="font-size:11px">Event Listener Accumulation</span></td><td class="cell-size">Listeners added but never removed</td><td class="cell-path">MCP transport on('message') in agent loops</td><td class="cell-path">Call emitter.off() or removeAllListeners() in cleanup</td></tr>
+              <tr><td><span class="pat pat-yellow" style="font-size:11px">Closure Scope Capture</span></td><td class="cell-size">Closures holding large outer scope</td><td class="cell-path">setInterval callbacks in MemoryMonitor capturing config</td><td class="cell-path">Destructure only needed values before closure</td></tr>
+              <tr><td><span class="pat pat-blue" style="font-size:11px">Unbounded Cache</span></td><td class="cell-size">Map/object growing without eviction</td><td class="cell-path">SkillManager skill maps, tool registry caches</td><td class="cell-path">Add LRU eviction or size cap</td></tr>
+              <tr><td><span class="pat pat-teal" style="font-size:11px">Array Accumulation</span></td><td class="cell-size">Arrays growing monotonically</td><td class="cell-path">AgentSession.history unbounded growth</td><td class="cell-path">Trim history to max N entries</td></tr>
+              <tr><td><span class="pat pat-purple" style="font-size:11px">Timer Leak</span></td><td class="cell-size">Timeout/Interval not cleared</td><td class="cell-path">Background monitoring intervals</td><td class="cell-path">Store intervalId and call clearInterval in stop()</td></tr>
+              <tr><td><span class="pat pat-red" style="font-size:11px">Promise Chain Buildup</span></td><td class="cell-size">Promises without .finally() drain</td><td class="cell-path">Streaming API responses not drained</td><td class="cell-path">Ensure all async chains have .finally() cleanup</td></tr>
+              <tr><td><span class="pat pat-yellow" style="font-size:11px">Detached DOM Subtree</span></td><td class="cell-size">React/Ink nodes detached from tree</td><td class="cell-path">useEffect missing cleanup function</td><td class="cell-path">Return cleanup fn from useEffect; call unmount</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <!-- ── TAB: CPU Profiler ─────────────────────── -->
+    <div id="tab-cpu" class="tab-panel" style="display:none">
+      <div class="section-h">CPU Profiler</div>
+      <div class="card" style="margin-bottom:16px">
+        <div class="card-header"><span class="card-header-title">Load a .cpuprofile file</span></div>
+        <div class="card-body">
+          <div class="drop-zone" id="cpu-drop" style="padding:32px 24px">
+            <div class="drop-icon"><svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="#8b949e" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg></div>
+            <div class="drop-title">Drop .cpuprofile here</div>
+            <div class="drop-sub">Generated with <code style="color:var(--cell-name)">--cpu-prof</code> Node.js flag</div>
+            <button class="drop-btn" onclick="document.getElementById('cpu-file').click()">Browse file</button>
+            <input type="file" id="cpu-file" accept=".cpuprofile,.json" style="display:none">
+          </div>
+        </div>
+      </div>
+      <div class="card">
+        <div class="card-header"><span class="card-header-title">How to generate a CPU profile</span></div>
+        <div class="card-body" style="display:flex;flex-direction:column;gap:12px">
+          <div style="font-size:13px;color:var(--text2)">Run Gemini CLI with the CPU profiler enabled:</div>
+          <pre style="background:var(--bg3);border:1px solid var(--border);border-radius:6px;padding:12px 14px;font-size:12px;color:var(--cell-name);overflow-x:auto">node --cpu-prof --cpu-prof-dir=/tmp gemini-cli</pre>
+          <div style="font-size:13px;color:var(--text2)">Or via the inspector in DevTools:</div>
+          <pre style="background:var(--bg3);border:1px solid var(--border);border-radius:6px;padding:12px 14px;font-size:12px;color:var(--cell-name);overflow-x:auto">node --inspect gemini-cli
+# Open chrome://inspect → DevTools → Profiler tab → Record</pre>
+          <div style="font-size:12px;color:var(--text3)">The .cpuprofile file will be analyzed here to identify hot functions, jank, and performance regressions in the Gemini CLI agent loop.</div>
+        </div>
+      </div>
+      <div id="cpu-results" style="display:none;margin-top:16px">
+        <div class="section-h">Top CPU Hotspots</div>
+        <div class="card"><div class="card-body"><table class="data-table"><thead><tr><th>#</th><th>Function</th><th>URL</th><th>Self Time</th><th>Self %</th></tr></thead><tbody id="cpu-tbody"></tbody></table></div></div>
+      </div>
+    </div>
+
+    <!-- ── TAB: Perfetto Traces ──────────────────── -->
+    <div id="tab-perfetto" class="tab-panel" style="display:none">
+      <div class="section-h">Perfetto Traces</div>
+      <div class="grid-2" style="margin-bottom:16px">
+        <div class="card">
+          <div class="card-header"><span class="card-header-title">Current Trace</span></div>
+          <div class="card-body" id="perf-tab-body">
+            <div style="color:var(--text3);font-size:13px">No trace loaded. Run a heap investigation to generate one.</div>
+          </div>
+        </div>
+        <div class="card">
+          <div class="card-header"><span class="card-header-title">How to read the trace</span></div>
+          <div class="card-body" style="display:flex;flex-direction:column;gap:10px;font-size:13px;color:var(--text2)">
+            <div>1. Open <a href="https://ui.perfetto.dev" target="_blank">ui.perfetto.dev</a></div>
+            <div>2. Click <strong style="color:var(--text)">Open trace file</strong> and select the <code style="color:var(--cell-name)">.perfetto.json</code></div>
+            <div>3. Look for <strong style="color:var(--text)">agent_turn_N</strong> slices — each represents one LLM call</div>
+            <div>4. <strong style="color:var(--text)">Flow arrows</strong> (orange) link memory spikes to the causative agent turn</div>
+            <div>5. Click a <code style="color:var(--cell-name)">threshold_exceeded</code> event to see which tool call caused the spike</div>
+            <div style="margin-top:4px;padding:10px;background:var(--bg3);border-radius:6px;font-size:12px;color:var(--text3)">Tip: Use W/S to zoom in/out, A/D to pan left/right in Perfetto UI</div>
+          </div>
+        </div>
+      </div>
+      <div class="card">
+        <div class="card-header"><span class="card-header-title">Perfetto Event Schema</span></div>
+        <div class="card-body">
+          <table class="data-table">
+            <thead><tr><th>Event Name</th><th>Phase</th><th>Category</th><th>Meaning</th></tr></thead>
+            <tbody>
+              <tr><td class="cell-name">agent_turn_N</td><td class="cell-size">B/E (slice)</td><td class="cell-size">agent</td><td style="font-size:12px;color:var(--text2)">LLM agent turn begins and ends</td></tr>
+              <tr><td class="cell-name">memory</td><td class="cell-size">C (counter)</td><td class="cell-size">—</td><td style="font-size:12px;color:var(--text2)">heap_used_mb and rss_mb counters over time</td></tr>
+              <tr><td class="cell-name">threshold_exceeded</td><td class="cell-size">i (instant)</td><td class="cell-size">memory</td><td style="font-size:12px;color:var(--text2)">HighWaterMarkTracker fired — investigation started</td></tr>
+              <tr><td class="cell-name">memory_to_agent_turn</td><td class="cell-size">s/f (flow)</td><td class="cell-size">flow</td><td style="font-size:12px;color:var(--text2)">Links memory spike to causative agent turn</td></tr>
+              <tr><td class="cell-name">investigation_*</td><td class="cell-size">B/E (slice)</td><td class="cell-size">investigation</td><td style="font-size:12px;color:var(--text2)">Each investigation phase (baseline/workload/stabilizing)</td></tr>
+              <tr><td class="cell-name">hdsl_report</td><td class="cell-size">i (instant)</td><td class="cell-size">investigation</td><td style="font-size:12px;color:var(--text2)">Final HDSL report summary annotated in trace</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <!-- ── TAB: Reports ──────────────────────────── -->
+    <div id="tab-reports" class="tab-panel" style="display:none">
+      <div class="section-h">Investigation Reports</div>
+      <div class="card" style="margin-bottom:16px">
+        <div class="card-header">
+          <span class="card-header-title">Report History</span>
+          <span class="card-header-sub" id="rep-count">0 reports</span>
+        </div>
+        <div class="card-body" id="rep-list">
+          <div style="color:var(--text3);font-size:13px;text-align:center;padding:24px">No reports in history. Load an HDSL report to add it here.</div>
+        </div>
+      </div>
+      <div class="card">
+        <div class="card-header"><span class="card-header-title">HDSL Report Format Reference</span></div>
+        <div class="card-body" style="display:flex;flex-direction:column;gap:8px">
+          <pre style="background:var(--bg3);border:1px solid var(--border);border-radius:6px;padding:14px;font-size:11px;color:var(--cell-name);overflow-x:auto;line-height:1.6">{
+  "hdsl_version": "1.0",
+  "investigation_id": "inv_m2k9a1_3f9c",
+  "timestamp_ms": 1743423300000,
+  "duration_ms": 183420,
+  "trigger": { "metric": "heap_used", "growth_percent": 23.4, "absolute_bytes": 41943040 },
+  "v8_spaces": { "old_space_delta_bytes": 38797312, "new_space_delta_bytes": 3145728, ... },
+  "constructors": [ { "name": "EventEmitter", "instances_delta": 1847, ... } ],
+  "detached_nodes": { "count": 1894, "top_constructors": ["InkComponent"] },
+  "patterns": ["event_listener_accumulation", "closure_scope_capture"],
+  "confidence": 0.87,
+  "payload_bytes": 3847,
+  "perfetto_path": "/tmp/gemini-cli-inv_m2k9a1_3f9c.perfetto.json"
+}</pre>
+          <div style="font-size:12px;color:var(--text3)">Generated by <code style="color:var(--cell-name)">HeapInvestigationSession.run()</code> in <code style="color:var(--cell-name)">packages/core/src/telemetry/heap-investigation/</code></div>
+        </div>
+      </div>
+    </div>
+
+  </div><!-- /content -->
+</div><!-- /main -->
+</div><!-- /shell -->
+
+<script>
+const PATTERNS = {
+  event_listener_accumulation:{label:'Event Listener Accumulation',cls:'pat-red'},
+  closure_scope_capture:{label:'Closure Scope Capture',cls:'pat-yellow'},
+  unbounded_cache:{label:'Unbounded Cache',cls:'pat-blue'},
+  array_accumulation:{label:'Array Accumulation',cls:'pat-teal'},
+  timer_leak:{label:'Timer Leak',cls:'pat-purple'},
+  global_reference:{label:'Global Reference',cls:'pat-orange'},
+  promise_chain_buildup:{label:'Promise Chain Buildup',cls:'pat-red'},
+  detached_dom_subtree:{label:'Detached DOM Subtree',cls:'pat-yellow'},
+  circular_reference:{label:'Circular Reference',cls:'pat-blue'},
+};
+
+function fmtB(b){
+  if(!b||b===0)return'0 B';
+  const a=Math.abs(b);
+  if(a<1024)return`${b} B`;
+  if(a<1048576)return`${(b/1024).toFixed(1)} KB`;
+  if(a<1073741824)return`${(b/1048576).toFixed(1)} MB`;
+  return`${(b/1073741824).toFixed(2)} GB`;
+}
+function fmtMs(ms){if(!ms)return'—';if(ms<1000)return`${ms}ms`;return`${(ms/1000).toFixed(1)}s`}
+function fmtPct(p){return`+${(p||0).toFixed(1)}%`}
+
+function setText(id,v){const el=document.getElementById(id);if(el)el.textContent=v}
+
+function render(r){
+  document.getElementById('upload-section').style.display='none';
+  document.getElementById('dashboard').style.display='block';
+
+  const conf=r.confidence||0;
+  const pct=Math.round(conf*100);
+
+  // Topbar
+  setText('topbar-id', r.investigation_id||'unknown');
+  const sp=document.getElementById('status-pill');
+  sp.className='pill '+(conf>0.7?'pill-green':'pill-yellow');
+  sp.innerHTML='<span class="dot-pulse"></span>'+(conf>0.7?'High Confidence':'Low Confidence');
+
+  // Alert
+  if(conf<0.3){
+    const ab=document.getElementById('alert-bar');
+    ab.style.display='flex';
+    setText('alert-text','Low confidence ('+pct+'%). Consider running another investigation after more user activity.');
+  }
+
+  // Meta
+  setText('m-id',r.investigation_id||'—');
+  setText('m-ts',new Date(r.timestamp_ms).toLocaleString('en-GB',{day:'2-digit',month:'short',year:'numeric',hour:'2-digit',minute:'2-digit'}));
+  setText('m-dur',fmtMs(r.duration_ms));
+  setText('m-payload',fmtB(r.payload_bytes));
+  setText('m-trigger',r.trigger?.metric||'—');
+
+  // Stats
+  const gp=r.trigger?.growth_percent||0;
+  setText('s-growth',fmtPct(gp));
+  setText('s-growth-abs',fmtB(r.trigger?.absolute_bytes||0)+' absolute');
+  setText('s-old',fmtB(r.v8_spaces?.old_space_delta_bytes||0));
+  const pc=(r.patterns||[]).length;
+  setText('s-pcount',pc);
+  const plEl=document.getElementById('s-plabel');
+  plEl.textContent=pc>0?'Leak pattern'+(pc>1?'s':'')+' identified':'No patterns detected';
+  plEl.style.color=pc>0?'#f85149':'#3fb950';
+
+  // Confidence arc
+  setText('conf-pct',pct+'%');
+  setText('conf-big',pct+'%');
+  setText('conf-label2',pct>70?'High confidence':pct>40?'Moderate':'Low confidence');
+  const arc=document.getElementById('arc-fg');
+  arc.style.stroke=pct>70?'#3fb950':pct>40?'#d29922':'#f85149';
+  const circumference=182;
+  const offset=circumference-(pct/100)*circumference;
+  setTimeout(()=>{arc.style.strokeDashoffset=offset;},80);
+
+  // Patterns
+  const pl=document.getElementById('pattern-list');
+  const pats=r.patterns||[];
+  if(pats.length===0){
+    pl.innerHTML='<span class="pat-none">No leak patterns detected</span>';
+  } else {
+    pl.innerHTML=pats.map(p=>{
+      const s=PATTERNS[p]||{label:p,cls:'pat-blue'};
+      return`<span class="pat ${s.cls}">${s.label}</span>`;
+    }).join('');
+  }
+
+  // Space bars
+  const sp2=r.v8_spaces||{};
+  const total=Math.max(sp2.total_heap_delta_bytes||1,1);
+  const spRows=[
+    {label:'Old Space',key:'old_space_delta_bytes',cls:'bar-red'},
+    {label:'New Space (ephemeral)',key:'new_space_delta_bytes',cls:'bar-yellow'},
+    {label:'Large Object Space',key:'large_object_space_delta_bytes',cls:'bar-blue'},
+    {label:'Code Space',key:'code_space_delta_bytes',cls:'bar-slate'},
+  ];
+  document.getElementById('space-rows').innerHTML=spRows.map(row=>{
+    const val=sp2[row.key]||0;
+    const pct=Math.min(Math.round(val/total*100),100);
+    return`<div class="space-row">
+      <div class="space-row-top">
+        <span class="space-row-name">${row.label}</span>
+        <span class="space-row-val">${fmtB(val)}</span>
+      </div>
+      <div class="bar-track"><div class="bar-fill ${row.cls}" data-w="${pct}"></div></div>
+    </div>`;
+  }).join('');
+  setTimeout(()=>{
+    document.querySelectorAll('.bar-fill[data-w]').forEach(el=>{
+      el.style.width=el.dataset.w+'%';
+    });
+  },80);
+
+  // Constructors
+  const ctors=r.constructors||[];
+  setText('ctor-count',ctors.length+' entries');
+  const maxB=ctors.reduce((m,c)=>Math.max(m,c.self_size_delta_bytes||0),1);
+  const tbody=document.getElementById('ctor-tbody');
+  if(ctors.length===0){
+    tbody.innerHTML='<tr><td colspan="8"><div class="empty-state">No constructor data available</div></td></tr>';
+  } else {
+    tbody.innerHTML=ctors.slice(0,15).map((c,i)=>{
+      const p=c.contributing_patterns?.[0];
+      const ps=p?PATTERNS[p]:{};
+      const chip=p?`<span class="pat-chip ${ps.cls||'pat-blue'}" style="font-size:10px">${ps.label||p}</span>`:'<span style="color:#7d8590">—</span>';
+      const pct2=Math.round((c.self_size_delta_bytes||0)/maxB*100);
+      return`<tr>
+        <td style="color:#7d8590;width:32px">${i+1}</td>
+        <td><span class="cell-name">${c.name||'?'}</span></td>
+        <td><span class="cell-delta">+${(c.instances_delta||0).toLocaleString()}</span></td>
+        <td><span class="cell-size">+${fmtB(c.self_size_delta_bytes||0)}</span></td>
+        <td><span class="cell-size">${fmtB(c.retained_size_bytes||0)}</span></td>
+        <td>${chip}</td>
+        <td><span class="cell-path" title="${c.first_retained_path||''}">${c.first_retained_path||'—'}</span></td>
+        <td class="micro-bar-wrap"><div class="micro-bar"><div class="micro-bar-fill" data-w="${pct2}"></div></div></td>
+      </tr>`;
+    }).join('');
+    setTimeout(()=>{
+      document.querySelectorAll('.micro-bar-fill[data-w]').forEach((el,i)=>{
+        setTimeout(()=>{el.style.width=el.dataset.w+'%';},i*30);
+      });
+    },100);
+  }
+
+  // Detached
+  const det=r.detached_nodes||{};
+  setText('det-count',(det.count||0).toLocaleString());
+  document.getElementById('det-tags').innerHTML=(det.top_constructors||[]).map(n=>`<span class="det-tag">${n}</span>`).join('');
+
+  // Perfetto
+  const pb=document.getElementById('perf-body');
+  if(r.perfetto_path){
+    pb.innerHTML=`
+      <div style="font-size:12px;color:#7d8590;margin-bottom:6px">Trace file</div>
+      <div class="perf-path">${r.perfetto_path}</div>
+      <a href="https://ui.perfetto.dev" target="_blank" class="perf-link">
+        <svg width="12" height="12" viewBox="0 0 16 16" fill="currentColor"><path d="M8.636 3.5a.5.5 0 0 0-.5-.5H1.5A1.5 1.5 0 0 0 0 4.5v10A1.5 1.5 0 0 0 1.5 16h10a1.5 1.5 0 0 0 1.5-1.5V7.864a.5.5 0 0 0-1 0V14.5a.5.5 0 0 1-.5.5h-10a.5.5 0 0 1-.5-.5v-10a.5.5 0 0 1 .5-.5h6.636a.5.5 0 0 0 .5-.5"/><path d="M16 .5a.5.5 0 0 0-.5-.5h-5a.5.5 0 0 0 0 1h3.793L6.146 9.146a.5.5 0 1 0 .708.708L15 1.707V5.5a.5.5 0 0 0 1 0z"/></svg>
+        Open in Perfetto UI
+      </a>
+      <div style="font-size:11px;color:#7d8590;margin-top:10px">Agent-turn flow arrows in the trace link memory spikes to the causative LLM call.</div>`;
+  }
+
+  // Trigger
+  setText('t-metric',r.trigger?.metric||'—');
+  setText('t-growth',r.trigger?.growth_percent?fmtPct(r.trigger.growth_percent):'—');
+  setText('t-hwm',fmtB(r.trigger?.previous_high_water_mark_bytes||0));
+  setText('t-uptime',fmtMs(r.trigger?.session_uptime_ms||0));
+
+  // Populate other tabs with the same data
+  populateTimeline(r);
+  populateConstructorsTab(r);
+  populatePatternsTab(r);
+  populatePerfettoTab(r);
+  addToReports(r);
+}
+
+// ── Tab routing ───────────────────────────────────
+const ALL_TABS=['overview','timeline','constructors','patterns','cpu','perfetto','reports'];
+const TAB_TITLES={overview:'Overview',timeline:'Memory Timeline',constructors:'Constructor Analysis',patterns:'Leak Patterns',cpu:'CPU Profiler',perfetto:'Perfetto Traces',reports:'Reports'};
+
+function showTab(tab){
+  // Hide all panels
+  ALL_TABS.forEach(t=>{
+    const panel=document.getElementById('tab-'+t)||document.getElementById('dashboard');
+    if(t==='overview'){document.getElementById('dashboard').style.display='none';}
+    else{const el=document.getElementById('tab-'+t);if(el)el.style.display='none';}
+    const nav=document.getElementById('nav-'+t);
+    if(nav)nav.classList.remove('active');
+  });
+  // Show selected
+  if(tab==='overview'){
+    document.getElementById('dashboard').style.display='block';
+  } else {
+    const el=document.getElementById('tab-'+tab);
+    if(el)el.style.display='block';
+  }
+  const nav=document.getElementById('nav-'+tab);
+  if(nav)nav.classList.add('active');
+  // Update topbar breadcrumb
+  const sub=document.getElementById('topbar-id');
+  if(sub){
+    const id=sub.dataset.reportId||'No report';
+    sub.textContent=TAB_TITLES[tab]+(id&&id!=='No report'?' / '+id:'');
+  }
+  // Draw timeline chart if switching to it
+  if(tab==='timeline')drawTimelineChart();
+}
+
+// Remember report id for breadcrumb
+let _currentReport=null;
+
+// ── Populate: Timeline tab ──────────────────────────
+function populateTimeline(r){
+  _currentReport=r;
+  const s1b=r.v8_spaces?.old_space_delta_bytes||0;
+  const prevHwm=r.trigger?.previous_high_water_mark_bytes||0;
+  const s1=prevHwm;
+  const s2=prevHwm+(r.trigger?.absolute_bytes||0);
+  const s3=prevHwm+(r.v8_spaces?.old_space_delta_bytes||0);
+  setText('tl-s1',fmtB(s1));
+  setText('tl-s2',fmtB(s2));
+  setText('tl-s3',fmtB(s3));
+  setText('tl-duration',fmtMs(r.duration_ms));
+  // Space rows
+  const sp=r.v8_spaces||{};
+  const total=Math.max(sp.total_heap_delta_bytes||1,1);
+  const spRows=[
+    {label:'Old Space (real leak)',key:'old_space_delta_bytes',cls:'bar-red'},
+    {label:'New Space (ephemeral)',key:'new_space_delta_bytes',cls:'bar-yellow'},
+    {label:'Large Object Space',key:'large_object_space_delta_bytes',cls:'bar-blue'},
+    {label:'Code Space',key:'code_space_delta_bytes',cls:'bar-slate'},
+  ];
+  document.getElementById('tl-space-rows').innerHTML=spRows.map(row=>{
+    const val=sp[row.key]||0;
+    const pct=Math.min(Math.round(val/total*100),100);
+    return`<div class="space-row"><div class="space-row-top"><span class="space-row-name">${row.label}</span><span class="space-row-val">${fmtB(val)}</span></div><div class="bar-track"><div class="bar-fill ${row.cls}" data-w="${pct}"></div></div></div>`;
+  }).join('');
+}
+
+function drawTimelineChart(){
+  const canvas=document.getElementById('timeline-canvas');
+  if(!canvas||!_currentReport)return;
+  const dpr=window.devicePixelRatio||1;
+  const rect=canvas.getBoundingClientRect();
+  canvas.width=rect.width*dpr;
+  canvas.height=220*dpr;
+  const ctx=canvas.getContext('2d');
+  ctx.scale(dpr,dpr);
+  const W=rect.width,H=220;
+  const isDark=document.documentElement.getAttribute('data-theme')!=='light';
+  const gridColor=isDark?'rgba(255,255,255,0.06)':'rgba(0,0,0,0.06)';
+  const textColor=isDark?'#7d8590':'#6e7781';
+  const lineColor='#2f81f7';
+  const threshColor='#f85149';
+  // Data points
+  const r=_currentReport;
+  const prevHwm=r.trigger?.previous_high_water_mark_bytes||0;
+  const points=[
+    {x:0.05,y:prevHwm,label:'S1 Baseline'},
+    {x:0.45,y:prevHwm+(r.trigger?.absolute_bytes||0),label:'S2 Workload'},
+    {x:0.75,y:prevHwm+(r.v8_spaces?.old_space_delta_bytes||0),label:'S3 Post-GC'},
+    {x:0.95,y:prevHwm+(r.v8_spaces?.old_space_delta_bytes||0),label:''},
+  ];
+  const maxY=Math.max(...points.map(p=>p.y))*1.1;
+  const pad={t:20,r:16,b:40,l:64};
+  const cw=W-pad.l-pad.r,ch=H-pad.t-pad.b;
+  const px=x=>pad.l+x*cw;
+  const py=y=>pad.t+ch-(y/maxY)*ch;
+  // Grid lines
+  ctx.strokeStyle=gridColor;ctx.lineWidth=1;
+  for(let i=0;i<=4;i++){
+    const y=pad.t+(i/4)*ch;
+    ctx.beginPath();ctx.moveTo(pad.l,y);ctx.lineTo(pad.l+cw,y);ctx.stroke();
+    ctx.fillStyle=textColor;ctx.font='10px Inter,sans-serif';ctx.textAlign='right';
+    ctx.fillText(fmtB(maxY*(1-i/4)),pad.l-6,y+4);
+  }
+  // Threshold line (S1 hwm)
+  ctx.setLineDash([4,4]);ctx.strokeStyle=threshColor;ctx.lineWidth=1;
+  ctx.beginPath();ctx.moveTo(pad.l,py(prevHwm));ctx.lineTo(pad.l+cw,py(prevHwm));ctx.stroke();
+  ctx.setLineDash([]);
+  ctx.fillStyle=threshColor;ctx.font='10px Inter,sans-serif';ctx.textAlign='left';
+  ctx.fillText('HWM',pad.l+4,py(prevHwm)-4);
+  // Area fill
+  ctx.beginPath();
+  ctx.moveTo(px(points[0].x),py(points[0].y));
+  points.slice(1).forEach(p=>ctx.lineTo(px(p.x),py(p.y)));
+  ctx.lineTo(px(points[points.length-1].x),pad.t+ch);
+  ctx.lineTo(px(points[0].x),pad.t+ch);
+  ctx.closePath();
+  ctx.fillStyle='rgba(47,129,247,0.07)';ctx.fill();
+  // Line
+  ctx.beginPath();ctx.strokeStyle=lineColor;ctx.lineWidth=2;
+  points.forEach((p,i)=>i===0?ctx.moveTo(px(p.x),py(p.y)):ctx.lineTo(px(p.x),py(p.y)));
+  ctx.stroke();
+  // Dots + labels
+  points.filter(p=>p.label).forEach(p=>{
+    ctx.beginPath();ctx.arc(px(p.x),py(p.y),4,0,Math.PI*2);
+    ctx.fillStyle=lineColor;ctx.fill();
+    ctx.strokeStyle=isDark?'#0f1117':'#ffffff';ctx.lineWidth=2;ctx.stroke();
+    ctx.fillStyle=textColor;ctx.font='11px Inter,sans-serif';ctx.textAlign='center';
+    ctx.fillText(p.label,px(p.x),py(p.y)-12);
+    ctx.fillStyle='#e6edf3';
+    ctx.fillText(fmtB(p.y),px(p.x),py(p.y)+22);
+  });
+  // Animate space bars
+  setTimeout(()=>{
+    document.querySelectorAll('#tab-timeline .bar-fill[data-w]').forEach(el=>{
+      el.style.width=el.dataset.w+'%';
+    });
+  },50);
+}
+
+// ── Populate: Constructors tab ──────────────────────
+function populateConstructorsTab(r){
+  const ctors=r.constructors||[];
+  setText('ct-count',ctors.length+' constructors');
+  const maxB=ctors.reduce((m,c)=>Math.max(m,c.self_size_delta_bytes||0),1);
+  const tbody=document.getElementById('ct-tbody');
+  tbody.innerHTML=ctors.map((c,i)=>{
+    const p=c.contributing_patterns?.[0];
+    const ps=p?PATTERNS[p]:{};
+    const chip=p?`<span class="pat-chip ${ps.cls||'pat-blue'}" style="font-size:10px">${ps.label||p}</span>`:'—';
+    return`<tr>
+      <td style="color:var(--text3)">${i+1}</td>
+      <td><span class="cell-name">${c.name}</span></td>
+      <td class="cell-size">${(c.instances_s1||0).toLocaleString()}</td>
+      <td class="cell-size">${(c.instances_s3||0).toLocaleString()}</td>
+      <td class="cell-delta">+${(c.instances_delta||0).toLocaleString()}</td>
+      <td class="cell-size">+${fmtB(c.self_size_delta_bytes||0)}</td>
+      <td class="cell-size">${fmtB(c.retained_size_bytes||0)}</td>
+      <td><span style="font-size:11px;color:var(--text3)">${c.v8_space||'old_space'}</span></td>
+      <td>${chip}</td>
+      <td><span class="cell-path" title="${c.first_retained_path||''}">${c.first_retained_path||'—'}</span></td>
+    </tr>`;
+  }).join('');
+}
+
+// ── Populate: Patterns tab ──────────────────────────
+function populatePatternsTab(r){
+  const pats=r.patterns||[];
+  const ctors=r.constructors||[];
+  const el=document.getElementById('pat-cards');
+  if(pats.length===0){
+    el.innerHTML='<div class="card"><div class="card-body" style="color:var(--text3);font-size:13px">No leak patterns detected in this report.</div></div>';
+    return;
+  }
+  const DETAILS={
+    event_listener_accumulation:{sev:'High',fix:'Call emitter.off() or removeAllListeners() in component/tool cleanup.'},
+    closure_scope_capture:{sev:'Medium',fix:'Destructure only needed values before the closure; avoid capturing large objects.'},
+    unbounded_cache:{sev:'High',fix:'Add LRU eviction with a max-size cap to all Map-based caches.'},
+    array_accumulation:{sev:'Medium',fix:'Trim arrays (e.g. history) to a max length on each push.'},
+    timer_leak:{sev:'High',fix:'Store the interval/timeout ID and call clearInterval/clearTimeout in stop/dispose.'},
+    global_reference:{sev:'High',fix:'Audit global/module-level variables; ensure they are nulled on cleanup.'},
+    promise_chain_buildup:{sev:'Medium',fix:'Add .finally() to async chains; drain streams completely.'},
+    detached_dom_subtree:{sev:'Medium',fix:'Return a cleanup function from useEffect; call component.unmount() on removal.'},
+    circular_reference:{sev:'Low',fix:'Use WeakRef or WeakMap for back-references to break retention cycles.'},
+  };
+  el.innerHTML=pats.map(p=>{
+    const s=PATTERNS[p]||{label:p,cls:'pat-blue'};
+    const d=DETAILS[p]||{sev:'Unknown',fix:'Review retainer paths in the constructor table.'};
+    const affected=ctors.filter(c=>(c.contributing_patterns||[]).includes(p)).map(c=>c.name).join(', ')||'—';
+    const sevColor=d.sev==='High'?'#f85149':d.sev==='Medium'?'#d29922':'#7d8590';
+    return`<div class="card">
+      <div class="card-header">
+        <span class="pat ${s.cls}">${s.label}</span>
+        <span style="margin-left:auto;font-size:12px;font-weight:600;color:${sevColor}">${d.sev} severity</span>
+      </div>
+      <div class="card-body" style="display:grid;grid-template-columns:1fr 1fr;gap:16px">
+        <div>
+          <div style="font-size:11px;color:var(--text3);text-transform:uppercase;letter-spacing:.5px;margin-bottom:4px">Affected Constructors</div>
+          <div style="font-size:13px;color:var(--cell-name);font-family:'JetBrains Mono',monospace">${affected}</div>
+        </div>
+        <div>
+          <div style="font-size:11px;color:var(--text3);text-transform:uppercase;letter-spacing:.5px;margin-bottom:4px">Recommended Fix</div>
+          <div style="font-size:13px;color:var(--text2)">${d.fix}</div>
+        </div>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+// ── Populate: Perfetto tab ──────────────────────────
+function populatePerfettoTab(r){
+  const el=document.getElementById('perf-tab-body');
+  if(r.perfetto_path){
+    el.innerHTML=`<div style="font-size:12px;color:var(--text3);margin-bottom:6px">Trace file</div>
+      <div class="perf-path">${r.perfetto_path}</div>
+      <a href="https://ui.perfetto.dev" target="_blank" class="perf-link" style="margin-top:8px">
+        <svg width="12" height="12" viewBox="0 0 16 16" fill="currentColor"><path d="M8.636 3.5a.5.5 0 0 0-.5-.5H1.5A1.5 1.5 0 0 0 0 4.5v10A1.5 1.5 0 0 0 1.5 16h10a1.5 1.5 0 0 0 1.5-1.5V7.864a.5.5 0 0 0-1 0V14.5a.5.5 0 0 1-.5.5h-10a.5.5 0 0 1-.5-.5v-10a.5.5 0 0 1 .5-.5h6.636a.5.5 0 0 0 .5-.5"/><path d="M16 .5a.5.5 0 0 0-.5-.5h-5a.5.5 0 0 0 0 1h3.793L6.146 9.146a.5.5 0 1 0 .708.708L15 1.707V5.5a.5.5 0 0 0 1 0z"/></svg>
+        Open in Perfetto UI
+      </a>`;
+  } else {
+    el.innerHTML='<div style="color:var(--text3);font-size:13px">No trace file. Set <code style="color:var(--cell-name)">emit_perfetto: true</code> in investigation options.</div>';
+  }
+}
+
+// ── Populate: Reports history ───────────────────────
+const reportHistory=[];
+function addToReports(r){
+  // Avoid duplicates
+  if(reportHistory.find(x=>x.investigation_id===r.investigation_id))return;
+  reportHistory.unshift(r);
+  setText('rep-count',reportHistory.length+' report'+(reportHistory.length!==1?'s':''));
+  const el=document.getElementById('rep-list');
+  el.innerHTML=reportHistory.map((rep,i)=>{
+    const conf=Math.round((rep.confidence||0)*100);
+    const confColor=conf>70?'#3fb950':conf>40?'#d29922':'#f85149';
+    return`<div style="display:flex;align-items:center;gap:12px;padding:10px 0;border-bottom:1px solid var(--border2);cursor:pointer" onclick="reloadReport(${i})">
+      <div style="width:36px;height:36px;border-radius:6px;background:var(--bg3);display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:600;color:${confColor}">${conf}%</div>
+      <div style="flex:1;min-width:0">
+        <div style="font-size:12px;font-family:'JetBrains Mono',monospace;color:var(--cell-name)">${rep.investigation_id}</div>
+        <div style="font-size:11px;color:var(--text3)">${new Date(rep.timestamp_ms).toLocaleString()} · ${fmtMs(rep.duration_ms)} · ${(rep.patterns||[]).length} pattern(s)</div>
+      </div>
+      <div style="font-size:12px;color:var(--text2);white-space:nowrap">${fmtB(rep.trigger?.absolute_bytes||0)} growth</div>
+    </div>`;
+  }).join('');
+}
+
+function reloadReport(idx){
+  const r=reportHistory[idx];
+  if(r){render(r);showTab('overview');}
+}
+
+// Update breadcrumb to include report id
+const _origRender=render;
+window.render=function(r){
+  _origRender(r);
+  const sub=document.getElementById('topbar-id');
+  if(sub){sub.textContent=r.investigation_id||'—';sub.dataset.reportId=r.investigation_id||'';}
+};
+
+// ── CPU Profiler file handler ───────────────────────
+document.addEventListener('DOMContentLoaded',()=>{
+  const cf=document.getElementById('cpu-file');
+  if(cf)cf.addEventListener('change',e=>{
+    const f=e.target.files[0];if(!f)return;
+    const rd=new FileReader();
+    rd.onload=ev=>{
+      try{
+        const prof=JSON.parse(ev.target.result);
+        renderCpuProfile(prof);
+      }catch{alert('Invalid .cpuprofile file.');}
+    };
+    rd.readAsText(f);
+  });
+});
+
+function renderCpuProfile(prof){
+  const nodes=prof.nodes||[];
+  const samples=prof.samples||[];
+  const deltas=prof.timeDeltas||[];
+  const totalTime=deltas.reduce((a,b)=>a+b,0)||1;
+  // Count hits per node
+  const hits=new Map();
+  samples.forEach(id=>hits.set(id,(hits.get(id)||0)+1));
+  // Sort by hitCount
+  const sorted=[...nodes]
+    .map(n=>({...n,selfPct:((hits.get(n.id)||0)/samples.length*100)}))
+    .filter(n=>n.selfPct>0)
+    .sort((a,b)=>b.selfPct-a.selfPct)
+    .slice(0,20);
+  document.getElementById('cpu-results').style.display='block';
+  document.getElementById('cpu-tbody').innerHTML=sorted.map((n,i)=>{
+    const fn=n.callFrame||{};
+    const url=(fn.url||'').replace(/.*\//,'').slice(0,30)||'(anonymous)';
+    const selfMs=((hits.get(n.id)||0)/samples.length*totalTime/1000).toFixed(1);
+    return`<tr>
+      <td style="color:var(--text3)">${i+1}</td>
+      <td class="cell-name">${fn.functionName||'(anonymous)'}</td>
+      <td class="cell-path" style="max-width:200px">${url}:${fn.lineNumber||0}</td>
+      <td class="cell-size">${selfMs}ms</td>
+      <td><div style="display:flex;align-items:center;gap:8px">${n.selfPct.toFixed(1)}%
+        <div style="width:60px;height:3px;background:var(--micro-track);border-radius:2px;overflow:hidden">
+          <div style="height:100%;width:${Math.min(n.selfPct*4,100)}%;background:#f85149;border-radius:2px"></div>
+        </div></div></td>
+    </tr>`;
+  }).join('');
+}
+
+// ── Theme toggle ───────────────────────────────────
+const DARK_ICON='<path d="M8 12a4 4 0 1 0 0-8 4 4 0 0 0 0 8M8 0a.5.5 0 0 1 .5.5v2a.5.5 0 0 1-1 0v-2A.5.5 0 0 1 8 0m0 13a.5.5 0 0 1 .5.5v2a.5.5 0 0 1-1 0v-2A.5.5 0 0 1 8 13m8-5a.5.5 0 0 1-.5.5h-2a.5.5 0 0 1 0-1h2a.5.5 0 0 1 .5.5M3 8a.5.5 0 0 1-.5.5h-2a.5.5 0 0 1 0-1h2A.5.5 0 0 1 3 8m10.657-5.657a.5.5 0 0 1 0 .707l-1.414 1.415a.5.5 0 1 1-.707-.708l1.414-1.414a.5.5 0 0 1 .707 0m-9.193 9.193a.5.5 0 0 1 0 .707L3.05 13.657a.5.5 0 0 1-.707-.707l1.414-1.414a.5.5 0 0 1 .707 0m9.193 2.121a.5.5 0 0 1-.707 0l-1.414-1.414a.5.5 0 0 1 .707-.707l1.414 1.414a.5.5 0 0 1 0 .707M4.464 4.465a.5.5 0 0 1-.707 0L2.343 3.05a.5.5 0 1 1 .707-.707l1.414 1.414a.5.5 0 0 1 0 .708"/>';
+const LIGHT_ICON='<path d="M6 .278a.77.77 0 0 1 .08.858 7.2 7.2 0 0 0-.878 3.46c0 4.021 3.278 7.277 7.318 7.277q.792-.001 1.533-.16a.79.79 0 0 1 .81.316.73.73 0 0 1-.031.893A8.35 8.35 0 0 1 8.344 16C3.734 16 0 12.286 0 7.71 0 4.266 2.114 1.312 5.124.06A.75.75 0 0 1 6 .278"/>';
+
+function applyTheme(theme){
+  document.documentElement.setAttribute('data-theme',theme);
+  const icon=document.getElementById('theme-icon');
+  const label=document.getElementById('theme-label');
+  if(theme==='light'){
+    icon.innerHTML=LIGHT_ICON;
+    label.textContent='Dark';
+  } else {
+    icon.innerHTML=DARK_ICON;
+    label.textContent='Light';
+  }
+  try{localStorage.setItem('heap-theme',theme);}catch{}
+}
+
+function toggleTheme(){
+  const current=document.documentElement.getAttribute('data-theme')||'dark';
+  applyTheme(current==='dark'?'light':'dark');
+}
+
+// Load saved preference on start
+(function(){
+  let saved='dark';
+  try{saved=localStorage.getItem('heap-theme')||'dark';}catch{}
+  applyTheme(saved);
+})();
+
+// File input
+document.getElementById('file-input').addEventListener('change',e=>{
+  const f=e.target.files[0];if(!f)return;
+  const rd=new FileReader();
+  rd.onload=ev=>{try{render(JSON.parse(ev.target.result))}catch{alert('Invalid HDSL JSON.')}};
+  rd.readAsText(f);
+});
+
+// Drag-drop
+const dz=document.getElementById('drop-zone');
+dz.addEventListener('dragover',e=>{e.preventDefault();dz.classList.add('dragover')});
+dz.addEventListener('dragleave',()=>dz.classList.remove('dragover'));
+dz.addEventListener('drop',e=>{
+  e.preventDefault();dz.classList.remove('dragover');
+  const f=e.dataTransfer.files[0];if(!f)return;
+  const rd=new FileReader();
+  rd.onload=ev=>{try{render(JSON.parse(ev.target.result))}catch{alert('Invalid HDSL JSON.')}};
+  rd.readAsText(f);
+});
+
+// Demo
+function loadDemo(){
+  render({
+    hdsl_version:'1.0',
+    investigation_id:'inv_m2k9a1_3f9c',
+    timestamp_ms:Date.now()-185000,
+    duration_ms:183420,
+    trigger:{metric:'heap_used',growth_percent:23.4,absolute_bytes:41943040,previous_high_water_mark_bytes:179306496,session_uptime_ms:742000},
+    v8_spaces:{old_space_delta_bytes:38797312,new_space_delta_bytes:3145728,code_space_delta_bytes:524288,large_object_space_delta_bytes:1048576,total_heap_delta_bytes:43515904},
+    constructors:[
+      {name:'EventEmitter',instances_s1:124,instances_s3:1971,instances_delta:1847,self_size_delta_bytes:29360128,retained_size_bytes:31457280,first_retained_path:'global → McpClient._transport → EventEmitter._events → listener',v8_space:'old_space',contributing_patterns:['event_listener_accumulation']},
+      {name:'Closure',instances_s1:890,instances_s3:1302,instances_delta:412,self_size_delta_bytes:8388608,retained_size_bytes:9437184,first_retained_path:'global → setInterval → MemoryMonitor → Closure',v8_space:'old_space',contributing_patterns:['closure_scope_capture']},
+      {name:'Map',instances_s1:45,instances_s3:89,instances_delta:44,self_size_delta_bytes:1572864,retained_size_bytes:1835008,first_retained_path:'global → SkillManager.skills → Map',v8_space:'old_space',contributing_patterns:['unbounded_cache']},
+      {name:'Buffer',instances_s1:203,instances_s3:891,instances_delta:688,self_size_delta_bytes:1048576,retained_size_bytes:1048576,first_retained_path:'global → ToolRegistry → ReadFileTool → Buffer[]',v8_space:'old_space',contributing_patterns:[]},
+      {name:'Promise',instances_s1:78,instances_s3:318,instances_delta:240,self_size_delta_bytes:524288,retained_size_bytes:524288,first_retained_path:'global → async_hooks → Promise',v8_space:'old_space',contributing_patterns:['promise_chain_buildup']},
+      {name:'Array',instances_s1:512,instances_s3:891,instances_delta:379,self_size_delta_bytes:417792,retained_size_bytes:417792,first_retained_path:'global → AgentSession.history → Array',v8_space:'old_space',contributing_patterns:['array_accumulation']},
+      {name:'String',instances_s1:4201,instances_s3:4889,instances_delta:688,self_size_delta_bytes:131072,retained_size_bytes:131072,first_retained_path:'global → String pool',v8_space:'old_space',contributing_patterns:[]},
+    ],
+    detached_nodes:{count:1894,top_constructors:['InkComponent','ReactFiberNode','Text','Box','ConsumerComponent'],detachedness_source:'v8_detachedness_field'},
+    patterns:['event_listener_accumulation','closure_scope_capture','unbounded_cache','promise_chain_buildup','array_accumulation'],
+    confidence:0.87,
+    payload_bytes:3847,
+    perfetto_path:'/tmp/gemini-cli-inv_m2k9a1_3f9c.perfetto.json'
+  });
+}
+</script>
+</body>
+</html>
