@@ -730,10 +730,7 @@ export class LocalAgentExecutor<TOutput extends z.ZodTypeAny> {
         // Save the session summary upon completion
         if (finalResult && chat) {
           try {
-            const summary =
-              finalResult.length > 200
-                ? `${finalResult.slice(0, 197)}...`
-                : finalResult;
+            const summary = this.getTruncatedSummary(finalResult);
             chat.getChatRecordingService()?.saveSummary(summary);
           } catch (error) {
             debugLogger.warn('Failed to save subagent session summary.', error);
@@ -778,10 +775,7 @@ export class LocalAgentExecutor<TOutput extends z.ZodTypeAny> {
 
             // Save the session summary upon successful recovery
             try {
-              const summary =
-                finalResult.length > 200
-                  ? `${finalResult.slice(0, 197)}...`
-                  : finalResult;
+              const summary = this.getTruncatedSummary(finalResult);
               chat.getChatRecordingService()?.saveSummary(summary);
             } catch (summaryError) {
               debugLogger.warn(
@@ -1514,5 +1508,16 @@ Important Rules:
       };
       this.onActivity(event);
     }
+  }
+
+  /**
+   * Truncates a string to 200 characters in a Unicode-safe way for session summaries.
+   */
+  private getTruncatedSummary(text: string): string {
+    const chars = Array.from(text);
+    if (chars.length <= 200) {
+      return text;
+    }
+    return chars.slice(0, 197).join('') + '...';
   }
 }
