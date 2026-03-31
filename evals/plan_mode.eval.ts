@@ -15,7 +15,9 @@ import {
 describe('plan_mode', () => {
   const TEST_PREFIX = 'Plan Mode: ';
   const settings = {
-    experimental: { plan: true },
+    general: {
+      plan: { enabled: true },
+    },
   };
 
   const getWriteTargets = (logs: any[]) =>

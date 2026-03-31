@@ -65,38 +65,38 @@
     <text x="0" y="342" fill="#878787" textLength="9" lengthAdjust="spacingAndGlyphs">│</text>
     <text x="891" y="342" fill="#878787" textLength="9" lengthAdjust="spacingAndGlyphs">│</text>
     <text x="0" y="359" fill="#878787" textLength="9" lengthAdjust="spacingAndGlyphs">│</text>
-    <text x="45" y="359" fill="#ffffff" textLength="126" lengthAdjust="spacingAndGlyphs">Plan Directory</text>
-    <text x="792" y="359" fill="#afafaf" textLength="81" lengthAdjust="spacingAndGlyphs">undefined</text>
+    <text x="45" y="359" fill="#ffffff" textLength="144" lengthAdjust="spacingAndGlyphs">Enable Plan Mode</text>
+    <text x="837" y="359" fill="#afafaf" textLength="36" lengthAdjust="spacingAndGlyphs">true</text>
     <text x="891" y="359" fill="#878787" textLength="9" lengthAdjust="spacingAndGlyphs">│</text>
     <text x="0" y="376" fill="#878787" textLength="9" lengthAdjust="spacingAndGlyphs">│</text>
-    <text x="45" y="376" fill="#afafaf" textLength="720" lengthAdjust="spacingAndGlyphs">The directory where planning artifacts are stored. If not specified, defaults t…</text>
+    <text x="45" y="376" fill="#afafaf" textLength="486" lengthAdjust="spacingAndGlyphs">Enable Plan Mode for read-only safety during planning.</text>
     <text x="891" y="376" fill="#878787" textLength="9" lengthAdjust="spacingAndGlyphs">│</text>
     <text x="0" y="393" fill="#878787" textLength="9" lengthAdjust="spacingAndGlyphs">│</text>
     <text x="891" y="393" fill="#878787" textLength="9" lengthAdjust="spacingAndGlyphs">│</text>
     <text x="0" y="410" fill="#878787" textLength="9" lengthAdjust="spacingAndGlyphs">│</text>
-    <text x="45" y="410" fill="#ffffff" textLength="162" lengthAdjust="spacingAndGlyphs">Plan Model Routing</text>
-    <text x="837" y="410" fill="#afafaf" textLength="36" lengthAdjust="spacingAndGlyphs">true</text>
+    <text x="45" y="410" fill="#ffffff" textLength="126" lengthAdjust="spacingAndGlyphs">Plan Directory</text>
+    <text x="792" y="410" fill="#afafaf" textLength="81" lengthAdjust="spacingAndGlyphs">undefined</text>
     <text x="891" y="410" fill="#878787" textLength="9" lengthAdjust="spacingAndGlyphs">│</text>
     <text x="0" y="427" fill="#878787" textLength="9" lengthAdjust="spacingAndGlyphs">│</text>
-    <text x="45" y="427" fill="#afafaf" textLength="765" lengthAdjust="spacingAndGlyphs">Automatically switch between Pro and Flash models based on Plan Mode status. Uses Pr…</text>
+    <text x="45" y="427" fill="#afafaf" textLength="720" lengthAdjust="spacingAndGlyphs">The directory where planning artifacts are stored. If not specified, defaults t…</text>
     <text x="891" y="427" fill="#878787" textLength="9" lengthAdjust="spacingAndGlyphs">│</text>
     <text x="0" y="444" fill="#878787" textLength="9" lengthAdjust="spacingAndGlyphs">│</text>
     <text x="891" y="444" fill="#878787" textLength="9" lengthAdjust="spacingAndGlyphs">│</text>
     <text x="0" y="461" fill="#878787" textLength="9" lengthAdjust="spacingAndGlyphs">│</text>
-    <text x="45" y="461" fill="#ffffff" textLength="162" lengthAdjust="spacingAndGlyphs">Retry Fetch Errors</text>
+    <text x="45" y="461" fill="#ffffff" textLength="162" lengthAdjust="spacingAndGlyphs">Plan Model Routing</text>
     <text x="837" y="461" fill="#afafaf" textLength="36" lengthAdjust="spacingAndGlyphs">true</text>
     <text x="891" y="461" fill="#878787" textLength="9" lengthAdjust="spacingAndGlyphs">│</text>
     <text x="0" y="478" fill="#878787" textLength="9" lengthAdjust="spacingAndGlyphs">│</text>
-    <text x="45" y="478" fill="#afafaf" textLength="612" lengthAdjust="spacingAndGlyphs">Retry on &quot;exception TypeError: fetch failed sending request&quot; errors.</text>
+    <text x="45" y="478" fill="#afafaf" textLength="765" lengthAdjust="spacingAndGlyphs">Automatically switch between Pro and Flash models based on Plan Mode status. Uses Pr…</text>
     <text x="891" y="478" fill="#878787" textLength="9" lengthAdjust="spacingAndGlyphs">│</text>
     <text x="0" y="495" fill="#878787" textLength="9" lengthAdjust="spacingAndGlyphs">│</text>
     <text x="891" y="495" fill="#878787" textLength="9" lengthAdjust="spacingAndGlyphs">│</text>
     <text x="0" y="512" fill="#878787" textLength="9" lengthAdjust="spacingAndGlyphs">│</text>
-    <text x="45" y="512" fill="#ffffff" textLength="207" lengthAdjust="spacingAndGlyphs">Max Chat Model Attempts</text>
-    <text x="855" y="512" fill="#afafaf" textLength="18" lengthAdjust="spacingAndGlyphs">10</text>
+    <text x="45" y="512" fill="#ffffff" textLength="162" lengthAdjust="spacingAndGlyphs">Retry Fetch Errors</text>
+    <text x="837" y="512" fill="#afafaf" textLength="36" lengthAdjust="spacingAndGlyphs">true</text>
     <text x="891" y="512" fill="#878787" textLength="9" lengthAdjust="spacingAndGlyphs">│</text>
     <text x="0" y="529" fill="#878787" textLength="9" lengthAdjust="spacingAndGlyphs">│</text>
-    <text x="45" y="529" fill="#afafaf" textLength="729" lengthAdjust="spacingAndGlyphs">Maximum number of attempts for requests to the main chat model. Cannot exceed 10.</text>
+    <text x="45" y="529" fill="#afafaf" textLength="612" lengthAdjust="spacingAndGlyphs">Retry on &quot;exception TypeError: fetch failed sending request&quot; errors.</text>
     <text x="891" y="529" fill="#878787" textLength="9" lengthAdjust="spacingAndGlyphs">│</text>
     <text x="0" y="546" fill="#878787" textLength="9" lengthAdjust="spacingAndGlyphs">│</text>
     <text x="891" y="546" fill="#878787" textLength="9" lengthAdjust="spacingAndGlyphs">│</text>

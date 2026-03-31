@@ -1364,8 +1364,8 @@ describe('Approval mode tool exclusion logic', () => {
       'test',
     ];
     const settings = createTestMergedSettings({
-      experimental: {
-        plan: true,
+      general: {
+        plan: { enabled: true },
       },
     });
     const argv = await parseArguments(createTestMergedSettings());
@@ -1479,9 +1479,7 @@ describe('Approval mode tool exclusion logic', () => {
     const settings = createTestMergedSettings({
       general: {
         defaultApprovalMode: 'plan',
-      },
-      experimental: {
-        plan: false,
+        plan: { enabled: false },
       },
     });
     const argv = await parseArguments(settings);
@@ -1489,14 +1487,12 @@ describe('Approval mode tool exclusion logic', () => {
     expect(config.getApprovalMode()).toBe(ApprovalMode.DEFAULT);
   });
 
-  it('should allow plan approval mode if experimental plan is enabled', async () => {
+  it('should allow plan approval mode if plan is enabled', async () => {
     process.argv = ['node', 'script.js'];
     const settings = createTestMergedSettings({
       general: {
         defaultApprovalMode: 'plan',
-      },
-      experimental: {
-        plan: true,
+        plan: { enabled: true },
       },
     });
     const argv = await parseArguments(settings);
@@ -2742,12 +2738,12 @@ describe('loadCliConfig approval mode', () => {
     expect(config.getApprovalMode()).toBe(ServerConfig.ApprovalMode.YOLO);
   });
 
-  it('should set Plan approval mode when --approval-mode=plan is used and experimental.plan is enabled', async () => {
+  it('should set Plan approval mode when --approval-mode=plan is used and plan is enabled', async () => {
     process.argv = ['node', 'script.js', '--approval-mode', 'plan'];
     const argv = await parseArguments(createTestMergedSettings());
     const settings = createTestMergedSettings({
-      experimental: {
-        plan: true,
+      general: {
+        plan: { enabled: true },
       },
     });
     const config = await loadCliConfig(settings, 'test-session', argv);
@@ -2767,12 +2763,12 @@ describe('loadCliConfig approval mode', () => {
     expect(config.getApprovalMode()).toBe(ServerConfig.ApprovalMode.DEFAULT);
   });
 
-  it('should throw error when --approval-mode=plan is used but experimental.plan is disabled', async () => {
+  it('should throw error when --approval-mode=plan is used but plan is disabled', async () => {
     process.argv = ['node', 'script.js', '--approval-mode', 'plan'];
     const argv = await parseArguments(createTestMergedSettings());
     const settings = createTestMergedSettings({
-      experimental: {
-        plan: false,
+      general: {
+        plan: { enabled: false },
       },
     });
 
@@ -2893,22 +2889,26 @@ describe('loadCliConfig approval mode', () => {
       expect(config.getApprovalMode()).toBe(ServerConfig.ApprovalMode.YOLO);
     });
 
-    it('should respect plan mode from settings when experimental.plan is enabled', async () => {
+    it('should respect plan mode from settings when plan is enabled', async () => {
       process.argv = ['node', 'script.js'];
       const settings = createTestMergedSettings({
-        general: { defaultApprovalMode: 'plan' },
-        experimental: { plan: true },
+        general: {
+          defaultApprovalMode: 'plan',
+          plan: { enabled: true },
+        },
       });
       const argv = await parseArguments(settings);
       const config = await loadCliConfig(settings, 'test-session', argv);
       expect(config.getApprovalMode()).toBe(ServerConfig.ApprovalMode.PLAN);
     });
 
-    it('should throw error if plan mode is in settings but experimental.plan is disabled', async () => {
+    it('should fall back to default if plan mode is in settings but disabled', async () => {
       process.argv = ['node', 'script.js'];
       const settings = createTestMergedSettings({
-        general: { defaultApprovalMode: 'plan' },
-        experimental: { plan: false },
+        general: {
+          defaultApprovalMode: 'plan',
+          plan: { enabled: false },
+        },
       });
       const argv = await parseArguments(settings);
       const config = await loadCliConfig(settings, 'test-session', argv);
@@ -3696,7 +3696,9 @@ describe('loadCliConfig mcpEnabled', () => {
     it('should use plan directory from active extension when user has not specified one', async () => {
       process.argv = ['node', 'script.js'];
       const settings = createTestMergedSettings({
-        experimental: { plan: true },
+        general: {
+          plan: { enabled: true },
+        },
       });
       const argv = await parseArguments(settings);
 
@@ -3715,9 +3717,11 @@ describe('loadCliConfig mcpEnabled', () => {
     it('should NOT use plan directory from active extension when user has specified one', async () => {
       process.argv = ['node', 'script.js'];
       const settings = createTestMergedSettings({
-        experimental: { plan: true },
         general: {
-          plan: { directory: 'user-plans-dir' },
+          plan: {
+            enabled: true,
+            directory: 'user-plans-dir',
+          },
         },
       });
       const argv = await parseArguments(settings);
@@ -3738,7 +3742,9 @@ describe('loadCliConfig mcpEnabled', () => {
     it('should NOT use plan directory from inactive extension', async () => {
       process.argv = ['node', 'script.js'];
       const settings = createTestMergedSettings({
-        experimental: { plan: true },
+        general: {
+          plan: { enabled: true },
+        },
       });
       const argv = await parseArguments(settings);
 
@@ -3759,7 +3765,9 @@ describe('loadCliConfig mcpEnabled', () => {
     it('should use default path if neither user nor extension settings provide a plan directory', async () => {
       process.argv = ['node', 'script.js'];
       const settings = createTestMergedSettings({
-        experimental: { plan: true },
+        general: {
+          plan: { enabled: true },
+        },
       });
       const argv = await parseArguments(settings);
 

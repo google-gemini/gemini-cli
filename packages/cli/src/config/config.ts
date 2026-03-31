@@ -669,9 +669,9 @@ export async function loadCliConfig(
         approvalMode = ApprovalMode.AUTO_EDIT;
         break;
       case 'plan':
-        if (!(settings.experimental?.plan ?? false)) {
+        if (!(settings.general?.plan?.enabled ?? true)) {
           debugLogger.warn(
-            'Approval mode "plan" is only available when experimental.plan is enabled. Falling back to "default".',
+            'Approval mode "plan" is disabled in your settings. Falling back to "default".',
           );
           approvalMode = ApprovalMode.DEFAULT;
         } else {
@@ -966,7 +966,7 @@ export async function loadCliConfig(
     extensionRegistryURI,
     enableExtensionReloading: settings.experimental?.extensionReloading,
     enableAgents: settings.experimental?.enableAgents,
-    plan: settings.experimental?.plan,
+    plan: settings.general?.plan?.enabled ?? true,
     tracker: settings.experimental?.taskTracker,
     directWebFetch: settings.experimental?.directWebFetch,
     planSettings: settings.general?.plan?.directory
