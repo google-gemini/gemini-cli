@@ -120,7 +120,14 @@ export class ToolOutputMaskingService {
           continue;
         }
 
-        const partTokens = estimateTokenCountSync([part]);
+        // Reuse the already-serialized content string to estimate token count,
+        // avoiding a redundant JSON.stringify inside estimateTokenCountSync.
+        // The content string (pretty-printed) is slightly longer than the compact
+        // form, but for a heuristic estimate the difference is negligible.
+        const nameTokens = (part.functionResponse?.name?.length ?? 0) / 4;
+        const partTokens = Math.floor(
+          toolOutputContent.length / 4 + nameTokens,
+        );
 
         if (!protectionBoundaryReached) {
           cumulativeToolTokens += partTokens;

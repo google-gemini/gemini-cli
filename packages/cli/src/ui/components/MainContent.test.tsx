@@ -343,6 +343,10 @@ describe('MainContent', () => {
   };
 
   beforeEach(() => {
+    // Freeze timers so ink-spinner's setInterval doesn't fire mid-test,
+    // which would cause unwrapped act() warnings and non-deterministic
+    // spinner frames in snapshots.
+    vi.useFakeTimers();
     vi.mocked(useAlternateBuffer).mockReturnValue(false);
     mockUseSettings.mockReturnValue({
       merged: {
@@ -354,6 +358,7 @@ describe('MainContent', () => {
   });
 
   afterEach(() => {
+    vi.useRealTimers();
     vi.restoreAllMocks();
   });
 
