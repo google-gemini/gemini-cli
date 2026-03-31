@@ -393,6 +393,33 @@ describe('MainContent', () => {
     unmount();
   });
 
+  it('renders BtwDisplay within ScrollableList in alternate buffer mode when btw is active', async () => {
+    vi.mocked(useAlternateBuffer).mockReturnValue(true);
+    const uiStateWithBtw = {
+      ...defaultMockUiState,
+      btwState: {
+        isActive: true,
+        query: 'test query',
+        response: 'test response',
+        isStreaming: false,
+        error: null,
+      },
+    };
+    const { lastFrame, unmount } = await renderWithProviders(<MainContent />, {
+      uiState: uiStateWithBtw as Partial<UIState>,
+    });
+    const output = lastFrame();
+    // Verify ScrollableList is rendered (from our mock)
+    expect(output).toContain('ScrollableList');
+    // Verify btw response is rendered
+    expect(output).toContain('test query');
+    expect(output).toContain('test response');
+
+    expect(output).toMatchSnapshot();
+    // Verify it rendered inside ScrollableList's items in the mock
+    unmount();
+  });
+
   it('renders minimal header in minimal mode (alternate buffer)', async () => {
     vi.mocked(useAlternateBuffer).mockReturnValue(true);
 

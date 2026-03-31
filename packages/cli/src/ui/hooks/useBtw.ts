@@ -87,6 +87,7 @@ export const useBtw = (
       abortControllerRef.current.abort();
       abortControllerRef.current = null;
     }
+    requestIdRef.current++;
     dispatch({ type: 'DISMISS' });
   }, []);
 
