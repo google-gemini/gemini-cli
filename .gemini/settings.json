@@ -1,6 +1,5 @@
 {
   "experimental": {
-    "plan": true,
     "extensionReloading": true,
     "modelSteering": true,
     "memoryManager": true,
@@ -8,5 +7,8 @@
   },
   "general": {
     "devtools": true
+  },
+  "security": {
+    "toolSandboxing": true
   }
 }

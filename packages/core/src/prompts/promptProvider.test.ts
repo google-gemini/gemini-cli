@@ -11,7 +11,10 @@ import {
   getAllGeminiMdFilenames,
   DEFAULT_CONTEXT_FILENAME,
 } from '../tools/memoryTool.js';
-import { PREVIEW_GEMINI_MODEL } from '../config/models.js';
+import {
+  PREVIEW_GEMINI_MODEL,
+  DEFAULT_GEMINI_MODEL,
+} from '../config/models.js';
 import { ApprovalMode } from '../policy/types.js';
 import { DiscoveredMCPTool } from '../tools/mcp-tool.js';
 import { MockTool } from '../test-utils/mock-tool.js';
@@ -300,6 +303,21 @@ describe('PromptProvider', () => {
       const prompt = provider.getCoreSystemPrompt(mockConfig);
 
       expect(prompt).toContain(`<tool>\`${UPDATE_TOPIC_TOOL_NAME}\`</tool>`);
+    });
+
+    it('should include topic update instructions in legacy model prompt when enabled', () => {
+      vi.mocked(mockConfig.getActiveModel).mockReturnValue(
+        DEFAULT_GEMINI_MODEL,
+      );
+      vi.mocked(mockConfig.isTopicUpdateNarrationEnabled).mockReturnValue(true);
+
+      const provider = new PromptProvider();
+      const prompt = provider.getCoreSystemPrompt(mockConfig);
+
+      expect(prompt).toContain('## Topic Updates');
+      expect(prompt).toContain(UPDATE_TOPIC_TOOL_NAME);
+      expect(prompt).toContain('No Chitchat');
+      expect(prompt).toContain('Topic Model');
     });
   });
 });

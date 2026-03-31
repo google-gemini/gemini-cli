@@ -5,7 +5,7 @@
  */
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { BrowserManager } from './browserManager.js';
+import { BrowserManager, DomainNotAllowedError } from './browserManager.js';
 import { makeFakeConfig } from '../../test-utils/config.js';
 import type { Config } from '../../config/config.js';
 import { injectAutomationOverlay } from './automationOverlay.js';
@@ -224,12 +224,9 @@ describe('BrowserManager', () => {
         },
       });
       const manager = new BrowserManager(restrictedConfig);
-      const result = await manager.callTool('navigate_page', {
-        url: 'https://evil.com',
-      });
-
-      expect(result.isError).toBe(true);
-      expect((result.content || [])[0]?.text).toContain('not permitted');
+      await expect(
+        manager.callTool('navigate_page', { url: 'https://evil.com' }),
+      ).rejects.toThrow(DomainNotAllowedError);
       expect(Client).not.toHaveBeenCalled();
     });
 
@@ -276,12 +273,9 @@ describe('BrowserManager', () => {
         },
       });
       const manager = new BrowserManager(restrictedConfig);
-      const result = await manager.callTool('new_page', {
-        url: 'https://evil.com',
-      });
-
-      expect(result.isError).toBe(true);
-      expect((result.content || [])[0]?.text).toContain('not permitted');
+      await expect(
+        manager.callTool('new_page', { url: 'https://evil.com' }),
+      ).rejects.toThrow(DomainNotAllowedError);
     });
 
     it('should block proxy URL with embedded disallowed domain in query params', async () => {
@@ -293,14 +287,11 @@ describe('BrowserManager', () => {
         },
       });
       const manager = new BrowserManager(restrictedConfig);
-      const result = await manager.callTool('new_page', {
-        url: 'https://translate.google.com/translate?sl=en&tl=en&u=https://blocked.org/page',
-      });
-
-      expect(result.isError).toBe(true);
-      expect((result.content || [])[0]?.text).toContain(
-        'an embedded URL targets a disallowed domain',
-      );
+      await expect(
+        manager.callTool('new_page', {
+          url: 'https://translate.google.com/translate?sl=en&tl=en&u=https://blocked.org/page',
+        }),
+      ).rejects.toThrow(DomainNotAllowedError);
     });
 
     it('should block proxy URL with embedded disallowed domain in URL fragment (hash)', async () => {
@@ -312,14 +303,11 @@ describe('BrowserManager', () => {
         },
       });
       const manager = new BrowserManager(restrictedConfig);
-      const result = await manager.callTool('new_page', {
-        url: 'https://translate.google.com/#view=home&op=translate&sl=en&tl=zh-CN&u=https://blocked.org',
-      });
-
-      expect(result.isError).toBe(true);
-      expect((result.content || [])[0]?.text).toContain(
-        'an embedded URL targets a disallowed domain',
-      );
+      await expect(
+        manager.callTool('new_page', {
+          url: 'https://translate.google.com/#view=home&op=translate&sl=en&tl=zh-CN&u=https://blocked.org',
+        }),
+      ).rejects.toThrow(DomainNotAllowedError);
     });
 
     it('should allow proxy URL when embedded domain is also allowed', async () => {
@@ -397,7 +385,7 @@ describe('BrowserManager', () => {
       const args = vi.mocked(StdioClientTransport).mock.calls[0]?.[0]
         ?.args as string[];
       expect(args).toContain(
-        '--chromeArg="--host-rules=MAP * 127.0.0.1, EXCLUDE google.com, EXCLUDE *.openai.com, EXCLUDE 127.0.0.1"',
+        '--chromeArg="--host-rules=MAP * ~NOTFOUND, EXCLUDE google.com, EXCLUDE *.openai.com"',
       );
     });
 
@@ -978,6 +966,30 @@ describe('BrowserManager', () => {
       // 4th call should throw
       await expect(manager.callTool('take_snapshot', {})).rejects.toThrow(
         /maximum action limit \(3\)/,
+      );
+    });
+
+    it('should NOT increment action counter when shouldCount is false', async () => {
+      const limitedConfig = makeFakeConfig({
+        agents: {
+          browser: {
+            maxActionsPerTask: 1,
+          },
+        },
+      });
+      const manager = new BrowserManager(limitedConfig);
+
+      // Multiple calls with isInternal: true should NOT exhaust the limit
+      await manager.callTool('evaluate_script', {}, undefined, true);
+      await manager.callTool('evaluate_script', {}, undefined, true);
+      await manager.callTool('evaluate_script', {}, undefined, true);
+
+      // This should still work
+      await manager.callTool('take_snapshot', {});
+
+      // Next one should throw (limit 1 allows exactly 1 call with >= check)
+      await expect(manager.callTool('take_snapshot', {})).rejects.toThrow(
+        /maximum action limit \(1\)/,
       );
     });
   });
