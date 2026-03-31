@@ -51,7 +51,10 @@ finalized plan to the user and requests approval to start the implementation.
     - Marks the plan as approved for implementation.
   - If the user rejects the plan:
     - Stays in Plan Mode.
+    - Saves a versioned backup of the rejected plan.
     - Returns user feedback to the model to refine the plan.
+    - The next time `exit_plan_mode` is called, a diff against the previous
+      version is shown in the approval step.
 - **Output (`llmContent`):**
   - On approval: A message indicating the plan was approved and the new approval
     mode.

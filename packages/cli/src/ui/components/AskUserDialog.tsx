@@ -190,7 +190,7 @@ interface AskUserDialogProps {
   /**
    * Custom keyboard shortcut hints (e.g., ["Ctrl+P to edit"])
    */
-  extraParts?: string[];
+  extraParts?: React.ReactNode[];
 }
 
 interface ReviewViewProps {
@@ -198,7 +198,7 @@ interface ReviewViewProps {
   answers: { [key: string]: string };
   onSubmit: () => void;
   progressHeader?: React.ReactNode;
-  extraParts?: string[];
+  extraParts?: React.ReactNode[];
 }
 
 const ReviewView: React.FC<ReviewViewProps> = ({

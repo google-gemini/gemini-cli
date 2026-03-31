@@ -539,6 +539,7 @@ export const ToolConfirmationMessage: React.FC<
         bodyContent = (
           <ExitPlanModeDialog
             planPath={confirmationDetails.planPath}
+            diffContent={confirmationDetails.diffContent}
             getPreferredEditor={getPreferredEditor}
             onApprove={(approvalMode) => {
               handleConfirm(ToolConfirmationOutcome.ProceedOnce, {

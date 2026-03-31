@@ -26,6 +26,11 @@ import { PlanExecutionEvent } from '../telemetry/types.js';
 import { getExitPlanModeDefinition } from './definitions/coreTools.js';
 import { resolveToolDeclaration } from './definitions/resolver.js';
 import { getPlanModeExitMessage } from '../utils/approvalModeUtils.js';
+import * as Diff from 'diff';
+import { DEFAULT_DIFF_OPTIONS } from './diffOptions.js';
+import { debugLogger } from '../utils/debugLogger.js';
+import * as fs from 'node:fs';
+import * as fsPromises from 'node:fs/promises';
 
 export interface ExitPlanModeParams {
   plan_filename: string;
@@ -153,10 +158,44 @@ export class ExitPlanModeInvocation extends BaseToolInvocation<
     }
 
     // decision is 'ask_user'
+    let diffContent: string | undefined;
+    try {
+      let latestVersion = 0;
+      let version = 1;
+      while (fs.existsSync(`${resolvedPlanPath}.v${version}`)) {
+        latestVersion = version;
+        version++;
+      }
+
+      if (latestVersion > 0) {
+        const previousPlanPath = `${resolvedPlanPath}.v${latestVersion}`;
+        const previousPlanContent = await fsPromises.readFile(
+          previousPlanPath,
+          'utf8',
+        );
+        const currentPlanContent = await fsPromises.readFile(
+          resolvedPlanPath,
+          'utf8',
+        );
+
+        diffContent = Diff.createPatch(
+          path.basename(resolvedPlanPath),
+          previousPlanContent,
+          currentPlanContent,
+          `Previous version (v${latestVersion})`,
+          'Current version',
+          DEFAULT_DIFF_OPTIONS,
+        );
+      }
+    } catch (err) {
+      debugLogger.error('Failed to create diff for plan:', err);
+    }
+
     return {
       type: 'exit_plan_mode',
       title: 'Plan Approval',
       planPath: resolvedPlanPath,
+      diffContent,
       onConfirm: async (
         outcome: ToolConfirmationOutcome,
         payload?: ToolConfirmationPayload,
@@ -229,6 +268,19 @@ Read and follow the plan strictly during implementation.`,
         returnDisplay: `Plan approved: ${resolvedPlanPath}`,
       };
     } else {
+      try {
+        let version = 1;
+        let backupPath = `${resolvedPlanPath}.v${version}`;
+        while (fs.existsSync(backupPath)) {
+          version++;
+          backupPath = `${resolvedPlanPath}.v${version}`;
+        }
+        const content = await fsPromises.readFile(resolvedPlanPath, 'utf8');
+        await fsPromises.writeFile(backupPath, content, 'utf8');
+      } catch (err) {
+        debugLogger.error('Failed to create plan backup:', err);
+      }
+
       const feedback = payload?.feedback?.trim();
       if (feedback) {
         return {

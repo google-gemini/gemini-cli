@@ -25,9 +25,11 @@ import { useKeypress } from '../hooks/useKeypress.js';
 import { Command } from '../key/keyMatchers.js';
 import { formatCommand } from '../key/keybindingUtils.js';
 import { useKeyMatchers } from '../hooks/useKeyMatchers.js';
+import { DiffRenderer } from './messages/DiffRenderer.js';
 
 export interface ExitPlanModeDialogProps {
   planPath: string;
+  diffContent?: string;
   onApprove: (approvalMode: ApprovalMode) => void;
   onFeedback: (feedback: string) => void;
   onCancel: () => void;
@@ -140,6 +142,7 @@ function usePlanContent(planPath: string, config: Config): PlanContentState {
 
 export const ExitPlanModeDialog: React.FC<ExitPlanModeDialogProps> = ({
   planPath,
+  diffContent,
   onApprove,
   onFeedback,
   onCancel,
@@ -226,6 +229,17 @@ export const ExitPlanModeDialog: React.FC<ExitPlanModeDialogProps> = ({
 
   const editHint = formatCommand(Command.OPEN_EXTERNAL_EDITOR);
 
+  const extraParts: React.ReactNode[] = [];
+  if (diffContent) {
+    extraParts.push(
+      <Box key="diff" flexDirection="column" marginTop={1}>
+        <Text bold>Changes since previous version:</Text>
+        <DiffRenderer diffContent={diffContent} terminalWidth={width} />
+      </Box>
+    );
+  }
+  extraParts.push(`${editHint} to edit plan`);
+
   return (
     <Box flexDirection="column" width={width}>
       <AskUserDialog
@@ -264,7 +278,7 @@ export const ExitPlanModeDialog: React.FC<ExitPlanModeDialogProps> = ({
         onCancel={onCancel}
         width={width}
         availableHeight={availableHeight}
-        extraParts={[`${editHint} to edit plan`]}
+        extraParts={extraParts}
       />
     </Box>
   );

@@ -1067,6 +1067,7 @@ export interface ToolExitPlanModeConfirmationDetails {
   title: string;
   systemMessage?: string;
   planPath: string;
+  diffContent?: string;
   onConfirm: (
     outcome: ToolConfirmationOutcome,
     payload?: ToolConfirmationPayload,
