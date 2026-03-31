@@ -43,6 +43,12 @@ import {
 const execAsync = promisify(exec);
 const execFileAsync = promisify(execFile);
 
+// Module-scope references to the previous proxy cleanup handlers.
+// Persists across start_sandbox calls so process.off() can match
+// and remove the correct listener from earlier launches.
+let previousStopProxy: (() => void) | undefined;
+let previousContainerStopProxy: (() => void) | undefined;
+
 export async function start_sandbox(
   config: SandboxConfig,
   nodeArgs: string[] = [],
@@ -156,7 +162,6 @@ export async function start_sandbox(
       // start and set up proxy if GEMINI_SANDBOX_PROXY_COMMAND is set
       const proxyCommand = process.env['GEMINI_SANDBOX_PROXY_COMMAND'];
       let proxyProcess: ChildProcess | undefined = undefined;
-      let previousStopProxy: (() => void) | undefined;
       let sandboxProcess: ChildProcess | undefined = undefined;
       const sandboxEnv = { ...process.env };
       if (proxyCommand) {
@@ -711,7 +716,6 @@ export async function start_sandbox(
     // start and set up proxy if GEMINI_SANDBOX_PROXY_COMMAND is set
     let proxyProcess: ChildProcess | undefined = undefined;
     let sandboxProcess: ChildProcess | undefined = undefined;
-    let previousContainerStopProxy: (() => void) | undefined;
 
     if (proxyCommand) {
       // run proxyCommand in its own container
