@@ -335,8 +335,7 @@ With this feature, you can:
   data sources) directly in the subagent's markdown frontmatter, isolating them
   to that specific agent.
 - **Maintain state isolation:** Ensure that subagents only interact with their
-  own set of tools and servers, preventing side effects and state
-  contamination.
+  own set of tools and servers, preventing side effects and state contamination.
 - **Apply subagent-specific policies:** Enforce granular rules in your
   [Policy Engine](../reference/policy-engine.md) TOML configuration based on the
   executing subagent's name.
@@ -367,10 +366,10 @@ mcpServers:
 
 ### Subagent-specific policies
 
-You can enforce fine-grained control over subagents using the [Policy
-Engine's](../reference/policy-engine.md) TOML configuration. This allows you to
-grant or restrict permissions specifically for an agent, without affecting the
-rest of your CLI session.
+You can enforce fine-grained control over subagents using the
+[Policy Engine's](../reference/policy-engine.md) TOML configuration. This allows
+you to grant or restrict permissions specifically for an agent, without
+affecting the rest of your CLI session.
 
 To restrict a policy rule to a specific subagent, add the `subagent` property to
 the `[[rules]]` block in your `policy.toml` file.
