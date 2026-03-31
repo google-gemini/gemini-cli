@@ -612,6 +612,7 @@ export async function startMemoryService(config: Config): Promise<void> {
   const executionId = handle.pid;
 
   const startTime = Date.now();
+  let completionResult: { error: Error } | undefined;
   try {
     // Read extraction state
     const state = await readExtractionState(statePath);
@@ -733,18 +734,18 @@ export async function startMemoryService(config: Config): Promise<void> {
         `[MemoryService] Failed after ${elapsed}s: ${error instanceof Error ? error.message : String(error)}`,
       );
     }
-    if (executionId !== undefined) {
-      ExecutionLifecycleService.completeExecution(executionId, {
-        error: error instanceof Error ? error : new Error(String(error)),
-      });
-    }
+    completionResult = {
+      error: error instanceof Error ? error : new Error(String(error)),
+    };
     return;
   } finally {
     await releaseLock(lockPath);
     debugLogger.log('[MemoryService] Lock released');
-  }
-
-  if (executionId !== undefined) {
-    ExecutionLifecycleService.completeExecution(executionId);
+    if (executionId !== undefined) {
+      ExecutionLifecycleService.completeExecution(
+        executionId,
+        completionResult,
+      );
+    }
   }
 }
