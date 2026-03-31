@@ -7,76 +7,93 @@
 import { act, useCallback } from 'react';
 import { vi } from 'vitest';
 import { render } from '../../test-utils/render.js';
-import { useConsoleMessages } from './useConsoleMessages.js';
-import { CoreEvent, type ConsoleLogPayload } from '@google/gemini-cli-core';
-
-// Mock coreEvents
-let consoleLogHandler: ((payload: ConsoleLogPayload) => void) | undefined;
+import {
+  useConsoleMessages,
+  useErrorCount,
+  initializeConsoleStore,
+} from './useConsoleMessages.js';
+import { coreEvents } from '@google/gemini-cli-core';
 
 vi.mock('@google/gemini-cli-core', async (importOriginal) => {
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const actual = (await importOriginal()) as any;
+  const actual = await importOriginal();
+  const handlers = new Map<string, (payload: unknown) => void>();
+
   return {
-    ...actual,
+    ...(actual as Record<string, unknown>),
     coreEvents: {
-      on: vi.fn((event, handler) => {
-        if (event === CoreEvent.ConsoleLog) {
-          consoleLogHandler = handler;
-        }
+      ...((actual as Record<string, unknown>)['coreEvents'] as Record<
+        string,
+        unknown
+      >),
+      on: vi.fn((event: string, handler: (payload: unknown) => void) => {
+        handlers.set(event, handler);
       }),
-      off: vi.fn((event) => {
-        if (event === CoreEvent.ConsoleLog) {
-          consoleLogHandler = undefined;
-        }
+      off: vi.fn((event: string) => {
+        handlers.delete(event);
       }),
-      emitConsoleLog: vi.fn(),
+      // Helper for testing to trigger the handlers
+      _trigger: (event: string, payload: unknown) => {
+        handlers.get(event)?.(payload);
+      },
     },
   };
 });
 
 describe('useConsoleMessages', () => {
+  let unmounts: Array<() => void> = [];
+
   beforeEach(() => {
     vi.useFakeTimers();
-    consoleLogHandler = undefined;
+    initializeConsoleStore();
   });
 
   afterEach(() => {
+    for (const unmount of unmounts) {
+      try {
+        unmount();
+      } catch (_e) {
+        // Ignore unmount errors
+      }
+    }
+    unmounts = [];
     vi.runOnlyPendingTimers();
     vi.useRealTimers();
     vi.restoreAllMocks();
   });
 
   const useTestableConsoleMessages = () => {
-    const { ...rest } = useConsoleMessages();
+    const consoleMessages = useConsoleMessages();
     const log = useCallback((content: string) => {
-      if (consoleLogHandler) {
-        consoleLogHandler({ type: 'log', content });
-      }
+      // @ts-expect-error - internal testing helper
+      coreEvents._trigger('console-log', { type: 'log', content });
     }, []);
     const error = useCallback((content: string) => {
-      if (consoleLogHandler) {
-        consoleLogHandler({ type: 'error', content });
-      }
+      // @ts-expect-error - internal testing helper
+      coreEvents._trigger('console-log', { type: 'error', content });
+    }, []);
+    const clearConsoleMessages = useCallback(() => {
+      initializeConsoleStore();
     }, []);
     return {
-      ...rest,
+      consoleMessages,
       log,
       error,
-      clearConsoleMessages: rest.clearConsoleMessages,
+      clearConsoleMessages,
     };
   };
 
   const renderConsoleMessagesHook = async () => {
-    let hookResult: ReturnType<typeof useTestableConsoleMessages>;
+    let hookResult: ReturnType<typeof useTestableConsoleMessages> | undefined;
     function TestComponent() {
       hookResult = useTestableConsoleMessages();
       return null;
     }
     const { unmount } = await render(<TestComponent />);
+    unmounts.push(unmount);
     return {
       result: {
         get current() {
-          return hookResult;
+          return hookResult!;
         },
       },
       unmount,
@@ -93,10 +110,7 @@ describe('useConsoleMessages', () => {
 
     act(() => {
       result.current.log('Test message');
-    });
-
-    await act(async () => {
-      await vi.advanceTimersByTimeAsync(60);
+      vi.runAllTimers();
     });
 
     expect(result.current.consoleMessages).toEqual([
@@ -111,10 +125,7 @@ describe('useConsoleMessages', () => {
       result.current.log('Test message');
       result.current.log('Test message');
       result.current.log('Test message');
-    });
-
-    await act(async () => {
-      await vi.advanceTimersByTimeAsync(60);
+      vi.runAllTimers();
     });
 
     expect(result.current.consoleMessages).toEqual([
@@ -128,10 +139,7 @@ describe('useConsoleMessages', () => {
     act(() => {
       result.current.log('First message');
       result.current.error('Second message');
-    });
-
-    await act(async () => {
-      await vi.advanceTimersByTimeAsync(60);
+      vi.runAllTimers();
     });
 
     expect(result.current.consoleMessages).toEqual([
@@ -139,53 +147,85 @@ describe('useConsoleMessages', () => {
       { type: 'error', content: 'Second message', count: 1 },
     ]);
   });
+});
 
-  it('should clear all messages when clearConsoleMessages is called', async () => {
-    const { result } = await renderConsoleMessagesHook();
+describe('useErrorCount', () => {
+  let unmounts: Array<() => void> = [];
 
-    act(() => {
-      result.current.log('A message');
-    });
-
-    await act(async () => {
-      await vi.advanceTimersByTimeAsync(60);
-    });
-
-    expect(result.current.consoleMessages).toHaveLength(1);
-
-    act(() => {
-      result.current.clearConsoleMessages();
-    });
-
-    expect(result.current.consoleMessages).toHaveLength(0);
+  beforeEach(() => {
+    vi.useFakeTimers();
+    initializeConsoleStore();
   });
 
-  it('should clear the pending timeout when clearConsoleMessages is called', async () => {
-    const { result } = await renderConsoleMessagesHook();
-    const clearTimeoutSpy = vi.spyOn(global, 'clearTimeout');
-
-    act(() => {
-      result.current.log('A message');
-    });
-
-    act(() => {
-      result.current.clearConsoleMessages();
-    });
-
-    expect(clearTimeoutSpy).toHaveBeenCalled();
-    // clearTimeoutSpy.mockRestore() is handled by afterEach restoreAllMocks
+  afterEach(() => {
+    for (const unmount of unmounts) {
+      try {
+        unmount();
+      } catch (_e) {
+        // Ignore unmount errors
+      }
+    }
+    unmounts = [];
+    vi.runOnlyPendingTimers();
+    vi.useRealTimers();
+    vi.restoreAllMocks();
   });
 
-  it('should clean up the timeout on unmount', async () => {
-    const { result, unmount } = await renderConsoleMessagesHook();
-    const clearTimeoutSpy = vi.spyOn(global, 'clearTimeout');
+  const renderErrorCountHook = async () => {
+    let hookResult: ReturnType<typeof useErrorCount>;
+    function TestComponent() {
+      hookResult = useErrorCount();
+      return null;
+    }
+    const { unmount } = await render(<TestComponent />);
+    unmounts.push(unmount);
+    return {
+      result: {
+        get current() {
+          return hookResult;
+        },
+      },
+      unmount,
+    };
+  };
+
+  it('should initialize with an error count of 0', async () => {
+    const { result } = await renderErrorCountHook();
+    expect(result.current.errorCount).toBe(0);
+  });
+
+  it('should increment error count when an error is logged', async () => {
+    const { result } = await renderErrorCountHook();
+    act(() => {
+      // @ts-expect-error - internal testing helper
+      coreEvents._trigger('console-log', { type: 'error', content: 'error' });
+      vi.runAllTimers();
+    });
+    expect(result.current.errorCount).toBe(1);
+  });
+
+  it('should not increment error count for non-error logs', async () => {
+    const { result } = await renderErrorCountHook();
+    act(() => {
+      // @ts-expect-error - internal testing helper
+      coreEvents._trigger('console-log', { type: 'log', content: 'log' });
+      vi.runAllTimers();
+    });
+    expect(result.current.errorCount).toBe(0);
+  });
+
+  it('should clear the error count', async () => {
+    const { result } = await renderErrorCountHook();
+    act(() => {
+      // @ts-expect-error - internal testing helper
+      coreEvents._trigger('console-log', { type: 'error', content: 'error' });
+      vi.runAllTimers();
+    });
+    expect(result.current.errorCount).toBe(1);
 
     act(() => {
-      result.current.log('A message');
+      result.current.clearErrorCount();
     });
-
-    unmount();
-
-    expect(clearTimeoutSpy).toHaveBeenCalled();
+    expect(result.current.errorCount).toBe(0);
   });
 });
