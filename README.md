@@ -344,6 +344,28 @@ custom tools:
 > @database Run a query to find inactive users
 ```
 
+#### Quick start: SQLite
+
+1. Install [`uv`](https://docs.astral.sh/uv/getting-started/installation/) so
+   you can run Python MCP servers with `uvx`.
+2. Add the SQLite reference server to `~/.gemini/settings.json`:
+
+   ```json
+   {
+     "mcpServers": {
+       "sqlite": {
+         "command": "uvx",
+         "args": ["mcp-server-sqlite", "--db-path", "/path/to/your.db"]
+       }
+     }
+   }
+   ```
+
+3. Use it in the CLI: `> @sqlite list the tables in this database`
+
+Use a database path for your platform, such as `/path/to/your.db` on macOS or
+Linux, or `C:\\path\\to\\your.db` on Windows.
+
 See the [MCP Server Integration guide](./docs/tools/mcp-server.md) for setup
 instructions.
 
