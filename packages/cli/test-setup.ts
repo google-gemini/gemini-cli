@@ -26,10 +26,14 @@ if (process.env.NO_COLOR !== undefined) {
 import './src/test-utils/customMatchers.js';
 
 let consoleErrorSpy: vi.SpyInstance;
+let consoleLogSpy: vi.SpyInstance;
+let consoleWarnSpy: vi.SpyInstance;
 let actWarnings: Array<{ message: string; stack: string }> = [];
 
 beforeEach(() => {
   actWarnings = [];
+  consoleLogSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
+  consoleWarnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
   consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation((...args) => {
     const firstArg = args[0];
     if (
@@ -63,6 +67,8 @@ beforeEach(() => {
 
 afterEach(() => {
   consoleErrorSpy.mockRestore();
+  consoleLogSpy.mockRestore();
+  consoleWarnSpy.mockRestore();
 
   vi.unstubAllEnvs();
 
