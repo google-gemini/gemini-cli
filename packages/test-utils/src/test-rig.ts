@@ -11,7 +11,7 @@ import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { env } from 'node:process';
 import { setTimeout as sleep } from 'node:timers/promises';
-import { DEFAULT_GEMINI_MODEL, GEMINI_DIR } from '@google/gemini-cli-core';
+import { PREVIEW_GEMINI_MODEL, GEMINI_DIR } from '@google/gemini-cli-core';
 export { GEMINI_DIR };
 import * as pty from '@lydell/node-pty';
 import stripAnsi from 'strip-ansi';
@@ -457,7 +457,7 @@ export class TestRig {
         ...(env['GEMINI_TEST_TYPE'] === 'integration'
           ? {
               model: {
-                name: DEFAULT_GEMINI_MODEL,
+                name: PREVIEW_GEMINI_MODEL,
               },
             }
           : {}),

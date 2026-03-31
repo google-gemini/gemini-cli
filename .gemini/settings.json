@@ -3,9 +3,13 @@
     "plan": true,
     "extensionReloading": true,
     "modelSteering": true,
-    "memoryManager": true
+    "memoryManager": true,
+    "topicUpdateNarration": true
   },
   "general": {
     "devtools": true
+  },
+  "security": {
+    "toolSandboxing": true
   }
 }
