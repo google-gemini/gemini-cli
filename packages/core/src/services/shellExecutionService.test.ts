@@ -787,7 +787,11 @@ describe('ShellExecutionService', () => {
       ]);
 
       // Background the process
-      ShellExecutionService.background(handle.pid!);
+      ShellExecutionService.background(
+        handle.pid!,
+        'default',
+        'long-running-pty',
+      );
 
       const result = await handle.result;
       expect(result.backgrounded).toBe(true);
@@ -826,7 +830,11 @@ describe('ShellExecutionService', () => {
       mockBgChildProcess.stdout?.emit('data', Buffer.from('initial cp output'));
       await new Promise((resolve) => process.nextTick(resolve));
 
-      ShellExecutionService.background(handle.pid!);
+      ShellExecutionService.background(
+        handle.pid!,
+        'default',
+        'long-running-child',
+      );
 
       const result = await handle.result;
       expect(result.backgrounded).toBe(true);
@@ -865,7 +873,11 @@ describe('ShellExecutionService', () => {
       });
 
       // Background the process
-      ShellExecutionService.background(handle.pid!);
+      ShellExecutionService.background(
+        handle.pid!,
+        'default',
+        'failing-log-setup',
+      );
 
       const result = await handle.result;
       expect(result.backgrounded).toBe(true);
@@ -881,7 +893,11 @@ describe('ShellExecutionService', () => {
       await simulateExecution(
         'history-test-cmd',
         async (pty) => {
-          ShellExecutionService.background(pty.pid);
+          ShellExecutionService.background(
+            pty.pid,
+            'default',
+            'history-test-cmd',
+          );
 
           const history =
             ShellExecutionService.listBackgroundProcesses('default');
@@ -935,7 +951,7 @@ describe('ShellExecutionService', () => {
         sessionId: 'default',
       });
 
-      ShellExecutionService.background(101);
+      ShellExecutionService.background(101, 'default', 'cmd-101');
 
       const processes =
         ShellExecutionService.listBackgroundProcesses('default');

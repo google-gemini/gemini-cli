@@ -1315,12 +1315,9 @@ export class ShellExecutionService {
    *
    * @param pid The process ID of the target PTY.
    */
-  static background(pid: number): void {
+  static background(pid: number, sessionId: string, command: string): void {
     const activePty = this.activePtys.get(pid);
     const activeChild = this.activeChildProcesses.get(pid);
-    const command =
-      activePty?.command ?? activeChild?.command ?? 'unknown command';
-    const sessionId = activePty?.sessionId ?? activeChild?.sessionId;
 
     if (!sessionId) {
       throw new Error('Session ID is required for background operations');
@@ -1360,7 +1357,7 @@ export class ShellExecutionService {
     const logDir = this.getLogDir();
     try {
       mkdirSync(logDir, { recursive: true, mode: 0o700 });
-      const stream = fs.createWriteStream(logPath, { flags: 'w' });
+      const stream = fs.createWriteStream(logPath, { flags: 'wx' });
       stream.on('error', (err) => {
         debugLogger.warn('Background log stream error:', err);
       });

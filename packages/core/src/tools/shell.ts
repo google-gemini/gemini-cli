@@ -559,8 +559,9 @@ export class ShellToolInvocation extends BaseToolInvocation<
 
         // If the model requested to run in the background, do so after a short delay.
         if (this.params.is_background) {
+          const sessionId = this.context.config?.getSessionId?.() ?? 'default';
           setTimeout(() => {
-            ShellExecutionService.background(pid);
+            ShellExecutionService.background(pid, sessionId, strippedCommand);
           }, BACKGROUND_DELAY_MS);
         }
       }

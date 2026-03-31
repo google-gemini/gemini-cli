@@ -65,7 +65,7 @@ describe('Background Tools Integration', () => {
     expect(pid).toBeGreaterThan(0);
 
     // 2. Simulate model triggering background operations
-    ShellExecutionService.background(pid);
+    ShellExecutionService.background(pid, 'default', 'node continuous_log');
 
     // 3. Model decides to inspect list
     const listInvocation = listTool.build({});

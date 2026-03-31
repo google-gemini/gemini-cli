@@ -160,32 +160,24 @@ class ReadBackgroundOutputInvocation extends BaseToolInvocation<
     }
 
     try {
-      const stats = await fs.promises.lstat(logPath);
-      if (stats.isSymbolicLink()) {
-        return {
-          llmContent:
-            'Symbolic link detected at predicted log path. Access is denied for security reasons.',
-          returnDisplay: `Symlink detected for PID ${pid}`,
-          error: {
-            message:
-              'Symbolic link detected at predicted log path. Access is denied for security reasons.',
-            type: ToolErrorType.EXECUTION_FAILED,
-          },
-        };
-      }
+      const fileHandle = await fs.promises.open(
+        logPath,
+        fs.constants.O_RDONLY | fs.constants.O_NOFOLLOW,
+      );
 
-      const readSize = Math.min(stats.size, MAX_BUFFER_LOAD_CAP_BYTES);
-      const position = Math.max(0, stats.size - readSize);
-
-      const buffer = Buffer.alloc(readSize);
-      const fileHandle = await fs.promises.open(logPath, 'r');
+      let content = '';
+      let position = 0;
       try {
+        const stats = await fileHandle.stat();
+        const readSize = Math.min(stats.size, MAX_BUFFER_LOAD_CAP_BYTES);
+        position = Math.max(0, stats.size - readSize);
+
+        const buffer = Buffer.alloc(readSize);
         await fileHandle.read(buffer, 0, readSize, position);
+        content = buffer.toString('utf-8');
       } finally {
         await fileHandle.close();
       }
-
-      const content = buffer.toString('utf-8');
 
       if (!content) {
         return {
@@ -197,6 +189,11 @@ class ReadBackgroundOutputInvocation extends BaseToolInvocation<
       const logLines = content.split('\n');
       if (logLines.length > 0 && logLines[logLines.length - 1] === '') {
         logLines.pop();
+      }
+
+      // Discard first line if we started reading from middle of file to avoid partial lines
+      if (position > 0 && logLines.length > 0) {
+        logLines.shift();
       }
 
       const requestedLinesCount = this.params.lines ?? DEFAULT_TAIL_LINES_COUNT;
@@ -215,6 +212,23 @@ class ReadBackgroundOutputInvocation extends BaseToolInvocation<
         returnDisplay: responseContent,
       };
     } catch (error) {
+      if (
+        typeof error === 'object' &&
+        error !== null &&
+        'code' in error &&
+        error.code === 'ELOOP'
+      ) {
+        return {
+          llmContent:
+            'Symbolic link detected at predicted log path. Access is denied for security reasons.',
+          returnDisplay: `Symlink detected for PID ${pid}`,
+          error: {
+            message:
+              'Symbolic link detected at predicted log path. Access is denied for security reasons.',
+            type: ToolErrorType.EXECUTION_FAILED,
+          },
+        };
+      }
       const errorMessage =
         error instanceof Error ? error.message : String(error);
       return {
@@ -254,6 +268,7 @@ export class ReadBackgroundOutputTool extends BaseDeclarativeTool<
           },
           lines: {
             type: 'integer',
+            minimum: 1,
             description:
               'Optional. Number of lines to read from the end of the log. Defaults to 100.',
           },

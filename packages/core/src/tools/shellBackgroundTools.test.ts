@@ -59,7 +59,7 @@ describe('Background Tools', () => {
       sessionId: 'default',
     });
 
-    ShellExecutionService.background(pid);
+    ShellExecutionService.background(pid, 'default', 'unknown command');
 
     const invocation = listTool.build({});
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -228,8 +228,8 @@ describe('Background Tools', () => {
     fs.mkdirSync(logDir, { recursive: true });
     fs.writeFileSync(logPath, 'dummy content');
 
-    // Mock stat to throw to hit catch block
-    vi.spyOn(fs.promises, 'lstat').mockRejectedValue(
+    // Mock open to throw to hit catch block
+    vi.spyOn(fs.promises, 'open').mockRejectedValue(
       new Error('Simulated read error'),
     );
 
@@ -264,10 +264,11 @@ describe('Background Tools', () => {
     fs.mkdirSync(logDir, { recursive: true });
     fs.writeFileSync(logPath, 'dummy content');
 
-    // Mock lstat to report symbolic link
-    vi.spyOn(fs.promises, 'lstat').mockResolvedValue({
-      isSymbolicLink: () => true,
-    } as unknown as fs.Stats);
+    // Mock open to throw ELOOP error for symbolic link
+    vi.spyOn(fs.promises, 'open').mockRejectedValue({
+      code: 'ELOOP',
+      message: 'ELOOP: too many symbolic links encountered',
+    });
 
     const invocation = readTool.build({ pid });
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
