@@ -118,6 +118,7 @@ export interface IndividualToolCallDisplay {
   callId: string;
   parentCallId?: string;
   name: string;
+  args?: Record<string, unknown>;
   description: string;
   resultDisplay: ToolResultDisplay | undefined;
   status: CoreToolCallStatus;
@@ -369,6 +370,7 @@ export type HistoryItemMcpStatus = HistoryItemBase & {
   showSchema: boolean;
 };
 
+// Individually exported types extending HistoryItemBase
 export type HistoryItemWithoutId =
   | HistoryItemUser
   | HistoryItemUserShell

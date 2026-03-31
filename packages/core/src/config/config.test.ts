@@ -92,6 +92,7 @@ vi.mock('../tools/tool-registry', () => {
   ToolRegistryMock.prototype.sortTools = vi.fn();
   ToolRegistryMock.prototype.getAllTools = vi.fn(() => []); // Mock methods if needed
   ToolRegistryMock.prototype.getTool = vi.fn();
+  ToolRegistryMock.prototype.getAllToolNames = vi.fn(() => []);
   ToolRegistryMock.prototype.getFunctionDeclarations = vi.fn(() => []);
   return { ToolRegistry: ToolRegistryMock };
 });
@@ -226,6 +227,7 @@ vi.mock('../services/contextManager.js', () => ({
     getGlobalMemory: vi.fn().mockReturnValue(''),
     getExtensionMemory: vi.fn().mockReturnValue(''),
     getEnvironmentMemory: vi.fn().mockReturnValue(''),
+    getUserProjectMemory: vi.fn().mockReturnValue(''),
     getLoadedPaths: vi.fn().mockReturnValue(new Set()),
   })),
 }));
@@ -1563,6 +1565,17 @@ describe('Server Config (config.ts)', () => {
       expect(config.getSandboxNetworkAccess()).toBe(false);
     });
   });
+
+  it('should have independent TopicState across instances', () => {
+    const config1 = new Config(baseParams);
+    const config2 = new Config(baseParams);
+
+    config1.topicState.setTopic('Topic 1');
+    config2.topicState.setTopic('Topic 2');
+
+    expect(config1.topicState.getTopic()).toBe('Topic 1');
+    expect(config2.topicState.getTopic()).toBe('Topic 2');
+  });
 });
 
 describe('GemmaModelRouterSettings', () => {
@@ -1667,6 +1680,12 @@ describe('setApprovalMode with folder trust', () => {
     const config = new Config(baseParams);
     vi.spyOn(config, 'isTrustedFolder').mockReturnValue(false);
     expect(() => config.setApprovalMode(ApprovalMode.DEFAULT)).not.toThrow();
+  });
+
+  it('should NOT throw an error when setting PLAN mode in an untrusted folder', () => {
+    const config = new Config(baseParams);
+    vi.spyOn(config, 'isTrustedFolder').mockReturnValue(false);
+    expect(() => config.setApprovalMode(ApprovalMode.PLAN)).not.toThrow();
   });
 
   it('should NOT throw an error when setting any mode in a trusted folder', () => {
@@ -2936,6 +2955,7 @@ describe('Config JIT Initialization', () => {
       getEnvironmentMemory: vi
         .fn()
         .mockReturnValue('Environment Memory\n\nMCP Instructions'),
+      getUserProjectMemory: vi.fn().mockReturnValue(''),
       getLoadedPaths: vi.fn().mockReturnValue(new Set(['/path/to/GEMINI.md'])),
     } as unknown as ContextManager;
     (ContextManager as unknown as Mock).mockImplementation(
@@ -2963,6 +2983,7 @@ describe('Config JIT Initialization', () => {
       global: 'Global Memory',
       extension: 'Extension Memory',
       project: 'Environment Memory\n\nMCP Instructions',
+      userProjectMemory: '',
     });
 
     // Tier 1: system instruction gets only global memory

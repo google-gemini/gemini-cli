@@ -141,6 +141,11 @@ their corresponding top-level category object in your `settings.json` file.
   - **Default:** `false`
   - **Requires restart:** Yes
 
+- **`general.plan.enabled`** (boolean):
+  - **Description:** Enable Plan Mode for read-only safety during planning.
+  - **Default:** `true`
+  - **Requires restart:** Yes
+
 - **`general.plan.directory`** (string):
   - **Description:** The directory where planning artifacts are stored. If not
     specified, defaults to the system temporary directory. A custom directory
@@ -256,6 +261,11 @@ their corresponding top-level category object in your `settings.json` file.
 - **`ui.showShortcutsHint`** (boolean):
   - **Description:** Show the "? for shortcuts" hint above the input.
   - **Default:** `true`
+
+- **`ui.compactToolOutput`** (boolean):
+  - **Description:** Display tool outputs (like directory listings and file
+    reads) in a compact, structured format.
+  - **Default:** `false`
 
 - **`ui.hideBanner`** (boolean):
   - **Description:** Hide the application banner
@@ -669,6 +679,11 @@ their corresponding top-level category object in your `settings.json` file.
       "chat-compression-default": {
         "modelConfig": {
           "model": "gemini-3-pro-preview"
+        }
+      },
+      "agent-history-provider-summarizer": {
+        "modelConfig": {
+          "model": "gemini-3-flash-preview"
         }
       }
     }
@@ -1282,6 +1297,18 @@ their corresponding top-level category object in your `settings.json` file.
   - **Description:** Maximum number of directories to search for memory.
   - **Default:** `200`
 
+- **`context.memoryBoundaryMarkers`** (array):
+  - **Description:** File or directory names that mark the boundary for
+    GEMINI.md discovery. The upward traversal stops at the first directory
+    containing any of these markers. An empty array disables parent traversal.
+  - **Default:**
+
+    ```json
+    [".git"]
+    ```
+
+  - **Requires restart:** Yes
+
 - **`context.includeDirectories`** (array):
   - **Description:** Additional directories to include in the workspace context.
     Missing directories will be skipped with a warning.
@@ -1348,6 +1375,14 @@ their corresponding top-level category object in your `settings.json` file.
     to child_process still applies.
   - **Default:** `true`
   - **Requires restart:** Yes
+
+- **`tools.shell.backgroundCompletionBehavior`** (enum):
+  - **Description:** Controls what happens when a background shell command
+    finishes. 'silent' (default): quietly exits in background. 'inject':
+    automatically returns output to agent. 'notify': shows brief message in
+    chat.
+  - **Default:** `"silent"`
+  - **Values:** `"silent"`, `"inject"`, `"notify"`
 
 - **`tools.shell.pager`** (string):
   - **Description:** The pager command to use for shell output. Defaults to
@@ -1627,11 +1662,6 @@ their corresponding top-level category object in your `settings.json` file.
     configured to allow it).
   - **Default:** `false`
 
-- **`experimental.plan`** (boolean):
-  - **Description:** Enable Plan Mode.
-  - **Default:** `true`
-  - **Requires restart:** Yes
-
 - **`experimental.taskTracker`** (boolean):
   - **Description:** Enable task tracker tools.
   - **Default:** `false`
@@ -1674,6 +1704,11 @@ their corresponding top-level category object in your `settings.json` file.
   - **Description:** Replace the built-in save_memory tool with a memory manager
     subagent that supports adding, removing, de-duplicating, and organizing
     memories.
+  - **Default:** `false`
+  - **Requires restart:** Yes
+
+- **`experimental.contextManagement`** (boolean):
+  - **Description:** Enable logic for context management.
   - **Default:** `false`
   - **Requires restart:** Yes
 
@@ -1767,6 +1802,49 @@ their corresponding top-level category object in your `settings.json` file.
   - **Description:** Hooks that execute before tool selection. Can filter or
     prioritize available tools dynamically.
   - **Default:** `[]`
+
+#### `contextManagement`
+
+- **`contextManagement.historyWindow.maxTokens`** (number):
+  - **Description:** The number of tokens to allow before triggering
+    compression.
+  - **Default:** `150000`
+  - **Requires restart:** Yes
+
+- **`contextManagement.historyWindow.retainedTokens`** (number):
+  - **Description:** The number of tokens to always retain.
+  - **Default:** `40000`
+  - **Requires restart:** Yes
+
+- **`contextManagement.messageLimits.normalMaxTokens`** (number):
+  - **Description:** The target number of tokens to budget for a normal
+    conversation turn.
+  - **Default:** `2500`
+  - **Requires restart:** Yes
+
+- **`contextManagement.messageLimits.retainedMaxTokens`** (number):
+  - **Description:** The maximum number of tokens a single conversation turn can
+    consume before truncation.
+  - **Default:** `12000`
+  - **Requires restart:** Yes
+
+- **`contextManagement.messageLimits.normalizationHeadRatio`** (number):
+  - **Description:** The ratio of tokens to retain from the beginning of a
+    truncated message (0.0 to 1.0).
+  - **Default:** `0.25`
+  - **Requires restart:** Yes
+
+- **`contextManagement.toolDistillation.maxOutputTokens`** (number):
+  - **Description:** Maximum tokens to show when truncating large tool outputs.
+  - **Default:** `10000`
+  - **Requires restart:** Yes
+
+- **`contextManagement.toolDistillation.summarizationThresholdTokens`**
+  (number):
+  - **Description:** Threshold above which truncated tool outputs will be
+    summarized by an LLM.
+  - **Default:** `20000`
+  - **Requires restart:** Yes
 
 #### `admin`
 
