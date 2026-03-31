@@ -357,31 +357,30 @@ async function parseTokenEndpointResponse(
   // Try to parse as JSON first, fall back to form-urlencoded
   try {
     const data: unknown = JSON.parse(responseText);
-    if (
-      data &&
-      typeof data === 'object' &&
-      'access_token' in data &&
-      // eslint-disable-next-line no-restricted-syntax
-      typeof (data as Record<string, unknown>)['access_token'] === 'string'
-    ) {
+    if (data && typeof data === 'object' && 'access_token' in data) {
       const obj = data as Record<string, unknown>;
-      const result: OAuthTokenResponse = {
-        access_token: String(obj['access_token']),
-        token_type:
-          // eslint-disable-next-line no-restricted-syntax
-          typeof obj['token_type'] === 'string' ? obj['token_type'] : 'Bearer',
-        expires_in:
-          // eslint-disable-next-line no-restricted-syntax
-          typeof obj['expires_in'] === 'number' ? obj['expires_in'] : undefined,
-        refresh_token:
-          // eslint-disable-next-line no-restricted-syntax
-          typeof obj['refresh_token'] === 'string'
-            ? obj['refresh_token']
-            : undefined,
-        // eslint-disable-next-line no-restricted-syntax
-        scope: typeof obj['scope'] === 'string' ? obj['scope'] : undefined,
-      };
-      return result;
+      const accessTokenValue = obj['access_token'];
+      if (typeof accessTokenValue === 'string') {
+        const tokenTypeValue = obj['token_type'];
+        const expiresInValue = obj['expires_in'];
+        const refreshTokenValue = obj['refresh_token'];
+        const scopeValue = obj['scope'];
+
+        const result: OAuthTokenResponse = {
+          access_token: accessTokenValue,
+          token_type:
+            typeof tokenTypeValue === 'string' ? tokenTypeValue : 'Bearer',
+          expires_in:
+            typeof expiresInValue === 'number' ? expiresInValue : undefined,
+          refresh_token:
+            typeof refreshTokenValue === 'string'
+              ? refreshTokenValue
+              : undefined,
+
+          scope: typeof scopeValue === 'string' ? scopeValue : undefined,
+        };
+        return result;
+      }
     }
     // JSON parsed but doesn't look like a token response — fall through
   } catch {
