@@ -147,6 +147,17 @@ describe('Storage – additional helpers', () => {
     expect(storage.getProjectAgentsDir()).toBe(expected);
   });
 
+  it('getProjectMemoryDir returns ~/.gemini/memory/<identifier>', async () => {
+    await storage.initialize();
+    const expected = path.join(
+      os.homedir(),
+      GEMINI_DIR,
+      'memory',
+      PROJECT_SLUG,
+    );
+    expect(storage.getProjectMemoryDir()).toBe(expected);
+  });
+
   it('getMcpOAuthTokensPath returns ~/.gemini/mcp-oauth-tokens.json', () => {
     const expected = path.join(
       os.homedir(),

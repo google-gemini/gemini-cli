@@ -517,6 +517,11 @@ ${trimmed}
       `<global_context>\n${memory.global.trim()}\n</global_context>`,
     );
   }
+  if (memory.userProjectMemory?.trim()) {
+    sections.push(
+      `<user_project_memory>\n--- User's Project Memory (private, not committed to repo) ---\n${memory.userProjectMemory.trim()}\n--- End User's Project Memory ---\n</user_project_memory>`,
+    );
+  }
   if (memory.extension?.trim()) {
     sections.push(
       `<extension_context>\n${memory.extension.trim()}\n</extension_context>`,
@@ -798,9 +803,12 @@ function toolUsageRememberingFacts(
 - **Memory Tool:** You MUST use ${formatToolName(MEMORY_TOOL_NAME)} to proactively record facts, preferences, and workflows that apply across all sessions. Whenever the user explicitly tells you to "remember" something, or when they state a preference or workflow (like "always lint after editing"), you MUST immediately call the save_memory subagent. Never save transient session state. Do not use memory to store summaries of code changes, bug fixes, or findings discovered during a task; this tool is strictly for persistent general knowledge.`;
   }
   const base = `
-- **Memory Tool:** Use ${formatToolName(MEMORY_TOOL_NAME)} only for global user preferences, personal facts, or high-level information that applies across all sessions. Never save workspace-specific context, local file paths, or transient session state. Do not use memory to store summaries of code changes, bug fixes, or findings discovered during a task; this tool is for persistent user-related information only.`;
+- **Memory Tool:** Use ${formatToolName(MEMORY_TOOL_NAME)} to persist facts across sessions. It supports two scopes via the \`scope\` parameter:
+  - \`"global"\` (default): Cross-project preferences and personal facts loaded in every workspace.
+  - \`"project"\`: Facts specific to the current workspace, private to the user (not committed to the repo). Use this for local dev setup notes, project-specific workflows, or personal reminders about this codebase.
+  Never save transient session state. Do not use memory to store summaries of code changes, bug fixes, or findings discovered during a task.`;
   const suffix = options.interactive
-    ? ' If unsure whether a fact is worth remembering globally, ask the user.'
+    ? ' If unsure whether a fact is global or project-specific, ask the user.'
     : '';
   return base + suffix;
 }

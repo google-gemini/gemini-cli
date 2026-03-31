@@ -405,6 +405,11 @@ ${trimmed}
       `<global_context>\n${memory.global.trim()}\n</global_context>`,
     );
   }
+  if (memory.userProjectMemory?.trim()) {
+    sections.push(
+      `<user_project_memory>\n--- User's Project Memory (private, not committed to repo) ---\n${memory.userProjectMemory.trim()}\n--- End User's Project Memory ---\n</user_project_memory>`,
+    );
+  }
   if (memory.extension?.trim()) {
     sections.push(
       `<extension_context>\n${memory.extension.trim()}\n</extension_context>`,
