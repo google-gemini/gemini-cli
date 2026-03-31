@@ -37,6 +37,18 @@ const __dirname = path.dirname(__filename);
 // Default browser profile directory name within ~/.gemini/
 const BROWSER_PROFILE_DIR = 'cli-browser-profile';
 
+/**
+ * Typed error for domain restriction violations.
+ * Thrown when a navigation tool targets a domain not in allowedDomains.
+ * Caught by mcpToolWrapper to terminate the agent immediately.
+ */
+export class DomainNotAllowedError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = 'DomainNotAllowedError';
+  }
+}
+
 // Default timeout for MCP operations
 const MCP_TIMEOUT_MS = 60_000;
 
@@ -242,15 +254,7 @@ export class BrowserManager {
 
     const errorMessage = this.checkNavigationRestrictions(toolName, args);
     if (errorMessage) {
-      return {
-        content: [
-          {
-            type: 'text',
-            text: errorMessage,
-          },
-        ],
-        isError: true,
-      };
+      throw new DomainNotAllowedError(errorMessage);
     }
 
     const client = await this.getRawMcpClient();
@@ -526,7 +530,7 @@ export class BrowserManager {
         })
         .join(', ');
       mcpArgs.push(
-        `--chromeArg="--host-rules=MAP * 127.0.0.1, ${exclusionRules}, EXCLUDE 127.0.0.1"`,
+        `--chromeArg="--host-rules=MAP * ~NOTFOUND, ${exclusionRules}"`,
       );
     }
 
@@ -739,8 +743,7 @@ export class BrowserManager {
       const urlHostname = parsedUrl.hostname;
 
       if (!this.isDomainAllowed(urlHostname, allowedDomains)) {
-        // If none matched, then deny
-        return `Tool '${toolName}' is not permitted for the requested URL/domain based on your current browser settings.`;
+        return 'Domain not allowed: The requested domain is not in the allowed list.';
       }
 
       // Check query parameters for embedded URLs that could bypass domain
@@ -759,7 +762,7 @@ export class BrowserManager {
           ) {
             const embeddedHostname = embeddedUrl.hostname.replace(/\.$/, '');
             if (!this.isDomainAllowed(embeddedHostname, allowedDomains)) {
-              return `Tool '${toolName}' is not permitted: an embedded URL targets a disallowed domain.`;
+              return 'Domain not allowed: Embedded URL targets a disallowed domain.';
             }
           }
         } catch {

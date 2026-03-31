@@ -28,7 +28,11 @@ import {
   type PolicyUpdateOptions,
 } from '../../tools/tools.js';
 import type { MessageBus } from '../../confirmation-bus/message-bus.js';
-import type { BrowserManager, McpToolCallResult } from './browserManager.js';
+import {
+  type BrowserManager,
+  type McpToolCallResult,
+  DomainNotAllowedError,
+} from './browserManager.js';
 import { debugLogger } from '../../utils/debugLogger.js';
 import { suspendInputBlocker, resumeInputBlocker } from './inputBlocker.js';
 import { MCP_TOOL_PREFIX } from '../../tools/mcp-tool.js';
@@ -173,9 +177,13 @@ class McpToolInvocation extends BaseToolInvocation<
     } catch (error) {
       const errorMsg = error instanceof Error ? error.message : String(error);
 
-      // Chrome connection errors are fatal — re-throw to terminate the agent
-      // immediately instead of returning a result the LLM would retry.
-      if (errorMsg.includes('Could not connect to Chrome')) {
+      // Domain restriction and Chrome connection errors are fatal — re-throw
+      // to terminate the agent immediately instead of returning a result
+      // the LLM would retry or work around.
+      if (
+        error instanceof DomainNotAllowedError ||
+        errorMsg.includes('Could not connect to Chrome')
+      ) {
         throw error;
       }
 
