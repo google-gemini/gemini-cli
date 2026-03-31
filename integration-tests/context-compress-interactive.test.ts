@@ -19,7 +19,7 @@ describe('Interactive Mode', () => {
     await rig.cleanup();
   });
 
-  it.skip('should trigger chat compression with /compress command', async () => {
+  it('should trigger chat compression with /compress command', async () => {
     await rig.setup('interactive-compress-success', {
       fakeResponsesPath: join(
         import.meta.dirname,
