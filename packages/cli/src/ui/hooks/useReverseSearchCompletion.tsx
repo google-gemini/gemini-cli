@@ -9,13 +9,14 @@ import { useCompletion } from './useCompletion.js';
 import type { TextBuffer } from '../components/shared/text-buffer.js';
 import type { Suggestion } from '../components/SuggestionsDisplay.js';
 
-function useDebouncedValue<T>(value: T, delay = 200): T {
+function useDebouncedValue<T>(value: T, delay = 200, enabled = true): T {
   const [debounced, setDebounced] = useState(value);
   useEffect(() => {
+    if (!enabled) return;
     const handle = setTimeout(() => setDebounced(value), delay);
     return () => clearTimeout(handle);
-  }, [value, delay]);
-  return debounced;
+  }, [value, delay, enabled]);
+  return enabled ? debounced : value;
 }
 
 export interface UseReverseSearchCompletionReturn {
@@ -48,7 +49,11 @@ export function useReverseSearchCompletion(
     setVisibleStartIndex,
   } = useCompletion();
 
-  const debouncedQuery = useDebouncedValue(buffer.text, 100);
+  const debouncedQuery = useDebouncedValue(
+    buffer.text,
+    100,
+    reverseSearchActive,
+  );
 
   // incremental search
   const prevQueryRef = useRef<string>('');

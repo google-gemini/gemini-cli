@@ -26,8 +26,10 @@ describe('SuggestionsDisplay UX Journey', () => {
     );
     rig = new AppRig({ fakeResponsesPath });
     await rig.initialize();
-    rig.render();
+    await rig.render();
     await rig.waitForIdle();
+    // Allow async command loading to settle
+    await new Promise((resolve) => setTimeout(resolve, 500));
   });
 
   afterEach(async () => {

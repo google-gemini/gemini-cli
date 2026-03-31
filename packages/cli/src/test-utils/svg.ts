@@ -221,6 +221,14 @@ export const generateSvgForTerminal = (
       if (node.internal_componentName)
         components.add(node.internal_componentName);
       if (node.internal_testId) components.add(node.internal_testId);
+      if (node.attributes?.internal_componentName)
+        components.add(node.attributes.internal_componentName);
+      if (node.attributes?.internal_testId)
+        components.add(node.attributes.internal_testId);
+      if (node.style?.internal_componentName)
+        components.add(node.style.internal_componentName);
+      if (node.style?.internal_testId)
+        components.add(node.style.internal_testId);
       if (node.childNodes) {
         for (const child of node.childNodes) collect(child);
       }

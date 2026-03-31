@@ -732,8 +732,16 @@ export class AppRig {
 
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         const find = (node: any): boolean => {
-          if (node.internal_componentName === componentName) return true;
-          if (node.internal_testId === componentName) return true;
+          if (
+            node.internal_componentName === componentName ||
+            node.internal_testId === componentName ||
+            node.attributes?.internal_testId === componentName ||
+            node.attributes?.internal_componentName === componentName ||
+            node.style?.internal_testId === componentName ||
+            node.style?.internal_componentName === componentName
+          ) {
+            return true;
+          }
           if (node.childNodes) {
             for (const child of node.childNodes) {
               if (child.nodeName !== '#text' && find(child)) return true;
@@ -746,7 +754,7 @@ export class AppRig {
       },
       {
         timeout,
-        message: `Timed out waiting for component: ${componentName}`,
+        message: `Timed out waiting for component: ${componentName}\nLast frame:\n${this.lastFrame}`,
       },
     );
   }

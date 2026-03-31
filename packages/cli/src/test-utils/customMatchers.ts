@@ -34,7 +34,7 @@ function findInTree(
 ): DOMNode | undefined {
   if (predicate(node)) return node;
   if (node.nodeName !== '#text') {
-    for (const child of (node as _DOMElement).childNodes) {
+    for (const child of (node).childNodes) {
       const found = findInTree(child, predicate);
       if (found) return found;
     }
@@ -66,7 +66,11 @@ export function toVisuallyContain(
         const el = node as any;
         const match =
           el.internal_componentName === componentName ||
-          el.internal_testId === componentName;
+          el.internal_testId === componentName ||
+          el.attributes?.internal_componentName === componentName ||
+          el.attributes?.internal_testId === componentName ||
+          el.style?.internal_componentName === componentName ||
+          el.style?.internal_testId === componentName;
         return match;
       })
     : false;
@@ -107,11 +111,17 @@ export async function toMatchSvgSnapshot(
 
   let textContent: string;
   if (renderInstance.lastFrameRaw) {
-    textContent = renderInstance.lastFrameRaw({
-      allowEmpty: options?.allowEmpty,
-    });
+    textContent =
+      typeof renderInstance.lastFrameRaw === 'function'
+        ? renderInstance.lastFrameRaw({
+            allowEmpty: options?.allowEmpty,
+          })
+        : renderInstance.lastFrameRaw;
   } else if (renderInstance.lastFrame) {
-    textContent = renderInstance.lastFrame({ allowEmpty: options?.allowEmpty });
+    textContent =
+      typeof renderInstance.lastFrame === 'function'
+        ? renderInstance.lastFrame({ allowEmpty: options?.allowEmpty })
+        : renderInstance.lastFrame;
   } else {
     throw new Error(
       'toMatchSvgSnapshot requires a renderInstance with either lastFrameRaw or lastFrame',

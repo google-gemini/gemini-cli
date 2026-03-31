@@ -2,10 +2,10 @@
 
 exports[`SuggestionsDisplay UX Journey > should visually show the suggestions display when / is typed 1`] = `
 "
-  ▝▜▄     Gemini CLI vtest-version
-    ▝▜▄
-   ▗▟▀    Authenticated with gemini-api-key /auth
-  ▝▀    
+ ▝▜▄     Gemini CLI vtest-version
+   ▝▜▄
+  ▗▟▀    Authenticated with gemini-api-key /auth
+ ▝▀    
 
 
 Tips for getting started:
@@ -15,21 +15,21 @@ Tips for getting started:
 4. Be specific for the best results
 
 
+
 ────────────────────────────────────────────────────────────
  Shift+Tab to accept edits
-
 
 ▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀
  > / 
 ▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄
+ compress         Compresses the context by replacing it…
+ directory        Manage workspace directories
+ footer           Configure which items appear in the fo…
+ quit             Exit the cli
+ stats            Check session stats. Usage: /stats [se…
+ tasks            Toggle background tasks view
  about            Show version info
  agents           Manage agents
- auth             Manage authentication
- bug              Submit a bug report
- chat             Browse auto-saved conversations and ma…
- clear            Clear the screen and conversation hist…
- commands         Manage custom slash commands. Usage: /…
- compress         Compresses the context by replacing it…
  ▼
  (1/38)
  workspace (/directory)        sandbox               /model
