@@ -1,16 +1,4 @@
 #!/usr/bin/env node
-/**
- * perfetto_export.js
- * Converts Node.js heap snapshots and CPU profiles into Perfetto trace format.
- * Output can be loaded in https://ui.perfetto.dev
- *
- * Usage:
- *   node perfetto_export.js --heap <snapshot.heapsnapshot>
- *   node perfetto_export.js --cpu <profile.cpuprofile>
- *   node perfetto_export.js --heap <snap.heapsnapshot> --cpu <prof.cpuprofile>
- *
- * Output: <filename>.perfetto-trace (JSON format compatible with ui.perfetto.dev)
- */
 
 import { readFileSync, writeFileSync } from 'fs';
 import path from 'path';
@@ -30,10 +18,6 @@ if (!heapFile && !cpuFile) {
   process.exit(1);
 }
 
-// ── Perfetto JSON Trace Format ────────────────────────────────────────────────
-// Uses the Trace Event Format (chrome://tracing compatible)
-// Reference: https://docs.google.com/document/d/1CvAClvFfyA5R-PhYUmn5OOQtYMH4h6I0nSsKchNAySU
-
 function createTrace() {
   return {
     traceEvents: [],
@@ -44,8 +28,6 @@ function createTrace() {
     displayTimeUnit: 'ms',
   };
 }
-
-// ── Heap Snapshot → Perfetto ──────────────────────────────────────────────────
 
 function convertHeapSnapshot(filePath, trace) {
   console.log(`Loading heap snapshot: ${path.basename(filePath)}`);
@@ -60,7 +42,6 @@ function convertHeapSnapshot(filePath, trace) {
   const strings = raw.strings;
   const nodeCount = raw.snapshot.node_count;
 
-  // Aggregate by class for memory breakdown counter track
   const byClass = new Map();
   let totalSize = 0;
 
@@ -76,18 +57,15 @@ function convertHeapSnapshot(filePath, trace) {
     byClass.set(key, byClass.get(key) + selfSize);
   }
 
-  // Sort by size
   const sorted = [...byClass.entries()].sort((a, b) => b[1] - a[1]);
 
-  // Create a counter track event for each top class
-  const ts = 0; // timestamp in microseconds
+  const ts = 0;
   const pid = 1;
   const topN = sorted.slice(0, 20);
 
-  // Memory totals as instant event
   trace.traceEvents.push({
     name: 'HeapSnapshot',
-    ph: 'i', // instant
+    ph: 'i',
     ts,
     pid,
     tid: 1,
@@ -99,11 +77,10 @@ function convertHeapSnapshot(filePath, trace) {
     }
   });
 
-  // Top memory consumers as counter events
   topN.forEach(([cls, size], idx) => {
     trace.traceEvents.push({
       name: cls,
-      ph: 'C', // counter
+      ph: 'C',
       ts: ts + idx,
       pid,
       tid: 1,
@@ -114,15 +91,13 @@ function convertHeapSnapshot(filePath, trace) {
     });
   });
 
-  // Top allocations as flow events for visualization
   topN.slice(0, 10).forEach(([cls, size], idx) => {
     const pct = ((size / totalSize) * 100).toFixed(1);
-    // Duration event to show as flame-style bar
     trace.traceEvents.push({
       name: `${cls} (${pct}%)`,
-      ph: 'X', // complete (duration)
+      ph: 'X',
       ts: idx * 1000,
-      dur: Math.max(1, Math.round(size / 1024)), // width proportional to size
+      dur: Math.max(1, Math.round(size / 1024)),
       pid,
       tid: idx + 1,
       args: {
@@ -132,11 +107,9 @@ function convertHeapSnapshot(filePath, trace) {
     });
   });
 
-  console.log(`  ✓ Converted ${nodeCount.toLocaleString()} nodes, total ${(totalSize / 1024 / 1024).toFixed(2)} MB`);
+  console.log(`  Converted ${nodeCount.toLocaleString()} nodes, total ${(totalSize / 1024 / 1024).toFixed(2)} MB`);
   return totalSize;
 }
-
-// ── CPU Profile → Perfetto ────────────────────────────────────────────────────
 
 function convertCpuProfile(filePath, trace) {
   console.log(`Loading CPU profile: ${path.basename(filePath)}`);
@@ -145,7 +118,6 @@ function convertCpuProfile(filePath, trace) {
   const pid = 2;
   const tid = 1;
 
-  // Build node map
   const nodeMap = new Map();
   function indexNodes(node) {
     nodeMap.set(node.id, node);
@@ -154,7 +126,7 @@ function convertCpuProfile(filePath, trace) {
   indexNodes(profile.head);
 
   if (!profile.samples || profile.samples.length === 0) {
-    console.log('  ⚠ No samples in profile, skipping CPU conversion');
+    console.log('  No samples in profile, skipping CPU conversion');
     return;
   }
 
@@ -162,7 +134,6 @@ function convertCpuProfile(filePath, trace) {
   const timeDeltas = profile.timeDeltas || [];
   let currentTime = startTime;
 
-  // Convert each sample to a trace event
   for (let i = 0; i < profile.samples.length; i++) {
     const nodeId = profile.samples[i];
     const node = nodeMap.get(nodeId);
@@ -177,8 +148,8 @@ function convertCpuProfile(filePath, trace) {
 
     trace.traceEvents.push({
       name: fn,
-      ph: 'X', // complete event
-      ts: (currentTime - startTime) / 1000, // µs → ms
+      ph: 'X',
+      ts: (currentTime - startTime) / 1000,
       dur: delta / 1000,
       pid,
       tid,
@@ -192,10 +163,8 @@ function convertCpuProfile(filePath, trace) {
   }
 
   const totalMs = (currentTime - startTime) / 1000000;
-  console.log(`  ✓ Converted ${profile.samples.length.toLocaleString()} samples, ${totalMs.toFixed(2)}s duration`);
+  console.log(`  Converted ${profile.samples.length.toLocaleString()} samples, ${totalMs.toFixed(2)}s duration`);
 }
-
-// ── Main ──────────────────────────────────────────────────────────────────────
 
 const trace = createTrace();
 const parts = [];
@@ -215,7 +184,7 @@ const outputPath = path.join(outputDir, outputName);
 
 writeFileSync(outputPath, JSON.stringify(trace, null, 2));
 
-console.log(`\n✅ Perfetto trace exported: ${outputPath}`);
+console.log(`\nPerfetto trace exported: ${outputPath}`);
 console.log('\nTo view:');
 console.log('  1. Open https://ui.perfetto.dev');
 console.log('  2. Click "Open trace file"');

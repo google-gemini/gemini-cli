@@ -1,26 +1,4 @@
 #!/usr/bin/env node
-/**
- * three_snapshot.js
- * Automates the 3-snapshot leak detection technique.
- *
- * Usage:
- *   node three_snapshot.js --port 9229 --interval 5000
- *   node three_snapshot.js --script <path> --interval 3000
- *
- * The 3-snapshot technique:
- *   1. Snapshot A (baseline)
- *   2. Wait / perform action
- *   3. Snapshot B
- *   4. Wait / perform action again
- *   5. Snapshot C
- *   6. Objects in B AND C but NOT A = leaked objects
- *
- * Output:
- *   - heap-A-<ts>.heapsnapshot
- *   - heap-B-<ts>.heapsnapshot
- *   - heap-C-<ts>.heapsnapshot
- *   - leak-report-<ts>.txt (human-readable diff)
- */
 
 import { createConnection } from 'net';
 import { writeFileSync, mkdirSync } from 'fs';
@@ -107,7 +85,7 @@ async function takeSnapshot(ws, WebSocket, label) {
   const outputPath = path.join(outputDir, `heap-${label}-${timestamp}.heapsnapshot`);
   const chunks = [];
 
-  console.log(`\n📸 Taking snapshot ${label}...`);
+  console.log(`\nTaking snapshot ${label}...`);
 
   return new Promise((resolve, reject) => {
     const chunkHandler = (raw) => {
@@ -130,7 +108,7 @@ async function takeSnapshot(ws, WebSocket, label) {
         const snapshot = chunks.join('');
         writeFileSync(outputPath, snapshot);
         const sizeMB = (snapshot.length / 1024 / 1024).toFixed(2);
-        console.log(`✅ Snapshot ${label} saved: ${path.basename(outputPath)} (${sizeMB} MB)`);
+        console.log(`Snapshot ${label} saved: ${path.basename(outputPath)} (${sizeMB} MB)`);
         resolve(outputPath);
       }
     };
@@ -141,7 +119,7 @@ async function takeSnapshot(ws, WebSocket, label) {
 
 async function forceGC(ws) {
   try {
-    console.log('🗑️  Forcing garbage collection...');
+    console.log('Forcing garbage collection...');
     await sendCdpCommand(ws, 'HeapProfiler.collectGarbage');
     await sleep(500);
   } catch (e) {
@@ -162,7 +140,7 @@ async function main() {
   let childProcess = null;
 
   if (script) {
-    console.log(`🚀 Starting: node --inspect=${port} ${script}`);
+    console.log(`Starting: node --inspect=${port} ${script}`);
     childProcess = spawn(process.execPath, [`--inspect=${port}`, '--expose-gc', script], {
       stdio: ['ignore', 'pipe', 'pipe'],
     });
@@ -173,7 +151,7 @@ async function main() {
   }
 
   await waitForPort('127.0.0.1', port);
-  console.log('✓ Inspector ready');
+  console.log('Inspector ready');
 
   const { default: WebSocket } = await import('ws').catch(async () => {
     execSync('npm install ws --no-save', { stdio: 'inherit' });
@@ -188,39 +166,32 @@ async function main() {
     ws.once('error', reject);
   });
 
-  console.log('✓ Connected to inspector\n');
+  console.log('Connected to inspector\n');
 
-  // Enable heap profiler
   await sendCdpCommand(ws, 'HeapProfiler.enable');
 
   const snapshotFiles = [];
 
-  // ── SNAPSHOT A (baseline) ──────────────────────────────────────────────────
   if (gcBetween) await forceGC(ws);
   const snapA = await takeSnapshot(ws, WebSocket, 'A-baseline');
   snapshotFiles.push(snapA);
 
-  // ── WAIT ───────────────────────────────────────────────────────────────────
-  console.log(`\n⏳ Waiting ${intervalMs}ms... (perform your action now if testing manually)`);
+  console.log(`\nWaiting ${intervalMs}ms... (perform your action now if testing manually)`);
   await sleep(intervalMs);
 
-  // ── SNAPSHOT B ─────────────────────────────────────────────────────────────
   if (gcBetween) await forceGC(ws);
   const snapB = await takeSnapshot(ws, WebSocket, 'B-after-first');
   snapshotFiles.push(snapB);
 
-  // ── WAIT AGAIN ────────────────────────────────────────────────────────────
-  console.log(`\n⏳ Waiting ${intervalMs}ms again...`);
+  console.log(`\nWaiting ${intervalMs}ms again...`);
   await sleep(intervalMs);
 
-  // ── SNAPSHOT C ─────────────────────────────────────────────────────────────
   if (gcBetween) await forceGC(ws);
   const snapC = await takeSnapshot(ws, WebSocket, 'C-after-second');
   snapshotFiles.push(snapC);
 
   ws.close();
 
-  // ── ANALYSIS ───────────────────────────────────────────────────────────────
   console.log('\n\n' + '═'.repeat(60));
   console.log('  ANALYZING SNAPSHOTS...');
   console.log('═'.repeat(60));
@@ -234,11 +205,10 @@ async function main() {
     });
     console.log(result);
 
-    // Save report
     const reportTs = new Date().toISOString().replace(/[:.]/g, '-');
     const reportPath = path.join(outputDir, `leak-report-${reportTs}.txt`);
     writeFileSync(reportPath, result);
-    console.log(`📄 Report saved: ${reportPath}`);
+    console.log(`Report saved: ${reportPath}`);
     console.log('\nTo view snapshots visually:');
     console.log('  1. Open Chrome → DevTools → Memory tab');
     console.log('  2. Click "Load" and select the .heapsnapshot files');

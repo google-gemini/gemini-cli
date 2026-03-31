@@ -1,17 +1,4 @@
 #!/usr/bin/env node
-/**
- * capture_snapshot.js
- * Captures a heap snapshot from a running Node.js process via CDP
- * (Chrome DevTools Protocol) using --inspect.
- *
- * Usage:
- *   node capture_snapshot.js --pid <PID>
- *   node capture_snapshot.js --port <inspect-port>  (default: 9229)
- *   node capture_snapshot.js --script <path-to-script.js>
- *
- * Output:
- *   heap-<timestamp>.heapsnapshot in current directory
- */
 
 import { createConnection } from 'net';
 import { writeFileSync } from 'fs';
@@ -81,36 +68,33 @@ async function captureSnapshot(wsUrl, outputPath) {
     const chunks = [];
 
     ws.on('open', () => {
-      console.log('✓ Connected to Node.js inspector');
-      console.log('📸 Taking heap snapshot (this may take a moment)...');
+      console.log('Connected to Node.js inspector');
+      console.log('Taking heap snapshot (this may take a moment)...');
       ws.send(JSON.stringify({ id: msgId++, method: 'HeapProfiler.takeHeapSnapshot', params: { reportProgress: true } }));
     });
 
     ws.on('message', (raw) => {
       const msg = JSON.parse(raw.toString());
 
-      // Collect snapshot chunks
       if (msg.method === 'HeapProfiler.addHeapSnapshotChunk') {
         chunks.push(msg.params.chunk);
         process.stdout.write('.');
         return;
       }
 
-      // Progress reporting
       if (msg.method === 'HeapProfiler.reportHeapSnapshotProgress') {
         const pct = Math.round((msg.params.done / msg.params.total) * 100);
-        process.stdout.write(`\r📸 Snapshotting: ${pct}%   `);
+        process.stdout.write(`\rSnapshotting: ${pct}%   `);
         return;
       }
 
-      // Snapshot complete
       if (msg.method === 'HeapProfiler.heapSnapshotChunkEnd' || 
           (msg.id && chunks.length > 0)) {
         process.stdout.write('\n');
         const snapshot = chunks.join('');
         writeFileSync(outputPath, snapshot);
-        console.log(`✅ Snapshot saved: ${outputPath}`);
-        console.log(`   Size: ${(snapshot.length / 1024 / 1024).toFixed(2)} MB`);
+        console.log(`Snapshot saved: ${outputPath}`);
+        console.log(`Size: ${(snapshot.length / 1024 / 1024).toFixed(2)} MB`);
         ws.close();
         resolve(outputPath);
       }
@@ -118,12 +102,11 @@ async function captureSnapshot(wsUrl, outputPath) {
 
     ws.on('error', reject);
 
-    // Fallback: close after snapshot method returns
     setTimeout(() => {
       if (chunks.length > 0) {
         const snapshot = chunks.join('');
         writeFileSync(outputPath, snapshot);
-        console.log(`\n✅ Snapshot saved: ${outputPath}`);
+        console.log(`\nSnapshot saved: ${outputPath}`);
         ws.close();
         resolve(outputPath);
       }
@@ -139,21 +122,19 @@ async function main() {
 
   try {
     if (script) {
-      // Launch script with --inspect
-      console.log(`🚀 Launching ${script} with --inspect on port ${port}...`);
+      console.log(`Launching ${script} with --inspect on port ${port}...`);
       childProcess = spawn(process.execPath, [`--inspect=${port}`, script], {
         stdio: ['ignore', 'pipe', 'pipe'],
         detached: false
       });
       childProcess.stderr.on('data', (d) => {
         if (d.toString().includes('Debugger listening')) {
-          console.log('✓ Inspector ready');
+          console.log('Inspector ready');
         }
       });
       await waitForPort('127.0.0.1', port);
     } else if (pid) {
-      // Signal existing process to open inspector
-      console.log(`🔍 Connecting to PID ${pid} on port ${port}...`);
+      console.log(`Connecting to PID ${pid} on port ${port}...`);
       try {
         process.kill(parseInt(pid), 'SIGUSR1');
         await new Promise(r => setTimeout(r, 500));
@@ -162,16 +143,16 @@ async function main() {
       }
       await waitForPort('127.0.0.1', port, 5000);
     } else {
-      console.log(`🔍 Connecting to inspector on port ${port}...`);
+      console.log(`Connecting to inspector on port ${port}...`);
       await waitForPort('127.0.0.1', port, 5000);
     }
 
     const wsUrl = await getWebSocketUrl(port);
-    console.log(`🔗 WebSocket: ${wsUrl}`);
+    console.log(`WebSocket: ${wsUrl}`);
     await captureSnapshot(wsUrl, outputPath);
 
   } catch (err) {
-    console.error(`\n❌ Error: ${err.message}`);
+    console.error(`\nError: ${err.message}`);
     console.error('\nTroubleshooting:');
     console.error('  1. Start your Node.js process with: node --inspect <script.js>');
     console.error('  2. Or use: node capture_snapshot.js --script <path>');
@@ -179,7 +160,6 @@ async function main() {
     process.exit(1);
   } finally {
     if (childProcess) {
-      // Give some time before killing (user might want to take more snapshots)
       console.log('\nPress Ctrl+C to stop the inspected process.');
     }
   }

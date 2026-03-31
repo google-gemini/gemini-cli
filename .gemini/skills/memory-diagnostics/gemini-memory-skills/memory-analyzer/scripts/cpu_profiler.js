@@ -169,10 +169,10 @@ function fmtProfile(analysis, profilePath) {
 
   const hot = analysis.topFunctions.filter(f => parseFloat(f.pct) > 5);
   if (hot.length === 0) {
-    lines.push('  ✅ No single hotspot dominates CPU time (healthy spread)');
+    lines.push('  No single hotspot dominates CPU time (healthy spread)');
   } else {
     for (const f of hot) {
-      lines.push(`  🔥 "${f.name}" consumes ${f.pct}% of CPU time`);
+      lines.push(`  "${f.name}" consumes ${f.pct}% of CPU time`);
       if (f.file.includes('node_modules')) {
         lines.push(`     → In dependency: ${f.file.replace(/.*node_modules\//, '').split('/')[0]}`);
       }
@@ -192,7 +192,7 @@ async function main() {
   let childProcess = null;
 
   if (script) {
-    console.log(`\n🚀 Starting: node --inspect=${port} ${script}`);
+    console.log(`\n Starting: node --inspect=${port} ${script}`);
     childProcess = spawn(process.execPath, [`--inspect=${port}`, script], {
       stdio: ['ignore', 'pipe', 'pipe'],
     });
@@ -212,11 +212,11 @@ async function main() {
   const ws = new WebSocket(wsUrl);
   await new Promise((resolve, reject) => { ws.once('open', resolve); ws.once('error', reject); });
 
-  console.log('✓ Connected\n');
+  console.log(' Connected\n');
   await cdp(ws, 'Profiler.enable');
   await cdp(ws, 'Profiler.setSamplingInterval', { interval: 100 }); // 100µs
 
-  console.log(`🎬 Recording CPU profile for ${duration}ms...`);
+  console.log(` Recording CPU profile for ${duration}ms...`);
   await cdp(ws, 'Profiler.start');
 
   // Progress bar
@@ -225,14 +225,14 @@ async function main() {
     const elapsed = Date.now() - start;
     const pct = Math.min(100, Math.round((elapsed / duration) * 100));
     const filled = Math.round(pct / 2);
-    process.stdout.write(`\r  [${'█'.repeat(filled)}${'░'.repeat(50 - filled)}] ${pct}%`);
+    process.stdout.write(`\r  [${"#".repeat(filled)}${'░'.repeat(50 - filled)}] ${pct}%`);
   }, 200);
 
   await new Promise(r => setTimeout(r, duration));
   clearInterval(bar);
   process.stdout.write('\n');
 
-  console.log('\n⏹️  Stopping profiler...');
+  console.log('\n  Stopping profiler...');
   const result = await cdp(ws, 'Profiler.stop');
   ws.close();
 
@@ -241,14 +241,14 @@ async function main() {
   const reportPath = path.join(outputDir, `profile-report-${timestamp}.txt`);
 
   writeFileSync(profilePath, JSON.stringify(result.profile, null, 2));
-  console.log(`\n✅ Profile saved: ${profilePath}`);
+  console.log(`\n Profile saved: ${profilePath}`);
 
   const analysis = analyzeProfile(result.profile);
   const report = fmtProfile(analysis, profilePath);
   console.log('\n' + report);
 
   writeFileSync(reportPath, report);
-  console.log(`📄 Report saved: ${reportPath}`);
+  console.log(` Report saved: ${reportPath}`);
   console.log('\nTo view visually:');
   console.log('  Chrome DevTools → Performance tab → Load profile');
 

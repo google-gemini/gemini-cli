@@ -1,19 +1,4 @@
 #!/usr/bin/env node
-/**
- * analyze_snapshot.js
- * Analyzes a .heapsnapshot file and outputs a structured memory report.
- *
- * Usage:
- *   node analyze_snapshot.js <snapshot.heapsnapshot>
- *   node analyze_snapshot.js <snap1.heapsnapshot> <snap2.heapsnapshot>   # diff mode
- *   node analyze_snapshot.js --json <snapshot.heapsnapshot>              # JSON output
- *
- * The .heapsnapshot format is a V8 heap snapshot (JSON) with:
- *   - snapshot.meta: field names, types, edge types
- *   - nodes: flat array of [type, name, id, self_size, edge_count, ...]
- *   - edges: flat array of [type, name_or_index, to_node]
- *   - strings: string table
- */
 
 import { readFileSync } from 'fs';
 import path from 'path';
@@ -27,17 +12,15 @@ if (files.length === 0) {
   process.exit(1);
 }
 
-// ── Parser ────────────────────────────────────────────────────────────────────
-
 function parseSnapshot(filePath) {
   console.error(`Loading ${path.basename(filePath)}...`);
   const raw = JSON.parse(readFileSync(filePath, 'utf8'));
 
   const meta = raw.snapshot.meta;
-  const nodeFields = meta.node_fields;       // e.g. ['type','name','id','self_size','edge_count','trace_node_id','detachedness']
-  const nodeTypes = meta.node_types[0];      // e.g. ['hidden','array','string','object',...]
-  const edgeFields = meta.edge_fields;       // e.g. ['type','name_or_index','to_node']
-  const edgeTypes = meta.edge_types[0];      // e.g. ['context','element','property',...]
+  const nodeFields = meta.node_fields;
+  const nodeTypes = meta.node_types[0];
+  const edgeFields = meta.edge_fields;
+  const edgeTypes = meta.edge_types[0];
 
   const nodeCount = raw.snapshot.node_count;
   const edgeCount = raw.snapshot.edge_count;
@@ -48,11 +31,9 @@ function parseSnapshot(filePath) {
   const edges = raw.edges;
   const strings = raw.strings;
 
-  // Field indices
   const F = Object.fromEntries(nodeFields.map((f, i) => [f, i]));
   const EF = Object.fromEntries(edgeFields.map((f, i) => [f, i]));
 
-  // Build node objects
   const nodeList = [];
   for (let i = 0; i < nodeCount; i++) {
     const base = i * nodeFieldCount;
@@ -67,7 +48,6 @@ function parseSnapshot(filePath) {
     });
   }
 
-  // Aggregate by type+name
   const byClass = new Map();
   for (const node of nodeList) {
     const key = node.type === 'object' || node.type === 'closure' || node.type === 'regexp'
@@ -79,21 +59,17 @@ function parseSnapshot(filePath) {
     entry.selfSize += node.selfSize;
   }
 
-  // Detached nodes
   const detached = nodeList.filter(n => n.detachedness === 1);
 
-  // Large objects (>100KB self size)
   const largeObjects = nodeList
     .filter(n => n.selfSize > 100 * 1024)
     .sort((a, b) => b.selfSize - a.selfSize)
     .slice(0, 20);
 
-  // Top classes by self size
   const topBySize = [...byClass.values()]
     .sort((a, b) => b.selfSize - a.selfSize)
     .slice(0, 30);
 
-  // Top classes by count
   const topByCount = [...byClass.values()]
     .sort((a, b) => b.count - a.count)
     .slice(0, 20);
@@ -115,8 +91,6 @@ function parseSnapshot(filePath) {
   };
 }
 
-// ── Formatters ────────────────────────────────────────────────────────────────
-
 function fmtSize(bytes) {
   if (bytes > 1024 * 1024) return `${(bytes / 1024 / 1024).toFixed(2)} MB`;
   if (bytes > 1024) return `${(bytes / 1024).toFixed(1)} KB`;
@@ -137,7 +111,6 @@ function printReport(snap) {
   console.log(`  Detached nodes: ${snap.detached.length.toLocaleString()}`);
   console.log('');
 
-  // Top by self size
   console.log('─'.repeat(70));
   console.log('  TOP 20 OBJECT CLASSES BY SELF SIZE');
   console.log('─'.repeat(70));
@@ -148,7 +121,6 @@ function printReport(snap) {
     console.log(`  ${pad(cls.key, 40)} ${String(cls.count).padStart(8)}  ${fmtSize(cls.selfSize).padStart(10)} (${pct}%)`);
   }
 
-  // Top by count
   console.log('');
   console.log('─'.repeat(70));
   console.log('  TOP 10 OBJECT CLASSES BY COUNT');
@@ -158,11 +130,10 @@ function printReport(snap) {
     console.log(`  ${pad(cls.key, 40)} ${String(cls.count).padStart(8)}`);
   }
 
-  // Detached nodes
   if (snap.detached.length > 0) {
     console.log('');
     console.log('─'.repeat(70));
-    console.log(`  ⚠️  DETACHED NODES (${snap.detached.length}) — potential DOM leaks`);
+    console.log(`  DETACHED NODES (${snap.detached.length}) — potential DOM leaks`);
     console.log('─'.repeat(70));
     const detachedByType = new Map();
     for (const n of snap.detached) {
@@ -174,21 +145,19 @@ function printReport(snap) {
     }
   }
 
-  // Large objects
   if (snap.largeObjects.length > 0) {
     console.log('');
     console.log('─'.repeat(70));
-    console.log('  🐋 LARGE OBJECTS (>100KB self size)');
+    console.log('  LARGE OBJECTS (>100KB self size)');
     console.log('─'.repeat(70));
     for (const obj of snap.largeObjects.slice(0, 10)) {
       console.log(`  ${pad(`${obj.type}:${obj.name}`, 50)} ${fmtSize(obj.selfSize)}`);
     }
   }
 
-  // Suspicion heuristics
   console.log('');
   console.log('─'.repeat(70));
-  console.log('  🔍 SUSPICION ANALYSIS');
+  console.log('  SUSPICION ANALYSIS');
   console.log('─'.repeat(70));
   printSuspicions(snap);
 
@@ -199,36 +168,31 @@ function printSuspicions(snap) {
   const suspicions = [];
 
   for (const cls of snap.topBySize) {
-    // Closure leaks
     if (cls.type === 'closure' && cls.selfSize > 5 * 1024 * 1024) {
-      suspicions.push(`⚠️  HIGH closure retained size (${fmtSize(cls.selfSize)}) for "${cls.name}" — check for event listeners not being removed`);
+      suspicions.push(`HIGH closure retained size (${fmtSize(cls.selfSize)}) for "${cls.name}" — check for event listeners not being removed`);
     }
-    // Array growth
     if (cls.key === 'array' && cls.selfSize > 10 * 1024 * 1024) {
-      suspicions.push(`⚠️  Large array allocation (${fmtSize(cls.selfSize)}) — check for unbounded caches or queues`);
+      suspicions.push(`Large array allocation (${fmtSize(cls.selfSize)}) — check for unbounded caches or queues`);
     }
-    // String growth
     if (cls.key === 'string' && cls.selfSize > 20 * 1024 * 1024) {
-      suspicions.push(`⚠️  Heavy string usage (${fmtSize(cls.selfSize)}) — check for log accumulation or string concatenation in loops`);
+      suspicions.push(`Heavy string usage (${fmtSize(cls.selfSize)}) — check for log accumulation or string concatenation in loops`);
     }
-    // Buffer
     if ((cls.key === 'object:Buffer' || cls.key === 'object:Uint8Array') && cls.selfSize > 10 * 1024 * 1024) {
-      suspicions.push(`⚠️  Large Buffer/Uint8Array usage (${fmtSize(cls.selfSize)}) — check for streams not being consumed or closed`);
+      suspicions.push(`Large Buffer/Uint8Array usage (${fmtSize(cls.selfSize)}) — check for streams not being consumed or closed`);
     }
   }
 
   if (snap.detached.length > 50) {
-    suspicions.push(`⚠️  ${snap.detached.length} detached nodes — DOM elements removed from tree but still referenced in JS`);
+    suspicions.push(`${snap.detached.length} detached nodes — DOM elements removed from tree but still referenced in JS`);
   }
 
-  // Promise leak
   const promises = snap.byClass.get('object:Promise');
   if (promises && promises.count > 1000) {
-    suspicions.push(`⚠️  ${promises.count.toLocaleString()} Promise objects — check for unresolved or chained promises accumulating`);
+    suspicions.push(`${promises.count.toLocaleString()} Promise objects — check for unresolved or chained promises accumulating`);
   }
 
   if (suspicions.length === 0) {
-    console.log('  ✅ No obvious leak patterns detected in self-size analysis.');
+    console.log('  No obvious leak patterns detected in self-size analysis.');
     console.log('     For definitive results, use the 3-snapshot technique.');
   } else {
     for (const s of suspicions) {
@@ -244,7 +208,7 @@ function printDiff(snap1, snap2) {
 
   const sizeDelta = snap2.totalSize - snap1.totalSize;
   const nodeDelta = snap2.nodeCount - snap1.nodeCount;
-  console.log(`  Total size delta : ${sizeDelta >= 0 ? '+' : ''}${fmtSize(Math.abs(sizeDelta))} ${sizeDelta >= 0 ? '📈' : '📉'}`);
+  console.log(`  Total size delta : ${sizeDelta >= 0 ? '+' : ''}${fmtSize(Math.abs(sizeDelta))}`);
   console.log(`  Node count delta : ${nodeDelta >= 0 ? '+' : ''}${nodeDelta.toLocaleString()}`);
 
   console.log('');
@@ -271,20 +235,18 @@ function printDiff(snap1, snap2) {
 
   console.log('');
   console.log('─'.repeat(70));
-  console.log('  🔍 LEAK CANDIDATES (new classes or significant growth)');
+  console.log('  LEAK CANDIDATES (new classes or significant growth)');
   console.log('─'.repeat(70));
   const leakCandidates = diffs.filter(d => d.deltaSize > 1024 * 1024 || d.deltaCount > 500);
   if (leakCandidates.length === 0) {
-    console.log('  ✅ No significant growth detected between snapshots.');
+    console.log('  No significant growth detected between snapshots.');
   } else {
     for (const d of leakCandidates) {
-      console.log(`  🚨 "${d.key}" grew by +${d.deltaCount} objects / +${fmtSize(d.deltaSize)}`);
+      console.log(`  "${d.key}" grew by +${d.deltaCount} objects / +${fmtSize(d.deltaSize)}`);
     }
   }
   console.log('═'.repeat(70) + '\n');
 }
-
-// ── Main ──────────────────────────────────────────────────────────────────────
 
 const snapshots = files.map(parseSnapshot);
 
@@ -305,7 +267,7 @@ if (jsonOutput) {
     printDiff(snapshots[0], snapshots[1]);
   }
   if (snapshots.length === 3) {
-    console.log('\n📊 3-SNAPSHOT DIFF ANALYSIS');
+    console.log('\n3-SNAPSHOT DIFF ANALYSIS');
     printDiff(snapshots[0], snapshots[1]);
     printDiff(snapshots[1], snapshots[2]);
     printDiff(snapshots[0], snapshots[2]);
