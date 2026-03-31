@@ -8,37 +8,37 @@ import { type ColorsTheme, Theme } from '../../theme.js';
 import { interpolateColor } from '../../color-utils.js';
 
 const palette = {
-  bg: "#1a1b26",
-  bg_dark: "#16161e",
-  bg_dark1: "#0C0E14",
-  bg_highlight: "#292e42",
-  blue: "#7aa2f7",
-  blue0: "#3d59a1",
-  blue1: "#2ac3de",
-  blue2: "#0db9d7",
-  blue5: "#89ddff",
-  blue6: "#b4f9f8",
-  blue7: "#394b70",
-  comment: "#565f89",
-  cyan: "#7dcfff",
-  fg: "#c0caf5",
-  fg_dark: "#a9b1d6",
-  fg_gutter: "#3b4261",
-  green: "#9ece6a",
-  green1: "#73daca",
-  green2: "#41a6b5",
-  magenta: "#bb9af7",
-  magenta2: "#ff007c",
-  orange: "#ff9e64",
-  purple: "#9d7cd8",
-  red: "#f7768e",
-  red1: "#db4b4b",
-  teal: "#1abc9c",
-  yellow: "#e0af68",
+  bg: '#1a1b26',
+  bg_dark: '#16161e',
+  bg_dark1: '#0C0E14',
+  bg_highlight: '#292e42',
+  blue: '#7aa2f7',
+  blue0: '#3d59a1',
+  blue1: '#2ac3de',
+  blue2: '#0db9d7',
+  blue5: '#89ddff',
+  blue6: '#b4f9f8',
+  blue7: '#394b70',
+  comment: '#565f89',
+  cyan: '#7dcfff',
+  fg: '#c0caf5',
+  fg_dark: '#a9b1d6',
+  fg_gutter: '#3b4261',
+  green: '#9ece6a',
+  green1: '#73daca',
+  green2: '#41a6b5',
+  magenta: '#bb9af7',
+  magenta2: '#ff007c',
+  orange: '#ff9e64',
+  purple: '#9d7cd8',
+  red: '#f7768e',
+  red1: '#db4b4b',
+  teal: '#1abc9c',
+  yellow: '#e0af68',
   diff: {
-    add: "#243e4a",
-    change: "#1f2231",
-    delete: "#4a272f",
+    add: '#243e4a',
+    change: '#1f2231',
+    delete: '#4a272f',
   },
 };
 
@@ -59,14 +59,14 @@ const tokyoNightColors: ColorsTheme = {
   Gray: palette.fg_dark,
   DarkGray: palette.fg_gutter,
   FocusColor: palette.blue,
-  GradientColors: [ palette.blue, palette.magenta, palette.cyan ]
+  GradientColors: [palette.blue, palette.magenta, palette.cyan],
 };
 
 export const TokyoNight: Theme = new Theme(
   'Tokyo Night',
   'dark',
   {
-    'hljs': {
+    hljs: {
       display: 'block',
       overflowX: 'auto',
       padding: '0.5em',
@@ -79,7 +79,7 @@ export const TokyoNight: Theme = new Theme(
     'hljs-brace': { color: palette.fg_dark },
     'hljs-built_in': { color: palette.blue1 },
     'hljs-builtin-symbol': { color: palette.blue1 },
-    'hljs-bullet': { 
+    'hljs-bullet': {
       color: palette.orange,
       fontWeight: 'bold',
     },
@@ -89,7 +89,7 @@ export const TokyoNight: Theme = new Theme(
     'hljs-class': { color: palette.blue1 },
     'hljs-class-title': { color: palette.blue1 },
     'hljs-code': { color: palette.green },
-    'hljs-comment': { 
+    'hljs-comment': {
       color: palette.comment,
       fontStyle: 'italic',
     },
@@ -99,8 +99,8 @@ export const TokyoNight: Theme = new Theme(
     'hljs-emphasis': { fontStyle: 'italic' },
     'hljs-function': { color: palette.blue },
     'hljs-function-dispatch': { color: palette.blue },
-    'hljs-keyword': { 
-      color: palette.magenta, 
+    'hljs-keyword': {
+      color: palette.magenta,
       fontStyle: 'italic',
     },
     'hljs-label': { color: palette.blue },
@@ -122,9 +122,11 @@ export const TokyoNight: Theme = new Theme(
     },
     'hljs-regex': { color: palette.blue6 },
     'hljs-regexp': { color: palette.blue6 },
-    'hljs-rest_arg': { color: interpolateColor(palette.yellow, palette.fg, 0.8) },
-    'hljs-section': { 
-      color: palette.blue, 
+    'hljs-rest_arg': {
+      color: interpolateColor(palette.yellow, palette.fg, 0.8),
+    },
+    'hljs-section': {
+      color: palette.blue,
       fontWeight: 'bold',
     },
     'hljs-selector-attr': { color: palette.cyan },
