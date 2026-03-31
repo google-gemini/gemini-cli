@@ -727,6 +727,18 @@ describe('ReadFileTool', () => {
         );
       });
 
+      it('should detect mobile YouTube URLs', () => {
+        expect(isYouTubeUrl('https://m.youtube.com/watch?v=dQw4w9WgXcQ')).toBe(
+          true,
+        );
+      });
+
+      it('should detect YouTube Music URLs', () => {
+        expect(
+          isYouTubeUrl('https://music.youtube.com/watch?v=dQw4w9WgXcQ'),
+        ).toBe(true);
+      });
+
       it('should not match non-YouTube URLs', () => {
         expect(isYouTubeUrl('https://example.com/video.mp4')).toBe(false);
         expect(isYouTubeUrl('/path/to/file.txt')).toBe(false);
@@ -775,7 +787,7 @@ describe('ReadFileTool', () => {
           llmContent: {
             fileData: {
               fileUri: url,
-              mimeType: 'video/*',
+              mimeType: 'video/mp4',
             },
           },
           returnDisplay: `Reading YouTube video: ${url}`,
@@ -790,7 +802,7 @@ describe('ReadFileTool', () => {
         expect(result.llmContent).toEqual({
           fileData: {
             fileUri: url.trim(),
-            mimeType: 'video/*',
+            mimeType: 'video/mp4',
           },
         });
       });

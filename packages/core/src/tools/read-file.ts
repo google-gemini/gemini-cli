@@ -43,9 +43,10 @@ import {
 /**
  * Regex to detect YouTube URLs.
  * Matches youtube.com/watch, youtu.be/, youtube.com/shorts/, youtube.com/live/, etc.
+ * Supports www, m (mobile), and music subdomains.
  */
 const YOUTUBE_URL_REGEX =
-  /^https?:\/\/(?:www\.)?(?:youtube\.com\/(?:watch\?.*v=|shorts\/|live\/|embed\/)|youtu\.be\/)/i;
+  /^https?:\/\/(?:(?:www|m|music)\.)?(?:youtube\.com\/(?:watch\?.*v=|shorts\/|live\/|embed\/)|youtu\.be\/)/i;
 
 /**
  * Returns true if the given string is a YouTube URL.
@@ -133,7 +134,7 @@ class ReadFileToolInvocation extends BaseToolInvocation<
         llmContent: {
           fileData: {
             fileUri: url,
-            mimeType: 'video/*',
+            mimeType: 'video/mp4',
           },
         },
         returnDisplay: `Reading YouTube video: ${url}`,
