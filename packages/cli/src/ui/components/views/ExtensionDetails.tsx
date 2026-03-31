@@ -81,7 +81,12 @@ export function ExtensionDetails({
         );
         return true;
       }
-      if (key.name === 'l' && isLinkable && !isInstalled && !isInstalling) {
+      if (
+        keyMatchers[Command.LINK_EXTENSION](key) &&
+        isLinkable &&
+        !isInstalled &&
+        !isInstalling
+      ) {
         setIsInstalling(true);
         void onLink(
           (prompt: string) =>
@@ -92,7 +97,7 @@ export function ExtensionDetails({
         return true;
       }
       if (
-        key.name === 'i' &&
+        keyMatchers[Command.UPDATE_EXTENSION](key) &&
         updateState === ExtensionUpdateState.UPDATE_AVAILABLE &&
         !isInstalling
       ) {
