@@ -136,12 +136,14 @@
     "yargs": "^17.7.2"
   },
   "dependencies": {
+    "chrome-remote-interface": "^0.34.0",
     "ink": "npm:@jrichman/ink@6.5.0",
     "latest-version": "^9.0.0",
     "node-fetch-native": "^1.6.7",
     "proper-lockfile": "^4.1.2",
     "punycode": "^2.3.1",
-    "simple-git": "^3.28.0"
+    "simple-git": "^3.28.0",
+    "source-map-explorer": "^2.5.3"
   },
   "optionalDependencies": {
     "@lydell/node-pty": "1.1.0",
