@@ -1315,17 +1315,25 @@ export class ShellExecutionService {
    *
    * @param pid The process ID of the target PTY.
    */
-  static background(pid: number, sessionId: string, command: string): void {
+  static background(pid: number, sessionId?: string, command?: string): void {
     const activePty = this.activePtys.get(pid);
     const activeChild = this.activeChildProcesses.get(pid);
 
-    if (!sessionId) {
+    const resolvedSessionId =
+      sessionId ?? activePty?.sessionId ?? activeChild?.sessionId;
+    const resolvedCommand =
+      command ??
+      activePty?.command ??
+      activeChild?.command ??
+      'unknown command';
+
+    if (!resolvedSessionId) {
       throw new Error('Session ID is required for background operations');
     }
 
     const MAX_BACKGROUND_PROCESS_HISTORY_SIZE = 100;
     const history =
-      this.backgroundProcessHistory.get(sessionId) ??
+      this.backgroundProcessHistory.get(resolvedSessionId) ??
       new Map<
         number,
         {
@@ -1346,11 +1354,11 @@ export class ShellExecutionService {
     }
 
     history.set(pid, {
-      command,
+      command: resolvedCommand,
       status: 'running',
       startTime: Date.now(),
     });
-    this.backgroundProcessHistory.set(sessionId, history);
+    this.backgroundProcessHistory.set(resolvedSessionId, history);
 
     // Set up background logging
     const logPath = this.getLogFilePath(pid);
