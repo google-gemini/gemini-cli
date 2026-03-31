@@ -19,7 +19,7 @@ import { CommandKind } from '../ui/commands/types.js';
  * block per command name to avoid UI clutter during startup or incremental loading.
  */
 export class SlashCommandConflictHandler {
-  private notifiedConflicts = new Set<string>();
+  private activeConflicts = new Set<string>();
   private pendingConflicts: SlashCommandConflict[] = [];
   private flushTimeout: ReturnType<typeof setTimeout> | null = null;
 
@@ -33,6 +33,7 @@ export class SlashCommandConflictHandler {
 
   stop() {
     coreEvents.off(CoreEvent.SlashCommandConflicts, this.handleConflicts);
+    this.activeConflicts.clear();
     if (this.flushTimeout) {
       clearTimeout(this.flushTimeout);
       this.flushTimeout = null;
@@ -40,22 +41,25 @@ export class SlashCommandConflictHandler {
   }
 
   private handleConflicts(payload: SlashCommandConflictsPayload) {
-    const newConflicts = payload.conflicts.filter((c) => {
-      // Use a unique key to prevent duplicate notifications for the same conflict
-      const sourceId =
-        c.loserExtensionName || c.loserMcpServerName || c.loserKind;
-      const key = `${c.name}:${sourceId}:${c.renamedTo}`;
-      if (this.notifiedConflicts.has(key)) {
-        return false;
-      }
-      this.notifiedConflicts.add(key);
-      return true;
-    });
+    const nextActiveConflicts = new Set(
+      payload.conflicts.map((c) => this.getConflictKey(c)),
+    );
+
+    const newConflicts = payload.conflicts.filter((c) => !this.activeConflicts.has(this.getConflictKey(c)));
+    this.activeConflicts = nextActiveConflicts;
 
     if (newConflicts.length > 0) {
       this.pendingConflicts.push(...newConflicts);
       this.scheduleFlush();
     }
+  }
+
+  private getConflictKey(conflict: SlashCommandConflict): string {
+    const sourceId =
+      conflict.loserExtensionName ||
+      conflict.loserMcpServerName ||
+      conflict.loserKind;
+    return `${conflict.name}:${sourceId}:${conflict.renamedTo}`;
   }
 
   private scheduleFlush() {
