@@ -116,7 +116,7 @@ describe('<FooterConfigDialog />', () => {
     expect(lastFrame()).toContain('~/project/path');
 
     // Move focus down to 'code-changes' (which has colored elements)
-    for (let i = 0; i < 8; i++) {
+    for (let i = 0; i < 9; i++) {
       act(() => {
         stdin.write('\u001b[B'); // Down arrow
       });
