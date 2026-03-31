@@ -35,6 +35,7 @@ interface ScrollableListProps<T> extends VirtualizedListProps<T> {
   stableScrollback?: boolean;
   copyModeEnabled?: boolean;
   isStatic?: boolean;
+  fixedItemHeight?: boolean;
 }
 
 export type ScrollableListRef<T> = VirtualizedListRef<T>;

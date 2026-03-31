@@ -39,6 +39,7 @@ export type VirtualizedListProps<T> = {
   scrollbar?: boolean;
   stableScrollback?: boolean;
   copyModeEnabled?: boolean;
+  fixedItemHeight?: boolean;
 };
 
 export type VirtualizedListRef<T> = {
@@ -131,6 +132,7 @@ function VirtualizedList<T>(
     scrollbar = true,
     stableScrollback,
     copyModeEnabled = false,
+    fixedItemHeight = false,
   } = props;
   const dataRef = useRef(data);
   useLayoutEffect(() => {
@@ -443,14 +445,14 @@ function VirtualizedList<T>(
         const key = keyExtractor(item, i);
         // Always update the key mapping because React can reuse nodes at different indices/keys
         nodeToKeyRef.current.set(node, key);
-        if (!isStatic && !observedNodes.current.has(node)) {
+        if (!isStatic && !fixedItemHeight && !observedNodes.current.has(node)) {
           itemsObserver.observe(node);
         }
       }
     }
     for (const node of observedNodes.current) {
       if (!currentNodes.has(node)) {
-        if (!isStatic) {
+        if (!isStatic && !fixedItemHeight) {
           itemsObserver.unobserve(node);
         }
         nodeToKeyRef.current.delete(node);
