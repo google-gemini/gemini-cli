@@ -12,7 +12,7 @@ import { fileURLToPath } from 'node:url';
 import { env } from 'node:process';
 import { setTimeout as sleep } from 'node:timers/promises';
 import {
-  PREVIEW_GEMINI_FLASH_MODEL,
+  DEFAULT_GEMINI_FLASH_MODEL,
   GEMINI_DIR,
 } from '@google/gemini-cli-core';
 export { GEMINI_DIR };
@@ -460,7 +460,7 @@ export class TestRig {
         ...(env['GEMINI_TEST_TYPE'] === 'integration'
           ? {
               model: {
-                name: PREVIEW_GEMINI_FLASH_MODEL,
+                name: DEFAULT_GEMINI_FLASH_MODEL,
               },
             }
           : {}),

@@ -166,30 +166,41 @@ function extractCuratedHistory(comprehensiveHistory: Content[]): Content[] {
   const length = comprehensiveHistory.length;
   let i = 0;
   while (i < length) {
-    if (comprehensiveHistory[i].role === 'user') {
-      const userMessage: Content = {
-        role: 'user',
-        parts: [...(comprehensiveHistory[i].parts || [])],
-      };
-      i++;
-      while (i < length && comprehensiveHistory[i].role === 'user') {
-        userMessage.parts!.push(...(comprehensiveHistory[i].parts || []));
-        i++;
+    const role = comprehensiveHistory[i].role;
+    const parts: Part[] = [];
+    let isValid = true;
+
+    while (i < length && comprehensiveHistory[i].role === role) {
+      if (
+        isValid &&
+        role === 'model' &&
+        !isValidContent(comprehensiveHistory[i])
+      ) {
+        isValid = false;
       }
-      curatedHistory.push(userMessage);
-    } else {
-      const modelOutput: Content[] = [];
-      let isValid = true;
-      while (i < length && comprehensiveHistory[i].role === 'model') {
-        modelOutput.push(comprehensiveHistory[i]);
-        if (isValid && !isValidContent(comprehensiveHistory[i])) {
-          isValid = false;
+
+      const entryParts = comprehensiveHistory[i].parts || [];
+      for (const part of entryParts) {
+        if (
+          parts.length > 0 &&
+          parts[parts.length - 1].text !== undefined &&
+          part.text !== undefined
+        ) {
+          // Merge consecutive text parts using a new object to avoid corruption
+          parts[parts.length - 1] = {
+            ...parts[parts.length - 1],
+            text: parts[parts.length - 1].text + '\n' + part.text,
+          };
+        } else {
+          // Deep copy the part to avoid reference issues
+          parts.push({ ...part });
         }
-        i++;
       }
-      if (isValid) {
-        curatedHistory.push(...modelOutput);
-      }
+      i++;
+    }
+
+    if (isValid && parts.length > 0) {
+      curatedHistory.push({ role, parts });
     }
   }
   return curatedHistory;
