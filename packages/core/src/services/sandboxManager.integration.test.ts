@@ -1,4 +1,4 @@
-/**
+﻿/**
  * @license
  * Copyright 2026 Google LLC
  * SPDX-License-Identifier: Apache-2.0
@@ -201,8 +201,47 @@ describe('SandboxManager Integration', () => {
         expect(result.status).not.toBe(0);
       });
 
+      it('allows dynamic expansion of permissions after a failure', async () => {
+        const tempDir = fs.mkdtempSync(
+          path.join(workspace, '..', 'expansion-'),
+        );
+        const testFile = path.join(tempDir, 'test.txt');
+
+        try {
+          const { command, args } = Platform.touch(testFile);
+
+          // First attempt: fails due to sandbox restrictions
+          const sandboxed1 = await manager.prepareCommand({
+            command,
+            args,
+            cwd: workspace,
+            env: process.env,
+          });
+          const result1 = await runCommand(sandboxed1);
+          expect(result1.status).not.toBe(0);
+          expect(fs.existsSync(testFile)).toBe(false);
+
+          // Second attempt: succeeds with additional permissions
+          const sandboxed2 = await manager.prepareCommand({
+            command,
+            args,
+            cwd: workspace,
+            env: process.env,
+            policy: { allowedPaths: [tempDir] },
+          });
+          const result2 = await runCommand(sandboxed2);
+          expect(result2.status).toBe(0);
+          expect(fs.existsSync(testFile)).toBe(true);
+        } finally {
+          if (fs.existsSync(testFile)) fs.unlinkSync(testFile);
+          fs.rmSync(tempDir, { recursive: true, force: true });
+        }
+      });
+
       it('grants access to explicitly allowed paths', async () => {
-        const allowedDir = fs.mkdtempSync(path.join(os.tmpdir(), 'allowed-'));
+        const allowedDir = fs.mkdtempSync(
+          path.join(workspace, '..', 'allowed-'),
+        );
         const testFile = path.join(allowedDir, 'test.txt');
 
         try {
