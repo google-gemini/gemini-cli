@@ -205,6 +205,7 @@ export async function injectInputBlocker(
       'evaluate_script',
       { function: INPUT_BLOCKER_FUNCTION },
       signal,
+      true,
     );
     debugLogger.log('Input blocker injected successfully');
   } catch (error) {
@@ -232,6 +233,7 @@ export async function removeInputBlocker(
       'evaluate_script',
       { function: REMOVE_BLOCKER_FUNCTION },
       signal,
+      true,
     );
     debugLogger.log('Input blocker removed successfully');
   } catch (error) {
@@ -257,6 +259,7 @@ export async function suspendInputBlocker(
       'evaluate_script',
       { function: SUSPEND_BLOCKER_FUNCTION },
       signal,
+      true,
     );
   } catch {
     // Non-critical — tool call will still attempt to proceed
@@ -276,6 +279,7 @@ export async function resumeInputBlocker(
       'evaluate_script',
       { function: RESUME_BLOCKER_FUNCTION },
       signal,
+      true,
     );
   } catch {
     // Non-critical

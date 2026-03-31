@@ -104,6 +104,8 @@ export interface SandboxedCommand {
   env: NodeJS.ProcessEnv;
   /** The working directory. */
   cwd?: string;
+  /** An optional cleanup function to be called after the command terminates. */
+  cleanup?: () => void;
 }
 
 /**
