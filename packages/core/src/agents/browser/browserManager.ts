@@ -526,7 +526,7 @@ export class BrowserManager {
         })
         .join(', ');
       mcpArgs.push(
-        `--chromeArg="--host-rules=MAP * 127.0.0.1, ${exclusionRules}, EXCLUDE 127.0.0.1"`,
+        `--chromeArg="--host-rules=MAP * ~NOTFOUND, ${exclusionRules}"`,
       );
     }
 
@@ -737,7 +737,7 @@ export class BrowserManager {
       const urlHostname = parsedUrl.hostname;
 
       if (!this.isDomainAllowed(urlHostname, allowedDomains)) {
-        return `'${urlHostname}' is not in the allowed domains list (${allowedDomains.join(', ')}). Navigation to this domain is blocked.`;
+        return 'Domain not allowed: The requested domain is not in the allowed list.';
       }
 
       // Check query parameters for embedded URLs that could bypass domain
@@ -756,7 +756,7 @@ export class BrowserManager {
           ) {
             const embeddedHostname = embeddedUrl.hostname.replace(/\.$/, '');
             if (!this.isDomainAllowed(embeddedHostname, allowedDomains)) {
-              return `Embedded URL targets '${embeddedHostname}' which is not in the allowed domains list (${allowedDomains.join(', ')}). Navigation to this domain is blocked.`;
+              return 'Domain not allowed: Embedded URL targets a disallowed domain.';
             }
           }
         } catch {

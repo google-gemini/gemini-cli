@@ -385,7 +385,7 @@ describe('BrowserManager', () => {
       const args = vi.mocked(StdioClientTransport).mock.calls[0]?.[0]
         ?.args as string[];
       expect(args).toContain(
-        '--chromeArg="--host-rules=MAP * 127.0.0.1, EXCLUDE google.com, EXCLUDE *.openai.com, EXCLUDE 127.0.0.1"',
+        '--chromeArg="--host-rules=MAP * ~NOTFOUND, EXCLUDE google.com, EXCLUDE *.openai.com"',
       );
     });
 
