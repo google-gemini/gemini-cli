@@ -88,7 +88,6 @@ function buildSystemPrompt(skillsDir: string): string {
     '',
     '**High confidence** — create the skill:',
     '- The same workflow appeared in multiple sessions (cross-session repetition)',
-    '- The user corrected the agent multiple times about the same thing',
     '- A multi-step procedure was validated (tests passed, user confirmed success)',
     '',
     '**Medium confidence** — create the skill if it is clearly project-specific:',

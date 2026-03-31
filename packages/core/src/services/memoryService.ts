@@ -17,6 +17,7 @@ import {
 import { partListUnionToString } from '../core/geminiRequest.js';
 import { debugLogger } from '../utils/debugLogger.js';
 import { isNodeError } from '../utils/errors.js';
+import { FRONTMATTER_REGEX, parseFrontmatter } from '../skills/skillLoader.js';
 import { LocalAgentExecutor } from '../agents/local-executor.js';
 import { SkillExtractionAgent } from '../agents/skill-extraction-agent.js';
 import { getModelConfigAlias } from '../agents/registry.js';
@@ -469,12 +470,11 @@ async function buildExistingSkillsSummary(
       const skillPath = path.join(skillsDir, entry.name, 'SKILL.md');
       try {
         const content = await fs.readFile(skillPath, 'utf-8');
-        const frontmatterMatch = content.match(/^---\s*\n([\s\S]*?)\n---/);
-        if (frontmatterMatch) {
-          const nameMatch = frontmatterMatch[1].match(/^name:\s*(.+)$/m);
-          const descMatch = frontmatterMatch[1].match(/^description:\s*(.+)$/m);
-          const name = nameMatch ? nameMatch[1].trim() : entry.name;
-          const desc = descMatch ? descMatch[1].trim() : '';
+        const match = content.match(FRONTMATTER_REGEX);
+        if (match) {
+          const parsed = parseFrontmatter(match[1]);
+          const name = parsed?.name ?? entry.name;
+          const desc = parsed?.description ?? '';
           memorySkills.push(`- **${name}**: ${desc}`);
         } else {
           memorySkills.push(`- **${entry.name}**`);
@@ -697,6 +697,11 @@ export async function startMemoryService(config: Config): Promise<void> {
       skillsDir,
       config,
     );
+    if (existingSkillsSummary) {
+      debugLogger.log(
+        `[MemoryService] Existing skills context:\n${existingSkillsSummary}`,
+      );
+    }
 
     // Build agent definition and context
     const agentDefinition = SkillExtractionAgent(
