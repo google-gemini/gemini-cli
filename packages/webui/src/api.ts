@@ -1102,7 +1102,7 @@ export async function handleFileSearch(
   const scored = matches.slice(0, 50).map((f) => {
     const fl = f.toLowerCase();
     let score = f.length;
-    if (fl.includes('/' + query) || fl.startsWith(query)) score -= 100;
+    if (fl.includes(path.sep + query) || fl.startsWith(query)) score -= 100;
     return { path: f, score };
   });
   scored.sort((a, b) => a.score - b.score);
