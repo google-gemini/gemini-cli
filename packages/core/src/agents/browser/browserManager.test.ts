@@ -729,25 +729,6 @@ describe('BrowserManager', () => {
         expect.stringContaining('transport closed unexpectedly'),
       );
     });
-
-    it('should NOT log error when transport error occurs during intentional close()', async () => {
-      const manager = new BrowserManager(mockConfig);
-      await manager.ensureConnection();
-
-      const transportInstance =
-        vi.mocked(StdioClientTransport).mock.results[0]?.value;
-
-      // Trigger onerror during close()
-      vi.spyOn(transportInstance, 'close').mockImplementation(async () => {
-        transportInstance.onerror?.(new Error('KABOOM'));
-      });
-
-      await manager.close();
-
-      expect(debugLogger.error).not.toHaveBeenCalledWith(
-        expect.stringContaining('transport error: KABOOM'),
-      );
-    });
   });
 
   describe('getInstance', () => {

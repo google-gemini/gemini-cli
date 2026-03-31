@@ -583,9 +583,6 @@ export class BrowserManager {
       );
     };
     this.mcpTransport.onerror = (error: Error) => {
-      if (this.isClosing || BrowserManager.isShuttingDown) {
-        return;
-      }
       debugLogger.error(
         `chrome-devtools-mcp transport error: ${error.message}`,
       );
