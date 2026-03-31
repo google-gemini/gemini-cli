@@ -346,7 +346,7 @@ npm run lint
 
 - Please adhere to the coding style, patterns, and conventions used throughout
   the existing codebase.
-- Consult [GEMINI.md](GEMINI.md) (typically found in the project root) for
+- Consult [GEMINI.md](https://github.com/google-gemini/gemini-cli/blob/main/GEMINI.md) (typically found in the project root) for
   specific instructions related to AI-assisted development, including
   conventions for React, comments, and Git usage.
 - **Imports:** Pay special attention to import paths. The project uses ESLint to
@@ -505,7 +505,7 @@ code.
 
 ### Documentation structure
 
-Our documentation is organized using [sidebar.json](/docs/sidebar.json) as the
+Our documentation is organized using [sidebar.json](https://github.com/google-gemini/gemini-cli/blob/main/docs/sidebar.json) as the
 table of contents. When adding new documentation:
 
 1. Create your markdown file **in the appropriate directory** under `/docs`.
