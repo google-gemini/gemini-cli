@@ -125,7 +125,9 @@ describe('WindowsSandboxManager', () => {
   });
 
   it('should handle persistent permissions from policyManager', async () => {
-    const persistentPath = path.resolve('/persistent/path');
+    const persistentPath = path.join(testCwd, 'persistent_path');
+    fs.mkdirSync(persistentPath, { recursive: true });
+
     const mockPolicyManager = {
       getCommandPermissions: vi.fn().mockReturnValue({
         fileSystem: { write: [persistentPath] },
@@ -465,5 +467,69 @@ describe('WindowsSandboxManager', () => {
     } finally {
       fs.rmSync(conflictPath, { recursive: true, force: true });
     }
+  });
+
+  it('should translate __write to PowerShell safely using environment variables', async () => {
+    const filePath = path.join(testCwd, 'test.txt');
+    fs.writeFileSync(filePath, '');
+    const req: SandboxRequest = {
+      command: '__write',
+      args: [filePath],
+      cwd: testCwd,
+      env: {},
+    };
+
+    const result = await manager.prepareCommand(req);
+
+    // [network, cwd, --forbidden-manifest, manifestPath, command, ...args]
+    expect(result.args[4]).toBe('PowerShell.exe');
+    expect(result.args[7]).toBe('-Command');
+    const psCommand = result.args[8];
+    expect(psCommand).toBe(
+      '& { $Input | Out-File -FilePath $env:GEMINI_TARGET_PATH -Encoding utf8 }',
+    );
+    expect(result.env['GEMINI_TARGET_PATH']).toBe(filePath);
+  });
+
+  it('should safely handle special characters in __write path using environment variables', async () => {
+    const maliciousPath = path.join(testCwd, 'foo"; echo bar; ".txt');
+    fs.writeFileSync(maliciousPath, '');
+    const req: SandboxRequest = {
+      command: '__write',
+      args: [maliciousPath],
+      cwd: testCwd,
+      env: {},
+    };
+
+    const result = await manager.prepareCommand(req);
+
+    expect(result.args[4]).toBe('PowerShell.exe');
+    const psCommand = result.args[8];
+    expect(psCommand).toBe(
+      '& { $Input | Out-File -FilePath $env:GEMINI_TARGET_PATH -Encoding utf8 }',
+    );
+    // The malicious path should be injected safely via environment variable, not interpolated in args
+    expect(result.env['GEMINI_TARGET_PATH']).toBe(maliciousPath);
+  });
+
+  it('should translate __read to PowerShell safely using environment variables', async () => {
+    const filePath = path.join(testCwd, 'test.txt');
+    fs.writeFileSync(filePath, 'hello');
+    const req: SandboxRequest = {
+      command: '__read',
+      args: [filePath],
+      cwd: testCwd,
+      env: {},
+    };
+
+    const result = await manager.prepareCommand(req);
+
+    expect(result.args[4]).toBe('PowerShell.exe');
+    expect(result.args[7]).toBe('-Command');
+    const psCommand = result.args[8];
+    expect(psCommand).toBe(
+      '& { Get-Content -LiteralPath $env:GEMINI_TARGET_PATH -Raw }',
+    );
+    expect(result.env['GEMINI_TARGET_PATH']).toBe(filePath);
   });
 });

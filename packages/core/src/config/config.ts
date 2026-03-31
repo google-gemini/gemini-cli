@@ -979,9 +979,29 @@ export class Config implements McpContext, AgentLoopContext {
           networkAccess: false,
         };
 
-    this._sandboxManager = createSandboxManager(this.sandbox, {
-      workspace: params.targetDir,
-    });
+    this.targetDir = path.resolve(params.targetDir);
+    this.folderTrust = params.folderTrust ?? false;
+    this.workspaceContext = new WorkspaceContext(this.targetDir, []);
+    this.pendingIncludeDirectories = params.includeDirectories ?? [];
+    this.debugMode = params.debugMode;
+    this.question = params.question;
+    this.worktreeSettings = params.worktreeSettings;
+
+    this._sandboxPolicyManager = new SandboxPolicyManager();
+    const initialApprovalMode =
+      params.approvalMode ??
+      params.policyEngineConfig?.approvalMode ??
+      'default';
+
+    this._sandboxManager = createSandboxManager(
+      this.sandbox,
+      {
+        workspace: this.targetDir,
+        includeDirectories: this.pendingIncludeDirectories,
+        policyManager: this._sandboxPolicyManager,
+      },
+      initialApprovalMode,
+    );
 
     if (
       !(this._sandboxManager instanceof NoopSandboxManager) &&
@@ -995,36 +1015,6 @@ export class Config implements McpContext, AgentLoopContext {
       this.fileSystemService = new StandardFileSystemService();
     }
 
-    this._sandboxPolicyManager = new SandboxPolicyManager();
-    const initialApprovalMode =
-      params.approvalMode ??
-      params.policyEngineConfig?.approvalMode ??
-      'default';
-    this._sandboxManager = createSandboxManager(
-      this.sandbox,
-      {
-        workspace: params.targetDir,
-        policyManager: this._sandboxPolicyManager,
-      },
-      initialApprovalMode,
-    );
-
-    if (
-      !(this._sandboxManager instanceof NoopSandboxManager) &&
-      this.sandbox?.enabled
-    ) {
-      this.fileSystemService = new SandboxedFileSystemService(
-        this._sandboxManager,
-        params.targetDir,
-      );
-    } else {
-      this.fileSystemService = new StandardFileSystemService();
-    }
-
-    this.targetDir = path.resolve(params.targetDir);
-    this.folderTrust = params.folderTrust ?? false;
-    this.workspaceContext = new WorkspaceContext(this.targetDir, []);
-    this.pendingIncludeDirectories = params.includeDirectories ?? [];
     this.debugMode = params.debugMode;
     this.question = params.question;
     this.worktreeSettings = params.worktreeSettings;
