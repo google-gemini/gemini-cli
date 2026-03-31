@@ -89,6 +89,7 @@ import path from 'node:path';
 import { useSessionStats } from '../contexts/SessionContext.js';
 import { useKeypress } from './useKeypress.js';
 import type { LoadedSettings } from '../../config/settings.js';
+import { handleDiscussionUserMessage } from '../discuss/discussionRuntime.js';
 
 type ToolResponseWithParts = ToolCallResponseInfo & {
   llmContent?: PartListUnion;
@@ -777,6 +778,19 @@ export const useGeminiStream = (
               }
             }
           }
+
+          // If discuss mode is active, route plain user text to discuss runtime.
+          if (!isSlashCommand(trimmedQuery)) {
+            const discussionHandled = await handleDiscussionUserMessage(
+              config,
+              trimmedQuery,
+              addItem,
+              setPendingHistoryItem,
+            );
+            if (discussionHandled) {
+              return { queryToSend: null, shouldProceed: false };
+            }
+          }
         }
 
         if (shellModeActive && handleShellCommand(trimmedQuery, abortSignal)) {
@@ -835,6 +849,7 @@ export const useGeminiStream = (
       logger,
       shellModeActive,
       scheduleToolCalls,
+      setPendingHistoryItem,
     ],
   );
 
