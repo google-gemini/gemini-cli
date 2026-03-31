@@ -338,9 +338,15 @@ class WebFetchToolInvocation extends BaseToolInvocation<
       textContent = rawContent;
     }
 
-    // Cap at MAX_CONTENT_LENGTH initially to avoid excessive memory usage
-    // before the global budget allocation.
-    return truncateString(textContent, MAX_CONTENT_LENGTH, '');
+    if (!this.context.config.isAutoDistillationEnabled()) {
+      return truncateString(
+        textContent,
+        MAX_CONTENT_LENGTH,
+        TRUNCATION_WARNING,
+      );
+    }
+
+    return textContent;
   }
 
   private filterAndValidateUrls(urls: string[]): {
@@ -406,28 +412,32 @@ class WebFetchToolInvocation extends BaseToolInvocation<
       };
     }
 
-    // Smart Budget Allocation (Water-filling algorithm) for successes
-    const sortedSuccesses = [...successes].sort(
-      (a, b) => a.content.length - b.content.length,
-    );
-
-    let remainingBudget = MAX_CONTENT_LENGTH;
-    let remainingUrls = sortedSuccesses.length;
     const finalContentsByUrl = new Map<string, string>();
-
-    for (const success of sortedSuccesses) {
-      const fairShare = Math.floor(remainingBudget / remainingUrls);
-      const allocated = Math.min(success.content.length, fairShare);
-
-      const truncated = truncateString(
-        success.content,
-        allocated,
-        TRUNCATION_WARNING,
+    if (this.context.config.isAutoDistillationEnabled()) {
+      successes.forEach((success) =>
+        finalContentsByUrl.set(success.url, success.content),
       );
+    } else {
+      // Smart Budget Allocation (Water-filling algorithm) for successes
+      const sortedSuccesses = [...successes].sort(
+        (a, b) => a.content.length - b.content.length,
+      );
+      let remainingBudget = MAX_CONTENT_LENGTH;
+      let remainingUrls = sortedSuccesses.length;
+      for (const success of sortedSuccesses) {
+        const fairShare = Math.floor(remainingBudget / remainingUrls);
+        const allocated = Math.min(success.content.length, fairShare);
 
-      finalContentsByUrl.set(success.url, truncated);
-      remainingBudget -= truncated.length;
-      remainingUrls--;
+        const truncated = truncateString(
+          success.content,
+          allocated,
+          TRUNCATION_WARNING,
+        );
+
+        finalContentsByUrl.set(success.url, truncated);
+        remainingBudget -= truncated.length;
+        remainingUrls--;
+      }
     }
 
     const aggregatedContent = uniqueUrls
@@ -648,14 +658,21 @@ ${aggregatedContent}
       );
 
       if (status >= 400) {
-        const rawResponseText = bodyBuffer.toString('utf8');
+        let rawResponseText = bodyBuffer.toString('utf8');
+        if (!this.context.config.isAutoDistillationEnabled()) {
+          rawResponseText = truncateString(
+            rawResponseText,
+            10000,
+            '\n\n... [Error response truncated] ...',
+          );
+        }
         const headers: Record<string, string> = {};
         response.headers.forEach((value, key) => {
           headers[key] = value;
         });
         const errorContent = `Request failed with status ${status}
 Headers: ${JSON.stringify(headers, null, 2)}
-Response: ${truncateString(rawResponseText, 10000, '\n\n... [Error response truncated] ...')}`;
+Response: ${rawResponseText}`;
         debugLogger.error(
           `[WebFetchTool] Experimental fetch failed with status ${status} for ${url}`,
         );
@@ -671,11 +688,10 @@ Response: ${truncateString(rawResponseText, 10000, '\n\n... [Error response trun
         lowContentType.includes('text/plain') ||
         lowContentType.includes('application/json')
       ) {
-        const text = truncateString(
-          bodyBuffer.toString('utf8'),
-          MAX_CONTENT_LENGTH,
-          TRUNCATION_WARNING,
-        );
+        let text = bodyBuffer.toString('utf8');
+        if (!this.context.config.isAutoDistillationEnabled()) {
+          text = truncateString(text, MAX_CONTENT_LENGTH, TRUNCATION_WARNING);
+        }
         return {
           llmContent: text,
           returnDisplay: `Fetched ${contentType} content from ${url}`,
@@ -684,16 +700,19 @@ Response: ${truncateString(rawResponseText, 10000, '\n\n... [Error response trun
 
       if (lowContentType.includes('text/html')) {
         const html = bodyBuffer.toString('utf8');
-        const textContent = truncateString(
-          convert(html, {
-            wordwrap: false,
-            selectors: [
-              { selector: 'a', options: { ignoreHref: false, baseUrl: url } },
-            ],
-          }),
-          MAX_CONTENT_LENGTH,
-          TRUNCATION_WARNING,
-        );
+        let textContent = convert(html, {
+          wordwrap: false,
+          selectors: [
+            { selector: 'a', options: { ignoreHref: false, baseUrl: url } },
+          ],
+        });
+        if (!this.context.config.isAutoDistillationEnabled()) {
+          textContent = truncateString(
+            textContent,
+            MAX_CONTENT_LENGTH,
+            TRUNCATION_WARNING,
+          );
+        }
         return {
           llmContent: textContent,
           returnDisplay: `Fetched and converted HTML content from ${url}`,
@@ -718,11 +737,10 @@ Response: ${truncateString(rawResponseText, 10000, '\n\n... [Error response trun
       }
 
       // Fallback for unknown types - try as text
-      const text = truncateString(
-        bodyBuffer.toString('utf8'),
-        MAX_CONTENT_LENGTH,
-        TRUNCATION_WARNING,
-      );
+      let text = bodyBuffer.toString('utf8');
+      if (!this.context.config.isAutoDistillationEnabled()) {
+        text = truncateString(text, MAX_CONTENT_LENGTH, TRUNCATION_WARNING);
+      }
       return {
         llmContent: text,
         returnDisplay: `Fetched ${contentType || 'unknown'} content from ${url}`,
