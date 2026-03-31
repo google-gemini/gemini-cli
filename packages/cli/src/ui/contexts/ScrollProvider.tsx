@@ -140,20 +140,19 @@ export const ScrollProvider: React.FC<{ children: React.ReactNode }> = ({
       // 50ms threshold to consider scrolls consecutive
       if (timeSinceLastScroll < 50) {
         scrollMomentumRef.current.count += 1;
-        if (scrollMomentumRef.current.count > 50) {
-          // Accelerate up to 5x
-          multiplier = Math.min(
-            5,
-            1 + (scrollMomentumRef.current.count - 50) * 0.5,
-          );
-        }
+        // Accelerate up to 3x, starting after 5 consecutive scrolls.
+        // Each consecutive scroll increases the multiplier by 0.1.
+        multiplier = Math.min(
+          3,
+          1 + Math.max(0, scrollMomentumRef.current.count - 5) * 0.1,
+        );
       } else {
         scrollMomentumRef.current.count = 0;
       }
     }
     scrollMomentumRef.current.lastTime = now;
 
-    const delta = (direction === 'up' ? -1 : 1) * Math.floor(multiplier);
+    const delta = (direction === 'up' ? -1 : 1) * multiplier;
     const candidates = findScrollableCandidates(
       mouseEvent,
       scrollablesRef.current,
@@ -169,15 +168,16 @@ export const ScrollProvider: React.FC<{ children: React.ReactNode }> = ({
       const canScrollUp = effectiveScrollTop > 0.001;
       const canScrollDown =
         effectiveScrollTop < scrollHeight - innerHeight - 0.001;
+      const totalDelta = Math.round(pendingDelta + delta);
 
       if (direction === 'up' && canScrollUp) {
-        pendingScrollsRef.current.set(candidate.id, pendingDelta + delta);
+        pendingScrollsRef.current.set(candidate.id, totalDelta);
         scheduleFlush();
         return true;
       }
 
       if (direction === 'down' && canScrollDown) {
-        pendingScrollsRef.current.set(candidate.id, pendingDelta + delta);
+        pendingScrollsRef.current.set(candidate.id, totalDelta);
         scheduleFlush();
         return true;
       }
