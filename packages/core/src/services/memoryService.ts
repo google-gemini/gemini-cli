@@ -305,7 +305,8 @@ async function scanEligibleSessions(
   // Sort by filename descending (most recent first)
   sessionFiles.sort((a, b) => b.localeCompare(a));
 
-  const results: Array<{ conversation: ConversationRecord; filePath: string }> = [];
+  const results: Array<{ conversation: ConversationRecord; filePath: string }> =
+    [];
 
   for (const file of sessionFiles) {
     if (results.length >= MAX_SESSION_INDEX_SIZE) break;
