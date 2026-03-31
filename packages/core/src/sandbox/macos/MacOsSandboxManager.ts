@@ -32,6 +32,7 @@ import {
 } from '../utils/commandSafety.js';
 import { verifySandboxOverrides } from '../utils/commandUtils.js';
 import { parsePosixSandboxDenials } from '../utils/sandboxDenialUtils.js';
+import { handleReadWriteCommands } from '../utils/sandboxReadWriteUtils.js';
 
 export class MacOsSandboxManager implements SandboxManager {
   constructor(private readonly options: GlobalSandboxOptions) {}
@@ -105,6 +106,13 @@ export class MacOsSandboxManager implements SandboxManager {
         false,
     };
 
+    const { command: finalCommand, args: finalArgs } = handleReadWriteCommands(
+      req,
+      mergedAdditional,
+      this.options.workspace,
+      req.policy?.allowedPaths,
+    );
+
     const sandboxArgs = buildSeatbeltProfile({
       workspace: this.options.workspace,
       allowedPaths: [...(req.policy?.allowedPaths || [])],
@@ -118,7 +126,7 @@ export class MacOsSandboxManager implements SandboxManager {
 
     return {
       program: '/usr/bin/sandbox-exec',
-      args: ['-f', tempFile, '--', req.command, ...req.args],
+      args: ['-f', tempFile, '--', finalCommand, ...finalArgs],
       env: sanitizedEnv,
       cwd: req.cwd,
       cleanup: () => {
