@@ -92,6 +92,7 @@ export const READ_MANY_PARAM_USE_DEFAULT_EXCLUDES = 'useDefaultExcludes';
 // -- save_memory --
 export const MEMORY_TOOL_NAME = 'save_memory';
 export const MEMORY_PARAM_FACT = 'fact';
+export const MEMORY_PARAM_SCOPE = 'scope';
 
 // -- get_internal_docs --
 export const GET_INTERNAL_DOCS_TOOL_NAME = 'get_internal_docs';

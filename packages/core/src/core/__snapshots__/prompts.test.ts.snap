@@ -164,7 +164,10 @@ Use the \`exit_plan_mode\` tool to present the plan and formally request approva
 - **Command Execution:** Use the \`run_shell_command\` tool for running shell commands, remembering the safety rule to explain modifying commands first.
 - **Background Processes:** To run a command in the background, set the \`is_background\` parameter to true. If unsure, ask the user.
 - **Interactive Commands:** Always prefer non-interactive commands (e.g., using 'run once' or 'CI' flags for test runners to avoid persistent watch modes or 'git --no-pager') unless a persistent process is specifically required; however, some commands are only interactive and expect user input during their execution (e.g. ssh, vim). If you choose to execute an interactive command consider letting the user know they can press \`tab\` to focus into the shell to provide input.
-- **Memory Tool:** Use \`save_memory\` only for global user preferences, personal facts, or high-level information that applies across all sessions. Never save workspace-specific context, local file paths, or transient session state. Do not use memory to store summaries of code changes, bug fixes, or findings discovered during a task; this tool is for persistent user-related information only. If unsure whether a fact is worth remembering globally, ask the user.
+- **Memory Tool:** Use \`save_memory\` to persist facts across sessions. It supports two scopes via the \`scope\` parameter:
+  - \`"global"\` (default): Cross-project preferences and personal facts loaded in every workspace.
+  - \`"project"\`: Facts specific to the current workspace, private to the user (not committed to the repo). Use this for local dev setup notes, project-specific workflows, or personal reminders about this codebase.
+  Never save transient session state. Do not use memory to store summaries of code changes, bug fixes, or findings discovered during a task. If unsure whether a fact is global or project-specific, ask the user.
 - **Confirmation Protocol:** If a tool call is declined or cancelled, respect the decision immediately. Do not re-attempt the action or "negotiate" for the same tool call unless the user explicitly directs you to. Offer an alternative technical path if possible.
 
 ## Interaction Details
@@ -342,7 +345,10 @@ An approved plan is available for this task at \`/tmp/plans/feature-x.md\`.
 - **Command Execution:** Use the \`run_shell_command\` tool for running shell commands, remembering the safety rule to explain modifying commands first.
 - **Background Processes:** To run a command in the background, set the \`is_background\` parameter to true. If unsure, ask the user.
 - **Interactive Commands:** Always prefer non-interactive commands (e.g., using 'run once' or 'CI' flags for test runners to avoid persistent watch modes or 'git --no-pager') unless a persistent process is specifically required; however, some commands are only interactive and expect user input during their execution (e.g. ssh, vim). If you choose to execute an interactive command consider letting the user know they can press \`tab\` to focus into the shell to provide input.
-- **Memory Tool:** Use \`save_memory\` only for global user preferences, personal facts, or high-level information that applies across all sessions. Never save workspace-specific context, local file paths, or transient session state. Do not use memory to store summaries of code changes, bug fixes, or findings discovered during a task; this tool is for persistent user-related information only. If unsure whether a fact is worth remembering globally, ask the user.
+- **Memory Tool:** Use \`save_memory\` to persist facts across sessions. It supports two scopes via the \`scope\` parameter:
+  - \`"global"\` (default): Cross-project preferences and personal facts loaded in every workspace.
+  - \`"project"\`: Facts specific to the current workspace, private to the user (not committed to the repo). Use this for local dev setup notes, project-specific workflows, or personal reminders about this codebase.
+  Never save transient session state. Do not use memory to store summaries of code changes, bug fixes, or findings discovered during a task. If unsure whether a fact is global or project-specific, ask the user.
 - **Confirmation Protocol:** If a tool call is declined or cancelled, respect the decision immediately. Do not re-attempt the action or "negotiate" for the same tool call unless the user explicitly directs you to. Offer an alternative technical path if possible.
 
 ## Interaction Details
@@ -627,7 +633,10 @@ Use the \`exit_plan_mode\` tool to present the plan and formally request approva
 - **Command Execution:** Use the \`run_shell_command\` tool for running shell commands, remembering the safety rule to explain modifying commands first.
 - **Background Processes:** To run a command in the background, set the \`is_background\` parameter to true. If unsure, ask the user.
 - **Interactive Commands:** Always prefer non-interactive commands (e.g., using 'run once' or 'CI' flags for test runners to avoid persistent watch modes or 'git --no-pager') unless a persistent process is specifically required; however, some commands are only interactive and expect user input during their execution (e.g. ssh, vim). If you choose to execute an interactive command consider letting the user know they can press \`tab\` to focus into the shell to provide input.
-- **Memory Tool:** Use \`save_memory\` only for global user preferences, personal facts, or high-level information that applies across all sessions. Never save workspace-specific context, local file paths, or transient session state. Do not use memory to store summaries of code changes, bug fixes, or findings discovered during a task; this tool is for persistent user-related information only. If unsure whether a fact is worth remembering globally, ask the user.
+- **Memory Tool:** Use \`save_memory\` to persist facts across sessions. It supports two scopes via the \`scope\` parameter:
+  - \`"global"\` (default): Cross-project preferences and personal facts loaded in every workspace.
+  - \`"project"\`: Facts specific to the current workspace, private to the user (not committed to the repo). Use this for local dev setup notes, project-specific workflows, or personal reminders about this codebase.
+  Never save transient session state. Do not use memory to store summaries of code changes, bug fixes, or findings discovered during a task. If unsure whether a fact is global or project-specific, ask the user.
 - **Confirmation Protocol:** If a tool call is declined or cancelled, respect the decision immediately. Do not re-attempt the action or "negotiate" for the same tool call unless the user explicitly directs you to. Offer an alternative technical path if possible.
 
 ## Interaction Details
@@ -782,7 +791,10 @@ Operate using a **Research -> Strategy -> Execution** lifecycle. For the Executi
 - **Command Execution:** Use the \`run_shell_command\` tool for running shell commands, remembering the safety rule to explain modifying commands first.
 - **Background Processes:** To run a command in the background, set the \`is_background\` parameter to true. If unsure, ask the user.
 - **Interactive Commands:** Always prefer non-interactive commands (e.g., using 'run once' or 'CI' flags for test runners to avoid persistent watch modes or 'git --no-pager') unless a persistent process is specifically required; however, some commands are only interactive and expect user input during their execution (e.g. ssh, vim). If you choose to execute an interactive command consider letting the user know they can press \`tab\` to focus into the shell to provide input.
-- **Memory Tool:** Use \`save_memory\` only for global user preferences, personal facts, or high-level information that applies across all sessions. Never save workspace-specific context, local file paths, or transient session state. Do not use memory to store summaries of code changes, bug fixes, or findings discovered during a task; this tool is for persistent user-related information only. If unsure whether a fact is worth remembering globally, ask the user.
+- **Memory Tool:** Use \`save_memory\` to persist facts across sessions. It supports two scopes via the \`scope\` parameter:
+  - \`"global"\` (default): Cross-project preferences and personal facts loaded in every workspace.
+  - \`"project"\`: Facts specific to the current workspace, private to the user (not committed to the repo). Use this for local dev setup notes, project-specific workflows, or personal reminders about this codebase.
+  Never save transient session state. Do not use memory to store summaries of code changes, bug fixes, or findings discovered during a task. If unsure whether a fact is global or project-specific, ask the user.
 - **Confirmation Protocol:** If a tool call is declined or cancelled, respect the decision immediately. Do not re-attempt the action or "negotiate" for the same tool call unless the user explicitly directs you to. Offer an alternative technical path if possible.
 
 ## Interaction Details
@@ -923,7 +935,10 @@ Operate using a **Research -> Strategy -> Execution** lifecycle. For the Executi
 - **Command Execution:** Use the \`run_shell_command\` tool for running shell commands, remembering the safety rule to explain modifying commands first.
 - **Background Processes:** To run a command in the background, set the \`is_background\` parameter to true.
 - **Interactive Commands:** Always prefer non-interactive commands (e.g., using 'run once' or 'CI' flags for test runners to avoid persistent watch modes or 'git --no-pager') unless a persistent process is specifically required; however, some commands are only interactive and expect user input during their execution (e.g. ssh, vim).
-- **Memory Tool:** Use \`save_memory\` only for global user preferences, personal facts, or high-level information that applies across all sessions. Never save workspace-specific context, local file paths, or transient session state. Do not use memory to store summaries of code changes, bug fixes, or findings discovered during a task; this tool is for persistent user-related information only.
+- **Memory Tool:** Use \`save_memory\` to persist facts across sessions. It supports two scopes via the \`scope\` parameter:
+  - \`"global"\` (default): Cross-project preferences and personal facts loaded in every workspace.
+  - \`"project"\`: Facts specific to the current workspace, private to the user (not committed to the repo). Use this for local dev setup notes, project-specific workflows, or personal reminders about this codebase.
+  Never save transient session state. Do not use memory to store summaries of code changes, bug fixes, or findings discovered during a task.
 - **Confirmation Protocol:** If a tool call is declined or cancelled, respect the decision immediately. Do not re-attempt the action or "negotiate" for the same tool call unless the user explicitly directs you to. Offer an alternative technical path if possible.
 
 ## Interaction Details
@@ -1047,7 +1062,10 @@ Operate using a **Research -> Strategy -> Execution** lifecycle. For the Executi
 - **Command Execution:** Use the \`run_shell_command\` tool for running shell commands, remembering the safety rule to explain modifying commands first.
 - **Background Processes:** To run a command in the background, set the \`is_background\` parameter to true.
 - **Interactive Commands:** Always prefer non-interactive commands (e.g., using 'run once' or 'CI' flags for test runners to avoid persistent watch modes or 'git --no-pager') unless a persistent process is specifically required; however, some commands are only interactive and expect user input during their execution (e.g. ssh, vim).
-- **Memory Tool:** Use \`save_memory\` only for global user preferences, personal facts, or high-level information that applies across all sessions. Never save workspace-specific context, local file paths, or transient session state. Do not use memory to store summaries of code changes, bug fixes, or findings discovered during a task; this tool is for persistent user-related information only.
+- **Memory Tool:** Use \`save_memory\` to persist facts across sessions. It supports two scopes via the \`scope\` parameter:
+  - \`"global"\` (default): Cross-project preferences and personal facts loaded in every workspace.
+  - \`"project"\`: Facts specific to the current workspace, private to the user (not committed to the repo). Use this for local dev setup notes, project-specific workflows, or personal reminders about this codebase.
+  Never save transient session state. Do not use memory to store summaries of code changes, bug fixes, or findings discovered during a task.
 - **Confirmation Protocol:** If a tool call is declined or cancelled, respect the decision immediately. Do not re-attempt the action or "negotiate" for the same tool call unless the user explicitly directs you to. Offer an alternative technical path if possible.
 
 ## Interaction Details
@@ -1688,7 +1706,10 @@ Operate using a **Research -> Strategy -> Execution** lifecycle. For the Executi
 - **Command Execution:** Use the \`run_shell_command\` tool for running shell commands, remembering the safety rule to explain modifying commands first.
 - **Background Processes:** To run a command in the background, set the \`is_background\` parameter to true. If unsure, ask the user.
 - **Interactive Commands:** Always prefer non-interactive commands (e.g., using 'run once' or 'CI' flags for test runners to avoid persistent watch modes or 'git --no-pager') unless a persistent process is specifically required; however, some commands are only interactive and expect user input during their execution (e.g. ssh, vim). If you choose to execute an interactive command consider letting the user know they can press \`tab\` to focus into the shell to provide input.
-- **Memory Tool:** Use \`save_memory\` only for global user preferences, personal facts, or high-level information that applies across all sessions. Never save workspace-specific context, local file paths, or transient session state. Do not use memory to store summaries of code changes, bug fixes, or findings discovered during a task; this tool is for persistent user-related information only. If unsure whether a fact is worth remembering globally, ask the user.
+- **Memory Tool:** Use \`save_memory\` to persist facts across sessions. It supports two scopes via the \`scope\` parameter:
+  - \`"global"\` (default): Cross-project preferences and personal facts loaded in every workspace.
+  - \`"project"\`: Facts specific to the current workspace, private to the user (not committed to the repo). Use this for local dev setup notes, project-specific workflows, or personal reminders about this codebase.
+  Never save transient session state. Do not use memory to store summaries of code changes, bug fixes, or findings discovered during a task. If unsure whether a fact is global or project-specific, ask the user.
 - **Confirmation Protocol:** If a tool call is declined or cancelled, respect the decision immediately. Do not re-attempt the action or "negotiate" for the same tool call unless the user explicitly directs you to. Offer an alternative technical path if possible.
 
 ## Interaction Details
@@ -1843,7 +1864,10 @@ Operate using a **Research -> Strategy -> Execution** lifecycle. For the Executi
 - **Command Execution:** Use the \`run_shell_command\` tool for running shell commands, remembering the safety rule to explain modifying commands first.
 - **Background Processes:** To run a command in the background, set the \`is_background\` parameter to true. If unsure, ask the user.
 - **Interactive Commands:** Always prefer non-interactive commands (e.g., using 'run once' or 'CI' flags for test runners to avoid persistent watch modes or 'git --no-pager') unless a persistent process is specifically required; however, some commands are only interactive and expect user input during their execution (e.g. ssh, vim). If you choose to execute an interactive command consider letting the user know they can press \`tab\` to focus into the shell to provide input.
-- **Memory Tool:** Use \`save_memory\` only for global user preferences, personal facts, or high-level information that applies across all sessions. Never save workspace-specific context, local file paths, or transient session state. Do not use memory to store summaries of code changes, bug fixes, or findings discovered during a task; this tool is for persistent user-related information only. If unsure whether a fact is worth remembering globally, ask the user.
+- **Memory Tool:** Use \`save_memory\` to persist facts across sessions. It supports two scopes via the \`scope\` parameter:
+  - \`"global"\` (default): Cross-project preferences and personal facts loaded in every workspace.
+  - \`"project"\`: Facts specific to the current workspace, private to the user (not committed to the repo). Use this for local dev setup notes, project-specific workflows, or personal reminders about this codebase.
+  Never save transient session state. Do not use memory to store summaries of code changes, bug fixes, or findings discovered during a task. If unsure whether a fact is global or project-specific, ask the user.
 - **Confirmation Protocol:** If a tool call is declined or cancelled, respect the decision immediately. Do not re-attempt the action or "negotiate" for the same tool call unless the user explicitly directs you to. Offer an alternative technical path if possible.
 
 ## Interaction Details
@@ -2002,7 +2026,10 @@ Operate using a **Research -> Strategy -> Execution** lifecycle. For the Executi
 - **Command Execution:** Use the \`run_shell_command\` tool for running shell commands, remembering the safety rule to explain modifying commands first.
 - **Background Processes:** To run a command in the background, set the \`is_background\` parameter to true. If unsure, ask the user.
 - **Interactive Commands:** Always prefer non-interactive commands (e.g., using 'run once' or 'CI' flags for test runners to avoid persistent watch modes or 'git --no-pager') unless a persistent process is specifically required; however, some commands are only interactive and expect user input during their execution (e.g. ssh, vim). If you choose to execute an interactive command consider letting the user know they can press \`tab\` to focus into the shell to provide input.
-- **Memory Tool:** Use \`save_memory\` only for global user preferences, personal facts, or high-level information that applies across all sessions. Never save workspace-specific context, local file paths, or transient session state. Do not use memory to store summaries of code changes, bug fixes, or findings discovered during a task; this tool is for persistent user-related information only. If unsure whether a fact is worth remembering globally, ask the user.
+- **Memory Tool:** Use \`save_memory\` to persist facts across sessions. It supports two scopes via the \`scope\` parameter:
+  - \`"global"\` (default): Cross-project preferences and personal facts loaded in every workspace.
+  - \`"project"\`: Facts specific to the current workspace, private to the user (not committed to the repo). Use this for local dev setup notes, project-specific workflows, or personal reminders about this codebase.
+  Never save transient session state. Do not use memory to store summaries of code changes, bug fixes, or findings discovered during a task. If unsure whether a fact is global or project-specific, ask the user.
 - **Confirmation Protocol:** If a tool call is declined or cancelled, respect the decision immediately. Do not re-attempt the action or "negotiate" for the same tool call unless the user explicitly directs you to. Offer an alternative technical path if possible.
 
 ## Interaction Details
@@ -2161,7 +2188,10 @@ Operate using a **Research -> Strategy -> Execution** lifecycle. For the Executi
 - **Command Execution:** Use the \`run_shell_command\` tool for running shell commands, remembering the safety rule to explain modifying commands first.
 - **Background Processes:** To run a command in the background, set the \`is_background\` parameter to true. If unsure, ask the user.
 - **Interactive Commands:** Always prefer non-interactive commands (e.g., using 'run once' or 'CI' flags for test runners to avoid persistent watch modes or 'git --no-pager') unless a persistent process is specifically required; however, some commands are only interactive and expect user input during their execution (e.g. ssh, vim). If you choose to execute an interactive command consider letting the user know they can press \`tab\` to focus into the shell to provide input.
-- **Memory Tool:** Use \`save_memory\` only for global user preferences, personal facts, or high-level information that applies across all sessions. Never save workspace-specific context, local file paths, or transient session state. Do not use memory to store summaries of code changes, bug fixes, or findings discovered during a task; this tool is for persistent user-related information only. If unsure whether a fact is worth remembering globally, ask the user.
+- **Memory Tool:** Use \`save_memory\` to persist facts across sessions. It supports two scopes via the \`scope\` parameter:
+  - \`"global"\` (default): Cross-project preferences and personal facts loaded in every workspace.
+  - \`"project"\`: Facts specific to the current workspace, private to the user (not committed to the repo). Use this for local dev setup notes, project-specific workflows, or personal reminders about this codebase.
+  Never save transient session state. Do not use memory to store summaries of code changes, bug fixes, or findings discovered during a task. If unsure whether a fact is global or project-specific, ask the user.
 - **Confirmation Protocol:** If a tool call is declined or cancelled, respect the decision immediately. Do not re-attempt the action or "negotiate" for the same tool call unless the user explicitly directs you to. Offer an alternative technical path if possible.
 
 ## Interaction Details
@@ -2316,7 +2346,10 @@ Operate using a **Research -> Strategy -> Execution** lifecycle. For the Executi
 - **Command Execution:** Use the \`run_shell_command\` tool for running shell commands, remembering the safety rule to explain modifying commands first.
 - **Background Processes:** To run a command in the background, set the \`is_background\` parameter to true. If unsure, ask the user.
 - **Interactive Commands:** Always prefer non-interactive commands (e.g., using 'run once' or 'CI' flags for test runners to avoid persistent watch modes or 'git --no-pager') unless a persistent process is specifically required; however, some commands are only interactive and expect user input during their execution (e.g. ssh, vim). If you choose to execute an interactive command consider letting the user know they can press \`tab\` to focus into the shell to provide input.
-- **Memory Tool:** Use \`save_memory\` only for global user preferences, personal facts, or high-level information that applies across all sessions. Never save workspace-specific context, local file paths, or transient session state. Do not use memory to store summaries of code changes, bug fixes, or findings discovered during a task; this tool is for persistent user-related information only. If unsure whether a fact is worth remembering globally, ask the user.
+- **Memory Tool:** Use \`save_memory\` to persist facts across sessions. It supports two scopes via the \`scope\` parameter:
+  - \`"global"\` (default): Cross-project preferences and personal facts loaded in every workspace.
+  - \`"project"\`: Facts specific to the current workspace, private to the user (not committed to the repo). Use this for local dev setup notes, project-specific workflows, or personal reminders about this codebase.
+  Never save transient session state. Do not use memory to store summaries of code changes, bug fixes, or findings discovered during a task. If unsure whether a fact is global or project-specific, ask the user.
 - **Confirmation Protocol:** If a tool call is declined or cancelled, respect the decision immediately. Do not re-attempt the action or "negotiate" for the same tool call unless the user explicitly directs you to. Offer an alternative technical path if possible.
 
 ## Interaction Details
@@ -2465,7 +2498,10 @@ Operate using a **Research -> Strategy -> Execution** lifecycle. For the Executi
 - **Command Execution:** Use the \`run_shell_command\` tool for running shell commands, remembering the safety rule to explain modifying commands first.
 - **Background Processes:** To run a command in the background, set the \`is_background\` parameter to true. If unsure, ask the user.
 - **Interactive Commands:** Always prefer non-interactive commands (e.g., using 'run once' or 'CI' flags for test runners to avoid persistent watch modes or 'git --no-pager') unless a persistent process is specifically required; however, some commands are only interactive and expect user input during their execution (e.g. ssh, vim). If you choose to execute an interactive command consider letting the user know they can press \`tab\` to focus into the shell to provide input.
-- **Memory Tool:** Use \`save_memory\` only for global user preferences, personal facts, or high-level information that applies across all sessions. Never save workspace-specific context, local file paths, or transient session state. Do not use memory to store summaries of code changes, bug fixes, or findings discovered during a task; this tool is for persistent user-related information only. If unsure whether a fact is worth remembering globally, ask the user.
+- **Memory Tool:** Use \`save_memory\` to persist facts across sessions. It supports two scopes via the \`scope\` parameter:
+  - \`"global"\` (default): Cross-project preferences and personal facts loaded in every workspace.
+  - \`"project"\`: Facts specific to the current workspace, private to the user (not committed to the repo). Use this for local dev setup notes, project-specific workflows, or personal reminders about this codebase.
+  Never save transient session state. Do not use memory to store summaries of code changes, bug fixes, or findings discovered during a task. If unsure whether a fact is global or project-specific, ask the user.
 - **Confirmation Protocol:** If a tool call is declined or cancelled, respect the decision immediately. Do not re-attempt the action or "negotiate" for the same tool call unless the user explicitly directs you to. Offer an alternative technical path if possible.
 
 ## Interaction Details
@@ -2619,7 +2655,10 @@ Operate using a **Research -> Strategy -> Execution** lifecycle. For the Executi
 - **Command Execution:** Use the \`run_shell_command\` tool for running shell commands, remembering the safety rule to explain modifying commands first.
 - **Background Processes:** To run a command in the background, set the \`is_background\` parameter to true. If unsure, ask the user.
 - **Interactive Commands:** Always prefer non-interactive commands (e.g., using 'run once' or 'CI' flags for test runners to avoid persistent watch modes or 'git --no-pager') unless a persistent process is specifically required; however, some commands are only interactive and expect user input during their execution (e.g. ssh, vim). If you choose to execute an interactive command consider letting the user know they can press \`tab\` to focus into the shell to provide input.
-- **Memory Tool:** Use \`save_memory\` only for global user preferences, personal facts, or high-level information that applies across all sessions. Never save workspace-specific context, local file paths, or transient session state. Do not use memory to store summaries of code changes, bug fixes, or findings discovered during a task; this tool is for persistent user-related information only. If unsure whether a fact is worth remembering globally, ask the user.
+- **Memory Tool:** Use \`save_memory\` to persist facts across sessions. It supports two scopes via the \`scope\` parameter:
+  - \`"global"\` (default): Cross-project preferences and personal facts loaded in every workspace.
+  - \`"project"\`: Facts specific to the current workspace, private to the user (not committed to the repo). Use this for local dev setup notes, project-specific workflows, or personal reminders about this codebase.
+  Never save transient session state. Do not use memory to store summaries of code changes, bug fixes, or findings discovered during a task. If unsure whether a fact is global or project-specific, ask the user.
 - **Confirmation Protocol:** If a tool call is declined or cancelled, respect the decision immediately. Do not re-attempt the action or "negotiate" for the same tool call unless the user explicitly directs you to. Offer an alternative technical path if possible.
 
 ## Interaction Details
@@ -2774,7 +2813,10 @@ Operate using a **Research -> Strategy -> Execution** lifecycle. For the Executi
 - **Command Execution:** Use the \`run_shell_command\` tool for running shell commands, remembering the safety rule to explain modifying commands first.
 - **Background Processes:** To run a command in the background, set the \`is_background\` parameter to true. If unsure, ask the user.
 - **Interactive Commands:** Always prefer non-interactive commands (e.g., using 'run once' or 'CI' flags for test runners to avoid persistent watch modes or 'git --no-pager') unless a persistent process is specifically required; however, some commands are only interactive and expect user input during their execution (e.g. ssh, vim). If you choose to execute an interactive command consider letting the user know they can press \`tab\` to focus into the shell to provide input.
-- **Memory Tool:** Use \`save_memory\` only for global user preferences, personal facts, or high-level information that applies across all sessions. Never save workspace-specific context, local file paths, or transient session state. Do not use memory to store summaries of code changes, bug fixes, or findings discovered during a task; this tool is for persistent user-related information only. If unsure whether a fact is worth remembering globally, ask the user.
+- **Memory Tool:** Use \`save_memory\` to persist facts across sessions. It supports two scopes via the \`scope\` parameter:
+  - \`"global"\` (default): Cross-project preferences and personal facts loaded in every workspace.
+  - \`"project"\`: Facts specific to the current workspace, private to the user (not committed to the repo). Use this for local dev setup notes, project-specific workflows, or personal reminders about this codebase.
+  Never save transient session state. Do not use memory to store summaries of code changes, bug fixes, or findings discovered during a task. If unsure whether a fact is global or project-specific, ask the user.
 - **Confirmation Protocol:** If a tool call is declined or cancelled, respect the decision immediately. Do not re-attempt the action or "negotiate" for the same tool call unless the user explicitly directs you to. Offer an alternative technical path if possible.
 
 ## Interaction Details
@@ -3064,7 +3106,10 @@ You are operating with a persistent file-based task tracking system located at \
 - **Command Execution:** Use the \`run_shell_command\` tool for running shell commands, remembering the safety rule to explain modifying commands first.
 - **Background Processes:** To run a command in the background, set the \`is_background\` parameter to true. If unsure, ask the user.
 - **Interactive Commands:** Always prefer non-interactive commands (e.g., using 'run once' or 'CI' flags for test runners to avoid persistent watch modes or 'git --no-pager') unless a persistent process is specifically required; however, some commands are only interactive and expect user input during their execution (e.g. ssh, vim). If you choose to execute an interactive command consider letting the user know they can press \`tab\` to focus into the shell to provide input.
-- **Memory Tool:** Use \`save_memory\` only for global user preferences, personal facts, or high-level information that applies across all sessions. Never save workspace-specific context, local file paths, or transient session state. Do not use memory to store summaries of code changes, bug fixes, or findings discovered during a task; this tool is for persistent user-related information only. If unsure whether a fact is worth remembering globally, ask the user.
+- **Memory Tool:** Use \`save_memory\` to persist facts across sessions. It supports two scopes via the \`scope\` parameter:
+  - \`"global"\` (default): Cross-project preferences and personal facts loaded in every workspace.
+  - \`"project"\`: Facts specific to the current workspace, private to the user (not committed to the repo). Use this for local dev setup notes, project-specific workflows, or personal reminders about this codebase.
+  Never save transient session state. Do not use memory to store summaries of code changes, bug fixes, or findings discovered during a task. If unsure whether a fact is global or project-specific, ask the user.
 - **Confirmation Protocol:** If a tool call is declined or cancelled, respect the decision immediately. Do not re-attempt the action or "negotiate" for the same tool call unless the user explicitly directs you to. Offer an alternative technical path if possible.
 
 ## Interaction Details
@@ -3460,7 +3505,10 @@ Operate using a **Research -> Strategy -> Execution** lifecycle. For the Executi
 - **Command Execution:** Use the \`run_shell_command\` tool for running shell commands, remembering the safety rule to explain modifying commands first.
 - **Background Processes:** To run a command in the background, set the \`is_background\` parameter to true. If unsure, ask the user.
 - **Interactive Commands:** Always prefer non-interactive commands (e.g., using 'run once' or 'CI' flags for test runners to avoid persistent watch modes or 'git --no-pager') unless a persistent process is specifically required; however, some commands are only interactive and expect user input during their execution (e.g. ssh, vim). If you choose to execute an interactive command consider letting the user know they can press \`tab\` to focus into the shell to provide input.
-- **Memory Tool:** Use \`save_memory\` only for global user preferences, personal facts, or high-level information that applies across all sessions. Never save workspace-specific context, local file paths, or transient session state. Do not use memory to store summaries of code changes, bug fixes, or findings discovered during a task; this tool is for persistent user-related information only. If unsure whether a fact is worth remembering globally, ask the user.
+- **Memory Tool:** Use \`save_memory\` to persist facts across sessions. It supports two scopes via the \`scope\` parameter:
+  - \`"global"\` (default): Cross-project preferences and personal facts loaded in every workspace.
+  - \`"project"\`: Facts specific to the current workspace, private to the user (not committed to the repo). Use this for local dev setup notes, project-specific workflows, or personal reminders about this codebase.
+  Never save transient session state. Do not use memory to store summaries of code changes, bug fixes, or findings discovered during a task. If unsure whether a fact is global or project-specific, ask the user.
 - **Confirmation Protocol:** If a tool call is declined or cancelled, respect the decision immediately. Do not re-attempt the action or "negotiate" for the same tool call unless the user explicitly directs you to. Offer an alternative technical path if possible.
 
 ## Interaction Details
@@ -3615,7 +3663,10 @@ Operate using a **Research -> Strategy -> Execution** lifecycle. For the Executi
 - **Command Execution:** Use the \`run_shell_command\` tool for running shell commands, remembering the safety rule to explain modifying commands first.
 - **Background Processes:** To run a command in the background, set the \`is_background\` parameter to true. If unsure, ask the user.
 - **Interactive Commands:** Always prefer non-interactive commands (e.g., using 'run once' or 'CI' flags for test runners to avoid persistent watch modes or 'git --no-pager') unless a persistent process is specifically required; however, some commands are only interactive and expect user input during their execution (e.g. ssh, vim). If you choose to execute an interactive command consider letting the user know they can press \`tab\` to focus into the shell to provide input.
-- **Memory Tool:** Use \`save_memory\` only for global user preferences, personal facts, or high-level information that applies across all sessions. Never save workspace-specific context, local file paths, or transient session state. Do not use memory to store summaries of code changes, bug fixes, or findings discovered during a task; this tool is for persistent user-related information only. If unsure whether a fact is worth remembering globally, ask the user.
+- **Memory Tool:** Use \`save_memory\` to persist facts across sessions. It supports two scopes via the \`scope\` parameter:
+  - \`"global"\` (default): Cross-project preferences and personal facts loaded in every workspace.
+  - \`"project"\`: Facts specific to the current workspace, private to the user (not committed to the repo). Use this for local dev setup notes, project-specific workflows, or personal reminders about this codebase.
+  Never save transient session state. Do not use memory to store summaries of code changes, bug fixes, or findings discovered during a task. If unsure whether a fact is global or project-specific, ask the user.
 - **Confirmation Protocol:** If a tool call is declined or cancelled, respect the decision immediately. Do not re-attempt the action or "negotiate" for the same tool call unless the user explicitly directs you to. Offer an alternative technical path if possible.
 
 ## Interaction Details
@@ -3882,7 +3933,10 @@ Operate using a **Research -> Strategy -> Execution** lifecycle. For the Executi
 - **Command Execution:** Use the \`run_shell_command\` tool for running shell commands, remembering the safety rule to explain modifying commands first.
 - **Background Processes:** To run a command in the background, set the \`is_background\` parameter to true. If unsure, ask the user.
 - **Interactive Commands:** Always prefer non-interactive commands (e.g., using 'run once' or 'CI' flags for test runners to avoid persistent watch modes or 'git --no-pager') unless a persistent process is specifically required; however, some commands are only interactive and expect user input during their execution (e.g. ssh, vim). If you choose to execute an interactive command consider letting the user know they can press \`tab\` to focus into the shell to provide input.
-- **Memory Tool:** Use \`save_memory\` only for global user preferences, personal facts, or high-level information that applies across all sessions. Never save workspace-specific context, local file paths, or transient session state. Do not use memory to store summaries of code changes, bug fixes, or findings discovered during a task; this tool is for persistent user-related information only. If unsure whether a fact is worth remembering globally, ask the user.
+- **Memory Tool:** Use \`save_memory\` to persist facts across sessions. It supports two scopes via the \`scope\` parameter:
+  - \`"global"\` (default): Cross-project preferences and personal facts loaded in every workspace.
+  - \`"project"\`: Facts specific to the current workspace, private to the user (not committed to the repo). Use this for local dev setup notes, project-specific workflows, or personal reminders about this codebase.
+  Never save transient session state. Do not use memory to store summaries of code changes, bug fixes, or findings discovered during a task. If unsure whether a fact is global or project-specific, ask the user.
 - **Confirmation Protocol:** If a tool call is declined or cancelled, respect the decision immediately. Do not re-attempt the action or "negotiate" for the same tool call unless the user explicitly directs you to. Offer an alternative technical path if possible.
 
 ## Interaction Details
@@ -4037,7 +4091,10 @@ Operate using a **Research -> Strategy -> Execution** lifecycle. For the Executi
 - **Command Execution:** Use the \`run_shell_command\` tool for running shell commands, remembering the safety rule to explain modifying commands first.
 - **Background Processes:** To run a command in the background, set the \`is_background\` parameter to true. If unsure, ask the user.
 - **Interactive Commands:** Always prefer non-interactive commands (e.g., using 'run once' or 'CI' flags for test runners to avoid persistent watch modes or 'git --no-pager') unless a persistent process is specifically required; however, some commands are only interactive and expect user input during their execution (e.g. ssh, vim). If you choose to execute an interactive command consider letting the user know they can press \`tab\` to focus into the shell to provide input.
-- **Memory Tool:** Use \`save_memory\` only for global user preferences, personal facts, or high-level information that applies across all sessions. Never save workspace-specific context, local file paths, or transient session state. Do not use memory to store summaries of code changes, bug fixes, or findings discovered during a task; this tool is for persistent user-related information only. If unsure whether a fact is worth remembering globally, ask the user.
+- **Memory Tool:** Use \`save_memory\` to persist facts across sessions. It supports two scopes via the \`scope\` parameter:
+  - \`"global"\` (default): Cross-project preferences and personal facts loaded in every workspace.
+  - \`"project"\`: Facts specific to the current workspace, private to the user (not committed to the repo). Use this for local dev setup notes, project-specific workflows, or personal reminders about this codebase.
+  Never save transient session state. Do not use memory to store summaries of code changes, bug fixes, or findings discovered during a task. If unsure whether a fact is global or project-specific, ask the user.
 - **Confirmation Protocol:** If a tool call is declined or cancelled, respect the decision immediately. Do not re-attempt the action or "negotiate" for the same tool call unless the user explicitly directs you to. Offer an alternative technical path if possible.
 
 ## Interaction Details

@@ -17,6 +17,7 @@ vi.mock('../utils/memoryDiscovery.js', async (importOriginal) => {
   return {
     ...actual,
     getGlobalMemoryPaths: vi.fn(),
+    getUserProjectMemoryPaths: vi.fn(),
     getExtensionMemoryPaths: vi.fn(),
     getEnvironmentMemoryPaths: vi.fn(),
     readGeminiMdFiles: vi.fn(),
@@ -47,12 +48,18 @@ describe('ContextManager', () => {
       }),
       isTrustedFolder: vi.fn().mockReturnValue(true),
       getMemoryBoundaryMarkers: vi.fn().mockReturnValue(['.git']),
+      storage: {
+        getProjectMemoryDir: vi
+          .fn()
+          .mockReturnValue('/home/user/.gemini/memory/test-project'),
+      },
     } as unknown as Config;
 
     contextManager = new ContextManager(mockConfig);
     vi.clearAllMocks();
     vi.spyOn(coreEvents, 'emit');
     vi.mocked(memoryDiscovery.getExtensionMemoryPaths).mockReturnValue([]);
+    vi.mocked(memoryDiscovery.getUserProjectMemoryPaths).mockResolvedValue([]);
     // default mock: deduplication returns paths as-is (no deduplication)
     vi.mocked(
       memoryDiscovery.deduplicatePathsByFileIdentity,

@@ -8,6 +8,7 @@ export interface HierarchicalMemory {
   global?: string;
   extension?: string;
   project?: string;
+  userProjectMemory?: string;
 }
 
 /**
@@ -20,6 +21,12 @@ export function flattenMemory(memory?: string | HierarchicalMemory): string {
   const sections: Array<{ name: string; content: string }> = [];
   if (memory.global?.trim()) {
     sections.push({ name: 'Global', content: memory.global.trim() });
+  }
+  if (memory.userProjectMemory?.trim()) {
+    sections.push({
+      name: 'User Project Memory',
+      content: memory.userProjectMemory.trim(),
+    });
   }
   if (memory.extension?.trim()) {
     sections.push({ name: 'Extension', content: memory.extension.trim() });
