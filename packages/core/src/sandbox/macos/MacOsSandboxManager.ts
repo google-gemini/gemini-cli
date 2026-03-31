@@ -10,7 +10,9 @@ import {
   type SandboxedCommand,
   type SandboxPermissions,
   type GlobalSandboxOptions,
+  type ParsedSandboxDenial,
 } from '../../services/sandboxManager.js';
+import type { ShellExecutionResult } from '../../services/shellExecutionService.js';
 import {
   sanitizeEnvironment,
   getSecureSanitizationConfig,
@@ -25,26 +27,14 @@ import {
   isDangerousCommand,
   isStrictlyApproved,
 } from '../utils/commandSafety.js';
-import { type SandboxPolicyManager } from '../../policy/sandboxPolicyManager.js';
 import { verifySandboxOverrides } from '../utils/commandUtils.js';
-
-export interface MacOsSandboxOptions extends GlobalSandboxOptions {
-  /** The current sandbox mode behavior from config. */
-  modeConfig?: {
-    readonly?: boolean;
-    network?: boolean;
-    approvedTools?: string[];
-    allowOverrides?: boolean;
-  };
-  /** The policy manager for persistent approvals. */
-  policyManager?: SandboxPolicyManager;
-}
+import { parsePosixSandboxDenials } from '../utils/sandboxDenialUtils.js';
 
 /**
  * A SandboxManager implementation for macOS that uses Seatbelt.
  */
 export class MacOsSandboxManager implements SandboxManager {
-  constructor(private readonly options: MacOsSandboxOptions) {}
+  constructor(private readonly options: GlobalSandboxOptions) {}
 
   isKnownSafeCommand(args: string[]): boolean {
     const toolName = args[0];
@@ -57,6 +47,10 @@ export class MacOsSandboxManager implements SandboxManager {
 
   isDangerousCommand(args: string[]): boolean {
     return isDangerousCommand(args);
+  }
+
+  parseDenials(result: ShellExecutionResult): ParsedSandboxDenial | undefined {
+    return parsePosixSandboxDenials(result);
   }
 
   async prepareCommand(req: SandboxRequest): Promise<SandboxedCommand> {
@@ -84,7 +78,7 @@ export class MacOsSandboxManager implements SandboxManager {
 
     const workspaceWrite = !isReadonlyMode || isApproved;
     const defaultNetwork =
-      this.options.modeConfig?.network ?? req.policy?.networkAccess ?? false;
+      this.options.modeConfig?.network || req.policy?.networkAccess || false;
 
     // Fetch persistent approvals for this command
     const commandName = await getCommandName(req.command, req.args);
@@ -114,7 +108,7 @@ export class MacOsSandboxManager implements SandboxManager {
     const sandboxArgs = buildSeatbeltArgs({
       workspace: this.options.workspace,
       allowedPaths: [...(req.policy?.allowedPaths || [])],
-      forbiddenPaths: req.policy?.forbiddenPaths,
+      forbiddenPaths: this.options.forbiddenPaths,
       networkAccess: mergedAdditional.network,
       workspaceWrite,
       additionalPermissions: mergedAdditional,

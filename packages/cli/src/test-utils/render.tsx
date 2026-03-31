@@ -506,8 +506,8 @@ const baseMockUiState = {
   cleanUiDetailsVisible: false,
   allowPlanMode: true,
   activePtyId: undefined,
-  backgroundShells: new Map(),
-  backgroundShellHeight: 0,
+  backgroundTasks: new Map(),
+  backgroundTaskHeight: 0,
   quota: {
     userTier: undefined,
     stats: undefined,
@@ -568,6 +568,7 @@ const mockUIActions: UIActions = {
   handleOverageMenuChoice: vi.fn(),
   handleEmptyWalletChoice: vi.fn(),
   setQueueErrorMessage: vi.fn(),
+  addMessage: vi.fn(),
   popAllMessages: vi.fn(),
   handleApiKeySubmit: vi.fn(),
   handleApiKeyCancel: vi.fn(),
@@ -578,9 +579,9 @@ const mockUIActions: UIActions = {
   revealCleanUiDetailsTemporarily: vi.fn(),
   handleWarning: vi.fn(),
   setEmbeddedShellFocused: vi.fn(),
-  dismissBackgroundShell: vi.fn(),
-  setActiveBackgroundShellPid: vi.fn(),
-  setIsBackgroundShellListOpen: vi.fn(),
+  dismissBackgroundTask: vi.fn(),
+  setActiveBackgroundTaskPid: vi.fn(),
+  setIsBackgroundTaskListOpen: vi.fn(),
   setAuthContext: vi.fn(),
   onHintInput: vi.fn(),
   onHintBackspace: vi.fn(),
@@ -612,6 +613,7 @@ export const renderWithProviders = async (
     mouseEventsEnabled = false,
     config,
     uiActions,
+    toolActions,
     persistentState,
     appState = mockAppState,
   }: {
@@ -622,6 +624,11 @@ export const renderWithProviders = async (
     mouseEventsEnabled?: boolean;
     config?: Config;
     uiActions?: Partial<UIActions>;
+    toolActions?: Partial<{
+      isExpanded: (callId: string) => boolean;
+      toggleExpansion: (callId: string) => void;
+      toggleAllExpansion: (callIds: string[]) => void;
+    }>;
     persistentState?: {
       get?: typeof persistentStateMock.get;
       set?: typeof persistentStateMock.set;
@@ -709,6 +716,16 @@ export const renderWithProviders = async (
                         <ToolActionsProvider
                           config={config}
                           toolCalls={allToolCalls}
+                          isExpanded={
+                            toolActions?.isExpanded ??
+                            vi.fn().mockReturnValue(false)
+                          }
+                          toggleExpansion={
+                            toolActions?.toggleExpansion ?? vi.fn()
+                          }
+                          toggleAllExpansion={
+                            toolActions?.toggleAllExpansion ?? vi.fn()
+                          }
                         >
                           <AskUserActionsProvider
                             request={null}

@@ -2,7 +2,7 @@ name: 'Evals: PR Regression Check'
 
 on:
   pull_request:
-    types: [opened, synchronize, reopened, ready_for_review]
+    types: ['opened', 'synchronize', 'reopened', 'ready_for_review']
     paths:
       - 'packages/core/src/prompts/**'
       - 'packages/core/src/tools/**'
@@ -69,10 +69,10 @@ jobs:
 
           for MODEL in "${MODELS[@]}"; do
             echo "--- Processing Model: $MODEL ---"
-            
+
             # 1. Identify Trustworthy Evals (Returns: FILE_LIST --test-pattern TEST_PATTERN)
             OUTPUT=$(node scripts/get_trustworthy_evals.js "$MODEL")
-            
+
             if [[ -z "$OUTPUT" ]]; then
               echo "No trustworthy tests found for $MODEL. Skipping."
               continue
@@ -83,7 +83,7 @@ jobs:
 
             # 3. Generate Report
             REPORT=$(node scripts/compare_evals.js "$MODEL")
-            
+
             if [[ -n "$REPORT" ]]; then
               COMBINED_REPORT="${COMBINED_REPORT}${REPORT}\n\n---\n\n"
             fi

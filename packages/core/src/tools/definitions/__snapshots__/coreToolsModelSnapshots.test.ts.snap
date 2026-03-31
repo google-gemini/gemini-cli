@@ -640,19 +640,27 @@ exports[`coreTools snapshots for specific models > Model: gemini-2.5-pro > snaps
 exports[`coreTools snapshots for specific models > Model: gemini-2.5-pro > snapshot for tool: save_memory 1`] = `
 {
   "description": "
-Saves concise global user context (preferences, facts) for use across ALL workspaces.
+Saves concise user context (preferences, facts) for use across future sessions.
 
-### CRITICAL: GLOBAL CONTEXT ONLY
-NEVER save workspace-specific context, local paths, or commands (e.g. "The entry point is src/index.js", "The test command is npm test"). These are local to the current workspace and must NOT be saved globally. EXCLUSIVELY for context relevant across ALL workspaces.
+Supports two scopes:
+- **global** (default): Cross-project preferences loaded in every workspace. Use for "Remember X" or clear personal facts.
+- **project**: Facts specific to the current workspace, private to the user (not committed to the repo). Use for local dev setup notes, project-specific workflows, or personal reminders about this codebase.
 
-- Use for "Remember X" or clear personal facts.
-- Do NOT use for session context.",
+Do NOT use for session-specific context or temporary data.",
   "name": "save_memory",
   "parametersJsonSchema": {
     "additionalProperties": false,
     "properties": {
       "fact": {
         "description": "The specific fact or piece of information to remember. Should be a clear, self-contained statement.",
+        "type": "string",
+      },
+      "scope": {
+        "description": "Where to save the memory. 'global' (default) saves to a file loaded in every workspace. 'project' saves to a project-specific file private to the user, not committed to the repo.",
+        "enum": [
+          "global",
+          "project",
+        ],
         "type": "string",
       },
     },
@@ -1433,13 +1441,21 @@ exports[`coreTools snapshots for specific models > Model: gemini-3-pro-preview >
 
 exports[`coreTools snapshots for specific models > Model: gemini-3-pro-preview > snapshot for tool: save_memory 1`] = `
 {
-  "description": "Persists global preferences or facts across ALL future sessions. Use this for recurring instructions like coding styles or tool aliases. Unlike 'write_file', which is for project-specific files, this appends to a global memory file loaded in every workspace. If you are unsure whether a fact should be remembered globally, ask the user first. CRITICAL: Do not use for session-specific context or temporary data.",
+  "description": "Persists preferences or facts across ALL future sessions. Supports two scopes: 'global' (default) for cross-project preferences loaded in every workspace, and 'project' for facts specific to the current workspace that are private to the user (not committed to the repo). Use 'project' scope for things like local dev setup notes, project-specific workflows, or personal reminders about this codebase. CRITICAL: Do not use for session-specific context or temporary data.",
   "name": "save_memory",
   "parametersJsonSchema": {
     "additionalProperties": false,
     "properties": {
       "fact": {
-        "description": "A concise, global fact or preference (e.g., 'I prefer using tabs'). Do not include local paths or project-specific names.",
+        "description": "A concise fact or preference to remember. Should be a clear, self-contained statement.",
+        "type": "string",
+      },
+      "scope": {
+        "description": "Where to save the memory. 'global' (default) saves to a file loaded in every workspace. 'project' saves to a project-specific file private to the user, not committed to the repo.",
+        "enum": [
+          "global",
+          "project",
+        ],
         "type": "string",
       },
     },

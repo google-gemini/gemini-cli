@@ -328,13 +328,13 @@ describe('AppContainer State Management', () => {
     handleApprovalModeChange: vi.fn(),
     activePtyId: null,
     loopDetectionConfirmationRequest: null,
-    backgroundShellCount: 0,
-    isBackgroundShellVisible: false,
-    toggleBackgroundShell: vi.fn(),
-    backgroundCurrentShell: vi.fn(),
-    backgroundShells: new Map(),
-    registerBackgroundShell: vi.fn(),
-    dismissBackgroundShell: vi.fn(),
+    backgroundTaskCount: 0,
+    isBackgroundTaskVisible: false,
+    toggleBackgroundTasks: vi.fn(),
+    backgroundCurrentExecution: vi.fn(),
+    backgroundTasks: new Map(),
+    registerBackgroundTask: vi.fn(),
+    dismissBackgroundTask: vi.fn(),
   };
 
   beforeEach(() => {
@@ -2257,13 +2257,13 @@ describe('AppContainer State Management', () => {
       });
 
       it('should focus background shell on Tab when already visible (not toggle it off)', async () => {
-        const mockToggleBackgroundShell = vi.fn();
+        const mockToggleBackgroundTask = vi.fn();
         mockedUseGeminiStream.mockReturnValue({
           ...DEFAULT_GEMINI_STREAM_MOCK,
           activePtyId: null,
-          isBackgroundShellVisible: true,
-          backgroundShells: new Map([[123, { pid: 123, status: 'running' }]]),
-          toggleBackgroundShell: mockToggleBackgroundShell,
+          isBackgroundTaskVisible: true,
+          backgroundTasks: new Map([[123, { pid: 123, status: 'running' }]]),
+          toggleBackgroundTasks: mockToggleBackgroundTask,
         });
 
         await setupKeypressTest();
@@ -2277,7 +2277,7 @@ describe('AppContainer State Management', () => {
         // Should be focused
         expect(capturedUIState.embeddedShellFocused).toBe(true);
         // Should NOT have toggled (closed) the shell
-        expect(mockToggleBackgroundShell).not.toHaveBeenCalled();
+        expect(mockToggleBackgroundTask).not.toHaveBeenCalled();
 
         unmount();
       });
@@ -2285,13 +2285,13 @@ describe('AppContainer State Management', () => {
 
     describe('Background Shell Toggling (CTRL+B)', () => {
       it('should toggle background shell on Ctrl+B even if visible but not focused', async () => {
-        const mockToggleBackgroundShell = vi.fn();
+        const mockToggleBackgroundTask = vi.fn();
         mockedUseGeminiStream.mockReturnValue({
           ...DEFAULT_GEMINI_STREAM_MOCK,
           activePtyId: null,
-          isBackgroundShellVisible: true,
-          backgroundShells: new Map([[123, { pid: 123, status: 'running' }]]),
-          toggleBackgroundShell: mockToggleBackgroundShell,
+          isBackgroundTaskVisible: true,
+          backgroundTasks: new Map([[123, { pid: 123, status: 'running' }]]),
+          toggleBackgroundTasks: mockToggleBackgroundTask,
         });
 
         await setupKeypressTest();
@@ -2303,7 +2303,7 @@ describe('AppContainer State Management', () => {
         pressKey('\x02');
 
         // Should have toggled (closed) the shell
-        expect(mockToggleBackgroundShell).toHaveBeenCalled();
+        expect(mockToggleBackgroundTask).toHaveBeenCalled();
         // Should be unfocused
         expect(capturedUIState.embeddedShellFocused).toBe(false);
 
@@ -2311,28 +2311,28 @@ describe('AppContainer State Management', () => {
       });
 
       it('should show and focus background shell on Ctrl+B if hidden', async () => {
-        const mockToggleBackgroundShell = vi.fn();
+        const mockToggleBackgroundTask = vi.fn();
         const geminiStreamMock = {
           ...DEFAULT_GEMINI_STREAM_MOCK,
           activePtyId: null,
-          isBackgroundShellVisible: false,
-          backgroundShells: new Map([[123, { pid: 123, status: 'running' }]]),
-          toggleBackgroundShell: mockToggleBackgroundShell,
+          isBackgroundTaskVisible: false,
+          backgroundTasks: new Map([[123, { pid: 123, status: 'running' }]]),
+          toggleBackgroundTasks: mockToggleBackgroundTask,
         };
         mockedUseGeminiStream.mockReturnValue(geminiStreamMock);
 
         await setupKeypressTest();
 
         // Update the mock state when toggled to simulate real behavior
-        mockToggleBackgroundShell.mockImplementation(() => {
-          geminiStreamMock.isBackgroundShellVisible = true;
+        mockToggleBackgroundTask.mockImplementation(() => {
+          geminiStreamMock.isBackgroundTaskVisible = true;
         });
 
         // Press Ctrl+B
         pressKey('\x02');
 
         // Should have toggled (shown) the shell
-        expect(mockToggleBackgroundShell).toHaveBeenCalled();
+        expect(mockToggleBackgroundTask).toHaveBeenCalled();
         // Should be focused
         expect(capturedUIState.embeddedShellFocused).toBe(true);
 

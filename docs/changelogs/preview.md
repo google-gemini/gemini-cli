@@ -1,6 +1,6 @@
-# Preview release: v0.36.0-preview.3
+# Preview release: v0.36.0-preview.6
 
-Released: March 25, 2026
+Released: March 28, 2026
 
 Our preview release includes the latest, new, and experimental features. This
 release may not be as stable as our [latest weekly release](latest.md).
@@ -31,6 +31,17 @@ npm install -g @google/gemini-cli@preview
 
 ## What's Changed
 
+- fix(patch): cherry-pick 765fb67 to release/v0.36.0-preview.5-pr-24055 to patch
+  version v0.36.0-preview.5 and create version 0.36.0-preview.6 by
+  @gemini-cli-robot in
+  [#24061](https://github.com/google-gemini/gemini-cli/pull/24061)
+- fix(a2a-server): A2A server should execute ask policies in interactive mode by
+  @kschaab in [#23831](https://github.com/google-gemini/gemini-cli/pull/23831)
+- docs(core): document agent_card_json string literal options for remote agents
+  by @adamfweidman in
+  [#23797](https://github.com/google-gemini/gemini-cli/pull/23797)
+- feat(core): support inline agentCardJson for remote agents by @adamfweidman in
+  [#23743](https://github.com/google-gemini/gemini-cli/pull/23743)
 - fix(patch): cherry-pick 055ff92 to release/v0.36.0-preview.0-pr-23672 to patch
   version v0.36.0-preview.0 and create version 0.36.0-preview.1 by
   @gemini-cli-robot in
@@ -379,4 +390,4 @@ npm install -g @google/gemini-cli@preview
   [#23666](https://github.com/google-gemini/gemini-cli/pull/23666)
 
 **Full Changelog**:
-https://github.com/google-gemini/gemini-cli/compare/v0.35.0-preview.5...v0.36.0-preview.3
+https://github.com/google-gemini/gemini-cli/compare/v0.35.0-preview.5...v0.36.0-preview.6
