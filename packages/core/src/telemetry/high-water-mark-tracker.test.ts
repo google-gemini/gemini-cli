@@ -251,40 +251,42 @@ describe('HighWaterMarkTracker', () => {
       expect(result).toBe(true);
     });
 
-    it('should trigger on every increase with a zero threshold', () => {
-      const zeroTracker = new HighWaterMarkTracker(0);
+    describe('with a zero threshold', () => {
+      let zeroTracker: HighWaterMarkTracker;
 
-      zeroTracker.shouldRecordMetric('heap_used', 1000000);
+      beforeEach(() => {
+        zeroTracker = new HighWaterMarkTracker(0);
+        expect(zeroTracker.shouldRecordMetric('heap_used', 1000000)).toBe(true);
+      });
 
-      // Any increase above current mark should trigger with 0% threshold
-      // threshold = 1000000 * (1 + 0/100) = 1000000, so >1000000 triggers
-      expect(zeroTracker.shouldRecordMetric('heap_used', 1000001)).toBe(true);
-      expect(zeroTracker.shouldRecordMetric('heap_used', 1000002)).toBe(true);
-    });
+      it('should trigger on every increase', () => {
+        // Any increase above current mark should trigger with 0% threshold
+        // threshold = 1000000 * (1 + 0/100) = 1000000, so >1000000 triggers
+        expect(zeroTracker.shouldRecordMetric('heap_used', 1000001)).toBe(true);
+        expect(zeroTracker.shouldRecordMetric('heap_used', 1000002)).toBe(true);
+      });
 
-    it('should not trigger for equal value with zero threshold', () => {
-      const zeroTracker = new HighWaterMarkTracker(0);
-
-      zeroTracker.shouldRecordMetric('heap_used', 1000000);
-
-      // Exactly the same value should not trigger (> not >=)
-      expect(zeroTracker.shouldRecordMetric('heap_used', 1000000)).toBe(false);
+      it('should not trigger for equal value', () => {
+        // Exactly the same value should not trigger (> not >=)
+        expect(zeroTracker.shouldRecordMetric('heap_used', 1000000)).toBe(
+          false,
+        );
+      });
     });
 
     it('should handle the high-water mark only ratcheting upward', () => {
-      tracker.shouldRecordMetric('heap_used', 1000000);
+      expect(tracker.shouldRecordMetric('heap_used', 1000000)).toBe(true);
 
       // Large increase updates the mark
-      tracker.shouldRecordMetric('heap_used', 2000000);
+      expect(tracker.shouldRecordMetric('heap_used', 2000000)).toBe(true);
       expect(tracker.getHighWaterMark('heap_used')).toBe(2000000);
 
       // Drop back down — mark stays at 2000000
-      tracker.shouldRecordMetric('heap_used', 500000);
+      expect(tracker.shouldRecordMetric('heap_used', 500000)).toBe(false);
       expect(tracker.getHighWaterMark('heap_used')).toBe(2000000);
 
       // A value above the OLD mark but below the CURRENT mark should not trigger
-      const result = tracker.shouldRecordMetric('heap_used', 1500000);
-      expect(result).toBe(false);
+      expect(tracker.shouldRecordMetric('heap_used', 1500000)).toBe(false);
       expect(tracker.getHighWaterMark('heap_used')).toBe(2000000);
     });
 
