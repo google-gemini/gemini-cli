@@ -78,6 +78,14 @@ gbuild
 
 _(You can ask me to set this alias up for you if you haven't already!)_
 
+**When to use what:**
+
+- **`gbuild`**: Use this for rapid development. It gives you the fastest
+  "change-code-to-test-run" loop.
+- **`npm run build` / `npm run preflight`**: Use this before submitting a PR.
+  This ensures your code is type-safe and all individual packages are correctly
+  built for distribution.
+
 ---
 
 **Ready to build?** Start with `/ux-new-feature` and tell me what's on your

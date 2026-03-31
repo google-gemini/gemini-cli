@@ -32,7 +32,7 @@ When the user asks to "start a new task" or "create a branch":
 #### 2. Checking out a PR (Semantic Naming)
 When the user asks to "check out PR #123":
 1.  **NEVER** use standard `gh pr checkout` without a directory.
-2.  **ALWAYS** use the automation script: `./packages/extensions/gemini-cli-ux/skills/ux-git-workflow/scripts/worktree-manager.sh pr 123`.
+2.  **ALWAYS** use the automation script: `./packages/extensions/gemini-cli-ux/skills/ux-git-skill/scripts/worktree-manager.sh pr 123`.
 3.  **Mandatory Prep**: Run `npm install` inside the new worktree directory to ensure all dependencies are resolved.
 4.  This script will automatically fetch the PR title and create a semantic directory name (e.g., `pr-123-fix-core-bug`).
 
@@ -139,8 +139,11 @@ If operating in a sibling worktree (e.g., `feature-xyz/`):
 #### 10. CI Verification & Remediation Loop (The Slog)
 - **Context**: Getting PRs ready for review is typically a "slog" due to CI checks failing in the GitHub environment even after passing local presubmit tests.
 - **Action**: You MUST assume that CI checks have failed until you explicitly verify they have passed on the PR.
-  1. **Immediate Output**: Before entering the monitoring loop, output the **GitHub PR link**, the **Issue URL**, and the **`npx` testing command** (e.g., `npx @google/gemini-cli@pr-<number>`) to the user so they can follow along while waiting.
-  2. Run `gh pr checks` to monitor the status of the GitHub CI pipeline.
+#### **1. Immediate Output**
+- **Action**: Before entering the monitoring loop, output the **GitHub PR link**, the **Issue URL**, and the **`npx` testing command** (e.g., `npx @google/gemini-cli@pr-<number>`) to the user.
+- **Link Integrity**: You MUST verify that any links you provide (especially to specific files or directories) are correct and actually exist on the current remote branch. Do not guess folder names; check the actual file system before constructing URLs. This prevents 404 errors for the user.
+
+#### 2. Run PR Checks
   3. If checks fail, fetch the failure logs, diagnose the issue, apply a fix, push the update, and loop back to step 2.
   4. Before transitioning a Draft PR to Open ("Ready for Review"), you MUST ensure:
      - An automated UI/frontend audit (e.g., `/review-frontend` or `/ux-review`) has been run and all feedback addressed.
