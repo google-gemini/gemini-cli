@@ -17,8 +17,6 @@ Slash commands provide meta-level control over the CLI itself.
 ### `/agents`
 
 - **Description:** Manage local and remote subagents.
-- **Note:** This command is experimental and requires
-  `experimental.enableAgents: true` in your `settings.json`.
 - **Sub-commands:**
   - **`list`**:
     - **Description:** Lists all discovered agents, including built-in, local,
