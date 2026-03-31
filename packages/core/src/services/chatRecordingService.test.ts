@@ -79,18 +79,33 @@ describe('ChatRecordingService', () => {
 
   describe('initialize', () => {
     it('should create a new session if none is provided', () => {
+      const originalMkdirSync = fs.mkdirSync;
+      const originalWriteFileSync = fs.writeFileSync;
+      const mkdirSyncSpy = vi
+        .spyOn(fs, 'mkdirSync')
+        .mockImplementation(originalMkdirSync);
+      const writeFileSyncSpy = vi
+        .spyOn(fs, 'writeFileSync')
+        .mockImplementation(originalWriteFileSync);
       chatRecordingService.initialize();
-      chatRecordingService.recordMessage({
-        type: 'user',
-        content: 'ping',
-        model: 'm',
-      });
 
       const chatsDir = path.join(testTempDir, 'chats');
-      expect(fs.existsSync(chatsDir)).toBe(true);
-      const files = fs.readdirSync(chatsDir);
-      expect(files.length).toBeGreaterThan(0);
-      expect(files[0]).toMatch(/^session-.*-test-ses\.json$/);
+      expect(mkdirSyncSpy).toHaveBeenCalledWith(chatsDir, { recursive: true });
+      expect(writeFileSyncSpy).toHaveBeenCalledOnce();
+
+      const [filePath, content] = writeFileSyncSpy.mock.calls[0];
+      expect(filePath).toMatch(/^session-.*-test-ses\.json$/);
+      expect(filePath).toContain(chatsDir);
+
+      const conversation = JSON.parse(content as string);
+      expect(conversation).toMatchObject({
+        sessionId: 'test-session-id',
+        projectHash: 'test-project-hash',
+        messages: [],
+      });
+
+      mkdirSyncSpy.mockRestore();
+      writeFileSyncSpy.mockRestore();
     });
 
     it('should include the conversation kind when specified', () => {
