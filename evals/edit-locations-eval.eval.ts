@@ -95,10 +95,10 @@ test('capitalize capitalizes the first letter', () => {
         }
       });
 
-      // Ignore unparsable tool args so the assertion only measures valid edit targets.
-      const editedPaths = targetFiles.filter(
-        (f): f is string => typeof f === 'string',
-      );
+      // Ignore unparsable tool args and empty strings so assertions only measure valid edit targets.
+      const editedPaths = targetFiles
+        .filter((f): f is string => typeof f === 'string' && f.trim() !== '')
+        .map((f) => f.trim());
 
       expect(
         new Set(editedPaths).size,
