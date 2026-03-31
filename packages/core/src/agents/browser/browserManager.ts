@@ -176,6 +176,7 @@ export class BrowserManager {
   private mcpTransport: StdioClientTransport | undefined;
   private discoveredTools: McpTool[] = [];
   private disconnected = false;
+  private isClosing = false;
   private connectionPromise: Promise<void> | undefined;
 
   /** State for action rate limiting */
@@ -360,7 +361,7 @@ export class BrowserManager {
    */
   async ensureConnection(): Promise<void> {
     // Already connected and healthy — nothing to do
-    if (this.rawMcpClient && !this.disconnected) {
+    if (this.isConnected()) {
       return;
     }
 
@@ -424,6 +425,7 @@ export class BrowserManager {
    * the transport will terminate the browser.
    */
   async close(): Promise<void> {
+    this.isClosing = true;
     // Close MCP client first
     if (this.rawMcpClient) {
       try {
@@ -463,6 +465,7 @@ export class BrowserManager {
    * BrowserManager instance.
    */
   private async connectMcp(): Promise<void> {
+    this.isClosing = false;
     debugLogger.log('Connecting isolated MCP client to chrome-devtools-mcp...');
 
     // Create raw MCP SDK Client (not the wrapper McpClient)
@@ -571,11 +574,14 @@ export class BrowserManager {
     }
 
     this.mcpTransport.onclose = () => {
+      this.disconnected = true;
+      if (this.isClosing) {
+        return;
+      }
       debugLogger.error(
         'chrome-devtools-mcp transport closed unexpectedly. ' +
           'The MCP server process may have crashed.',
       );
-      this.disconnected = true;
     };
     this.mcpTransport.onerror = (error: Error) => {
       debugLogger.error(
