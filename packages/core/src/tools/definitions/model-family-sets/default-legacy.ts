@@ -59,6 +59,7 @@ import {
   READ_MANY_PARAM_RECURSIVE,
   READ_MANY_PARAM_USE_DEFAULT_EXCLUDES,
   MEMORY_PARAM_FACT,
+  MEMORY_PARAM_SCOPE,
   TODOS_PARAM_TODOS,
   TODOS_ITEM_PARAM_DESCRIPTION,
   TODOS_ITEM_PARAM_STATUS,
@@ -513,13 +514,13 @@ Use this tool when the user's query implies needing the content of several files
   save_memory: {
     name: MEMORY_TOOL_NAME,
     description: `
-Saves concise global user context (preferences, facts) for use across ALL workspaces.
+Saves concise user context (preferences, facts) for use across future sessions.
 
-### CRITICAL: GLOBAL CONTEXT ONLY
-NEVER save workspace-specific context, local paths, or commands (e.g. "The entry point is src/index.js", "The test command is npm test"). These are local to the current workspace and must NOT be saved globally. EXCLUSIVELY for context relevant across ALL workspaces.
+Supports two scopes:
+- **global** (default): Cross-project preferences loaded in every workspace. Use for "Remember X" or clear personal facts.
+- **project**: Facts specific to the current workspace, private to the user (not committed to the repo). Use for local dev setup notes, project-specific workflows, or personal reminders about this codebase.
 
-- Use for "Remember X" or clear personal facts.
-- Do NOT use for session context.`,
+Do NOT use for session-specific context or temporary data.`,
     parametersJsonSchema: {
       type: 'object',
       properties: {
@@ -527,6 +528,12 @@ NEVER save workspace-specific context, local paths, or commands (e.g. "The entry
           type: 'string',
           description:
             'The specific fact or piece of information to remember. Should be a clear, self-contained statement.',
+        },
+        [MEMORY_PARAM_SCOPE]: {
+          type: 'string',
+          enum: ['global', 'project'],
+          description:
+            "Where to save the memory. 'global' (default) saves to a file loaded in every workspace. 'project' saves to a project-specific file private to the user, not committed to the repo.",
         },
       },
       required: [MEMORY_PARAM_FACT],
