@@ -156,6 +156,7 @@ export async function start_sandbox(
       // start and set up proxy if GEMINI_SANDBOX_PROXY_COMMAND is set
       const proxyCommand = process.env['GEMINI_SANDBOX_PROXY_COMMAND'];
       let proxyProcess: ChildProcess | undefined = undefined;
+      let previousStopProxy: (() => void) | undefined;
       let sandboxProcess: ChildProcess | undefined = undefined;
       const sandboxEnv = { ...process.env };
       if (proxyCommand) {
@@ -180,17 +181,21 @@ export async function start_sandbox(
           detached: true,
         });
         // install handlers to stop proxy on exit/signal
+        // Remove the previous handler by its saved reference, not a new closure
+        if (previousStopProxy) {
+          process.off('exit', previousStopProxy);
+          process.off('SIGINT', previousStopProxy);
+          process.off('SIGTERM', previousStopProxy);
+        }
         const stopProxy = () => {
           debugLogger.log('stopping proxy ...');
           if (proxyProcess?.pid) {
             process.kill(-proxyProcess.pid, 'SIGTERM');
           }
         };
-        process.off('exit', stopProxy);
+        previousStopProxy = stopProxy;
         process.on('exit', stopProxy);
-        process.off('SIGINT', stopProxy);
         process.on('SIGINT', stopProxy);
-        process.off('SIGTERM', stopProxy);
         process.on('SIGTERM', stopProxy);
 
         // commented out as it disrupts ink rendering
@@ -706,6 +711,7 @@ export async function start_sandbox(
     // start and set up proxy if GEMINI_SANDBOX_PROXY_COMMAND is set
     let proxyProcess: ChildProcess | undefined = undefined;
     let sandboxProcess: ChildProcess | undefined = undefined;
+    let previousContainerStopProxy: (() => void) | undefined;
 
     if (proxyCommand) {
       // run proxyCommand in its own container
@@ -738,15 +744,19 @@ export async function start_sandbox(
         detached: true,
       });
       // install handlers to stop proxy on exit/signal
+      // Remove the previous handler by its saved reference, not a new closure
+      if (previousContainerStopProxy) {
+        process.off('exit', previousContainerStopProxy);
+        process.off('SIGINT', previousContainerStopProxy);
+        process.off('SIGTERM', previousContainerStopProxy);
+      }
       const stopProxy = () => {
         debugLogger.log('stopping proxy container ...');
         execSync(`${command} rm -f ${SANDBOX_PROXY_NAME}`);
       };
-      process.off('exit', stopProxy);
+      previousContainerStopProxy = stopProxy;
       process.on('exit', stopProxy);
-      process.off('SIGINT', stopProxy);
       process.on('SIGINT', stopProxy);
-      process.off('SIGTERM', stopProxy);
       process.on('SIGTERM', stopProxy);
 
       // commented out as it disrupts ink rendering
