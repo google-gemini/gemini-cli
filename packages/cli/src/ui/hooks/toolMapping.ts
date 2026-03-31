@@ -50,6 +50,7 @@ export function mapToDisplay(
       callId: call.request.callId,
       parentCallId: call.request.parentCallId,
       name: displayName,
+      args: call.request.args,
       description,
       renderOutputAsMarkdown,
     };
@@ -103,6 +104,7 @@ export function mapToDisplay(
       ...baseDisplayProperties,
       status: call.status,
       isClientInitiated: !!call.request.isClientInitiated,
+      kind: call.tool?.kind,
       resultDisplay,
       confirmationDetails,
       outputFile,

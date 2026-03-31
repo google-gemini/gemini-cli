@@ -4,13 +4,16 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { type Config } from '../config/config.js';
-import { type Status } from '../core/coreToolScheduler.js';
+import { type Status } from '../scheduler/types.js';
 import { type ThoughtSummary } from '../utils/thoughtUtils.js';
 import { getProjectHash } from '../utils/paths.js';
-import { sanitizeFilenamePart } from '../utils/fileUtils.js';
 import path from 'node:path';
 import fs from 'node:fs';
+import { sanitizeFilenamePart } from '../utils/fileUtils.js';
+import {
+  deleteSessionArtifactsAsync,
+  deleteSubagentSessionDirAndArtifactsAsync,
+} from '../utils/sessionOperations.js';
 import { randomUUID } from 'node:crypto';
 import type {
   Content,
@@ -20,6 +23,7 @@ import type {
 } from '@google/genai';
 import { debugLogger } from '../utils/debugLogger.js';
 import type { ToolResultDisplay } from '../tools/tools.js';
+import type { AgentLoopContext } from '../config/agent-loop-context.js';
 
 export const SESSION_FILE_PREFIX = 'session-';
 
@@ -134,12 +138,12 @@ export class ChatRecordingService {
   private kind?: 'main' | 'subagent';
   private queuedThoughts: Array<ThoughtSummary & { timestamp: string }> = [];
   private queuedTokens: TokensSummary | null = null;
-  private config: Config;
+  private context: AgentLoopContext;
 
-  constructor(config: Config) {
-    this.config = config;
-    this.sessionId = config.getSessionId();
-    this.projectHash = getProjectHash(config.getProjectRoot());
+  constructor(context: AgentLoopContext) {
+    this.context = context;
+    this.sessionId = context.promptId;
+    this.projectHash = getProjectHash(context.config.getProjectRoot());
   }
 
   /**
@@ -171,20 +175,47 @@ export class ChatRecordingService {
         this.cachedConversation = null;
       } else {
         // Create new session
-        const chatsDir = path.join(
-          this.config.storage.getProjectTempDir(),
+        this.sessionId = this.context.promptId;
+        let chatsDir = path.join(
+          this.context.config.storage.getProjectTempDir(),
           'chats',
         );
+
+        // subagents are nested under the complete parent session id
+        if (this.kind === 'subagent' && this.context.parentSessionId) {
+          const safeParentId = sanitizeFilenamePart(
+            this.context.parentSessionId,
+          );
+          if (!safeParentId) {
+            throw new Error(
+              `Invalid parentSessionId after sanitization: ${this.context.parentSessionId}`,
+            );
+          }
+          chatsDir = path.join(chatsDir, safeParentId);
+        }
+
         fs.mkdirSync(chatsDir, { recursive: true });
 
         const timestamp = new Date()
           .toISOString()
           .slice(0, 16)
           .replace(/:/g, '-');
-        const filename = `${SESSION_FILE_PREFIX}${timestamp}-${this.sessionId.slice(
-          0,
-          8,
-        )}.json`;
+        const safeSessionId = sanitizeFilenamePart(this.sessionId);
+        if (!safeSessionId) {
+          throw new Error(
+            `Invalid sessionId after sanitization: ${this.sessionId}`,
+          );
+        }
+
+        let filename: string;
+        if (this.kind === 'subagent') {
+          filename = `${safeSessionId}.json`;
+        } else {
+          filename = `${SESSION_FILE_PREFIX}${timestamp}-${safeSessionId.slice(
+            0,
+            8,
+          )}.json`;
+        }
         this.conversationFile = path.join(chatsDir, filename);
 
         this.writeConversation({
@@ -340,13 +371,14 @@ export class ChatRecordingService {
     if (!this.conversationFile) return;
 
     // Enrich tool calls with metadata from the ToolRegistry
-    const toolRegistry = this.config.getToolRegistry();
+    const toolRegistry = this.context.toolRegistry;
     const enrichedToolCalls = toolCalls.map((toolCall) => {
       const toolInstance = toolRegistry.getTool(toolCall.name);
       return {
         ...toolCall,
         displayName: toolInstance?.displayName || toolCall.name,
-        description: toolInstance?.description || '',
+        description:
+          toolCall.description?.trim() || toolInstance?.description || '',
         renderOutputAsMarkdown: toolInstance?.isOutputMarkdown || false,
       };
     });
@@ -588,50 +620,103 @@ export class ChatRecordingService {
   }
 
   /**
-   * Deletes a session file by session ID.
+   * Deletes a session file by sessionId, filename, or basename.
+   * Derives an 8-character shortId to find and delete all associated files
+   * (parent and subagents).
+   *
+   * @throws {Error} If shortId validation fails.
    */
-  deleteSession(sessionId: string): void {
+  async deleteSession(sessionIdOrBasename: string): Promise<void> {
     try {
-      const tempDir = this.config.storage.getProjectTempDir();
+      const tempDir = this.context.config.storage.getProjectTempDir();
       const chatsDir = path.join(tempDir, 'chats');
-      const sessionPath = path.join(chatsDir, `${sessionId}.json`);
-      if (fs.existsSync(sessionPath)) {
-        fs.unlinkSync(sessionPath);
+
+      const shortId = this.deriveShortId(sessionIdOrBasename);
+
+      // Using stat instead of existsSync for async sanity
+      if (!(await fs.promises.stat(chatsDir).catch(() => null))) {
+        return; // Nothing to delete
       }
 
-      // Cleanup Activity logs in the project logs directory
-      const logsDir = path.join(tempDir, 'logs');
-      const logPath = path.join(logsDir, `session-${sessionId}.jsonl`);
-      if (fs.existsSync(logPath)) {
-        fs.unlinkSync(logPath);
-      }
+      const matchingFiles = this.getMatchingSessionFiles(chatsDir, shortId);
 
-      // Cleanup tool outputs for this session
-      const safeSessionId = sanitizeFilenamePart(sessionId);
-      const toolOutputDir = path.join(
-        tempDir,
-        'tool-outputs',
-        `session-${safeSessionId}`,
-      );
-
-      // Robustness: Ensure the path is strictly within the tool-outputs base
-      const toolOutputsBase = path.join(tempDir, 'tool-outputs');
-      if (
-        fs.existsSync(toolOutputDir) &&
-        toolOutputDir.startsWith(toolOutputsBase)
-      ) {
-        fs.rmSync(toolOutputDir, { recursive: true, force: true });
-      }
-
-      // ALSO cleanup the session-specific directory (contains plans, tasks, etc.)
-      const sessionDir = path.join(tempDir, safeSessionId);
-      // Robustness: Ensure the path is strictly within the temp root
-      if (fs.existsSync(sessionDir) && sessionDir.startsWith(tempDir)) {
-        fs.rmSync(sessionDir, { recursive: true, force: true });
+      for (const file of matchingFiles) {
+        await this.deleteSessionAndArtifacts(chatsDir, file, tempDir);
       }
     } catch (error) {
       debugLogger.error('Error deleting session file.', error);
       throw error;
+    }
+  }
+
+  /**
+   * Derives an 8-character shortId from a sessionId, filename, or basename.
+   */
+  private deriveShortId(sessionIdOrBasename: string): string {
+    let shortId = sessionIdOrBasename;
+    if (sessionIdOrBasename.startsWith(SESSION_FILE_PREFIX)) {
+      const withoutExt = sessionIdOrBasename.replace('.json', '');
+      const parts = withoutExt.split('-');
+      shortId = parts[parts.length - 1];
+    } else if (sessionIdOrBasename.length >= 8) {
+      shortId = sessionIdOrBasename.slice(0, 8);
+    } else {
+      throw new Error('Invalid sessionId or basename provided for deletion');
+    }
+
+    if (shortId.length !== 8) {
+      throw new Error('Derived shortId must be exactly 8 characters');
+    }
+
+    return shortId;
+  }
+
+  /**
+   * Finds all session files matching the pattern session-*-<shortId>.json
+   */
+  private getMatchingSessionFiles(chatsDir: string, shortId: string): string[] {
+    const files = fs.readdirSync(chatsDir);
+    return files.filter(
+      (f) =>
+        f.startsWith(SESSION_FILE_PREFIX) && f.endsWith(`-${shortId}.json`),
+    );
+  }
+
+  /**
+   * Deletes a single session file and its associated logs, tool-outputs, and directory.
+   */
+  private async deleteSessionAndArtifacts(
+    chatsDir: string,
+    file: string,
+    tempDir: string,
+  ): Promise<void> {
+    const filePath = path.join(chatsDir, file);
+    try {
+      const fileContent = await fs.promises.readFile(filePath, 'utf8');
+      const content = JSON.parse(fileContent) as unknown;
+
+      let fullSessionId: string | undefined;
+      if (content && typeof content === 'object' && 'sessionId' in content) {
+        const id = (content as Record<string, unknown>)['sessionId'];
+        if (typeof id === 'string') {
+          fullSessionId = id;
+        }
+      }
+
+      // Delete the session file
+      await fs.promises.unlink(filePath);
+
+      if (fullSessionId) {
+        // Delegate to shared utility!
+        await deleteSessionArtifactsAsync(fullSessionId, tempDir);
+        await deleteSubagentSessionDirAndArtifactsAsync(
+          fullSessionId,
+          chatsDir,
+          tempDir,
+        );
+      }
+    } catch (error) {
+      debugLogger.error(`Error deleting associated file ${file}:`, error);
     }
   }
 
@@ -664,7 +749,7 @@ export class ChatRecordingService {
    * Updates the conversation history based on the provided API Content array.
    * This is used to persist changes made to the history (like masking) back to disk.
    */
-  updateMessagesFromHistory(history: Content[]): void {
+  updateMessagesFromHistory(history: readonly Content[]): void {
     if (!this.conversationFile) return;
 
     try {

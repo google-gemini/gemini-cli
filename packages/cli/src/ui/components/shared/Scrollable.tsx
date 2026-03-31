@@ -19,8 +19,9 @@ import { useKeypress, type Key } from '../../hooks/useKeypress.js';
 import { useScrollable } from '../../contexts/ScrollProvider.js';
 import { useAnimatedScrollbar } from '../../hooks/useAnimatedScrollbar.js';
 import { useBatchedScroll } from '../../hooks/useBatchedScroll.js';
-import { keyMatchers, Command } from '../../keyMatchers.js';
+import { Command } from '../../key/keyMatchers.js';
 import { useOverflowActions } from '../../contexts/OverflowContext.js';
+import { useKeyMatchers } from '../../hooks/useKeyMatchers.js';
 
 interface ScrollableProps {
   children?: React.ReactNode;
@@ -45,6 +46,7 @@ export const Scrollable: React.FC<ScrollableProps> = ({
   flexGrow,
   reportOverflow = false,
 }) => {
+  const keyMatchers = useKeyMatchers();
   const [scrollTop, setScrollTop] = useState(0);
   const viewportRef = useRef<DOMElement | null>(null);
   const contentRef = useRef<DOMElement | null>(null);

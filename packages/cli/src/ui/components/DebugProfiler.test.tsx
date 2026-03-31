@@ -242,8 +242,7 @@ describe('DebugProfiler Component', () => {
       showDebugProfiler: false,
       constrainHeight: false,
     } as unknown as UIState);
-    const { lastFrame, waitUntilReady, unmount } = render(<DebugProfiler />);
-    await waitUntilReady();
+    const { lastFrame, unmount } = await render(<DebugProfiler />);
     expect(lastFrame({ allowEmpty: true })).toBe('');
     unmount();
   });
@@ -257,8 +256,7 @@ describe('DebugProfiler Component', () => {
     profiler.totalIdleFrames = 5;
     profiler.totalFlickerFrames = 2;
 
-    const { lastFrame, waitUntilReady, unmount } = render(<DebugProfiler />);
-    await waitUntilReady();
+    const { lastFrame, unmount } = await render(<DebugProfiler />);
     const output = lastFrame();
 
     expect(output).toContain('Renders: 10 (total)');
@@ -275,8 +273,7 @@ describe('DebugProfiler Component', () => {
 
     const reportActionSpy = vi.spyOn(profiler, 'reportAction');
 
-    const { waitUntilReady, unmount } = render(<DebugProfiler />);
-    await waitUntilReady();
+    const { waitUntilReady, unmount } = await render(<DebugProfiler />);
 
     await act(async () => {
       coreEvents.emitModelChanged('new-model');
@@ -295,8 +292,7 @@ describe('DebugProfiler Component', () => {
 
     const reportActionSpy = vi.spyOn(profiler, 'reportAction');
 
-    const { waitUntilReady, unmount } = render(<DebugProfiler />);
-    await waitUntilReady();
+    const { waitUntilReady, unmount } = await render(<DebugProfiler />);
 
     await act(async () => {
       appEvents.emit(AppEvent.SelectionWarning);

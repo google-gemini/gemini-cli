@@ -20,7 +20,7 @@ exports[`SettingsDialog > Initial Rendering > should render settings list with v
 │    Enable automatic updates.                                                                     │
 │                                                                                                  │
 │    Enable Notifications                                                                   false  │
-│    Enable run-event notifications for action-required prompts and session completion. …          │
+│    Enable run-event notifications for action-required prompts and session completion.            │
 │                                                                                                  │
 │    Plan Directory                                                                     undefined  │
 │    The directory where planning artifacts are stored. If not specified, defaults t…              │
@@ -28,11 +28,11 @@ exports[`SettingsDialog > Initial Rendering > should render settings list with v
 │    Plan Model Routing                                                                      true  │
 │    Automatically switch between Pro and Flash models based on Plan Mode status. Uses Pr…         │
 │                                                                                                  │
+│    Retry Fetch Errors                                                                      true  │
+│    Retry on "exception TypeError: fetch failed sending request" errors.                          │
+│                                                                                                  │
 │    Max Chat Model Attempts                                                                   10  │
 │    Maximum number of attempts for requests to the main chat model. Cannot exceed 10.             │
-│                                                                                                  │
-│    Debug Keystroke Logging                                                                false  │
-│    Enable debug logging of keystrokes to the console.                                            │
 │                                                                                                  │
 │  ▼                                                                                               │
 │                                                                                                  │
@@ -66,7 +66,7 @@ exports[`SettingsDialog > Snapshot Tests > should render 'accessibility settings
 │    Enable automatic updates.                                                                     │
 │                                                                                                  │
 │    Enable Notifications                                                                   false  │
-│    Enable run-event notifications for action-required prompts and session completion. …          │
+│    Enable run-event notifications for action-required prompts and session completion.            │
 │                                                                                                  │
 │    Plan Directory                                                                     undefined  │
 │    The directory where planning artifacts are stored. If not specified, defaults t…              │
@@ -74,11 +74,11 @@ exports[`SettingsDialog > Snapshot Tests > should render 'accessibility settings
 │    Plan Model Routing                                                                      true  │
 │    Automatically switch between Pro and Flash models based on Plan Mode status. Uses Pr…         │
 │                                                                                                  │
+│    Retry Fetch Errors                                                                      true  │
+│    Retry on "exception TypeError: fetch failed sending request" errors.                          │
+│                                                                                                  │
 │    Max Chat Model Attempts                                                                   10  │
 │    Maximum number of attempts for requests to the main chat model. Cannot exceed 10.             │
-│                                                                                                  │
-│    Debug Keystroke Logging                                                                false  │
-│    Enable debug logging of keystrokes to the console.                                            │
 │                                                                                                  │
 │  ▼                                                                                               │
 │                                                                                                  │
@@ -112,7 +112,7 @@ exports[`SettingsDialog > Snapshot Tests > should render 'all boolean settings d
 │    Enable automatic updates.                                                                     │
 │                                                                                                  │
 │    Enable Notifications                                                                   false  │
-│    Enable run-event notifications for action-required prompts and session completion. …          │
+│    Enable run-event notifications for action-required prompts and session completion.            │
 │                                                                                                  │
 │    Plan Directory                                                                     undefined  │
 │    The directory where planning artifacts are stored. If not specified, defaults t…              │
@@ -120,11 +120,11 @@ exports[`SettingsDialog > Snapshot Tests > should render 'all boolean settings d
 │    Plan Model Routing                                                                      true  │
 │    Automatically switch between Pro and Flash models based on Plan Mode status. Uses Pr…         │
 │                                                                                                  │
+│    Retry Fetch Errors                                                                      true  │
+│    Retry on "exception TypeError: fetch failed sending request" errors.                          │
+│                                                                                                  │
 │    Max Chat Model Attempts                                                                   10  │
 │    Maximum number of attempts for requests to the main chat model. Cannot exceed 10.             │
-│                                                                                                  │
-│    Debug Keystroke Logging                                                               false*  │
-│    Enable debug logging of keystrokes to the console.                                            │
 │                                                                                                  │
 │  ▼                                                                                               │
 │                                                                                                  │
@@ -158,7 +158,7 @@ exports[`SettingsDialog > Snapshot Tests > should render 'default state' correct
 │    Enable automatic updates.                                                                     │
 │                                                                                                  │
 │    Enable Notifications                                                                   false  │
-│    Enable run-event notifications for action-required prompts and session completion. …          │
+│    Enable run-event notifications for action-required prompts and session completion.            │
 │                                                                                                  │
 │    Plan Directory                                                                     undefined  │
 │    The directory where planning artifacts are stored. If not specified, defaults t…              │
@@ -166,11 +166,11 @@ exports[`SettingsDialog > Snapshot Tests > should render 'default state' correct
 │    Plan Model Routing                                                                      true  │
 │    Automatically switch between Pro and Flash models based on Plan Mode status. Uses Pr…         │
 │                                                                                                  │
+│    Retry Fetch Errors                                                                      true  │
+│    Retry on "exception TypeError: fetch failed sending request" errors.                          │
+│                                                                                                  │
 │    Max Chat Model Attempts                                                                   10  │
 │    Maximum number of attempts for requests to the main chat model. Cannot exceed 10.             │
-│                                                                                                  │
-│    Debug Keystroke Logging                                                                false  │
-│    Enable debug logging of keystrokes to the console.                                            │
 │                                                                                                  │
 │  ▼                                                                                               │
 │                                                                                                  │
@@ -204,7 +204,7 @@ exports[`SettingsDialog > Snapshot Tests > should render 'file filtering setting
 │    Enable automatic updates.                                                                     │
 │                                                                                                  │
 │    Enable Notifications                                                                   false  │
-│    Enable run-event notifications for action-required prompts and session completion. …          │
+│    Enable run-event notifications for action-required prompts and session completion.            │
 │                                                                                                  │
 │    Plan Directory                                                                     undefined  │
 │    The directory where planning artifacts are stored. If not specified, defaults t…              │
@@ -212,11 +212,11 @@ exports[`SettingsDialog > Snapshot Tests > should render 'file filtering setting
 │    Plan Model Routing                                                                      true  │
 │    Automatically switch between Pro and Flash models based on Plan Mode status. Uses Pr…         │
 │                                                                                                  │
+│    Retry Fetch Errors                                                                      true  │
+│    Retry on "exception TypeError: fetch failed sending request" errors.                          │
+│                                                                                                  │
 │    Max Chat Model Attempts                                                                   10  │
 │    Maximum number of attempts for requests to the main chat model. Cannot exceed 10.             │
-│                                                                                                  │
-│    Debug Keystroke Logging                                                                false  │
-│    Enable debug logging of keystrokes to the console.                                            │
 │                                                                                                  │
 │  ▼                                                                                               │
 │                                                                                                  │
@@ -250,7 +250,7 @@ exports[`SettingsDialog > Snapshot Tests > should render 'focused on scope selec
 │    Enable automatic updates.                                                                     │
 │                                                                                                  │
 │    Enable Notifications                                                                   false  │
-│    Enable run-event notifications for action-required prompts and session completion. …          │
+│    Enable run-event notifications for action-required prompts and session completion.            │
 │                                                                                                  │
 │    Plan Directory                                                                     undefined  │
 │    The directory where planning artifacts are stored. If not specified, defaults t…              │
@@ -258,11 +258,11 @@ exports[`SettingsDialog > Snapshot Tests > should render 'focused on scope selec
 │    Plan Model Routing                                                                      true  │
 │    Automatically switch between Pro and Flash models based on Plan Mode status. Uses Pr…         │
 │                                                                                                  │
+│    Retry Fetch Errors                                                                      true  │
+│    Retry on "exception TypeError: fetch failed sending request" errors.                          │
+│                                                                                                  │
 │    Max Chat Model Attempts                                                                   10  │
 │    Maximum number of attempts for requests to the main chat model. Cannot exceed 10.             │
-│                                                                                                  │
-│    Debug Keystroke Logging                                                                false  │
-│    Enable debug logging of keystrokes to the console.                                            │
 │                                                                                                  │
 │  ▼                                                                                               │
 │                                                                                                  │
@@ -296,7 +296,7 @@ exports[`SettingsDialog > Snapshot Tests > should render 'mixed boolean and numb
 │    Enable automatic updates.                                                                     │
 │                                                                                                  │
 │    Enable Notifications                                                                   false  │
-│    Enable run-event notifications for action-required prompts and session completion. …          │
+│    Enable run-event notifications for action-required prompts and session completion.            │
 │                                                                                                  │
 │    Plan Directory                                                                     undefined  │
 │    The directory where planning artifacts are stored. If not specified, defaults t…              │
@@ -304,11 +304,11 @@ exports[`SettingsDialog > Snapshot Tests > should render 'mixed boolean and numb
 │    Plan Model Routing                                                                      true  │
 │    Automatically switch between Pro and Flash models based on Plan Mode status. Uses Pr…         │
 │                                                                                                  │
+│    Retry Fetch Errors                                                                      true  │
+│    Retry on "exception TypeError: fetch failed sending request" errors.                          │
+│                                                                                                  │
 │    Max Chat Model Attempts                                                                   10  │
 │    Maximum number of attempts for requests to the main chat model. Cannot exceed 10.             │
-│                                                                                                  │
-│    Debug Keystroke Logging                                                                false  │
-│    Enable debug logging of keystrokes to the console.                                            │
 │                                                                                                  │
 │  ▼                                                                                               │
 │                                                                                                  │
@@ -342,7 +342,7 @@ exports[`SettingsDialog > Snapshot Tests > should render 'tools and security set
 │    Enable automatic updates.                                                                     │
 │                                                                                                  │
 │    Enable Notifications                                                                   false  │
-│    Enable run-event notifications for action-required prompts and session completion. …          │
+│    Enable run-event notifications for action-required prompts and session completion.            │
 │                                                                                                  │
 │    Plan Directory                                                                     undefined  │
 │    The directory where planning artifacts are stored. If not specified, defaults t…              │
@@ -350,11 +350,11 @@ exports[`SettingsDialog > Snapshot Tests > should render 'tools and security set
 │    Plan Model Routing                                                                      true  │
 │    Automatically switch between Pro and Flash models based on Plan Mode status. Uses Pr…         │
 │                                                                                                  │
+│    Retry Fetch Errors                                                                      true  │
+│    Retry on "exception TypeError: fetch failed sending request" errors.                          │
+│                                                                                                  │
 │    Max Chat Model Attempts                                                                   10  │
 │    Maximum number of attempts for requests to the main chat model. Cannot exceed 10.             │
-│                                                                                                  │
-│    Debug Keystroke Logging                                                                false  │
-│    Enable debug logging of keystrokes to the console.                                            │
 │                                                                                                  │
 │  ▼                                                                                               │
 │                                                                                                  │
@@ -388,7 +388,7 @@ exports[`SettingsDialog > Snapshot Tests > should render 'various boolean settin
 │    Enable automatic updates.                                                                     │
 │                                                                                                  │
 │    Enable Notifications                                                                   false  │
-│    Enable run-event notifications for action-required prompts and session completion. …          │
+│    Enable run-event notifications for action-required prompts and session completion.            │
 │                                                                                                  │
 │    Plan Directory                                                                     undefined  │
 │    The directory where planning artifacts are stored. If not specified, defaults t…              │
@@ -396,11 +396,11 @@ exports[`SettingsDialog > Snapshot Tests > should render 'various boolean settin
 │    Plan Model Routing                                                                      true  │
 │    Automatically switch between Pro and Flash models based on Plan Mode status. Uses Pr…         │
 │                                                                                                  │
+│    Retry Fetch Errors                                                                      true  │
+│    Retry on "exception TypeError: fetch failed sending request" errors.                          │
+│                                                                                                  │
 │    Max Chat Model Attempts                                                                   10  │
 │    Maximum number of attempts for requests to the main chat model. Cannot exceed 10.             │
-│                                                                                                  │
-│    Debug Keystroke Logging                                                                true*  │
-│    Enable debug logging of keystrokes to the console.                                            │
 │                                                                                                  │
 │  ▼                                                                                               │
 │                                                                                                  │

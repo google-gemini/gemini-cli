@@ -5,6 +5,7 @@
  */
 
 import { z } from 'zod';
+import { AuthProviderType } from '../config/config.js';
 
 export interface ClientMetadata {
   ideType?: ClientMetadataIdeType;
@@ -315,6 +316,7 @@ export interface ConversationOffered {
   streamingLatency?: StreamingLatency;
   isAgentic?: boolean;
   initiationMethod?: InitiationMethod;
+  trajectoryId?: string;
 }
 
 export interface StreamingLatency {
@@ -330,6 +332,7 @@ export interface ConversationInteraction {
   removedLines?: string;
   language?: string;
   isAgentic?: boolean;
+  initiationMethod?: InitiationMethod;
 }
 
 export interface FetchAdminControlsRequest {
@@ -357,8 +360,41 @@ const McpServerConfigSchema = z.object({
   excludeTools: z.array(z.string()).optional(),
 });
 
+const RequiredMcpServerOAuthSchema = z.object({
+  scopes: z.array(z.string()).optional(),
+  clientId: z.string().optional(),
+  clientSecret: z.string().optional(),
+});
+
+export const RequiredMcpServerConfigSchema = z.object({
+  // Connection (required for forced servers)
+  url: z.string(),
+  type: z.enum(['sse', 'http']),
+
+  // Auth
+  authProviderType: z.nativeEnum(AuthProviderType).optional(),
+  oauth: RequiredMcpServerOAuthSchema.optional(),
+  targetAudience: z.string().optional(),
+  targetServiceAccount: z.string().optional(),
+  headers: z.record(z.string()).optional(),
+
+  // Common
+  trust: z.boolean().optional(),
+  timeout: z.number().optional(),
+  description: z.string().optional(),
+
+  // Tool filtering
+  includeTools: z.array(z.string()).optional(),
+  excludeTools: z.array(z.string()).optional(),
+});
+
+export type RequiredMcpServerConfig = z.infer<
+  typeof RequiredMcpServerConfigSchema
+>;
+
 export const McpConfigDefinitionSchema = z.object({
   mcpServers: z.record(McpServerConfigSchema).optional(),
+  requiredMcpServers: z.record(RequiredMcpServerConfigSchema).optional(),
 });
 
 export type McpConfigDefinition = z.infer<typeof McpConfigDefinitionSchema>;
@@ -375,6 +411,7 @@ export const AdminControlsSettingsSchema = z.object({
     .object({
       mcpEnabled: z.boolean().optional(),
       mcpConfig: McpConfigDefinitionSchema.optional(),
+      requiredMcpConfig: z.record(RequiredMcpServerConfigSchema).optional(),
     })
     .optional(),
   cliFeatureSetting: CliFeatureSettingSchema.optional(),

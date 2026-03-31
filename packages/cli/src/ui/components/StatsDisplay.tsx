@@ -9,8 +9,10 @@ import { Box, Text, useStdout } from 'ink';
 import { ThemedGradient } from './ThemedGradient.js';
 import { theme } from '../semantic-colors.js';
 import { formatDuration, formatResetTime } from '../utils/formatters.js';
-import type { ModelMetrics } from '../contexts/SessionContext.js';
-import { useSessionStats } from '../contexts/SessionContext.js';
+import {
+  useSessionStats,
+  type ModelMetrics,
+} from '../contexts/SessionContext.js';
 import {
   getStatusColor,
   TOOL_SUCCESS_RATE_HIGH,
@@ -25,6 +27,7 @@ import {
 } from '../utils/displayUtils.js';
 import { computeSessionStats } from '../utils/computeStats.js';
 import {
+  type Config,
   type RetrieveUserQuotaResponse,
   isActiveModel,
   getDisplayString,
@@ -86,13 +89,17 @@ const Section: React.FC<SectionProps> = ({ title, children }) => (
 // Logic for building the unified list of table rows
 const buildModelRows = (
   models: Record<string, ModelMetrics>,
+  config: Config,
   quotas?: RetrieveUserQuotaResponse,
   useGemini3_1 = false,
+  useGemini3_1FlashLite = false,
   useCustomToolModel = false,
 ) => {
   const getBaseModelName = (name: string) => name.replace('-001', '');
   const usedModelNames = new Set(
-    Object.keys(models).map(getBaseModelName).map(getDisplayString),
+    Object.keys(models)
+      .map(getBaseModelName)
+      .map((name) => getDisplayString(name, config)),
   );
 
   // 1. Models with active usage
@@ -102,7 +109,7 @@ const buildModelRows = (
     const inputTokens = metrics.tokens.input;
     return {
       key: name,
-      modelName: getDisplayString(modelName),
+      modelName: getDisplayString(modelName, config),
       requests: metrics.api.totalRequests,
       cachedTokens: cachedTokens.toLocaleString(),
       inputTokens: inputTokens.toLocaleString(),
@@ -118,12 +125,17 @@ const buildModelRows = (
       ?.filter(
         (b) =>
           b.modelId &&
-          isActiveModel(b.modelId, useGemini3_1, useCustomToolModel) &&
-          !usedModelNames.has(getDisplayString(b.modelId)),
+          isActiveModel(
+            b.modelId,
+            useGemini3_1,
+            useGemini3_1FlashLite,
+            useCustomToolModel,
+          ) &&
+          !usedModelNames.has(getDisplayString(b.modelId, config)),
       )
       .map((bucket) => ({
         key: bucket.modelId!,
-        modelName: getDisplayString(bucket.modelId!),
+        modelName: getDisplayString(bucket.modelId!, config),
         requests: '-',
         cachedTokens: '-',
         inputTokens: '-',
@@ -137,6 +149,7 @@ const buildModelRows = (
 
 const ModelUsageTable: React.FC<{
   models: Record<string, ModelMetrics>;
+  config: Config;
   quotas?: RetrieveUserQuotaResponse;
   cacheEfficiency: number;
   totalCachedTokens: number;
@@ -145,9 +158,11 @@ const ModelUsageTable: React.FC<{
   pooledLimit?: number;
   pooledResetTime?: string;
   useGemini3_1?: boolean;
+  useGemini3_1FlashLite?: boolean;
   useCustomToolModel?: boolean;
 }> = ({
   models,
+  config,
   quotas,
   cacheEfficiency,
   totalCachedTokens,
@@ -156,11 +171,19 @@ const ModelUsageTable: React.FC<{
   pooledLimit,
   pooledResetTime,
   useGemini3_1,
+  useGemini3_1FlashLite,
   useCustomToolModel,
 }) => {
   const { stdout } = useStdout();
   const terminalWidth = stdout?.columns ?? 84;
-  const rows = buildModelRows(models, quotas, useGemini3_1, useCustomToolModel);
+  const rows = buildModelRows(
+    models,
+    config,
+    quotas,
+    useGemini3_1,
+    useGemini3_1FlashLite,
+    useCustomToolModel,
+  );
 
   if (rows.length === 0) {
     return null;
@@ -527,6 +550,8 @@ export const StatsDisplay: React.FC<StatsDisplayProps> = ({
   const settings = useSettings();
   const config = useConfig();
   const useGemini3_1 = config.getGemini31LaunchedSync?.() ?? false;
+  const useGemini3_1FlashLite =
+    config.getGemini31FlashLiteLaunchedSync?.() ?? false;
   const useCustomToolModel =
     useGemini3_1 &&
     config.getContentGeneratorConfig().authType === AuthType.USE_GEMINI;
@@ -589,8 +614,8 @@ export const StatsDisplay: React.FC<StatsDisplayProps> = ({
             <Text color={theme.text.primary}>
               {selectedAuthType.startsWith('oauth')
                 ? userEmail
-                  ? `Logged in with Google (${userEmail})`
-                  : 'Logged in with Google'
+                  ? `Signed in with Google (${userEmail})`
+                  : 'Signed in with Google'
                 : selectedAuthType}
             </Text>
           </StatRow>
@@ -674,6 +699,7 @@ export const StatsDisplay: React.FC<StatsDisplayProps> = ({
       </Section>
       <ModelUsageTable
         models={models}
+        config={config}
         quotas={quotas}
         cacheEfficiency={computed.cacheEfficiency}
         totalCachedTokens={computed.totalCachedTokens}
@@ -682,6 +708,7 @@ export const StatsDisplay: React.FC<StatsDisplayProps> = ({
         pooledLimit={pooledLimit}
         pooledResetTime={pooledResetTime}
         useGemini3_1={useGemini3_1}
+        useGemini3_1FlashLite={useGemini3_1FlashLite}
         useCustomToolModel={useCustomToolModel}
       />
       {renderFooter()}

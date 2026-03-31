@@ -5,11 +5,10 @@
  */
 
 import { vi, describe, it, expect, beforeEach, afterEach } from 'vitest';
-import { coreEvents } from '@google/gemini-cli-core';
+import { coreEvents, type Config } from '@google/gemini-cli-core';
 import { handleList, listCommand } from './list.js';
 import { loadSettings, type LoadedSettings } from '../../config/settings.js';
 import { loadCliConfig } from '../../config/config.js';
-import type { Config } from '@google/gemini-cli-core';
 import chalk from 'chalk';
 
 vi.mock('@google/gemini-cli-core', async (importOriginal) => {

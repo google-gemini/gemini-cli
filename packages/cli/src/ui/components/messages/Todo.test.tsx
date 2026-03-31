@@ -8,11 +8,9 @@ import { render } from '../../../test-utils/render.js';
 import { describe, it, expect } from 'vitest';
 import { Box } from 'ink';
 import { TodoTray } from './Todo.js';
-import type { Todo } from '@google/gemini-cli-core';
-import type { UIState } from '../../contexts/UIStateContext.js';
-import { UIStateContext } from '../../contexts/UIStateContext.js';
-import type { HistoryItem } from '../../types.js';
-import { CoreToolCallStatus } from '@google/gemini-cli-core';
+import { CoreToolCallStatus, type Todo } from '@google/gemini-cli-core';
+import { UIStateContext, type UIState } from '../../contexts/UIStateContext.js';
+import { type HistoryItem } from '../../types.js';
 
 const createTodoHistoryItem = (todos: Todo[]): HistoryItem =>
   ({
@@ -34,12 +32,11 @@ describe.each([true, false])(
   '<TodoTray /> (showFullTodos: %s)',
   async (showFullTodos: boolean) => {
     const renderWithUiState = async (uiState: Partial<UIState>) => {
-      const result = render(
+      const result = await render(
         <UIStateContext.Provider value={uiState as UIState}>
           <TodoTray />
         </UIStateContext.Provider>,
       );
-      await result.waitUntilReady();
       return result;
     };
 
@@ -93,7 +90,7 @@ describe.each([true, false])(
     });
 
     it('renders a todo list with long descriptions that wrap when full view is on', async () => {
-      const { lastFrame, waitUntilReady, unmount } = render(
+      const { lastFrame, unmount } = await render(
         <Box width="50">
           <UIStateContext.Provider
             value={
@@ -120,7 +117,6 @@ describe.each([true, false])(
           </UIStateContext.Provider>
         </Box>,
       );
-      await waitUntilReady();
       expect(lastFrame()).toMatchSnapshot();
       unmount();
     });

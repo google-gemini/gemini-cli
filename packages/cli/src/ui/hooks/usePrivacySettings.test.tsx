@@ -7,8 +7,12 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { act } from 'react';
 import { render } from '../../test-utils/render.js';
-import type { Config, CodeAssistServer } from '@google/gemini-cli-core';
-import { UserTierId, getCodeAssistServer } from '@google/gemini-cli-core';
+import {
+  UserTierId,
+  getCodeAssistServer,
+  type Config,
+  type CodeAssistServer,
+} from '@google/gemini-cli-core';
 import { usePrivacySettings } from './usePrivacySettings.js';
 import { waitFor } from '../../test-utils/async.js';
 
@@ -29,13 +33,13 @@ describe('usePrivacySettings', () => {
     vi.clearAllMocks();
   });
 
-  const renderPrivacySettingsHook = () => {
+  const renderPrivacySettingsHook = async () => {
     let hookResult: ReturnType<typeof usePrivacySettings>;
     function TestComponent() {
       hookResult = usePrivacySettings(mockConfig);
       return null;
     }
-    render(<TestComponent />);
+    await render(<TestComponent />);
     return {
       result: {
         get current() {
@@ -48,7 +52,7 @@ describe('usePrivacySettings', () => {
   it('should throw error when content generator is not a CodeAssistServer', async () => {
     vi.mocked(getCodeAssistServer).mockReturnValue(undefined);
 
-    const { result } = renderPrivacySettingsHook();
+    const { result } = await act(async () => renderPrivacySettingsHook());
 
     await waitFor(() => {
       expect(result.current.privacyState.isLoading).toBe(false);
@@ -64,7 +68,7 @@ describe('usePrivacySettings', () => {
       userTier: UserTierId.STANDARD,
     } as unknown as CodeAssistServer);
 
-    const { result } = renderPrivacySettingsHook();
+    const { result } = await act(async () => renderPrivacySettingsHook());
 
     await waitFor(() => {
       expect(result.current.privacyState.isLoading).toBe(false);
@@ -80,7 +84,7 @@ describe('usePrivacySettings', () => {
       userTier: UserTierId.FREE,
     } as unknown as CodeAssistServer);
 
-    const { result } = renderPrivacySettingsHook();
+    const { result } = await act(async () => renderPrivacySettingsHook());
 
     await waitFor(() => {
       expect(result.current.privacyState.isLoading).toBe(false);
@@ -92,11 +96,15 @@ describe('usePrivacySettings', () => {
   });
 
   it('should update data collection opt-in setting', async () => {
+    let deferredGet: { resolve: (val: unknown) => void };
     const mockCodeAssistServer = {
       projectId: 'test-project-id',
-      getCodeAssistGlobalUserSetting: vi.fn().mockResolvedValue({
-        freeTierDataCollectionOptin: true,
-      }),
+      getCodeAssistGlobalUserSetting: vi.fn().mockImplementation(
+        () =>
+          new Promise((resolve) => {
+            deferredGet = { resolve };
+          }),
+      ),
       setCodeAssistGlobalUserSetting: vi.fn().mockResolvedValue({
         freeTierDataCollectionOptin: false,
       }),
@@ -104,9 +112,19 @@ describe('usePrivacySettings', () => {
     } as unknown as CodeAssistServer;
     vi.mocked(getCodeAssistServer).mockReturnValue(mockCodeAssistServer);
 
-    const { result } = renderPrivacySettingsHook();
+    const { result } = await act(async () => renderPrivacySettingsHook());
 
-    // Wait for initial load
+    // Initially loading
+    expect(result.current.privacyState.isLoading).toBe(true);
+
+    // Finish initial load
+    await act(async () => {
+      deferredGet.resolve({
+        freeTierDataCollectionOptin: true,
+      });
+    });
+
+    // Wait for initial load to process
     await waitFor(() => {
       expect(result.current.privacyState.isLoading).toBe(false);
     });

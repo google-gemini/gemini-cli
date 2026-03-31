@@ -29,8 +29,8 @@ import {
   cleanupTerminalOnExit,
   terminalCapabilityManager,
 } from '../utils/terminalCapabilityManager.js';
-import { formatCommand } from '../utils/keybindingUtils.js';
-import { Command } from '../../config/keyBindings.js';
+import { formatCommand } from '../key/keybindingUtils.js';
+import { Command } from '../key/keyBindings.js';
 
 vi.mock('@google/gemini-cli-core', async () => {
   const actual = await vi.importActual('@google/gemini-cli-core');
@@ -80,7 +80,7 @@ describe('useSuspend', () => {
     setPlatform(originalPlatform);
   });
 
-  it('cleans terminal state on suspend and restores/repaints on resume in alternate screen mode', () => {
+  it('cleans terminal state on suspend and restores/repaints on resume in alternate screen mode', async () => {
     const handleWarning = vi.fn();
     const setRawMode = vi.fn();
     const refreshStatic = vi.fn();
@@ -88,7 +88,7 @@ describe('useSuspend', () => {
     const enableSupportedModes =
       terminalCapabilityManager.enableSupportedModes as unknown as Mock;
 
-    const { result, unmount } = renderHook(() =>
+    const { result, unmount } = await renderHook(() =>
       useSuspend({
         handleWarning,
         setRawMode,
@@ -137,13 +137,13 @@ describe('useSuspend', () => {
     unmount();
   });
 
-  it('does not toggle alternate screen or mouse restore when alternate screen mode is disabled', () => {
+  it('does not toggle alternate screen or mouse restore when alternate screen mode is disabled', async () => {
     const handleWarning = vi.fn();
     const setRawMode = vi.fn();
     const refreshStatic = vi.fn();
     const setForceRerenderKey = vi.fn();
 
-    const { result, unmount } = renderHook(() =>
+    const { result, unmount } = await renderHook(() =>
       useSuspend({
         handleWarning,
         setRawMode,
@@ -169,7 +169,7 @@ describe('useSuspend', () => {
     unmount();
   });
 
-  it('warns and skips suspension on windows', () => {
+  it('warns and skips suspension on windows', async () => {
     setPlatform('win32');
 
     const handleWarning = vi.fn();
@@ -177,7 +177,7 @@ describe('useSuspend', () => {
     const refreshStatic = vi.fn();
     const setForceRerenderKey = vi.fn();
 
-    const { result, unmount } = renderHook(() =>
+    const { result, unmount } = await renderHook(() =>
       useSuspend({
         handleWarning,
         setRawMode,

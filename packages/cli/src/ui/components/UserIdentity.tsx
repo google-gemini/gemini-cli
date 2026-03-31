@@ -5,7 +5,7 @@
  */
 
 import type React from 'react';
-import { useMemo, useEffect, useState } from 'react';
+import { useMemo } from 'react';
 import { Box, Text } from 'ink';
 import { theme } from '../semantic-colors.js';
 import {
@@ -13,6 +13,7 @@ import {
   UserAccountManager,
   AuthType,
 } from '@google/gemini-cli-core';
+import { isUltraTier } from '../../utils/tierUtils.js';
 
 interface UserIdentityProps {
   config: Config;
@@ -20,19 +21,20 @@ interface UserIdentityProps {
 
 export const UserIdentity: React.FC<UserIdentityProps> = ({ config }) => {
   const authType = config.getContentGeneratorConfig()?.authType;
-  const [email, setEmail] = useState<string | undefined>();
-
-  useEffect(() => {
+  const email = useMemo(() => {
     if (authType) {
       const userAccountManager = new UserAccountManager();
-      setEmail(userAccountManager.getCachedGoogleAccount() ?? undefined);
+      return userAccountManager.getCachedGoogleAccount() ?? undefined;
     }
+    return undefined;
   }, [authType]);
 
   const tierName = useMemo(
     () => (authType ? config.getUserTierName() : undefined),
     [config, authType],
   );
+
+  const isUltra = useMemo(() => isUltraTier(tierName), [tierName]);
 
   if (!authType) {
     return null;
@@ -44,7 +46,10 @@ export const UserIdentity: React.FC<UserIdentityProps> = ({ config }) => {
       <Box>
         <Text color={theme.text.primary} wrap="truncate-end">
           {authType === AuthType.LOGIN_WITH_GOOGLE ? (
-            <Text>{email ?? 'Logged in with Google'}</Text>
+            <Text>
+              <Text bold>Signed in with Google{email ? ':' : ''}</Text>
+              {email ? ` ${email}` : ''}
+            </Text>
           ) : (
             `Authenticated with ${authType}`
           )}
@@ -56,9 +61,9 @@ export const UserIdentity: React.FC<UserIdentityProps> = ({ config }) => {
       {tierName && (
         <Box>
           <Text color={theme.text.primary} wrap="truncate-end">
-            {tierName}
+            <Text bold>Plan:</Text> {tierName}
           </Text>
-          <Text color={theme.text.secondary}> /upgrade</Text>
+          {!isUltra && <Text color={theme.text.secondary}> /upgrade</Text>}
         </Box>
       )}
     </Box>
