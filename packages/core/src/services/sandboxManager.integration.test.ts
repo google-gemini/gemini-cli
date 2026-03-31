@@ -101,8 +101,8 @@ function ensureSandboxAvailable(): boolean {
   const platform = os.platform();
 
   if (platform === 'win32') {
-    // Windows sandboxing relies on icacls, which is a core system utility and
-    // always available.
+    // Windows sandboxing relies on the GeminiSandbox.exe helper, which is compiled
+    // using the built-in .NET Framework compiler (csc.exe) and is always available.
     return true;
   }
 

@@ -11,7 +11,6 @@ import path from 'node:path';
 import { WindowsSandboxManager } from './WindowsSandboxManager.js';
 import * as sandboxManager from '../../services/sandboxManager.js';
 import type { SandboxRequest } from '../../services/sandboxManager.js';
-import { spawnAsync } from '../../utils/shell-utils.js';
 import type { SandboxPolicyManager } from '../../policy/sandboxPolicyManager.js';
 
 vi.mock('../../utils/shell-utils.js', async (importOriginal) => {
@@ -19,14 +18,13 @@ vi.mock('../../utils/shell-utils.js', async (importOriginal) => {
     await importOriginal<typeof import('../../utils/shell-utils.js')>();
   return {
     ...actual,
-    spawnAsync: vi.fn(),
     initializeShellParsers: vi.fn(),
     isStrictlyApproved: vi.fn().mockResolvedValue(true),
   };
 });
 
 describe('WindowsSandboxManager', () => {
-  let manager: WindowsSandboxManager;
+  let manager: WindowsSandboxManager | undefined;
   let testCwd: string;
 
   beforeEach(() => {
@@ -35,19 +33,19 @@ describe('WindowsSandboxManager', () => {
       p.toString(),
     );
     testCwd = fs.mkdtempSync(path.join(os.tmpdir(), 'gemini-cli-test-'));
-    manager = new WindowsSandboxManager({
-      workspace: testCwd,
-      modeConfig: { readonly: false, allowOverrides: true },
-      forbiddenPaths: [],
-    });
+    vi.spyOn(fs, 'writeFileSync');
   });
 
   afterEach(() => {
+    manager?.cleanup();
     vi.restoreAllMocks();
     fs.rmSync(testCwd, { recursive: true, force: true });
   });
 
   it('should prepare a GeminiSandbox.exe command', async () => {
+    manager = new WindowsSandboxManager({
+      workspace: testCwd,
+    });
     const req: SandboxRequest = {
       command: 'whoami',
       args: ['/groups'],
@@ -64,14 +62,17 @@ describe('WindowsSandboxManager', () => {
     expect(result.args).toEqual([
       '0',
       testCwd,
-      '--forbidden-manifest',
-      expect.stringMatching(/manifest\.txt$/),
+      '--setup-manifest',
+      expect.stringMatching(/gemini-cli-sandbox-[^/\\]+[/\\]acls-.*\.txt$/),
       'whoami',
       '/groups',
     ]);
   });
 
   it('should handle networkAccess from config', async () => {
+    manager = new WindowsSandboxManager({
+      workspace: testCwd,
+    });
     const req: SandboxRequest = {
       command: 'whoami',
       args: [],
@@ -87,6 +88,9 @@ describe('WindowsSandboxManager', () => {
   });
 
   it('should handle network access from additionalPermissions', async () => {
+    manager = new WindowsSandboxManager({
+      workspace: testCwd,
+    });
     const req: SandboxRequest = {
       command: 'whoami',
       args: [],
@@ -104,11 +108,11 @@ describe('WindowsSandboxManager', () => {
   });
 
   it('should reject network access in Plan mode', async () => {
-    const planManager = new WindowsSandboxManager({
+    manager = new WindowsSandboxManager({
       workspace: testCwd,
       modeConfig: { readonly: true, allowOverrides: false },
-      forbiddenPaths: [],
     });
+
     const req: SandboxRequest = {
       command: 'curl',
       args: ['google.com'],
@@ -119,7 +123,7 @@ describe('WindowsSandboxManager', () => {
       },
     };
 
-    await expect(planManager.prepareCommand(req)).rejects.toThrow(
+    await expect(manager.prepareCommand(req)).rejects.toThrow(
       'Sandbox request rejected: Cannot override readonly/network/filesystem restrictions in Plan mode.',
     );
   });
@@ -133,11 +137,10 @@ describe('WindowsSandboxManager', () => {
       }),
     } as unknown as SandboxPolicyManager;
 
-    const managerWithPolicy = new WindowsSandboxManager({
+    manager = new WindowsSandboxManager({
       workspace: testCwd,
       modeConfig: { allowOverrides: true, network: false },
       policyManager: mockPolicyManager,
-      forbiddenPaths: [],
     });
 
     const req: SandboxRequest = {
@@ -147,22 +150,21 @@ describe('WindowsSandboxManager', () => {
       env: {},
     };
 
-    const result = await managerWithPolicy.prepareCommand(req);
+    const result = await manager.prepareCommand(req);
     expect(result.args[0]).toBe('1'); // Network allowed by persistent policy
 
-    const icaclsArgs = vi
-      .mocked(spawnAsync)
-      .mock.calls.filter((c) => c[0] === 'icacls')
-      .map((c) => c[1]);
-
-    expect(icaclsArgs).toContainEqual([
-      persistentPath,
-      '/setintegritylevel',
-      '(OI)(CI)Low',
-    ]);
+    const writeFileSyncCalls = vi.mocked(fs.writeFileSync).mock.calls;
+    const aclCall = writeFileSyncCalls.find((call) =>
+      String(call[0]).match(/gemini-cli-sandbox-[^/\\]+[/\\]acls-.*\.txt$/),
+    );
+    expect(aclCall).toBeDefined();
+    expect(aclCall![1]).toContain(`L ${persistentPath}`);
   });
 
   it('should sanitize environment variables', async () => {
+    manager = new WindowsSandboxManager({
+      workspace: testCwd,
+    });
     const req: SandboxRequest = {
       command: 'test',
       args: [],
@@ -186,6 +188,9 @@ describe('WindowsSandboxManager', () => {
   });
 
   it('should ensure governance files exist', async () => {
+    manager = new WindowsSandboxManager({
+      workspace: testCwd,
+    });
     const req: SandboxRequest = {
       command: 'test',
       args: [],
@@ -202,6 +207,10 @@ describe('WindowsSandboxManager', () => {
   });
 
   it('should grant Low Integrity access to the workspace and allowed paths', async () => {
+    manager = new WindowsSandboxManager({
+      workspace: testCwd,
+      modeConfig: { readonly: false, allowOverrides: true },
+    });
     const allowedPath = path.join(os.tmpdir(), 'gemini-cli-test-allowed');
     if (!fs.existsSync(allowedPath)) {
       fs.mkdirSync(allowedPath);
@@ -219,28 +228,22 @@ describe('WindowsSandboxManager', () => {
 
       await manager.prepareCommand(req);
 
-      const icaclsArgs = vi
-        .mocked(spawnAsync)
-        .mock.calls.filter((c) => c[0] === 'icacls')
-        .map((c) => c[1]);
-
-      expect(icaclsArgs).toContainEqual([
-        path.resolve(testCwd),
-        '/setintegritylevel',
-        '(OI)(CI)Low',
-      ]);
-
-      expect(icaclsArgs).toContainEqual([
-        path.resolve(allowedPath),
-        '/setintegritylevel',
-        '(OI)(CI)Low',
-      ]);
+      const writeFileSyncCalls = vi.mocked(fs.writeFileSync).mock.calls;
+      const aclCall = writeFileSyncCalls.find((call) =>
+        String(call[0]).match(/gemini-cli-sandbox-[^/\\]+[/\\]acls-.*\.txt$/),
+      );
+      expect(aclCall).toBeDefined();
+      expect(aclCall![1]).toContain(`L ${path.resolve(testCwd)}`);
+      expect(aclCall![1]).toContain(`L ${path.resolve(allowedPath)}`);
     } finally {
       fs.rmSync(allowedPath, { recursive: true, force: true });
     }
   });
 
   it('should grant Low Integrity access to additional write paths', async () => {
+    manager = new WindowsSandboxManager({
+      workspace: testCwd,
+    });
     const extraWritePath = path.join(
       os.tmpdir(),
       'gemini-cli-test-extra-write',
@@ -265,16 +268,12 @@ describe('WindowsSandboxManager', () => {
 
       await manager.prepareCommand(req);
 
-      const icaclsArgs = vi
-        .mocked(spawnAsync)
-        .mock.calls.filter((c) => c[0] === 'icacls')
-        .map((c) => c[1]);
-
-      expect(icaclsArgs).toContainEqual([
-        path.resolve(extraWritePath),
-        '/setintegritylevel',
-        '(OI)(CI)Low',
-      ]);
+      const writeFileSyncCalls = vi.mocked(fs.writeFileSync).mock.calls;
+      const aclCall = writeFileSyncCalls.find((call) =>
+        String(call[0]).match(/gemini-cli-sandbox-[^/\\]+[/\\]acls-.*\.txt$/),
+      );
+      expect(aclCall).toBeDefined();
+      expect(aclCall![1]).toContain(`L ${path.resolve(extraWritePath)}`);
     } finally {
       fs.rmSync(extraWritePath, { recursive: true, force: true });
     }
@@ -283,6 +282,9 @@ describe('WindowsSandboxManager', () => {
   it.runIf(process.platform === 'win32')(
     'should reject UNC paths in grantLowIntegrityAccess',
     async () => {
+      manager = new WindowsSandboxManager({
+        workspace: testCwd,
+      });
       const uncPath = '\\\\attacker\\share\\malicious.txt';
       const req: SandboxRequest = {
         command: 'test',
@@ -300,22 +302,22 @@ describe('WindowsSandboxManager', () => {
 
       await manager.prepareCommand(req);
 
-      const icaclsArgs = vi
-        .mocked(spawnAsync)
-        .mock.calls.filter((c) => c[0] === 'icacls')
-        .map((c) => c[1]);
-
-      expect(icaclsArgs).not.toContainEqual([
-        uncPath,
-        '/setintegritylevel',
-        '(OI)(CI)Low',
-      ]);
+      const writeFileSyncCalls = vi.mocked(fs.writeFileSync).mock.calls;
+      const aclCall = writeFileSyncCalls.find((call) =>
+        String(call[0]).match(/gemini-cli-sandbox-[^/\\]+[/\\]acls-.*\.txt$/),
+      );
+      if (aclCall) {
+        expect(aclCall[1]).not.toContain(`L ${uncPath}`);
+      }
     },
   );
 
   it.runIf(process.platform === 'win32')(
     'should allow extended-length and local device paths',
     async () => {
+      manager = new WindowsSandboxManager({
+        workspace: testCwd,
+      });
       const longPath = '\\\\?\\C:\\very\\long\\path';
       const devicePath = '\\\\.\\PhysicalDrive0';
 
@@ -335,25 +337,17 @@ describe('WindowsSandboxManager', () => {
 
       await manager.prepareCommand(req);
 
-      const icaclsArgs = vi
-        .mocked(spawnAsync)
-        .mock.calls.filter((c) => c[0] === 'icacls')
-        .map((c) => c[1]);
-
-      expect(icaclsArgs).toContainEqual([
-        longPath,
-        '/setintegritylevel',
-        '(OI)(CI)Low',
-      ]);
-      expect(icaclsArgs).toContainEqual([
-        devicePath,
-        '/setintegritylevel',
-        '(OI)(CI)Low',
-      ]);
+      const writeFileSyncCalls = vi.mocked(fs.writeFileSync).mock.calls;
+      const aclCall = writeFileSyncCalls.find((call) =>
+        String(call[0]).match(/gemini-cli-sandbox-[^/\\]+[/\\]acls-.*\.txt$/),
+      );
+      expect(aclCall).toBeDefined();
+      expect(aclCall![1]).toContain(`L ${longPath}`);
+      expect(aclCall![1]).toContain(`L ${devicePath}`);
     },
   );
 
-  it('skips denying access to non-existent forbidden paths to prevent icacls failure', async () => {
+  it('skips denying access to non-existent forbidden paths to prevent failure', async () => {
     const missingPath = path.join(
       os.tmpdir(),
       'gemini-cli-test-missing',
@@ -365,7 +359,7 @@ describe('WindowsSandboxManager', () => {
       fs.rmSync(missingPath, { recursive: true, force: true });
     }
 
-    const managerWithForbidden = new WindowsSandboxManager({
+    manager = new WindowsSandboxManager({
       workspace: testCwd,
       forbiddenPaths: [missingPath],
     });
@@ -377,14 +371,61 @@ describe('WindowsSandboxManager', () => {
       env: {},
     };
 
-    await managerWithForbidden.prepareCommand(req);
+    await manager.prepareCommand(req);
 
-    // Should NOT have called icacls to deny the missing path
-    expect(spawnAsync).not.toHaveBeenCalledWith('icacls', [
-      path.resolve(missingPath),
-      '/deny',
-      '*S-1-16-4096:(OI)(CI)(F)',
-    ]);
+    // Should NOT have included the missing path in the ACL manifest
+    const writeFileSyncCalls = vi.mocked(fs.writeFileSync).mock.calls;
+    const aclCall = writeFileSyncCalls.find((call) =>
+      String(call[0]).match(/gemini-cli-sandbox-[^/\\]+[/\\]acls-.*\.txt$/),
+    );
+    if (aclCall) {
+      expect(aclCall[1]).not.toContain(`D ${path.resolve(missingPath)}`);
+    }
+  });
+
+  it('should deny access to discovered secret files (e.g., .env)', async () => {
+    manager = new WindowsSandboxManager({
+      workspace: testCwd,
+    });
+    const envFile = path.join(testCwd, '.env');
+    fs.writeFileSync(envFile, 'API_KEY=secret');
+
+    const req: SandboxRequest = {
+      command: 'test',
+      args: [],
+      cwd: testCwd,
+      env: {},
+    };
+
+    await manager.prepareCommand(req);
+
+    const writeFileSyncCalls = vi.mocked(fs.writeFileSync).mock.calls;
+    const aclCall = writeFileSyncCalls.find((call) =>
+      String(call[0]).match(/gemini-cli-sandbox-[^/\\]+[/\\]acls-.*\.txt$/),
+    );
+    expect(aclCall).toBeDefined();
+    expect(aclCall![1]).toContain(`D ${path.resolve(envFile)}`);
+  });
+
+  describe('isKnownSafeCommand', () => {
+    it('should return true for approved tools in modeConfig', () => {
+      manager = new WindowsSandboxManager({
+        workspace: testCwd,
+        modeConfig: { approvedTools: ['my-safe-tool'] },
+      });
+
+      expect(manager.isKnownSafeCommand(['my-safe-tool', 'arg'])).toBe(true);
+      expect(manager.isKnownSafeCommand(['MY-SAFE-TOOL', 'arg'])).toBe(true);
+    });
+
+    it('should fall back to default isKnownSafeCommand logic', () => {
+      manager = new WindowsSandboxManager({
+        workspace: testCwd,
+      });
+      // 'git' is typically a known safe command in commandSafety.ts
+      expect(manager.isKnownSafeCommand(['git', 'status'])).toBe(true);
+      expect(manager.isKnownSafeCommand(['unknown-tool'])).toBe(false);
+    });
   });
 
   it('should deny Low Integrity access to forbidden paths', async () => {
@@ -393,7 +434,7 @@ describe('WindowsSandboxManager', () => {
       fs.mkdirSync(forbiddenPath);
     }
     try {
-      const managerWithForbidden = new WindowsSandboxManager({
+      manager = new WindowsSandboxManager({
         workspace: testCwd,
         forbiddenPaths: [forbiddenPath],
       });
@@ -405,13 +446,14 @@ describe('WindowsSandboxManager', () => {
         env: {},
       };
 
-      await managerWithForbidden.prepareCommand(req);
+      await manager.prepareCommand(req);
 
-      expect(spawnAsync).toHaveBeenCalledWith('icacls', [
-        path.resolve(forbiddenPath),
-        '/deny',
-        '*S-1-16-4096:(OI)(CI)(F)',
-      ]);
+      const writeFileSyncCalls = vi.mocked(fs.writeFileSync).mock.calls;
+      const aclCall = writeFileSyncCalls.find((call) =>
+        String(call[0]).match(/gemini-cli-sandbox-[^/\\]+[/\\]acls-.*\.txt$/),
+      );
+      expect(aclCall).toBeDefined();
+      expect(aclCall![1]).toContain(`D ${path.resolve(forbiddenPath)}`);
     } finally {
       fs.rmSync(forbiddenPath, { recursive: true, force: true });
     }
@@ -423,7 +465,7 @@ describe('WindowsSandboxManager', () => {
       fs.mkdirSync(conflictPath);
     }
     try {
-      const managerWithForbidden = new WindowsSandboxManager({
+      manager = new WindowsSandboxManager({
         workspace: testCwd,
         forbiddenPaths: [conflictPath],
       });
@@ -438,30 +480,21 @@ describe('WindowsSandboxManager', () => {
         },
       };
 
-      await managerWithForbidden.prepareCommand(req);
+      await manager.prepareCommand(req);
 
-      const spawnMock = vi.mocked(spawnAsync);
-      const allowCallIndex = spawnMock.mock.calls.findIndex(
-        (call) =>
-          call[1] &&
-          call[1].includes('/setintegritylevel') &&
-          call[0] === 'icacls' &&
-          call[1][0] === path.resolve(conflictPath),
+      const writeFileSyncCalls = vi.mocked(fs.writeFileSync).mock.calls;
+      const aclCall = writeFileSyncCalls.find((call) =>
+        String(call[0]).match(/gemini-cli-sandbox-[^/\\]+[/\\]acls-.*\.txt$/),
       );
-      const denyCallIndex = spawnMock.mock.calls.findIndex(
-        (call) =>
-          call[1] &&
-          call[1].includes('/deny') &&
-          call[0] === 'icacls' &&
-          call[1][0] === path.resolve(conflictPath),
-      );
+      expect(aclCall).toBeDefined();
 
-      // Both should have been called
-      expect(allowCallIndex).toBeGreaterThan(-1);
-      expect(denyCallIndex).toBeGreaterThan(-1);
+      const content = String(aclCall![1]);
+      const allowIndex = content.indexOf(`L ${path.resolve(conflictPath)}`);
+      const denyIndex = content.indexOf(`D ${path.resolve(conflictPath)}`);
 
-      // Verify order: explicitly denying must happen after the explicit allow
-      expect(allowCallIndex).toBeLessThan(denyCallIndex);
+      expect(allowIndex).toBeGreaterThan(-1);
+      expect(denyIndex).toBeGreaterThan(-1);
+      expect(allowIndex).toBeLessThan(denyIndex);
     } finally {
       fs.rmSync(conflictPath, { recursive: true, force: true });
     }

@@ -5,8 +5,6 @@
  */
 
 using System;
-using System.Collections.Generic;
-using System.Diagnostics;
 using System.IO;
 using System.Runtime.InteropServices;
 using System.Security;
@@ -151,33 +149,53 @@ public class GeminiSandbox {
         public SID_AND_ATTRIBUTES Label;
     }
 
+    [DllImport("advapi32.dll", CharSet = CharSet.Auto, SetLastError = true)]
+    static extern bool ConvertStringSecurityDescriptorToSecurityDescriptor(string StringSecurityDescriptor, uint StringSDRevision, out IntPtr SecurityDescriptor, out uint SecurityDescriptorSize);
+
+    [DllImport("advapi32.dll", SetLastError = true)]
+    static extern bool GetSecurityDescriptorSacl(IntPtr pSecurityDescriptor, out bool lpbSaclPresent, out IntPtr pSacl, out bool lpbSaclDefaulted);
+
+    [DllImport("advapi32.dll", CharSet = CharSet.Auto, SetLastError = true)]
+    static extern uint SetNamedSecurityInfo(string pObjectName, int ObjectType, uint SecurityInfo, IntPtr psidOwner, IntPtr psidGroup, IntPtr pDacl, IntPtr pSacl);
+
+    [DllImport("kernel32.dll")]
+    static extern IntPtr LocalFree(IntPtr hMem);
+
     private const int TokenIntegrityLevel = 25;
     private const uint SE_GROUP_INTEGRITY = 0x00000020;
     private const uint TOKEN_ALL_ACCESS = 0xF01FF;
     private const uint DISABLE_MAX_PRIVILEGE = 0x1;
+    private const int SE_FILE_OBJECT = 1;
+    private const uint LABEL_SECURITY_INFORMATION = 0x00000010;
 
     static int Main(string[] args) {
-        if (args.Length < 3) {
-            Console.WriteLine("Usage: GeminiSandbox.exe <network:0|1> <cwd> [--forbidden-manifest <path>] <command> [args...]");
-            Console.WriteLine("Internal commands: __read <path>, __write <path>");
+        if (args.Length < 1) {
+            Console.WriteLine("Usage: GeminiSandbox.exe <network:0|1> <cwd> [--setup-manifest <path>] <command> [args...]");
+            Console.WriteLine("Internal commands: __read <path>, __write <path>, __apply_batch_acls <manifestPath>");
             return 1;
         }
 
-        bool networkAccess = args[0] == "1";
-        string cwd = args[1];
-        HashSet<string> forbiddenPaths = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-        int argIndex = 2;
+        int argIndex = 0;
+        string command = args[argIndex++];
 
-        if (argIndex < args.Length && args[argIndex] == "--forbidden-manifest") {
+        // Batch ACL command: __apply_batch_acls <manifestPath> (maintained for backward compatibility/standalone use)
+        if (command == "__apply_batch_acls") {
+            if (args.Length < 2) {
+                Console.WriteLine("Error: Missing manifest path for batch ACLs");
+                return 1;
+            }
+            ApplyManifest(args[1]);
+            return 0;
+        }
+
+        // Standard execution flow
+        bool networkAccess = command == "1";
+        if (argIndex >= args.Length) return 1;
+        string cwd = args[argIndex++];
+
+        if (argIndex < args.Length && args[argIndex] == "--setup-manifest") {
             if (argIndex + 1 < args.Length) {
-                string manifestPath = args[argIndex + 1];
-                if (File.Exists(manifestPath)) {
-                    foreach (string line in File.ReadAllLines(manifestPath)) {
-                        if (!string.IsNullOrWhiteSpace(line)) {
-                            forbiddenPaths.Add(GetNormalizedPath(line.Trim()));
-                        }
-                    }
-                }
+                ApplyManifest(args[argIndex + 1]);
                 argIndex += 2;
             }
         }
@@ -187,7 +205,7 @@ public class GeminiSandbox {
             return 1;
         }
 
-        string command = args[argIndex];
+        string subCommand = args[argIndex];
 
         IntPtr hToken = IntPtr.Zero;
         IntPtr hRestrictedToken = IntPtr.Zero;
@@ -207,7 +225,6 @@ public class GeminiSandbox {
             }
 
             // 2. Lower Integrity Level to Low
-            // S-1-16-4096 is the SID for "Low Mandatory Level"
             if (ConvertStringSidToSid("S-1-16-4096", out lowIntegritySid)) {
                 TOKEN_MANDATORY_LABEL tml = new TOKEN_MANDATORY_LABEL();
                 tml.Label.Sid = lowIntegritySid;
@@ -248,13 +265,12 @@ public class GeminiSandbox {
             }
 
             // 4. Handle Internal Commands or External Process
-            if (command == "__read") {
+            if (subCommand == "__read") {
                 if (argIndex + 1 >= args.Length) {
                     Console.WriteLine("Error: Missing path for __read");
                     return 1;
                 }
                 string path = args[argIndex + 1];
-                CheckForbidden(path, forbiddenPaths);
                 return RunInImpersonation(hRestrictedToken, () => {
                     try {
                         using (FileStream fs = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.Read))
@@ -263,17 +279,16 @@ public class GeminiSandbox {
                         }
                         return 0;
                     } catch (Exception e) {
-                        Console.Error.WriteLine("Error reading file: " + e.Message);
+                        Console.Error.WriteLine("Error reading file (check permissions): " + e.Message);
                         return 1;
                     }
                 });
-            } else if (command == "__write") {
+            } else if (subCommand == "__write") {
                 if (argIndex + 1 >= args.Length) {
                     Console.WriteLine("Error: Missing path for __write");
                     return 1;
                 }
                 string path = args[argIndex + 1];
-                CheckForbidden(path, forbiddenPaths);
                 return RunInImpersonation(hRestrictedToken, () => {
                     try {
                         using (StreamReader reader = new StreamReader(Console.OpenStandardInput(), System.Text.Encoding.UTF8))
@@ -283,7 +298,7 @@ public class GeminiSandbox {
                         }
                         return 0;
                     } catch (Exception e) {
-                        Console.Error.WriteLine("Error writing file: " + e.Message);
+                        Console.Error.WriteLine("Error writing file (check permissions): " + e.Message);
                         return 1;
                     }
                 });
@@ -304,7 +319,6 @@ public class GeminiSandbox {
             }
 
             PROCESS_INFORMATION pi = new PROCESS_INFORMATION();
-            // Creation Flags: 0x04000000 (CREATE_BREAKAWAY_FROM_JOB) to allow job assignment if parent is in job
             uint creationFlags = 0;
             if (!CreateProcessAsUser(hRestrictedToken, null, commandLine, IntPtr.Zero, IntPtr.Zero, true, creationFlags, IntPtr.Zero, cwd, ref si, out pi)) {
                 Console.WriteLine("Error: CreateProcessAsUser failed (" + Marshal.GetLastWin32Error() + ") Command: " + commandLine);
@@ -347,21 +361,16 @@ public class GeminiSandbox {
         }
     }
 
-    private static string GetNormalizedPath(string path) {
-        string fullPath = Path.GetFullPath(path);
-        StringBuilder longPath = new StringBuilder(1024);
-        uint result = GetLongPathName(fullPath, longPath, (uint)longPath.Capacity);
-        if (result > 0 && result < longPath.Capacity) {
-            return longPath.ToString();
-        }
-        return fullPath;
-    }
-
-    private static void CheckForbidden(string path, HashSet<string> forbiddenPaths) {
-        string fullPath = GetNormalizedPath(path);
-        foreach (string forbidden in forbiddenPaths) {
-            if (fullPath.Equals(forbidden, StringComparison.OrdinalIgnoreCase) || fullPath.StartsWith(forbidden + Path.DirectorySeparatorChar, StringComparison.OrdinalIgnoreCase)) {
-                throw new UnauthorizedAccessException("Access to forbidden path is denied: " + path);
+    private static void ApplyManifest(string manifestPath) {
+        if (!File.Exists(manifestPath)) return;
+        foreach (string line in File.ReadAllLines(manifestPath)) {
+            if (string.IsNullOrWhiteSpace(line) || line.Length < 3) continue;
+            char op = line[0];
+            string targetPath = line.Substring(2).Trim();
+            if (op == 'L') {
+                SetLowIntegritySacl(targetPath);
+            } else if (op == 'D') {
+                DenyLowIntegrityDacl(targetPath);
             }
         }
     }
@@ -407,5 +416,35 @@ public class GeminiSandbox {
         }
         sb.Append('\"');
         return sb.ToString();
+    }
+
+    private static void SetLowIntegritySacl(string path) {
+        IntPtr pSD = IntPtr.Zero;
+        try {
+            // S:(ML;;NW;;;LW) - SACL, Mandatory Label, No Write Up, Low Mandatory Level
+            if (ConvertStringSecurityDescriptorToSecurityDescriptor("S:(ML;;NW;;;LW)", 1, out pSD, out uint sdSize)) {
+                if (GetSecurityDescriptorSacl(pSD, out bool saclPresent, out IntPtr pSacl, out bool saclDefaulted) && saclPresent) {
+                    SetNamedSecurityInfo(path, SE_FILE_OBJECT, LABEL_SECURITY_INFORMATION, IntPtr.Zero, IntPtr.Zero, IntPtr.Zero, pSacl);
+                }
+            }
+        } finally {
+            if (pSD != IntPtr.Zero) LocalFree(pSD);
+        }
+    }
+
+    private static void DenyLowIntegrityDacl(string path) {
+        try {
+            if (Directory.Exists(path)) {
+                DirectorySecurity ds = Directory.GetAccessControl(path);
+                ds.AddAccessRule(new FileSystemAccessRule(new SecurityIdentifier("S-1-16-4096"), FileSystemRights.FullControl, InheritanceFlags.ContainerInherit | InheritanceFlags.ObjectInherit, PropagationFlags.None, AccessControlType.Deny));
+                Directory.SetAccessControl(path, ds);
+            } else if (File.Exists(path)) {
+                FileSecurity fs = File.GetAccessControl(path);
+                fs.AddAccessRule(new FileSystemAccessRule(new SecurityIdentifier("S-1-16-4096"), FileSystemRights.FullControl, AccessControlType.Deny));
+                File.SetAccessControl(path, fs);
+            }
+        } catch (Exception) {
+            // Ignore access errors or path not found
+        }
     }
 }
