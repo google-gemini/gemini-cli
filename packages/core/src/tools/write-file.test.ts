@@ -105,6 +105,7 @@ const mockConfigInternal = {
     }) as unknown as ToolRegistry,
   isInteractive: () => false,
   getDisableLLMCorrection: vi.fn(() => true),
+  isPlanMode: vi.fn(() => false),
   getActiveModel: () => 'test-model',
   storage: {
     getProjectTempDir: vi.fn().mockReturnValue('/tmp/project'),
@@ -367,6 +368,7 @@ describe('WriteFileTool', () => {
       const abortSignal = new AbortController().signal;
 
       const mockGemini3Config = {
+        // eslint-disable-next-line @typescript-eslint/no-misused-spread
         ...mockConfig,
         getActiveModel: () => 'gemini-3.0-pro',
       } as unknown as Config;

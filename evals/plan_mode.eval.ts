@@ -15,7 +15,9 @@ import {
 describe('plan_mode', () => {
   const TEST_PREFIX = 'Plan Mode: ';
   const settings = {
-    experimental: { plan: true },
+    general: {
+      plan: { enabled: true },
+    },
   };
 
   const getWriteTargets = (logs: any[]) =>
@@ -136,6 +138,32 @@ describe('plan_mode', () => {
       expect(wasToolCalled, 'Expected exit_plan_mode tool to be called').toBe(
         true,
       );
+
+      const toolLogs = rig.readToolLogs();
+      const exitPlanCall = toolLogs.find(
+        (log) => log.toolRequest.name === 'exit_plan_mode',
+      );
+      expect(
+        exitPlanCall,
+        'Expected to find exit_plan_mode in tool logs',
+      ).toBeDefined();
+
+      const args = JSON.parse(exitPlanCall!.toolRequest.args);
+      expect(args.plan_filename, 'plan_filename should be a string').toBeTypeOf(
+        'string',
+      );
+      expect(args.plan_filename, 'plan_filename should end with .md').toMatch(
+        /\.md$/,
+      );
+      expect(
+        args.plan_filename,
+        'plan_filename should not be a path',
+      ).not.toContain('/');
+      expect(
+        args.plan_filename,
+        'plan_filename should not be a path',
+      ).not.toContain('\\');
+
       assertModelHasOutput(result);
     },
   });
@@ -198,6 +226,30 @@ describe('plan_mode', () => {
 
       await rig.waitForTelemetryReady();
       const toolLogs = rig.readToolLogs();
+
+      const exitPlanCall = toolLogs.find(
+        (log) => log.toolRequest.name === 'exit_plan_mode',
+      );
+      expect(
+        exitPlanCall,
+        'Expected to find exit_plan_mode in tool logs',
+      ).toBeDefined();
+
+      const args = JSON.parse(exitPlanCall!.toolRequest.args);
+      expect(args.plan_filename, 'plan_filename should be a string').toBeTypeOf(
+        'string',
+      );
+      expect(args.plan_filename, 'plan_filename should end with .md').toMatch(
+        /\.md$/,
+      );
+      expect(
+        args.plan_filename,
+        'plan_filename should not be a path',
+      ).not.toContain('/');
+      expect(
+        args.plan_filename,
+        'plan_filename should not be a path',
+      ).not.toContain('\\');
 
       // Check if plan was written
       const planWrite = toolLogs.find(

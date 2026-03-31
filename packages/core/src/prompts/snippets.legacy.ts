@@ -20,6 +20,9 @@ import {
   TRACKER_CREATE_TASK_TOOL_NAME,
   TRACKER_LIST_TASKS_TOOL_NAME,
   TRACKER_UPDATE_TASK_TOOL_NAME,
+  UPDATE_TOPIC_TOOL_NAME,
+  TOPIC_PARAM_TITLE,
+  TOPIC_PARAM_SUMMARY,
   WRITE_FILE_TOOL_NAME,
   WRITE_TODOS_TOOL_NAME,
 } from '../tools/tool-names.js';
@@ -36,7 +39,7 @@ export interface SystemPromptOptions {
   planningWorkflow?: PlanningWorkflowOptions;
   taskTracker?: boolean;
   operationalGuidelines?: OperationalGuidelinesOptions;
-  sandbox?: SandboxMode;
+  sandbox?: SandboxOptions;
   interactiveYoloMode?: boolean;
   gitRepo?: GitRepoOptions;
   finalReminder?: FinalReminderOptions;
@@ -51,6 +54,7 @@ export interface CoreMandatesOptions {
   isGemini3: boolean;
   hasSkills: boolean;
   hasHierarchicalMemory: boolean;
+  topicUpdateNarration?: boolean;
 }
 
 export interface PrimaryWorkflowsOptions {
@@ -60,6 +64,7 @@ export interface PrimaryWorkflowsOptions {
   enableEnterPlanModeTool: boolean;
   approvedPlan?: { path: string };
   taskTracker?: boolean;
+  topicUpdateNarration?: boolean;
 }
 
 export interface OperationalGuidelinesOptions {
@@ -67,10 +72,16 @@ export interface OperationalGuidelinesOptions {
   isGemini3: boolean;
   enableShellEfficiency: boolean;
   interactiveShellEnabled: boolean;
+  topicUpdateNarration?: boolean;
   memoryManagerEnabled: boolean;
 }
 
 export type SandboxMode = 'macos-seatbelt' | 'generic' | 'outside';
+
+export interface SandboxOptions {
+  mode: SandboxMode;
+  toolSandboxingEnabled: boolean;
+}
 
 export interface GitRepoOptions {
   interactive: boolean;
@@ -172,7 +183,11 @@ export function renderCoreMandates(options?: CoreMandatesOptions): string {
 - **User Hints:** During execution, the user may provide real-time hints (marked as "User hint:" or "User hints:"). Treat these as high-priority but scope-preserving course corrections: apply the minimal plan change needed, keep unaffected user tasks active, and never cancel/skip tasks unless cancellation is explicit for those tasks. Hints may add new tasks, modify one or more tasks, cancel specific tasks, or provide extra context only. If scope is ambiguous, ask for clarification before dropping work.
 - ${mandateConfirm(options.interactive)}
 - **Explaining Changes:** After completing a code modification or file operation *do not* provide summaries unless asked.
-- **Do Not revert changes:** Do not revert changes to the codebase unless asked to do so by the user. Only revert changes made by you if they have resulted in an error or if the user has explicitly asked you to revert the changes.${mandateSkillGuidance(options.hasSkills)}${mandateExplainBeforeActing(options.isGemini3)}${mandateContinueWork(options.interactive)}
+- **Do Not revert changes:** Do not revert changes to the codebase unless asked to do so by the user. Only revert changes made by you if they have resulted in an error or if the user has explicitly asked you to revert the changes.${mandateSkillGuidance(options.hasSkills)}${
+    options.topicUpdateNarration
+      ? mandateTopicUpdateModel()
+      : mandateExplainBeforeActing(options.isGemini3)
+  }${mandateContinueWork(options.interactive)}
 `.trim();
 }
 
@@ -267,7 +282,12 @@ ${shellEfficiencyGuidelines(options.enableShellEfficiency)}
 ## Tone and Style (CLI Interaction)
 - **Concise & Direct:** Adopt a professional, direct, and concise tone suitable for a CLI environment.
 - **Minimal Output:** Aim for fewer than 3 lines of text output (excluding tool use/code generation) per response whenever practical. Focus strictly on the user's query.
-- **Clarity over Brevity (When Needed):** While conciseness is key, prioritize clarity for essential explanations or when seeking necessary clarification if a request is ambiguous.${toneAndStyleNoChitchat(options.isGemini3)}
+- **Clarity over Brevity (When Needed):** While conciseness is key, prioritize clarity for essential explanations or when seeking necessary clarification if a request is ambiguous.${
+    options.topicUpdateNarration
+      ? `
+- **No Chitchat:** Avoid conversational filler, preambles ("Okay, I will now..."), or postambles ("I have finished the changes...") unless they are part of the **Topic Model**.`
+      : toneAndStyleNoChitchat(options.isGemini3)
+  }
 - **Formatting:** Use GitHub-flavored Markdown. Responses will be rendered in monospace.
 - **Tools vs. Text:** Use tools for actions, text output *only* for communication. Do not add explanatory comments within tool calls or code blocks unless specifically part of the required code/command itself.
 - **Handling Inability:** If unable/unwilling to fulfill a request, state so briefly (1-2 sentences) without excessive justification. Offer alternatives if appropriate.
@@ -290,8 +310,9 @@ ${shellEfficiencyGuidelines(options.enableShellEfficiency)}
 `.trim();
 }
 
-export function renderSandbox(mode?: SandboxMode): string {
-  if (!mode) return '';
+export function renderSandbox(options?: SandboxOptions): string {
+  if (!options || !options.mode) return '';
+  const mode = options.mode;
   if (mode === 'macos-seatbelt') {
     return `
 # macOS Seatbelt
@@ -300,11 +321,12 @@ You are running under macos seatbelt with limited access to files outside the pr
     return `
 # Sandbox
 You are running in a sandbox container with limited access to files outside the project directory or system temp directory, and with limited access to host system resources such as ports. If you encounter failures that could be due to sandboxing (e.g. if a command fails with 'Operation not permitted' or similar error), when you report the error to the user, also explain why you think it could be due to sandboxing, and how the user may need to adjust their sandbox configuration.`.trim();
-  } else {
+  } else if (mode === 'outside') {
     return `
 # Outside of Sandbox
 You are running outside of a sandbox container, directly on the user's system. For critical commands that are particularly likely to modify the user's system outside of the project directory or system temp directory, as you explain the command to the user (per the Explain Critical Commands rule above), also remind the user to consider enabling sandboxing.`.trim();
   }
+  return '';
 }
 
 export function renderInteractiveYoloMode(enabled?: boolean): string {
@@ -381,6 +403,11 @@ ${trimmed}
   if (memory.global?.trim()) {
     sections.push(
       `<global_context>\n${memory.global.trim()}\n</global_context>`,
+    );
+  }
+  if (memory.userProjectMemory?.trim()) {
+    sections.push(
+      `<user_project_memory>\n--- User's Project Memory (private, not committed to repo) ---\n${memory.userProjectMemory.trim()}\n--- End User's Project Memory ---\n</user_project_memory>`,
     );
   }
   if (memory.extension?.trim()) {
@@ -484,6 +511,23 @@ function mandateConfirm(interactive: boolean): string {
   return interactive
     ? "**Confirm Ambiguity/Expansion:** Do not take significant actions beyond the clear scope of the request without confirming with the user. If the user implies a change (e.g., reports a bug) without explicitly asking for a fix, **ask for confirmation first**. If asked *how* to do something, explain first, don't just do it."
     : '**Handle Ambiguity/Expansion:** Do not take significant actions beyond the clear scope of the request. If the user implies a change (e.g., reports a bug) without explicitly asking for a fix, do not perform it automatically.';
+}
+
+function mandateTopicUpdateModel(): string {
+  return `
+## Topic Updates
+As you work, the user follows along by reading topic updates that you publish with ${UPDATE_TOPIC_TOOL_NAME}. Keep them informed by doing the following:
+
+- Always call ${UPDATE_TOPIC_TOOL_NAME} in your first and last turn. The final turn should always recap what was done.
+- Each topic update should give a concise description of what you are doing for the next few turns in the \`${TOPIC_PARAM_SUMMARY}\` parameter.
+- Provide topic updates whenever you change "topics". A topic is typically a discrete subgoal and will be every 3 to 10 turns. Do not use ${UPDATE_TOPIC_TOOL_NAME} on every turn.
+- The typical user message should call ${UPDATE_TOPIC_TOOL_NAME} 3 or more times. Each corresponds to a distinct phase of the task, such as "Researching X", "Researching Y", "Implementing Z with X", and "Testing Z".
+- Remember to call ${UPDATE_TOPIC_TOOL_NAME} when you experience an unexpected event (e.g., a test failure, compilation error, environment issue, or unexpected learning) that requires a strategic detour.
+- **Examples:**
+  - ${UPDATE_TOPIC_TOOL_NAME}(${TOPIC_PARAM_TITLE}="Researching Parser", ${TOPIC_PARAM_SUMMARY}="I am starting an investigation into the parser timeout bug. My goal is to first understand the current test coverage and then attempt to reproduce the failure. This phase will focus on identifying the bottleneck in the main loop before we move to implementation.")
+  - ${UPDATE_TOPIC_TOOL_NAME}(${TOPIC_PARAM_TITLE}="Implementing Buffer Fix", ${TOPIC_PARAM_SUMMARY}="I have completed the research phase and identified a race condition in the tokenizer's buffer management. I am now transitioning to implementation. This new chapter will focus on refactoring the buffer logic to handle async chunks safely, followed by unit testing the fix.")
+
+`;
 }
 
 function mandateSkillGuidance(hasSkills: boolean): string {

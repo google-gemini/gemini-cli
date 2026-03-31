@@ -28,7 +28,11 @@ import {
   type PolicyUpdateOptions,
 } from '../../tools/tools.js';
 import type { MessageBus } from '../../confirmation-bus/message-bus.js';
-import type { BrowserManager, McpToolCallResult } from './browserManager.js';
+import {
+  type BrowserManager,
+  type McpToolCallResult,
+  DomainNotAllowedError,
+} from './browserManager.js';
 import { debugLogger } from '../../utils/debugLogger.js';
 import { suspendInputBlocker, resumeInputBlocker } from './inputBlocker.js';
 import { MCP_TOOL_PREFIX } from '../../tools/mcp-tool.js';
@@ -63,6 +67,7 @@ class McpToolInvocation extends BaseToolInvocation<
     params: Record<string, unknown>,
     messageBus: MessageBus,
     private readonly shouldDisableInput: boolean,
+    private readonly blockFileUploads: boolean = false,
   ) {
     super(
       params,
@@ -114,11 +119,21 @@ class McpToolInvocation extends BaseToolInvocation<
 
   async execute(signal: AbortSignal): Promise<ToolResult> {
     try {
+      // Hard block for file uploads if configured
+      if (this.blockFileUploads && this.toolName === 'upload_file') {
+        const errorMsg = 'File uploads are blocked by configuration.';
+        return {
+          llmContent: `Error: ${errorMsg}`,
+          returnDisplay: `Error: ${errorMsg}`,
+          error: { message: errorMsg },
+        };
+      }
+
       // Suspend the input blocker for interactive tools so
       // chrome-devtools-mcp's interactability checks pass.
       // Only toggles pointer-events CSS — no DOM change, no flicker.
       if (this.needsBlockerSuspend) {
-        await suspendInputBlocker(this.browserManager);
+        await suspendInputBlocker(this.browserManager, signal);
       }
 
       const result: McpToolCallResult = await this.browserManager.callTool(
@@ -144,7 +159,7 @@ class McpToolInvocation extends BaseToolInvocation<
 
       // Resume input blocker after interactive tool completes.
       if (this.needsBlockerSuspend) {
-        await resumeInputBlocker(this.browserManager);
+        await resumeInputBlocker(this.browserManager, signal);
       }
 
       if (result.isError) {
@@ -162,15 +177,19 @@ class McpToolInvocation extends BaseToolInvocation<
     } catch (error) {
       const errorMsg = error instanceof Error ? error.message : String(error);
 
-      // Chrome connection errors are fatal — re-throw to terminate the agent
-      // immediately instead of returning a result the LLM would retry.
-      if (errorMsg.includes('Could not connect to Chrome')) {
+      // Domain restriction and Chrome connection errors are fatal — re-throw
+      // to terminate the agent immediately instead of returning a result
+      // the LLM would retry or work around.
+      if (
+        error instanceof DomainNotAllowedError ||
+        errorMsg.includes('Could not connect to Chrome')
+      ) {
         throw error;
       }
 
       // Resume on error path too so the blocker is always restored
       if (this.needsBlockerSuspend) {
-        await resumeInputBlocker(this.browserManager).catch(() => {});
+        await resumeInputBlocker(this.browserManager, signal).catch(() => {});
       }
 
       debugLogger.error(`MCP tool ${this.toolName} failed: ${errorMsg}`);
@@ -197,6 +216,7 @@ class McpDeclarativeTool extends DeclarativeTool<
     parameterSchema: unknown,
     messageBus: MessageBus,
     private readonly shouldDisableInput: boolean,
+    private readonly blockFileUploads: boolean = false,
   ) {
     super(
       name,
@@ -227,6 +247,7 @@ class McpDeclarativeTool extends DeclarativeTool<
       params,
       this.messageBus,
       this.shouldDisableInput,
+      this.blockFileUploads,
     );
   }
 }
@@ -249,6 +270,7 @@ export async function createMcpDeclarativeTools(
   browserManager: BrowserManager,
   messageBus: MessageBus,
   shouldDisableInput: boolean = false,
+  blockFileUploads: boolean = false,
 ): Promise<McpDeclarativeTool[]> {
   // Get dynamically discovered tools from the MCP server
   const mcpTools = await browserManager.getDiscoveredTools();
@@ -272,6 +294,7 @@ export async function createMcpDeclarativeTools(
       schema.parametersJsonSchema,
       messageBus,
       shouldDisableInput,
+      blockFileUploads,
     );
   });
 

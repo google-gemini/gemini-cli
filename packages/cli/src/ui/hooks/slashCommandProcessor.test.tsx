@@ -187,7 +187,7 @@ describe('useSlashCommandProcessor', () => {
     let rerender!: (props?: unknown) => void;
 
     await act(async () => {
-      const hook = renderHook(() =>
+      const hook = await renderHook(() =>
         useSlashCommandProcessor(
           mockConfig,
           mockSettings,
@@ -213,7 +213,7 @@ describe('useSlashCommandProcessor', () => {
             toggleDebugProfiler: vi.fn(),
             dispatchExtensionStateUpdate: vi.fn(),
             addConfirmUpdateExtensionRequest: vi.fn(),
-            toggleBackgroundShell: vi.fn(),
+            toggleBackgroundTasks: vi.fn(),
             toggleShortcutsHelp: vi.fn(),
             setText: vi.fn(),
           },

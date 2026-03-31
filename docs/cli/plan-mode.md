@@ -39,7 +39,9 @@ To start Plan Mode while using Gemini CLI:
   the rotation when Gemini CLI is actively processing or showing confirmation
   dialogs.
 
-- **Command:** Type `/plan` in the input box.
+- **Command:** Type `/plan [goal]` in the input box. The `[goal]` is optional;
+  for example, `/plan implement authentication` will switch to Plan Mode and
+  immediately submit the prompt to the model.
 
 - **Natural Language:** Ask Gemini CLI to "start a plan for...". Gemini CLI
   calls the
@@ -200,6 +202,7 @@ your specific environment.
 
 ```toml
 [[rule]]
+toolName = "*"
 mcpName = "*"
 toolAnnotations = { readOnlyHint = true }
 decision = "allow"

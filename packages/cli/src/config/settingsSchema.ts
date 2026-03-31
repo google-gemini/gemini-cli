@@ -261,7 +261,7 @@ const SETTINGS_SCHEMA = {
         requiresRestart: false,
         default: false,
         description:
-          'Enable run-event notifications for action-required prompts and session completion. Currently macOS only.',
+          'Enable run-event notifications for action-required prompts and session completion.',
         showInDialog: true,
       },
       checkpointing: {
@@ -293,6 +293,16 @@ const SETTINGS_SCHEMA = {
         description: 'Planning features configuration.',
         showInDialog: false,
         properties: {
+          enabled: {
+            type: 'boolean',
+            label: 'Enable Plan Mode',
+            category: 'General',
+            requiresRestart: true,
+            default: true,
+            description:
+              'Enable Plan Mode for read-only safety during planning.',
+            showInDialog: true,
+          },
           directory: {
             type: 'string',
             label: 'Plan Directory',
@@ -300,7 +310,7 @@ const SETTINGS_SCHEMA = {
             requiresRestart: true,
             default: undefined as string | undefined,
             description:
-              'The directory where planning artifacts are stored. If not specified, defaults to the system temporary directory.',
+              'The directory where planning artifacts are stored. If not specified, defaults to the system temporary directory. A custom directory requires a policy to allow write access in Plan Mode.',
             showInDialog: true,
           },
           modelRouting: {
@@ -561,6 +571,16 @@ const SETTINGS_SCHEMA = {
         description: 'Show the "? for shortcuts" hint above the input.',
         showInDialog: true,
       },
+      compactToolOutput: {
+        type: 'boolean',
+        label: 'Compact Tool Output',
+        category: 'UI',
+        requiresRestart: false,
+        default: false,
+        description:
+          'Display tool outputs (like directory listings and file reads) in a compact, structured format.',
+        showInDialog: true,
+      },
       hideBanner: {
         type: 'boolean',
         label: 'Hide Banner',
@@ -656,6 +676,16 @@ const SETTINGS_SCHEMA = {
         default: false,
         description: 'Hide the footer from the UI',
         showInDialog: true,
+      },
+      collapseDrawerDuringApproval: {
+        type: 'boolean',
+        label: 'Collapse Drawer During Approval',
+        category: 'UI',
+        requiresRestart: false,
+        default: true,
+        description:
+          'Whether to collapse the UI drawer when a tool is awaiting confirmation.',
+        showInDialog: false,
       },
       showMemoryUsage: {
         type: 'boolean',
@@ -1094,7 +1124,7 @@ const SETTINGS_SCHEMA = {
         showInDialog: false,
         additionalProperties: {
           type: 'array',
-          ref: 'ModelPolicy',
+          ref: 'ModelPolicyChain',
         },
       },
     },
@@ -1198,6 +1228,36 @@ const SETTINGS_SCHEMA = {
               'Disable user input on browser window during automation.',
             showInDialog: false,
           },
+          maxActionsPerTask: {
+            type: 'number',
+            label: 'Max Actions Per Task',
+            category: 'Advanced',
+            requiresRestart: false,
+            default: 100,
+            description:
+              'The maximum number of tool calls allowed per browser task. Enforcement is hard: the agent will be terminated when the limit is reached.',
+            showInDialog: false,
+          },
+          confirmSensitiveActions: {
+            type: 'boolean',
+            label: 'Confirm Sensitive Actions',
+            category: 'Advanced',
+            requiresRestart: true,
+            default: false,
+            description:
+              'Require manual confirmation for sensitive browser actions (e.g., fill_form, evaluate_script).',
+            showInDialog: true,
+          },
+          blockFileUploads: {
+            type: 'boolean',
+            label: 'Block File Uploads',
+            category: 'Advanced',
+            requiresRestart: true,
+            default: false,
+            description:
+              'Hard-block file upload requests from the browser agent.',
+            showInDialog: true,
+          },
         },
       },
     },
@@ -1250,6 +1310,19 @@ const SETTINGS_SCHEMA = {
         default: 200,
         description: 'Maximum number of directories to search for memory.',
         showInDialog: true,
+      },
+      memoryBoundaryMarkers: {
+        type: 'array',
+        label: 'Memory Boundary Markers',
+        category: 'Context',
+        requiresRestart: true,
+        default: ['.git'] as string[],
+        description:
+          'File or directory names that mark the boundary for GEMINI.md discovery. ' +
+          'The upward traversal stops at the first directory containing any of these markers. ' +
+          'An empty array disables parent traversal.',
+        showInDialog: false,
+        items: { type: 'string' },
       },
       includeDirectories: {
         type: 'array',
@@ -1404,6 +1477,21 @@ const SETTINGS_SCHEMA = {
               Fallback to child_process still applies.
             `,
             showInDialog: true,
+          },
+          backgroundCompletionBehavior: {
+            type: 'enum',
+            label: 'Background Completion Behavior',
+            category: 'Tools',
+            requiresRestart: false,
+            default: 'silent',
+            description:
+              "Controls what happens when a background shell command finishes. 'silent' (default): quietly exits in background. 'inject': automatically returns output to agent. 'notify': shows brief message in chat.",
+            showInDialog: false,
+            options: [
+              { label: 'Silent', value: 'silent' },
+              { label: 'Inject', value: 'inject' },
+              { label: 'Notify', value: 'notify' },
+            ],
           },
           pager: {
             type: 'string',
@@ -1906,6 +1994,16 @@ const SETTINGS_SCHEMA = {
         description: 'Enable local and remote subagents.',
         showInDialog: false,
       },
+      worktrees: {
+        type: 'boolean',
+        label: 'Enable Git Worktrees',
+        category: 'Experimental',
+        requiresRestart: true,
+        default: false,
+        description:
+          'Enable automated Git worktree management for parallel work.',
+        showInDialog: true,
+      },
       extensionManagement: {
         type: 'boolean',
         label: 'Extension Management',
@@ -1980,15 +2078,6 @@ const SETTINGS_SCHEMA = {
         default: false,
         description:
           'Use OSC 52 for copying. This may be more robust than the default system when using remote terminal sessions (if your terminal is configured to allow it).',
-        showInDialog: true,
-      },
-      plan: {
-        type: 'boolean',
-        label: 'Plan',
-        category: 'Experimental',
-        requiresRestart: true,
-        default: true,
-        description: 'Enable Plan Mode.',
         showInDialog: true,
       },
       taskTracker: {
@@ -2089,6 +2178,15 @@ const SETTINGS_SCHEMA = {
         default: false,
         description:
           'Replace the built-in save_memory tool with a memory manager subagent that supports adding, removing, de-duplicating, and organizing memories.',
+        showInDialog: true,
+      },
+      contextManagement: {
+        type: 'boolean',
+        label: 'Enable Context Management',
+        category: 'Experimental',
+        requiresRestart: true,
+        default: false,
+        description: 'Enable logic for context management.',
         showInDialog: true,
       },
       topicUpdateNarration: {
@@ -2364,6 +2462,118 @@ const SETTINGS_SCHEMA = {
       description:
         'Custom hook event arrays that contain hook definitions for user-defined events',
       mergeStrategy: MergeStrategy.CONCAT,
+    },
+  },
+
+  contextManagement: {
+    type: 'object',
+    label: 'Context Management',
+    category: 'Experimental',
+    requiresRestart: true,
+    default: {},
+    description:
+      'Settings for agent history and tool distillation context management.',
+    showInDialog: false,
+    properties: {
+      historyWindow: {
+        type: 'object',
+        label: 'History Window Settings',
+        category: 'Context Management',
+        requiresRestart: true,
+        default: {},
+        showInDialog: false,
+        properties: {
+          maxTokens: {
+            type: 'number',
+            label: 'Max Tokens',
+            category: 'Context Management',
+            requiresRestart: true,
+            default: 150_000,
+            description:
+              'The number of tokens to allow before triggering compression.',
+            showInDialog: false,
+          },
+          retainedTokens: {
+            type: 'number',
+            label: 'Retained Tokens',
+            category: 'Context Management',
+            requiresRestart: true,
+            default: 40_000,
+            description: 'The number of tokens to always retain.',
+            showInDialog: false,
+          },
+        },
+      },
+      messageLimits: {
+        type: 'object',
+        label: 'Message Limits',
+        category: 'Context Management',
+        requiresRestart: true,
+        default: {},
+        showInDialog: false,
+        properties: {
+          normalMaxTokens: {
+            type: 'number',
+            label: 'Normal Maximum Tokens',
+            category: 'Context Management',
+            requiresRestart: true,
+            default: 2500,
+            description:
+              'The target number of tokens to budget for a normal conversation turn.',
+            showInDialog: false,
+          },
+          retainedMaxTokens: {
+            type: 'number',
+            label: 'Retained Maximum Tokens',
+            category: 'Context Management',
+            requiresRestart: true,
+            default: 12000,
+            description:
+              'The maximum number of tokens a single conversation turn can consume before truncation.',
+            showInDialog: false,
+          },
+          normalizationHeadRatio: {
+            type: 'number',
+            label: 'Normalization Head Ratio',
+            category: 'Context Management',
+            requiresRestart: true,
+            default: 0.25,
+            description:
+              'The ratio of tokens to retain from the beginning of a truncated message (0.0 to 1.0).',
+            showInDialog: false,
+          },
+        },
+      },
+      toolDistillation: {
+        type: 'object',
+        label: 'Tool Distillation',
+        category: 'Context Management',
+        requiresRestart: true,
+        default: {},
+        showInDialog: false,
+        properties: {
+          maxOutputTokens: {
+            type: 'number',
+            label: 'Max Output Tokens',
+            category: 'Context Management',
+            requiresRestart: true,
+            default: 10_000,
+            description:
+              'Maximum tokens to show when truncating large tool outputs.',
+            showInDialog: false,
+          },
+          summarizationThresholdTokens: {
+            type: 'number',
+            label: 'Tool Summarization Threshold',
+            category: 'Context Management',
+            requiresRestart: true,
+            default: 20_000,
+            description:
+              'Threshold above which truncated tool outputs will be summarized by an LLM.',
+            showInDialog: false,
+          },
+        },
+      },
     },
   },
 
@@ -2974,6 +3184,7 @@ export const SETTINGS_SCHEMA_DEFINITIONS: Record<
               type: 'object',
               properties: {
                 useGemini3_1: { type: 'boolean' },
+                useGemini3_1FlashLite: { type: 'boolean' },
                 useCustomTools: { type: 'boolean' },
                 hasAccessToPreview: { type: 'boolean' },
                 requestedModels: {
@@ -2986,6 +3197,14 @@ export const SETTINGS_SCHEMA_DEFINITIONS: Record<
           },
         },
       },
+    },
+  },
+  ModelPolicyChain: {
+    type: 'array',
+    description: 'A chain of model policies for fallback behavior.',
+    items: {
+      type: 'object',
+      ref: 'ModelPolicy',
     },
   },
   ModelPolicy: {

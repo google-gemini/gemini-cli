@@ -8,9 +8,10 @@ import * as fs from 'node:fs';
 import * as path from 'node:path';
 import ignore from 'ignore';
 import { debugLogger } from './debugLogger.js';
+import { getNormalizedRelativePath } from './ignorePathUtils.js';
 
 export interface IgnoreFileFilter {
-  isIgnored(filePath: string): boolean;
+  isIgnored(filePath: string, isDirectory: boolean): boolean;
   getPatterns(): string[];
   getIgnoreFilePaths(): string[];
   hasPatterns(): boolean;
@@ -74,34 +75,21 @@ export class IgnoreFileParser implements IgnoreFileFilter {
       .filter((p) => p !== '' && !p.startsWith('#'));
   }
 
-  isIgnored(filePath: string): boolean {
+  isIgnored(filePath: string, isDirectory: boolean): boolean {
     if (this.patterns.length === 0) {
       return false;
     }
 
-    if (!filePath || typeof filePath !== 'string') {
-      return false;
-    }
-
+    const normalizedPath = getNormalizedRelativePath(
+      this.projectRoot,
+      filePath,
+      isDirectory,
+    );
     if (
-      filePath.startsWith('\\') ||
-      filePath === '/' ||
-      filePath.includes('\0')
+      normalizedPath === null ||
+      normalizedPath === '' ||
+      normalizedPath === '/'
     ) {
-      return false;
-    }
-
-    const resolved = path.resolve(this.projectRoot, filePath);
-    const relativePath = path.relative(this.projectRoot, resolved);
-
-    if (relativePath === '' || relativePath.startsWith('..')) {
-      return false;
-    }
-
-    // Even in windows, Ignore expects forward slashes.
-    const normalizedPath = relativePath.replace(/\\/g, '/');
-
-    if (normalizedPath.startsWith('/') || normalizedPath === '') {
       return false;
     }
 

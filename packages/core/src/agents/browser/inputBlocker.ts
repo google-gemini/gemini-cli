@@ -198,11 +198,15 @@ const RESUME_BLOCKER_FUNCTION = `() => {
  */
 export async function injectInputBlocker(
   browserManager: BrowserManager,
+  signal?: AbortSignal,
 ): Promise<void> {
   try {
-    await browserManager.callTool('evaluate_script', {
-      function: INPUT_BLOCKER_FUNCTION,
-    });
+    await browserManager.callTool(
+      'evaluate_script',
+      { function: INPUT_BLOCKER_FUNCTION },
+      signal,
+      true,
+    );
     debugLogger.log('Input blocker injected successfully');
   } catch (error) {
     // Log but don't throw - input blocker is a UX enhancement, not critical functionality
@@ -222,11 +226,15 @@ export async function injectInputBlocker(
  */
 export async function removeInputBlocker(
   browserManager: BrowserManager,
+  signal?: AbortSignal,
 ): Promise<void> {
   try {
-    await browserManager.callTool('evaluate_script', {
-      function: REMOVE_BLOCKER_FUNCTION,
-    });
+    await browserManager.callTool(
+      'evaluate_script',
+      { function: REMOVE_BLOCKER_FUNCTION },
+      signal,
+      true,
+    );
     debugLogger.log('Input blocker removed successfully');
   } catch (error) {
     // Log but don't throw - removal failure is not critical
@@ -244,11 +252,15 @@ export async function removeInputBlocker(
  */
 export async function suspendInputBlocker(
   browserManager: BrowserManager,
+  signal?: AbortSignal,
 ): Promise<void> {
   try {
-    await browserManager.callTool('evaluate_script', {
-      function: SUSPEND_BLOCKER_FUNCTION,
-    });
+    await browserManager.callTool(
+      'evaluate_script',
+      { function: SUSPEND_BLOCKER_FUNCTION },
+      signal,
+      true,
+    );
   } catch {
     // Non-critical — tool call will still attempt to proceed
   }
@@ -260,11 +272,15 @@ export async function suspendInputBlocker(
  */
 export async function resumeInputBlocker(
   browserManager: BrowserManager,
+  signal?: AbortSignal,
 ): Promise<void> {
   try {
-    await browserManager.callTool('evaluate_script', {
-      function: RESUME_BLOCKER_FUNCTION,
-    });
+    await browserManager.callTool(
+      'evaluate_script',
+      { function: RESUME_BLOCKER_FUNCTION },
+      signal,
+      true,
+    );
   } catch {
     // Non-critical
   }

@@ -5,6 +5,7 @@
  */
 
 import type { SafetyCheckInput } from '../safety/protocol.js';
+import type { SandboxManager } from '../services/sandboxManager.js';
 
 export enum PolicyDecision {
   ALLOW = 'allow',
@@ -106,9 +107,9 @@ export interface PolicyRule {
 
   /**
    * The name of the tool this rule applies to.
-   * If undefined, the rule applies to all tools.
+   * Use '*' to match all tools.
    */
-  toolName?: string;
+  toolName: string;
 
   /**
    * The name of the subagent this rule applies to.
@@ -188,9 +189,9 @@ export interface PolicyRule {
 export interface SafetyCheckerRule {
   /**
    * The name of the tool this rule applies to.
-   * If undefined, the rule applies to all tools.
+   * Use '*' to match all tools.
    */
-  toolName?: string;
+  toolName: string;
 
   /**
    * Identifies the MCP server this rule applies to.
@@ -320,6 +321,11 @@ export interface PolicyEngineConfig {
    * Used to filter rules that have specific 'modes' defined.
    */
   approvalMode?: ApprovalMode;
+
+  /**
+   * The sandbox manager instance.
+   */
+  sandboxManager?: SandboxManager;
 }
 
 export interface PolicySettings {
