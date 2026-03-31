@@ -1585,6 +1585,7 @@ export async function handleChatRequest(
         authType === AuthType.COMPUTE_ADC
         ? LlmRole.MAIN
         : LlmRole.UTILITY_TOOL,
+      req.signal,
     );
 
     let totalText = '';
