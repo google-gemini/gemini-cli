@@ -282,9 +282,6 @@ describe('AllocationHotspotProfiler', () => {
         sample(2, 1000, 10, [frame('other')]),
       ];
       const report = profiler.analyze(samples, { profileDurationMs: 1000 });
-      const hasBufferRec = report.recommendations.some(r =>
-        r.toLowerCase().includes('buffer') || r.toLowerCase().includes('pool'),
-      );
       // May or may not trigger depending on classification
       expect(report.recommendations.length).toBeGreaterThan(0);
     });

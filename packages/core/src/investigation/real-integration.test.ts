@@ -13,7 +13,7 @@ import { RootCauseAnalyzer, type RootCauseReport } from './rootCauseAnalyzer.js'
 import { PerfettoExporter } from './perfettoExporter.js';
 import { PerfettoSqlIntegration, SqlParser } from './perfettoSqlIntegration.js';
 import { SmartDiffEngine } from './smartDiff.js';
-import { TrendForecaster, type HeapDataPoint } from './trendForecaster.js';
+import { TrendForecaster } from './trendForecaster.js';
 import { GCPressureAnalyzer, type GCEvent } from './gcPressureAnalyzer.js';
 import { FlameGraphGenerator } from './flameGraphGenerator.js';
 import { AllocationHotspotProfiler, type AllocationSample } from './allocationHotspotProfiler.js';

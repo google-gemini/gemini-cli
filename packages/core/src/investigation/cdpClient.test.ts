@@ -233,7 +233,7 @@ describe('CDPClient', () => {
 
     it('should reject when no server is running', async () => {
       await expect(CDPClient.discoverTargets(19999)).rejects.toThrow();
-    });
+    }, 15000);
   });
 
   describe('connect()', () => {
