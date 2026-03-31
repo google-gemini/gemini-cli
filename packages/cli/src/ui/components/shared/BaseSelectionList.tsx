@@ -154,6 +154,7 @@ export function BaseSelectionList<
           <Box
             key={item.key}
             alignItems="flex-start"
+            width="100%"
             backgroundColor={isSelected ? theme.background.focus : undefined}
           >
             {/* Radio button indicator */}

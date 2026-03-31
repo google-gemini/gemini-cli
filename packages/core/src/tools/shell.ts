@@ -96,7 +96,7 @@ export class ShellToolInvocation extends BaseToolInvocation<
   }
 
   getDescription(): string {
-    return `${this.params.command} ${this.getContextualDetails()}`;
+    return this.params.description || '';
   }
 
   override getDisplayTitle(): string {

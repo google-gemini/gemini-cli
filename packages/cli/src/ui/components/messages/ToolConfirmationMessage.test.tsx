@@ -59,6 +59,7 @@ describe('ToolConfirmationMessage', () => {
         getPreferredEditor={vi.fn()}
         availableTerminalHeight={30}
         terminalWidth={80}
+        toolName="shell"
       />,
     );
 
@@ -85,6 +86,7 @@ describe('ToolConfirmationMessage', () => {
         getPreferredEditor={vi.fn()}
         availableTerminalHeight={30}
         terminalWidth={80}
+        toolName="shell"
       />,
     );
 
@@ -108,6 +110,7 @@ describe('ToolConfirmationMessage', () => {
         getPreferredEditor={vi.fn()}
         availableTerminalHeight={30}
         terminalWidth={80}
+        toolName="shell"
       />,
     );
 
@@ -137,6 +140,7 @@ describe('ToolConfirmationMessage', () => {
         getPreferredEditor={vi.fn()}
         availableTerminalHeight={30}
         terminalWidth={80}
+        toolName="shell"
       />,
     );
 
@@ -166,6 +170,7 @@ describe('ToolConfirmationMessage', () => {
         getPreferredEditor={vi.fn()}
         availableTerminalHeight={30}
         terminalWidth={80}
+        toolName="shell"
       />,
     );
 
@@ -194,6 +199,7 @@ describe('ToolConfirmationMessage', () => {
         getPreferredEditor={vi.fn()}
         availableTerminalHeight={30}
         terminalWidth={80}
+        toolName="shell"
       />,
     );
 
@@ -222,6 +228,7 @@ describe('ToolConfirmationMessage', () => {
         getPreferredEditor={vi.fn()}
         availableTerminalHeight={30}
         terminalWidth={80}
+        toolName="shell"
       />,
     );
 
@@ -250,6 +257,7 @@ describe('ToolConfirmationMessage', () => {
         getPreferredEditor={vi.fn()}
         availableTerminalHeight={30}
         terminalWidth={80}
+        toolName="shell"
       />,
     );
     await result.waitUntilReady();
@@ -335,6 +343,7 @@ describe('ToolConfirmationMessage', () => {
             getPreferredEditor={vi.fn()}
             availableTerminalHeight={30}
             terminalWidth={80}
+            toolName="shell"
           />,
         );
 
@@ -358,6 +367,7 @@ describe('ToolConfirmationMessage', () => {
             getPreferredEditor={vi.fn()}
             availableTerminalHeight={30}
             terminalWidth={80}
+            toolName="shell"
           />,
         );
 
@@ -393,6 +403,7 @@ describe('ToolConfirmationMessage', () => {
           getPreferredEditor={vi.fn()}
           availableTerminalHeight={30}
           terminalWidth={80}
+          toolName="shell"
         />,
         {
           settings: createMockSettings({
@@ -420,6 +431,7 @@ describe('ToolConfirmationMessage', () => {
           getPreferredEditor={vi.fn()}
           availableTerminalHeight={30}
           terminalWidth={80}
+          toolName="shell"
         />,
         {
           settings: createMockSettings({
@@ -467,6 +479,7 @@ describe('ToolConfirmationMessage', () => {
           getPreferredEditor={vi.fn()}
           availableTerminalHeight={30}
           terminalWidth={80}
+          toolName="shell"
         />,
       );
 
@@ -494,6 +507,7 @@ describe('ToolConfirmationMessage', () => {
           getPreferredEditor={vi.fn()}
           availableTerminalHeight={30}
           terminalWidth={80}
+          toolName="shell"
         />,
       );
 
@@ -522,6 +536,7 @@ describe('ToolConfirmationMessage', () => {
           getPreferredEditor={vi.fn()}
           availableTerminalHeight={30}
           terminalWidth={80}
+          toolName="shell"
         />,
       );
 
@@ -548,6 +563,7 @@ describe('ToolConfirmationMessage', () => {
         getPreferredEditor={vi.fn()}
         availableTerminalHeight={30}
         terminalWidth={80}
+        toolName="shell"
       />,
     );
 
@@ -593,6 +609,7 @@ describe('ToolConfirmationMessage', () => {
         getPreferredEditor={vi.fn()}
         availableTerminalHeight={30}
         terminalWidth={80}
+        toolName="shell"
       />,
     );
 
@@ -624,6 +641,7 @@ describe('ToolConfirmationMessage', () => {
         getPreferredEditor={vi.fn()}
         availableTerminalHeight={30}
         terminalWidth={80}
+        toolName="shell"
       />,
     );
 
@@ -658,6 +676,7 @@ describe('ToolConfirmationMessage', () => {
             getPreferredEditor={vi.fn()}
             availableTerminalHeight={40}
             terminalWidth={80}
+            toolName="shell"
           />,
         );
       await waitUntilReady();
@@ -698,6 +717,7 @@ describe('ToolConfirmationMessage', () => {
             getPreferredEditor={vi.fn()}
             availableTerminalHeight={40}
             terminalWidth={80}
+            toolName="shell"
           />,
         );
       await waitUntilReady();
@@ -744,6 +764,7 @@ describe('ToolConfirmationMessage', () => {
           getPreferredEditor={vi.fn()}
           availableTerminalHeight={30}
           terminalWidth={80}
+          toolName="shell"
         />,
       );
 
