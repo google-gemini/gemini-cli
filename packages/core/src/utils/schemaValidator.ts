@@ -11,11 +11,14 @@ import Ajv2020Pkg from 'ajv/dist/2020.js';
 import * as addFormats from 'ajv-formats';
 import { debugLogger } from './debugLogger.js';
 
-// Ajv's ESM/CJS interop: use 'any' for compatibility as recommended by Ajv docs
-// eslint-disable-next-line @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-type-assertion, @typescript-eslint/no-unsafe-assignment
-const AjvClass = (AjvPkg as any).default || AjvPkg;
-// eslint-disable-next-line @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-type-assertion, @typescript-eslint/no-unsafe-assignment
-const Ajv2020Class = (Ajv2020Pkg as any).default || Ajv2020Pkg;
+// Ajv's ESM/CJS interop handling: disable strict linting for this section
+/* eslint-disable @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-type-assertion, @typescript-eslint/no-unsafe-assignment */
+const AjvClass = ((AjvPkg as any).default || AjvPkg) as new (
+  options?: any,
+) => Ajv;
+const Ajv2020Class = ((Ajv2020Pkg as any).default || Ajv2020Pkg) as new (
+  options?: any,
+) => Ajv;
 
 const ajvOptions = {
   // See: https://ajv.js.org/options.html#strict-mode-options
@@ -29,20 +32,28 @@ const ajvOptions = {
 };
 
 // Draft-07 validator (default)
-// eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
 const ajvDefault: Ajv = new AjvClass(ajvOptions);
 
 // Draft-2020-12 validator for MCP servers using rmcp
-// eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
 const ajv2020: Ajv = new Ajv2020Class(ajvOptions);
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-type-assertion, @typescript-eslint/no-unsafe-assignment
 const addFormatsFunc = (addFormats as any).default || addFormats;
 addFormatsFunc(ajvDefault);
 addFormatsFunc(ajv2020);
+/* eslint-enable @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-type-assertion, @typescript-eslint/no-unsafe-assignment */
 
 // Canonical draft-2020-12 meta-schema URI (used by rmcp MCP servers)
 const DRAFT_2020_12_SCHEMA = 'https://json-schema.org/draft/2020-12/schema';
+
+/**
+ * Helper to safely extract $schema from a potential schema object.
+ */
+function getSchemaUri(schema: unknown): string {
+  if (typeof schema === 'object' && schema !== null && '$schema' in schema) {
+    return String(schema.$schema);
+  }
+  return '<no $schema>';
+}
 
 /**
  * Returns the appropriate validator based on schema's $schema field.
@@ -91,11 +102,9 @@ export class SchemaValidator {
       // Skip validation rather than blocking tool usage.
       // This matches LenientJsonSchemaValidator behavior in mcp-client.ts.
       debugLogger.warn(
-        `Failed to compile schema (${
-          // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
-          (schema as Record<string, unknown>)?.['$schema'] ?? '<no $schema>'
-        }): ${error instanceof Error ? error.message : String(error)}. ` +
-          'Skipping parameter validation.',
+        `Failed to compile schema (${getSchemaUri(schema)}): ${
+          error instanceof Error ? error.message : String(error)
+        }. ` + 'Skipping parameter validation.',
       );
       return null;
     }
@@ -123,11 +132,9 @@ export class SchemaValidator {
       // Schema validation failed (unsupported version, etc.)
       // Skip validation rather than blocking tool usage.
       debugLogger.warn(
-        `Failed to validate schema (${
-          // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
-          (schema as Record<string, unknown>)?.['$schema'] ?? '<no $schema>'
-        }): ${error instanceof Error ? error.message : String(error)}. ` +
-          'Skipping schema validation.',
+        `Failed to validate schema (${getSchemaUri(schema)}): ${
+          error instanceof Error ? error.message : String(error)
+        }. ` + 'Skipping schema validation.',
       );
       return null;
     }

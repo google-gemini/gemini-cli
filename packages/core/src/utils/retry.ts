@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { ApiError, type GenerateContentResponse } from '@google/genai';
+import { ApiError } from '@google/genai';
 import {
   TerminalQuotaError,
   RetryableQuotaError,
@@ -19,12 +19,12 @@ import type { RetryAvailabilityContext } from '../availability/modelPolicy.js';
 export type { RetryAvailabilityContext };
 export const DEFAULT_MAX_ATTEMPTS = 10;
 
-export interface RetryOptions {
+export interface RetryOptions<T = unknown> {
   maxAttempts: number;
   initialDelayMs: number;
   maxDelayMs: number;
   shouldRetryOnError: (error: Error, retryFetchErrors?: boolean) => boolean;
-  shouldRetryOnContent?: (content: GenerateContentResponse) => boolean;
+  shouldRetryOnContent?: (content: T) => boolean;
   onPersistent429?: (
     authType?: string,
     error?: unknown,
@@ -39,7 +39,7 @@ export interface RetryOptions {
   onRetry?: (attempt: number, error: unknown, delayMs: number) => void;
 }
 
-const DEFAULT_RETRY_OPTIONS: RetryOptions = {
+const DEFAULT_RETRY_OPTIONS: RetryOptions<unknown> = {
   maxAttempts: DEFAULT_MAX_ATTEMPTS,
   initialDelayMs: 5000,
   maxDelayMs: 30000, // 30 seconds
@@ -66,9 +66,8 @@ function getNetworkErrorCode(error: unknown): string | undefined {
     if (typeof obj !== 'object' || obj === null) {
       return undefined;
     }
-    if ('code' in obj && typeof (obj as { code: unknown }).code === 'string') {
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
-      return (obj as { code: string }).code;
+    if ('code' in obj && typeof obj.code === 'string') {
+      return obj.code;
     }
     return undefined;
   };
@@ -197,7 +196,7 @@ export function isRetryableError(
  */
 export async function retryWithBackoff<T>(
   fn: () => Promise<T>,
-  options?: Partial<RetryOptions>,
+  options?: Partial<RetryOptions<T>>,
 ): Promise<T> {
   if (options?.signal?.aborted) {
     throw createAbortError();
@@ -241,11 +240,7 @@ export async function retryWithBackoff<T>(
     try {
       const result = await fn();
 
-      if (
-        shouldRetryOnContent &&
-        // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
-        shouldRetryOnContent(result as GenerateContentResponse)
-      ) {
+      if (shouldRetryOnContent && shouldRetryOnContent(result)) {
         const jitter = currentDelay * 0.3 * (Math.random() * 2 - 1);
         const delayWithJitter = Math.max(0, currentDelay + jitter);
         if (onRetry) {

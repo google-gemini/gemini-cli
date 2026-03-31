@@ -107,11 +107,12 @@ export class AgentRegistry {
   private async loadAgents(): Promise<void> {
     this.agents.clear();
     this.allDefinitions.clear();
-    this.loadBuiltInAgents();
 
     if (!this.config.isAgentsEnabled()) {
       return;
     }
+
+    this.loadBuiltInAgents();
 
     // Load user-level agents: ~/.gemini/agents/
     const userAgentsDir = Storage.getUserAgentsDir();

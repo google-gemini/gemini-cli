@@ -109,19 +109,22 @@ export async function checkNextSpeaker(
   ];
 
   try {
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
-    const parsedResponse = (await baseLlmClient.generateJson({
+    const rawResponse = await baseLlmClient.generateJson({
       modelConfigKey: { model: 'next-speaker-checker' },
       contents,
       schema: RESPONSE_SCHEMA,
       abortSignal,
       promptId,
       role: LlmRole.UTILITY_NEXT_SPEAKER,
-    })) as unknown as NextSpeakerResponse;
+    });
+
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
+    const parsedResponse = rawResponse as NextSpeakerResponse;
 
     if (
       parsedResponse &&
-      parsedResponse.next_speaker &&
+      typeof parsedResponse === 'object' &&
+      'next_speaker' in parsedResponse &&
       ['user', 'model'].includes(parsedResponse.next_speaker)
     ) {
       return parsedResponse;
