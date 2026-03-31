@@ -167,8 +167,16 @@ function extractCuratedHistory(comprehensiveHistory: Content[]): Content[] {
   let i = 0;
   while (i < length) {
     if (comprehensiveHistory[i].role === 'user') {
-      curatedHistory.push(comprehensiveHistory[i]);
+      const userMessage: Content = {
+        role: 'user',
+        parts: [...(comprehensiveHistory[i].parts || [])],
+      };
       i++;
+      while (i < length && comprehensiveHistory[i].role === 'user') {
+        userMessage.parts!.push(...(comprehensiveHistory[i].parts || []));
+        i++;
+      }
+      curatedHistory.push(userMessage);
     } else {
       const modelOutput: Content[] = [];
       let isValid = true;
@@ -186,11 +194,6 @@ function extractCuratedHistory(comprehensiveHistory: Content[]): Content[] {
   }
   return curatedHistory;
 }
-
-/**
- * Custom error to signal that a stream completed with invalid content,
- * which should trigger a retry.
- */
 export class InvalidStreamError extends Error {
   readonly type:
     | 'NO_FINISH_REASON'
@@ -342,7 +345,17 @@ export class GeminiChat {
     }
 
     // Add user content to history ONCE before any attempts.
-    this.history.push(userContent);
+    if (
+      this.history.length > 0 &&
+      this.history[this.history.length - 1].role === 'user'
+    ) {
+      const lastUser = this.history[this.history.length - 1];
+      const lastUserParts = lastUser.parts || [];
+      const currentUserParts = userContent.parts || [];
+      lastUser.parts = [...lastUserParts, ...currentUserParts];
+    } else {
+      this.history.push(userContent);
+    }
     const requestContents = this.getHistory(true);
 
     const streamWithRetries = async function* (
