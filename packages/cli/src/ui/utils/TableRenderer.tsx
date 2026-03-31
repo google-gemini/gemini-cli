@@ -10,11 +10,11 @@ import {
   Box,
   StyledLine,
   toStyledCharacters,
-  styledCharsWidth,
   wordBreakStyledChars,
   wrapStyledChars,
   widestLineFromStyledChars,
-  styledCharsToString,
+  styledCharsWidth,
+  styledLineToString,
 } from 'ink';
 import { theme } from '../semantic-colors.js';
 import { parseMarkdownToANSI } from './markdownParsingUtils.js';
@@ -196,7 +196,7 @@ export const TableRenderer: React.FC<TableRendererProps> = ({
         );
 
         const lines = wrappedStyledLines.map((line) => ({
-          text: styledCharsToString(line),
+          text: styledLineToString(line),
           width: styledCharsWidth(line),
         }));
         rowResult.push(lines);
