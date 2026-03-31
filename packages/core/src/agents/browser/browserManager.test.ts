@@ -79,6 +79,7 @@ import * as fs from 'node:fs';
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { StdioClientTransport } from '@modelcontextprotocol/sdk/client/stdio.js';
 import { getBrowserConsentIfNeeded } from '../../utils/browserConsent.js';
+import { debugLogger } from '../../utils/debugLogger.js';
 
 describe('BrowserManager', () => {
   let mockConfig: Config;
@@ -124,6 +125,16 @@ describe('BrowserManager', () => {
             content: [{ type: 'text', text: 'Tool result' }],
           }),
         }) as unknown as InstanceType<typeof Client>,
+    );
+
+    vi.mocked(StdioClientTransport).mockImplementation(
+      () =>
+        ({
+          close: vi.fn().mockResolvedValue(undefined),
+          stderr: {
+            on: vi.fn(),
+          },
+        }) as unknown as InstanceType<typeof StdioClientTransport>,
     );
   });
 
@@ -682,11 +693,29 @@ describe('BrowserManager', () => {
   describe('close', () => {
     it('should close MCP connections', async () => {
       const manager = new BrowserManager(mockConfig);
-      const client = await manager.getRawMcpClient();
+      await manager.getRawMcpClient();
+
+      await manager.close();
+      expect(manager.isConnected()).toBe(false);
+    });
+
+    it('should NOT log error when transport closes during intentional close()', async () => {
+      const manager = new BrowserManager(mockConfig);
+      await manager.ensureConnection();
+
+      const transportInstance =
+        vi.mocked(StdioClientTransport).mock.results[0]?.value;
+
+      // Trigger onclose during close()
+      vi.spyOn(transportInstance, 'close').mockImplementation(async () => {
+        transportInstance.onclose?.();
+      });
 
       await manager.close();
 
-      expect(client.close).toHaveBeenCalled();
+      expect(debugLogger.error).not.toHaveBeenCalledWith(
+        expect.stringContaining('transport closed unexpectedly'),
+      );
     });
   });
 
@@ -765,6 +794,25 @@ describe('BrowserManager', () => {
       // Should not throw
       await expect(BrowserManager.resetAll()).resolves.toBeUndefined();
     });
+
+    it('should NOT log error when transport closes during resetAll()', async () => {
+      const instance = BrowserManager.getInstance(mockConfig);
+      await instance.ensureConnection();
+
+      const transportInstance =
+        vi.mocked(StdioClientTransport).mock.results[0]?.value;
+
+      // Trigger onclose during close() which is called by resetAll()
+      vi.spyOn(transportInstance, 'close').mockImplementation(async () => {
+        transportInstance.onclose?.();
+      });
+
+      await BrowserManager.resetAll();
+
+      expect(debugLogger.error).not.toHaveBeenCalledWith(
+        expect.stringContaining('transport closed unexpectedly'),
+      );
+    });
   });
 
   describe('isConnected', () => {
@@ -788,7 +836,7 @@ describe('BrowserManager', () => {
   });
 
   describe('reconnection', () => {
-    it('should reconnect after unexpected disconnect', async () => {
+    it('should reconnect after unexpected disconnect and log error', async () => {
       const manager = new BrowserManager(mockConfig);
       await manager.ensureConnection();
 
@@ -798,6 +846,10 @@ describe('BrowserManager', () => {
       if (transportInstance?.onclose) {
         transportInstance.onclose();
       }
+
+      expect(debugLogger.error).toHaveBeenCalledWith(
+        expect.stringContaining('transport closed unexpectedly'),
+      );
 
       // Manager should recognize disconnection
       expect(manager.isConnected()).toBe(false);
