@@ -27,7 +27,7 @@ describe('replace', () => {
     rig.createFile(fileName, originalContent);
 
     await rig.run({
-      args: `Read the file 'file_to_replace.txt', then replace the exact string 'foo' with 'bar' in it.`,
+      args: `Replace 'foo' with 'bar' in the file 'file_to_replace.txt'`,
     });
 
     const foundToolCall = await rig.waitForToolCall('replace');
