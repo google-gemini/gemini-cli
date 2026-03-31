@@ -27,8 +27,8 @@ and PDF.
 - **Tool name:** `read_file`
 - **Arguments:**
   - `file_path` (string, required): Path to the file.
-  - `offset` (number, optional): Start line for text files (0-based).
-  - `limit` (number, optional): Maximum lines to read.
+  - `start_line` (number, optional): Start line for text files (1-based).
+  - `end_line` (number, optional): End line for text files (1-based, inclusive).
 
 ### `write_file` (WriteFile)
 
@@ -51,12 +51,14 @@ Finds files matching specific glob patterns across the workspace.
 - **Parameters:**
   - `pattern` (string, required): The glob pattern to match against (e.g.,
     `"*.py"`, `"src/**/*.js"`).
-  - `path` (string, optional): The absolute path to the directory to search
+  - `dir_path` (string, optional): The absolute path to the directory to search
     within. If omitted, searches the tool's root directory.
   - `case_sensitive` (boolean, optional): Whether the search should be
     case-sensitive. Defaults to `false`.
   - `respect_git_ignore` (boolean, optional): Whether to respect .gitignore
     patterns when finding files. Defaults to `true`.
+  - `respect_gemini_ignore` (boolean, optional): Whether to respect
+    .geminiignore patterns when finding files. Defaults to `true`.
 - **Behavior:**
   - Searches for files matching the glob pattern within the specified directory.
   - Returns a list of absolute paths, sorted with the most recently modified
@@ -79,11 +81,19 @@ lines containing matches, along with their file paths and line numbers.
 - **Parameters:**
   - `pattern` (string, required): The regular expression (regex) to search for
     (e.g., `"function\s+myFunction"`).
-  - `path` (string, optional): The absolute path to the directory to search
+  - `dir_path` (string, optional): The absolute path to the directory to search
     within. Defaults to the current working directory.
-  - `include` (string, optional): A glob pattern to filter which files are
-    searched (e.g., `"*.js"`, `"src/**/*.{ts,tsx}"`). If omitted, searches most
-    files (respecting common ignores).
+  - `include_pattern` (string, optional): A glob pattern to filter which files
+    are searched (e.g., `"*.js"`, `"src/**/*.{ts,tsx}"`). If omitted, searches
+    most files (respecting common ignores).
+  - `exclude_pattern` (string, optional): A glob pattern to exclude files from
+    the search.
+  - `names_only` (boolean, optional): If `true`, returns only file names
+    containing matches instead of the matching lines.
+  - `max_matches_per_file` (number, optional): Maximum number of matches to
+    return per file.
+  - `total_max_matches` (number, optional): Maximum total number of matches to
+    return across all files.
 - **Behavior:**
   - Uses `git grep` if available in a Git repository for speed; otherwise, falls
     back to system `grep` or a JavaScript-based search.
