@@ -9,7 +9,6 @@ import {
   UPDATE_TOPIC_DISPLAY_NAME,
   TOPIC_PARAM_TITLE,
   TOPIC_PARAM_SUMMARY,
-  TOPIC_PARAM_STRATEGIC_INTENT,
 } from './definitions/coreTools.js';
 import {
   BaseDeclarativeTool,
@@ -25,7 +24,6 @@ import type { Config } from '../config/config.js';
 interface UpdateTopicParams {
   [TOPIC_PARAM_TITLE]?: string;
   [TOPIC_PARAM_SUMMARY]?: string;
-  [TOPIC_PARAM_STRATEGIC_INTENT]?: string;
 }
 
 class UpdateTopicInvocation extends BaseToolInvocation<
@@ -43,17 +41,15 @@ class UpdateTopicInvocation extends BaseToolInvocation<
 
   getDescription(): string {
     const title = this.params[TOPIC_PARAM_TITLE];
-    const intent = this.params[TOPIC_PARAM_STRATEGIC_INTENT];
     if (title) {
       return `Update topic to: "${title}"`;
     }
-    return `Update tactical intent: "${intent || '...'}"`;
+    return 'Update Topic';
   }
 
   async execute(): Promise<ToolResult> {
     const title = this.params[TOPIC_PARAM_TITLE];
     const summary = this.params[TOPIC_PARAM_SUMMARY];
-    const strategicIntent = this.params[TOPIC_PARAM_STRATEGIC_INTENT];
 
     const activeTopic = this.config.topicState.getTopic();
     const isNewTopic = !!(
@@ -62,14 +58,12 @@ class UpdateTopicInvocation extends BaseToolInvocation<
       title.trim() !== activeTopic
     );
 
-    this.config.topicState.setTopic(title, strategicIntent);
+    this.config.topicState.setTopic(title);
 
     const currentTopic = this.config.topicState.getTopic() || '...';
-    const currentIntent =
-      strategicIntent || this.config.topicState.getIntent() || '...';
 
     debugLogger.log(
-      `[TopicTool] Update: Topic="${currentTopic}", Intent="${currentIntent}", isNew=${isNewTopic}`,
+      `[TopicTool] Update: Topic="${currentTopic}", isNew=${isNewTopic}`,
     );
 
     let llmContent = '';
@@ -79,15 +73,10 @@ class UpdateTopicInvocation extends BaseToolInvocation<
       // Handle New Topic Header & Summary
       llmContent = `Current topic: "${currentTopic}"\nTopic summary: ${summary || '...'}`;
       returnDisplay = `## 📂 Topic: **${currentTopic}**\n\n**Summary:**\n${summary || '...'}`;
-
-      if (strategicIntent && strategicIntent.trim()) {
-        llmContent += `\n\nStrategic Intent: ${strategicIntent.trim()}`;
-        returnDisplay += `\n\n> [!STRATEGY]\n> **Intent:** ${strategicIntent.trim()}`;
-      }
     } else {
-      // Tactical update only
-      llmContent = `Strategic Intent: ${currentIntent}`;
-      returnDisplay = `> [!STRATEGY]\n> **Intent:** ${currentIntent}`;
+      // Fallback display if not a new topic (though mandate suggests only for new topics)
+      llmContent = `Current topic: "${currentTopic}"`;
+      returnDisplay = `## 📂 Topic: **${currentTopic}**`;
     }
 
     return {
@@ -98,7 +87,7 @@ class UpdateTopicInvocation extends BaseToolInvocation<
 }
 
 /**
- * Tool to update semantic topic context and tactical intent for UI grouping and model focus.
+ * Tool to update semantic topic context for UI grouping and model focus.
  */
 export class UpdateTopicTool extends BaseDeclarativeTool<
   UpdateTopicParams,

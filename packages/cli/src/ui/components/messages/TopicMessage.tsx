@@ -11,7 +11,6 @@ import {
   UPDATE_TOPIC_DISPLAY_NAME,
   TOPIC_PARAM_TITLE,
   TOPIC_PARAM_SUMMARY,
-  TOPIC_PARAM_STRATEGIC_INTENT,
 } from '@google/gemini-cli-core';
 import type { IndividualToolCallDisplay } from '../../types.js';
 import { theme } from '../../semantic-colors.js';
@@ -26,16 +25,23 @@ export const isTopicTool = (name: string): boolean =>
 export const TopicMessage: React.FC<TopicMessageProps> = ({ args }) => {
   const rawTitle = args?.[TOPIC_PARAM_TITLE];
   const title = typeof rawTitle === 'string' ? rawTitle : undefined;
-  const rawIntent =
-    args?.[TOPIC_PARAM_STRATEGIC_INTENT] || args?.[TOPIC_PARAM_SUMMARY];
-  const intent = typeof rawIntent === 'string' ? rawIntent : undefined;
+  const rawSummary = args?.[TOPIC_PARAM_SUMMARY];
+  const summary = typeof rawSummary === 'string' ? rawSummary : undefined;
 
+  // Use summary as a fallback subtitle if title is present,
+  // or use it as the main text if title is missing.
+  // We allow the summary to wrap naturally to avoid truncation.
   return (
-    <Box flexDirection="row" marginLeft={2}>
+    <Box flexDirection="row" marginLeft={2} flexWrap="wrap">
       <Text color={theme.text.primary} bold>
         {title || 'Topic'}
       </Text>
-      {intent && <Text color={theme.text.secondary}> — {intent}</Text>}
+      {summary && (
+        <Text color={theme.text.secondary}>
+          {' — '}
+          {summary}
+        </Text>
+      )}
     </Box>
   );
 };

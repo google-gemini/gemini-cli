@@ -10,7 +10,7 @@ import { ToolGroupMessage } from './ToolGroupMessage.js';
 import {
   UPDATE_TOPIC_TOOL_NAME,
   TOPIC_PARAM_TITLE,
-  TOPIC_PARAM_STRATEGIC_INTENT,
+  TOPIC_PARAM_SUMMARY,
   makeFakeConfig,
   CoreToolCallStatus,
   ApprovalMode,
@@ -264,7 +264,6 @@ describe('<ToolGroupMessage />', () => {
           name: UPDATE_TOPIC_TOOL_NAME,
           args: {
             [TOPIC_PARAM_TITLE]: 'Testing Topic',
-            [TOPIC_PARAM_STRATEGIC_INTENT]: 'This is the description',
           },
         }),
       ];
@@ -280,19 +279,18 @@ describe('<ToolGroupMessage />', () => {
 
       const output = lastFrame();
       expect(output).toContain('Testing Topic');
-      expect(output).toContain('— This is the description');
       expect(output).toMatchSnapshot('update_topic_tool');
       unmount();
     });
 
-    it('renders update_topic tool call with summary instead of strategic_intent', async () => {
+    it('renders update_topic tool call with summary', async () => {
       const toolCalls = [
         createToolCall({
           callId: 'topic-tool-summary',
           name: UPDATE_TOPIC_TOOL_NAME,
           args: {
             [TOPIC_PARAM_TITLE]: 'Testing Topic',
-            summary: 'This is the summary',
+            [TOPIC_PARAM_SUMMARY]: 'This is the summary',
           },
         }),
       ];
@@ -309,6 +307,36 @@ describe('<ToolGroupMessage />', () => {
       const output = lastFrame();
       expect(output).toContain('Testing Topic');
       expect(output).toContain('— This is the summary');
+      expect(output).toMatchSnapshot('update_topic_with_summary');
+      unmount();
+    });
+
+    it('renders update_topic with a very long summary that wraps', async () => {
+      const toolCalls = [
+        createToolCall({
+          callId: 'topic-tool-long-summary',
+          name: UPDATE_TOPIC_TOOL_NAME,
+          args: {
+            [TOPIC_PARAM_TITLE]: 'Testing Topic',
+            [TOPIC_PARAM_SUMMARY]:
+              'This is a very long summary that is designed to exceed the typical terminal width and force the UI to wrap the text across multiple lines instead of truncating it. We want to ensure that all strategic information is visible to the user at all times.',
+          },
+        }),
+      ];
+      const item = createItem(toolCalls);
+
+      const { lastFrame, unmount } = await renderWithProviders(
+        <ToolGroupMessage {...baseProps} item={item} toolCalls={toolCalls} />,
+        {
+          config: baseMockConfig,
+          settings: fullVerbositySettings,
+        },
+      );
+
+      const output = lastFrame();
+      expect(output).toContain('Testing Topic');
+      expect(output).toContain('— This is a very long summary');
+      expect(output).toMatchSnapshot('update_topic_long_summary');
       unmount();
     });
 
@@ -319,7 +347,7 @@ describe('<ToolGroupMessage />', () => {
           name: UPDATE_TOPIC_TOOL_NAME,
           args: {
             [TOPIC_PARAM_TITLE]: 'Testing Topic',
-            [TOPIC_PARAM_STRATEGIC_INTENT]: 'This is the description',
+            [TOPIC_PARAM_SUMMARY]: 'This is the summary',
           },
         }),
         createToolCall({
