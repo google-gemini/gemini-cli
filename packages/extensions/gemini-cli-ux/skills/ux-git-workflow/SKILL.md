@@ -76,14 +76,15 @@ If operating in a sibling worktree (e.g., `feature-xyz/`):
 - **Reason**: This prevents macOS-specific icons (like `MAC_TERMINAL_ICON`) from leaking into snapshots, which causes CI failure on Linux runners.
 
 #### **3. Full Validation (No Shortcuts)**
-- **Action**: You MUST run the complete validation suite:
+- **Action**: You MUST run the complete validation and build suite:
   ```bash
+  npm run build
   npm run preflight
   ```
 - **Verification**: Run `npm run typecheck` explicitly if `preflight` does not include it, to ensure cross-package integrity.
-- **Automated Audit**: You MUST run `/review-frontend <PR_NUMBER>` and address any issues found. This provides an automated audit of your changes to catch common mistakes before a maintainer review.
-- **Constraint**: Passing individual tests is NOT enough. `preflight` ensures `tsc --build` passes, catching TypeScript inference bugs that unit tests miss.
-- **TDD Fallback**: If `preflight` fails, you must create a local reproduction test before attempting a fix.
+- **Automated Audit**: You MUST run `/ux-review <PR_NUMBER>` (or similar audit tool) and address any issues found. This provides an automated audit of your changes to catch common mistakes before a maintainer review.
+- **Constraint**: Passing individual tests is NOT enough. `preflight` ensures `tsc --build` passes, catching TypeScript inference bugs that unit tests miss. `npm run build` ensures all packages are successfully bundled for distribution.
+- **TDD Fallback**: If `preflight` or `build` fails, you must create a local reproduction test before attempting a fix.
 
 #### **4. UI Dimension Audit**
 - **Action**: If Header or Footer height changed, check `packages/cli/src/test-utils/AppRig.tsx`.

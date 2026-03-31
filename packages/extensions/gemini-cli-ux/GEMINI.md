@@ -60,8 +60,9 @@ underlying "rigor."
 7.  **Keep PRs Small**: ALWAYS aim for under 500 lines of code changed
     (excluding snapshots). If a task exceeds this limit, simplify the code, cut
     scope, or plan to split it into multiple PRs.
-8.  **Task Finality**: ALWAYS run `npm run build` or `npm run typecheck` to
-    verify structural integrity before declaring any task as "complete".
+8.  **Task Finality**: ALWAYS run `npm run build` and `npm run typecheck` to
+    verify structural integrity before declaring any task as "complete" or
+    pushing a PR.
 9.  **Copyright Headers**: NEVER modify or update the copyright header comments
     (e.g., year) in existing files.
 
