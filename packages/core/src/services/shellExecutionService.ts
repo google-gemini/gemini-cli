@@ -367,8 +367,9 @@ export class ShellExecutionService {
   ): Promise<{
     program: string;
     args: string[];
-    env: Record<string, string | undefined>;
+    env: NodeJS.ProcessEnv;
     cwd: string;
+    cleanup?: () => void;
   }> {
     const sandboxManager =
       shellExecutionConfig.sandboxManager ?? new NoopSandboxManager();
@@ -474,6 +475,7 @@ export class ShellExecutionService {
       args: sandboxedCommand.args,
       env: sandboxedCommand.env,
       cwd: sandboxedCommand.cwd ?? cwd,
+      cleanup: sandboxedCommand.cleanup,
     };
   }
 
@@ -493,6 +495,7 @@ export class ShellExecutionService {
         args: finalArgs,
         env: finalEnv,
         cwd: finalCwd,
+        cleanup: cmdCleanup,
       } = await this.prepareExecution(
         commandToExecute,
         cwd,
@@ -661,6 +664,7 @@ export class ShellExecutionService {
         signal: NodeJS.Signals | null,
       ) => {
         cleanup();
+        cmdCleanup?.();
 
         let combinedOutput = state.output;
         if (state.truncated) {
@@ -810,6 +814,7 @@ export class ShellExecutionService {
         args: finalArgs,
         env: finalEnv,
         cwd: finalCwd,
+        cleanup: cmdCleanup,
       } = await this.prepareExecution(
         commandToExecute,
         cwd,
@@ -1104,6 +1109,7 @@ export class ShellExecutionService {
 
           const finalize = () => {
             render(true);
+            cmdCleanup?.();
 
             const event: ShellOutputEvent = {
               type: 'exit',
