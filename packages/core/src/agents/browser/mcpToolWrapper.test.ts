@@ -225,6 +225,7 @@ describe('mcpToolWrapper', () => {
           function: expect.stringContaining('__gemini_input_blocker'),
         }),
         expect.any(AbortSignal),
+        true,
       );
 
       // Second call: click
@@ -243,6 +244,7 @@ describe('mcpToolWrapper', () => {
           function: expect.stringContaining('__gemini_input_blocker'),
         }),
         expect.any(AbortSignal),
+        true,
       );
     });
 
