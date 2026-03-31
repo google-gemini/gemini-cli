@@ -100,7 +100,6 @@ export interface McpToolCallResult {
 export class BrowserManager {
   // --- Static singleton management ---
   private static instances = new Map<string, BrowserManager>();
-  private static isShuttingDown = false;
 
   /**
    * Returns the cache key for a given config.
@@ -137,24 +136,19 @@ export class BrowserManager {
    * Called on /clear commands and CLI exit.
    */
   static async resetAll(): Promise<void> {
-    BrowserManager.isShuttingDown = true;
-    try {
-      const results = await Promise.allSettled(
-        Array.from(BrowserManager.instances.values()).map((instance) =>
-          instance.close(),
-        ),
-      );
-      for (const result of results) {
-        if (result.status === 'rejected') {
-          debugLogger.error(
-            `Error during BrowserManager cleanup: ${result.reason instanceof Error ? result.reason.message : String(result.reason)}`,
-          );
-        }
+    const results = await Promise.allSettled(
+      Array.from(BrowserManager.instances.values()).map((instance) =>
+        instance.close(),
+      ),
+    );
+    for (const result of results) {
+      if (result.status === 'rejected') {
+        debugLogger.error(
+          `Error during BrowserManager cleanup: ${result.reason instanceof Error ? result.reason.message : String(result.reason)}`,
+        );
       }
-      BrowserManager.instances.clear();
-    } finally {
-      BrowserManager.isShuttingDown = false;
     }
+    BrowserManager.instances.clear();
   }
 
   /**
@@ -450,7 +444,6 @@ export class BrowserManager {
 
     this.discoveredTools = [];
     this.connectionPromise = undefined;
-    this.isClosing = false;
   }
 
   /**
@@ -574,7 +567,7 @@ export class BrowserManager {
 
     this.mcpTransport.onclose = () => {
       this.disconnected = true;
-      if (this.isClosing || BrowserManager.isShuttingDown) {
+      if (this.isClosing) {
         return;
       }
       debugLogger.error(
