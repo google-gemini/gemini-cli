@@ -105,6 +105,10 @@ export enum Command {
   UNFOCUS_BACKGROUND_SHELL = 'background.unfocus',
   UNFOCUS_BACKGROUND_SHELL_LIST = 'background.unfocusList',
   SHOW_BACKGROUND_SHELL_UNFOCUS_WARNING = 'background.unfocusWarning',
+
+  // Extension Controls
+  UPDATE_EXTENSION = 'extension.update',
+  LINK_EXTENSION = 'extension.link',
 }
 
 /**
@@ -402,6 +406,10 @@ export const defaultKeyBindingConfig: KeyBindingConfig = new Map([
   [Command.UNFOCUS_BACKGROUND_SHELL, [new KeyBinding('shift+tab')]],
   [Command.UNFOCUS_BACKGROUND_SHELL_LIST, [new KeyBinding('tab')]],
   [Command.SHOW_BACKGROUND_SHELL_UNFOCUS_WARNING, [new KeyBinding('tab')]],
+
+  // Extension Controls
+  [Command.UPDATE_EXTENSION, [new KeyBinding('i')]],
+  [Command.LINK_EXTENSION, [new KeyBinding('l')]],
 ]);
 
 interface CommandCategory {
@@ -529,6 +537,10 @@ export const commandCategories: readonly CommandCategory[] = [
       Command.SHOW_BACKGROUND_SHELL_UNFOCUS_WARNING,
     ],
   },
+  {
+    title: 'Extension Controls',
+    commands: [Command.UPDATE_EXTENSION, Command.LINK_EXTENSION],
+  },
 ];
 
 /**
@@ -638,6 +650,10 @@ export const commandDescriptions: Readonly<Record<Command, string>> = {
     'Move focus from background shell list to Gemini.',
   [Command.SHOW_BACKGROUND_SHELL_UNFOCUS_WARNING]:
     'Show warning when trying to move focus away from background shell.',
+
+  // Extension Controls
+  [Command.UPDATE_EXTENSION]: 'Update the current extension if available.',
+  [Command.LINK_EXTENSION]: 'Link the current extension to a local path.',
 };
 
 const keybindingsSchema = z.array(
