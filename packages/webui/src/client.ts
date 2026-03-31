@@ -553,7 +553,7 @@ function makeSI(s){
       '<span class="si-src ' + esc(source) + '">' + (source === 'cli' ? 'CLI' : 'Draft') + '</span>' +
     '</span>' +
     '<span class="si-d">' + esc(s.time||'') + '</span>' +
-    '<button class="si-del" title="Delete" onclick="event.stopPropagation();confirmDeleteSession(&quot;' + escJsDouble(s.id) + '&quot;, &quot;' + escJsDouble(source) + '&quot;)"><svg class="ic xs" viewBox="0 0 24 24"><path d="M3 6h18"/><path d="M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6"/><path d="M8 6V4a2 2 0 012-2h4a2 2 0 012 2v2"/></svg></button>';
+    '<button class="si-del" title="Delete" onclick="event.stopPropagation();confirmDeleteSession(\'' + esc(escJs(s.id)) + '\', \'' + esc(escJs(source)) + '\')"><svg class="ic xs" viewBox="0 0 24 24"><path d="M3 6h18"/><path d="M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6"/><path d="M8 6V4a2 2 0 012-2h4a2 2 0 012 2v2"/></svg></button>';
   el.onclick = function(){ loadSession(s.id, source); };
   return el;
 }
