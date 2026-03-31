@@ -8,12 +8,7 @@ import os from 'node:os';
 import fs from 'node:fs';
 import path from 'node:path';
 import { quote } from 'shell-quote';
-import {
-  spawn,
-  spawnSync,
-  type SpawnOptionsWithoutStdio,
-} from 'node:child_process';
-import * as readline from 'node:readline';
+import { spawnSync } from 'node:child_process';
 import { Language, Parser, Query, type Node, type Tree } from 'web-tree-sitter';
 import { loadWasmBinary } from './fileUtils.js';
 import { debugLogger } from './debugLogger.js';
@@ -727,6 +722,17 @@ export function stripShellWrapper(command: string): string {
  * @returns true if command substitution would be executed by bash
  */
 export function detectCommandSubstitution(command: string): boolean {
+  const shell = getShellConfiguration().shell;
+
+  // PowerShell uses different syntax and escaping rules than bash
+  if (shell === 'powershell') {
+    return detectPowerShellSubstitution(command);
+  }
+
+  return detectBashSubstitution(command);
+}
+
+function detectBashSubstitution(command: string): boolean {
   let inSingleQuote = false;
   let inDoubleQuote = false;
   let i = 0;
@@ -734,6 +740,76 @@ export function detectCommandSubstitution(command: string): boolean {
   while (i < command.length) {
     const char = command[i];
 
+    // Toggle single quote — nothing is special inside single quotes
+    if (char === "'" && !inDoubleQuote) {
+      inSingleQuote = !inSingleQuote;
+      i++;
+      continue;
+    }
+
+    // Toggle double quote
+    if (char === '"' && !inSingleQuote) {
+      inDoubleQuote = !inDoubleQuote;
+      i++;
+      continue;
+    }
+
+    // Inside single quotes — everything is literal
+    if (inSingleQuote) {
+      i++;
+      continue;
+    }
+
+    // Handle backslash escaping
+    if (char === '\\') {
+      if (inDoubleQuote) {
+        // In double quotes, only these chars can be escaped
+        const next = command[i + 1];
+        if (['$', '`', '"', '\\', '\n'].includes(next)) {
+          i += 2;
+          continue;
+        }
+      } else {
+        // Outside quotes, backslash escapes the next character
+        i += 2;
+        continue;
+      }
+    }
+
+    // Detect $() command substitution
+    if (char === '$' && command[i + 1] === '(') {
+      return true;
+    }
+
+    // Detect <() and >() process substitution (not valid inside double quotes)
+    if (
+      !inDoubleQuote &&
+      (char === '<' || char === '>') &&
+      command[i + 1] === '('
+    ) {
+      return true;
+    }
+
+    // Detect backtick substitution
+    if (char === '`') {
+      return true;
+    }
+
+    i++;
+  }
+
+  return false;
+}
+
+function detectPowerShellSubstitution(command: string): boolean {
+  let inSingleQuote = false;
+  let inDoubleQuote = false;
+  let i = 0;
+
+  while (i < command.length) {
+    const char = command[i];
+
+    // In PowerShell, single quotes are literal — no substitution possible
     if (char === "'" && !inDoubleQuote) {
       inSingleQuote = !inSingleQuote;
       i++;
@@ -751,36 +827,25 @@ export function detectCommandSubstitution(command: string): boolean {
       continue;
     }
 
-    if (char === '\\') {
-      if (inSingleQuote) {
-        i++;
-        continue;
-      }
-      if (inDoubleQuote) {
-        const next = command[i + 1];
-        if (['$', '`', '"', '\\', '\n'].includes(next)) {
-          i += 2;
-          continue;
-        }
-      } else if (!inDoubleQuote) {
-        i += 2;
-        continue;
-      }
+    // In PowerShell, backtick ` is the escape character (not backslash)
+    if (char === '`' && !inSingleQuote) {
+      // Skip next character — it's escaped
+      i += 2;
+      continue;
     }
 
+    // Detect $() subexpression
     if (char === '$' && command[i + 1] === '(') {
       return true;
     }
 
-    if (
-      !inDoubleQuote &&
-      (char === '<' || char === '>') &&
-      command[i + 1] === '('
-    ) {
+    // Detect @() array subexpression — can execute commands in PowerShell
+    if (char === '@' && command[i + 1] === '(') {
       return true;
     }
 
-    if (char === '`') {
+    // Detect bare (...) subexpression in PowerShell
+    if (char === '(' && !inDoubleQuote) {
       return true;
     }
 
@@ -788,165 +853,4 @@ export function detectCommandSubstitution(command: string): boolean {
   }
 
   return false;
-}
-/**
- * Determines whether a given shell command is allowed to execute based on
- * the tool's configuration including allowlists and blocklists.
- *
- * This function operates in "default allow" mode. It is a wrapper around
- * `checkCommandPermissions`.
- *
- * @param command The shell command string to validate.
- * @param config The application configuration.
- * @returns An object with 'allowed' boolean and optional 'reason' string if not allowed.
- */
-export const spawnAsync = (
-  command: string,
-  args: string[],
-  options?: SpawnOptionsWithoutStdio,
-): Promise<{ stdout: string; stderr: string }> =>
-  new Promise((resolve, reject) => {
-    const child = spawn(command, args, options);
-    let stdout = '';
-    let stderr = '';
-
-    child.stdout.on('data', (data) => {
-      stdout += data.toString();
-    });
-
-    child.stderr.on('data', (data) => {
-      stderr += data.toString();
-    });
-
-    child.on('close', (code) => {
-      if (code === 0) {
-        resolve({ stdout, stderr });
-      } else {
-        reject(new Error(`Command failed with exit code ${code}:\n${stderr}`));
-      }
-    });
-
-    child.on('error', (err) => {
-      reject(err);
-    });
-  });
-
-/**
- * Executes a command and yields lines of output as they appear.
- * Use for large outputs where buffering is not feasible.
- *
- * @param command The executable to run
- * @param args Arguments for the executable
- * @param options Spawn options (cwd, env, etc.)
- */
-export async function* execStreaming(
-  command: string,
-  args: string[],
-  options?: SpawnOptionsWithoutStdio & {
-    signal?: AbortSignal;
-    allowedExitCodes?: number[];
-  },
-): AsyncGenerator<string, void, void> {
-  const child = spawn(command, args, {
-    ...options,
-    // ensure we don't open a window on windows if possible/relevant
-    windowsHide: true,
-  });
-
-  const rl = readline.createInterface({
-    input: child.stdout,
-    terminal: false,
-  });
-
-  const errorChunks: Buffer[] = [];
-  let stderrTotalBytes = 0;
-  const MAX_STDERR_BYTES = 20 * 1024; // 20KB limit
-
-  child.stderr.on('data', (chunk) => {
-    if (stderrTotalBytes < MAX_STDERR_BYTES) {
-      errorChunks.push(chunk);
-      stderrTotalBytes += chunk.length;
-    }
-  });
-
-  let error: Error | null = null;
-  child.on('error', (err) => {
-    error = err;
-  });
-
-  const onAbort = () => {
-    // If manually aborted by signal, we kill immediately.
-    if (!child.killed) child.kill();
-  };
-
-  if (options?.signal?.aborted) {
-    onAbort();
-  } else {
-    options?.signal?.addEventListener('abort', onAbort);
-  }
-
-  let finished = false;
-  try {
-    for await (const line of rl) {
-      if (options?.signal?.aborted) break;
-      yield line;
-    }
-    finished = true;
-  } finally {
-    rl.close();
-    options?.signal?.removeEventListener('abort', onAbort);
-
-    // Ensure process is killed when the generator is closed (consumer breaks loop)
-    let killedByGenerator = false;
-    if (!finished && child.exitCode === null && !child.killed) {
-      try {
-        child.kill();
-      } catch (_e) {
-        // ignore error if process is already dead
-      }
-      killedByGenerator = true;
-    }
-
-    // Ensure we wait for the process to exit to check codes
-    await new Promise<void>((resolve, reject) => {
-      // If an error occurred before we got here (e.g. spawn failure), reject immediately.
-      if (error) {
-        reject(error);
-        return;
-      }
-
-      function checkExit(code: number | null) {
-        // If we aborted or killed it manually, we treat it as success (stop waiting)
-        if (options?.signal?.aborted || killedByGenerator) {
-          resolve();
-          return;
-        }
-
-        const allowed = options?.allowedExitCodes ?? [0];
-        if (code !== null && allowed.includes(code)) {
-          resolve();
-        } else {
-          // If we have an accumulated error or explicit error event
-          if (error) reject(error);
-          else {
-            const stderr = Buffer.concat(errorChunks).toString('utf8');
-            const truncatedMsg =
-              stderrTotalBytes >= MAX_STDERR_BYTES ? '...[truncated]' : '';
-            reject(
-              new Error(
-                `Process exited with code ${code}: ${stderr}${truncatedMsg}`,
-              ),
-            );
-          }
-        }
-      }
-
-      if (child.exitCode !== null) {
-        checkExit(child.exitCode);
-      } else {
-        child.on('close', (code) => checkExit(code));
-        child.on('error', (err) => reject(err));
-      }
-    });
-  }
 }

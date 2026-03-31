@@ -159,7 +159,7 @@ export class ShellToolInvocation extends BaseToolInvocation<
       return {
         llmContent:
           'Command injection detected: command substitution syntax ' +
-          '($(), backticks, <>()) found in command arguments. ' +
+          '($(), backticks, <() or >()) found in command arguments. ' +
           'This is a security risk and the command was blocked.',
         returnDisplay:
           'Blocked: command substitution detected in shell command.',

@@ -899,19 +899,19 @@ describe('ShellTool', () => {
 
     it('should allow escaped backtick outside double quotes', async () => {
       mockShellExecutionService.mockImplementation((_cmd, _cwd, _callback) => ({
+        pid: 12345,
+        result: Promise.resolve({
+          output: 'hello',
+          rawOutput: Buffer.from('hello'),
+          exitCode: 0,
+          signal: null,
+          error: null,
+          aborted: false,
           pid: 12345,
-          result: Promise.resolve({
-            output: 'hello',
-            rawOutput: Buffer.from('hello'),
-            exitCode: 0,
-            signal: null,
-            error: null,
-            aborted: false,
-            pid: 12345,
-            executionMethod: 'child_process',
-            backgrounded: false,
-          }),
-        }));
+          executionMethod: 'child_process',
+          backgrounded: false,
+        }),
+      }));
       const tool = new ShellTool(mockConfig, createMockMessageBus());
       const invocation = tool.build({ command: 'echo \\`hello\\`' });
       const result = await invocation.execute(new AbortController().signal);
@@ -933,6 +933,45 @@ describe('ShellTool', () => {
     });
 
     it('should allow $() inside single quotes', async () => {
+      mockShellExecutionService.mockImplementation((_cmd, _cwd, _callback) => ({
+        pid: 12345,
+        result: Promise.resolve({
+          output: '$(whoami)',
+          rawOutput: Buffer.from('$(whoami)'),
+          exitCode: 0,
+          signal: null,
+          error: null,
+          aborted: false,
+          pid: 12345,
+          executionMethod: 'child_process',
+          backgrounded: false,
+        }),
+      }));
+      const tool = new ShellTool(mockConfig, createMockMessageBus());
+      const invocation = tool.build({
+        command: "echo '$(whoami)'",
+      });
+      const result = await invocation.execute(new AbortController().signal);
+      expect(result.returnDisplay).not.toContain('Blocked');
+    });
+    it('should block PowerShell @() array subexpression', async () => {
+      mockPlatform.mockReturnValue('win32');
+      const tool = new ShellTool(mockConfig, createMockMessageBus());
+      const invocation = tool.build({ command: 'echo @(whoami)' });
+      const result = await invocation.execute(new AbortController().signal);
+      expect(result.returnDisplay).toContain('Blocked');
+    });
+
+    it('should block PowerShell $() subexpression', async () => {
+      mockPlatform.mockReturnValue('win32');
+      const tool = new ShellTool(mockConfig, createMockMessageBus());
+      const invocation = tool.build({ command: 'echo $(whoami)' });
+      const result = await invocation.execute(new AbortController().signal);
+      expect(result.returnDisplay).toContain('Blocked');
+    });
+
+    it('should allow PowerShell single quoted strings', async () => {
+      mockPlatform.mockReturnValue('win32');
       mockShellExecutionService.mockImplementation((_cmd, _cwd, _callback) => ({
           pid: 12345,
           result: Promise.resolve({
