@@ -38,9 +38,10 @@ export function buildPolicyListItems(
     .filter(({ rule }) => rule.decision === decision)
     .sort((a, b) => (b.rule.priority ?? 0) - (a.rule.priority ?? 0))
     .map(({ rule, index }) => {
-      const toolDisplayName = rule.toolName
-        ? (toolDisplayNames.get(rule.toolName) ?? rule.toolName)
-        : 'all tools';
+      const toolDisplayName =
+        !rule.toolName || rule.toolName === '*'
+          ? 'all tools'
+          : (toolDisplayNames.get(rule.toolName) ?? rule.toolName);
       const constraint = rule.constraintDisplay;
       const source = rule.source ?? '';
 

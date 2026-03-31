@@ -65,7 +65,7 @@ describe('buildPolicyListItems', () => {
     const rules = [
       { decision: PolicyDecision.ALLOW, toolName: 'run_shell_command' },
       { decision: PolicyDecision.ALLOW, toolName: 'unknown_tool' },
-      { decision: PolicyDecision.ALLOW },
+      { decision: PolicyDecision.ALLOW, toolName: '*' },
     ];
 
     const items = buildPolicyListItems(
