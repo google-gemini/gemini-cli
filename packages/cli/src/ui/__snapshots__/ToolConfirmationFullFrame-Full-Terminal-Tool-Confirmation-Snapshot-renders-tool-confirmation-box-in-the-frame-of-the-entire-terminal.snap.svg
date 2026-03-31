@@ -28,9 +28,11 @@
     <text x="882" y="104" fill="#ffffaf" textLength="9" lengthAdjust="spacingAndGlyphs">│</text>
     <text x="0" y="121" fill="#ffffaf" textLength="9" lengthAdjust="spacingAndGlyphs">│</text>
     <text x="882" y="121" fill="#ffffaf" textLength="9" lengthAdjust="spacingAndGlyphs">│</text>
+    <text x="891" y="121" fill="#333333" textLength="9" lengthAdjust="spacingAndGlyphs">▄</text>
     <text x="0" y="138" fill="#ffffaf" textLength="9" lengthAdjust="spacingAndGlyphs">│</text>
     <text x="18" y="138" fill="#afafaf" textLength="414" lengthAdjust="spacingAndGlyphs">... first 44 lines hidden (Ctrl+O to show) ...</text>
     <text x="882" y="138" fill="#ffffaf" textLength="9" lengthAdjust="spacingAndGlyphs">│</text>
+    <text x="891" y="138" fill="#333333" textLength="9" lengthAdjust="spacingAndGlyphs">█</text>
     <text x="0" y="155" fill="#ffffaf" textLength="9" lengthAdjust="spacingAndGlyphs">│</text>
     <text x="18" y="155" fill="#afafaf" textLength="18" lengthAdjust="spacingAndGlyphs">45</text>
     <text x="63" y="155" fill="#e5e5e5" textLength="54" lengthAdjust="spacingAndGlyphs">const </text>
@@ -39,6 +41,7 @@
     <text x="198" y="155" fill="#0000ee" textLength="36" lengthAdjust="spacingAndGlyphs">true</text>
     <text x="234" y="155" fill="#00cd00" textLength="9" lengthAdjust="spacingAndGlyphs">;</text>
     <text x="882" y="155" fill="#ffffaf" textLength="9" lengthAdjust="spacingAndGlyphs">│</text>
+    <text x="891" y="155" fill="#333333" textLength="9" lengthAdjust="spacingAndGlyphs">█</text>
     <text x="0" y="172" fill="#ffffaf" textLength="9" lengthAdjust="spacingAndGlyphs">│</text>
     <text x="18" y="172" fill="#afafaf" textLength="18" lengthAdjust="spacingAndGlyphs">46</text>
     <text x="63" y="172" fill="#e5e5e5" textLength="54" lengthAdjust="spacingAndGlyphs">const </text>
@@ -47,6 +50,7 @@
     <text x="198" y="172" fill="#0000ee" textLength="36" lengthAdjust="spacingAndGlyphs">true</text>
     <text x="234" y="172" fill="#00cd00" textLength="9" lengthAdjust="spacingAndGlyphs">;</text>
     <text x="882" y="172" fill="#ffffaf" textLength="9" lengthAdjust="spacingAndGlyphs">│</text>
+    <text x="891" y="172" fill="#333333" textLength="9" lengthAdjust="spacingAndGlyphs">█</text>
     <text x="0" y="189" fill="#ffffaf" textLength="9" lengthAdjust="spacingAndGlyphs">│</text>
     <text x="18" y="189" fill="#afafaf" textLength="18" lengthAdjust="spacingAndGlyphs">47</text>
     <text x="63" y="189" fill="#e5e5e5" textLength="54" lengthAdjust="spacingAndGlyphs">const </text>
