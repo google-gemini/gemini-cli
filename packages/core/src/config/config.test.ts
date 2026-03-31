@@ -227,6 +227,7 @@ vi.mock('../services/contextManager.js', () => ({
     getGlobalMemory: vi.fn().mockReturnValue(''),
     getExtensionMemory: vi.fn().mockReturnValue(''),
     getEnvironmentMemory: vi.fn().mockReturnValue(''),
+    getUserProjectMemory: vi.fn().mockReturnValue(''),
     getLoadedPaths: vi.fn().mockReturnValue(new Set()),
   })),
 }));
@@ -1681,6 +1682,12 @@ describe('setApprovalMode with folder trust', () => {
     expect(() => config.setApprovalMode(ApprovalMode.DEFAULT)).not.toThrow();
   });
 
+  it('should NOT throw an error when setting PLAN mode in an untrusted folder', () => {
+    const config = new Config(baseParams);
+    vi.spyOn(config, 'isTrustedFolder').mockReturnValue(false);
+    expect(() => config.setApprovalMode(ApprovalMode.PLAN)).not.toThrow();
+  });
+
   it('should NOT throw an error when setting any mode in a trusted folder', () => {
     const config = new Config(baseParams);
     vi.spyOn(config, 'isTrustedFolder').mockReturnValue(true);
@@ -2948,6 +2955,7 @@ describe('Config JIT Initialization', () => {
       getEnvironmentMemory: vi
         .fn()
         .mockReturnValue('Environment Memory\n\nMCP Instructions'),
+      getUserProjectMemory: vi.fn().mockReturnValue(''),
       getLoadedPaths: vi.fn().mockReturnValue(new Set(['/path/to/GEMINI.md'])),
     } as unknown as ContextManager;
     (ContextManager as unknown as Mock).mockImplementation(
@@ -2975,6 +2983,7 @@ describe('Config JIT Initialization', () => {
       global: 'Global Memory',
       extension: 'Extension Memory',
       project: 'Environment Memory\n\nMCP Instructions',
+      userProjectMemory: '',
     });
 
     // Tier 1: system instruction gets only global memory

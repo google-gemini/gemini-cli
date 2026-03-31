@@ -71,11 +71,7 @@ import {
   applyModelSelection,
   createAvailabilityContextProvider,
 } from '../availability/policyHelpers.js';
-import {
-  getDisplayString,
-  resolveModel,
-  isGemini2Model,
-} from '../config/models.js';
+import { getDisplayString, resolveModel } from '../config/models.js';
 import { partToString } from '../utils/partUtils.js';
 import { coreEvents, CoreEvent } from '../utils/events.js';
 
@@ -115,12 +111,10 @@ export class GeminiClient {
   constructor(private readonly context: AgentLoopContext) {
     this.loopDetector = new LoopDetectionService(this.config);
     this.compressionService = new ChatCompressionService();
-    this.agentHistoryProvider = new AgentHistoryProvider(this.config, {
-      truncationThreshold:
-        this.config.getExperimentalAgentHistoryTruncationThreshold(),
-      retainedMessages:
-        this.config.getExperimentalAgentHistoryRetainedMessages(),
-    });
+    this.agentHistoryProvider = new AgentHistoryProvider(
+      this.config.agentHistoryProviderConfig,
+      this.config,
+    );
     this.toolOutputMaskingService = new ToolOutputMaskingService();
     this.lastPromptId = this.config.getSessionId();
 
@@ -621,7 +615,7 @@ export class GeminiClient {
     // Check for context window overflow
     const modelForLimitCheck = this._getActiveModelForCurrentTurn();
 
-    if (this.config.isExperimentalAgentHistoryTruncationEnabled()) {
+    if (this.config.getContextManagementConfig().enabled) {
       const newHistory = await this.agentHistoryProvider.manageHistory(
         this.getHistory(),
         signal,
@@ -822,10 +816,7 @@ export class GeminiClient {
     }
 
     if (isInvalidStream) {
-      if (
-        this.config.getContinueOnFailedApiCall() &&
-        isGemini2Model(modelToUse)
-      ) {
+      if (this.config.getContinueOnFailedApiCall()) {
         if (isInvalidStreamRetry) {
           logContentRetryFailure(
             this.config,
