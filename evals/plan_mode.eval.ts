@@ -283,4 +283,47 @@ describe('plan_mode', () => {
       assertModelHasOutput(result);
     },
   });
+
+  evalTest('ALWAYS_PASSES', {
+    name: 'should transition from plan mode to normal execution and create a plan file from scratch',
+    params: {
+      settings,
+    },
+    prompt:
+      'Enter plan mode and plan to create a new module called foo. The plan should be saved as foo-plan.md. Then, exit plan mode.',
+    assert: async (rig, result) => {
+      const enterPlanCalled = await rig.waitForToolCall('enter_plan_mode');
+      expect(
+        enterPlanCalled,
+        'Expected enter_plan_mode tool to be called',
+      ).toBe(true);
+
+      const exitPlanCalled = await rig.waitForToolCall('exit_plan_mode');
+      expect(exitPlanCalled, 'Expected exit_plan_mode tool to be called').toBe(
+        true,
+      );
+
+      await rig.waitForTelemetryReady();
+      const toolLogs = rig.readToolLogs();
+
+      // Check if the plan file was written successfully
+      const planWrite = toolLogs.find(
+        (log) =>
+          log.toolRequest.name === 'write_file' &&
+          log.toolRequest.args.includes('foo-plan.md'),
+      );
+
+      expect(
+        planWrite,
+        'Expected write_file to be called for foo-plan.md',
+      ).toBeDefined();
+
+      expect(
+        planWrite?.toolRequest.success,
+        `Expected write_file to succeed, but got error: ${planWrite?.toolRequest.error}`,
+      ).toBe(true);
+
+      assertModelHasOutput(result);
+    },
+  });
 });

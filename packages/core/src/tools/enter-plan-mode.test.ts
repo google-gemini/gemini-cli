@@ -11,6 +11,22 @@ import type { Config } from '../config/config.js';
 import type { MessageBus } from '../confirmation-bus/message-bus.js';
 import { ToolConfirmationOutcome } from './tools.js';
 import { ApprovalMode } from '../policy/types.js';
+import fs from 'node:fs';
+
+vi.mock('node:fs', async () => {
+  const actual = await vi.importActual<typeof import('node:fs')>('node:fs');
+  return {
+    ...actual,
+    default: {
+      // @ts-expect-error - Property 'default' does not exist on type 'typeof import("node:fs")'
+      ...actual.default,
+      existsSync: vi.fn(),
+      mkdirSync: vi.fn(),
+    },
+    existsSync: vi.fn(),
+    mkdirSync: vi.fn(),
+  };
+});
 
 describe('EnterPlanModeTool', () => {
   let tool: EnterPlanModeTool;
@@ -103,6 +119,7 @@ describe('EnterPlanModeTool', () => {
   describe('execute', () => {
     it('should set approval mode to PLAN and return message', async () => {
       const invocation = tool.build({});
+      vi.mocked(fs.existsSync).mockReturnValue(true);
 
       const result = await invocation.execute(new AbortController().signal);
 
@@ -113,9 +130,21 @@ describe('EnterPlanModeTool', () => {
       expect(result.returnDisplay).toBe('Switching to Plan mode');
     });
 
+    it('should create plans directory if it does not exist', async () => {
+      const invocation = tool.build({});
+      vi.mocked(fs.existsSync).mockReturnValue(false);
+
+      await invocation.execute(new AbortController().signal);
+
+      expect(fs.mkdirSync).toHaveBeenCalledWith('/mock/plans/dir', {
+        recursive: true,
+      });
+    });
+
     it('should include optional reason in output display but not in llmContent', async () => {
       const reason = 'Design new database schema';
       const invocation = tool.build({ reason });
+      vi.mocked(fs.existsSync).mockReturnValue(true);
 
       const result = await invocation.execute(new AbortController().signal);
 

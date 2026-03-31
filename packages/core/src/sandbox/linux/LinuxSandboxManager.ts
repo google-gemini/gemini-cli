@@ -182,9 +182,23 @@ export class LinuxSandboxManager implements SandboxManager {
 
     verifySandboxOverrides(allowOverrides, req.policy);
 
-    const commandName = await getCommandName(req);
+    let command = req.command;
+    let args = req.args;
+
+    // Translate virtual commands for sandboxed file system access
+    if (command === '__read') {
+      command = 'cat';
+    } else if (command === '__write') {
+      command = 'sh';
+      args = ['-c', 'cat > "$1"', '_', ...args];
+    }
+
+    const commandName = await getCommandName({ ...req, command, args });
     const isApproved = allowOverrides
-      ? await isStrictlyApproved(req, this.options.modeConfig?.approvedTools)
+      ? await isStrictlyApproved(
+          { ...req, command, args },
+          this.options.modeConfig?.approvedTools,
+        )
       : false;
     const workspaceWrite = !isReadonlyMode || isApproved;
     const networkAccess =
@@ -280,11 +294,36 @@ export class LinuxSandboxManager implements SandboxManager {
       bwrapArgs.push(bindFlag, mainGitDir, mainGitDir);
     }
 
+    const includeDirs = sanitizePaths(this.options.includeDirectories) || [];
+    for (const includeDir of includeDirs) {
+      try {
+        const resolved = tryRealpath(includeDir);
+        bwrapArgs.push('--ro-bind-try', resolved, resolved);
+      } catch {
+        // Ignore
+      }
+    }
+
     const allowedPaths = sanitizePaths(req.policy?.allowedPaths) || [];
+
     const normalizedWorkspace = normalize(workspacePath).replace(/\/$/, '');
     for (const allowedPath of allowedPaths) {
       const resolved = tryRealpath(allowedPath);
-      if (!fs.existsSync(resolved)) continue;
+      if (!fs.existsSync(resolved)) {
+        // If the path doesn't exist, we still want to allow access to its parent
+        // if it's explicitly allowed, to enable creating it.
+        try {
+          const resolvedParent = tryRealpath(dirname(resolved));
+          bwrapArgs.push(
+            req.command === '__write' ? '--bind-try' : bindFlag,
+            resolvedParent,
+            resolvedParent,
+          );
+        } catch {
+          // Ignore
+        }
+        continue;
+      }
       const normalizedAllowedPath = normalize(resolved).replace(/\/$/, '');
       if (normalizedAllowedPath !== normalizedWorkspace) {
         bwrapArgs.push('--bind-try', resolved, resolved);
