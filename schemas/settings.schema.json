@@ -122,6 +122,13 @@
           "default": {},
           "type": "object",
           "properties": {
+            "enabled": {
+              "title": "Enable Plan Mode",
+              "description": "Enable Plan Mode for read-only safety during planning.",
+              "markdownDescription": "Enable Plan Mode for read-only safety during planning.\n\n- Category: `General`\n- Requires restart: `yes`\n- Default: `true`",
+              "default": true,
+              "type": "boolean"
+            },
             "directory": {
               "title": "Plan Directory",
               "description": "The directory where planning artifacts are stored. If not specified, defaults to the system temporary directory. A custom directory requires a policy to allow write access in Plan Mode.",
@@ -2847,13 +2854,6 @@
           "description": "Use OSC 52 for copying. This may be more robust than the default system when using remote terminal sessions (if your terminal is configured to allow it).",
           "markdownDescription": "Use OSC 52 for copying. This may be more robust than the default system when using remote terminal sessions (if your terminal is configured to allow it).\n\n- Category: `Experimental`\n- Requires restart: `no`\n- Default: `false`",
           "default": false,
-          "type": "boolean"
-        },
-        "plan": {
-          "title": "Plan",
-          "description": "Enable Plan Mode.",
-          "markdownDescription": "Enable Plan Mode.\n\n- Category: `Experimental`\n- Requires restart: `yes`\n- Default: `true`",
-          "default": true,
           "type": "boolean"
         },
         "taskTracker": {
