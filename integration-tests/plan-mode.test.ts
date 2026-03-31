@@ -135,7 +135,7 @@ describe('Plan Mode', () => {
 
     await rig.run({
       approvalMode: 'plan',
-      args: 'Create a file called hello.txt in the current directory.',
+      args: 'Attempt to create a file named "hello.txt" in the current directory. Do not create a plan file, try to write hello.txt directly.',
     });
 
     const toolLogs = rig.readToolLogs();

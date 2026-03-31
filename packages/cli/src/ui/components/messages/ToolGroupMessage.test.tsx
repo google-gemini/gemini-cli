@@ -481,7 +481,7 @@ describe('<ToolGroupMessage />', () => {
       ];
       const item = createItem(toolCalls);
       const { lastFrame, unmount } = await renderWithProviders(
-        <Scrollable height={10} hasFocus={true} scrollToBottom={true}>
+        <Scrollable height={12} hasFocus={true} scrollToBottom={true}>
           <ToolGroupMessage {...baseProps} item={item} toolCalls={toolCalls} />
         </Scrollable>,
         {
