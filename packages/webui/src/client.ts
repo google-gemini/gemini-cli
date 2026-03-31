@@ -239,7 +239,7 @@ function renderMd(text){
       } else {
         var codeBody = code.trimStart();
         if(codeBody.indexOf('__FILE:')===0){
-          var bodyNl = codeBody.indexOf('\\n');
+          var bodyNl = codeBody.indexOf('\n');
           fpath = codeBody.substring(7, bodyNl > -1 ? bodyNl : codeBody.length).trim();
           code = bodyNl > -1 ? codeBody.substring(bodyNl+1) : '';
         }
@@ -247,14 +247,11 @@ function renderMd(text){
 
       var id = 'cb_' + Math.random().toString(36).slice(2);
       if(fpath){
-        // File write card with collapsible preview
+        // File write card with collapsible preview — use data-* to avoid XSS.
         var fcId = 'fc_' + Math.random().toString(36).slice(2);
-        var safeId = fcId.replace(/'/g,'');
-        var safePreId = id.replace(/'/g,'');
-        var safeFpath = esc(fpath.replace(/\\/g,'\\\\').replace(/'/g,"\\'"));
         var shortFpath = fpath.length > 40 ? '...' + fpath.slice(-37) : fpath;
-        out += '<div class="tool-call file-card" id="'+fcId+'">' +
-          '<div class="tool-call-hdr" onclick="toggleFileCard(event, \\''+safeId+'\\')">'+
+        out += '<div class="tool-call file-card" id="'+esc(fcId)+'" data-fc-id="'+esc(fcId)+'">' +
+          '<div class="tool-call-hdr" data-toggle-fc="'+esc(fcId)+'">'+
             '<span class="tool-call-icon">'+SVG_FILE+'</span>' +
             '<span class="tool-call-title">WriteFile</span>' +
             '<span class="tool-call-meta">'+esc(shortFpath)+'</span>' +
@@ -263,30 +260,29 @@ function renderMd(text){
           '</div>' +
           '<div class="tool-call-body fc-body">' +
             '<div class="fc-path" style="border-radius:0;border:none;margin:0;padding:10px 14px;background:var(--bg-low);font-size:11px">Writing to: <code>'+esc(fpath)+'</code></div>' +
-            '<div class="fc-preview" style="max-height:200px;border-top:1px solid var(--outline)"><pre id="'+id+'" style="margin:0">'+esc(code.trim())+'</pre></div>' +
+            '<div class="fc-preview" style="max-height:200px;border-top:1px solid var(--outline)"><pre id="'+esc(id)+'" style="margin:0">'+esc(code.trim())+'</pre></div>' +
             '<div class="fc-btns" style="padding:10px 14px;background:var(--bg-low);border-top:1px solid var(--outline)">' +
-              '<button class="fc-btn primary" onclick="approveFile(\\''+safeId+'\\',\\''+safeFpath+'\\',\\''+safePreId+'\\')">&#10003; Approve<kbd>1</kbd></button>' +
-              '<button class="fc-btn" onclick="approveFileSession(\\''+safeId+'\\',\\''+safeFpath+'\\',\\''+safePreId+'\\')">Session<kbd>2</kbd></button>' +
-              '<button class="fc-btn danger" onclick="declineFile(\\''+safeId+'\\')">&#10007; Decline<kbd>3</kbd></button>' +
+              '<button class="fc-btn primary" data-fc-approve="'+esc(fcId)+'" data-pre-id="'+esc(id)+'" data-fpath="'+esc(fpath)+'">&#10003; Approve<kbd>1</kbd></button>' +
+              '<button class="fc-btn" data-fc-session="'+esc(fcId)+'" data-pre-id="'+esc(id)+'" data-fpath="'+esc(fpath)+'">Session<kbd>2</kbd></button>' +
+              '<button class="fc-btn danger" data-fc-decline="'+esc(fcId)+'">&#10007; Decline<kbd>3</kbd></button>' +
             '</div>' +
           '</div>' +
         '</div>';
       } else {
         // Regular code block with collapsible
         var langText = lang || 'text';
-        var shortLang = langText.length > 20 ? langText.slice(0,17) + '...' : langText;
         out += '<div class="tool-call">' +
-          '<div class="tool-call-hdr" onclick="toggleCodeBlock(event, this)">' +
+          '<div class="tool-call-hdr" data-toggle-cb="1">' +
             '<span class="tool-call-icon"><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="16 18 22 12 16 6"></polyline><polyline points="8 6 2 12 8 18"></polyline></svg></span>' +
             '<span class="tool-call-title">'+esc(langText)+'</span>' +
-            '<span class="tool-call-meta">'+code.trim().split('\\n').length+' lines</span>' +
+            '<span class="tool-call-meta">'+code.trim().split('\n').length+' lines</span>' +
             '<svg class="ic xs tool-call-chev" viewBox="0 0 24 24"><path d="m9 18 6-6-6-6"/></svg>' +
           '</div>' +
           '<div class="tool-call-body">' +
             '<div style="display:flex;justify-content:flex-end;padding:4px 8px;background:var(--bg-low);border-top:1px solid var(--outline)">' +
-              '<button class="cb-copy" onclick="cpCode(\\''+id+'\\')" style="border:none;padding:4px 8px">Copy</button>' +
+              '<button class="cb-copy" data-copy-id="'+esc(id)+'" style="border:none;padding:4px 8px">Copy</button>' +
             '</div>' +
-            '<pre id="'+id+'">'+esc(code.trim())+'</pre>' +
+            '<pre id="'+esc(id)+'">'+esc(code.trim())+'</pre>' +
           '</div>' +
         '</div>';
       }
@@ -440,15 +436,39 @@ function updateFilesPanel(){
         '<span class="fp-adds"><span class="add">+' + f.lines + '</span></span>' +
         '<span class="fp-path" title="' + esc(f.path) + '">' + esc(f.path) + '</span>' +
         '<div class="fp-actions">' +
-          '<button type="button" class="fp-open-btn" aria-expanded="' + (isOpen ? 'true' : 'false') + '" aria-controls="' + menuId + '" onclick="toggleFileMenu(event, \'' + esc(escJs(f.path)) + '\', \'' + menuId + '\')">Open</button>' +
+          '<button type="button" class="fp-open-btn" aria-expanded="' + (isOpen ? 'true' : 'false') + '" aria-controls="' + menuId + '" data-fp="' + esc(f.path) + '" data-menu="' + esc(menuId) + '">Open</button>' +
           '<div class="fp-menu' + (isOpen ? ' open' : '') + '" id="' + menuId + '">' +
-            '<button type="button" class="fp-menu-item" onclick="openTrackedFile(event, \\'' + escJs(f.path) + '\\', \\'finder\\')">Finder</button>' +
-            '<button type="button" class="fp-menu-item" onclick="openTrackedFile(event, \\'' + escJs(f.path) + '\\', \\'cursor\\')">Cursor</button>' +
-            '<button type="button" class="fp-menu-item" onclick="openTrackedFile(event, \\'' + escJs(f.path) + '\\', \\'vscode\\')">VS Code</button>' +
+            '<button type="button" class="fp-menu-item" data-fp="' + esc(f.path) + '" data-target="finder">Finder</button>' +
+            '<button type="button" class="fp-menu-item" data-fp="' + esc(f.path) + '" data-target="cursor">Cursor</button>' +
+            '<button type="button" class="fp-menu-item" data-fp="' + esc(f.path) + '" data-target="vscode">VS Code</button>' +
             '<div class="fp-menu-sep"></div>' +
-            '<button type="button" class="fp-menu-item" onclick="copyTrackedFilePath(event, \\'' + escJs(f.path) + '\\')">Copy path</button>' +
+            '<button type="button" class="fp-menu-item fp-copy-path" data-fp="' + esc(f.path) + '">Copy path</button>' +
           '</div>' +
         '</div>';
+      // Wire buttons via addEventListener — never inject paths into onclick.
+      var openBtn = el.querySelector('.fp-open-btn');
+      if(openBtn){
+        openBtn.addEventListener('click', function(e){
+          e.stopPropagation();
+          var fp = openBtn.getAttribute('data-fp');
+          var mid = openBtn.getAttribute('data-menu');
+          toggleFileMenu(e, fp, mid);
+        });
+      }
+      el.querySelectorAll('.fp-menu-item[data-target]').forEach(function(btn){
+        btn.addEventListener('click', function(e){
+          var fp = btn.getAttribute('data-fp');
+          var target = btn.getAttribute('data-target');
+          openTrackedFile(e, fp, target);
+        });
+      });
+      var copyBtn = el.querySelector('.fp-copy-path');
+      if(copyBtn){
+        copyBtn.addEventListener('click', function(e){
+          var fp = copyBtn.getAttribute('data-fp');
+          copyTrackedFilePath(e, fp);
+        });
+      }
       list.appendChild(el);
     });
   }
@@ -475,7 +495,21 @@ function toggleFilesPanel(){
 }
 
 function escJs(s){
-  return String(s).replace(/\\\\/g, '\\\\\\\\').replace(/'/g, "\\'");
+  // First escape for JS string, then encode remaining HTML entities so the
+  // browser cannot decode &apos; or similar back into a quote before JS runs.
+  return String(s)
+    .replace(/\\\\/g, '\\\\\\\\')
+    .replace(/'/g, "\\\\'");
+}
+
+function escJsHtml(s){
+  // Safe for use inside an HTML attribute that contains a JS string literal
+  // wrapped in single quotes: applies JS escaping then HTML-encodes the result.
+  return escJs(s)
+    .replace(/&/g, '&amp;')
+    .replace(/"/g, '&quot;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;');
 }
 
 function escJsDouble(s){
@@ -548,12 +582,23 @@ function makeSI(s){
   var isActive = s.id === curId && (s.source || 'draft') === curSource;
   var source = s.source || 'draft';
   el.className = 'si' + (isActive ? ' active' : '');
+  // Use esc() for all HTML-injected values; store id/source on data attributes
+  // so the delete button can read them via JS without inline event injection.
   el.innerHTML = '<span class="si-main">' +
       '<span class="si-t">' + esc(s.title||'Untitled') + '</span>' +
       '<span class="si-src ' + esc(source) + '">' + (source === 'cli' ? 'CLI' : 'Draft') + '</span>' +
     '</span>' +
     '<span class="si-d">' + esc(s.time||'') + '</span>' +
-    '<button class="si-del" title="Delete" onclick="event.stopPropagation();confirmDeleteSession(\'' + esc(escJs(s.id)) + '\', \'' + esc(escJs(source)) + '\')"><svg class="ic xs" viewBox="0 0 24 24"><path d="M3 6h18"/><path d="M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6"/><path d="M8 6V4a2 2 0 012-2h4a2 2 0 012 2v2"/></svg></button>';
+    '<button class="si-del" title="Delete" data-sid="' + esc(s.id) + '" data-src="' + esc(source) + '"><svg class="ic xs" viewBox="0 0 24 24"><path d="M3 6h18"/><path d="M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6"/><path d="M8 6V4a2 2 0 012-2h4a2 2 0 012 2v2"/></svg></button>';
+  var delBtn = el.querySelector('.si-del');
+  if(delBtn){
+    delBtn.addEventListener('click', function(e){
+      e.stopPropagation();
+      var sid = delBtn.getAttribute('data-sid');
+      var src = delBtn.getAttribute('data-src');
+      confirmDeleteSession(sid, src);
+    });
+  }
   el.onclick = function(){ loadSession(s.id, source); };
   return el;
 }
@@ -590,8 +635,15 @@ function renderSessions(){
       hdr.innerHTML = '<svg class="ic xs ws-chev' + (isOpen?'':' closed') + '" viewBox="0 0 24 24"><polyline points="6 9 12 15 18 9"/></svg>' +
         '<span class="ws-path">' + esc(shortPath(cwd)) + '</span>' +
         '<span class="ws-cnt">(' + items.length + ')</span>' +
-        '<button class="ws-new" title="New chat in this folder" onclick="event.stopPropagation(); newChatInCwd(&quot;' + escJsDouble(cwd) + '&quot;)"><svg class="ic xs" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg></button>';
+        '<button class="ws-new" title="New chat in this folder" data-cwd="' + esc(cwd) + '"><svg class="ic xs" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg></button>';
       hdr.onclick = function(){ wsOpen[cwd] = !isOpen; renderSessions(); };
+      var newBtn = hdr.querySelector('.ws-new');
+      if(newBtn){
+        newBtn.addEventListener('click', function(e){
+          e.stopPropagation();
+          newChatInCwd(newBtn.getAttribute('data-cwd'));
+        });
+      }
       grp.appendChild(hdr);
 
       var body = document.createElement('div');
@@ -2082,6 +2134,44 @@ document.addEventListener('click', function(e){
   if(panel && panel.classList.contains('open') && !e.target.closest('.ctx-wrap')){
     panel.classList.remove('open');
   }
+});
+
+/* ═══ Chat Area Event Delegation ═══ */
+// All file-card and code-block buttons use data-* attributes (no inline onclick
+// with user-controlled data) to prevent XSS. Wire them here via delegation.
+chatArea.addEventListener('click', function(e){
+  var t = e.target;
+  if(!t) return;
+
+  // Toggle collapsible code block header
+  var cbHdr = t.closest('[data-toggle-cb]');
+  if(cbHdr){ toggleCodeBlock(e, cbHdr); return; }
+
+  // Toggle collapsible file card header
+  var fcHdr = t.closest('[data-toggle-fc]');
+  if(fcHdr){ toggleFileCard(e, fcHdr.getAttribute('data-toggle-fc')); return; }
+
+  // Copy code button
+  var copyBtn = t.closest('[data-copy-id]');
+  if(copyBtn){ cpCode(copyBtn.getAttribute('data-copy-id')); return; }
+
+  // Approve file
+  var apprBtn = t.closest('[data-fc-approve]');
+  if(apprBtn){
+    approveFile(apprBtn.getAttribute('data-fc-approve'), apprBtn.getAttribute('data-fpath'), apprBtn.getAttribute('data-pre-id'));
+    return;
+  }
+
+  // Approve for session
+  var sessBtn = t.closest('[data-fc-session]');
+  if(sessBtn){
+    approveFileSession(sessBtn.getAttribute('data-fc-session'), sessBtn.getAttribute('data-fpath'), sessBtn.getAttribute('data-pre-id'));
+    return;
+  }
+
+  // Decline file
+  var declBtn = t.closest('[data-fc-decline]');
+  if(declBtn){ declineFile(declBtn.getAttribute('data-fc-decline')); return; }
 });
 
 /* ═══ Init ═══ */

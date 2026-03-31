@@ -1073,16 +1073,20 @@ export async function handleFileSearch(
   }
 
   let query: string;
+  let requestCwd: string | undefined;
   try {
     const parsed = JSON.parse(body);
     query = (parsed.query || '').toLowerCase();
+    requestCwd = typeof parsed.cwd === 'string' ? parsed.cwd : undefined;
   } catch {
     res.writeHead(400, { 'Content-Type': 'application/json' });
     res.end(JSON.stringify({ error: 'Invalid request.' }));
     return;
   }
 
-  const cwd = process.cwd();
+  // Use cwd from request when provided (workspace-aware); fall back to process.cwd().
+  const cwd =
+    requestCwd && path.isAbsolute(requestCwd) ? requestCwd : process.cwd();
   const allFiles: string[] = [];
   await walkFiles(cwd, cwd, allFiles, 5000);
 
@@ -1136,16 +1140,32 @@ export async function handleFileRead(
     return;
   }
 
-  // Security: prevent path traversal
-  const cwd = process.cwd();
-  const resolved = path.resolve(cwd, filePath);
-  if (!resolved.startsWith(cwd + path.sep) && resolved !== cwd) {
+  // Security: prevent path traversal (including via symlinks)
+  let realCwd: string;
+  try {
+    realCwd = await fs.realpath(process.cwd());
+  } catch {
+    realCwd = process.cwd();
+  }
+  const resolved = path.resolve(realCwd, filePath);
+  let realResolved: string;
+  try {
+    realResolved = await fs.realpath(resolved);
+  } catch {
+    res.writeHead(404, { 'Content-Type': 'application/json' });
+    res.end(JSON.stringify({ error: 'File not found or cannot be read.' }));
+    return;
+  }
+  if (
+    !realResolved.startsWith(realCwd + path.sep) &&
+    realResolved !== realCwd
+  ) {
     res.writeHead(403, { 'Content-Type': 'application/json' });
     res.end(JSON.stringify({ error: 'Access denied: path outside project.' }));
     return;
   }
 
-  const ext = path.extname(resolved).toLowerCase();
+  const ext = path.extname(realResolved).toLowerCase();
   if (BINARY_EXTS.has(ext)) {
     res.writeHead(200, { 'Content-Type': 'application/json' });
     res.end(
@@ -1158,10 +1178,10 @@ export async function handleFileRead(
   }
 
   try {
-    const content = await fs.readFile(resolved, 'utf-8');
+    const content = await fs.readFile(realResolved, 'utf-8');
     const maxLen = 50_000;
     const truncated = content.length > maxLen;
-    const stat = await fs.stat(resolved);
+    const stat = await fs.stat(realResolved);
     const totalLines = content.split('\n').length;
     res.writeHead(200, { 'Content-Type': 'application/json' });
     res.end(
@@ -1212,18 +1232,34 @@ export async function handleFileWrite(
     return;
   }
 
-  // Security: prevent path traversal
-  const cwd = process.cwd();
-  const resolved = path.resolve(cwd, filePath);
-  if (!resolved.startsWith(cwd + path.sep) && resolved !== cwd) {
+  // Security: prevent path traversal (including via symlinks)
+  let realCwd: string;
+  try {
+    realCwd = await fs.realpath(process.cwd());
+  } catch {
+    realCwd = process.cwd();
+  }
+  const resolved = path.resolve(realCwd, filePath);
+  // For write, the file may not exist yet — resolve the parent directory.
+  let realParent: string;
+  try {
+    realParent = await fs.realpath(path.dirname(resolved));
+  } catch {
+    realParent = path.dirname(resolved);
+  }
+  const realResolved = path.join(realParent, path.basename(resolved));
+  if (
+    !realResolved.startsWith(realCwd + path.sep) &&
+    realResolved !== realCwd
+  ) {
     res.writeHead(403, { 'Content-Type': 'application/json' });
     res.end(JSON.stringify({ error: 'Access denied: path outside project.' }));
     return;
   }
 
   try {
-    await fs.mkdir(path.dirname(resolved), { recursive: true });
-    await fs.writeFile(resolved, content, 'utf-8');
+    await fs.mkdir(path.dirname(realResolved), { recursive: true });
+    await fs.writeFile(realResolved, content, 'utf-8');
     res.writeHead(200, { 'Content-Type': 'application/json' });
     res.end(JSON.stringify({ ok: true, path: filePath }));
   } catch (err) {
@@ -1267,19 +1303,28 @@ export async function handleFileOpen(
     return;
   }
 
-  const cwd = process.cwd();
-  const resolved = path.resolve(cwd, filePath);
-  if (!resolved.startsWith(cwd + path.sep) && resolved !== cwd) {
-    res.writeHead(403, { 'Content-Type': 'application/json' });
-    res.end(JSON.stringify({ error: 'Access denied: path outside project.' }));
-    return;
-  }
-
+  let realCwd: string;
   try {
-    await fs.access(resolved);
+    realCwd = await fs.realpath(process.cwd());
+  } catch {
+    realCwd = process.cwd();
+  }
+  const resolved = path.resolve(realCwd, filePath);
+  // Resolve symlinks before prefix check to prevent symlink traversal.
+  let realResolved: string;
+  try {
+    realResolved = await fs.realpath(resolved);
   } catch {
     res.writeHead(404, { 'Content-Type': 'application/json' });
     res.end(JSON.stringify({ error: 'File not found.' }));
+    return;
+  }
+  if (
+    !realResolved.startsWith(realCwd + path.sep) &&
+    realResolved !== realCwd
+  ) {
+    res.writeHead(403, { 'Content-Type': 'application/json' });
+    res.end(JSON.stringify({ error: 'Access denied: path outside project.' }));
     return;
   }
 
@@ -1289,20 +1334,20 @@ export async function handleFileOpen(
   if (target === 'finder') {
     if (process.platform === 'darwin') {
       command = 'open';
-      args = ['-R', resolved];
+      args = ['-R', realResolved];
     } else if (process.platform === 'win32') {
       command = 'explorer.exe';
-      args = ['/select,', resolved];
+      args = ['/select,', realResolved];
     } else {
       command = 'xdg-open';
-      args = [path.dirname(resolved)];
+      args = [path.dirname(realResolved)];
     }
   } else if (target === 'cursor') {
     command = 'cursor';
-    args = [resolved];
+    args = [realResolved];
   } else if (target === 'vscode') {
     command = 'code';
-    args = [resolved];
+    args = [realResolved];
   } else {
     res.writeHead(400, { 'Content-Type': 'application/json' });
     res.end(JSON.stringify({ error: 'Unsupported open target.' }));
@@ -1438,14 +1483,29 @@ export async function handleSessionDelete(
 
   const chatsDir = getChatsDir(gcConfig);
   const resolved = path.resolve(chatsDir, id);
-  if (!resolved.startsWith(chatsDir + path.sep)) {
+  // Resolve symlinks before prefix check to prevent symlink traversal.
+  let realResolved: string;
+  try {
+    realResolved = await fs.realpath(resolved);
+  } catch {
+    res.writeHead(404, { 'Content-Type': 'application/json' });
+    res.end(JSON.stringify({ error: 'Session not found.' }));
+    return;
+  }
+  let realChatsDir: string;
+  try {
+    realChatsDir = await fs.realpath(chatsDir);
+  } catch {
+    realChatsDir = chatsDir;
+  }
+  if (!realResolved.startsWith(realChatsDir + path.sep)) {
     res.writeHead(403, { 'Content-Type': 'application/json' });
     res.end(JSON.stringify({ error: 'Access denied.' }));
     return;
   }
 
   try {
-    await fs.unlink(resolved);
+    await fs.unlink(realResolved);
     res.writeHead(200, { 'Content-Type': 'application/json' });
     res.end(JSON.stringify({ ok: true }));
   } catch (err) {
