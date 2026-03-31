@@ -10,10 +10,10 @@ import { debugLogger } from './debugLogger.js';
 
 // Token estimation constants
 // ASCII characters (0-127) are roughly 4 chars per token
-const ASCII_TOKENS_PER_CHAR = 0.25;
+export const ASCII_TOKENS_PER_CHAR = 0.25;
 // Non-ASCII characters (including CJK) are often 1-2 tokens per char.
 // We use 1.3 as a conservative estimate to avoid underestimation.
-const NON_ASCII_TOKENS_PER_CHAR = 1.3;
+export const NON_ASCII_TOKENS_PER_CHAR = 1.3;
 // Fixed token estimate for images
 const IMAGE_TOKEN_ESTIMATE = 3000;
 // Fixed token estimate for PDFs (~100 pages at 258 tokens/page)

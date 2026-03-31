@@ -6,9 +6,12 @@
 
 import { type FunctionCall } from '@google/genai';
 import {
-  isDangerousCommand,
-  isKnownSafeCommand,
-} from '../sandbox/macos/commandSafety.js';
+  SHELL_TOOL_NAMES,
+  initializeShellParsers,
+  splitCommands,
+  hasRedirection,
+  extractStringFromParseEntry,
+} from '../utils/shell-utils.js';
 import { parse as shellParse } from 'shell-quote';
 import {
   PolicyDecision,
@@ -24,12 +27,6 @@ import { stableStringify } from './stable-stringify.js';
 import { debugLogger } from '../utils/debugLogger.js';
 import type { CheckerRunner } from '../safety/checker-runner.js';
 import { SafetyCheckDecision } from '../safety/protocol.js';
-import {
-  SHELL_TOOL_NAMES,
-  initializeShellParsers,
-  splitCommands,
-  hasRedirection,
-} from '../utils/shell-utils.js';
 import { getToolAliases } from '../tools/tool-names.js';
 import {
   MCP_TOOL_PREFIX,
@@ -38,6 +35,10 @@ import {
   formatMcpToolName,
   isMcpToolName,
 } from '../tools/mcp-tool.js';
+import {
+  type SandboxManager,
+  NoopSandboxManager,
+} from '../services/sandboxManager.js';
 
 function isWildcardPattern(name: string): boolean {
   return name === '*' || name.includes('*');
@@ -197,8 +198,7 @@ export class PolicyEngine {
   private readonly disableAlwaysAllow: boolean;
   private readonly checkerRunner?: CheckerRunner;
   private approvalMode: ApprovalMode;
-  private toolSandboxEnabled: boolean;
-  private sandboxApprovedTools: string[];
+  private readonly sandboxManager: SandboxManager;
 
   constructor(config: PolicyEngineConfig = {}, checkerRunner?: CheckerRunner) {
     this.rules = (config.rules ?? []).sort(
@@ -244,23 +244,21 @@ export class PolicyEngine {
       }
     }
 
-    this.defaultDecision = config.defaultDecision ?? PolicyDecision.ASK_USER;
     this.nonInteractive = config.nonInteractive ?? false;
+    this.defaultDecision =
+      config.defaultDecision ??
+      (this.nonInteractive ? PolicyDecision.DENY : PolicyDecision.ASK_USER);
     this.disableAlwaysAllow = config.disableAlwaysAllow ?? false;
     this.checkerRunner = checkerRunner;
     this.approvalMode = config.approvalMode ?? ApprovalMode.DEFAULT;
-    this.toolSandboxEnabled = config.toolSandboxEnabled ?? false;
-    this.sandboxApprovedTools = config.sandboxApprovedTools ?? [];
+    this.sandboxManager = config.sandboxManager ?? new NoopSandboxManager();
   }
 
   /**
    * Update the current approval mode.
    */
-  setApprovalMode(mode: ApprovalMode, sandboxApprovedTools?: string[]): void {
+  setApprovalMode(mode: ApprovalMode): void {
     this.approvalMode = mode;
-    if (sandboxApprovedTools !== undefined) {
-      this.sandboxApprovedTools = sandboxApprovedTools;
-    }
   }
 
   /**
@@ -285,8 +283,9 @@ export class PolicyEngine {
     if (!hasRedirection(command)) return false;
 
     // Do not downgrade (do not ask user) if sandboxing is enabled and in AUTO_EDIT or YOLO
+    const sandboxEnabled = !(this.sandboxManager instanceof NoopSandboxManager);
     if (
-      this.toolSandboxEnabled &&
+      sandboxEnabled &&
       (this.approvalMode === ApprovalMode.AUTO_EDIT ||
         this.approvalMode === ApprovalMode.YOLO)
     ) {
@@ -299,7 +298,6 @@ export class PolicyEngine {
   /**
    * Check if a shell command is allowed.
    */
-
   private async applyShellHeuristics(
     command: string,
     decision: PolicyDecision,
@@ -307,19 +305,17 @@ export class PolicyEngine {
     await initializeShellParsers();
     try {
       const parsedObjArgs = shellParse(command);
-      if (parsedObjArgs.some((arg) => typeof arg === 'object')) return decision;
-      const parsedArgs = parsedObjArgs.map(String);
-      if (isDangerousCommand(parsedArgs)) {
+      const parsedArgs = parsedObjArgs.map(extractStringFromParseEntry);
+
+      if (this.sandboxManager.isDangerousCommand(parsedArgs)) {
         debugLogger.debug(
           `[PolicyEngine.check] Command evaluated as dangerous, forcing ASK_USER: ${command}`,
         );
         return PolicyDecision.ASK_USER;
       }
-      const isApprovedBySandbox =
-        this.toolSandboxEnabled &&
-        this.sandboxApprovedTools.includes(parsedArgs[0]);
+
       if (
-        (isKnownSafeCommand(parsedArgs) || isApprovedBySandbox) &&
+        this.sandboxManager.isKnownSafeCommand(parsedArgs) &&
         decision === PolicyDecision.ASK_USER
       ) {
         debugLogger.debug(
@@ -346,7 +342,7 @@ export class PolicyEngine {
   ): Promise<CheckResult> {
     if (!command) {
       return {
-        decision: this.applyNonInteractiveMode(ruleDecision),
+        decision: ruleDecision,
         rule,
       };
     }
@@ -369,13 +365,13 @@ export class PolicyEngine {
       }
 
       debugLogger.debug(
-        `[PolicyEngine.check] Command parsing failed for: ${command}. Falling back to ASK_USER.`,
+        `[PolicyEngine.check] Command parsing failed for: ${command}. Falling back to ${this.defaultDecision}.`,
       );
 
-      // Parsing logic failed, we can't trust it. Force ASK_USER (or DENY).
+      // Parsing logic failed, we can't trust it. Use default decision ASK_USER (or DENY in non-interactive).
       // We return the rule that matched so the evaluation loop terminates.
       return {
-        decision: this.applyNonInteractiveMode(PolicyDecision.ASK_USER),
+        decision: this.defaultDecision,
         rule,
       };
     }
@@ -472,7 +468,7 @@ export class PolicyEngine {
       }
 
       return {
-        decision: this.applyNonInteractiveMode(aggregateDecision),
+        decision: aggregateDecision,
         // If we stayed at ALLOW, we return the original rule (if any).
         // If we downgraded, we return the responsible rule (or undefined if implicit).
         rule: aggregateDecision === ruleDecision ? rule : responsibleRule,
@@ -480,7 +476,7 @@ export class PolicyEngine {
     }
 
     return {
-      decision: this.applyNonInteractiveMode(ruleDecision),
+      decision: ruleDecision,
       rule,
     };
   }
@@ -603,7 +599,7 @@ export class PolicyEngine {
             break;
           }
         } else {
-          decision = this.applyNonInteractiveMode(rule.decision);
+          decision = rule.decision;
           matchedRule = rule;
           break;
         }
@@ -647,7 +643,7 @@ export class PolicyEngine {
         decision = shellResult.decision;
         matchedRule = shellResult.rule;
       } else {
-        decision = this.applyNonInteractiveMode(this.defaultDecision);
+        decision = this.defaultDecision;
       }
     }
 
@@ -703,7 +699,7 @@ export class PolicyEngine {
     }
 
     return {
-      decision: this.applyNonInteractiveMode(decision),
+      decision,
       rule: matchedRule,
     };
   }
@@ -872,7 +868,7 @@ export class PolicyEngine {
             continue;
           } else {
             // Unconditional rule for this tool
-            const decision = this.applyNonInteractiveMode(rule.decision);
+            const decision = rule.decision;
             staticallyExcluded = decision === PolicyDecision.DENY;
             matchFound = true;
             break;
@@ -882,7 +878,7 @@ export class PolicyEngine {
 
       if (!matchFound) {
         // Fallback to default decision if no rule matches
-        const defaultDec = this.applyNonInteractiveMode(this.defaultDecision);
+        const defaultDec = this.defaultDecision;
         if (defaultDec === PolicyDecision.DENY) {
           staticallyExcluded = true;
         }
@@ -894,13 +890,5 @@ export class PolicyEngine {
     }
 
     return excludedTools;
-  }
-
-  private applyNonInteractiveMode(decision: PolicyDecision): PolicyDecision {
-    // In non-interactive mode, ASK_USER becomes DENY
-    if (this.nonInteractive && decision === PolicyDecision.ASK_USER) {
-      return PolicyDecision.DENY;
-    }
-    return decision;
   }
 }

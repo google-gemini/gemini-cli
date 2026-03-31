@@ -789,6 +789,7 @@ const listExtensionsCommand: SlashCommand = {
   description: 'List active extensions',
   kind: CommandKind.BUILT_IN,
   autoExecute: true,
+  takesArgs: false,
   action: listAction,
 };
 
@@ -849,6 +850,7 @@ const exploreExtensionsCommand: SlashCommand = {
   description: 'Open extensions page in your browser',
   kind: CommandKind.BUILT_IN,
   autoExecute: true,
+  takesArgs: false,
   action: exploreAction,
 };
 
@@ -870,6 +872,8 @@ const configCommand: SlashCommand = {
   action: configAction,
 };
 
+import { parseSlashCommand } from '../../utils/commands.js';
+
 export function extensionsCommand(
   enableExtensionReloading?: boolean,
 ): SlashCommand {
@@ -883,20 +887,29 @@ export function extensionsCommand(
         configCommand,
       ]
     : [];
+  const subCommands = [
+    listExtensionsCommand,
+    updateExtensionsCommand,
+    exploreExtensionsCommand,
+    reloadCommand,
+    ...conditionalCommands,
+  ];
+
   return {
     name: 'extensions',
     description: 'Manage extensions',
     kind: CommandKind.BUILT_IN,
     autoExecute: false,
-    subCommands: [
-      listExtensionsCommand,
-      updateExtensionsCommand,
-      exploreExtensionsCommand,
-      reloadCommand,
-      ...conditionalCommands,
-    ],
-    action: (context, args) =>
+    subCommands,
+    action: async (context, args) => {
+      if (args) {
+        const parsed = parseSlashCommand(`/${args}`, subCommands);
+        if (parsed.commandToExecute?.action) {
+          return parsed.commandToExecute.action(context, parsed.args);
+        }
+      }
       // Default to list if no subcommand is provided
-      listExtensionsCommand.action!(context, args),
+      return listExtensionsCommand.action!(context, args);
+    },
   };
 }

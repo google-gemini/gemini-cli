@@ -62,10 +62,15 @@ export function getErrorMessage(error: unknown): string {
 export function getErrorType(error: unknown): string {
   if (!(error instanceof Error)) return 'unknown';
 
-  // Return constructor name if the generic 'Error' name is used (for custom errors)
-  return error.name === 'Error'
-    ? (error.constructor?.name ?? 'Error')
-    : error.name;
+  // Use the constructor name if the standard error name is missing or generic.
+  const name =
+    error.name && error.name !== 'Error'
+      ? error.name
+      : (error.constructor?.name ?? 'Error');
+
+  // Strip leading underscore from error names. Bundlers like esbuild sometimes
+  // rename classes to avoid scope collisions.
+  return name.replace(/^_+/, '');
 }
 
 export class FatalError extends Error {
@@ -74,42 +79,50 @@ export class FatalError extends Error {
     readonly exitCode: number,
   ) {
     super(message);
+    this.name = 'FatalError';
   }
 }
 
 export class FatalAuthenticationError extends FatalError {
   constructor(message: string) {
     super(message, 41);
+    this.name = 'FatalAuthenticationError';
   }
 }
 export class FatalInputError extends FatalError {
   constructor(message: string) {
     super(message, 42);
+    this.name = 'FatalInputError';
   }
 }
 export class FatalSandboxError extends FatalError {
   constructor(message: string) {
     super(message, 44);
+    this.name = 'FatalSandboxError';
   }
 }
 export class FatalConfigError extends FatalError {
   constructor(message: string) {
     super(message, 52);
+    this.name = 'FatalConfigError';
   }
 }
 export class FatalTurnLimitedError extends FatalError {
   constructor(message: string) {
     super(message, 53);
+    this.name = 'FatalTurnLimitedError';
   }
 }
 export class FatalToolExecutionError extends FatalError {
   constructor(message: string) {
     super(message, 54);
+    this.name = 'FatalToolExecutionError';
   }
 }
 export class FatalCancellationError extends FatalError {
   constructor(message: string) {
     super(message, 130); // Standard exit code for SIGINT
+    this.name = 'FatalCancellationError';
   }
 }
 
@@ -120,7 +133,12 @@ export class CanceledError extends Error {
   }
 }
 
-export class ForbiddenError extends Error {}
+export class ForbiddenError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = 'ForbiddenError';
+  }
+}
 export class AccountSuspendedError extends ForbiddenError {
   readonly appealUrl?: string;
   readonly appealLinkText?: string;
@@ -132,8 +150,18 @@ export class AccountSuspendedError extends ForbiddenError {
     this.appealLinkText = metadata?.['appeal_url_link_text'];
   }
 }
-export class UnauthorizedError extends Error {}
-export class BadRequestError extends Error {}
+export class UnauthorizedError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = 'UnauthorizedError';
+  }
+}
+export class BadRequestError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = 'BadRequestError';
+  }
+}
 
 export class ChangeAuthRequestedError extends Error {
   constructor() {
@@ -266,10 +294,7 @@ export function isAuthenticationError(error: unknown): boolean {
   }
 
   // Check for UnauthorizedError class (from MCP SDK or our own)
-  if (
-    error instanceof Error &&
-    error.constructor.name === 'UnauthorizedError'
-  ) {
+  if (error instanceof Error && error.name === 'UnauthorizedError') {
     return true;
   }
 

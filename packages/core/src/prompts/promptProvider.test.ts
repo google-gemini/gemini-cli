@@ -11,10 +11,15 @@ import {
   getAllGeminiMdFilenames,
   DEFAULT_CONTEXT_FILENAME,
 } from '../tools/memoryTool.js';
-import { PREVIEW_GEMINI_MODEL } from '../config/models.js';
+import {
+  PREVIEW_GEMINI_MODEL,
+  DEFAULT_GEMINI_MODEL,
+} from '../config/models.js';
 import { ApprovalMode } from '../policy/types.js';
 import { DiscoveredMCPTool } from '../tools/mcp-tool.js';
 import { MockTool } from '../test-utils/mock-tool.js';
+import { UPDATE_TOPIC_TOOL_NAME } from '../tools/tool-names.js';
+import { TopicState } from '../config/topicState.js';
 import type { CallableTool } from '@google/genai';
 import type { MessageBus } from '../confirmation-bus/message-bus.js';
 import type { ToolRegistry } from '../tools/tool-registry.js';
@@ -53,6 +58,7 @@ describe('PromptProvider', () => {
         ).getToolRegistry?.() as unknown as ToolRegistry;
       },
       getToolRegistry: vi.fn().mockReturnValue(mockToolRegistry),
+      topicState: new TopicState(),
       getEnableShellOutputEfficiency: vi.fn().mockReturnValue(true),
       getSandboxEnabled: vi.fn().mockReturnValue(false),
       storage: {
@@ -73,6 +79,8 @@ describe('PromptProvider', () => {
       getApprovedPlanPath: vi.fn().mockReturnValue(undefined),
       getApprovalMode: vi.fn(),
       isTrackerEnabled: vi.fn().mockReturnValue(false),
+      getHasAccessToPreviewModel: vi.fn().mockReturnValue(true),
+      getGemini31LaunchedSync: vi.fn().mockReturnValue(true),
     } as unknown as Config;
   });
 
@@ -232,6 +240,84 @@ describe('PromptProvider', () => {
       const prompt = provider.getCompressionPrompt(mockConfig);
 
       expect(prompt).not.toContain('### APPROVED PLAN PRESERVATION');
+    });
+  });
+
+  describe('Topic & Update Narration', () => {
+    beforeEach(() => {
+      mockConfig.topicState.reset();
+      vi.mocked(mockConfig.isTopicUpdateNarrationEnabled).mockReturnValue(true);
+      (mockConfig.getToolRegistry as ReturnType<typeof vi.fn>).mockReturnValue({
+        getAllToolNames: vi.fn().mockReturnValue([UPDATE_TOPIC_TOOL_NAME]),
+        getAllTools: vi.fn().mockReturnValue([
+          new MockTool({
+            name: UPDATE_TOPIC_TOOL_NAME,
+            displayName: 'Topic',
+          }),
+        ]),
+      });
+      vi.mocked(mockConfig.getHasAccessToPreviewModel).mockReturnValue(true);
+      vi.mocked(mockConfig.getGemini31LaunchedSync).mockReturnValue(true);
+    });
+
+    it('should include active topic context when narration is enabled', () => {
+      mockConfig.topicState.setTopic('Active Chapter');
+      const provider = new PromptProvider();
+      const prompt = provider.getCoreSystemPrompt(mockConfig);
+
+      expect(prompt).toContain('[Active Topic: Active Chapter]');
+    });
+
+    it('should NOT include active topic context when narration is disabled', () => {
+      vi.mocked(mockConfig.isTopicUpdateNarrationEnabled).mockReturnValue(
+        false,
+      );
+      mockConfig.topicState.setTopic('Active Chapter');
+      const provider = new PromptProvider();
+      const prompt = provider.getCoreSystemPrompt(mockConfig);
+
+      expect(prompt).not.toContain('[Active Topic: Active Chapter]');
+    });
+
+    it('should filter out update_topic tool when narration is disabled', () => {
+      vi.mocked(mockConfig.getApprovalMode).mockReturnValue(ApprovalMode.PLAN);
+      vi.mocked(mockConfig.isTopicUpdateNarrationEnabled).mockReturnValue(
+        false,
+      );
+      // Simulate registry behavior where it filters out update_topic
+      vi.mocked(mockConfig.getToolRegistry().getAllToolNames).mockReturnValue(
+        [],
+      );
+      vi.mocked(mockConfig.getToolRegistry().getAllTools).mockReturnValue([]);
+
+      const provider = new PromptProvider();
+
+      const prompt = provider.getCoreSystemPrompt(mockConfig);
+      expect(prompt).not.toContain(UPDATE_TOPIC_TOOL_NAME);
+    });
+
+    it('should NOT filter out update_topic tool when narration is enabled', () => {
+      vi.mocked(mockConfig.getApprovalMode).mockReturnValue(ApprovalMode.PLAN);
+      vi.mocked(mockConfig.isTopicUpdateNarrationEnabled).mockReturnValue(true);
+      const provider = new PromptProvider();
+      const prompt = provider.getCoreSystemPrompt(mockConfig);
+
+      expect(prompt).toContain(`<tool>\`${UPDATE_TOPIC_TOOL_NAME}\`</tool>`);
+    });
+
+    it('should include topic update instructions in legacy model prompt when enabled', () => {
+      vi.mocked(mockConfig.getActiveModel).mockReturnValue(
+        DEFAULT_GEMINI_MODEL,
+      );
+      vi.mocked(mockConfig.isTopicUpdateNarrationEnabled).mockReturnValue(true);
+
+      const provider = new PromptProvider();
+      const prompt = provider.getCoreSystemPrompt(mockConfig);
+
+      expect(prompt).toContain('## Topic Updates');
+      expect(prompt).toContain(UPDATE_TOPIC_TOOL_NAME);
+      expect(prompt).toContain('No Chitchat');
+      expect(prompt).toContain('Topic Model');
     });
   });
 });

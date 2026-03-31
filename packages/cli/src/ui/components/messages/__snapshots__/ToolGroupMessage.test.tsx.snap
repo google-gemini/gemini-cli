@@ -63,7 +63,8 @@ exports[`<ToolGroupMessage /> > Golden Snapshots > renders empty tool calls arra
 exports[`<ToolGroupMessage /> > Golden Snapshots > renders header when scrolled 1`] = `
 "╭──────────────────────────────────────────────────────────────────────────╮
 │ ✓  tool-1 Description 1. This is a long description that will need to b… │
-│──────────────────────────────────────────────────────────────────────────│
+│──────────────────────────────────────────────────────────────────────────│                       ▄
+│ line4                                                                    │                       █
 │ line5                                                                    │                       █
 │                                                                          │                       █
 │ ✓  tool-2 Description 2                                                  │                       █
@@ -71,11 +72,13 @@ exports[`<ToolGroupMessage /> > Golden Snapshots > renders header when scrolled 
 │ line1                                                                    │                       █
 │ line2                                                                    │                       █
 ╰──────────────────────────────────────────────────────────────────────────╯                       █
+                                                                                                   █
 "
 `;
 
-exports[`<ToolGroupMessage /> > Golden Snapshots > renders mixed tool calls including shell command 1`] = `
-"╭──────────────────────────────────────────────────────────────────────────╮
+exports[`<ToolGroupMessage /> > Golden Snapshots > renders mixed tool calls including update_topic 1`] = `
+"  Testing Topic — This is the description
+╭──────────────────────────────────────────────────────────────────────────╮
 │ ✓  read_file Read a file                                                 │
 │                                                                          │
 │ Test result                                                              │
@@ -128,12 +131,17 @@ exports[`<ToolGroupMessage /> > Golden Snapshots > renders tool call with output
 `;
 
 exports[`<ToolGroupMessage /> > Golden Snapshots > renders two tool groups where only the last line of the previous group is visible 1`] = `
-"╰──────────────────────────────────────────────────────────────────────────╯
-╭──────────────────────────────────────────────────────────────────────────╮
+"╭──────────────────────────────────────────────────────────────────────────╮
 │ ✓  tool-2 Description 2                                                  │
-│                                                                          │                       ▄
-│ line1                                                                    │                       █
+│                                                                          │
+│ line1                                                                    │                       ▄
 ╰──────────────────────────────────────────────────────────────────────────╯                       █
+                                                                                                   █
+"
+`;
+
+exports[`<ToolGroupMessage /> > Golden Snapshots > renders update_topic tool call using TopicMessage > update_topic_tool 1`] = `
+"  Testing Topic — This is the description
 "
 `;
 

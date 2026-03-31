@@ -613,8 +613,17 @@ export async function main() {
     }
 
     cliStartupHandle?.end();
+
     // Render UI, passing necessary config values. Check that there is no command line question.
     if (config.isInteractive()) {
+      // Earlier initialization phases (like TerminalCapabilityManager resolving
+      // or authWithWeb) may have added and removed 'data' listeners on process.stdin.
+      // When the listener count drops to 0, Node.js implicitly pauses the stream buffer.
+      // React Ink's useInput hooks will silently fail to receive keystrokes if the stream remains paused.
+      if (process.stdin.isTTY) {
+        process.stdin.resume();
+      }
+
       await startInteractiveUI(
         config,
         settings,
@@ -661,11 +670,6 @@ export async function main() {
         }
       }
     }
-
-    // Register SessionEnd hook for graceful exit
-    registerCleanup(async () => {
-      await config.getHookSystem()?.fireSessionEndEvent(SessionEndReason.Exit);
-    });
 
     if (!input) {
       debugLogger.error(

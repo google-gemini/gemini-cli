@@ -642,6 +642,7 @@ export async function loadCliConfig(
       memoryImportFormat,
       memoryFileFiltering,
       settings.context?.discoveryMaxDirs,
+      settings.context?.memoryBoundaryMarkers,
     );
     memoryContent = result.memoryContent;
     fileCount = result.fileCount;
@@ -792,8 +793,8 @@ export async function loadCliConfig(
     effectiveSettings,
     approvalMode,
     workspacePoliciesDir,
+    interactive,
   );
-  policyEngineConfig.nonInteractive = !interactive;
 
   const defaultModel = PREVIEW_GEMINI_MODEL_AUTO;
   const specifiedModel =
@@ -896,6 +897,7 @@ export async function loadCliConfig(
     loadMemoryFromIncludeDirectories:
       settings.context?.loadMemoryFromIncludeDirectories || false,
     discoveryMaxDirs: settings.context?.discoveryMaxDirs,
+    memoryBoundaryMarkers: settings.context?.memoryBoundaryMarkers,
     importFormat: settings.context?.importFormat,
     debugMode,
     question,
@@ -975,6 +977,10 @@ export async function loadCliConfig(
     disabledSkills: settings.skills?.disabled,
     experimentalJitContext: settings.experimental?.jitContext,
     experimentalMemoryManager: settings.experimental?.memoryManager,
+    contextManagement: {
+      enabled: settings.experimental?.contextManagement,
+      ...settings?.contextManagement,
+    },
     modelSteering: settings.experimental?.modelSteering,
     topicUpdateNarration: settings.experimental?.topicUpdateNarration,
     toolOutputMasking: settings.experimental?.toolOutputMasking,
@@ -990,6 +996,8 @@ export async function loadCliConfig(
     useAlternateBuffer: settings.ui?.useAlternateBuffer,
     useRipgrep: settings.tools?.useRipgrep,
     enableInteractiveShell: settings.tools?.shell?.enableInteractiveShell,
+    shellBackgroundCompletionBehavior: settings.tools?.shell
+      ?.backgroundCompletionBehavior as string | undefined,
     shellToolInactivityTimeout: settings.tools?.shell?.inactivityTimeout,
     enableShellOutputEfficiency:
       settings.tools?.shell?.enableShellOutputEfficiency ?? true,
