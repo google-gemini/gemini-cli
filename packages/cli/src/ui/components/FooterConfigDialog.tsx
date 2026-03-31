@@ -255,6 +255,7 @@ export const FooterConfigDialog: React.FC<FooterConfigDialogProps> = ({
           <Text color={getColor('code-changes', theme.status.error)}>-4</Text>
         </Box>
       ),
+      auth: <Text color={getColor('auth', itemColor)}>test@example.com</Text>,
       'token-count': (
         <Text color={getColor('token-count', itemColor)}>1.5k tokens</Text>
       ),

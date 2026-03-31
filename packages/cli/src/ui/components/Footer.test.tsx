@@ -8,7 +8,11 @@ import { describe, it, expect, vi, afterEach, beforeEach } from 'vitest';
 import { renderWithProviders } from '../../test-utils/render.js';
 import { Footer } from './Footer.js';
 import { createMockSettings } from '../../test-utils/settings.js';
-import { type Config } from '@google/gemini-cli-core';
+import {
+  type Config,
+  UserAccountManager,
+  AuthType,
+} from '@google/gemini-cli-core';
 import path from 'node:path';
 
 // Normalize paths to POSIX slashes for stable cross-platform snapshots.
@@ -69,14 +73,17 @@ const defaultProps = {
   branchName: 'main',
 };
 
-const mockConfig = {
+const mockConfigPlain = {
   getTargetDir: () => defaultProps.targetDir,
   getDebugMode: () => false,
   getModel: () => defaultProps.model,
   getIdeMode: () => false,
   isTrustedFolder: () => true,
   getExtensionRegistryURI: () => undefined,
-} as unknown as Config;
+  getContentGeneratorConfig: () => ({ authType: undefined }),
+};
+
+const mockConfig = mockConfigPlain as unknown as Config;
 
 const mockSessionStats = {
   sessionId: 'test-session-id',
@@ -675,6 +682,75 @@ describe('<Footer />', () => {
   });
 
   describe('Footer Custom Items', () => {
+    it('renders auth item with email', async () => {
+      const authConfig = {
+        ...mockConfigPlain,
+        getContentGeneratorConfig: () => ({
+          authType: AuthType.LOGIN_WITH_GOOGLE,
+        }),
+      } as unknown as Config;
+      const getCachedAccountSpy = vi
+        .spyOn(UserAccountManager.prototype, 'getCachedGoogleAccount')
+        .mockReturnValue('test@example.com');
+
+      const { lastFrame, unmount } = await renderWithProviders(<Footer />, {
+        config: authConfig,
+        width: 120,
+        uiState: {
+          currentModel: 'gemini-pro',
+          sessionStats: mockSessionStats,
+        },
+        settings: createMockSettings({
+          ui: {
+            footer: {
+              items: ['auth'],
+            },
+          },
+        }),
+      });
+
+      expect(lastFrame()).toContain('auth');
+      expect(lastFrame()).toContain('test@example.com');
+      unmount();
+      getCachedAccountSpy.mockRestore();
+    });
+
+    it('does NOT render auth item when showUserIdentity is false', async () => {
+      const authConfig = {
+        ...mockConfigPlain,
+        getContentGeneratorConfig: () => ({
+          authType: AuthType.LOGIN_WITH_GOOGLE,
+        }),
+      } as unknown as Config;
+      const getCachedAccountSpy = vi
+        .spyOn(UserAccountManager.prototype, 'getCachedGoogleAccount')
+        .mockReturnValue('test@example.com');
+
+      const { lastFrame, unmount } = await renderWithProviders(<Footer />, {
+        config: authConfig,
+        width: 120,
+        uiState: {
+          currentModel: 'gemini-pro',
+          sessionStats: mockSessionStats,
+        },
+        settings: createMockSettings({
+          ui: {
+            showUserIdentity: false,
+            footer: {
+              items: ['workspace', 'auth'],
+            },
+          },
+        }),
+      });
+
+      const output = lastFrame();
+      expect(output).toContain('workspace');
+      expect(output).not.toContain('auth');
+      expect(output).not.toContain('test@example.com');
+      unmount();
+      getCachedAccountSpy.mockRestore();
+    });
+
     it('renders items in the specified order', async () => {
       const { lastFrame, unmount } = await renderWithProviders(<Footer />, {
         config: mockConfig,
