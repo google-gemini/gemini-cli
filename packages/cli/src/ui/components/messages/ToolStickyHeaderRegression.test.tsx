@@ -120,10 +120,10 @@ describe('ToolMessage Sticky Header Regression', () => {
       expect(lastFrame()).toContain('tool-1');
     });
     expect(lastFrame()).toContain('Description for tool-1');
-    // Content lines 1-4 should be scrolled off
+    // Content lines 1-5 should be scrolled off
     expect(lastFrame()).not.toContain('c1-01');
-    expect(lastFrame()).not.toContain('c1-04');
-    // Line 6 and 7 should be visible (terminalHeight=5 means only 2 lines of content show below 3-line header)
+    expect(lastFrame()).not.toContain('c1-05');
+    // Line 6 and 7 should be visible (terminalHeight=5 means 2 lines of content show below 3-line header)
     expect(lastFrame()).toContain('c1-06');
     expect(lastFrame()).toContain('c1-07');
     expect(lastFrame()).toMatchSnapshot();

@@ -293,6 +293,16 @@ const SETTINGS_SCHEMA = {
         description: 'Planning features configuration.',
         showInDialog: false,
         properties: {
+          enabled: {
+            type: 'boolean',
+            label: 'Enable Plan Mode',
+            category: 'General',
+            requiresRestart: true,
+            default: true,
+            description:
+              'Enable Plan Mode for read-only safety during planning.',
+            showInDialog: true,
+          },
           directory: {
             type: 'string',
             label: 'Plan Directory',
@@ -559,6 +569,16 @@ const SETTINGS_SCHEMA = {
         requiresRestart: false,
         default: true,
         description: 'Show the "? for shortcuts" hint above the input.',
+        showInDialog: true,
+      },
+      compactToolOutput: {
+        type: 'boolean',
+        label: 'Compact Tool Output',
+        category: 'UI',
+        requiresRestart: false,
+        default: false,
+        description:
+          'Display tool outputs (like directory listings and file reads) in a compact, structured format.',
         showInDialog: true,
       },
       hideBanner: {
@@ -2036,7 +2056,7 @@ const SETTINGS_SCHEMA = {
         label: 'JIT Context Loading',
         category: 'Experimental',
         requiresRestart: true,
-        default: true,
+        default: false,
         description: 'Enable Just-In-Time (JIT) context loading.',
         showInDialog: false,
       },
@@ -2058,15 +2078,6 @@ const SETTINGS_SCHEMA = {
         default: false,
         description:
           'Use OSC 52 for copying. This may be more robust than the default system when using remote terminal sessions (if your terminal is configured to allow it).',
-        showInDialog: true,
-      },
-      plan: {
-        type: 'boolean',
-        label: 'Plan',
-        category: 'Experimental',
-        requiresRestart: true,
-        default: true,
-        description: 'Enable Plan Mode.',
         showInDialog: true,
       },
       taskTracker: {
@@ -2169,44 +2180,13 @@ const SETTINGS_SCHEMA = {
           'Replace the built-in save_memory tool with a memory manager subagent that supports adding, removing, de-duplicating, and organizing memories.',
         showInDialog: true,
       },
-      agentHistoryTruncation: {
+      contextManagement: {
         type: 'boolean',
-        label: 'Agent History Truncation',
+        label: 'Enable Context Management',
         category: 'Experimental',
         requiresRestart: true,
         default: false,
-        description:
-          'Enable truncation window logic for the Agent History Provider.',
-        showInDialog: true,
-      },
-      agentHistoryTruncationThreshold: {
-        type: 'number',
-        label: 'Agent History Truncation Threshold',
-        category: 'Experimental',
-        requiresRestart: true,
-        default: 30,
-        description:
-          'The maximum number of messages before history is truncated.',
-        showInDialog: true,
-      },
-      agentHistoryRetainedMessages: {
-        type: 'number',
-        label: 'Agent History Retained Messages',
-        category: 'Experimental',
-        requiresRestart: true,
-        default: 15,
-        description:
-          'The number of recent messages to retain after truncation.',
-        showInDialog: true,
-      },
-      agentHistorySummarization: {
-        type: 'boolean',
-        label: 'Agent History Summarization',
-        category: 'Experimental',
-        requiresRestart: true,
-        default: false,
-        description:
-          'Enable summarization of truncated content via a small model for the Agent History Provider.',
+        description: 'Enable logic for context management.',
         showInDialog: true,
       },
       topicUpdateNarration: {
@@ -2482,6 +2462,118 @@ const SETTINGS_SCHEMA = {
       description:
         'Custom hook event arrays that contain hook definitions for user-defined events',
       mergeStrategy: MergeStrategy.CONCAT,
+    },
+  },
+
+  contextManagement: {
+    type: 'object',
+    label: 'Context Management',
+    category: 'Experimental',
+    requiresRestart: true,
+    default: {},
+    description:
+      'Settings for agent history and tool distillation context management.',
+    showInDialog: false,
+    properties: {
+      historyWindow: {
+        type: 'object',
+        label: 'History Window Settings',
+        category: 'Context Management',
+        requiresRestart: true,
+        default: {},
+        showInDialog: false,
+        properties: {
+          maxTokens: {
+            type: 'number',
+            label: 'Max Tokens',
+            category: 'Context Management',
+            requiresRestart: true,
+            default: 150_000,
+            description:
+              'The number of tokens to allow before triggering compression.',
+            showInDialog: false,
+          },
+          retainedTokens: {
+            type: 'number',
+            label: 'Retained Tokens',
+            category: 'Context Management',
+            requiresRestart: true,
+            default: 40_000,
+            description: 'The number of tokens to always retain.',
+            showInDialog: false,
+          },
+        },
+      },
+      messageLimits: {
+        type: 'object',
+        label: 'Message Limits',
+        category: 'Context Management',
+        requiresRestart: true,
+        default: {},
+        showInDialog: false,
+        properties: {
+          normalMaxTokens: {
+            type: 'number',
+            label: 'Normal Maximum Tokens',
+            category: 'Context Management',
+            requiresRestart: true,
+            default: 2500,
+            description:
+              'The target number of tokens to budget for a normal conversation turn.',
+            showInDialog: false,
+          },
+          retainedMaxTokens: {
+            type: 'number',
+            label: 'Retained Maximum Tokens',
+            category: 'Context Management',
+            requiresRestart: true,
+            default: 12000,
+            description:
+              'The maximum number of tokens a single conversation turn can consume before truncation.',
+            showInDialog: false,
+          },
+          normalizationHeadRatio: {
+            type: 'number',
+            label: 'Normalization Head Ratio',
+            category: 'Context Management',
+            requiresRestart: true,
+            default: 0.25,
+            description:
+              'The ratio of tokens to retain from the beginning of a truncated message (0.0 to 1.0).',
+            showInDialog: false,
+          },
+        },
+      },
+      toolDistillation: {
+        type: 'object',
+        label: 'Tool Distillation',
+        category: 'Context Management',
+        requiresRestart: true,
+        default: {},
+        showInDialog: false,
+        properties: {
+          maxOutputTokens: {
+            type: 'number',
+            label: 'Max Output Tokens',
+            category: 'Context Management',
+            requiresRestart: true,
+            default: 10_000,
+            description:
+              'Maximum tokens to show when truncating large tool outputs.',
+            showInDialog: false,
+          },
+          summarizationThresholdTokens: {
+            type: 'number',
+            label: 'Tool Summarization Threshold',
+            category: 'Context Management',
+            requiresRestart: true,
+            default: 20_000,
+            description:
+              'Threshold above which truncated tool outputs will be summarized by an LLM.',
+            showInDialog: false,
+          },
+        },
+      },
     },
   },
 
