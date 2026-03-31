@@ -307,6 +307,36 @@ describe('<ToolGroupMessage />', () => {
       const output = lastFrame();
       expect(output).toContain('Testing Topic');
       expect(output).toContain('— This is the summary');
+      expect(output).toMatchSnapshot('update_topic_with_summary');
+      unmount();
+    });
+
+    it('renders update_topic with a very long summary that wraps', async () => {
+      const toolCalls = [
+        createToolCall({
+          callId: 'topic-tool-long-summary',
+          name: UPDATE_TOPIC_TOOL_NAME,
+          args: {
+            [TOPIC_PARAM_TITLE]: 'Testing Topic',
+            [TOPIC_PARAM_SUMMARY]:
+              'This is a very long summary that is designed to exceed the typical terminal width and force the UI to wrap the text across multiple lines instead of truncating it. We want to ensure that all strategic information is visible to the user at all times.',
+          },
+        }),
+      ];
+      const item = createItem(toolCalls);
+
+      const { lastFrame, unmount } = await renderWithProviders(
+        <ToolGroupMessage {...baseProps} item={item} toolCalls={toolCalls} />,
+        {
+          config: baseMockConfig,
+          settings: fullVerbositySettings,
+        },
+      );
+
+      const output = lastFrame();
+      expect(output).toContain('Testing Topic');
+      expect(output).toContain('— This is a very long summary');
+      expect(output).toMatchSnapshot('update_topic_long_summary');
       unmount();
     });
 

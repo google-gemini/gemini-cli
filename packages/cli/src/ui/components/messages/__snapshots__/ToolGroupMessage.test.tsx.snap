@@ -145,6 +145,20 @@ exports[`<ToolGroupMessage /> > Golden Snapshots > renders update_topic tool cal
 "
 `;
 
+exports[`<ToolGroupMessage /> > Golden Snapshots > renders update_topic tool call with summary > update_topic_with_summary 1`] = `
+"  Testing Topic — This is the summary
+"
+`;
+
+exports[`<ToolGroupMessage /> > Golden Snapshots > renders update_topic with a very long summary that wraps > update_topic_long_summary 1`] = `
+"  Testing Topic
+   — This is a very long summary that is designed to exceed the typical
+  terminal width and force the UI to wrap the text across multiple lines
+  instead of truncating it. We want to ensure that all strategic information
+  is visible to the user at all times.
+"
+`;
+
 exports[`<ToolGroupMessage /> > Golden Snapshots > renders with limited terminal height 1`] = `
 "╭──────────────────────────────────────────────────────────────────────────╮
 │ ✓  tool-with-result Tool with output                                     │

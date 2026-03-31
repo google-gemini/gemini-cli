@@ -30,15 +30,16 @@ export const TopicMessage: React.FC<TopicMessageProps> = ({ args }) => {
 
   // Use summary as a fallback subtitle if title is present,
   // or use it as the main text if title is missing.
+  // We allow the summary to wrap naturally to avoid truncation.
   return (
-    <Box flexDirection="row" marginLeft={2}>
+    <Box flexDirection="row" marginLeft={2} flexWrap="wrap">
       <Text color={theme.text.primary} bold>
         {title || 'Topic'}
       </Text>
       {summary && (
-        <Text color={theme.text.secondary} wrap="truncate-end">
+        <Text color={theme.text.secondary}>
           {' — '}
-          {summary.length > 80 ? `${summary.substring(0, 80)}...` : summary}
+          {summary}
         </Text>
       )}
     </Box>
