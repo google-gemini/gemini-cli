@@ -980,5 +980,29 @@ describe('BrowserManager', () => {
         /maximum action limit \(3\)/,
       );
     });
+
+    it('should NOT increment action counter when shouldCount is false', async () => {
+      const limitedConfig = makeFakeConfig({
+        agents: {
+          browser: {
+            maxActionsPerTask: 1,
+          },
+        },
+      });
+      const manager = new BrowserManager(limitedConfig);
+
+      // Multiple calls with isInternal: true should NOT exhaust the limit
+      await manager.callTool('evaluate_script', {}, undefined, true);
+      await manager.callTool('evaluate_script', {}, undefined, true);
+      await manager.callTool('evaluate_script', {}, undefined, true);
+
+      // This should still work
+      await manager.callTool('take_snapshot', {});
+
+      // Next one should throw (limit 1 allows exactly 1 call with >= check)
+      await expect(manager.callTool('take_snapshot', {})).rejects.toThrow(
+        /maximum action limit \(1\)/,
+      );
+    });
   });
 });
