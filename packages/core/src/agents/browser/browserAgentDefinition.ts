@@ -109,7 +109,7 @@ Many web apps (Google Sheets/Docs, Notion, Figma, etc.) use custom rendering rat
 
 TERMINAL FAILURES — STOP IMMEDIATELY:
 Some errors are unrecoverable and retrying will never help. When you see ANY of these, call complete_task immediately with success=false and include the EXACT error message (including any remediation steps it contains) in your summary:
-- "Could not connect to Chrome" or "Failed to connect to Chrome" or "Timed out connecting to Chrome" — Include the full error message with its remediation steps in your summary verbatim. Do NOT paraphrase or omit instructions.
+- "Could not connect to Chrome" or "Failed to connect to Chrome" or "Timed out connecting to Chrome" or "The browser is already running" — Include the full error message with its remediation steps in your summary verbatim. Do NOT paraphrase or omit instructions.
 - "Browser closed" or "Target closed" or "Session closed" — The browser process has terminated. Include the error and tell the user to try again.
 - "Domain not allowed:" — The target domain is blocked by the allowedDomains security policy. Do NOT retry with a different URL or try to find the content on an allowed domain.
 - "net::ERR_" network errors on the SAME URL after 2 retries — the site is unreachable. Report the URL and error.
