@@ -83,8 +83,10 @@ describe('useBtw', () => {
       useBtw(mockGeminiClient as unknown as GeminiClient),
     );
 
+    let submitPromise!: Promise<void>;
     await act(async () => {
-      await result.current.submitBtw('test query');
+      submitPromise = result.current.submitBtw('test query');
+      await submitPromise;
     });
 
     expect(result.current.error).toBe('API Error');
@@ -104,8 +106,10 @@ describe('useBtw', () => {
       useBtw(mockGeminiClient as unknown as GeminiClient),
     );
 
+    let submitPromise!: Promise<void>;
     await act(async () => {
-      await result.current.submitBtw('test query');
+      submitPromise = result.current.submitBtw('test query');
+      await submitPromise;
     });
 
     expect(result.current.error).toBe('Direct string error');
@@ -124,8 +128,10 @@ describe('useBtw', () => {
       useBtw(mockGeminiClient as unknown as GeminiClient),
     );
 
+    let submitPromise!: Promise<void>;
     await act(async () => {
-      await result.current.submitBtw('test query');
+      submitPromise = result.current.submitBtw('test query');
+      await submitPromise;
     });
 
     expect(result.current.error).toBe('Unknown error');
@@ -144,18 +150,25 @@ describe('useBtw', () => {
       useBtw(mockGeminiClient as unknown as GeminiClient),
     );
 
+    let submitPromise!: Promise<void>;
     await act(async () => {
-      await result.current.submitBtw('test query');
+      submitPromise = result.current.submitBtw('test query');
+      await submitPromise;
     });
 
     expect(result.current.error).toBe('Just some raw string value');
   });
 
   it('should reset state on dismiss', async () => {
+    let resolveStream: (value: void) => void;
+    const streamGate = new Promise<void>((resolve) => {
+      resolveStream = resolve;
+    });
+
     const mockStream = (async function* () {
       yield { type: GeminiEventType.Content, value: 'partial' };
       // Hang
-      await new Promise(() => {});
+      await streamGate;
     })();
     mockGeminiClient.sendBtwStream.mockReturnValue(mockStream);
 
@@ -163,14 +176,23 @@ describe('useBtw', () => {
       useBtw(mockGeminiClient as unknown as GeminiClient),
     );
 
-    act(() => {
-      void result.current.submitBtw('test query');
+    let submitPromise!: Promise<void>;
+    await act(async () => {
+      submitPromise = result.current.submitBtw('test query');
     });
 
     expect(result.current.isActive).toBe(true);
+    expect(result.current.query).toBe('test query');
 
-    act(() => {
+    await act(async () => {
       result.current.dismissBtw();
+      resolveStream();
+      // wait for the catch/finally blocks inside submitBtw to finish
+      try {
+        await submitPromise;
+      } catch (_e) {
+        // ignore AbortError
+      }
     });
 
     expect(result.current.isActive).toBe(false);
