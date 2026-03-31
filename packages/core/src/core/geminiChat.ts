@@ -25,11 +25,7 @@ import {
   getRetryErrorType,
 } from '../utils/retry.js';
 import type { ValidationRequiredError } from '../utils/googleQuotaErrors.js';
-import {
-  resolveModel,
-  isGemini2Model,
-  supportsModernFeatures,
-} from '../config/models.js';
+import { resolveModel, supportsModernFeatures } from '../config/models.js';
 import { hasCycleInSchema } from '../tools/tools.js';
 import type { StructuredError } from './turn.js';
 import type { CompletedToolCall } from '../scheduler/types.js';
@@ -423,10 +419,7 @@ export class GeminiChat {
               ? error.type
               : getRetryErrorType(error);
 
-            if (
-              (isContentError && isGemini2Model(model)) ||
-              (isRetryable && !signal.aborted)
-            ) {
+            if (isContentError || (isRetryable && !signal.aborted)) {
               // The issue requests exactly 3 retries (4 attempts) for API errors during stream iteration.
               // Regardless of the global maxAttempts (e.g. 10), we only want to retry these mid-stream API errors
               // up to 3 times before finally throwing the error to the user.
