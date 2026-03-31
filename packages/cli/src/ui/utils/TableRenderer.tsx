@@ -26,7 +26,6 @@ interface TableRendererProps {
   terminalWidth: number;
 }
 
-const MIN_COLUMN_WIDTH = 5;
 const COLUMN_PADDING = 2;
 const TABLE_MARGIN = 2;
 
@@ -129,47 +128,99 @@ export const TableRenderer: React.FC<TableRendererProps> = ({
     );
 
     // --- Allocation Algorithm ---
-    const totalMinWidth = constraints.reduce((sum, c) => sum + c.minWidth, 0);
     let finalContentWidths: number[];
 
-    if (totalMinWidth > availableWidth) {
-      // We must scale all the columns except the ones that are very short(<=5 characters)
-      const shortColumns = constraints.filter(
-        (c) => c.maxWidth <= MIN_COLUMN_WIDTH,
-      );
-      const totalShortColumnWidth = shortColumns.reduce(
-        (sum, c) => sum + c.minWidth,
-        0,
-      );
-
-      const finalTotalShortColumnWidth =
-        totalShortColumnWidth >= availableWidth ? 0 : totalShortColumnWidth;
-
-      const scale =
-        (availableWidth - finalTotalShortColumnWidth) /
-          (totalMinWidth - finalTotalShortColumnWidth) || 0;
-      finalContentWidths = constraints.map((c) => {
-        if (c.maxWidth <= MIN_COLUMN_WIDTH && finalTotalShortColumnWidth > 0) {
-          return c.minWidth;
-        }
-        return Math.floor(c.minWidth * scale);
-      });
+    if (availableWidth <= numColumns) {
+      // Structurally impossible to fit > 1 character per column.
+      // Every column gets at least 1 wide.
+      finalContentWidths = new Array(numColumns).fill(1);
     } else {
-      const surplus = availableWidth - totalMinWidth;
-      const totalGrowthNeed = constraints.reduce(
-        (sum, c) => sum + (c.maxWidth - c.minWidth),
-        0,
-      );
+      // 1. Initial fair baseline: Everyone gets 1 character width initially.
+      finalContentWidths = new Array(numColumns).fill(1);
+      let budget = availableWidth - numColumns;
 
-      if (totalGrowthNeed === 0) {
-        finalContentWidths = constraints.map((c) => c.minWidth);
-      } else {
-        finalContentWidths = constraints.map((c) => {
-          const growthNeed = c.maxWidth - c.minWidth;
-          const share = growthNeed / totalGrowthNeed;
-          const extra = Math.floor(surplus * share);
-          return Math.min(c.maxWidth, c.minWidth + extra);
-        });
+      // 2. Satisfy minWidths proportionally
+      const neededForMin = constraints.map((c) => Math.max(0, c.minWidth - 1));
+      let totalNeededForMin = neededForMin.reduce((a, b) => a + b, 0);
+
+      if (totalNeededForMin > 0) {
+        if (budget >= totalNeededForMin) {
+          // Can satisfy all minWidths easily
+          for (let i = 0; i < numColumns; i++) {
+            finalContentWidths[i]! += neededForMin[i]!;
+            budget -= neededForMin[i]!;
+          }
+        } else {
+          // Cannot satisfy all minWidths, distribute budget proportionally
+          const initialBudget = budget;
+          for (let i = 0; i < numColumns; i++) {
+            if (neededForMin[i]! > 0) {
+              const proportion = neededForMin[i]! / totalNeededForMin;
+              const extra = Math.floor(initialBudget * proportion);
+              finalContentWidths[i]! += extra;
+              budget -= extra;
+            }
+          }
+          // Distribute rounding remainders to columns still below minWidth
+          for (let i = 0; i < numColumns && budget > 0; i++) {
+            if (finalContentWidths[i]! < constraints[i]!.minWidth) {
+              finalContentWidths[i]! += 1;
+              budget -= 1;
+            }
+          }
+        }
+      }
+
+      // 3. Satisfy maxWidths proportionally, if budget still remains
+      if (budget > 0) {
+        const neededForMax = constraints.map((c, i) =>
+          Math.max(0, c.maxWidth - finalContentWidths[i]!),
+        );
+        let totalNeededForMax = neededForMax.reduce((a, b) => a + b, 0);
+
+        if (totalNeededForMax > 0) {
+          const initialBudget = budget;
+          for (let i = 0; i < numColumns; i++) {
+            if (neededForMax[i]! > 0) {
+              const proportion = neededForMax[i]! / totalNeededForMax;
+              let extra = Math.floor(initialBudget * proportion);
+              // strictly cap to avoid overflowing maxWidths
+              extra = Math.min(extra, neededForMax[i]!);
+              finalContentWidths[i]! += extra;
+              budget -= extra;
+            }
+          }
+
+          // Distribute any final fractional rounding remainders up to maxWidth
+          // Continue looping until budget is exhausted or no columns can grow
+          while (budget > 0) {
+            let distributed = false;
+            for (let i = 0; i < numColumns && budget > 0; i++) {
+              if (finalContentWidths[i]! < constraints[i]!.maxWidth) {
+                finalContentWidths[i]! += 1;
+                budget -= 1;
+                distributed = true;
+              }
+            }
+            // If we made a full pass without distributing, all eligible columns are at maxWidth
+            if (!distributed) break;
+          }
+        }
+
+        // 4. Distribute any absolute surplus remainder
+        // Only to columns that can still grow within their maxWidth constraints
+        while (budget > 0) {
+          let distributed = false;
+          for (let i = 0; i < numColumns && budget > 0; i++) {
+            if (finalContentWidths[i]! < constraints[i]!.maxWidth) {
+              finalContentWidths[i]! += 1;
+              budget -= 1;
+              distributed = true;
+            }
+          }
+          // If we made a full pass without distributing, all columns are at maxWidth
+          if (!distributed) break;
+        }
       }
     }
 

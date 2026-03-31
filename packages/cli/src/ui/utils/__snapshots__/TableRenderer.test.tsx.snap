@@ -130,15 +130,14 @@ exports[`TableRenderer > 'renders correctly when there are more…' 1`] = `
 
 exports[`TableRenderer > handles wrapped bold headers without showing markers 1`] = `
 "
-┌─────────────┬───────┬─────────┐
-│ Very Long   │ Short │ Another │
-│ Bold Header │       │ Long    │
-│ That Will   │       │ Header  │
-│ Wrap        │       │         │
-├─────────────┼───────┼─────────┤
-│ Data 1      │ Data  │ Data 3  │
-│             │ 2     │         │
-└─────────────┴───────┴─────────┘
+┌─────────────┬────────┬─────────┐
+│ Very Long   │ Short  │ Another │
+│ Bold Header │        │ Long    │
+│ That Will   │        │ Header  │
+│ Wrap        │        │         │
+├─────────────┼────────┼─────────┤
+│ Data 1      │ Data 2 │ Data 3  │
+└─────────────┴────────┴─────────┘
 "
 `;
 
@@ -156,54 +155,51 @@ exports[`TableRenderer > renders a 3x3 table correctly 1`] = `
 
 exports[`TableRenderer > renders a complex table with mixed content lengths correctly 1`] = `
 "
-┌─────────────────────────────┬──────────────────────────────┬─────────────────────────────┬──────────────────────────────┬─────┬────────┬─────────┬───────┐
-│ Comprehensive Architectural │ Implementation Details for   │ Longitudinal Performance    │ Strategic Security Framework │ Key │ Status │ Version │ Owner │
-│ Specification for the       │ the High-Throughput          │ Analysis Across             │ for Mitigating Sophisticated │     │        │         │       │
-│ Distributed Infrastructure  │ Asynchronous Message         │ Multi-Regional Cloud        │ Cross-Site Scripting         │     │        │         │       │
-│ Layer                       │ Processing Pipeline with     │ Deployment Clusters         │ Vulnerabilities              │     │        │         │       │
-│                             │ Extended Scalability         │                             │                              │     │        │         │       │
-│                             │ Features and Redundancy      │                             │                              │     │        │         │       │
-│                             │ Protocols                    │                             │                              │     │        │         │       │
-├─────────────────────────────┼──────────────────────────────┼─────────────────────────────┼──────────────────────────────┼─────┼────────┼─────────┼───────┤
-│ The primary architecture    │ Each message is processed    │ Historical data indicates a │ A multi-layered defense      │ INF │ Active │ v2.4    │ J.    │
-│ utilizes a decoupled        │ through a series of          │ significant reduction in    │ strategy incorporates        │     │        │         │ Doe   │
-│ microservices approach,     │ specialized workers that     │ tail latency when utilizing │ content security policies,   │     │        │         │       │
-│ leveraging container        │ handle data transformation,  │ edge computing nodes closer │ input sanitization           │     │        │         │       │
-│ orchestration for           │ validation, and persistent   │ to the geographic location  │ libraries, and regular       │     │        │         │       │
-│ scalability and fault       │ storage using a persistent   │ of the end-user base.       │ automated penetration        │     │        │         │       │
-│ tolerance in high-load      │ queue.                       │                             │ testing routines.            │     │        │         │       │
-│ scenarios.                  │                              │ Monitoring tools have       │                              │     │        │         │       │
-│                             │ The pipeline features        │ captured a steady increase  │ Developers are required to   │     │        │         │       │
-│ This layer provides the     │ built-in retry mechanisms    │ in throughput efficiency    │ undergo mandatory security   │     │        │         │       │
-│ fundamental building blocks │ with exponential backoff to  │ since the introduction of   │ training focusing on the     │     │        │         │       │
-│ for service discovery, load │ ensure message delivery      │ the vectorized query engine │ OWASP Top Ten to ensure that │     │        │         │       │
-│ balancing, and              │ integrity even during        │ in the primary data         │ security is integrated into  │     │        │         │       │
-│ inter-service communication │ transient network or service │ warehouse.                  │ the initial design phase.    │     │        │         │       │
-│ via highly efficient        │ failures.                    │                             │                              │     │        │         │       │
-│ protocol buffers.           │                              │ Resource utilization        │ The implementation of a      │     │        │         │       │
-│                             │ Horizontal autoscaling is    │ metrics demonstrate that    │ robust Identity and Access   │     │        │         │       │
-│ Advanced telemetry and      │ triggered automatically      │ the transition to           │ Management system ensures    │     │        │         │       │
-│ logging integrations allow  │ based on the depth of the    │ serverless compute for      │ that the principle of least  │     │        │         │       │
-│ for real-time monitoring of │ processing queue, ensuring   │ intermittent tasks has      │ privilege is strictly        │     │        │         │       │
-│ system health and rapid     │ consistent performance       │ resulted in a thirty        │ enforced across all          │     │        │         │       │
-│ identification of           │ during unexpected traffic    │ percent cost optimization.  │ environments.                │     │        │         │       │
-│ bottlenecks within the      │ spikes.                      │                             │                              │     │        │         │       │
-│ service mesh.               │                              │                             │                              │     │        │         │       │
-└─────────────────────────────┴──────────────────────────────┴─────────────────────────────┴──────────────────────────────┴─────┴────────┴─────────┴───────┘
+┌──────────────────────────────┬───────────────────────────────┬─────────────────────────────┬──────────────────────────────┬─────┬────────┬─────────┬───────┐
+│ Comprehensive Architectural  │ Implementation Details for    │ Longitudinal Performance    │ Strategic Security Framework │ Key │ Status │ Version │ Owner │
+│ Specification for the        │ the High-Throughput           │ Analysis Across             │ for Mitigating Sophisticated │     │        │         │       │
+│ Distributed Infrastructure   │ Asynchronous Message          │ Multi-Regional Cloud        │ Cross-Site Scripting         │     │        │         │       │
+│ Layer                        │ Processing Pipeline with      │ Deployment Clusters         │ Vulnerabilities              │     │        │         │       │
+│                              │ Extended Scalability Features │                             │                              │     │        │         │       │
+│                              │ and Redundancy Protocols      │                             │                              │     │        │         │       │
+├──────────────────────────────┼───────────────────────────────┼─────────────────────────────┼──────────────────────────────┼─────┼────────┼─────────┼───────┤
+│ The primary architecture     │ Each message is processed     │ Historical data indicates a │ A multi-layered defense      │ INF │ Active │ v2.4    │ J.    │
+│ utilizes a decoupled         │ through a series of           │ significant reduction in    │ strategy incorporates        │     │        │         │ Doe   │
+│ microservices approach,      │ specialized workers that      │ tail latency when utilizing │ content security policies,   │     │        │         │       │
+│ leveraging container         │ handle data transformation,   │ edge computing nodes closer │ input sanitization           │     │        │         │       │
+│ orchestration for            │ validation, and persistent    │ to the geographic location  │ libraries, and regular       │     │        │         │       │
+│ scalability and fault        │ storage using a persistent    │ of the end-user base.       │ automated penetration        │     │        │         │       │
+│ tolerance in high-load       │ queue.                        │                             │ testing routines.            │     │        │         │       │
+│ scenarios.                   │                               │ Monitoring tools have       │                              │     │        │         │       │
+│                              │ The pipeline features         │ captured a steady increase  │ Developers are required to   │     │        │         │       │
+│ This layer provides the      │ built-in retry mechanisms     │ in throughput efficiency    │ undergo mandatory security   │     │        │         │       │
+│ fundamental building blocks  │ with exponential backoff to   │ since the introduction of   │ training focusing on the     │     │        │         │       │
+│ for service discovery, load  │ ensure message delivery       │ the vectorized query engine │ OWASP Top Ten to ensure that │     │        │         │       │
+│ balancing, and inter-service │ integrity even during         │ in the primary data         │ security is integrated into  │     │        │         │       │
+│ communication via highly     │ transient network or service  │ warehouse.                  │ the initial design phase.    │     │        │         │       │
+│ efficient protocol buffers.  │ failures.                     │                             │                              │     │        │         │       │
+│                              │                               │ Resource utilization        │ The implementation of a      │     │        │         │       │
+│ Advanced telemetry and       │ Horizontal autoscaling is     │ metrics demonstrate that    │ robust Identity and Access   │     │        │         │       │
+│ logging integrations allow   │ triggered automatically based │ the transition to           │ Management system ensures    │     │        │         │       │
+│ for real-time monitoring of  │ on the depth of the           │ serverless compute for      │ that the principle of least  │     │        │         │       │
+│ system health and rapid      │ processing queue, ensuring    │ intermittent tasks has      │ privilege is strictly        │     │        │         │       │
+│ identification of            │ consistent performance during │ resulted in a thirty        │ enforced across all          │     │        │         │       │
+│ bottlenecks within the       │ unexpected traffic spikes.    │ percent cost optimization.  │ environments.                │     │        │         │       │
+│ service mesh.                │                               │                             │                              │     │        │         │       │
+└──────────────────────────────┴───────────────────────────────┴─────────────────────────────┴──────────────────────────────┴─────┴────────┴─────────┴───────┘
 "
 `;
 
 exports[`TableRenderer > renders a table with long headers and 4 columns correctly 1`] = `
 "
-┌───────────────┬───────────────┬──────────────────┬──────────────────┐
-│ Very Long     │ Very Long     │ Very Long Column │ Very Long Column │
-│ Column Header │ Column Header │ Header Three     │ Header Four      │
-│ One           │ Two           │                  │                  │
-├───────────────┼───────────────┼──────────────────┼──────────────────┤
-│ Data 1.1      │ Data 1.2      │ Data 1.3         │ Data 1.4         │
-│ Data 2.1      │ Data 2.2      │ Data 2.3         │ Data 2.4         │
-│ Data 3.1      │ Data 3.2      │ Data 3.3         │ Data 3.4         │
-└───────────────┴───────────────┴──────────────────┴──────────────────┘
+┌──────────────────┬──────────────────┬──────────────────┬──────────────────┐
+│ Very Long Column │ Very Long Column │ Very Long Column │ Very Long Column │
+│ Header One       │ Header Two       │ Header Three     │ Header Four      │
+├──────────────────┼──────────────────┼──────────────────┼──────────────────┤
+│ Data 1.1         │ Data 1.2         │ Data 1.3         │ Data 1.4         │
+│ Data 2.1         │ Data 2.2         │ Data 2.3         │ Data 2.4         │
+│ Data 3.1         │ Data 3.2         │ Data 3.3         │ Data 3.4         │
+└──────────────────┴──────────────────┴──────────────────┴──────────────────┘
 "
 `;
 
@@ -233,15 +229,15 @@ exports[`TableRenderer > wraps all long columns correctly 1`] = `
 
 exports[`TableRenderer > wraps columns with punctuation correctly 1`] = `
 "
-┌───────────────────┬───────────────┬─────────────────┐
-│ Punctuation 1     │ Punctuation 2 │ Punctuation 3   │
-├───────────────────┼───────────────┼─────────────────┤
-│ Start. Stop.      │ Semi; colon:  │ At@ Hash#       │
-│ Comma, separated. │ Pipe| Slash/  │ Dollar$         │
-│ Exclamation!      │ Backslash\\    │ Percent% Caret^ │
-│ Question?         │               │ Ampersand&      │
-│ hyphen-ated       │               │ Asterisk*       │
-└───────────────────┴───────────────┴─────────────────┘
+┌─────────────────────┬───────────────┬─────────────────┐
+│ Punctuation 1       │ Punctuation 2 │ Punctuation 3   │
+├─────────────────────┼───────────────┼─────────────────┤
+│ Start. Stop. Comma, │ Semi; colon:  │ At@ Hash#       │
+│ separated.          │ Pipe| Slash/  │ Dollar$         │
+│ Exclamation!        │ Backslash\\    │ Percent% Caret^ │
+│ Question?           │               │ Ampersand&      │
+│ hyphen-ated         │               │ Asterisk*       │
+└─────────────────────┴───────────────┴─────────────────┘
 "
 `;
 
