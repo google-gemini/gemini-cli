@@ -34,12 +34,7 @@ import { verifySandboxOverrides } from '../utils/commandUtils.js';
 import { parsePosixSandboxDenials } from '../utils/sandboxDenialUtils.js';
 
 export class MacOsSandboxManager implements SandboxManager {
-  private profileTempDir?: string;
-  private readonly exitCleanupHandler: () => void;
-
-  constructor(private readonly options: GlobalSandboxOptions) {
-    this.exitCleanupHandler = () => this.cleanup();
-  }
+  constructor(private readonly options: GlobalSandboxOptions) {}
 
   isKnownSafeCommand(args: string[]): boolean {
     const toolName = args[0];
@@ -126,34 +121,22 @@ export class MacOsSandboxManager implements SandboxManager {
       args: ['-f', tempFile, '--', req.command, ...req.args],
       env: sanitizedEnv,
       cwd: req.cwd,
+      cleanup: () => {
+        try {
+          fs.unlinkSync(tempFile);
+        } catch {
+          // Ignore cleanup errors
+        }
+      },
     };
   }
 
   private writeProfileToTempFile(profile: string): string {
-    if (!this.profileTempDir) {
-      this.profileTempDir = fs.mkdtempSync(
-        path.join(os.tmpdir(), 'gemini-cli-seatbelt-'),
-      );
-      process.on('exit', this.exitCleanupHandler);
-    }
-
     const tempFile = path.join(
-      this.profileTempDir,
-      `profile-${Date.now()}-${Math.random().toString(36).slice(2)}.sb`,
+      os.tmpdir(),
+      `gemini-cli-seatbelt-${Date.now()}-${Math.random().toString(36).slice(2)}.sb`,
     );
-    fs.writeFileSync(tempFile, profile);
+    fs.writeFileSync(tempFile, profile, { mode: 0o600 });
     return tempFile;
-  }
-
-  cleanup(): void {
-    if (this.profileTempDir) {
-      try {
-        fs.rmSync(this.profileTempDir, { recursive: true, force: true });
-      } catch {
-        /* ignore */
-      }
-      this.profileTempDir = undefined;
-    }
-    process.removeListener('exit', this.exitCleanupHandler);
   }
 }
