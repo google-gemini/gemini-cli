@@ -434,6 +434,7 @@ describe('<Footer />', () => {
 
     it('renders footer with all optional sections hidden (minimal footer)', async () => {
       const { lastFrame, unmount } = await renderWithProviders(<Footer />, {
+        config: mockConfig,
         width: 120,
         uiState: { sessionStats: mockSessionStats },
         settings: createMockSettings({
@@ -551,6 +552,7 @@ describe('<Footer />', () => {
   describe('Footer Token Formatting', () => {
     const renderWithTokens = async (tokens: number) => {
       const result = await renderWithProviders(<Footer />, {
+        config: mockConfig,
         width: 120,
         uiState: {
           sessionStats: {
@@ -734,6 +736,7 @@ describe('<Footer />', () => {
 
     it('handles empty items array', async () => {
       const { lastFrame, unmount } = await renderWithProviders(<Footer />, {
+        config: mockConfig,
         width: 120,
         uiState: { sessionStats: mockSessionStats },
         settings: createMockSettings({
