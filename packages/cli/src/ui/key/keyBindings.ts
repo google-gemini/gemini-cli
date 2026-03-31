@@ -541,6 +541,7 @@ export const commandCategories: readonly CommandCategory[] = [
       Command.RESTART_APP,
       Command.SUSPEND_APP,
       Command.SHOW_SHELL_INPUT_UNFOCUS_WARNING,
+      Command.VOICE_MODE_PTT,
     ],
   },
   {
