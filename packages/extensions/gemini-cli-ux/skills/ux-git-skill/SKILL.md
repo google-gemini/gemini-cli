@@ -139,16 +139,14 @@ If operating in a sibling worktree (e.g., `feature-xyz/`):
 #### 10. CI Verification & Remediation Loop (The Slog)
 - **Context**: Getting PRs ready for review is typically a "slog" due to CI checks failing in the GitHub environment even after passing local presubmit tests.
 - **Action**: You MUST assume that CI checks have failed until you explicitly verify they have passed on the PR.
-#### **1. Immediate Output**
-- **Action**: Before entering the monitoring loop, output the **GitHub PR link**, the **Issue URL**, and the **`npx` testing command** (e.g., `npx @google/gemini-cli@pr-<number>`) to the user.
-- **Link Integrity**: You MUST verify that any links you provide (especially to specific files or directories) are correct and actually exist on the current remote branch. Do not guess folder names; check the actual file system before constructing URLs. This prevents 404 errors for the user.
-
-#### 2. Run PR Checks
-  3. If checks fail, fetch the failure logs, diagnose the issue, apply a fix, push the update, and loop back to step 2.
-  4. Before transitioning a Draft PR to Open ("Ready for Review"), you MUST ensure:
+  1. **Immediate Output**: Before entering the monitoring loop, output the **GitHub PR link**, the **Issue URL**, and the **`npx` testing command** (e.g., `npx @google/gemini-cli@pr-<number>`) to the user.
+  2. **Link Integrity**: You MUST verify that any links you provide (especially to specific files or directories) are correct and actually exist on the current remote branch. Do not guess folder names; check the actual file system before constructing URLs. This prevents 404 errors for the user.
+  3. **Check Status (No Blocking)**: Run `gh pr checks` to check the status of the pipeline. **CRITICAL: NEVER use the `--watch` flag.** It will block the execution loop and cause you to hang indefinitely. Run the command once to inspect the current output. If checks are still pending, communicate the status to the user and either use a non-blocking delay (e.g., `sleep 30`) before checking again, or ask the user to wait.
+  4. **Remediate**: If checks fail, fetch the failure logs, diagnose the issue, apply a fix, push the update, and loop back to step 3.
+  5. **Ready for Review Gate**: Before transitioning a Draft PR to Open ("Ready for Review"), you MUST ensure:
      - An automated UI/frontend audit (e.g., `/review-frontend` or `/ux-review`) has been run and all feedback addressed.
      - All comments from automated bots on the GitHub PR have been fetched, reviewed, and fully addressed.
-  5. Once ALL checks have passed and the above conditions are met, ask the user if they want to mark the PR as ready for review (or use `gh pr ready` to do it for them upon explicit approval). Do not mark it ready without user verification.
+  6. **Finalize**: Once ALL checks have passed and the above conditions are met, ask the user if they want to mark the PR as ready for review (or use `gh pr ready` to do it for them upon explicit approval). Do not mark it ready without user verification.
 
 #### 11. Requesting Review (Google Chat)
 - **Context**: The engineering manager requests that all PRs passing checks and ready for review be posted to a specific Google Chat space so reviewers can pick them up.
