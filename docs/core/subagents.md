@@ -334,10 +334,12 @@ With this feature, you can:
   (which provide a standardized way to connect AI models to external tools and
   data sources) directly in the subagent's markdown frontmatter, isolating them
   to that specific agent.
-- **Maintain state isolation:** Use an isolated `MessageBus` for communication,
-  as tools are cloned for each subagent.
-- **Apply subagent-specific policies:** Enforce granular policy rules based on
-  the executing subagent's name using TOML configuration.
+- **Maintain state isolation:** Ensure that subagents only interact with their
+  own set of tools and servers, preventing side effects and state
+  contamination.
+- **Apply subagent-specific policies:** Enforce granular rules in your
+  [Policy Engine](../reference/policy-engine.md) TOML configuration based on the
+  executing subagent's name.
 
 ### Configuring isolated tools and servers
 
@@ -365,9 +367,10 @@ mcpServers:
 
 ### Subagent-specific policies
 
-You can enforce fine-grained control over subagents using the Policy Engine's
-TOML configuration. This prevents subagents from inheriting universal rules that
-might be too permissive or restrictive for their specific tasks.
+You can enforce fine-grained control over subagents using the [Policy
+Engine's](../reference/policy-engine.md) TOML configuration. This allows you to
+grant or restrict permissions specifically for an agent, without affecting the
+rest of your CLI session.
 
 To restrict a policy rule to a specific subagent, add the `subagent` property to
 the `[[rules]]` block in your `policy.toml` file.
@@ -376,16 +379,16 @@ the `[[rules]]` block in your `policy.toml` file.
 
 ```toml
 [[rules]]
-name = "Allow docs-writer to read docs"
-subagent = "docs-writer"
-description = "Permit reading files in the docs directory."
+name = "Allow pr-creator to push code"
+subagent = "pr-creator"
+description = "Permit pr-creator to push branches automatically."
 action = "allow"
-tools = ["read_file"]
-args = { file_path = "^docs/.*" }
+toolName = "run_shell_command"
+commandPrefix = "git push"
 ```
 
 In this configuration, the policy rule only triggers if the executing subagent's
-name matches `docs-writer`. Rules without the `subagent` property apply
+name matches `pr-creator`. Rules without the `subagent` property apply
 universally to all agents.
 
 ## Managing subagents
