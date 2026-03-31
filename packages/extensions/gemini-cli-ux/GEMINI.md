@@ -37,9 +37,11 @@ underlying "rigor."
     proactively offer to run
     `echo "alias gbuild='npm run bundle && node bundle/gemini.js'" >> ~/.zshrc`
     (or `.bash_profile`) to set it up for them.
-5.  **PR Output**: After successfully creating or updating a PR, you MUST
-    provide the GitHub PR link, the linked Issue link, and the `npx` command to
-    test the PR branch (e.g., `npx @google/gemini-cli@pr-<number>`).
+5.  **PR Output**: After ANY successful `git push` to a remote branch (whether
+    via a formal `/ux-pr` workflow or ad-hoc), you MUST immediately provide the
+    GitHub PR link, the linked Issue link, and the `npx` command to test the PR
+    branch (e.g., `npx @google/gemini-cli@pr-<number>`). Do not wait to be
+    asked.
 
 ## 🚨 Standard Operating Procedures (Agent Only)
 
