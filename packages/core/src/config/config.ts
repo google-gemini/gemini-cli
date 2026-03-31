@@ -186,6 +186,7 @@ export interface SummarizeToolOutputSettings {
 }
 
 export interface PlanSettings {
+  enabled?: boolean;
   directory?: string;
   modelRouting?: boolean;
 }
