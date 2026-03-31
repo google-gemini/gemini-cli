@@ -68,6 +68,8 @@ export interface GlobalSandboxOptions {
    * This directory is granted full read and write access.
    */
   workspace: string;
+  /** Absolute paths to explicitly include in the workspace context. */
+  includeDirectories?: string[];
   /** Absolute paths to explicitly deny read/write access to (overrides allowlists). */
   forbiddenPaths?: string[];
   /** The current sandbox mode behavior from config. */
@@ -104,6 +106,8 @@ export interface SandboxedCommand {
   env: NodeJS.ProcessEnv;
   /** The working directory. */
   cwd?: string;
+  /** An optional cleanup function to be called after the command terminates. */
+  cleanup?: () => void;
 }
 
 /**
