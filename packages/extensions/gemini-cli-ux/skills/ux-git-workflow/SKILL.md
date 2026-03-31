@@ -133,7 +133,7 @@ If operating in a sibling worktree (e.g., `feature-xyz/`):
   3.  **Tier 3 (Latest Feedback)**: Separate, granular commits addressing only the **very last** round of reviewer feedback.
   - **Action**: Use `git rebase -i` or `git reset --soft` to organize commits into these tiers. Ensure refactors are ALWAYS isolated from logic.
 - **Push**: `git push origin HEAD --force-with-lease`.
-- **Draft PR**: If creating a new PR, you MUST create it as a draft by default (e.g., `gh pr create --draft`).
+- **Draft PR**: If creating a new PR, you MUST create it as a draft by default (e.g., `gh pr create --draft`). It MUST remain in a draft state until all automated bot comments and frontend audits are resolved.
 - **MANDATORY FINAL OUTPUT**: You MUST provide the full, clickable **GitHub PR link** (e.g., `https://github.com/google-gemini/gemini-cli/pull/23487`), the **Issue URL** (e.g., `https://github.com/google-gemini/gemini-cli/issues/12345`), AND the **npx command** to test the PR branch directly (e.g., `npx @google/gemini-cli@pr-<number>`) as the final output of this skill. This allows the user to immediately verify the update and track the associated task.
 
 #### 10. CI Verification & Remediation Loop (The Slog)
@@ -141,7 +141,10 @@ If operating in a sibling worktree (e.g., `feature-xyz/`):
 - **Action**: You MUST assume that CI checks have failed until you explicitly verify they have passed on the PR.
   1. Run `gh pr checks` to monitor the status of the GitHub CI pipeline.
   2. If checks fail, fetch the failure logs, diagnose the issue, apply a fix, push the update, and loop back to step 1.
-  3. Once you verify that ALL checks have passed, you must ask the user if they want to mark the PR as ready for review (or remind them to do so themselves). Do not mark it ready without explicit user verification.
+  3. Before transitioning a Draft PR to Open ("Ready for Review"), you MUST ensure:
+     - An automated UI/frontend audit (e.g., `/review-frontend` or `/ux-review`) has been run and all feedback addressed.
+     - All comments from automated bots on the GitHub PR have been fetched, reviewed, and fully addressed.
+  4. Once ALL checks have passed and the above conditions are met, ask the user if they want to mark the PR as ready for review (or use `gh pr ready` to do it for them upon explicit approval). Do not mark it ready without user verification.
 
 #### 11. Requesting Review (Google Chat)
 - **Context**: The engineering manager requests that all PRs passing checks and ready for review be posted to a specific Google Chat space so reviewers can pick them up.
