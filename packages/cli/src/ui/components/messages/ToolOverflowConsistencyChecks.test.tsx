@@ -7,9 +7,10 @@
 import { describe, it, expect } from 'vitest';
 import { ToolGroupMessage } from './ToolGroupMessage.js';
 import { renderWithProviders } from '../../../test-utils/render.js';
+import { createMockSettings } from '../../../test-utils/settings.js';
 import { StreamingState, type IndividualToolCallDisplay } from '../../types.js';
 import { waitFor } from '../../../test-utils/async.js';
-import { CoreToolCallStatus } from '@google/gemini-cli-core';
+import { CoreToolCallStatus, makeFakeConfig } from '@google/gemini-cli-core';
 import { useOverflowState } from '../../contexts/OverflowContext.js';
 
 describe('ToolOverflowConsistencyChecks: ToolGroupMessage and ToolResultDisplay synchronization', () => {
@@ -56,7 +57,8 @@ describe('ToolOverflowConsistencyChecks: ToolGroupMessage and ToolResultDisplay 
           streamingState: StreamingState.Idle,
           constrainHeight: true,
         },
-        useAlternateBuffer: true,
+        config: makeFakeConfig({ useAlternateBuffer: true }),
+        settings: createMockSettings({ ui: { useAlternateBuffer: true } }),
       },
     );
 
@@ -106,7 +108,8 @@ describe('ToolOverflowConsistencyChecks: ToolGroupMessage and ToolResultDisplay 
           streamingState: StreamingState.Idle,
           constrainHeight: true,
         },
-        useAlternateBuffer: false,
+        config: makeFakeConfig({ useAlternateBuffer: false }),
+        settings: createMockSettings({ ui: { useAlternateBuffer: false } }),
       },
     );
 

@@ -16,6 +16,8 @@ import {
   CoreToolCallStatus,
 } from '@google/gemini-cli-core';
 import { renderWithProviders } from '../../../test-utils/render.js';
+import { createMockSettings } from '../../../test-utils/settings.js';
+import { makeFakeConfig } from '@google/gemini-cli-core';
 import { waitFor } from '../../../test-utils/async.js';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { SHELL_COMMAND_NAME, ACTIVE_SHELL_MAX_LINES } from '../../constants.js';
@@ -48,14 +50,6 @@ describe('<ShellToolMessage />', () => {
     setEmbeddedShellFocused: mockSetEmbeddedShellFocused,
   };
 
-  const renderShell = (
-    props: Partial<ShellToolMessageProps> = {},
-    options: Parameters<typeof renderWithProviders>[1] = {},
-  ) =>
-    renderWithProviders(<ShellToolMessage {...baseProps} {...props} />, {
-      uiActions,
-      ...options,
-    });
   beforeEach(() => {
     vi.clearAllMocks();
   });
@@ -65,9 +59,9 @@ describe('<ShellToolMessage />', () => {
       ['SHELL_COMMAND_NAME', SHELL_COMMAND_NAME],
       ['SHELL_TOOL_NAME', SHELL_TOOL_NAME],
     ])('clicks inside the shell area sets focus for %s', async (_, name) => {
-      const { lastFrame, simulateClick, unmount } = renderShell(
-        { name },
-        { mouseEventsEnabled: true },
+      const { lastFrame, simulateClick, unmount } = renderWithProviders(
+        <ShellToolMessage {...baseProps} name={name} />,
+        { uiActions, mouseEventsEnabled: true },
       );
 
       await waitFor(() => {
@@ -152,7 +146,8 @@ describe('<ShellToolMessage />', () => {
           ptyId: 1,
         },
         {
-          useAlternateBuffer: true,
+          config: makeFakeConfig({ useAlternateBuffer: true }),
+          settings: createMockSettings({ ui: { useAlternateBuffer: true } }),
           uiState: {
             embeddedShellFocused: true,
             activePtyId: 1,
@@ -166,7 +161,8 @@ describe('<ShellToolMessage />', () => {
           ptyId: 1,
         },
         {
-          useAlternateBuffer: true,
+          config: makeFakeConfig({ useAlternateBuffer: true }),
+          settings: createMockSettings({ ui: { useAlternateBuffer: true } }),
           uiState: {
             embeddedShellFocused: false,
             activePtyId: 1,
@@ -174,9 +170,9 @@ describe('<ShellToolMessage />', () => {
         },
       ],
     ])('%s', async (_, props, options) => {
-      const { lastFrame, waitUntilReady, unmount } = renderShell(
-        props,
-        options,
+      const { lastFrame, waitUntilReady, unmount } = renderWithProviders(
+        <ShellToolMessage {...baseProps} {...props} />,
+        { uiActions, ...options },
       );
       await waitUntilReady();
       expect(lastFrame()).toMatchSnapshot();
@@ -203,7 +199,7 @@ describe('<ShellToolMessage />', () => {
       [
         'uses full availableTerminalHeight when focused in alternate buffer mode',
         100,
-        98, // 100 - 2
+        98,
         true,
         false,
       ],
@@ -223,16 +219,19 @@ describe('<ShellToolMessage />', () => {
         focused,
         constrainHeight,
       ) => {
-        const { lastFrame, waitUntilReady, unmount } = renderShell(
+        const { lastFrame, waitUntilReady, unmount } = renderWithProviders(
+          <ShellToolMessage
+            {...baseProps}
+            resultDisplay={LONG_OUTPUT}
+            renderOutputAsMarkdown={false}
+            availableTerminalHeight={availableTerminalHeight}
+            ptyId={1}
+            status={CoreToolCallStatus.Executing}
+          />,
           {
-            resultDisplay: LONG_OUTPUT,
-            renderOutputAsMarkdown: false,
-            availableTerminalHeight,
-            ptyId: 1,
-            status: CoreToolCallStatus.Executing,
-          },
-          {
-            useAlternateBuffer: true,
+            uiActions,
+            config: makeFakeConfig({ useAlternateBuffer: true }),
+            settings: createMockSettings({ ui: { useAlternateBuffer: true } }),
             uiState: {
               activePtyId: focused ? 1 : 2,
               embeddedShellFocused: focused,
@@ -250,14 +249,19 @@ describe('<ShellToolMessage />', () => {
     );
 
     it('fully expands in standard mode when availableTerminalHeight is undefined', async () => {
-      const { lastFrame, unmount } = renderShell(
+      const { lastFrame, unmount } = renderWithProviders(
+        <ShellToolMessage
+          {...baseProps}
+          resultDisplay={LONG_OUTPUT}
+          renderOutputAsMarkdown={false}
+          availableTerminalHeight={undefined}
+          status={CoreToolCallStatus.Executing}
+        />,
         {
-          resultDisplay: LONG_OUTPUT,
-          renderOutputAsMarkdown: false,
-          availableTerminalHeight: undefined,
-          status: CoreToolCallStatus.Executing,
+          uiActions,
+          config: makeFakeConfig({ useAlternateBuffer: false }),
+          settings: createMockSettings({ ui: { useAlternateBuffer: false } }),
         },
-        { useAlternateBuffer: false },
       );
 
       await waitFor(() => {
@@ -269,16 +273,19 @@ describe('<ShellToolMessage />', () => {
     });
 
     it('fully expands in alternate buffer mode when constrainHeight is false and isExpandable is true', async () => {
-      const { lastFrame, waitUntilReady, unmount } = renderShell(
+      const { lastFrame, waitUntilReady, unmount } = renderWithProviders(
+        <ShellToolMessage
+          {...baseProps}
+          resultDisplay={LONG_OUTPUT}
+          renderOutputAsMarkdown={false}
+          availableTerminalHeight={undefined}
+          status={CoreToolCallStatus.Success}
+          isExpandable={true}
+        />,
         {
-          resultDisplay: LONG_OUTPUT,
-          renderOutputAsMarkdown: false,
-          availableTerminalHeight: undefined,
-          status: CoreToolCallStatus.Success,
-          isExpandable: true,
-        },
-        {
-          useAlternateBuffer: true,
+          uiActions,
+          config: makeFakeConfig({ useAlternateBuffer: true }),
+          settings: createMockSettings({ ui: { useAlternateBuffer: true } }),
           uiState: {
             constrainHeight: false,
           },
@@ -296,16 +303,19 @@ describe('<ShellToolMessage />', () => {
     });
 
     it('stays constrained in alternate buffer mode when isExpandable is false even if constrainHeight is false', async () => {
-      const { lastFrame, waitUntilReady, unmount } = renderShell(
+      const { lastFrame, waitUntilReady, unmount } = renderWithProviders(
+        <ShellToolMessage
+          {...baseProps}
+          resultDisplay={LONG_OUTPUT}
+          renderOutputAsMarkdown={false}
+          availableTerminalHeight={undefined}
+          status={CoreToolCallStatus.Success}
+          isExpandable={false}
+        />,
         {
-          resultDisplay: LONG_OUTPUT,
-          renderOutputAsMarkdown: false,
-          availableTerminalHeight: undefined,
-          status: CoreToolCallStatus.Success,
-          isExpandable: false,
-        },
-        {
-          useAlternateBuffer: true,
+          uiActions,
+          config: makeFakeConfig({ useAlternateBuffer: true }),
+          settings: createMockSettings({ ui: { useAlternateBuffer: true } }),
           uiState: {
             constrainHeight: false,
           },

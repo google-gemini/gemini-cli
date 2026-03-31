@@ -5,7 +5,7 @@
  */
 
 import React from 'react';
-import { render } from '../../../test-utils/render.js';
+import { renderWithProviders } from '../../../test-utils/render.js';
 import { waitFor } from '../../../test-utils/async.js';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import {
@@ -14,7 +14,6 @@ import {
   type SearchListState,
   type GenericListItem,
 } from './SearchableList.js';
-import { KeypressProvider } from '../../contexts/KeypressContext.js';
 import { useTextBuffer } from './text-buffer.js';
 
 const useMockSearch = (props: {
@@ -51,12 +50,6 @@ const useMockSearch = (props: {
     maxLabelWidth: 10,
   };
 };
-
-vi.mock('../../contexts/UIStateContext.js', () => ({
-  useUIState: () => ({
-    mainAreaWidth: 100,
-  }),
-}));
 
 const mockItems: GenericListItem[] = [
   {
@@ -98,11 +91,7 @@ describe('SearchableList', () => {
       ...props,
     };
 
-    return render(
-      <KeypressProvider>
-        <SearchableList {...defaultProps} />
-      </KeypressProvider>,
-    );
+    return renderWithProviders(<SearchableList {...defaultProps} />);
   };
 
   it('should render all items initially', async () => {

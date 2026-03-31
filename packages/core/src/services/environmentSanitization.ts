@@ -162,6 +162,10 @@ function shouldRedactEnvironmentVariable(
     }
   }
 
+  if (key.startsWith('GIT_CONFIG_')) {
+    return false;
+  }
+
   if (allowedSet?.has(key)) {
     return false;
   }
@@ -188,4 +192,44 @@ function shouldRedactEnvironmentVariable(
   }
 
   return false;
+}
+
+/**
+ * Merges a partial sanitization config with secure defaults and validates it.
+ * This ensures that sensitive environment variables cannot be bypassed by
+ * request-provided configurations.
+ */
+export function getSecureSanitizationConfig(
+  requestedConfig: Partial<EnvironmentSanitizationConfig> = {},
+  baseConfig?: EnvironmentSanitizationConfig,
+): EnvironmentSanitizationConfig {
+  const allowed = [
+    ...(baseConfig?.allowedEnvironmentVariables ?? []),
+    ...(requestedConfig.allowedEnvironmentVariables ?? []),
+  ].filter((key) => {
+    const upperKey = key.toUpperCase();
+    // Never allow variables that are explicitly forbidden by name
+    if (NEVER_ALLOWED_ENVIRONMENT_VARIABLES.has(upperKey)) {
+      return false;
+    }
+    // Never allow variables that match sensitive name patterns
+    for (const pattern of NEVER_ALLOWED_NAME_PATTERNS) {
+      if (pattern.test(upperKey)) {
+        return false;
+      }
+    }
+    return true;
+  });
+
+  const blocked = [
+    ...(baseConfig?.blockedEnvironmentVariables ?? []),
+    ...(requestedConfig.blockedEnvironmentVariables ?? []),
+  ];
+
+  return {
+    allowedEnvironmentVariables: [...new Set(allowed)],
+    blockedEnvironmentVariables: [...new Set(blocked)],
+    // Redaction must be enabled for secure configurations
+    enableEnvironmentVariableRedaction: true,
+  };
 }

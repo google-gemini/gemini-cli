@@ -395,7 +395,7 @@ interface OptionItem {
   key: string;
   label: string;
   description: string;
-  type: 'option' | 'other' | 'done';
+  type: 'option' | 'other' | 'done' | 'all';
   index: number;
 }
 
@@ -407,6 +407,7 @@ interface ChoiceQuestionState {
 
 type ChoiceQuestionAction =
   | { type: 'TOGGLE_INDEX'; payload: { index: number; multiSelect: boolean } }
+  | { type: 'TOGGLE_ALL'; payload: { totalOptions: number } }
   | {
       type: 'SET_CUSTOM_SELECTED';
       payload: { selected: boolean; multiSelect: boolean };
@@ -419,6 +420,25 @@ function choiceQuestionReducer(
   action: ChoiceQuestionAction,
 ): ChoiceQuestionState {
   switch (action.type) {
+    case 'TOGGLE_ALL': {
+      const { totalOptions } = action.payload;
+      const allSelected = state.selectedIndices.size === totalOptions;
+      if (allSelected) {
+        return {
+          ...state,
+          selectedIndices: new Set(),
+        };
+      } else {
+        const newIndices = new Set<number>();
+        for (let i = 0; i < totalOptions; i++) {
+          newIndices.add(i);
+        }
+        return {
+          ...state,
+          selectedIndices: newIndices,
+        };
+      }
+    }
     case 'TOGGLE_INDEX': {
       const { index, multiSelect } = action.payload;
       const newIndices = new Set(multiSelect ? state.selectedIndices : []);
@@ -703,6 +723,18 @@ const ChoiceQuestionView: React.FC<ChoiceQuestionViewProps> = ({
       },
     );
 
+    // Add 'All of the above' for multi-select
+    if (question.multiSelect && questionOptions.length > 1) {
+      const allItem: OptionItem = {
+        key: 'all',
+        label: 'All of the above',
+        description: 'Select all options',
+        type: 'all',
+        index: list.length,
+      };
+      list.push({ key: 'all', value: allItem });
+    }
+
     // Only add custom option for choice type, not yesno
     if (question.type !== 'yesno') {
       const otherItem: OptionItem = {
@@ -755,6 +787,11 @@ const ChoiceQuestionView: React.FC<ChoiceQuestionViewProps> = ({
             type: 'TOGGLE_CUSTOM_SELECTED',
             payload: { multiSelect: true },
           });
+        } else if (itemValue.type === 'all') {
+          dispatch({
+            type: 'TOGGLE_ALL',
+            payload: { totalOptions: questionOptions.length },
+          });
         } else if (itemValue.type === 'done') {
           // Done just triggers navigation, selections already saved via useEffect
           onAnswer(
@@ -783,6 +820,7 @@ const ChoiceQuestionView: React.FC<ChoiceQuestionViewProps> = ({
     },
     [
       question.multiSelect,
+      questionOptions.length,
       selectedIndices,
       isCustomOptionSelected,
       customOptionText,
@@ -857,11 +895,16 @@ const ChoiceQuestionView: React.FC<ChoiceQuestionViewProps> = ({
         renderItem={(item, context) => {
           const optionItem = item.value;
           const isChecked =
-            selectedIndices.has(optionItem.index) ||
-            (optionItem.type === 'other' && isCustomOptionSelected);
+            (optionItem.type === 'option' &&
+              selectedIndices.has(optionItem.index)) ||
+            (optionItem.type === 'other' && isCustomOptionSelected) ||
+            (optionItem.type === 'all' &&
+              selectedIndices.size === questionOptions.length);
           const showCheck =
             question.multiSelect &&
-            (optionItem.type === 'option' || optionItem.type === 'other');
+            (optionItem.type === 'option' ||
+              optionItem.type === 'other' ||
+              optionItem.type === 'all');
 
           // Render inline text input for custom option
           if (optionItem.type === 'other') {

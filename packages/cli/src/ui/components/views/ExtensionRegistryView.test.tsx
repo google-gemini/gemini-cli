@@ -5,7 +5,7 @@
  */
 
 import React from 'react';
-import { render } from '../../../test-utils/render.js';
+import { renderWithProviders } from '../../../test-utils/render.js';
 import { waitFor } from '../../../test-utils/async.js';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { ExtensionRegistryView } from './ExtensionRegistryView.js';
@@ -14,9 +14,7 @@ import { useExtensionRegistry } from '../../hooks/useExtensionRegistry.js';
 import { useExtensionUpdates } from '../../hooks/useExtensionUpdates.js';
 import { useRegistrySearch } from '../../hooks/useRegistrySearch.js';
 import { type RegistryExtension } from '../../../config/extensionRegistryClient.js';
-import { useUIState } from '../../contexts/UIStateContext.js';
-import { useConfig } from '../../contexts/ConfigContext.js';
-import { KeypressProvider } from '../../contexts/KeypressContext.js';
+import { type UIState } from '../../contexts/UIStateContext.js';
 import {
   type SearchListState,
   type GenericListItem,
@@ -28,8 +26,6 @@ vi.mock('../../hooks/useExtensionRegistry.js');
 vi.mock('../../hooks/useExtensionUpdates.js');
 vi.mock('../../hooks/useRegistrySearch.js');
 vi.mock('../../../config/extension-manager.js');
-vi.mock('../../contexts/UIStateContext.js');
-vi.mock('../../contexts/ConfigContext.js');
 
 const mockExtensions: RegistryExtension[] = [
   {
@@ -123,34 +119,27 @@ describe('ExtensionRegistryView', () => {
           maxLabelWidth: 10,
         }) as unknown as SearchListState<GenericListItem>,
     );
-
-    vi.mocked(useUIState).mockReturnValue({
-      mainAreaWidth: 100,
-      terminalHeight: 40,
-      staticExtraHeight: 5,
-    } as unknown as ReturnType<typeof useUIState>);
-
-    vi.mocked(useConfig).mockReturnValue({
-      getEnableExtensionReloading: vi.fn().mockReturnValue(false),
-      getExtensionRegistryURI: vi
-        .fn()
-        .mockReturnValue('https://geminicli.com/extensions.json'),
-    } as unknown as ReturnType<typeof useConfig>);
   });
 
   const renderView = () =>
-    render(
-      <KeypressProvider>
-        <ExtensionRegistryView
-          extensionManager={mockExtensionManager}
-          onSelect={mockOnSelect}
-          onClose={mockOnClose}
-        />
-      </KeypressProvider>,
+    renderWithProviders(
+      <ExtensionRegistryView
+        extensionManager={mockExtensionManager}
+        onSelect={mockOnSelect}
+        onClose={mockOnClose}
+      />,
+      {
+        uiState: {
+          staticExtraHeight: 5,
+          terminalHeight: 40,
+        } as Partial<UIState>,
+      },
     );
 
   it('should render extensions', async () => {
-    const { lastFrame } = renderView();
+    const { lastFrame, waitUntilReady } = renderView();
+    await waitUntilReady();
+
     await waitFor(() => {
       expect(lastFrame()).toContain('Test Extension 1');
       expect(lastFrame()).toContain('Test Extension 2');

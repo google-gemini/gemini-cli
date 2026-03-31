@@ -137,6 +137,7 @@ describe('handleInstall', () => {
       mcps: [],
       hooks: [],
       skills: [],
+      agents: [],
       settings: [],
       securityWarnings: [],
       discoveryErrors: [],
@@ -379,6 +380,7 @@ describe('handleInstall', () => {
       mcps: [],
       hooks: [],
       skills: ['cool-skill'],
+      agents: ['cool-agent'],
       settings: [],
       securityWarnings: ['Security risk!'],
       discoveryErrors: ['Read error'],
@@ -406,6 +408,10 @@ describe('handleInstall', () => {
     );
     expect(mockPromptForConsentNonInteractive).toHaveBeenCalledWith(
       expect.stringContaining('cool-skill'),
+      false,
+    );
+    expect(mockPromptForConsentNonInteractive).toHaveBeenCalledWith(
+      expect.stringContaining('cool-agent'),
       false,
     );
     expect(mockPromptForConsentNonInteractive).toHaveBeenCalledWith(

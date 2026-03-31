@@ -13,6 +13,9 @@ import {
   afterEach,
   type Mock,
 } from 'vitest';
+import * as fs from 'node:fs';
+import * as os from 'node:os';
+import { spawnSync } from 'node:child_process';
 import { KeychainService } from './keychainService.js';
 import { coreEvents } from '../utils/events.js';
 import { debugLogger } from '../utils/debugLogger.js';
@@ -53,6 +56,21 @@ vi.mock('../utils/debugLogger.js', () => ({
   debugLogger: { log: vi.fn() },
 }));
 
+vi.mock('node:os', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('node:os')>();
+  return { ...actual, platform: vi.fn() };
+});
+
+vi.mock('node:child_process', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('node:child_process')>();
+  return { ...actual, spawnSync: vi.fn() };
+});
+
+vi.mock('node:fs', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('node:fs')>();
+  return { ...actual, existsSync: vi.fn(), promises: { ...actual.promises } };
+});
+
 describe('KeychainService', () => {
   let service: KeychainService;
   const SERVICE_NAME = 'test-service';
@@ -64,6 +82,9 @@ describe('KeychainService', () => {
     process.env = { ...originalEnv };
     service = new KeychainService(SERVICE_NAME);
     passwords = {};
+
+    vi.mocked(os.platform).mockReturnValue('linux');
+    vi.mocked(fs.existsSync).mockReturnValue(true);
 
     // Stateful mock implementation for native keychain
     mockKeytar.setPassword?.mockImplementation((_svc, acc, val) => {
@@ -197,6 +218,90 @@ describe('KeychainService', () => {
     });
   });
 
+  describe('macOS Keychain Probing', () => {
+    beforeEach(() => {
+      vi.mocked(os.platform).mockReturnValue('darwin');
+    });
+
+    it('should skip functional test and fallback if security default-keychain fails', async () => {
+      vi.mocked(spawnSync).mockReturnValue({
+        status: 1,
+        stderr: 'not found',
+        stdout: '',
+        output: [],
+        pid: 123,
+        signal: null,
+      });
+
+      const available = await service.isAvailable();
+
+      expect(available).toBe(true);
+      expect(vi.mocked(spawnSync)).toHaveBeenCalledWith(
+        'security',
+        ['default-keychain'],
+        expect.any(Object),
+      );
+      expect(mockKeytar.setPassword).not.toHaveBeenCalled();
+      expect(FileKeychain).toHaveBeenCalled();
+      expect(debugLogger.log).toHaveBeenCalledWith(
+        expect.stringContaining('MacOS default keychain not found'),
+      );
+    });
+
+    it('should skip functional test and fallback if security default-keychain returns non-existent path', async () => {
+      vi.mocked(spawnSync).mockReturnValue({
+        status: 0,
+        stdout: '  "/non/existent/path"  \n',
+        stderr: '',
+        output: [],
+        pid: 123,
+        signal: null,
+      });
+      vi.mocked(fs.existsSync).mockReturnValue(false);
+
+      const available = await service.isAvailable();
+
+      expect(available).toBe(true);
+      expect(fs.existsSync).toHaveBeenCalledWith('/non/existent/path');
+      expect(mockKeytar.setPassword).not.toHaveBeenCalled();
+      expect(FileKeychain).toHaveBeenCalled();
+    });
+
+    it('should proceed with functional test if valid default keychain is found', async () => {
+      vi.mocked(spawnSync).mockReturnValue({
+        status: 0,
+        stdout: '"/path/to/valid.keychain"',
+        stderr: '',
+        output: [],
+        pid: 123,
+        signal: null,
+      });
+      vi.mocked(fs.existsSync).mockReturnValue(true);
+
+      const available = await service.isAvailable();
+
+      expect(available).toBe(true);
+      expect(mockKeytar.setPassword).toHaveBeenCalled();
+      expect(FileKeychain).not.toHaveBeenCalled();
+    });
+
+    it('should handle unquoted paths from security output', async () => {
+      vi.mocked(spawnSync).mockReturnValue({
+        status: 0,
+        stdout: '  /path/to/valid.keychain  \n',
+        stderr: '',
+        output: [],
+        pid: 123,
+        signal: null,
+      });
+      vi.mocked(fs.existsSync).mockReturnValue(true);
+
+      await service.isAvailable();
+
+      expect(fs.existsSync).toHaveBeenCalledWith('/path/to/valid.keychain');
+    });
+  });
+
   describe('Password Operations', () => {
     beforeEach(async () => {
       await service.isAvailable();
@@ -223,6 +328,4 @@ describe('KeychainService', () => {
       expect(await service.getPassword('missing')).toBeNull();
     });
   });
-
-  // Removing 'When Unavailable' tests since the service is always available via fallback
 });

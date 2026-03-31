@@ -99,11 +99,15 @@ export async function handleInstall(args: InstallArgs) {
         if (hasDiscovery) {
           promptLines.push(chalk.bold('This folder contains:'));
           const groups = [
-            { label: 'Commands', items: discoveryResults.commands },
-            { label: 'MCP Servers', items: discoveryResults.mcps },
-            { label: 'Hooks', items: discoveryResults.hooks },
-            { label: 'Skills', items: discoveryResults.skills },
-            { label: 'Setting overrides', items: discoveryResults.settings },
+            { label: 'Commands', items: discoveryResults.commands ?? [] },
+            { label: 'MCP Servers', items: discoveryResults.mcps ?? [] },
+            { label: 'Hooks', items: discoveryResults.hooks ?? [] },
+            { label: 'Skills', items: discoveryResults.skills ?? [] },
+            { label: 'Agents', items: discoveryResults.agents ?? [] },
+            {
+              label: 'Setting overrides',
+              items: discoveryResults.settings ?? [],
+            },
           ].filter((g) => g.items.length > 0);
 
           for (const group of groups) {

@@ -7,20 +7,14 @@ the main agent's context or toolset.
 
 > **Note: Subagents are currently an experimental feature.**
 >
-> To use custom subagents, you must explicitly enable them in your
-> `settings.json`:
+> To use custom subagents, you must ensure they are enabled in your
+> `settings.json` (enabled by default):
 >
 > ```json
 > {
 >   "experimental": { "enableAgents": true }
 > }
 > ```
->
-> **Warning:** Subagents currently operate in
-> ["YOLO mode"](../reference/configuration.md#command-line-arguments), meaning
-> they may execute tools without individual user confirmation for each step.
-> Proceed with caution when defining agents with powerful tools like
-> `run_shell_command` or `write_file`.
 
 ## What are subagents?
 

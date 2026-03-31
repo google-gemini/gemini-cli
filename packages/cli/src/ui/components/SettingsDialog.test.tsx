@@ -20,28 +20,20 @@
  *
  */
 
-import { render } from '../../test-utils/render.js';
+import { renderWithProviders } from '../../test-utils/render.js';
 import { waitFor } from '../../test-utils/async.js';
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { SettingsDialog } from './SettingsDialog.js';
 import { SettingScope } from '../../config/settings.js';
 import { createMockSettings } from '../../test-utils/settings.js';
-import { KeypressProvider } from '../contexts/KeypressContext.js';
 import { act } from 'react';
 import { TEST_ONLY } from '../../utils/settingsUtils.js';
-import { SettingsContext } from '../contexts/SettingsContext.js';
 import {
   getSettingsSchema,
   type SettingDefinition,
   type SettingsSchemaType,
 } from '../../config/settingsSchema.js';
 import { terminalCapabilityManager } from '../utils/terminalCapabilityManager.js';
-
-vi.mock('../contexts/UIStateContext.js', () => ({
-  useUIState: () => ({
-    terminalWidth: 100, // Fixed width for consistent snapshots
-  }),
-}));
 
 enum TerminalKeys {
   ENTER = '\u000D',
@@ -52,6 +44,8 @@ enum TerminalKeys {
   RIGHT_ARROW = '\u001B[C',
   ESCAPE = '\u001B',
   BACKSPACE = '\u0008',
+  CTRL_P = '\u0010',
+  CTRL_N = '\u000E',
 }
 
 vi.mock('../../config/settingsSchema.js', async (importOriginal) => {
@@ -94,7 +88,25 @@ const ENUM_SETTING: SettingDefinition = {
   showInDialog: true,
 };
 
+// Minimal general schema for KeypressProvider
+const MINIMAL_GENERAL_SCHEMA = {
+  general: {
+    showInDialog: false,
+    properties: {
+      debugKeystrokeLogging: {
+        type: 'boolean',
+        label: 'Debug Keystroke Logging',
+        category: 'General',
+        requiresRestart: false,
+        default: false,
+        showInDialog: false,
+      },
+    },
+  },
+};
+
 const ENUM_FAKE_SCHEMA: SettingsSchemaType = {
+  ...MINIMAL_GENERAL_SCHEMA,
   ui: {
     showInDialog: false,
     properties: {
@@ -106,6 +118,7 @@ const ENUM_FAKE_SCHEMA: SettingsSchemaType = {
 } as unknown as SettingsSchemaType;
 
 const ARRAY_FAKE_SCHEMA: SettingsSchemaType = {
+  ...MINIMAL_GENERAL_SCHEMA,
   context: {
     type: 'object',
     label: 'Context',
@@ -162,6 +175,7 @@ const ARRAY_FAKE_SCHEMA: SettingsSchemaType = {
 } as unknown as SettingsSchemaType;
 
 const TOOLS_SHELL_FAKE_SCHEMA: SettingsSchemaType = {
+  ...MINIMAL_GENERAL_SCHEMA,
   tools: {
     type: 'object',
     label: 'Tools',
@@ -222,16 +236,16 @@ const renderDialog = (
     availableTerminalHeight?: number;
   },
 ) =>
-  render(
-    <SettingsContext.Provider value={settings}>
-      <KeypressProvider>
-        <SettingsDialog
-          onSelect={onSelect}
-          onRestartRequest={options?.onRestartRequest}
-          availableTerminalHeight={options?.availableTerminalHeight}
-        />
-      </KeypressProvider>
-    </SettingsContext.Provider>,
+  renderWithProviders(
+    <SettingsDialog
+      onSelect={onSelect}
+      onRestartRequest={options?.onRestartRequest}
+      availableTerminalHeight={options?.availableTerminalHeight}
+    />,
+    {
+      settings,
+      uiState: { terminalBackgroundColor: undefined },
+    },
   );
 
 describe('SettingsDialog', () => {
@@ -357,9 +371,9 @@ describe('SettingsDialog', () => {
         up: TerminalKeys.UP_ARROW,
       },
       {
-        name: 'vim keys (j/k)',
-        down: 'j',
-        up: 'k',
+        name: 'emacs keys (Ctrl+P/N)',
+        down: TerminalKeys.CTRL_N,
+        up: TerminalKeys.CTRL_P,
       },
     ])('should navigate with $name', async ({ down, up }) => {
       const settings = createMockSettings();
@@ -394,6 +408,31 @@ describe('SettingsDialog', () => {
         expect(lastFrame()).toContain('Vim Mode');
       });
 
+      unmount();
+    });
+
+    it('should allow j and k characters to be typed in search without triggering navigation', async () => {
+      const settings = createMockSettings();
+      const onSelect = vi.fn();
+      const { lastFrame, stdin, waitUntilReady, unmount } = renderDialog(
+        settings,
+        onSelect,
+      );
+      await waitUntilReady();
+
+      // Enter 'j' and 'k' in search
+      await act(async () => stdin.write('j'));
+      await waitUntilReady();
+      await act(async () => stdin.write('k'));
+      await waitUntilReady();
+
+      await waitFor(() => {
+        const frame = lastFrame();
+        // The search box should contain 'jk'
+        expect(frame).toContain('jk');
+        // Since 'jk' doesn't match any setting labels, it should say "No matches found."
+        expect(frame).toContain('No matches found.');
+      });
       unmount();
     });
 
@@ -1317,17 +1356,14 @@ describe('SettingsDialog', () => {
 
   describe('String Settings Editing', () => {
     it('should allow editing and committing a string setting', async () => {
-      let settings = createMockSettings({
+      const settings = createMockSettings({
         'general.sessionCleanup.maxAge': 'initial',
       });
       const onSelect = vi.fn();
 
-      const { stdin, unmount, rerender, waitUntilReady } = render(
-        <SettingsContext.Provider value={settings}>
-          <KeypressProvider>
-            <SettingsDialog onSelect={onSelect} />
-          </KeypressProvider>
-        </SettingsContext.Provider>,
+      const { stdin, unmount, waitUntilReady } = renderWithProviders(
+        <SettingsDialog onSelect={onSelect} />,
+        { settings },
       );
       await waitUntilReady();
 
@@ -1357,20 +1393,15 @@ describe('SettingsDialog', () => {
       });
       await waitUntilReady();
 
-      settings = createMockSettings({
-        user: {
-          settings: { 'general.sessionCleanup.maxAge': 'new value' },
-          originalSettings: { 'general.sessionCleanup.maxAge': 'new value' },
-          path: '',
-        },
+      // Simulate the settings file being updated on disk
+      await act(async () => {
+        settings.setValue(
+          SettingScope.User,
+          'general.sessionCleanup.maxAge',
+          'new value',
+        );
       });
-      rerender(
-        <SettingsContext.Provider value={settings}>
-          <KeypressProvider>
-            <SettingsDialog onSelect={onSelect} />
-          </KeypressProvider>
-        </SettingsContext.Provider>,
-      );
+      await waitUntilReady();
 
       // Press Escape to exit
       await act(async () => {

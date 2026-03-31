@@ -5,9 +5,10 @@
  */
 
 import { renderWithProviders } from '../../../test-utils/render.js';
+import { createMockSettings } from '../../../test-utils/settings.js';
 import { ToolResultDisplay } from './ToolResultDisplay.js';
 import { describe, it, expect } from 'vitest';
-import { type AnsiOutput } from '@google/gemini-cli-core';
+import { makeFakeConfig, type AnsiOutput } from '@google/gemini-cli-core';
 
 describe('ToolResultDisplay Overflow', () => {
   it('shows the head of the content when overflowDirection is bottom (string)', async () => {
@@ -20,7 +21,8 @@ describe('ToolResultDisplay Overflow', () => {
         overflowDirection="bottom"
       />,
       {
-        useAlternateBuffer: false,
+        config: makeFakeConfig({ useAlternateBuffer: false }),
+        settings: createMockSettings({ ui: { useAlternateBuffer: false } }),
         uiState: { constrainHeight: true },
       },
     );
@@ -46,7 +48,8 @@ describe('ToolResultDisplay Overflow', () => {
         overflowDirection="top"
       />,
       {
-        useAlternateBuffer: false,
+        config: makeFakeConfig({ useAlternateBuffer: false }),
+        settings: createMockSettings({ ui: { useAlternateBuffer: false } }),
         uiState: { constrainHeight: true },
       },
     );
@@ -83,7 +86,8 @@ describe('ToolResultDisplay Overflow', () => {
         overflowDirection="bottom"
       />,
       {
-        useAlternateBuffer: false,
+        config: makeFakeConfig({ useAlternateBuffer: false }),
+        settings: createMockSettings({ ui: { useAlternateBuffer: false } }),
         uiState: { constrainHeight: true },
       },
     );

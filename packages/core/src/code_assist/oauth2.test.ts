@@ -480,6 +480,7 @@ describe('oauth2', () => {
       expect(fs.existsSync(googleAccountPath)).toBe(true);
       if (fs.existsSync(googleAccountPath)) {
         const cachedGoogleAccount = fs.readFileSync(googleAccountPath, 'utf-8');
+
         expect(JSON.parse(cachedGoogleAccount)).toEqual({
           active: 'test-user-code-account@gmail.com',
           old: [],
@@ -1349,7 +1350,7 @@ describe('oauth2', () => {
         let dataHandler: ((data: Buffer) => void) | undefined;
         await vi.waitFor(() => {
           const dataCall = stdinOnSpy.mock.calls.find(
-            (call: [string, ...unknown[]]) => call[0] === 'data',
+            (call: [string | symbol, ...unknown[]]) => call[0] === 'data',
           );
           dataHandler = dataCall?.[1] as ((data: Buffer) => void) | undefined;
           if (!dataHandler) throw new Error('stdin handler not registered yet');

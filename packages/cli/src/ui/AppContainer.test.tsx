@@ -95,7 +95,8 @@ vi.mock('@google/gemini-cli-core', async (importOriginal) => {
   };
 });
 import ansiEscapes from 'ansi-escapes';
-import { mergeSettings, type LoadedSettings } from '../config/settings.js';
+import { type LoadedSettings } from '../config/settings.js';
+import { createMockSettings } from '../test-utils/settings.js';
 import type { InitializationResult } from '../core/initializer.js';
 import { useQuotaAndFallback } from './hooks/useQuotaAndFallback.js';
 import { StreamingState } from './types.js';
@@ -484,23 +485,18 @@ describe('AppContainer State Management', () => {
     );
 
     // Mock LoadedSettings
-    const defaultMergedSettings = mergeSettings({}, {}, {}, {}, true);
-    mockSettings = {
-      merged: {
-        ...defaultMergedSettings,
-        hideBanner: false,
-        hideFooter: false,
-        hideTips: false,
-        showMemoryUsage: false,
-        theme: 'default',
-        ui: {
-          ...defaultMergedSettings.ui,
-          showStatusInTitle: false,
-          hideWindowTitle: false,
-          useAlternateBuffer: false,
-        },
+    mockSettings = createMockSettings({
+      hideBanner: false,
+      hideFooter: false,
+      hideTips: false,
+      showMemoryUsage: false,
+      theme: 'default',
+      ui: {
+        showStatusInTitle: false,
+        hideWindowTitle: false,
+        useAlternateBuffer: false,
       },
-    } as unknown as LoadedSettings;
+    });
 
     // Mock InitializationResult
     mockInitResult = {
@@ -1008,16 +1004,12 @@ describe('AppContainer State Management', () => {
 
   describe('Settings Integration', () => {
     it('handles settings with all display options disabled', async () => {
-      const defaultMergedSettings = mergeSettings({}, {}, {}, {}, true);
-      const settingsAllHidden = {
-        merged: {
-          ...defaultMergedSettings,
-          hideBanner: true,
-          hideFooter: true,
-          hideTips: true,
-          showMemoryUsage: false,
-        },
-      } as unknown as LoadedSettings;
+      const settingsAllHidden = createMockSettings({
+        hideBanner: true,
+        hideFooter: true,
+        hideTips: true,
+        showMemoryUsage: false,
+      });
 
       let unmount: () => void;
       await act(async () => {
@@ -1029,16 +1021,9 @@ describe('AppContainer State Management', () => {
     });
 
     it('handles settings with memory usage enabled', async () => {
-      const defaultMergedSettings = mergeSettings({}, {}, {}, {}, true);
-      const settingsWithMemory = {
-        merged: {
-          ...defaultMergedSettings,
-          hideBanner: false,
-          hideFooter: false,
-          hideTips: false,
-          showMemoryUsage: true,
-        },
-      } as unknown as LoadedSettings;
+      const settingsWithMemory = createMockSettings({
+        showMemoryUsage: true,
+      });
 
       let unmount: () => void;
       await act(async () => {
@@ -1078,9 +1063,7 @@ describe('AppContainer State Management', () => {
     });
 
     it('handles undefined settings gracefully', async () => {
-      const undefinedSettings = {
-        merged: mergeSettings({}, {}, {}, {}, true),
-      } as LoadedSettings;
+      const undefinedSettings = createMockSettings();
 
       let unmount: () => void;
       await act(async () => {
@@ -1498,18 +1481,12 @@ describe('AppContainer State Management', () => {
 
     it('should update terminal title with Working… when showStatusInTitle is false', () => {
       // Arrange: Set up mock settings with showStatusInTitle disabled
-      const defaultMergedSettings = mergeSettings({}, {}, {}, {}, true);
-      const mockSettingsWithShowStatusFalse = {
-        ...mockSettings,
-        merged: {
-          ...defaultMergedSettings,
-          ui: {
-            ...defaultMergedSettings.ui,
-            showStatusInTitle: false,
-            hideWindowTitle: false,
-          },
+      const mockSettingsWithShowStatusFalse = createMockSettings({
+        ui: {
+          showStatusInTitle: false,
+          hideWindowTitle: false,
         },
-      } as unknown as LoadedSettings;
+      });
 
       // Mock the streaming state as Active
       mockedUseGeminiStream.mockReturnValue({
@@ -1537,17 +1514,12 @@ describe('AppContainer State Management', () => {
 
     it('should use legacy terminal title when dynamicWindowTitle is false', () => {
       // Arrange: Set up mock settings with dynamicWindowTitle disabled
-      const mockSettingsWithDynamicTitleFalse = {
-        ...mockSettings,
-        merged: {
-          ...mockSettings.merged,
-          ui: {
-            ...mockSettings.merged.ui,
-            dynamicWindowTitle: false,
-            hideWindowTitle: false,
-          },
+      const mockSettingsWithDynamicTitleFalse = createMockSettings({
+        ui: {
+          dynamicWindowTitle: false,
+          hideWindowTitle: false,
         },
-      } as unknown as LoadedSettings;
+      });
 
       // Mock the streaming state
       mockedUseGeminiStream.mockReturnValue({
@@ -1575,18 +1547,12 @@ describe('AppContainer State Management', () => {
 
     it('should not update terminal title when hideWindowTitle is true', () => {
       // Arrange: Set up mock settings with hideWindowTitle enabled
-      const defaultMergedSettings = mergeSettings({}, {}, {}, {}, true);
-      const mockSettingsWithHideTitleTrue = {
-        ...mockSettings,
-        merged: {
-          ...defaultMergedSettings,
-          ui: {
-            ...defaultMergedSettings.ui,
-            showStatusInTitle: true,
-            hideWindowTitle: true,
-          },
+      const mockSettingsWithHideTitleTrue = createMockSettings({
+        ui: {
+          showStatusInTitle: true,
+          hideWindowTitle: true,
         },
-      } as unknown as LoadedSettings;
+      });
 
       // Act: Render the container
       const { unmount } = renderAppContainer({
@@ -1604,18 +1570,12 @@ describe('AppContainer State Management', () => {
 
     it('should update terminal title with thought subject when in active state', () => {
       // Arrange: Set up mock settings with showStatusInTitle enabled
-      const defaultMergedSettings = mergeSettings({}, {}, {}, {}, true);
-      const mockSettingsWithTitleEnabled = {
-        ...mockSettings,
-        merged: {
-          ...defaultMergedSettings,
-          ui: {
-            ...defaultMergedSettings.ui,
-            showStatusInTitle: true,
-            hideWindowTitle: false,
-          },
+      const mockSettingsWithTitleEnabled = createMockSettings({
+        ui: {
+          showStatusInTitle: true,
+          hideWindowTitle: false,
         },
-      } as unknown as LoadedSettings;
+      });
 
       // Mock the streaming state and thought
       const thoughtSubject = 'Processing request';
@@ -1644,18 +1604,12 @@ describe('AppContainer State Management', () => {
 
     it('should update terminal title with default text when in Idle state and no thought subject', () => {
       // Arrange: Set up mock settings with showStatusInTitle enabled
-      const defaultMergedSettings = mergeSettings({}, {}, {}, {}, true);
-      const mockSettingsWithTitleEnabled = {
-        ...mockSettings,
-        merged: {
-          ...defaultMergedSettings,
-          ui: {
-            ...defaultMergedSettings.ui,
-            showStatusInTitle: true,
-            hideWindowTitle: false,
-          },
+      const mockSettingsWithTitleEnabled = createMockSettings({
+        ui: {
+          showStatusInTitle: true,
+          hideWindowTitle: false,
         },
-      } as unknown as LoadedSettings;
+      });
 
       // Mock the streaming state as Idle with no thought
       mockedUseGeminiStream.mockReturnValue(DEFAULT_GEMINI_STREAM_MOCK);
@@ -1679,18 +1633,12 @@ describe('AppContainer State Management', () => {
 
     it('should update terminal title when in WaitingForConfirmation state with thought subject', async () => {
       // Arrange: Set up mock settings with showStatusInTitle enabled
-      const defaultMergedSettings = mergeSettings({}, {}, {}, {}, true);
-      const mockSettingsWithTitleEnabled = {
-        ...mockSettings,
-        merged: {
-          ...defaultMergedSettings,
-          ui: {
-            ...defaultMergedSettings.ui,
-            showStatusInTitle: true,
-            hideWindowTitle: false,
-          },
+      const mockSettingsWithTitleEnabled = createMockSettings({
+        ui: {
+          showStatusInTitle: true,
+          hideWindowTitle: false,
         },
-      } as unknown as LoadedSettings;
+      });
 
       // Mock the streaming state and thought
       const thoughtSubject = 'Confirm tool execution';
@@ -1742,17 +1690,12 @@ describe('AppContainer State Management', () => {
         vi.setSystemTime(startTime);
 
         // Arrange: Set up mock settings with showStatusInTitle enabled
-        const mockSettingsWithTitleEnabled = {
-          ...mockSettings,
-          merged: {
-            ...mockSettings.merged,
-            ui: {
-              ...mockSettings.merged.ui,
-              showStatusInTitle: true,
-              hideWindowTitle: false,
-            },
+        const mockSettingsWithTitleEnabled = createMockSettings({
+          ui: {
+            showStatusInTitle: true,
+            hideWindowTitle: false,
           },
-        } as unknown as LoadedSettings;
+        });
 
         // Mock an active shell pty but not focused
         mockedUseGeminiStream.mockReturnValue({
@@ -1801,17 +1744,12 @@ describe('AppContainer State Management', () => {
         vi.setSystemTime(startTime);
 
         // Arrange: Set up mock settings with showStatusInTitle enabled
-        const mockSettingsWithTitleEnabled = {
-          ...mockSettings,
-          merged: {
-            ...mockSettings.merged,
-            ui: {
-              ...mockSettings.merged.ui,
-              showStatusInTitle: true,
-              hideWindowTitle: false,
-            },
+        const mockSettingsWithTitleEnabled = createMockSettings({
+          ui: {
+            showStatusInTitle: true,
+            hideWindowTitle: false,
           },
-        } as unknown as LoadedSettings;
+        });
 
         // Mock an active shell pty with redirection active
         mockedUseGeminiStream.mockReturnValue({
@@ -1871,17 +1809,12 @@ describe('AppContainer State Management', () => {
         vi.setSystemTime(startTime);
 
         // Arrange: Set up mock settings with showStatusInTitle enabled
-        const mockSettingsWithTitleEnabled = {
-          ...mockSettings,
-          merged: {
-            ...mockSettings.merged,
-            ui: {
-              ...mockSettings.merged.ui,
-              showStatusInTitle: true,
-              hideWindowTitle: false,
-            },
+        const mockSettingsWithTitleEnabled = createMockSettings({
+          ui: {
+            showStatusInTitle: true,
+            hideWindowTitle: false,
           },
-        } as unknown as LoadedSettings;
+        });
 
         // Mock an active shell pty with NO output since operation started (silent)
         mockedUseGeminiStream.mockReturnValue({
@@ -1921,17 +1854,12 @@ describe('AppContainer State Management', () => {
         vi.setSystemTime(startTime);
 
         // Arrange: Set up mock settings with showStatusInTitle enabled
-        const mockSettingsWithTitleEnabled = {
-          ...mockSettings,
-          merged: {
-            ...mockSettings.merged,
-            ui: {
-              ...mockSettings.merged.ui,
-              showStatusInTitle: true,
-              hideWindowTitle: false,
-            },
+        const mockSettingsWithTitleEnabled = createMockSettings({
+          ui: {
+            showStatusInTitle: true,
+            hideWindowTitle: false,
           },
-        } as unknown as LoadedSettings;
+        });
 
         // Mock an active shell pty but not focused
         let lastOutputTime = startTime + 1000;
@@ -2005,18 +1933,12 @@ describe('AppContainer State Management', () => {
 
     it('should pad title to exactly 80 characters', () => {
       // Arrange: Set up mock settings with showStatusInTitle enabled
-      const defaultMergedSettings = mergeSettings({}, {}, {}, {}, true);
-      const mockSettingsWithTitleEnabled = {
-        ...mockSettings,
-        merged: {
-          ...defaultMergedSettings,
-          ui: {
-            ...defaultMergedSettings.ui,
-            showStatusInTitle: true,
-            hideWindowTitle: false,
-          },
+      const mockSettingsWithTitleEnabled = createMockSettings({
+        ui: {
+          showStatusInTitle: true,
+          hideWindowTitle: false,
         },
-      } as unknown as LoadedSettings;
+      });
 
       // Mock the streaming state and thought with a short subject
       const shortTitle = 'Short';
@@ -2046,18 +1968,12 @@ describe('AppContainer State Management', () => {
 
     it('should use correct ANSI escape code format', () => {
       // Arrange: Set up mock settings with showStatusInTitle enabled
-      const defaultMergedSettings = mergeSettings({}, {}, {}, {}, true);
-      const mockSettingsWithTitleEnabled = {
-        ...mockSettings,
-        merged: {
-          ...defaultMergedSettings,
-          ui: {
-            ...defaultMergedSettings.ui,
-            showStatusInTitle: true,
-            hideWindowTitle: false,
-          },
+      const mockSettingsWithTitleEnabled = createMockSettings({
+        ui: {
+          showStatusInTitle: true,
+          hideWindowTitle: false,
         },
-      } as unknown as LoadedSettings;
+      });
 
       // Mock the streaming state and thought
       const title = 'Test Title';
@@ -2085,17 +2001,12 @@ describe('AppContainer State Management', () => {
 
     it('should use CLI_TITLE environment variable when set', () => {
       // Arrange: Set up mock settings with showStatusInTitle disabled (so it shows suffix)
-      const mockSettingsWithTitleDisabled = {
-        ...mockSettings,
-        merged: {
-          ...mockSettings.merged,
-          ui: {
-            ...mockSettings.merged.ui,
-            showStatusInTitle: false,
-            hideWindowTitle: false,
-          },
+      const mockSettingsWithTitleDisabled = createMockSettings({
+        ui: {
+          showStatusInTitle: false,
+          hideWindowTitle: false,
         },
-      } as unknown as LoadedSettings;
+      });
 
       // Mock CLI_TITLE environment variable
       vi.stubEnv('CLI_TITLE', 'Custom Gemini Title');
@@ -2664,17 +2575,9 @@ describe('AppContainer State Management', () => {
       );
 
       // Update settings for this test run
-      const defaultMergedSettings = mergeSettings({}, {}, {}, {}, true);
-      const testSettings = {
-        ...mockSettings,
-        merged: {
-          ...defaultMergedSettings,
-          ui: {
-            ...defaultMergedSettings.ui,
-            useAlternateBuffer: isAlternateMode,
-          },
-        },
-      } as unknown as LoadedSettings;
+      const testSettings = createMockSettings({
+        ui: { useAlternateBuffer: isAlternateMode },
+      });
 
       function TestChild() {
         useKeypress(childHandler || (() => {}), {
@@ -3384,13 +3287,7 @@ describe('AppContainer State Management', () => {
       let unmount: () => void;
       await act(async () => {
         unmount = renderAppContainer({
-          settings: {
-            ...mockSettings,
-            merged: {
-              ...mockSettings.merged,
-              ui: { ...mockSettings.merged.ui, useAlternateBuffer: false },
-            },
-          } as LoadedSettings,
+          settings: createMockSettings({ ui: { useAlternateBuffer: false } }),
         }).unmount;
       });
 
@@ -3426,13 +3323,7 @@ describe('AppContainer State Management', () => {
       let unmount: () => void;
       await act(async () => {
         unmount = renderAppContainer({
-          settings: {
-            ...mockSettings,
-            merged: {
-              ...mockSettings.merged,
-              ui: { ...mockSettings.merged.ui, useAlternateBuffer: true },
-            },
-          } as LoadedSettings,
+          settings: createMockSettings({ ui: { useAlternateBuffer: true } }),
         }).unmount;
       });
 
@@ -3701,16 +3592,9 @@ describe('AppContainer State Management', () => {
     });
 
     it('DOES set showIsExpandableHint when overflow occurs in Alternate Buffer Mode', async () => {
-      const alternateSettings = mergeSettings({}, {}, {}, {}, true);
-      const settingsWithAlternateBuffer = {
-        merged: {
-          ...alternateSettings,
-          ui: {
-            ...alternateSettings.ui,
-            useAlternateBuffer: true,
-          },
-        },
-      } as unknown as LoadedSettings;
+      const settingsWithAlternateBuffer = createMockSettings({
+        ui: { useAlternateBuffer: true },
+      });
 
       vi.spyOn(mockConfig, 'getUseAlternateBuffer').mockReturnValue(true);
 

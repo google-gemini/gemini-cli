@@ -19,6 +19,8 @@ export * from './policy/policy-engine.js';
 export * from './policy/toml-loader.js';
 export * from './policy/config.js';
 export * from './policy/integrity.js';
+export * from './config/extensions/integrity.js';
+export * from './config/extensions/integrityTypes.js';
 export * from './billing/index.js';
 export * from './confirmation-bus/types.js';
 export * from './confirmation-bus/message-bus.js';
@@ -116,6 +118,7 @@ export * from './utils/channel.js';
 export * from './utils/constants.js';
 export * from './utils/sessionUtils.js';
 export * from './utils/cache.js';
+export * from './utils/markdownUtils.js';
 
 // Export services
 export * from './services/fileDiscoveryService.js';
@@ -147,6 +150,18 @@ export * from './ide/types.js';
 // Export Shell Execution Service
 export * from './services/shellExecutionService.js';
 export * from './services/sandboxManager.js';
+
+// Export Execution Lifecycle Service
+export * from './services/executionLifecycleService.js';
+
+// Export Injection Service
+export * from './config/injectionService.js';
+
+// Export Execution Lifecycle Service
+export * from './services/executionLifecycleService.js';
+
+// Export Injection Service
+export * from './config/injectionService.js';
 
 // Export base tool definitions
 export * from './tools/tools.js';

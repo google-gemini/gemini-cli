@@ -5,6 +5,8 @@
  */
 
 import { renderWithProviders } from '../../test-utils/render.js';
+import { createMockSettings } from '../../test-utils/settings.js';
+import { makeFakeConfig, CoreToolCallStatus } from '@google/gemini-cli-core';
 import { waitFor } from '../../test-utils/async.js';
 import { MainContent } from './MainContent.js';
 import { getToolGroupBorderAppearance } from '../utils/borderStyles.js';
@@ -18,7 +20,6 @@ import {
   useUIState,
   type UIState,
 } from '../contexts/UIStateContext.js';
-import { CoreToolCallStatus } from '@google/gemini-cli-core';
 import { type IndividualToolCallDisplay } from '../types.js';
 
 // Mock dependencies
@@ -482,7 +483,8 @@ describe('MainContent', () => {
       <MainContent />,
       {
         uiState: uiState as Partial<UIState>,
-        useAlternateBuffer: true,
+        config: makeFakeConfig({ useAlternateBuffer: true }),
+        settings: createMockSettings({ ui: { useAlternateBuffer: true } }),
       },
     );
 
@@ -509,7 +511,8 @@ describe('MainContent', () => {
       <MainContent />,
       {
         uiState: uiState as unknown as Partial<UIState>,
-        useAlternateBuffer: true,
+        config: makeFakeConfig({ useAlternateBuffer: true }),
+        settings: createMockSettings({ ui: { useAlternateBuffer: true } }),
       },
     );
 
@@ -733,7 +736,10 @@ describe('MainContent', () => {
           <MainContent />,
           {
             uiState: uiState as Partial<UIState>,
-            useAlternateBuffer: isAlternateBuffer,
+            config: makeFakeConfig({ useAlternateBuffer: isAlternateBuffer }),
+            settings: createMockSettings({
+              ui: { useAlternateBuffer: isAlternateBuffer },
+            }),
           },
         );
         await waitUntilReady();

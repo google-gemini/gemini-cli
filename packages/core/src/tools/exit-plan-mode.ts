@@ -7,12 +7,12 @@
 import {
   BaseDeclarativeTool,
   BaseToolInvocation,
-  type ToolResult,
   Kind,
-  type ToolExitPlanModeConfirmationDetails,
-  type ToolConfirmationPayload,
-  type ToolExitPlanModeConfirmationPayload,
   ToolConfirmationOutcome,
+  type ToolConfirmationPayload,
+  type ToolExitPlanModeConfirmationDetails,
+  type ToolExitPlanModeConfirmationPayload,
+  type ToolResult,
 } from './tools.js';
 import type { MessageBus } from '../confirmation-bus/message-bus.js';
 import path from 'node:path';
@@ -151,7 +151,7 @@ export class ExitPlanModeInvocation extends BaseToolInvocation<
       this.confirmationOutcome = ToolConfirmationOutcome.ProceedOnce;
       this.approvalPayload = {
         approved: true,
-        approvalMode: ApprovalMode.DEFAULT,
+        approvalMode: this.getAllowApprovalMode(),
       };
       return false;
     }
@@ -205,17 +205,15 @@ export class ExitPlanModeInvocation extends BaseToolInvocation<
 
     // When a user policy grants `allow` for exit_plan_mode, the scheduler
     // skips the confirmation phase entirely and shouldConfirmExecute is never
-    // called, leaving approvalPayload null.  Treat that as an approval with
-    // the default mode — consistent with the ALLOW branch inside
-    // shouldConfirmExecute.
+    // called, leaving approvalPayload null.
     const payload = this.approvalPayload ?? {
       approved: true,
-      approvalMode: ApprovalMode.DEFAULT,
+      approvalMode: this.getAllowApprovalMode(),
     };
     if (payload.approved) {
       const newMode = payload.approvalMode ?? ApprovalMode.DEFAULT;
 
-      if (newMode === ApprovalMode.PLAN || newMode === ApprovalMode.YOLO) {
+      if (newMode === ApprovalMode.PLAN) {
         throw new Error(`Unexpected approval mode: ${newMode}`);
       }
 
@@ -253,5 +251,19 @@ Ask the user for specific feedback on how to improve the plan.`,
         };
       }
     }
+  }
+
+  /**
+   * Determines the approval mode to switch to when plan mode is exited via a policy ALLOW.
+   * In non-interactive environments, this defaults to YOLO to allow automated execution.
+   */
+  private getAllowApprovalMode(): ApprovalMode {
+    if (!this.config.isInteractive()) {
+      // For non-interactive environment requires minimal user action, exit as YOLO mode for plan implementation.
+      return ApprovalMode.YOLO;
+    }
+    // By default, YOLO mode in interactive environment cannot enter/exit plan mode.
+    // Always exit plan mode and move to default approval mode if exit_plan_mode tool is configured with allow decision.
+    return ApprovalMode.DEFAULT;
   }
 }

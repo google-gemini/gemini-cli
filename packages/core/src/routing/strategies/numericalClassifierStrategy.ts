@@ -109,7 +109,7 @@ export class NumericalClassifierStrategy implements RoutingStrategy {
         return null;
       }
 
-      if (!isGemini3Model(model)) {
+      if (!isGemini3Model(model, config)) {
         return null;
       }
 
@@ -156,6 +156,8 @@ export class NumericalClassifierStrategy implements RoutingStrategy {
         modelAlias,
         useGemini3_1,
         useCustomToolModel,
+        config.getHasAccessToPreviewModel?.() ?? true,
+        config,
       );
 
       const latencyMs = Date.now() - startTime;

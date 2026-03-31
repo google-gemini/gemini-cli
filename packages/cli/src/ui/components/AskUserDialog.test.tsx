@@ -7,6 +7,8 @@
 import { describe, it, expect, vi, afterEach, beforeEach } from 'vitest';
 import { act } from 'react';
 import { renderWithProviders } from '../../test-utils/render.js';
+import { createMockSettings } from '../../test-utils/settings.js';
+import { makeFakeConfig } from '@google/gemini-cli-core';
 import { waitFor } from '../../test-utils/async.js';
 import { AskUserDialog } from './AskUserDialog.js';
 import { QuestionType, type Question } from '@google/gemini-cli-core';
@@ -87,6 +89,31 @@ describe('AskUserDialog', () => {
         writeKey(stdin, '\r'); // Toggle TS
         writeKey(stdin, '\x1b[B'); // Down
         writeKey(stdin, '\r'); // Toggle ESLint
+        writeKey(stdin, '\x1b[B'); // Down to All of the above
+        writeKey(stdin, '\x1b[B'); // Down to Other
+        writeKey(stdin, '\x1b[B'); // Down to Done
+        writeKey(stdin, '\r'); // Done
+      },
+      expectedSubmit: { '0': 'TypeScript, ESLint' },
+    },
+    {
+      name: 'All of the above',
+      questions: [
+        {
+          question: 'Which features?',
+          header: 'Features',
+          type: QuestionType.CHOICE,
+          options: [
+            { label: 'TypeScript', description: '' },
+            { label: 'ESLint', description: '' },
+          ],
+          multiSelect: true,
+        },
+      ] as Question[],
+      actions: (stdin: { write: (data: string) => void }) => {
+        writeKey(stdin, '\x1b[B'); // Down to ESLint
+        writeKey(stdin, '\x1b[B'); // Down to All of the above
+        writeKey(stdin, '\r'); // Toggle All of the above
         writeKey(stdin, '\x1b[B'); // Down to Other
         writeKey(stdin, '\x1b[B'); // Down to Done
         writeKey(stdin, '\r'); // Done
@@ -128,6 +155,42 @@ describe('AskUserDialog', () => {
       await waitFor(async () => {
         expect(onSubmit).toHaveBeenCalledWith(expectedSubmit);
       });
+    });
+  });
+
+  it('verifies "All of the above" visual state with snapshot', async () => {
+    const questions = [
+      {
+        question: 'Which features?',
+        header: 'Features',
+        type: QuestionType.CHOICE,
+        options: [
+          { label: 'TypeScript', description: '' },
+          { label: 'ESLint', description: '' },
+        ],
+        multiSelect: true,
+      },
+    ] as Question[];
+
+    const { stdin, lastFrame, waitUntilReady } = renderWithProviders(
+      <AskUserDialog
+        questions={questions}
+        onSubmit={vi.fn()}
+        onCancel={vi.fn()}
+        width={120}
+      />,
+      { width: 120 },
+    );
+
+    // Navigate to "All of the above" and toggle it
+    writeKey(stdin, '\x1b[B'); // Down to ESLint
+    writeKey(stdin, '\x1b[B'); // Down to All of the above
+    writeKey(stdin, '\r'); // Toggle All of the above
+
+    await waitFor(async () => {
+      await waitUntilReady();
+      // Verify visual state (checkmarks on all options)
+      expect(lastFrame()).toMatchSnapshot();
     });
   });
 
@@ -252,7 +315,10 @@ describe('AskUserDialog', () => {
             width={80}
             availableHeight={10} // Small height to force scrolling
           />,
-          { useAlternateBuffer },
+          {
+            config: makeFakeConfig({ useAlternateBuffer }),
+            settings: createMockSettings({ ui: { useAlternateBuffer } }),
+          },
         );
 
         await waitFor(async () => {
@@ -1230,7 +1296,10 @@ describe('AskUserDialog', () => {
           width={80}
         />
       </UIStateContext.Provider>,
-      { useAlternateBuffer: false },
+      {
+        config: makeFakeConfig({ useAlternateBuffer: false }),
+        settings: createMockSettings({ ui: { useAlternateBuffer: false } }),
+      },
     );
 
     // With height 5 and alternate buffer disabled, it should show scroll arrows (▲)
@@ -1266,7 +1335,10 @@ describe('AskUserDialog', () => {
           width={40} // Small width to force wrapping
         />
       </UIStateContext.Provider>,
-      { useAlternateBuffer: true },
+      {
+        config: makeFakeConfig({ useAlternateBuffer: true }),
+        settings: createMockSettings({ ui: { useAlternateBuffer: true } }),
+      },
     );
 
     // Should NOT contain the truncation message

@@ -408,7 +408,7 @@ describe('Composer', () => {
         thought: { subject: 'Hidden', description: 'Should not show' },
       });
       const settings = createMockSettings({
-        merged: { ui: { loadingPhrases: 'off' } },
+        ui: { loadingPhrases: 'off' },
       });
 
       const { lastFrame } = await renderComposer(uiState, settings);

@@ -6,6 +6,8 @@
 
 import { OverflowProvider } from '../../contexts/OverflowContext.js';
 import { renderWithProviders } from '../../../test-utils/render.js';
+import { createMockSettings } from '../../../test-utils/settings.js';
+import { makeFakeConfig } from '@google/gemini-cli-core';
 import { waitFor } from '../../../test-utils/async.js';
 import { DiffRenderer } from './DiffRenderer.js';
 import * as CodeColorizer from '../../utils/CodeColorizer.js';
@@ -42,7 +44,10 @@ index 0000000..e69de29
               terminalWidth={80}
             />
           </OverflowProvider>,
-          { useAlternateBuffer },
+          {
+            config: makeFakeConfig({ useAlternateBuffer }),
+            settings: createMockSettings({ ui: { useAlternateBuffer } }),
+          },
         );
         await waitFor(() =>
           expect(mockColorizeCode).toHaveBeenCalledWith({
@@ -74,7 +79,10 @@ index 0000000..e69de29
               terminalWidth={80}
             />
           </OverflowProvider>,
-          { useAlternateBuffer },
+          {
+            config: makeFakeConfig({ useAlternateBuffer }),
+            settings: createMockSettings({ ui: { useAlternateBuffer } }),
+          },
         );
         await waitFor(() =>
           expect(mockColorizeCode).toHaveBeenCalledWith({
@@ -102,7 +110,10 @@ index 0000000..e69de29
           <OverflowProvider>
             <DiffRenderer diffContent={newFileDiffContent} terminalWidth={80} />
           </OverflowProvider>,
-          { useAlternateBuffer },
+          {
+            config: makeFakeConfig({ useAlternateBuffer }),
+            settings: createMockSettings({ ui: { useAlternateBuffer } }),
+          },
         );
         await waitFor(() =>
           expect(mockColorizeCode).toHaveBeenCalledWith({
@@ -135,7 +146,10 @@ index 0000001..0000002 100644
               terminalWidth={80}
             />
           </OverflowProvider>,
-          { useAlternateBuffer },
+          {
+            config: makeFakeConfig({ useAlternateBuffer }),
+            settings: createMockSettings({ ui: { useAlternateBuffer } }),
+          },
         );
         // colorizeCode is used internally by the line-by-line rendering, not for the whole block
         await waitFor(() => expect(lastFrame()).toContain('new line'));
@@ -166,7 +180,10 @@ index 1234567..1234567 100644
               terminalWidth={80}
             />
           </OverflowProvider>,
-          { useAlternateBuffer },
+          {
+            config: makeFakeConfig({ useAlternateBuffer }),
+            settings: createMockSettings({ ui: { useAlternateBuffer } }),
+          },
         );
         await waitFor(() => expect(lastFrame()).toBeDefined());
         expect(lastFrame()).toMatchSnapshot();
@@ -178,7 +195,10 @@ index 1234567..1234567 100644
           <OverflowProvider>
             <DiffRenderer diffContent="" terminalWidth={80} />
           </OverflowProvider>,
-          { useAlternateBuffer },
+          {
+            config: makeFakeConfig({ useAlternateBuffer }),
+            settings: createMockSettings({ ui: { useAlternateBuffer } }),
+          },
         );
         await waitFor(() => expect(lastFrame()).toBeDefined());
         expect(lastFrame()).toMatchSnapshot();
@@ -208,7 +228,10 @@ index 123..456 100644
               terminalWidth={80}
             />
           </OverflowProvider>,
-          { useAlternateBuffer },
+          {
+            config: makeFakeConfig({ useAlternateBuffer }),
+            settings: createMockSettings({ ui: { useAlternateBuffer } }),
+          },
         );
         await waitFor(() => expect(lastFrame()).toContain('added line'));
         expect(lastFrame()).toMatchSnapshot();
@@ -242,7 +265,10 @@ index abc..def 100644
               terminalWidth={80}
             />
           </OverflowProvider>,
-          { useAlternateBuffer },
+          {
+            config: makeFakeConfig({ useAlternateBuffer }),
+            settings: createMockSettings({ ui: { useAlternateBuffer } }),
+          },
         );
         await waitFor(() => expect(lastFrame()).toContain('context line 15'));
         expect(lastFrame()).toMatchSnapshot();
@@ -292,7 +318,10 @@ index 123..789 100644
                   availableTerminalHeight={height}
                 />
               </OverflowProvider>,
-              { useAlternateBuffer },
+              {
+                config: makeFakeConfig({ useAlternateBuffer }),
+                settings: createMockSettings({ ui: { useAlternateBuffer } }),
+              },
             );
             await waitFor(() => expect(lastFrame()).toContain('anotherNew'));
             const output = lastFrame();
@@ -326,7 +355,10 @@ fileDiff Index: file.txt
               terminalWidth={80}
             />
           </OverflowProvider>,
-          { useAlternateBuffer },
+          {
+            config: makeFakeConfig({ useAlternateBuffer }),
+            settings: createMockSettings({ ui: { useAlternateBuffer } }),
+          },
         );
         await waitFor(() => expect(lastFrame()).toContain('newVar'));
         expect(lastFrame()).toMatchSnapshot();
@@ -353,7 +385,10 @@ fileDiff Index: Dockerfile
               terminalWidth={80}
             />
           </OverflowProvider>,
-          { useAlternateBuffer },
+          {
+            config: makeFakeConfig({ useAlternateBuffer }),
+            settings: createMockSettings({ ui: { useAlternateBuffer } }),
+          },
         );
         await waitFor(() => expect(lastFrame()).toContain('RUN npm run build'));
         expect(lastFrame()).toMatchSnapshot();
