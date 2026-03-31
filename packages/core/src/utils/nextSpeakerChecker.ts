@@ -109,30 +109,22 @@ export async function checkNextSpeaker(
   ];
 
   try {
-    const rawResponse = await baseLlmClient.generateJson({
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
+    const parsedResponse = (await baseLlmClient.generateJson({
       modelConfigKey: { model: 'next-speaker-checker' },
       contents,
       schema: RESPONSE_SCHEMA,
       abortSignal,
       promptId,
       role: LlmRole.UTILITY_NEXT_SPEAKER,
-    });
+    })) as unknown as NextSpeakerResponse;
 
-    const responseObj = rawResponse;
     if (
-      responseObj &&
-      typeof responseObj === 'object' &&
-      'next_speaker' in responseObj &&
-      ['user', 'model'].includes(String(responseObj['next_speaker']))
+      parsedResponse &&
+      parsedResponse.next_speaker &&
+      ['user', 'model'].includes(parsedResponse.next_speaker)
     ) {
-      const speaker = responseObj['next_speaker'];
-      if (speaker === 'user' || speaker === 'model') {
-        const result: NextSpeakerResponse = {
-          reasoning: String(responseObj['reasoning'] ?? ''),
-          next_speaker: speaker,
-        };
-        return result;
-      }
+      return parsedResponse;
     }
     return null;
   } catch (error) {
