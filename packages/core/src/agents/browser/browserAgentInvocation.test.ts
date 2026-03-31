@@ -699,13 +699,17 @@ describe('BrowserAgentInvocation', () => {
       vi.mocked(createBrowserAgentDefinition).mockResolvedValue({
         definition: {
           name: 'browser_agent',
+          description: 'mock definition',
+          kind: 'local',
+          inputConfig: {} as never,
+          outputConfig: {} as never,
           processOutput: () => '',
           modelConfig: { model: 'test' },
           runConfig: {},
           promptConfig: { query: '', systemPrompt: '' },
           toolConfig: { tools: [] },
-        } as any,
-        browserManager: mockBrowserManager as any,
+        },
+        browserManager: mockBrowserManager as never,
       });
 
       const mockExecutor = {
