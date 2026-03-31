@@ -105,6 +105,7 @@ If operating in a sibling worktree (e.g., `feature-xyz/`):
 - **Diff Verification**: After reverting, run `git diff origin/main...HEAD` on the specific reverted files to ensure their diff is completely empty.
 
 #### 7. Diff Minimization & Refactor Isolation (Jacob's Protocol)
+- **Strict Scoping**: Keep work tightly scoped to the user's explicit request to ensure PRs remain tight and clean. Do not make sweeping, loosely tied changes or opportunistic refactors. If a scope change/expansion is recommended, ask the user for input and receive approval FIRST.
 - **Mandatory Two-Step Process**: Never move code between files AND make logic changes in the same commit.
 - **Refactor Commit**: If your task requires moving code or reorganization, create a "zero-modification" commit first. Verify that `npm run typecheck` passes but no functional logic has changed.
 - **Logic Commit**: Apply logic changes or new features in a separate, follow-up commit.

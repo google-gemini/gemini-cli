@@ -65,6 +65,10 @@ underlying "rigor."
     pushing a PR.
 9.  **Copyright Headers**: NEVER modify or update the copyright header comments
     (e.g., year) in existing files.
+10. **Strict Scoping**: Keep work tightly scoped to the user's explicit request
+    to ensure PRs remain tight and clean. Do not make sweeping, loosely tied
+    changes or opportunistic refactors. If a scope change or expansion is
+    recommended, you MUST ask the user for input and receive approval FIRST.
 
 ## Mandatory Workflow Triggers
 
