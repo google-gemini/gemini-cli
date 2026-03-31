@@ -419,20 +419,6 @@ decision = "ask_user"
 priority = 10
 ```
 
-**4. Targeting a tool name across all servers**
-
-Use `mcpName = "*"` with a specific `toolName` to target that operation
-regardless of which server provides it.
-
-```toml
-# Allow the `search` tool across all connected MCP servers
-[[rule]]
-mcpName = "*"
-toolName = "search"
-decision = "allow"
-priority = 50
-```
-
 ## Default policies
 
 The Gemini CLI ships with a set of default policies to provide a safe
