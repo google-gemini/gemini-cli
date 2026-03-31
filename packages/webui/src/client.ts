@@ -251,7 +251,7 @@ function renderMd(text){
         var fcId = 'fc_' + Math.random().toString(36).slice(2);
         var safeId = fcId.replace(/'/g,'');
         var safePreId = id.replace(/'/g,'');
-        var safeFpath = fpath.replace(/\\\\/g,'\\\\\\\\').replace(/'/g,"\\'");
+        var safeFpath = esc(fpath.replace(/\\/g,'\\\\').replace(/'/g,"\\'"));
         var shortFpath = fpath.length > 40 ? '...' + fpath.slice(-37) : fpath;
         out += '<div class="tool-call file-card" id="'+fcId+'">' +
           '<div class="tool-call-hdr" onclick="toggleFileCard(event, \\''+safeId+'\\')">'+
