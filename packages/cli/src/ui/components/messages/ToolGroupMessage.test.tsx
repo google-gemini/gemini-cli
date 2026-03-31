@@ -7,13 +7,10 @@
 import { renderWithProviders } from '../../../test-utils/render.js';
 import { describe, it, expect, vi, afterEach } from 'vitest';
 import { ToolGroupMessage } from './ToolGroupMessage.js';
-import type {
-  HistoryItem,
-  HistoryItemWithoutId,
-  IndividualToolCallDisplay,
-} from '../../types.js';
-import { Scrollable } from '../shared/Scrollable.js';
 import {
+  UPDATE_TOPIC_TOOL_NAME,
+  TOPIC_PARAM_TITLE,
+  TOPIC_PARAM_STRATEGIC_INTENT,
   makeFakeConfig,
   CoreToolCallStatus,
   ApprovalMode,
@@ -23,6 +20,12 @@ import {
   READ_FILE_DISPLAY_NAME,
   GLOB_DISPLAY_NAME,
 } from '@google/gemini-cli-core';
+import type {
+  HistoryItem,
+  HistoryItemWithoutId,
+  IndividualToolCallDisplay,
+} from '../../types.js';
+import { Scrollable } from '../shared/Scrollable.js';
 import os from 'node:os';
 import { createMockSettings } from '../../../test-utils/settings.js';
 
@@ -36,6 +39,7 @@ describe('<ToolGroupMessage />', () => {
   ): IndividualToolCallDisplay => ({
     callId: 'tool-123',
     name: 'test-tool',
+    args: {},
     description: 'A tool for testing',
     resultDisplay: 'Test result',
     status: CoreToolCallStatus.Success,
@@ -253,8 +257,71 @@ describe('<ToolGroupMessage />', () => {
       unmount();
     });
 
-    it('renders mixed tool calls including shell command', async () => {
+    it('renders update_topic tool call using TopicMessage', async () => {
       const toolCalls = [
+        createToolCall({
+          callId: 'topic-tool',
+          name: UPDATE_TOPIC_TOOL_NAME,
+          args: {
+            [TOPIC_PARAM_TITLE]: 'Testing Topic',
+            [TOPIC_PARAM_STRATEGIC_INTENT]: 'This is the description',
+          },
+        }),
+      ];
+      const item = createItem(toolCalls);
+
+      const { lastFrame, unmount } = await renderWithProviders(
+        <ToolGroupMessage {...baseProps} item={item} toolCalls={toolCalls} />,
+        {
+          config: baseMockConfig,
+          settings: fullVerbositySettings,
+        },
+      );
+
+      const output = lastFrame();
+      expect(output).toContain('Testing Topic');
+      expect(output).toContain('— This is the description');
+      expect(output).toMatchSnapshot('update_topic_tool');
+      unmount();
+    });
+
+    it('renders update_topic tool call with summary instead of strategic_intent', async () => {
+      const toolCalls = [
+        createToolCall({
+          callId: 'topic-tool-summary',
+          name: UPDATE_TOPIC_TOOL_NAME,
+          args: {
+            [TOPIC_PARAM_TITLE]: 'Testing Topic',
+            summary: 'This is the summary',
+          },
+        }),
+      ];
+      const item = createItem(toolCalls);
+
+      const { lastFrame, unmount } = await renderWithProviders(
+        <ToolGroupMessage {...baseProps} item={item} toolCalls={toolCalls} />,
+        {
+          config: baseMockConfig,
+          settings: fullVerbositySettings,
+        },
+      );
+
+      const output = lastFrame();
+      expect(output).toContain('Testing Topic');
+      expect(output).toContain('— This is the summary');
+      unmount();
+    });
+
+    it('renders mixed tool calls including update_topic', async () => {
+      const toolCalls = [
+        createToolCall({
+          callId: 'topic-tool-mixed',
+          name: UPDATE_TOPIC_TOOL_NAME,
+          args: {
+            [TOPIC_PARAM_TITLE]: 'Testing Topic',
+            [TOPIC_PARAM_STRATEGIC_INTENT]: 'This is the description',
+          },
+        }),
         createToolCall({
           callId: 'tool-1',
           name: 'read_file',
@@ -414,7 +481,7 @@ describe('<ToolGroupMessage />', () => {
       ];
       const item = createItem(toolCalls);
       const { lastFrame, unmount } = await renderWithProviders(
-        <Scrollable height={10} hasFocus={true} scrollToBottom={true}>
+        <Scrollable height={12} hasFocus={true} scrollToBottom={true}>
           <ToolGroupMessage {...baseProps} item={item} toolCalls={toolCalls} />
         </Scrollable>,
         {

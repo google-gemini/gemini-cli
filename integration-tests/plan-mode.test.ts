@@ -4,8 +4,10 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+import { writeFileSync, mkdirSync } from 'node:fs';
+import { join } from 'node:path';
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
-import { TestRig, checkModelOutputContent } from './test-helper.js';
+import { GEMINI_DIR, TestRig, checkModelOutputContent } from './test-helper.js';
 
 describe('Plan Mode', () => {
   let rig: TestRig;
@@ -133,7 +135,7 @@ describe('Plan Mode', () => {
 
     await rig.run({
       approvalMode: 'plan',
-      args: 'Create a file called hello.txt in the current directory.',
+      args: 'Attempt to create a file named "hello.txt" in the current directory. Do not create a plan file, try to write hello.txt directly.',
     });
 
     const toolLogs = rig.readToolLogs();
@@ -226,5 +228,69 @@ describe('Plan Mode', () => {
       planWrite?.toolRequest.success,
       `Expected write_file to succeed, but it failed with error: ${planWrite?.toolRequest.error}`,
     ).toBe(true);
+  });
+  it('should switch from a pro model to a flash model after exiting plan mode', async () => {
+    const plansDir = 'plans-folder';
+    const planFilename = 'my-plan.md';
+
+    await rig.setup('should-switch-to-flash', {
+      settings: {
+        model: {
+          name: 'auto-gemini-2.5',
+        },
+        experimental: { plan: true },
+        tools: {
+          core: ['exit_plan_mode', 'run_shell_command'],
+          allowed: ['exit_plan_mode', 'run_shell_command'],
+        },
+        general: {
+          defaultApprovalMode: 'plan',
+          plan: {
+            directory: plansDir,
+          },
+        },
+      },
+    });
+
+    writeFileSync(
+      join(rig.homeDir!, GEMINI_DIR, 'state.json'),
+      JSON.stringify({ terminalSetupPromptShown: true }, null, 2),
+    );
+
+    const fullPlansDir = join(rig.testDir!, plansDir);
+    mkdirSync(fullPlansDir, { recursive: true });
+    writeFileSync(join(fullPlansDir, planFilename), 'Execute echo hello');
+
+    await rig.run({
+      approvalMode: 'plan',
+      stdin: `Exit plan mode using ${planFilename} and then run a shell command \`echo hello\`.`,
+    });
+
+    const exitCallFound = await rig.waitForToolCall('exit_plan_mode');
+    expect(exitCallFound, 'Expected exit_plan_mode to be called').toBe(true);
+
+    const shellCallFound = await rig.waitForToolCall('run_shell_command');
+    expect(shellCallFound, 'Expected run_shell_command to be called').toBe(
+      true,
+    );
+
+    const apiRequests = rig.readAllApiRequest();
+    const modelNames = apiRequests.map((r) => r.attributes?.model || 'unknown');
+
+    const proRequests = apiRequests.filter((r) =>
+      r.attributes?.model?.includes('pro'),
+    );
+    const flashRequests = apiRequests.filter((r) =>
+      r.attributes?.model?.includes('flash'),
+    );
+
+    expect(
+      proRequests.length,
+      `Expected at least one Pro request. Models used: ${modelNames.join(', ')}`,
+    ).toBeGreaterThanOrEqual(1);
+    expect(
+      flashRequests.length,
+      `Expected at least one Flash request after mode switch. Models used: ${modelNames.join(', ')}`,
+    ).toBeGreaterThanOrEqual(1);
   });
 });
