@@ -47,13 +47,6 @@ for (const workspace of rootPackageJson.workspaces) {
     try {
       if (statSync(pkgDir).isDirectory()) {
         rmSync(join(pkgDir, 'dist'), RMRF_OPTIONS);
-        // Also remove any tsbuildinfo files in the package root
-        const files = readdirSync(pkgDir);
-        for (const file of files) {
-          if (file.endsWith('.tsbuildinfo')) {
-            rmSync(join(pkgDir, file), RMRF_OPTIONS);
-          }
-        }
       }
     } catch (e) {
       if (e.code !== 'ENOENT') {
