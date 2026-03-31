@@ -12,6 +12,7 @@ import type {
 } from '../tools/tools.js';
 import type { ToolCall } from '../scheduler/types.js';
 import type { SandboxPermissions } from '../services/sandboxManager.js';
+import type { SubagentActivityItem } from '../agents/types.js';
 
 export enum MessageBusType {
   TOOL_CONFIRMATION_REQUEST = 'tool-confirmation-request',
@@ -23,6 +24,7 @@ export enum MessageBusType {
   TOOL_CALLS_UPDATE = 'tool-calls-update',
   ASK_USER_REQUEST = 'ask-user-request',
   ASK_USER_RESPONSE = 'ask-user-response',
+  SUBAGENT_ACTIVITY = 'subagent-activity',
 }
 
 export interface ToolCallsUpdateMessage {
@@ -207,6 +209,12 @@ export interface AskUserResponse {
   cancelled?: boolean;
 }
 
+export interface SubagentActivityMessage {
+  type: MessageBusType.SUBAGENT_ACTIVITY;
+  subagentName: string;
+  activity: SubagentActivityItem;
+}
+
 export type Message =
   | ToolConfirmationRequest
   | ToolConfirmationResponse
@@ -216,4 +224,5 @@ export type Message =
   | UpdatePolicy
   | AskUserRequest
   | AskUserResponse
-  | ToolCallsUpdateMessage;
+  | ToolCallsUpdateMessage
+  | SubagentActivityMessage;

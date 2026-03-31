@@ -5,6 +5,7 @@
  */
 
 import { type AgentLoopContext } from '../config/agent-loop-context.js';
+import { MessageBusType } from '../confirmation-bus/types.js';
 import { LocalAgentExecutor } from './local-executor.js';
 import {
   BaseToolInvocation,
@@ -33,7 +34,6 @@ import {
 
 const INPUT_PREVIEW_MAX_LENGTH = 50;
 const DESCRIPTION_MAX_LENGTH = 200;
-const MAX_RECENT_ACTIVITY = 3;
 
 /**
  * Represents a validated, executable instance of a subagent tool.
@@ -87,6 +87,14 @@ export class LocalSubagentInvocation extends BaseToolInvocation<
     return description.slice(0, DESCRIPTION_MAX_LENGTH);
   }
 
+  private publishActivity(activity: SubagentActivityItem): void {
+    void this.messageBus.publish({
+      type: MessageBusType.SUBAGENT_ACTIVITY,
+      subagentName: this.definition.displayName ?? this.definition.name,
+      activity,
+    });
+  }
+
   /**
    * Executes the subagent.
    *
@@ -99,7 +107,7 @@ export class LocalSubagentInvocation extends BaseToolInvocation<
     signal: AbortSignal,
     updateOutput?: (output: ToolLiveOutput) => void,
   ): Promise<ToolResult> {
-    let recentActivity: SubagentActivityItem[] = [];
+    const recentActivity: SubagentActivityItem[] = [];
 
     try {
       if (updateOutput) {
@@ -140,6 +148,11 @@ export class LocalSubagentInvocation extends BaseToolInvocation<
               });
             }
             updated = true;
+
+            const latestThought = recentActivity[recentActivity.length - 1];
+            if (latestThought) {
+              this.publishActivity(latestThought);
+            }
             break;
           }
           case 'TOOL_CALL_START': {
@@ -163,6 +176,11 @@ export class LocalSubagentInvocation extends BaseToolInvocation<
               status: 'running',
             });
             updated = true;
+
+            const latestTool = recentActivity[recentActivity.length - 1];
+            if (latestTool) {
+              this.publishActivity(latestTool);
+            }
             break;
           }
           case 'TOOL_CALL_END': {
@@ -178,6 +196,8 @@ export class LocalSubagentInvocation extends BaseToolInvocation<
               ) {
                 recentActivity[i].status = isError ? 'error' : 'completed';
                 updated = true;
+
+                this.publishActivity(recentActivity[i]);
                 break;
               }
             }
@@ -242,11 +262,6 @@ export class LocalSubagentInvocation extends BaseToolInvocation<
         }
 
         if (updated) {
-          // Keep only the last N items
-          if (recentActivity.length > MAX_RECENT_ACTIVITY) {
-            recentActivity = recentActivity.slice(-MAX_RECENT_ACTIVITY);
-          }
-
           const progress: SubagentProgress = {
             isSubagentProgress: true,
             agentName: this.definition.name,
@@ -332,9 +347,7 @@ ${output.result}`;
             status: 'error',
           });
           // Maintain size limit
-          if (recentActivity.length > MAX_RECENT_ACTIVITY) {
-            recentActivity = recentActivity.slice(-MAX_RECENT_ACTIVITY);
-          }
+          // No limit on UI events sent via bus
         }
       }
 
