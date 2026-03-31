@@ -977,14 +977,10 @@ export async function loadCliConfig(
     disabledSkills: settings.skills?.disabled,
     experimentalJitContext: settings.experimental?.jitContext,
     experimentalMemoryManager: settings.experimental?.memoryManager,
-    experimentalAgentHistoryTruncation:
-      settings.experimental?.agentHistoryTruncation,
-    experimentalAgentHistoryTruncationThreshold:
-      settings.experimental?.agentHistoryTruncationThreshold,
-    experimentalAgentHistoryRetainedMessages:
-      settings.experimental?.agentHistoryRetainedMessages,
-    experimentalAgentHistorySummarization:
-      settings.experimental?.agentHistorySummarization,
+    contextManagement: {
+      enabled: settings.experimental?.contextManagement,
+      ...settings?.contextManagement,
+    },
     modelSteering: settings.experimental?.modelSteering,
     topicUpdateNarration: settings.experimental?.topicUpdateNarration,
     toolOutputMasking: settings.experimental?.toolOutputMasking,
@@ -1000,6 +996,8 @@ export async function loadCliConfig(
     useAlternateBuffer: settings.ui?.useAlternateBuffer,
     useRipgrep: settings.tools?.useRipgrep,
     enableInteractiveShell: settings.tools?.shell?.enableInteractiveShell,
+    shellBackgroundCompletionBehavior: settings.tools?.shell
+      ?.backgroundCompletionBehavior as string | undefined,
     shellToolInactivityTimeout: settings.tools?.shell?.inactivityTimeout,
     enableShellOutputEfficiency:
       settings.tools?.shell?.enableShellOutputEfficiency ?? true,
