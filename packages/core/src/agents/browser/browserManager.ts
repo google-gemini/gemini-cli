@@ -424,7 +424,6 @@ export class BrowserManager {
    */
   async close(): Promise<void> {
     this.isClosing = true;
-
     // Close MCP client first
     if (this.rawMcpClient) {
       try {
@@ -451,6 +450,7 @@ export class BrowserManager {
 
     this.discoveredTools = [];
     this.connectionPromise = undefined;
+    this.isClosing = false;
   }
 
   /**
