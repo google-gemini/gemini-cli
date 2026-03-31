@@ -112,18 +112,24 @@ export function shellReducer(
           combinedLength >
           MAX_SHELL_OUTPUT_SIZE + SHELL_OUTPUT_TRUNCATION_BUFFER
         ) {
-          // Truncate using Array.from to avoid splitting multi-byte Unicode
-          // characters (e.g. emojis) at a code-unit boundary.
-          const chunkArr = Array.from(action.chunk);
-          if (chunkArr.length >= MAX_SHELL_OUTPUT_SIZE) {
+          if (action.chunk.length >= MAX_SHELL_OUTPUT_SIZE) {
             // Incoming chunk alone exceeds the cap — keep its tail.
-            newOutput = chunkArr.slice(-MAX_SHELL_OUTPUT_SIZE).join('');
+            newOutput = action.chunk.slice(-MAX_SHELL_OUTPUT_SIZE);
           } else {
             // Keep as much of the existing output as possible, then append.
-            const keepFromCurrent = MAX_SHELL_OUTPUT_SIZE - chunkArr.length;
-            const currentArr = Array.from(currentOutput);
-            newOutput =
-              currentArr.slice(-keepFromCurrent).join('') + action.chunk;
+            const keepFromCurrent = MAX_SHELL_OUTPUT_SIZE - action.chunk.length;
+            newOutput = currentOutput.slice(-keepFromCurrent) + action.chunk;
+          }
+
+          // Native slice operates on UTF-16 code units, so it may split a
+          // surrogate pair at the truncation boundary. If the first code unit
+          // of the result is a low surrogate (\uDC00-\uDFFF), trim it off to
+          // avoid emitting a broken character.
+          if (newOutput.length > 0) {
+            const firstCharCode = newOutput.charCodeAt(0);
+            if (firstCharCode >= 0xdc00 && firstCharCode <= 0xdfff) {
+              newOutput = newOutput.slice(1);
+            }
           }
         } else {
           newOutput = currentOutput + action.chunk;

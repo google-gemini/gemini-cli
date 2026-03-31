@@ -336,4 +336,52 @@ describe('shellReducer', () => {
     // Because largeChunk > MAX_SHELL_OUTPUT_SIZE, we only preserve its tail
     expect(output).toBe('b'.repeat(MAX_SHELL_OUTPUT_SIZE));
   });
+
+  it('should not produce a broken surrogate pair at the truncation boundary', () => {
+    // '😀' is U+1F600, encoded as the surrogate pair \uD83D\uDE00 (2 code units).
+    // If a slice cuts between the high and low surrogate, the result starts with
+    // a stray low surrogate (\uDE00). The reducer must detect and strip it.
+    const emoji = '\uD83D\uDE00'; // 😀 — 2 UTF-16 code units
+    // Fill up to just below the trigger threshold with 'a', then append an emoji
+    // whose low surrogate lands exactly on the boundary so the slice splits it.
+    const baseLength =
+      MAX_SHELL_OUTPUT_SIZE + SHELL_OUTPUT_TRUNCATION_BUFFER - 1;
+    const existingOutput = 'a'.repeat(baseLength);
+    // chunk = emoji + padding so combinedLength exceeds the threshold
+    const chunk = emoji + 'z';
+
+    const taskState: ShellState = {
+      ...initialState,
+      backgroundTasks: new Map([
+        [
+          1001,
+          {
+            pid: 1001,
+            command: 'test',
+            output: existingOutput,
+            isBinary: false,
+            binaryBytesReceived: 0,
+            status: 'running',
+          },
+        ],
+      ]),
+    };
+
+    const action: ShellAction = {
+      type: 'APPEND_TASK_OUTPUT',
+      pid: 1001,
+      chunk,
+    };
+
+    const state = shellReducer(taskState, action);
+    const output = state.backgroundTasks.get(1001)?.output as string;
+
+    expect(typeof output).toBe('string');
+    // The output must not begin with a lone low surrogate (U+DC00–U+DFFF).
+    const firstCharCode = output.charCodeAt(0);
+    const isLowSurrogate = firstCharCode >= 0xdc00 && firstCharCode <= 0xdfff;
+    expect(isLowSurrogate).toBe(false);
+    // The final 'z' from the chunk must always be preserved.
+    expect(output.endsWith('z')).toBe(true);
+  });
 });
