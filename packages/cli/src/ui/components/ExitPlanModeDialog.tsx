@@ -235,7 +235,7 @@ export const ExitPlanModeDialog: React.FC<ExitPlanModeDialogProps> = ({
       <Box key="diff" flexDirection="column" marginTop={1}>
         <Text bold>Changes since previous version:</Text>
         <DiffRenderer diffContent={diffContent} terminalWidth={width} />
-      </Box>
+      </Box>,
     );
   }
   extraParts.push(`${editHint} to edit plan`);

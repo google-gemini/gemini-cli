@@ -35,7 +35,9 @@ export const DialogFooter: React.FC<DialogFooterProps> = ({
   }
 
   // We split string parts and node parts to properly render nodes without forcing them into a single string join
-  const stringExtras = extraParts.filter((p): p is string => typeof p === 'string');
+  const stringExtras = extraParts.filter(
+    (p): p is string => typeof p === 'string',
+  );
   const nodeExtras = extraParts.filter((p) => typeof p !== 'string');
 
   textParts.push(...stringExtras);
