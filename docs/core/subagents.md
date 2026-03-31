@@ -386,33 +386,7 @@ args = { file_path = "^docs/.*" }
 
 In this configuration, the policy rule only triggers if the executing subagent's
 name matches `docs-writer`. Rules without the `subagent` property apply
-universally to all agents. The `LocalAgentExecutor` automatically injects the
-subagent's context into the tool execution flow to ensure accurate policy
-enforcement.
-
-### How it works
-
-The subagent tool isolation architecture relies on several core components
-working together to sandbox the subagent's execution environment.
-
-- **Agent loader:** When loading the agent from markdown, the loader parses the
-  new `mcpServers` configurations and supports cloning the necessary tools from
-  the global registry, preparing them for isolated use.
-- **Multi-registry architecture:** The core `McpClient` and `McpClientManager`
-  support multiple simultaneous `RegistrySet` instances (for tools, prompts, and
-  resources). A connection-pooling mechanism keys MCP clients by a hash of their
-  configuration to prevent collisions and ensure that isolated servers are
-  reused safely where appropriate.
-- **Execution wiring:** The `LocalAgentExecutor` is responsible for
-  instantiating and using private registries during each subagent execution. It
-  carefully unregisters these isolated registries after a subagent finishes to
-  prevent memory leaks. It also dynamically overrides the `MessageBus` to inject
-  subagent context for policy enforcement.
-- **Tool filtering:** The main agent's `ToolRegistry` filters tools to ensure
-  that the main agent only sees its permitted tools and remains entirely unaware
-  of internal tools provisioned for subagents.
-- **Context-aware enforcement:** The `PolicyEngine` evaluates the subagent
-  context during tool execution and applies rules based on the `subagent` key.
+universally to all agents.
 
 ## Managing subagents
 
