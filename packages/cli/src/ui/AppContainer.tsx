@@ -83,6 +83,8 @@ import {
   logBillingEvent,
   ApiKeyUpdatedEvent,
   type InjectionSource,
+  startGlobalMemoryMonitoring,
+  stopGlobalMemoryMonitoring,
 } from '@google/gemini-cli-core';
 import { validateAuthMethod } from '../config/auth.js';
 import process from 'node:process';
@@ -446,6 +448,9 @@ export const AppContainer = (props: AppContainerProps) => {
       }
       setConfigInitialized(true);
       startupProfiler.flush(config);
+      // The core monitor already implements sampling/rate-limiting; start it
+      // in interactive sessions so telemetry captures real session memory data.
+      startGlobalMemoryMonitoring(config);
 
       const sessionStartSource = resumedSessionData
         ? SessionStartSource.Resume
@@ -495,6 +500,8 @@ export const AppContainer = (props: AppContainerProps) => {
 
       const ideClient = await IdeClient.getInstance();
       await ideClient.disconnect();
+
+      stopGlobalMemoryMonitoring(config);
 
       // Fire SessionEnd hook on cleanup (only if hooks are enabled)
       await config?.getHookSystem()?.fireSessionEndEvent(SessionEndReason.Exit);
