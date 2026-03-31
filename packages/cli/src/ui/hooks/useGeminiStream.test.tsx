@@ -193,6 +193,46 @@ vi.mock('../utils/markdownUtilities.js', () => ({
   findLastSafeSplitPoint: vi.fn((s: string) => s.length),
 }));
 
+vi.mock('./useStateAndRef.js', async () => {
+  const React = await vi.importActual<typeof import('react')>('react');
+
+  return {
+    useStateAndRef: vi.fn((initial) => {
+      // Keep the heavyweight test file lightweight, but still let
+      // `isResponding` participate in real rerenders.
+      if (initial === false) {
+        const [state, setState] = React.useState(initial);
+        const ref = React.useRef(initial);
+        const setStateInternal = (
+          updater: typeof initial | ((prev: typeof initial) => typeof initial),
+        ) => {
+          const nextValue =
+            typeof updater === 'function'
+              ? (updater as (prev: typeof initial) => typeof initial)(
+                  ref.current,
+                )
+              : updater;
+          ref.current = nextValue;
+          setState(nextValue);
+        };
+        return [state, ref, setStateInternal];
+      }
+
+      let val = initial;
+      const ref = { current: val };
+      const setVal = vi.fn((updater) => {
+        if (typeof updater === 'function') {
+          val = updater(val);
+        } else {
+          val = updater;
+        }
+        ref.current = val;
+      });
+      return [val, ref, setVal];
+    }),
+  };
+});
+
 vi.mock('./useLogger.js', () => ({
   useLogger: vi.fn().mockReturnValue({
     logMessage: vi.fn().mockResolvedValue(undefined),
