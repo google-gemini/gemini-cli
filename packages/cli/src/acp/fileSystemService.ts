@@ -21,7 +21,10 @@ export class AcpFileSystemService implements FileSystemService {
     private readonly capabilities: acp.FileSystemCapabilities,
     private readonly fallback: FileSystemService,
     private readonly root: string,
-  ) {}
+  ) {
+    this.readTextFile = this.readTextFile.bind(this);
+    this.writeTextFile = this.writeTextFile.bind(this);
+  }
 
   private shouldUseFallback(filePath: string): boolean {
     // Files inside the global CLI directory must always use the native file system,

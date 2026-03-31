@@ -47,10 +47,7 @@ import { LocalLiteRtLmClient } from '../core/localLiteRtLmClient.js';
 import type { HookDefinition, HookEventName } from '../hooks/types.js';
 import { FileDiscoveryService } from '../services/fileDiscoveryService.js';
 import { GitService } from '../services/gitService.js';
-import {
-  type SandboxManager,
-  NoopSandboxManager,
-} from '../services/sandboxManager.js';
+import { type SandboxManager } from '../services/sandboxManager.js';
 import { createSandboxManager } from '../services/sandboxManagerFactory.js';
 import { SandboxedFileSystemService } from '../services/sandboxedFileSystemService.js';
 import {
@@ -79,10 +76,7 @@ import { shouldAttemptBrowserLaunch } from '../utils/browser.js';
 import type { MCPOAuthConfig } from '../mcp/oauth-provider.js';
 import { ideContextStore } from '../ide/ideContext.js';
 import { WriteTodosTool } from '../tools/write-todos.js';
-import {
-  StandardFileSystemService,
-  type FileSystemService,
-} from '../services/fileSystemService.js';
+import { type FileSystemService } from '../services/fileSystemService.js';
 import {
   TrackerCreateTaskTool,
   TrackerUpdateTaskTool,
@@ -750,7 +744,7 @@ export class Config implements McpContext, AgentLoopContext {
   private _sessionId: string;
   private readonly clientName: string | undefined;
   private clientVersion: string;
-  private fileSystemService: FileSystemService;
+  private fileSystemService!: FileSystemService;
   private trackerService?: TrackerService;
   readonly topicState = new TopicState();
   private contentGeneratorConfig!: ContentGeneratorConfig;
@@ -786,7 +780,7 @@ export class Config implements McpContext, AgentLoopContext {
   private readonly telemetrySettings: TelemetrySettings;
   private readonly usageStatisticsEnabled: boolean;
   private _geminiClient!: GeminiClient;
-  private _sandboxManager: SandboxManager;
+  private _sandboxManager!: SandboxManager;
   private readonly _sandboxPolicyManager: SandboxPolicyManager;
   private baseLlmClient!: BaseLlmClient;
   private localLiteRtLmClient?: LocalLiteRtLmClient;
@@ -979,49 +973,20 @@ export class Config implements McpContext, AgentLoopContext {
           networkAccess: false,
         };
 
-    this._sandboxManager = createSandboxManager(this.sandbox, {
-      workspace: params.targetDir,
-    });
+    this.targetDir = path.resolve(params.targetDir);
 
-    if (
-      !(this._sandboxManager instanceof NoopSandboxManager) &&
-      this.sandbox.enabled
-    ) {
-      this.fileSystemService = new SandboxedFileSystemService(
-        this._sandboxManager,
-        params.targetDir,
-      );
-    } else {
-      this.fileSystemService = new StandardFileSystemService();
-    }
+    this.fileSystemService = new SandboxedFileSystemService(
+      () => this._sandboxManager,
+      this.targetDir,
+    );
 
     this._sandboxPolicyManager = new SandboxPolicyManager();
     const initialApprovalMode =
       params.approvalMode ??
       params.policyEngineConfig?.approvalMode ??
       'default';
-    this._sandboxManager = createSandboxManager(
-      this.sandbox,
-      {
-        workspace: params.targetDir,
-        policyManager: this._sandboxPolicyManager,
-      },
-      initialApprovalMode,
-    );
+    this.rebuildSandboxEnvironment(initialApprovalMode);
 
-    if (
-      !(this._sandboxManager instanceof NoopSandboxManager) &&
-      this.sandbox?.enabled
-    ) {
-      this.fileSystemService = new SandboxedFileSystemService(
-        this._sandboxManager,
-        params.targetDir,
-      );
-    } else {
-      this.fileSystemService = new StandardFileSystemService();
-    }
-
-    this.targetDir = path.resolve(params.targetDir);
     this.folderTrust = params.folderTrust ?? false;
     this.workspaceContext = new WorkspaceContext(this.targetDir, []);
     this.pendingIncludeDirectories = params.includeDirectories ?? [];
@@ -1416,6 +1381,11 @@ export class Config implements McpContext, AgentLoopContext {
     // Initialize centralized FileDiscoveryService
     const discoverToolsHandle = startupProfiler.start('discover_tools');
     this.getFileService();
+
+    if (this.getSandboxEnabled()) {
+      this.rebuildSandboxEnvironment();
+    }
+
     if (this.getCheckpointingEnabled()) {
       await this.getGitService();
     }
@@ -1688,16 +1658,23 @@ export class Config implements McpContext, AgentLoopContext {
     return this._geminiClient;
   }
 
-  private refreshSandboxManager(): void {
+  private rebuildSandboxEnvironment(initialApprovalMode?: string): void {
+    const approvalMode =
+      initialApprovalMode ??
+      (this.policyEngine ? this.getApprovalMode() : 'default');
+
     this._sandboxManager = createSandboxManager(
       this.sandbox,
       {
         workspace: this.targetDir,
         policyManager: this._sandboxPolicyManager,
       },
-      this.getApprovalMode(),
+      approvalMode,
     );
-    this.shellExecutionConfig.sandboxManager = this._sandboxManager;
+
+    if (this.shellExecutionConfig) {
+      this.shellExecutionConfig.sandboxManager = this._sandboxManager;
+    }
   }
 
   get sandboxPolicyManager() {
@@ -2538,7 +2515,7 @@ export class Config implements McpContext, AgentLoopContext {
     }
 
     this.policyEngine.setApprovalMode(mode);
-    this.refreshSandboxManager();
+    this.rebuildSandboxEnvironment();
 
     const isPlanModeTransition =
       currentMode !== mode &&

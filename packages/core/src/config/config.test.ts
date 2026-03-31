@@ -253,6 +253,10 @@ vi.mock('../core/tokenLimits.js', () => ({
 vi.mock('../code_assist/codeAssist.js');
 vi.mock('../code_assist/experiments/experiments.js');
 
+afterEach(() => {
+  vi.clearAllMocks();
+});
+
 describe('Server Config (config.ts)', () => {
   const MODEL = DEFAULT_GEMINI_MODEL;
   const SANDBOX: SandboxConfig = createMockSandboxConfig({
@@ -1563,6 +1567,46 @@ describe('Server Config (config.ts)', () => {
       expect(config.getSandboxEnabled()).toBe(true);
       expect(config.getSandboxAllowedPaths()).toEqual(['/only/this']);
       expect(config.getSandboxNetworkAccess()).toBe(false);
+    });
+
+    it('rebuilds sandbox services when approval mode changes while preserving FS service instance', () => {
+      const config = new Config({
+        ...baseParams,
+        trustedFolder: true,
+        sandbox: { enabled: true, command: 'docker' },
+      });
+
+      const initialFs = config['fileSystemService'];
+      const initialSandboxManager =
+        config['shellExecutionConfig'].sandboxManager;
+
+      // Change approval mode, which triggers rebuildSandboxEnvironment
+      config.setApprovalMode(ApprovalMode.PLAN);
+
+      // Verify that the FS instance is preserved
+      expect(config['fileSystemService']).toBe(initialFs);
+      // Verify that the internal sandbox manager was swapped
+      expect(config['shellExecutionConfig'].sandboxManager).not.toBe(
+        initialSandboxManager,
+      );
+    });
+
+    it('always uses SandboxedFileSystemService and delegates internally based on mode', () => {
+      const config = new Config({
+        ...baseParams,
+        trustedFolder: true,
+        sandbox: { enabled: true, command: 'docker' },
+      });
+
+      expect(config['fileSystemService'].constructor.name).toBe(
+        'SandboxedFileSystemService',
+      );
+
+      config.setApprovalMode(ApprovalMode.YOLO);
+
+      expect(config['fileSystemService'].constructor.name).toBe(
+        'SandboxedFileSystemService',
+      );
     });
   });
 

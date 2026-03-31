@@ -56,12 +56,12 @@ describe('SandboxedFileSystemService', () => {
 
   beforeEach(() => {
     sandboxManager = new MockSandboxManager();
-    service = new SandboxedFileSystemService(sandboxManager, cwd);
+    service = new SandboxedFileSystemService(() => sandboxManager, cwd);
     vi.clearAllMocks();
   });
 
   afterEach(() => {
-    vi.restoreAllMocks();
+    vi.clearAllMocks();
   });
 
   it('should read a file through the sandbox', async () => {

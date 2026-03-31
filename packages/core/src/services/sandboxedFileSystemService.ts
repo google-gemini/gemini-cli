@@ -5,8 +5,13 @@
  */
 
 import { spawn } from 'node:child_process';
+import fs from 'node:fs/promises';
 import { type FileSystemService } from './fileSystemService.js';
-import { type SandboxManager } from './sandboxManager.js';
+import {
+  type SandboxManager,
+  NoopSandboxManager,
+  LocalSandboxManager,
+} from './sandboxManager.js';
 import { debugLogger } from '../utils/debugLogger.js';
 import { isNodeError } from '../utils/errors.js';
 
@@ -15,12 +20,24 @@ import { isNodeError } from '../utils/errors.js';
  */
 export class SandboxedFileSystemService implements FileSystemService {
   constructor(
-    private sandboxManager: SandboxManager,
+    private getSandboxManager: () => SandboxManager,
     private cwd: string,
-  ) {}
+  ) {
+    this.readTextFile = this.readTextFile.bind(this);
+    this.writeTextFile = this.writeTextFile.bind(this);
+  }
 
   async readTextFile(filePath: string): Promise<string> {
-    const prepared = await this.sandboxManager.prepareCommand({
+    const sandboxManager = this.getSandboxManager();
+
+    if (
+      sandboxManager instanceof NoopSandboxManager ||
+      sandboxManager instanceof LocalSandboxManager
+    ) {
+      return fs.readFile(filePath, 'utf-8');
+    }
+
+    const prepared = await sandboxManager.prepareCommand({
       command: '__read',
       args: [filePath],
       cwd: this.cwd,
@@ -69,7 +86,16 @@ export class SandboxedFileSystemService implements FileSystemService {
   }
 
   async writeTextFile(filePath: string, content: string): Promise<void> {
-    const prepared = await this.sandboxManager.prepareCommand({
+    const sandboxManager = this.getSandboxManager();
+
+    if (
+      sandboxManager instanceof NoopSandboxManager ||
+      sandboxManager instanceof LocalSandboxManager
+    ) {
+      return fs.writeFile(filePath, content, 'utf-8');
+    }
+
+    const prepared = await sandboxManager.prepareCommand({
       command: '__write',
       args: [filePath],
       cwd: this.cwd,
