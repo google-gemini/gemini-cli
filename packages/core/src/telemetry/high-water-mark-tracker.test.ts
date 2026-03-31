@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { describe, it, expect, beforeEach, vi } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { HighWaterMarkTracker } from './high-water-mark-tracker.js';
 
 describe('HighWaterMarkTracker', () => {
@@ -177,9 +177,15 @@ describe('HighWaterMarkTracker', () => {
   });
 
   describe('time-based cleanup', () => {
-    it('should clean up old readings', () => {
+    beforeEach(() => {
       vi.useFakeTimers();
+    });
 
+    afterEach(() => {
+      vi.useRealTimers();
+    });
+
+    it('should clean up old readings', () => {
       // Add readings
       tracker.shouldRecordMetric('heap_used', 1000000);
 
@@ -191,13 +197,9 @@ describe('HighWaterMarkTracker', () => {
 
       // Entry should be removed
       expect(tracker.getHighWaterMark('heap_used')).toBe(0);
-
-      vi.useRealTimers();
     });
 
     it('should preserve fresh entries while removing stale ones', () => {
-      vi.useFakeTimers();
-
       tracker.shouldRecordMetric('heap_used', 1000000);
 
       // Advance time so first entry becomes stale
@@ -211,8 +213,6 @@ describe('HighWaterMarkTracker', () => {
 
       expect(tracker.getHighWaterMark('heap_used')).toBe(0);
       expect(tracker.getHighWaterMark('rss')).toBe(2000000);
-
-      vi.useRealTimers();
     });
 
     it('should be a no-op when no entries are stale', () => {
@@ -290,6 +290,14 @@ describe('HighWaterMarkTracker', () => {
       expect(tracker.getHighWaterMark('heap_used')).toBe(2000000);
     });
 
+    it('should handle zero values correctly', () => {
+      // First call with 0: no prior entry exists, treated as first measurement
+      expect(tracker.shouldRecordMetric('zero', 0)).toBe(true);
+
+      // Second call with 0: entry exists, value has not grown — should not record
+      expect(tracker.shouldRecordMetric('zero', 0)).toBe(false);
+    });
+
     it('should treat first measurement as always recording regardless of value', () => {
       // Even a very small first value should be recorded
       expect(tracker.shouldRecordMetric('tiny', 1)).toBe(true);
@@ -351,9 +359,15 @@ describe('HighWaterMarkTracker', () => {
   });
 
   describe('lastUpdateTimes tracking', () => {
-    it('should update lastUpdateTime even when metric does not trigger recording', () => {
+    beforeEach(() => {
       vi.useFakeTimers();
+    });
 
+    afterEach(() => {
+      vi.useRealTimers();
+    });
+
+    it('should update lastUpdateTime even when metric does not trigger recording', () => {
       tracker.shouldRecordMetric('heap_used', 1000000);
 
       vi.advanceTimersByTime(5000);
@@ -366,8 +380,6 @@ describe('HighWaterMarkTracker', () => {
       // Cleanup with 10s max age: the entry was touched 8s ago, so it's fresh
       tracker.cleanup(10000);
       expect(tracker.getHighWaterMark('heap_used')).toBe(1000000);
-
-      vi.useRealTimers();
     });
   });
 });
