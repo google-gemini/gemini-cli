@@ -34,6 +34,34 @@ Color in a terminal is a scarce resource. It should be functional, not decorativ
 - **Rule:** Strip unnecessary colors. Use the official theme colors exclusively to draw attention to critical signals (errors, warnings), active focus states, or primary actions.
 - **Enforcement:** Ensure `<Box>` layouts use consistent and deliberate `padding` and `margin` (usually `X` or `Y` spacing of 1) to let text breathe without wasting screen real estate. Reject "rainbow" text or over-styled borders.
 
+## UI Standards: Bullets & Icons
+
+Adhere to these established patterns for lists and status signaling:
+
+### 1. Descriptive UI Bullets: `•` (U+2022)
+Use the standard bullet for descriptive lists (e.g., permissions, features).
+- **Pattern**: `• <Text bold>Label:</Text> Description`
+- **Example**:
+  ```tsx
+  <Text color={theme.text.primary}>
+    • <Text bold color={theme.text.accent}>Label</Text>: Description
+  </Text>
+  ```
+
+### 2. Technical List Bullets: `- ` (Hyphen)
+Use for data-heavy or property-based lists (e.g., settings, extension properties).
+
+### 3. Checklist Status Icons
+Use specific semantic icons for lifecycle states:
+- `✓` : Completed
+- `»` : In Progress
+- `☐` : Pending
+- `✗` : Cancelled
+- `⛔` : Blocked
+
+### 4. Help Text Separator
+Use ` - ` (Space-Hyphen-Space) to separate commands or labels from their short descriptions in help text.
+
 ## Workflow
 
 1. **Review Request:** When asked to review a component (e.g., `InputPrompt.tsx`), load the file and analyze its Ink layout and React state.
