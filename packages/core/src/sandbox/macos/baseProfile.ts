@@ -134,12 +134,6 @@ export const BASE_SEATBELT_PROFILE = `(version 1)
   (literal "/dev/zero")
   (subpath "/tmp")
   (subpath "/private/tmp")
-  (subpath (param "TMPDIR"))
-)
-
-; Workspace access using parameterized paths
-(allow file-read*
-  (subpath (param "WORKSPACE"))
 )
 
 `;
