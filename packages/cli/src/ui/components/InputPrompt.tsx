@@ -689,8 +689,8 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
         return true;
       }
 
-      if (isVoiceModeEnabled && buffer.text === '') {
-        if (keyMatchers[Command.ESCAPE](key)) {
+      if (isVoiceModeEnabled) {
+        if (keyMatchers[Command.ESCAPE](key) && buffer.text === '') {
           setVoiceModeEnabled(false);
           return true;
         }
@@ -710,6 +710,7 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
             }
 
             recordingInProgressRef.current = true;
+            turnBaselineRef.current = buffer.text;
 
             isConnectingRef.current = true;
             setIsRecording(true);
@@ -762,18 +763,15 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
               transcriptionServiceRef.current =
                 TranscriptionFactory.createProvider(settings.voice, apiKey);
 
+              // TranscriptionProviders may be session-cumulative (full text so far) or
+              // turn-based (resetting text after turnComplete). We maintain a baseline
+              // that updates on every turnComplete to handle both cases transparently.
               transcriptionServiceRef.current.on('transcription', (text) => {
                 // If user toggled off while transcription was in flight
                 if (!recordingInProgressRef.current) return;
 
                 if (text) {
-                  // Capture the baseline at the EXACT moment the FIRST transcription part arrives
-                  // using the live Ref to avoid stale closures.
-                  if (turnBaselineRef.current === null) {
-                    turnBaselineRef.current = bufferRef.current.text;
-                  }
-
-                  const baseline = turnBaselineRef.current;
+                  const baseline = turnBaselineRef.current ?? '';
                   const separator =
                     baseline &&
                     !baseline.endsWith(' ') &&
@@ -789,9 +787,13 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
               });
 
               transcriptionServiceRef.current.on('turnComplete', () => {
-                turnBaselineRef.current = null;
+                // When a turn is complete, some providers (like Gemini Live) will start a new
+                // transcription from empty. We capture the current buffer as the NEW baseline
+                // so that the next turn appends to what we have so far.
+                turnBaselineRef.current = bufferRef.current.text;
                 liveTranscriptionRef.current = '';
               });
+
               transcriptionServiceRef.current.on('error', (err) => {
                 debugLogger.error('[Voice] Transcription error:', err);
 
@@ -1845,12 +1847,15 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
                 <Text color={theme.status.success}>🎙️ Listening...</Text>
               </Box>
             )}
-            {buffer.text.length === 0 && !isRecording ? (
-              isVoiceModeEnabled ? (
+            {isVoiceModeEnabled && !isRecording && (
+              <Box flexDirection="row" marginBottom={0}>
                 <Text color={theme.text.secondary}>
                   &gt; Voice mode: Space to start/stop recording (Esc to exit)
                 </Text>
-              ) : placeholder ? (
+              </Box>
+            )}
+            {buffer.text.length === 0 && !isRecording ? (
+              !isVoiceModeEnabled && placeholder ? (
                 showCursor ? (
                   <Text
                     terminalCursorFocus={showCursor}
