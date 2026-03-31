@@ -121,6 +121,7 @@ describe('file-system', () => {
 
     const result = await rig.run({
       args: `write "hello" to "${fileName}" and then stop. Do not perform any other actions.`,
+      timeout: 600000, // 10 min — real LLM can be slow in Docker sandbox
     });
 
     const foundToolCall = await rig.waitForToolCall('write_file');

@@ -53,7 +53,7 @@ import {
 export async function createBrowserAgentDefinition(
   config: Config,
   messageBus: MessageBus,
-  printOutput?: (msg: string) => void,
+  _printOutput?: (msg: string) => void,
 ): Promise<{
   definition: LocalAgentDefinition<typeof BrowserTaskResultSchema>;
   browserManager: BrowserManager;
@@ -66,23 +66,17 @@ export async function createBrowserAgentDefinition(
   const browserManager = BrowserManager.getInstance(config);
   await browserManager.ensureConnection();
 
-  if (printOutput) {
-    printOutput('Browser connected with isolated MCP client.');
-  }
+  debugLogger.log('Browser connected with isolated MCP client.');
 
   // Determine if input blocker should be active (non-headless + enabled)
   const shouldDisableInput = config.shouldDisableBrowserUserInput();
   // Inject automation overlay and input blocker if not in headless mode
   const browserConfig = config.getBrowserAgentConfig();
   if (!browserConfig?.customConfig?.headless) {
-    if (printOutput) {
-      printOutput('Injecting automation overlay...');
-    }
+    debugLogger.log('Injecting automation overlay...');
     await injectAutomationOverlay(browserManager);
     if (shouldDisableInput) {
-      if (printOutput) {
-        printOutput('Injecting input blocker...');
-      }
+      debugLogger.log('Injecting input blocker...');
       await injectInputBlocker(browserManager);
     }
   }
