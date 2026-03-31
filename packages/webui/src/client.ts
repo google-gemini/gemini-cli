@@ -512,9 +512,6 @@ function escJsHtml(s){
     .replace(/>/g, '&gt;');
 }
 
-function escJsDouble(s){
-  return String(s).replace(/\\\\/g, '\\\\\\\\').replace(/"/g, '\\"');
-}
 
 function toggleFileMenu(event, path, menuId){
   event.stopPropagation();
