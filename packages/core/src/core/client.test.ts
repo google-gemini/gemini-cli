@@ -253,8 +253,8 @@ describe('Gemini Client (client.ts)', () => {
       getContinueOnFailedApiCall: vi.fn(),
       getProjectRoot: vi.fn().mockReturnValue('/test/project/root'),
       getIncludeDirectoryTree: vi.fn().mockReturnValue(true),
-      isExperimentalWatchmanEnabled: vi.fn().mockReturnValue(false),
-      getExperimentalWatchmanInterval: vi.fn().mockReturnValue(20),
+      isExperimentalWatcherEnabled: vi.fn().mockReturnValue(false),
+      getExperimentalWatcherInterval: vi.fn().mockReturnValue(20),
       storage: {
         getProjectTempDir: vi.fn().mockReturnValue('/test/temp'),
       },

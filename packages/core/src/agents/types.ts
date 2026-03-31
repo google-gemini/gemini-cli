@@ -104,7 +104,7 @@ export interface SubagentProgress {
   terminateReason?: AgentTerminateMode;
 }
 
-export interface WatchmanProgress {
+export interface WatcherProgress {
   userDirections: string;
   progressSummary: string;
   evaluation: string;

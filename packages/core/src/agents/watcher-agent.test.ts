@@ -5,11 +5,11 @@
  */
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { WatchmanAgent } from './watchman-agent.js';
+import { WatcherAgent } from './watcher-agent.js';
 import { makeFakeConfig } from '../test-utils/config.js';
 import * as path from 'node:path';
 
-describe('WatchmanAgent', () => {
+describe('WatcherAgent', () => {
   beforeEach(() => {
     vi.stubEnv('GEMINI_SYSTEM_MD', '');
     vi.stubEnv('GEMINI_WRITE_SYSTEM_MD', '');
@@ -19,20 +19,22 @@ describe('WatchmanAgent', () => {
     vi.unstubAllEnvs();
   });
 
-  it('should create a valid watchman agent definition', () => {
+  it('should create a valid watcher agent definition', () => {
     const config = makeFakeConfig();
     const projectTempDir = '/tmp/project';
-    vi.spyOn(config.storage, 'getProjectTempDir').mockReturnValue(projectTempDir);
-    
+    vi.spyOn(config.storage, 'getProjectTempDir').mockReturnValue(
+      projectTempDir,
+    );
+
     Object.defineProperty(config, 'config', {
       get() {
         return this;
       },
     });
 
-    const agent = WatchmanAgent(config);
+    const agent = WatcherAgent(config);
 
-    expect(agent.name).toBe('watchman');
+    expect(agent.name).toBe('watcher');
     expect(agent.kind).toBe('local');
     expect(agent.description).toContain('monitors the progress');
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -40,8 +42,8 @@ describe('WatchmanAgent', () => {
       'recentHistory',
     );
     expect(agent.outputConfig?.outputName).toBe('report');
-    
-    const statusFilePath = path.join(projectTempDir, 'watchman_status.md');
+
+    const statusFilePath = path.join(projectTempDir, 'watcher_status.md');
     expect(agent.promptConfig.systemPrompt).toContain(statusFilePath);
     expect(agent.promptConfig.query).toContain(statusFilePath);
   });

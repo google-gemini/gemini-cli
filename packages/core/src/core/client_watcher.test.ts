@@ -8,9 +8,9 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { GeminiClient } from './client.js';
 import { makeFakeConfig } from '../test-utils/config.js';
 import { ApprovalMode } from '../policy/types.js';
-import type { WatchmanProgress } from '../agents/types.js';
+import type { WatcherProgress } from '../agents/types.js';
 
-describe('GeminiClient Watchman Integration', () => {
+describe('GeminiClient Watcher Integration', () => {
   beforeEach(() => {
     vi.stubEnv('GEMINI_SYSTEM_MD', '');
     vi.stubEnv('GEMINI_WRITE_SYSTEM_MD', '');
@@ -20,12 +20,12 @@ describe('GeminiClient Watchman Integration', () => {
     vi.unstubAllEnvs();
   });
 
-  it('should trigger watchman periodically when enabled', async () => {
+  it('should trigger watcher periodically when enabled', async () => {
     const config = makeFakeConfig();
-    vi.spyOn(config, 'isExperimentalWatchmanEnabled').mockReturnValue(true);
-    vi.spyOn(config, 'getExperimentalWatchmanInterval').mockReturnValue(2);
+    vi.spyOn(config, 'isExperimentalWatcherEnabled').mockReturnValue(true);
+    vi.spyOn(config, 'getExperimentalWatcherInterval').mockReturnValue(2);
     vi.spyOn(config, 'getApprovalMode').mockReturnValue(ApprovalMode.DEFAULT);
-    
+
     // Mock getContentGenerator
     const mockContentGenerator = {
       countTokens: vi.fn().mockResolvedValue({ totalTokens: 10 }),
@@ -47,7 +47,7 @@ describe('GeminiClient Watchman Integration', () => {
     const client = new GeminiClient(config);
 
     // Mock toolRegistry before initialize calls startChat
-    const mockWatchmanTool = {
+    const mockWatcherTool = {
       build: vi.fn().mockReturnValue({
         execute: vi.fn().mockResolvedValue({
           llmContent: JSON.stringify({
@@ -55,24 +55,24 @@ describe('GeminiClient Watchman Integration', () => {
             progressSummary: 'Making progress',
             evaluation: 'Good',
             feedback: 'You are doing great',
-          } as WatchmanProgress),
+          } as WatcherProgress),
         }),
       }),
       isReadOnly: true,
-      name: 'watchman',
-      displayName: 'Watchman',
-      description: 'Watchman tool',
+      name: 'watcher',
+      displayName: 'Watcher',
+      description: 'Watcher tool',
     };
 
     const mockToolRegistry = {
       getFunctionDeclarations: vi.fn().mockReturnValue([]),
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+       
       getTool: vi.fn().mockImplementation((name) => {
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        if (name === 'watchman') return mockWatchmanTool as any;
+        if (name === 'watcher') return mockWatcherTool as any;
         return undefined;
       }),
-      getAllToolNames: vi.fn().mockReturnValue(['watchman']),
+      getAllToolNames: vi.fn().mockReturnValue(['watcher']),
       sortTools: vi.fn(),
       discoverAllTools: vi.fn(),
     };
@@ -83,7 +83,7 @@ describe('GeminiClient Watchman Integration', () => {
     });
 
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    ((client as any).context as any).agentRegistry = {
+    ((client as any).context).agentRegistry = {
       getAllDefinitions: vi.fn().mockReturnValue([]),
     };
 
@@ -100,7 +100,7 @@ describe('GeminiClient Watchman Integration', () => {
       'gemini-pro',
     );
 
-    // Manually increment sessionTurnCount to trigger watchman
+    // Manually increment sessionTurnCount to trigger watcher
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     (client as any).sessionTurnCount = 1; // It will be 2 inside processTurn
 
@@ -121,21 +121,21 @@ describe('GeminiClient Watchman Integration', () => {
       // Intentionally consume
     }
 
-    expect(mockWatchmanTool.build).toHaveBeenCalled();
+    expect(mockWatcherTool.build).toHaveBeenCalled();
     const history = client.getHistory();
     const feedbackMessage = history.find((m) =>
       m.parts?.some(
-        (p) => 'text' in p && p.text?.includes('Feedback from Watchman'),
+        (p) => 'text' in p && p.text?.includes('Feedback from Watcher'),
       ),
     );
     expect(feedbackMessage).toBeDefined();
     expect(feedbackMessage?.parts?.[0].text).toContain('You are doing great');
   });
 
-  it('should NOT trigger watchman when NOT enabled', async () => {
+  it('should NOT trigger watcher when NOT enabled', async () => {
     const config = makeFakeConfig();
-    vi.spyOn(config, 'isExperimentalWatchmanEnabled').mockReturnValue(false);
-    
+    vi.spyOn(config, 'isExperimentalWatcherEnabled').mockReturnValue(false);
+
     // Mock getContentGenerator
     const mockContentGenerator = {
       countTokens: vi.fn().mockResolvedValue({ totalTokens: 10 }),
@@ -157,53 +157,68 @@ describe('GeminiClient Watchman Integration', () => {
     const client = new GeminiClient(config);
 
     // Mock toolRegistry before initialize calls startChat
-    const mockWatchmanTool = {
+    const mockWatcherTool = {
       build: vi.fn().mockReturnValue({
         execute: vi.fn(),
       }),
       isReadOnly: true,
-      name: 'watchman',
+      name: 'watcher',
     };
 
     const mockToolRegistry = {
       getFunctionDeclarations: vi.fn().mockReturnValue([]),
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+       
       getTool: vi.fn().mockImplementation((name) => {
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        if (name === 'watchman') return mockWatchmanTool as any;
+        if (name === 'watcher') return mockWatcherTool as any;
         return undefined;
       }),
-      getAllToolNames: vi.fn().mockReturnValue(['watchman']),
+      getAllToolNames: vi.fn().mockReturnValue(['watcher']),
       sortTools: vi.fn(),
       discoverAllTools: vi.fn(),
     };
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    Object.defineProperty((client as any).context, 'toolRegistry', {
+    // Use type assertion for testing purposes to access protected members
+    const clientAccess = client as unknown as {
+      context: AgentLoopContext;
+      sessionTurnCount: number;
+      tryCompressChat: () => Promise<{ compressionStatus: string }>;
+      _getActiveModelForCurrentTurn: () => string;
+      processTurn: (
+        request: unknown,
+        signal: AbortSignal,
+        promptId: string,
+        maxTokens: number,
+        forceFullContext: boolean,
+      ) => AsyncGenerator;
+    };
+
+    Object.defineProperty(clientAccess.context, 'toolRegistry', {
       get: () => mockToolRegistry,
       configurable: true,
     });
 
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    ((client as any).context as any).agentRegistry = {
+    (
+      clientAccess.context as unknown as { agentRegistry: unknown }
+    ).agentRegistry = {
       getAllDefinitions: vi.fn().mockReturnValue([]),
     };
 
     await config.storage.initialize();
     await client.initialize();
 
-    vi.spyOn(client as any, 'tryCompressChat').mockResolvedValue({
+    vi.spyOn(clientAccess, 'tryCompressChat').mockResolvedValue({
       compressionStatus: 'skipped',
     });
-    vi.spyOn(client as any, '_getActiveModelForCurrentTurn').mockReturnValue(
+    vi.spyOn(clientAccess, '_getActiveModelForCurrentTurn').mockReturnValue(
       'gemini-pro',
     );
 
-    (client as any).sessionTurnCount = 1;
+    clientAccess.sessionTurnCount = 1;
 
     const promptId = 'test-prompt';
     const signal = new AbortController().signal;
 
-    const generator = (client as any).processTurn(
+    const generator = clientAccess.processTurn(
       [{ text: 'test' }],
       signal,
       promptId,
@@ -214,7 +229,6 @@ describe('GeminiClient Watchman Integration', () => {
       // Intentionally consume
     }
 
-    expect(mockWatchmanTool.build).not.toHaveBeenCalled();
+    expect(mockWatcherTool.build).not.toHaveBeenCalled();
   });
 });
-;

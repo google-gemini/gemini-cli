@@ -14,7 +14,7 @@ import {
 import { GEMINI_MODEL_ALIAS_FLASH } from '../config/models.js';
 import * as path from 'node:path';
 
-export const WatchmanReportSchema = z.object({
+export const WatcherReportSchema = z.object({
   userDirections: z
     .string()
     .describe(
@@ -35,18 +35,18 @@ export const WatchmanReportSchema = z.object({
 });
 
 /**
- * Watchman subagent specialized in monitoring the main agent's progress and direction.
+ * Watcher subagent specialized in monitoring the main agent's progress and direction.
  */
-export const WatchmanAgent = (
+export const WatcherAgent = (
   context: AgentLoopContext,
-): LocalAgentDefinition<typeof WatchmanReportSchema> => {
+): LocalAgentDefinition<typeof WatcherReportSchema> => {
   const projectTempDir = context.config.storage.getProjectTempDir();
-  const statusFilePath = path.join(projectTempDir, 'watchman_status.md');
+  const statusFilePath = path.join(projectTempDir, 'watcher_status.md');
 
   return {
-    name: 'watchman',
+    name: 'watcher',
     kind: 'local',
-    displayName: 'Watchman Agent',
+    displayName: 'Watcher Agent',
     description:
       'Specialized agent that monitors the progress and direction of the main agent.',
     inputConfig: {
@@ -65,7 +65,7 @@ export const WatchmanAgent = (
     outputConfig: {
       outputName: 'report',
       description: 'The progress report and evaluation.',
-      schema: WatchmanReportSchema,
+      schema: WatcherReportSchema,
     },
 
     processOutput: (output) => JSON.stringify(output, null, 2),
@@ -94,7 +94,7 @@ Status file path: ${statusFilePath}
 <recent_history>
 \${recentHistory}
 </recent_history>`,
-      systemPrompt: `You are **Watchman**, a specialized monitoring subagent. Your purpose is to ensure the main agent stays on track and follows the user's directions.
+      systemPrompt: `You are **Watcher**, a specialized monitoring subagent. Your purpose is to ensure the main agent stays on track and follows the user's directions.
 
 ### Your Objectives:
 1.  **Track Directions**: Identify high-level user directions, redirections, and any changes in plans.
@@ -110,7 +110,7 @@ Status file path: ${statusFilePath}
 
 ### Status File Format:
 \`\`\`md
-# Watchman Status Update
+# Watcher Status Update
 ## User Directions
 [Summary of initial goal and changes]
 

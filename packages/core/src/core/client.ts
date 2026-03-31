@@ -44,8 +44,8 @@ import type { ContentGenerator } from './contentGenerator.js';
 import { LoopDetectionService } from '../services/loopDetectionService.js';
 import { ChatCompressionService } from '../context/chatCompressionService.js';
 import { AgentHistoryProvider } from '../context/agentHistoryProvider.js';
-import type { WatchmanProgress } from '../agents/types.js';
-import { WatchmanReportSchema } from '../agents/watchman-agent.js';
+import type { WatcherProgress } from '../agents/types.js';
+import { WatcherReportSchema } from '../agents/watcher-agent.js';
 import { ideContextStore } from '../ide/ideContext.js';
 import {
   logContentRetryFailure,
@@ -121,27 +121,21 @@ export class GeminiClient {
     const modelForLimitCheck = this._getActiveModelForCurrentTurn();
 
     if (
-      this.config.isExperimentalWatchmanEnabled() &&
+      this.config.isExperimentalWatcherEnabled() &&
       this.sessionTurnCount > 0 &&
-      this.sessionTurnCount % this.config.getExperimentalWatchmanInterval() ===
+      this.sessionTurnCount % this.config.getExperimentalWatcherInterval() ===
         0
     ) {
-      debugLogger.log(`[Watchman] Kicking in at turn ${this.sessionTurnCount}`);
-      const watchmanResult = await this.tryRunWatchman(prompt_id, signal);
-      if (watchmanResult?.feedback) {
-        debugLogger.log(
-          `[Watchman] Feedback provided: ${watchmanResult.feedback}`,
-        );
-        const feedback = watchmanResult.feedback;
+      const watcherResult = await this.tryRunWatcher(prompt_id, signal);
+      if (watcherResult?.feedback) {
+        const feedback = watcherResult.feedback;
         const feedbackRequest = [
           {
-            text: `System: Feedback from Watchman (Review of last ${this.config.getExperimentalWatchmanInterval()} turns):\n\n${feedback}`,
+            text: `System: Feedback from Watcher (Review of last ${this.config.getExperimentalWatcherInterval()} turns):\n\n${feedback}`,
           },
         ];
         // Inject feedback into the conversation
         this.getChat().addHistory(createUserContent(feedbackRequest));
-      } else {
-        debugLogger.log('[Watchman] No feedback provided.');
       }
     }
 
@@ -396,16 +390,16 @@ export class GeminiClient {
     return this.config.getActiveModel();
   }
 
-  private async tryRunWatchman(
+  private async tryRunWatcher(
     prompt_id: string,
     signal: AbortSignal,
-  ): Promise<WatchmanProgress | undefined> {
-    const watchmanTool = this.context.toolRegistry.getTool('watchman');
-    if (!watchmanTool) {
+  ): Promise<WatcherProgress | undefined> {
+    const watcherTool = this.context.toolRegistry.getTool('watcher');
+    if (!watcherTool) {
       return undefined;
     }
 
-    const interval = this.config.getExperimentalWatchmanInterval();
+    const interval = this.config.getExperimentalWatcherInterval();
     const history = this.getChat().getHistory();
     // Get last N turns (approx)
     const recentHistory = history
@@ -445,24 +439,21 @@ export class GeminiClient {
       .join('\n\n');
 
     try {
-      debugLogger.log('[Watchman] Executing subagent...');
-      const invocation = watchmanTool.build({ recentHistory });
+      const invocation = watcherTool.build({ recentHistory });
       const result = await invocation.execute(signal);
 
       if (result.llmContent) {
         try {
           const contentString = partListUnionToString(result.llmContent);
-          debugLogger.log(`[Watchman] Raw content response: ${contentString}`);
-          const parsed = WatchmanReportSchema.parse(JSON.parse(contentString));
-          debugLogger.log('[Watchman] Subagent execution complete.');
-          return parsed as WatchmanProgress;
+          const parsed = WatcherReportSchema.parse(JSON.parse(contentString));
+          return parsed as WatcherProgress;
         } catch (e) {
-          debugLogger.warn('Failed to parse watchman output', e);
+          debugLogger.warn('Failed to parse watcher output', e);
           return undefined;
         }
       }
     } catch (e) {
-      debugLogger.warn('Error running watchman subagent', e);
+      debugLogger.warn('Error running watcher subagent', e);
     }
 
     return undefined;
