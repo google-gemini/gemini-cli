@@ -40,6 +40,7 @@ import {
   isDangerousCommand,
 } from '../utils/commandSafety.js';
 import { parsePosixSandboxDenials } from '../utils/sandboxDenialUtils.js';
+import { handleReadWriteCommands } from '../utils/sandboxReadWriteUtils.js';
 
 let cachedBpfPath: string | undefined;
 
@@ -211,6 +212,13 @@ export class LinuxSandboxManager implements SandboxManager {
         false,
     };
 
+    const { command: finalCommand, args: finalArgs } = handleReadWriteCommands(
+      req,
+      mergedAdditional,
+      this.options.workspace,
+      req.policy?.allowedPaths,
+    );
+
     const sanitizationConfig = getSecureSanitizationConfig(
       req.policy?.sanitizationConfig,
     );
@@ -279,14 +287,7 @@ export class LinuxSandboxManager implements SandboxManager {
       if (!fs.existsSync(resolved)) continue;
       const normalizedAllowedPath = normalize(resolved).replace(/\/$/, '');
       if (normalizedAllowedPath !== normalizedWorkspace) {
-        if (
-          !workspaceWrite &&
-          normalizedAllowedPath.startsWith(normalizedWorkspace + '/')
-        ) {
-          bwrapArgs.push('--ro-bind-try', resolved, resolved);
-        } else {
-          bwrapArgs.push('--bind-try', resolved, resolved);
-        }
+        bwrapArgs.push('--bind-try', resolved, resolved);
       }
     }
 
@@ -362,7 +363,7 @@ export class LinuxSandboxManager implements SandboxManager {
     const bpfPath = getSeccompBpfPath();
 
     bwrapArgs.push('--seccomp', '9');
-    bwrapArgs.push('--', req.command, ...req.args);
+    bwrapArgs.push('--', finalCommand, ...finalArgs);
 
     const shArgs = [
       '-c',

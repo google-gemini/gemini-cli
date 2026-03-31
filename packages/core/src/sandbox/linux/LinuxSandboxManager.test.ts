@@ -317,7 +317,7 @@ describe('LinuxSandboxManager', () => {
         );
       });
 
-      it('should not grant read-write access to allowedPaths inside the workspace when readonly mode is active', async () => {
+      it('should grant read-write access to allowedPaths inside the workspace even when readonly mode is active', async () => {
         const manager = new LinuxSandboxManager({
           workspace,
           modeConfig: { readonly: true },
@@ -333,7 +333,7 @@ describe('LinuxSandboxManager', () => {
         });
         const bwrapArgs = result.args;
         const bindIndex = bwrapArgs.indexOf(workspace + '/subdirectory');
-        expect(bwrapArgs[bindIndex - 1]).toBe('--ro-bind-try');
+        expect(bwrapArgs[bindIndex - 1]).toBe('--bind-try');
       });
 
       it('should not bind the workspace twice even if it has a trailing slash in allowedPaths', async () => {
