@@ -23,7 +23,9 @@ describe('Plan Mode', () => {
       'should allow read-only tools but deny write tools in plan mode',
       {
         settings: {
-          experimental: { plan: true },
+          general: {
+            plan: { enabled: true },
+          },
           tools: {
             core: [
               'run_shell_command',
@@ -67,15 +69,12 @@ describe('Plan Mode', () => {
 
     await rig.setup(testName, {
       settings: {
-        experimental: { plan: true },
         tools: {
           core: ['write_file', 'read_file', 'list_directory'],
         },
         general: {
+          plan: { enabled: true, directory: plansDir },
           defaultApprovalMode: 'plan',
-          plan: {
-            directory: plansDir,
-          },
         },
       },
     });
@@ -120,15 +119,12 @@ describe('Plan Mode', () => {
 
     await rig.setup(testName, {
       settings: {
-        experimental: { plan: true },
         tools: {
           core: ['write_file', 'read_file', 'list_directory'],
         },
         general: {
+          plan: { enabled: true, directory: plansDir },
           defaultApprovalMode: 'plan',
-          plan: {
-            directory: plansDir,
-          },
         },
       },
     });
@@ -156,7 +152,9 @@ describe('Plan Mode', () => {
   it('should be able to enter plan mode from default mode', async () => {
     await rig.setup('should be able to enter plan mode from default mode', {
       settings: {
-        experimental: { plan: true },
+        general: {
+          plan: { enabled: true },
+        },
         tools: {
           core: ['enter_plan_mode'],
           allowed: ['enter_plan_mode'],
@@ -184,15 +182,12 @@ describe('Plan Mode', () => {
 
     await rig.setup(testName, {
       settings: {
-        experimental: { plan: true },
         tools: {
           core: ['write_file', 'read_file', 'list_directory'],
         },
         general: {
+          plan: { enabled: true, directory: plansDir },
           defaultApprovalMode: 'plan',
-          plan: {
-            directory: plansDir,
-          },
         },
       },
     });
