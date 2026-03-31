@@ -42,14 +42,12 @@ execSync('npm run build -w @google/gemini-cli-core', {
 
 // Build the rest in parallel
 console.log('Building other workspaces in parallel...');
-const parallelWorkspaces = [
-  '@google/gemini-cli',
-  '@google/gemini-cli-sdk',
-  '@google/gemini-cli-a2a-server',
-  '@google/gemini-cli-test-utils',
-  '@google/gemini-cli-devtools',
-  'gemini-cli-vscode-ide-companion',
-];
+const workspaceInfo = JSON.parse(
+  execSync('npm query .workspace --json', { cwd: root, encoding: 'utf-8' }),
+);
+const parallelWorkspaces = workspaceInfo
+  .map((w) => w.name)
+  .filter((name) => name !== '@google/gemini-cli-core');
 
 execSync(
   `npx npm-run-all --parallel ${parallelWorkspaces.map((w) => `"build -w ${w}"`).join(' ')}`,
