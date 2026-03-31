@@ -402,6 +402,7 @@ export const Footer: React.FC<{ copyModeEnabled?: boolean }> = ({
         break;
       }
       case 'auth': {
+        if (!settings.merged.ui.showUserIdentity) break;
         if (!authType) break;
         const displayStr =
           authType === AuthType.LOGIN_WITH_GOOGLE

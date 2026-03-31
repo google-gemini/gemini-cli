@@ -715,6 +715,42 @@ describe('<Footer />', () => {
       getCachedAccountSpy.mockRestore();
     });
 
+    it('does NOT render auth item when showUserIdentity is false', async () => {
+      const authConfig = {
+        ...mockConfigPlain,
+        getContentGeneratorConfig: () => ({
+          authType: AuthType.LOGIN_WITH_GOOGLE,
+        }),
+      } as unknown as Config;
+      const getCachedAccountSpy = vi
+        .spyOn(UserAccountManager.prototype, 'getCachedGoogleAccount')
+        .mockReturnValue('test@example.com');
+
+      const { lastFrame, unmount } = await renderWithProviders(<Footer />, {
+        config: authConfig,
+        width: 120,
+        uiState: {
+          currentModel: 'gemini-pro',
+          sessionStats: mockSessionStats,
+        },
+        settings: createMockSettings({
+          ui: {
+            showUserIdentity: false,
+            footer: {
+              items: ['workspace', 'auth'],
+            },
+          },
+        }),
+      });
+
+      const output = lastFrame();
+      expect(output).toContain('workspace');
+      expect(output).not.toContain('auth');
+      expect(output).not.toContain('test@example.com');
+      unmount();
+      getCachedAccountSpy.mockRestore();
+    });
+
     it('renders items in the specified order', async () => {
       const { lastFrame, unmount } = await renderWithProviders(<Footer />, {
         config: mockConfig,
