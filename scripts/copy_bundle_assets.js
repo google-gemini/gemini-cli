@@ -25,23 +25,48 @@ import { glob } from 'glob';
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const root = join(__dirname, '..');
 const bundleDir = join(root, 'bundle');
+const distDir = join(root, 'dist');
 
-// Create the bundle directory if it doesn't exist
+// Create the bundle and dist directories if they don't exist
 if (!existsSync(bundleDir)) {
   mkdirSync(bundleDir);
+}
+if (!existsSync(distDir)) {
+  mkdirSync(distDir);
+}
+
+function copyToDirs(src, destSubPath) {
+  const isDir =
+    existsSync(src) &&
+    !src.endsWith('.sb') &&
+    !src.endsWith('.toml') &&
+    !src.endsWith('.json');
+  if (isDir) {
+    cpSync(src, join(bundleDir, destSubPath), {
+      recursive: true,
+      dereference: true,
+    });
+    cpSync(src, join(distDir, destSubPath), {
+      recursive: true,
+      dereference: true,
+    });
+  } else {
+    copyFileSync(src, join(bundleDir, destSubPath));
+    copyFileSync(src, join(distDir, destSubPath));
+  }
 }
 
 // 1. Copy Sandbox definitions (.sb)
 const sbFiles = glob.sync('packages/**/*.sb', { cwd: root });
 for (const file of sbFiles) {
-  copyFileSync(join(root, file), join(bundleDir, basename(file)));
+  copyToDirs(join(root, file), basename(file));
 }
 
 // 2. Copy Policy definitions (.toml)
-const policyDir = join(bundleDir, 'policies');
-if (!existsSync(policyDir)) {
-  mkdirSync(policyDir);
-}
+const policyDirBundle = join(bundleDir, 'policies');
+const policyDirDist = join(distDir, 'policies');
+if (!existsSync(policyDirBundle)) mkdirSync(policyDirBundle);
+if (!existsSync(policyDirDist)) mkdirSync(policyDirDist);
 
 // Locate policy files specifically in the core package
 const policyFiles = glob.sync('packages/core/src/policy/policies/*.toml', {
@@ -49,58 +74,77 @@ const policyFiles = glob.sync('packages/core/src/policy/policies/*.toml', {
 });
 
 for (const file of policyFiles) {
-  copyFileSync(join(root, file), join(policyDir, basename(file)));
+  copyFileSync(join(root, file), join(policyDirBundle, basename(file)));
+  copyFileSync(join(root, file), join(policyDirDist, basename(file)));
 }
 
-console.log(`Copied ${policyFiles.length} policy files to bundle/policies/`);
+console.log(
+  `Copied ${policyFiles.length} policy files to bundle/policies/ and dist/policies/`,
+);
 
 // 3. Copy Documentation (docs/)
 const docsSrc = join(root, 'docs');
-const docsDest = join(bundleDir, 'docs');
 if (existsSync(docsSrc)) {
-  cpSync(docsSrc, docsDest, { recursive: true, dereference: true });
-  console.log('Copied docs to bundle/docs/');
+  copyToDirs(docsSrc, 'docs');
+  console.log('Copied docs to bundle/docs/ and dist/docs/');
 }
 
 // 4. Copy Built-in Skills (packages/core/src/skills/builtin)
 const builtinSkillsSrc = join(root, 'packages/core/src/skills/builtin');
-const builtinSkillsDest = join(bundleDir, 'builtin');
 if (existsSync(builtinSkillsSrc)) {
-  cpSync(builtinSkillsSrc, builtinSkillsDest, {
-    recursive: true,
-    dereference: true,
-  });
-  console.log('Copied built-in skills to bundle/builtin/');
+  copyToDirs(builtinSkillsSrc, 'builtin');
+  console.log('Copied built-in skills to bundle/builtin/ and dist/builtin/');
 }
 
 // 5. Copy DevTools package so the external dynamic import resolves at runtime
 const devtoolsSrc = join(root, 'packages/devtools');
-const devtoolsDest = join(
+const devtoolsDestBundle = join(
   bundleDir,
   'node_modules',
   '@google',
   'gemini-cli-devtools',
 );
+const devtoolsDestDist = join(
+  distDir,
+  'node_modules',
+  '@google',
+  'gemini-cli-devtools',
+);
 const devtoolsDistSrc = join(devtoolsSrc, 'dist');
+
 if (existsSync(devtoolsDistSrc)) {
-  mkdirSync(devtoolsDest, { recursive: true });
-  cpSync(devtoolsDistSrc, join(devtoolsDest, 'dist'), {
+  mkdirSync(devtoolsDestBundle, { recursive: true });
+  mkdirSync(devtoolsDestDist, { recursive: true });
+
+  cpSync(devtoolsDistSrc, join(devtoolsDestBundle, 'dist'), {
     recursive: true,
     dereference: true,
   });
+  cpSync(devtoolsDistSrc, join(devtoolsDestDist, 'dist'), {
+    recursive: true,
+    dereference: true,
+  });
+
   copyFileSync(
     join(devtoolsSrc, 'package.json'),
-    join(devtoolsDest, 'package.json'),
+    join(devtoolsDestBundle, 'package.json'),
   );
-  console.log('Copied devtools package to bundle/node_modules/');
+  copyFileSync(
+    join(devtoolsSrc, 'package.json'),
+    join(devtoolsDestDist, 'package.json'),
+  );
+  console.log(
+    'Copied devtools package to bundle/node_modules/ and dist/node_modules/',
+  );
 }
 
 // 6. Copy bundled chrome-devtools-mcp
 const bundleMcpSrc = join(root, 'packages/core/dist/bundled');
-const bundleMcpDest = join(bundleDir, 'bundled');
 if (existsSync(bundleMcpSrc)) {
-  cpSync(bundleMcpSrc, bundleMcpDest, { recursive: true, dereference: true });
-  console.log('Copied bundled chrome-devtools-mcp to bundle/bundled/');
+  copyToDirs(bundleMcpSrc, 'bundled');
+  console.log(
+    'Copied bundled chrome-devtools-mcp to bundle/bundled/ and dist/bundled/',
+  );
 }
 
-console.log('Assets copied to bundle/');
+console.log('Assets copied to bundle/ and dist/');

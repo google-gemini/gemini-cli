@@ -103,6 +103,30 @@ const cliConfig = {
   metafile: true,
 };
 
+const cliStandaloneConfig = {
+  ...baseConfig,
+  banner: {
+    js: `import { createRequire as __createRequire } from 'node:module';\nimport { fileURLToPath as __fileURLToPath } from 'node:url';\nimport { dirname as __dirname } from 'node:path';\nconst require = __createRequire(import.meta.url);\nconst __chunk_filename = __fileURLToPath(import.meta.url);\nconst __chunk_dirname = __dirname(__chunk_filename);`,
+  },
+  entryPoints: { gemini: 'packages/cli/index.ts' },
+  outfile: 'dist/gemini.js',
+  splitting: false,
+  define: {
+    __filename: '__chunk_filename',
+    __dirname: '__chunk_dirname',
+    'process.env.CLI_VERSION': JSON.stringify(pkg.version),
+    'process.env.GEMINI_SANDBOX_IMAGE_DEFAULT': JSON.stringify(
+      pkg.config?.sandboxImageUri,
+    ),
+  },
+  plugins: createWasmPlugins(),
+  alias: {
+    'is-in-ci': path.resolve(__dirname, 'packages/cli/src/patches/is-in-ci.ts'),
+    ...commonAliases,
+  },
+  metafile: false,
+};
+
 const a2aServerConfig = {
   ...baseConfig,
   banner: {
@@ -125,11 +149,19 @@ Promise.allSettled([
       writeFileSync('./bundle/esbuild.json', JSON.stringify(metafile, null, 2));
     }
   }),
+  esbuild.build(cliStandaloneConfig),
   esbuild.build(a2aServerConfig),
 ]).then((results) => {
-  const [cliResult, a2aResult] = results;
+  const [cliResult, cliStandaloneResult, a2aResult] = results;
   if (cliResult.status === 'rejected') {
     console.error('gemini.js build failed:', cliResult.reason);
+    process.exit(1);
+  }
+  if (cliStandaloneResult.status === 'rejected') {
+    console.error(
+      'standalone gemini.js build failed:',
+      cliStandaloneResult.reason,
+    );
     process.exit(1);
   }
   // error in a2a-server bundling will not stop gemini.js bundling process
