@@ -1,20 +1,16 @@
-# Subagents (experimental)
+# Subagents
 
 Subagents are specialized agents that operate within your main Gemini CLI
 session. They are designed to handle specific, complex tasks—like deep codebase
 analysis, documentation lookup, or domain-specific reasoning—without cluttering
 the main agent's context or toolset.
 
-<!-- prettier-ignore -->
-> [!NOTE]
-> Subagents are currently an experimental feature.
-> 
-To use custom subagents, you must ensure they are enabled in your
-`settings.json` (enabled by default):
+Subagents are enabled by default. To disable them, set `enableAgents` to `false`
+in your `settings.json`:
 
 ```json
 {
-  "experimental": { "enableAgents": true }
+  "experimental": { "enableAgents": false }
 }
 ```
 
@@ -229,16 +225,7 @@ the `click_at` tool for precise, coordinate-based interactions.
 ## Creating custom subagents
 
 You can create your own subagents to automate specific workflows or enforce
-specific personas. To use custom subagents, you must enable them in your
-`settings.json`:
-
-```json
-{
-  "experimental": {
-    "enableAgents": true
-  }
-}
-```
+specific personas.
 
 ### Agent definition files
 
@@ -406,14 +393,10 @@ If you need to further tune your subagent, you can do so by selecting the model
 to optimize for with `/model` and then asking the model why it does not think
 that your subagent was called with a specific prompt and the given description.
 
-## Remote subagents (Agent2Agent) (experimental)
+## Remote subagents (Agent2Agent)
 
 Gemini CLI can also delegate tasks to remote subagents using the Agent-to-Agent
 (A2A) protocol.
-
-<!-- prettier-ignore -->
-> [!NOTE]
-> Remote subagents are currently an experimental feature.
 
 See the [Remote Subagents documentation](remote-agents) for detailed
 configuration, authentication, and usage instructions.
