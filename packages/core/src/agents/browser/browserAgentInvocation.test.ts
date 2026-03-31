@@ -715,7 +715,9 @@ describe('BrowserAgentInvocation', () => {
         }),
       };
 
-      vi.mocked(LocalAgentExecutor.create).mockResolvedValue(mockExecutor as any);
+      vi.mocked(LocalAgentExecutor.create).mockResolvedValue(
+        mockExecutor as any,
+      );
 
       const invocation = new BrowserAgentInvocation(
         mockConfig,

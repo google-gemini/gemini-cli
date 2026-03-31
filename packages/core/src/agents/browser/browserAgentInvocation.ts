@@ -380,7 +380,7 @@ ${displayResult}
             true,
           );
           const pagesText =
-                      listResult.content?.find((c) => c.type === 'text')?.text || '';
+            listResult.content?.find((c) => c.type === 'text')?.text || '';
           const pageMatches = Array.from(pagesText.matchAll(/^(\d+):/gm));
           const pageIds = pageMatches.map((m) => parseInt(m[1], 10));
           if (pageIds.length > 1) {
