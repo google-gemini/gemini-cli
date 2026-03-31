@@ -6,6 +6,7 @@
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { GeminiClient } from './client.js';
+import { type AgentLoopContext } from '../config/agent-loop-context.js';
 import { makeFakeConfig } from '../test-utils/config.js';
 import { ApprovalMode } from '../policy/types.js';
 import type { WatcherProgress } from '../agents/types.js';
@@ -66,7 +67,7 @@ describe('GeminiClient Watcher Integration', () => {
 
     const mockToolRegistry = {
       getFunctionDeclarations: vi.fn().mockReturnValue([]),
-       
+
       getTool: vi.fn().mockImplementation((name) => {
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         if (name === 'watcher') return mockWatcherTool as any;
@@ -83,7 +84,7 @@ describe('GeminiClient Watcher Integration', () => {
     });
 
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    ((client as any).context).agentRegistry = {
+    (client as any).context.agentRegistry = {
       getAllDefinitions: vi.fn().mockReturnValue([]),
     };
 
@@ -167,7 +168,7 @@ describe('GeminiClient Watcher Integration', () => {
 
     const mockToolRegistry = {
       getFunctionDeclarations: vi.fn().mockReturnValue([]),
-       
+
       getTool: vi.fn().mockImplementation((name) => {
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         if (name === 'watcher') return mockWatcherTool as any;
