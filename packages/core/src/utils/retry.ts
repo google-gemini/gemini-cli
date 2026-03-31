@@ -415,30 +415,33 @@ function logRetryAttempt(
   errorStatus?: number,
 ): void {
   let message = `Attempt ${attempt} failed. Retrying with backoff...`;
-  if (errorStatus) {
-    message = `Attempt ${attempt} failed with status ${errorStatus}. Retrying with backoff...`;
-  }
 
   if (errorStatus === 429) {
+    message = `Attempt ${attempt} failed: Rate limit reached (HTTP 429 - Too Many Requests). The model is temporarily unavailable due to quota limits. Retrying with backoff...`;
     debugLogger.warn(message, error);
   } else if (errorStatus && errorStatus >= 500 && errorStatus < 600) {
+    message = `Attempt ${attempt} failed: Server error (HTTP ${errorStatus}). Retrying with backoff...`;
     debugLogger.warn(message, error);
   } else if (error instanceof Error) {
-    // Fallback for errors that might not have a status but have a message
     if (error.message.includes('429')) {
       debugLogger.warn(
-        `Attempt ${attempt} failed with 429 error (no Retry-After header). Retrying with backoff...`,
+        `Attempt ${attempt} failed: Rate limit reached (429 - Too Many Requests, no Retry-After header). Retrying with backoff...`,
+        error,
+      );
+    } else if (error.message.toLowerCase().includes('exhausted')) {
+      debugLogger.warn(
+        `Attempt ${attempt} failed: Model capacity exhausted. Your quota may be temporarily limited. Retrying with backoff...`,
         error,
       );
     } else if (error.message.match(/5\d{2}/)) {
       debugLogger.warn(
-        `Attempt ${attempt} failed with 5xx error. Retrying with backoff...`,
+        `Attempt ${attempt} failed: Server-side error detected. Retrying with backoff...`,
         error,
       );
     } else {
-      debugLogger.warn(message, error); // Default to warn for other errors
+      debugLogger.warn(message, error);
     }
   } else {
-    debugLogger.warn(message, error); // Default to warn if error type is unknown
+    debugLogger.warn(message, error);
   }
 }
