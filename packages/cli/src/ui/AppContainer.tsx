@@ -4,14 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import {
-  useMemo,
-  useState,
-  useCallback,
-  useEffect,
-  useRef,
-  useLayoutEffect,
-} from 'react';
+import { useMemo, useState, useCallback, useEffect, useRef } from 'react';
 import {
   type DOMElement,
   ResizeObserver,
