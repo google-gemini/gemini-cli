@@ -121,6 +121,20 @@ priority = 70
 modes = ["plan"]
 
 [[rule]]
+toolName = "web_fetch"
+decision = "ask_user"
+priority = 70
+modes = ["plan"]
+interactive = true
+
+[[rule]]
+toolName = "web_fetch"
+decision = "deny"
+priority = 70
+modes = ["plan"]
+interactive = false
+
+[[rule]]
 toolName = ["ask_user", "save_memory"]
 decision = "ask_user"
 priority = 70
