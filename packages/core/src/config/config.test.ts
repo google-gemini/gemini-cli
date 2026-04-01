@@ -3445,3 +3445,29 @@ describe('ConfigSchema validation', () => {
     }
   });
 });
+
+describe('ADKSettings', () => {
+  const baseParams: ConfigParameters = {
+    sessionId: 'test',
+    targetDir: '.',
+    debugMode: false,
+    model: 'test-model',
+    cwd: '.',
+  };
+
+  it('should default agentSessionNoninteractiveEnabled to false', () => {
+    const config = new Config(baseParams);
+    expect(config.getAgentSessionNoninteractiveEnabled()).toBe(false);
+  });
+
+  it('should return provided agentSessionNoninteractiveEnabled', () => {
+    const params: ConfigParameters = {
+      ...baseParams,
+      adk: {
+        agentSessionNoninteractiveEnabled: true,
+      },
+    };
+    const config = new Config(params);
+    expect(config.getAgentSessionNoninteractiveEnabled()).toBe(true);
+  });
+});
