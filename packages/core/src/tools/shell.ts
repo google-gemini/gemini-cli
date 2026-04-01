@@ -161,6 +161,7 @@ export class ShellToolInvocation extends BaseToolInvocation<
 
     const sensitiveDirs = new Set([
       os.homedir(),
+      path.dirname(os.homedir()),
       path.sep,
       path.join(path.sep, 'etc'),
       path.join(path.sep, 'usr'),
@@ -169,7 +170,21 @@ export class ShellToolInvocation extends BaseToolInvocation<
       path.join(path.sep, 'sbin'),
       path.join(path.sep, 'lib'),
       path.join(path.sep, 'root'),
+      path.join(path.sep, 'home'),
+      path.join(path.sep, 'Users'),
     ]);
+
+    if (os.platform() === 'win32') {
+      const systemRoot = process.env['SystemRoot'];
+      if (systemRoot) {
+        sensitiveDirs.add(systemRoot);
+        sensitiveDirs.add(path.join(systemRoot, 'System32'));
+      }
+      const programFiles = process.env['ProgramFiles'];
+      if (programFiles) sensitiveDirs.add(programFiles);
+      const programFilesX86 = process.env['ProgramFiles(x86)'];
+      if (programFilesX86) sensitiveDirs.add(programFilesX86);
+    }
 
     for (const [parent, children] of parentCounts.entries()) {
       const isSensitive = sensitiveDirs.has(parent);

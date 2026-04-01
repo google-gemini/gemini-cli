@@ -991,6 +991,68 @@ describe('ShellTool', () => {
       );
     });
 
+    it('should NOT consolidate paths into sensitive directories', async () => {
+      const rootDir = path.join(tempRootDir, 'fake_root');
+      const homeDir = path.join(rootDir, 'home');
+      const user1Dir = path.join(homeDir, 'user1');
+      const user2Dir = path.join(homeDir, 'user2');
+      const user3Dir = path.join(homeDir, 'user3');
+      fs.mkdirSync(homeDir, { recursive: true });
+      fs.mkdirSync(user1Dir);
+      fs.mkdirSync(user2Dir);
+      fs.mkdirSync(user3Dir);
+
+      mockHomedir.mockReturnValue(path.join(homeDir, 'user'));
+
+      vi.spyOn(mockConfig, 'isPathAllowed').mockImplementation((p) => {
+        if (p.includes('fake_root')) return false;
+        return true;
+      });
+
+      const sandboxManager = {
+        parseDenials: vi.fn().mockReturnValue({
+          network: false,
+          filePaths: [
+            path.join(user1Dir, 'file1'),
+            path.join(user2Dir, 'file2'),
+            path.join(user3Dir, 'file3'),
+          ],
+        }),
+        prepareCommand: vi.fn(),
+        isKnownSafeCommand: vi.fn(),
+        isDangerousCommand: vi.fn(),
+      } as unknown as SandboxManager;
+      mockSandboxManager = sandboxManager;
+
+      const invocation = shellTool.build({ command: `ls ${homeDir}` });
+      const promise = invocation.execute(mockAbortSignal);
+
+      resolveExecutionPromise({
+        exitCode: 1,
+        output: 'Permission denied',
+        executionMethod: 'child_process',
+        signal: null,
+        error: null,
+        aborted: false,
+        pid: 12345,
+        rawOutput: Buffer.from('Permission denied'),
+      });
+
+      const result = await promise;
+
+      expect(result.error?.type).toBe(ToolErrorType.SANDBOX_EXPANSION_REQUIRED);
+      const details = JSON.parse(result.error!.message);
+
+      // Should NOT contain homeDir as it is a parent of homedir and thus sensitive
+      expect(details.additionalPermissions.fileSystem.read).not.toContain(
+        homeDir,
+      );
+      // Should contain individual paths instead
+      expect(details.additionalPermissions.fileSystem.read).toContain(user1Dir);
+      expect(details.additionalPermissions.fileSystem.read).toContain(user2Dir);
+      expect(details.additionalPermissions.fileSystem.read).toContain(user3Dir);
+    });
+
     it('should proactively suggest expansion for npm install in confirmation', async () => {
       const homeDir = path.join(tempRootDir, 'home');
       fs.mkdirSync(homeDir);
