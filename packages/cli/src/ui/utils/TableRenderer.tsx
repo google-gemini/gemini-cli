@@ -8,7 +8,6 @@ import React, { useMemo } from 'react';
 import {
   Text,
   Box,
-  StyledLine,
   toStyledCharacters,
   wordBreakStyledChars,
   wrapStyledChars,
@@ -16,6 +15,12 @@ import {
   styledCharsWidth,
   styledCharsToString,
 } from 'ink';
+
+/* eslint-disable @typescript-eslint/no-explicit-any */
+/* eslint-disable @typescript-eslint/no-unsafe-assignment */
+/* eslint-disable @typescript-eslint/no-unsafe-return */
+type StyledLine = any;
+/* eslint-enable @typescript-eslint/no-explicit-any */
 import { theme } from '../semantic-colors.js';
 import { parseMarkdownToANSI } from './markdownParsingUtils.js';
 import { stripUnsafeCharacters } from './textUtils.js';
@@ -100,12 +105,12 @@ export const TableRenderer: React.FC<TableRendererProps> = ({
     // --- Define Constraints per Column ---
     const constraints = Array.from({ length: numColumns }).map(
       (_, colIndex) => {
-        const headerStyledLine = styledHeaders[colIndex] || StyledLine.empty(0);
+        const headerStyledLine = styledHeaders[colIndex] || [];
         let { contentWidth: maxContentWidth, maxWordWidth } =
           calculateWidths(headerStyledLine);
 
         styledRows.forEach((row) => {
-          const cellStyledLine = row[colIndex] || StyledLine.empty(0);
+          const cellStyledLine = row[colIndex] || [];
           const { contentWidth: cellWidth, maxWordWidth: cellWordWidth } =
             calculateWidths(cellStyledLine);
 
@@ -180,7 +185,7 @@ export const TableRenderer: React.FC<TableRendererProps> = ({
       const rowResult: ProcessedLine[][] = [];
       // Ensure we iterate up to numColumns, filling with empty cells if needed
       for (let colIndex = 0; colIndex < numColumns; colIndex++) {
-        const cellStyledLine = row[colIndex] || StyledLine.empty(0);
+        const cellStyledLine = row[colIndex] || [];
         const allocatedWidth = finalContentWidths[colIndex];
         const contentWidth = Math.max(1, allocatedWidth);
 
@@ -210,7 +215,7 @@ export const TableRenderer: React.FC<TableRendererProps> = ({
     // Use the TIGHTEST widths that fit the wrapped content + padding
     const adjustedWidths = actualColumnWidths.map(
       (w) =>
-        // eslint-disable-next-line @typescript-eslint/no-unsafe-return
+         
         w + COLUMN_PADDING,
     );
 
@@ -263,7 +268,7 @@ export const TableRenderer: React.FC<TableRendererProps> = ({
     isHeader = false,
   ): React.ReactNode => {
     const renderedCells = cells.map((cell, index) => {
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
+       
       const width = adjustedWidths[index] || 0;
       return renderCell(cell, width, isHeader);
     });

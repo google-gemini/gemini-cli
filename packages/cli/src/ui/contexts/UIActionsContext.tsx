@@ -91,7 +91,9 @@ export interface UIActions {
   onHintSubmit: (hint: string) => void;
   handleRestart: () => void;
   handleNewAgentsSelect: (choice: NewAgentsChoice) => Promise<void>;
-  getPreferredEditor: () => EditorType | undefined;
+  handleTeamSelect: (teamName: string | undefined) => void;
+  getPreferredEditor: () => EditorType;
+
   clearAccountSuspension: () => void;
 }
 

@@ -415,6 +415,7 @@ export const AppContainer = (props: AppContainerProps) => {
   );
 
   const [isConfigInitialized, setConfigInitialized] = useState(false);
+  const [isTeamSelectionActive, setIsTeamSelectionActive] = useState(false);
 
   const logger = useLogger(config.storage);
   const { inputHistory, addInput, initializeFromLogger } =
@@ -444,6 +445,16 @@ export const AppContainer = (props: AppContainerProps) => {
       if (!config.isInitialized()) {
         await config.initialize();
       }
+
+      // Check if team selection is needed
+      const teamRegistry = config.getTeamRegistry();
+      const availableTeams = teamRegistry.getAllTeams();
+      const activeTeam = config.getActiveTeam();
+
+      if (availableTeams.length > 0 && !activeTeam) {
+        setIsTeamSelectionActive(true);
+      }
+
       setConfigInitialized(true);
       startupProfiler.flush(config);
 
@@ -1407,6 +1418,15 @@ Logging in with Google... Restarting Gemini CLI to continue.
 
   const { handleInput: vimHandleInput } = useVim(buffer, handleFinalSubmit);
 
+  const handleTeamSelect = useCallback(
+    (teamName: string | undefined) => {
+      config.setActiveTeam(teamName);
+      setIsTeamSelectionActive(false);
+      refreshStatic();
+    },
+    [config, refreshStatic],
+  );
+
   /**
    * Determines if the input prompt should be active and accept user input.
    * Input is disabled during:
@@ -2046,6 +2066,7 @@ Logging in with Google... Restarting Gemini CLI to continue.
   const nightly = props.version.includes('nightly');
 
   const dialogsVisible =
+    isTeamSelectionActive ||
     shouldShowIdePrompt ||
     shouldShowIdePrompt ||
     isFolderTrustDialogOpen ||
@@ -2377,6 +2398,7 @@ Logging in with Google... Restarting Gemini CLI to continue.
       isBackgroundTaskListOpen,
       adminSettingsChanged,
       newAgents,
+      isTeamSelectionActive,
       showIsExpandableHint,
       hintMode:
         config.isModelSteeringEnabled() && isToolExecuting(pendingHistoryItems),
@@ -2504,6 +2526,7 @@ Logging in with Google... Restarting Gemini CLI to continue.
       adminSettingsChanged,
       newAgents,
       showIsExpandableHint,
+      isTeamSelectionActive,
     ],
   );
 
@@ -2600,6 +2623,7 @@ Logging in with Google... Restarting Gemini CLI to continue.
         }
         setNewAgents(null);
       },
+      handleTeamSelect,
       getPreferredEditor,
       clearAccountSuspension: () => {
         setAccountSuspensionInfo(null);
@@ -2661,6 +2685,7 @@ Logging in with Google... Restarting Gemini CLI to continue.
       config,
       historyManager,
       getPreferredEditor,
+      handleTeamSelect,
     ],
   );
 

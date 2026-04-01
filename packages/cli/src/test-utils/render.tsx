@@ -589,6 +589,7 @@ const mockUIActions: UIActions = {
   onHintSubmit: vi.fn(),
   handleRestart: vi.fn(),
   handleNewAgentsSelect: vi.fn(),
+  handleTeamSelect: vi.fn(),
   getPreferredEditor: vi.fn(),
   clearAccountSuspension: vi.fn(),
 };

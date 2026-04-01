@@ -221,6 +221,7 @@ export interface UIState {
   isBackgroundTaskListOpen: boolean;
   adminSettingsChanged: boolean;
   newAgents: AgentDefinition[] | null;
+  isTeamSelectionActive: boolean;
   showIsExpandableHint: boolean;
   hintMode: boolean;
   hintBuffer: string;

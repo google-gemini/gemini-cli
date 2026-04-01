@@ -12,9 +12,11 @@ import { type TeamDefinition } from '../agents/types.js';
 describe('PromptProvider with Agent Teams', () => {
   let promptProvider: PromptProvider;
   let mockContext: AgentLoopContext;
+  const mockGetActiveTeam = vi.fn();
 
   beforeEach(() => {
     promptProvider = new PromptProvider();
+    mockGetActiveTeam.mockReturnValue(undefined);
     mockContext = {
       config: {
         isInteractive: vi.fn().mockReturnValue(true),
@@ -23,7 +25,7 @@ describe('PromptProvider with Agent Teams', () => {
           .fn()
           .mockReturnValue({ getAllDefinitions: () => [] }),
         getActiveModel: vi.fn().mockReturnValue('gemini-3.1-pro-preview'),
-        getActiveTeam: vi.fn().mockReturnValue(undefined),
+        getActiveTeam: mockGetActiveTeam,
         getApprovedPlanPath: vi.fn().mockReturnValue(undefined),
         getApprovalMode: vi.fn().mockReturnValue('default'),
         getGemini31LaunchedSync: vi.fn().mockReturnValue(true),
@@ -50,9 +52,7 @@ describe('PromptProvider with Agent Teams', () => {
   });
 
   it('should not include team section when no team is active', () => {
-    const prompt = promptProvider.getCoreSystemPrompt(
-      mockContext as unknown as AgentLoopContext,
-    );
+    const prompt = promptProvider.getCoreSystemPrompt(mockContext);
     expect(prompt).not.toContain('# Active Agent Team');
   });
 
@@ -64,11 +64,9 @@ describe('PromptProvider with Agent Teams', () => {
       instructions: 'These are the team instructions.',
       agents: [],
     };
-    mockContext.config.getActiveTeam.mockReturnValue(mockTeam);
+    mockGetActiveTeam.mockReturnValue(mockTeam);
 
-    const prompt = promptProvider.getCoreSystemPrompt(
-      mockContext as unknown as AgentLoopContext,
-    );
+    const prompt = promptProvider.getCoreSystemPrompt(mockContext);
     expect(prompt).toContain('# Active Agent Team: Test Team');
     expect(prompt).toContain('These are the team instructions.');
     expect(prompt).toContain(
