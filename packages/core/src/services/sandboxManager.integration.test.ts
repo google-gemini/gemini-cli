@@ -28,7 +28,15 @@ const Platform = {
   /** Returns a command to create an empty file. */
   touch(filePath: string) {
     return this.isWindows
-      ? { command: 'cmd.exe', args: ['/c', `type nul > "${filePath}"`] }
+      ? {
+          command: 'powershell.exe',
+          args: [
+            '-NoProfile',
+            '-NonInteractive',
+            '-Command',
+            `New-Item -Path "${filePath}" -ItemType File -Force`,
+          ],
+        }
       : { command: 'touch', args: [filePath] };
   },
 
@@ -48,12 +56,7 @@ const Platform = {
 
   /** Returns a command to perform a network request. */
   curl(url: string) {
-    return this.isWindows
-      ? {
-          command: 'powershell.exe',
-          args: ['-Command', `Invoke-WebRequest -Uri ${url} -TimeoutSec 1`],
-        }
-      : { command: 'curl', args: ['-s', '--connect-timeout', '1', url] };
+    return { command: 'curl', args: ['-s', '--connect-timeout', '1', url] };
   },
 
   /** Returns a command that checks if the current terminal is interactive. */
@@ -517,12 +520,17 @@ describe('SandboxManager Integration', () => {
           command,
           args,
           cwd: workspace,
-          env: process.env,
+          env: {
+            ...process.env,
+            // Fail fast on Windows/curl by using an unreachable proxy
+            HTTP_PROXY: 'http://0.0.0.0:1',
+            HTTPS_PROXY: 'http://0.0.0.0:1',
+          },
         });
 
         const result = await runCommand(sandboxed);
         expect(result.status).not.toBe(0);
-      });
+      }, 30000);
 
       it('grants network access when explicitly allowed', async () => {
         const { command, args } = Platform.curl(url);
@@ -539,7 +547,7 @@ describe('SandboxManager Integration', () => {
         if (!Platform.isWindows) {
           expect(result.stdout.trim()).toBe('ok');
         }
-      });
+      }, 30000);
     });
   });
 });

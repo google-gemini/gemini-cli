@@ -311,14 +311,18 @@ public class GeminiSandbox {
             }
 
             PROCESS_INFORMATION pi = new PROCESS_INFORMATION();
-            // Creation Flags: 0x04000000 (CREATE_BREAKAWAY_FROM_JOB) to allow job assignment if parent is in job
-            uint creationFlags = 0;
+            // Creation Flags: 0x01000000 (CREATE_BREAKAWAY_FROM_JOB) to allow job assignment if parent is in job
+            uint creationFlags = 0x01000000;
             if (!CreateProcessAsUser(hRestrictedToken, null, commandLine, IntPtr.Zero, IntPtr.Zero, true, creationFlags, IntPtr.Zero, cwd, ref si, out pi)) {
-                Console.WriteLine("Error: CreateProcessAsUser failed (" + Marshal.GetLastWin32Error() + ") Command: " + commandLine);
+                Console.Error.WriteLine("Error: CreateProcessAsUser failed (" + Marshal.GetLastWin32Error() + ") Command: " + commandLine);
                 return 1;
             }
 
-            AssignProcessToJobObject(hJob, pi.hProcess);
+            if (!AssignProcessToJobObject(hJob, pi.hProcess)) {
+                Console.Error.WriteLine("Error: AssignProcessToJobObject failed (" + Marshal.GetLastWin32Error() + ")");
+                TerminateProcess(pi.hProcess, 1);
+                return 1;
+            }
             
             // Wait for exit
             uint waitResult = WaitForSingleObject(pi.hProcess, 0xFFFFFFFF);
@@ -335,6 +339,9 @@ public class GeminiSandbox {
             if (hRestrictedToken != IntPtr.Zero) CloseHandle(hRestrictedToken);
         }
     }
+
+    [DllImport("kernel32.dll", SetLastError = true)]
+    static extern bool TerminateProcess(IntPtr hProcess, uint uExitCode);
 
     [DllImport("kernel32.dll", SetLastError = true)]
     static extern uint WaitForSingleObject(IntPtr hHandle, uint dwMilliseconds);
