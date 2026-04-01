@@ -224,29 +224,39 @@ class LSToolInvocation extends BaseToolInvocation<LSToolParams, ToolResult> {
             DEFAULT_FILE_FILTERING_OPTIONS.respectGeminiIgnore,
         });
 
-      const entries = [];
-      for (const relativePath of filteredPaths) {
-        const fullPath = path.resolve(this.config.getTargetDir(), relativePath);
-
-        if (this.shouldIgnore(path.basename(fullPath), this.params.ignore)) {
-          continue;
-        }
-
-        try {
-          const stats = await fs.stat(fullPath);
-          const isDir = stats.isDirectory();
-          entries.push({
-            name: path.basename(fullPath),
-            path: fullPath,
-            isDirectory: isDir,
-            size: isDir ? 0 : stats.size,
-            modifiedTime: stats.mtime,
-          });
-        } catch (error) {
-          // Log error internally but don't fail the whole listing
-          debugLogger.debug(`Error accessing ${fullPath}: ${error}`);
-        }
-      }
+      const entryResults = await Promise.all(
+        filteredPaths
+          .filter(
+            (relativePath) =>
+              !this.shouldIgnore(
+                path.basename(relativePath),
+                this.params.ignore,
+              ),
+          )
+          .map(async (relativePath) => {
+            const fullPath = path.resolve(
+              this.config.getTargetDir(),
+              relativePath,
+            );
+            try {
+              const stats = await fs.stat(fullPath);
+              const isDir = stats.isDirectory();
+              return {
+                name: path.basename(fullPath),
+                path: fullPath,
+                isDirectory: isDir,
+                size: isDir ? 0 : stats.size,
+                modifiedTime: stats.mtime,
+              };
+            } catch (error) {
+              debugLogger.debug(`Error accessing ${fullPath}: ${error}`);
+              return null;
+            }
+          }),
+      );
+      const entries = entryResults.filter(
+        (e): e is NonNullable<typeof e> => e !== null,
+      );
 
       // Sort entries (directories first, then alphabetically)
       entries.sort((a, b) => {

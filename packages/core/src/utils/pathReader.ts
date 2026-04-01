@@ -64,9 +64,11 @@ export async function readPathFromWorkspace(
     // Use glob to recursively find all files within the directory.
     const files = await glob('**/*', {
       cwd: absolutePath,
-      nodir: true, // We only want files
-      dot: true, // Include dotfiles
+      nodir: true,
+      dot: true,
       absolute: true,
+      ignore: config.getFileExclusions().getGlobExcludes(),
+      follow: false,
     });
 
     const relativeFiles = files.map((p) =>

@@ -6,6 +6,7 @@
 
 import type { MessageBus } from '../confirmation-bus/message-bus.js';
 import fs from 'node:fs';
+import fsPromises from 'node:fs/promises';
 import path from 'node:path';
 import { glob, escape } from 'glob';
 import {
@@ -164,8 +165,17 @@ class GlobToolInvocation extends BaseToolInvocation<
       // Get centralized file discovery service
       const fileDiscovery = this.config.getFileService();
 
-      // Collect entries from all search directories
-      const allEntries: GlobPath[] = [];
+      // Use platform-aware case sensitivity: on Linux, nocase is expensive
+      // because it forces readdir at every level. Linux filesystems are
+      // case-sensitive, so nocase provides little benefit there.
+      const defaultNocase =
+        process.platform === 'linux' ? false : !this.params.case_sensitive;
+      const nocase =
+        this.params.case_sensitive === true ? false : defaultNocase;
+
+      // Phase 1: Fast discovery without stat (avoids thousands of stat calls
+      // on broad patterns). We stat only after filtering.
+      const allPaths: string[] = [];
       for (const searchDir of searchDirectories) {
         let pattern = this.params.pattern;
         const fullPath = path.join(searchDir, pattern);
@@ -173,25 +183,25 @@ class GlobToolInvocation extends BaseToolInvocation<
           pattern = escape(pattern);
         }
 
-        const entries = (await glob(pattern, {
+        const entries = await glob(pattern, {
           cwd: searchDir,
-          withFileTypes: true,
           nodir: true,
-          stat: true,
-          nocase: !this.params.case_sensitive,
+          nocase,
           dot: true,
           ignore: this.config.getFileExclusions().getGlobExcludes(),
           follow: false,
           signal,
-        })) as GlobPath[];
+          absolute: true,
+        });
 
-        allEntries.push(...entries);
+        allPaths.push(...entries);
       }
 
-      const relativePaths = allEntries.map((p) =>
-        path.relative(this.config.getTargetDir(), p.fullpath()),
+      const relativePaths = allPaths.map((p) =>
+        path.relative(this.config.getTargetDir(), p),
       );
 
+      // Phase 2: Apply gitignore / geminiignore filtering
       const { filteredPaths, ignoredCount } =
         fileDiscovery.filterFilesWithReport(relativePaths, {
           respectGitIgnore:
@@ -204,13 +214,27 @@ class GlobToolInvocation extends BaseToolInvocation<
             DEFAULT_FILE_FILTERING_OPTIONS.respectGeminiIgnore,
         });
 
-      const filteredAbsolutePaths = new Set(
-        filteredPaths.map((p) => path.resolve(this.config.getTargetDir(), p)),
+      // Phase 3: Stat only the filtered survivors in parallel for recency sorting
+      const statResults = await Promise.all(
+        filteredPaths.map(async (relativePath) => {
+          const absPath = path.resolve(
+            this.config.getTargetDir(),
+            relativePath,
+          );
+          try {
+            const stats = await fsPromises.stat(absPath);
+            return {
+              fullpath: () => absPath,
+              mtimeMs: stats.mtimeMs,
+            } as GlobPath;
+          } catch {
+            // File may have been deleted between glob and stat
+            return { fullpath: () => absPath, mtimeMs: 0 } as GlobPath;
+          }
+        }),
       );
 
-      const filteredEntries = allEntries.filter((entry) =>
-        filteredAbsolutePaths.has(entry.fullpath()),
-      );
+      const filteredEntries = statResults;
 
       if (!filteredEntries || filteredEntries.length === 0) {
         let message = `No files found matching pattern "${this.params.pattern}"`;

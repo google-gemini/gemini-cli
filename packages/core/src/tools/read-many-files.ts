@@ -218,7 +218,10 @@ ${finalExclusionPatternsForDescription
           nodir: true,
           dot: true,
           absolute: true,
-          nocase: true,
+          // On Linux, nocase forces readdir at every directory level to
+          // simulate case-insensitive matching on a case-sensitive FS.
+          // Default to false there to avoid expensive readdir storms.
+          nocase: process.platform !== 'linux',
           signal,
         });
         for (const entry of entriesInDir) {
