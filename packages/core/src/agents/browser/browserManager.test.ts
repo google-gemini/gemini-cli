@@ -996,6 +996,28 @@ describe('BrowserManager', () => {
       const manager = new BrowserManager(mockConfig);
       await manager.callTool('click', { uid: 'bad' });
     });
+
+    it('should NOT re-inject overlay if select_page is called with bringToFront: false', async () => {
+      mockConfig = makeFakeConfig({
+        agents: {
+          overrides: {
+            browser_agent: {
+              enabled: true,
+            },
+          },
+          browser: {
+            headless: false,
+            disableUserInput: true,
+          },
+        },
+      });
+
+      const manager = new BrowserManager(mockConfig);
+      await manager.callTool('select_page', { pageId: 1, bringToFront: false });
+
+      expect(injectAutomationOverlay).not.toHaveBeenCalled();
+      expect(injectInputBlocker).not.toHaveBeenCalled();
+    });
   });
 
   describe('Rate limiting', () => {
