@@ -38,14 +38,12 @@ function main() {
     const nightlyStats = latestNightly[testName];
     const nightlyRate = nightlyStats ? nightlyStats.passRate : null;
 
-    // Regression check: dropped to 33% (1/3) or 0%
-    if (prRate <= 0.34) {
+    // Show ONLY if it is an explicit 'regression' (passed on main, failed in PR)
+    // or if the pass rate is extremely low and no baseline was run.
+    if (pr.status === 'regression' || (prRate <= 0.34 && !pr.status)) {
       regressions.push({
         name: testName,
-        nightly:
-          nightlyRate !== null
-            ? (nightlyRate * 100).toFixed(0) + '%'
-            : 'No Data',
+        nightly: nightlyStats ? (nightlyRate * 100).toFixed(0) + '%' : 'N/A',
         pr: (prRate * 100).toFixed(0) + '%',
       });
     } else {
@@ -54,14 +52,28 @@ function main() {
   }
 
   if (regressions.length > 0) {
-    let markdown = '### ⚠️ Eval Regression Warning\n\n';
+    let markdown = '### 🚨 Action Required: Eval Regressions Detected\n\n';
     markdown += `**Model:** \`${targetModel}\`\n\n`;
-    markdown += '| Test Name | Nightly Baseline | PR Result | Status |\n';
+    markdown +=
+      'The following trustworthy evaluations passed on `main` but failed in this PR. These regressions must be addressed before merging to maintain behavioral quality.\n\n';
+    markdown += '| Test Name | Nightly (Baseline) | PR Result | Status |\n';
     markdown += '| :--- | :---: | :---: | :--- |\n';
     for (const r of regressions) {
       markdown += `| ${r.name} | ${r.nightly} | ${r.pr} | ❌ **Regression** |\n`;
     }
-    markdown += `\n*The check passed on ${passes.length} other trustworthy evaluations.*\n`;
+    markdown += `\n*The check passed or was cleared for ${passes.length} other trustworthy evaluations.*\n\n`;
+
+    markdown += '### 🛠️ How to Fix\n\n';
+    markdown +=
+      '1. **Reproduce Locally:** Run the following command to see the failure trajectory:\n';
+    markdown += '   ```bash\n';
+    markdown += `   GEMINI_MODEL=${targetModel} npm run test:eval -- -t "${regressions[0].name}"\n`;
+    markdown += '   ```\n';
+    markdown +=
+      '2. **Ask Gemini CLI:** You can ask the agent to fix it for you: `"The eval \'<test-name>\' is failing in my PR. Please investigate and fix it using the behavioral-evals skill."`\n';
+    markdown +=
+      '3. **Manual Fix:** Most regressions can be resolved by refining the instructions in `packages/core/src/prompts/` or adjusting tool descriptions. See the [Fixing Guide](https://github.com/google-gemini/gemini-cli/blob/main/evals/README.md#fixing-evaluations) for more details.\n';
+
     process.stdout.write(markdown);
   }
 }

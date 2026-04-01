@@ -261,11 +261,13 @@ async function processResults(firstPass, pattern, model, files) {
             console.log(
               `  ℹ️ Test also fails on 'main' (0/${baselineTotal}). Marking as PRE-EXISTING (Cleared).`,
             );
-            results[testName].passed = 2; // "Clear" it for the report
+            results[testName].status = 'pre-existing';
+            results[testName].passed = results[testName].total; // Effectively clear it
           } else {
             console.log(
               `  ❌ Test passes on 'main' (${baselinePasses}/${baselineTotal}) but fails in PR. Marking as CONFIRMED REGRESSION.`,
             );
+            results[testName].status = 'regression';
           }
         } catch (baselineError) {
           console.error(
