@@ -591,6 +591,55 @@ describe('Server Config (config.ts)', () => {
         expect(await config.getResolvedClassifierThreshold()).toBe(90);
       });
     });
+
+    describe('getGemini31LaunchedSync', () => {
+      it.each([AuthType.USE_GEMINI, AuthType.USE_VERTEX_AI, AuthType.GATEWAY])(
+        'should return true for %s',
+        async (authType) => {
+          const config = new Config(baseParams);
+          vi.mocked(createContentGeneratorConfig).mockResolvedValue({
+            authType,
+          });
+          await config.refreshAuth(authType);
+          expect(config.getGemini31LaunchedSync()).toBe(true);
+        },
+      );
+
+      it('should fallback to experiments for other auth types', async () => {
+        vi.mocked(getExperiments).mockResolvedValue({
+          experimentIds: [],
+          flags: {
+            [ExperimentFlags.GEMINI_3_1_PRO_LAUNCHED]: {
+              flagId: ExperimentFlags.GEMINI_3_1_PRO_LAUNCHED,
+              boolValue: true,
+            },
+          },
+        });
+
+        const config = new Config(baseParams);
+
+        vi.mocked(createContentGeneratorConfig).mockResolvedValue({
+          authType: AuthType.LOGIN_WITH_GOOGLE,
+        });
+
+        await config.refreshAuth(AuthType.LOGIN_WITH_GOOGLE);
+        expect(config.getGemini31LaunchedSync()).toBe(true);
+      });
+    });
+
+    describe('getGemini31FlashLiteLaunchedSync', () => {
+      it.each([AuthType.USE_GEMINI, AuthType.USE_VERTEX_AI, AuthType.GATEWAY])(
+        'should return true for %s',
+        async (authType) => {
+          const config = new Config(baseParams);
+          vi.mocked(createContentGeneratorConfig).mockResolvedValue({
+            authType,
+          });
+          await config.refreshAuth(authType);
+          expect(config.getGemini31FlashLiteLaunchedSync()).toBe(true);
+        },
+      );
+    });
   });
 
   describe('refreshAuth', () => {
