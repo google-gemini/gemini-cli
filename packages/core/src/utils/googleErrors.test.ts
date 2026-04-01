@@ -412,6 +412,65 @@ describe('parseGoogleApiError', () => {
     ).toBe(true);
   });
 
+  it('should parse a byte-coded error message from ApiError', () => {
+    // Simulates the issue where Uint8Array.toString() produces comma-separated bytes
+    // in the ApiError message field
+    const innerError = JSON.stringify({
+      error: {
+        code: 429,
+        message:
+          'No capacity available for model gemini-3-flash-preview on the server',
+        status: 'RESOURCE_EXHAUSTED',
+        details: [
+          {
+            '@type': 'type.googleapis.com/google.rpc.ErrorInfo',
+            reason: 'RESOURCE_EXHAUSTED',
+          },
+        ],
+      },
+    });
+    const byteValues = Array.from(new TextEncoder().encode(innerError)).join(
+      ',',
+    );
+
+    const mockError = {
+      message: byteValues,
+      code: 429,
+      status: 429,
+    };
+
+    const parsed = parseGoogleApiError(mockError);
+    expect(parsed).not.toBeNull();
+    expect(parsed?.code).toBe(429);
+    expect(parsed?.message).toContain('No capacity available');
+    expect(parsed?.details).toHaveLength(1);
+  });
+
+  it('should parse a byte-coded error message with a status prefix', () => {
+    const innerError = JSON.stringify({
+      error: {
+        code: 429,
+        message: 'Resource exhausted',
+        status: 'RESOURCE_EXHAUSTED',
+        details: [],
+      },
+    });
+    const byteValues = Array.from(new TextEncoder().encode(innerError)).join(
+      ',',
+    );
+
+    const mockError = {
+      message: `got status: 429 Too Many Requests. ${byteValues}`,
+      code: 429,
+      status: 429,
+    };
+
+    const parsed = parseGoogleApiError(mockError);
+    expect(parsed).not.toBeNull();
+    expect(parsed?.code).toBe(429);
+    expect(parsed?.message).toBe('Resource exhausted');
+  });
+
   it('should parse a gaxios error with SSE-corrupted JSON in response.data', () => {
     const corruptedJson = JSON.stringify([
       {

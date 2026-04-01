@@ -5,6 +5,9 @@
  */
 
 import { parseGoogleApiError, type ErrorInfo } from './googleErrors.js';
+import { decodeByteCodedString } from './byteDecoder.js';
+
+export { decodeByteCodedString } from './byteDecoder.js';
 
 interface GaxiosError {
   response?: {
@@ -35,23 +38,25 @@ export function isAbortError(error: unknown): boolean {
 
 export function getErrorMessage(error: unknown): string {
   const friendlyError = toFriendlyError(error);
+  let message: string;
   if (friendlyError instanceof Error) {
-    return friendlyError.message;
-  }
-  if (
+    message = friendlyError.message;
+  } else if (
     typeof friendlyError === 'object' &&
     friendlyError !== null &&
     'message' in friendlyError &&
     typeof (friendlyError as { message: unknown }).message === 'string'
   ) {
     // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
-    return (friendlyError as { message: string }).message;
+    message = (friendlyError as { message: string }).message;
+  } else {
+    try {
+      message = String(friendlyError);
+    } catch {
+      return 'Failed to get error details';
+    }
   }
-  try {
-    return String(friendlyError);
-  } catch {
-    return 'Failed to get error details';
-  }
+  return decodeByteCodedString(message);
 }
 
 export function getErrorType(error: unknown): string {
