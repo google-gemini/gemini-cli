@@ -51,10 +51,15 @@ export const LoginRestartDialog = ({
     "You've successfully signed in with Google. Gemini CLI needs to be restarted.";
 
   return (
-    <Box borderStyle="round" borderColor={theme.status.warning} paddingX={1}>
+    <Box
+      borderStyle="round"
+      borderColor={theme.status.warning}
+      paddingX={1}
+      flexDirection="column"
+    >
+      <Text color={theme.status.warning}>{displayMessage}</Text>
       <Text color={theme.status.warning}>
-        {displayMessage} Press R to restart, or Esc to choose a different
-        authentication method.
+        Press R to restart, or Esc to choose a different authentication method.
       </Text>
     </Box>
   );
