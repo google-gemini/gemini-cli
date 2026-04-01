@@ -121,29 +121,14 @@ priority = 70
 modes = ["plan"]
 
 [[rule]]
-toolName = "web_fetch"
+toolName = ["ask_user", "save_memory", "web_fetch"]
 decision = "ask_user"
 priority = 70
 modes = ["plan"]
 interactive = true
 
 [[rule]]
-toolName = "web_fetch"
-decision = "deny"
-denyMessage = "The 'web_fetch' tool requires user confirmation and is not available in non-interactive environments while in Plan Mode."
-priority = 70
-modes = ["plan"]
-interactive = false
-
-[[rule]]
-toolName = ["ask_user", "save_memory"]
-decision = "ask_user"
-priority = 70
-modes = ["plan"]
-interactive = true
-
-[[rule]]
-toolName = ["ask_user", "save_memory"]
+toolName = ["ask_user", "save_memory", "web_fetch"]
 decision = "deny"
 priority = 70
 modes = ["plan"]
