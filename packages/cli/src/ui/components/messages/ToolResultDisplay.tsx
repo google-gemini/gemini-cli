@@ -51,7 +51,7 @@ export const ToolResultDisplay: React.FC<ToolResultDisplayProps> = ({
   hasFocus = false,
   overflowDirection = 'top',
 }) => {
-  const { renderMarkdown } = useUIState();
+  const { renderMarkdown, terminalHeight } = useUIState();
   const isAlternateBuffer = useAlternateBuffer();
 
   const availableHeight = calculateToolContentMaxLines({
@@ -202,7 +202,8 @@ export const ToolResultDisplay: React.FC<ToolResultDisplayProps> = ({
   if (isAlternateBuffer) {
     // Virtualized path for large ANSI arrays
     if (Array.isArray(resultDisplay)) {
-      const limit = maxLines ?? availableHeight ?? ACTIVE_SHELL_MAX_LINES;
+      const limit =
+        maxLines ?? availableHeight ?? terminalHeight ?? ACTIVE_SHELL_MAX_LINES;
       const listHeight = Math.min(
         // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
         (resultDisplay as AnsiOutput).length,

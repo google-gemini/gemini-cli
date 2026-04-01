@@ -6,7 +6,7 @@ exports[`ToolResultDisplay > does not fall back to plain text if availableHeight
 `;
 
 exports[`ToolResultDisplay > keeps markdown if in alternate buffer even with availableHeight 1`] = `
-"Some result
+"Some result                                                                 
 "
 `;
 

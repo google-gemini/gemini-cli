@@ -473,7 +473,7 @@ export class ShellToolInvocation extends BaseToolInvocation<
         llmContent = llmContentParts.join('\n');
       }
 
-      let returnDisplayMessage = '';
+      let returnDisplayMessage: string | AnsiOutput = '';
       if (this.context.config.getDebugMode()) {
         returnDisplayMessage = llmContent;
       } else {
@@ -486,6 +486,8 @@ export class ShellToolInvocation extends BaseToolInvocation<
           } else {
             returnDisplayMessage = cancelMsg;
           }
+        } else if (Array.isArray(cumulativeOutput)) {
+          returnDisplayMessage = cumulativeOutput;
         } else if (result.output.trim()) {
           returnDisplayMessage = result.output;
         } else {

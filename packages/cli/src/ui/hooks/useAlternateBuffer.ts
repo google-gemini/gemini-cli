@@ -8,7 +8,7 @@ import { useConfig } from '../contexts/ConfigContext.js';
 import type { Config } from '@google/gemini-cli-core';
 
 export const isAlternateBufferEnabled = (config: Config): boolean =>
-  config.getUseAlternateBuffer();
+  config.getUseAlternateBuffer() || config.getUseTerminalBuffer();
 
 // This is read from Config so that the UI reads the same value per application session
 export const useAlternateBuffer = (): boolean => {
