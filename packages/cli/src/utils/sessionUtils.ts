@@ -315,7 +315,7 @@ export const getAllSessionFiles = async (
 
           const sessionInfo: SessionInfo = {
             id: content.sessionId,
-            file: file.replace('.json', ''),
+            file: file.replace(/\.jsonl?$/, ''),
             fileName: file,
             startTime: content.startTime,
             lastUpdated: content.lastUpdated,
