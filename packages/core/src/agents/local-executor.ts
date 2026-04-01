@@ -317,8 +317,10 @@ export class LocalAgentExecutor<TOutput extends z.ZodTypeAny> {
 
     await this.tryCompressChat(chat, promptId, combinedSignal);
 
-    const { functionCalls } = await promptIdContext.run(promptId, async () =>
-      this.callModel(chat, currentMessage, combinedSignal, promptId),
+    const { functionCalls, modelToUse } = await promptIdContext.run(
+      promptId,
+      async () =>
+        this.callModel(chat, currentMessage, combinedSignal, promptId),
     );
 
     if (combinedSignal.aborted) {
@@ -348,6 +350,8 @@ export class LocalAgentExecutor<TOutput extends z.ZodTypeAny> {
 
     const { nextMessage, submittedOutput, taskCompleted, aborted } =
       await this.processFunctionCalls(
+        chat,
+        modelToUse,
         functionCalls,
         combinedSignal,
         promptId,
@@ -722,8 +726,17 @@ export class LocalAgentExecutor<TOutput extends z.ZodTypeAny> {
         }
       }
 
-      // === FINAL RETURN LOGIC ===
       if (terminateReason === AgentTerminateMode.GOAL) {
+        // Save the session summary upon completion
+        if (finalResult && chat) {
+          try {
+            const summary = this.getTruncatedSummary(finalResult);
+            chat.getChatRecordingService()?.saveSummary(summary);
+          } catch (error) {
+            debugLogger.warn('Failed to save subagent session summary.', error);
+          }
+        }
+
         return {
           result: finalResult || 'Task completed.',
           terminate_reason: terminateReason,
@@ -759,6 +772,18 @@ export class LocalAgentExecutor<TOutput extends z.ZodTypeAny> {
             // Recovery Succeeded
             terminateReason = AgentTerminateMode.GOAL;
             finalResult = recoveryResult;
+
+            // Save the session summary upon successful recovery
+            try {
+              const summary = this.getTruncatedSummary(finalResult);
+              chat.getChatRecordingService()?.saveSummary(summary);
+            } catch (summaryError) {
+              debugLogger.warn(
+                'Failed to save subagent session summary during recovery.',
+                summaryError,
+              );
+            }
+
             return {
               result: finalResult,
               terminate_reason: terminateReason,
@@ -846,7 +871,11 @@ export class LocalAgentExecutor<TOutput extends z.ZodTypeAny> {
     message: Content,
     signal: AbortSignal,
     promptId: string,
-  ): Promise<{ functionCalls: FunctionCall[]; textResponse: string }> {
+  ): Promise<{
+    functionCalls: FunctionCall[];
+    textResponse: string;
+    modelToUse: string;
+  }> {
     const modelConfigAlias = getModelConfigAlias(this.definition);
 
     // Resolve the model config early to get the concrete model string (which may be `auto`).
@@ -931,7 +960,7 @@ export class LocalAgentExecutor<TOutput extends z.ZodTypeAny> {
       }
     }
 
-    return { functionCalls, textResponse };
+    return { functionCalls, textResponse, modelToUse };
   }
 
   /** Initializes a `GeminiChat` instance for the agent run. */
@@ -985,6 +1014,8 @@ export class LocalAgentExecutor<TOutput extends z.ZodTypeAny> {
    * @returns A new `Content` object for history, any submitted output, and completion status.
    */
   private async processFunctionCalls(
+    chat: GeminiChat,
+    model: string,
     functionCalls: FunctionCall[],
     signal: AbortSignal,
     promptId: string,
@@ -1225,6 +1256,9 @@ export class LocalAgentExecutor<TOutput extends z.ZodTypeAny> {
           onWaitingForConfirmation,
         },
       );
+
+      // Record completed tool calls for persistent chat history
+      chat.recordCompletedToolCalls(model, completedCalls);
 
       for (const call of completedCalls) {
         const toolName =
@@ -1474,5 +1508,16 @@ Important Rules:
       };
       this.onActivity(event);
     }
+  }
+
+  /**
+   * Truncates a string to 200 characters in a Unicode-safe way for session summaries.
+   */
+  private getTruncatedSummary(text: string): string {
+    const chars = Array.from(text);
+    if (chars.length <= 200) {
+      return text;
+    }
+    return chars.slice(0, 197).join('') + '...';
   }
 }
