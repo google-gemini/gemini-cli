@@ -258,7 +258,7 @@ export function renderActiveTeam(team?: TeamDefinition): string {
 
 ${team.instructions}
 
-You should prioritize delegating tasks to this team's agents whenever appropriate.`.trim();
+**Orchestration Mandate:** You must prioritize delegating tasks to this team's specialized agents for their respective roles. Do not perform these specialized tasks yourself if a team member is available and qualified to handle them.`.trim();
 }
 
 export function renderSubAgents(subAgents?: SubAgentOptions[]): string {
