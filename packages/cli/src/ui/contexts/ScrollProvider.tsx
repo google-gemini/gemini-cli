@@ -90,6 +90,7 @@ export const ScrollProvider: React.FC<{ children: React.ReactNode }> = ({
       next.delete(id);
       return next;
     });
+    pendingScrollsRef.current.delete(id);
   }, []);
 
   const scrollablesRef = useRef(scrollables);
@@ -118,10 +119,23 @@ export const ScrollProvider: React.FC<{ children: React.ReactNode }> = ({
         for (const [id, delta] of pendingScrollsRef.current.entries()) {
           const entry = scrollablesRef.current.get(id);
           if (entry) {
-            entry.scrollBy(delta);
+            const truncatedDelta = Math.trunc(delta);
+            if (truncatedDelta !== 0) {
+              entry.scrollBy(truncatedDelta);
+            }
+
+            const remainder = delta - truncatedDelta;
+            // Keep the fractional remainder for the next scroll event to ensure
+            // smooth accumulation across flushes.
+            if (Math.abs(remainder) > 0.001) {
+              pendingScrollsRef.current.set(id, remainder);
+            } else {
+              pendingScrollsRef.current.delete(id);
+            }
+          } else {
+            pendingScrollsRef.current.delete(id);
           }
         }
-        pendingScrollsRef.current.clear();
       }, 0);
     }
   }, []);
@@ -129,6 +143,7 @@ export const ScrollProvider: React.FC<{ children: React.ReactNode }> = ({
   const scrollMomentumRef = useRef({
     count: 0,
     lastTime: 0,
+    lastDirection: null as 'up' | 'down' | null,
   });
 
   const handleScroll = (direction: 'up' | 'down', mouseEvent: MouseEvent) => {
@@ -137,8 +152,11 @@ export const ScrollProvider: React.FC<{ children: React.ReactNode }> = ({
 
     if (!terminalCapabilityManager.isGhosttyTerminal()) {
       const timeSinceLastScroll = now - scrollMomentumRef.current.lastTime;
+      const isSameDirection =
+        scrollMomentumRef.current.lastDirection === direction;
+
       // 50ms threshold to consider scrolls consecutive
-      if (timeSinceLastScroll < 50) {
+      if (timeSinceLastScroll < 50 && isSameDirection) {
         scrollMomentumRef.current.count += 1;
         // Accelerate up to 3x, starting after 5 consecutive scrolls.
         // Each consecutive scroll increases the multiplier by 0.1.
@@ -151,6 +169,7 @@ export const ScrollProvider: React.FC<{ children: React.ReactNode }> = ({
       }
     }
     scrollMomentumRef.current.lastTime = now;
+    scrollMomentumRef.current.lastDirection = direction;
 
     const delta = (direction === 'up' ? -1 : 1) * multiplier;
     const candidates = findScrollableCandidates(
@@ -168,7 +187,7 @@ export const ScrollProvider: React.FC<{ children: React.ReactNode }> = ({
       const canScrollUp = effectiveScrollTop > 0.001;
       const canScrollDown =
         effectiveScrollTop < scrollHeight - innerHeight - 0.001;
-      const totalDelta = Math.round(pendingDelta + delta);
+      const totalDelta = pendingDelta + delta;
 
       if (direction === 'up' && canScrollUp) {
         pendingScrollsRef.current.set(candidate.id, totalDelta);
