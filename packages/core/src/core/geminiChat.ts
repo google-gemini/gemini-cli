@@ -175,11 +175,16 @@ function extractCuratedHistory(comprehensiveHistory: Content[]): Content[] {
       }
       // Thought parts must be non-empty strings
       if (part.thought !== undefined) {
-        return typeof part.thought === 'string' && part.thought.trim() !== '';
+        return (
+          typeof part.thought === 'string' &&
+          (part.thought as string).trim() !== ''
+        );
       }
       // Text parts must be non-empty strings
       if (part.text !== undefined) {
-        return typeof part.text === 'string' && part.text.trim() !== '';
+        return (
+          typeof part.text === 'string' && (part.text).trim() !== ''
+        );
       }
       // Keep other parts (functionCall, functionResponse, etc.)
       return true;
@@ -207,9 +212,11 @@ function extractCuratedHistory(comprehensiveHistory: Content[]): Content[] {
           (p) => p.text !== undefined,
         );
         if (existingTextPart) {
-          const lastText = existingTextPart.text!;
+          // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
+          const lastText = existingTextPart.text as string;
           const separator = lastText.endsWith('\n') ? '' : '\n';
-          existingTextPart.text = lastText + separator + part.text;
+           
+          existingTextPart.text = lastText + separator + (part.text);
         } else {
           lastEntryParts.push({ ...part });
         }
@@ -219,9 +226,14 @@ function extractCuratedHistory(comprehensiveHistory: Content[]): Content[] {
           (p) => p.thought !== undefined,
         );
         if (existingThoughtPart) {
-          const lastThought = existingThoughtPart.thought!;
+          // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
+          const lastThought = existingThoughtPart.thought as unknown as string;
           const separator = lastThought.endsWith('\n') ? '' : '\n';
-          existingThoughtPart.thought = lastThought + separator + part.thought;
+          // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
+          existingThoughtPart.thought = (lastThought +
+            separator +
+            // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
+            (part.thought as unknown as string)) as unknown as boolean;
         } else {
           // Insert thought at the beginning for model consistency
           lastEntryParts.unshift({ ...part });
@@ -991,7 +1003,8 @@ export class GeminiChat {
         isValidNonThoughtTextPart(lastPart) &&
         isValidNonThoughtTextPart(part)
       ) {
-        lastPart.text += part.text;
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
+        (lastPart as { text: string }).text += part.text as string;
       } else {
         consolidatedParts.push(part);
       }
@@ -999,7 +1012,8 @@ export class GeminiChat {
 
     const responseText = consolidatedParts
       .filter((part) => part.text)
-      .map((part) => part.text)
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
+      .map((part) => part.text as string)
       .join('')
       .trim();
 
@@ -1105,7 +1119,7 @@ export class GeminiChat {
 
     const thoughtPart = content.parts[0];
     if (thoughtPart.text) {
-      // Extract subject and description using the same logic as turn.ts
+       
       const rawText = thoughtPart.text;
       const subjectStringMatches = rawText.match(/\*\*(.*?)\*\*/s);
       const subject = subjectStringMatches

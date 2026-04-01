@@ -182,6 +182,14 @@ export const DEFAULT_MODEL_CONFIGS: ModelConfigServiceConfig = {
         },
       },
     },
+    'web-search-internal': {
+      extends: 'gemini-3-flash-base',
+      modelConfig: {
+        generateContentConfig: {
+          tools: [{ googleSearch: {} }],
+        },
+      },
+    },
     'web-fetch': {
       extends: 'gemini-3-flash-base',
       modelConfig: {
@@ -285,13 +293,6 @@ export const DEFAULT_MODEL_CONFIGS: ModelConfigServiceConfig = {
       family: 'gemini-3',
       isPreview: true,
       isVisible: false,
-      features: { thinking: true, multimodalToolUse: true },
-    },
-    'gemini-3.1-pro-preview': {
-      tier: 'pro',
-      family: 'gemini-3',
-      isPreview: true,
-      isVisible: true,
       features: { thinking: true, multimodalToolUse: true },
     },
     'gemini-3-pro-preview': {
