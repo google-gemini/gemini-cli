@@ -667,6 +667,7 @@ export const renderWithProviders = async (
 
   if (!config) {
     config = makeFakeConfig();
+    await config.initialize();
   }
 
   const mainAreaWidth = providedUiState?.mainAreaWidth ?? terminalWidth;
