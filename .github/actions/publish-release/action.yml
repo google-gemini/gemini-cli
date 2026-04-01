@@ -292,7 +292,7 @@ runs:
       shell: 'bash'
       run: |
         gh release create "${INPUTS_RELEASE_TAG}" \
-          bundle/gemini.js \
+          dist/gemini.js \
           --target "${STEPS_RELEASE_BRANCH_OUTPUTS_BRANCH_NAME}" \
           --title "Release ${INPUTS_RELEASE_TAG}" \
           --notes-start-tag "${INPUTS_PREVIOUS_TAG}" \
