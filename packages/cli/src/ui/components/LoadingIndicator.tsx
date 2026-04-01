@@ -11,7 +11,6 @@ import { theme } from '../semantic-colors.js';
 import { useStreamingContext } from '../contexts/StreamingContext.js';
 import { StreamingState } from '../types.js';
 import { GeminiRespondingSpinner } from './GeminiRespondingSpinner.js';
-import { formatDuration } from '../utils/formatters.js';
 import { useTerminalSize } from '../hooks/useTerminalSize.js';
 import { isNarrowWidth } from '../utils/isNarrowWidth.js';
 import { INTERACTIVE_SHELL_WAITING_PHRASE } from '../hooks/usePhraseCycler.js';
@@ -74,7 +73,11 @@ export const LoadingIndicator: React.FC<LoadingIndicatorProps> = ({
   const cancelAndTimerContent =
     showCancelAndTimer &&
     streamingState !== StreamingState.WaitingForConfirmation
-      ? `(esc to cancel, ${elapsedTime < 60 ? `${elapsedTime}s` : formatDuration(elapsedTime * 1000)})`
+      ? `(esc to cancel, ${
+          elapsedTime < 60
+            ? `${elapsedTime}s`
+            : `${Math.floor(elapsedTime / 60)}m`
+        })`
       : null;
 
   const wittyPhraseNode =

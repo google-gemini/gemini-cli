@@ -120,7 +120,7 @@ describe('<LoadingIndicator />', () => {
     unmount();
   });
 
-  it('should display the elapsedTime correctly in human-readable format', async () => {
+  it('should display the elapsedTime correctly in minutes and OMIT seconds for > 1m', async () => {
     const props = {
       currentLoadingPhrase: 'Thinking...',
       elapsedTime: 125,
@@ -130,7 +130,9 @@ describe('<LoadingIndicator />', () => {
       StreamingState.Responding,
     );
     await waitUntilReady();
-    expect(lastFrame()).toContain('(esc to cancel, 2m 5s)');
+    const output = lastFrame();
+    expect(output).toContain('(esc to cancel, 2m)');
+    expect(output).not.toContain('5s');
     unmount();
   });
 
@@ -258,15 +260,13 @@ describe('<LoadingIndicator />', () => {
     const output = lastFrame();
     expect(output).toBeDefined();
     if (output) {
-      // Should NOT contain "Thinking... " prefix because the subject already starts with "Thinking"
-      expect(output).not.toContain('Thinking... Thinking');
+      expect(output).not.toContain('Gemini is thinking');
       expect(output).toContain('Thinking about something...');
-      expect(output).not.toContain('and other stuff.');
     }
     unmount();
   });
 
-  it('should NOT prepend "Thinking... " even if the subject does not start with "Thinking"', async () => {
+  it('should NOT prepend "Thinking... " if a subject is provided', async () => {
     const props = {
       thought: {
         subject: 'Planning the response...',

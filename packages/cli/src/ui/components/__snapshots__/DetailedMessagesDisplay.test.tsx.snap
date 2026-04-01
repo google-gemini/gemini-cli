@@ -3,7 +3,7 @@
 exports[`DetailedMessagesDisplay > renders message counts 1`] = `
 "
 ╭──────────────────────────────────────────────────────────────────────────────╮
-│ Debug Console (F12 to close)                                                 │
+│ Debug console (F12 to close)                                                 │
 │                                                                              │
 │ ℹ  Repeated message (x5)                                                     │
 │                                                                              │
@@ -18,7 +18,7 @@ exports[`DetailedMessagesDisplay > renders message counts 1`] = `
 exports[`DetailedMessagesDisplay > renders messages correctly 1`] = `
 "
 ╭──────────────────────────────────────────────────────────────────────────────╮
-│ Debug Console (F12 to close)                                                 │
+│ Debug console (F12 to close)                                                 │
 │                                                                              │
 │ ℹ  Log message                                                               │
 │ ⚠  Warning message                                                           │
