@@ -1755,7 +1755,13 @@ Logging in with Google... Restarting Gemini CLI to continue.
       }
 
       if (keyMatchers[Command.TOGGLE_MOUSE_MODE](key)) {
-        setMouseMode((prev) => !prev);
+        setMouseMode((prev) => {
+          const next = !prev;
+          if (!next && !isAlternateBuffer) {
+            appEvents.emit(AppEvent.ScrollToBottom);
+          }
+          return next;
+        });
         return true;
       }
 

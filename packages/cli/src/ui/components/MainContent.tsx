@@ -23,6 +23,7 @@ import { MAX_GEMINI_MESSAGE_LINES } from '../constants.js';
 import { useConfirmingTool } from '../hooks/useConfirmingTool.js';
 import { ToolConfirmationQueue } from './ToolConfirmationQueue.js';
 import { isTopicTool } from './messages/TopicMessage.js';
+import { appEvents, AppEvent } from '../../utils/events.js';
 
 const MemoizedHistoryItemDisplay = memo(HistoryItemDisplay);
 const MemoizedAppHeader = memo(AppHeader);
@@ -52,6 +53,16 @@ export const MainContent = () => {
       scrollableListRef.current?.scrollToEnd();
     }
   }, [showConfirmationQueue, confirmingToolCallId]);
+
+  useEffect(() => {
+    const handleScroll = () => {
+      scrollableListRef.current?.scrollToEnd();
+    };
+    appEvents.on(AppEvent.ScrollToBottom, handleScroll);
+    return () => {
+      appEvents.off(AppEvent.ScrollToBottom, handleScroll);
+    };
+  }, []);
 
   const {
     pendingHistoryItems,
