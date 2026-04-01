@@ -106,6 +106,10 @@ export class Storage {
     return path.join(Storage.getGlobalGeminiDir(), 'agents');
   }
 
+  static getUserTeamsDir(): string {
+    return path.join(Storage.getGlobalGeminiDir(), 'teams');
+  }
+
   static getAcknowledgedAgentsPath(): string {
     return path.join(
       Storage.getGlobalGeminiDir(),

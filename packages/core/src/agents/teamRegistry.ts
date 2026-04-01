@@ -6,8 +6,9 @@
 
 import { type TeamDefinition } from './types.js';
 import { type Config } from '../config/config.js';
+import { Storage } from '../config/storage.js';
 import { type AgentRegistry } from './registry.js';
-import { loadTeamsFromDirectory } from './teamLoader.js';
+import { loadTeamsFromDirectory, type TeamLoadResult } from './teamLoader.js';
 import { coreEvents } from '../utils/events.js';
 import { debugLogger } from '../utils/debugLogger.js';
 
@@ -24,7 +25,7 @@ export class TeamRegistry {
   ) {}
 
   /**
-   * Discovers and loads teams from the project's .gemini/teams/ directory.
+   * Discovers and loads teams from the global and project-level directories.
    */
   async initialize(): Promise<void> {
     await this.loadTeams();
@@ -44,6 +45,11 @@ export class TeamRegistry {
       return;
     }
 
+    // Load user-level teams first
+    const userTeamsDir = Storage.getUserTeamsDir();
+    const userLoadResult = await loadTeamsFromDirectory(userTeamsDir);
+    this.processLoadResult(userLoadResult);
+
     const folderTrustEnabled = this.config.getFolderTrust();
     const isTrustedFolder = this.config.isTrustedFolder();
 
@@ -55,25 +61,30 @@ export class TeamRegistry {
         'info',
         'Skipping project teams due to untrusted folder. To enable, ensure that the project root is trusted.',
       );
-      return;
+    } else {
+      // Load project-level teams (takes precedence over user-level if names collide)
+      const projectTeamsDir = this.config.storage.getProjectTeamsDir();
+      const projectLoadResult = await loadTeamsFromDirectory(projectTeamsDir);
+      this.processLoadResult(projectLoadResult);
     }
 
-    const projectTeamsDir = this.config.storage.getProjectTeamsDir();
-    const loadResult = await loadTeamsFromDirectory(projectTeamsDir);
+    if (this.config.getDebugMode()) {
+      debugLogger.log(`[TeamRegistry] Loaded with ${this.teams.size} teams.`);
+    }
+  }
 
-    for (const error of loadResult.errors) {
+  private processLoadResult(result: TeamLoadResult): void {
+    for (const error of result.errors) {
       debugLogger.warn(`[TeamRegistry] Error loading team: ${error.message}`);
       coreEvents.emitFeedback('error', `Team loading error: ${error.message}`);
     }
 
-    for (const team of loadResult.teams) {
+    for (const team of result.teams) {
       this.teams.set(team.name, team);
 
       // Register team agents in the global AgentRegistry so they are available as SubagentTools
       for (const agent of team.agents) {
-        try {
-          await this.agentRegistry.registerAgent(agent);
-        } catch (e) {
+        this.agentRegistry.registerAgent(agent).catch((e) => {
           debugLogger.warn(
             `[TeamRegistry] Error registering agent "${agent.name}" from team "${team.name}":`,
             e,
@@ -82,12 +93,8 @@ export class TeamRegistry {
             'error',
             `Error registering agent "${agent.name}" from team "${team.name}": ${e instanceof Error ? e.message : String(e)}`,
           );
-        }
+        });
       }
-    }
-
-    if (this.config.getDebugMode()) {
-      debugLogger.log(`[TeamRegistry] Loaded with ${this.teams.size} teams.`);
     }
   }
 

@@ -151,6 +151,7 @@ import {
 } from '../code_assist/experiments/experiments.js';
 import { AgentRegistry } from '../agents/registry.js';
 import { TeamRegistry } from '../agents/teamRegistry.js';
+import type { AgentDefinition, TeamDefinition } from '../agents/types.js';
 import { AcknowledgedAgentsService } from '../agents/acknowledgedAgents.js';
 import { setGlobalProxy } from '../utils/fetch.js';
 import { SubagentTool } from '../agents/subagent-tool.js';
@@ -158,7 +159,6 @@ import { ExperimentFlags } from '../code_assist/experiments/flagNames.js';
 import { debugLogger } from '../utils/debugLogger.js';
 import { SkillManager, type SkillDefinition } from '../skills/skillManager.js';
 import { startupProfiler } from '../telemetry/startupProfiler.js';
-import type { AgentDefinition } from '../agents/types.js';
 import { fetchAdminControls } from '../code_assist/admin/admin_controls.js';
 import { isSubpath, resolveToRealPath } from '../utils/paths.js';
 import { InjectionService } from './injectionService.js';
@@ -2035,6 +2035,20 @@ export class Config implements McpContext, AgentLoopContext {
     return this.teamRegistry;
   }
 
+  getActiveTeam(): TeamDefinition | undefined {
+    return this.teamRegistry.getActiveTeam();
+  }
+
+  setActiveTeam(name: string | undefined): void {
+    if (name) {
+      this.teamRegistry.setActiveTeam(name);
+    } else {
+      // Logic for clearing active team could be added here if needed,
+      // but for now TeamRegistry.setActiveTeam expects a string.
+      // We'll leave it as is to match TeamRegistry signature or update TeamRegistry if null is allowed.
+    }
+  }
+
   getAcknowledgedAgentsService(): AcknowledgedAgentsService {
     return this.acknowledgedAgentsService;
   }
@@ -3716,6 +3730,7 @@ export class Config implements McpContext, AgentLoopContext {
   }
 
   private onAgentsRefreshed = async () => {
+    await this.teamRegistry.reload();
     if (this._toolRegistry) {
       this.registerSubAgentTools(this._toolRegistry);
     }

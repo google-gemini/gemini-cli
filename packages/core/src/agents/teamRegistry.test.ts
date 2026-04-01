@@ -7,6 +7,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { TeamRegistry } from './teamRegistry.js';
 import { type Config } from '../config/config.js';
+import { Storage } from '../config/storage.js';
 import { type AgentRegistry } from './registry.js';
 import { loadTeamsFromDirectory } from './teamLoader.js';
 import { type TeamDefinition, type AgentDefinition } from './types.js';
@@ -21,6 +22,10 @@ describe('TeamRegistry', () => {
   let registry: TeamRegistry;
 
   beforeEach(() => {
+    vi.spyOn(Storage, 'getUserTeamsDir').mockReturnValue(
+      '/mock/user/.gemini/teams',
+    );
+
     mockConfig = {
       isAgentsEnabled: vi.fn().mockReturnValue(true),
       getFolderTrust: vi.fn().mockReturnValue(false),
@@ -40,6 +45,11 @@ describe('TeamRegistry', () => {
 
     registry = new TeamRegistry(mockConfig, mockAgentRegistry);
     vi.mocked(loadTeamsFromDirectory).mockReset();
+    // Default mock behavior to return empty result
+    vi.mocked(loadTeamsFromDirectory).mockResolvedValue({
+      teams: [],
+      errors: [],
+    });
   });
 
   it('should load teams and register agents on initialize', async () => {
@@ -58,20 +68,24 @@ describe('TeamRegistry', () => {
       agents: [mockAgent],
     };
 
-    vi.mocked(loadTeamsFromDirectory).mockResolvedValue({
-      teams: [mockTeam],
-      errors: [],
-    });
+    // First call for user teams (empty), second for project teams
+    vi.mocked(loadTeamsFromDirectory)
+      .mockResolvedValueOnce({ teams: [], errors: [] })
+      .mockResolvedValueOnce({
+        teams: [mockTeam],
+        errors: [],
+      });
 
     await registry.initialize();
 
     expect(registry.getAllTeams()).toHaveLength(1);
     expect(registry.getTeam('test-team')).toEqual(mockTeam);
     expect(mockAgentRegistry.registerAgent).toHaveBeenCalledWith(mockAgent);
+    expect(loadTeamsFromDirectory).toHaveBeenCalledTimes(2);
   });
 
   it('should not load teams if agents are disabled', async () => {
-    mockConfig.isAgentsEnabled.mockReturnValue(false);
+    vi.mocked(mockConfig.isAgentsEnabled).mockReturnValue(false);
 
     await registry.initialize();
 
@@ -79,13 +93,17 @@ describe('TeamRegistry', () => {
     expect(registry.getAllTeams()).toHaveLength(0);
   });
 
-  it('should skip project teams in untrusted folder', async () => {
-    mockConfig.getFolderTrust.mockReturnValue(true);
-    mockConfig.isTrustedFolder.mockReturnValue(false);
+  it('should skip project teams in untrusted folder but still load user teams', async () => {
+    vi.mocked(mockConfig.getFolderTrust).mockReturnValue(true);
+    vi.mocked(mockConfig.isTrustedFolder).mockReturnValue(false);
 
     await registry.initialize();
 
-    expect(loadTeamsFromDirectory).not.toHaveBeenCalled();
+    // Should only be called once for user teams
+    expect(loadTeamsFromDirectory).toHaveBeenCalledTimes(1);
+    expect(loadTeamsFromDirectory).toHaveBeenCalledWith(
+      '/mock/user/.gemini/teams',
+    );
   });
 
   it('should manage active team', async () => {
@@ -115,15 +133,10 @@ describe('TeamRegistry', () => {
   });
 
   it('should reload teams', async () => {
-    vi.mocked(loadTeamsFromDirectory).mockResolvedValue({
-      teams: [],
-      errors: [],
-    });
-
     await registry.initialize();
-    expect(loadTeamsFromDirectory).toHaveBeenCalledTimes(1);
+    expect(loadTeamsFromDirectory).toHaveBeenCalledTimes(2);
 
     await registry.reload();
-    expect(loadTeamsFromDirectory).toHaveBeenCalledTimes(2);
+    expect(loadTeamsFromDirectory).toHaveBeenCalledTimes(4);
   });
 });
