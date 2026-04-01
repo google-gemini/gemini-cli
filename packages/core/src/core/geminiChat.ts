@@ -168,18 +168,20 @@ function extractCuratedHistory(comprehensiveHistory: Content[]): Content[] {
     const role = entry.role;
     const rawParts = entry.parts || [];
 
-    // Filter parts: keep only non-empty text or non-text parts
+    // Filter out invalid/empty parts
     const validParts = rawParts.filter((part) => {
       if (part === undefined || Object.keys(part).length === 0) {
         return false;
       }
-      // Thought parts should always be kept if present
-      if (part.thought) {
-        return true;
+      // Thought parts must be non-empty strings
+      if (part.thought !== undefined) {
+        return typeof part.thought === 'string' && part.thought.trim() !== '';
       }
-      if (part.text !== undefined && part.text.trim() === '') {
-        return false;
+      // Text parts must be non-empty strings
+      if (part.text !== undefined) {
+        return typeof part.text === 'string' && part.text.trim() !== '';
       }
+      // Keep other parts (functionCall, functionResponse, etc.)
       return true;
     });
 
@@ -188,9 +190,7 @@ function extractCuratedHistory(comprehensiveHistory: Content[]): Content[] {
     }
 
     let lastEntry = curatedHistory[curatedHistory.length - 1];
-    if (lastEntry && lastEntry.role === role) {
-      // Merge into last entry
-    } else {
+    if (!lastEntry || lastEntry.role !== role) {
       // Create new entry
       lastEntry = {
         role,
@@ -201,19 +201,33 @@ function extractCuratedHistory(comprehensiveHistory: Content[]): Content[] {
 
     const lastEntryParts = lastEntry.parts || [];
     for (const part of validParts) {
-      if (
-        lastEntryParts.length > 0 &&
-        lastEntryParts[lastEntryParts.length - 1].text !== undefined &&
-        part.text !== undefined
-      ) {
-        // Coalesce text parts
-        const lastText = lastEntryParts[lastEntryParts.length - 1].text!;
-        const separator = lastText.endsWith('\n') ? '' : '\n';
-        lastEntryParts[lastEntryParts.length - 1] = {
-          ...lastEntryParts[lastEntryParts.length - 1],
-          text: lastText + separator + part.text,
-        };
+      if (part.text !== undefined) {
+        // Coalesce text into the last text part of this turn
+        const existingTextPart = lastEntryParts.find(
+          (p) => p.text !== undefined,
+        );
+        if (existingTextPart) {
+          const lastText = existingTextPart.text!;
+          const separator = lastText.endsWith('\n') ? '' : '\n';
+          existingTextPart.text = lastText + separator + part.text;
+        } else {
+          lastEntryParts.push({ ...part });
+        }
+      } else if (part.thought !== undefined) {
+        // Coalesce thought into the last thought part of this turn
+        const existingThoughtPart = lastEntryParts.find(
+          (p) => p.thought !== undefined,
+        );
+        if (existingThoughtPart) {
+          const lastThought = existingThoughtPart.thought!;
+          const separator = lastThought.endsWith('\n') ? '' : '\n';
+          existingThoughtPart.thought = lastThought + separator + part.thought;
+        } else {
+          // Insert thought at the beginning for model consistency
+          lastEntryParts.unshift({ ...part });
+        }
       } else {
+        // Add as is (functionCall, functionResponse)
         lastEntryParts.push({ ...part });
       }
     }
