@@ -15,18 +15,18 @@ jobs:
 
     steps:
       - name: 'Checkout repository'
-        uses: 'actions/checkout@v4'
+        uses: 'actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5'
         with:
           fetch-depth: 0
           ref: 'main'
 
       - name: 'Set up Node.js'
-        uses: 'actions/setup-node@v4'
+        uses: 'actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020'
         with:
           node-version: '20'
 
       - name: 'Run Docs Audit with Gemini'
-        uses: 'google-github-actions/run-gemini-cli@v0' # Use a specific tag or SHA for stability
+        uses: 'google-github-actions/run-gemini-cli@a3bf79042542528e91937b3a3a6fbc4967ee3c31'
         with:
           gemini_api_key: '${{ secrets.GEMINI_API_KEY }}'
           prompt: |
@@ -37,7 +37,7 @@ jobs:
             When you are done, please output your thought process and the steps you took for future debugging purposes, and save the audit results to 'audit-results-${{ github.run_id }}.md'.
 
       - name: 'Create Pull Request with Audit Results'
-        uses: 'peter-evans/create-pull-request@v6'
+        uses: 'peter-evans/create-pull-request@c5a7806660adbe173f04e3e038b0ccdcd758773c'
         with:
           token: '${{ secrets.GEMINI_CLI_ROBOT_GITHUB_PAT }}'
           commit-message: 'docs: weekly audit results for ${{ github.run_id }}'
