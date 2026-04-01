@@ -292,6 +292,20 @@ runs:
       shell: 'bash'
       run: |
         (cd bundle && zip -r ../gemini-cli-bundle.zip .)
+        
+        echo "Testing the generated bundle archive..."
+        mkdir -p test-bundle
+        unzip -q gemini-cli-bundle.zip -d test-bundle
+        chmod +x test-bundle/gemini.js
+        # Verify it runs and outputs a version
+        BUNDLE_VERSION=$(node test-bundle/gemini.js --version)
+        echo "Bundle version output: ${BUNDLE_VERSION}"
+        if [[ -z "${BUNDLE_VERSION}" ]]; then
+          echo "Error: Bundle failed to execute or return version."
+          exit 1
+        fi
+        rm -rf test-bundle
+
         gh release create "${INPUTS_RELEASE_TAG}" \
           gemini-cli-bundle.zip \
           --target "${STEPS_RELEASE_BRANCH_OUTPUTS_BRANCH_NAME}" \
