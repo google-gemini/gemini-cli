@@ -21,8 +21,8 @@ import {
   type ContentGeneratorConfig,
 } from '../core/contentGenerator.js';
 import type { OverageStrategy } from '../billing/billing.js';
-import { PromptRegistry } from '../prompts/prompt-registry.js';
-import { ResourceRegistry } from '../resources/resource-registry.js';
+import type { PromptRegistry } from '../prompts/prompt-registry.js';
+import type { ResourceRegistry } from '../resources/resource-registry.js';
 import { ToolRegistry } from '../tools/tool-registry.js';
 import { LSTool } from '../tools/ls.js';
 import { ReadFileTool } from '../tools/read-file.js';
@@ -1375,6 +1375,8 @@ export class Config implements McpContext, AgentLoopContext {
     this._geminiClient = new GeminiClient(this);
     this.a2aClientManager = new A2AClientManager(this);
     this.modelRouterService = new ModelRouterService(this);
+    this.agentRegistry = new AgentRegistry(this);
+    this.teamRegistry = new TeamRegistry(this, this.agentRegistry);
   }
 
   get config(): Config {
@@ -1427,13 +1429,8 @@ export class Config implements McpContext, AgentLoopContext {
     if (this.getCheckpointingEnabled()) {
       await this.getGitService();
     }
-    this._promptRegistry = new PromptRegistry();
-    this._resourceRegistry = new ResourceRegistry();
 
-    this.agentRegistry = new AgentRegistry(this);
     await this.agentRegistry.initialize();
-
-    this.teamRegistry = new TeamRegistry(this, this.agentRegistry);
     await this.teamRegistry.initialize();
 
     coreEvents.on(CoreEvent.AgentsRefreshed, this.onAgentsRefreshed);
@@ -3774,5 +3771,6 @@ export class Config implements McpContext, AgentLoopContext {
     }
   }
 }
+
 // Export model constants for use in CLI
 export { DEFAULT_GEMINI_FLASH_MODEL };

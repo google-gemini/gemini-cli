@@ -16,6 +16,7 @@ import { type ActiveHook } from '../types.js';
 import { useUIState } from '../contexts/UIStateContext.js';
 import { useSettings } from '../contexts/SettingsContext.js';
 import { theme } from '../semantic-colors.js';
+import { useConfig } from '../contexts/ConfigContext.js';
 import { GENERIC_WORKING_LABEL } from '../textConstants.js';
 import { INTERACTIVE_SHELL_WAITING_PHRASE } from '../hooks/usePhraseCycler.js';
 import { LoadingIndicator } from './LoadingIndicator.js';
@@ -142,6 +143,22 @@ export const StatusNode: React.FC<{
         forceRealStatusOnly={false}
         wittyPhrase={currentWittyPhrase}
       />
+    </Box>
+  );
+};
+
+/**
+ * Renders an indicator for the currently active agent team.
+ */
+const ActiveTeamIndicator: React.FC = () => {
+  const config = useConfig();
+  const activeTeam = config?.getActiveTeam();
+
+  if (!activeTeam) return null;
+
+  return (
+    <Box marginLeft={LAYOUT.INDICATOR_LEFT_MARGIN}>
+      <Text color={theme.text.accent}>[ Team: {activeTeam.displayName} ]</Text>
     </Box>
   );
 };
@@ -393,6 +410,7 @@ export const StatusRow: React.FC<StatusRowProps> = ({
                     <RawMarkdownIndicator />
                   </Box>
                 )}
+                <ActiveTeamIndicator />
               </>
             ) : (
               showRow2Minimal &&
