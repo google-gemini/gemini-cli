@@ -1693,6 +1693,11 @@ their corresponding top-level category object in your `settings.json` file.
   - **Default:** `false`
   - **Requires restart:** Yes
 
+- **`experimental.generalistProfile`** (boolean):
+  - **Description:** Suitable for general coding and software development tasks.
+  - **Default:** `false`
+  - **Requires restart:** Yes
+
 - **`experimental.contextManagement`** (boolean):
   - **Description:** Enable logic for context management.
   - **Default:** `false`
