@@ -418,14 +418,17 @@ describe('SettingsSchema', () => {
     });
 
     it('should have plan setting in schema', () => {
-      const setting = getSettingsSchema().experimental.properties.plan;
+      const setting =
+        getSettingsSchema().general.properties.plan.properties.enabled;
       expect(setting).toBeDefined();
       expect(setting.type).toBe('boolean');
-      expect(setting.category).toBe('Experimental');
+      expect(setting.category).toBe('General');
       expect(setting.default).toBe(true);
       expect(setting.requiresRestart).toBe(true);
       expect(setting.showInDialog).toBe(true);
-      expect(setting.description).toBe('Enable Plan Mode.');
+      expect(setting.description).toBe(
+        'Enable Plan Mode for read-only safety during planning.',
+      );
     });
 
     it('should have hooksConfig.notifications setting in schema', () => {

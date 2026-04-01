@@ -517,6 +517,11 @@ ${trimmed}
       `<global_context>\n${memory.global.trim()}\n</global_context>`,
     );
   }
+  if (memory.userProjectMemory?.trim()) {
+    sections.push(
+      `<user_project_memory>\n--- User's Project Memory (private, not committed to repo) ---\n${memory.userProjectMemory.trim()}\n--- End User's Project Memory ---\n</user_project_memory>`,
+    );
+  }
   if (memory.extension?.trim()) {
     sections.push(
       `<extension_context>\n${memory.extension.trim()}\n</extension_context>`,
@@ -547,7 +552,8 @@ You are operating with a persistent file-based task tracking system located at \
 4.  **PLAN MODE INTEGRATION**: If an approved plan exists, you MUST use the ${trackerCreate} tool to decompose it into discrete tasks before writing any code. Maintain a bidirectional understanding between the plan document and the task graph.
 5.  **VERIFICATION**: Before marking a task as complete, verify the work is actually done (e.g., run the test, check the file existence).
 6.  **STATE OVER CHAT**: If the user says "I think we finished that," but the tool says it is 'pending', trust the tool--or verify explicitly before updating.
-7.  **DEPENDENCY MANAGEMENT**: Respect task topology. Never attempt to execute a task if its dependencies are not marked as 'closed'. If you are blocked, focus only on the leaf nodes of the task graph.`.trim();
+7.  **DEPENDENCY MANAGEMENT**: Respect task topology. Never attempt to execute a task if its dependencies are not marked as 'closed'. If you are blocked, focus only on the leaf nodes of the task graph.
+8.  **DETAILED TASKS**: Ensure that the tasks created have highly detailed titles and descriptions. The description MUST provide significantly more specific details and technical context than the title.`.trim();
 }
 
 export function renderPlanningWorkflow(
@@ -582,10 +588,12 @@ Plan Mode uses an adaptive planning workflow where the research depth, plan stru
 Analyze requirements and use search/read tools to explore the codebase. Systematically map affected modules, trace data flow, and identify dependencies.
 
 ### 2. Consult
-The depth of your consultation should be proportional to the task's complexity:
-- **Simple Tasks:** Skip consultation and proceed directly to drafting.
+The depth of your consultation should be proportional to the task's complexity. Before proceeding to Step 3 (Draft), you MUST discuss your findings and proposed strategy with the user to reach an informal agreement.
+- **Simple Tasks:** Briefly describe your proposed strategy in the chat to ensure alignment, then **STOP and wait** for the user to confirm agreement before drafting the plan.
 - **Standard Tasks:** If multiple viable approaches exist, present a concise summary (including pros/cons and your recommendation) via ${formatToolName(ASK_USER_TOOL_NAME)} and wait for a decision.
 - **Complex Tasks:** You MUST present at least two viable approaches with detailed trade-offs via ${formatToolName(ASK_USER_TOOL_NAME)} and obtain approval before drafting the plan.
+
+**CRITICAL:** You MUST NOT proceed to Step 3 (Draft) or Step 4 (Review & Approval) in the same turn as your initial strategy proposal. You MUST wait for user feedback and reach a clear agreement before drafting or submitting the plan.
 
 ### 3. Draft
 Write the implementation plan to \`${options.plansDir}/\`. The plan's structure adapts to the task:
@@ -594,7 +602,7 @@ Write the implementation plan to \`${options.plansDir}/\`. The plan's structure 
 - **Complex Tasks:** Include **Background & Motivation**, **Scope & Impact**, **Proposed Solution**, **Alternatives Considered**, a phased **Implementation Plan**, **Verification**, and **Migration & Rollback** strategies.
 
 ### 4. Review & Approval
-Use the ${formatToolName(EXIT_PLAN_MODE_TOOL_NAME)} tool to present the plan and ${options.interactive ? 'formally request approval.' : 'begin implementation.'}
+ONLY use the ${formatToolName(EXIT_PLAN_MODE_TOOL_NAME)} tool to present the plan for formal approval AFTER you have reached an informal agreement with the user in the chat regarding the proposed strategy. When called, this tool will present the plan and ${options.interactive ? 'formally request approval.' : 'begin implementation.'}
 
 ${renderApprovedPlanSection(options.approvedPlanPath)}`.trim();
 }
@@ -798,9 +806,12 @@ function toolUsageRememberingFacts(
 - **Memory Tool:** You MUST use ${formatToolName(MEMORY_TOOL_NAME)} to proactively record facts, preferences, and workflows that apply across all sessions. Whenever the user explicitly tells you to "remember" something, or when they state a preference or workflow (like "always lint after editing"), you MUST immediately call the save_memory subagent. Never save transient session state. Do not use memory to store summaries of code changes, bug fixes, or findings discovered during a task; this tool is strictly for persistent general knowledge.`;
   }
   const base = `
-- **Memory Tool:** Use ${formatToolName(MEMORY_TOOL_NAME)} only for global user preferences, personal facts, or high-level information that applies across all sessions. Never save workspace-specific context, local file paths, or transient session state. Do not use memory to store summaries of code changes, bug fixes, or findings discovered during a task; this tool is for persistent user-related information only.`;
+- **Memory Tool:** Use ${formatToolName(MEMORY_TOOL_NAME)} to persist facts across sessions. It supports two scopes via the \`scope\` parameter:
+  - \`"global"\` (default): Cross-project preferences and personal facts loaded in every workspace.
+  - \`"project"\`: Facts specific to the current workspace, private to the user (not committed to the repo). Use this for local dev setup notes, project-specific workflows, or personal reminders about this codebase.
+  Never save transient session state. Do not use memory to store summaries of code changes, bug fixes, or findings discovered during a task.`;
   const suffix = options.interactive
-    ? ' If unsure whether a fact is worth remembering globally, ask the user.'
+    ? ' If unsure whether a fact is global or project-specific, ask the user.'
     : '';
   return base + suffix;
 }

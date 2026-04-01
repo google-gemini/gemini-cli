@@ -279,8 +279,8 @@ describe('<ToolGroupMessage />', () => {
       );
 
       const output = lastFrame();
-      expect(output).toContain('Testing Topic');
-      expect(output).toContain('— This is the description');
+      expect(output).toContain('Testing Topic: ');
+      expect(output).toContain('This is the description');
       expect(output).toMatchSnapshot('update_topic_tool');
       unmount();
     });
@@ -307,8 +307,8 @@ describe('<ToolGroupMessage />', () => {
       );
 
       const output = lastFrame();
-      expect(output).toContain('Testing Topic');
-      expect(output).toContain('— This is the summary');
+      expect(output).toContain('Testing Topic: ');
+      expect(output).toContain('This is the summary');
       unmount();
     });
 
@@ -481,7 +481,7 @@ describe('<ToolGroupMessage />', () => {
       ];
       const item = createItem(toolCalls);
       const { lastFrame, unmount } = await renderWithProviders(
-        <Scrollable height={10} hasFocus={true} scrollToBottom={true}>
+        <Scrollable height={12} hasFocus={true} scrollToBottom={true}>
           <ToolGroupMessage {...baseProps} item={item} toolCalls={toolCalls} />
         </Scrollable>,
         {
