@@ -554,8 +554,8 @@ function buildAgentLoopContext(config: Config): AgentLoopContext {
  * to extract and write SKILL.md files.
  */
 export async function startMemoryService(config: Config): Promise<void> {
-  const memoryDir = config.storage.getProjectMemoryDir();
   const skillsDir = config.storage.getProjectSkillsMemoryDir();
+  const memoryDir = path.dirname(skillsDir);
   const lockPath = path.join(memoryDir, LOCK_FILENAME);
   const statePath = path.join(memoryDir, STATE_FILENAME);
   const chatsDir = path.join(config.storage.getProjectTempDir(), 'chats');

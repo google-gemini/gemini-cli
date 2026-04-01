@@ -14,7 +14,7 @@ import {
   READ_FILE_TOOL_NAME,
   WRITE_FILE_TOOL_NAME,
 } from '../tools/tool-names.js';
-import { DEFAULT_GEMINI_FLASH_MODEL } from '../config/models.js';
+import { PREVIEW_GEMINI_FLASH_MODEL } from '../config/models.js';
 
 const SkillExtractionSchema = z.object({
   response: z
@@ -237,7 +237,7 @@ export const SkillExtractionAgent = (
     schema: SkillExtractionSchema,
   },
   modelConfig: {
-    model: DEFAULT_GEMINI_FLASH_MODEL,
+    model: PREVIEW_GEMINI_FLASH_MODEL,
   },
   toolConfig: {
     tools: [

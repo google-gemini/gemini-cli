@@ -272,7 +272,7 @@ export class Storage {
   }
 
   getProjectSkillsMemoryDir(): string {
-    return path.join(this.getProjectMemoryDir(), 'skills');
+    return path.join(this.getProjectTempDir(), 'memory', 'skills');
   }
 
   getWorkspaceSettingsPath(): string {
