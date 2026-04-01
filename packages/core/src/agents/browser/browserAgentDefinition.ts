@@ -14,6 +14,7 @@
  */
 
 import type { LocalAgentDefinition } from '../types.js';
+import { supersedeStaleSnapshots } from './snapshotSuperseder.js';
 import type { Config } from '../../config/config.js';
 import { z } from 'zod';
 import {
@@ -183,6 +184,11 @@ export const BrowserAgentDefinition = (
     // Tools are set dynamically by browserAgentFactory after MCP connection
     // This is undefined here and will be set at invocation time
     toolConfig: undefined,
+
+    // Supersede stale take_snapshot outputs to reclaim context-window tokens.
+    // Each snapshot contains the full accessibility tree; only the most recent
+    // one is meaningful, so prior snapshots are replaced with a placeholder.
+    onBeforeTurn: (chat) => supersedeStaleSnapshots(chat),
 
     promptConfig: {
       query: `Your task is:
