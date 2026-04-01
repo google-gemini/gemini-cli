@@ -272,6 +272,18 @@ export class TerminalCapabilityManager {
     return this.kittyEnabled;
   }
 
+  isGhosttyTerminal(env: NodeJS.ProcessEnv = process.env): boolean {
+    const termProgram = env['TERM_PROGRAM']?.toLowerCase();
+    const term = env['TERM']?.toLowerCase();
+    const name = this.getTerminalName()?.toLowerCase();
+
+    return !!(
+      name?.includes('ghostty') ||
+      termProgram?.includes('ghostty') ||
+      term?.includes('ghostty')
+    );
+  }
+
   supportsOsc9Notifications(env: NodeJS.ProcessEnv = process.env): boolean {
     if (env['WT_SESSION']) {
       return false;
