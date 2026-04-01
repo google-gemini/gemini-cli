@@ -190,7 +190,7 @@ export const BrowserAgentDefinition = (
 \${task}
 </task>
 
-First, use list_pages to check if there are any existing pages that can fulfill the user's request. If not, you MUST use new_page to open the relevant URL unless the user explicitly provides different instructions.`,
+First, use list_page to check if there are any existing pages that can fulfill the user's request. If not, you MUST use new_page to open the relevant URL unless the user explicitly provides different instructions.`,
       systemPrompt: buildBrowserSystemPrompt(
         visionEnabled,
         config.getBrowserAgentConfig().customConfig.allowedDomains,
