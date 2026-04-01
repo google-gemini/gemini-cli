@@ -338,6 +338,50 @@ describe('sandbox', () => {
       await expect(start_sandbox(config)).rejects.toThrow(FatalSandboxError);
     });
 
+    it('removes proxy exit handlers after the sandbox process closes', async () => {
+      process.env['GEMINI_SANDBOX_PROXY_COMMAND'] = 'proxy-cmd';
+      vi.mocked(os.platform).mockReturnValue('darwin');
+
+      const config: SandboxConfig = createMockSandboxConfig({
+        command: 'sandbox-exec',
+        image: 'some-image',
+      });
+
+      const createMockProcess = (autoClose: boolean) => {
+        const proc = new EventEmitter() as unknown as ReturnType<
+          typeof spawn
+        > & {
+          stdout: ReturnType<typeof spawn>['stdout'];
+          stderr: ReturnType<typeof spawn>['stderr'];
+        };
+        proc.stdout = new EventEmitter() as unknown as ReturnType<
+          typeof spawn
+        >['stdout'];
+        proc.stderr = new EventEmitter() as unknown as ReturnType<
+          typeof spawn
+        >['stderr'];
+        proc.on = vi.fn().mockImplementation((event, cb) => {
+          if (autoClose && event === 'close') {
+            setTimeout(() => cb(0), 0);
+          }
+          return proc;
+        });
+        return proc;
+      };
+
+      vi.mocked(spawn)
+        .mockImplementationOnce(() => createMockProcess(false))
+        .mockImplementationOnce(() => createMockProcess(true));
+
+      const initialExitListenerCount = process.listeners('exit').length;
+
+      await expect(
+        start_sandbox(config, [], undefined, ['arg1']),
+      ).resolves.toBe(0);
+
+      expect(process.listeners('exit')).toHaveLength(initialExitListenerCount);
+    });
+
     it('should mount volumes correctly', async () => {
       const config: SandboxConfig = createMockSandboxConfig({
         command: 'docker',
