@@ -38,7 +38,7 @@ describe('WindowsSandboxManager', () => {
     manager = new WindowsSandboxManager({
       workspace: testCwd,
       modeConfig: { readonly: false, allowOverrides: true },
-      forbiddenPaths: [],
+      forbiddenPaths: async () => [],
     });
   });
 
@@ -107,7 +107,7 @@ describe('WindowsSandboxManager', () => {
     const planManager = new WindowsSandboxManager({
       workspace: testCwd,
       modeConfig: { readonly: true, allowOverrides: false },
-      forbiddenPaths: [],
+      forbiddenPaths: async () => [],
     });
     const req: SandboxRequest = {
       command: 'curl',
@@ -139,7 +139,7 @@ describe('WindowsSandboxManager', () => {
       workspace: testCwd,
       modeConfig: { allowOverrides: true, network: false },
       policyManager: mockPolicyManager,
-      forbiddenPaths: [],
+      forbiddenPaths: async () => [],
     });
 
     const req: SandboxRequest = {
@@ -369,7 +369,7 @@ describe('WindowsSandboxManager', () => {
 
     const managerWithForbidden = new WindowsSandboxManager({
       workspace: testCwd,
-      forbiddenPaths: [missingPath],
+      forbiddenPaths: async () => [missingPath],
     });
 
     const req: SandboxRequest = {
@@ -397,7 +397,7 @@ describe('WindowsSandboxManager', () => {
     try {
       const managerWithForbidden = new WindowsSandboxManager({
         workspace: testCwd,
-        forbiddenPaths: [forbiddenPath],
+        forbiddenPaths: async () => [forbiddenPath],
       });
 
       const req: SandboxRequest = {
@@ -427,7 +427,7 @@ describe('WindowsSandboxManager', () => {
     try {
       const managerWithForbidden = new WindowsSandboxManager({
         workspace: testCwd,
-        forbiddenPaths: [conflictPath],
+        forbiddenPaths: async () => [conflictPath],
       });
 
       const req: SandboxRequest = {
@@ -458,12 +458,9 @@ describe('WindowsSandboxManager', () => {
           call[1][0] === path.resolve(conflictPath),
       );
 
-      // Both should have been called
-      expect(allowCallIndex).toBeGreaterThan(-1);
+      // Conflict should have been filtered out of allow calls
+      expect(allowCallIndex).toBe(-1);
       expect(denyCallIndex).toBeGreaterThan(-1);
-
-      // Verify order: explicitly denying must happen after the explicit allow
-      expect(allowCallIndex).toBeLessThan(denyCallIndex);
     } finally {
       fs.rmSync(conflictPath, { recursive: true, force: true });
     }

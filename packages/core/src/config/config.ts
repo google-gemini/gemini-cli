@@ -116,7 +116,7 @@ import {
   type ModelConfigServiceConfig,
 } from '../services/modelConfigService.js';
 import { DEFAULT_MODEL_CONFIGS } from './defaultModelConfigs.js';
-import { ContextManager } from '../services/contextManager.js';
+import { ContextManager } from '../context/contextManager.js';
 import { TrackerService } from '../services/trackerService.js';
 import type { GenerateContentParameters } from '@google/genai';
 
@@ -451,7 +451,7 @@ import {
   DEFAULT_TOOL_PROTECTION_THRESHOLD,
   DEFAULT_MIN_PRUNABLE_TOKENS_THRESHOLD,
   DEFAULT_PROTECT_LATEST_TURN,
-} from '../services/toolOutputMaskingService.js';
+} from '../context/toolOutputMaskingService.js';
 
 import {
   type ExtensionLoader,
@@ -758,6 +758,7 @@ export class Config implements McpContext, AgentLoopContext {
   readonly modelConfigService: ModelConfigService;
   private readonly embeddingModel: string;
   private readonly sandbox: SandboxConfig | undefined;
+  private _sandboxForbiddenPaths: string[] | undefined;
   private readonly targetDir: string;
   private workspaceContext: WorkspaceContext;
   private readonly debugMode: boolean;
@@ -997,6 +998,7 @@ export class Config implements McpContext, AgentLoopContext {
       this.sandbox,
       {
         workspace: this.targetDir,
+        forbiddenPaths: this.getSandboxForbiddenPaths.bind(this),
         includeDirectories: this.pendingIncludeDirectories,
         policyManager: this._sandboxPolicyManager,
       },
@@ -1678,11 +1680,25 @@ export class Config implements McpContext, AgentLoopContext {
     return this._geminiClient;
   }
 
+  private async getSandboxForbiddenPaths(): Promise<string[]> {
+    if (this._sandboxForbiddenPaths) {
+      return this._sandboxForbiddenPaths;
+    }
+
+    this._sandboxForbiddenPaths = await this.getFileService().getIgnoredPaths({
+      respectGitIgnore: false,
+      respectGeminiIgnore: true,
+    });
+
+    return this._sandboxForbiddenPaths;
+  }
+
   private refreshSandboxManager(): void {
     this._sandboxManager = createSandboxManager(
       this.sandbox,
       {
         workspace: this.targetDir,
+        forbiddenPaths: this.getSandboxForbiddenPaths.bind(this),
         policyManager: this._sandboxPolicyManager,
       },
       this.getApprovalMode(),
@@ -3083,6 +3099,14 @@ export class Config implements McpContext, AgentLoopContext {
     return useGemini3_1 && authType === AuthType.USE_GEMINI;
   }
 
+  private isGemini31LaunchedForAuthType(authType?: AuthType): boolean {
+    return (
+      authType === AuthType.USE_GEMINI ||
+      authType === AuthType.USE_VERTEX_AI ||
+      authType === AuthType.GATEWAY
+    );
+  }
+
   /**
    * Returns whether Gemini 3.1 has been launched.
    *
@@ -3092,10 +3116,7 @@ export class Config implements McpContext, AgentLoopContext {
    */
   getGemini31LaunchedSync(): boolean {
     const authType = this.contentGeneratorConfig?.authType;
-    if (
-      authType === AuthType.USE_GEMINI ||
-      authType === AuthType.USE_VERTEX_AI
-    ) {
+    if (this.isGemini31LaunchedForAuthType(authType)) {
       return true;
     }
     return (
@@ -3113,10 +3134,7 @@ export class Config implements McpContext, AgentLoopContext {
    */
   getGemini31FlashLiteLaunchedSync(): boolean {
     const authType = this.contentGeneratorConfig?.authType;
-    if (
-      authType === AuthType.USE_GEMINI ||
-      authType === AuthType.USE_VERTEX_AI
-    ) {
+    if (this.isGemini31LaunchedForAuthType(authType)) {
       return true;
     }
     return (

@@ -302,6 +302,11 @@ export class BrowserManager {
       POTENTIALLY_NAVIGATING_TOOLS.has(toolName) &&
       !signal?.aborted
     ) {
+      // Don't re-inject if explicitly switching to a page in the background
+      if (toolName === 'select_page' && args['bringToFront'] === false) {
+        return result;
+      }
+
       try {
         if (this.shouldInjectOverlay) {
           await injectAutomationOverlay(this, signal);
@@ -601,7 +606,6 @@ export class BrowserManager {
           await this.rawMcpClient!.connect(this.mcpTransport!);
           debugLogger.log('MCP client connected to chrome-devtools-mcp');
           await this.discoverTools();
-          this.registerInputBlockerHandler();
           // clear the action counter for each connection
           this.actionCounter = 0;
         })(),
@@ -804,46 +808,5 @@ export class BrowserManager {
     }
     // If none matched, then deny
     return false;
-  }
-
-  /**
-   * Registers a fallback notification handler on the MCP client to
-   * automatically re-inject the input blocker after any server-side
-   * notification (e.g. page navigation, resource updates).
-   *
-   * This covers ALL navigation types (link clicks, form submissions,
-   * history navigation) — not just explicit navigate_page tool calls.
-   */
-  private registerInputBlockerHandler(): void {
-    if (!this.rawMcpClient) {
-      return;
-    }
-
-    if (!this.config.shouldDisableBrowserUserInput()) {
-      return;
-    }
-
-    const existingHandler = this.rawMcpClient.fallbackNotificationHandler;
-    this.rawMcpClient.fallbackNotificationHandler = async (notification: {
-      method: string;
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      params?: any;
-    }) => {
-      // Chain with any existing handler first.
-      if (existingHandler) {
-        await existingHandler(notification);
-      }
-
-      // Only re-inject on resource update notifications which indicate
-      // page content has changed (navigation, new page, etc.)
-      if (notification.method === 'notifications/resources/updated') {
-        debugLogger.log('Page content changed, re-injecting input blocker...');
-        void injectInputBlocker(this);
-      }
-    };
-
-    debugLogger.log(
-      'Registered global notification handler for input blocker re-injection',
-    );
   }
 }
