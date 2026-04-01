@@ -27,7 +27,6 @@ import { ResourceRegistry } from '../resources/resource-registry.js';
 import { PolicyEngine } from '../policy/policy-engine.js';
 import { PolicyDecision } from '../policy/types.js';
 import { MessageBus } from '../confirmation-bus/message-bus.js';
-import { WorkspaceContext } from '../utils/workspaceContext.js';
 import { Storage } from '../config/storage.js';
 import type { AgentLoopContext } from '../config/agent-loop-context.js';
 
@@ -519,17 +518,8 @@ async function buildExistingSkillsSummary(
 
 /**
  * Builds an AgentLoopContext from a Config for background agent execution.
- *
- * Uses Object.create() to produce a prototype-delegating wrapper around the
- * shared Config instance.  Overridden methods live only on the wrapper —
- * the original Config is never mutated, avoiding a race condition where the
- * main agent loop would see empty memory strings while the background
- * extraction agent is running (up to 30 minutes).
  */
-function buildAgentLoopContext(
-  config: Config,
-  skillsDir: string,
-): AgentLoopContext {
+function buildAgentLoopContext(config: Config): AgentLoopContext {
   // Create a PolicyEngine that auto-approves all tool calls so the
   // background sub-agent never prompts the user for confirmation.
   const autoApprovePolicy = new PolicyEngine({
@@ -543,25 +533,8 @@ function buildAgentLoopContext(
   });
   const autoApproveBus = new MessageBus(autoApprovePolicy);
 
-  // Scope the workspace context to the skills directory so the agent only
-  // sees the extraction target, not the full project tree.
-  const scopedWorkspace = new WorkspaceContext(skillsDir);
-
-  // Prototype-delegate: property lookups fall through to the real config,
-  // but the overrides below live only on this wrapper object.
-  // Object.create is the only viable option here — Config is a large class
-  // and we need to override just 4 methods without mutating the shared instance.
-  // eslint-disable-next-line no-restricted-syntax, @typescript-eslint/no-unsafe-type-assertion
-  const scopedConfig = Object.create(config) as Config;
-  scopedConfig.getWorkspaceContext = () => scopedWorkspace;
-  // Return empty strings to prevent project GEMINI.md and session/environment
-  // memory from being injected into the extraction agent's system prompt.
-  scopedConfig.getSystemInstructionMemory = () => '';
-  scopedConfig.getEnvironmentMemory = () => '';
-  scopedConfig.getSessionMemory = () => '';
-
   return {
-    config: scopedConfig,
+    config,
     promptId: `skill-extraction-${randomUUID().slice(0, 8)}`,
     toolRegistry: config.getToolRegistry(),
     promptRegistry: new PromptRegistry(),
@@ -671,7 +644,7 @@ export async function startMemoryService(config: Config): Promise<void> {
       existingSkillsSummary,
     );
 
-    const context = buildAgentLoopContext(config, skillsDir);
+    const context = buildAgentLoopContext(config);
 
     // Register the agent's model config since it's not going through AgentRegistry.
     const modelAlias = getModelConfigAlias(agentDefinition);
