@@ -69,6 +69,10 @@ export async function readPathFromWorkspace(
       absolute: true,
       ignore: config.getFileExclusions().getGlobExcludes(),
       follow: false,
+      // On Linux, nocase forces readdir at every directory level to simulate
+      // case-insensitive matching on a case-sensitive FS. Default to false
+      // there to avoid expensive readdir storms.
+      nocase: process.platform !== 'linux',
     });
 
     const relativeFiles = files.map((p) =>

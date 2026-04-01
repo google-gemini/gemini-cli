@@ -165,13 +165,11 @@ class GlobToolInvocation extends BaseToolInvocation<
       // Get centralized file discovery service
       const fileDiscovery = this.config.getFileService();
 
-      // Use platform-aware case sensitivity: on Linux, nocase is expensive
-      // because it forces readdir at every level. Linux filesystems are
-      // case-sensitive, so nocase provides little benefit there.
-      const defaultNocase =
-        process.platform === 'linux' ? false : !this.params.case_sensitive;
+      // On Linux, nocase forces readdir at every directory level to simulate
+      // case-insensitive matching on a case-sensitive FS. Default to false
+      // there to avoid expensive readdir storms.
       const nocase =
-        this.params.case_sensitive === true ? false : defaultNocase;
+        !this.params.case_sensitive && process.platform !== 'linux';
 
       // Phase 1: Fast discovery without stat (avoids thousands of stat calls
       // on broad patterns). We stat only after filtering.
@@ -234,9 +232,7 @@ class GlobToolInvocation extends BaseToolInvocation<
         }),
       );
 
-      const filteredEntries = statResults;
-
-      if (!filteredEntries || filteredEntries.length === 0) {
+      if (!statResults || statResults.length === 0) {
         let message = `No files found matching pattern "${this.params.pattern}"`;
         if (searchDirectories.length === 1) {
           message += ` within ${searchDirectories[0]}`;
@@ -258,7 +254,7 @@ class GlobToolInvocation extends BaseToolInvocation<
 
       // Sort the filtered entries using the new helper function
       const sortedEntries = sortFileEntries(
-        filteredEntries,
+        statResults,
         nowTimestamp,
         oneDayInMs,
       );

@@ -273,6 +273,48 @@ describe('readPathFromWorkspace', () => {
       });
     });
 
+    it('should exclude files matching getGlobExcludes patterns during directory expansion', async () => {
+      mock({
+        [CWD]: {
+          'my-dir': {
+            'file.txt': 'visible',
+            node_modules: {
+              'dep.js': 'should be excluded',
+            },
+          },
+        },
+      });
+      const mockFileService = {
+        filterFiles: vi.fn((files) => files),
+      } as unknown as FileDiscoveryService;
+      // Build a config whose getGlobExcludes returns a real pattern
+      const workspace = new WorkspaceContext(CWD, []);
+      const fileSystemService = new StandardFileSystemService();
+      const config = {
+        getWorkspaceContext: () => workspace,
+        getTargetDir: () => CWD,
+        getFileSystemService: () => fileSystemService,
+        getFileService: () => mockFileService,
+        getFileFilteringRespectGitIgnore: () => true,
+        getFileFilteringRespectGeminiIgnore: () => true,
+        getFileExclusions: () => ({
+          getGlobExcludes: () => ['**/node_modules/**'],
+        }),
+      } as unknown as Config;
+
+      const result = await readPathFromWorkspace('my-dir', config);
+      const resultText = result
+        .map((p) => {
+          if (typeof p === 'string') return p;
+          if (typeof p === 'object' && p && 'text' in p) return p.text;
+          return '';
+        })
+        .join('');
+
+      expect(resultText).toContain('visible');
+      expect(resultText).not.toContain('should be excluded');
+    });
+
     it('should handle an empty directory', async () => {
       mock({
         [CWD]: {
