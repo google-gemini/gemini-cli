@@ -55,6 +55,10 @@ export class MacOsSandboxManager implements SandboxManager {
     return parsePosixSandboxDenials(result);
   }
 
+  getWorkspace(): string {
+    return this.options.workspace;
+  }
+
   async prepareCommand(req: SandboxRequest): Promise<SandboxedCommand> {
     await initializeShellParsers();
     const sanitizationConfig = getSecureSanitizationConfig(

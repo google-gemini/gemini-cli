@@ -144,6 +144,10 @@ export class LinuxSandboxManager implements SandboxManager {
     return parsePosixSandboxDenials(result);
   }
 
+  getWorkspace(): string {
+    return this.options.workspace;
+  }
+
   private getMaskFilePath(): string {
     if (
       LinuxSandboxManager.maskFilePath &&

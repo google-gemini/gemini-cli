@@ -36,8 +36,8 @@ export function createSandboxManager(
     } else if (os.platform() === 'darwin') {
       return new MacOsSandboxManager(options);
     }
-    return new LocalSandboxManager();
+    return new LocalSandboxManager(options);
   }
 
-  return new NoopSandboxManager();
+  return new NoopSandboxManager(options);
 }

@@ -72,6 +72,10 @@ export class WindowsSandboxManager implements SandboxManager {
     return parseWindowsSandboxDenials(result);
   }
 
+  getWorkspace(): string {
+    return this.options.workspace;
+  }
+
   /**
    * Ensures a file or directory exists.
    */
