@@ -291,6 +291,10 @@ export class Storage {
     return path.join(this.getGeminiDir(), 'agents');
   }
 
+  getProjectTeamsDir(): string {
+    return path.join(this.getGeminiDir(), 'teams');
+  }
+
   getProjectTempCheckpointsDir(): string {
     return path.join(this.getProjectTempDir(), 'checkpoints');
   }

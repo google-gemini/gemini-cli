@@ -340,3 +340,26 @@ export interface RunConfig {
    */
   maxTurns?: number;
 }
+
+/**
+ * Represents a team of agents orchestrated by a set of instructions.
+ */
+export interface TeamDefinition {
+  /** The directory name (slug) of the team. */
+  name: string;
+  /** The human-readable name of the team. */
+  displayName: string;
+  /** A short description of the team's purpose. */
+  description: string;
+  /** Orchestration instructions for the top-level agent. */
+  instructions: string;
+  /** The list of agents that comprise the team. */
+  agents: AgentDefinition[];
+  /** Optional metadata for the team definition. */
+  metadata?: {
+    /** SHA-256 hash of the TEAM.md content. */
+    hash?: string;
+    /** Absolute path to the TEAM.md file. */
+    filePath?: string;
+  };
+}

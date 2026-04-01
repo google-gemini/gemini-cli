@@ -150,6 +150,7 @@ import {
   type Experiments,
 } from '../code_assist/experiments/experiments.js';
 import { AgentRegistry } from '../agents/registry.js';
+import { TeamRegistry } from '../agents/teamRegistry.js';
 import { AcknowledgedAgentsService } from '../agents/acknowledgedAgents.js';
 import { setGlobalProxy } from '../utils/fetch.js';
 import { SubagentTool } from '../agents/subagent-tool.js';
@@ -752,6 +753,7 @@ export class Config implements McpContext, AgentLoopContext {
   private _promptRegistry!: PromptRegistry;
   private _resourceRegistry!: ResourceRegistry;
   private agentRegistry!: AgentRegistry;
+  private teamRegistry!: TeamRegistry;
   private readonly acknowledgedAgentsService: AcknowledgedAgentsService;
   private skillManager!: SkillManager;
   private _sessionId: string;
@@ -1431,6 +1433,9 @@ export class Config implements McpContext, AgentLoopContext {
     this.agentRegistry = new AgentRegistry(this);
     await this.agentRegistry.initialize();
 
+    this.teamRegistry = new TeamRegistry(this, this.agentRegistry);
+    await this.teamRegistry.initialize();
+
     coreEvents.on(CoreEvent.AgentsRefreshed, this.onAgentsRefreshed);
 
     this._toolRegistry = await this.createToolRegistry();
@@ -2024,6 +2029,10 @@ export class Config implements McpContext, AgentLoopContext {
 
   getAgentRegistry(): AgentRegistry {
     return this.agentRegistry;
+  }
+
+  getTeamRegistry(): TeamRegistry {
+    return this.teamRegistry;
   }
 
   getAcknowledgedAgentsService(): AcknowledgedAgentsService {

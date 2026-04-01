@@ -317,7 +317,7 @@ export class AgentRegistry {
    * it will be overwritten, respecting the precedence established by the
    * initialization order.
    */
-  protected async registerAgent<TOutput extends z.ZodTypeAny>(
+  async registerAgent<TOutput extends z.ZodTypeAny>(
     definition: AgentDefinition<TOutput>,
   ): Promise<void> {
     if (definition.kind === 'local') {
