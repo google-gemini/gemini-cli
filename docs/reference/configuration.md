@@ -141,6 +141,11 @@ their corresponding top-level category object in your `settings.json` file.
   - **Default:** `false`
   - **Requires restart:** Yes
 
+- **`general.plan.enabled`** (boolean):
+  - **Description:** Enable Plan Mode for read-only safety during planning.
+  - **Default:** `true`
+  - **Requires restart:** Yes
+
 - **`general.plan.directory`** (string):
   - **Description:** The directory where planning artifacts are stored. If not
     specified, defaults to the system temporary directory. A custom directory
@@ -256,6 +261,11 @@ their corresponding top-level category object in your `settings.json` file.
 - **`ui.showShortcutsHint`** (boolean):
   - **Description:** Show the "? for shortcuts" hint above the input.
   - **Default:** `true`
+
+- **`ui.compactToolOutput`** (boolean):
+  - **Description:** Display tool outputs (like directory listings and file
+    reads) in a compact, structured format.
+  - **Default:** `false`
 
 - **`ui.hideBanner`** (boolean):
   - **Description:** Hide the application banner
@@ -1637,7 +1647,7 @@ their corresponding top-level category object in your `settings.json` file.
 
 - **`experimental.jitContext`** (boolean):
   - **Description:** Enable Just-In-Time (JIT) context loading.
-  - **Default:** `true`
+  - **Default:** `false`
   - **Requires restart:** Yes
 
 - **`experimental.useOSC52Paste`** (boolean):
@@ -1651,11 +1661,6 @@ their corresponding top-level category object in your `settings.json` file.
     default system when using remote terminal sessions (if your terminal is
     configured to allow it).
   - **Default:** `false`
-
-- **`experimental.plan`** (boolean):
-  - **Description:** Enable Plan Mode.
-  - **Default:** `true`
-  - **Requires restart:** Yes
 
 - **`experimental.taskTracker`** (boolean):
   - **Description:** Enable task tracker tools.
@@ -1702,25 +1707,8 @@ their corresponding top-level category object in your `settings.json` file.
   - **Default:** `false`
   - **Requires restart:** Yes
 
-- **`experimental.agentHistoryTruncation`** (boolean):
-  - **Description:** Enable truncation window logic for the Agent History
-    Provider.
-  - **Default:** `false`
-  - **Requires restart:** Yes
-
-- **`experimental.agentHistoryTruncationThreshold`** (number):
-  - **Description:** The maximum number of messages before history is truncated.
-  - **Default:** `30`
-  - **Requires restart:** Yes
-
-- **`experimental.agentHistoryRetainedMessages`** (number):
-  - **Description:** The number of recent messages to retain after truncation.
-  - **Default:** `15`
-  - **Requires restart:** Yes
-
-- **`experimental.agentHistorySummarization`** (boolean):
-  - **Description:** Enable summarization of truncated content via a small model
-    for the Agent History Provider.
+- **`experimental.contextManagement`** (boolean):
+  - **Description:** Enable logic for context management.
   - **Default:** `false`
   - **Requires restart:** Yes
 
@@ -1814,6 +1802,49 @@ their corresponding top-level category object in your `settings.json` file.
   - **Description:** Hooks that execute before tool selection. Can filter or
     prioritize available tools dynamically.
   - **Default:** `[]`
+
+#### `contextManagement`
+
+- **`contextManagement.historyWindow.maxTokens`** (number):
+  - **Description:** The number of tokens to allow before triggering
+    compression.
+  - **Default:** `150000`
+  - **Requires restart:** Yes
+
+- **`contextManagement.historyWindow.retainedTokens`** (number):
+  - **Description:** The number of tokens to always retain.
+  - **Default:** `40000`
+  - **Requires restart:** Yes
+
+- **`contextManagement.messageLimits.normalMaxTokens`** (number):
+  - **Description:** The target number of tokens to budget for a normal
+    conversation turn.
+  - **Default:** `2500`
+  - **Requires restart:** Yes
+
+- **`contextManagement.messageLimits.retainedMaxTokens`** (number):
+  - **Description:** The maximum number of tokens a single conversation turn can
+    consume before truncation.
+  - **Default:** `12000`
+  - **Requires restart:** Yes
+
+- **`contextManagement.messageLimits.normalizationHeadRatio`** (number):
+  - **Description:** The ratio of tokens to retain from the beginning of a
+    truncated message (0.0 to 1.0).
+  - **Default:** `0.25`
+  - **Requires restart:** Yes
+
+- **`contextManagement.toolDistillation.maxOutputTokens`** (number):
+  - **Description:** Maximum tokens to show when truncating large tool outputs.
+  - **Default:** `10000`
+  - **Requires restart:** Yes
+
+- **`contextManagement.toolDistillation.summarizationThresholdTokens`**
+  (number):
+  - **Description:** Threshold above which truncated tool outputs will be
+    summarized by an LLM.
+  - **Default:** `20000`
+  - **Requires restart:** Yes
 
 #### `admin`
 

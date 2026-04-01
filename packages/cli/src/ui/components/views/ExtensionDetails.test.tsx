@@ -10,6 +10,7 @@ import { waitFor } from '../../../test-utils/async.js';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { ExtensionDetails } from './ExtensionDetails.js';
 import { type RegistryExtension } from '../../../config/extensionRegistryClient.js';
+import { ExtensionUpdateState } from '../../state/extensions.js';
 
 const mockExtension: RegistryExtension = {
   id: 'ext1',
@@ -48,7 +49,11 @@ describe('ExtensionDetails', () => {
     mockOnLink = vi.fn();
   });
 
-  const renderDetails = async (isInstalled = false) =>
+  const renderDetails = async (
+    isInstalled = false,
+    updateState?: ExtensionUpdateState,
+    onUpdate = vi.fn(),
+  ) =>
     renderWithProviders(
       <ExtensionDetails
         extension={mockExtension}
@@ -56,6 +61,8 @@ describe('ExtensionDetails', () => {
         onInstall={mockOnInstall}
         onLink={mockOnLink}
         isInstalled={isInstalled}
+        updateState={updateState}
+        onUpdate={onUpdate}
       />,
     );
 
@@ -163,6 +170,42 @@ describe('ExtensionDetails', () => {
     );
     await waitFor(() => {
       expect(lastFrame()).toContain('[L] Link');
+    });
+  });
+
+  it('should show update button when update is available', async () => {
+    const { lastFrame } = await renderDetails(
+      true,
+      ExtensionUpdateState.UPDATE_AVAILABLE,
+    );
+    await waitFor(() => {
+      expect(lastFrame()).toContain('[I] Update');
+    });
+  });
+
+  it('should call onUpdate when "i" is pressed', async () => {
+    const mockOnUpdate = vi.fn();
+    const { stdin } = await renderDetails(
+      true,
+      ExtensionUpdateState.UPDATE_AVAILABLE,
+      mockOnUpdate,
+    );
+    await React.act(async () => {
+      stdin.write('i');
+    });
+    await waitFor(() => {
+      expect(mockOnUpdate).toHaveBeenCalled();
+    });
+  });
+
+  it('should show [Updating...] and hide "Already Installed" when update is in progress', async () => {
+    const { lastFrame } = await renderDetails(
+      true,
+      ExtensionUpdateState.UPDATING,
+    );
+    await waitFor(() => {
+      expect(lastFrame()).toContain('[Updating...]');
+      expect(lastFrame()).not.toContain('Already Installed');
     });
   });
 });
