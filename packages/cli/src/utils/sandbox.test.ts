@@ -514,6 +514,41 @@ describe('sandbox', () => {
       );
     });
 
+    it('should handle SANDBOX_ENV in macOS seatbelt', async () => {
+      vi.mocked(os.platform).mockReturnValue('darwin');
+      process.env['SANDBOX_ENV'] = 'MY_VAR=hello,ANOTHER_VAR=world';
+      const config: SandboxConfig = createMockSandboxConfig({
+        command: 'sandbox-exec',
+        image: 'some-image',
+      });
+
+      interface MockProcess extends EventEmitter {
+        stdout: EventEmitter;
+        stderr: EventEmitter;
+      }
+      const mockSpawnProcess = new EventEmitter() as MockProcess;
+      mockSpawnProcess.stdout = new EventEmitter();
+      mockSpawnProcess.stderr = new EventEmitter();
+      vi.mocked(spawn).mockReturnValue(
+        mockSpawnProcess as unknown as ReturnType<typeof spawn>,
+      );
+
+      const promise = start_sandbox(config);
+      setTimeout(() => mockSpawnProcess.emit('close', 0), 10);
+      await promise;
+
+      // Check that SANDBOX_ENV variables are passed in the sh -c command
+      expect(spawn).toHaveBeenCalledWith(
+        'sandbox-exec',
+        expect.arrayContaining([
+          'sh',
+          '-c',
+          expect.stringContaining('MY_VAR=hello ANOTHER_VAR=world'),
+        ]),
+        expect.any(Object),
+      );
+    });
+
     it('should pass through GOOGLE_GEMINI_BASE_URL and GOOGLE_VERTEX_BASE_URL', async () => {
       const config: SandboxConfig = createMockSandboxConfig({
         command: 'docker',

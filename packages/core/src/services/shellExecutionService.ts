@@ -425,6 +425,20 @@ export class ShellExecutionService {
       GIT_PAGER: shellExecutionConfig.pager ?? 'cat',
     };
 
+    // Forward SANDBOX_ENV key=value pairs
+    if (process.env['SANDBOX_ENV']) {
+      for (let env of process.env['SANDBOX_ENV'].split(',')) {
+        if ((env = env.trim())) {
+          const index = env.indexOf('=');
+          if (index > 0) {
+            const key = env.substring(0, index);
+            const value = env.substring(index + 1);
+            baseEnv[key] = value;
+          }
+        }
+      }
+    }
+
     if (!isInteractive) {
       // Ensure all GIT_CONFIG_* variables are preserved even if they were redacted
       for (const key of gitConfigKeys) {
