@@ -1067,4 +1067,96 @@ describe('BrowserManager', () => {
       );
     });
   });
+
+  describe('sandbox behavior', () => {
+    afterEach(() => {
+      vi.unstubAllEnvs();
+    });
+
+    it('should force --isolated and --headless when in seatbelt sandbox with persistent mode', async () => {
+      vi.stubEnv('SANDBOX', 'sandbox-exec');
+      const feedbackSpy = vi
+        .spyOn(coreEvents, 'emitFeedback')
+        .mockImplementation(() => {});
+
+      const manager = new BrowserManager(mockConfig); // default persistent mode
+      await manager.ensureConnection();
+
+      const args = vi.mocked(StdioClientTransport).mock.calls[0]?.[0]
+        ?.args as string[];
+      expect(args).toContain('--isolated');
+      expect(args).toContain('--headless');
+      expect(args).not.toContain('--userDataDir');
+      expect(args).not.toContain('--autoConnect');
+      expect(feedbackSpy).toHaveBeenCalledWith(
+        'info',
+        expect.stringContaining('isolated browser session'),
+      );
+    });
+
+    it('should preserve --autoConnect when in seatbelt sandbox with existing mode', async () => {
+      vi.stubEnv('SANDBOX', 'sandbox-exec');
+      const existingConfig = makeFakeConfig({
+        agents: {
+          overrides: { browser_agent: { enabled: true } },
+          browser: { sessionMode: 'existing' },
+        },
+      });
+
+      const manager = new BrowserManager(existingConfig);
+      await manager.ensureConnection();
+
+      const args = vi.mocked(StdioClientTransport).mock.calls[0]?.[0]
+        ?.args as string[];
+      expect(args).toContain('--autoConnect');
+      expect(args).not.toContain('--isolated');
+      // Headless should NOT be forced for existing mode in seatbelt
+      expect(args).not.toContain('--headless');
+    });
+
+    it('should use --browser-url with resolved IP for container sandbox with existing mode', async () => {
+      vi.stubEnv('SANDBOX', 'docker-container-0');
+      // Mock DNS resolution of host.docker.internal
+      const dns = await import('node:dns');
+      vi.spyOn(dns.promises, 'lookup').mockResolvedValue({
+        address: '192.168.127.254',
+        family: 4,
+      });
+      const feedbackSpy = vi
+        .spyOn(coreEvents, 'emitFeedback')
+        .mockImplementation(() => {});
+      const existingConfig = makeFakeConfig({
+        agents: {
+          overrides: { browser_agent: { enabled: true } },
+          browser: { sessionMode: 'existing' },
+        },
+      });
+
+      const manager = new BrowserManager(existingConfig);
+      await manager.ensureConnection();
+
+      const args = vi.mocked(StdioClientTransport).mock.calls[0]?.[0]
+        ?.args as string[];
+      expect(args).toContain('--browser-url');
+      expect(args).toContain('http://192.168.127.254:9222');
+      expect(args).not.toContain('--autoConnect');
+      expect(feedbackSpy).toHaveBeenCalledWith(
+        'info',
+        expect.stringContaining('192.168.127.254:9222'),
+      );
+    });
+
+    it('should not override session mode when not in sandbox', async () => {
+      vi.stubEnv('SANDBOX', '');
+      const manager = new BrowserManager(mockConfig);
+      await manager.ensureConnection();
+
+      const args = vi.mocked(StdioClientTransport).mock.calls[0]?.[0]
+        ?.args as string[];
+      // Default persistent mode: no --isolated, no --autoConnect
+      expect(args).not.toContain('--isolated');
+      expect(args).not.toContain('--autoConnect');
+      expect(args).toContain('--userDataDir');
+    });
+  });
 });

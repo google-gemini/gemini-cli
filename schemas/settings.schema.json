@@ -2748,44 +2748,6 @@
       "default": {},
       "type": "object",
       "properties": {
-        "toolOutputMasking": {
-          "title": "Tool Output Masking",
-          "description": "Advanced settings for tool output masking to manage context window efficiency.",
-          "markdownDescription": "Advanced settings for tool output masking to manage context window efficiency.\n\n- Category: `Experimental`\n- Requires restart: `yes`\n- Default: `{}`",
-          "default": {},
-          "type": "object",
-          "properties": {
-            "enabled": {
-              "title": "Enable Tool Output Masking",
-              "description": "Enables tool output masking to save tokens.",
-              "markdownDescription": "Enables tool output masking to save tokens.\n\n- Category: `Experimental`\n- Requires restart: `yes`\n- Default: `true`",
-              "default": true,
-              "type": "boolean"
-            },
-            "toolProtectionThreshold": {
-              "title": "Tool Protection Threshold",
-              "description": "Minimum number of tokens to protect from masking (most recent tool outputs).",
-              "markdownDescription": "Minimum number of tokens to protect from masking (most recent tool outputs).\n\n- Category: `Experimental`\n- Requires restart: `yes`\n- Default: `50000`",
-              "default": 50000,
-              "type": "number"
-            },
-            "minPrunableTokensThreshold": {
-              "title": "Min Prunable Tokens Threshold",
-              "description": "Minimum prunable tokens required to trigger a masking pass.",
-              "markdownDescription": "Minimum prunable tokens required to trigger a masking pass.\n\n- Category: `Experimental`\n- Requires restart: `yes`\n- Default: `30000`",
-              "default": 30000,
-              "type": "number"
-            },
-            "protectLatestTurn": {
-              "title": "Protect Latest Turn",
-              "description": "Ensures the absolute latest turn is never masked, regardless of token count.",
-              "markdownDescription": "Ensures the absolute latest turn is never masked, regardless of token count.\n\n- Category: `Experimental`\n- Requires restart: `yes`\n- Default: `true`",
-              "default": true,
-              "type": "boolean"
-            }
-          },
-          "additionalProperties": false
-        },
         "enableAgents": {
           "title": "Enable Agents",
           "description": "Enable local and remote subagents.",
@@ -3190,25 +3152,65 @@
           },
           "additionalProperties": false
         },
-        "toolDistillation": {
-          "title": "Tool Distillation",
+        "tools": {
+          "title": "Context Management Tools",
           "markdownDescription": "Description not provided.\n\n- Category: `Context Management`\n- Requires restart: `yes`\n- Default: `{}`",
           "default": {},
           "type": "object",
           "properties": {
-            "maxOutputTokens": {
-              "title": "Max Output Tokens",
-              "description": "Maximum tokens to show when truncating large tool outputs.",
-              "markdownDescription": "Maximum tokens to show when truncating large tool outputs.\n\n- Category: `Context Management`\n- Requires restart: `yes`\n- Default: `10000`",
-              "default": 10000,
-              "type": "number"
+            "distillation": {
+              "title": "Tool Distillation",
+              "markdownDescription": "Description not provided.\n\n- Category: `Context Management`\n- Requires restart: `yes`\n- Default: `{}`",
+              "default": {},
+              "type": "object",
+              "properties": {
+                "maxOutputTokens": {
+                  "title": "Max Output Tokens",
+                  "description": "Maximum tokens to show to the model when truncating large tool outputs.",
+                  "markdownDescription": "Maximum tokens to show to the model when truncating large tool outputs.\n\n- Category: `Context Management`\n- Requires restart: `yes`\n- Default: `10000`",
+                  "default": 10000,
+                  "type": "number"
+                },
+                "summarizationThresholdTokens": {
+                  "title": "Tool Summarization Threshold",
+                  "description": "Threshold above which truncated tool outputs will be summarized by an LLM.",
+                  "markdownDescription": "Threshold above which truncated tool outputs will be summarized by an LLM.\n\n- Category: `Context Management`\n- Requires restart: `yes`\n- Default: `20000`",
+                  "default": 20000,
+                  "type": "number"
+                }
+              },
+              "additionalProperties": false
             },
-            "summarizationThresholdTokens": {
-              "title": "Tool Summarization Threshold",
-              "description": "Threshold above which truncated tool outputs will be summarized by an LLM.",
-              "markdownDescription": "Threshold above which truncated tool outputs will be summarized by an LLM.\n\n- Category: `Context Management`\n- Requires restart: `yes`\n- Default: `20000`",
-              "default": 20000,
-              "type": "number"
+            "outputMasking": {
+              "title": "Tool Output Masking",
+              "description": "Advanced settings for tool output masking to manage context window efficiency.",
+              "markdownDescription": "Advanced settings for tool output masking to manage context window efficiency.\n\n- Category: `Context Management`\n- Requires restart: `yes`\n- Default: `{}`",
+              "default": {},
+              "type": "object",
+              "properties": {
+                "protectionThresholdTokens": {
+                  "title": "Tool Protection Threshold (Tokens)",
+                  "description": "Minimum number of tokens to protect from masking (most recent tool outputs).",
+                  "markdownDescription": "Minimum number of tokens to protect from masking (most recent tool outputs).\n\n- Category: `Context Management`\n- Requires restart: `yes`\n- Default: `50000`",
+                  "default": 50000,
+                  "type": "number"
+                },
+                "minPrunableThresholdTokens": {
+                  "title": "Min Prunable Tokens Threshold",
+                  "description": "Minimum prunable tokens required to trigger a masking pass.",
+                  "markdownDescription": "Minimum prunable tokens required to trigger a masking pass.\n\n- Category: `Context Management`\n- Requires restart: `yes`\n- Default: `30000`",
+                  "default": 30000,
+                  "type": "number"
+                },
+                "protectLatestTurn": {
+                  "title": "Protect Latest Turn",
+                  "description": "Ensures the absolute latest turn is never masked, regardless of token count.",
+                  "markdownDescription": "Ensures the absolute latest turn is never masked, regardless of token count.\n\n- Category: `Context Management`\n- Requires restart: `yes`\n- Default: `true`",
+                  "default": true,
+                  "type": "boolean"
+                }
+              },
+              "additionalProperties": false
             }
           },
           "additionalProperties": false
