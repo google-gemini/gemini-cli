@@ -537,266 +537,282 @@ export class LocalAgentExecutor<TOutput extends z.ZodTypeAny> {
       new AgentStartEvent(this.agentId, this.definition.name),
     );
 
-    let chat: GeminiChat | undefined;
-    let tools: FunctionDeclaration[] | undefined;
-    try {
-      // Inject standard runtime context into inputs
-      const augmentedInputs = {
-        ...inputs,
-        cliVersion: await getVersion(),
-        activeModel: this.context.config.getActiveModel(),
-        today: new Date().toLocaleDateString(),
-      };
+    // Run the agent loop inside a scoped workspace context so that any
+    // additional directories declared by this agent (e.g., ~/.gemini for the
+    // memory manager) are visible only within this async execution tree.
+    return this.context.config.runWithWorkspaceScope(
+      this.definition.workspaceDirs ?? [],
+      async () => {
+        let chat: GeminiChat | undefined;
+        let tools: FunctionDeclaration[] | undefined;
+        try {
+          // Inject standard runtime context into inputs
+          const augmentedInputs = {
+            ...inputs,
+            cliVersion: await getVersion(),
+            activeModel: this.context.config.getActiveModel(),
+            today: new Date().toLocaleDateString(),
+          };
 
-      tools = this.prepareToolsList();
-      chat = await this.createChatObject(augmentedInputs, tools);
-      const query = this.definition.promptConfig.query
-        ? templateString(this.definition.promptConfig.query, augmentedInputs)
-        : DEFAULT_QUERY_STRING;
+          tools = this.prepareToolsList();
+          chat = await this.createChatObject(augmentedInputs, tools);
+          const query = this.definition.promptConfig.query
+            ? templateString(
+                this.definition.promptConfig.query,
+                augmentedInputs,
+              )
+            : DEFAULT_QUERY_STRING;
 
-      const pendingHintsQueue: string[] = [];
-      const pendingBgCompletionsQueue: string[] = [];
-      const injectionListener = (text: string, source: InjectionSource) => {
-        if (source === 'user_steering') {
-          pendingHintsQueue.push(text);
-        } else if (source === 'background_completion') {
-          pendingBgCompletionsQueue.push(text);
-        }
-      };
-      // Capture the index of the last hint before starting to avoid re-injecting old hints.
-      // NOTE: Hints added AFTER this point will be broadcast to all currently running
-      // local agents via the listener below.
-      const startIndex =
-        this.context.config.injectionService.getLatestInjectionIndex();
-      this.context.config.injectionService.onInjection(injectionListener);
-
-      try {
-        const initialHints =
-          this.context.config.injectionService.getInjectionsAfter(
-            startIndex,
-            'user_steering',
-          );
-        const formattedInitialHints = formatUserHintsForModel(initialHints);
-
-        // Inject loaded memory files (JIT + extension/project memory)
-        const environmentMemory = this.context.config.isJitContextEnabled?.()
-          ? this.context.config.getSessionMemory()
-          : this.context.config.getEnvironmentMemory();
-
-        const initialParts: Part[] = [];
-        if (environmentMemory) {
-          initialParts.push({ text: environmentMemory });
-        }
-        if (formattedInitialHints) {
-          initialParts.push({ text: formattedInitialHints });
-        }
-        initialParts.push({ text: query });
-
-        let currentMessage: Content = {
-          role: 'user',
-          parts: initialParts,
-        };
-
-        while (true) {
-          // Check for termination conditions like max turns.
-          const reason = this.checkTermination(turnCounter, maxTurns);
-          if (reason) {
-            terminateReason = reason;
-            break;
-          }
-
-          // Check for timeout or external abort.
-          if (combinedSignal.aborted) {
-            // Determine which signal caused the abort.
-            terminateReason = deadlineTimer.signal.aborted
-              ? AgentTerminateMode.TIMEOUT
-              : AgentTerminateMode.ABORTED;
-            break;
-          }
-
-          const turnResult = await this.executeTurn(
-            chat,
-            currentMessage,
-            turnCounter++,
-            combinedSignal,
-            deadlineTimer.signal,
-            onWaitingForConfirmation,
-          );
-
-          if (turnResult.status === 'stop') {
-            terminateReason = turnResult.terminateReason;
-            // Only set finalResult if the turn provided one (e.g., error or goal).
-            if (turnResult.finalResult) {
-              finalResult = turnResult.finalResult;
+          const pendingHintsQueue: string[] = [];
+          const pendingBgCompletionsQueue: string[] = [];
+          const injectionListener = (text: string, source: InjectionSource) => {
+            if (source === 'user_steering') {
+              pendingHintsQueue.push(text);
+            } else if (source === 'background_completion') {
+              pendingBgCompletionsQueue.push(text);
             }
-            break; // Exit the loop for *any* stop reason.
-          }
+          };
+          // Capture the index of the last hint before starting to avoid re-injecting old hints.
+          // NOTE: Hints added AFTER this point will be broadcast to all currently running
+          // local agents via the listener below.
+          const startIndex =
+            this.context.config.injectionService.getLatestInjectionIndex();
+          this.context.config.injectionService.onInjection(injectionListener);
 
-          // If status is 'continue', update message for the next loop
-          currentMessage = turnResult.nextMessage;
+          try {
+            const initialHints =
+              this.context.config.injectionService.getInjectionsAfter(
+                startIndex,
+                'user_steering',
+              );
+            const formattedInitialHints = formatUserHintsForModel(initialHints);
 
-          // Prepend inter-turn injections. User hints are unshifted first so
-          // that bg completions (unshifted second) appear before them in the
-          // final message — the model sees context before the user's reaction.
-          if (pendingHintsQueue.length > 0) {
-            const hintsToProcess = [...pendingHintsQueue];
-            pendingHintsQueue.length = 0;
-            const formattedHints = formatUserHintsForModel(hintsToProcess);
-            if (formattedHints) {
-              currentMessage.parts ??= [];
-              currentMessage.parts.unshift({ text: formattedHints });
+            // Inject loaded memory files (JIT + extension/project memory)
+            const environmentMemory =
+              this.context.config.isJitContextEnabled?.()
+                ? this.context.config.getSessionMemory()
+                : this.context.config.getEnvironmentMemory();
+
+            const initialParts: Part[] = [];
+            if (environmentMemory) {
+              initialParts.push({ text: environmentMemory });
+            }
+            if (formattedInitialHints) {
+              initialParts.push({ text: formattedInitialHints });
+            }
+            initialParts.push({ text: query });
+
+            let currentMessage: Content = {
+              role: 'user',
+              parts: initialParts,
+            };
+
+            while (true) {
+              // Check for termination conditions like max turns.
+              const reason = this.checkTermination(turnCounter, maxTurns);
+              if (reason) {
+                terminateReason = reason;
+                break;
+              }
+
+              // Check for timeout or external abort.
+              if (combinedSignal.aborted) {
+                // Determine which signal caused the abort.
+                terminateReason = deadlineTimer.signal.aborted
+                  ? AgentTerminateMode.TIMEOUT
+                  : AgentTerminateMode.ABORTED;
+                break;
+              }
+
+              const turnResult = await this.executeTurn(
+                chat,
+                currentMessage,
+                turnCounter++,
+                combinedSignal,
+                deadlineTimer.signal,
+                onWaitingForConfirmation,
+              );
+
+              if (turnResult.status === 'stop') {
+                terminateReason = turnResult.terminateReason;
+                // Only set finalResult if the turn provided one (e.g., error or goal).
+                if (turnResult.finalResult) {
+                  finalResult = turnResult.finalResult;
+                }
+                break; // Exit the loop for *any* stop reason.
+              }
+
+              // If status is 'continue', update message for the next loop
+              currentMessage = turnResult.nextMessage;
+
+              // Prepend inter-turn injections. User hints are unshifted first so
+              // that bg completions (unshifted second) appear before them in the
+              // final message — the model sees context before the user's reaction.
+              if (pendingHintsQueue.length > 0) {
+                const hintsToProcess = [...pendingHintsQueue];
+                pendingHintsQueue.length = 0;
+                const formattedHints = formatUserHintsForModel(hintsToProcess);
+                if (formattedHints) {
+                  currentMessage.parts ??= [];
+                  currentMessage.parts.unshift({ text: formattedHints });
+                }
+              }
+
+              if (pendingBgCompletionsQueue.length > 0) {
+                const bgText = pendingBgCompletionsQueue.join('\n');
+                pendingBgCompletionsQueue.length = 0;
+                currentMessage.parts ??= [];
+                currentMessage.parts.unshift({
+                  text: formatBackgroundCompletionForModel(bgText),
+                });
+              }
+            }
+          } finally {
+            this.context.config.injectionService.offInjection(
+              injectionListener,
+            );
+
+            const globalMcpManager = this.context.config.getMcpClientManager();
+            if (globalMcpManager) {
+              globalMcpManager.removeRegistries({
+                toolRegistry: this.toolRegistry,
+                promptRegistry: this.promptRegistry,
+                resourceRegistry: this.resourceRegistry,
+              });
             }
           }
 
-          if (pendingBgCompletionsQueue.length > 0) {
-            const bgText = pendingBgCompletionsQueue.join('\n');
-            pendingBgCompletionsQueue.length = 0;
-            currentMessage.parts ??= [];
-            currentMessage.parts.unshift({
-              text: formatBackgroundCompletionForModel(bgText),
-            });
+          // === UNIFIED RECOVERY BLOCK ===
+          // Only attempt recovery if it's a known recoverable reason.
+          // We don't recover from GOAL (already done) or ABORTED (user cancelled).
+          if (
+            terminateReason !== AgentTerminateMode.ERROR &&
+            terminateReason !== AgentTerminateMode.ABORTED &&
+            terminateReason !== AgentTerminateMode.GOAL
+          ) {
+            const recoveryResult = await this.executeFinalWarningTurn(
+              chat,
+              turnCounter, // Use current turnCounter for the recovery attempt
+              terminateReason,
+              signal, // Pass the external signal
+              onWaitingForConfirmation,
+            );
+
+            if (recoveryResult !== null) {
+              // Recovery Succeeded
+              terminateReason = AgentTerminateMode.GOAL;
+              finalResult = recoveryResult;
+            } else {
+              // Recovery Failed. Set the final error message based on the *original* reason.
+              if (terminateReason === AgentTerminateMode.TIMEOUT) {
+                finalResult = `Agent timed out after ${maxTimeMinutes} minutes.`;
+                this.emitActivity('ERROR', {
+                  error: finalResult,
+                  context: 'timeout',
+                  errorType: SubagentActivityErrorType.GENERIC,
+                });
+              } else if (terminateReason === AgentTerminateMode.MAX_TURNS) {
+                finalResult = `Agent reached max turns limit (${maxTurns}).`;
+                this.emitActivity('ERROR', {
+                  error: finalResult,
+                  context: 'max_turns',
+                  errorType: SubagentActivityErrorType.GENERIC,
+                });
+              } else if (
+                terminateReason ===
+                AgentTerminateMode.ERROR_NO_COMPLETE_TASK_CALL
+              ) {
+                // The finalResult was already set by executeTurn, but we re-emit just in case.
+                finalResult =
+                  finalResult ||
+                  `Agent stopped calling tools but did not call '${TASK_COMPLETE_TOOL_NAME}'.`;
+                this.emitActivity('ERROR', {
+                  error: finalResult,
+                  context: 'protocol_violation',
+                  errorType: SubagentActivityErrorType.GENERIC,
+                });
+              }
+            }
           }
-        }
-      } finally {
-        this.context.config.injectionService.offInjection(injectionListener);
 
-        const globalMcpManager = this.context.config.getMcpClientManager();
-        if (globalMcpManager) {
-          globalMcpManager.removeRegistries({
-            toolRegistry: this.toolRegistry,
-            promptRegistry: this.promptRegistry,
-            resourceRegistry: this.resourceRegistry,
-          });
-        }
-      }
+          // === FINAL RETURN LOGIC ===
+          if (terminateReason === AgentTerminateMode.GOAL) {
+            return {
+              result: finalResult || 'Task completed.',
+              terminate_reason: terminateReason,
+            };
+          }
 
-      // === UNIFIED RECOVERY BLOCK ===
-      // Only attempt recovery if it's a known recoverable reason.
-      // We don't recover from GOAL (already done) or ABORTED (user cancelled).
-      if (
-        terminateReason !== AgentTerminateMode.ERROR &&
-        terminateReason !== AgentTerminateMode.ABORTED &&
-        terminateReason !== AgentTerminateMode.GOAL
-      ) {
-        const recoveryResult = await this.executeFinalWarningTurn(
-          chat,
-          turnCounter, // Use current turnCounter for the recovery attempt
-          terminateReason,
-          signal, // Pass the external signal
-          onWaitingForConfirmation,
-        );
+          return {
+            result:
+              finalResult ||
+              'Agent execution was terminated before completion.',
+            terminate_reason: terminateReason,
+          };
+        } catch (error) {
+          // Check if the error is an AbortError caused by our internal timeout.
+          if (
+            error instanceof Error &&
+            error.name === 'AbortError' &&
+            deadlineTimer.signal.aborted &&
+            !signal.aborted // Ensure the external signal was not the cause
+          ) {
+            terminateReason = AgentTerminateMode.TIMEOUT;
 
-        if (recoveryResult !== null) {
-          // Recovery Succeeded
-          terminateReason = AgentTerminateMode.GOAL;
-          finalResult = recoveryResult;
-        } else {
-          // Recovery Failed. Set the final error message based on the *original* reason.
-          if (terminateReason === AgentTerminateMode.TIMEOUT) {
+            // Also use the unified recovery logic here
+            if (chat && tools) {
+              const recoveryResult = await this.executeFinalWarningTurn(
+                chat,
+                turnCounter, // Use current turnCounter
+                AgentTerminateMode.TIMEOUT,
+                signal,
+                onWaitingForConfirmation,
+              );
+
+              if (recoveryResult !== null) {
+                // Recovery Succeeded
+                terminateReason = AgentTerminateMode.GOAL;
+                finalResult = recoveryResult;
+                return {
+                  result: finalResult,
+                  terminate_reason: terminateReason,
+                };
+              }
+            }
+
+            // Recovery failed or wasn't possible
             finalResult = `Agent timed out after ${maxTimeMinutes} minutes.`;
             this.emitActivity('ERROR', {
               error: finalResult,
               context: 'timeout',
               errorType: SubagentActivityErrorType.GENERIC,
             });
-          } else if (terminateReason === AgentTerminateMode.MAX_TURNS) {
-            finalResult = `Agent reached max turns limit (${maxTurns}).`;
-            this.emitActivity('ERROR', {
-              error: finalResult,
-              context: 'max_turns',
-              errorType: SubagentActivityErrorType.GENERIC,
-            });
-          } else if (
-            terminateReason === AgentTerminateMode.ERROR_NO_COMPLETE_TASK_CALL
-          ) {
-            // The finalResult was already set by executeTurn, but we re-emit just in case.
-            finalResult =
-              finalResult ||
-              `Agent stopped calling tools but did not call '${TASK_COMPLETE_TOOL_NAME}'.`;
-            this.emitActivity('ERROR', {
-              error: finalResult,
-              context: 'protocol_violation',
-              errorType: SubagentActivityErrorType.GENERIC,
-            });
-          }
-        }
-      }
-
-      // === FINAL RETURN LOGIC ===
-      if (terminateReason === AgentTerminateMode.GOAL) {
-        return {
-          result: finalResult || 'Task completed.',
-          terminate_reason: terminateReason,
-        };
-      }
-
-      return {
-        result:
-          finalResult || 'Agent execution was terminated before completion.',
-        terminate_reason: terminateReason,
-      };
-    } catch (error) {
-      // Check if the error is an AbortError caused by our internal timeout.
-      if (
-        error instanceof Error &&
-        error.name === 'AbortError' &&
-        deadlineTimer.signal.aborted &&
-        !signal.aborted // Ensure the external signal was not the cause
-      ) {
-        terminateReason = AgentTerminateMode.TIMEOUT;
-
-        // Also use the unified recovery logic here
-        if (chat && tools) {
-          const recoveryResult = await this.executeFinalWarningTurn(
-            chat,
-            turnCounter, // Use current turnCounter
-            AgentTerminateMode.TIMEOUT,
-            signal,
-            onWaitingForConfirmation,
-          );
-
-          if (recoveryResult !== null) {
-            // Recovery Succeeded
-            terminateReason = AgentTerminateMode.GOAL;
-            finalResult = recoveryResult;
             return {
               result: finalResult,
               terminate_reason: terminateReason,
             };
           }
+
+          this.emitActivity('ERROR', {
+            error: String(error),
+            errorType: SubagentActivityErrorType.GENERIC,
+          });
+          throw error; // Re-throw other errors or external aborts.
+        } finally {
+          deadlineTimer.abort();
+          logAgentFinish(
+            this.context.config,
+            new AgentFinishEvent(
+              this.agentId,
+              this.definition.name,
+              Date.now() - startTime,
+              turnCounter,
+              terminateReason,
+            ),
+          );
         }
-
-        // Recovery failed or wasn't possible
-        finalResult = `Agent timed out after ${maxTimeMinutes} minutes.`;
-        this.emitActivity('ERROR', {
-          error: finalResult,
-          context: 'timeout',
-          errorType: SubagentActivityErrorType.GENERIC,
-        });
-        return {
-          result: finalResult,
-          terminate_reason: terminateReason,
-        };
-      }
-
-      this.emitActivity('ERROR', {
-        error: String(error),
-        errorType: SubagentActivityErrorType.GENERIC,
-      });
-      throw error; // Re-throw other errors or external aborts.
-    } finally {
-      deadlineTimer.abort();
-      logAgentFinish(
-        this.context.config,
-        new AgentFinishEvent(
-          this.agentId,
-          this.definition.name,
-          Date.now() - startTime,
-          turnCounter,
-          terminateReason,
-        ),
-      );
-    }
+      }, // end of runWithWorkspaceScope callback
+    );
   }
 
   private async tryCompressChat(

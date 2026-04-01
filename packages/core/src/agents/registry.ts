@@ -261,21 +261,10 @@ export class AgentRegistry {
     }
 
     // Register the memory manager agent as a replacement for the save_memory tool.
+    // The agent declares its own workspaceDirs (e.g., ~/.gemini) in its definition,
+    // and LocalAgentExecutor creates a scoped child WorkspaceContext for it.
     if (this.config.isMemoryManagerEnabled()) {
       this.registerLocalAgent(MemoryManagerAgent(this.config));
-
-      // Ensure the global .gemini directory is accessible to tools.
-      // This allows the save_memory agent to read and write to it.
-      // Access control is enforced by the Policy Engine (memory-manager.toml).
-      try {
-        const globalDir = Storage.getGlobalGeminiDir();
-        this.config.getWorkspaceContext().addDirectory(globalDir);
-      } catch (e) {
-        debugLogger.warn(
-          `[AgentRegistry] Could not add global .gemini directory to workspace:`,
-          e,
-        );
-      }
     }
   }
 

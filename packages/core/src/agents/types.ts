@@ -215,6 +215,16 @@ export interface LocalAgentDefinition<
   toolConfig?: ToolConfig;
 
   /**
+   * Optional additional workspace directories scoped to this agent.
+   * These directories are added to a child WorkspaceContext for this agent only,
+   * without affecting the parent or other agents' workspace visibility.
+   *
+   * Example: The memory manager agent uses this to access ~/.gemini
+   * without leaking that directory to the main agent.
+   */
+  workspaceDirs?: string[];
+
+  /**
    * Optional inline MCP servers for this agent.
    */
   mcpServers?: Record<string, MCPServerConfig>;

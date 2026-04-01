@@ -493,3 +493,83 @@ describe('WorkspaceContext with optional directories', () => {
     expect(debugLogger.warn).not.toHaveBeenCalled();
   });
 });
+
+describe('WorkspaceContext.createChildScope', () => {
+  let tempDir: string;
+  let cwd: string;
+  let extraDir: string;
+
+  beforeEach(() => {
+    tempDir = fs.realpathSync(
+      fs.mkdtempSync(path.join(os.tmpdir(), 'workspace-context-child-')),
+    );
+    cwd = path.join(tempDir, 'project');
+    extraDir = path.join(tempDir, 'extra');
+    fs.mkdirSync(cwd, { recursive: true });
+    fs.mkdirSync(extraDir, { recursive: true });
+  });
+
+  afterEach(() => {
+    fs.rmSync(tempDir, { recursive: true, force: true });
+  });
+
+  it('should create a child with parent directories plus additional ones', () => {
+    const parent = new WorkspaceContext(cwd);
+    const child = parent.createChildScope([extraDir]);
+
+    expect(child.getDirectories()).toEqual([cwd, extraDir]);
+  });
+
+  it('should not modify the parent workspace', () => {
+    const parent = new WorkspaceContext(cwd);
+    parent.createChildScope([extraDir]);
+
+    expect(parent.getDirectories()).toEqual([cwd]);
+  });
+
+  it('should create an independent child that does not affect the parent', () => {
+    const parent = new WorkspaceContext(cwd);
+    const child = parent.createChildScope([]);
+
+    const anotherDir = path.join(tempDir, 'another');
+    fs.mkdirSync(anotherDir, { recursive: true });
+    child.addDirectory(anotherDir);
+
+    expect(child.getDirectories()).toContain(anotherDir);
+    expect(parent.getDirectories()).not.toContain(anotherDir);
+  });
+
+  it('child should allow paths within extra directories', () => {
+    const parent = new WorkspaceContext(cwd);
+    const child = parent.createChildScope([extraDir]);
+
+    const fileInExtra = path.join(extraDir, 'GEMINI.md');
+    expect(child.isPathWithinWorkspace(fileInExtra)).toBe(true);
+    expect(parent.isPathWithinWorkspace(fileInExtra)).toBe(false);
+  });
+
+  it('should return same directories when called with empty array', () => {
+    const parent = new WorkspaceContext(cwd);
+    const child = parent.createChildScope([]);
+
+    expect(child.getDirectories()).toEqual(parent.getDirectories());
+  });
+
+  it('should inherit readOnlyPaths from the parent', () => {
+    const readOnlyDir = path.join(tempDir, 'readonly');
+    fs.mkdirSync(readOnlyDir, { recursive: true });
+    const readOnlyFile = path.join(readOnlyDir, 'data.txt');
+    fs.writeFileSync(readOnlyFile, 'test');
+
+    const parent = new WorkspaceContext(cwd);
+    parent.addReadOnlyPath(readOnlyDir);
+
+    // Parent allows reading
+    expect(parent.isPathReadable(readOnlyFile)).toBe(true);
+
+    const child = parent.createChildScope([extraDir]);
+
+    // Child should also allow reading the parent's read-only path
+    expect(child.isPathReadable(readOnlyFile)).toBe(true);
+  });
+});

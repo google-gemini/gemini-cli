@@ -174,6 +174,29 @@ export class WorkspaceContext {
   }
 
   /**
+   * Creates a child WorkspaceContext that inherits all directories from this context
+   * plus any additional directories. The child is an independent instance — mutations
+   * to it do not affect the parent, and vice-versa.
+   *
+   * This is used to give subagents a scoped view of the workspace that may include
+   * extra directories (e.g., ~/.gemini for the memory manager) without leaking those
+   * directories to the parent or other agents.
+   *
+   * @param additionalDirectories Extra directories to include in the child scope.
+   * @returns A new WorkspaceContext with the combined set of directories.
+   */
+  createChildScope(additionalDirectories: string[] = []): WorkspaceContext {
+    const childDirs = [...this.getDirectories(), ...additionalDirectories];
+    // Use the same targetDir so relative path resolution is consistent.
+    const child = new WorkspaceContext(this.targetDir, childDirs.slice(1));
+    // Carry over read-only paths so the child inherits the parent's read allowances.
+    for (const roPath of this.readOnlyPaths) {
+      child.readOnlyPaths.add(roPath);
+    }
+    return child;
+  }
+
+  /**
    * Checks if a given path is within any of the workspace directories.
    * @param pathToCheck The path to validate
    * @returns True if the path is within the workspace, false otherwise

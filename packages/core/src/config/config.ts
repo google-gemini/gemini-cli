@@ -6,6 +6,7 @@
 
 import * as fs from 'node:fs';
 import * as path from 'node:path';
+import { AsyncLocalStorage } from 'node:async_hooks';
 import { SandboxPolicyManager } from '../policy/sandboxPolicyManager.js';
 import { inspect } from 'node:util';
 import process from 'node:process';
@@ -734,6 +735,14 @@ export interface ConfigParameters {
 }
 
 export class Config implements McpContext, AgentLoopContext {
+  /**
+   * Async-context-scoped workspace override. Each async execution tree (e.g., a
+   * subagent) gets its own store value, so concurrent subagents never trample
+   * each other's workspace views.
+   */
+  private static readonly workspaceScopeStorage =
+    new AsyncLocalStorage<WorkspaceContext>();
+
   private _toolRegistry!: ToolRegistry;
   private mcpClientManager?: McpClientManager;
   private readonly a2aClientManager?: A2AClientManager;
@@ -1989,7 +1998,28 @@ export class Config implements McpContext, AgentLoopContext {
   }
 
   getWorkspaceContext(): WorkspaceContext {
-    return this.workspaceContext;
+    return Config.workspaceScopeStorage.getStore() ?? this.workspaceContext;
+  }
+
+  /**
+   * Runs `fn` with an expanded workspace context that includes `additionalDirs`.
+   * The expanded scope is visible only within the async execution tree of `fn`,
+   * so concurrent subagents each get their own isolated workspace view.
+   *
+   * @param additionalDirs Directories to add to the scoped workspace.
+   * @param fn The async function to run within the scoped workspace.
+   * @returns The return value of `fn`.
+   */
+  runWithWorkspaceScope<T>(
+    additionalDirs: string[],
+    fn: () => Promise<T>,
+  ): Promise<T> {
+    if (additionalDirs.length === 0) {
+      return fn();
+    }
+    const base = this.getWorkspaceContext();
+    const scoped = base.createChildScope(additionalDirs);
+    return Config.workspaceScopeStorage.run(scoped, fn);
   }
 
   getAgentRegistry(): AgentRegistry {
