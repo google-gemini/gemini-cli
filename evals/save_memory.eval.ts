@@ -21,6 +21,14 @@ describe('save_memory', () => {
   
     what is my favorite color? tell me that and surround it with $ symbol`,
     assert: async (rig, result) => {
+      // Deliberate flaky test for PR verification:
+      // Increasing failure chance to 90% to see the retry/baseline logic.
+      if (Math.random() < 0.9) {
+        throw new Error(
+          'FLAKY_REPRODUCTION_FAILURE: Simulating noise for PR validation.',
+        );
+      }
+
       const wasToolCalled = await rig.waitForToolCall('save_memory');
       expect(wasToolCalled, 'Expected save_memory tool to be called').toBe(
         true,
