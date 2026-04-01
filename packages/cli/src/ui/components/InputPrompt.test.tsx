@@ -2137,85 +2137,67 @@ describe('InputPrompt', () => {
           name: 'mid-word',
           text: 'hello world',
           visualCursor: [0, 3],
-          expected: `hel${chalk.inverse('l')}o world`,
         },
         {
           name: 'at the beginning of the line',
           text: 'hello',
           visualCursor: [0, 0],
-          expected: `${chalk.inverse('h')}ello`,
         },
         {
           name: 'at the end of the line',
           text: 'hello',
           visualCursor: [0, 5],
-          expected: `hello${chalk.inverse(' ')}`,
         },
         {
           name: 'on a highlighted token',
           text: 'run @path/to/file',
           visualCursor: [0, 9],
-          expected: `@path/${chalk.inverse('t')}o/file`,
         },
         {
           name: 'for multi-byte unicode characters',
           text: 'hello 👍 world',
           visualCursor: [0, 6],
-          expected: `hello ${chalk.inverse('👍')} world`,
         },
         {
           name: 'after multi-byte unicode characters',
           text: '👍A',
           visualCursor: [0, 1],
-          expected: `👍${chalk.inverse('A')}`,
         },
         {
           name: 'at the end of a line with unicode characters',
           text: 'hello 👍',
           visualCursor: [0, 8],
-          expected: `hello 👍`, // skip checking inverse ansi due to ink truncation bug
         },
         {
           name: 'at the end of a short line with unicode characters',
           text: '👍',
           visualCursor: [0, 1],
-          expected: `👍${chalk.inverse(' ')}`,
         },
         {
           name: 'on an empty line',
           text: '',
           visualCursor: [0, 0],
-          expected: chalk.inverse(' '),
         },
         {
           name: 'on a space between words',
           text: 'hello world',
           visualCursor: [0, 5],
-          expected: `hello${chalk.inverse(' ')}world`,
         },
       ])(
         'should display cursor correctly $name',
-        async ({ name, text, visualCursor, expected }) => {
+        async ({ text, visualCursor }) => {
           mockBuffer.text = text;
           mockBuffer.lines = [text];
           mockBuffer.viewportVisualLines = [text];
           mockBuffer.visualCursor = visualCursor as [number, number];
           props.config.getUseBackgroundColor = () => false;
 
-          const { stdout, unmount } = await renderWithProviders(
+          const renderResult = await renderWithProviders(
             <InputPrompt {...props} />,
           );
-          await waitFor(() => {
-            const frame = stdout.lastFrameRaw();
-            expect(stripAnsi(frame)).toContain(stripAnsi(expected));
-            if (
-              name !== 'at the end of a line with unicode characters' &&
-              name !== 'on a highlighted token'
-            ) {
-              expect(frame).toContain('\u001b[7m');
-            }
-          });
-          unmount();
+          await renderResult.waitUntilReady();
+          await expect(renderResult).toMatchSvgSnapshot();
+          renderResult.unmount();
         },
       );
     });
@@ -2231,7 +2213,6 @@ describe('InputPrompt', () => {
             [1, 0],
             [2, 0],
           ],
-          expected: `sec${chalk.inverse('o')}nd line`,
         },
         {
           name: 'at the beginning of a line',
@@ -2241,7 +2222,6 @@ describe('InputPrompt', () => {
             [0, 0],
             [1, 0],
           ],
-          expected: `${chalk.inverse('s')}econd line`,
         },
         {
           name: 'at the end of a line',
@@ -2251,11 +2231,10 @@ describe('InputPrompt', () => {
             [0, 0],
             [1, 0],
           ],
-          expected: `first line${chalk.inverse(' ')}`,
         },
       ])(
         'should display cursor correctly $name in a multiline block',
-        async ({ name, text, visualCursor, expected, visualToLogicalMap }) => {
+        async ({ text, visualCursor, visualToLogicalMap }) => {
           mockBuffer.text = text;
           mockBuffer.lines = text.split('\n');
           mockBuffer.viewportVisualLines = text.split('\n');
@@ -2265,20 +2244,12 @@ describe('InputPrompt', () => {
           >;
           props.config.getUseBackgroundColor = () => false;
 
-          const { stdout, unmount } = await renderWithProviders(
+          const renderResult = await renderWithProviders(
             <InputPrompt {...props} />,
           );
-          await waitFor(() => {
-            const frame = stdout.lastFrameRaw();
-            expect(stripAnsi(frame)).toContain(stripAnsi(expected));
-            if (
-              name !== 'at the end of a line with unicode characters' &&
-              name !== 'on a highlighted token'
-            ) {
-              expect(frame).toContain('\u001b[7m');
-            }
-          });
-          unmount();
+          await renderResult.waitUntilReady();
+          await expect(renderResult).toMatchSvgSnapshot();
+          renderResult.unmount();
         },
       );
 
@@ -2295,18 +2266,12 @@ describe('InputPrompt', () => {
         ];
         props.config.getUseBackgroundColor = () => false;
 
-        const { stdout, unmount } = await renderWithProviders(
+        const renderResult = await renderWithProviders(
           <InputPrompt {...props} />,
         );
-        await waitFor(() => {
-          const frame = stdout.lastFrameRaw();
-          const lines = frame.split('\n');
-          // The line with the cursor should just be an inverted space inside the box border
-          expect(
-            lines.find((l) => l.includes(chalk.inverse(' '))),
-          ).not.toBeUndefined();
-        });
-        unmount();
+        await renderResult.waitUntilReady();
+        await expect(renderResult).toMatchSvgSnapshot();
+        renderResult.unmount();
       });
     });
   });
@@ -2327,22 +2292,14 @@ describe('InputPrompt', () => {
       ];
       props.config.getUseBackgroundColor = () => false;
 
-      const { stdout, unmount } = await renderWithProviders(
+      const renderResult = await renderWithProviders(
         <InputPrompt {...props} />,
       );
-      await waitFor(() => {
-        const frame = stdout.lastFrameRaw();
-        // Check that all lines, including the empty one, are rendered.
-        // This implicitly tests that the Box wrapper provides height for the empty line.
-        expect(frame).toContain('hello');
-        expect(frame).toContain('world');
-        expect(frame).toContain(chalk.inverse(' '));
 
-        const outputLines = frame.trim().split('\n');
-        // The number of lines should be 2 for the border plus 3 for the content.
-        expect(outputLines.length).toBe(5);
-      });
-      unmount();
+      await renderResult.waitUntilReady();
+      await expect(renderResult).toMatchSvgSnapshot();
+
+      renderResult.unmount();
     });
   });
 
@@ -3955,14 +3912,12 @@ describe('InputPrompt', () => {
     it('should not show inverted cursor when shell is focused', async () => {
       props.isEmbeddedShellFocused = true;
       props.focus = false;
-      const { stdout, unmount } = await renderWithProviders(
+      const renderResult = await renderWithProviders(
         <InputPrompt {...props} />,
       );
-      await waitFor(() => {
-        expect(stdout.lastFrame()).not.toContain(`{chalk.inverse(' ')}`);
-      });
-      expect(stdout.lastFrame()).toMatchSnapshot();
-      unmount();
+      await renderResult.waitUntilReady();
+      await expect(renderResult).toMatchSvgSnapshot();
+      renderResult.unmount();
     });
   });
 
