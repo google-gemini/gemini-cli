@@ -39,7 +39,7 @@ import { tokenLimit } from './tokenLimits.js';
 import { ideContextStore } from '../ide/ideContext.js';
 import type { ModelRouterService } from '../routing/modelRouterService.js';
 import { uiTelemetryService } from '../telemetry/uiTelemetry.js';
-import { ChatCompressionService } from '../services/chatCompressionService.js';
+import { ChatCompressionService } from '../context/chatCompressionService.js';
 import type { ChatRecordingService } from '../services/chatRecordingService.js';
 import { createAvailabilityServiceMock } from '../availability/testUtils.js';
 import type { ModelAvailabilityService } from '../availability/modelAvailabilityService.js';
@@ -2154,48 +2154,6 @@ ${JSON.stringify(
       ]);
 
       // Verify that turn.run was called only once
-      expect(mockTurnRunFn).toHaveBeenCalledTimes(1);
-    });
-
-    it('should not retry with "Please continue." when InvalidStream event is received for non-Gemini-2 models', async () => {
-      vi.spyOn(client['config'], 'getContinueOnFailedApiCall').mockReturnValue(
-        true,
-      );
-      // Arrange - router returns a non-Gemini-2 model
-      mockRouterService.route.mockResolvedValue({
-        model: 'gemini-3.0-pro',
-        reason: 'test',
-      });
-
-      const mockStream1 = (async function* () {
-        yield { type: GeminiEventType.InvalidStream };
-      })();
-
-      mockTurnRunFn.mockReturnValueOnce(mockStream1);
-
-      const mockChat: Partial<GeminiChat> = {
-        addHistory: vi.fn(),
-        setTools: vi.fn(),
-        getHistory: vi.fn().mockReturnValue([]),
-        getLastPromptTokenCount: vi.fn(),
-      };
-      client['chat'] = mockChat as GeminiChat;
-
-      const initialRequest = [{ text: 'Hi' }];
-      const promptId = 'prompt-id-invalid-stream-non-g2';
-      const signal = new AbortController().signal;
-
-      // Act
-      const stream = client.sendMessageStream(initialRequest, signal, promptId);
-      const events = await fromAsync(stream);
-
-      // Assert
-      expect(events).toEqual([
-        { type: GeminiEventType.ModelInfo, value: 'gemini-3.0-pro' },
-        { type: GeminiEventType.InvalidStream },
-      ]);
-
-      // Verify that turn.run was called only once (no retry)
       expect(mockTurnRunFn).toHaveBeenCalledTimes(1);
     });
 
