@@ -2930,6 +2930,12 @@ describe('PolicyEngine', () => {
             modes: [ApprovalMode.PLAN],
           },
           {
+            toolName: 'web_fetch',
+            decision: PolicyDecision.ASK_USER,
+            priority: 70,
+            modes: [ApprovalMode.PLAN],
+          },
+          {
             toolName: '*',
             decision: PolicyDecision.DENY,
             priority: 60,
@@ -2972,7 +2978,6 @@ describe('PolicyEngine', () => {
       const excluded = engine.getExcludedTools(toolMetadata, allToolNames);
       // These should be excluded (caught by catch-all DENY)
       expect(excluded.has('shell')).toBe(true);
-      expect(excluded.has('web_fetch')).toBe(true);
       expect(excluded.has('write_todos')).toBe(true);
       expect(excluded.has('memory')).toBe(true);
       // write_file and replace are excluded unless they have argsPattern rules
@@ -2988,6 +2993,7 @@ describe('PolicyEngine', () => {
       expect(excluded.has('list_directory')).toBe(false);
       expect(excluded.has('google_web_search')).toBe(false);
       expect(excluded.has('activate_skill')).toBe(false);
+      expect(excluded.has('web_fetch')).toBe(false);
       expect(excluded.has('ask_user')).toBe(false);
       expect(excluded.has('exit_plan_mode')).toBe(false);
       expect(excluded.has('save_memory')).toBe(false);

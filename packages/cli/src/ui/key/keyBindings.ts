@@ -108,6 +108,9 @@ export enum Command {
 
   // Voice Input
   VOICE_INPUT = 'input.voice',
+  // Extension Controls
+  UPDATE_EXTENSION = 'extension.update',
+  LINK_EXTENSION = 'extension.link',
 }
 
 /**
@@ -407,6 +410,10 @@ export const defaultKeyBindingConfig: KeyBindingConfig = new Map([
   [Command.SHOW_BACKGROUND_SHELL_UNFOCUS_WARNING, [new KeyBinding('tab')]],
   // Voice Input — triggered by double-space on empty input (see InputPrompt.tsx)
   [Command.VOICE_INPUT, []],
+
+  // Extension Controls
+  [Command.UPDATE_EXTENSION, [new KeyBinding('i')]],
+  [Command.LINK_EXTENSION, [new KeyBinding('l')]],
 ]);
 
 interface CommandCategory {
@@ -538,6 +545,10 @@ export const commandCategories: readonly CommandCategory[] = [
     title: 'Voice Input',
     commands: [Command.VOICE_INPUT],
   },
+  {
+    title: 'Extension Controls',
+    commands: [Command.UPDATE_EXTENSION, Command.LINK_EXTENSION],
+  },
 ];
 
 /**
@@ -651,6 +662,9 @@ export const commandDescriptions: Readonly<Record<Command, string>> = {
   // Voice Input
   [Command.VOICE_INPUT]:
     'Toggle voice input recording (press space twice rapidly).',
+  // Extension Controls
+  [Command.UPDATE_EXTENSION]: 'Update the current extension if available.',
+  [Command.LINK_EXTENSION]: 'Link the current extension to a local path.',
 };
 
 const keybindingsSchema = z.array(
