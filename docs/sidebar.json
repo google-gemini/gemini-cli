@@ -138,12 +138,10 @@
           { "label": "Plan mode", "slug": "docs/cli/plan-mode" },
           {
             "label": "Subagents",
-            "badge": "🔬",
             "slug": "docs/core/subagents"
           },
           {
             "label": "Remote subagents",
-            "badge": "🔬",
             "slug": "docs/core/remote-agents"
           },
           { "label": "Rewind", "slug": "docs/cli/rewind" },

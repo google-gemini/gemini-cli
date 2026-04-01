@@ -85,44 +85,53 @@ jobs:
           GH_TOKEN: '${{ secrets.GITHUB_TOKEN }}'
           MODEL_LIST: '${{ env.MODEL_LIST }}'
         run: |
-          # Run the regression check loop and capture the Markdown report
-          # Use a temporary file to handle potential large outputs safely
-          node scripts/run_eval_regression.js > model_report.md
+          # Run the regression check loop. The script saves the report to a file.
+          node scripts/run_eval_regression.js
 
-          echo "FINAL_REPORT<<EOF" >> "$GITHUB_ENV"
-          cat model_report.md >> "$GITHUB_ENV"
-          echo "EOF" >> "$GITHUB_ENV"
-
+          # Use the generated report file if it exists
+          if [[ -f eval_regression_report.md ]]; then
+            echo "REPORT_FILE=eval_regression_report.md" >> "$GITHUB_ENV"
+          fi
 
       - name: 'Post or Update PR Comment'
         if: "always() && steps.detect.outputs.STEERING_DETECTED == 'true'"
         env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          COMMENT_BODY: |
-            ${{ env.FINAL_REPORT != '' && env.FINAL_REPORT || '' }}
-
-            ### 🧠 Model Steering Guidance
-
-            This PR modifies files that affect the model's behavior (prompts, tools, or instructions).
-
-            ${{ steps.analysis.outputs.MISSING_EVALS == 'true' && '- ⚠️ **Consider adding Evals:** No behavioral evaluations (`evals/*.eval.ts`) were added or updated in this PR. Consider [adding a test case](https://github.com/google-gemini/gemini-cli/blob/main/evals/README.md#creating-an-evaluation) to verify the new behavior and prevent regressions.' || '' }}
-            ${{ steps.analysis.outputs.IS_MAINTAINER == 'true' && '- 🚀 **Maintainer Reminder:** Please ensure that these changes do not regress results on benchmark evals before merging.' || '' }}
-
-            ---
-            *This is an automated guidance message triggered by steering logic signatures.*
-            <!-- eval-pr-report -->
+          GH_TOKEN: '${{ secrets.GITHUB_TOKEN }}'
         run: |
-          # 1. Save the comment body to a file to handle multi-line content safely
-          echo "$COMMENT_BODY" > pr_comment.md
+          # 1. Build the full comment body
+          {
+            if [[ -f eval_regression_report.md ]]; then
+              cat eval_regression_report.md
+              echo ""
+            fi
+            echo "### 🧠 Model Steering Guidance"
+            echo ""
+            echo "This PR modifies files that affect the model's behavior (prompts, tools, or instructions)."
+            echo ""
+
+            if [[ "${{ steps.analysis.outputs.MISSING_EVALS }}" == "true" ]]; then
+              echo "- ⚠️ **Consider adding Evals:** No behavioral evaluations (\`evals/*.eval.ts\`) were added or updated in this PR. Consider [adding a test case](https://github.com/google-gemini/gemini-cli/blob/main/evals/README.md#creating-an-evaluation) to verify the new behavior and prevent regressions."
+            fi
+
+            if [[ "${{ steps.analysis.outputs.IS_MAINTAINER }}" == "true" ]]; then
+              echo "- 🚀 **Maintainer Reminder:** Please ensure that these changes do not regress results on benchmark evals before merging."
+            fi
+
+            echo ""
+            echo "---"
+            echo "*This is an automated guidance message triggered by steering logic signatures.*"
+            echo "<!-- eval-pr-report -->"
+          } > full_comment.md
 
           # 2. Find if a comment with our unique tag already exists
-          COMMENT_ID=$(gh pr view ${{ github.event.pull_request.number }} --json comments --jq '.comments[] | select(.body | contains("<!-- eval-pr-report -->")) | .id' | head -n 1)
+          # We extract the numeric ID from the URL to ensure compatibility with the REST API
+          COMMENT_ID=$(gh pr view ${{ github.event.pull_request.number }} --json comments --jq '.comments[] | select(.body | contains("<!-- eval-pr-report -->")) | .url' | grep -oE "[0-9]+$" | head -n 1)
 
           # 3. Update or Create the comment
           if [ -n "$COMMENT_ID" ]; then
-            echo "Updating existing comment $COMMENT_ID..."
-            gh pr comment ${{ github.event.pull_request.number }} --edit "$COMMENT_ID" -F pr_comment.md
+            echo "Updating existing comment $COMMENT_ID via API..."
+            gh api -X PATCH "repos/${{ github.repository }}/issues/comments/$COMMENT_ID" -F body=@full_comment.md
           else
             echo "Creating new PR comment..."
-            gh pr comment ${{ github.event.pull_request.number }} -F pr_comment.md
+            gh pr comment ${{ github.event.pull_request.number }} --body-file full_comment.md
           fi

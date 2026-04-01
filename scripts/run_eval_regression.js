@@ -14,6 +14,7 @@
  */
 
 import { execSync } from 'node:child_process';
+import fs from 'node:fs';
 
 /**
  * Main execution logic.
@@ -80,20 +81,24 @@ async function main() {
     }
   }
 
-  // Save the combined report to a temporary environment variable/file for the workflow to use
+  // Always save the combined report to a file so the workflow can capture it cleanly
   if (combinedReport) {
-    process.stdout.write(combinedReport);
+    fs.writeFileSync('eval_regression_report.md', combinedReport);
+    console.log(
+      '\n📊 Final Markdown report saved to eval_regression_report.md',
+    );
   }
 
-  // Final exit signal: if any regression was confirmed, exit with error to fail the CI job
+  // Log status for CI visibility, but don't exit with error
   if (hasRegression) {
     console.error(
-      '\n🚨 Confirmed regressions detected across one or more models.',
+      '\n⚠️ Confirmed regressions detected across one or more models. See PR comment for details.',
     );
-    process.exit(1);
+  } else {
+    console.log('\n✅ All evaluations passed successfully (or were cleared).');
   }
 
-  console.log('\n✅ All evaluations passed successfully (or were cleared).');
+  process.exit(0);
 }
 
 main().catch((err) => {

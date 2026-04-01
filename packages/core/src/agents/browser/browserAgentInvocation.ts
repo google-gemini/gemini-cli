@@ -18,7 +18,6 @@ import { randomUUID } from 'node:crypto';
 import type { Config } from '../../config/config.js';
 import { type AgentLoopContext } from '../../config/agent-loop-context.js';
 import { LocalAgentExecutor } from '../local-executor.js';
-import { safeJsonToMarkdown } from '../../utils/markdownUtils.js';
 import {
   BaseToolInvocation,
   type ToolResult,
@@ -30,6 +29,7 @@ import {
   type SubagentActivityEvent,
   type SubagentProgress,
   type SubagentActivityItem,
+  AgentTerminateMode,
   isToolActivityError,
 } from '../types.js';
 import type { MessageBus } from '../../confirmation-bus/message-bus.js';
@@ -40,6 +40,7 @@ import {
   sanitizeToolArgs,
   sanitizeErrorMessage,
 } from '../../utils/agent-sanitization-utils.js';
+import { removeAutomationOverlay } from './automationOverlay.js';
 
 const INPUT_PREVIEW_MAX_LENGTH = 50;
 const DESCRIPTION_MAX_LENGTH = 200;
@@ -56,6 +57,8 @@ export class BrowserAgentInvocation extends BaseToolInvocation<
   AgentInputs,
   ToolResult
 > {
+  private readonly agentName: string;
+
   constructor(
     private readonly context: AgentLoopContext,
     params: AgentInputs,
@@ -63,13 +66,15 @@ export class BrowserAgentInvocation extends BaseToolInvocation<
     _toolName?: string,
     _toolDisplayName?: string,
   ) {
+    const resolvedName = _toolName ?? 'browser_agent';
     // Note: BrowserAgentDefinition is a factory function, so we use hardcoded names
     super(
       params,
       messageBus,
-      _toolName ?? 'browser_agent',
+      resolvedName,
       _toolDisplayName ?? 'Browser Agent',
     );
+    this.agentName = resolvedName;
   }
 
   private get config(): Config {
@@ -112,7 +117,7 @@ export class BrowserAgentInvocation extends BaseToolInvocation<
         // Send initial state
         const initialProgress: SubagentProgress = {
           isSubagentProgress: true,
-          agentName: this['_toolName'] ?? 'browser_agent',
+          agentName: this.agentName,
           recentActivity: [],
           state: 'running',
         };
@@ -135,7 +140,7 @@ export class BrowserAgentInvocation extends BaseToolInvocation<
             }
             updateOutput({
               isSubagentProgress: true,
-              agentName: this['_toolName'] ?? 'browser_agent',
+              agentName: this.agentName,
               recentActivity: [...recentActivity],
               state: 'running',
             } as SubagentProgress);
@@ -280,7 +285,7 @@ export class BrowserAgentInvocation extends BaseToolInvocation<
 
           const progress: SubagentProgress = {
             isSubagentProgress: true,
-            agentName: this['_toolName'] ?? 'browser_agent',
+            agentName: this.agentName,
             recentActivity: [...recentActivity],
             state: 'running',
           };
@@ -297,34 +302,40 @@ export class BrowserAgentInvocation extends BaseToolInvocation<
 
       const output = await executor.run(this.params, signal);
 
-      const displayResult = safeJsonToMarkdown(output.result);
-
       const resultContent = `Browser agent finished.
 Termination Reason: ${output.terminate_reason}
 Result:
 ${output.result}`;
 
-      const displayContent = `
-Browser Agent Finished
+      // Map terminate_reason to the correct SubagentProgress state.
+      // GOAL = agent completed its task normally.
+      // ABORTED = user cancelled.
+      // Others (ERROR, MAX_TURNS, ERROR_NO_COMPLETE_TASK_CALL) = error.
+      let progressState: SubagentProgress['state'];
+      if (output.terminate_reason === AgentTerminateMode.ABORTED) {
+        progressState = 'cancelled';
+      } else if (output.terminate_reason === AgentTerminateMode.GOAL) {
+        progressState = 'completed';
+      } else {
+        progressState = 'error';
+      }
 
-Termination Reason: ${output.terminate_reason}
-
-Result:
-${displayResult}
-`;
+      const progress: SubagentProgress = {
+        isSubagentProgress: true,
+        agentName: this.agentName,
+        recentActivity: [...recentActivity],
+        state: progressState,
+        result: output.result,
+        terminateReason: output.terminate_reason,
+      };
 
       if (updateOutput) {
-        updateOutput({
-          isSubagentProgress: true,
-          agentName: this['_toolName'] ?? 'browser_agent',
-          recentActivity: [...recentActivity],
-          state: 'completed',
-        } as SubagentProgress);
+        updateOutput(progress);
       }
 
       return {
         llmContent: [{ text: resultContent }],
-        returnDisplay: displayContent,
+        returnDisplay: progress,
       };
     } catch (error) {
       const rawErrorMessage =
@@ -343,7 +354,7 @@ ${displayResult}
 
       const progress: SubagentProgress = {
         isSubagentProgress: true,
-        agentName: this['_toolName'] ?? 'browser_agent',
+        agentName: this.agentName,
         recentActivity: [...recentActivity],
         state: isAbort ? 'cancelled' : 'error',
       };
@@ -367,7 +378,40 @@ ${displayResult}
     } finally {
       // Clean up input blocker, but keep browserManager alive for persistent sessions
       if (browserManager) {
-        await removeInputBlocker(browserManager);
+        await removeInputBlocker(browserManager, signal);
+        await removeAutomationOverlay(browserManager, signal);
+
+        // try cleaning up overlays in previous opened pages if any
+        try {
+          const listResult = await browserManager.callTool(
+            'list_pages',
+            {},
+            signal,
+            true,
+          );
+          const pagesText =
+            listResult.content?.find((c) => c.type === 'text')?.text || '';
+          const pageMatches = Array.from(pagesText.matchAll(/^(\d+):/gm));
+          const pageIds = pageMatches.map((m) => parseInt(m[1], 10));
+          if (pageIds.length > 1) {
+            for (const pageId of pageIds) {
+              try {
+                await browserManager.callTool(
+                  'select_page',
+                  { pageId, bringToFront: false },
+                  signal,
+                  true,
+                );
+                await removeInputBlocker(browserManager, signal);
+                await removeAutomationOverlay(browserManager, signal);
+              } catch (_err) {
+                // Ignore errors for individual pages
+              }
+            }
+          }
+        } catch (_) {
+          // Ignore errors for removing the overlays.
+        }
       }
     }
   }

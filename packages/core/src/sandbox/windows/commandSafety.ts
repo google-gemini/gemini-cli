@@ -72,6 +72,8 @@ export function isKnownSafeCommand(args: string[]): boolean {
 
   // Native Windows/PowerShell safe commands
   const safeCommands = new Set([
+    '__read',
+    '__write',
     'dir',
     'type',
     'echo',

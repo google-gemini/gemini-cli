@@ -29,13 +29,12 @@ To create your first policy:
     ```toml
     [[rule]]
     toolName = "run_shell_command"
-    commandPrefix = "git status"
-    decision = "allow"
+    commandPrefix = "rm -rf"
+    decision = "deny"
     priority = 100
     ```
 3.  **Run a command** that triggers the policy (e.g., ask Gemini CLI to
-    `git status`). The tool will now execute automatically without prompting for
-    confirmation.
+    `rm -rf /`). The tool will now be blocked automatically.
 
 ## Core concepts
 
@@ -143,25 +142,26 @@ engine transforms this into a final priority using the following formula:
 
 This system guarantees that:
 
-- Admin policies always override User, Workspace, and Default policies.
+- Admin policies always override User, Workspace, and Default policies (defined
+  in policy TOML files).
 - User policies override Workspace and Default policies.
 - Workspace policies override Default policies.
 - You can still order rules within a single tier with fine-grained control.
 
 For example:
 
-- A `priority: 50` rule in a Default policy file becomes `1.050`.
-- A `priority: 10` rule in a Workspace policy policy file becomes `2.010`.
-- A `priority: 100` rule in a User policy file becomes `3.100`.
-- A `priority: 20` rule in an Admin policy file becomes `4.020`.
+- A `priority: 50` rule in a Default policy TOML becomes `1.050`.
+- A `priority: 10` rule in a Workspace policy TOML becomes `2.010`.
+- A `priority: 100` rule in a User policy TOML becomes `3.100`.
+- A `priority: 20` rule in an Admin policy TOML becomes `4.020`.
 
 ### Approval modes
 
 Approval modes allow the policy engine to apply different sets of rules based on
-the CLI's operational mode. A rule can be associated with one or more modes
-(e.g., `yolo`, `autoEdit`, `plan`). The rule will only be active if the CLI is
-running in one of its specified modes. If a rule has no modes specified, it is
-always active.
+the CLI's operational mode. A rule in a TOML policy file can be associated with
+one or more modes (e.g., `yolo`, `autoEdit`, `plan`). The rule will only be
+active if the CLI is running in one of its specified modes. If a rule has no
+modes specified, it is always active.
 
 - `default`: The standard interactive mode where most write tools require
   confirmation.
@@ -179,8 +179,8 @@ outcome.
 
 A rule matches a tool call if all of its conditions are met:
 
-1.  **Tool name**: The `toolName` in the rule must match the name of the tool
-    being called.
+1.  **Tool name**: The `toolName` in the TOML rule must match the name of the
+    tool being called.
     - **Wildcards**: You can use wildcards like `*`, `mcp_server_*`, or
       `mcp_*_toolName` to match multiple tools. See [Tool Name](#tool-name) for
       details.
@@ -264,7 +264,7 @@ toolName = "run_shell_command"
 
 # (Optional) The name of a subagent. If provided, the rule only applies to tool
 # calls made by this specific subagent.
-subagent = "generalist"
+subagent = "codebase_investigator"
 
 # (Optional) The name of an MCP server. Can be combined with toolName
 # to form a composite FQN internally like "mcp_mcpName_toolName".
@@ -417,20 +417,6 @@ toolName = "*"
 mcpName = "*"
 decision = "ask_user"
 priority = 10
-```
-
-**4. Targeting a tool name across all servers**
-
-Use `mcpName = "*"` with a specific `toolName` to target that operation
-regardless of which server provides it.
-
-```toml
-# Allow the `search` tool across all connected MCP servers
-[[rule]]
-mcpName = "*"
-toolName = "search"
-decision = "allow"
-priority = 50
 ```
 
 ## Default policies

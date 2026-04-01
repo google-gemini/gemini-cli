@@ -163,8 +163,9 @@ async function runRetries(testName, results, files, model) {
  * Verifies a potential regression against the 'main' branch.
  */
 async function verifyBaseline(testName, results, files, model) {
+  console.log('\n--- Step 3: Dynamic Baseline Verification ---');
   console.log(
-    `  ⚠️ Potential regression detected. Verifying baseline on 'main'...`,
+    `⚠️ Potential regression detected. Verifying baseline on 'main'...`,
   );
 
   try {
@@ -233,6 +234,10 @@ async function processResults(firstPass, pattern, model, files) {
 
   for (const fileResult of firstPass.testResults) {
     for (const assertion of fileResult.assertionResults) {
+      if (assertion.status !== 'passed' && assertion.status !== 'failed') {
+        continue;
+      }
+
       const name = assertion.title;
       results[name] = {
         passed: assertion.status === 'passed' ? 1 : 0,
@@ -252,7 +257,10 @@ async function processResults(firstPass, pattern, model, files) {
   if (failingTests.length === 0) {
     console.log('✅ All trustworthy tests passed on the first try!');
   } else {
-    console.log(`⚠️ ${failingTests.length} tests failed. Starting retries...`);
+    console.log('\n--- Step 2: Best-of-4 Retries ---');
+    console.log(
+      `⚠️ ${failingTests.length} tests failed the optimistic run. Starting retries...`,
+    );
     for (const testName of failingTests) {
       await runRetries(testName, results, files, model);
     }
