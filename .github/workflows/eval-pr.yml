@@ -105,7 +105,10 @@ jobs:
             REPORT=$(node scripts/compare_evals.js "$MODEL")
 
             if [[ -n "$REPORT" ]]; then
-              COMBINED_REPORT="${COMBINED_REPORT}${REPORT}\n\n---\n\n"
+              if [[ -n "$COMBINED_REPORT" ]]; then
+                COMBINED_REPORT="${COMBINED_REPORT}\n\n---\n\n"
+              fi
+              COMBINED_REPORT="${COMBINED_REPORT}${REPORT}"
             fi
           done
 
@@ -119,14 +122,14 @@ jobs:
         with:
           comment-tag: 'eval-pr-report'
           message: |
+            ${{ env.FINAL_REPORT != '' && env.FINAL_REPORT || '' }}
+
             ### 🧠 Model Steering Guidance
 
             This PR modifies files that affect the model's behavior (prompts, tools, or instructions).
 
             ${{ steps.analysis.outputs.MISSING_EVALS == 'true' && '- ⚠️ **Consider adding Evals:** No behavioral evaluations (`evals/*.eval.ts`) were added or updated in this PR. Consider adding a test case to verify the new behavior and prevent regressions.' || '' }}
             ${{ steps.analysis.outputs.IS_MAINTAINER == 'true' && '- 🚀 **Maintainer Reminder:** Please ensure that these changes do not regress results on benchmark evals before merging.' || '' }}
-
-            ${{ env.FINAL_REPORT != '' && format('### 📊 Regression Check Results\n\n{0}', env.FINAL_REPORT) || '' }}
 
             ---
             *This is an automated guidance message triggered by steering logic signatures.*

@@ -35,44 +35,69 @@ function main() {
 
   for (const [testName, pr] of Object.entries(prReport.results)) {
     const prRate = pr.passed / pr.total;
-    const nightlyStats = latestNightly[testName];
-    const nightlyRate = nightlyStats ? nightlyStats.passRate : null;
-
-    // Show ONLY if it is an explicit 'regression' (passed on main, failed in PR)
-    // or if the pass rate is extremely low and no baseline was run.
     if (pr.status === 'regression' || (prRate <= 0.34 && !pr.status)) {
+      // Use relative path from workspace root
+      const relativeFile = pr.file
+        ? path.relative(process.cwd(), pr.file)
+        : 'evals/';
+
       regressions.push({
         name: testName,
-        nightly: nightlyStats ? (nightlyRate * 100).toFixed(0) + '%' : 'N/A',
+        file: relativeFile,
+        nightly: latestNightly[testName]
+          ? (latestNightly[testName].passRate * 100).toFixed(0) + '%'
+          : 'N/A',
         pr: (prRate * 100).toFixed(0) + '%',
       });
     } else {
       passes.push(testName);
     }
   }
-
   if (regressions.length > 0) {
     let markdown = '### 🚨 Action Required: Eval Regressions Detected\n\n';
     markdown += `**Model:** \`${targetModel}\`\n\n`;
     markdown +=
-      'The following trustworthy evaluations passed on `main` but failed in this PR. These regressions must be addressed before merging to maintain behavioral quality.\n\n';
-    markdown += '| Test Name | Nightly (Baseline) | PR Result | Status |\n';
+      'The following trustworthy evaluations passed on **`main`** and in **recent Nightly runs**, but failed in this PR. These regressions must be addressed before merging.\n\n';
+
+    markdown += '| Test Name | Nightly | PR Result | Status |\n';
     markdown += '| :--- | :---: | :---: | :--- |\n';
     for (const r of regressions) {
       markdown += `| ${r.name} | ${r.nightly} | ${r.pr} | ❌ **Regression** |\n`;
     }
     markdown += `\n*The check passed or was cleared for ${passes.length} other trustworthy evaluations.*\n\n`;
 
-    markdown += '### 🛠️ How to Fix\n\n';
+    markdown += '<details>\n';
     markdown +=
-      '1. **Reproduce Locally:** Run the following command to see the failure trajectory:\n';
-    markdown += '   ```bash\n';
-    markdown += `   GEMINI_MODEL=${targetModel} npm run test:eval -- -t "${regressions[0].name}"\n`;
-    markdown += '   ```\n';
+      '<summary><b>🛠️ Troubleshooting & Fix Instructions</b></summary>\n\n';
+
+    for (let i = 0; i < regressions.length; i++) {
+      const r = regressions[i];
+      if (regressions.length > 1) {
+        markdown += `### Failure ${i + 1}: ${r.name}\n\n`;
+      }
+
+      markdown += '#### 1. Ask Gemini CLI to fix it (Recommended)\n';
+      markdown += 'Copy and paste this prompt to the agent:\n';
+      markdown += '```text\n';
+      markdown += `The eval "${r.name}" in ${r.file} is failing. Investigate and fix it using the behavioral-evals skill.\n`;
+      markdown += '```\n\n';
+
+      markdown += '#### 2. Reproduce Locally\n';
+      markdown += 'Run the following command to see the failure trajectory:\n';
+      markdown += '```bash\n';
+      const pattern = r.name.replace(/'/g, '.');
+      markdown += `GEMINI_MODEL=${targetModel} npm run test:eval -- ${r.file} --testNamePattern="${pattern}"\n`;
+      markdown += '```\n\n';
+
+      if (i < regressions.length - 1) {
+        markdown += '---\n\n';
+      }
+    }
+
+    markdown += '#### 3. Manual Fix\n';
     markdown +=
-      '2. **Ask Gemini CLI:** You can ask the agent to fix it for you: `"The eval \'<test-name>\' is failing in my PR. Please investigate and fix it using the behavioral-evals skill."`\n';
-    markdown +=
-      '3. **Manual Fix:** Most regressions can be resolved by refining the instructions in `packages/core/src/prompts/` or adjusting tool descriptions. See the [Fixing Guide](https://github.com/google-gemini/gemini-cli/blob/main/evals/README.md#fixing-evaluations) for more details.\n';
+      'See the [Fixing Guide](https://github.com/google-gemini/gemini-cli/blob/main/evals/README.md#fixing-evaluations) for detailed troubleshooting steps.\n';
+    markdown += '</details>\n';
 
     process.stdout.write(markdown);
   }

@@ -143,17 +143,17 @@ async function processResults(firstPass, pattern, model, files) {
   let totalProcessed = 0;
 
   for (const fileResult of firstPass.testResults) {
+    const filePath = fileResult.name;
     for (const assertion of fileResult.assertionResults) {
       const name = assertion.title;
       if (assertion.status === 'passed') {
-        results[name] = { passed: 1, total: 1 };
+        results[name] = { passed: 1, total: 1, file: filePath };
         totalProcessed++;
       } else if (assertion.status === 'failed') {
-        results[name] = { passed: 0, total: 1 };
+        results[name] = { passed: 0, total: 1, file: filePath };
         failingTests.push(name);
         totalProcessed++;
       }
-      // Statuses like 'skipped' or 'todo' are ignored
     }
   }
 
