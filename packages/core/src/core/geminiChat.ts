@@ -173,7 +173,11 @@ function extractCuratedHistory(comprehensiveHistory: Content[]): Content[] {
       if (part === undefined || Object.keys(part).length === 0) {
         return false;
       }
-      if (!part.thought && part.text !== undefined && part.text.trim() === '') {
+      // Thought parts should always be kept if present
+      if (part.thought) {
+        return true;
+      }
+      if (part.text !== undefined && part.text.trim() === '') {
         return false;
       }
       return true;
@@ -183,39 +187,42 @@ function extractCuratedHistory(comprehensiveHistory: Content[]): Content[] {
       continue;
     }
 
-    const lastEntry = curatedHistory[curatedHistory.length - 1];
+    let lastEntry = curatedHistory[curatedHistory.length - 1];
     if (lastEntry && lastEntry.role === role) {
-      const lastEntryParts = lastEntry.parts || [];
       // Merge into last entry
-      for (const part of validParts) {
-        if (
-          lastEntryParts.length > 0 &&
-          lastEntryParts[lastEntryParts.length - 1].text !== undefined &&
-          part.text !== undefined
-        ) {
-          // Coalesce text parts
-          const lastText = lastEntryParts[lastEntryParts.length - 1].text!;
-          const separator = lastText.endsWith('\n') ? '' : '\n';
-          lastEntryParts[lastEntryParts.length - 1] = {
-            ...lastEntryParts[lastEntryParts.length - 1],
-            text: lastText + separator + part.text,
-          };
-        } else {
-          lastEntryParts.push({ ...part });
-        }
-      }
-      lastEntry.parts = lastEntryParts;
     } else {
-      // Create new entry with deep-copied parts
-      curatedHistory.push({
+      // Create new entry
+      lastEntry = {
         role,
-        parts: validParts.map((p) => ({ ...p })),
-      });
+        parts: [],
+      };
+      curatedHistory.push(lastEntry);
     }
+
+    const lastEntryParts = lastEntry.parts || [];
+    for (const part of validParts) {
+      if (
+        lastEntryParts.length > 0 &&
+        lastEntryParts[lastEntryParts.length - 1].text !== undefined &&
+        part.text !== undefined
+      ) {
+        // Coalesce text parts
+        const lastText = lastEntryParts[lastEntryParts.length - 1].text!;
+        const separator = lastText.endsWith('\n') ? '' : '\n';
+        lastEntryParts[lastEntryParts.length - 1] = {
+          ...lastEntryParts[lastEntryParts.length - 1],
+          text: lastText + separator + part.text,
+        };
+      } else {
+        lastEntryParts.push({ ...part });
+      }
+    }
+    lastEntry.parts = lastEntryParts;
   }
 
   return curatedHistory;
 }
+
 export class InvalidStreamError extends Error {
   readonly type:
     | 'NO_FINISH_REASON'
