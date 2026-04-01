@@ -1813,7 +1813,8 @@ their corresponding top-level category object in your `settings.json` file.
   - **Requires restart:** Yes
 
 - **`contextManagement.tools.distillation.maxOutputTokens`** (number):
-  - **Description:** Maximum tokens to show when truncating large tool outputs.
+  - **Description:** Maximum tokens to show to the model when truncating large
+    tool outputs.
   - **Default:** `10000`
   - **Requires restart:** Yes
 

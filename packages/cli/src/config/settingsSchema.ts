@@ -2515,7 +2515,7 @@ const SETTINGS_SCHEMA = {
                 requiresRestart: true,
                 default: 10_000,
                 description:
-                  'Maximum tokens to show when truncating large tool outputs.',
+                  'Maximum tokens to show to the model when truncating large tool outputs.',
                 showInDialog: false,
               },
               summarizationThresholdTokens: {
@@ -2546,7 +2546,7 @@ const SETTINGS_SCHEMA = {
                 label: 'Tool Protection Threshold (Tokens)',
                 category: 'Context Management',
                 requiresRestart: true,
-                default: 50000,
+                default: 50_000,
                 description:
                   'Minimum number of tokens to protect from masking (most recent tool outputs).',
                 showInDialog: false,
@@ -2556,7 +2556,7 @@ const SETTINGS_SCHEMA = {
                 label: 'Min Prunable Tokens Threshold',
                 category: 'Context Management',
                 requiresRestart: true,
-                default: 30000,
+                default: 30_000,
                 description:
                   'Minimum prunable tokens required to trigger a masking pass.',
                 showInDialog: false,
