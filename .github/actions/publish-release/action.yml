@@ -291,8 +291,9 @@ runs:
         INPUTS_PREVIOUS_TAG: '${{ inputs.previous-tag }}'
       shell: 'bash'
       run: |
+        zip -r gemini-cli-bundle.zip bundle/
         gh release create "${INPUTS_RELEASE_TAG}" \
-          bundle/gemini.js \
+          gemini-cli-bundle.zip \
           --target "${STEPS_RELEASE_BRANCH_OUTPUTS_BRANCH_NAME}" \
           --title "Release ${INPUTS_RELEASE_TAG}" \
           --notes-start-tag "${INPUTS_PREVIOUS_TAG}" \
