@@ -62,6 +62,12 @@ describe('summarizers', () => {
       getResolvedConfig: vi.fn().mockReturnValue(mockResolvedConfig),
     } as unknown as ModelConfigService;
 
+    // .config is already set correctly by the getter on the instance.
+    Object.defineProperty(mockConfigInstance, 'promptId', {
+      get: () => 'test-prompt-id',
+      configurable: true,
+    });
+
     mockGeminiClient = new GeminiClient(mockConfigInstance);
     (mockGeminiClient.generateContent as Mock) = vi.fn();
 

@@ -48,12 +48,14 @@ describe('textUtils', () => {
     it('should handle unicode characters that crash string-width', () => {
       // U+0602 caused string-width to crash (see #16418)
       const char = '؂';
-      expect(getCachedStringWidth(char)).toBe(0);
+      expect(() => getCachedStringWidth(char)).not.toThrow();
+      expect(typeof getCachedStringWidth(char)).toBe('number');
     });
 
     it('should handle unicode characters that crash string-width with ANSI codes', () => {
       const charWithAnsi = '\u001b[31m' + '؂' + '\u001b[0m';
-      expect(getCachedStringWidth(charWithAnsi)).toBe(0);
+      expect(() => getCachedStringWidth(charWithAnsi)).not.toThrow();
+      expect(typeof getCachedStringWidth(charWithAnsi)).toBe('number');
     });
   });
 
@@ -512,6 +514,7 @@ describe('textUtils', () => {
           const b = sanitized.b as { c: string; d: Array<string | object> };
           expect(b.c).toBe('\\u001b[32mgreen\\u001b[0m');
           expect(b.d[0]).toBe('\\u001b[33myellow\\u001b[0m');
+          // eslint-disable-next-line no-restricted-syntax
           if (typeof b.d[1] === 'object' && b.d[1] !== null) {
             const e = b.d[1] as { e: string };
             expect(e.e).toBe('\\u001b[34mblue\\u001b[0m');

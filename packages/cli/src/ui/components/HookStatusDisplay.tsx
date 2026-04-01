@@ -6,8 +6,10 @@
 
 import type React from 'react';
 import { Text } from 'ink';
-import { theme } from '../semantic-colors.js';
 import { type ActiveHook } from '../types.js';
+import { isUserVisibleHook } from '@google/gemini-cli-core';
+import { GENERIC_WORKING_LABEL } from '../textConstants.js';
+import { theme } from '../semantic-colors.js';
 
 interface HookStatusDisplayProps {
   activeHooks: ActiveHook[];
@@ -20,20 +22,30 @@ export const HookStatusDisplay: React.FC<HookStatusDisplayProps> = ({
     return null;
   }
 
-  const label = activeHooks.length > 1 ? 'Executing Hooks' : 'Executing Hook';
-  const displayNames = activeHooks.map((hook) => {
-    let name = hook.name;
-    if (hook.index && hook.total && hook.total > 1) {
-      name += ` (${hook.index}/${hook.total})`;
-    }
-    return name;
-  });
+  const userHooks = activeHooks.filter((h) => isUserVisibleHook(h.source));
 
-  const text = `${label}: ${displayNames.join(', ')}`;
+  if (userHooks.length > 0) {
+    const label = userHooks.length > 1 ? 'Executing Hooks' : 'Executing Hook';
+    const displayNames = userHooks.map((hook) => {
+      let name = hook.name;
+      if (hook.index && hook.total && hook.total > 1) {
+        name += ` (${hook.index}/${hook.total})`;
+      }
+      return name;
+    });
 
+    const text = `${label}: ${displayNames.join(', ')}`;
+    return (
+      <Text color={theme.text.secondary} italic={true}>
+        {text}
+      </Text>
+    );
+  }
+
+  // If only system/extension hooks are running, show a generic message.
   return (
-    <Text color={theme.status.warning} wrap="truncate">
-      {text}
+    <Text color={theme.text.secondary} italic={true}>
+      {GENERIC_WORKING_LABEL}
     </Text>
   );
 };

@@ -13,7 +13,10 @@ import type { AnyDeclarativeTool } from '../tools/tools.js';
 import { type z } from 'zod';
 import type { ModelConfig } from '../services/modelConfigService.js';
 import type { AnySchema } from 'ajv';
+import type { AgentCard } from '@a2a-js/sdk';
 import type { A2AAuthConfig } from './auth-provider/types.js';
+import type { MCPServerConfig } from '../config/config.js';
+import type { GeminiChat } from '../core/geminiChat.js';
 
 /**
  * Describes the possible termination modes for an agent.
@@ -43,12 +46,12 @@ export const DEFAULT_QUERY_STRING = 'Get Started!';
 /**
  * The default maximum number of conversational turns for an agent.
  */
-export const DEFAULT_MAX_TURNS = 15;
+export const DEFAULT_MAX_TURNS = 30;
 
 /**
  * The default maximum execution time for an agent in minutes.
  */
-export const DEFAULT_MAX_TIME_MINUTES = 5;
+export const DEFAULT_MAX_TIME_MINUTES = 10;
 
 /**
  * Represents the validated input parameters passed to an agent upon invocation.
@@ -64,6 +67,18 @@ export type RemoteAgentInputs = { query: string };
 /**
  * Structured events emitted during subagent execution for user observability.
  */
+export enum SubagentActivityErrorType {
+  REJECTED = 'REJECTED',
+  CANCELLED = 'CANCELLED',
+  GENERIC = 'GENERIC',
+}
+
+/**
+ * Standard error messages for subagent activities.
+ */
+export const SUBAGENT_REJECTED_ERROR_PREFIX = 'User rejected this operation.';
+export const SUBAGENT_CANCELLED_ERROR_MESSAGE = 'Request cancelled.';
+
 export interface SubagentActivityEvent {
   isSubagentActivityEvent: true;
   agentName: string;
@@ -86,6 +101,8 @@ export interface SubagentProgress {
   agentName: string;
   recentActivity: SubagentActivityItem[];
   state?: 'running' | 'completed' | 'error' | 'cancelled';
+  result?: string;
+  terminateReason?: AgentTerminateMode;
 }
 
 export function isSubagentProgress(obj: unknown): obj is SubagentProgress {
@@ -98,9 +115,77 @@ export function isSubagentProgress(obj: unknown): obj is SubagentProgress {
 }
 
 /**
+ * Checks if the tool call data indicates an error.
+ */
+export function isToolActivityError(data: unknown): boolean {
+  return (
+    data !== null &&
+    typeof data === 'object' &&
+    'isError' in data &&
+    data.isError === true
+  );
+}
+
+/**
  * The base definition for an agent.
  * @template TOutput The specific Zod schema for the agent's final output object.
  */
+export type AgentCardLoadOptions =
+  | { type: 'url'; url: string }
+  | { type: 'json'; json: string };
+
+/** Minimal shape needed by helper functions, avoids generic TOutput constraints. */
+interface RemoteAgentRef {
+  name: string;
+  agentCardUrl?: string;
+  agentCardJson?: string;
+}
+
+/**
+ * Derives the AgentCardLoadOptions from a RemoteAgentDefinition.
+ * Throws if neither agentCardUrl nor agentCardJson is present.
+ */
+export function getAgentCardLoadOptions(
+  def: RemoteAgentRef,
+): AgentCardLoadOptions {
+  if (def.agentCardJson) {
+    return { type: 'json', json: def.agentCardJson };
+  }
+  if (def.agentCardUrl) {
+    return { type: 'url', url: def.agentCardUrl };
+  }
+  throw new Error(
+    `Remote agent '${def.name}' has neither agentCardUrl nor agentCardJson`,
+  );
+}
+
+/**
+ * Extracts a target URL for auth providers from a RemoteAgentDefinition.
+ * For URL-based agents, returns the agentCardUrl.
+ * For JSON-based agents, attempts to parse the URL from the inline card JSON.
+ * Returns undefined if no URL can be determined.
+ */
+export function getRemoteAgentTargetUrl(
+  def: RemoteAgentRef,
+): string | undefined {
+  if (def.agentCardUrl) {
+    return def.agentCardUrl;
+  }
+  if (def.agentCardJson) {
+    try {
+      const parsed: unknown = JSON.parse(def.agentCardJson);
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
+      const card = parsed as AgentCard;
+      if (card.url) {
+        return card.url;
+      }
+    } catch {
+      // JSON parse will fail properly later in loadAgent
+    }
+  }
+  return undefined;
+}
+
 export interface BaseAgentDefinition<
   TOutput extends z.ZodTypeAny = z.ZodUnknown,
 > {
@@ -131,6 +216,11 @@ export interface LocalAgentDefinition<
   toolConfig?: ToolConfig;
 
   /**
+   * Optional inline MCP servers for this agent.
+   */
+  mcpServers?: Record<string, MCPServerConfig>;
+
+  /**
    * An optional function to process the raw output from the agent's final tool
    * call into a string format.
    *
@@ -138,13 +228,24 @@ export interface LocalAgentDefinition<
    * @returns A string representation of the final output.
    */
   processOutput?: (output: z.infer<TOutput>) => string;
+
+  /**
+   * Optional hook invoked before each model call. Receives the active
+   * {@link GeminiChat} instance and may modify chat history (e.g., to
+   * supersede stale tool outputs and reclaim context-window tokens).
+   *
+   * Runs immediately after chat compression in the agent loop.
+   */
+  onBeforeTurn?: (
+    chat: GeminiChat,
+    signal?: AbortSignal,
+  ) => Promise<void> | void;
 }
 
-export interface RemoteAgentDefinition<
+export interface BaseRemoteAgentDefinition<
   TOutput extends z.ZodTypeAny = z.ZodUnknown,
 > extends BaseAgentDefinition<TOutput> {
   kind: 'remote';
-  agentCardUrl: string;
   /** The user-provided description, before any remote card merging. */
   originalDescription?: string;
   /**
@@ -153,6 +254,13 @@ export interface RemoteAgentDefinition<
    * security requirements.
    */
   auth?: A2AAuthConfig;
+}
+
+export interface RemoteAgentDefinition<
+  TOutput extends z.ZodTypeAny = z.ZodUnknown,
+> extends BaseRemoteAgentDefinition<TOutput> {
+  agentCardUrl?: string;
+  agentCardJson?: string;
 }
 
 export type AgentDefinition<TOutput extends z.ZodTypeAny = z.ZodUnknown> =
@@ -223,12 +331,12 @@ export interface OutputConfig<T extends z.ZodTypeAny> {
 export interface RunConfig {
   /**
    * The maximum execution time for the agent in minutes.
-   * If not specified, defaults to DEFAULT_MAX_TIME_MINUTES (5).
+   * If not specified, defaults to DEFAULT_MAX_TIME_MINUTES (10).
    */
   maxTimeMinutes?: number;
   /**
    * The maximum number of conversational turns.
-   * If not specified, defaults to DEFAULT_MAX_TURNS (15).
+   * If not specified, defaults to DEFAULT_MAX_TURNS (30).
    */
   maxTurns?: number;
 }

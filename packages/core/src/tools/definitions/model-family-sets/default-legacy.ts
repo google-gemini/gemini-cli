@@ -59,6 +59,7 @@ import {
   READ_MANY_PARAM_RECURSIVE,
   READ_MANY_PARAM_USE_DEFAULT_EXCLUDES,
   MEMORY_PARAM_FACT,
+  MEMORY_PARAM_SCOPE,
   TODOS_PARAM_TODOS,
   TODOS_ITEM_PARAM_DESCRIPTION,
   TODOS_ITEM_PARAM_STATUS,
@@ -332,8 +333,16 @@ export const DEFAULT_LEGACY_SET: CoreToolSet = {
     },
   },
 
-  run_shell_command: (enableInteractiveShell, enableEfficiency) =>
-    getShellDeclaration(enableInteractiveShell, enableEfficiency),
+  run_shell_command: (
+    enableInteractiveShell,
+    enableEfficiency,
+    enableToolSandboxing,
+  ) =>
+    getShellDeclaration(
+      enableInteractiveShell,
+      enableEfficiency,
+      enableToolSandboxing,
+    ),
 
   replace: {
     name: EDIT_TOOL_NAME,
@@ -505,13 +514,13 @@ Use this tool when the user's query implies needing the content of several files
   save_memory: {
     name: MEMORY_TOOL_NAME,
     description: `
-Saves concise global user context (preferences, facts) for use across ALL workspaces.
+Saves concise user context (preferences, facts) for use across future sessions.
 
-### CRITICAL: GLOBAL CONTEXT ONLY
-NEVER save workspace-specific context, local paths, or commands (e.g. "The entry point is src/index.js", "The test command is npm test"). These are local to the current workspace and must NOT be saved globally. EXCLUSIVELY for context relevant across ALL workspaces.
+Supports two scopes:
+- **global** (default): Cross-project preferences loaded in every workspace. Use for "Remember X" or clear personal facts.
+- **project**: Facts specific to the current workspace, private to the user (not committed to the repo). Use for local dev setup notes, project-specific workflows, or personal reminders about this codebase.
 
-- Use for "Remember X" or clear personal facts.
-- Do NOT use for session context.`,
+Do NOT use for session-specific context or temporary data.`,
     parametersJsonSchema: {
       type: 'object',
       properties: {
@@ -519,6 +528,12 @@ NEVER save workspace-specific context, local paths, or commands (e.g. "The entry
           type: 'string',
           description:
             'The specific fact or piece of information to remember. Should be a clear, self-contained statement.',
+        },
+        [MEMORY_PARAM_SCOPE]: {
+          type: 'string',
+          enum: ['global', 'project'],
+          description:
+            "Where to save the memory. 'global' (default) saves to a file loaded in every workspace. 'project' saves to a project-specific file private to the user, not committed to the repo.",
         },
       },
       required: [MEMORY_PARAM_FACT],
@@ -543,6 +558,7 @@ DO NOT use this tool for simple tasks that can be completed in less than 2 steps
 - in_progress: Marked just prior to beginning work on a given subtask. You should only have one subtask as in_progress at a time.
 - completed: Subtask was successfully completed with no errors or issues. If the subtask required more steps to complete, update the todo list with the subtasks. All steps should be identified as completed only when they are completed.
 - cancelled: As you update the todo list, some tasks are not required anymore due to the dynamic nature of the task. In this case, mark the subtasks as cancelled.
+- blocked: Subtask is blocked and cannot be completed at this time.
 
 
 ## Methodology for using this tool
@@ -609,7 +625,13 @@ The agent did not use the todo list because this task could be completed by a ti
               [TODOS_ITEM_PARAM_STATUS]: {
                 type: 'string',
                 description: 'The current status of the task.',
-                enum: ['pending', 'in_progress', 'completed', 'cancelled'],
+                enum: [
+                  'pending',
+                  'in_progress',
+                  'completed',
+                  'cancelled',
+                  'blocked',
+                ],
               },
             },
             required: [TODOS_ITEM_PARAM_DESCRIPTION, TODOS_ITEM_PARAM_STATUS],
@@ -732,6 +754,6 @@ The agent did not use the todo list because this task could be completed by a ti
     },
   },
 
-  exit_plan_mode: (plansDir) => getExitPlanModeDeclaration(plansDir),
+  exit_plan_mode: () => getExitPlanModeDeclaration(),
   activate_skill: (skillNames) => getActivateSkillDeclaration(skillNames),
 };

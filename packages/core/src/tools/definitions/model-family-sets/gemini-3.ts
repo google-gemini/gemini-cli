@@ -59,6 +59,7 @@ import {
   READ_MANY_PARAM_RECURSIVE,
   READ_MANY_PARAM_USE_DEFAULT_EXCLUDES,
   MEMORY_PARAM_FACT,
+  MEMORY_PARAM_SCOPE,
   TODOS_PARAM_TODOS,
   TODOS_ITEM_PARAM_DESCRIPTION,
   TODOS_ITEM_PARAM_STATUS,
@@ -78,6 +79,7 @@ import {
   getShellDeclaration,
   getExitPlanModeDeclaration,
   getActivateSkillDeclaration,
+  getUpdateTopicDeclaration,
 } from '../dynamic-declaration-helpers.js';
 import {
   DEFAULT_MAX_LINES_TEXT_FILE,
@@ -338,8 +340,16 @@ export const GEMINI_3_SET: CoreToolSet = {
     },
   },
 
-  run_shell_command: (enableInteractiveShell, enableEfficiency) =>
-    getShellDeclaration(enableInteractiveShell, enableEfficiency),
+  run_shell_command: (
+    enableInteractiveShell,
+    enableEfficiency,
+    enableToolSandboxing,
+  ) =>
+    getShellDeclaration(
+      enableInteractiveShell,
+      enableEfficiency,
+      enableToolSandboxing,
+    ),
 
   replace: {
     name: EDIT_TOOL_NAME,
@@ -486,14 +496,20 @@ Use this tool when the user's query implies needing the content of several files
 
   save_memory: {
     name: MEMORY_TOOL_NAME,
-    description: `Persists global preferences or facts across ALL future sessions. Use this for recurring instructions like coding styles or tool aliases. Unlike '${WRITE_FILE_TOOL_NAME}', which is for project-specific files, this appends to a global memory file loaded in every workspace. If you are unsure whether a fact should be remembered globally, ask the user first. CRITICAL: Do not use for session-specific context or temporary data.`,
+    description: `Persists preferences or facts across ALL future sessions. Supports two scopes: 'global' (default) for cross-project preferences loaded in every workspace, and 'project' for facts specific to the current workspace that are private to the user (not committed to the repo). Use 'project' scope for things like local dev setup notes, project-specific workflows, or personal reminders about this codebase. CRITICAL: Do not use for session-specific context or temporary data.`,
     parametersJsonSchema: {
       type: 'object',
       properties: {
         [MEMORY_PARAM_FACT]: {
           type: 'string',
           description:
-            "A concise, global fact or preference (e.g., 'I prefer using tabs'). Do not include local paths or project-specific names.",
+            'A concise fact or preference to remember. Should be a clear, self-contained statement.',
+        },
+        [MEMORY_PARAM_SCOPE]: {
+          type: 'string',
+          enum: ['global', 'project'],
+          description:
+            "Where to save the memory. 'global' (default) saves to a file loaded in every workspace. 'project' saves to a project-specific file private to the user, not committed to the repo.",
         },
       },
       required: [MEMORY_PARAM_FACT],
@@ -518,6 +534,7 @@ DO NOT use this tool for simple tasks that can be completed in less than 2 steps
 - in_progress: Marked just prior to beginning work on a given subtask. You should only have one subtask as in_progress at a time.
 - completed: Subtask was successfully completed with no errors or issues. If the subtask required more steps to complete, update the todo list with the subtasks. All steps should be identified as completed only when they are completed.
 - cancelled: As you update the todo list, some tasks are not required anymore due to the dynamic nature of the task. In this case, mark the subtasks as cancelled.
+- blocked: Subtask is blocked and cannot be completed at this time.
 
 
 ## Methodology for using this tool
@@ -584,7 +601,13 @@ The agent did not use the todo list because this task could be completed by a ti
               [TODOS_ITEM_PARAM_STATUS]: {
                 type: 'string',
                 description: 'The current status of the task.',
-                enum: ['pending', 'in_progress', 'completed', 'cancelled'],
+                enum: [
+                  'pending',
+                  'in_progress',
+                  'completed',
+                  'cancelled',
+                  'blocked',
+                ],
               },
             },
             required: [TODOS_ITEM_PARAM_DESCRIPTION, TODOS_ITEM_PARAM_STATUS],
@@ -707,6 +730,7 @@ The agent did not use the todo list because this task could be completed by a ti
     },
   },
 
-  exit_plan_mode: (plansDir) => getExitPlanModeDeclaration(plansDir),
+  exit_plan_mode: () => getExitPlanModeDeclaration(),
   activate_skill: (skillNames) => getActivateSkillDeclaration(skillNames),
+  update_topic: getUpdateTopicDeclaration(),
 };

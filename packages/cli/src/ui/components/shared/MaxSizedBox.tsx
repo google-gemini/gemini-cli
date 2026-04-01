@@ -10,8 +10,8 @@ import { Box, Text, ResizeObserver, type DOMElement } from 'ink';
 import { theme } from '../../semantic-colors.js';
 import { useOverflowActions } from '../../contexts/OverflowContext.js';
 import { isNarrowWidth } from '../../utils/isNarrowWidth.js';
-import { Command } from '../../../config/keyBindings.js';
-import { formatCommand } from '../../utils/keybindingUtils.js';
+import { Command } from '../../key/keyBindings.js';
+import { formatCommand } from '../../key/keybindingUtils.js';
 
 /**
  * Minimum height for the MaxSizedBox component.
@@ -20,7 +20,7 @@ import { formatCommand } from '../../utils/keybindingUtils.js';
  */
 export const MINIMUM_MAX_HEIGHT = 2;
 
-interface MaxSizedBoxProps {
+export interface MaxSizedBoxProps {
   children?: React.ReactNode;
   maxWidth?: number;
   maxHeight?: number;

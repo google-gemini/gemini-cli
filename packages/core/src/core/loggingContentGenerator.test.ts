@@ -19,7 +19,6 @@ const runInDevTraceSpan = vi.hoisted(() =>
     const metadata = { attributes: opts.attributes || {} };
     return fn({
       metadata,
-      endSpan: vi.fn(),
     });
   }),
 );
@@ -73,6 +72,7 @@ describe('LoggingContentGenerator', () => {
       getContentGeneratorConfig: vi.fn().mockReturnValue({
         authType: 'API_KEY',
       }),
+      getTelemetryLogPromptsEnabled: vi.fn().mockReturnValue(true),
       refreshUserQuotaIfStale: vi.fn().mockResolvedValue(undefined),
     } as unknown as Config;
     loggingContentGenerator = new LoggingContentGenerator(wrapped, config);
@@ -158,7 +158,7 @@ describe('LoggingContentGenerator', () => {
       const spanArgs = vi.mocked(runInDevTraceSpan).mock.calls[0];
       const fn = spanArgs[1];
       const metadata: SpanMetadata = { name: '', attributes: {} };
-      await fn({ metadata, endSpan: vi.fn() });
+      await fn({ metadata });
 
       expect(metadata).toMatchObject({
         input: req.contents,
@@ -222,7 +222,7 @@ describe('LoggingContentGenerator', () => {
       const spanArgs = vi.mocked(runInDevTraceSpan).mock.calls[0];
       const fn = spanArgs[1];
       const metadata: SpanMetadata = { name: '', attributes: {} };
-      promise = fn({ metadata, endSpan: vi.fn() });
+      promise = fn({ metadata });
 
       await expect(promise).rejects.toThrow(error);
 
@@ -407,7 +407,7 @@ describe('LoggingContentGenerator', () => {
       expect(runInDevTraceSpan).toHaveBeenCalledWith(
         expect.objectContaining({
           operation: GeminiCliOperation.LLMCall,
-          noAutoEnd: true,
+
           attributes: expect.objectContaining({
             [GEN_AI_REQUEST_MODEL]: 'gemini-pro',
             [GEN_AI_PROMPT_NAME]: userPromptId,
@@ -427,7 +427,7 @@ describe('LoggingContentGenerator', () => {
       vi.mocked(wrapped.generateContentStream).mockResolvedValue(
         createAsyncGenerator(),
       );
-      stream = await fn({ metadata, endSpan: vi.fn() });
+      stream = await fn({ metadata });
 
       for await (const _ of stream) {
         // consume stream
@@ -644,7 +644,7 @@ describe('LoggingContentGenerator', () => {
       const spanArgs = vi.mocked(runInDevTraceSpan).mock.calls[0];
       const fn = spanArgs[1];
       const metadata: SpanMetadata = { name: '', attributes: {} };
-      await fn({ metadata, endSpan: vi.fn() });
+      await fn({ metadata });
 
       expect(metadata).toMatchObject({
         input: req.contents,
@@ -709,7 +709,7 @@ describe('estimateContextBreakdown', () => {
         {
           functionDeclarations: [
             {
-              name: 'myserver__search',
+              name: 'mcp_myserver_search',
               description: 'Search via MCP',
               parameters: {},
             },
@@ -747,8 +747,7 @@ describe('estimateContextBreakdown', () => {
     expect(builtinOnly.mcp_servers).toBe(0);
   });
 
-  it('should not classify tools with __ in the middle of a segment as MCP', () => {
-    // "__" at start or end (not a valid server__tool pattern) should not be MCP
+  it('should not classify tools without mcp_ prefix as MCP', () => {
     const config = {
       tools: [
         {
@@ -842,7 +841,7 @@ describe('estimateContextBreakdown', () => {
           functionDeclarations: [
             { name: 'read_file', description: 'Read', parameters: {} },
             {
-              name: 'myserver__search',
+              name: 'mcp_myserver_search',
               description: 'MCP search',
               parameters: {},
             },
@@ -858,7 +857,7 @@ describe('estimateContextBreakdown', () => {
     expect(result.history).toBeGreaterThan(0);
     // tool_calls should only contain non-MCP tools
     expect(result.tool_calls['read_file']).toBeGreaterThan(0);
-    expect(result.tool_calls['myserver__search']).toBeUndefined();
+    expect(result.tool_calls['mcp_myserver_search']).toBeUndefined();
     // MCP tokens are only in mcp_servers
     expect(result.mcp_servers).toBeGreaterThan(0);
   });
@@ -870,7 +869,7 @@ describe('estimateContextBreakdown', () => {
         parts: [
           {
             functionCall: {
-              name: 'myserver__search',
+              name: 'mcp_myserver_search',
               args: { query: 'test' },
             },
           },
@@ -881,7 +880,7 @@ describe('estimateContextBreakdown', () => {
         parts: [
           {
             functionResponse: {
-              name: 'myserver__search',
+              name: 'mcp_myserver_search',
               response: { results: [] },
             },
           },
@@ -890,7 +889,7 @@ describe('estimateContextBreakdown', () => {
     ];
     const result = estimateContextBreakdown(contents);
     // MCP tool calls should NOT appear in tool_calls
-    expect(result.tool_calls['myserver__search']).toBeUndefined();
+    expect(result.tool_calls['mcp_myserver_search']).toBeUndefined();
     // MCP call tokens should only be counted in mcp_servers
     expect(result.mcp_servers).toBeGreaterThan(0);
   });
@@ -908,7 +907,7 @@ describe('estimateContextBreakdown', () => {
           },
           {
             functionCall: {
-              name: 'myserver__search',
+              name: 'mcp_myserver_search',
               args: { q: 'hello' },
             },
           },
@@ -919,7 +918,7 @@ describe('estimateContextBreakdown', () => {
     // Non-MCP tools should be in tool_calls
     expect(result.tool_calls['read_file']).toBeGreaterThan(0);
     // MCP tools should NOT be in tool_calls
-    expect(result.tool_calls['myserver__search']).toBeUndefined();
+    expect(result.tool_calls['mcp_myserver_search']).toBeUndefined();
     // MCP tool calls should only be in mcp_servers
     expect(result.mcp_servers).toBeGreaterThan(0);
   });

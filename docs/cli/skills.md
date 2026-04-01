@@ -69,6 +69,11 @@ complex workflows.
 - **Progressive disclosure**: Only skill metadata (name and description) is
   loaded initially. Detailed instructions and resources are only disclosed when
   the model explicitly activates the skill, saving context tokens.
+  
+<!-- prettier-ignore -->
+> [!NOTE]
+> `/skills disable` and `/skills enable` default to the `user` scope. Use
+> `--scope workspace` to manage workspace-specific settings.
 
 To see all available skills in your current session, use the `/skills list`
 command.

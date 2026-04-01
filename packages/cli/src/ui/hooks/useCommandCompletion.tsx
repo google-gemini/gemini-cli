@@ -1,23 +1,24 @@
 /**
  * @license
- * Copyright 2025 Google LLC
+ * Copyright 2026 Google LLC
  * SPDX-License-Identifier: Apache-2.0
  */
 
+import type React from 'react';
 import { useCallback, useMemo, useEffect, useState } from 'react';
 import type { Suggestion } from '../components/SuggestionsDisplay.js';
 import type { CommandContext, SlashCommand } from '../commands/types.js';
 import type { TextBuffer } from '../components/shared/text-buffer.js';
 import { logicalPosToOffset } from '../components/shared/text-buffer.js';
-import { isSlashCommand } from '../utils/commandUtils.js';
 import { toCodePoints } from '../utils/textUtils.js';
+import { isSlashCommand } from '../utils/commandUtils.js';
 import { useAtCompletion } from './useAtCompletion.js';
 import { useSlashCompletion } from './useSlashCompletion.js';
 import { useShellCompletion } from './useShellCompletion.js';
-import type { PromptCompletion } from './usePromptCompletion.js';
 import {
   usePromptCompletion,
   PROMPT_COMPLETION_MIN_LENGTH,
+  type PromptCompletion,
 } from './usePromptCompletion.js';
 import type { Config } from '@google/gemini-cli-core';
 import { useCompletion } from './useCompletion.js';
@@ -374,7 +375,7 @@ export function useCommandCompletion({
       }
 
       // Apply space padding for slash commands (needed for subcommands like "/chat list")
-      let suggestionText = suggestion.value;
+      let suggestionText = suggestion.insertValue ?? suggestion.value;
       if (completionMode === CompletionMode.SLASH) {
         // Add leading space if completing a subcommand (cursor is after parent command with no space)
         if (start === end && start > 1 && currentLine[start - 1] !== ' ') {
@@ -423,7 +424,7 @@ export function useCommandCompletion({
       }
 
       // Add space padding for Tab completion (auto-execute gets padding from getCompletedText)
-      let suggestionText = suggestion.value;
+      let suggestionText = suggestion.insertValue ?? suggestion.value;
       if (completionMode === CompletionMode.SLASH) {
         if (
           start === end &&
@@ -436,10 +437,23 @@ export function useCommandCompletion({
 
       const lineCodePoints = toCodePoints(buffer.lines[cursorRow] || '');
       const charAfterCompletion = lineCodePoints[end];
+
+      let shouldAddSpace = true;
+      if (completionMode === CompletionMode.SLASH) {
+        const command =
+          slashCompletionRange.getCommandFromSuggestion(suggestion);
+        // Don't add a space if the command has an action (can be executed)
+        // and doesn't have a completion function (doesn't REQUIRE more arguments)
+        const isExecutableCommand = !!(command && command.action);
+        const requiresArguments = !!(command && command.completion);
+        shouldAddSpace = !isExecutableCommand || requiresArguments;
+      }
+
       if (
         charAfterCompletion !== ' ' &&
         !suggestionText.endsWith('/') &&
-        !suggestionText.endsWith('\\')
+        !suggestionText.endsWith('\\') &&
+        shouldAddSpace
       ) {
         suggestionText += ' ';
       }

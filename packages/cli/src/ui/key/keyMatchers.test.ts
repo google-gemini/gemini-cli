@@ -1,0 +1,548 @@
+/**
+ * @license
+ * Copyright 2025 Google LLC
+ * SPDX-License-Identifier: Apache-2.0
+ */
+
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import * as os from 'node:os';
+import * as path from 'node:path';
+import * as fs from 'node:fs/promises';
+import { Storage } from '@google/gemini-cli-core';
+import {
+  defaultKeyMatchers,
+  Command,
+  createKeyMatchers,
+  loadKeyMatchers,
+} from './keyMatchers.js';
+import { defaultKeyBindingConfig, KeyBinding } from './keyBindings.js';
+import type { Key } from '../hooks/useKeypress.js';
+
+const createKey = (name: string, mods: Partial<Key> = {}): Key => ({
+  name,
+  shift: false,
+  alt: false,
+  ctrl: false,
+  cmd: false,
+  insertable: false,
+  sequence: name,
+  ...mods,
+});
+
+describe('keyMatchers', () => {
+  // Test data for each command with positive and negative test cases
+  const testCases = [
+    // Basic bindings
+    {
+      command: Command.RETURN,
+      positive: [createKey('enter')],
+      negative: [createKey('r')],
+    },
+    {
+      command: Command.ESCAPE,
+      positive: [createKey('escape')],
+      negative: [
+        createKey('e'),
+        createKey('esc'),
+        createKey('escape', { ctrl: true }),
+      ],
+    },
+
+    // Cursor movement
+    {
+      command: Command.HOME,
+      positive: [createKey('a', { ctrl: true }), createKey('home')],
+      negative: [
+        createKey('a'),
+        createKey('a', { shift: true }),
+        createKey('b', { ctrl: true }),
+        createKey('home', { ctrl: true }),
+      ],
+    },
+    {
+      command: Command.END,
+      positive: [createKey('e', { ctrl: true }), createKey('end')],
+      negative: [
+        createKey('e'),
+        createKey('e', { shift: true }),
+        createKey('a', { ctrl: true }),
+        createKey('end', { ctrl: true }),
+      ],
+    },
+    {
+      command: Command.MOVE_LEFT,
+      positive: [createKey('left')],
+      negative: [
+        createKey('left', { ctrl: true }),
+        createKey('b'),
+        createKey('b', { ctrl: true }),
+      ],
+    },
+    {
+      command: Command.MOVE_RIGHT,
+      positive: [createKey('right'), createKey('f', { ctrl: true })],
+      negative: [createKey('right', { ctrl: true }), createKey('f')],
+    },
+    {
+      command: Command.MOVE_WORD_LEFT,
+      positive: [
+        createKey('left', { ctrl: true }),
+        createKey('left', { alt: true }),
+        createKey('b', { alt: true }),
+      ],
+      negative: [createKey('left'), createKey('b', { ctrl: true })],
+    },
+    {
+      command: Command.MOVE_WORD_RIGHT,
+      positive: [
+        createKey('right', { ctrl: true }),
+        createKey('right', { alt: true }),
+        createKey('f', { alt: true }),
+      ],
+      negative: [createKey('right'), createKey('f', { ctrl: true })],
+    },
+
+    // Text deletion
+    {
+      command: Command.KILL_LINE_RIGHT,
+      positive: [createKey('k', { ctrl: true })],
+      negative: [createKey('k'), createKey('l', { ctrl: true })],
+    },
+    {
+      command: Command.KILL_LINE_LEFT,
+      positive: [createKey('u', { ctrl: true })],
+      negative: [createKey('u'), createKey('k', { ctrl: true })],
+    },
+    {
+      command: Command.CLEAR_INPUT,
+      positive: [createKey('c', { ctrl: true })],
+      negative: [createKey('c'), createKey('k', { ctrl: true })],
+    },
+    {
+      command: Command.DELETE_CHAR_LEFT,
+      positive: [createKey('backspace'), createKey('h', { ctrl: true })],
+      negative: [createKey('h'), createKey('x', { ctrl: true })],
+    },
+    {
+      command: Command.DELETE_CHAR_RIGHT,
+      positive: [createKey('delete'), createKey('d', { ctrl: true })],
+      negative: [createKey('d'), createKey('x', { ctrl: true })],
+    },
+    {
+      command: Command.DELETE_WORD_BACKWARD,
+      positive: [
+        createKey('backspace', { ctrl: true }),
+        createKey('backspace', { alt: true }),
+        createKey('w', { ctrl: true }),
+      ],
+      negative: [createKey('backspace'), createKey('delete', { ctrl: true })],
+    },
+    {
+      command: Command.DELETE_WORD_FORWARD,
+      positive: [
+        createKey('delete', { ctrl: true }),
+        createKey('delete', { alt: true }),
+        createKey('d', { alt: true }),
+      ],
+      negative: [createKey('delete'), createKey('backspace', { ctrl: true })],
+    },
+    {
+      command: Command.UNDO,
+      positive: [
+        createKey('z', { shift: false, cmd: true }),
+        createKey('z', { shift: false, alt: true }),
+      ],
+      negative: [
+        createKey('z'),
+        createKey('z', { shift: true, cmd: true }),
+        createKey('z', { shift: false, ctrl: true }),
+      ],
+    },
+    {
+      command: Command.REDO,
+      positive: [
+        createKey('z', { shift: true, cmd: true }),
+        createKey('z', { shift: true, alt: true }),
+        createKey('z', { shift: true, ctrl: true }),
+      ],
+      negative: [createKey('z'), createKey('z', { shift: false, cmd: true })],
+    },
+
+    // Screen control
+    {
+      command: Command.CLEAR_SCREEN,
+      positive: [createKey('l', { ctrl: true })],
+      negative: [createKey('l'), createKey('k', { ctrl: true })],
+    },
+
+    // Scrolling
+    {
+      command: Command.SCROLL_UP,
+      positive: [createKey('up', { shift: true })],
+      negative: [createKey('up')],
+    },
+    {
+      command: Command.SCROLL_DOWN,
+      positive: [createKey('down', { shift: true })],
+      negative: [createKey('down')],
+    },
+    {
+      command: Command.SCROLL_HOME,
+      positive: [
+        createKey('home', { ctrl: true }),
+        createKey('home', { shift: true }),
+      ],
+      negative: [createKey('end'), createKey('home')],
+    },
+    {
+      command: Command.SCROLL_END,
+      positive: [
+        createKey('end', { ctrl: true }),
+        createKey('end', { shift: true }),
+      ],
+      negative: [createKey('home'), createKey('end')],
+    },
+    {
+      command: Command.PAGE_UP,
+      positive: [createKey('pageup')],
+      negative: [
+        createKey('pagedown'),
+        createKey('up'),
+        createKey('pageup', { shift: true }),
+      ],
+    },
+    {
+      command: Command.PAGE_DOWN,
+      positive: [createKey('pagedown')],
+      negative: [
+        createKey('pageup'),
+        createKey('down'),
+        createKey('pagedown', { ctrl: true }),
+      ],
+    },
+
+    // History navigation
+    {
+      command: Command.HISTORY_UP,
+      positive: [createKey('p', { ctrl: true })],
+      negative: [createKey('p'), createKey('up')],
+    },
+    {
+      command: Command.HISTORY_DOWN,
+      positive: [createKey('n', { ctrl: true })],
+      negative: [createKey('n'), createKey('down')],
+    },
+    {
+      command: Command.NAVIGATION_UP,
+      positive: [createKey('up')],
+      negative: [
+        createKey('p'),
+        createKey('u'),
+        createKey('up', { ctrl: true }),
+      ],
+    },
+    {
+      command: Command.NAVIGATION_DOWN,
+      positive: [createKey('down')],
+      negative: [
+        createKey('n'),
+        createKey('d'),
+        createKey('down', { ctrl: true }),
+      ],
+    },
+
+    // Dialog navigation
+    {
+      command: Command.DIALOG_NAVIGATION_UP,
+      positive: [createKey('up'), createKey('k')],
+      negative: [
+        createKey('up', { shift: true }),
+        createKey('k', { shift: true }),
+        createKey('p'),
+      ],
+    },
+    {
+      command: Command.DIALOG_NAVIGATION_DOWN,
+      positive: [createKey('down'), createKey('j')],
+      negative: [
+        createKey('down', { shift: true }),
+        createKey('j', { shift: true }),
+        createKey('n'),
+      ],
+    },
+
+    // Auto-completion
+    {
+      command: Command.ACCEPT_SUGGESTION,
+      positive: [createKey('tab'), createKey('enter')],
+      negative: [createKey('enter', { ctrl: true }), createKey('space')],
+    },
+    {
+      command: Command.COMPLETION_UP,
+      positive: [createKey('up'), createKey('p', { ctrl: true })],
+      negative: [createKey('p'), createKey('down')],
+    },
+    {
+      command: Command.COMPLETION_DOWN,
+      positive: [createKey('down'), createKey('n', { ctrl: true })],
+      negative: [createKey('n'), createKey('up')],
+    },
+
+    // Text input
+    {
+      command: Command.SUBMIT,
+      positive: [createKey('enter')],
+      negative: [
+        createKey('enter', { ctrl: true }),
+        createKey('enter', { cmd: true }),
+        createKey('enter', { alt: true }),
+      ],
+    },
+    {
+      command: Command.NEWLINE,
+      positive: [
+        createKey('enter', { ctrl: true }),
+        createKey('enter', { cmd: true }),
+        createKey('enter', { alt: true }),
+      ],
+      negative: [createKey('enter'), createKey('n')],
+    },
+
+    // External tools
+    {
+      command: Command.OPEN_EXTERNAL_EDITOR,
+      positive: [createKey('x', { ctrl: true })],
+      negative: [createKey('x'), createKey('c', { ctrl: true })],
+    },
+    {
+      command: Command.PASTE_CLIPBOARD,
+      positive: [createKey('v', { ctrl: true })],
+      negative: [createKey('v'), createKey('c', { ctrl: true })],
+    },
+
+    // App level bindings
+    {
+      command: Command.SHOW_ERROR_DETAILS,
+      positive: [createKey('f12')],
+      negative: [
+        createKey('o', { ctrl: true }),
+        createKey('b', { ctrl: true }),
+      ],
+    },
+    {
+      command: Command.SHOW_FULL_TODOS,
+      positive: [createKey('t', { ctrl: true })],
+      negative: [createKey('t'), createKey('e', { ctrl: true })],
+    },
+    {
+      command: Command.SHOW_IDE_CONTEXT_DETAIL,
+      positive: [createKey('g', { ctrl: true })],
+      negative: [createKey('g'), createKey('t', { ctrl: true })],
+    },
+    {
+      command: Command.TOGGLE_MARKDOWN,
+      positive: [createKey('m', { alt: true })],
+      negative: [createKey('m'), createKey('m', { shift: true })],
+    },
+    {
+      command: Command.TOGGLE_COPY_MODE,
+      positive: [createKey('s', { ctrl: true })],
+      negative: [createKey('s'), createKey('s', { alt: true })],
+    },
+    {
+      command: Command.QUIT,
+      positive: [createKey('c', { ctrl: true })],
+      negative: [createKey('c'), createKey('d', { ctrl: true })],
+    },
+    {
+      command: Command.EXIT,
+      positive: [createKey('d', { ctrl: true })],
+      negative: [createKey('d'), createKey('c', { ctrl: true })],
+    },
+    {
+      command: Command.SUSPEND_APP,
+      positive: [createKey('z', { ctrl: true })],
+      negative: [
+        createKey('z'),
+        createKey('y', { ctrl: true }),
+        createKey('z', { alt: true }),
+        createKey('z', { ctrl: true, shift: true }),
+      ],
+    },
+    {
+      command: Command.SHOW_MORE_LINES,
+      positive: [createKey('o', { ctrl: true })],
+      negative: [
+        createKey('s', { ctrl: true }),
+        createKey('s'),
+        createKey('l', { ctrl: true }),
+      ],
+    },
+    // Shell commands
+    {
+      command: Command.REVERSE_SEARCH,
+      positive: [createKey('r', { ctrl: true })],
+      negative: [createKey('r'), createKey('s', { ctrl: true })],
+    },
+    {
+      command: Command.SUBMIT_REVERSE_SEARCH,
+      positive: [createKey('enter')],
+      negative: [createKey('enter', { ctrl: true }), createKey('tab')],
+    },
+    {
+      command: Command.ACCEPT_SUGGESTION_REVERSE_SEARCH,
+      positive: [createKey('tab')],
+      negative: [
+        createKey('enter'),
+        createKey('space'),
+        createKey('tab', { ctrl: true }),
+      ],
+    },
+    {
+      command: Command.FOCUS_SHELL_INPUT,
+      positive: [createKey('tab')],
+      negative: [createKey('f6'), createKey('f', { ctrl: true })],
+    },
+    {
+      command: Command.TOGGLE_YOLO,
+      positive: [createKey('y', { ctrl: true })],
+      negative: [createKey('y'), createKey('y', { alt: true })],
+    },
+    {
+      command: Command.CYCLE_APPROVAL_MODE,
+      positive: [createKey('tab', { shift: true })],
+      negative: [createKey('tab')],
+    },
+    {
+      command: Command.TOGGLE_BACKGROUND_SHELL,
+      positive: [createKey('b', { ctrl: true })],
+      negative: [createKey('f10'), createKey('b')],
+    },
+    {
+      command: Command.TOGGLE_BACKGROUND_SHELL_LIST,
+      positive: [createKey('l', { ctrl: true })],
+      negative: [createKey('l')],
+    },
+  ];
+
+  describe('Data-driven key binding matches original logic', () => {
+    testCases.forEach(({ command, positive, negative }) => {
+      it(`should match ${command} correctly`, () => {
+        positive.forEach((key) => {
+          expect(
+            defaultKeyMatchers[command](key),
+            `Expected ${command} to match ${JSON.stringify(key)}`,
+          ).toBe(true);
+        });
+
+        negative.forEach((key) => {
+          expect(
+            defaultKeyMatchers[command](key),
+            `Expected ${command} to NOT match ${JSON.stringify(key)}`,
+          ).toBe(false);
+        });
+      });
+    });
+  });
+
+  describe('Custom key bindings', () => {
+    it('should work with custom configuration', () => {
+      const customConfig = new Map(defaultKeyBindingConfig);
+      customConfig.set(Command.HOME, [
+        new KeyBinding('ctrl+h'),
+        new KeyBinding('0'),
+      ]);
+
+      const customMatchers = createKeyMatchers(customConfig);
+
+      expect(customMatchers[Command.HOME](createKey('h', { ctrl: true }))).toBe(
+        true,
+      );
+      expect(customMatchers[Command.HOME](createKey('0'))).toBe(true);
+      expect(customMatchers[Command.HOME](createKey('a', { ctrl: true }))).toBe(
+        false,
+      );
+    });
+
+    it('should support multiple key bindings for same command', () => {
+      const config = new Map(defaultKeyBindingConfig);
+      config.set(Command.QUIT, [
+        new KeyBinding('ctrl+q'),
+        new KeyBinding('alt+q'),
+      ]);
+
+      const matchers = createKeyMatchers(config);
+      expect(matchers[Command.QUIT](createKey('q', { ctrl: true }))).toBe(true);
+      expect(matchers[Command.QUIT](createKey('q', { alt: true }))).toBe(true);
+    });
+    it('should support matching non-ASCII and CJK characters', () => {
+      const config = new Map(defaultKeyBindingConfig);
+      config.set(Command.QUIT, [new KeyBinding('Å'), new KeyBinding('가')]);
+
+      const matchers = createKeyMatchers(config);
+
+      // Å is normalized to å with shift=true by the parser
+      expect(matchers[Command.QUIT](createKey('å', { shift: true }))).toBe(
+        true,
+      );
+      expect(matchers[Command.QUIT](createKey('å'))).toBe(false);
+
+      // CJK characters do not have a lower/upper case
+      expect(matchers[Command.QUIT](createKey('가'))).toBe(true);
+      expect(matchers[Command.QUIT](createKey('나'))).toBe(false);
+    });
+  });
+
+  describe('Edge Cases', () => {
+    it('should handle empty binding arrays', () => {
+      const config = new Map(defaultKeyBindingConfig);
+      config.set(Command.HOME, []);
+
+      const matchers = createKeyMatchers(config);
+      expect(matchers[Command.HOME](createKey('a', { ctrl: true }))).toBe(
+        false,
+      );
+    });
+  });
+});
+
+describe('loadKeyMatchers integration', () => {
+  let tempDir: string;
+  let tempFilePath: string;
+
+  beforeEach(async () => {
+    tempDir = await fs.mkdtemp(
+      path.join(os.tmpdir(), 'gemini-keymatchers-test-'),
+    );
+    tempFilePath = path.join(tempDir, 'keybindings.json');
+    vi.spyOn(Storage, 'getUserKeybindingsPath').mockReturnValue(tempFilePath);
+  });
+
+  afterEach(async () => {
+    await fs.rm(tempDir, { recursive: true, force: true });
+    vi.restoreAllMocks();
+  });
+
+  it('loads matchers from a real file on disk', async () => {
+    const customJson = JSON.stringify([
+      { command: Command.QUIT, key: 'ctrl+y' },
+    ]);
+    await fs.writeFile(tempFilePath, customJson, 'utf8');
+
+    const { matchers, errors } = await loadKeyMatchers();
+
+    expect(errors).toHaveLength(0);
+    // User binding matches
+    expect(matchers[Command.QUIT](createKey('y', { ctrl: true }))).toBe(true);
+    // Default binding still matches as fallback
+    expect(matchers[Command.QUIT](createKey('c', { ctrl: true }))).toBe(true);
+  });
+
+  it('returns errors when the file on disk is invalid', async () => {
+    await fs.writeFile(tempFilePath, 'invalid json {', 'utf8');
+
+    const { errors } = await loadKeyMatchers();
+
+    expect(errors.length).toBeGreaterThan(0);
+  });
+});

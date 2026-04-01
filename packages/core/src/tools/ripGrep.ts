@@ -54,7 +54,23 @@ async function resolveExistingRgPath(): Promise<string | null> {
 }
 
 let ripgrepAcquisitionPromise: Promise<string | null> | null = null;
-
+/**
+ * Ensures a ripgrep binary is available.
+ *
+ * NOTE:
+ * - The Gemini CLI currently prefers a managed ripgrep binary downloaded
+ *   into its global bin directory.
+ * - Even if ripgrep is available on the system PATH, it is intentionally
+ *   not used at this time.
+ *
+ * Preference for system-installed ripgrep is blocked on:
+ * - checksum verification of external binaries
+ * - internalization of the get-ripgrep dependency
+ *
+ * See:
+ * - feat(core): Prefer rg in system path (#11847)
+ * - Move get-ripgrep to third_party (#12099)
+ */
 async function ensureRipgrepAvailable(): Promise<string | null> {
   const existingPath = await resolveExistingRgPath();
   if (existingPath) {
@@ -234,9 +250,17 @@ class GrepToolInvocation extends BaseToolInvocation<
 
       // Create a timeout controller to prevent indefinitely hanging searches
       const timeoutController = new AbortController();
+      const configTimeout = this.config.getFileFilteringOptions().searchTimeout;
+      // If configTimeout is less than standard default, it might be too short for grep.
+      // We check if it's greater or if we should use DEFAULT_SEARCH_TIMEOUT_MS as a fallback.
+      // Let's assume the user can set it higher if they want. Using it directly if it exists, otherwise fallback.
+      const timeoutMs =
+        configTimeout && configTimeout > DEFAULT_SEARCH_TIMEOUT_MS
+          ? configTimeout
+          : DEFAULT_SEARCH_TIMEOUT_MS;
       const timeoutId = setTimeout(() => {
         timeoutController.abort();
-      }, DEFAULT_SEARCH_TIMEOUT_MS);
+      }, timeoutMs);
 
       // Link the passed signal to our timeout controller
       const onAbort = () => timeoutController.abort();
@@ -263,6 +287,13 @@ class GrepToolInvocation extends BaseToolInvocation<
           max_matches_per_file: this.params.max_matches_per_file,
           signal: timeoutController.signal,
         });
+      } catch (error) {
+        if (timeoutController.signal.aborted) {
+          throw new Error(
+            `Operation timed out after ${timeoutMs}ms. In large repositories, consider narrowing your search scope by specifying a 'dir_path' or an 'include_pattern'.`,
+          );
+        }
+        throw error;
       } finally {
         clearTimeout(timeoutId);
         signal.removeEventListener('abort', onAbort);
@@ -460,6 +491,7 @@ class GrepToolInvocation extends BaseToolInvocation<
       const generator = execStreaming(rgPath, rgArgs, {
         signal: options.signal,
         allowedExitCodes: [0, 1],
+        sandboxManager: this.config.sandboxManager,
       });
 
       let matchesFound = 0;

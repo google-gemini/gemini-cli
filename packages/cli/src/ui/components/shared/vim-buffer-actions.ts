@@ -24,6 +24,13 @@ import { assumeExhaustive } from '@google/gemini-cli-core';
 
 export type VimAction = Extract<
   TextBufferAction,
+  | { type: 'vim_delete_char_before' }
+  | { type: 'vim_toggle_case' }
+  | { type: 'vim_replace_char' }
+  | { type: 'vim_find_char_forward' }
+  | { type: 'vim_find_char_backward' }
+  | { type: 'vim_delete_to_char_forward' }
+  | { type: 'vim_delete_to_char_backward' }
   | { type: 'vim_delete_word_forward' }
   | { type: 'vim_delete_word_backward' }
   | { type: 'vim_delete_word_end' }
@@ -71,7 +78,88 @@ export type VimAction = Extract<
   | { type: 'vim_move_to_last_line' }
   | { type: 'vim_move_to_line' }
   | { type: 'vim_escape_insert_mode' }
+  | { type: 'vim_yank_line' }
+  | { type: 'vim_yank_word_forward' }
+  | { type: 'vim_yank_big_word_forward' }
+  | { type: 'vim_yank_word_end' }
+  | { type: 'vim_yank_big_word_end' }
+  | { type: 'vim_yank_to_end_of_line' }
+  | { type: 'vim_paste_after' }
+  | { type: 'vim_paste_before' }
 >;
+
+/**
+ * Find the Nth occurrence of `char` in `codePoints`, starting at `start` and
+ * stepping by `direction` (+1 forward, -1 backward). Returns the index or -1.
+ */
+function findCharInLine(
+  codePoints: string[],
+  char: string,
+  count: number,
+  start: number,
+  direction: 1 | -1,
+): number {
+  let found = -1;
+  let hits = 0;
+  for (
+    let i = start;
+    direction === 1 ? i < codePoints.length : i >= 0;
+    i += direction
+  ) {
+    if (codePoints[i] === char) {
+      hits++;
+      if (hits >= count) {
+        found = i;
+        break;
+      }
+    }
+  }
+  return found;
+}
+
+/**
+ * In NORMAL mode the cursor can never rest past the last character of a line.
+ * Call this after any delete action that stays in NORMAL mode to enforce that
+ * invariant. Change actions must NOT use this — they immediately enter INSERT
+ * mode where the cursor is allowed to sit at the end of the line.
+ */
+function clampNormalCursor(state: TextBufferState): TextBufferState {
+  const line = state.lines[state.cursorRow] || '';
+  const len = cpLen(line);
+  const maxCol = Math.max(0, len - 1);
+  if (state.cursorCol <= maxCol) return state;
+  return { ...state, cursorCol: maxCol };
+}
+
+/** Extract the text that will be removed by a delete/yank operation. */
+function extractRange(
+  lines: string[],
+  startRow: number,
+  startCol: number,
+  endRow: number,
+  endCol: number,
+): string {
+  if (startRow === endRow) {
+    return toCodePoints(lines[startRow] || '')
+      .slice(startCol, endCol)
+      .join('');
+  }
+  const parts: string[] = [];
+  parts.push(
+    toCodePoints(lines[startRow] || '')
+      .slice(startCol)
+      .join(''),
+  );
+  for (let r = startRow + 1; r < endRow; r++) {
+    parts.push(lines[r] || '');
+  }
+  parts.push(
+    toCodePoints(lines[endRow] || '')
+      .slice(0, endCol)
+      .join(''),
+  );
+  return parts.join('\n');
+}
 
 export function handleVimAction(
   state: TextBufferState,
@@ -106,8 +194,15 @@ export function handleVimAction(
       }
 
       if (endRow !== cursorRow || endCol !== cursorCol) {
+        const yankedText = extractRange(
+          lines,
+          cursorRow,
+          cursorCol,
+          endRow,
+          endCol,
+        );
         const nextState = detachExpandedPaste(pushUndo(state));
-        return replaceRangeInternal(
+        const newState = replaceRangeInternal(
           nextState,
           cursorRow,
           cursorCol,
@@ -115,6 +210,13 @@ export function handleVimAction(
           endCol,
           '',
         );
+        if (action.type === 'vim_delete_word_forward') {
+          return {
+            ...clampNormalCursor(newState),
+            yankRegister: { text: yankedText, linewise: false },
+          };
+        }
+        return newState;
       }
       return state;
     }
@@ -148,8 +250,15 @@ export function handleVimAction(
       }
 
       if (endRow !== cursorRow || endCol !== cursorCol) {
+        const yankedText = extractRange(
+          lines,
+          cursorRow,
+          cursorCol,
+          endRow,
+          endCol,
+        );
         const nextState = pushUndo(state);
-        return replaceRangeInternal(
+        const newState = replaceRangeInternal(
           nextState,
           cursorRow,
           cursorCol,
@@ -157,6 +266,13 @@ export function handleVimAction(
           endCol,
           '',
         );
+        if (action.type === 'vim_delete_big_word_forward') {
+          return {
+            ...clampNormalCursor(newState),
+            yankRegister: { text: yankedText, linewise: false },
+          };
+        }
+        return newState;
       }
       return state;
     }
@@ -261,8 +377,15 @@ export function handleVimAction(
       }
 
       if (endRow !== cursorRow || endCol !== cursorCol) {
+        const yankedText = extractRange(
+          lines,
+          cursorRow,
+          cursorCol,
+          endRow,
+          endCol,
+        );
         const nextState = detachExpandedPaste(pushUndo(state));
-        return replaceRangeInternal(
+        const newState = replaceRangeInternal(
           nextState,
           cursorRow,
           cursorCol,
@@ -270,6 +393,13 @@ export function handleVimAction(
           endCol,
           '',
         );
+        if (action.type === 'vim_delete_word_end') {
+          return {
+            ...clampNormalCursor(newState),
+            yankRegister: { text: yankedText, linewise: false },
+          };
+        }
+        return newState;
       }
       return state;
     }
@@ -314,8 +444,15 @@ export function handleVimAction(
       }
 
       if (endRow !== cursorRow || endCol !== cursorCol) {
+        const yankedText = extractRange(
+          lines,
+          cursorRow,
+          cursorCol,
+          endRow,
+          endCol,
+        );
         const nextState = pushUndo(state);
-        return replaceRangeInternal(
+        const newState = replaceRangeInternal(
           nextState,
           cursorRow,
           cursorCol,
@@ -323,6 +460,13 @@ export function handleVimAction(
           endCol,
           '',
         );
+        if (action.type === 'vim_delete_big_word_end') {
+          return {
+            ...clampNormalCursor(newState),
+            yankRegister: { text: yankedText, linewise: false },
+          };
+        }
+        return newState;
       }
       return state;
     }
@@ -333,6 +477,9 @@ export function handleVimAction(
 
       const linesToDelete = Math.min(count, lines.length - cursorRow);
       const totalLines = lines.length;
+      const yankedText = lines
+        .slice(cursorRow, cursorRow + linesToDelete)
+        .join('\n');
 
       if (totalLines === 1 || linesToDelete >= totalLines) {
         // If there's only one line, or we're deleting all remaining lines,
@@ -344,6 +491,7 @@ export function handleVimAction(
           cursorRow: 0,
           cursorCol: 0,
           preferredCol: null,
+          yankRegister: { text: yankedText, linewise: true },
         };
       }
 
@@ -361,6 +509,7 @@ export function handleVimAction(
         cursorRow: newCursorRow,
         cursorCol: newCursorCol,
         preferredCol: null,
+        yankRegister: { text: yankedText, linewise: true },
       };
     }
 
@@ -396,12 +545,20 @@ export function handleVimAction(
       const { count } = action.payload;
       const currentLine = lines[cursorRow] || '';
       const totalLines = lines.length;
+      const isDelete = action.type === 'vim_delete_to_end_of_line';
 
       if (count === 1) {
         // Single line: delete from cursor to end of current line
         if (cursorCol < cpLen(currentLine)) {
+          const yankedText = extractRange(
+            lines,
+            cursorRow,
+            cursorCol,
+            cursorRow,
+            cpLen(currentLine),
+          );
           const nextState = detachExpandedPaste(pushUndo(state));
-          return replaceRangeInternal(
+          const newState = replaceRangeInternal(
             nextState,
             cursorRow,
             cursorCol,
@@ -409,6 +566,13 @@ export function handleVimAction(
             cpLen(currentLine),
             '',
           );
+          if (isDelete) {
+            return {
+              ...clampNormalCursor(newState),
+              yankRegister: { text: yankedText, linewise: false },
+            };
+          }
+          return newState;
         }
         return state;
       } else {
@@ -420,8 +584,15 @@ export function handleVimAction(
         if (endRow === cursorRow) {
           // No additional lines to delete, just delete to EOL
           if (cursorCol < cpLen(currentLine)) {
+            const yankedText = extractRange(
+              lines,
+              cursorRow,
+              cursorCol,
+              cursorRow,
+              cpLen(currentLine),
+            );
             const nextState = detachExpandedPaste(pushUndo(state));
-            return replaceRangeInternal(
+            const newState = replaceRangeInternal(
               nextState,
               cursorRow,
               cursorCol,
@@ -429,14 +600,28 @@ export function handleVimAction(
               cpLen(currentLine),
               '',
             );
+            if (isDelete) {
+              return {
+                ...clampNormalCursor(newState),
+                yankRegister: { text: yankedText, linewise: false },
+              };
+            }
+            return newState;
           }
           return state;
         }
 
         // Delete from cursor position to end of endRow (including newlines)
-        const nextState = detachExpandedPaste(pushUndo(state));
         const endLine = lines[endRow] || '';
-        return replaceRangeInternal(
+        const yankedText = extractRange(
+          lines,
+          cursorRow,
+          cursorCol,
+          endRow,
+          cpLen(endLine),
+        );
+        const nextState = detachExpandedPaste(pushUndo(state));
+        const newState = replaceRangeInternal(
           nextState,
           cursorRow,
           cursorCol,
@@ -444,6 +629,13 @@ export function handleVimAction(
           cpLen(endLine),
           '',
         );
+        if (isDelete) {
+          return {
+            ...clampNormalCursor(newState),
+            yankRegister: { text: yankedText, linewise: false },
+          };
+        }
+        return newState;
       }
     }
 
@@ -998,8 +1190,11 @@ export function handleVimAction(
 
       if (cursorCol < lineLength) {
         const deleteCount = Math.min(count, lineLength - cursorCol);
+        const deletedText = toCodePoints(currentLine)
+          .slice(cursorCol, cursorCol + deleteCount)
+          .join('');
         const nextState = detachExpandedPaste(pushUndo(state));
-        return replaceRangeInternal(
+        const newState = replaceRangeInternal(
           nextState,
           cursorRow,
           cursorCol,
@@ -1007,6 +1202,10 @@ export function handleVimAction(
           cursorCol + deleteCount,
           '',
         );
+        return {
+          ...clampNormalCursor(newState),
+          yankRegister: { text: deletedText, linewise: false },
+        };
       }
       return state;
     }
@@ -1181,6 +1380,464 @@ export function handleVimAction(
         cursorCol: newCol,
         preferredCol: null,
       };
+    }
+
+    case 'vim_delete_char_before': {
+      const { count } = action.payload;
+      if (cursorCol > 0) {
+        const deleteStart = Math.max(0, cursorCol - count);
+        const deletedText = toCodePoints(lines[cursorRow] || '')
+          .slice(deleteStart, cursorCol)
+          .join('');
+        const nextState = detachExpandedPaste(pushUndo(state));
+        const newState = replaceRangeInternal(
+          nextState,
+          cursorRow,
+          deleteStart,
+          cursorRow,
+          cursorCol,
+          '',
+        );
+        return {
+          ...newState,
+          yankRegister: { text: deletedText, linewise: false },
+        };
+      }
+      return state;
+    }
+
+    case 'vim_toggle_case': {
+      const { count } = action.payload;
+      const currentLine = lines[cursorRow] || '';
+      const lineLen = cpLen(currentLine);
+      if (cursorCol >= lineLen) return state;
+      const end = Math.min(cursorCol + count, lineLen);
+      const codePoints = toCodePoints(currentLine);
+      for (let i = cursorCol; i < end; i++) {
+        const ch = codePoints[i];
+        const upper = ch.toUpperCase();
+        const lower = ch.toLowerCase();
+        codePoints[i] = ch === upper ? lower : upper;
+      }
+      const newLine = codePoints.join('');
+      const nextState = detachExpandedPaste(pushUndo(state));
+      const newLines = [...nextState.lines];
+      newLines[cursorRow] = newLine;
+      const newCol = Math.min(end, lineLen > 0 ? lineLen - 1 : 0);
+      return {
+        ...nextState,
+        lines: newLines,
+        cursorCol: newCol,
+        preferredCol: null,
+      };
+    }
+
+    case 'vim_replace_char': {
+      const { char, count } = action.payload;
+      const currentLine = lines[cursorRow] || '';
+      const lineLen = cpLen(currentLine);
+      if (cursorCol >= lineLen) return state;
+      const replaceCount = Math.min(count, lineLen - cursorCol);
+      const replacement = char.repeat(replaceCount);
+      const nextState = detachExpandedPaste(pushUndo(state));
+      const resultState = replaceRangeInternal(
+        nextState,
+        cursorRow,
+        cursorCol,
+        cursorRow,
+        cursorCol + replaceCount,
+        replacement,
+      );
+      return {
+        ...resultState,
+        cursorCol: cursorCol + replaceCount - 1,
+        preferredCol: null,
+      };
+    }
+
+    case 'vim_delete_to_char_forward': {
+      const { char, count, till } = action.payload;
+      const lineCodePoints = toCodePoints(lines[cursorRow] || '');
+      const found = findCharInLine(
+        lineCodePoints,
+        char,
+        count,
+        cursorCol + 1,
+        1,
+      );
+      if (found === -1) return state;
+      const endCol = till ? found : found + 1;
+      const yankedText = lineCodePoints.slice(cursorCol, endCol).join('');
+      const nextState = detachExpandedPaste(pushUndo(state));
+      return {
+        ...clampNormalCursor(
+          replaceRangeInternal(
+            nextState,
+            cursorRow,
+            cursorCol,
+            cursorRow,
+            endCol,
+            '',
+          ),
+        ),
+        yankRegister: { text: yankedText, linewise: false },
+      };
+    }
+
+    case 'vim_delete_to_char_backward': {
+      const { char, count, till } = action.payload;
+      const lineCodePoints = toCodePoints(lines[cursorRow] || '');
+      const found = findCharInLine(
+        lineCodePoints,
+        char,
+        count,
+        cursorCol - 1,
+        -1,
+      );
+      if (found === -1) return state;
+      const startCol = till ? found + 1 : found;
+      const endCol = cursorCol + 1; // inclusive: cursor char is part of the deletion
+      if (startCol >= endCol) return state;
+      const yankedText = lineCodePoints.slice(startCol, endCol).join('');
+      const nextState = detachExpandedPaste(pushUndo(state));
+      const resultState = replaceRangeInternal(
+        nextState,
+        cursorRow,
+        startCol,
+        cursorRow,
+        endCol,
+        '',
+      );
+      return {
+        ...clampNormalCursor({
+          ...resultState,
+          cursorCol: startCol,
+          preferredCol: null,
+        }),
+        yankRegister: { text: yankedText, linewise: false },
+      };
+    }
+
+    case 'vim_find_char_forward': {
+      const { char, count, till } = action.payload;
+      const lineCodePoints = toCodePoints(lines[cursorRow] || '');
+      const found = findCharInLine(
+        lineCodePoints,
+        char,
+        count,
+        cursorCol + 1,
+        1,
+      );
+      if (found === -1) return state;
+      const newCol = till ? Math.max(cursorCol, found - 1) : found;
+      return { ...state, cursorCol: newCol, preferredCol: null };
+    }
+
+    case 'vim_find_char_backward': {
+      const { char, count, till } = action.payload;
+      const lineCodePoints = toCodePoints(lines[cursorRow] || '');
+      const found = findCharInLine(
+        lineCodePoints,
+        char,
+        count,
+        cursorCol - 1,
+        -1,
+      );
+      if (found === -1) return state;
+      const newCol = till ? Math.min(cursorCol, found + 1) : found;
+      return { ...state, cursorCol: newCol, preferredCol: null };
+    }
+
+    case 'vim_yank_line': {
+      const { count } = action.payload;
+      const linesToYank = Math.min(count, lines.length - cursorRow);
+      const text = lines.slice(cursorRow, cursorRow + linesToYank).join('\n');
+      return { ...state, yankRegister: { text, linewise: true } };
+    }
+
+    case 'vim_yank_word_forward': {
+      const { count } = action.payload;
+      let endRow = cursorRow;
+      let endCol = cursorCol;
+
+      for (let i = 0; i < count; i++) {
+        const nextWord = findNextWordAcrossLines(lines, endRow, endCol, true);
+        if (nextWord) {
+          endRow = nextWord.row;
+          endCol = nextWord.col;
+        } else {
+          const currentLine = lines[endRow] || '';
+          const wordEnd = findWordEndInLine(currentLine, endCol);
+          if (wordEnd !== null) {
+            endCol = wordEnd + 1;
+          }
+          break;
+        }
+      }
+
+      if (endRow !== cursorRow || endCol !== cursorCol) {
+        const yankedText = extractRange(
+          lines,
+          cursorRow,
+          cursorCol,
+          endRow,
+          endCol,
+        );
+        return {
+          ...state,
+          yankRegister: { text: yankedText, linewise: false },
+        };
+      }
+      return state;
+    }
+
+    case 'vim_yank_big_word_forward': {
+      const { count } = action.payload;
+      let endRow = cursorRow;
+      let endCol = cursorCol;
+
+      for (let i = 0; i < count; i++) {
+        const nextWord = findNextBigWordAcrossLines(
+          lines,
+          endRow,
+          endCol,
+          true,
+        );
+        if (nextWord) {
+          endRow = nextWord.row;
+          endCol = nextWord.col;
+        } else {
+          const currentLine = lines[endRow] || '';
+          const wordEnd = findBigWordEndInLine(currentLine, endCol);
+          if (wordEnd !== null) {
+            endCol = wordEnd + 1;
+          }
+          break;
+        }
+      }
+
+      if (endRow !== cursorRow || endCol !== cursorCol) {
+        const yankedText = extractRange(
+          lines,
+          cursorRow,
+          cursorCol,
+          endRow,
+          endCol,
+        );
+        return {
+          ...state,
+          yankRegister: { text: yankedText, linewise: false },
+        };
+      }
+      return state;
+    }
+
+    case 'vim_yank_word_end': {
+      const { count } = action.payload;
+      let row = cursorRow;
+      let col = cursorCol;
+      let endRow = cursorRow;
+      let endCol = cursorCol;
+
+      for (let i = 0; i < count; i++) {
+        const wordEnd = findNextWordAcrossLines(lines, row, col, false);
+        if (wordEnd) {
+          endRow = wordEnd.row;
+          endCol = wordEnd.col + 1;
+          if (i < count - 1) {
+            const nextWord = findNextWordAcrossLines(
+              lines,
+              wordEnd.row,
+              wordEnd.col + 1,
+              true,
+            );
+            if (nextWord) {
+              row = nextWord.row;
+              col = nextWord.col;
+            } else {
+              break;
+            }
+          }
+        } else {
+          break;
+        }
+      }
+
+      if (endRow < lines.length) {
+        endCol = Math.min(endCol, cpLen(lines[endRow] || ''));
+      }
+
+      if (endRow !== cursorRow || endCol !== cursorCol) {
+        const yankedText = extractRange(
+          lines,
+          cursorRow,
+          cursorCol,
+          endRow,
+          endCol,
+        );
+        return {
+          ...state,
+          yankRegister: { text: yankedText, linewise: false },
+        };
+      }
+      return state;
+    }
+
+    case 'vim_yank_big_word_end': {
+      const { count } = action.payload;
+      let row = cursorRow;
+      let col = cursorCol;
+      let endRow = cursorRow;
+      let endCol = cursorCol;
+
+      for (let i = 0; i < count; i++) {
+        const wordEnd = findNextBigWordAcrossLines(lines, row, col, false);
+        if (wordEnd) {
+          endRow = wordEnd.row;
+          endCol = wordEnd.col + 1;
+          if (i < count - 1) {
+            const nextWord = findNextBigWordAcrossLines(
+              lines,
+              wordEnd.row,
+              wordEnd.col + 1,
+              true,
+            );
+            if (nextWord) {
+              row = nextWord.row;
+              col = nextWord.col;
+            } else {
+              break;
+            }
+          }
+        } else {
+          break;
+        }
+      }
+
+      if (endRow < lines.length) {
+        endCol = Math.min(endCol, cpLen(lines[endRow] || ''));
+      }
+
+      if (endRow !== cursorRow || endCol !== cursorCol) {
+        const yankedText = extractRange(
+          lines,
+          cursorRow,
+          cursorCol,
+          endRow,
+          endCol,
+        );
+        return {
+          ...state,
+          yankRegister: { text: yankedText, linewise: false },
+        };
+      }
+      return state;
+    }
+
+    case 'vim_yank_to_end_of_line': {
+      const currentLine = lines[cursorRow] || '';
+      const lineLen = cpLen(currentLine);
+      if (cursorCol < lineLen) {
+        const yankedText = toCodePoints(currentLine).slice(cursorCol).join('');
+        return {
+          ...state,
+          yankRegister: { text: yankedText, linewise: false },
+        };
+      }
+      return state;
+    }
+
+    case 'vim_paste_after': {
+      const { count } = action.payload;
+      const reg = state.yankRegister;
+      if (!reg) return state;
+
+      const nextState = detachExpandedPaste(pushUndo(state));
+
+      if (reg.linewise) {
+        // Insert lines BELOW cursorRow
+        const pasteText = (reg.text + '\n').repeat(count).slice(0, -1); // N copies, no trailing newline
+        const pasteLines = pasteText.split('\n');
+        const newLines = [...nextState.lines];
+        newLines.splice(cursorRow + 1, 0, ...pasteLines);
+        return {
+          ...nextState,
+          lines: newLines,
+          cursorRow: cursorRow + 1,
+          cursorCol: 0,
+          preferredCol: null,
+        };
+      } else {
+        // Insert after cursor (at cursorCol + 1)
+        const currentLine = nextState.lines[cursorRow] || '';
+        const lineLen = cpLen(currentLine);
+        const insertCol = Math.min(cursorCol + 1, lineLen);
+        const pasteText = reg.text.repeat(count);
+        const newState = replaceRangeInternal(
+          nextState,
+          cursorRow,
+          insertCol,
+          cursorRow,
+          insertCol,
+          pasteText,
+        );
+        // replaceRangeInternal leaves cursorCol one past the last inserted char;
+        // step back by 1 to land on the last pasted character.
+        const pasteLength = pasteText.length;
+        return clampNormalCursor({
+          ...newState,
+          cursorCol: Math.max(
+            0,
+            newState.cursorCol - (pasteLength > 0 ? 1 : 0),
+          ),
+          preferredCol: null,
+        });
+      }
+    }
+
+    case 'vim_paste_before': {
+      const { count } = action.payload;
+      const reg = state.yankRegister;
+      if (!reg) return state;
+
+      const nextState = detachExpandedPaste(pushUndo(state));
+
+      if (reg.linewise) {
+        // Insert lines ABOVE cursorRow
+        const pasteText = (reg.text + '\n').repeat(count).slice(0, -1);
+        const pasteLines = pasteText.split('\n');
+        const newLines = [...nextState.lines];
+        newLines.splice(cursorRow, 0, ...pasteLines);
+        return {
+          ...nextState,
+          lines: newLines,
+          cursorRow,
+          cursorCol: 0,
+          preferredCol: null,
+        };
+      } else {
+        // Insert at cursorCol (not +1)
+        const pasteText = reg.text.repeat(count);
+        const newState = replaceRangeInternal(
+          nextState,
+          cursorRow,
+          cursorCol,
+          cursorRow,
+          cursorCol,
+          pasteText,
+        );
+        // replaceRangeInternal leaves cursorCol one past the last inserted char;
+        // step back by 1 to land on the last pasted character.
+        const pasteLength = pasteText.length;
+        return clampNormalCursor({
+          ...newState,
+          cursorCol: Math.max(
+            0,
+            newState.cursorCol - (pasteLength > 0 ? 1 : 0),
+          ),
+          preferredCol: null,
+        });
+      }
     }
 
     default: {

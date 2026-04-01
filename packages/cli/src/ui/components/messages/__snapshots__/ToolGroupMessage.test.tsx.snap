@@ -49,12 +49,22 @@ exports[`<ToolGroupMessage /> > Border Color Logic > uses yellow border for shel
 "
 `;
 
+exports[`<ToolGroupMessage /> > Golden Snapshots > renders canceled tool calls > canceled_tool 1`] = `
+"╭──────────────────────────────────────────────────────────────────────────╮
+│ -  canceled-tool A tool for testing                                      │
+│                                                                          │
+│ Test result                                                              │
+╰──────────────────────────────────────────────────────────────────────────╯
+"
+`;
+
 exports[`<ToolGroupMessage /> > Golden Snapshots > renders empty tool calls array 1`] = `""`;
 
 exports[`<ToolGroupMessage /> > Golden Snapshots > renders header when scrolled 1`] = `
 "╭──────────────────────────────────────────────────────────────────────────╮
 │ ✓  tool-1 Description 1. This is a long description that will need to b… │
-│──────────────────────────────────────────────────────────────────────────│
+│──────────────────────────────────────────────────────────────────────────│                       ▄
+│ line4                                                                    │                       █
 │ line5                                                                    │                       █
 │                                                                          │                       █
 │ ✓  tool-2 Description 2                                                  │                       █
@@ -62,16 +72,22 @@ exports[`<ToolGroupMessage /> > Golden Snapshots > renders header when scrolled 
 │ line1                                                                    │                       █
 │ line2                                                                    │                       █
 ╰──────────────────────────────────────────────────────────────────────────╯                       █
+                                                                                                   █
 "
 `;
 
-exports[`<ToolGroupMessage /> > Golden Snapshots > renders mixed tool calls including shell command 1`] = `
-"╭──────────────────────────────────────────────────────────────────────────╮
+exports[`<ToolGroupMessage /> > Golden Snapshots > renders mixed tool calls including update_topic 1`] = `
+"  Testing Topic: This is the description
+╭──────────────────────────────────────────────────────────────────────────╮
 │ ✓  read_file Read a file                                                 │
 │                                                                          │
 │ Test result                                                              │
 │                                                                          │
 │ ⊶  run_shell_command Run command                                         │
+│                                                                          │
+│ Test result                                                              │
+│                                                                          │
+│ o  write_file Write to file                                              │
 │                                                                          │
 │ Test result                                                              │
 ╰──────────────────────────────────────────────────────────────────────────╯
@@ -81,6 +97,10 @@ exports[`<ToolGroupMessage /> > Golden Snapshots > renders mixed tool calls incl
 exports[`<ToolGroupMessage /> > Golden Snapshots > renders multiple tool calls with different statuses (only visible ones) 1`] = `
 "╭──────────────────────────────────────────────────────────────────────────╮
 │ ✓  successful-tool This tool succeeded                                   │
+│                                                                          │
+│ Test result                                                              │
+│                                                                          │
+│ o  pending-tool This tool is pending                                     │
 │                                                                          │
 │ Test result                                                              │
 │                                                                          │
@@ -111,12 +131,17 @@ exports[`<ToolGroupMessage /> > Golden Snapshots > renders tool call with output
 `;
 
 exports[`<ToolGroupMessage /> > Golden Snapshots > renders two tool groups where only the last line of the previous group is visible 1`] = `
-"╰──────────────────────────────────────────────────────────────────────────╯
-╭──────────────────────────────────────────────────────────────────────────╮
+"╭──────────────────────────────────────────────────────────────────────────╮
 │ ✓  tool-2 Description 2                                                  │
-│                                                                          │                       ▄
-│ line1                                                                    │                       █
+│                                                                          │
+│ line1                                                                    │                       ▄
 ╰──────────────────────────────────────────────────────────────────────────╯                       █
+                                                                                                   █
+"
+`;
+
+exports[`<ToolGroupMessage /> > Golden Snapshots > renders update_topic tool call using TopicMessage > update_topic_tool 1`] = `
+"  Testing Topic: This is the description
 "
 `;
 

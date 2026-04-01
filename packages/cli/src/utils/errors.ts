@@ -18,15 +18,10 @@ import {
   isFatalToolError,
   debugLogger,
   coreEvents,
+  getErrorMessage,
+  getErrorType,
 } from '@google/gemini-cli-core';
 import { runSyncCleanup } from './cleanup.js';
-
-export function getErrorMessage(error: unknown): string {
-  if (error instanceof Error) {
-    return error.message;
-  }
-  return String(error);
-}
 
 interface ErrorWithCode extends Error {
   exitCode?: number;
@@ -88,7 +83,7 @@ export function handleError(
       timestamp: new Date().toISOString(),
       status: 'error',
       error: {
-        type: error instanceof Error ? error.constructor.name : 'Error',
+        type: getErrorType(error),
         message: errorMessage,
       },
       stats: streamFormatter.convertToStreamStats(metrics, 0),
@@ -183,7 +178,7 @@ export function handleCancellationError(config: Config): never {
       timestamp: new Date().toISOString(),
       status: 'error',
       error: {
-        type: 'FatalCancellationError',
+        type: getErrorType(cancellationError),
         message: cancellationError.message,
       },
       stats: streamFormatter.convertToStreamStats(metrics, 0),
@@ -224,7 +219,7 @@ export function handleMaxTurnsExceededError(config: Config): never {
       timestamp: new Date().toISOString(),
       status: 'error',
       error: {
-        type: 'FatalTurnLimitedError',
+        type: getErrorType(maxTurnsError),
         message: maxTurnsError.message,
       },
       stats: streamFormatter.convertToStreamStats(metrics, 0),

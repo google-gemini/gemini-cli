@@ -17,6 +17,7 @@ import { ToolGroupMessage } from './messages/ToolGroupMessage.js';
 import { GeminiMessageContent } from './messages/GeminiMessageContent.js';
 import { CompressionMessage } from './messages/CompressionMessage.js';
 import { WarningMessage } from './messages/WarningMessage.js';
+import { SubagentHistoryMessage } from './messages/SubagentHistoryMessage.js';
 import { Box } from 'ink';
 import { AboutBox } from './AboutBox.js';
 import { StatsDisplay } from './StatsDisplay.js';
@@ -46,6 +47,9 @@ interface HistoryItemDisplayProps {
   commands?: readonly SlashCommand[];
   availableTerminalHeightGemini?: number;
   isExpandable?: boolean;
+  isFirstThinking?: boolean;
+  isFirstAfterThinking?: boolean;
+  suppressNarration?: boolean;
 }
 
 export const HistoryItemDisplay: React.FC<HistoryItemDisplayProps> = ({
@@ -56,16 +60,42 @@ export const HistoryItemDisplay: React.FC<HistoryItemDisplayProps> = ({
   commands,
   availableTerminalHeightGemini,
   isExpandable,
+  isFirstThinking = false,
+  isFirstAfterThinking = false,
+  suppressNarration = false,
 }) => {
   const settings = useSettings();
   const inlineThinkingMode = getInlineThinkingMode(settings);
   const itemForDisplay = useMemo(() => escapeAnsiCtrlCodes(item), [item]);
 
+  const needsTopMarginAfterThinking =
+    isFirstAfterThinking && inlineThinkingMode !== 'off';
+
+  // If there's a topic update in this turn, we suppress the regular narration
+  // and thoughts as they are being "replaced" by the update_topic tool.
+  if (
+    suppressNarration &&
+    (itemForDisplay.type === 'thinking' ||
+      itemForDisplay.type === 'gemini' ||
+      itemForDisplay.type === 'gemini_content')
+  ) {
+    return null;
+  }
+
   return (
-    <Box flexDirection="column" key={itemForDisplay.id} width={terminalWidth}>
+    <Box
+      flexDirection="column"
+      key={itemForDisplay.id}
+      width={terminalWidth}
+      marginTop={needsTopMarginAfterThinking ? 1 : 0}
+    >
       {/* Render standard message types */}
       {itemForDisplay.type === 'thinking' && inlineThinkingMode !== 'off' && (
-        <ThinkingMessage thought={itemForDisplay.thought} />
+        <ThinkingMessage
+          thought={itemForDisplay.thought}
+          terminalWidth={terminalWidth}
+          isFirstThinking={isFirstThinking}
+        />
       )}
       {itemForDisplay.type === 'hint' && (
         <HintMessage text={itemForDisplay.text} />
@@ -184,6 +214,12 @@ export const HistoryItemDisplay: React.FC<HistoryItemDisplayProps> = ({
           borderTop={itemForDisplay.borderTop}
           borderBottom={itemForDisplay.borderBottom}
           isExpandable={isExpandable}
+        />
+      )}
+      {itemForDisplay.type === 'subagent' && (
+        <SubagentHistoryMessage
+          item={itemForDisplay}
+          terminalWidth={terminalWidth}
         />
       )}
       {itemForDisplay.type === 'compression' && (
