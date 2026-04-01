@@ -17,6 +17,7 @@ vi.mock('../utils/memoryDiscovery.js', async (importOriginal) => {
   return {
     ...actual,
     getGlobalMemoryPaths: vi.fn(),
+    getUserProjectMemoryPaths: vi.fn(),
     getExtensionMemoryPaths: vi.fn(),
     getEnvironmentMemoryPaths: vi.fn(),
     readGeminiMdFiles: vi.fn(),
@@ -46,12 +47,19 @@ describe('ContextManager', () => {
         getMcpInstructions: vi.fn().mockReturnValue('MCP Instructions'),
       }),
       isTrustedFolder: vi.fn().mockReturnValue(true),
+      getMemoryBoundaryMarkers: vi.fn().mockReturnValue(['.git']),
+      storage: {
+        getProjectMemoryDir: vi
+          .fn()
+          .mockReturnValue('/home/user/.gemini/memory/test-project'),
+      },
     } as unknown as Config;
 
     contextManager = new ContextManager(mockConfig);
     vi.clearAllMocks();
     vi.spyOn(coreEvents, 'emit');
     vi.mocked(memoryDiscovery.getExtensionMemoryPaths).mockReturnValue([]);
+    vi.mocked(memoryDiscovery.getUserProjectMemoryPaths).mockResolvedValue([]);
     // default mock: deduplication returns paths as-is (no deduplication)
     vi.mocked(
       memoryDiscovery.deduplicatePathsByFileIdentity,
@@ -81,12 +89,14 @@ describe('ContextManager', () => {
       await contextManager.refresh();
 
       expect(memoryDiscovery.getGlobalMemoryPaths).toHaveBeenCalled();
-      expect(memoryDiscovery.getEnvironmentMemoryPaths).toHaveBeenCalledWith([
-        '/app',
-      ]);
+      expect(memoryDiscovery.getEnvironmentMemoryPaths).toHaveBeenCalledWith(
+        ['/app'],
+        ['.git'],
+      );
       expect(memoryDiscovery.readGeminiMdFiles).toHaveBeenCalledWith(
         expect.arrayContaining([...globalPaths, ...envPaths]),
         'tree',
+        ['.git'],
       );
 
       expect(contextManager.getGlobalMemory()).toContain('Global Content');
@@ -172,6 +182,7 @@ describe('ContextManager', () => {
       expect(memoryDiscovery.readGeminiMdFiles).toHaveBeenCalledWith(
         ['/home/user/.gemini/GEMINI.md', '/app/gemini.md'],
         'tree',
+        ['.git'],
       );
       expect(contextManager.getEnvironmentMemory()).toContain(
         'Project Content',
@@ -197,6 +208,7 @@ describe('ContextManager', () => {
         ['/app'],
         expect.any(Set),
         expect.any(Set),
+        ['.git'],
       );
       expect(result).toMatch(/--- Context from: \/app\/src\/GEMINI\.md ---/);
       expect(result).toContain('Src Content');
@@ -225,6 +237,26 @@ describe('ContextManager', () => {
 
       expect(memoryDiscovery.loadJitSubdirectoryMemory).not.toHaveBeenCalled();
       expect(result).toBe('');
+    });
+
+    it('should pass custom boundary markers from config', async () => {
+      const customMarkers = ['.monorepo-root', 'package.json'];
+      vi.mocked(mockConfig.getMemoryBoundaryMarkers).mockReturnValue(
+        customMarkers,
+      );
+      vi.mocked(memoryDiscovery.loadJitSubdirectoryMemory).mockResolvedValue({
+        files: [],
+      });
+
+      await contextManager.discoverContext('/app/src/file.ts', ['/app']);
+
+      expect(memoryDiscovery.loadJitSubdirectoryMemory).toHaveBeenCalledWith(
+        '/app/src/file.ts',
+        ['/app'],
+        expect.any(Set),
+        expect.any(Set),
+        customMarkers,
+      );
     });
   });
 });

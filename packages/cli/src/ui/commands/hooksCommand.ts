@@ -74,7 +74,7 @@ async function enableAction(
     };
   }
 
-  const hookName = context.invocation!.args.trim();
+  const hookName = context.invocation?.args.trim() ?? '';
   if (!hookName) {
     return {
       type: 'message',
@@ -127,7 +127,7 @@ async function disableAction(
     };
   }
 
-  const hookName = context.invocation!.args.trim();
+  const hookName = context.invocation?.args.trim() ?? '';
   if (!hookName) {
     return {
       type: 'message',

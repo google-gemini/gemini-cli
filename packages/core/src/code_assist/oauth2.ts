@@ -119,7 +119,8 @@ async function initOauthClient(
     credentials &&
     typeof credentials === 'object' &&
     'type' in credentials &&
-    credentials.type === 'external_account_authorized_user'
+    (credentials.type === 'external_account_authorized_user' ||
+      credentials.type === 'service_account')
   ) {
     const auth = new GoogleAuth({
       scopes: OAUTH_SCOPE,
@@ -130,7 +131,7 @@ async function initOauthClient(
     });
     const token = await byoidClient.getAccessToken();
     if (token) {
-      debugLogger.debug('Created BYOID auth client.');
+      debugLogger.debug(`Created ${credentials.type} auth client.`);
       return byoidClient;
     }
   }

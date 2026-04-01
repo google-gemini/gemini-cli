@@ -29,7 +29,7 @@ export const permissionsCommand: SlashCommand = {
       kind: CommandKind.BUILT_IN,
       autoExecute: false,
       action: (context: CommandContext): SlashCommandActionReturn => {
-        const dirPath = context.invocation!.args.trim();
+        const dirPath = context.invocation?.args.trim() ?? '';
         let targetDirectory: string;
 
         if (!dirPath) {
@@ -66,7 +66,7 @@ export const permissionsCommand: SlashCommand = {
     },
   ],
   action: (context: CommandContext): SlashCommandActionReturn => {
-    const parts = context.invocation!.args.trim().split(' ');
+    const parts = (context.invocation?.args ?? '').trim().split(' ');
     const subcommand = parts[0];
 
     if (!subcommand) {

@@ -35,7 +35,7 @@ const ToolCallDataSchema = getToolCallDataSchema(HistoryItemSchema);
 async function restoreAction(
   context: CommandContext,
 ): Promise<void | SlashCommandActionReturn> {
-  const args = context.invocation!.args;
+  const args = context.invocation?.args ?? '';
   const { services, ui } = context;
   const { agentContext, git: gitService } = services;
   const { addItem, loadHistory } = ui;
