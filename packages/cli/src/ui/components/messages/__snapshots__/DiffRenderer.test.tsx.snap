@@ -50,11 +50,8 @@ exports[`<OverflowProvider><DiffRenderer /></OverflowProvider> > with useAlterna
 `;
 
 exports[`<OverflowProvider><DiffRenderer /></OverflowProvider> > with useAlternateBuffer = false > should handle diff with only header and no changes 1`] = `
-"╭──────────────────────────────────────────────────────────────────────────────────────────────────╮
-│                                                                                                  │
-│ No changes detected.                                                                             │
-│                                                                                                  │
-╰──────────────────────────────────────────────────────────────────────────────────────────────────╯
+"
+ No changes detected.
 "
 `;
 
@@ -143,11 +140,8 @@ exports[`<OverflowProvider><DiffRenderer /></OverflowProvider> > with useAlterna
 `;
 
 exports[`<OverflowProvider><DiffRenderer /></OverflowProvider> > with useAlternateBuffer = true > should handle diff with only header and no changes 1`] = `
-"╭──────────────────────────────────────────────────────────────────────────────────────────────────╮
-│                                                                                                  │
-│ No changes detected.                                                                             │
-│                                                                                                  │
-╰──────────────────────────────────────────────────────────────────────────────────────────────────╯
+"
+ No changes detected.
 "
 `;
 

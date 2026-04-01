@@ -254,6 +254,14 @@ export const ToolConfirmationMessage: React.FC<
     { isActive: isFocused, priority: true },
   );
 
+  // TODO(#23009): Remove this hack once we migrate to the new renderer.
+  // Why useEffect is used here instead of calling handleConfirm directly:
+  // There is a race condition where calling handleConfirm immediately upon
+  // keypress removes the tool UI component while the UI is in an expanded state.
+  // This simultaneously triggers setConstrainHeight, causing render two footers.
+  // By bridging the cancel action through state (isCancelling) and this useEffect,
+  // we delay handleConfirm until the next render cycle, ensuring setConstrainHeight
+  // resolves properly first.
   useEffect(() => {
     if (isCancelling) {
       handleConfirm(ToolConfirmationOutcome.Cancel);
@@ -289,6 +297,8 @@ export const ToolConfirmationMessage: React.FC<
             });
           }
         }
+        // We hide "Modify with external editor" if IDE mode is active AND
+        // the IDE is actually capable of showing a diff (connected).
         if (!config.getIdeMode() || !isDiffingEnabled) {
           options.push({
             label: 'Modify with external editor',
@@ -427,6 +437,8 @@ export const ToolConfirmationMessage: React.FC<
       return availableTerminalHeight;
     }
 
+    // Calculate the vertical space (in lines) consumed by UI elements
+    // surrounding the main body content.
     const PADDING_OUTER_Y = 1;
     const HEIGHT_QUESTION = 1;
     const MARGIN_QUESTION_TOP = 0;
@@ -499,6 +511,9 @@ export const ToolConfirmationMessage: React.FC<
 
       let initialIndex = 0;
       if (isTrustedFolder && allowPermanentApproval) {
+        // It is safe to allow permanent approval for info, edit, and mcp tools
+        // in trusted folders because the generated policy rules are narrowed
+        // to specific files, patterns, or tools (rather than allowing all access).
         const isSafeToPersist =
           confirmationDetails.type === 'info' ||
           confirmationDetails.type === 'edit' ||
@@ -607,41 +622,52 @@ export const ToolConfirmationMessage: React.FC<
           );
         }
       } else if (confirmationDetails.type === 'sandbox_expansion') {
-        const { additionalPermissions } = confirmationDetails;
+        const { additionalPermissions, command, rootCommand } =
+          confirmationDetails;
         const readPaths = additionalPermissions?.fileSystem?.read || [];
         const writePaths = additionalPermissions?.fileSystem?.write || [];
         const network = additionalPermissions?.network;
         const isShell = isShellTool(toolName);
 
-        const rootCmds = confirmationDetails.rootCommand
+        const rootCmds = rootCommand
           .split(',')
           .map((c) => c.trim().split(/\s+/)[0])
           .filter((c) => c && !c.startsWith('redirection'));
         const commandNames = Array.from(new Set(rootCmds)).join(', ');
 
-        question = (
+        question = `To run [${sanitizeForDisplay(commandNames)}], allow access to the following?`;
+
+        bodyContent = (
           <Box flexDirection="column">
-            <Text>
-              To run{' '}
-              <Text
-                color={isShell ? theme.status.warning : undefined}
-                bold={isShell}
-              >
-                [{sanitizeForDisplay(commandNames)}]
-              </Text>
-              {', allow access to:'}
-            </Text>
+            <Box
+              borderStyle="round"
+              borderColor={theme.border.default}
+              paddingX={1}
+              paddingY={0}
+              marginBottom={1}
+            >
+              {colorizeCode({
+                code: command.trim(),
+                language: 'bash',
+                maxWidth: Math.max(terminalWidth, 1) - 6,
+                settings,
+                theme: activeTheme,
+                hideLineNumbers: true,
+              })}
+            </Box>
             {network && (
-              <Text>
-                <Text color={isShell ? theme.status.warning : undefined} bold>
-                  {' '}
-                  • Network
-                </Text>{' '}
-                All Urls
-              </Text>
+              <Box height={1}>
+                <Text>
+                  <Text color={isShell ? theme.status.warning : undefined} bold>
+                    {' '}
+                    • Network
+                  </Text>{' '}
+                  All Urls
+                </Text>
+              </Box>
             )}
             {writePaths.map((p, i) => (
-              <Box key={`write-${i}`} flexDirection="row">
+              <Box key={`write-${i}`} flexDirection="row" height={1}>
                 <Text color={isShell ? theme.status.warning : undefined} bold>
                   {' '}
                   • Write{' '}
@@ -652,7 +678,7 @@ export const ToolConfirmationMessage: React.FC<
               </Box>
             ))}
             {readPaths.map((p, i) => (
-              <Box key={`read-${i}`} flexDirection="row">
+              <Box key={`read-${i}`} flexDirection="row" height={1}>
                 <Text color={isShell ? theme.status.warning : undefined} bold>
                   {' '}
                   • Read{' '}
@@ -662,53 +688,6 @@ export const ToolConfirmationMessage: React.FC<
                 </Box>
               </Box>
             ))}
-          </Box>
-        );
-
-        const executionProps = confirmationDetails;
-        const commandsToDisplay = [executionProps.command];
-
-        bodyContent = (
-          <Box flexDirection="column">
-            <Box
-              borderStyle="round"
-              borderColor={theme.border.default}
-              paddingX={1}
-              paddingY={0}
-              marginBottom={0}
-            >
-              <MaxSizedBox
-                maxHeight={
-                  bodyHeight !== undefined
-                    ? Math.max(bodyHeight - 2, 2)
-                    : undefined
-                }
-                maxWidth={Math.max(terminalWidth, 1) - 4}
-              >
-                <Box flexDirection="column">
-                  {commandsToDisplay.map((cmd, idx) => (
-                    <Box
-                      key={idx}
-                      flexDirection="column"
-                      paddingBottom={idx < commandsToDisplay.length - 1 ? 1 : 0}
-                    >
-                      {colorizeCode({
-                        code: cmd.trim(),
-                        language: 'bash',
-                        maxWidth: Math.max(terminalWidth, 1) - 6,
-                        settings,
-                        theme: activeTheme,
-                        hideLineNumbers: true,
-                        availableHeight:
-                          bodyHeight !== undefined
-                            ? Math.max(bodyHeight - 2, 2)
-                            : undefined,
-                      })}
-                    </Box>
-                  ))}
-                </Box>
-              </MaxSizedBox>
-            </Box>
           </Box>
         );
       } else if (confirmationDetails.type === 'exec') {

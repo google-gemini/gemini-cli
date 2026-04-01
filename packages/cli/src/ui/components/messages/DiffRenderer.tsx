@@ -130,11 +130,7 @@ export const DiffRenderer: React.FC<DiffRendererProps> = ({
 
     if (parsedLines.length === 0) {
       return (
-        <Box
-          borderStyle="round"
-          borderColor={semanticTheme.border.default}
-          padding={1}
-        >
+        <Box padding={1}>
           <Text dimColor>No changes detected.</Text>
         </Box>
       );
@@ -215,11 +211,7 @@ const renderDiffContent = (
 
   if (displayableLines.length === 0) {
     return (
-      <Box
-        borderStyle="round"
-        borderColor={semanticTheme.border.default}
-        padding={1}
-      >
+      <Box padding={1}>
         <Text dimColor>No changes detected.</Text>
       </Box>
     );

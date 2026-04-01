@@ -2,11 +2,9 @@
 
 exports[`ToolConfirmationMessage > enablePermanentToolApproval setting > should show "Allow for all future sessions" when trusted 1`] = `
 "╭──────────────────────────────────────────────────────────────────────────────╮
-│ ╭──────────────────────╮                                                     │
-│ │                      │                                                     │
-│ │ No changes detected. │                                                     │
-│ │                      │                                                     │
-│ ╰──────────────────────╯                                                     │
+│                                                                              │
+│  No changes detected.                                                        │
+│                                                                              │
 ╰──────────────────────────────────────────────────────────────────────────────╯
 Apply this change?
 
@@ -169,11 +167,9 @@ Allow execution of MCP tool "testtool" from server "testserver"?
 
 exports[`ToolConfirmationMessage > with folder trust > 'for edit confirmations' > should NOT show "allow always" when folder is untrusted 1`] = `
 "╭──────────────────────────────────────────────────────────────────────────────╮
-│ ╭──────────────────────╮                                                     │
-│ │                      │                                                     │
-│ │ No changes detected. │                                                     │
-│ │                      │                                                     │
-│ ╰──────────────────────╯                                                     │
+│                                                                              │
+│  No changes detected.                                                        │
+│                                                                              │
 ╰──────────────────────────────────────────────────────────────────────────────╯
 Apply this change?
 
@@ -185,11 +181,9 @@ Apply this change?
 
 exports[`ToolConfirmationMessage > with folder trust > 'for edit confirmations' > should show "allow always" when folder is trusted 1`] = `
 "╭──────────────────────────────────────────────────────────────────────────────╮
-│ ╭──────────────────────╮                                                     │
-│ │                      │                                                     │
-│ │ No changes detected. │                                                     │
-│ │                      │                                                     │
-│ ╰──────────────────────╯                                                     │
+│                                                                              │
+│  No changes detected.                                                        │
+│                                                                              │
 ╰──────────────────────────────────────────────────────────────────────────────╯
 Apply this change?
 
