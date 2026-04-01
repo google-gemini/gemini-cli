@@ -253,6 +253,16 @@ describe('Gemini Client (client.ts)', () => {
       getContinueOnFailedApiCall: vi.fn(),
       getProjectRoot: vi.fn().mockReturnValue('/test/project/root'),
       getIncludeDirectoryTree: vi.fn().mockReturnValue(true),
+      isExperimentalAgentHistoryTruncationEnabled: vi
+        .fn()
+        .mockReturnValue(false),
+      getExperimentalAgentHistoryTruncationThreshold: vi
+        .fn()
+        .mockReturnValue(30),
+      getExperimentalAgentHistoryRetainedMessages: vi.fn().mockReturnValue(15),
+      isExperimentalAgentHistorySummarizationEnabled: vi
+        .fn()
+        .mockReturnValue(false),
       isExperimentalWatcherEnabled: vi.fn().mockReturnValue(false),
       getExperimentalWatcherInterval: vi.fn().mockReturnValue(20),
       storage: {
@@ -711,6 +721,9 @@ describe('Gemini Client (client.ts)', () => {
   describe('sendMessageStream', () => {
     it('calls AgentHistoryProvider.manageHistory when history truncation is enabled', async () => {
       // Arrange
+      mockConfig.isExperimentalAgentHistoryTruncationEnabled = vi
+        .fn()
+        .mockReturnValue(true);
       mockConfig.getContextManagementConfig = vi
         .fn()
         .mockReturnValue({ enabled: true });

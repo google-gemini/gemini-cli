@@ -2409,6 +2409,22 @@ export class Config implements McpContext, AgentLoopContext {
     };
   }
 
+  isExperimentalAgentHistoryTruncationEnabled(): boolean {
+    return this.experimentalAgentHistoryTruncation;
+  }
+
+  getExperimentalAgentHistoryTruncationThreshold(): number {
+    return this.experimentalAgentHistoryTruncationThreshold;
+  }
+
+  getExperimentalAgentHistoryRetainedMessages(): number {
+    return this.experimentalAgentHistoryRetainedMessages;
+  }
+
+  isExperimentalAgentHistorySummarizationEnabled(): boolean {
+    return this.experimentalAgentHistorySummarization;
+  }
+
   isExperimentalWatcherEnabled(): boolean {
     return this.experimentalWatcher;
   }
