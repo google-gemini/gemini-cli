@@ -113,4 +113,21 @@ describe('tracker_mode', () => {
       assertModelHasOutput(result);
     },
   });
+
+  evalTest('USUALLY_PASSES', {
+    name: 'should correctly identify the task tracker storage location from the system prompt',
+    params: {
+      settings: { experimental: { taskTracker: true } },
+    },
+    prompt:
+      'Where is my task tracker storage located? Please provide the absolute path in your response.',
+    assert: async (rig, result) => {
+      // The rig sets GEMINI_CLI_HOME to rig.homeDir
+      const homeDir = rig.homeDir!;
+      // The response should contain the dynamic path which includes the home directory
+      // and follows the .gemini/tmp/.../tracker structure.
+      expect(result).toContain(homeDir);
+      expect(result).toMatch(/\.gemini\/tmp\/.*\/tracker/);
+    },
+  });
 });
