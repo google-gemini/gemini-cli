@@ -134,7 +134,7 @@ export * from './services/fileSystemService.js';
 export * from './services/sandboxedFileSystemService.js';
 export * from './sandbox/windows/WindowsSandboxManager.js';
 export * from './services/sessionSummaryUtils.js';
-export * from './services/contextManager.js';
+export * from './context/contextManager.js';
 export * from './services/trackerService.js';
 export * from './services/trackerTypes.js';
 export * from './services/keychainService.js';
