@@ -32,9 +32,7 @@ jobs:
           prompt: |
             Activate the 'docs-writer' skill.
 
-            **Task:** Audit the entire documentation set for correctness and adherence to style guidelines, as defined in your 'docs-auditing.md' reference.
-
-            When you are done, please output your thought process and the steps you took for future debugging purposes, and save the audit results to 'audit-results-${{ github.run_id }}.md'.
+            **Task:** Execute the docs audit procedure, as defined in your 'docs-auditing.md' reference.
 
       - name: 'Create Pull Request with Audit Results'
         uses: 'peter-evans/create-pull-request@c5a7806660adbe173f04e3e038b0ccdcd758773c'

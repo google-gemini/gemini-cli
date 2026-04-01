@@ -53,12 +53,11 @@ style guide violations and technical inaccuracies.
         elements (notes, warnings), and the absence of a table of contents.
         Check for a "Next steps" section if applicable.
     - **Verify Code Accuracy (if applicable):**
-      - If the document contains code snippets (e.g., shell commands, API
-        calls, file paths, Docker image versions), use `grep_search` and
-        `read_file` within the `packages/` directory (or other relevant parts
-        of the codebase) to ensure the code is still accurate and up-to-date.
-        Pay close attention to version numbers, package names, and command
-        syntax.
+      - If the document contains code snippets (e.g., shell commands, API calls,
+        file paths, Docker image versions), use `grep_search` and `read_file`
+        within the `packages/` directory (or other relevant parts of the
+        codebase) to ensure the code is still accurate and up-to-date. Pay close
+        attention to version numbers, package names, and command syntax.
     - **Record Findings:** For each violation or inaccuracy found:
       - Note the file path.
       - Describe the violation (e.g., "Violation (Language and Grammar): Uses
@@ -69,35 +68,50 @@ style guide violations and technical inaccuracies.
 
 ## Phase 2: Software Engineer Audit
 
-**Role:** The software engineer is responsible for finding undocumented features by auditing the codebase and recent changelogs, and passing these findings to the technical writer.
+**Role:** The software engineer is responsible for finding undocumented features
+by auditing the codebase and recent changelogs, and passing these findings to
+the technical writer.
 
 ### Steps
 
 1.  **Proactive Codebase Audit:**
-    - Audit high-signal areas of the codebase to identify undocumented features. You MUST review:
+    - Audit high-signal areas of the codebase to identify undocumented features.
+      You MUST review:
       - `packages/cli/src/commands/`
       - `packages/core/src/tools/`
       - `packages/cli/src/config/settings.ts`
 
 2.  **Review Recent Updates:**
-    - Check recent changelogs in stable and announcements within the documentation to see if newly introduced features are documented properly.
+    - Check recent changelogs in stable and announcements within the
+      documentation to see if newly introduced features are documented properly.
 
 3.  **Evaluate and Record Findings:**
-    - Determine if these features are adequately covered in the docs. They do not need to be documented word for word, but major features that customers should care about probably should have an article.
-    - Append your findings to the `audit-results-[YYYY-MM-DD].md` file, providing a brief description of the feature and where it should be documented.
+    - Determine if these features are adequately covered in the docs. They do
+      not need to be documented word for word, but major features that customers
+      should care about probably should have an article.
+    - Append your findings to the `audit-results-[YYYY-MM-DD].md` file,
+      providing a brief description of the feature and where it should be
+      documented.
 
 ## Phase 3: Technical Writer Implementation
 
-**Role:** The technical writer handles input from both the editor and the software engineer, makes appropriate decisions about what to change, and implements the approved changes.
+**Role:** The technical writer handles input from both the editor and the
+software engineer, makes appropriate decisions about what to change, and
+implements the approved changes.
 
 ### Steps
 
 1.  **Review Audit Results:**
-    - Read `audit-results-[YYYY-MM-DD].md` to understand all identified issues, undocumented features, and recommendations from both the Editor and Software Engineer phases.
+    - Read `audit-results-[YYYY-MM-DD].md` to understand all identified issues,
+      undocumented features, and recommendations from both the Editor and
+      Software Engineer phases.
 
 2.  **Make Decisions and Log Reasoning:**
-    - Create or update an implementation log (e.g., `audit-implementation-log-[YYYY-MM-DD].md`).
-    - Make sure the logs are updated for all steps, documenting your reasoning for each recommendation (why it was accepted, modified, or rejected). This is required for a final check by a human in the PR.
+    - Create or update an implementation log (e.g.,
+      `audit-implementation-log-[YYYY-MM-DD].md`).
+    - Make sure the logs are updated for all steps, documenting your reasoning
+      for each recommendation (why it was accepted, modified, or rejected). This
+      is required for a final check by a human in the PR.
 
 3.  **Implement Changes:**
     - For each approved recommendation:
@@ -113,7 +127,15 @@ style guide violations and technical inaccuracies.
       - For creating new files (e.g., `docs/get-started.md` to fix a broken
         link, or a new feature article), use `write_file`.
 
-4.  **Format Code:**
+4.  **Execute Auto-Generation Scripts:**
+    - Some documentation pages are auto-generated from the codebase and should
+      be updated using npm scripts rather than manual edits. After implementing
+      manual changes (especially if you edited settings or configurations based
+      on SWE recommendations), ensure you run:
+      - `npm run docs:settings` to generate/update the configuration reference.
+      - `npm run docs:keybindings` to generate/update the keybindings reference.
+
+5.  **Format Code:**
     - **Dependencies:** If `npm run format` fails, it may be necessary to run
       `npm install` first to ensure all formatting dependencies are available.
     - After all changes have been implemented, run `npm run format` to ensure
