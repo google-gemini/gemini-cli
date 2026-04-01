@@ -317,6 +317,10 @@ export class LocalAgentExecutor<TOutput extends z.ZodTypeAny> {
 
     await this.tryCompressChat(chat, promptId, combinedSignal);
 
+    // Allow the agent definition to modify history before the model call
+    // (e.g., superseding stale tool outputs to reclaim context tokens).
+    await this.definition.onBeforeTurn?.(chat, combinedSignal);
+
     const { functionCalls, modelToUse } = await promptIdContext.run(
       promptId,
       async () =>
