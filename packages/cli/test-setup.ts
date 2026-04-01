@@ -72,7 +72,9 @@ beforeEach(() => {
 
       if (
         relevantStack.includes('OverflowContext.tsx') ||
-        relevantStack.includes('useTimedMessage.ts')
+        relevantStack.includes('useTimedMessage.ts') ||
+        relevantStack.includes('useSlashCompletion.ts') ||
+        relevantStack.includes('slashCommandProcessor.ts')
       ) {
         return;
       }

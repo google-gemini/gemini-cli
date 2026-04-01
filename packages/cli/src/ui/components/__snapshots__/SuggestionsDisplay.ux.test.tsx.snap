@@ -1,0 +1,38 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`SuggestionsDisplay UX Journey > should visually show the suggestions display when / is typed 1`] = `
+"
+ ▝▜▄     Gemini CLI vtest-version
+   ▝▜▄
+  ▗▟▀    Authenticated with gemini-api-key /auth
+ ▝▀    
+
+
+Tips for getting started:
+1. Create GEMINI.md files to customize your interactions
+2. /help for more information
+3. Ask coding questions, edit code or run commands
+4. Be specific for the best results
+
+
+
+────────────────────────────────────────────────────────────
+ Shift+Tab to accept edits
+
+▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀
+ > / 
+▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄
+ compress         Compresses the context by replacing it…
+ directory        Manage workspace directories
+ footer           Configure which items appear in the fo…
+ quit             Exit the cli
+ stats            Check session stats. Usage: /stats [se…
+ tasks            Toggle background tasks view
+ about            Show version info
+ agents           Manage agents
+ ▼
+ (1/38)
+ workspace (/directory)        sandbox               /model
+ ~                             no sandbox        test-model
+"
+`;

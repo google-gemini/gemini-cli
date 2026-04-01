@@ -80,7 +80,13 @@ export function SuggestionsDisplay({
     mode === 'slash' ? Math.min(maxLabelLength, Math.floor(width * 0.5)) : 0;
 
   return (
-    <Box flexDirection="column" paddingX={1} width={width}>
+    <Box
+      flexDirection="column"
+      paddingX={1}
+      width={width}
+      // @ts-expect-error - internal_testId is used for testing component presence
+      internal_testId={SuggestionsDisplay.name}
+    >
       {scrollOffset > 0 && <Text color={theme.text.primary}>▲</Text>}
 
       {visibleSuggestions.map((suggestion, index) => {

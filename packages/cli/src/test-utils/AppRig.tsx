@@ -705,6 +705,10 @@ export class AppRig {
     return stripAnsi(this.renderResult.stdout.lastFrame() || '');
   }
 
+  generateSvg(): string {
+    return this.renderResult?.generateSvg() ?? '';
+  }
+
   async waitForOutput(pattern: string | RegExp, timeout = 30000) {
     await this.waitUntil(
       () => {
@@ -716,6 +720,58 @@ export class AppRig {
       {
         timeout,
         message: `Timed out waiting for output: ${pattern}\nLast frame:\n${this.lastFrame}`,
+      },
+    );
+  }
+
+  async waitForComponent(componentName: string, timeout = 30000) {
+    await this.waitUntil(
+      () => {
+        const rootNode = this.renderResult?.rootNode;
+        if (!rootNode) return false;
+
+        type TestableDOMNode = import('ink').DOMNode & {
+          internal_componentName?: string;
+          internal_testId?: string;
+          attributes?: {
+            internal_componentName?: string;
+            internal_testId?: string;
+          };
+          style?: {
+            internal_componentName?: string;
+            internal_testId?: string;
+          };
+        };
+
+        const find = (node: TestableDOMNode): boolean => {
+          if (
+            node.internal_componentName === componentName ||
+            node.internal_testId === componentName ||
+            node.attributes?.internal_testId === componentName ||
+            node.attributes?.internal_componentName === componentName ||
+            node.style?.internal_testId === componentName ||
+            node.style?.internal_componentName === componentName
+          ) {
+            return true;
+          }
+          if ('childNodes' in node && node.childNodes) {
+            for (const child of node.childNodes) {
+              if (
+                child.nodeName !== '#text' &&
+                find(child as TestableDOMNode)
+              ) {
+                return true;
+              }
+            }
+          }
+          return false;
+        };
+
+        return find(rootNode as TestableDOMNode);
+      },
+      {
+        timeout,
+        message: `Timed out waiting for component: ${componentName}\nLast frame:\n${this.lastFrame}`,
       },
     );
   }
