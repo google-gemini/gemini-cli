@@ -225,6 +225,8 @@ Implement a comprehensive authentication system with multiple providers.
           expect(lastFrame()).toContain('old');
           expect(lastFrame()).toContain('new');
         });
+
+        expect(lastFrame()).toMatchSnapshot();
       });
 
       it('calls onApprove with AUTO_EDIT when first option is selected', async () => {

@@ -191,6 +191,10 @@ interface AskUserDialogProps {
    * Custom keyboard shortcut hints (e.g., ["Ctrl+P to edit"])
    */
   extraParts?: React.ReactNode[];
+  /**
+   * Content to render before the options/input field.
+   */
+  preOptionsContent?: React.ReactNode;
 }
 
 interface ReviewViewProps {
@@ -199,6 +203,7 @@ interface ReviewViewProps {
   onSubmit: () => void;
   progressHeader?: React.ReactNode;
   extraParts?: React.ReactNode[];
+  preOptionsContent?: React.ReactNode;
 }
 
 const ReviewView: React.FC<ReviewViewProps> = ({
@@ -207,6 +212,7 @@ const ReviewView: React.FC<ReviewViewProps> = ({
   onSubmit,
   progressHeader,
   extraParts,
+  preOptionsContent,
 }) => {
   const keyMatchers = useKeyMatchers();
   const unansweredCount = questions.length - Object.keys(answers).length;
@@ -232,6 +238,7 @@ const ReviewView: React.FC<ReviewViewProps> = ({
           Review your answers:
         </Text>
       </Box>
+      {preOptionsContent}
 
       {hasUnanswered && (
         <Box marginBottom={1}>
@@ -276,6 +283,7 @@ interface TextQuestionViewProps {
   initialAnswer?: string;
   progressHeader?: React.ReactNode;
   keyboardHints?: React.ReactNode;
+  preOptionsContent?: React.ReactNode;
 }
 
 const TextQuestionView: React.FC<TextQuestionViewProps> = ({
@@ -288,6 +296,7 @@ const TextQuestionView: React.FC<TextQuestionViewProps> = ({
   initialAnswer,
   progressHeader,
   keyboardHints,
+  preOptionsContent,
 }) => {
   const keyMatchers = useKeyMatchers();
   const isAlternateBuffer = useAlternateBuffer();
@@ -367,11 +376,14 @@ const TextQuestionView: React.FC<TextQuestionViewProps> = ({
           maxWidth={availableWidth}
           overflowDirection="bottom"
         >
-          <MarkdownDisplay
-            text={autoBoldIfPlain(question.question)}
-            terminalWidth={availableWidth - DIALOG_PADDING}
-            isPending={false}
-          />
+          <Box flexDirection="column">
+            <MarkdownDisplay
+              text={autoBoldIfPlain(question.question)}
+              terminalWidth={availableWidth - DIALOG_PADDING}
+              isPending={false}
+            />
+            {preOptionsContent}
+          </Box>
         </MaxSizedBox>
       </Box>
 
@@ -496,6 +508,7 @@ interface ChoiceQuestionViewProps {
   initialAnswer?: string;
   progressHeader?: React.ReactNode;
   keyboardHints?: React.ReactNode;
+  preOptionsContent?: React.ReactNode;
 }
 
 const ChoiceQuestionView: React.FC<ChoiceQuestionViewProps> = ({
@@ -508,6 +521,7 @@ const ChoiceQuestionView: React.FC<ChoiceQuestionViewProps> = ({
   initialAnswer,
   progressHeader,
   keyboardHints,
+  preOptionsContent,
 }) => {
   const keyMatchers = useKeyMatchers();
   const isAlternateBuffer = useAlternateBuffer();
@@ -889,6 +903,7 @@ const ChoiceQuestionView: React.FC<ChoiceQuestionViewProps> = ({
                 (Select all that apply)
               </Text>
             )}
+            {preOptionsContent}
           </Box>
         </MaxSizedBox>
       </Box>
@@ -1009,6 +1024,7 @@ export const AskUserDialog: React.FC<AskUserDialogProps> = ({
   width,
   availableHeight: availableHeightProp,
   extraParts,
+  preOptionsContent,
 }) => {
   const keyMatchers = useKeyMatchers();
   const uiState = useContext(UIStateContext);
@@ -1206,6 +1222,7 @@ export const AskUserDialog: React.FC<AskUserDialogProps> = ({
           onSubmit={handleReviewSubmit}
           progressHeader={progressHeader}
           extraParts={extraParts}
+          preOptionsContent={preOptionsContent}
         />
       </Box>
     );
@@ -1246,6 +1263,7 @@ export const AskUserDialog: React.FC<AskUserDialogProps> = ({
         initialAnswer={answers[currentQuestionIndex]}
         progressHeader={progressHeader}
         keyboardHints={keyboardHints}
+        preOptionsContent={preOptionsContent}
       />
     ) : (
       <ChoiceQuestionView
@@ -1259,6 +1277,7 @@ export const AskUserDialog: React.FC<AskUserDialogProps> = ({
         initialAnswer={answers[currentQuestionIndex]}
         progressHeader={progressHeader}
         keyboardHints={keyboardHints}
+        preOptionsContent={preOptionsContent}
       />
     );
 

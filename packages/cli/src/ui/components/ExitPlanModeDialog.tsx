@@ -230,15 +230,14 @@ export const ExitPlanModeDialog: React.FC<ExitPlanModeDialogProps> = ({
   const editHint = formatCommand(Command.OPEN_EXTERNAL_EDITOR);
 
   const extraParts: React.ReactNode[] = [];
-  if (diffContent) {
-    extraParts.push(
-      <Box key="diff" flexDirection="column" marginTop={1}>
-        <Text bold>Changes since previous version:</Text>
-        <DiffRenderer diffContent={diffContent} terminalWidth={width} />
-      </Box>,
-    );
-  }
   extraParts.push(`${editHint} to edit plan`);
+
+  const preOptionsContent = diffContent ? (
+    <Box key="diff" flexDirection="column" marginTop={1} marginBottom={1}>
+      <Text bold>Changes since previous version:</Text>
+      <DiffRenderer diffContent={diffContent} terminalWidth={width} />
+    </Box>
+  ) : undefined;
 
   return (
     <Box flexDirection="column" width={width}>
@@ -279,6 +278,7 @@ export const ExitPlanModeDialog: React.FC<ExitPlanModeDialogProps> = ({
         width={width}
         availableHeight={availableHeight}
         extraParts={extraParts}
+        preOptionsContent={preOptionsContent}
       />
     </Box>
   );

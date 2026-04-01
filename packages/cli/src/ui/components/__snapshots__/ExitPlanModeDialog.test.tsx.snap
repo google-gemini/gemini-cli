@@ -113,6 +113,38 @@ Enter to select · ↑/↓ to navigate · Ctrl+X to edit plan · Esc to cancel
 "
 `;
 
+exports[`ExitPlanModeDialog > useAlternateBuffer: false > renders diffContent if provided 1`] = `
+"Overview
+
+Add user authentication to the CLI application.
+
+Implementation Steps
+
+ 1. Create src/auth/AuthService.ts with login/logout methods
+ 2. Add session storage in src/storage/SessionStore.ts
+ 3. Update src/commands/index.ts to check auth status
+ 4. Add tests in src/auth/__tests__/
+
+Files to Modify
+
+ - src/index.ts - Add auth middleware
+ - src/config.ts - Add auth configuration options
+
+Changes since previous version:
+1 - old
+1 + new
+
+
+● 1.  Yes, automatically accept edits                                           
+      Approves plan and allows tools to run automatically                       
+  2.  Yes, manually accept edits
+      Approves plan but requires confirmation for each tool
+  3.  Type your feedback...
+
+Enter to select · ↑/↓ to navigate · Ctrl+X to edit plan · Esc to cancel
+"
+`;
+
 exports[`ExitPlanModeDialog > useAlternateBuffer: true > bubbles up Ctrl+C when feedback is empty while editing 1`] = `
 "Overview
 
@@ -236,6 +268,38 @@ Files to Modify
 
  - src/index.ts - Add auth middleware
  - src/config.ts - Add auth configuration options
+
+● 1.  Yes, automatically accept edits                                           
+      Approves plan and allows tools to run automatically                       
+  2.  Yes, manually accept edits
+      Approves plan but requires confirmation for each tool
+  3.  Type your feedback...
+
+Enter to select · ↑/↓ to navigate · Ctrl+X to edit plan · Esc to cancel
+"
+`;
+
+exports[`ExitPlanModeDialog > useAlternateBuffer: true > renders diffContent if provided 1`] = `
+"Overview
+
+Add user authentication to the CLI application.
+
+Implementation Steps
+
+ 1. Create src/auth/AuthService.ts with login/logout methods
+ 2. Add session storage in src/storage/SessionStore.ts
+ 3. Update src/commands/index.ts to check auth status
+ 4. Add tests in src/auth/__tests__/
+
+Files to Modify
+
+ - src/index.ts - Add auth middleware
+ - src/config.ts - Add auth configuration options
+
+Changes since previous version:
+1 - old
+1 + new
+
 
 ● 1.  Yes, automatically accept edits                                           
       Approves plan and allows tools to run automatically                       
