@@ -10,6 +10,9 @@ import {
   EDIT_TOOL_NAME,
   ENTER_PLAN_MODE_TOOL_NAME,
   EXIT_PLAN_MODE_TOOL_NAME,
+  UPDATE_TOPIC_TOOL_NAME,
+  TOPIC_PARAM_TITLE,
+  TOPIC_PARAM_SUMMARY,
   GLOB_TOOL_NAME,
   GREP_TOOL_NAME,
   MEMORY_TOOL_NAME,
@@ -239,7 +242,9 @@ Use the following guidelines to optimize your search and read patterns.
       ? mandateTopicUpdateModel()
       : mandateExplainBeforeActing()
   }
-- **Do Not revert changes:** Do not revert changes to the codebase unless asked to do so by the user. Only revert changes made by you if they have resulted in an error or if the user has explicitly asked you to revert the changes.${mandateSkillGuidance(options.hasSkills)}${mandateContinueWork(options.interactive)}
+- **Do Not revert changes:** Do not revert changes to the codebase unless asked to do so by the user. Only revert changes made by you if they have resulted in an error or if the user has explicitly asked you to revert the changes.${mandateSkillGuidance(
+    options.hasSkills,
+  )}${mandateContinueWork(options.interactive)}
 `.trim();
 }
 
@@ -361,7 +366,7 @@ export function renderOperationalGuidelines(
 - **Role:** A senior software engineer and collaborative peer programmer.
 - **High-Signal Output:** Focus exclusively on **intent** and **technical rationale**. Avoid conversational filler, apologies, and ${
     options.topicUpdateNarration
-      ? 'per-tool explanations.'
+      ? 'unnecessary per-tool explanations.'
       : 'mechanical tool-use narration (e.g., "I will now call...").'
   }
 - **Concise & Direct:** Adopt a professional, direct, and concise tone suitable for a CLI environment.
@@ -512,6 +517,11 @@ ${trimmed}
       `<global_context>\n${memory.global.trim()}\n</global_context>`,
     );
   }
+  if (memory.userProjectMemory?.trim()) {
+    sections.push(
+      `<user_project_memory>\n--- User's Project Memory (private, not committed to repo) ---\n${memory.userProjectMemory.trim()}\n--- End User's Project Memory ---\n</user_project_memory>`,
+    );
+  }
   if (memory.extension?.trim()) {
     sections.push(
       `<extension_context>\n${memory.extension.trim()}\n</extension_context>`,
@@ -614,46 +624,19 @@ function mandateConfirm(interactive: boolean): string {
 
 function mandateTopicUpdateModel(): string {
   return `
-- **Protocol: Topic Model**
-  You are an agentic system. You must maintain a visible state log that tracks broad logical phases using a specific header format.
+## Topic Updates
+As you work, the user follows along by reading topic updates that you publish with ${UPDATE_TOPIC_TOOL_NAME}. Keep them informed by doing the following:
 
-- **1. Topic Initialization & Persistence:**
-  - **The Trigger:** You MUST issue a \`Topic: <Phase> : <Brief Summary>\` header ONLY when beginning a task or when the broad logical nature of the task changes (e.g., transitioning from research to implementation).
-  - **The Format:** Use exactly \`Topic: <Phase> : <Brief Summary>\` (e.g., \`Topic: <Research> : Researching Agent Skills in the repo\`).
-  - **Persistence:** Once a Topic is declared, do NOT repeat it for subsequent tool calls or in subsequent messages within that same phase. 
-  - **Start of Task:** Your very first tool execution must be preceded by a Topic header.
+- Always call ${UPDATE_TOPIC_TOOL_NAME} in your first and last turn. The final turn should always recap what was done.
+- Each topic update should give a concise description of what you are doing for the next few turns in the \`${TOPIC_PARAM_SUMMARY}\` parameter.
+- Provide topic updates whenever you change "topics". A topic is typically a discrete subgoal and will be every 3 to 10 turns. Do not use ${UPDATE_TOPIC_TOOL_NAME} on every turn.
+- The typical user message should call ${UPDATE_TOPIC_TOOL_NAME} 3 or more times. Each corresponds to a distinct phase of the task, such as "Researching X", "Researching Y", "Implementing Z with X", and "Testing Z".
+- Remember to call ${UPDATE_TOPIC_TOOL_NAME} when you experience an unexpected event (e.g., a test failure, compilation error, environment issue, or unexpected learning) that requires a strategic detour.
+- **Examples:**
+  - \`update_topic(${TOPIC_PARAM_TITLE}="Researching Parser", ${TOPIC_PARAM_SUMMARY}="I am starting an investigation into the parser timeout bug. My goal is to first understand the current test coverage and then attempt to reproduce the failure. This phase will focus on identifying the bottleneck in the main loop before we move to implementation.")\`
+  - \`update_topic(${TOPIC_PARAM_TITLE}="Implementing Buffer Fix", ${TOPIC_PARAM_SUMMARY}="I have completed the research phase and identified a race condition in the tokenizer's buffer management. I am now transitioning to implementation. This new chapter will focus on refactoring the buffer logic to handle async chunks safely, followed by unit testing the fix.")\`
 
-- **2. Tool Execution Protocol (Zero-Noise):**
-  - **No Per-Tool Headers:** It is a violation of protocol to print "Topic:" before every tool call. 
-  - **Silent Mode:** No conversational filler, no "I will now...", and no summaries between tools. 
-  - Only the Topic header at the start of a broad phase is permitted to break the silence. Everything in between must be silent.
-
-- **3. Thinking Protocol:**
-  - Use internal thought blocks to keep track of what tools you have called, plan your next steps, and reason about the task.
-  - Without reasoning and tracking in thought blocks, you may lose context.
-  - Always use the required syntax for thought blocks to ensure they remain hidden from the user interface.
-
-- **4. Completion:**
-  - Only when the entire task is finalized do you provide a **Final Summary**.
-
-**IMPORTANT: Topic Headers vs. Thoughts**
-The \`Topic: <Phase> : <Brief Summary>\` header must **NOT** be placed inside a thought block. It must be standard text output so that it is properly rendered and displayed in the UI.
-
-**Correct State Log Example:**
-\`\`\`
-Topic: <Research> : Researching Agent Skills in the repo
-<tool_call 1>
-<tool_call 2>
-<tool_call 3>
-
-Topic: <Implementation> : Implementing the skill-creator logic
-<tool_call 1>
-<tool_call 2>
-
-The task is complete. [Final Summary]
-\`\`\`
-
-- **Constraint Enforcement:** If you repeat a "Topic:" line without a fundamental shift in work, or if you provide a Topic for every tool call, you have failed the system integrity protocol.`;
+`;
 }
 
 function mandateExplainBeforeActing(): string {
@@ -820,9 +803,12 @@ function toolUsageRememberingFacts(
 - **Memory Tool:** You MUST use ${formatToolName(MEMORY_TOOL_NAME)} to proactively record facts, preferences, and workflows that apply across all sessions. Whenever the user explicitly tells you to "remember" something, or when they state a preference or workflow (like "always lint after editing"), you MUST immediately call the save_memory subagent. Never save transient session state. Do not use memory to store summaries of code changes, bug fixes, or findings discovered during a task; this tool is strictly for persistent general knowledge.`;
   }
   const base = `
-- **Memory Tool:** Use ${formatToolName(MEMORY_TOOL_NAME)} only for global user preferences, personal facts, or high-level information that applies across all sessions. Never save workspace-specific context, local file paths, or transient session state. Do not use memory to store summaries of code changes, bug fixes, or findings discovered during a task; this tool is for persistent user-related information only.`;
+- **Memory Tool:** Use ${formatToolName(MEMORY_TOOL_NAME)} to persist facts across sessions. It supports two scopes via the \`scope\` parameter:
+  - \`"global"\` (default): Cross-project preferences and personal facts loaded in every workspace.
+  - \`"project"\`: Facts specific to the current workspace, private to the user (not committed to the repo). Use this for local dev setup notes, project-specific workflows, or personal reminders about this codebase.
+  Never save transient session state. Do not use memory to store summaries of code changes, bug fixes, or findings discovered during a task.`;
   const suffix = options.interactive
-    ? ' If unsure whether a fact is worth remembering globally, ask the user.'
+    ? ' If unsure whether a fact is global or project-specific, ask the user.'
     : '';
   return base + suffix;
 }

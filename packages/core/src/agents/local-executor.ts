@@ -30,7 +30,7 @@ import {
 } from '../tools/mcp-tool.js';
 import { CompressionStatus } from '../core/turn.js';
 import { type ToolCallRequestInfo } from '../scheduler/types.js';
-import { ChatCompressionService } from '../services/chatCompressionService.js';
+import { ChatCompressionService } from '../context/chatCompressionService.js';
 import { getDirectoryContextString } from '../utils/environmentContext.js';
 import { renderUserMemory } from '../prompts/snippets.js';
 import { promptIdContext } from '../utils/promptIdContext.js';
@@ -1329,9 +1329,13 @@ export class LocalAgentExecutor<TOutput extends z.ZodTypeAny> {
           toolsList.push(toolRef);
         }
       }
-      // Add schemas from tools that were explicitly registered by name, wildcard, or instance.
-      toolsList.push(...this.toolRegistry.getFunctionDeclarations());
     }
+    // Add schemas from tools that were explicitly registered by name, wildcard, or instance.
+    toolsList.push(
+      ...this.toolRegistry.getFunctionDeclarations(
+        this.definition.modelConfig.model,
+      ),
+    );
 
     // Always inject complete_task.
     // Configure its schema based on whether output is expected.
