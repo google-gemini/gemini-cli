@@ -15,7 +15,6 @@ import {
 import {
   type DOMElement,
   ResizeObserver,
-  Box,
   useApp,
   useStdout,
   useStdin,
@@ -2672,16 +2671,14 @@ Logging in with Google... Restarting Gemini CLI to continue.
       ? 'Switching to Vertex AI in Cloud Shell requires a restart to apply project settings.'
       : undefined;
     return (
-      <Box flexDirection="column">
-        <LoginRestartDialog
-          onDismiss={() => {
-            setAuthContext({});
-            setAuthState(AuthState.Updating);
-          }}
-          config={config}
-          message={restartMessage}
-        />
-      </Box>
+      <LoginRestartDialog
+        onDismiss={() => {
+          setAuthContext({});
+          setAuthState(AuthState.Updating);
+        }}
+        config={config}
+        message={restartMessage}
+      />
     );
   }
 
