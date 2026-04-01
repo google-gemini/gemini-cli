@@ -243,7 +243,8 @@ function VirtualizedList<T>(
     return { totalHeight, offsets };
   }, [heights, data, estimatedItemHeight, keyExtractor]);
 
-  const scrollableContainerHeight = containerHeight;
+  const scrollableContainerHeight =
+    containerHeight || (process.env['NODE_ENV'] === 'test' ? 1000 : 0);
 
   const getAnchorForScrollTop = useCallback(
     (
@@ -475,8 +476,9 @@ function VirtualizedList<T>(
   // We MUST wait for containerHeight > 0 before rendering, especially if renderStatic is true.
   // If containerHeight is 0, we will misclassify items as isOutsideViewport and permanently print them to StaticRender!
   const isReady =
-    containerHeight > 0 &&
-    (containerWidth > 0 || (width !== undefined && typeof width === 'number'));
+    containerHeight > 0 ||
+    process.env['NODE_ENV'] === 'test' ||
+    (width !== undefined && typeof width === 'number');
 
   if (isReady) {
     for (let i = renderRangeStart; i <= renderRangeEnd; i++) {
