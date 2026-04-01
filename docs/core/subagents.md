@@ -1,20 +1,18 @@
-# Subagents (experimental)
+# Subagents
 
 Subagents are specialized agents that operate within your main Gemini CLI
 session. They are designed to handle specific, complex tasks—like deep codebase
 analysis, documentation lookup, or domain-specific reasoning—without cluttering
 the main agent's context or toolset.
 
-> **Note: Subagents are currently an experimental feature.**
->
-> To use custom subagents, you must ensure they are enabled in your
-> `settings.json` (enabled by default):
->
-> ```json
-> {
->   "experimental": { "enableAgents": true }
-> }
-> ```
+Subagents are enabled by default. To disable them, set `enableAgents` to `false`
+in your `settings.json`:
+
+```json
+{
+  "experimental": { "enableAgents": false }
+}
+```
 
 ## What are subagents?
 
@@ -114,7 +112,9 @@ Gemini CLI comes with the following built-in subagents:
   the pricing table from this page," "Click the login button and enter my
   credentials."
 
-> **Note:** This is a preview feature currently under active development.
+<!-- prettier-ignore -->
+> [!NOTE]
+> This is a preview feature currently under active development.
 
 #### Prerequisites
 
@@ -217,22 +217,70 @@ captures a screenshot and sends it to the vision model for analysis. The model
 returns coordinates and element descriptions that the browser agent uses with
 the `click_at` tool for precise, coordinate-based interactions.
 
-> **Note:** The visual agent requires API key or Vertex AI authentication. It is
+<!-- prettier-ignore -->
+> [!NOTE]
+> The visual agent requires API key or Vertex AI authentication. It is
 > not available when using "Sign in with Google".
+
+#### Sandbox support
+
+The browser agent adjusts its behavior automatically when running inside a
+sandbox.
+
+##### macOS seatbelt (`sandbox-exec`)
+
+When the CLI runs under the macOS seatbelt sandbox, `persistent` and `isolated`
+session modes are forced to `isolated` with `headless` enabled. This avoids
+permission errors caused by seatbelt file-system restrictions on persistent
+browser profiles. If `sessionMode` is set to `existing`, no override is applied.
+
+##### Container sandboxes (Docker / Podman)
+
+Chrome is not available inside the container, so the browser agent is
+**disabled** unless `sessionMode` is set to `"existing"`. When enabled with
+`existing` mode, the agent automatically connects to Chrome on the host via the
+resolved IP of `host.docker.internal:9222` instead of using local pipe
+discovery. Port `9222` is currently hardcoded and cannot be customized.
+
+To use the browser agent in a Docker sandbox:
+
+1. Start Chrome on the host with remote debugging enabled:
+
+   ```bash
+   # Option A: Launch Chrome from the command line
+   google-chrome --remote-debugging-port=9222
+
+   # Option B: Enable in Chrome settings
+   # Navigate to chrome://inspect/#remote-debugging and enable
+   ```
+
+2. Configure `sessionMode` and allowed domains in your project's
+   `.gemini/settings.json`:
+
+   ```json
+   {
+     "agents": {
+       "overrides": {
+         "browser_agent": { "enabled": true }
+       },
+       "browser": {
+         "sessionMode": "existing",
+         "allowedDomains": ["example.com"]
+       }
+     }
+   }
+   ```
+
+3. Launch the CLI with port forwarding:
+
+   ```bash
+   GEMINI_SANDBOX=docker SANDBOX_PORTS=9222 gemini
+   ```
 
 ## Creating custom subagents
 
 You can create your own subagents to automate specific workflows or enforce
-specific personas. To use custom subagents, you must enable them in your
-`settings.json`:
-
-```json
-{
-  "experimental": {
-    "enableAgents": true
-  }
-}
-```
+specific personas.
 
 ### Agent definition files
 
@@ -400,12 +448,10 @@ If you need to further tune your subagent, you can do so by selecting the model
 to optimize for with `/model` and then asking the model why it does not think
 that your subagent was called with a specific prompt and the given description.
 
-## Remote subagents (Agent2Agent) (experimental)
+## Remote subagents (Agent2Agent)
 
 Gemini CLI can also delegate tasks to remote subagents using the Agent-to-Agent
 (A2A) protocol.
-
-> **Note: Remote subagents are currently an experimental feature.**
 
 See the [Remote Subagents documentation](remote-agents) for detailed
 configuration, authentication, and usage instructions.

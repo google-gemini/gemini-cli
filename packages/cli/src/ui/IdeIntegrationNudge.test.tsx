@@ -42,6 +42,7 @@ describe('IdeIntegrationNudge', () => {
   beforeEach(() => {
     vi.mocked(debugLogger.warn).mockImplementation((...args) => {
       if (
+        // eslint-disable-next-line no-restricted-syntax
         typeof args[0] === 'string' &&
         /was not wrapped in act/.test(args[0])
       ) {
@@ -53,10 +54,9 @@ describe('IdeIntegrationNudge', () => {
   });
 
   it('renders correctly with default options', async () => {
-    const { lastFrame, waitUntilReady, unmount } = renderWithProviders(
+    const { lastFrame, unmount } = await renderWithProviders(
       <IdeIntegrationNudge {...defaultProps} />,
     );
-    await waitUntilReady();
     const frame = lastFrame();
 
     expect(frame).toContain('Do you want to connect VS Code to Gemini CLI?');
@@ -68,11 +68,9 @@ describe('IdeIntegrationNudge', () => {
 
   it('handles "Yes" selection', async () => {
     const onComplete = vi.fn();
-    const { stdin, waitUntilReady, unmount } = renderWithProviders(
+    const { stdin, waitUntilReady, unmount } = await renderWithProviders(
       <IdeIntegrationNudge {...defaultProps} onComplete={onComplete} />,
     );
-
-    await waitUntilReady();
 
     // "Yes" is the first option and selected by default usually.
     await act(async () => {
@@ -89,11 +87,9 @@ describe('IdeIntegrationNudge', () => {
 
   it('handles "No" selection', async () => {
     const onComplete = vi.fn();
-    const { stdin, waitUntilReady, unmount } = renderWithProviders(
+    const { stdin, waitUntilReady, unmount } = await renderWithProviders(
       <IdeIntegrationNudge {...defaultProps} onComplete={onComplete} />,
     );
-
-    await waitUntilReady();
 
     // Navigate down to "No (esc)"
     await act(async () => {
@@ -115,11 +111,9 @@ describe('IdeIntegrationNudge', () => {
 
   it('handles "Dismiss" selection', async () => {
     const onComplete = vi.fn();
-    const { stdin, waitUntilReady, unmount } = renderWithProviders(
+    const { stdin, waitUntilReady, unmount } = await renderWithProviders(
       <IdeIntegrationNudge {...defaultProps} onComplete={onComplete} />,
     );
-
-    await waitUntilReady();
 
     // Navigate down to "No, don't ask again"
     await act(async () => {
@@ -146,11 +140,9 @@ describe('IdeIntegrationNudge', () => {
 
   it('handles Escape key press', async () => {
     const onComplete = vi.fn();
-    const { stdin, waitUntilReady, unmount } = renderWithProviders(
+    const { stdin, waitUntilReady, unmount } = await renderWithProviders(
       <IdeIntegrationNudge {...defaultProps} onComplete={onComplete} />,
     );
-
-    await waitUntilReady();
 
     // Press Escape
     await act(async () => {
@@ -173,11 +165,10 @@ describe('IdeIntegrationNudge', () => {
     vi.stubEnv('GEMINI_CLI_IDE_WORKSPACE_PATH', '/tmp');
 
     const onComplete = vi.fn();
-    const { lastFrame, stdin, waitUntilReady, unmount } = renderWithProviders(
-      <IdeIntegrationNudge {...defaultProps} onComplete={onComplete} />,
-    );
-
-    await waitUntilReady();
+    const { lastFrame, stdin, waitUntilReady, unmount } =
+      await renderWithProviders(
+        <IdeIntegrationNudge {...defaultProps} onComplete={onComplete} />,
+      );
 
     const frame = lastFrame();
 

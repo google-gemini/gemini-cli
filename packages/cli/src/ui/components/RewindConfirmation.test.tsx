@@ -23,7 +23,7 @@ describe('RewindConfirmation', () => {
       details: [{ fileName: 'test.ts', diff: '' }],
     };
     const onConfirm = vi.fn();
-    const { lastFrame, waitUntilReady, unmount } = renderWithProviders(
+    const { lastFrame, unmount } = await renderWithProviders(
       <RewindConfirmation
         stats={stats}
         onConfirm={onConfirm}
@@ -31,7 +31,6 @@ describe('RewindConfirmation', () => {
       />,
       { width: 80 },
     );
-    await waitUntilReady();
 
     expect(lastFrame()).toMatchSnapshot();
     expect(lastFrame()).toContain('Revert code changes');
@@ -40,7 +39,7 @@ describe('RewindConfirmation', () => {
 
   it('renders correctly without stats', async () => {
     const onConfirm = vi.fn();
-    const { lastFrame, waitUntilReady, unmount } = renderWithProviders(
+    const { lastFrame, unmount } = await renderWithProviders(
       <RewindConfirmation
         stats={null}
         onConfirm={onConfirm}
@@ -48,7 +47,6 @@ describe('RewindConfirmation', () => {
       />,
       { width: 80 },
     );
-    await waitUntilReady();
 
     expect(lastFrame()).toMatchSnapshot();
     expect(lastFrame()).not.toContain('Revert code changes');
@@ -58,7 +56,7 @@ describe('RewindConfirmation', () => {
 
   it('calls onConfirm with Cancel on Escape', async () => {
     const onConfirm = vi.fn();
-    const { stdin, waitUntilReady, unmount } = renderWithProviders(
+    const { stdin, unmount } = await renderWithProviders(
       <RewindConfirmation
         stats={null}
         onConfirm={onConfirm}
@@ -66,7 +64,6 @@ describe('RewindConfirmation', () => {
       />,
       { width: 80 },
     );
-    await waitUntilReady();
 
     await act(async () => {
       stdin.write('\x1b');
@@ -81,7 +78,7 @@ describe('RewindConfirmation', () => {
   it('renders timestamp when provided', async () => {
     const onConfirm = vi.fn();
     const timestamp = new Date().toISOString();
-    const { lastFrame, waitUntilReady, unmount } = renderWithProviders(
+    const { lastFrame, unmount } = await renderWithProviders(
       <RewindConfirmation
         stats={null}
         onConfirm={onConfirm}
@@ -90,7 +87,6 @@ describe('RewindConfirmation', () => {
       />,
       { width: 80 },
     );
-    await waitUntilReady();
 
     expect(lastFrame()).toMatchSnapshot();
     expect(lastFrame()).not.toContain('Revert code changes');

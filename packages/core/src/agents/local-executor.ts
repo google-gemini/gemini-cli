@@ -18,7 +18,10 @@ import {
 import { ToolRegistry } from '../tools/tool-registry.js';
 import { PromptRegistry } from '../prompts/prompt-registry.js';
 import { ResourceRegistry } from '../resources/resource-registry.js';
-import { type AnyDeclarativeTool } from '../tools/tools.js';
+import {
+  type AnyDeclarativeTool,
+  ToolConfirmationOutcome,
+} from '../tools/tools.js';
 import {
   DiscoveredMCPTool,
   isMcpToolName,
@@ -27,8 +30,9 @@ import {
 } from '../tools/mcp-tool.js';
 import { CompressionStatus } from '../core/turn.js';
 import { type ToolCallRequestInfo } from '../scheduler/types.js';
-import { ChatCompressionService } from '../services/chatCompressionService.js';
+import { ChatCompressionService } from '../context/chatCompressionService.js';
 import { getDirectoryContextString } from '../utils/environmentContext.js';
+import { renderUserMemory } from '../prompts/snippets.js';
 import { promptIdContext } from '../utils/promptIdContext.js';
 import {
   logAgentStart,
@@ -46,6 +50,9 @@ import {
   DEFAULT_QUERY_STRING,
   DEFAULT_MAX_TURNS,
   DEFAULT_MAX_TIME_MINUTES,
+  SubagentActivityErrorType,
+  SUBAGENT_REJECTED_ERROR_PREFIX,
+  SUBAGENT_CANCELLED_ERROR_MESSAGE,
   type LocalAgentDefinition,
   type AgentInputs,
   type OutputObject,
@@ -114,7 +121,8 @@ export class LocalAgentExecutor<TOutput extends z.ZodTypeAny> {
   private get executionContext(): AgentLoopContext {
     return {
       config: this.context.config,
-      promptId: this.context.promptId,
+      promptId: this.agentId,
+      parentSessionId: this.context.parentSessionId || this.context.promptId, // Always preserve the main agent session ID
       geminiClient: this.context.geminiClient,
       sandboxManager: this.context.sandboxManager,
       toolRegistry: this.toolRegistry,
@@ -248,9 +256,6 @@ export class LocalAgentExecutor<TOutput extends z.ZodTypeAny> {
 
     agentToolRegistry.sortTools();
 
-    // Get the parent prompt ID from context
-    const parentPromptId = context.promptId;
-
     // Get the parent tool call ID from context
     const toolContext = getToolCallContext();
     const parentCallId = toolContext?.callId;
@@ -258,7 +263,6 @@ export class LocalAgentExecutor<TOutput extends z.ZodTypeAny> {
     return new LocalAgentExecutor(
       definition,
       context,
-      parentPromptId,
       agentToolRegistry,
       agentPromptRegistry,
       agentResourceRegistry,
@@ -276,7 +280,6 @@ export class LocalAgentExecutor<TOutput extends z.ZodTypeAny> {
   private constructor(
     definition: LocalAgentDefinition<TOutput>,
     context: AgentLoopContext,
-    parentPromptId: string | undefined,
     toolRegistry: ToolRegistry,
     promptRegistry: PromptRegistry,
     resourceRegistry: ResourceRegistry,
@@ -292,11 +295,7 @@ export class LocalAgentExecutor<TOutput extends z.ZodTypeAny> {
     this.compressionService = new ChatCompressionService();
     this.parentCallId = parentCallId;
 
-    const randomIdPart = Math.random().toString(36).slice(2, 8);
-    // parentPromptId will be undefined if this agent is invoked directly
-    // (top-level), rather than as a sub-agent.
-    const parentPrefix = parentPromptId ? `${parentPromptId}-` : '';
-    this.agentId = `${parentPrefix}${this.definition.name}-${randomIdPart}`;
+    this.agentId = Math.random().toString(36).slice(2, 8);
   }
 
   /**
@@ -316,10 +315,12 @@ export class LocalAgentExecutor<TOutput extends z.ZodTypeAny> {
   ): Promise<AgentTurnResult> {
     const promptId = `${this.agentId}#${turnCounter}`;
 
-    await this.tryCompressChat(chat, promptId);
+    await this.tryCompressChat(chat, promptId, combinedSignal);
 
-    const { functionCalls } = await promptIdContext.run(promptId, async () =>
-      this.callModel(chat, currentMessage, combinedSignal, promptId),
+    const { functionCalls, modelToUse } = await promptIdContext.run(
+      promptId,
+      async () =>
+        this.callModel(chat, currentMessage, combinedSignal, promptId),
     );
 
     if (combinedSignal.aborted) {
@@ -338,6 +339,7 @@ export class LocalAgentExecutor<TOutput extends z.ZodTypeAny> {
       this.emitActivity('ERROR', {
         error: `Agent stopped calling tools but did not call '${TASK_COMPLETE_TOOL_NAME}' to finalize the session.`,
         context: 'protocol_violation',
+        errorType: SubagentActivityErrorType.GENERIC,
       });
       return {
         status: 'stop',
@@ -348,6 +350,8 @@ export class LocalAgentExecutor<TOutput extends z.ZodTypeAny> {
 
     const { nextMessage, submittedOutput, taskCompleted, aborted } =
       await this.processFunctionCalls(
+        chat,
+        modelToUse,
         functionCalls,
         combinedSignal,
         promptId,
@@ -471,6 +475,7 @@ export class LocalAgentExecutor<TOutput extends z.ZodTypeAny> {
       this.emitActivity('ERROR', {
         error: `Graceful recovery attempt failed. Reason: ${turnResult.status}`,
         context: 'recovery_turn',
+        errorType: SubagentActivityErrorType.GENERIC,
       });
       return null;
     } catch (error) {
@@ -478,6 +483,7 @@ export class LocalAgentExecutor<TOutput extends z.ZodTypeAny> {
       this.emitActivity('ERROR', {
         error: `Graceful recovery attempt failed: ${String(error)}`,
         context: 'recovery_turn',
+        errorType: SubagentActivityErrorType.GENERIC,
       });
       return null;
     } finally {
@@ -576,12 +582,24 @@ export class LocalAgentExecutor<TOutput extends z.ZodTypeAny> {
           );
         const formattedInitialHints = formatUserHintsForModel(initialHints);
 
-        let currentMessage: Content = formattedInitialHints
-          ? {
-              role: 'user',
-              parts: [{ text: formattedInitialHints }, { text: query }],
-            }
-          : { role: 'user', parts: [{ text: query }] };
+        // Inject loaded memory files (JIT + extension/project memory)
+        const environmentMemory = this.context.config.isJitContextEnabled?.()
+          ? this.context.config.getSessionMemory()
+          : this.context.config.getEnvironmentMemory();
+
+        const initialParts: Part[] = [];
+        if (environmentMemory) {
+          initialParts.push({ text: environmentMemory });
+        }
+        if (formattedInitialHints) {
+          initialParts.push({ text: formattedInitialHints });
+        }
+        initialParts.push({ text: query });
+
+        let currentMessage: Content = {
+          role: 'user',
+          parts: initialParts,
+        };
 
         while (true) {
           // Check for termination conditions like max turns.
@@ -683,12 +701,14 @@ export class LocalAgentExecutor<TOutput extends z.ZodTypeAny> {
             this.emitActivity('ERROR', {
               error: finalResult,
               context: 'timeout',
+              errorType: SubagentActivityErrorType.GENERIC,
             });
           } else if (terminateReason === AgentTerminateMode.MAX_TURNS) {
             finalResult = `Agent reached max turns limit (${maxTurns}).`;
             this.emitActivity('ERROR', {
               error: finalResult,
               context: 'max_turns',
+              errorType: SubagentActivityErrorType.GENERIC,
             });
           } else if (
             terminateReason === AgentTerminateMode.ERROR_NO_COMPLETE_TASK_CALL
@@ -700,13 +720,23 @@ export class LocalAgentExecutor<TOutput extends z.ZodTypeAny> {
             this.emitActivity('ERROR', {
               error: finalResult,
               context: 'protocol_violation',
+              errorType: SubagentActivityErrorType.GENERIC,
             });
           }
         }
       }
 
-      // === FINAL RETURN LOGIC ===
       if (terminateReason === AgentTerminateMode.GOAL) {
+        // Save the session summary upon completion
+        if (finalResult && chat) {
+          try {
+            const summary = this.getTruncatedSummary(finalResult);
+            chat.getChatRecordingService()?.saveSummary(summary);
+          } catch (error) {
+            debugLogger.warn('Failed to save subagent session summary.', error);
+          }
+        }
+
         return {
           result: finalResult || 'Task completed.',
           terminate_reason: terminateReason,
@@ -742,6 +772,18 @@ export class LocalAgentExecutor<TOutput extends z.ZodTypeAny> {
             // Recovery Succeeded
             terminateReason = AgentTerminateMode.GOAL;
             finalResult = recoveryResult;
+
+            // Save the session summary upon successful recovery
+            try {
+              const summary = this.getTruncatedSummary(finalResult);
+              chat.getChatRecordingService()?.saveSummary(summary);
+            } catch (summaryError) {
+              debugLogger.warn(
+                'Failed to save subagent session summary during recovery.',
+                summaryError,
+              );
+            }
+
             return {
               result: finalResult,
               terminate_reason: terminateReason,
@@ -754,6 +796,7 @@ export class LocalAgentExecutor<TOutput extends z.ZodTypeAny> {
         this.emitActivity('ERROR', {
           error: finalResult,
           context: 'timeout',
+          errorType: SubagentActivityErrorType.GENERIC,
         });
         return {
           result: finalResult,
@@ -761,7 +804,10 @@ export class LocalAgentExecutor<TOutput extends z.ZodTypeAny> {
         };
       }
 
-      this.emitActivity('ERROR', { error: String(error) });
+      this.emitActivity('ERROR', {
+        error: String(error),
+        errorType: SubagentActivityErrorType.GENERIC,
+      });
       throw error; // Re-throw other errors or external aborts.
     } finally {
       deadlineTimer.abort();
@@ -781,6 +827,7 @@ export class LocalAgentExecutor<TOutput extends z.ZodTypeAny> {
   private async tryCompressChat(
     chat: GeminiChat,
     prompt_id: string,
+    abortSignal?: AbortSignal,
   ): Promise<void> {
     const model = this.definition.modelConfig.model ?? DEFAULT_GEMINI_MODEL;
 
@@ -791,6 +838,7 @@ export class LocalAgentExecutor<TOutput extends z.ZodTypeAny> {
       model,
       this.context.config,
       this.hasFailedCompressionAttempt,
+      abortSignal,
     );
 
     if (
@@ -823,7 +871,11 @@ export class LocalAgentExecutor<TOutput extends z.ZodTypeAny> {
     message: Content,
     signal: AbortSignal,
     promptId: string,
-  ): Promise<{ functionCalls: FunctionCall[]; textResponse: string }> {
+  ): Promise<{
+    functionCalls: FunctionCall[];
+    textResponse: string;
+    modelToUse: string;
+  }> {
     const modelConfigAlias = getModelConfigAlias(this.definition);
 
     // Resolve the model config early to get the concrete model string (which may be `auto`).
@@ -908,7 +960,7 @@ export class LocalAgentExecutor<TOutput extends z.ZodTypeAny> {
       }
     }
 
-    return { functionCalls, textResponse };
+    return { functionCalls, textResponse, modelToUse };
   }
 
   /** Initializes a `GeminiChat` instance for the agent run. */
@@ -962,6 +1014,8 @@ export class LocalAgentExecutor<TOutput extends z.ZodTypeAny> {
    * @returns A new `Content` object for history, any submitted output, and completion status.
    */
   private async processFunctionCalls(
+    chat: GeminiChat,
+    model: string,
     functionCalls: FunctionCall[],
     signal: AbortSignal,
     promptId: string,
@@ -1030,6 +1084,7 @@ export class LocalAgentExecutor<TOutput extends z.ZodTypeAny> {
             context: 'tool_call',
             name: toolName,
             error,
+            errorType: SubagentActivityErrorType.GENERIC,
           });
           continue;
         }
@@ -1057,6 +1112,7 @@ export class LocalAgentExecutor<TOutput extends z.ZodTypeAny> {
                 context: 'tool_call',
                 name: toolName,
                 error,
+                errorType: SubagentActivityErrorType.GENERIC,
               });
               continue;
             }
@@ -1099,6 +1155,7 @@ export class LocalAgentExecutor<TOutput extends z.ZodTypeAny> {
               name: toolName,
               callId,
               error,
+              errorType: SubagentActivityErrorType.GENERIC,
             });
           }
         } else {
@@ -1142,6 +1199,7 @@ export class LocalAgentExecutor<TOutput extends z.ZodTypeAny> {
               name: toolName,
               callId,
               error,
+              errorType: SubagentActivityErrorType.GENERIC,
             });
           }
         }
@@ -1166,6 +1224,7 @@ export class LocalAgentExecutor<TOutput extends z.ZodTypeAny> {
           name: toolName,
           callId,
           error,
+          errorType: SubagentActivityErrorType.GENERIC,
         });
 
         continue;
@@ -1198,6 +1257,9 @@ export class LocalAgentExecutor<TOutput extends z.ZodTypeAny> {
         },
       );
 
+      // Record completed tool calls for persistent chat history
+      chat.recordCompletedToolCalls(model, completedCalls);
+
       for (const call of completedCalls) {
         const toolName =
           toolNameMap.get(call.request.callId) || call.request.name;
@@ -1206,6 +1268,7 @@ export class LocalAgentExecutor<TOutput extends z.ZodTypeAny> {
             name: toolName,
             id: call.request.callId,
             output: call.response.resultDisplay,
+            data: call.response.data,
           });
         } else if (call.status === 'error') {
           this.emitActivity('ERROR', {
@@ -1213,18 +1276,46 @@ export class LocalAgentExecutor<TOutput extends z.ZodTypeAny> {
             name: toolName,
             callId: call.request.callId,
             error: call.response.error?.message || 'Unknown error',
+            errorType: SubagentActivityErrorType.GENERIC,
           });
         } else if (call.status === 'cancelled') {
-          this.emitActivity('ERROR', {
-            context: 'tool_call',
-            name: toolName,
-            callId: call.request.callId,
-            error: 'Request cancelled.',
-          });
-          aborted = true;
+          const isSoftRejection =
+            call.outcome === ToolConfirmationOutcome.Cancel;
+
+          if (isSoftRejection) {
+            const error = `${SUBAGENT_REJECTED_ERROR_PREFIX} Please acknowledge this, rethink your strategy, and try a different approach. If you cannot proceed without the rejected operation, summarize the issue and use \`${TASK_COMPLETE_TOOL_NAME}\` to report your findings and the blocker.`;
+            this.emitActivity('ERROR', {
+              context: 'tool_call',
+              name: toolName,
+              callId: call.request.callId,
+              error,
+              errorType: SubagentActivityErrorType.REJECTED,
+            });
+            // Soft rejection: we do NOT set aborted=true, allowing the agent to rethink.
+
+            // Provide the direct instruction to the model as the tool error response.
+            syncResults.set(call.request.callId, {
+              functionResponse: {
+                name: toolName,
+                id: call.request.callId,
+                response: { error },
+              },
+            });
+            continue; // Skip the generic syncResults.set below
+          } else {
+            // Hard abort (Ctrl+C)
+            this.emitActivity('ERROR', {
+              context: 'tool_call',
+              name: toolName,
+              callId: call.request.callId,
+              error: SUBAGENT_CANCELLED_ERROR_MESSAGE,
+              errorType: SubagentActivityErrorType.CANCELLED,
+            });
+            aborted = true;
+          }
         }
 
-        // Add result to syncResults to preserve order later
+        // Add result to syncResults for other statuses (success, error, hard abort)
         syncResults.set(call.request.callId, call.response.responseParts[0]);
       }
     }
@@ -1272,9 +1363,13 @@ export class LocalAgentExecutor<TOutput extends z.ZodTypeAny> {
           toolsList.push(toolRef);
         }
       }
-      // Add schemas from tools that were explicitly registered by name, wildcard, or instance.
-      toolsList.push(...this.toolRegistry.getFunctionDeclarations());
     }
+    // Add schemas from tools that were explicitly registered by name, wildcard, or instance.
+    toolsList.push(
+      ...this.toolRegistry.getFunctionDeclarations(
+        this.definition.modelConfig.model,
+      ),
+    );
 
     // Always inject complete_task.
     // Configure its schema based on whether output is expected.
@@ -1326,6 +1421,12 @@ export class LocalAgentExecutor<TOutput extends z.ZodTypeAny> {
     // Inject user inputs into the prompt template.
     let finalPrompt = templateString(promptConfig.systemPrompt, inputs);
 
+    // Append memory context if available.
+    const systemMemory = this.context.config.getSystemInstructionMemory();
+    if (systemMemory) {
+      finalPrompt += `\n\n${renderUserMemory(systemMemory)}`;
+    }
+
     // Append environment context (CWD and folder structure).
     const dirContext = await getDirectoryContextString(this.context.config);
     finalPrompt += `\n\n# Environment Context\n${dirContext}`;
@@ -1335,7 +1436,8 @@ export class LocalAgentExecutor<TOutput extends z.ZodTypeAny> {
 Important Rules:
 * You are running in a non-interactive mode. You CANNOT ask the user for input or clarification.
 * Work systematically using available tools to complete your task.
-* Always use absolute paths for file operations. Construct them using the provided "Environment Context".`;
+* Always use absolute paths for file operations. Construct them using the provided "Environment Context".
+* If a tool call is rejected by the user, acknowledge the rejection, rethink your strategy, and try a different approach. Do not repeatedly attempt the same rejected operation.`;
 
     if (this.definition.outputConfig) {
       finalPrompt += `
@@ -1406,5 +1508,16 @@ Important Rules:
       };
       this.onActivity(event);
     }
+  }
+
+  /**
+   * Truncates a string to 200 characters in a Unicode-safe way for session summaries.
+   */
+  private getTruncatedSummary(text: string): string {
+    const chars = Array.from(text);
+    if (chars.length <= 200) {
+      return text;
+    }
+    return chars.slice(0, 197).join('') + '...';
   }
 }

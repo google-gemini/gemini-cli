@@ -30,6 +30,9 @@ import {
   getToolAliases,
   WRITE_FILE_TOOL_NAME,
   EDIT_TOOL_NAME,
+  UPDATE_TOPIC_TOOL_NAME,
+  ENTER_PLAN_MODE_TOOL_NAME,
+  EXIT_PLAN_MODE_TOOL_NAME,
 } from './tool-names.js';
 
 type ToolParams = Record<string, unknown>;
@@ -575,6 +578,20 @@ export class ToolRegistry {
           new Set(this.allKnownTools.keys()),
         ),
       ) ?? new Set([]);
+
+    if (tool.name === UPDATE_TOPIC_TOOL_NAME) {
+      if (!this.config.isTopicUpdateNarrationEnabled()) {
+        return false;
+      }
+    }
+
+    const isPlanMode = this.config.getApprovalMode() === ApprovalMode.PLAN;
+    if (
+      (tool.name === ENTER_PLAN_MODE_TOOL_NAME && isPlanMode) ||
+      (tool.name === EXIT_PLAN_MODE_TOOL_NAME && !isPlanMode)
+    ) {
+      return false;
+    }
 
     const normalizedClassName = tool.constructor.name.replace(/^_+/, '');
     const possibleNames = [tool.name, normalizedClassName];
