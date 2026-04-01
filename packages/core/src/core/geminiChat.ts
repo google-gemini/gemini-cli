@@ -182,9 +182,7 @@ function extractCuratedHistory(comprehensiveHistory: Content[]): Content[] {
       }
       // Text parts must be non-empty strings
       if (part.text !== undefined) {
-        return (
-          typeof part.text === 'string' && (part.text).trim() !== ''
-        );
+        return typeof part.text === 'string' && part.text.trim() !== '';
       }
       // Keep other parts (functionCall, functionResponse, etc.)
       return true;
@@ -215,8 +213,8 @@ function extractCuratedHistory(comprehensiveHistory: Content[]): Content[] {
           // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
           const lastText = existingTextPart.text as string;
           const separator = lastText.endsWith('\n') ? '' : '\n';
-           
-          existingTextPart.text = lastText + separator + (part.text);
+
+          existingTextPart.text = lastText + separator + part.text;
         } else {
           lastEntryParts.push({ ...part });
         }
@@ -1119,7 +1117,6 @@ export class GeminiChat {
 
     const thoughtPart = content.parts[0];
     if (thoughtPart.text) {
-       
       const rawText = thoughtPart.text;
       const subjectStringMatches = rawText.match(/\*\*(.*?)\*\*/s);
       const subject = subjectStringMatches

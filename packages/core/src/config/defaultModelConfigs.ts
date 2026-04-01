@@ -66,14 +66,9 @@ export const DEFAULT_MODEL_CONFIGS: ModelConfigServiceConfig = {
       },
     },
     'gemini-3-flash-preview': {
-      extends: 'base',
+      extends: 'chat-base-3',
       modelConfig: {
         model: 'gemini-3-flash-preview',
-        generateContentConfig: {
-          temperature: 0,
-          topP: 0.95,
-          topK: 64,
-        },
       },
     },
     'gemini-2.5-pro': {
@@ -175,14 +170,6 @@ export const DEFAULT_MODEL_CONFIGS: ModelConfigServiceConfig = {
       },
     },
     'web-search': {
-      extends: 'gemini-3-flash-base',
-      modelConfig: {
-        generateContentConfig: {
-          tools: [{ googleSearch: {} }],
-        },
-      },
-    },
-    'web-search-internal': {
       extends: 'gemini-3-flash-base',
       modelConfig: {
         generateContentConfig: {
