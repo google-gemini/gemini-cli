@@ -54,7 +54,7 @@ jobs:
 
       - name: 'Post Guidance Comment'
         if: "steps.detect.outputs.STEERING_DETECTED == 'true'"
-        uses: 'thollander/actions-comment-pull-request@65f9e5c9a1f2cd378bd74b2e057c9736982a8e74' # ratchet:thollander/actions-comment-pull-request@v3
+        uses: 'thollander/actions-comment-pull-request@e4a76dd2b0a3c2027c3fd84147a67c22ee4c90fa' # ratchet:thollander/actions-comment-pull-request@v3
         with:
           comment-tag: 'eval-guidance-bot'
           message: |
