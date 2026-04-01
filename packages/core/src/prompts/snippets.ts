@@ -78,6 +78,7 @@ export interface PrimaryWorkflowsOptions {
   approvedPlan?: { path: string };
   taskTracker?: string;
   topicUpdateNarration: boolean;
+  activeTeam?: TeamDefinition;
 }
 
 export interface OperationalGuidelinesOptions {
@@ -126,9 +127,9 @@ export function getCoreSystemPrompt(options: SystemPromptOptions): string {
   return `
 ${renderPreamble(options.preamble)}
 
-${renderCoreMandates(options.coreMandates)}
-
 ${renderActiveTeam(options.activeTeam)}
+
+${renderCoreMandates(options.coreMandates)}
 
 ${renderSubAgents(options.subAgents)}
 
@@ -344,11 +345,15 @@ export function renderPrimaryWorkflows(
     ? `\n\n**State Transition Override:** You are now in **Execution Mode**. All previous "Read-Only", "Plan Mode", and "ONLY FOR PLANS" constraints are **immediately lifted**. You are explicitly authorized and required to use tools to modify source code and environment files to implement the approved plan. Begin executing the steps of the plan immediately.`
     : '';
 
+  const teamMandate = options.activeTeam
+    ? `\n\n**Team Orchestration Mandate:** You are orchestrating the **${options.activeTeam.displayName}**. You MUST NOT perform implementation, review, or testing tasks yourself. You MUST delegate these specialized tasks to the appropriate team-member sub-agents.`
+    : '';
+
   return `
 # Primary Workflows
 
 ## Development Lifecycle
-Operate using a **Research -> Strategy -> Execution** lifecycle. For the Execution phase, resolve each sub-task through an iterative **Plan -> Act -> Validate** cycle.${transitionOverride}
+Operate using a **Research -> Strategy -> Execution** lifecycle. For the Execution phase, resolve each sub-task through an iterative **Plan -> Act -> Validate** cycle.${transitionOverride}${teamMandate}
 
 ${workflowStepResearch(options)}
 ${workflowStepStrategy(options)}

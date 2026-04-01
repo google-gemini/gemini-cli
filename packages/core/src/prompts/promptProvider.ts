@@ -181,6 +181,7 @@ export class PromptProvider {
             taskTracker: trackerDir,
             topicUpdateNarration:
               context.config.isTopicUpdateNarrationEnabled(),
+            activeTeam: context.config.getActiveTeam(),
           }),
           !isPlanMode,
         ),

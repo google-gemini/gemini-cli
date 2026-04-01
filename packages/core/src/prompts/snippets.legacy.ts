@@ -5,6 +5,7 @@
  */
 
 import type { HierarchicalMemory } from '../config/memory.js';
+import { type TeamDefinition } from '../agents/types.js';
 import {
   ACTIVATE_SKILL_TOOL_NAME,
   ASK_USER_TOOL_NAME,
@@ -62,9 +63,11 @@ export interface PrimaryWorkflowsOptions {
   enableCodebaseInvestigator: boolean;
   enableWriteTodosTool: boolean;
   enableEnterPlanModeTool: boolean;
+  enableGrep: boolean;
+  enableGlob: boolean;
   approvedPlan?: { path: string };
   taskTracker?: string;
-  topicUpdateNarration?: boolean;
+  activeTeam?: TeamDefinition;
 }
 
 export interface OperationalGuidelinesOptions {
@@ -249,11 +252,16 @@ export function renderPrimaryWorkflows(
   options?: PrimaryWorkflowsOptions,
 ): string {
   if (!options) return '';
+
+  const teamMandate = options.activeTeam
+    ? `\n\n**Team Orchestration Mandate:** You are orchestrating the **${options.activeTeam.displayName}**. You MUST NOT perform implementation, review, or testing tasks yourself. You MUST delegate these specialized tasks to the appropriate team-member sub-agents.`
+    : '';
+
   return `
 # Primary Workflows
 
 ## Software Engineering Tasks
-When requested to perform tasks like fixing bugs, adding features, refactoring, or explaining code, follow this sequence:
+When requested to perform tasks like fixing bugs, adding features, refactoring, or explaining code, follow this sequence:${teamMandate}
 ${workflowStepUnderstand(options)}
 ${workflowStepPlan(options)}
 3. **Implement:** Use the available tools (e.g., '${EDIT_TOOL_NAME}', '${WRITE_FILE_TOOL_NAME}' '${SHELL_TOOL_NAME}' ...) to act on the plan. Strictly adhere to the project's established conventions (detailed under 'Core Mandates'). Before making manual code changes, check if an ecosystem tool (like 'eslint --fix', 'prettier --write', 'go fmt', 'cargo fmt') is available in the project to perform the task automatically.

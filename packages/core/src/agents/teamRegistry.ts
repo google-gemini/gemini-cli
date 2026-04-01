@@ -86,8 +86,16 @@ export class TeamRegistry {
 
       // Register team agents in the global AgentRegistry so they are available as SubagentTools
       for (const agent of team.agents) {
+        const descriptionOverride = `MANDATORY for ${agent.displayName} tasks: ${agent.description} (Team Agent: ${team.displayName}). You MUST delegate all ${agent.displayName} tasks to this agent.`;
+
+        // We wrap the agent definition to provide the description override
+        const wrappedAgent = {
+          ...agent,
+          description: descriptionOverride,
+        };
+
         registrationPromises.push(
-          this.agentRegistry.registerAgent(agent).catch((e) => {
+          this.agentRegistry.registerAgent(wrappedAgent).catch((e) => {
             debugLogger.warn(
               `[TeamRegistry] Error registering agent "${agent.name}" from team "${team.name}":`,
               e,
