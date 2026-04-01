@@ -200,9 +200,14 @@ export class LinuxSandboxManager implements SandboxManager {
           this.options.modeConfig?.approvedTools,
         )
       : false;
-    const workspaceWrite = !isReadonlyMode || isApproved;
+    const isYolo = this.options.modeConfig?.yolo ?? false;
+    const workspaceWrite = !isReadonlyMode || isApproved || isYolo;
+
+    // Grant full filesystem read/write access in YOLO mode (sandboxed protection still applies)
+    const yoloPaths = isYolo ? ['/'] : [];
+
     const networkAccess =
-      this.options.modeConfig?.network || req.policy?.networkAccess || false;
+      this.options.modeConfig?.network || req.policy?.networkAccess || isYolo;
 
     const persistentPermissions = allowOverrides
       ? this.options.policyManager?.getCommandPermissions(commandName)
@@ -211,10 +216,12 @@ export class LinuxSandboxManager implements SandboxManager {
     const mergedAdditional: SandboxPermissions = {
       fileSystem: {
         read: [
+          ...yoloPaths,
           ...(persistentPermissions?.fileSystem?.read ?? []),
           ...(req.policy?.additionalPermissions?.fileSystem?.read ?? []),
         ],
         write: [
+          ...yoloPaths,
           ...(persistentPermissions?.fileSystem?.write ?? []),
           ...(req.policy?.additionalPermissions?.fileSystem?.write ?? []),
         ],

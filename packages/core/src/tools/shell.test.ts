@@ -16,6 +16,7 @@ import {
 } from 'vitest';
 
 const mockPlatform = vi.hoisted(() => vi.fn());
+const mockHomedir = vi.hoisted(() => vi.fn());
 
 const mockShellExecutionService = vi.hoisted(() => vi.fn());
 const mockShellBackground = vi.hoisted(() => vi.fn());
@@ -34,8 +35,10 @@ vi.mock('node:os', async (importOriginal) => {
     default: {
       ...actualOs,
       platform: mockPlatform,
+      homedir: mockHomedir,
     },
     platform: mockPlatform,
+    homedir: mockHomedir,
   };
 });
 vi.mock('crypto');
@@ -57,7 +60,11 @@ import { isSubpath } from '../utils/paths.js';
 import * as crypto from 'node:crypto';
 import * as summarizer from '../utils/summarizer.js';
 import { ToolErrorType } from './tool-error.js';
-import { ToolConfirmationOutcome } from './tools.js';
+import {
+  ToolConfirmationOutcome,
+  type ToolSandboxExpansionConfirmationDetails,
+  type ToolExecuteConfirmationDetails,
+} from './tools.js';
 import { SHELL_TOOL_NAME } from './tool-names.js';
 import { WorkspaceContext } from '../utils/workspaceContext.js';
 import {
@@ -69,6 +76,7 @@ import {
   type UpdatePolicy,
 } from '../confirmation-bus/types.js';
 import { type MessageBus } from '../confirmation-bus/message-bus.js';
+import { type SandboxManager } from '../services/sandboxManager.js';
 
 interface TestableMockMessageBus extends MessageBus {
   defaultToolDecision: 'allow' | 'deny' | 'ask_user';
@@ -141,6 +149,12 @@ describe('ShellTool', () => {
       getSandboxEnabled: vi.fn().mockReturnValue(false),
       sanitizationConfig: {},
       sandboxManager: new NoopSandboxManager(),
+      sandboxPolicyManager: {
+        getCommandPermissions: vi.fn().mockReturnValue(undefined),
+        getModeConfig: vi.fn().mockReturnValue({ readonly: false }),
+        addPersistentApproval: vi.fn(),
+        addSessionApproval: vi.fn(),
+      },
     } as unknown as Config;
 
     const bus = createMockMessageBus();
@@ -168,6 +182,7 @@ describe('ShellTool', () => {
     shellTool = new ShellTool(mockConfig, bus);
 
     mockPlatform.mockReturnValue('linux');
+    mockHomedir.mockReturnValue('/home/user');
     (vi.mocked(crypto.randomBytes) as Mock).mockReturnValue(
       Buffer.from('abcdef', 'hex'),
     );
@@ -646,7 +661,7 @@ describe('ShellTool', () => {
 
   describe('shouldConfirmExecute', () => {
     it('should request confirmation for a new command and allowlist it on "Always"', async () => {
-      const params = { command: 'npm install' };
+      const params = { command: 'ls -la' };
       const invocation = shellTool.build(params);
 
       // Accessing protected messageBus for testing purposes
@@ -917,6 +932,90 @@ describe('ShellTool', () => {
       if (details && details.type === 'exec') {
         expect(details.rootCommand).toBe('ls, grep');
       }
+    });
+  });
+
+  describe('sandbox heuristics', () => {
+    const mockAbortSignal = new AbortController().signal;
+
+    it('should suggest proactive permissions for npm commands', async () => {
+      const homeDir = path.join(tempRootDir, 'home');
+      fs.mkdirSync(homeDir);
+      fs.mkdirSync(path.join(homeDir, '.npm'));
+      fs.mkdirSync(path.join(homeDir, '.cache'));
+
+      mockHomedir.mockReturnValue(homeDir);
+
+      const sandboxManager = {
+        parseDenials: vi.fn().mockReturnValue({
+          network: true,
+          filePaths: [path.join(homeDir, '.npm/_logs/test.log')],
+        }),
+        prepareCommand: vi.fn(),
+        isKnownSafeCommand: vi.fn(),
+        isDangerousCommand: vi.fn(),
+      } as unknown as SandboxManager;
+      mockConfig.sandboxManager = sandboxManager;
+
+      const invocation = shellTool.build({ command: 'npm install' });
+      const promise = invocation.execute(mockAbortSignal);
+
+      resolveExecutionPromise({
+        exitCode: 1,
+        output: 'npm error code EPERM',
+        executionMethod: 'child_process',
+        signal: null,
+        error: null,
+        aborted: false,
+        pid: 12345,
+        rawOutput: Buffer.from('npm error code EPERM'),
+      });
+
+      const result = await promise;
+
+      expect(result.error?.type).toBe(ToolErrorType.SANDBOX_EXPANSION_REQUIRED);
+      const details = JSON.parse(result.error!.message);
+      expect(details.additionalPermissions.network).toBe(true);
+      expect(details.additionalPermissions.fileSystem.read).toContain(
+        path.join(homeDir, '.npm'),
+      );
+      expect(details.additionalPermissions.fileSystem.read).toContain(
+        path.join(homeDir, '.cache'),
+      );
+      expect(details.additionalPermissions.fileSystem.write).toContain(
+        path.join(homeDir, '.npm'),
+      );
+    });
+
+    it('should proactively suggest expansion for npm install in confirmation', async () => {
+      const homeDir = path.join(tempRootDir, 'home');
+      fs.mkdirSync(homeDir);
+      mockHomedir.mockReturnValue(homeDir);
+
+      const invocation = shellTool.build({ command: 'npm install' });
+      const details = (await invocation.shouldConfirmExecute(
+        new AbortController().signal,
+        'ask_user',
+      )) as ToolSandboxExpansionConfirmationDetails;
+
+      expect(details.type).toBe('sandbox_expansion');
+      expect(details.title).toContain('Recommended');
+      expect(details.additionalPermissions.network).toBe(true);
+    });
+
+    it('should NOT proactively suggest expansion for npm test', async () => {
+      const homeDir = path.join(tempRootDir, 'home');
+      fs.mkdirSync(homeDir);
+      mockHomedir.mockReturnValue(homeDir);
+
+      const invocation = shellTool.build({ command: 'npm test' });
+      const details = (await invocation.shouldConfirmExecute(
+        new AbortController().signal,
+        'ask_user',
+      )) as ToolExecuteConfirmationDetails;
+
+      // Should be regular exec confirmation, not expansion
+      expect(details.type).toBe('exec');
     });
   });
 

@@ -24,10 +24,6 @@ export function createSandboxManager(
   options: GlobalSandboxOptions,
   approvalMode?: string,
 ): SandboxManager {
-  if (approvalMode === 'yolo') {
-    return new NoopSandboxManager();
-  }
-
   if (!options.modeConfig && options.policyManager && approvalMode) {
     options.modeConfig = options.policyManager.getModeConfig(approvalMode);
   }

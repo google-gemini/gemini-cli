@@ -20,6 +20,9 @@ export function parsePosixSandboxDenials(
 
   const isFileDenial = [
     'operation not permitted',
+    'permission denied',
+    'eperm',
+    'eacces',
     'vim:e303',
     'should be read/write',
     'sandbox_apply',
@@ -32,6 +35,17 @@ export function parsePosixSandboxDenials(
     'could not resolve host',
     'connection refused',
     'no address associated with hostname',
+    'econnrefused',
+    'enotfound',
+    'etimedout',
+    'econnreset',
+    'network error',
+    'getaddrinfo',
+    'socket hang up',
+    'connect-timeout',
+    'err_pnpm_fetch',
+    'err_pnpm_no_matching_version',
+    "syscall: 'listen'",
   ].some((keyword) => combined.includes(keyword));
 
   if (!isFileDenial && !isNetworkDenial) {
@@ -40,16 +54,30 @@ export function parsePosixSandboxDenials(
 
   const filePaths = new Set<string>();
 
-  // Extract denied paths (POSIX absolute paths)
-  const regex =
-    /(?:^|\s)['"]?(\/[\w.-/]+)['"]?:\s*[Oo]peration not permitted/gi;
-  let match;
-  while ((match = regex.exec(output)) !== null) {
-    filePaths.add(match[1]);
-  }
-  if (errorOutput) {
-    while ((match = regex.exec(errorOutput)) !== null) {
+  // Extract denied paths (POSIX absolute paths or home-relative paths starting with ~)
+  const regexes = [
+    // format: /path: operation not permitted
+    /(?:^|\s)['"]?((?:\/|~)[\w.\-/:~]+)['"]?:\s*[Oo]peration not permitted/gi,
+    // format: operation not permitted, open '/path'
+    /[Oo]peration not permitted,\s*open\s*['"]?((?:\/|~)[\w.\-/:~]+)['"]?/gi,
+    // format: permission denied, open '/path'
+    /[Pp]ermission denied,\s*open\s*['"]?((?:\/|~)[\w.\-/:~]+)['"]?/gi,
+    // format: npm error path /path or npm ERR! path /path
+    /npm\s+(?:error|ERR!)\s+path\s+((?:\/|~)[\w.\-/:~]+)/gi,
+    // format: EACCES: permission denied, mkdir '/path'
+    /EACCES:\s*permission denied,\s*\w+\s*['"]?((?:\/|~)[\w.\-/:~]+)['"]?/gi,
+  ];
+
+  for (const regex of regexes) {
+    let match;
+    while ((match = regex.exec(output)) !== null) {
       filePaths.add(match[1]);
+    }
+    if (errorOutput) {
+      regex.lastIndex = 0; // Reset for next use
+      while ((match = regex.exec(errorOutput)) !== null) {
+        filePaths.add(match[1]);
+      }
     }
   }
 

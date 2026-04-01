@@ -670,7 +670,7 @@ export const renderWithProviders = async (
       settings.merged,
       'random-session-id',
       {} as unknown as CliArgs,
-      { cwd: '/' },
+      { cwd: process.env['GEMINI_CLI_TEST_CWD'] || process.cwd() },
     );
   }
 

@@ -89,9 +89,14 @@ export class MacOsSandboxManager implements SandboxManager {
         )
       : false;
 
-    const workspaceWrite = !isReadonlyMode || isApproved;
+    const isYolo = this.options.modeConfig?.yolo ?? false;
+    const workspaceWrite = !isReadonlyMode || isApproved || isYolo;
+
+    // Grant full filesystem read/write access in YOLO mode (sandboxed protection still applies)
+    const yoloPaths = isYolo ? ['/'] : [];
+
     const defaultNetwork =
-      this.options.modeConfig?.network || req.policy?.networkAccess || false;
+      this.options.modeConfig?.network || req.policy?.networkAccess || isYolo;
 
     // Fetch persistent approvals for this command
     const commandName = await getFullCommandName(currentReq);
@@ -99,14 +104,15 @@ export class MacOsSandboxManager implements SandboxManager {
       ? this.options.policyManager?.getCommandPermissions(commandName)
       : undefined;
 
-    // Merge all permissions
     const mergedAdditional: SandboxPermissions = {
       fileSystem: {
         read: [
+          ...yoloPaths,
           ...(persistentPermissions?.fileSystem?.read ?? []),
           ...(req.policy?.additionalPermissions?.fileSystem?.read ?? []),
         ],
         write: [
+          ...yoloPaths,
           ...(persistentPermissions?.fileSystem?.write ?? []),
           ...(req.policy?.additionalPermissions?.fileSystem?.write ?? []),
         ],

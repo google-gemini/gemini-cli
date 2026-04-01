@@ -239,25 +239,32 @@ export class WindowsSandboxManager implements SandboxManager {
       ];
     }
 
+    const isYolo = this.options.modeConfig?.yolo ?? false;
+
     // Fetch persistent approvals for this command
     const commandName = await getCommandName(command, args);
     const persistentPermissions = allowOverrides
       ? this.options.policyManager?.getCommandPermissions(commandName)
       : undefined;
 
+    const yoloPaths = isYolo ? ['C:\\', 'D:\\', 'E:\\'] : [];
+
     // Merge all permissions
     const mergedAdditional: SandboxPermissions = {
       fileSystem: {
         read: [
+          ...yoloPaths,
           ...(persistentPermissions?.fileSystem?.read ?? []),
           ...(req.policy?.additionalPermissions?.fileSystem?.read ?? []),
         ],
         write: [
+          ...yoloPaths,
           ...(persistentPermissions?.fileSystem?.write ?? []),
           ...(req.policy?.additionalPermissions?.fileSystem?.write ?? []),
         ],
       },
       network:
+        isYolo ||
         persistentPermissions?.network ||
         req.policy?.additionalPermissions?.network ||
         false,

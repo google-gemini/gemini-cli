@@ -57,6 +57,7 @@ export interface SandboxModeConfig {
   network?: boolean;
   approvedTools?: string[];
   allowOverrides?: boolean;
+  yolo?: boolean;
 }
 
 /**
