@@ -332,6 +332,7 @@ it yourself; just report it.
 | `description`  | string | Yes      | Short description of what the agent does. This is visible to the main agent to help it decide when to call this subagent.                                                                                     |
 | `kind`         | string | No       | `local` (default) or `remote`.                                                                                                                                                                                |
 | `tools`        | array  | No       | List of tool names this agent can use. Supports wildcards: `*` (all tools), `mcp_*` (all MCP tools), `mcp_server_*` (all tools from a server). **If omitted, it inherits all tools from the parent session.** |
+| `mcpServers`   | object | No       | Configuration for inline Model Context Protocol (MCP) servers isolated to this specific agent.                                                                                                                |
 | `model`        | string | No       | Specific model to use (e.g., `gemini-3-preview`). Defaults to `inherit` (uses the main session model).                                                                                                        |
 | `temperature`  | number | No       | Model temperature (0.0 - 2.0). Defaults to `1`.                                                                                                                                                               |
 | `max_turns`    | number | No       | Maximum number of conversation turns allowed for this agent before it must return. Defaults to `30`.                                                                                                          |
@@ -358,6 +359,78 @@ Each subagent runs in its own isolated context loop. This means:
 - **Recursion protection:** To prevent infinite loops and excessive token usage,
   subagents **cannot** call other subagents. If a subagent is granted the `*`
   tool wildcard, it will still be unable to see or invoke other agents.
+
+## Subagent tool isolation
+
+Subagent tool isolation moves Gemini CLI away from a single global tool
+registry. By providing isolated execution environments, you can ensure that
+subagents only interact with the parts of the system they are designed for. This
+prevents unintended side effects, improves reliability by avoiding state
+contamination, and enables fine-grained permission control.
+
+With this feature, you can:
+
+- **Specify tool access:** Define exactly which tools an agent can access using
+  a `tools` list in the agent definition.
+- **Define inline MCP servers:** Configure Model Context Protocol (MCP) servers
+  (which provide a standardized way to connect AI models to external tools and
+  data sources) directly in the subagent's markdown frontmatter, isolating them
+  to that specific agent.
+- **Maintain state isolation:** Ensure that subagents only interact with their
+  own set of tools and servers, preventing side effects and state contamination.
+- **Apply subagent-specific policies:** Enforce granular rules in your
+  [Policy Engine](../reference/policy-engine.md) TOML configuration based on the
+  executing subagent's name.
+
+### Configuring isolated tools and servers
+
+You can configure tool isolation for a subagent by updating its markdown
+frontmatter. This allows you to explicitly state which tools the subagent can
+use, rather than relying on the global registry.
+
+Add an `mcpServers` object to define inline MCP servers that are unique to the
+agent.
+
+**Example:**
+
+```yaml
+---
+name: my-isolated-agent
+tools:
+  - grep_search
+  - read_file
+mcpServers:
+  my-custom-server:
+    command: 'node'
+    args: ['path/to/server.js']
+---
+```
+
+### Subagent-specific policies
+
+You can enforce fine-grained control over subagents using the
+[Policy Engine's](../reference/policy-engine.md) TOML configuration. This allows
+you to grant or restrict permissions specifically for an agent, without
+affecting the rest of your CLI session.
+
+To restrict a policy rule to a specific subagent, add the `subagent` property to
+the `[[rules]]` block in your `policy.toml` file.
+
+**Example:**
+
+```toml
+[[rules]]
+name = "Allow pr-creator to push code"
+subagent = "pr-creator"
+description = "Permit pr-creator to push branches automatically."
+action = "allow"
+toolName = "run_shell_command"
+commandPrefix = "git push"
+```
+
+In this configuration, the policy rule only triggers if the executing subagent's
+name matches `pr-creator`. Rules without the `subagent` property apply
+universally to all agents.
 
 ## Managing subagents
 
