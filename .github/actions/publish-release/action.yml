@@ -292,7 +292,7 @@ runs:
       shell: 'bash'
       run: |
         (cd bundle && zip -r ../gemini-cli-bundle.zip .)
-        
+
         echo "Testing the generated bundle archive..."
         mkdir -p test-bundle
         unzip -q gemini-cli-bundle.zip -d test-bundle
