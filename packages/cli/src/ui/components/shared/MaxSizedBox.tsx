@@ -9,6 +9,9 @@ import { useCallback, useEffect, useId, useRef, useState } from 'react';
 import { Box, Text, ResizeObserver, type DOMElement } from 'ink';
 import { theme } from '../../semantic-colors.js';
 import { useOverflowActions } from '../../contexts/OverflowContext.js';
+import { isNarrowWidth } from '../../utils/isNarrowWidth.js';
+import { Command } from '../../key/keyBindings.js';
+import { formatCommand } from '../../key/keybindingUtils.js';
 
 /**
  * Minimum height for the MaxSizedBox component.
@@ -17,7 +20,7 @@ import { useOverflowActions } from '../../contexts/OverflowContext.js';
  */
 export const MINIMUM_MAX_HEIGHT = 2;
 
-interface MaxSizedBoxProps {
+export interface MaxSizedBoxProps {
   children?: React.ReactNode;
   maxWidth?: number;
   maxHeight?: number;
@@ -84,17 +87,23 @@ export const MaxSizedBox: React.FC<MaxSizedBoxProps> = ({
 
   const totalHiddenLines = hiddenLinesCount + additionalHiddenLinesCount;
 
+  const isNarrow = maxWidth !== undefined && isNarrowWidth(maxWidth);
+  const showMoreKey = formatCommand(Command.SHOW_MORE_LINES);
+
   useEffect(() => {
     if (totalHiddenLines > 0) {
       addOverflowingId?.(id);
     } else {
       removeOverflowingId?.(id);
     }
-
-    return () => {
-      removeOverflowingId?.(id);
-    };
   }, [id, totalHiddenLines, addOverflowingId, removeOverflowingId]);
+
+  useEffect(
+    () => () => {
+      removeOverflowingId?.(id);
+    },
+    [id, removeOverflowingId],
+  );
 
   if (effectiveMaxHeight === undefined) {
     return (
@@ -116,8 +125,9 @@ export const MaxSizedBox: React.FC<MaxSizedBoxProps> = ({
     >
       {totalHiddenLines > 0 && overflowDirection === 'top' && (
         <Text color={theme.text.secondary} wrap="truncate">
-          ... first {totalHiddenLines} line{totalHiddenLines === 1 ? '' : 's'}{' '}
-          hidden ...
+          {isNarrow
+            ? `... ${totalHiddenLines} hidden (${showMoreKey}) ...`
+            : `... first ${totalHiddenLines} line${totalHiddenLines === 1 ? '' : 's'} hidden (${showMoreKey} to show) ...`}
         </Text>
       )}
       <Box
@@ -137,8 +147,9 @@ export const MaxSizedBox: React.FC<MaxSizedBoxProps> = ({
       </Box>
       {totalHiddenLines > 0 && overflowDirection === 'bottom' && (
         <Text color={theme.text.secondary} wrap="truncate">
-          ... last {totalHiddenLines} line{totalHiddenLines === 1 ? '' : 's'}{' '}
-          hidden ...
+          {isNarrow
+            ? `... ${totalHiddenLines} hidden (${showMoreKey}) ...`
+            : `... last ${totalHiddenLines} line${totalHiddenLines === 1 ? '' : 's'} hidden (${showMoreKey} to show) ...`}
         </Text>
       )}
     </Box>

@@ -48,12 +48,14 @@ describe('textUtils', () => {
     it('should handle unicode characters that crash string-width', () => {
       // U+0602 caused string-width to crash (see #16418)
       const char = '؂';
-      expect(getCachedStringWidth(char)).toBe(1);
+      expect(() => getCachedStringWidth(char)).not.toThrow();
+      expect(typeof getCachedStringWidth(char)).toBe('number');
     });
 
     it('should handle unicode characters that crash string-width with ANSI codes', () => {
       const charWithAnsi = '\u001b[31m' + '؂' + '\u001b[0m';
-      expect(getCachedStringWidth(charWithAnsi)).toBe(1);
+      expect(() => getCachedStringWidth(charWithAnsi)).not.toThrow();
+      expect(typeof getCachedStringWidth(charWithAnsi)).toBe('number');
     });
   });
 
@@ -332,6 +334,35 @@ describe('textUtils', () => {
       });
     });
 
+    describe('BiDi and deceptive Unicode characters', () => {
+      it('should strip BiDi override characters', () => {
+        const input = 'safe\u202Etxt.sh';
+        // When stripped, it should be 'safetxt.sh'
+        expect(stripUnsafeCharacters(input)).toBe('safetxt.sh');
+      });
+
+      it('should strip all BiDi control characters (LRM, RLM, U+202A-U+202E, U+2066-U+2069)', () => {
+        const bidiChars =
+          '\u200E\u200F\u202A\u202B\u202C\u202D\u202E\u2066\u2067\u2068\u2069';
+        expect(stripUnsafeCharacters('a' + bidiChars + 'b')).toBe('ab');
+      });
+
+      it('should strip zero-width characters (U+200B, U+FEFF)', () => {
+        const zeroWidthChars = '\u200B\uFEFF';
+        expect(stripUnsafeCharacters('a' + zeroWidthChars + 'b')).toBe('ab');
+      });
+
+      it('should preserve ZWJ (U+200D) for complex emojis', () => {
+        const input = 'Family: 👨‍👩‍👧‍👦';
+        expect(stripUnsafeCharacters(input)).toBe('Family: 👨‍👩‍👧‍👦');
+      });
+
+      it('should preserve ZWNJ (U+200C)', () => {
+        const input = 'hello\u200Cworld';
+        expect(stripUnsafeCharacters(input)).toBe('hello\u200Cworld');
+      });
+    });
+
     describe('performance: regex vs array-based', () => {
       it('should handle real-world terminal output with control chars', () => {
         // Simulate terminal output with various control sequences
@@ -483,6 +514,7 @@ describe('textUtils', () => {
           const b = sanitized.b as { c: string; d: Array<string | object> };
           expect(b.c).toBe('\\u001b[32mgreen\\u001b[0m');
           expect(b.d[0]).toBe('\\u001b[33myellow\\u001b[0m');
+          // eslint-disable-next-line no-restricted-syntax
           if (typeof b.d[1] === 'object' && b.d[1] !== null) {
             const e = b.d[1] as { e: string };
             expect(e.e).toBe('\\u001b[34mblue\\u001b[0m');

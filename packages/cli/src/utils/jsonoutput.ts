@@ -29,6 +29,7 @@ export function tryParseJSON(input: string): object | null {
   if (!checkInput(input)) return null;
   const trimmed = input.trim();
   try {
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
     const parsed = JSON.parse(trimmed);
     if (parsed === null || typeof parsed !== 'object') {
       return null;
@@ -39,6 +40,7 @@ export function tryParseJSON(input: string): object | null {
 
     if (!Array.isArray(parsed) && Object.keys(parsed).length === 0) return null;
 
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-return
     return parsed;
   } catch (_err) {
     return null;

@@ -11,7 +11,7 @@ import {
   shouldSwitchTheme,
 } from '../themes/color-utils.js';
 import { themeManager, DEFAULT_THEME } from '../themes/theme-manager.js';
-import { DefaultLight } from '../themes/default-light.js';
+import { DefaultLight } from '../themes/builtin/light/default-light.js';
 import { useSettings } from '../contexts/SettingsContext.js';
 import type { Config } from '@google/gemini-cli-core';
 import { useTerminalContext } from '../contexts/TerminalContext.js';
@@ -59,14 +59,6 @@ export function useTerminalTheme(
       if (!hexColor) return;
 
       const previousColor = config.getTerminalBackground();
-
-      if (previousColor === hexColor) {
-        return;
-      }
-
-      config.setTerminalBackground(hexColor);
-      themeManager.setTerminalBackground(hexColor);
-
       const luminance = getLuminance(hexColor);
       const currentThemeName = settings.merged.ui.theme;
 
@@ -76,6 +68,16 @@ export function useTerminalTheme(
         DEFAULT_THEME.name,
         DefaultLight.name,
       );
+
+      if (previousColor === hexColor) {
+        if (newTheme) {
+          void handleThemeSelect(newTheme, SettingScope.User);
+        }
+        return;
+      }
+
+      config.setTerminalBackground(hexColor);
+      themeManager.setTerminalBackground(hexColor);
 
       if (newTheme) {
         void handleThemeSelect(newTheme, SettingScope.User);
