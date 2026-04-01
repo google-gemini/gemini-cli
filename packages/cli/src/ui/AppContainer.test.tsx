@@ -31,6 +31,8 @@ import {
   AuthType,
   type AgentDefinition,
   CoreToolCallStatus,
+  startGlobalMemoryMonitoring,
+  stopGlobalMemoryMonitoring,
 } from '@google/gemini-cli-core';
 
 // Mock coreEvents
@@ -92,6 +94,8 @@ vi.mock('@google/gemini-cli-core', async (importOriginal) => {
       start: vi.fn(),
       end: vi.fn(),
     },
+    startGlobalMemoryMonitoring: vi.fn(),
+    stopGlobalMemoryMonitoring: vi.fn(),
   };
 });
 import ansiEscapes from 'ansi-escapes';
@@ -198,6 +202,7 @@ import { useHookDisplayState } from './hooks/useHookDisplayState.js';
 import { useTerminalTheme } from './hooks/useTerminalTheme.js';
 import { useShellInactivityStatus } from './hooks/useShellInactivityStatus.js';
 import { useFocus } from './hooks/useFocus.js';
+import { registerCleanup } from '../utils/cleanup.js';
 
 // Mock external utilities
 vi.mock('../utils/events.js');
@@ -606,6 +611,26 @@ describe('AppContainer State Management', () => {
         }),
       );
 
+      unmount();
+    });
+
+    it('starts and stops the global memory monitor with the interactive app lifecycle', async () => {
+      mockIdeClient.getInstance.mockResolvedValue({
+        disconnect: vi.fn().mockResolvedValue(undefined),
+        getCurrentIde: vi.fn().mockReturnValue(null),
+      });
+
+      const { unmount } = await act(async () => renderAppContainer());
+
+      await waitFor(() => {
+        expect(startGlobalMemoryMonitoring).toHaveBeenCalledWith(mockConfig);
+      });
+
+      const cleanupHandler = vi.mocked(registerCleanup).mock.calls.at(-1)?.[0];
+      expect(cleanupHandler).toBeDefined();
+      await cleanupHandler?.();
+
+      expect(stopGlobalMemoryMonitoring).toHaveBeenCalledWith(mockConfig);
       unmount();
     });
 
