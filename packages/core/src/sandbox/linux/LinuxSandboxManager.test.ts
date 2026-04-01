@@ -8,6 +8,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { LinuxSandboxManager } from './LinuxSandboxManager.js';
 import type { SandboxRequest } from '../../services/sandboxManager.js';
 import fs from 'node:fs';
+import path from 'node:path';
 import * as shellUtils from '../../utils/shell-utils.js';
 
 vi.mock('node:fs', async () => {
@@ -349,6 +350,61 @@ describe('LinuxSandboxManager', () => {
 
         const binds = bwrapArgs.filter((a) => a === workspace);
         expect(binds.length).toBe(2);
+      });
+
+      it('should bind the parent directory of a non-existent path', async () => {
+        vi.mocked(fs.existsSync).mockImplementation((p) => {
+          if (p === '/home/user/workspace/new-file.txt') return false;
+          return true;
+        });
+
+        const bwrapArgs = await getBwrapArgs({
+          command: '__write',
+          args: ['/home/user/workspace/new-file.txt'],
+          cwd: workspace,
+          env: {},
+          policy: {
+            allowedPaths: ['/home/user/workspace/new-file.txt'],
+          },
+        });
+
+        const parentDir = '/home/user/workspace';
+        const bindIndex = bwrapArgs.lastIndexOf(parentDir);
+        expect(bindIndex).not.toBe(-1);
+        expect(bwrapArgs[bindIndex - 2]).toBe('--bind-try');
+      });
+    });
+
+    describe('virtual commands', () => {
+      it('should translate __read to cat', async () => {
+        const testFile = path.join(workspace, 'file.txt');
+        const bwrapArgs = await getBwrapArgs({
+          command: '__read',
+          args: [testFile],
+          cwd: workspace,
+          env: {},
+        });
+
+        // args are: [...bwrapBaseArgs, '--', '/bin/cat', '.../file.txt']
+        expect(bwrapArgs[bwrapArgs.length - 2]).toBe('/bin/cat');
+        expect(bwrapArgs[bwrapArgs.length - 1]).toBe(testFile);
+      });
+
+      it('should translate __write to sh -c cat', async () => {
+        const testFile = path.join(workspace, 'file.txt');
+        const bwrapArgs = await getBwrapArgs({
+          command: '__write',
+          args: [testFile],
+          cwd: workspace,
+          env: {},
+        });
+
+        // args are: [...bwrapBaseArgs, '--', '/bin/sh', '-c', 'tee -- "$@" > /dev/null', '_', '.../file.txt']
+        expect(bwrapArgs[bwrapArgs.length - 5]).toBe('/bin/sh');
+        expect(bwrapArgs[bwrapArgs.length - 4]).toBe('-c');
+        expect(bwrapArgs[bwrapArgs.length - 3]).toBe('tee -- "$@" > /dev/null');
+        expect(bwrapArgs[bwrapArgs.length - 2]).toBe('_');
+        expect(bwrapArgs[bwrapArgs.length - 1]).toBe(testFile);
       });
     });
 

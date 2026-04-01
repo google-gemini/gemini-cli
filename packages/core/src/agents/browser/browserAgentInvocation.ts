@@ -18,7 +18,6 @@ import { randomUUID } from 'node:crypto';
 import type { Config } from '../../config/config.js';
 import { type AgentLoopContext } from '../../config/agent-loop-context.js';
 import { LocalAgentExecutor } from '../local-executor.js';
-import { safeJsonToMarkdown } from '../../utils/markdownUtils.js';
 import {
   BaseToolInvocation,
   type ToolResult,
@@ -30,6 +29,7 @@ import {
   type SubagentActivityEvent,
   type SubagentProgress,
   type SubagentActivityItem,
+  AgentTerminateMode,
   isToolActivityError,
 } from '../types.js';
 import type { MessageBus } from '../../confirmation-bus/message-bus.js';
@@ -56,6 +56,8 @@ export class BrowserAgentInvocation extends BaseToolInvocation<
   AgentInputs,
   ToolResult
 > {
+  private readonly agentName: string;
+
   constructor(
     private readonly context: AgentLoopContext,
     params: AgentInputs,
@@ -63,13 +65,15 @@ export class BrowserAgentInvocation extends BaseToolInvocation<
     _toolName?: string,
     _toolDisplayName?: string,
   ) {
+    const resolvedName = _toolName ?? 'browser_agent';
     // Note: BrowserAgentDefinition is a factory function, so we use hardcoded names
     super(
       params,
       messageBus,
-      _toolName ?? 'browser_agent',
+      resolvedName,
       _toolDisplayName ?? 'Browser Agent',
     );
+    this.agentName = resolvedName;
   }
 
   private get config(): Config {
@@ -112,7 +116,7 @@ export class BrowserAgentInvocation extends BaseToolInvocation<
         // Send initial state
         const initialProgress: SubagentProgress = {
           isSubagentProgress: true,
-          agentName: this['_toolName'] ?? 'browser_agent',
+          agentName: this.agentName,
           recentActivity: [],
           state: 'running',
         };
@@ -135,7 +139,7 @@ export class BrowserAgentInvocation extends BaseToolInvocation<
             }
             updateOutput({
               isSubagentProgress: true,
-              agentName: this['_toolName'] ?? 'browser_agent',
+              agentName: this.agentName,
               recentActivity: [...recentActivity],
               state: 'running',
             } as SubagentProgress);
@@ -280,7 +284,7 @@ export class BrowserAgentInvocation extends BaseToolInvocation<
 
           const progress: SubagentProgress = {
             isSubagentProgress: true,
-            agentName: this['_toolName'] ?? 'browser_agent',
+            agentName: this.agentName,
             recentActivity: [...recentActivity],
             state: 'running',
           };
@@ -297,34 +301,40 @@ export class BrowserAgentInvocation extends BaseToolInvocation<
 
       const output = await executor.run(this.params, signal);
 
-      const displayResult = safeJsonToMarkdown(output.result);
-
       const resultContent = `Browser agent finished.
 Termination Reason: ${output.terminate_reason}
 Result:
 ${output.result}`;
 
-      const displayContent = `
-Browser Agent Finished
+      // Map terminate_reason to the correct SubagentProgress state.
+      // GOAL = agent completed its task normally.
+      // ABORTED = user cancelled.
+      // Others (ERROR, MAX_TURNS, ERROR_NO_COMPLETE_TASK_CALL) = error.
+      let progressState: SubagentProgress['state'];
+      if (output.terminate_reason === AgentTerminateMode.ABORTED) {
+        progressState = 'cancelled';
+      } else if (output.terminate_reason === AgentTerminateMode.GOAL) {
+        progressState = 'completed';
+      } else {
+        progressState = 'error';
+      }
 
-Termination Reason: ${output.terminate_reason}
-
-Result:
-${displayResult}
-`;
+      const progress: SubagentProgress = {
+        isSubagentProgress: true,
+        agentName: this.agentName,
+        recentActivity: [...recentActivity],
+        state: progressState,
+        result: output.result,
+        terminateReason: output.terminate_reason,
+      };
 
       if (updateOutput) {
-        updateOutput({
-          isSubagentProgress: true,
-          agentName: this['_toolName'] ?? 'browser_agent',
-          recentActivity: [...recentActivity],
-          state: 'completed',
-        } as SubagentProgress);
+        updateOutput(progress);
       }
 
       return {
         llmContent: [{ text: resultContent }],
-        returnDisplay: displayContent,
+        returnDisplay: progress,
       };
     } catch (error) {
       const rawErrorMessage =
@@ -343,7 +353,7 @@ ${displayResult}
 
       const progress: SubagentProgress = {
         isSubagentProgress: true,
-        agentName: this['_toolName'] ?? 'browser_agent',
+        agentName: this.agentName,
         recentActivity: [...recentActivity],
         state: isAbort ? 'cancelled' : 'error',
       };
