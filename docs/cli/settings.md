@@ -151,9 +151,10 @@ they appear in the UI.
 
 ### Advanced
 
-| UI Label                          | Setting                        | Description                                   | Default |
-| --------------------------------- | ------------------------------ | --------------------------------------------- | ------- |
-| Auto Configure Max Old Space Size | `advanced.autoConfigureMemory` | Automatically configure Node.js memory limits | `false` |
+| UI Label                          | Setting                        | Description                                                                                                                                                  | Default |
+| --------------------------------- | ------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------ | ------- |
+| Auto Configure Max Old Space Size | `advanced.autoConfigureMemory` | Automatically configure Node.js memory limits                                                                                                                | `false` |
+| Ignore Local .env Files           | `advanced.ignoreLocalDotEnv`   | When enabled, the CLI will ignore .env files in the project and parent directories, and only load environment variables from the global ~/.gemini/.env file. | `false` |
 
 ### Experimental
 

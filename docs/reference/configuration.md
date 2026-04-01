@@ -1581,6 +1581,13 @@ their corresponding top-level category object in your `settings.json` file.
     ["DEBUG", "DEBUG_MODE"]
     ```
 
+- **`advanced.ignoreLocalDotEnv`** (boolean):
+  - **Description:** When enabled, the CLI will ignore .env files in the project
+    and parent directories, and only load environment variables from the global
+    ~/.gemini/.env file.
+  - **Default:** `false`
+  - **Requires restart:** Yes
+
 - **`advanced.bugCommand`** (object):
   - **Description:** Configuration for the bug report command.
   - **Default:** `undefined`

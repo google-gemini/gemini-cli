@@ -494,9 +494,12 @@ export class LoadedSettings {
   }
 }
 
-function findEnvFile(startDir: string): string | null {
+function findEnvFile(
+  startDir: string,
+  ignoreLocalDotEnv = false,
+): string | null {
   let currentDir = path.resolve(startDir);
-  while (true) {
+  while (!ignoreLocalDotEnv) {
     // prefer gemini-specific .env under GEMINI_DIR
     const geminiEnvPath = path.join(currentDir, GEMINI_DIR, '.env');
     if (fs.existsSync(geminiEnvPath)) {
@@ -508,19 +511,21 @@ function findEnvFile(startDir: string): string | null {
     }
     const parentDir = path.dirname(currentDir);
     if (parentDir === currentDir || !parentDir) {
-      // check .env under home as fallback, again preferring gemini-specific .env
-      const homeGeminiEnvPath = path.join(homedir(), GEMINI_DIR, '.env');
-      if (fs.existsSync(homeGeminiEnvPath)) {
-        return homeGeminiEnvPath;
-      }
-      const homeEnvPath = path.join(homedir(), '.env');
-      if (fs.existsSync(homeEnvPath)) {
-        return homeEnvPath;
-      }
-      return null;
+      break;
     }
     currentDir = parentDir;
   }
+
+  // check .env under home as fallback, again preferring gemini-specific .env
+  const homeGeminiEnvPath = path.join(homedir(), GEMINI_DIR, '.env');
+  if (fs.existsSync(homeGeminiEnvPath)) {
+    return homeGeminiEnvPath;
+  }
+  const homeEnvPath = path.join(homedir(), '.env');
+  if (fs.existsSync(homeEnvPath)) {
+    return homeEnvPath;
+  }
+  return null;
 }
 
 export function setUpCloudShellEnvironment(
@@ -554,7 +559,10 @@ export function loadEnvironment(
   workspaceDir: string,
   isWorkspaceTrustedFn = isWorkspaceTrusted,
 ): void {
-  const envFilePath = findEnvFile(workspaceDir);
+  const envFilePath = findEnvFile(
+    workspaceDir,
+    settings?.advanced?.ignoreLocalDotEnv,
+  );
   const trustResult = isWorkspaceTrustedFn(settings, workspaceDir);
 
   const isTrusted = trustResult.isTrusted ?? false;

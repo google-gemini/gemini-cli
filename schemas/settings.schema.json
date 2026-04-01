@@ -2732,6 +2732,13 @@
             "type": "string"
           }
         },
+        "ignoreLocalDotEnv": {
+          "title": "Ignore Local .env Files",
+          "description": "When enabled, the CLI will ignore .env files in the project and parent directories, and only load environment variables from the global ~/.gemini/.env file.",
+          "markdownDescription": "When enabled, the CLI will ignore .env files in the project and parent directories, and only load environment variables from the global ~/.gemini/.env file.\n\n- Category: `Advanced`\n- Requires restart: `yes`\n- Default: `false`",
+          "default": false,
+          "type": "boolean"
+        },
         "bugCommand": {
           "title": "Bug Command",
           "description": "Configuration for the bug report command.",

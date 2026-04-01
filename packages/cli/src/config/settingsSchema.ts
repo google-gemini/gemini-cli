@@ -1911,6 +1911,16 @@ const SETTINGS_SCHEMA = {
         items: { type: 'string' },
         mergeStrategy: MergeStrategy.UNION,
       },
+      ignoreLocalDotEnv: {
+        type: 'boolean',
+        label: 'Ignore Local .env Files',
+        category: 'Advanced',
+        requiresRestart: true,
+        default: false,
+        description:
+          'When enabled, the CLI will ignore .env files in the project and parent directories, and only load environment variables from the global ~/.gemini/.env file.',
+        showInDialog: true,
+      },
       bugCommand: {
         type: 'object',
         label: 'Bug Command',
