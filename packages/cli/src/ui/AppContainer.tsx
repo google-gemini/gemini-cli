@@ -39,6 +39,7 @@ import {
 import { checkPermissions } from './hooks/atCommandProcessor.js';
 import { MessageType, StreamingState } from './types.js';
 import { ToolActionsProvider } from './contexts/ToolActionsContext.js';
+import { toggleDevToolsPanel } from '../utils/devtoolsService.js';
 import {
   type StartupWarning,
   type EditorType,
@@ -1822,9 +1823,6 @@ Logging in with Google... Restarting Gemini CLI to continue.
       if (keyMatchers[Command.SHOW_ERROR_DETAILS](key)) {
         if (settings.merged.general.devtools) {
           void (async () => {
-            const { toggleDevToolsPanel } = await import(
-              '../utils/devtoolsService.js'
-            );
             await toggleDevToolsPanel(
               config,
               showErrorDetails,
