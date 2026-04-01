@@ -113,6 +113,7 @@ interface ToolGroupMessageProps {
   borderTop?: boolean;
   borderBottom?: boolean;
   isExpandable?: boolean;
+  isToolGroupBoundary?: boolean;
 }
 
 // Main component renders the border and maps the tools using ToolMessage
@@ -126,6 +127,7 @@ export const ToolGroupMessage: React.FC<ToolGroupMessageProps> = ({
   borderTop: borderTopOverride,
   borderBottom: borderBottomOverride,
   isExpandable,
+  isToolGroupBoundary,
 }) => {
   const settings = useSettings();
   const isLowErrorVerbosity = settings.merged.ui?.errorVerbosity !== 'full';
@@ -219,10 +221,13 @@ export const ToolGroupMessage: React.FC<ToolGroupMessageProps> = ({
 
   const staticHeight = useMemo(() => {
     let height = 0;
+    // To match rendering, we track if all tools so far have been topics
+    let allPreviousWereTopics = true;
+
     for (let i = 0; i < groupedTools.length; i++) {
       const group = groupedTools[i];
-      const isFirst = i === 0;
       const isLast = i === groupedTools.length - 1;
+
       const prevGroup = i > 0 ? groupedTools[i - 1] : null;
       const prevIsCompact =
         prevGroup &&
@@ -235,42 +240,67 @@ export const ToolGroupMessage: React.FC<ToolGroupMessageProps> = ({
         !Array.isArray(nextGroup) &&
         isCompactTool(nextGroup, isCompactModeEnabled);
 
+      const nextIsTopicToolCall =
+        nextGroup && !Array.isArray(nextGroup) && isTopicTool(nextGroup.name);
+
       const isAgentGroup = Array.isArray(group);
       const isCompact =
         !isAgentGroup && isCompactTool(group, isCompactModeEnabled);
+      const isTopicToolCall = !isAgentGroup && isTopicTool(group.name);
 
-      const showClosingBorder = !isCompact && (nextIsCompact || isLast);
+      // Align isFirst logic with rendering
+      let isFirst = i === 0;
+      if (!isFirst) {
+        isFirst = allPreviousWereTopics;
+      }
 
-      if (isFirst) {
-        height += borderTopOverride ? 1 : 0;
-      } else if (isCompact !== prevIsCompact) {
-        // Add a 1-line gap when transitioning between compact and standard tools (or vice versa)
-        height += 1;
+      // Update state for next tool
+      if (isAgentGroup || !isTopicToolCall) {
+        allPreviousWereTopics = false;
       }
 
       const isFirstProp = !!(isFirst
         ? (borderTopOverride ?? true)
         : prevIsCompact);
 
+      // Align closing border logic
+      const showClosingBorder =
+        !isCompact &&
+        !isTopicToolCall &&
+        (nextIsCompact || nextIsTopicToolCall || isLast);
+
       if (isAgentGroup) {
-        // Agent group
         height += 1; // Header
         height += group.length; // 1 line per agent
         if (isFirstProp) height += 1; // Top border
         if (showClosingBorder) height += 1; // Bottom border
+      } else if (isTopicToolCall) {
+        const hasTopMargin = !(isFirst && isToolGroupBoundary);
+        height += 1 + (hasTopMargin ? 1 : 0) + 1; // TopicMessage + top/bottom padding
+      } else if (isCompact) {
+        height += 1; // Base height for compact tool header
       } else {
-        if (isCompact) {
-          height += 1; // Base height for compact tool
-        } else {
-          // Static overhead for standard tool header:
-          height +=
-            TOOL_RESULT_STATIC_HEIGHT +
-            TOOL_RESULT_STANDARD_RESERVED_LINE_COUNT;
+        // Standard tool (Shell or ToolMessage)
+        if (isFirstProp) height += 1; // StickyHeader borderTop
+
+        height +=
+          TOOL_RESULT_STATIC_HEIGHT + TOOL_RESULT_STANDARD_RESERVED_LINE_COUNT;
+
+        // Account for "Output saved to..." message
+        if (group.outputFile) {
+          height += 1;
         }
+
+        if (showClosingBorder) height += 1; // Bottom border
       }
     }
     return height;
-  }, [groupedTools, isCompactModeEnabled, borderTopOverride]);
+  }, [
+    groupedTools,
+    isCompactModeEnabled,
+    borderTopOverride,
+    isToolGroupBoundary,
+  ]);
 
   let countToolCallsWithResults = 0;
   for (const tool of visibleToolCalls) {
@@ -327,7 +357,7 @@ export const ToolGroupMessage: React.FC<ToolGroupMessageProps> = ({
       paddingRight={TOOL_MESSAGE_HORIZONTAL_MARGIN}
       // When border will be present, add margin of 1 to create spacing from the
       // previous message.
-      marginBottom={(borderBottomOverride ?? true) ? 1 : 0}
+      marginBottom={0}
     >
       {visibleToolCalls.length === 0 &&
         isExplicitClosingSlice &&
@@ -371,41 +401,27 @@ export const ToolGroupMessage: React.FC<ToolGroupMessageProps> = ({
           nextGroup &&
           !Array.isArray(nextGroup) &&
           isCompactTool(nextGroup, isCompactModeEnabled);
+        const nextIsTopicToolCall =
+          nextGroup && !Array.isArray(nextGroup) && isTopicTool(nextGroup.name);
 
         const isAgentGroup = Array.isArray(group);
         const isCompact =
           !isAgentGroup && isCompactTool(group, isCompactModeEnabled);
         const isTopicToolCall = !isAgentGroup && isTopicTool(group.name);
 
-        // When border is present, add margin of 1 to create spacing from the
-        // previous message.
-        let marginTop = 0;
-        if (isFirst) {
-          marginTop = (borderTopOverride ?? false) ? 1 : 0;
-        } else if (isCompact && prevIsCompact) {
-          marginTop = 0;
-        } else if (isCompact || prevIsCompact) {
-          marginTop = 1;
-        } else {
-          // For subsequent standard tools scenarios, the ToolMessage and
-          // ShellToolMessage components manage their own top spacing by passing
-          // `isFirst=false` to their internal StickyHeader which then applies
-          // a paddingTop=1 to create desired gap between standard tool outputs.
-          marginTop = 0;
-        }
-
         const isFirstProp = !!(isFirst
           ? (borderTopOverride ?? true)
           : prevIsCompact);
 
         const showClosingBorder =
-          !isCompact && !isTopicToolCall && (nextIsCompact || isLast);
+          !isCompact &&
+          !isTopicToolCall &&
+          (nextIsCompact || nextIsTopicToolCall || isLast);
 
         if (isAgentGroup) {
           return (
             <Box
               key={group[0].callId}
-              marginTop={marginTop}
               flexDirection="column"
               width={contentWidth}
             >
@@ -450,16 +466,16 @@ export const ToolGroupMessage: React.FC<ToolGroupMessageProps> = ({
 
         return (
           <Fragment key={tool.callId}>
-            <Box
-              flexDirection="column"
-              minHeight={1}
-              width={contentWidth}
-              marginTop={marginTop}
-            >
+            <Box flexDirection="column" minHeight={1} width={contentWidth}>
               {isCompact ? (
                 <DenseToolMessage {...commonProps} />
               ) : isTopicToolCall ? (
-                <TopicMessage {...commonProps} />
+                <Box
+                  marginTop={isFirst && isToolGroupBoundary ? 0 : 1}
+                  marginBottom={1}
+                >
+                  <TopicMessage {...commonProps} />
+                </Box>
               ) : isShellToolCall ? (
                 <ShellToolMessage {...commonProps} config={config} />
               ) : (
