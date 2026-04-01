@@ -604,7 +604,7 @@ describe('BrowserAgentInvocation', () => {
         type: 'ERROR',
         data: {
           error:
-            'Failed to authenticate: -----BEGIN RSA PRIVATE KEY----- MIIEowIBAAKCAQEA12345... -----END RSA PRIVATE KEY----- Please check credentials.',
+            'Failed to authenticate:\n-----BEGIN RSA PRIVATE KEY-----\nMIIEowIBAAKCAQEA12345...\n-----END RSA PRIVATE KEY-----\nPlease check credentials.',
         },
       });
 
@@ -620,6 +620,7 @@ describe('BrowserAgentInvocation', () => {
 
       expect(errorItem).toBeDefined();
       expect(errorItem?.content).toContain('[REDACTED_PEM]');
+      expect(errorItem?.content).not.toContain('-----BEGIN');
     });
 
     it('should mark all running tools as errored when ERROR has no callId', async () => {
