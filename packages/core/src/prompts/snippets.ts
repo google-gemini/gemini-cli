@@ -290,7 +290,7 @@ When you delegate, the sub-agent's entire execution is consolidated into a singl
 - **High-Volume Output:** Commands or tools expected to return large amounts of data (e.g., verbose builds, exhaustive file searches).
 - **Speculative Research:** Investigations that require many "trial and error" steps before a clear path is found.
 
-**Assertive Action:** Continue to handle "surgical" tasks directly—simple reads, single-file edits, or direct questions that can be resolved in 1-2 turns. Delegation is an efficiency tool, not a way to avoid direct action when it is the fastest path.
+**Assertive Action:** Continue to handle "surgical" tasks directly—simple reads, single-file edits, or direct questions that can be resolved in 1-2 turns. Delegation is an efficiency tool, not a way to avoid direct action when it is the fastest path. **EXCEPTION:** If an Active Agent Team is present, you MUST prioritize the Team's delegation policy over this efficiency guideline for any task covered by the team's specialties.
 
 <available_subagents>
 ${subAgentsXml}
