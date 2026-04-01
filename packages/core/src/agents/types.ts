@@ -236,7 +236,10 @@ export interface LocalAgentDefinition<
    *
    * Runs immediately after chat compression in the agent loop.
    */
-  onBeforeTurn?: (chat: GeminiChat) => void;
+  onBeforeTurn?: (
+    chat: GeminiChat,
+    signal?: AbortSignal,
+  ) => Promise<void> | void;
 }
 
 export interface BaseRemoteAgentDefinition<
