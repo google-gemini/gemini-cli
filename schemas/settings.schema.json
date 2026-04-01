@@ -2748,6 +2748,23 @@
       "default": {},
       "type": "object",
       "properties": {
+        "adk": {
+          "title": "ADK",
+          "description": "Settings for the Agent Development Kit (ADK).",
+          "markdownDescription": "Settings for the Agent Development Kit (ADK).\n\n- Category: `Experimental`\n- Requires restart: `yes`\n- Default: `{}`",
+          "default": {},
+          "type": "object",
+          "properties": {
+            "agentSessionNoninteractiveEnabled": {
+              "title": "Agent Session Non-interactive Enabled",
+              "description": "Enable non-interactive agent sessions.",
+              "markdownDescription": "Enable non-interactive agent sessions.\n\n- Category: `Experimental`\n- Requires restart: `yes`\n- Default: `false`",
+              "default": false,
+              "type": "boolean"
+            }
+          },
+          "additionalProperties": false
+        },
         "enableAgents": {
           "title": "Enable Agents",
           "description": "Enable local and remote subagents.",

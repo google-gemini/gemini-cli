@@ -505,6 +505,31 @@ describe('SettingsSchema', () => {
         'The model to use for the classifier. Only tested on `gemma3-1b-gpu-custom`.',
       );
     });
+
+    it('should have adk setting in schema', () => {
+      const adk = getSettingsSchema().experimental.properties.adk;
+      expect(adk).toBeDefined();
+      expect(adk.type).toBe('object');
+      expect(adk.category).toBe('Experimental');
+      expect(adk.default).toEqual({});
+      expect(adk.requiresRestart).toBe(true);
+      expect(adk.showInDialog).toBe(false);
+      expect(adk.description).toBe(
+        'Settings for the Agent Development Kit (ADK).',
+      );
+
+      const agentSessionNoninteractiveEnabled =
+        adk.properties.agentSessionNoninteractiveEnabled;
+      expect(agentSessionNoninteractiveEnabled).toBeDefined();
+      expect(agentSessionNoninteractiveEnabled.type).toBe('boolean');
+      expect(agentSessionNoninteractiveEnabled.category).toBe('Experimental');
+      expect(agentSessionNoninteractiveEnabled.default).toBe(false);
+      expect(agentSessionNoninteractiveEnabled.requiresRestart).toBe(true);
+      expect(agentSessionNoninteractiveEnabled.showInDialog).toBe(false);
+      expect(agentSessionNoninteractiveEnabled.description).toBe(
+        'Enable non-interactive agent sessions.',
+      );
+    });
   });
 
   it('has JSON schema definitions for every referenced ref', () => {
