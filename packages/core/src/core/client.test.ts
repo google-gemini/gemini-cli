@@ -39,7 +39,7 @@ import { tokenLimit } from './tokenLimits.js';
 import { ideContextStore } from '../ide/ideContext.js';
 import type { ModelRouterService } from '../routing/modelRouterService.js';
 import { uiTelemetryService } from '../telemetry/uiTelemetry.js';
-import { ChatCompressionService } from '../services/chatCompressionService.js';
+import { ChatCompressionService } from '../context/chatCompressionService.js';
 import type { ChatRecordingService } from '../services/chatRecordingService.js';
 import { createAvailabilityServiceMock } from '../availability/testUtils.js';
 import type { ModelAvailabilityService } from '../availability/modelAvailabilityService.js';
@@ -220,8 +220,12 @@ describe('Gemini Client (client.ts)', () => {
       getSessionMemory: vi.fn().mockReturnValue(''),
       isJitContextEnabled: vi.fn().mockReturnValue(false),
       getContextManager: vi.fn().mockReturnValue(undefined),
-      getToolOutputMaskingEnabled: vi.fn().mockReturnValue(false),
       getDisableLoopDetection: vi.fn().mockReturnValue(false),
+      getToolOutputMaskingConfig: vi.fn().mockReturnValue({
+        protectionThresholdTokens: 50000,
+        minPrunableThresholdTokens: 30000,
+        protectLatestTurn: true,
+      }),
 
       getSessionId: vi.fn().mockReturnValue('test-session-id'),
       getProxy: vi.fn().mockReturnValue(undefined),

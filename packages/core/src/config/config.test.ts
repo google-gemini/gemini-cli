@@ -221,7 +221,7 @@ vi.mock('../utils/fetch.js', () => ({
   setGlobalProxy: mockSetGlobalProxy,
 }));
 
-vi.mock('../services/contextManager.js', () => ({
+vi.mock('../context/contextManager.js', () => ({
   ContextManager: vi.fn().mockImplementation(() => ({
     refresh: vi.fn(),
     getGlobalMemory: vi.fn().mockReturnValue(''),
@@ -237,7 +237,7 @@ import { tokenLimit } from '../core/tokenLimits.js';
 import { getCodeAssistServer } from '../code_assist/codeAssist.js';
 import { getExperiments } from '../code_assist/experiments/experiments.js';
 import type { CodeAssistServer } from '../code_assist/server.js';
-import { ContextManager } from '../services/contextManager.js';
+import { ContextManager } from '../context/contextManager.js';
 import { UserTierId } from '../code_assist/types.js';
 import type {
   ModelConfigService,
@@ -252,6 +252,10 @@ vi.mock('../core/tokenLimits.js', () => ({
 }));
 vi.mock('../code_assist/codeAssist.js');
 vi.mock('../code_assist/experiments/experiments.js');
+
+afterEach(() => {
+  vi.clearAllMocks();
+});
 
 describe('Server Config (config.ts)', () => {
   const MODEL = DEFAULT_GEMINI_MODEL;
@@ -590,6 +594,55 @@ describe('Server Config (config.ts)', () => {
         } as unknown as ConfigParameters);
         expect(await config.getResolvedClassifierThreshold()).toBe(90);
       });
+    });
+
+    describe('getGemini31LaunchedSync', () => {
+      it.each([AuthType.USE_GEMINI, AuthType.USE_VERTEX_AI, AuthType.GATEWAY])(
+        'should return true for %s',
+        async (authType) => {
+          const config = new Config(baseParams);
+          vi.mocked(createContentGeneratorConfig).mockResolvedValue({
+            authType,
+          });
+          await config.refreshAuth(authType);
+          expect(config.getGemini31LaunchedSync()).toBe(true);
+        },
+      );
+
+      it('should fallback to experiments for other auth types', async () => {
+        vi.mocked(getExperiments).mockResolvedValue({
+          experimentIds: [],
+          flags: {
+            [ExperimentFlags.GEMINI_3_1_PRO_LAUNCHED]: {
+              flagId: ExperimentFlags.GEMINI_3_1_PRO_LAUNCHED,
+              boolValue: true,
+            },
+          },
+        });
+
+        const config = new Config(baseParams);
+
+        vi.mocked(createContentGeneratorConfig).mockResolvedValue({
+          authType: AuthType.LOGIN_WITH_GOOGLE,
+        });
+
+        await config.refreshAuth(AuthType.LOGIN_WITH_GOOGLE);
+        expect(config.getGemini31LaunchedSync()).toBe(true);
+      });
+    });
+
+    describe('getGemini31FlashLiteLaunchedSync', () => {
+      it.each([AuthType.USE_GEMINI, AuthType.USE_VERTEX_AI, AuthType.GATEWAY])(
+        'should return true for %s',
+        async (authType) => {
+          const config = new Config(baseParams);
+          vi.mocked(createContentGeneratorConfig).mockResolvedValue({
+            authType,
+          });
+          await config.refreshAuth(authType);
+          expect(config.getGemini31FlashLiteLaunchedSync()).toBe(true);
+        },
+      );
     });
   });
 
@@ -1563,6 +1616,31 @@ describe('Server Config (config.ts)', () => {
       expect(config.getSandboxEnabled()).toBe(true);
       expect(config.getSandboxAllowedPaths()).toEqual(['/only/this']);
       expect(config.getSandboxNetworkAccess()).toBe(false);
+    });
+
+    it('lazily resolves forbidden paths when first accessed', async () => {
+      const config = new Config({
+        ...baseParams,
+        sandbox: { enabled: true, command: 'docker' },
+      });
+
+      const fileService = config.getFileService();
+      vi.spyOn(fileService, 'getIgnoredPaths').mockResolvedValue([
+        '/tmp/forbidden',
+      ]);
+
+      await config.initialize();
+      expect(fileService.getIgnoredPaths).not.toHaveBeenCalled();
+
+      // Access resolved paths via the internal resolver
+      const resolved = await (
+        config as unknown as {
+          getSandboxForbiddenPaths: () => Promise<string[]>;
+        }
+      ).getSandboxForbiddenPaths();
+
+      expect(fileService.getIgnoredPaths).toHaveBeenCalled();
+      expect(resolved).toEqual(['/tmp/forbidden']);
     });
   });
 

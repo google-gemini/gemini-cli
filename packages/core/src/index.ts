@@ -49,6 +49,10 @@ export * from './scheduler/tool-executor.js';
 export * from './scheduler/policy.js';
 export * from './core/recordingContentGenerator.js';
 
+// Export Routing
+export * from './routing/routingStrategy.js';
+export * from './routing/modelRouterService.js';
+
 export * from './fallback/types.js';
 export * from './fallback/handler.js';
 
@@ -132,9 +136,10 @@ export * from './services/FolderTrustDiscoveryService.js';
 export * from './services/chatRecordingService.js';
 export * from './services/fileSystemService.js';
 export * from './services/sandboxedFileSystemService.js';
+export * from './services/modelConfigService.js';
 export * from './sandbox/windows/WindowsSandboxManager.js';
 export * from './services/sessionSummaryUtils.js';
-export * from './services/contextManager.js';
+export * from './context/contextManager.js';
 export * from './services/trackerService.js';
 export * from './services/trackerTypes.js';
 export * from './services/keychainService.js';

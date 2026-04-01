@@ -116,7 +116,7 @@ import {
   type ModelConfigServiceConfig,
 } from '../services/modelConfigService.js';
 import { DEFAULT_MODEL_CONFIGS } from './defaultModelConfigs.js';
-import { ContextManager } from '../services/contextManager.js';
+import { ContextManager } from '../context/contextManager.js';
 import { TrackerService } from '../services/trackerService.js';
 import type { GenerateContentParameters } from '@google/genai';
 
@@ -206,6 +206,12 @@ export interface OutputSettings {
   format?: OutputFormat;
 }
 
+export interface ToolOutputMaskingConfig {
+  protectionThresholdTokens: number;
+  minPrunableThresholdTokens: number;
+  protectLatestTurn: boolean;
+}
+
 export interface ContextManagementConfig {
   enabled: boolean;
   historyWindow: {
@@ -217,17 +223,13 @@ export interface ContextManagementConfig {
     retainedMaxTokens: number;
     normalizationHeadRatio: number;
   };
-  toolDistillation: {
-    maxOutputTokens: number;
-    summarizationThresholdTokens: number;
+  tools: {
+    distillation: {
+      maxOutputTokens: number;
+      summarizationThresholdTokens: number;
+    };
+    outputMasking: ToolOutputMaskingConfig;
   };
-}
-
-export interface ToolOutputMaskingConfig {
-  enabled: boolean;
-  toolProtectionThreshold: number;
-  minPrunableTokensThreshold: number;
-  protectLatestTurn: boolean;
 }
 
 export interface GemmaModelRouterSettings {
@@ -451,7 +453,7 @@ import {
   DEFAULT_TOOL_PROTECTION_THRESHOLD,
   DEFAULT_MIN_PRUNABLE_TOKENS_THRESHOLD,
   DEFAULT_PROTECT_LATEST_TURN,
-} from '../services/toolOutputMaskingService.js';
+} from '../context/toolOutputMaskingService.js';
 
 import {
   type ExtensionLoader,
@@ -711,7 +713,7 @@ export interface ConfigParameters {
   experimentalAgentHistorySummarization?: boolean;
   memoryBoundaryMarkers?: string[];
   topicUpdateNarration?: boolean;
-  toolOutputMasking?: Partial<ToolOutputMaskingConfig>;
+
   disableLLMCorrection?: boolean;
   plan?: boolean;
   tracker?: boolean;
@@ -758,6 +760,7 @@ export class Config implements McpContext, AgentLoopContext {
   readonly modelConfigService: ModelConfigService;
   private readonly embeddingModel: string;
   private readonly sandbox: SandboxConfig | undefined;
+  private _sandboxForbiddenPaths: string[] | undefined;
   private readonly targetDir: string;
   private workspaceContext: WorkspaceContext;
   private readonly debugMode: boolean;
@@ -912,7 +915,7 @@ export class Config implements McpContext, AgentLoopContext {
   private pendingIncludeDirectories: string[];
   private readonly enableHooks: boolean;
   private readonly enableHooksUI: boolean;
-  private readonly toolOutputMasking: ToolOutputMaskingConfig;
+
   private hooks: { [K in HookEventName]?: HookDefinition[] } | undefined;
   private projectHooks:
     | ({ [K in HookEventName]?: HookDefinition[] } & { disabled?: string[] })
@@ -997,6 +1000,7 @@ export class Config implements McpContext, AgentLoopContext {
       this.sandbox,
       {
         workspace: this.targetDir,
+        forbiddenPaths: this.getSandboxForbiddenPaths.bind(this),
         includeDirectories: this.pendingIncludeDirectories,
         policyManager: this._sandboxPolicyManager,
       },
@@ -1160,12 +1164,27 @@ export class Config implements McpContext, AgentLoopContext {
           params.contextManagement?.messageLimits?.normalizationHeadRatio ??
           0.25,
       },
-      toolDistillation: {
-        maxOutputTokens:
-          params.contextManagement?.toolDistillation?.maxOutputTokens ?? 10000,
-        summarizationThresholdTokens:
-          params.contextManagement?.toolDistillation
-            ?.summarizationThresholdTokens ?? 20000,
+      tools: {
+        distillation: {
+          maxOutputTokens:
+            params.contextManagement?.tools?.distillation?.maxOutputTokens ??
+            10000,
+          summarizationThresholdTokens:
+            params.contextManagement?.tools?.distillation
+              ?.summarizationThresholdTokens ?? 20000,
+        },
+        outputMasking: {
+          protectionThresholdTokens:
+            params.contextManagement?.tools?.outputMasking
+              ?.protectionThresholdTokens ?? DEFAULT_TOOL_PROTECTION_THRESHOLD,
+          minPrunableThresholdTokens:
+            params.contextManagement?.tools?.outputMasking
+              ?.minPrunableThresholdTokens ??
+            DEFAULT_MIN_PRUNABLE_TOKENS_THRESHOLD,
+          protectLatestTurn:
+            params.contextManagement?.tools?.outputMasking?.protectLatestTurn ??
+            DEFAULT_PROTECT_LATEST_TURN,
+        },
       },
     };
     this.topicUpdateNarration = params.topicUpdateNarration ?? false;
@@ -1174,18 +1193,6 @@ export class Config implements McpContext, AgentLoopContext {
       this.isModelSteeringEnabled(),
     );
     ExecutionLifecycleService.setInjectionService(this.injectionService);
-    this.toolOutputMasking = {
-      enabled: params.toolOutputMasking?.enabled ?? true,
-      toolProtectionThreshold:
-        params.toolOutputMasking?.toolProtectionThreshold ??
-        DEFAULT_TOOL_PROTECTION_THRESHOLD,
-      minPrunableTokensThreshold:
-        params.toolOutputMasking?.minPrunableTokensThreshold ??
-        DEFAULT_MIN_PRUNABLE_TOKENS_THRESHOLD,
-      protectLatestTurn:
-        params.toolOutputMasking?.protectLatestTurn ??
-        DEFAULT_PROTECT_LATEST_TURN,
-    };
     this.maxSessionTurns = params.maxSessionTurns ?? -1;
     this.acpMode = params.acpMode ?? false;
     this.listSessions = params.listSessions ?? false;
@@ -1678,11 +1685,25 @@ export class Config implements McpContext, AgentLoopContext {
     return this._geminiClient;
   }
 
+  private async getSandboxForbiddenPaths(): Promise<string[]> {
+    if (this._sandboxForbiddenPaths) {
+      return this._sandboxForbiddenPaths;
+    }
+
+    this._sandboxForbiddenPaths = await this.getFileService().getIgnoredPaths({
+      respectGitIgnore: false,
+      respectGeminiIgnore: true,
+    });
+
+    return this._sandboxForbiddenPaths;
+  }
+
   private refreshSandboxManager(): void {
     this._sandboxManager = createSandboxManager(
       this.sandbox,
       {
         workspace: this.targetDir,
+        forbiddenPaths: this.getSandboxForbiddenPaths.bind(this),
         policyManager: this._sandboxPolicyManager,
       },
       this.getApprovalMode(),
@@ -2399,10 +2420,6 @@ export class Config implements McpContext, AgentLoopContext {
     return this.modelSteering;
   }
 
-  getToolOutputMaskingEnabled(): boolean {
-    return this.toolOutputMasking.enabled;
-  }
-
   async getToolOutputMaskingConfig(): Promise<ToolOutputMaskingConfig> {
     await this.ensureExperimentsLoaded();
 
@@ -2424,17 +2441,19 @@ export class Config implements McpContext, AgentLoopContext {
       : undefined;
 
     return {
-      enabled: this.toolOutputMasking.enabled,
-      toolProtectionThreshold:
+      protectionThresholdTokens:
         parsedProtection !== undefined && !isNaN(parsedProtection)
           ? parsedProtection
-          : this.toolOutputMasking.toolProtectionThreshold,
-      minPrunableTokensThreshold:
+          : this.contextManagement.tools.outputMasking
+              .protectionThresholdTokens,
+      minPrunableThresholdTokens:
         parsedPrunable !== undefined && !isNaN(parsedPrunable)
           ? parsedPrunable
-          : this.toolOutputMasking.minPrunableTokensThreshold,
+          : this.contextManagement.tools.outputMasking
+              .minPrunableThresholdTokens,
       protectLatestTurn:
-        remoteProtectLatest ?? this.toolOutputMasking.protectLatestTurn,
+        remoteProtectLatest ??
+        this.contextManagement.tools.outputMasking.protectLatestTurn,
     };
   }
 
@@ -2662,6 +2681,10 @@ export class Config implements McpContext, AgentLoopContext {
 
   getModelRouterService(): ModelRouterService {
     return this.modelRouterService;
+  }
+
+  getModelConfigService(): ModelConfigService {
+    return this.modelConfigService;
   }
 
   getModelAvailabilityService(): ModelAvailabilityService {
@@ -3083,6 +3106,14 @@ export class Config implements McpContext, AgentLoopContext {
     return useGemini3_1 && authType === AuthType.USE_GEMINI;
   }
 
+  private isGemini31LaunchedForAuthType(authType?: AuthType): boolean {
+    return (
+      authType === AuthType.USE_GEMINI ||
+      authType === AuthType.USE_VERTEX_AI ||
+      authType === AuthType.GATEWAY
+    );
+  }
+
   /**
    * Returns whether Gemini 3.1 has been launched.
    *
@@ -3092,10 +3123,7 @@ export class Config implements McpContext, AgentLoopContext {
    */
   getGemini31LaunchedSync(): boolean {
     const authType = this.contentGeneratorConfig?.authType;
-    if (
-      authType === AuthType.USE_GEMINI ||
-      authType === AuthType.USE_VERTEX_AI
-    ) {
+    if (this.isGemini31LaunchedForAuthType(authType)) {
       return true;
     }
     return (
@@ -3113,10 +3141,7 @@ export class Config implements McpContext, AgentLoopContext {
    */
   getGemini31FlashLiteLaunchedSync(): boolean {
     const authType = this.contentGeneratorConfig?.authType;
-    if (
-      authType === AuthType.USE_GEMINI ||
-      authType === AuthType.USE_VERTEX_AI
-    ) {
+    if (this.isGemini31LaunchedForAuthType(authType)) {
       return true;
     }
     return (
@@ -3283,11 +3308,12 @@ export class Config implements McpContext, AgentLoopContext {
   }
 
   getToolMaxOutputTokens(): number {
-    return this.contextManagement.toolDistillation.maxOutputTokens;
+    return this.contextManagement.tools.distillation.maxOutputTokens;
   }
 
   getToolSummarizationThresholdTokens(): number {
-    return this.contextManagement.toolDistillation.summarizationThresholdTokens;
+    return this.contextManagement.tools.distillation
+      .summarizationThresholdTokens;
   }
 
   getNextCompressionTruncationId(): number {
