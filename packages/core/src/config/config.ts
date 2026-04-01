@@ -116,7 +116,7 @@ import {
   type ModelConfigServiceConfig,
 } from '../services/modelConfigService.js';
 import { DEFAULT_MODEL_CONFIGS } from './defaultModelConfigs.js';
-import { ContextManager } from '../services/contextManager.js';
+import { ContextManager } from '../context/contextManager.js';
 import { TrackerService } from '../services/trackerService.js';
 import type { GenerateContentParameters } from '@google/genai';
 
@@ -451,7 +451,7 @@ import {
   DEFAULT_TOOL_PROTECTION_THRESHOLD,
   DEFAULT_MIN_PRUNABLE_TOKENS_THRESHOLD,
   DEFAULT_PROTECT_LATEST_TURN,
-} from '../services/toolOutputMaskingService.js';
+} from '../context/toolOutputMaskingService.js';
 
 import {
   type ExtensionLoader,

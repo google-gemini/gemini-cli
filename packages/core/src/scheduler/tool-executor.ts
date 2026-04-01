@@ -19,7 +19,7 @@ import {
 import { isAbortError } from '../utils/errors.js';
 import { SHELL_TOOL_NAME } from '../tools/tool-names.js';
 import { DiscoveredMCPTool } from '../tools/mcp-tool.js';
-import { ToolOutputDistillationService } from '../services/toolDistillationService.js';
+import { ToolOutputDistillationService } from '../context/toolDistillationService.js';
 import { executeToolWithHooks } from '../core/coreToolHookTriggers.js';
 import {
   saveTruncatedToolOutput,

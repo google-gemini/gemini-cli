@@ -30,7 +30,7 @@ import {
 } from '../tools/mcp-tool.js';
 import { CompressionStatus } from '../core/turn.js';
 import { type ToolCallRequestInfo } from '../scheduler/types.js';
-import { ChatCompressionService } from '../services/chatCompressionService.js';
+import { ChatCompressionService } from '../context/chatCompressionService.js';
 import { getDirectoryContextString } from '../utils/environmentContext.js';
 import { renderUserMemory } from '../prompts/snippets.js';
 import { promptIdContext } from '../utils/promptIdContext.js';

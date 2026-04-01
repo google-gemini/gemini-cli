@@ -9,7 +9,7 @@ import {
   estimateTokenCountSync,
   ASCII_TOKENS_PER_CHAR,
   NON_ASCII_TOKENS_PER_CHAR,
-} from './tokenCalculation.js';
+} from '../utils/tokenCalculation.js';
 
 export const MIN_TARGET_TOKENS = 10;
 export const MIN_CHARS_FOR_TRUNCATION = 100;

@@ -25,7 +25,7 @@ import {
   MIN_TARGET_TOKENS,
   estimateCharsFromTokens,
   normalizeFunctionResponse,
-} from '../utils/truncation.js';
+} from './truncation.js';
 
 // Skip structural map generation for outputs larger than this threshold (in characters)
 // as it consumes excessive tokens and may not be representative of the full content.
