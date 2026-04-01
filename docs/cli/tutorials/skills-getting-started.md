@@ -6,9 +6,7 @@ it during a session.
 
 ## Create your first skill
 
-A skill is defined by a directory containing a `SKILL.md` file. Let's create an
-**API Auditor** skill that helps you verify if local or remote endpoints are
-responding correctly.
+A skill is defined by a directory containing a `SKILL.md` file and subdirectories containing reference materials or scripts used by the skill. Let's create an **API Auditor** skill that runs a script to help you verify if local or remote endpoints are responding correctly.
 
 ### 1. Create the directory structure
 
