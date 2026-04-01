@@ -261,7 +261,10 @@ export class AgentRegistry {
       // available inside the container. The browser agent can only work with
       // sessionMode "existing" (connecting to a host Chrome instance).
       const sandboxType = process.env['SANDBOX'];
-      const isContainerSandbox = sandboxType && sandboxType !== 'sandbox-exec';
+      const isContainerSandbox =
+        !!sandboxType &&
+        sandboxType !== 'sandbox-exec' &&
+        sandboxType !== 'sandbox:none';
       const sessionMode =
         browserConfig.customConfig.sessionMode ?? 'persistent';
 

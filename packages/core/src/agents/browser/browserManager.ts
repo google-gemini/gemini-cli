@@ -486,8 +486,12 @@ export class BrowserManager {
     // Detect sandbox environment.
     // SANDBOX env var is set to 'sandbox-exec' (seatbelt) or the container
     // name (Docker/Podman/gVisor/LXC) when running inside a sandbox.
+    // CI uses 'sandbox:none' as a metadata label — not a real sandbox.
     const sandboxType = process.env['SANDBOX'];
-    const isContainerSandbox = sandboxType && sandboxType !== 'sandbox-exec';
+    const isContainerSandbox =
+      !!sandboxType &&
+      sandboxType !== 'sandbox-exec' &&
+      sandboxType !== 'sandbox:none';
     const isSeatbeltSandbox =
       sandboxType === 'sandbox-exec' && sessionMode !== 'existing';
 
