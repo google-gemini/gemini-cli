@@ -190,7 +190,7 @@ export const BrowserAgentDefinition = (
 \${task}
 </task>
 
-First, check if there are any existing pages. If so, check if any existing page can fullfill the user's request.`,
+First, use list_pages to check if there are any existing pages that can fulfill the user's request. If not, use new_page to open the relevant URL. Then, call take_snapshot to see the page and proceed with your task.`,
       systemPrompt: buildBrowserSystemPrompt(
         visionEnabled,
         config.getBrowserAgentConfig().customConfig.allowedDomains,
