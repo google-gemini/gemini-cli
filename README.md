@@ -363,7 +363,7 @@ encourage the community to:
 - Submit code improvements.
 - Share your MCP servers and extensions.
 
-See our [Contributing Guide](./CONTRIBUTING) for development setup, coding
+See our [Contributing Guide](./CONTRIBUTING.md) for development setup, coding
 standards, and how to submit pull requests.
 
 Check our [Official Roadmap](https://github.com/orgs/google-gemini/projects/11)
@@ -391,7 +391,7 @@ for removal instructions.
 - **License**: [Apache License 2.0](LICENSE)
 - **Terms of Service**:
   [Terms & Privacy](https://www.geminicli.com/docs/resources/tos-privacy)
-- **Security**: [Security Policy](SECURITY)
+- **Security**: [Security Policy](SECURITY.md)
 
 ---
 
