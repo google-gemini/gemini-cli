@@ -40,6 +40,11 @@ setGlobalDispatcher(
 );
 
 export function updateGlobalFetchTimeouts(timeoutMs: number) {
+  if (!Number.isFinite(timeoutMs) || timeoutMs <= 0) {
+    throw new RangeError(
+      `Invalid timeout value: ${timeoutMs}. Must be a positive finite number.`,
+    );
+  }
   defaultTimeout = timeoutMs;
   if (currentProxy) {
     setGlobalProxy(currentProxy);
