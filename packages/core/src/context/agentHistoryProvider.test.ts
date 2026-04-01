@@ -17,12 +17,12 @@ vi.mock('../utils/tokenCalculation.js', () => ({
 import type { Content, GenerateContentResponse, Part } from '@google/genai';
 import type { Config, ContextManagementConfig } from '../config/config.js';
 import type { BaseLlmClient } from '../core/baseLlmClient.js';
-import type { AgentHistoryProviderConfig } from './types.js';
+import type { AgentHistoryProviderConfig } from '../services/types.js';
 import {
   TEXT_TRUNCATION_PREFIX,
   TOOL_TRUNCATION_PREFIX,
   truncateProportionally,
-} from 'src/utils/truncation.js';
+} from './truncation.js';
 
 describe('AgentHistoryProvider', () => {
   let config: Config;

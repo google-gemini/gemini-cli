@@ -108,7 +108,7 @@ import {
 } from '../scheduler/types.js';
 
 import { CompressionStatus } from '../core/turn.js';
-import { ChatCompressionService } from '../services/chatCompressionService.js';
+import { ChatCompressionService } from '../context/chatCompressionService.js';
 import type {
   ModelConfigKey,
   ResolvedModelConfig,
@@ -121,7 +121,7 @@ const mockSetHistory = vi.fn((newHistory: Content[]) => {
   mockChatHistory = newHistory;
 });
 
-vi.mock('../services/chatCompressionService.js', () => ({
+vi.mock('../context/chatCompressionService.js', () => ({
   ChatCompressionService: vi.fn().mockImplementation(() => ({
     compress: mockCompress,
   })),
