@@ -435,7 +435,7 @@ function logRetryAttempt(
       );
     } else if (error.message.match(/5\d{2}/)) {
       debugLogger.warn(
-        `Attempt ${attempt} failed: Server-side error detected. Retrying with backoff...`,
+        `Attempt ${attempt} failed: Server-side/5xx error detected. Retrying with backoff...`,
         error,
       );
     } else {
