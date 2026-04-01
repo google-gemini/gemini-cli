@@ -20,10 +20,9 @@ interface IDevTools {
 
 const DEFAULT_DEVTOOLS_PORT = 25417;
 const DEFAULT_DEVTOOLS_HOST = '127.0.0.1';
-const MAX_PROMOTION_ATTEMPTS = 3;
-let promotionAttempts = 0;
 let serverStartPromise: Promise<string> | null = null;
 let connectedUrl: string | null = null;
+let wsAlive = false;
 
 /**
  * Probe whether a DevTools server is already listening on the given host:port.
@@ -88,35 +87,8 @@ async function startOrJoinDevTools(
 }
 
 /**
- * Handle promotion: when reconnect fails, start or join a DevTools server
- * and add a new network transport for the logger.
- */
-async function handlePromotion(config: Config) {
-  promotionAttempts++;
-  if (promotionAttempts > MAX_PROMOTION_ATTEMPTS) {
-    debugLogger.debug(
-      `Giving up on DevTools promotion after ${MAX_PROMOTION_ATTEMPTS} attempts`,
-    );
-    return;
-  }
-
-  try {
-    const result = await startOrJoinDevTools(
-      DEFAULT_DEVTOOLS_HOST,
-      DEFAULT_DEVTOOLS_PORT,
-    );
-    addNetworkTransport(config, result.host, result.port, () =>
-      handlePromotion(config),
-    );
-  } catch (err) {
-    debugLogger.debug('Failed to promote to DevTools server:', err);
-  }
-}
-
-/**
- * Initializes the activity logger.
- * Interception starts immediately in buffering mode.
- * If an existing DevTools server is found, attaches transport eagerly.
+ * Initializes the activity logger for file logging only.
+ * Interactive mode does nothing at startup — F12 triggers connection lazily.
  */
 export async function setupInitialActivityLogger(config: Config) {
   const target = process.env['GEMINI_CLI_ACTIVITY_LOG_TARGET'];
@@ -124,32 +96,8 @@ export async function setupInitialActivityLogger(config: Config) {
   if (target) {
     if (!config.storage) return;
     initActivityLogger(config, { mode: 'file', filePath: target });
-  } else {
-    // Start in buffering mode (no transport attached yet)
-    initActivityLogger(config, { mode: 'buffer' });
-
-    // Eagerly probe for an existing DevTools server
-    try {
-      const existing = await probeDevTools(
-        DEFAULT_DEVTOOLS_HOST,
-        DEFAULT_DEVTOOLS_PORT,
-      );
-      if (existing) {
-        const onReconnectFailed = () => handlePromotion(config);
-        addNetworkTransport(
-          config,
-          DEFAULT_DEVTOOLS_HOST,
-          DEFAULT_DEVTOOLS_PORT,
-          onReconnectFailed,
-        );
-        ActivityLogger.getInstance().enableNetworkLogging();
-        connectedUrl = `http://localhost:${DEFAULT_DEVTOOLS_PORT}`;
-        debugLogger.log(`DevTools (existing) at startup: ${connectedUrl}`);
-      }
-    } catch {
-      // Probe failed silently — stay in buffer mode
-    }
   }
+  // Interactive mode: do nothing at startup. F12 will trigger connection.
 }
 
 /**
@@ -168,8 +116,6 @@ export function startDevToolsServer(config: Config): Promise<string> {
 }
 
 async function startDevToolsServerImpl(config: Config): Promise<string> {
-  const onReconnectFailed = () => handlePromotion(config);
-
   // Probe for an existing DevTools server
   const existing = await probeDevTools(
     DEFAULT_DEVTOOLS_HOST,
@@ -198,10 +144,18 @@ async function startDevToolsServerImpl(config: Config): Promise<string> {
     }
   }
 
-  // Promote the activity logger to use the network transport
-  addNetworkTransport(config, host, port, onReconnectFailed);
+  // Enable interception if not already active, then attach network transport
+  initActivityLogger(config);
+  addNetworkTransport(config, host, port);
+
+  // Track transport connection state
   const capture = ActivityLogger.getInstance();
-  capture.enableNetworkLogging();
+  capture.on('transport-connected', () => {
+    wsAlive = true;
+  });
+  capture.on('transport-disconnected', () => {
+    wsAlive = false;
+  });
 
   const url = `http://localhost:${port}`;
   connectedUrl = url;
@@ -213,6 +167,7 @@ async function startDevToolsServerImpl(config: Config): Promise<string> {
  * Starts the DevTools server, attempts to open the browser.
  * If the panel is already open, it closes it.
  * If the panel is closed:
+ * - Checks if a previous connection died and resets state so we re-probe.
  * - Attempts to open the browser.
  * - If browser opening is successful, the panel remains closed.
  * - If browser opening fails or is not possible, the panel is opened.
@@ -226,6 +181,12 @@ export async function toggleDevToolsPanel(
   if (isOpen) {
     toggle();
     return;
+  }
+
+  // If we had a connection but the WS died, reset so we re-probe
+  if (connectedUrl && !wsAlive) {
+    connectedUrl = null;
+    serverStartPromise = null;
   }
 
   try {
@@ -252,7 +213,7 @@ export async function toggleDevToolsPanel(
 
 /** Reset module-level state — test only. */
 export function resetForTesting() {
-  promotionAttempts = 0;
   serverStartPromise = null;
   connectedUrl = null;
+  wsAlive = false;
 }

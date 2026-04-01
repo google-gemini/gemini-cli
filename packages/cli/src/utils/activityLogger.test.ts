@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { describe, it, expect, beforeEach } from 'vitest';
+import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { ActivityLogger, type NetworkLog } from './activityLogger.js';
 import type { ConsoleLogPayload } from '@google/gemini-cli-core';
 
@@ -13,44 +13,81 @@ describe('ActivityLogger', () => {
 
   beforeEach(() => {
     logger = ActivityLogger.getInstance();
-    logger.clearBufferedLogs();
+    logger.removeAllListeners();
   });
 
-  it('buffers the last 10 requests with all their events grouped', () => {
-    // Emit 15 requests, each with an initial + response event
-    for (let i = 0; i < 15; i++) {
-      const initial: NetworkLog = {
-        id: `req-${i}`,
-        timestamp: i * 2,
-        method: 'GET',
-        url: 'http://example.com',
-        headers: {},
-        pending: true,
-      };
-      logger.emitNetworkEvent(initial);
-      logger.emitNetworkEvent({
-        id: `req-${i}`,
-        pending: false,
-        response: {
-          status: 200,
-          headers: {},
-          body: 'ok',
-          durationMs: 10,
+  it('emits network events with sanitized headers', () => {
+    const events: unknown[] = [];
+    logger.on('network', (payload) => events.push(payload));
+
+    const log: NetworkLog = {
+      id: 'req-1',
+      timestamp: 1,
+      method: 'GET',
+      url: 'http://example.com',
+      headers: {
+        'content-type': 'application/json',
+        authorization: 'Bearer secret',
+        'x-goog-api-key': 'my-api-key',
+      },
+      pending: true,
+    };
+    logger.emitNetworkEvent(log);
+
+    expect(events.length).toBe(1);
+    const emitted = events[0] as NetworkLog;
+    expect(emitted.headers['content-type']).toBe('application/json');
+    expect(emitted.headers['authorization']).toBe('[REDACTED]');
+    expect(emitted.headers['x-goog-api-key']).toBe('[REDACTED]');
+  });
+
+  it('emits network events with sanitized response headers', () => {
+    const events: unknown[] = [];
+    logger.on('network', (payload) => events.push(payload));
+
+    logger.emitNetworkEvent({
+      id: 'req-2',
+      pending: false,
+      response: {
+        status: 200,
+        headers: {
+          'content-type': 'text/html',
+          'set-cookie': 'session=abc123',
         },
-      });
-    }
+        body: 'ok',
+        durationMs: 10,
+      },
+    });
 
-    const logs = logger.getBufferedLogs();
-    // 10 requests * 2 events each = 20 events
-    expect(logs.network.length).toBe(20);
-    // Oldest kept should be req-5 (first 5 evicted)
-    expect(logs.network[0].id).toBe('req-5');
-    // Last should be req-14
-    expect(logs.network[19].id).toBe('req-14');
+    expect(events.length).toBe(1);
+    const emitted = events[0] as NetworkLog;
+    expect(emitted.response?.headers['content-type']).toBe('text/html');
+    expect(emitted.response?.headers['set-cookie']).toBe('[REDACTED]');
   });
 
-  it('keeps all chunk events for a buffered request', () => {
-    // One request with many chunks
+  it('emits console events with timestamp', () => {
+    const events: unknown[] = [];
+    logger.on('console', (payload) => events.push(payload));
+
+    const now = Date.now();
+    vi.setSystemTime(now);
+
+    const log: ConsoleLogPayload = { content: 'hello', type: 'log' };
+    logger.logConsole(log);
+
+    expect(events.length).toBe(1);
+    const emitted = events[0] as ConsoleLogPayload & { timestamp: number };
+    expect(emitted.content).toBe('hello');
+    expect(emitted.type).toBe('log');
+    expect(emitted.timestamp).toBe(now);
+
+    vi.useRealTimers();
+  });
+
+  it('emits multiple network events for the same request id', () => {
+    const events: unknown[] = [];
+    logger.on('network', (payload) => events.push(payload));
+
     logger.emitNetworkEvent({
       id: 'chunked',
       timestamp: 1,
@@ -59,7 +96,7 @@ describe('ActivityLogger', () => {
       headers: {},
       pending: true,
     });
-    for (let i = 0; i < 5; i++) {
+    for (let i = 0; i < 3; i++) {
       logger.emitNetworkEvent({
         id: 'chunked',
         pending: true,
@@ -72,64 +109,20 @@ describe('ActivityLogger', () => {
       response: { status: 200, headers: {}, body: 'done', durationMs: 50 },
     });
 
-    const logs = logger.getBufferedLogs();
-    // 1 initial + 5 chunks + 1 response = 7 events, all for 'chunked'
-    expect(logs.network.length).toBe(7);
-    expect(logs.network.every((l) => l.id === 'chunked')).toBe(true);
+    // 1 initial + 3 chunks + 1 response = 5 events
+    expect(events.length).toBe(5);
+    expect(events.every((e) => (e as NetworkLog).id === 'chunked')).toBe(true);
   });
 
-  it('buffers only the last 10 console logs', () => {
+  it('emits console events without buffering', () => {
+    const events: unknown[] = [];
+    logger.on('console', (payload) => events.push(payload));
+
     for (let i = 0; i < 15; i++) {
-      const log: ConsoleLogPayload = { content: `log-${i}`, type: 'log' };
-      logger.logConsole(log);
+      logger.logConsole({ content: `log-${i}`, type: 'log' });
     }
 
-    const logs = logger.getBufferedLogs();
-    expect(logs.console.length).toBe(10);
-    expect(logs.console[0].content).toBe('log-5');
-    expect(logs.console[9].content).toBe('log-14');
-  });
-
-  it('getBufferedLogs is non-destructive', () => {
-    logger.logConsole({ content: 'test', type: 'log' });
-    const first = logger.getBufferedLogs();
-    const second = logger.getBufferedLogs();
-    expect(first.console.length).toBe(1);
-    expect(second.console.length).toBe(1);
-  });
-
-  it('clearBufferedLogs empties both buffers', () => {
-    logger.logConsole({ content: 'test', type: 'log' });
-    logger.emitNetworkEvent({
-      id: 'r1',
-      timestamp: 1,
-      method: 'GET',
-      url: 'http://example.com',
-      headers: {},
-    });
-    logger.clearBufferedLogs();
-    const logs = logger.getBufferedLogs();
-    expect(logs.console.length).toBe(0);
-    expect(logs.network.length).toBe(0);
-  });
-
-  it('drainBufferedLogs returns and clears atomically', () => {
-    logger.logConsole({ content: 'drain-test', type: 'log' });
-    logger.emitNetworkEvent({
-      id: 'r1',
-      timestamp: 1,
-      method: 'GET',
-      url: 'http://example.com',
-      headers: {},
-    });
-
-    const drained = logger.drainBufferedLogs();
-    expect(drained.console.length).toBe(1);
-    expect(drained.network.length).toBe(1);
-
-    // Buffer should now be empty
-    const after = logger.getBufferedLogs();
-    expect(after.console.length).toBe(0);
-    expect(after.network.length).toBe(0);
+    // All 15 events should be emitted (no buffer eviction)
+    expect(events.length).toBe(15);
   });
 });

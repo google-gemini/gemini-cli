@@ -464,13 +464,6 @@ export async function main() {
 
     adminControlsListner.setConfig(config);
 
-    if (config.isInteractive() && settings.merged.general.devtools) {
-      const { setupInitialActivityLogger } = await import(
-        './utils/devtoolsService.js'
-      );
-      await setupInitialActivityLogger(config);
-    }
-
     // Register config for telemetry shutdown
     // This ensures telemetry (including SessionEnd hooks) is properly flushed on exit
     registerTelemetryConfig(config);

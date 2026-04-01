@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { vi, describe, it, expect, beforeEach } from 'vitest';
+import { vi, describe, it, expect, beforeEach, afterEach } from 'vitest';
 import type { Config } from '@google/gemini-cli-core';
 
 // --- Mocks (hoisted) ---
@@ -56,11 +56,22 @@ const mockDevToolsInstance = vi.hoisted(() => ({
   getPort: vi.fn(),
 }));
 
-const mockActivityLoggerInstance = vi.hoisted(() => ({
-  disableNetworkLogging: vi.fn(),
-  enableNetworkLogging: vi.fn(),
-  drainBufferedLogs: vi.fn().mockReturnValue({ network: [], console: [] }),
-}));
+const mockActivityLoggerInstance = vi.hoisted(() => {
+  const listeners = new Map<string, Listener[]>();
+  return {
+    on: vi.fn((event: string, fn: Listener) => {
+      const fns = listeners.get(event) || [];
+      fns.push(fn);
+      listeners.set(event, fns);
+    }),
+    emit: vi.fn((event: string, ...args: unknown[]) => {
+      for (const fn of listeners.get(event) || []) {
+        fn(...args);
+      }
+    }),
+    _clearListeners: () => listeners.clear(),
+  };
+});
 
 vi.mock('./activityLogger.js', () => ({
   initActivityLogger: mockInitActivityLogger,
@@ -119,71 +130,16 @@ describe('devtoolsService', () => {
     vi.clearAllMocks();
     MockWebSocket.instances = [];
     resetForTesting();
-    delete process.env['GEMINI_CLI_ACTIVITY_LOG_TARGET'];
+    mockActivityLoggerInstance._clearListeners();
+  });
+
+  afterEach(() => {
+    vi.unstubAllEnvs();
   });
 
   describe('setupInitialActivityLogger', () => {
-    it('stays in buffer mode when no existing server found', async () => {
-      const config = createMockConfig();
-      const promise = setupInitialActivityLogger(config);
-
-      // Probe fires immediately — no server running
-      await vi.waitFor(() => expect(MockWebSocket.instances.length).toBe(1));
-      MockWebSocket.instances[0].simulateError();
-
-      await promise;
-
-      expect(mockInitActivityLogger).toHaveBeenCalledWith(config, {
-        mode: 'buffer',
-      });
-      expect(mockAddNetworkTransport).not.toHaveBeenCalled();
-    });
-
-    it('attaches transport when existing server found at startup', async () => {
-      const config = createMockConfig();
-      const promise = setupInitialActivityLogger(config);
-
-      await vi.waitFor(() => expect(MockWebSocket.instances.length).toBe(1));
-      MockWebSocket.instances[0].simulateOpen();
-
-      await promise;
-
-      expect(mockInitActivityLogger).toHaveBeenCalledWith(config, {
-        mode: 'buffer',
-      });
-      expect(mockAddNetworkTransport).toHaveBeenCalledWith(
-        config,
-        '127.0.0.1',
-        25417,
-        expect.any(Function),
-      );
-      expect(
-        mockActivityLoggerInstance.enableNetworkLogging,
-      ).toHaveBeenCalled();
-    });
-
-    it('F12 short-circuits when startup already connected', async () => {
-      const config = createMockConfig();
-
-      // Startup: probe succeeds
-      const setupPromise = setupInitialActivityLogger(config);
-      await vi.waitFor(() => expect(MockWebSocket.instances.length).toBe(1));
-      MockWebSocket.instances[0].simulateOpen();
-      await setupPromise;
-
-      mockAddNetworkTransport.mockClear();
-      mockActivityLoggerInstance.enableNetworkLogging.mockClear();
-
-      // F12: should return URL immediately
-      const url = await startDevToolsServer(config);
-
-      expect(url).toBe('http://localhost:25417');
-      expect(mockAddNetworkTransport).not.toHaveBeenCalled();
-      expect(mockDevToolsInstance.start).not.toHaveBeenCalled();
-    });
-
     it('initializes in file mode when target env var is set', async () => {
-      process.env['GEMINI_CLI_ACTIVITY_LOG_TARGET'] = '/tmp/test.jsonl';
+      vi.stubEnv('GEMINI_CLI_ACTIVITY_LOG_TARGET', '/tmp/test.jsonl');
       const config = createMockConfig();
       await setupInitialActivityLogger(config);
 
@@ -196,8 +152,17 @@ describe('devtoolsService', () => {
     });
 
     it('does nothing in file mode when config.storage is missing', async () => {
-      process.env['GEMINI_CLI_ACTIVITY_LOG_TARGET'] = '/tmp/test.jsonl';
+      vi.stubEnv('GEMINI_CLI_ACTIVITY_LOG_TARGET', '/tmp/test.jsonl');
       const config = createMockConfig({ storage: undefined });
+      await setupInitialActivityLogger(config);
+
+      expect(mockInitActivityLogger).not.toHaveBeenCalled();
+      expect(MockWebSocket.instances.length).toBe(0);
+    });
+
+    it('does nothing in interactive mode (no eager probe)', async () => {
+      vi.stubEnv('GEMINI_CLI_ACTIVITY_LOG_TARGET', '');
+      const config = createMockConfig();
       await setupInitialActivityLogger(config);
 
       expect(mockInitActivityLogger).not.toHaveBeenCalled();
@@ -206,7 +171,7 @@ describe('devtoolsService', () => {
   });
 
   describe('startDevToolsServer', () => {
-    it('starts new server when none exists and enables logging', async () => {
+    it('starts new server when none exists', async () => {
       const config = createMockConfig();
       mockDevToolsInstance.start.mockResolvedValue('http://127.0.0.1:25417');
       mockDevToolsInstance.getPort.mockReturnValue(25417);
@@ -219,15 +184,12 @@ describe('devtoolsService', () => {
       const url = await promise;
 
       expect(url).toBe('http://localhost:25417');
+      expect(mockInitActivityLogger).toHaveBeenCalledWith(config);
       expect(mockAddNetworkTransport).toHaveBeenCalledWith(
         config,
         '127.0.0.1',
         25417,
-        expect.any(Function),
       );
-      expect(
-        mockActivityLoggerInstance.enableNetworkLogging,
-      ).toHaveBeenCalled();
     });
 
     it('connects to existing server if one is found', async () => {
@@ -241,10 +203,8 @@ describe('devtoolsService', () => {
       const url = await promise;
 
       expect(url).toBe('http://localhost:25417');
+      expect(mockInitActivityLogger).toHaveBeenCalledWith(config);
       expect(mockAddNetworkTransport).toHaveBeenCalled();
-      expect(
-        mockActivityLoggerInstance.enableNetworkLogging,
-      ).toHaveBeenCalled();
     });
 
     it('deduplicates concurrent calls (returns same promise)', async () => {
@@ -326,12 +286,14 @@ describe('devtoolsService', () => {
 
       mockAddNetworkTransport.mockClear();
       mockDevToolsInstance.start.mockClear();
+      mockInitActivityLogger.mockClear();
 
       // Second call should short-circuit via connectedUrl
       const url2 = await startDevToolsServer(config);
       expect(url2).toBe('http://localhost:25417');
       expect(mockAddNetworkTransport).not.toHaveBeenCalled();
       expect(mockDevToolsInstance.start).not.toHaveBeenCalled();
+      expect(mockInitActivityLogger).not.toHaveBeenCalled();
     });
 
     it('stops own server and connects to existing when losing port race', async () => {
@@ -364,7 +326,6 @@ describe('devtoolsService', () => {
         config,
         '127.0.0.1',
         25417,
-        expect.any(Function),
       );
     });
 
@@ -396,43 +357,7 @@ describe('devtoolsService', () => {
         config,
         '127.0.0.1',
         25418,
-        expect.any(Function),
       );
-    });
-  });
-
-  describe('handlePromotion (via startDevToolsServer)', () => {
-    it('caps promotion attempts at MAX_PROMOTION_ATTEMPTS', async () => {
-      const config = createMockConfig();
-      mockDevToolsInstance.start.mockResolvedValue('http://127.0.0.1:25417');
-      mockDevToolsInstance.getPort.mockReturnValue(25417);
-
-      // First: set up the logger so we can grab onReconnectFailed
-      const promise = startDevToolsServer(config);
-
-      await vi.waitFor(() => {
-        expect(MockWebSocket.instances.length).toBe(1);
-      });
-      MockWebSocket.instances[0].simulateError();
-
-      await promise;
-
-      // Extract onReconnectFailed callback
-      const initCall = mockAddNetworkTransport.mock.calls[0];
-      const onReconnectFailed = initCall[3];
-      expect(onReconnectFailed).toBeDefined();
-
-      // Trigger promotion MAX_PROMOTION_ATTEMPTS + 1 times
-      // Each call should succeed (addNetworkTransport called) until cap is hit
-      mockAddNetworkTransport.mockClear();
-
-      await onReconnectFailed(); // attempt 1
-      await onReconnectFailed(); // attempt 2
-      await onReconnectFailed(); // attempt 3
-      await onReconnectFailed(); // attempt 4 — should be capped
-
-      // Only 3 calls to addNetworkTransport (capped at MAX_PROMOTION_ATTEMPTS)
-      expect(mockAddNetworkTransport).toHaveBeenCalledTimes(3);
     });
   });
 
@@ -527,6 +452,46 @@ describe('devtoolsService', () => {
 
       expect(toggle).not.toHaveBeenCalled();
       expect(setOpen).toHaveBeenCalledTimes(1);
+    });
+
+    it('resets and re-probes when connectedUrl is set but wsAlive is false', async () => {
+      const config = createMockConfig();
+      const toggle = vi.fn();
+      const setOpen = vi.fn();
+
+      // First F12: establish a connection
+      mockDevToolsInstance.start.mockResolvedValue('http://127.0.0.1:25417');
+      mockDevToolsInstance.getPort.mockReturnValue(25417);
+
+      const promise1 = toggleDevToolsPanel(config, false, toggle, setOpen);
+      await vi.waitFor(() => expect(MockWebSocket.instances.length).toBe(1));
+      MockWebSocket.instances[0].simulateError();
+      await promise1;
+
+      // Simulate transport-disconnected: wsAlive becomes false
+      mockActivityLoggerInstance.emit('transport-disconnected');
+
+      // Reset mocks for second F12
+      mockAddNetworkTransport.mockClear();
+      mockInitActivityLogger.mockClear();
+      MockWebSocket.instances = [];
+      setOpen.mockClear();
+
+      mockShouldLaunchBrowser.mockReturnValue(true);
+      mockOpenBrowserSecurely.mockResolvedValue(undefined);
+
+      // Second F12: should reset connectedUrl and re-probe
+      const promise2 = toggleDevToolsPanel(config, false, toggle, setOpen);
+
+      // Should start a fresh probe (new WebSocket instance)
+      await vi.waitFor(() => expect(MockWebSocket.instances.length).toBe(1));
+      MockWebSocket.instances[0].simulateError();
+
+      await promise2;
+
+      // Should have re-initialized
+      expect(mockInitActivityLogger).toHaveBeenCalledWith(config);
+      expect(mockAddNetworkTransport).toHaveBeenCalled();
     });
   });
 });

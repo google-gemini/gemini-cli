@@ -20,7 +20,6 @@ import {
 import WebSocket from 'ws';
 
 const ACTIVITY_ID_HEADER = 'x-activity-request-id';
-const MAX_BUFFER_SIZE = 100;
 
 function isHeaderRecord(
   h: http.OutgoingHttpHeaders | readonly string[],
@@ -131,75 +130,12 @@ export class ActivityLogger extends EventEmitter {
   private static instance: ActivityLogger;
   private isInterceptionEnabled = false;
   private requestStartTimes = new Map<string, number>();
-  private networkLoggingEnabled = false;
-
-  private networkBufferMap = new Map<
-    string,
-    Array<NetworkLog | PartialNetworkLog>
-  >();
-  private networkBufferIds: string[] = [];
-  private consoleBuffer: Array<ConsoleLogPayload & { timestamp: number }> = [];
-  private readonly bufferLimit = 10;
 
   static getInstance(): ActivityLogger {
     if (!ActivityLogger.instance) {
       ActivityLogger.instance = new ActivityLogger();
     }
     return ActivityLogger.instance;
-  }
-
-  enableNetworkLogging() {
-    this.networkLoggingEnabled = true;
-    this.emit('network-logging-enabled');
-  }
-
-  disableNetworkLogging() {
-    this.networkLoggingEnabled = false;
-  }
-
-  isNetworkLoggingEnabled(): boolean {
-    return this.networkLoggingEnabled;
-  }
-
-  /**
-   * Atomically returns and clears all buffered logs.
-   * Prevents data loss from events emitted between get and clear.
-   */
-  drainBufferedLogs(): {
-    network: Array<NetworkLog | PartialNetworkLog>;
-    console: Array<ConsoleLogPayload & { timestamp: number }>;
-  } {
-    const network: Array<NetworkLog | PartialNetworkLog> = [];
-    for (const id of this.networkBufferIds) {
-      const events = this.networkBufferMap.get(id);
-      if (events) network.push(...events);
-    }
-    const console = [...this.consoleBuffer];
-    this.networkBufferMap.clear();
-    this.networkBufferIds = [];
-    this.consoleBuffer = [];
-    return { network, console };
-  }
-
-  getBufferedLogs(): {
-    network: Array<NetworkLog | PartialNetworkLog>;
-    console: Array<ConsoleLogPayload & { timestamp: number }>;
-  } {
-    const network: Array<NetworkLog | PartialNetworkLog> = [];
-    for (const id of this.networkBufferIds) {
-      const events = this.networkBufferMap.get(id);
-      if (events) network.push(...events);
-    }
-    return {
-      network,
-      console: [...this.consoleBuffer],
-    };
-  }
-
-  clearBufferedLogs(): void {
-    this.networkBufferMap.clear();
-    this.networkBufferIds = [];
-    this.consoleBuffer = [];
   }
 
   private stringifyHeaders(headers: unknown): Record<string, string> {
@@ -263,19 +199,6 @@ export class ActivityLogger extends EventEmitter {
 
   private safeEmitNetwork(payload: NetworkLog | PartialNetworkLog) {
     const sanitized = this.sanitizeNetworkLog(payload);
-    const id = sanitized.id;
-
-    if (!this.networkBufferMap.has(id)) {
-      this.networkBufferIds.push(id);
-      this.networkBufferMap.set(id, []);
-      // Evict oldest request group if over limit
-      if (this.networkBufferIds.length > this.bufferLimit) {
-        const evictId = this.networkBufferIds.shift()!;
-        this.networkBufferMap.delete(evictId);
-      }
-    }
-    this.networkBufferMap.get(id)!.push(sanitized);
-
     this.emit('network', sanitized);
   }
 
@@ -661,10 +584,6 @@ export class ActivityLogger extends EventEmitter {
 
   logConsole(payload: ConsoleLogPayload) {
     const enriched = { ...payload, timestamp: Date.now() };
-    this.consoleBuffer.push(enriched);
-    if (this.consoleBuffer.length > this.bufferLimit) {
-      this.consoleBuffer.shift();
-    }
     this.emit('console', enriched);
   }
 }
@@ -716,22 +635,20 @@ function setupFileLogging(
 }
 
 /**
- * Setup network-based logging via WebSocket
+ * Setup network-based logging via WebSocket.
+ * Sends events directly when connected; drops them when disconnected.
+ * Emits 'transport-connected' and 'transport-disconnected' on the capture
+ * instance so upstream services can track connection state.
  */
 function setupNetworkLogging(
   capture: ActivityLogger,
   host: string,
   port: number,
   config: Config,
-  onReconnectFailed?: () => void,
 ) {
-  const transportBuffer: object[] = [];
   let ws: WebSocket | null = null;
-  let reconnectTimer: NodeJS.Timeout | null = null;
   let sessionId: string | null = null;
   let pingInterval: NodeJS.Timeout | null = null;
-  let reconnectAttempts = 0;
-  const MAX_RECONNECT_ATTEMPTS = 2;
 
   const connect = () => {
     try {
@@ -739,7 +656,6 @@ function setupNetworkLogging(
 
       ws.on('open', () => {
         debugLogger.debug(`WebSocket connected to ${host}:${port}`);
-        reconnectAttempts = 0;
         // Register with CLI's session ID
         sendMessage({
           type: 'register',
@@ -773,7 +689,7 @@ function setupNetworkLogging(
       ws.on('close', () => {
         debugLogger.debug(`WebSocket disconnected from ${host}:${port}`);
         cleanup();
-        scheduleReconnect();
+        capture.emit('transport-disconnected');
       });
 
       ws.on('error', (err) => {
@@ -781,7 +697,6 @@ function setupNetworkLogging(
       });
     } catch (err) {
       debugLogger.debug(`Failed to connect WebSocket:`, err);
-      scheduleReconnect();
     }
   };
 
@@ -800,8 +715,7 @@ function setupNetworkLogging(
           sendMessage({ type: 'pong', timestamp: Date.now() });
         }, 15000);
 
-        // Flush buffered logs
-        flushBuffer();
+        capture.emit('transport-connected');
         break;
       case 'trigger-debugger': {
         import('node:inspector')
@@ -847,62 +761,8 @@ function setupNetworkLogging(
       timestamp: Date.now(),
     };
 
-    // If not connected or network logging not enabled, buffer
-    if (
-      !ws ||
-      ws.readyState !== WebSocket.OPEN ||
-      !capture.isNetworkLoggingEnabled()
-    ) {
-      transportBuffer.push(message);
-      if (transportBuffer.length > MAX_BUFFER_SIZE) transportBuffer.shift();
-      return;
-    }
-
-    sendMessage(message);
-  };
-
-  const flushBuffer = () => {
-    if (
-      !ws ||
-      ws.readyState !== WebSocket.OPEN ||
-      !capture.isNetworkLoggingEnabled()
-    ) {
-      return;
-    }
-
-    const { network, console: consoleLogs } = capture.drainBufferedLogs();
-    const allInitialLogs: Array<{
-      type: 'network' | 'console';
-      payload: object;
-      timestamp: number;
-    }> = [
-      ...network.map((l) => ({
-        type: 'network' as const,
-        payload: l,
-        timestamp: 'timestamp' in l && l.timestamp ? l.timestamp : Date.now(),
-      })),
-      ...consoleLogs.map((l) => ({
-        type: 'console' as const,
-        payload: l,
-        timestamp: l.timestamp,
-      })),
-    ].sort((a, b) => a.timestamp - b.timestamp);
-
-    debugLogger.debug(
-      `Flushing ${allInitialLogs.length} initial buffered logs and ${transportBuffer.length} transport buffered logs...`,
-    );
-
-    for (const log of allInitialLogs) {
-      sendMessage({
-        type: log.type,
-        payload: log.payload,
-        sessionId: sessionId || config.getSessionId(),
-        timestamp: Date.now(),
-      });
-    }
-
-    while (transportBuffer.length > 0) {
-      const message = transportBuffer.shift()!;
+    // Send directly if connected, otherwise drop
+    if (ws && ws.readyState === WebSocket.OPEN) {
       sendMessage(message);
     }
   };
@@ -915,39 +775,14 @@ function setupNetworkLogging(
     ws = null;
   };
 
-  const scheduleReconnect = () => {
-    if (reconnectTimer) return;
-
-    reconnectAttempts++;
-    if (reconnectAttempts > MAX_RECONNECT_ATTEMPTS && onReconnectFailed) {
-      debugLogger.debug(
-        `WebSocket reconnect failed after ${MAX_RECONNECT_ATTEMPTS} attempts, promoting to server...`,
-      );
-      onReconnectFailed();
-      return;
-    }
-
-    reconnectTimer = setTimeout(() => {
-      reconnectTimer = null;
-      debugLogger.debug('Reconnecting WebSocket...');
-      connect();
-    }, 1000);
-  };
-
   // Initial connection
   connect();
 
   capture.on('console', (payload) => sendToNetwork('console', payload));
   capture.on('network', (payload) => sendToNetwork('network', payload));
 
-  capture.on('network-logging-enabled', () => {
-    debugLogger.debug('Network logging enabled, flushing buffer...');
-    flushBuffer();
-  });
-
   // Cleanup on process exit
   process.on('exit', () => {
-    if (reconnectTimer) clearTimeout(reconnectTimer);
     if (ws) ws.close();
     cleanup();
   });
@@ -967,53 +802,33 @@ function bridgeCoreEvents(capture: ActivityLogger) {
 }
 
 /**
- * Initialize the activity logger with a specific transport mode.
+ * Initialize the activity logger: enable interception and bridge core events.
  *
  * @param config  CLI configuration
- * @param options Transport configuration: network (WebSocket) or file (JSONL)
+ * @param options Optional file transport configuration
  */
 export function initActivityLogger(
   config: Config,
-  options:
-    | {
-        mode: 'network';
-        host: string;
-        port: number;
-        onReconnectFailed?: () => void;
-      }
-    | { mode: 'file'; filePath?: string }
-    | { mode: 'buffer' },
+  options?: { mode: 'file'; filePath?: string },
 ): void {
   const capture = ActivityLogger.getInstance();
   capture.enable();
 
-  if (options.mode === 'network') {
-    setupNetworkLogging(
-      capture,
-      options.host,
-      options.port,
-      config,
-      options.onReconnectFailed,
-    );
-    capture.enableNetworkLogging();
-  } else if (options.mode === 'file') {
+  if (options?.mode === 'file') {
     setupFileLogging(capture, config, options.filePath);
   }
-  // buffer mode: no transport, just intercept + bridge
 
   bridgeCoreEvents(capture);
 }
 
 /**
  * Add a network (WebSocket) transport to the existing ActivityLogger singleton.
- * Used for promotion re-entry without re-bridging coreEvents.
  */
 export function addNetworkTransport(
   config: Config,
   host: string,
   port: number,
-  onReconnectFailed?: () => void,
 ): void {
   const capture = ActivityLogger.getInstance();
-  setupNetworkLogging(capture, host, port, config, onReconnectFailed);
+  setupNetworkLogging(capture, host, port, config);
 }
