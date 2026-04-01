@@ -130,6 +130,8 @@ function isSafeToCallWithExec(args: string[]): boolean {
   const cmd = args[0];
 
   const safeCommands = new Set([
+    '__read',
+    '__write',
     'cat',
     'cd',
     'cut',

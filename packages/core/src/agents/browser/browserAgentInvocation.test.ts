@@ -32,6 +32,10 @@ vi.mock('./inputBlocker.js', () => ({
   removeInputBlocker: vi.fn(),
 }));
 
+vi.mock('./automationOverlay.js', () => ({
+  removeAutomationOverlay: vi.fn(),
+}));
+
 vi.mock('../local-executor.js', () => ({
   LocalAgentExecutor: {
     create: vi.fn(),
@@ -40,6 +44,7 @@ vi.mock('../local-executor.js', () => ({
 
 import { createBrowserAgentDefinition } from './browserAgentFactory.js';
 import { removeInputBlocker } from './inputBlocker.js';
+import { removeAutomationOverlay } from './automationOverlay.js';
 import { LocalAgentExecutor } from '../local-executor.js';
 import type { ToolLiveOutput } from '../../tools/tools.js';
 
@@ -675,6 +680,83 @@ describe('BrowserAgentInvocation', () => {
       // Both should be error since no callId was specified
       expect(toolA?.status).toBe('error');
       expect(toolB?.status).toBe('error');
+    });
+  });
+
+  describe('cleanup', () => {
+    it('should clean up all pages on finally', async () => {
+      const mockBrowserManager = {
+        callTool: vi.fn().mockImplementation(async (toolName: string) => {
+          if (toolName === 'list_pages') {
+            return {
+              content: [{ type: 'text', text: '0: Page 1\n1: Page 2\n' }],
+              isError: false,
+            };
+          }
+          return { isError: false };
+        }),
+      };
+
+      vi.mocked(createBrowserAgentDefinition).mockResolvedValue({
+        definition: {
+          name: 'browser_agent',
+          description: 'mock definition',
+          kind: 'local',
+          inputConfig: {} as never,
+          outputConfig: {} as never,
+          processOutput: () => '',
+          modelConfig: { model: 'test' },
+          runConfig: {},
+          promptConfig: { query: '', systemPrompt: '' },
+          toolConfig: { tools: [] },
+        },
+        browserManager: mockBrowserManager as never,
+      });
+
+      const mockExecutor = {
+        run: vi.fn().mockResolvedValue({
+          result: JSON.stringify({ success: true }),
+          terminate_reason: 'GOAL',
+        }),
+      };
+
+      vi.mocked(LocalAgentExecutor.create).mockResolvedValue(
+        mockExecutor as never,
+      );
+
+      const invocation = new BrowserAgentInvocation(
+        mockConfig,
+        { task: 'test' },
+        mockMessageBus,
+      );
+
+      await invocation.execute(new AbortController().signal);
+
+      // Verify list_pages was called
+      expect(mockBrowserManager.callTool).toHaveBeenCalledWith(
+        'list_pages',
+        expect.anything(),
+        expect.anything(),
+        true,
+      );
+
+      // Verify select_page was called for each page
+      expect(mockBrowserManager.callTool).toHaveBeenCalledWith(
+        'select_page',
+        { pageId: 0, bringToFront: false },
+        expect.anything(),
+        true,
+      );
+      expect(mockBrowserManager.callTool).toHaveBeenCalledWith(
+        'select_page',
+        { pageId: 1, bringToFront: false },
+        expect.anything(),
+        true,
+      );
+
+      // Verify removeInputBlocker and removeAutomationOverlay were called for each page + initial cleanup
+      expect(removeInputBlocker).toHaveBeenCalledTimes(3);
+      expect(removeAutomationOverlay).toHaveBeenCalledTimes(3);
     });
   });
 });
