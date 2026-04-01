@@ -6,6 +6,12 @@
 
 import type { GenerateContentConfig } from '@google/genai';
 import type { ModelPolicy } from '../availability/modelPolicy.js';
+import {
+  getDisplayString,
+  PREVIEW_GEMINI_3_1_MODEL,
+  PREVIEW_GEMINI_3_1_FLASH_LITE_MODEL,
+  isProModel,
+} from '../config/models.js';
 
 // The primary key for the ModelConfig is the model string. However, we also
 // support a secondary key to limit the override scope, typically an agent name.
@@ -93,6 +99,7 @@ export interface ResolutionContext {
   useGemini3_1FlashLite?: boolean;
   useCustomTools?: boolean;
   hasAccessToPreview?: boolean;
+  hasAccessToProModel?: boolean;
   requestedModel?: string;
 }
 
@@ -134,6 +141,78 @@ export class ModelConfigService {
 
   // TODO(12597): Process config to build a typed alias hierarchy.
   constructor(private readonly config: ModelConfigServiceConfig) {}
+
+  /**
+   * Returns a standardized list of available model options based on the resolution context.
+   * This logic is shared across the TUI and ACP mode.
+   */
+  getAvailableModelOptions(context: ResolutionContext): Array<{
+    modelId: string;
+    name: string;
+    description: string;
+    tier: string;
+  }> {
+    const definitions = this.config.modelDefinitions ?? {};
+    const shouldShowPreviewModels = context.hasAccessToPreview ?? false;
+    const useGemini31 = context.useGemini3_1 ?? false;
+    const useGemini31FlashLite = context.useGemini3_1FlashLite ?? false;
+
+    const mainOptions = Object.entries(definitions)
+      .filter(([_, m]) => {
+        if (m.isVisible !== true) return false;
+        if (m.isPreview && !shouldShowPreviewModels) return false;
+        if (m.tier !== 'auto') return false;
+        return true;
+      })
+      .map(([id, m]) => ({
+        modelId: id,
+        name: m.displayName ?? getDisplayString(id),
+        description:
+          id === 'auto-gemini-3' && useGemini31
+            ? (m.dialogDescription ?? '').replace(
+                'gemini-3-pro',
+                'gemini-3.1-pro',
+              )
+            : (m.dialogDescription ?? ''),
+        tier: m.tier ?? 'auto',
+      }));
+
+    const manualOptions = Object.entries(definitions)
+      .filter(([id, m]) => {
+        if (m.isVisible !== true) return false;
+        if (m.isPreview && !shouldShowPreviewModels) return false;
+        if (m.tier === 'auto') return false;
+        if (context.hasAccessToProModel === false && isProModel(id))
+          return false;
+        if (id === PREVIEW_GEMINI_3_1_MODEL && !useGemini31) return false;
+        if (id === PREVIEW_GEMINI_3_1_FLASH_LITE_MODEL && !useGemini31FlashLite)
+          return false;
+        return true;
+      })
+      .map(([id, m]) => {
+        const resolvedId = this.resolveModelId(id, context);
+        const titleId = this.resolveModelId(id, {
+          useGemini3_1: useGemini31,
+          useGemini3_1FlashLite: useGemini31FlashLite,
+        });
+        return {
+          modelId: resolvedId,
+          name: m.displayName ?? getDisplayString(titleId),
+          description: m.dialogDescription ?? '',
+          tier: m.tier ?? 'custom',
+        };
+      });
+
+    // Deduplicate manual options
+    const seen = new Set<string>();
+    const uniqueManualOptions = manualOptions.filter((option) => {
+      if (seen.has(option.modelId)) return false;
+      seen.add(option.modelId);
+      return true;
+    });
+
+    return [...mainOptions, ...uniqueManualOptions];
+  }
 
   getModelDefinition(modelId: string): ModelDefinition | undefined {
     const definition = this.config.modelDefinitions?.[modelId];
