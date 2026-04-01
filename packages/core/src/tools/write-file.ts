@@ -415,6 +415,17 @@ class WriteFileToolInvocation extends BaseToolInvocation<
         llmContent = appendJitContext(llmContent, jitContext);
       }
 
+      // Append LSP diagnostics if enabled.
+      const { enrichToolResultWithLsp } = await import('../lsp/enrichment.js');
+      llmContent = await enrichToolResultWithLsp(
+        this.config,
+        this.resolvedPath,
+        finalContent,
+        llmContent,
+        displayResult,
+        abortSignal,
+      );
+
       return {
         llmContent,
         returnDisplay: displayResult,

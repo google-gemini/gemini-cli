@@ -51,4 +51,5 @@ export interface CoreToolSet {
   exit_plan_mode: () => FunctionDeclaration;
   activate_skill: (skillNames: string[]) => FunctionDeclaration;
   update_topic?: FunctionDeclaration;
+  lsp_query: FunctionDeclaration;
 }

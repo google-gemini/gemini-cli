@@ -475,6 +475,11 @@ export async function main() {
     // This ensures telemetry (including SessionEnd hooks) is properly flushed on exit
     registerTelemetryConfig(config);
 
+    // Register LSP server shutdown for graceful cleanup.
+    registerCleanup(async () => {
+      await config.shutdownLsp();
+    });
+
     const policyEngine = config.getPolicyEngine();
     const messageBus = config.getMessageBus();
     createPolicyUpdater(policyEngine, messageBus, config.storage);

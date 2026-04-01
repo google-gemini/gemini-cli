@@ -1626,6 +1626,66 @@ const SETTINGS_SCHEMA = {
         `,
         showInDialog: true,
       },
+      lsp: {
+        type: 'object',
+        label: 'Language Server Protocol',
+        category: 'Tools',
+        requiresRestart: true,
+        default: {},
+        description:
+          'Language Server Protocol integration for compiler diagnostics and semantic code queries.',
+        showInDialog: false,
+        properties: {
+          enabled: {
+            type: 'boolean',
+            label: 'LSP',
+            category: 'Tools',
+            requiresRestart: true,
+            default: false,
+            description: oneLine`
+              Enable Language Server Protocol integration. When enabled, compiler
+              diagnostics are automatically included in file write and edit results.
+            `,
+            showInDialog: true,
+          },
+          diagnosticTimeout: {
+            type: 'number',
+            label: 'Diagnostic Timeout (ms)',
+            category: 'Tools',
+            requiresRestart: false,
+            default: 5000,
+            description:
+              'Maximum time in milliseconds to wait for LSP diagnostics before returning without them.',
+            showInDialog: false,
+          },
+          servers: {
+            type: 'object',
+            label: 'LSP Servers',
+            category: 'Tools',
+            requiresRestart: false,
+            default: {} as Record<
+              string,
+              {
+                command: string;
+                args?: string[];
+                languages?: string[];
+                rootMarkers?: string[];
+                initializationOptions?: Record<string, unknown>;
+                enabled?: boolean;
+              }
+            >,
+            description: oneLine`
+              Custom language server configurations. Keys are server IDs.
+              Override built-in servers (typescript, pyright, gopls, rust-analyzer) or add new ones.
+            `,
+            showInDialog: false,
+            mergeStrategy: MergeStrategy.SHALLOW_MERGE,
+            additionalProperties: {
+              type: 'object',
+            },
+          },
+        },
+      },
     },
   },
 

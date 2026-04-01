@@ -37,9 +37,15 @@ export interface ToolResultDisplayProps {
   overflowDirection?: 'top' | 'bottom';
 }
 
+interface LspDiagnosticSummary {
+  text: string;
+  severity: 'error' | 'warning' | 'clean' | 'timeout';
+}
+
 interface FileDiffResult {
   fileDiff: string;
   fileName: string;
+  lspDiagnosticSummary?: LspDiagnosticSummary;
 }
 
 export const ToolResultDisplay: React.FC<ToolResultDisplayProps> = ({
@@ -146,17 +152,34 @@ export const ToolResultDisplay: React.FC<ToolResultDisplayProps> = ({
       contentData !== null &&
       'fileDiff' in contentData
     ) {
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
+      const fileDiffData = contentData as FileDiffResult;
+      const lsp = fileDiffData.lspDiagnosticSummary;
+      const LSP_COLORS: Record<string, string> = {
+        error: theme.status.error,
+        warning: theme.status.warning,
+        timeout: theme.status.warning,
+        clean: theme.status.success,
+      };
       content = (
-        <DiffRenderer
-          diffContent={
-            // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
-            (contentData as FileDiffResult).fileDiff
-          }
-          // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
-          filename={(contentData as FileDiffResult).fileName}
-          availableTerminalHeight={availableHeight}
-          terminalWidth={childWidth}
-        />
+        <Box flexDirection="column">
+          <DiffRenderer
+            diffContent={fileDiffData.fileDiff}
+            filename={fileDiffData.fileName}
+            availableTerminalHeight={availableHeight}
+            terminalWidth={childWidth}
+          />
+          {lsp && (
+            <Box paddingLeft={1} paddingTop={0}>
+              <Text
+                color={LSP_COLORS[lsp.severity] ?? theme.text.secondary}
+                dimColor={lsp.severity === 'clean'}
+              >
+                {lsp.text}
+              </Text>
+            </Box>
+          )}
+        </Box>
       );
     } else {
       const shouldDisableTruncation =

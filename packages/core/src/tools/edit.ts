@@ -983,6 +983,21 @@ ${snippet}`);
         llmContent = appendJitContext(llmContent, jitContext);
       }
 
+      // Append LSP diagnostics if enabled.
+      if (typeof displayResult === 'object') {
+        const { enrichToolResultWithLsp } = await import(
+          '../lsp/enrichment.js'
+        );
+        llmContent = await enrichToolResultWithLsp(
+          this.config,
+          this.resolvedPath,
+          finalContent,
+          llmContent,
+          displayResult,
+          signal,
+        );
+      }
+
       return {
         llmContent,
         returnDisplay: displayResult,
