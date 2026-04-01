@@ -86,9 +86,54 @@ jobs:
           path: 'evals/logs'
           retention-days: 7
 
+  long-context:
+    name: 'Long-context eval nightly run'
+    runs-on: 'gemini-cli-ubuntu-16-core'
+    if: "github.repository == 'google-gemini/gemini-cli'"
+    strategy:
+      fail-fast: false
+      matrix:
+        model:
+          - 'gemini-3.1-pro-preview-customtools'
+          - 'gemini-2.5-pro'
+        run_attempt: [1, 2]
+    steps:
+      - name: 'Checkout'
+        uses: 'actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8' # ratchet:actions/checkout@v5
+
+      - name: 'Set up Node.js'
+        uses: 'actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020' # ratchet:actions/setup-node@v4
+        with:
+          node-version-file: '.nvmrc'
+          cache: 'npm'
+
+      - name: 'Install dependencies'
+        run: 'npm ci'
+
+      - name: 'Build project'
+        run: 'npm run build'
+
+      - name: 'Create logs directory'
+        run: 'mkdir -p evals/logs/long-context'
+
+      - name: 'Run long-context evals'
+        continue-on-error: true
+        env:
+          GEMINI_API_KEY: '${{ secrets.GEMINI_API_KEY }}'
+          GEMINI_MODEL: '${{ matrix.model }}'
+        run: 'npm run test:long-context'
+
+      - name: 'Upload long-context logs'
+        if: 'always()'
+        uses: 'actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02' # ratchet:actions/upload-artifact@v4
+        with:
+          name: 'long-context-logs-${{ matrix.model }}-${{ matrix.run_attempt }}'
+          path: 'evals/logs/long-context'
+          retention-days: 7
+
   aggregate-results:
     name: 'Aggregate Results'
-    needs: ['evals']
+    needs: ['evals', 'long-context']
     if: "github.repository == 'google-gemini/gemini-cli' && always()"
     runs-on: 'gemini-cli-ubuntu-16-core'
     steps:

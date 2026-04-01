@@ -164,6 +164,20 @@ npm run test:all_evals
 This command sets the `RUN_EVALS` environment variable to `1`, which enables the
 `USUALLY_PASSES` tests.
 
+### Long-context evals
+
+To run the standalone long-context scaffold and manifest runner:
+
+```bash
+npm run test:long-context:scaffold
+npm run test:long-context -- --task=smoke-stream-json
+npm run test:long-context
+```
+
+These write per-task artifacts and a manifest-level `summary.json` under
+`evals/logs/long-context/`. The nightly workflow also uploads these artifacts
+separately and includes them in the aggregated summary.
+
 ## Ensuring Eval is Stable Prior to Check-in
 
 The

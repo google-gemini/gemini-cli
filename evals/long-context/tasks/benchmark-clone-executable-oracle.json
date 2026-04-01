@@ -1,0 +1,91 @@
+{
+  "id": "benchmark-clone-executable-oracle",
+  "repositoryId": "clone-fixture-repo",
+  "title": "Clone executable-oracle benchmark slice",
+  "description": "Exercises the proposal-aligned executable oracle path on an isolated cloned repository with fail-to-pass, pass-to-pass, and build-style checks.",
+  "prompt": "Inspect README.txt, then write the exact token BENCHMARK_CLONE_SUCCESS followed by a newline into clone-output.txt.",
+  "timeoutMs": 30000,
+  "runner": {
+    "mode": "git_clone",
+    "cwd": ".",
+    "fakeResponsesPath": "evals/long-context/fixtures/benchmark-clone.responses",
+    "outputFormat": "stream-json",
+    "approvalMode": "yolo",
+    "cliArgs": []
+  },
+  "validation": {
+    "type": "executable_oracle",
+    "failToPass": [
+      {
+        "label": "fail-to-pass clone output check",
+        "command": "python3",
+        "args": [
+          "-c",
+          "from pathlib import Path; print(Path('clone-output.txt').read_text())"
+        ],
+        "expectedExitCode": 0,
+        "stdoutIncludes": ["BENCHMARK_CLONE_SUCCESS"],
+        "stderrIncludes": []
+      }
+    ],
+    "passToPass": [
+      {
+        "label": "pass-to-pass readme check",
+        "command": "python3",
+        "args": [
+          "-c",
+          "from pathlib import Path; print(Path('README.txt').read_text())"
+        ],
+        "expectedExitCode": 0,
+        "stdoutIncludes": ["clone seed"],
+        "stderrIncludes": []
+      }
+    ],
+    "build": {
+      "label": "build-style clone output existence check",
+      "command": "python3",
+      "args": [
+        "-c",
+        "from pathlib import Path; print('exists' if Path('clone-output.txt').exists() else 'missing')"
+      ],
+      "expectedExitCode": 0,
+      "stdoutIncludes": ["exists"],
+      "stderrIncludes": []
+    },
+    "augmented": [
+      {
+        "label": "augmented clone output exact token check",
+        "command": "python3",
+        "args": [
+          "-c",
+          "from pathlib import Path; content = Path('clone-output.txt').read_text().strip(); print('ok' if content == 'BENCHMARK_CLONE_SUCCESS' else content)"
+        ],
+        "expectedExitCode": 0,
+        "stdoutIncludes": ["ok"],
+        "stderrIncludes": []
+      }
+    ]
+  },
+  "tags": ["benchmark", "git-clone", "executable-oracle"],
+  "taskType": "cross_component_feature",
+  "difficulty": {
+    "filesInvolved": 3,
+    "directoriesCrossed": 2,
+    "architecturalReasoningDepth": 2
+  },
+  "goldenPatchPath": "evals/long-context/fixtures/clone-fixture-golden.patch",
+  "antiContamination": {
+    "promptMutated": true,
+    "humanValidated": true,
+    "reviewers": ["long-context-scaffold", "proposal-mvp"],
+    "sourceCommitDate": "2026-03-28T00:00:00.000Z"
+  },
+  "expectedScope": {
+    "criticalFiles": [
+      "README.txt",
+      "clone-output.txt",
+      "workspace/clone-fixture-repo/clone-output.txt"
+    ],
+    "minFilesTouched": 1
+  }
+}

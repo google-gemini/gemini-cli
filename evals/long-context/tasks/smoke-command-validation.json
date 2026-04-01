@@ -1,0 +1,38 @@
+{
+  "id": "smoke-command-validation",
+  "repositoryId": "gemini-cli-local",
+  "title": "Smoke command-validation task",
+  "description": "Validates executable command oracles by writing a file and checking it with a shell command.",
+  "prompt": "Write the exact token COMMAND_SMOKE_SUCCESS followed by a newline into output.txt.",
+  "timeoutMs": 30000,
+  "runner": {
+    "mode": "local_workspace",
+    "cwd": "evals/long-context/fixtures/command-workspace",
+    "fakeResponsesPath": "evals/long-context/fixtures/command-smoke.responses",
+    "outputFormat": "stream-json",
+    "approvalMode": "yolo",
+    "cliArgs": []
+  },
+  "validation": {
+    "type": "command",
+    "command": "python3",
+    "args": [
+      "-c",
+      "from pathlib import Path; print(Path('output.txt').read_text())"
+    ],
+    "expectedExitCode": 0,
+    "stdoutIncludes": ["COMMAND_SMOKE_SUCCESS"],
+    "stderrIncludes": []
+  },
+  "tags": ["smoke", "command-validation"],
+  "taskType": "cross_component_feature",
+  "difficulty": {
+    "filesInvolved": 1,
+    "directoriesCrossed": 0,
+    "architecturalReasoningDepth": 1
+  },
+  "expectedScope": {
+    "criticalFiles": ["output.txt"],
+    "minFilesTouched": 1
+  }
+}

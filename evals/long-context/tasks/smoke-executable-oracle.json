@@ -1,0 +1,68 @@
+{
+  "id": "smoke-executable-oracle",
+  "repositoryId": "gemini-cli-local",
+  "title": "Smoke executable oracle task",
+  "description": "Validates executable oracles with fail-to-pass, pass-to-pass, and build-style checks.",
+  "prompt": "Write the exact token ORACLE_SMOKE_SUCCESS followed by a newline into oracle-output.txt.",
+  "timeoutMs": 30000,
+  "runner": {
+    "mode": "local_workspace",
+    "cwd": "evals/long-context/fixtures/command-workspace",
+    "fakeResponsesPath": "evals/long-context/fixtures/oracle-smoke.responses",
+    "outputFormat": "stream-json",
+    "approvalMode": "yolo",
+    "cliArgs": []
+  },
+  "validation": {
+    "type": "executable_oracle",
+    "failToPass": [
+      {
+        "label": "fail-to-pass oracle check",
+        "command": "python3",
+        "args": [
+          "-c",
+          "from pathlib import Path; print(Path('oracle-output.txt').read_text())"
+        ],
+        "expectedExitCode": 0,
+        "stdoutIncludes": ["ORACLE_SMOKE_SUCCESS"],
+        "stderrIncludes": []
+      }
+    ],
+    "passToPass": [
+      {
+        "label": "pass-to-pass original file check",
+        "command": "python3",
+        "args": [
+          "-c",
+          "from pathlib import Path; print(Path('original.txt').read_text())"
+        ],
+        "expectedExitCode": 0,
+        "stdoutIncludes": ["seed"],
+        "stderrIncludes": []
+      }
+    ],
+    "build": {
+      "label": "build-style file existence check",
+      "command": "python3",
+      "args": [
+        "-c",
+        "from pathlib import Path; print('exists' if Path('oracle-output.txt').exists() else 'missing')"
+      ],
+      "expectedExitCode": 0,
+      "stdoutIncludes": ["exists"],
+      "stderrIncludes": []
+    },
+    "augmented": []
+  },
+  "tags": ["smoke", "executable-oracle"],
+  "taskType": "dependency_chain_resolution",
+  "difficulty": {
+    "filesInvolved": 2,
+    "directoriesCrossed": 0,
+    "architecturalReasoningDepth": 1
+  },
+  "expectedScope": {
+    "criticalFiles": ["oracle-output.txt", "original.txt"],
+    "minFilesTouched": 1
+  }
+}

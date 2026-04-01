@@ -1,0 +1,50 @@
+{
+  "version": "0.1.0",
+  "repositories": [
+    {
+      "id": "gemini-cli-local",
+      "source": "local_workspace",
+      "root": ".",
+      "description": "Local workspace smoke repository for long-context runner bootstrapping",
+      "languages": ["TypeScript", "JSON"],
+      "license": "Apache-2.0"
+    },
+    {
+      "id": "clone-fixture-repo",
+      "source": "git_clone",
+      "url": "evals/long-context/fixtures/clone-source.bundle",
+      "commitSha": "991fbe34543548963e0760eb3bb10db4f7ac99b7",
+      "description": "Local git fixture used to validate isolated clone execution",
+      "languages": ["Text"],
+      "license": "Apache-2.0",
+      "buildCommand": "test -f clone-output.txt",
+      "testCommand": "python3 -c \"from pathlib import Path; print(Path('README.txt').read_text())\""
+    }
+  ],
+  "tasks": [
+    {
+      "id": "smoke-stream-json",
+      "file": "tasks/smoke-stream-json.json"
+    },
+    {
+      "id": "smoke-command-validation",
+      "file": "tasks/smoke-command-validation.json"
+    },
+    {
+      "id": "smoke-executable-oracle",
+      "file": "tasks/smoke-executable-oracle.json"
+    },
+    {
+      "id": "smoke-git-clone",
+      "file": "tasks/smoke-git-clone.json"
+    },
+    {
+      "id": "benchmark-clone-executable-oracle",
+      "file": "tasks/benchmark-clone-executable-oracle.json"
+    },
+    {
+      "id": "benchmark-local-executable-oracle",
+      "file": "tasks/benchmark-local-executable-oracle.json"
+    }
+  ]
+}
