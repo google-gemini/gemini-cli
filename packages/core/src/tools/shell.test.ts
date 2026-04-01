@@ -56,7 +56,6 @@ import * as path from 'node:path';
 import { isSubpath } from '../utils/paths.js';
 import * as crypto from 'node:crypto';
 import * as summarizer from '../utils/summarizer.js';
-import { ToolErrorType } from './tool-error.js';
 import { ToolConfirmationOutcome } from './tools.js';
 import { SHELL_TOOL_NAME } from './tool-names.js';
 import { WorkspaceContext } from '../utils/workspaceContext.js';
@@ -455,20 +454,21 @@ describe('ShellTool', () => {
       expect(result.llmContent).not.toContain('pgrep');
     });
 
-    it('should return a SHELL_EXECUTE_ERROR for a command failure', async () => {
+    it('should NOT return a SHELL_EXECUTE_ERROR for a command failure', async () => {
       const error = new Error('command failed');
       const invocation = shellTool.build({ command: 'user-command' });
       const promise = invocation.execute(mockAbortSignal);
       resolveShellExecution({
         error,
         exitCode: 1,
+        output: '',
       });
 
       const result = await promise;
 
-      expect(result.error).toBeDefined();
-      expect(result.error?.type).toBe(ToolErrorType.SHELL_EXECUTE_ERROR);
-      expect(result.error?.message).toBe('command failed');
+      expect(result.error).toBeUndefined();
+      expect(result.llmContent).toContain('Error: command failed');
+      expect(result.returnDisplay).toBe('Command failed: command failed');
     });
 
     it('should throw an error for invalid parameters', () => {
