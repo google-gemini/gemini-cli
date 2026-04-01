@@ -615,14 +615,6 @@ export class ShellToolInvocation extends BaseToolInvocation<
 
       const summarizeConfig =
         this.context.config.getSummarizeToolOutputConfig();
-      const executionError = result.error
-        ? {
-            error: {
-              message: result.error.message,
-              type: ToolErrorType.SHELL_EXECUTE_ERROR,
-            },
-          }
-        : {};
       if (summarizeConfig && summarizeConfig[SHELL_TOOL_NAME]) {
         const summary = await summarizeToolOutput(
           this.context.config,
@@ -634,7 +626,6 @@ export class ShellToolInvocation extends BaseToolInvocation<
         return {
           llmContent: summary,
           returnDisplay: returnDisplayMessage,
-          ...executionError,
         };
       }
 
@@ -642,7 +633,6 @@ export class ShellToolInvocation extends BaseToolInvocation<
         llmContent,
         returnDisplay: returnDisplayMessage,
         data,
-        ...executionError,
       };
     } finally {
       if (timeoutTimer) clearTimeout(timeoutTimer);

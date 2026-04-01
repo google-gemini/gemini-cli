@@ -158,6 +158,7 @@ export class ToolExecutor {
               toolResult.error.type,
               displayText,
               toolResult.tailToolCallRequest,
+              toolResult.llmContent,
             );
           }
         } catch (executionError: unknown) {
@@ -418,12 +419,14 @@ export class ToolExecutor {
     errorType?: ToolErrorType,
     returnDisplay?: string,
     tailToolCallRequest?: { name: string; args: Record<string, unknown> },
+    llmContent?: PartListUnion,
   ): ErroredToolCall {
     const response = this.createErrorResponse(
       call.request,
       error,
       errorType,
       returnDisplay,
+      llmContent,
     );
     const startTime = 'startTime' in call ? call.startTime : undefined;
 
@@ -445,12 +448,28 @@ export class ToolExecutor {
     error: Error,
     errorType: ToolErrorType | undefined,
     returnDisplay?: string,
+    llmContent?: PartListUnion,
   ): ToolCallResponseInfo {
     const displayText = returnDisplay ?? error.message;
-    return {
-      callId: request.callId,
-      error,
-      responseParts: [
+
+    let responseParts: Part[];
+    if (llmContent) {
+      responseParts = convertToFunctionResponse(
+        request.originalRequestName ?? request.name,
+        request.callId,
+        llmContent,
+        this.config.getActiveModel(),
+        this.config,
+      );
+
+      // Inject the error message into the response object
+      const mainPart = responseParts[0];
+      if (mainPart?.functionResponse?.response) {
+        const respObj = mainPart.functionResponse.response;
+        respObj['error'] = error.message;
+      }
+    } else {
+      responseParts = [
         {
           functionResponse: {
             id: request.callId,
@@ -458,7 +477,13 @@ export class ToolExecutor {
             response: { error: error.message },
           },
         },
-      ],
+      ];
+    }
+
+    return {
+      callId: request.callId,
+      error,
+      responseParts,
       resultDisplay: displayText,
       errorType,
       contentLength: displayText.length,

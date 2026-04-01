@@ -24,6 +24,8 @@ function getConfirmationHeader(
   > = {
     ask_user: 'Answer Questions',
     exit_plan_mode: 'Ready to start implementation?',
+    permission_expansion: 'Permission Request',
+    sandbox_expansion: 'Sandbox Expansion Request',
   };
   if (!details?.type) {
     return 'Action Required';

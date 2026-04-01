@@ -21,6 +21,7 @@ import * as fileUtils from '../utils/fileUtils.js';
 import * as coreToolHookTriggers from '../core/coreToolHookTriggers.js';
 import { ShellToolInvocation } from '../tools/shell.js';
 import { createMockMessageBus } from '../test-utils/mock-message-bus.js';
+import { ToolErrorType } from '../tools/tool-error.js';
 import {
   GeminiCliOperation,
   GEN_AI_TOOL_CALL_ID,
@@ -150,6 +151,67 @@ describe('ToolExecutor', () => {
         durationMs: expect.any(Number),
         endTime: expect.any(Number),
       },
+    });
+  });
+
+  it('should include full llmContent in errored output', async () => {
+    const errorTool = new MockTool({ name: 'error_tool' });
+    const params = { param1: 'value1' };
+    const invocation = errorTool.build(params);
+
+    const call: ScheduledToolCall = {
+      status: CoreToolCallStatus.Scheduled,
+      request: {
+        name: 'error_tool',
+        callId: 'call_id',
+        args: params,
+        isClientInitiated: false,
+        prompt_id: 'prompt_1',
+      },
+      tool: errorTool,
+      invocation: invocation as unknown as AnyToolInvocation,
+      startTime: Date.now(),
+    };
+
+    const expectedResult: ToolResult = {
+      error: {
+        message: 'Something went wrong',
+        type: ToolErrorType.UNKNOWN,
+      },
+      llmContent: 'Full error output from the command',
+      returnDisplay: 'Short error display',
+    };
+
+    vi.mocked(coreToolHookTriggers.executeToolWithHooks).mockResolvedValueOnce(
+      expectedResult,
+    );
+
+    const executor = new ToolExecutor({
+      config,
+      messageBus: createMockMessageBus(),
+      toolRegistry: config.toolRegistry,
+      geminiClient: config.getGeminiClient(),
+      promptId: 'prompt_1',
+      promptRegistry: config.getPromptRegistry(),
+      resourceRegistry: config.getResourceRegistry(),
+      sandboxManager: config.sandboxManager,
+    });
+
+    const abortController = new AbortController();
+    const result = await executor.execute({
+      call,
+      signal: abortController.signal,
+      onUpdateToolCall: vi.fn(),
+    });
+
+    expect(result.status).toBe(CoreToolCallStatus.Error);
+    expect(result.response.error?.message).toBe('Something went wrong');
+    expect(result.response.resultDisplay).toBe('Short error display');
+    expect(
+      result.response.responseParts[0]?.functionResponse?.response,
+    ).toEqual({
+      error: 'Something went wrong',
+      output: 'Full error output from the command',
     });
   });
 

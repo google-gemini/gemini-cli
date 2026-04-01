@@ -4,6 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+import path from 'node:path';
 import type { Config } from '../config/config.js';
 import type { AgentLoopContext } from '../config/agent-loop-context.js';
 import type { MessageBus } from '../confirmation-bus/message-bus.js';
@@ -903,6 +904,88 @@ export class Scheduler {
         );
       } catch (_e) {
         // Fallback to normal error handling if parsing/looping fails
+      }
+    }
+
+    if (
+      result.status === CoreToolCallStatus.Error &&
+      result.response.errorType === ToolErrorType.PATH_NOT_IN_WORKSPACE
+    ) {
+      const args = activeCall.request.args;
+      const pathArg =
+        args['path'] ||
+        args['file_path'] ||
+        args['dir_path'] ||
+        args['cwd'] ||
+        args['target_path'];
+
+      if (typeof pathArg === 'string') {
+        try {
+          const absolutePath = path.resolve(
+            this.config.getTargetDir(),
+            pathArg,
+          );
+
+          const confirmationDetails: SerializableConfirmationDetails = {
+            type: 'permission_expansion',
+            title: 'Workspace Permission Request',
+            paths: [absolutePath],
+          };
+
+          const correlationId = crypto.randomUUID();
+
+          this.state.updateStatus(callId, CoreToolCallStatus.AwaitingApproval, {
+            confirmationDetails,
+            correlationId,
+          });
+
+          const validatingCall = {
+            ...activeCall,
+            status: CoreToolCallStatus.Validating,
+          } as ValidatingToolCall;
+
+          const confResult = await resolveConfirmation(validatingCall, signal, {
+            config: this.config,
+            messageBus: this.messageBus,
+            state: this.state,
+            modifier: this.modifier,
+            getPreferredEditor: this.getPreferredEditor,
+            schedulerId: this.schedulerId,
+            onWaitingForConfirmation: this.onWaitingForConfirmation,
+          });
+
+          if (confResult.outcome === ToolConfirmationOutcome.Cancel) {
+            this.state.updateStatus(
+              callId,
+              CoreToolCallStatus.Error,
+              result.response,
+            );
+            return false;
+          }
+
+          if (
+            confResult.outcome === ToolConfirmationOutcome.ProceedOnce ||
+            confResult.outcome === ToolConfirmationOutcome.ProceedAlways ||
+            confResult.outcome === ToolConfirmationOutcome.ProceedAlwaysAndSave
+          ) {
+            this.config.getWorkspaceContext().addReadOnlyPath(absolutePath);
+          }
+
+          // Reset the status and retry
+          this.state.updateStatus(callId, CoreToolCallStatus.Executing, {
+            liveOutput: undefined,
+          });
+
+          return await this._execute(
+            {
+              ...activeCall,
+              status: CoreToolCallStatus.Scheduled,
+            },
+            signal,
+          );
+        } catch (_e) {
+          // Fallback to normal error handling
+        }
       }
     }
 

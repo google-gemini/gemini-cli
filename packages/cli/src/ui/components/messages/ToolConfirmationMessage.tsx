@@ -315,6 +315,31 @@ export const ToolConfirmationMessage: React.FC<
           key: 'No, suggest changes (esc)',
         });
       }
+    } else if (confirmationDetails.type === 'permission_expansion') {
+      options.push({
+        label: 'Allow once',
+        value: ToolConfirmationOutcome.ProceedOnce,
+        key: 'Allow once',
+      });
+      if (isTrustedFolder) {
+        options.push({
+          label: 'Allow for this session',
+          value: ToolConfirmationOutcome.ProceedAlways,
+          key: 'Allow for this session',
+        });
+        if (allowPermanentApproval) {
+          options.push({
+            label: 'Allow for all future sessions',
+            value: ToolConfirmationOutcome.ProceedAlwaysAndSave,
+            key: 'Allow for all future sessions',
+          });
+        }
+      }
+      options.push({
+        label: 'No, suggest changes (esc)',
+        value: ToolConfirmationOutcome.Cancel,
+        key: 'No, suggest changes (esc)',
+      });
     } else if (confirmationDetails.type === 'sandbox_expansion') {
       options.push({
         label: 'Allow once',
@@ -572,6 +597,8 @@ export const ToolConfirmationMessage: React.FC<
         if (!confirmationDetails.isModifying) {
           question = `Apply this change?`;
         }
+      } else if (confirmationDetails.type === 'permission_expansion') {
+        question = `Allow access to files outside workspace?`;
       } else if (confirmationDetails.type === 'sandbox_expansion') {
         question = `Allow sandbox expansion for: '${sanitizeForDisplay(confirmationDetails.rootCommand)}'?`;
       } else if (confirmationDetails.type === 'exec') {
@@ -601,6 +628,26 @@ export const ToolConfirmationMessage: React.FC<
             />
           );
         }
+      } else if (confirmationDetails.type === 'permission_expansion') {
+        const { paths } = confirmationDetails;
+        bodyContent = (
+          <Box flexDirection="column" padding={1}>
+            <Text color={theme.text.secondary} italic>
+              The agent is requesting permission to access files outside your
+              workspace:
+            </Text>
+            <Box flexDirection="column" paddingY={1}>
+              {paths.map((p, i) => (
+                <Text key={i} color={theme.text.secondary}>
+                  - {sanitizeForDisplay(p)}
+                </Text>
+              ))}
+            </Box>
+            <Text color={theme.text.secondary}>
+              Do you want to allow this read?
+            </Text>
+          </Box>
+        );
       } else if (confirmationDetails.type === 'sandbox_expansion') {
         const { additionalPermissions } = confirmationDetails;
         const readPaths = additionalPermissions?.fileSystem?.read || [];

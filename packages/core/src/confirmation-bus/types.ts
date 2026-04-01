@@ -82,6 +82,12 @@ export interface ToolConfirmationResponse {
  */
 export type SerializableConfirmationDetails =
   | {
+      type: 'permission_expansion';
+      title: string;
+      paths: string[];
+      systemMessage?: string;
+    }
+  | {
       type: 'sandbox_expansion';
       title: string;
       command: string;

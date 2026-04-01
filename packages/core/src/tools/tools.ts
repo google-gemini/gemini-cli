@@ -1014,6 +1014,14 @@ export type ToolConfirmationPayload =
   | ToolAskUserConfirmationPayload
   | ToolExitPlanModeConfirmationPayload;
 
+export interface ToolPermissionExpansionConfirmationDetails {
+  type: 'permission_expansion';
+  systemMessage?: string;
+  title: string;
+  paths: string[];
+  onConfirm: (outcome: ToolConfirmationOutcome) => Promise<void>;
+}
+
 export interface ToolSandboxExpansionConfirmationDetails {
   type: 'sandbox_expansion';
   systemMessage?: string;
@@ -1080,6 +1088,7 @@ export interface ToolExitPlanModeConfirmationDetails {
 }
 
 export type ToolCallConfirmationDetails =
+  | ToolPermissionExpansionConfirmationDetails
   | ToolSandboxExpansionConfirmationDetails
   | ToolEditConfirmationDetails
   | ToolExecuteConfirmationDetails
