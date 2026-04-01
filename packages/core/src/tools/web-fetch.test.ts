@@ -293,6 +293,7 @@ describe('WebFetchTool', () => {
         })),
       },
       isInteractive: () => false,
+      isAutoDistillationEnabled: vi.fn().mockReturnValue(false),
     } as unknown as Config;
   });
 
@@ -497,7 +498,7 @@ describe('WebFetchTool', () => {
 
       expect(result.llmContent).toBe('fallback processed response');
       expect(result.returnDisplay).toContain(
-        '2 URL(s) processed using fallback fetch',
+        'URL(s) processed using fallback fetch',
       );
     });
 
@@ -530,20 +531,10 @@ describe('WebFetchTool', () => {
       // Verify private URL was NOT fetched (mockFetch would throw if it was called for private.com)
     });
 
-    it('should return WEB_FETCH_FALLBACK_FAILED on fallback fetch failure', async () => {
+    it('should return WEB_FETCH_FALLBACK_FAILED on total failure', async () => {
       vi.spyOn(fetchUtils, 'isPrivateIp').mockReturnValue(false);
       mockGenerateContent.mockRejectedValue(new Error('primary fail'));
       mockFetch('https://public.ip/', new Error('fallback fetch failed'));
-      const tool = new WebFetchTool(mockConfig, bus);
-      const params = { prompt: 'fetch https://public.ip' };
-      const invocation = tool.build(params);
-      const result = await invocation.execute(new AbortController().signal);
-      expect(result.error?.type).toBe(ToolErrorType.WEB_FETCH_FALLBACK_FAILED);
-    });
-
-    it('should return WEB_FETCH_FALLBACK_FAILED on general processing failure (when fallback also fails)', async () => {
-      vi.spyOn(fetchUtils, 'isPrivateIp').mockReturnValue(false);
-      mockGenerateContent.mockRejectedValue(new Error('API error'));
       const tool = new WebFetchTool(mockConfig, bus);
       const params = { prompt: 'fetch https://public.ip' };
       const invocation = tool.build(params);
@@ -639,6 +630,14 @@ describe('WebFetchTool', () => {
         const invocation = tool.build(params);
         const result = await invocation.execute(new AbortController().signal);
 
+        const sanitizeXml = (text: string) =>
+          text
+            .replace(/&/g, '&amp;')
+            .replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;')
+            .replace(/"/g, '&quot;')
+            .replace(/'/g, '&apos;');
+
         if (shouldConvert) {
           expect(convert).toHaveBeenCalledWith(content, {
             wordwrap: false,
@@ -647,10 +646,12 @@ describe('WebFetchTool', () => {
               { selector: 'img', format: 'skip' },
             ],
           });
-          expect(result.llmContent).toContain(`Converted: ${content}`);
+          expect(result.llmContent).toContain(
+            `Converted: ${sanitizeXml(content)}`,
+          );
         } else {
           expect(convert).not.toHaveBeenCalled();
-          expect(result.llmContent).toContain(content);
+          expect(result.llmContent).toContain(sanitizeXml(content));
         }
       },
     );
@@ -749,6 +750,24 @@ describe('WebFetchTool', () => {
 
       // Schedulers are now responsible for mode transitions via updatePolicy
       expect(mockConfig.setApprovalMode).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('getPolicyUpdateOptions', () => {
+    it('should return empty object for any outcome to allow global approval', () => {
+      const tool = new WebFetchTool(mockConfig, bus);
+      const invocation = tool.build({ prompt: 'fetch https://example.com' });
+
+      expect(
+        invocation.getPolicyUpdateOptions!(
+          ToolConfirmationOutcome.ProceedAlways,
+        ),
+      ).toEqual({});
+      expect(
+        invocation.getPolicyUpdateOptions!(
+          ToolConfirmationOutcome.ProceedAlwaysAndSave,
+        ),
+      ).toEqual({});
     });
   });
 
@@ -1099,6 +1118,41 @@ describe('WebFetchTool', () => {
         'Error: Access to blocked or private host http://localhost/ is not allowed.',
       );
       expect(result.error?.type).toBe(ToolErrorType.WEB_FETCH_PROCESSING_ERROR);
+    });
+
+    it('should bypass truncation if isAutoDistillationEnabled is true', async () => {
+      vi.spyOn(mockConfig, 'isAutoDistillationEnabled').mockReturnValue(true);
+      const largeContent = 'a'.repeat(300000); // Larger than MAX_CONTENT_LENGTH (250000)
+      mockFetch('https://example.com/large-text', {
+        status: 200,
+        headers: new Headers({ 'content-type': 'text/plain' }),
+        text: () => Promise.resolve(largeContent),
+      });
+
+      const tool = new WebFetchTool(mockConfig, bus);
+      const invocation = tool.build({ url: 'https://example.com/large-text' });
+      const result = await invocation.execute(new AbortController().signal);
+
+      expect((result.llmContent as string).length).toBe(300000); // No truncation
+    });
+
+    it('should truncate if isAutoDistillationEnabled is false', async () => {
+      vi.spyOn(mockConfig, 'isAutoDistillationEnabled').mockReturnValue(false);
+      const largeContent = 'a'.repeat(300000); // Larger than MAX_CONTENT_LENGTH (250000)
+      mockFetch('https://example.com/large-text2', {
+        status: 200,
+        headers: new Headers({ 'content-type': 'text/plain' }),
+        text: () => Promise.resolve(largeContent),
+      });
+
+      const tool = new WebFetchTool(mockConfig, bus);
+      const invocation = tool.build({ url: 'https://example.com/large-text2' });
+      const result = await invocation.execute(new AbortController().signal);
+
+      expect((result.llmContent as string).length).toBeLessThan(300000);
+      expect(result.llmContent).toContain(
+        '[Content truncated due to size limit]',
+      );
     });
   });
 });

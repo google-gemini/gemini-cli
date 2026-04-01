@@ -19,7 +19,7 @@ import {
   resolveExecutable,
   type ShellType,
 } from '../utils/shell-utils.js';
-import { isBinary } from '../utils/textUtils.js';
+import { isBinary, truncateString } from '../utils/textUtils.js';
 import pkg from '@xterm/headless';
 import { debugLogger } from '../utils/debugLogger.js';
 import { Storage } from '../config/storage.js';
@@ -27,8 +27,16 @@ import {
   serializeTerminalToObject,
   type AnsiOutput,
 } from '../utils/terminalSerializer.js';
-import { type EnvironmentSanitizationConfig } from './environmentSanitization.js';
-import { type SandboxManager } from './sandboxManager.js';
+import {
+  sanitizeEnvironment,
+  type EnvironmentSanitizationConfig,
+} from './environmentSanitization.js';
+import {
+  NoopSandboxManager,
+  type SandboxManager,
+  type SandboxPermissions,
+} from './sandboxManager.js';
+import type { SandboxConfig } from '../config/config.js';
 import { killProcessGroup } from '../utils/process-utils.js';
 import {
   ExecutionLifecycleService,
@@ -80,6 +88,7 @@ export type ShellExecutionResult = ExecutionResult;
 export type ShellExecutionHandle = ExecutionHandle;
 
 export interface ShellExecutionConfig {
+  additionalPermissions?: SandboxPermissions;
   terminalWidth?: number;
   terminalHeight?: number;
   pager?: string;
@@ -92,6 +101,8 @@ export interface ShellExecutionConfig {
   disableDynamicLineTrimming?: boolean;
   scrollback?: number;
   maxSerializedLines?: number;
+  sandboxConfig?: SandboxConfig;
+  backgroundCompletionBehavior?: 'inject' | 'notify' | 'silent';
 }
 
 /**
@@ -110,7 +121,8 @@ interface ActiveChildProcess {
   state: {
     output: string;
     truncated: boolean;
-    outputChunks: Buffer[];
+    sniffChunks: Buffer[];
+    binaryBytesReceived: number;
   };
 }
 
@@ -228,6 +240,23 @@ export class ShellExecutionService {
     return path.join(Storage.getGlobalTempDir(), 'background-processes');
   }
 
+  private static formatShellBackgroundCompletion(
+    pid: number,
+    behavior: string,
+    output: string,
+    error?: Error,
+  ): string {
+    const logPath = ShellExecutionService.getLogFilePath(pid);
+    const status = error ? `with error: ${error.message}` : 'successfully';
+
+    if (behavior === 'inject') {
+      const truncated = truncateString(output, 5000);
+      return `[Background command completed ${status}. Output saved to ${logPath}]\n\n${truncated}`;
+    }
+
+    return `[Background command completed ${status}. Output saved to ${logPath}]`;
+  }
+
   static getLogFilePath(pid: number): string {
     return path.join(this.getLogDir(), `background-${pid}.log`);
   }
@@ -331,37 +360,122 @@ export class ShellExecutionService {
   }
 
   private static async prepareExecution(
-    executable: string,
-    args: string[],
+    commandToExecute: string,
     cwd: string,
-    env: NodeJS.ProcessEnv,
     shellExecutionConfig: ShellExecutionConfig,
-    sanitizationConfigOverride?: EnvironmentSanitizationConfig,
+    isInteractive: boolean,
   ): Promise<{
     program: string;
     args: string[];
     env: NodeJS.ProcessEnv;
     cwd: string;
+    cleanup?: () => void;
   }> {
+    const sandboxManager =
+      shellExecutionConfig.sandboxManager ?? new NoopSandboxManager();
+
+    // 1. Determine Shell Configuration
+    const isWindows = os.platform() === 'win32';
+    const isStrictSandbox =
+      isWindows &&
+      shellExecutionConfig.sandboxConfig?.enabled &&
+      shellExecutionConfig.sandboxConfig?.command === 'windows-native' &&
+      !shellExecutionConfig.sandboxConfig?.networkAccess;
+
+    let { executable, argsPrefix, shell } = getShellConfiguration();
+    if (isStrictSandbox) {
+      shell = 'cmd';
+      argsPrefix = ['/c'];
+      executable = 'cmd.exe';
+    }
+
     const resolvedExecutable =
       (await resolveExecutable(executable)) ?? executable;
 
-    const prepared = await shellExecutionConfig.sandboxManager.prepareCommand({
+    const guardedCommand = ensurePromptvarsDisabled(commandToExecute, shell);
+    const spawnArgs = [...argsPrefix, guardedCommand];
+
+    // 2. Prepare Environment
+    const gitConfigKeys: string[] = [];
+    if (!isInteractive) {
+      for (const key in process.env) {
+        if (key.startsWith('GIT_CONFIG_')) {
+          gitConfigKeys.push(key);
+        }
+      }
+    }
+
+    const sanitizationConfig = {
+      ...shellExecutionConfig.sanitizationConfig,
+      allowedEnvironmentVariables: [
+        ...(shellExecutionConfig.sanitizationConfig
+          .allowedEnvironmentVariables || []),
+        ...gitConfigKeys,
+      ],
+    };
+
+    const sanitizedEnv = sanitizeEnvironment(process.env, sanitizationConfig);
+
+    const baseEnv: Record<string, string | undefined> = {
+      ...sanitizedEnv,
+      [GEMINI_CLI_IDENTIFICATION_ENV_VAR]:
+        GEMINI_CLI_IDENTIFICATION_ENV_VAR_VALUE,
+      TERM: 'xterm-256color',
+      PAGER: shellExecutionConfig.pager ?? 'cat',
+      GIT_PAGER: shellExecutionConfig.pager ?? 'cat',
+    };
+
+    if (!isInteractive) {
+      // Ensure all GIT_CONFIG_* variables are preserved even if they were redacted
+      for (const key of gitConfigKeys) {
+        baseEnv[key] = process.env[key];
+      }
+
+      const gitConfigCount = parseInt(baseEnv['GIT_CONFIG_COUNT'] || '0', 10);
+      const newKey = `GIT_CONFIG_KEY_${gitConfigCount}`;
+      const newValue = `GIT_CONFIG_VALUE_${gitConfigCount}`;
+
+      // Ensure these new keys are allowed through sanitization
+      sanitizationConfig.allowedEnvironmentVariables.push(
+        'GIT_CONFIG_COUNT',
+        newKey,
+        newValue,
+      );
+
+      Object.assign(baseEnv, {
+        GIT_TERMINAL_PROMPT: '0',
+        GIT_ASKPASS: '',
+        SSH_ASKPASS: '',
+        GH_PROMPT_DISABLED: '1',
+        GCM_INTERACTIVE: 'never',
+        DISPLAY: '',
+        DBUS_SESSION_BUS_ADDRESS: '',
+        GIT_CONFIG_COUNT: (gitConfigCount + 1).toString(),
+        [newKey]: 'credential.helper',
+        [newValue]: '',
+      });
+    }
+
+    // 3. Prepare Sandboxed Command
+    const sandboxedCommand = await sandboxManager.prepareCommand({
       command: resolvedExecutable,
-      args,
+      args: spawnArgs,
+      env: baseEnv,
       cwd,
-      env,
-      config: {
-        sanitizationConfig:
-          sanitizationConfigOverride ?? shellExecutionConfig.sanitizationConfig,
+      policy: {
+        ...shellExecutionConfig,
+        ...(shellExecutionConfig.sandboxConfig || {}),
+        sanitizationConfig,
+        additionalPermissions: shellExecutionConfig.additionalPermissions,
       },
     });
 
     return {
-      program: prepared.program,
-      args: prepared.args,
-      env: prepared.env,
-      cwd: prepared.cwd ?? cwd,
+      program: sandboxedCommand.program,
+      args: sandboxedCommand.args,
+      env: sandboxedCommand.env,
+      cwd: sandboxedCommand.cwd ?? cwd,
+      cleanup: sandboxedCommand.cleanup,
     };
   }
 
@@ -375,69 +489,19 @@ export class ShellExecutionService {
   ): Promise<ShellExecutionHandle> {
     try {
       const isWindows = os.platform() === 'win32';
-      const { executable, argsPrefix, shell } = getShellConfiguration();
-      const guardedCommand = ensurePromptvarsDisabled(commandToExecute, shell);
-      const spawnArgs = [...argsPrefix, guardedCommand];
-
-      // Specifically allow GIT_CONFIG_* variables to pass through sanitization
-      // in non-interactive mode so we can safely append our overrides.
-      const gitConfigKeys = !isInteractive
-        ? Object.keys(process.env).filter((k) => k.startsWith('GIT_CONFIG_'))
-        : [];
-      const localSanitizationConfig = {
-        ...shellExecutionConfig.sanitizationConfig,
-        allowedEnvironmentVariables: [
-          ...(shellExecutionConfig.sanitizationConfig
-            .allowedEnvironmentVariables || []),
-          ...gitConfigKeys,
-        ],
-      };
-
-      const env = {
-        ...process.env,
-        [GEMINI_CLI_IDENTIFICATION_ENV_VAR]:
-          GEMINI_CLI_IDENTIFICATION_ENV_VAR_VALUE,
-        TERM: 'xterm-256color',
-        PAGER: 'cat',
-        GIT_PAGER: 'cat',
-      };
 
       const {
         program: finalExecutable,
         args: finalArgs,
-        env: sanitizedEnv,
+        env: finalEnv,
         cwd: finalCwd,
+        cleanup: cmdCleanup,
       } = await this.prepareExecution(
-        executable,
-        spawnArgs,
+        commandToExecute,
         cwd,
-        env,
         shellExecutionConfig,
-        localSanitizationConfig,
+        isInteractive,
       );
-
-      const finalEnv = { ...sanitizedEnv };
-
-      if (!isInteractive) {
-        const gitConfigCount = parseInt(
-          finalEnv['GIT_CONFIG_COUNT'] || '0',
-          10,
-        );
-        Object.assign(finalEnv, {
-          // Disable interactive prompts and session-linked credential helpers
-          // in non-interactive mode to prevent hangs in detached process groups.
-          GIT_TERMINAL_PROMPT: '0',
-          GIT_ASKPASS: '',
-          SSH_ASKPASS: '',
-          GH_PROMPT_DISABLED: '1',
-          GCM_INTERACTIVE: 'never',
-          DISPLAY: '',
-          DBUS_SESSION_BUS_ADDRESS: '',
-          GIT_CONFIG_COUNT: (gitConfigCount + 1).toString(),
-          [`GIT_CONFIG_KEY_${gitConfigCount}`]: 'credential.helper',
-          [`GIT_CONFIG_VALUE_${gitConfigCount}`]: '',
-        });
-      }
 
       const child = cpSpawn(finalExecutable, finalArgs, {
         cwd: finalCwd,
@@ -451,7 +515,8 @@ export class ShellExecutionService {
       const state = {
         output: '',
         truncated: false,
-        outputChunks: [] as Buffer[],
+        sniffChunks: [] as Buffer[],
+        binaryBytesReceived: 0,
       };
 
       if (child.pid) {
@@ -488,6 +553,15 @@ export class ShellExecutionService {
                 return false;
               }
             },
+            formatInjection: (output, error) =>
+              ShellExecutionService.formatShellBackgroundCompletion(
+                child.pid!,
+                shellExecutionConfig.backgroundCompletionBehavior || 'silent',
+                output,
+                error ?? undefined,
+              ),
+            completionBehavior:
+              shellExecutionConfig.backgroundCompletionBehavior || 'silent',
           })
         : undefined;
 
@@ -521,14 +595,19 @@ export class ShellExecutionService {
           }
         }
 
-        state.outputChunks.push(data);
+        if (isStreamingRawContent && sniffedBytes < MAX_SNIFF_SIZE) {
+          state.sniffChunks.push(data);
+        } else if (!isStreamingRawContent) {
+          state.binaryBytesReceived += data.length;
+        }
 
         if (isStreamingRawContent && sniffedBytes < MAX_SNIFF_SIZE) {
-          const sniffBuffer = Buffer.concat(state.outputChunks.slice(0, 20));
+          const sniffBuffer = Buffer.concat(state.sniffChunks.slice(0, 20));
           sniffedBytes = sniffBuffer.length;
 
           if (isBinary(sniffBuffer)) {
             isStreamingRawContent = false;
+            state.binaryBytesReceived = sniffBuffer.length;
             const event: ShellOutputEvent = { type: 'binary_detected' };
             onOutputEvent(event);
             if (child.pid) {
@@ -568,10 +647,7 @@ export class ShellExecutionService {
             }
           }
         } else {
-          const totalBytes = state.outputChunks.reduce(
-            (sum, chunk) => sum + chunk.length,
-            0,
-          );
+          const totalBytes = state.binaryBytesReceived;
           const event: ShellOutputEvent = {
             type: 'binary_progress',
             bytesReceived: totalBytes,
@@ -587,7 +663,8 @@ export class ShellExecutionService {
         code: number | null,
         signal: NodeJS.Signals | null,
       ) => {
-        const { finalBuffer } = cleanup();
+        cleanup();
+        cmdCleanup?.();
 
         let combinedOutput = state.output;
         if (state.truncated) {
@@ -602,7 +679,7 @@ export class ShellExecutionService {
         const exitSignal = signal ? os.constants.signals[signal] : null;
 
         const resultPayload: ShellExecutionResult = {
-          rawOutput: finalBuffer,
+          rawOutput: Buffer.from(''),
           output: finalStrippedOutput,
           exitCode,
           signal: exitSignal,
@@ -691,8 +768,7 @@ export class ShellExecutionService {
           }
         }
 
-        const finalBuffer = Buffer.concat(state.outputChunks);
-        return { finalBuffer };
+        return;
       }
 
       return { pid: child.pid, result };
@@ -732,45 +808,18 @@ export class ShellExecutionService {
     try {
       const cols = shellExecutionConfig.terminalWidth ?? 80;
       const rows = shellExecutionConfig.terminalHeight ?? 30;
-      const { executable, argsPrefix, shell } = getShellConfiguration();
-
-      const guardedCommand = ensurePromptvarsDisabled(commandToExecute, shell);
-      const args = [...argsPrefix, guardedCommand];
-
-      const env = {
-        ...process.env,
-        GEMINI_CLI: '1',
-        TERM: 'xterm-256color',
-        PAGER: shellExecutionConfig.pager ?? 'cat',
-        GIT_PAGER: shellExecutionConfig.pager ?? 'cat',
-      };
-
-      // Specifically allow GIT_CONFIG_* variables to pass through sanitization
-      // so we can safely append our overrides if needed.
-      const gitConfigKeys = Object.keys(process.env).filter((k) =>
-        k.startsWith('GIT_CONFIG_'),
-      );
-      const localSanitizationConfig = {
-        ...shellExecutionConfig.sanitizationConfig,
-        allowedEnvironmentVariables: [
-          ...(shellExecutionConfig.sanitizationConfig
-            ?.allowedEnvironmentVariables ?? []),
-          ...gitConfigKeys,
-        ],
-      };
 
       const {
         program: finalExecutable,
         args: finalArgs,
         env: finalEnv,
         cwd: finalCwd,
+        cleanup: cmdCleanup,
       } = await this.prepareExecution(
-        executable,
-        args,
+        commandToExecute,
         cwd,
-        env,
         shellExecutionConfig,
-        localSanitizationConfig,
+        true,
       );
 
       // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
@@ -782,6 +831,7 @@ export class ShellExecutionService {
         env: finalEnv,
         handleFlowControl: true,
       });
+
       // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
       spawnedPty = ptyProcess as IPty;
       const ptyPid = Number(ptyProcess.pid);
@@ -844,12 +894,22 @@ export class ShellExecutionService {
           );
           return bufferData.length > 0 ? bufferData : undefined;
         },
+        formatInjection: (output, error) =>
+          ShellExecutionService.formatShellBackgroundCompletion(
+            ptyPid,
+            shellExecutionConfig.backgroundCompletionBehavior || 'silent',
+            output,
+            error ?? undefined,
+          ),
+        completionBehavior:
+          shellExecutionConfig.backgroundCompletionBehavior || 'silent',
       }).result;
 
       let processingChain = Promise.resolve();
       let decoder: TextDecoder | null = null;
       let output: string | AnsiOutput | null = null;
-      const outputChunks: Buffer[] = [];
+      const sniffChunks: Buffer[] = [];
+      let binaryBytesReceived = 0;
       const error: Error | null = null;
       let exited = false;
 
@@ -980,14 +1040,19 @@ export class ShellExecutionService {
                 }
               }
 
-              outputChunks.push(data);
+              if (isStreamingRawContent && sniffedBytes < MAX_SNIFF_SIZE) {
+                sniffChunks.push(data);
+              } else if (!isStreamingRawContent) {
+                binaryBytesReceived += data.length;
+              }
 
               if (isStreamingRawContent && sniffedBytes < MAX_SNIFF_SIZE) {
-                const sniffBuffer = Buffer.concat(outputChunks.slice(0, 20));
+                const sniffBuffer = Buffer.concat(sniffChunks.slice(0, 20));
                 sniffedBytes = sniffBuffer.length;
 
                 if (isBinary(sniffBuffer)) {
                   isStreamingRawContent = false;
+                  binaryBytesReceived = sniffBuffer.length;
                   const event: ShellOutputEvent = { type: 'binary_detected' };
                   onOutputEvent(event);
                   ExecutionLifecycleService.emitEvent(ptyPid, event);
@@ -1012,10 +1077,7 @@ export class ShellExecutionService {
                   resolveChunk();
                 });
               } else {
-                const totalBytes = outputChunks.reduce(
-                  (sum, chunk) => sum + chunk.length,
-                  0,
-                );
+                const totalBytes = binaryBytesReceived;
                 const event: ShellOutputEvent = {
                   type: 'binary_progress',
                   bytesReceived: totalBytes,
@@ -1047,6 +1109,7 @@ export class ShellExecutionService {
 
           const finalize = () => {
             render(true);
+            cmdCleanup?.();
 
             const event: ShellOutputEvent = {
               type: 'exit',
@@ -1061,7 +1124,7 @@ export class ShellExecutionService {
             });
 
             ExecutionLifecycleService.completeWithResult(ptyPid, {
-              rawOutput: Buffer.concat(outputChunks),
+              rawOutput: Buffer.from(''),
               output: getFullBufferText(headlessTerminal),
               exitCode,
               signal: signal ?? null,

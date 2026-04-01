@@ -29,10 +29,10 @@ describe('copyCommand', () => {
 
     mockContext = createMockCommandContext({
       services: {
-        config: {
-          getGeminiClient: () => ({
+        agentContext: {
+          geminiClient: {
             getChat: mockGetChat,
-          }),
+          },
         },
       },
     });
@@ -301,7 +301,7 @@ describe('copyCommand', () => {
     if (!copyCommand.action) throw new Error('Command has no action');
 
     const nullConfigContext = createMockCommandContext({
-      services: { config: null },
+      services: { agentContext: null },
     });
 
     const result = await copyCommand.action(nullConfigContext, '');

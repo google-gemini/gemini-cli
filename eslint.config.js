@@ -35,13 +35,19 @@ const commonRestrictedSyntaxRules = [
     message:
       'Do not throw string literals or non-Error objects. Throw new Error("...") instead.',
   },
+  {
+    selector:
+      'UnaryExpression[operator="typeof"] > MemberExpression[computed=true][property.type="Literal"]',
+    message:
+      'Do not use typeof to check object properties. Define a TypeScript interface and a type guard function instead.',
+  },
 ];
 
 export default tseslint.config(
   {
     // Global ignores
     ignores: [
-      'node_modules/*',
+      '**/node_modules/**',
       'eslint.config.js',
       'packages/**/dist/**',
       'bundle/**',
@@ -50,7 +56,8 @@ export default tseslint.config(
       'dist/**',
       'evals/**',
       'packages/test-utils/**',
-      '.gemini/skills/**',
+      '.gemini/**',
+      '**/*.d.ts',
     ],
   },
   eslint.configs.recommended,
@@ -132,16 +139,7 @@ export default tseslint.config(
       'no-cond-assign': 'error',
       'no-debugger': 'error',
       'no-duplicate-case': 'error',
-      'no-restricted-syntax': [
-        'error',
-        ...commonRestrictedSyntaxRules,
-        {
-          selector:
-            'UnaryExpression[operator="typeof"] > MemberExpression[computed=true][property.type="Literal"]',
-          message:
-            'Do not use typeof to check object properties. Define a TypeScript interface and a type guard function instead.',
-        },
-      ],
+      'no-restricted-syntax': ['error', ...commonRestrictedSyntaxRules],
       'no-unsafe-finally': 'error',
       'no-unused-expressions': 'off', // Disable base rule
       '@typescript-eslint/no-unused-expressions': [
@@ -160,6 +158,7 @@ export default tseslint.config(
       '@typescript-eslint/await-thenable': ['error'],
       '@typescript-eslint/no-floating-promises': ['error'],
       '@typescript-eslint/no-unnecessary-type-assertion': ['error'],
+      '@typescript-eslint/no-misused-spread': ['error'],
       'no-restricted-imports': [
         'error',
         {
@@ -206,11 +205,26 @@ export default tseslint.config(
   {
     // Rules that only apply to product code
     files: ['packages/*/src/**/*.{ts,tsx}'],
-    ignores: ['**/*.test.ts', '**/*.test.tsx'],
+    ignores: ['**/*.test.ts', '**/*.test.tsx', 'packages/*/src/test-utils/**'],
     rules: {
       '@typescript-eslint/no-unsafe-type-assertion': 'error',
       '@typescript-eslint/no-unsafe-assignment': 'error',
       '@typescript-eslint/no-unsafe-return': 'error',
+      'no-restricted-syntax': [
+        'error',
+        ...commonRestrictedSyntaxRules,
+        {
+          selector:
+            'CallExpression[callee.object.name="Object"][callee.property.name="create"]',
+          message:
+            'Avoid using Object.create() in product code. Use object spread {...obj}, explicit class instantiation, structuredClone(), or copy constructors instead.',
+        },
+        {
+          selector: 'Identifier[name="Reflect"]',
+          message:
+            'Avoid using Reflect namespace in product code. Do not use reflection to make copies. Instead, use explicit object copying or cloning (structuredClone() for values, new instance/clone function for classes).',
+        },
+      ],
     },
   },
   {
@@ -303,7 +317,12 @@ export default tseslint.config(
     },
   },
   {
-    files: ['./scripts/**/*.js', 'esbuild.config.js'],
+    files: [
+      './scripts/**/*.js',
+      'packages/*/scripts/**/*.js',
+      'esbuild.config.js',
+      'packages/core/scripts/**/*.{js,mjs}',
+    ],
     languageOptions: {
       globals: {
         ...globals.node,

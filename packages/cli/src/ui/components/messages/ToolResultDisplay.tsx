@@ -15,6 +15,7 @@ import {
   type AnsiOutput,
   type AnsiLine,
   isSubagentProgress,
+  isStructuredToolResult,
 } from '@google/gemini-cli-core';
 import { useUIState } from '../../contexts/UIStateContext.js';
 import { tryParseJSON } from '../../../utils/jsonoutput.js';
@@ -102,7 +103,12 @@ export const ToolResultDisplay: React.FC<ToolResultDisplayProps> = ({
         </Text>
       );
     } else if (isSubagentProgress(contentData)) {
-      content = <SubagentProgressDisplay progress={contentData} />;
+      content = (
+        <SubagentProgressDisplay
+          progress={contentData}
+          terminalWidth={childWidth}
+        />
+      );
     } else if (typeof contentData === 'string' && renderOutputAsMarkdown) {
       content = (
         <MarkdownDisplay
@@ -118,7 +124,28 @@ export const ToolResultDisplay: React.FC<ToolResultDisplayProps> = ({
           {contentData}
         </Text>
       );
-    } else if (typeof contentData === 'object' && 'fileDiff' in contentData) {
+    } else if (isStructuredToolResult(contentData)) {
+      if (renderOutputAsMarkdown) {
+        content = (
+          <MarkdownDisplay
+            text={contentData.summary}
+            terminalWidth={childWidth}
+            renderMarkdown={renderMarkdown}
+            isPending={false}
+          />
+        );
+      } else {
+        content = (
+          <Text wrap="wrap" color={theme.text.primary}>
+            {contentData.summary}
+          </Text>
+        );
+      }
+    } else if (
+      typeof contentData === 'object' &&
+      contentData !== null &&
+      'fileDiff' in contentData
+    ) {
       content = (
         <DiffRenderer
           diffContent={
@@ -152,10 +179,13 @@ export const ToolResultDisplay: React.FC<ToolResultDisplayProps> = ({
 
     // Final render based on session mode
     if (isAlternateBuffer) {
+      // Use maxLines if provided, otherwise fall back to the calculated available height
+      const effectiveMaxHeight = maxLines ?? availableHeight;
+
       return (
         <Scrollable
           width={childWidth}
-          maxHeight={maxLines ?? availableHeight}
+          maxHeight={effectiveMaxHeight}
           hasFocus={hasFocus} // Allow scrolling via keyboard (Shift+Up/Down)
           scrollToBottom={true}
           reportOverflow={true}
