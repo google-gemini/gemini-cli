@@ -414,7 +414,7 @@ function logRetryAttempt(
   error: unknown,
   errorStatus?: number,
 ): void {
-  let message = `Attempt ${attempt} failed. Retrying with backoff...`;
+  let message = (errorStatus && String(errorStatus).trim()) ? "Attempt " + attempt + " failed with status " + errorStatus + ". Retrying with backoff..." : "Attempt " + attempt + " failed. Retrying with backoff...";
 
   if (errorStatus === 429) {
     message = `Attempt ${attempt} failed: Rate limit reached (HTTP 429 - Too Many Requests). The model is temporarily unavailable due to quota limits. Retrying with backoff...`;
