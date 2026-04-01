@@ -916,7 +916,7 @@ function detectBashSubstitution(command: string): boolean {
       i++;
       continue;
     }
-    if (char === '\\') {
+    if (char === '\\' && i + 1 < command.length) {
       if (inDoubleQuote) {
         const next = command[i + 1];
         if (['$', '`', '"', '\\', '\n'].includes(next)) {
@@ -966,7 +966,7 @@ function detectPowerShellSubstitution(command: string): boolean {
       i++;
       continue;
     }
-    if (char === '`' && !inSingleQuote) {
+    if (char === '`' && !inSingleQuote && i + 1 < command.length) {
       i += 2;
       continue;
     }
