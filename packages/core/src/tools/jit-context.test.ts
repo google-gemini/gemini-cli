@@ -7,7 +7,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { discoverJitContext, appendJitContext } from './jit-context.js';
 import type { Config } from '../config/config.js';
-import type { ContextManager } from '../services/contextManager.js';
+import type { ContextManager } from '../context/contextManager.js';
 
 describe('jit-context', () => {
   describe('discoverJitContext', () => {

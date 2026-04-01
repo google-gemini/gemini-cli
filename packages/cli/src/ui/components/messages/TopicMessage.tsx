@@ -31,11 +31,16 @@ export const TopicMessage: React.FC<TopicMessageProps> = ({ args }) => {
   const intent = typeof rawIntent === 'string' ? rawIntent : undefined;
 
   return (
-    <Box flexDirection="row" marginLeft={2}>
-      <Text color={theme.text.primary} bold>
+    <Box flexDirection="row" marginLeft={2} flexWrap="wrap">
+      <Text color={theme.text.primary} bold wrap="truncate-end">
         {title || 'Topic'}
+        {intent && <Text>: </Text>}
       </Text>
-      {intent && <Text color={theme.text.secondary}> — {intent}</Text>}
+      {intent && (
+        <Text color={theme.text.secondary} wrap="wrap">
+          {intent}
+        </Text>
+      )}
     </Box>
   );
 };
