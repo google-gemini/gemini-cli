@@ -45,11 +45,10 @@ describe('ToolOutputMaskingService', () => {
       },
       getSessionId: () => 'mock-session',
       getUsageStatisticsEnabled: () => false,
-      getToolOutputMaskingEnabled: () => true,
       getToolOutputMaskingConfig: async () => ({
         enabled: true,
-        toolProtectionThreshold: 50000,
-        minPrunableTokensThreshold: 30000,
+        protectionThresholdTokens: 50000,
+        minPrunableThresholdTokens: 30000,
         protectLatestTurn: true,
       }),
     } as unknown as Config;
@@ -66,8 +65,8 @@ describe('ToolOutputMaskingService', () => {
   it('should respect remote configuration overrides', async () => {
     mockConfig.getToolOutputMaskingConfig = async () => ({
       enabled: true,
-      toolProtectionThreshold: 100, // Very low threshold
-      minPrunableTokensThreshold: 50,
+      protectionThresholdTokens: 100, // Very low threshold
+      minPrunableThresholdTokens: 50,
       protectLatestTurn: false,
     });
 

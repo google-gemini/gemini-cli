@@ -53,13 +53,13 @@ export interface MaskingResult {
  *
  * It implements a "Hybrid Backward Scanned FIFO" algorithm to balance context relevance with
  * token savings:
- * 1. **Protection Window**: Protects the newest `toolProtectionThreshold` (default 50k) tool tokens
+ * 1. **Protection Window**: Protects the newest `protectionThresholdTokens` (default 50k) tool tokens
  *    from pruning. Optionally skips the entire latest conversation turn to ensure full context for
  *    the model's next response.
  * 2. **Global Aggregation**: Scans backwards past the protection window to identify all remaining
  *    tool outputs that haven't been masked yet.
  * 3. **Batch Trigger**: Trigger masking only if the total prunable tokens exceed
- *    `minPrunableTokensThreshold` (default 30k).
+ *    `minPrunableThresholdTokens` (default 30k).
  *
  * @remarks
  * Effectively, this means masking only starts once the conversation contains approximately 80k
@@ -71,11 +71,11 @@ export class ToolOutputMaskingService {
     history: readonly Content[],
     config: Config,
   ): Promise<MaskingResult> {
-    const maskingConfig = await config.getToolOutputMaskingConfig();
-    if (!maskingConfig.enabled || history.length === 0) {
+    if (history.length === 0) {
       return { newHistory: history, maskedCount: 0, tokensSaved: 0 };
     }
 
+    const maskingConfig = await config.getToolOutputMaskingConfig();
     let cumulativeToolTokens = 0;
     let protectionBoundaryReached = false;
     let totalPrunableTokens = 0;
@@ -124,7 +124,7 @@ export class ToolOutputMaskingService {
 
         if (!protectionBoundaryReached) {
           cumulativeToolTokens += partTokens;
-          if (cumulativeToolTokens > maskingConfig.toolProtectionThreshold) {
+          if (cumulativeToolTokens > maskingConfig.protectionThresholdTokens) {
             protectionBoundaryReached = true;
             // The part that crossed the boundary is prunable.
             totalPrunableTokens += partTokens;
@@ -151,12 +151,12 @@ export class ToolOutputMaskingService {
 
     // Trigger pruning only if we have accumulated enough savings to justify the
     // overhead of masking and file I/O (batch pruning threshold).
-    if (totalPrunableTokens < maskingConfig.minPrunableTokensThreshold) {
+    if (totalPrunableTokens < maskingConfig.minPrunableThresholdTokens) {
       return { newHistory: history, maskedCount: 0, tokensSaved: 0 };
     }
 
     debugLogger.debug(
-      `[ToolOutputMasking] Triggering masking. Prunable tool tokens: ${totalPrunableTokens.toLocaleString()} (> ${maskingConfig.minPrunableTokensThreshold.toLocaleString()})`,
+      `[ToolOutputMasking] Triggering masking. Prunable tool tokens: ${totalPrunableTokens.toLocaleString()} (> ${maskingConfig.minPrunableThresholdTokens.toLocaleString()})`,
     );
 
     // Perform masking and offloading

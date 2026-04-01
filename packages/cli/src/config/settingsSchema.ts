@@ -1933,58 +1933,6 @@ const SETTINGS_SCHEMA = {
     description: 'Setting to enable experimental features',
     showInDialog: false,
     properties: {
-      toolOutputMasking: {
-        type: 'object',
-        label: 'Tool Output Masking',
-        category: 'Experimental',
-        requiresRestart: true,
-        ignoreInDocs: false,
-        default: {},
-        description:
-          'Advanced settings for tool output masking to manage context window efficiency.',
-        showInDialog: false,
-        properties: {
-          enabled: {
-            type: 'boolean',
-            label: 'Enable Tool Output Masking',
-            category: 'Experimental',
-            requiresRestart: true,
-            default: true,
-            description: 'Enables tool output masking to save tokens.',
-            showInDialog: true,
-          },
-          toolProtectionThreshold: {
-            type: 'number',
-            label: 'Tool Protection Threshold',
-            category: 'Experimental',
-            requiresRestart: true,
-            default: 50000,
-            description:
-              'Minimum number of tokens to protect from masking (most recent tool outputs).',
-            showInDialog: false,
-          },
-          minPrunableTokensThreshold: {
-            type: 'number',
-            label: 'Min Prunable Tokens Threshold',
-            category: 'Experimental',
-            requiresRestart: true,
-            default: 30000,
-            description:
-              'Minimum prunable tokens required to trigger a masking pass.',
-            showInDialog: false,
-          },
-          protectLatestTurn: {
-            type: 'boolean',
-            label: 'Protect Latest Turn',
-            category: 'Experimental',
-            requiresRestart: true,
-            default: true,
-            description:
-              'Ensures the absolute latest turn is never masked, regardless of token count.',
-            showInDialog: false,
-          },
-        },
-      },
       enableAgents: {
         type: 'boolean',
         label: 'Enable Agents',
@@ -2544,33 +2492,86 @@ const SETTINGS_SCHEMA = {
           },
         },
       },
-      toolDistillation: {
+      tools: {
         type: 'object',
-        label: 'Tool Distillation',
+        label: 'Context Management Tools',
         category: 'Context Management',
         requiresRestart: true,
         default: {},
         showInDialog: false,
         properties: {
-          maxOutputTokens: {
-            type: 'number',
-            label: 'Max Output Tokens',
+          distillation: {
+            type: 'object',
+            label: 'Tool Distillation',
             category: 'Context Management',
             requiresRestart: true,
-            default: 10_000,
-            description:
-              'Maximum tokens to show when truncating large tool outputs.',
+            default: {},
             showInDialog: false,
+            properties: {
+              maxOutputTokens: {
+                type: 'number',
+                label: 'Max Output Tokens',
+                category: 'Context Management',
+                requiresRestart: true,
+                default: 10_000,
+                description:
+                  'Maximum tokens to show to the model when truncating large tool outputs.',
+                showInDialog: false,
+              },
+              summarizationThresholdTokens: {
+                type: 'number',
+                label: 'Tool Summarization Threshold',
+                category: 'Context Management',
+                requiresRestart: true,
+                default: 20_000,
+                description:
+                  'Threshold above which truncated tool outputs will be summarized by an LLM.',
+                showInDialog: false,
+              },
+            },
           },
-          summarizationThresholdTokens: {
-            type: 'number',
-            label: 'Tool Summarization Threshold',
+          outputMasking: {
+            type: 'object',
+            label: 'Tool Output Masking',
             category: 'Context Management',
             requiresRestart: true,
-            default: 20_000,
+            ignoreInDocs: false,
+            default: {},
             description:
-              'Threshold above which truncated tool outputs will be summarized by an LLM.',
+              'Advanced settings for tool output masking to manage context window efficiency.',
             showInDialog: false,
+            properties: {
+              protectionThresholdTokens: {
+                type: 'number',
+                label: 'Tool Protection Threshold (Tokens)',
+                category: 'Context Management',
+                requiresRestart: true,
+                default: 50_000,
+                description:
+                  'Minimum number of tokens to protect from masking (most recent tool outputs).',
+                showInDialog: false,
+              },
+              minPrunableThresholdTokens: {
+                type: 'number',
+                label: 'Min Prunable Tokens Threshold',
+                category: 'Context Management',
+                requiresRestart: true,
+                default: 30_000,
+                description:
+                  'Minimum prunable tokens required to trigger a masking pass.',
+                showInDialog: false,
+              },
+              protectLatestTurn: {
+                type: 'boolean',
+                label: 'Protect Latest Turn',
+                category: 'Context Management',
+                requiresRestart: true,
+                default: true,
+                description:
+                  'Ensures the absolute latest turn is never masked, regardless of token count.',
+                showInDialog: false,
+              },
+            },
           },
         },
       },
