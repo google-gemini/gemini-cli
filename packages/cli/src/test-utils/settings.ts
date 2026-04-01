@@ -63,6 +63,7 @@ export const createMockSettings = (
     (workspace as any) || { path: '', settings: {}, originalSettings: {} },
     isTrusted ?? true,
     errors || [],
+    '',
   );
 
   if (mergedOverride) {

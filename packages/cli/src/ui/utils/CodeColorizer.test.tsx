@@ -25,6 +25,7 @@ describe('colorizeCode', () => {
       { path: '', settings: {}, originalSettings: {} },
       true,
       [],
+      '',
     );
 
     const result = colorizeCode({
@@ -63,6 +64,7 @@ describe('colorizeCode', () => {
       { path: '', settings: {}, originalSettings: {} },
       true,
       [],
+      '',
     );
 
     const result = colorizeCode({
@@ -89,6 +91,7 @@ describe('colorizeCode', () => {
       { path: '', settings: {}, originalSettings: {} },
       true,
       [],
+      '',
     );
 
     const result = colorizeCode({

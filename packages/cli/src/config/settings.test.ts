@@ -2857,6 +2857,7 @@ describe('Settings Loading and Merging', () => {
         { ...emptySettingsFile, path: MOCK_WORKSPACE_SETTINGS_PATH },
         true, // isTrusted
         [],
+        MOCK_WORKSPACE_DIR,
       );
     });
 
@@ -3181,6 +3182,8 @@ describe('LoadedSettings Isolation and Serializability', () => {
       { ...emptyScope }, // user
       emptyScope, // workspace
       true, // isTrusted
+      [],
+      '',
     );
   });
 

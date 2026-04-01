@@ -122,6 +122,9 @@ vi.mock('../ui/commands/toolsCommand.js', () => ({ toolsCommand: {} }));
 vi.mock('../ui/commands/skillsCommand.js', () => ({
   skillsCommand: { name: 'skills' },
 }));
+vi.mock('../ui/commands/reloadCommand.js', () => ({
+  reloadCommand: { name: 'reload' },
+}));
 vi.mock('../ui/commands/planCommand.js', async () => {
   const { CommandKind } = await import('../ui/commands/types.js');
   return {
@@ -247,6 +250,9 @@ describe('BuiltinCommandLoader', () => {
 
     const mcpCmd = commands.find((c) => c.name === 'mcp');
     expect(mcpCmd).toBeDefined();
+
+    const reloadCmd = commands.find((c) => c.name === 'reload');
+    expect(reloadCmd).toBeDefined();
   });
 
   it('should include permissions command when folder trust is enabled', async () => {
