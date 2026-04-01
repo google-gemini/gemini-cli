@@ -1593,14 +1593,6 @@ export class Config implements McpContext, AgentLoopContext {
       this.setModel(DEFAULT_GEMINI_MODEL_AUTO);
     }
 
-    // Fetch admin controls
-    const experiments = await this.experimentsPromise;
-
-    const requestTimeoutMs = this.getRequestTimeoutMs();
-    if (requestTimeoutMs !== undefined) {
-      updateGlobalFetchTimeouts(requestTimeoutMs);
-    }
-
     const adminControlsEnabled =
       experiments?.flags[ExperimentFlags.ENABLE_ADMIN_CONTROLS]?.boolValue ??
       false;
