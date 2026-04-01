@@ -372,7 +372,7 @@ for planned features and priorities.
 ## 📖 Resources
 
 - **[Official Roadmap](./ROADMAP.md)** - See what's coming next.
-- **[Changelog](https://www.geminicli.com/docs/changelogs/index)** - See recent
+- **[Changelog](https://www.geminicli.com/docs/changelogs)** - See recent
   notable updates.
 - **[NPM Package](https://www.npmjs.com/package/@google/gemini-cli)** - Package
   registry.
