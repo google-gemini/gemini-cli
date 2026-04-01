@@ -215,6 +215,15 @@ export interface LocalAgentDefinition<
   toolConfig?: ToolConfig;
 
   /**
+   * Optional additional workspace directories scoped to this agent.
+   * When provided, the agent receives a workspace context that extends
+   * the parent's with these directories. Other agents and the main
+   * session are unaffected. If omitted, the parent workspace context
+   * is inherited unchanged.
+   */
+  workspaceDirectories?: string[];
+
+  /**
    * Optional inline MCP servers for this agent.
    */
   mcpServers?: Record<string, MCPServerConfig>;
