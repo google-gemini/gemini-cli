@@ -2762,7 +2762,7 @@ export class Config implements McpContext, AgentLoopContext {
   getSimulateUser(): boolean {
     return this.simulateUser;
   }
-  
+
   getKnowledgeSource(): string | undefined {
     return this.knowledgeSource;
   }

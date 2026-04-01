@@ -8,7 +8,7 @@ import React, { useMemo } from 'react';
 import {
   Text,
   Box,
-  StyledLine,
+  type StyledChar,
   toStyledCharacters,
   wordBreakStyledChars,
   wrapStyledChars,
@@ -19,6 +19,8 @@ import {
 import { theme } from '../semantic-colors.js';
 import { parseMarkdownToANSI } from './markdownParsingUtils.js';
 import { stripUnsafeCharacters } from './textUtils.js';
+
+type StyledLine = StyledChar[];
 
 interface TableRendererProps {
   headers: string[];
@@ -100,12 +102,12 @@ export const TableRenderer: React.FC<TableRendererProps> = ({
     // --- Define Constraints per Column ---
     const constraints = Array.from({ length: numColumns }).map(
       (_, colIndex) => {
-        const headerStyledLine = styledHeaders[colIndex] || StyledLine.empty(0);
+        const headerStyledLine = styledHeaders[colIndex] || [];
         let { contentWidth: maxContentWidth, maxWordWidth } =
           calculateWidths(headerStyledLine);
 
         styledRows.forEach((row) => {
-          const cellStyledLine = row[colIndex] || StyledLine.empty(0);
+          const cellStyledLine = row[colIndex] || [];
           const { contentWidth: cellWidth, maxWordWidth: cellWordWidth } =
             calculateWidths(cellStyledLine);
 
@@ -180,7 +182,7 @@ export const TableRenderer: React.FC<TableRendererProps> = ({
       const rowResult: ProcessedLine[][] = [];
       // Ensure we iterate up to numColumns, filling with empty cells if needed
       for (let colIndex = 0; colIndex < numColumns; colIndex++) {
-        const cellStyledLine = row[colIndex] || StyledLine.empty(0);
+        const cellStyledLine = row[colIndex] || [];
         const allocatedWidth = finalContentWidths[colIndex];
         const contentWidth = Math.max(1, allocatedWidth);
 

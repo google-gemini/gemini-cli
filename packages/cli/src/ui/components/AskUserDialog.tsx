@@ -850,12 +850,15 @@ const ChoiceQuestionView: React.FC<ChoiceQuestionViewProps> = ({
     : undefined;
 
   // Reserve space for at least 3 items if more selectionItems available.
-  const reservedListHeight = Math.min(selectionItems.length * 2, 6);
+
   const questionHeightLimit =
     listHeight && !isAlternateBuffer
       ? question.unconstrainedHeight
         ? Math.max(1, listHeight - selectionItems.length * 2)
-        : Math.min(15, Math.max(1, listHeight - Math.min(selectionItems.length, 5) * 2))
+        : Math.min(
+            15,
+            Math.max(1, listHeight - Math.min(selectionItems.length, 5) * 2),
+          )
       : undefined;
 
   let maxItemsToShow = selectionItems.length;
@@ -865,7 +868,7 @@ const ChoiceQuestionView: React.FC<ChoiceQuestionViewProps> = ({
     } else {
       maxItemsToShow = Math.min(
         selectionItems.length,
-        Math.max(1, Math.floor((listHeight - (questionHeightLimit ?? 0)) / 2))
+        Math.max(1, Math.floor((listHeight - (questionHeightLimit ?? 0)) / 2)),
       );
     }
   }

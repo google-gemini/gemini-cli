@@ -13,7 +13,6 @@ import {
 import type { Writable } from 'node:stream';
 import * as fs from 'node:fs';
 
-
 export class UserSimulator {
   private isRunning = false;
   private timer: NodeJS.Timeout | null = null;
@@ -117,15 +116,17 @@ export class UserSimulator {
         ? `\nThe original goal was: "${originalGoal}"\n`
         : '';
 
-
-
       const knowledgeInstruction = this.knowledgeBase
         ? `\nUser Knowledge Base:\nUse this information to answer questions if applicable. If the answer is not here, respond as you normally would.\n${this.knowledgeBase}\n`
         : '';
 
-      const historyInstruction = this.actionHistory.length > 0
-        ? `\nRecent Simulator Actions (last 10):\n${this.actionHistory.slice(-10).map((a, i) => `${i + 1}. ${JSON.stringify(a)}`).join('\n')}\n`
-        : '';
+      const historyInstruction =
+        this.actionHistory.length > 0
+          ? `\nRecent Simulator Actions (last 10):\n${this.actionHistory
+              .slice(-10)
+              .map((a, i) => `${i + 1}. ${JSON.stringify(a)}`)
+              .join('\n')}\n`
+          : '';
 
       const prompt = `You are evaluating a CLI agent by simulating a user sitting at the terminal.
 Look carefully at the screen and determine the CLI's current state:
@@ -174,6 +175,7 @@ ${strippedScreen}
       const model = resolveModel(
         PREVIEW_GEMINI_FLASH_MODEL,
         false, // useGemini3_1
+        false, // useGemini3_1FlashLite
         false, // useCustomToolModel
         this.config.getHasAccessToPreviewModel?.() ?? true,
         this.config,
@@ -196,14 +198,31 @@ ${strippedScreen}
       let responseText = '';
       let parsedJson: any = {};
       try {
-        const cleanJson = (response.text || '').replace(/^```json\s*|\s*```$/gm, '').trim();
+        let cleanJson = response.text || '';
+        const startIdx = cleanJson.indexOf('{');
+        const endIdx = cleanJson.lastIndexOf('}');
+        if (startIdx !== -1 && endIdx !== -1 && endIdx > startIdx) {
+          cleanJson = cleanJson.substring(startIdx, endIdx + 1);
+        } else {
+          cleanJson = cleanJson.replace(/^```json\s*|\s*```$/gm, '').trim();
+        }
         parsedJson = JSON.parse(cleanJson);
         responseText = parsedJson.action || '';
       } catch (err) {
         debugLogger.error('Failed to parse simulator response as JSON', err);
-        responseText = (response.text || '').replace(/^[`"']+|[`"']+$/g, '');
+        const text = (response.text || '').trim();
+        if (
+          text === '<WAIT>' ||
+          text === '<DONE>' ||
+          /^\d+\\r$/.test(text) ||
+          text === '\\r'
+        ) {
+          responseText = text.replace(/^[`"']+|[`"']+$/g, '');
+        } else {
+          responseText = ''; // Prevent typing broken JSON string
+        }
       }
-      
+
       const trimmedResponse = responseText.trim();
 
       debugLogger.log(
@@ -247,7 +266,9 @@ ${strippedScreen}
       }
 
       if (responseText) {
-        const keys = responseText.replace(/\\n|\n/g, '\r').replace(/\\r/g, '\r');
+        const keys = responseText
+          .replace(/\\n|\n/g, '\r')
+          .replace(/\\r/g, '\r');
 
         debugLogger.log(
           `[SIMULATOR] Sending to stdin: ${JSON.stringify(keys)}`,
@@ -270,9 +291,14 @@ ${strippedScreen}
           this.knowledgeBase += newKnowledge;
           try {
             fs.appendFileSync(this.editableKnowledgeFile, newKnowledge);
-            debugLogger.log(`[SIMULATOR] Saved new knowledge to ${this.editableKnowledgeFile}`);
+            debugLogger.log(
+              `[SIMULATOR] Saved new knowledge to ${this.editableKnowledgeFile}`,
+            );
             if (this.interactionsFile) {
-               fs.appendFileSync(this.interactionsFile, `[LOG] [SIMULATOR] Saved new knowledge to ${this.editableKnowledgeFile}\n\n`);
+              fs.appendFileSync(
+                this.interactionsFile,
+                `[LOG] [SIMULATOR] Saved new knowledge to ${this.editableKnowledgeFile}\n\n`,
+              );
             }
           } catch (e) {
             debugLogger.error(`Failed to append knowledge`, e);
@@ -280,16 +306,15 @@ ${strippedScreen}
         }
 
         for (const char of keys) {
-          if (char === '\r' || char === '\n') {
-            await new Promise((resolve) => setTimeout(resolve, 40));
-          }
           this.stdinBuffer.write(char);
-          await new Promise((resolve) => setTimeout(resolve, 20));
+          // Small delay to ensure Ink processes each keypress event individually
+          // while preventing UI state collisions during long simulated inputs.
+          await new Promise((resolve) => setTimeout(resolve, 5));
         }
         this.lastScreenContent = normalizedScreen;
       } else {
         debugLogger.log('[SIMULATOR] Skipping (empty response)');
-        
+
         this.actionHistory.push('<EMPTY>');
         if (this.interactionsFile) {
           fs.appendFileSync(
@@ -297,7 +322,7 @@ ${strippedScreen}
             `[LOG] [SIMULATOR] Action History updated with: "<EMPTY>"\n\n`,
           );
         }
-        
+
         this.lastScreenContent = normalizedScreen;
       }
     } catch (e: unknown) {
