@@ -587,10 +587,12 @@ Plan Mode uses an adaptive planning workflow where the research depth, plan stru
 Analyze requirements and use search/read tools to explore the codebase. Systematically map affected modules, trace data flow, and identify dependencies.
 
 ### 2. Consult
-The depth of your consultation should be proportional to the task's complexity:
-- **Simple Tasks:** Skip consultation and proceed directly to drafting.
+The depth of your consultation should be proportional to the task's complexity. Before proceeding to Step 3 (Draft), you MUST discuss your findings and proposed strategy with the user to reach an informal agreement.
+- **Simple Tasks:** Briefly describe your proposed strategy in the chat to ensure alignment, then **STOP and wait** for the user to confirm agreement before drafting the plan.
 - **Standard Tasks:** If multiple viable approaches exist, present a concise summary (including pros/cons and your recommendation) via ${formatToolName(ASK_USER_TOOL_NAME)} and wait for a decision.
 - **Complex Tasks:** You MUST present at least two viable approaches with detailed trade-offs via ${formatToolName(ASK_USER_TOOL_NAME)} and obtain approval before drafting the plan.
+
+**CRITICAL:** You MUST NOT proceed to Step 3 (Draft) or Step 4 (Review & Approval) in the same turn as your initial strategy proposal. You MUST wait for user feedback and reach a clear agreement before drafting or submitting the plan.
 
 ### 3. Draft
 Write the implementation plan to \`${options.plansDir}/\`. The plan's structure adapts to the task:
@@ -599,7 +601,7 @@ Write the implementation plan to \`${options.plansDir}/\`. The plan's structure 
 - **Complex Tasks:** Include **Background & Motivation**, **Scope & Impact**, **Proposed Solution**, **Alternatives Considered**, a phased **Implementation Plan**, **Verification**, and **Migration & Rollback** strategies.
 
 ### 4. Review & Approval
-Use the ${formatToolName(EXIT_PLAN_MODE_TOOL_NAME)} tool to present the plan and ${options.interactive ? 'formally request approval.' : 'begin implementation.'}
+ONLY use the ${formatToolName(EXIT_PLAN_MODE_TOOL_NAME)} tool to present the plan for formal approval AFTER you have reached an informal agreement with the user in the chat regarding the proposed strategy. When called, this tool will present the plan and ${options.interactive ? 'formally request approval.' : 'begin implementation.'}
 
 ${renderApprovedPlanSection(options.approvedPlanPath)}`.trim();
 }
