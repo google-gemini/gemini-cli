@@ -163,46 +163,57 @@ function extractCuratedHistory(comprehensiveHistory: Content[]): Content[] {
     return [];
   }
   const curatedHistory: Content[] = [];
-  const length = comprehensiveHistory.length;
-  let i = 0;
-  while (i < length) {
-    const role = comprehensiveHistory[i].role;
-    const parts: Part[] = [];
-    let isValid = true;
 
-    while (i < length && comprehensiveHistory[i].role === role) {
-      if (
-        isValid &&
-        role === 'model' &&
-        !isValidContent(comprehensiveHistory[i])
-      ) {
-        isValid = false;
+  for (const entry of comprehensiveHistory) {
+    const role = entry.role;
+    const rawParts = entry.parts || [];
+
+    // Filter parts: keep only non-empty text or non-text parts
+    const validParts = rawParts.filter((part) => {
+      if (part === undefined || Object.keys(part).length === 0) {
+        return false;
       }
+      if (!part.thought && part.text !== undefined && part.text.trim() === '') {
+        return false;
+      }
+      return true;
+    });
 
-      const entryParts = comprehensiveHistory[i].parts || [];
-      for (const part of entryParts) {
+    if (validParts.length === 0) {
+      continue;
+    }
+
+    const lastEntry = curatedHistory[curatedHistory.length - 1];
+    if (lastEntry && lastEntry.role === role) {
+      const lastEntryParts = lastEntry.parts || [];
+      // Merge into last entry
+      for (const part of validParts) {
         if (
-          parts.length > 0 &&
-          parts[parts.length - 1].text !== undefined &&
+          lastEntryParts.length > 0 &&
+          lastEntryParts[lastEntryParts.length - 1].text !== undefined &&
           part.text !== undefined
         ) {
-          // Merge consecutive text parts using a new object to avoid corruption
-          parts[parts.length - 1] = {
-            ...parts[parts.length - 1],
-            text: parts[parts.length - 1].text + '\n' + part.text,
+          // Coalesce text parts
+          const lastText = lastEntryParts[lastEntryParts.length - 1].text!;
+          const separator = lastText.endsWith('\n') ? '' : '\n';
+          lastEntryParts[lastEntryParts.length - 1] = {
+            ...lastEntryParts[lastEntryParts.length - 1],
+            text: lastText + separator + part.text,
           };
         } else {
-          // Deep copy the part to avoid reference issues
-          parts.push({ ...part });
+          lastEntryParts.push({ ...part });
         }
       }
-      i++;
-    }
-
-    if (isValid && parts.length > 0) {
-      curatedHistory.push({ role, parts });
+      lastEntry.parts = lastEntryParts;
+    } else {
+      // Create new entry with deep-copied parts
+      curatedHistory.push({
+        role,
+        parts: validParts.map((p) => ({ ...p })),
+      });
     }
   }
+
   return curatedHistory;
 }
 export class InvalidStreamError extends Error {
