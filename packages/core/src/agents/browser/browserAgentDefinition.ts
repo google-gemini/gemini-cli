@@ -190,7 +190,7 @@ export const BrowserAgentDefinition = (
 \${task}
 </task>
 
-First, use new_page to open the relevant URL. Then call take_snapshot to see the page and proceed with your task.`,
+First, use <list_pages/> to check if there are any existing pages that can fulfill the user's request. If not, you MUST use <new_page/> to open the relevant URL unless the user explicitly provides different instructions.`,
       systemPrompt: buildBrowserSystemPrompt(
         visionEnabled,
         config.getBrowserAgentConfig().customConfig.allowedDomains,
