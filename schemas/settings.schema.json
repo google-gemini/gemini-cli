@@ -478,9 +478,9 @@
         },
         "loadingPhrases": {
           "title": "Loading Phrases",
-          "description": "What to show while the model is working: tips, witty comments, both, or nothing.",
-          "markdownDescription": "What to show while the model is working: tips, witty comments, both, or nothing.\n\n- Category: `UI`\n- Requires restart: `no`\n- Default: `tips`",
-          "default": "tips",
+          "description": "What to show while the model is working: tips, witty comments, all, or off.",
+          "markdownDescription": "What to show while the model is working: tips, witty comments, all, or off.\n\n- Category: `UI`\n- Requires restart: `no`\n- Default: `off`",
+          "default": "off",
           "type": "string",
           "enum": ["tips", "witty", "all", "off"]
         },
