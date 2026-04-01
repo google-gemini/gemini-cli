@@ -527,12 +527,21 @@ export function setUpCloudShellEnvironment(
   envFilePath: string | null,
   isTrusted: boolean,
   isSandboxed: boolean,
+  selectedAuthType?: string,
 ): void {
   // Special handling for GOOGLE_CLOUD_PROJECT in Cloud Shell:
   // Because GOOGLE_CLOUD_PROJECT in Cloud Shell tracks the project
   // set by the user using "gcloud config set project" we do not want to
   // use its value. So, unless the user overrides GOOGLE_CLOUD_PROJECT in
   // one of the .env files, we set the Cloud Shell-specific default here.
+  //
+  // However, if the user has explicitly selected Vertex AI auth, they intend
+  // to use their own GCP project, so we skip the Cloud Shell override to
+  // respect their shell environment or .env settings.
+  if (selectedAuthType === 'vertex-ai') {
+    return;
+  }
+
   let value = 'cloudshell-gca';
 
   if (envFilePath && fs.existsSync(envFilePath)) {
@@ -575,7 +584,13 @@ export function loadEnvironment(
 
   // Cloud Shell environment variable handling
   if (process.env['CLOUD_SHELL'] === 'true') {
-    setUpCloudShellEnvironment(envFilePath, isTrusted, isSandboxed);
+    const selectedAuthType = settings.security?.auth?.selectedType;
+    setUpCloudShellEnvironment(
+      envFilePath,
+      isTrusted,
+      isSandboxed,
+      selectedAuthType,
+    );
   }
 
   if (envFilePath) {

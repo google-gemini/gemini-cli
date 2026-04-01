@@ -3131,6 +3131,29 @@ MALICIOUS_VAR=allowed-because-trusted
         expect(process.env['GOOGLE_CLOUD_PROJECT']).toBe('cloudshell-gca');
       });
 
+      it('should not override GOOGLE_CLOUD_PROJECT in Cloud Shell when auth type is vertex-ai', () => {
+        process.env['CLOUD_SHELL'] = 'true';
+        process.env['GOOGLE_CLOUD_PROJECT'] = 'my-vertex-project';
+        process.argv = ['node', 'gemini', '-s', 'prompt'];
+        vi.mocked(isWorkspaceTrusted).mockReturnValue({
+          isTrusted: false,
+          source: 'file',
+        });
+
+        // No .env file
+        vi.mocked(fs.existsSync).mockReturnValue(false);
+
+        loadEnvironment(
+          createMockSettings({
+            tools: { sandbox: false },
+            security: { auth: { selectedType: 'vertex-ai' } },
+          }).merged,
+          MOCK_WORKSPACE_DIR,
+        );
+
+        expect(process.env['GOOGLE_CLOUD_PROJECT']).toBe('my-vertex-project');
+      });
+
       it('should sanitize GOOGLE_CLOUD_PROJECT in Cloud Shell when loaded from .env in untrusted mode', () => {
         process.env['CLOUD_SHELL'] = 'true';
         process.argv = ['node', 'gemini', '-s', 'prompt'];
