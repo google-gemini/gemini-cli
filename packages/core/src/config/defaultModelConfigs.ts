@@ -66,9 +66,14 @@ export const DEFAULT_MODEL_CONFIGS: ModelConfigServiceConfig = {
       },
     },
     'gemini-3-flash-preview': {
-      extends: 'chat-base-3',
+      extends: 'base',
       modelConfig: {
         model: 'gemini-3-flash-preview',
+        generateContentConfig: {
+          temperature: 0,
+          topP: 0.95,
+          topK: 64,
+        },
       },
     },
     'gemini-2.5-pro': {
@@ -280,6 +285,13 @@ export const DEFAULT_MODEL_CONFIGS: ModelConfigServiceConfig = {
       family: 'gemini-3',
       isPreview: true,
       isVisible: false,
+      features: { thinking: true, multimodalToolUse: true },
+    },
+    'gemini-3.1-pro-preview': {
+      tier: 'pro',
+      family: 'gemini-3',
+      isPreview: true,
+      isVisible: true,
       features: { thinking: true, multimodalToolUse: true },
     },
     'gemini-3-pro-preview': {
