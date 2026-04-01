@@ -8,6 +8,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { coreEvents, type GeminiCLIExtension } from '@google/gemini-cli-core';
 import { ExtensionStorage } from './storage.js';
+import { z } from 'zod';
 
 export interface ExtensionEnablementConfig {
   overrides: string[];
@@ -179,8 +180,12 @@ export class ExtensionEnablementManager {
   readConfig(): AllExtensionsEnablementConfig {
     try {
       const content = fs.readFileSync(this.configFilePath, 'utf-8');
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-return
-      return JSON.parse(content);
+      const parsed: unknown = JSON.parse(content);
+      const schema = z.record(
+        z.string(),
+        z.object({ overrides: z.array(z.string()) }),
+      );
+      return schema.parse(parsed);
     } catch (error) {
       if (
         error instanceof Error &&

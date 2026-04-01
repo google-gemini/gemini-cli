@@ -111,5 +111,11 @@ export const createMockCommandContext = (
     return output;
   };
 
-  return merge(defaultMocks, overrides);
+  const merged: unknown = merge(defaultMocks, overrides);
+  const isCommandContext = (val: unknown): val is CommandContext =>
+    typeof val === 'object' && val !== null;
+  if (isCommandContext(merged)) {
+    return merged;
+  }
+  throw new Error('Unreachable');
 };
