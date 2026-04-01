@@ -211,6 +211,8 @@ export interface ParsedLog {
     error?: string;
     error_type?: string;
     prompt_id?: string;
+    // api_request event attributes
+    model?: string;
   };
   scopeMetrics?: {
     metrics: {
@@ -1171,6 +1173,8 @@ export class TestRig {
         success: boolean;
         duration_ms: number;
         prompt_id?: string;
+        error?: string;
+        error_type?: string;
       };
     }[] = [];
 
