@@ -8,7 +8,9 @@ import type {
   OpenDialogActionReturn,
   SlashCommand,
   SlashCommandActionReturn,
- CommandKind, type CommandContext } from './types.js';
+  CommandContext,
+} from './types.js';
+import { CommandKind } from './types.js';
 import * as process from 'node:process';
 import * as path from 'node:path';
 import * as fs from 'node:fs';
