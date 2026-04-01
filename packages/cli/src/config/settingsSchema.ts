@@ -1196,6 +1196,16 @@ const SETTINGS_SCHEMA = {
               'Path to browser profile directory for session persistence.',
             showInDialog: false,
           },
+          browserUrl: {
+            type: 'string',
+            label: 'Browser URL',
+            category: 'Advanced',
+            requiresRestart: true,
+            default: undefined as string | undefined,
+            description:
+              'Remote Chrome DevTools browser URL (for example, http://host:9222). Only used when sessionMode is existing.',
+            showInDialog: false,
+          },
           visualModel: {
             type: 'string',
             label: 'Browser Visual Model',

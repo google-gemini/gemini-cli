@@ -481,19 +481,34 @@ export class BrowserManager {
 
     // Build args for chrome-devtools-mcp
     const browserConfig = this.config.getBrowserAgentConfig();
-    const sessionMode = browserConfig.customConfig.sessionMode ?? 'persistent';
+    const {
+      sessionMode = 'persistent',
+      browserUrl,
+      headless,
+      profilePath,
+    } = browserConfig.customConfig;
+
+    this.validateBrowserConnectionConfig(
+      sessionMode,
+      browserUrl,
+      headless,
+      profilePath,
+    );
 
     const mcpArgs = ['--experimental-vision'];
 
     // Session mode determines how the browser is managed:
     // - "isolated": Temp profile, cleaned up after session (--isolated)
     // - "persistent": Persistent profile at ~/.gemini/cli-browser-profile/ (default)
-    // - "existing": Connect to already-running Chrome (--autoConnect, requires
-    //   remote debugging enabled at chrome://inspect/#remote-debugging)
+    // - "existing": Connect to already-running Chrome (--autoConnect or --browserUrl)
     if (sessionMode === 'isolated') {
       mcpArgs.push('--isolated');
     } else if (sessionMode === 'existing') {
-      mcpArgs.push('--autoConnect');
+      if (browserUrl) {
+        mcpArgs.push('--browserUrl', browserUrl);
+      } else {
+        mcpArgs.push('--autoConnect');
+      }
       const message =
         '🔒 Browsing with your signed-in Chrome profile — cookies and saved logins will be visible to the agent.';
       coreEvents.emitFeedback('info', message);
@@ -501,11 +516,11 @@ export class BrowserManager {
     }
 
     // Add optional settings from config
-    if (browserConfig.customConfig.headless) {
+    if (headless) {
       mcpArgs.push('--headless');
     }
-    if (browserConfig.customConfig.profilePath) {
-      mcpArgs.push('--userDataDir', browserConfig.customConfig.profilePath);
+    if (profilePath) {
+      mcpArgs.push('--userDataDir', profilePath);
     } else if (sessionMode === 'persistent') {
       // Default persistent profile lives under ~/.gemini/cli-browser-profile
       const defaultProfilePath = path.join(
@@ -624,6 +639,7 @@ export class BrowserManager {
       throw this.createConnectionError(
         error instanceof Error ? error.message : String(error),
         sessionMode,
+        browserUrl,
       );
     } finally {
       if (timeoutId !== undefined) {
@@ -632,11 +648,53 @@ export class BrowserManager {
     }
   }
 
+  private validateBrowserConnectionConfig(
+    sessionMode: 'isolated' | 'persistent' | 'existing',
+    browserUrl: string | undefined,
+    headless: boolean | undefined,
+    profilePath: string | undefined,
+  ): void {
+    if (sessionMode === 'existing') {
+      if (headless) {
+        throw new Error('headless is not supported with existing sessions.');
+      }
+      if (profilePath) {
+        throw new Error('profilePath is not supported with existing sessions.');
+      }
+    }
+
+    if (!browserUrl) {
+      return;
+    }
+
+    if (sessionMode !== 'existing') {
+      throw new Error('browserUrl requires sessionMode "existing".');
+    }
+
+    let parsedUrl: URL;
+    try {
+      parsedUrl = new URL(browserUrl);
+    } catch (error) {
+      debugLogger.error(
+        `Failed to parse browserUrl: ${browserUrl}. ${error instanceof Error ? error.message : String(error)}`,
+      );
+      throw new Error('Invalid browserUrl.');
+    }
+
+    if (!['http:', 'https:'].includes(parsedUrl.protocol)) {
+      throw new Error('Invalid browserUrl protocol.');
+    }
+  }
+
   /**
    * Creates an Error with context-specific remediation based on the actual
    * error message and the current sessionMode.
    */
-  private createConnectionError(message: string, sessionMode: string): Error {
+  private createConnectionError(
+    message: string,
+    sessionMode: string,
+    browserUrl?: string,
+  ): Error {
     const lowerMessage = message.toLowerCase();
 
     // "already running for the current profile" — persistent mode profile lock
@@ -662,6 +720,11 @@ export class BrowserManager {
     // Timeout errors
     if (lowerMessage.includes('timed out')) {
       if (sessionMode === 'existing') {
+        if (browserUrl) {
+          return new Error(
+            `Timed out connecting to remote Chrome at ${browserUrl}. Check that remote debugging is enabled and the URL is reachable.`,
+          );
+        }
         return new Error(
           `Timed out connecting to Chrome: ${message}\n\n` +
             `To use sessionMode "existing", you must:\n` +
@@ -681,6 +744,11 @@ export class BrowserManager {
 
     // Generic "existing" mode failures (connection refused, etc.)
     if (sessionMode === 'existing') {
+      if (browserUrl) {
+        return new Error(
+          `Failed to connect to remote Chrome at ${browserUrl}. Check that remote debugging is enabled and the URL is reachable.`,
+        );
+      }
       return new Error(
         `Failed to connect to existing Chrome instance: ${message}\n\n` +
           `To use sessionMode "existing", you must:\n` +

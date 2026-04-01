@@ -509,10 +509,121 @@ describe('BrowserManager', () => {
         ?.args as string[];
       expect(args).toContain('--autoConnect');
       expect(args).not.toContain('--isolated');
+      expect(args).not.toContain('--browserUrl');
 
       expect(coreEvents.emitFeedback).toHaveBeenCalledWith(
         'info',
         expect.stringContaining('saved logins will be visible'),
+      );
+    });
+
+    it('should pass --browserUrl when sessionMode is existing and browserUrl is configured', async () => {
+      const remoteConfig = makeFakeConfig({
+        agents: {
+          overrides: {
+            browser_agent: {
+              enabled: true,
+            },
+          },
+          browser: {
+            sessionMode: 'existing',
+            browserUrl: 'http://remote-browser:9222',
+          },
+        },
+      });
+
+      const manager = new BrowserManager(remoteConfig);
+      await manager.ensureConnection();
+
+      const args = vi.mocked(StdioClientTransport).mock.calls[0]?.[0]
+        ?.args as string[];
+      expect(args).toContain('--browserUrl');
+      const browserUrlIndex = args.indexOf('--browserUrl');
+      expect(args[browserUrlIndex + 1]).toBe('http://remote-browser:9222');
+      expect(args).not.toContain('--autoConnect');
+    });
+
+    it('should reject browserUrl outside existing mode', async () => {
+      const invalidConfig = makeFakeConfig({
+        agents: {
+          overrides: {
+            browser_agent: {
+              enabled: true,
+            },
+          },
+          browser: {
+            sessionMode: 'persistent',
+            browserUrl: 'http://remote-browser:9222',
+          },
+        },
+      });
+
+      const manager = new BrowserManager(invalidConfig);
+      await expect(manager.ensureConnection()).rejects.toThrow(
+        /browserUrl requires sessionMode "existing"/,
+      );
+    });
+
+    it('should reject invalid browserUrl values', async () => {
+      const invalidConfig = makeFakeConfig({
+        agents: {
+          overrides: {
+            browser_agent: {
+              enabled: true,
+            },
+          },
+          browser: {
+            sessionMode: 'existing',
+            browserUrl: 'not-a-url',
+          },
+        },
+      });
+
+      const manager = new BrowserManager(invalidConfig);
+      await expect(manager.ensureConnection()).rejects.toThrow(
+        /Invalid browserUrl\./,
+      );
+    });
+
+    it('should reject headless in existing mode', async () => {
+      const invalidConfig = makeFakeConfig({
+        agents: {
+          overrides: {
+            browser_agent: {
+              enabled: true,
+            },
+          },
+          browser: {
+            sessionMode: 'existing',
+            headless: true,
+          },
+        },
+      });
+
+      const manager = new BrowserManager(invalidConfig);
+      await expect(manager.ensureConnection()).rejects.toThrow(
+        /headless is not supported with existing sessions/,
+      );
+    });
+
+    it('should reject profilePath in existing mode', async () => {
+      const invalidConfig = makeFakeConfig({
+        agents: {
+          overrides: {
+            browser_agent: {
+              enabled: true,
+            },
+          },
+          browser: {
+            sessionMode: 'existing',
+            profilePath: '/path/to/profile',
+          },
+        },
+      });
+
+      const manager = new BrowserManager(invalidConfig);
+      await expect(manager.ensureConnection()).rejects.toThrow(
+        /profilePath is not supported with existing sessions/,
       );
     });
 
@@ -550,6 +661,41 @@ describe('BrowserManager', () => {
       const manager2 = new BrowserManager(existingConfig);
       await expect(manager2.ensureConnection()).rejects.toThrow(
         /chrome:\/\/inspect\/#remote-debugging/,
+      );
+    });
+
+    it('should throw remote remediation when browserUrl connection fails', async () => {
+      vi.mocked(Client).mockImplementation(
+        () =>
+          ({
+            connect: vi.fn().mockRejectedValue(new Error('Connection refused')),
+            close: vi.fn().mockResolvedValue(undefined),
+            listTools: vi.fn(),
+            callTool: vi.fn(),
+          }) as unknown as InstanceType<typeof Client>,
+      );
+
+      const remoteConfig = makeFakeConfig({
+        agents: {
+          overrides: {
+            browser_agent: {
+              enabled: true,
+            },
+          },
+          browser: {
+            sessionMode: 'existing',
+            browserUrl: 'http://remote-browser:9222',
+          },
+        },
+      });
+
+      const manager = new BrowserManager(remoteConfig);
+      await expect(manager.ensureConnection()).rejects.toThrow(
+        /Failed to connect to remote Chrome at http:\/\/remote-browser:9222/,
+      );
+      const manager2 = new BrowserManager(remoteConfig);
+      await expect(manager2.ensureConnection()).rejects.toThrow(
+        /remote debugging is enabled and the URL is reachable/,
       );
     });
 
