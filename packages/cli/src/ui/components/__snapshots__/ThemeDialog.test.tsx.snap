@@ -14,9 +14,9 @@ exports[`Initial Theme Selection > should default to a dark theme when terminal 
 │    7. Holiday Dark                           │ 6     return a                                  │ │
 │    8. Shades Of Purple Dark                  │                                                 │ │
 │    9. Solarized Dark                         │ 1 - print("Hello, " + name)                     │ │
-│   10. ANSI Light                             │ 1 + print(f"Hello, {name}!")                    │ │
-│   11. Ayu Light                              │                                                 │ │
-│   12. Default Light                          └─────────────────────────────────────────────────┘ │
+│   10. Tokyo Night Dark                       │ 1 + print(f"Hello, {name}!")                    │ │
+│   11. ANSI Light                             │                                                 │ │
+│   12. Ayu Light                              └─────────────────────────────────────────────────┘ │
 │ ▼                                                                                                │
 │                                                                                                  │
 │ (Use Enter to select, Tab to configure scope, Esc to close)                                      │
@@ -64,9 +64,9 @@ exports[`Initial Theme Selection > should use the theme from settings even if te
 │    7. Holiday Dark                           │ 6     return a                                  │ │
 │    8. Shades Of Purple Dark                  │                                                 │ │
 │    9. Solarized Dark                         │ 1 - print("Hello, " + name)                     │ │
-│   10. ANSI Light                             │ 1 + print(f"Hello, {name}!")                    │ │
-│   11. Ayu Light                              │                                                 │ │
-│   12. Default Light                          └─────────────────────────────────────────────────┘ │
+│   10. Tokyo Night Dark                       │ 1 + print(f"Hello, {name}!")                    │ │
+│   11. ANSI Light                             │                                                 │ │
+│   12. Ayu Light                              └─────────────────────────────────────────────────┘ │
 │ ▼                                                                                                │
 │                                                                                                  │
 │ (Use Enter to select, Tab to configure scope, Esc to close)                                      │
@@ -103,9 +103,9 @@ exports[`ThemeDialog Snapshots > should render correctly in theme selection mode
 │    7. Holiday Dark                           │ 6     return a                                  │ │
 │    8. Shades Of Purple Dark                  │                                                 │ │
 │    9. Solarized Dark                         │ 1 - print("Hello, " + name)                     │ │
-│   10. ANSI Light                             │ 1 + print(f"Hello, {name}!")                    │ │
-│   11. Ayu Light                              │                                                 │ │
-│   12. Default Light                          └─────────────────────────────────────────────────┘ │
+│   10. Tokyo Night Dark                       │ 1 + print(f"Hello, {name}!")                    │ │
+│   11. ANSI Light                             │                                                 │ │
+│   12. Ayu Light                              └─────────────────────────────────────────────────┘ │
 │ ▼                                                                                                │
 │                                                                                                  │
 │ (Use Enter to select, Tab to configure scope, Esc to close)                                      │
@@ -128,9 +128,9 @@ exports[`ThemeDialog Snapshots > should render correctly in theme selection mode
 │    7. Holiday Dark                           │ 6     return a                                  │ │
 │    8. Shades Of Purple Dark                  │                                                 │ │
 │    9. Solarized Dark                         │ 1 - print("Hello, " + name)                     │ │
-│   10. ANSI Light                             │ 1 + print(f"Hello, {name}!")                    │ │
-│   11. Ayu Light                              │                                                 │ │
-│   12. Default Light                          └─────────────────────────────────────────────────┘ │
+│   10. Tokyo Night Dark                       │ 1 + print(f"Hello, {name}!")                    │ │
+│   11. ANSI Light                             │                                                 │ │
+│   12. Ayu Light                              └─────────────────────────────────────────────────┘ │
 │ ▼                                                                                                │
 │                                              ╭─────────────────────────────────────────────────╮ │
 │                                              │ DEVELOPER TOOLS (Not visible to users)          │ │
