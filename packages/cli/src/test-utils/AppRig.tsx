@@ -730,8 +730,20 @@ export class AppRig {
         const rootNode = this.renderResult?.rootNode;
         if (!rootNode) return false;
 
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        const find = (node: any): boolean => {
+        type TestableDOMNode = import('ink').DOMNode & {
+          internal_componentName?: string;
+          internal_testId?: string;
+          attributes?: {
+            internal_componentName?: string;
+            internal_testId?: string;
+          };
+          style?: {
+            internal_componentName?: string;
+            internal_testId?: string;
+          };
+        };
+
+        const find = (node: TestableDOMNode): boolean => {
           if (
             node.internal_componentName === componentName ||
             node.internal_testId === componentName ||
@@ -742,15 +754,20 @@ export class AppRig {
           ) {
             return true;
           }
-          if (node.childNodes) {
+          if ('childNodes' in node && node.childNodes) {
             for (const child of node.childNodes) {
-              if (child.nodeName !== '#text' && find(child)) return true;
+              if (
+                child.nodeName !== '#text' &&
+                find(child as TestableDOMNode)
+              ) {
+                return true;
+              }
             }
           }
           return false;
         };
 
-        return find(rootNode);
+        return find(rootNode as TestableDOMNode);
       },
       {
         timeout,

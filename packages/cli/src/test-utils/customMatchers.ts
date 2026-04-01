@@ -17,7 +17,7 @@ export interface CustomMatchers<R = unknown> {
     allowEmpty?: boolean;
     name?: string;
   }): Promise<R>;
-  toVisuallyContain(componentName: string): R;
+  toContainComponent(componentName: string): R;
   toHaveOnlyValidCharacters(): R;
 }
 
@@ -25,17 +25,30 @@ export interface CustomMatchers<R = unknown> {
 // eslint-disable-next-line no-control-regex
 const invalidCharsRegex = /[\b\x1b]/;
 
+type TestableDOMNode = DOMNode & {
+  internal_componentName?: string;
+  internal_testId?: string;
+  attributes?: {
+    internal_componentName?: string;
+    internal_testId?: string;
+  };
+  style?: {
+    internal_componentName?: string;
+    internal_testId?: string;
+  };
+};
+
 /**
  * Traverses the Ink tree to find a node matching a predicate.
  */
 function findInTree(
-  node: DOMNode,
-  predicate: (node: DOMNode) => boolean,
-): DOMNode | undefined {
+  node: TestableDOMNode,
+  predicate: (node: TestableDOMNode) => boolean,
+): TestableDOMNode | undefined {
   if (predicate(node)) return node;
-  if (node.nodeName !== '#text') {
-    for (const child of (node).childNodes) {
-      const found = findInTree(child, predicate);
+  if ('childNodes' in node && node.childNodes) {
+    for (const child of node.childNodes) {
+      const found = findInTree(child as TestableDOMNode, predicate);
       if (found) return found;
     }
   }
@@ -45,7 +58,7 @@ function findInTree(
 /**
  * Checks if the Ink DOM tree contains a specific component by name or testId.
  */
-export function toVisuallyContain(
+export function toContainComponent(
   this: Assertion,
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   received: any,
@@ -55,37 +68,26 @@ export function toVisuallyContain(
   const { isNot } = this as any;
 
   const rootNode = received.rootNode || received.renderResult?.rootNode;
-  const svg =
-    typeof received.generateSvg === 'function' ? received.generateSvg() : '';
 
-  // 1. Check logical tree presence (Automatic via Ink Root)
-  const isTreePresent = rootNode
-    ? !!findInTree(rootNode, (node) => {
+  // Check logical tree presence (Automatic via Ink Root)
+  const pass = rootNode
+    ? !!findInTree(rootNode as TestableDOMNode, (node) => {
         if (node.nodeName === '#text') return false;
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        const el = node as any;
         const match =
-          el.internal_componentName === componentName ||
-          el.internal_testId === componentName ||
-          el.attributes?.internal_componentName === componentName ||
-          el.attributes?.internal_testId === componentName ||
-          el.style?.internal_componentName === componentName ||
-          el.style?.internal_testId === componentName;
+          node.internal_componentName === componentName ||
+          node.internal_testId === componentName ||
+          node.attributes?.internal_componentName === componentName ||
+          node.attributes?.internal_testId === componentName ||
+          node.style?.internal_componentName === componentName ||
+          node.style?.internal_testId === componentName;
         return match;
       })
     : false;
 
-  // 2. Check physical presence in the SVG audit trail (Fallback)
-  const isPhysicallyPresent = svg.includes(
-    `<!-- component: ${componentName} -->`,
-  );
-
-  const pass = isTreePresent || isPhysicallyPresent;
-
   return {
     pass,
     message: () =>
-      `Expected component "${componentName}" ${isNot ? 'NOT ' : ''}to be present in the Ink tree or SVG metadata.`,
+      `Expected component "${componentName}" ${isNot ? 'NOT ' : ''}to be present in the Ink tree.`,
   };
 }
 
@@ -191,7 +193,7 @@ function toHaveOnlyValidCharacters(this: Assertion, buffer: TextBuffer) {
 expect.extend({
   toHaveOnlyValidCharacters,
   toMatchSvgSnapshot,
-  toVisuallyContain,
+  toContainComponent,
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
 } as any);
 
@@ -208,6 +210,6 @@ declare module 'vitest' {
       allowEmpty?: boolean;
       name?: string;
     }): Promise<void>;
-    toVisuallyContain(componentName: string): T;
+    toContainComponent(componentName: string): T;
   }
 }

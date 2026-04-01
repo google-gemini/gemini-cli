@@ -467,8 +467,7 @@ export const render = async (
     generateSvg: stdout.generateSvg,
     terminal: state.terminal,
     get rootNode() {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      return (instance as any).rootNode as DOMElement;
+      return (instance as InkInstance & { rootNode: DOMElement }).rootNode;
     },
     waitUntilReady: () => stdout.waitUntilReady(),
     capturedOverflowState: undefined,

@@ -38,7 +38,7 @@ describe('SuggestionsDisplay UX Journey', () => {
 
   it('should visually show the suggestions display when / is typed', async () => {
     // Initially should not have suggestions
-    expect(rig).not.toVisuallyContain(SuggestionsDisplay.name);
+    expect(rig).not.toContainComponent(SuggestionsDisplay.name);
 
     // Type '/' to trigger suggestions
     await rig.type('/');
@@ -47,7 +47,7 @@ describe('SuggestionsDisplay UX Journey', () => {
     await rig.waitForComponent(SuggestionsDisplay.name);
 
     // Assert that the component is now present in the tree
-    expect(rig).toVisuallyContain(SuggestionsDisplay.name);
+    expect(rig).toContainComponent(SuggestionsDisplay.name);
 
     // Also verify text for sanity
     expect(rig.lastFrame).toContain('about');
