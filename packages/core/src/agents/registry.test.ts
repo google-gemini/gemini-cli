@@ -1534,4 +1534,87 @@ describe('AgentRegistry', () => {
       expect(getterCalled).toBe(true); // Getter should have been called now
     });
   });
+
+  describe('browser agent sandbox registration', () => {
+    afterEach(() => {
+      vi.unstubAllEnvs();
+    });
+
+    it('should NOT register browser agent in container sandbox without existing mode', async () => {
+      vi.stubEnv('SANDBOX', 'docker-container-0');
+      const feedbackSpy = vi
+        .spyOn(coreEvents, 'emitFeedback')
+        .mockImplementation(() => {});
+
+      const config = makeMockedConfig({
+        agents: {
+          overrides: {
+            browser_agent: { enabled: true },
+          },
+          browser: {
+            sessionMode: 'persistent',
+          },
+        },
+      });
+      const registry = new TestableAgentRegistry(config);
+      await registry.initialize();
+
+      expect(registry.getDefinition('browser_agent')).toBeUndefined();
+      expect(feedbackSpy).toHaveBeenCalledWith(
+        'info',
+        expect.stringContaining('Browser agent disabled in container sandbox'),
+      );
+    });
+
+    it('should register browser agent in container sandbox with existing mode', async () => {
+      vi.stubEnv('SANDBOX', 'docker-container-0');
+
+      const config = makeMockedConfig({
+        agents: {
+          overrides: {
+            browser_agent: { enabled: true },
+          },
+          browser: {
+            sessionMode: 'existing',
+          },
+        },
+      });
+      const registry = new TestableAgentRegistry(config);
+      await registry.initialize();
+
+      expect(registry.getDefinition('browser_agent')).toBeDefined();
+    });
+
+    it('should register browser agent normally in seatbelt sandbox', async () => {
+      vi.stubEnv('SANDBOX', 'sandbox-exec');
+
+      const config = makeMockedConfig({
+        agents: {
+          overrides: {
+            browser_agent: { enabled: true },
+          },
+        },
+      });
+      const registry = new TestableAgentRegistry(config);
+      await registry.initialize();
+
+      expect(registry.getDefinition('browser_agent')).toBeDefined();
+    });
+
+    it('should register browser agent normally when not in sandbox', async () => {
+      vi.stubEnv('SANDBOX', '');
+
+      const config = makeMockedConfig({
+        agents: {
+          overrides: {
+            browser_agent: { enabled: true },
+          },
+        },
+      });
+      const registry = new TestableAgentRegistry(config);
+      await registry.initialize();
+
+      expect(registry.getDefinition('browser_agent')).toBeDefined();
+    });
+  });
 });
