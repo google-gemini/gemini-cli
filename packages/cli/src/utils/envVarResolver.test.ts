@@ -77,6 +77,28 @@ describe('resolveEnvVarsInString', () => {
 
     expect(result).toBe('value and $UNDEFINED mixed');
   });
+
+  it('should use default value when environment variable is missing', () => {
+    const result = resolveEnvVarsInString(
+      'URL: ${MISSING_VAR:-https://default.example.com}/api',
+    );
+    expect(result).toBe('URL: https://default.example.com/api');
+  });
+
+  it('should ignore default value when environment variable is present', () => {
+    process.env['PRESENT_VAR'] = 'https://actual.example.com';
+    const result = resolveEnvVarsInString(
+      'URL: ${PRESENT_VAR:-https://default.example.com}/api',
+    );
+    expect(result).toBe('URL: https://actual.example.com/api');
+  });
+
+  it('should correctly handle default values that contain colons or dashes', () => {
+    const result = resolveEnvVarsInString(
+      'Value: ${MISSING_VAR:-val:-123-abc}',
+    );
+    expect(result).toBe('Value: val:-123-abc');
+  });
 });
 
 describe('resolveEnvVarsInObject', () => {
