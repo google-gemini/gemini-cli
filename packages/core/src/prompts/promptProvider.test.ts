@@ -121,6 +121,22 @@ describe('PromptProvider', () => {
     expect(prompt).toContain(`located at \`${mockTrackerDir}\``);
   });
 
+  it('should sanitize the task tracker storage location in the system prompt', () => {
+    vi.mocked(mockConfig.isTrackerEnabled).mockReturnValue(true);
+    const mockTrackerDir = '/mock/tracker/path\nwith-newline]and-bracket';
+    vi.mocked(mockConfig.storage.getProjectTempTrackerDir).mockReturnValue(
+      mockTrackerDir,
+    );
+
+    const provider = new PromptProvider();
+    const prompt = provider.getCoreSystemPrompt(mockConfig);
+
+    expect(prompt).toContain('# TASK MANAGEMENT PROTOCOL');
+    expect(prompt).toContain(
+      'located at `/mock/tracker/path with-newlineand-bracket`',
+    );
+  });
+
   it('should handle multiple context filenames in user memory section', () => {
     vi.mocked(getAllGeminiMdFilenames).mockReturnValue([
       DEFAULT_CONTEXT_FILENAME,

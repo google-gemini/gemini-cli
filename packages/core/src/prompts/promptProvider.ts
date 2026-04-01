@@ -72,9 +72,14 @@ export class PromptProvider {
     const activeSnippets = isModernModel ? snippets : legacySnippets;
     const contextFilenames = getAllGeminiMdFilenames();
 
-    const trackerDir = context.config.isTrackerEnabled()
+    let trackerDir = context.config.isTrackerEnabled()
       ? context.config.storage.getProjectTempTrackerDir()
       : undefined;
+
+    if (trackerDir) {
+      // Sanitize path to prevent prompt injection
+      trackerDir = trackerDir.replace(/\n/g, ' ').replace(/\]/g, '');
+    }
 
     // --- Context Gathering ---
     let planModeToolsList = '';
