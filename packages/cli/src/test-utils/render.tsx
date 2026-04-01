@@ -666,8 +666,11 @@ export const renderWithProviders = async (
   const terminalWidth = width ?? baseState.terminalWidth;
 
   if (!config) {
-    config = makeFakeConfig();
-    await config.initialize();
+    config = makeFakeConfig({
+      useAlternateBuffer: settings.merged.ui?.useAlternateBuffer,
+      showMemoryUsage: settings.merged.ui?.showMemoryUsage,
+      accessibility: settings.merged.ui?.accessibility,
+    });
   }
 
   const mainAreaWidth = providedUiState?.mainAreaWidth ?? terminalWidth;
