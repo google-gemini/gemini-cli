@@ -13,7 +13,6 @@ import {
 } from './baseProfile.js';
 import {
   type SandboxPermissions,
-  sanitizePaths,
   GOVERNANCE_FILES,
   SECRET_FILES,
 } from '../../services/sandboxManager.js';
@@ -26,9 +25,9 @@ export interface SeatbeltArgsOptions {
   /** The primary workspace path to allow access to. */
   workspace: string;
   /** Additional paths to allow access to. */
-  allowedPaths?: string[];
+  allowedPaths: string[];
   /** Absolute paths to explicitly deny read/write access to (overrides allowlists). */
-  forbiddenPaths?: string[];
+  forbiddenPaths: string[];
   /** Whether to allow network access. */
   networkAccess?: boolean;
   /** Granular additional permissions. */
@@ -92,10 +91,7 @@ export function buildSeatbeltProfile(options: SeatbeltArgsOptions): string {
   // Add explicit deny rules for secret files (.env, .env.*) in the workspace and allowed paths.
   // We use regex rules to avoid expensive file discovery scans.
   // Anchoring to workspace/allowed paths to avoid over-blocking.
-  const searchPaths = sanitizePaths([
-    options.workspace,
-    ...(options.allowedPaths || []),
-  ]) || [options.workspace];
+  const searchPaths = [options.workspace, ...options.allowedPaths];
 
   for (const basePath of searchPaths) {
     const resolvedBase = tryRealpath(basePath);
@@ -159,7 +155,7 @@ export function buildSeatbeltProfile(options: SeatbeltArgsOptions): string {
   }
 
   // Handle allowedPaths
-  const allowedPaths = sanitizePaths(options.allowedPaths) || [];
+  const allowedPaths = options.allowedPaths;
   for (let i = 0; i < allowedPaths.length; i++) {
     const allowedPath = tryRealpath(allowedPaths[i]);
     profile += `(allow file-read* file-write* (subpath "${escapeSchemeString(allowedPath)}"))\n`;
@@ -203,7 +199,7 @@ export function buildSeatbeltProfile(options: SeatbeltArgsOptions): string {
   }
 
   // Handle forbiddenPaths
-  const forbiddenPaths = sanitizePaths(options.forbiddenPaths) || [];
+  const forbiddenPaths = options.forbiddenPaths;
   for (let i = 0; i < forbiddenPaths.length; i++) {
     const forbiddenPath = tryRealpath(forbiddenPaths[i]);
     profile += `(deny file-read* file-write* (subpath "${escapeSchemeString(forbiddenPath)}"))\n`;

@@ -420,7 +420,7 @@ describe('LinuxSandboxManager', () => {
 
         const customManager = new LinuxSandboxManager({
           workspace,
-          forbiddenPaths: ['/tmp/cache', '/opt/secret.txt'],
+          forbiddenPaths: async () => ['/tmp/cache', '/opt/secret.txt'],
         });
 
         const bwrapArgs = await getBwrapArgs(
@@ -452,7 +452,7 @@ describe('LinuxSandboxManager', () => {
 
         const customManager = new LinuxSandboxManager({
           workspace,
-          forbiddenPaths: ['/tmp/forbidden-symlink'],
+          forbiddenPaths: async () => ['/tmp/forbidden-symlink'],
         });
 
         const bwrapArgs = await getBwrapArgs(
@@ -480,7 +480,7 @@ describe('LinuxSandboxManager', () => {
 
         const customManager = new LinuxSandboxManager({
           workspace,
-          forbiddenPaths: ['/tmp/not-here.txt'],
+          forbiddenPaths: async () => ['/tmp/not-here.txt'],
         });
 
         const bwrapArgs = await getBwrapArgs(
@@ -509,7 +509,7 @@ describe('LinuxSandboxManager', () => {
 
         const customManager = new LinuxSandboxManager({
           workspace,
-          forbiddenPaths: ['/tmp/dir-link'],
+          forbiddenPaths: async () => ['/tmp/dir-link'],
         });
 
         const bwrapArgs = await getBwrapArgs(
@@ -534,7 +534,7 @@ describe('LinuxSandboxManager', () => {
 
         const customManager = new LinuxSandboxManager({
           workspace,
-          forbiddenPaths: ['/tmp/conflict'],
+          forbiddenPaths: async () => ['/tmp/conflict'],
         });
 
         const bwrapArgs = await getBwrapArgs(
@@ -550,12 +550,14 @@ describe('LinuxSandboxManager', () => {
           customManager,
         );
 
-        const bindTryIdx = bwrapArgs.indexOf('--bind-try');
-        const tmpfsIdx = bwrapArgs.lastIndexOf('--tmpfs');
+        // Conflict should have been filtered out of allow list (--bind-try)
+        expect(bwrapArgs).not.toContain('--bind-try');
+        expect(bwrapArgs).not.toContain('--bind-try-ro');
 
-        expect(bwrapArgs[bindTryIdx + 1]).toBe('/tmp/conflict');
-        expect(bwrapArgs[tmpfsIdx + 1]).toBe('/tmp/conflict');
-        expect(tmpfsIdx).toBeGreaterThan(bindTryIdx);
+        // It should only appear as a forbidden path (via --tmpfs)
+        const conflictIdx = bwrapArgs.indexOf('/tmp/conflict');
+        expect(conflictIdx).toBeGreaterThan(0);
+        expect(bwrapArgs[conflictIdx - 1]).toBe('--tmpfs');
       });
     });
   });

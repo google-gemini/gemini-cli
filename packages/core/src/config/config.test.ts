@@ -253,6 +253,10 @@ vi.mock('../core/tokenLimits.js', () => ({
 vi.mock('../code_assist/codeAssist.js');
 vi.mock('../code_assist/experiments/experiments.js');
 
+afterEach(() => {
+  vi.clearAllMocks();
+});
+
 describe('Server Config (config.ts)', () => {
   const MODEL = DEFAULT_GEMINI_MODEL;
   const SANDBOX: SandboxConfig = createMockSandboxConfig({
@@ -1612,6 +1616,31 @@ describe('Server Config (config.ts)', () => {
       expect(config.getSandboxEnabled()).toBe(true);
       expect(config.getSandboxAllowedPaths()).toEqual(['/only/this']);
       expect(config.getSandboxNetworkAccess()).toBe(false);
+    });
+
+    it('lazily resolves forbidden paths when first accessed', async () => {
+      const config = new Config({
+        ...baseParams,
+        sandbox: { enabled: true, command: 'docker' },
+      });
+
+      const fileService = config.getFileService();
+      vi.spyOn(fileService, 'getIgnoredPaths').mockResolvedValue([
+        '/tmp/forbidden',
+      ]);
+
+      await config.initialize();
+      expect(fileService.getIgnoredPaths).not.toHaveBeenCalled();
+
+      // Access resolved paths via the internal resolver
+      const resolved = await (
+        config as unknown as {
+          getSandboxForbiddenPaths: () => Promise<string[]>;
+        }
+      ).getSandboxForbiddenPaths();
+
+      expect(fileService.getIgnoredPaths).toHaveBeenCalled();
+      expect(resolved).toEqual(['/tmp/forbidden']);
     });
   });
 
