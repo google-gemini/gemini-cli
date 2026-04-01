@@ -302,6 +302,11 @@ export class BrowserManager {
       POTENTIALLY_NAVIGATING_TOOLS.has(toolName) &&
       !signal?.aborted
     ) {
+      // Don't re-inject if explicitly switching to a page in the background
+      if (toolName === 'select_page' && args['bringToFront'] === false) {
+        return result;
+      }
+
       try {
         if (this.shouldInjectOverlay) {
           await injectAutomationOverlay(this, signal);
