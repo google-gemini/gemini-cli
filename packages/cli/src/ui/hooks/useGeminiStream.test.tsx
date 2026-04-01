@@ -1022,6 +1022,90 @@ describe('useGeminiStream', () => {
     });
   });
 
+  it('should NOT stop responding when only update_topic is called', async () => {
+    const topicToolCalls: TrackedToolCall[] = [
+      {
+        request: {
+          callId: 'topic1',
+          name: UPDATE_TOPIC_TOOL_NAME,
+          args: {},
+          isClientInitiated: false,
+          prompt_id: 'prompt-id-3',
+        },
+        status: CoreToolCallStatus.Success,
+        response: {
+          callId: 'topic1',
+          responseParts: [
+            {
+              functionResponse: {
+                name: UPDATE_TOPIC_TOOL_NAME,
+                id: 'topic1',
+                response: {},
+              },
+            },
+          ],
+        },
+        tool: { displayName: 'Update Topic Context' },
+        invocation: { getDescription: () => 'Updating topic' },
+      } as any,
+    ];
+    const client = new MockedGeminiClientClass(mockConfig);
+
+    // Capture the onComplete callback
+    let capturedOnComplete:
+      | ((completedTools: TrackedToolCall[]) => Promise<void>)
+      | null = null;
+
+    mockUseToolScheduler.mockImplementation((onComplete) => {
+      capturedOnComplete = onComplete;
+      return [
+        topicToolCalls,
+        vi.fn(),
+        mockMarkToolsAsSubmitted,
+        vi.fn(),
+        vi.fn(),
+        0,
+      ];
+    });
+
+    await renderHookWithProviders(() =>
+      useGeminiStream(
+        client,
+        [],
+        mockAddItem,
+        mockConfig,
+        mockLoadedSettings,
+        mockOnDebugMessage,
+        mockHandleSlashCommand,
+        false,
+        () => 'vscode' as EditorType,
+        () => {},
+        () => Promise.resolve(),
+        false,
+        () => {},
+        () => {},
+        () => {},
+        80,
+        24,
+      ),
+    );
+
+    // Trigger the onComplete callback with the topic tool
+    await act(async () => {
+      if (capturedOnComplete) {
+        await capturedOnComplete(topicToolCalls);
+      }
+    });
+
+    await waitFor(() => {
+      // The streaming state should still be Responding because we didn't cancel anything important
+      // and we expect a continuation.
+      expect(mockMarkToolsAsSubmitted).toHaveBeenCalledWith(['topic1']);
+      // Should HAVE called back to the API for continuation
+      expect(mockSendMessageStream).toHaveBeenCalled();
+    });
+  });
+
   it('should stop agent execution immediately when a tool call returns STOP_EXECUTION error', async () => {
     const stopExecutionToolCalls: TrackedCompletedToolCall[] = [
       {

@@ -1969,11 +1969,19 @@ export const useGeminiStream = (
 
       // If all the tools were cancelled, don't submit a response to Gemini.
       // Note: we ignore the topic tool because the user doesn't have a chance to decline it.
-      const allDeclinableToolsCancelled = geminiTools
-        .filter((tc) => !isTopicTool(tc.request.name))
-        .every((tc) => tc.status === CoreToolCallStatus.Cancelled);
+      const declinableTools = geminiTools.filter(
+        (tc) => !isTopicTool(tc.request.name),
+      );
+      const allDeclinableToolsCancelled =
+        declinableTools.length > 0 &&
+        declinableTools.every(
+          (tc) => tc.status === CoreToolCallStatus.Cancelled,
+        );
+      const allToolsCancelled =
+        geminiTools.length > 0 &&
+        geminiTools.every((tc) => tc.status === CoreToolCallStatus.Cancelled);
 
-      if (allDeclinableToolsCancelled && geminiTools.length > 0) {
+      if (allDeclinableToolsCancelled || allToolsCancelled) {
         // If the turn was cancelled via the imperative escape key flow,
         // the cancellation message is added there. We check the ref to avoid duplication.
         if (!turnCancelledRef.current) {
