@@ -71,9 +71,11 @@ export function ModelDialog({ onClose }: ModelDialogProps): React.JSX.Element {
   const manualModelSelected = useMemo(() => {
     if (
       config?.getExperimentalDynamicModelConfiguration?.() === true &&
-      config.modelConfigService
+      config.getModelConfigService
     ) {
-      const def = config.modelConfigService.getModelDefinition(preferredModel);
+      const def = config
+        .getModelConfigService()
+        .getModelDefinition(preferredModel);
       // Only treat as manual selection if it's a visible, non-auto model.
       return def && def.tier !== 'auto' && def.isVisible === true
         ? preferredModel
@@ -119,30 +121,25 @@ export function ModelDialog({ onClose }: ModelDialogProps): React.JSX.Element {
     // --- DYNAMIC PATH ---
     if (
       config?.getExperimentalDynamicModelConfiguration?.() === true &&
-      config.modelConfigService
+      config.getModelConfigService
     ) {
-      const list = Object.entries(
-        config.modelConfigService.getModelDefinitions?.() ?? {},
-      )
-        .filter(([_, m]) => {
-          // Basic visibility and Preview access
-          if (m.isVisible !== true) return false;
-          if (m.isPreview && !shouldShowPreviewModels) return false;
-          // Only auto models are shown on the main menu
-          if (m.tier !== 'auto') return false;
-          return true;
-        })
-        .map(([id, m]) => ({
-          value: id,
-          title: m.displayName ?? getDisplayString(id, config ?? undefined),
-          description:
-            id === 'auto-gemini-3' && useGemini31
-              ? (m.dialogDescription ?? '').replace(
-                  'gemini-3-pro',
-                  'gemini-3.1-pro',
-                )
-              : (m.dialogDescription ?? ''),
-          key: id,
+      const allOptions = config
+        .getModelConfigService()
+        .getAvailableModelOptions({
+          useGemini3_1: useGemini31,
+          useGemini3_1FlashLite: useGemini31FlashLite,
+          useCustomTools: useCustomToolModel,
+          hasAccessToPreview: shouldShowPreviewModels,
+          hasAccessToProModel,
+        });
+
+      const list = allOptions
+        .filter((o) => o.tier === 'auto')
+        .map((o) => ({
+          value: o.modelId,
+          title: o.name,
+          description: o.description,
+          key: o.modelId,
         }));
 
       list.push({
@@ -186,64 +183,39 @@ export function ModelDialog({ onClose }: ModelDialogProps): React.JSX.Element {
       });
     }
     return list;
-  }, [config, shouldShowPreviewModels, manualModelSelected, useGemini31]);
+  }, [
+    config,
+    shouldShowPreviewModels,
+    manualModelSelected,
+    useGemini31,
+    useGemini31FlashLite,
+    useCustomToolModel,
+    hasAccessToProModel,
+  ]);
 
   const manualOptions = useMemo(() => {
     // --- DYNAMIC PATH ---
     if (
       config?.getExperimentalDynamicModelConfiguration?.() === true &&
-      config.modelConfigService
+      config.getModelConfigService
     ) {
-      const list = Object.entries(
-        config.modelConfigService.getModelDefinitions?.() ?? {},
-      )
-        .filter(([id, m]) => {
-          // Basic visibility and Preview access
-          if (m.isVisible !== true) return false;
-          if (m.isPreview && !shouldShowPreviewModels) return false;
-          // Auto models are for main menu only
-          if (m.tier === 'auto') return false;
-          // Pro models are shown for users with pro access
-          if (!hasAccessToProModel && m.tier === 'pro') return false;
-
-          // Flag Guard: Versioned models only show if their flag is active.
-          if (id === PREVIEW_GEMINI_3_1_MODEL && !useGemini31) return false;
-          if (
-            id === PREVIEW_GEMINI_3_1_FLASH_LITE_MODEL &&
-            !useGemini31FlashLite
-          )
-            return false;
-
-          return true;
-        })
-        .map(([id, m]) => {
-          const resolvedId = config.modelConfigService.resolveModelId(id, {
-            useGemini3_1: useGemini31,
-            useGemini3_1FlashLite: useGemini31FlashLite,
-            useCustomTools: useCustomToolModel,
-          });
-          // Title ID is the resolved ID without custom tools flag
-          const titleId = config.modelConfigService.resolveModelId(id, {
-            useGemini3_1: useGemini31,
-            useGemini3_1FlashLite: useGemini31FlashLite,
-          });
-          return {
-            value: resolvedId,
-            title:
-              m.displayName ?? getDisplayString(titleId, config ?? undefined),
-            key: id,
-          };
+      const allOptions = config
+        .getModelConfigService()
+        .getAvailableModelOptions({
+          useGemini3_1: useGemini31,
+          useGemini3_1FlashLite: useGemini31FlashLite,
+          useCustomTools: useCustomToolModel,
+          hasAccessToPreview: shouldShowPreviewModels,
+          hasAccessToProModel,
         });
 
-      // Deduplicate: only show one entry per unique resolved model value.
-      // This is needed because 3 pro and 3.1 pro models can resolve to the same
-      // value, depending on the useGemini31 flag.
-      const seen = new Set<string>();
-      return list.filter((option) => {
-        if (seen.has(option.value)) return false;
-        seen.add(option.value);
-        return true;
-      });
+      return allOptions
+        .filter((o) => o.tier !== 'auto')
+        .map((o) => ({
+          value: o.modelId,
+          title: o.name,
+          key: o.modelId,
+        }));
     }
 
     // --- LEGACY PATH ---
