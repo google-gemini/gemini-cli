@@ -3617,6 +3617,9 @@ export class Config implements McpContext, AgentLoopContext {
     }
 
     const discoveredNames = this.agentRegistry.getAllDiscoveredAgentNames();
+    const activeTeam = this.teamRegistry.getActiveTeam();
+    const teamAgentNames = new Set(activeTeam?.agents.map((a) => a.name) ?? []);
+
     for (const agentName of discoveredNames) {
       const definition = this.agentRegistry.getDiscoveredDefinition(agentName);
       if (!definition) {
@@ -3630,7 +3633,17 @@ export class Config implements McpContext, AgentLoopContext {
           continue;
         }
 
-        const tool = new SubagentTool(definition, this, this.messageBus);
+        let descriptionOverride = definition.description;
+        if (teamAgentNames.has(definition.name)) {
+          descriptionOverride = `(Team Agent: ${activeTeam?.displayName}) ${definition.description}`;
+        }
+
+        const tool = new SubagentTool(
+          definition,
+          this,
+          this.messageBus,
+          descriptionOverride,
+        );
         registry.registerTool(tool);
       } catch (e: unknown) {
         debugLogger.warn(
@@ -3730,8 +3743,10 @@ export class Config implements McpContext, AgentLoopContext {
   }
 
   private onAgentsRefreshed = async () => {
+    debugLogger.log('[Config] onAgentsRefreshed triggered');
     await this.teamRegistry.reload();
     if (this._toolRegistry) {
+      debugLogger.log('[Config] Re-registering sub-agent tools');
       this.registerSubAgentTools(this._toolRegistry);
     }
     // Propagate updates to the active chat session

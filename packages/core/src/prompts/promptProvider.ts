@@ -140,6 +140,7 @@ export class PromptProvider {
           contextFilenames,
           topicUpdateNarration: context.config.isTopicUpdateNarrationEnabled(),
         })),
+        activeTeam: context.config.getActiveTeam(),
         subAgents: this.withSection('agentContexts', () =>
           context.config
             .getAgentRegistry()

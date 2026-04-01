@@ -48,7 +48,7 @@ export class TeamRegistry {
     // Load user-level teams first
     const userTeamsDir = Storage.getUserTeamsDir();
     const userLoadResult = await loadTeamsFromDirectory(userTeamsDir);
-    this.processLoadResult(userLoadResult);
+    await this.processLoadResult(userLoadResult);
 
     const folderTrustEnabled = this.config.getFolderTrust();
     const isTrustedFolder = this.config.isTrustedFolder();
@@ -65,7 +65,7 @@ export class TeamRegistry {
       // Load project-level teams (takes precedence over user-level if names collide)
       const projectTeamsDir = this.config.storage.getProjectTeamsDir();
       const projectLoadResult = await loadTeamsFromDirectory(projectTeamsDir);
-      this.processLoadResult(projectLoadResult);
+      await this.processLoadResult(projectLoadResult);
     }
 
     if (this.config.getDebugMode()) {
@@ -73,29 +73,35 @@ export class TeamRegistry {
     }
   }
 
-  private processLoadResult(result: TeamLoadResult): void {
+  private async processLoadResult(result: TeamLoadResult): Promise<void> {
     for (const error of result.errors) {
       debugLogger.warn(`[TeamRegistry] Error loading team: ${error.message}`);
       coreEvents.emitFeedback('error', `Team loading error: ${error.message}`);
     }
+
+    const registrationPromises: Array<Promise<void>> = [];
 
     for (const team of result.teams) {
       this.teams.set(team.name, team);
 
       // Register team agents in the global AgentRegistry so they are available as SubagentTools
       for (const agent of team.agents) {
-        this.agentRegistry.registerAgent(agent).catch((e) => {
-          debugLogger.warn(
-            `[TeamRegistry] Error registering agent "${agent.name}" from team "${team.name}":`,
-            e,
-          );
-          coreEvents.emitFeedback(
-            'error',
-            `Error registering agent "${agent.name}" from team "${team.name}": ${e instanceof Error ? e.message : String(e)}`,
-          );
-        });
+        registrationPromises.push(
+          this.agentRegistry.registerAgent(agent).catch((e) => {
+            debugLogger.warn(
+              `[TeamRegistry] Error registering agent "${agent.name}" from team "${team.name}":`,
+              e,
+            );
+            coreEvents.emitFeedback(
+              'error',
+              `Error registering agent "${agent.name}" from team "${team.name}": ${e instanceof Error ? e.message : String(e)}`,
+            );
+          }),
+        );
       }
     }
+
+    await Promise.allSettled(registrationPromises);
   }
 
   /**

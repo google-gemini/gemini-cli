@@ -36,12 +36,14 @@ import {
 } from '../tools/tool-names.js';
 import type { HierarchicalMemory } from '../config/memory.js';
 import { DEFAULT_CONTEXT_FILENAME } from '../tools/memoryTool.js';
+import { type TeamDefinition } from '../agents/types.js';
 
 // --- Options Structs ---
 
 export interface SystemPromptOptions {
   preamble?: PreambleOptions;
   coreMandates?: CoreMandatesOptions;
+  activeTeam?: TeamDefinition;
   subAgents?: SubAgentOptions[];
   agentSkills?: AgentSkillOptions[];
   hookContext?: boolean;
@@ -125,6 +127,8 @@ export function getCoreSystemPrompt(options: SystemPromptOptions): string {
 ${renderPreamble(options.preamble)}
 
 ${renderCoreMandates(options.coreMandates)}
+
+${renderActiveTeam(options.activeTeam)}
 
 ${renderSubAgents(options.subAgents)}
 
@@ -245,6 +249,16 @@ Use the following guidelines to optimize your search and read patterns.
     options.hasSkills,
   )}${mandateContinueWork(options.interactive)}
 `.trim();
+}
+
+export function renderActiveTeam(team?: TeamDefinition): string {
+  if (!team) return '';
+  return `
+# Active Agent Team: ${team.displayName}
+
+${team.instructions}
+
+You should prioritize delegating tasks to this team's agents whenever appropriate.`.trim();
 }
 
 export function renderSubAgents(subAgents?: SubAgentOptions[]): string {

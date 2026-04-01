@@ -33,6 +33,7 @@ export class SubagentTool extends BaseDeclarativeTool<AgentInputs, ToolResult> {
     private readonly definition: AgentDefinition,
     private readonly context: AgentLoopContext,
     messageBus: MessageBus,
+    descriptionOverride?: string,
   ) {
     const inputSchema = definition.inputConfig.inputSchema;
 
@@ -47,7 +48,7 @@ export class SubagentTool extends BaseDeclarativeTool<AgentInputs, ToolResult> {
     super(
       definition.name,
       definition.displayName ?? definition.name,
-      definition.description,
+      descriptionOverride ?? definition.description,
       Kind.Agent,
       inputSchema,
       messageBus,
