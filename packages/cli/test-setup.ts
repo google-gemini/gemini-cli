@@ -6,7 +6,7 @@
 
 import { vi, beforeEach, afterEach } from 'vitest';
 import { format } from 'node:util';
-import { coreEvents } from '@google/gemini-cli-core';
+import { coreEvents, debugLogger } from '@google/gemini-cli-core';
 import { themeManager } from './src/ui/themes/theme-manager.js';
 import { mockInkSpinner } from './src/test-utils/mockSpinner.js';
 
@@ -42,9 +42,24 @@ import './src/test-utils/customMatchers.js';
 let consoleErrorSpy: vi.SpyInstance;
 let actWarnings: Array<{ message: string; stack: string }> = [];
 
+let logSpy: vi.SpyInstance;
+let warnSpy: vi.SpyInstance;
+let errorSpy: vi.SpyInstance;
+let debugSpy: vi.SpyInstance;
+
 beforeEach(() => {
   // Reset themeManager state to ensure test isolation
   themeManager.resetForTesting();
+
+  // Mock debugLogger to avoid test output noise
+  logSpy = vi.spyOn(debugLogger, 'log').mockImplementation(() => {});
+  warnSpy = vi.spyOn(debugLogger, 'warn').mockImplementation((...args) => {
+    console.warn(...args);
+  });
+  errorSpy = vi.spyOn(debugLogger, 'error').mockImplementation((...args) => {
+    console.error(...args);
+  });
+  debugSpy = vi.spyOn(debugLogger, 'debug').mockImplementation(() => {});
 
   actWarnings = [];
   consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation((...args) => {
@@ -88,8 +103,12 @@ beforeEach(() => {
 afterEach(() => {
   consoleErrorSpy.mockRestore();
 
-  vi.unstubAllEnvs();
+  logSpy?.mockRestore();
+  warnSpy?.mockRestore();
+  errorSpy?.mockRestore();
+  debugSpy?.mockRestore();
 
+  vi.unstubAllEnvs();
   if (actWarnings.length > 0) {
     const messages = actWarnings
       .map(({ message, stack }) => `${message}\n${stack}`)
