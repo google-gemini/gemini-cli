@@ -242,6 +242,16 @@ export class ReadFileTool extends BaseDeclarativeTool<
       return validationError;
     }
 
+    const mimetype = getSpecificMimeType(resolvedPath);
+    if (
+      mimetype.startsWith('image/') ||
+      mimetype.startsWith('video/') ||
+      mimetype.startsWith('audio/') ||
+      mimetype === 'application/octet-stream'
+    ) {
+      return `File path '${params.file_path}' appears to be a binary file (${mimetype}). 'read_file' can only be used for text-based files.`;
+    }
+
     if (params.start_line !== undefined && params.start_line < 1) {
       return 'start_line must be at least 1';
     }

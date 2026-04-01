@@ -641,7 +641,7 @@ As you work, the user follows along by reading topic updates that you publish wi
 
 function mandateExplainBeforeActing(): string {
   return `
-- **Explain Before Acting:** Never call tools in silence. You MUST provide a concise, one-sentence explanation of your intent or strategy immediately before executing tool calls. This is essential for transparency, especially when confirming a request or answering a question. Silence is only acceptable for repetitive, low-level discovery operations (e.g., sequential file reads) where narration would be noisy.
+- **Explain Before Acting:** Never call tools in silence. You MUST provide a concise, one-sentence explanation of your intent or strategy in the conversational text immediately before executing tool calls. This is mandatory for every turn that includes tool calls. The explanation must describe *what* you are about to do and *why*.
 - **Explaining Changes:** After completing a code modification or file operation *do not* provide summaries unless asked.`;
 }
 
