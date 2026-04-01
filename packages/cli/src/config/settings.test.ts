@@ -2026,6 +2026,47 @@ describe('Settings Loading and Merging', () => {
         process.argv = originalArgv;
       }
     });
+
+    it('ignores local .env files when ignoreLocalDotEnv is true', () => {
+      // Mock homedir to return a consistent path
+      const mockHomeDir = path.resolve('/mock/home/user');
+      const globalEnvPath = path.join(mockHomeDir, GEMINI_DIR, '.env');
+      // findEnvFile checks both GEMINI_DIR/.env AND .env in each directory.
+      // We'll mock the .env one since that's what's typically in a project.
+      const localEnvPath = path.join(MOCK_WORKSPACE_DIR, '.env');
+
+      delete process.env['LOCAL_VAR'];
+      delete process.env['GLOBAL_VAR'];
+
+      vi.spyOn(trustedFolders, 'isWorkspaceTrusted').mockReturnValue({
+        isTrusted: true,
+        source: 'file',
+      });
+
+      const mockFsExistsSync = vi.mocked(fs.existsSync);
+      mockFsExistsSync.mockImplementation((p: fs.PathLike) => {
+        const normalizedP = path.resolve(p.toString());
+        return [globalEnvPath, localEnvPath].includes(normalizedP);
+      });
+
+      vi.mocked(fs.readFileSync).mockImplementation(
+        (p: fs.PathOrFileDescriptor) => {
+          const normalizedP = path.resolve(p.toString());
+          if (normalizedP === localEnvPath) return 'LOCAL_VAR=local';
+          if (normalizedP === globalEnvPath) return 'GLOBAL_VAR=global';
+          return '';
+        },
+      );
+
+      const settings = {
+        advanced: { ignoreLocalDotEnv: true },
+      } as Settings;
+
+      loadEnvironment(settings, MOCK_WORKSPACE_DIR, isWorkspaceTrusted);
+
+      expect(process.env['LOCAL_VAR']).toBeUndefined();
+      expect(process.env['GLOBAL_VAR']).toEqual('global');
+    });
   });
 
   describe('migrateDeprecatedSettings', () => {
