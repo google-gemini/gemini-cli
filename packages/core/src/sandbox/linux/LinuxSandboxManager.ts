@@ -17,6 +17,7 @@ import {
   getSecretFileFindArgs,
   sanitizePaths,
   type ParsedSandboxDenial,
+  resolveSandboxPaths,
 } from '../../services/sandboxManager.js';
 import type { ShellExecutionResult } from '../../services/shellExecutionService.js';
 import {
@@ -294,7 +295,7 @@ export class LinuxSandboxManager implements SandboxManager {
       bwrapArgs.push(bindFlag, mainGitDir, mainGitDir);
     }
 
-    const includeDirs = sanitizePaths(this.options.includeDirectories) || [];
+    const includeDirs = sanitizePaths(this.options.includeDirectories);
     for (const includeDir of includeDirs) {
       try {
         const resolved = tryRealpath(includeDir);
@@ -304,7 +305,8 @@ export class LinuxSandboxManager implements SandboxManager {
       }
     }
 
-    const allowedPaths = sanitizePaths(req.policy?.allowedPaths) || [];
+    const { allowed: allowedPaths, forbidden: forbiddenPaths } =
+      await resolveSandboxPaths(this.options, req);
 
     const normalizedWorkspace = normalize(workspacePath).replace(/\/$/, '');
     for (const allowedPath of allowedPaths) {
@@ -330,8 +332,7 @@ export class LinuxSandboxManager implements SandboxManager {
       }
     }
 
-    const additionalReads =
-      sanitizePaths(mergedAdditional.fileSystem?.read) || [];
+    const additionalReads = sanitizePaths(mergedAdditional.fileSystem?.read);
     for (const p of additionalReads) {
       try {
         const safeResolvedPath = tryRealpath(p);
@@ -341,8 +342,7 @@ export class LinuxSandboxManager implements SandboxManager {
       }
     }
 
-    const additionalWrites =
-      sanitizePaths(mergedAdditional.fileSystem?.write) || [];
+    const additionalWrites = sanitizePaths(mergedAdditional.fileSystem?.write);
     for (const p of additionalWrites) {
       try {
         const safeResolvedPath = tryRealpath(p);
@@ -362,7 +362,6 @@ export class LinuxSandboxManager implements SandboxManager {
       }
     }
 
-    const forbiddenPaths = sanitizePaths(this.options.forbiddenPaths) || [];
     for (const p of forbiddenPaths) {
       let resolved: string;
       try {

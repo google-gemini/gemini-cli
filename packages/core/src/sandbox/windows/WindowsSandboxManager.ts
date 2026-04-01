@@ -19,6 +19,7 @@ import {
   tryRealpath,
   type SandboxPermissions,
   type ParsedSandboxDenial,
+  resolveSandboxPaths,
 } from '../../services/sandboxManager.js';
 import type { ShellExecutionResult } from '../../services/shellExecutionService.js';
 import {
@@ -288,14 +289,16 @@ export class WindowsSandboxManager implements SandboxManager {
       await this.grantLowIntegrityAccess(this.options.workspace);
     }
 
+    const { allowed: allowedPaths, forbidden: forbiddenPaths } =
+      await resolveSandboxPaths(this.options, req);
+
     // Grant "Low Mandatory Level" access to includeDirectories.
-    const includeDirs = sanitizePaths(this.options.includeDirectories) || [];
+    const includeDirs = sanitizePaths(this.options.includeDirectories);
     for (const includeDir of includeDirs) {
       await this.grantLowIntegrityAccess(includeDir);
     }
 
     // Grant "Low Mandatory Level" read/write access to allowedPaths.
-    const allowedPaths = sanitizePaths(req.policy?.allowedPaths) || [];
     for (const allowedPath of allowedPaths) {
       const resolved = await tryRealpath(allowedPath);
       if (!fs.existsSync(resolved)) {
@@ -308,8 +311,9 @@ export class WindowsSandboxManager implements SandboxManager {
     }
 
     // Grant "Low Mandatory Level" write access to additional permissions write paths.
-    const additionalWritePaths =
-      sanitizePaths(mergedAdditional.fileSystem?.write) || [];
+    const additionalWritePaths = sanitizePaths(
+      mergedAdditional.fileSystem?.write,
+    );
     for (const writePath of additionalWritePaths) {
       const resolved = await tryRealpath(writePath);
       if (!fs.existsSync(resolved)) {
@@ -358,7 +362,6 @@ export class WindowsSandboxManager implements SandboxManager {
     // is restricted to avoid host corruption. External commands rely on
     // Low Integrity read/write restrictions, while internal commands
     // use the manifest for enforcement.
-    const forbiddenPaths = sanitizePaths(this.options.forbiddenPaths) || [];
     for (const forbiddenPath of forbiddenPaths) {
       try {
         await this.denyLowIntegrityAccess(forbiddenPath);
