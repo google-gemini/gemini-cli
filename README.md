@@ -371,7 +371,7 @@ for planned features and priorities.
 
 ## 📖 Resources
 
-- **[Official Roadmap](./ROADMAP)** - See what's coming next.
+- **[Official Roadmap](./ROADMAP.md)** - See what's coming next.
 - **[Changelog](https://www.geminicli.com/docs/changelogs/index)** - See recent
   notable updates.
 - **[NPM Package](https://www.npmjs.com/package/@google/gemini-cli)** - Package
