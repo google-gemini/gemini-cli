@@ -89,6 +89,7 @@ export class FolderTrustDiscoveryService {
         const skillFiles = await glob('**/SKILL.md', {
           cwd: skillsDir,
           nodir: true,
+          dot: true,
           ignore: ['**/node_modules/**', '**/.git/**'],
         });
         for (const skillFile of skillFiles) {
