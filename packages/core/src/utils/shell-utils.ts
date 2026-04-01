@@ -976,9 +976,6 @@ function detectPowerShellSubstitution(command: string): boolean {
     if (char === '@' && command[i + 1] === '(') {
       return true;
     }
-    if (char === '(' && !inDoubleQuote) {
-      return true;
-    }
     i++;
   }
   return false;
