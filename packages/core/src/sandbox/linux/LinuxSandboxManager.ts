@@ -144,6 +144,10 @@ export class LinuxSandboxManager implements SandboxManager {
     return parsePosixSandboxDenials(result);
   }
 
+  getWorkspace(): string {
+    return this.options.workspace;
+  }
+
   private getMaskFilePath(): string {
     if (
       LinuxSandboxManager.maskFilePath &&
@@ -193,9 +197,11 @@ export class LinuxSandboxManager implements SandboxManager {
           this.options.modeConfig?.approvedTools,
         )
       : false;
-    const workspaceWrite = !isReadonlyMode || isApproved;
+    const isYolo = this.options.modeConfig?.yolo ?? false;
+    const workspaceWrite = !isReadonlyMode || isApproved || isYolo;
+
     const networkAccess =
-      this.options.modeConfig?.network || req.policy?.networkAccess || false;
+      this.options.modeConfig?.network || req.policy?.networkAccess || isYolo;
 
     const persistentPermissions = allowOverrides
       ? this.options.policyManager?.getCommandPermissions(commandName)
