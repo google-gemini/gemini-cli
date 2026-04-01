@@ -30,8 +30,9 @@ import {
 } from '../tools/mcp-tool.js';
 import { CompressionStatus } from '../core/turn.js';
 import { type ToolCallRequestInfo } from '../scheduler/types.js';
-import { ChatCompressionService } from '../services/chatCompressionService.js';
+import { ChatCompressionService } from '../context/chatCompressionService.js';
 import { getDirectoryContextString } from '../utils/environmentContext.js';
+import { renderUserMemory } from '../prompts/snippets.js';
 import { promptIdContext } from '../utils/promptIdContext.js';
 import {
   logAgentStart,
@@ -120,7 +121,8 @@ export class LocalAgentExecutor<TOutput extends z.ZodTypeAny> {
   private get executionContext(): AgentLoopContext {
     return {
       config: this.context.config,
-      promptId: this.context.promptId,
+      promptId: this.agentId,
+      parentSessionId: this.context.parentSessionId || this.context.promptId, // Always preserve the main agent session ID
       geminiClient: this.context.geminiClient,
       sandboxManager: this.context.sandboxManager,
       toolRegistry: this.toolRegistry,
@@ -254,9 +256,6 @@ export class LocalAgentExecutor<TOutput extends z.ZodTypeAny> {
 
     agentToolRegistry.sortTools();
 
-    // Get the parent prompt ID from context
-    const parentPromptId = context.promptId;
-
     // Get the parent tool call ID from context
     const toolContext = getToolCallContext();
     const parentCallId = toolContext?.callId;
@@ -264,7 +263,6 @@ export class LocalAgentExecutor<TOutput extends z.ZodTypeAny> {
     return new LocalAgentExecutor(
       definition,
       context,
-      parentPromptId,
       agentToolRegistry,
       agentPromptRegistry,
       agentResourceRegistry,
@@ -282,7 +280,6 @@ export class LocalAgentExecutor<TOutput extends z.ZodTypeAny> {
   private constructor(
     definition: LocalAgentDefinition<TOutput>,
     context: AgentLoopContext,
-    parentPromptId: string | undefined,
     toolRegistry: ToolRegistry,
     promptRegistry: PromptRegistry,
     resourceRegistry: ResourceRegistry,
@@ -298,11 +295,7 @@ export class LocalAgentExecutor<TOutput extends z.ZodTypeAny> {
     this.compressionService = new ChatCompressionService();
     this.parentCallId = parentCallId;
 
-    const randomIdPart = Math.random().toString(36).slice(2, 8);
-    // parentPromptId will be undefined if this agent is invoked directly
-    // (top-level), rather than as a sub-agent.
-    const parentPrefix = parentPromptId ? `${parentPromptId}-` : '';
-    this.agentId = `${parentPrefix}${this.definition.name}-${randomIdPart}`;
+    this.agentId = Math.random().toString(36).slice(2, 8);
   }
 
   /**
@@ -322,7 +315,7 @@ export class LocalAgentExecutor<TOutput extends z.ZodTypeAny> {
   ): Promise<AgentTurnResult> {
     const promptId = `${this.agentId}#${turnCounter}`;
 
-    await this.tryCompressChat(chat, promptId);
+    await this.tryCompressChat(chat, promptId, combinedSignal);
 
     const { functionCalls } = await promptIdContext.run(promptId, async () =>
       this.callModel(chat, currentMessage, combinedSignal, promptId),
@@ -585,12 +578,24 @@ export class LocalAgentExecutor<TOutput extends z.ZodTypeAny> {
           );
         const formattedInitialHints = formatUserHintsForModel(initialHints);
 
-        let currentMessage: Content = formattedInitialHints
-          ? {
-              role: 'user',
-              parts: [{ text: formattedInitialHints }, { text: query }],
-            }
-          : { role: 'user', parts: [{ text: query }] };
+        // Inject loaded memory files (JIT + extension/project memory)
+        const environmentMemory = this.context.config.isJitContextEnabled?.()
+          ? this.context.config.getSessionMemory()
+          : this.context.config.getEnvironmentMemory();
+
+        const initialParts: Part[] = [];
+        if (environmentMemory) {
+          initialParts.push({ text: environmentMemory });
+        }
+        if (formattedInitialHints) {
+          initialParts.push({ text: formattedInitialHints });
+        }
+        initialParts.push({ text: query });
+
+        let currentMessage: Content = {
+          role: 'user',
+          parts: initialParts,
+        };
 
         while (true) {
           // Check for termination conditions like max turns.
@@ -797,6 +802,7 @@ export class LocalAgentExecutor<TOutput extends z.ZodTypeAny> {
   private async tryCompressChat(
     chat: GeminiChat,
     prompt_id: string,
+    abortSignal?: AbortSignal,
   ): Promise<void> {
     const model = this.definition.modelConfig.model ?? DEFAULT_GEMINI_MODEL;
 
@@ -807,6 +813,7 @@ export class LocalAgentExecutor<TOutput extends z.ZodTypeAny> {
       model,
       this.context.config,
       this.hasFailedCompressionAttempt,
+      abortSignal,
     );
 
     if (
@@ -1227,6 +1234,7 @@ export class LocalAgentExecutor<TOutput extends z.ZodTypeAny> {
             name: toolName,
             id: call.request.callId,
             output: call.response.resultDisplay,
+            data: call.response.data,
           });
         } else if (call.status === 'error') {
           this.emitActivity('ERROR', {
@@ -1321,9 +1329,13 @@ export class LocalAgentExecutor<TOutput extends z.ZodTypeAny> {
           toolsList.push(toolRef);
         }
       }
-      // Add schemas from tools that were explicitly registered by name, wildcard, or instance.
-      toolsList.push(...this.toolRegistry.getFunctionDeclarations());
     }
+    // Add schemas from tools that were explicitly registered by name, wildcard, or instance.
+    toolsList.push(
+      ...this.toolRegistry.getFunctionDeclarations(
+        this.definition.modelConfig.model,
+      ),
+    );
 
     // Always inject complete_task.
     // Configure its schema based on whether output is expected.
@@ -1374,6 +1386,12 @@ export class LocalAgentExecutor<TOutput extends z.ZodTypeAny> {
 
     // Inject user inputs into the prompt template.
     let finalPrompt = templateString(promptConfig.systemPrompt, inputs);
+
+    // Append memory context if available.
+    const systemMemory = this.context.config.getSystemInstructionMemory();
+    if (systemMemory) {
+      finalPrompt += `\n\n${renderUserMemory(systemMemory)}`;
+    }
 
     // Append environment context (CWD and folder structure).
     const dirContext = await getDirectoryContextString(this.context.config);

@@ -2,10 +2,13 @@
 
 exports[`AlternateBufferQuittingDisplay > renders with a tool awaiting confirmation > with_confirming_tool 1`] = `
 "
-  ▝▜▄     Gemini CLI v0.10.0
-    ▝▜▄
-   ▗▟▀ 
-  ▝▀    
+ ▝▜▄      ▗█▀▀▜▙▝█▛▀▀▌▜██▖▟██▘▜█▘▜██▖▝█▛▝█▛
+   ▝▜▄    █▌     █▙▟  ▐█▝█▛▐█ ▐█ ▐█▝█▖█▌ █▌
+  ▗▟▀     ▜▙ ▝█▛ █▌▝ ▖▐█   ▐█ ▐█ ▐█ ▝██▌ █▌
+ ▝▀        ▀▀▀▀▘▝▀▀▀▀▘▀▀▘  ▀▀▘▀▀▘▀▀▘ ▝▀▀▝▀▀
+
+ Gemini CLI v0.10.0
+
 
 
 Tips for getting started:
@@ -22,10 +25,13 @@ Action Required (was prompted):
 
 exports[`AlternateBufferQuittingDisplay > renders with active and pending tool messages > with_history_and_pending 1`] = `
 "
-  ▝▜▄     Gemini CLI v0.10.0
-    ▝▜▄
-   ▗▟▀ 
-  ▝▀    
+ ▝▜▄      ▗█▀▀▜▙▝█▛▀▀▌▜██▖▟██▘▜█▘▜██▖▝█▛▝█▛
+   ▝▜▄    █▌     █▙▟  ▐█▝█▛▐█ ▐█ ▐█▝█▖█▌ █▌
+  ▗▟▀     ▜▙ ▝█▛ █▌▝ ▖▐█   ▐█ ▐█ ▐█ ▝██▌ █▌
+ ▝▀        ▀▀▀▀▘▝▀▀▀▀▘▀▀▘  ▀▀▘▀▀▘▀▀▘ ▝▀▀▝▀▀
+
+ Gemini CLI v0.10.0
+
 
 
 Tips for getting started:
@@ -37,10 +43,12 @@ Tips for getting started:
 │ ✓  tool1 Description for tool 1                                          │
 │                                                                          │
 ╰──────────────────────────────────────────────────────────────────────────╯
+
 ╭──────────────────────────────────────────────────────────────────────────╮
 │ ✓  tool2 Description for tool 2                                          │
 │                                                                          │
 ╰──────────────────────────────────────────────────────────────────────────╯
+
 ╭──────────────────────────────────────────────────────────────────────────╮
 │ o  tool3 Description for tool 3                                          │
 │                                                                          │
@@ -50,10 +58,13 @@ Tips for getting started:
 
 exports[`AlternateBufferQuittingDisplay > renders with empty history and no pending items > empty 1`] = `
 "
-  ▝▜▄     Gemini CLI v0.10.0
-    ▝▜▄
-   ▗▟▀ 
-  ▝▀    
+ ▝▜▄      ▗█▀▀▜▙▝█▛▀▀▌▜██▖▟██▘▜█▘▜██▖▝█▛▝█▛
+   ▝▜▄    █▌     █▙▟  ▐█▝█▛▐█ ▐█ ▐█▝█▖█▌ █▌
+  ▗▟▀     ▜▙ ▝█▛ █▌▝ ▖▐█   ▐█ ▐█ ▐█ ▝██▌ █▌
+ ▝▀        ▀▀▀▀▘▝▀▀▀▀▘▀▀▘  ▀▀▘▀▀▘▀▀▘ ▝▀▀▝▀▀
+
+ Gemini CLI v0.10.0
+
 
 
 Tips for getting started:
@@ -66,10 +77,13 @@ Tips for getting started:
 
 exports[`AlternateBufferQuittingDisplay > renders with history but no pending items > with_history_no_pending 1`] = `
 "
-  ▝▜▄     Gemini CLI v0.10.0
-    ▝▜▄
-   ▗▟▀ 
-  ▝▀    
+ ▝▜▄      ▗█▀▀▜▙▝█▛▀▀▌▜██▖▟██▘▜█▘▜██▖▝█▛▝█▛
+   ▝▜▄    █▌     █▙▟  ▐█▝█▛▐█ ▐█ ▐█▝█▖█▌ █▌
+  ▗▟▀     ▜▙ ▝█▛ █▌▝ ▖▐█   ▐█ ▐█ ▐█ ▝██▌ █▌
+ ▝▀        ▀▀▀▀▘▝▀▀▀▀▘▀▀▘  ▀▀▘▀▀▘▀▀▘ ▝▀▀▝▀▀
+
+ Gemini CLI v0.10.0
+
 
 
 Tips for getting started:
@@ -81,6 +95,7 @@ Tips for getting started:
 │ ✓  tool1 Description for tool 1                                          │
 │                                                                          │
 ╰──────────────────────────────────────────────────────────────────────────╯
+
 ╭──────────────────────────────────────────────────────────────────────────╮
 │ ✓  tool2 Description for tool 2                                          │
 │                                                                          │
@@ -90,10 +105,13 @@ Tips for getting started:
 
 exports[`AlternateBufferQuittingDisplay > renders with pending items but no history > with_pending_no_history 1`] = `
 "
-  ▝▜▄     Gemini CLI v0.10.0
-    ▝▜▄
-   ▗▟▀ 
-  ▝▀    
+ ▝▜▄      ▗█▀▀▜▙▝█▛▀▀▌▜██▖▟██▘▜█▘▜██▖▝█▛▝█▛
+   ▝▜▄    █▌     █▙▟  ▐█▝█▛▐█ ▐█ ▐█▝█▖█▌ █▌
+  ▗▟▀     ▜▙ ▝█▛ █▌▝ ▖▐█   ▐█ ▐█ ▐█ ▝██▌ █▌
+ ▝▀        ▀▀▀▀▘▝▀▀▀▀▘▀▀▘  ▀▀▘▀▀▘▀▀▘ ▝▀▀▝▀▀
+
+ Gemini CLI v0.10.0
+
 
 
 Tips for getting started:
@@ -110,10 +128,13 @@ Tips for getting started:
 
 exports[`AlternateBufferQuittingDisplay > renders with user and gemini messages > with_user_gemini_messages 1`] = `
 "
-  ▝▜▄     Gemini CLI v0.10.0
-    ▝▜▄
-   ▗▟▀ 
-  ▝▀    
+ ▝▜▄      ▗█▀▀▜▙▝█▛▀▀▌▜██▖▟██▘▜█▘▜██▖▝█▛▝█▛
+   ▝▜▄    █▌     █▙▟  ▐█▝█▛▐█ ▐█ ▐█▝█▖█▌ █▌
+  ▗▟▀     ▜▙ ▝█▛ █▌▝ ▖▐█   ▐█ ▐█ ▐█ ▝██▌ █▌
+ ▝▀        ▀▀▀▀▘▝▀▀▀▀▘▀▀▘  ▀▀▘▀▀▘▀▀▘ ▝▀▀▝▀▀
+
+ Gemini CLI v0.10.0
+
 
 
 Tips for getting started:

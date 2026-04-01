@@ -26,7 +26,10 @@ vi.mock('../../utils/debugLogger.js', () => ({
 
 vi.mock('./browserAgentFactory.js', () => ({
   createBrowserAgentDefinition: vi.fn(),
-  cleanupBrowserAgent: vi.fn(),
+}));
+
+vi.mock('./inputBlocker.js', () => ({
+  removeInputBlocker: vi.fn(),
 }));
 
 vi.mock('../local-executor.js', () => ({
@@ -35,10 +38,8 @@ vi.mock('../local-executor.js', () => ({
   },
 }));
 
-import {
-  createBrowserAgentDefinition,
-  cleanupBrowserAgent,
-} from './browserAgentFactory.js';
+import { createBrowserAgentDefinition } from './browserAgentFactory.js';
+import { removeInputBlocker } from './inputBlocker.js';
 import { LocalAgentExecutor } from '../local-executor.js';
 import type { ToolLiveOutput } from '../../tools/tools.js';
 
@@ -190,7 +191,7 @@ describe('BrowserAgentInvocation', () => {
       vi.mocked(LocalAgentExecutor.create).mockResolvedValue(
         mockExecutor as never,
       );
-      vi.mocked(cleanupBrowserAgent).mockClear();
+      vi.mocked(removeInputBlocker).mockClear();
     });
 
     it('should return result text and call cleanup on success', async () => {
@@ -209,7 +210,7 @@ describe('BrowserAgentInvocation', () => {
       expect((result.llmContent as Array<{ text: string }>)[0].text).toContain(
         'Browser agent finished',
       );
-      expect(cleanupBrowserAgent).toHaveBeenCalled();
+      expect(removeInputBlocker).toHaveBeenCalled();
     });
 
     it('should work without updateOutput (fire-and-forget)', async () => {
@@ -239,7 +240,7 @@ describe('BrowserAgentInvocation', () => {
       const result = await invocation.execute(controller.signal);
 
       expect(result.error).toBeDefined();
-      expect(cleanupBrowserAgent).toHaveBeenCalled();
+      expect(removeInputBlocker).toHaveBeenCalled();
     });
 
     // ─── Structured SubagentProgress emission tests ───────────────────────
@@ -343,7 +344,55 @@ describe('BrowserAgentInvocation', () => {
             a.content.includes('Navigating to the page...'),
         ),
       );
+
       expect(thoughtProgress).toBeDefined();
+    });
+
+    it('should overwrite the thought content with new THOUGHT_CHUNK activity', async () => {
+      const { fireActivity } = setupActivityCapture();
+      const updateOutput = vi.fn();
+
+      const invocation = new BrowserAgentInvocation(
+        mockConfig,
+        mockParams,
+        mockMessageBus,
+      );
+
+      const executePromise = invocation.execute(
+        new AbortController().signal,
+        updateOutput,
+      );
+
+      // Allow createBrowserAgentDefinition to resolve and onActivity to be registered
+      await Promise.resolve();
+      await Promise.resolve();
+
+      fireActivity({
+        isSubagentActivityEvent: true,
+        agentName: 'browser_agent',
+        type: 'THOUGHT_CHUNK',
+        data: { text: 'I am thinking.' },
+      });
+      fireActivity({
+        isSubagentActivityEvent: true,
+        agentName: 'browser_agent',
+        type: 'THOUGHT_CHUNK',
+        data: { text: 'Now I will act.' },
+      });
+
+      await executePromise;
+
+      const progressCalls = updateOutput.mock.calls
+        .map((c) => c[0] as SubagentProgress)
+        .filter((p) => p.isSubagentProgress);
+
+      const lastCall = progressCalls[progressCalls.length - 1];
+      expect(lastCall.recentActivity).toContainEqual(
+        expect.objectContaining({
+          type: 'thought',
+          content: 'Now I will act.',
+        }),
+      );
     });
 
     it('should handle TOOL_CALL_START and TOOL_CALL_END with callId tracking', async () => {

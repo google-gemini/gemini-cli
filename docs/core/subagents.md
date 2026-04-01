@@ -1,20 +1,18 @@
-# Subagents (experimental)
+# Subagents
 
 Subagents are specialized agents that operate within your main Gemini CLI
 session. They are designed to handle specific, complex tasks—like deep codebase
 analysis, documentation lookup, or domain-specific reasoning—without cluttering
 the main agent's context or toolset.
 
-> **Note: Subagents are currently an experimental feature.**
->
-> To use custom subagents, you must ensure they are enabled in your
-> `settings.json` (enabled by default):
->
-> ```json
-> {
->   "experimental": { "enableAgents": true }
-> }
-> ```
+Subagents are enabled by default. To disable them, set `enableAgents` to `false`
+in your `settings.json`:
+
+```json
+{
+  "experimental": { "enableAgents": false }
+}
+```
 
 ## What are subagents?
 
@@ -114,7 +112,9 @@ Gemini CLI comes with the following built-in subagents:
   the pricing table from this page," "Click the login button and enter my
   credentials."
 
-> **Note:** This is a preview feature currently under active development.
+<!-- prettier-ignore -->
+> [!NOTE]
+> This is a preview feature currently under active development.
 
 #### Prerequisites
 
@@ -217,22 +217,15 @@ captures a screenshot and sends it to the vision model for analysis. The model
 returns coordinates and element descriptions that the browser agent uses with
 the `click_at` tool for precise, coordinate-based interactions.
 
-> **Note:** The visual agent requires API key or Vertex AI authentication. It is
+<!-- prettier-ignore -->
+> [!NOTE]
+> The visual agent requires API key or Vertex AI authentication. It is
 > not available when using "Sign in with Google".
 
 ## Creating custom subagents
 
 You can create your own subagents to automate specific workflows or enforce
-specific personas. To use custom subagents, you must enable them in your
-`settings.json`:
-
-```json
-{
-  "experimental": {
-    "enableAgents": true
-  }
-}
-```
+specific personas.
 
 ### Agent definition files
 
@@ -400,12 +393,10 @@ If you need to further tune your subagent, you can do so by selecting the model
 to optimize for with `/model` and then asking the model why it does not think
 that your subagent was called with a specific prompt and the given description.
 
-## Remote subagents (Agent2Agent) (experimental)
+## Remote subagents (Agent2Agent)
 
 Gemini CLI can also delegate tasks to remote subagents using the Agent-to-Agent
 (A2A) protocol.
-
-> **Note: Remote subagents are currently an experimental feature.**
 
 See the [Remote Subagents documentation](remote-agents) for detailed
 configuration, authentication, and usage instructions.

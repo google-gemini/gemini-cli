@@ -6,6 +6,7 @@
 
 import { describe, it, expect, vi } from 'vitest';
 import {
+  BaseToolInvocation,
   DeclarativeTool,
   hasCycleInSchema,
   Kind,
@@ -270,5 +271,57 @@ describe('Tools Read-Only property', () => {
 
     const searcher = new MyTool('s', 'S', 'd', Kind.Search, {}, bus);
     expect(searcher.isReadOnly).toBe(true);
+  });
+});
+
+describe('toJSON serialization', () => {
+  it('DeclarativeTool.toJSON should return essential metadata', () => {
+    const bus = createMockMessageBus();
+    class MyTool extends DeclarativeTool<object, ToolResult> {
+      build(_params: object): ToolInvocation<object, ToolResult> {
+        throw new Error('Not implemented');
+      }
+    }
+    const tool = new MyTool(
+      'name',
+      'display',
+      'desc',
+      Kind.Read,
+      { type: 'object' },
+      bus,
+    );
+    const json = tool.toJSON();
+
+    expect(json).toEqual({
+      name: 'name',
+      displayName: 'display',
+      description: 'desc',
+      kind: Kind.Read,
+      parameterSchema: { type: 'object' },
+    });
+    // Ensure messageBus is NOT included in serialization
+    expect(Object.keys(json)).not.toContain('messageBus');
+    expect(JSON.stringify(tool)).toContain('"name":"name"');
+    expect(JSON.stringify(tool)).not.toContain('messageBus');
+  });
+
+  it('BaseToolInvocation.toJSON should return only params', () => {
+    const bus = createMockMessageBus();
+    const params = { foo: 'bar' };
+    class MyInvocation extends BaseToolInvocation<object, ToolResult> {
+      getDescription() {
+        return 'desc';
+      }
+      async execute() {
+        return { llmContent: '', returnDisplay: '' };
+      }
+    }
+    const invocation = new MyInvocation(params, bus, 'tool');
+    const json = invocation.toJSON();
+
+    expect(json).toEqual({ params });
+    // Ensure messageBus is NOT included in serialization
+    expect(Object.keys(json)).not.toContain('messageBus');
+    expect(JSON.stringify(invocation)).toBe('{"params":{"foo":"bar"}}');
   });
 });

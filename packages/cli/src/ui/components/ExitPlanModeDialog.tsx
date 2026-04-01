@@ -80,7 +80,6 @@ function usePlanContent(planPath: string, config: Config): PlanContentState {
         const pathError = await validatePlanPath(
           planPath,
           config.storage.getPlansDir(),
-          config.getTargetDir(),
         );
         if (ignore) return;
         if (pathError) {

@@ -35,7 +35,7 @@ const getSavedChatTags = async (
   context: CommandContext,
   mtSortDesc: boolean,
 ): Promise<ChatDetail[]> => {
-  const cfg = context.services.config;
+  const cfg = context.services.agentContext?.config;
   const geminiDir = cfg?.storage?.getProjectTempDir();
   if (!geminiDir) {
     return [];
@@ -75,6 +75,7 @@ const listCommand: SlashCommand = {
   description: 'List saved manual conversation checkpoints',
   kind: CommandKind.BUILT_IN,
   autoExecute: true,
+  takesArgs: false,
   action: async (context): Promise<void> => {
     const chatDetails = await getSavedChatTags(context, false);
 
@@ -103,7 +104,8 @@ const saveCommand: SlashCommand = {
       };
     }
 
-    const { logger, config } = context.services;
+    const { logger } = context.services;
+    const config = context.services.agentContext?.config;
     await logger.initialize();
 
     if (!context.overwriteConfirmed) {
@@ -125,7 +127,7 @@ const saveCommand: SlashCommand = {
       }
     }
 
-    const chat = config?.getGeminiClient()?.getChat();
+    const chat = context.services.agentContext?.geminiClient?.getChat();
     if (!chat) {
       return {
         type: 'message',
@@ -172,7 +174,8 @@ const resumeCheckpointCommand: SlashCommand = {
       };
     }
 
-    const { logger, config } = context.services;
+    const { logger } = context.services;
+    const config = context.services.agentContext?.config;
     await logger.initialize();
     const checkpoint = await logger.loadCheckpoint(tag);
     const conversation = checkpoint.history;
@@ -298,7 +301,7 @@ const shareCommand: SlashCommand = {
       };
     }
 
-    const chat = context.services.config?.getGeminiClient()?.getChat();
+    const chat = context.services.agentContext?.geminiClient?.getChat();
     if (!chat) {
       return {
         type: 'message',
@@ -344,7 +347,7 @@ export const debugCommand: SlashCommand = {
   kind: CommandKind.BUILT_IN,
   autoExecute: true,
   action: async (context): Promise<MessageActionReturn> => {
-    const req = context.services.config?.getLatestApiRequest();
+    const req = context.services.agentContext?.config.getLatestApiRequest();
     if (!req) {
       return {
         type: 'message',
@@ -404,14 +407,24 @@ export const chatResumeSubCommands: SlashCommand[] = [
   checkpointCompatibilityCommand,
 ];
 
+import { parseSlashCommand } from '../../utils/commands.js';
+
 export const chatCommand: SlashCommand = {
   name: 'chat',
   description: 'Browse auto-saved conversations and manage chat checkpoints',
   kind: CommandKind.BUILT_IN,
   autoExecute: true,
-  action: async () => ({
-    type: 'dialog',
-    dialog: 'sessionBrowser',
-  }),
+  action: async (context, args) => {
+    if (args) {
+      const parsed = parseSlashCommand(`/${args}`, chatResumeSubCommands);
+      if (parsed.commandToExecute?.action) {
+        return parsed.commandToExecute.action(context, parsed.args);
+      }
+    }
+    return {
+      type: 'dialog',
+      dialog: 'sessionBrowser',
+    };
+  },
   subCommands: chatResumeSubCommands,
 };

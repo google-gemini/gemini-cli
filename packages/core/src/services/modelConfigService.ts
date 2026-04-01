@@ -5,6 +5,7 @@
  */
 
 import type { GenerateContentConfig } from '@google/genai';
+import type { ModelPolicy } from '../availability/modelPolicy.js';
 
 // The primary key for the ModelConfig is the model string. However, we also
 // support a secondary key to limit the override scope, typically an agent name.
@@ -89,6 +90,7 @@ export interface ModelResolution {
 /** The actual state of the current session. */
 export interface ResolutionContext {
   useGemini3_1?: boolean;
+  useGemini3_1FlashLite?: boolean;
   useCustomTools?: boolean;
   hasAccessToPreview?: boolean;
   requestedModel?: string;
@@ -97,6 +99,7 @@ export interface ResolutionContext {
 /** The requirements defined in the registry. */
 export interface ResolutionCondition {
   useGemini3_1?: boolean;
+  useGemini3_1FlashLite?: boolean;
   useCustomTools?: boolean;
   hasAccessToPreview?: boolean;
   /** Matches if the current model is in this list. */
@@ -111,6 +114,7 @@ export interface ModelConfigServiceConfig {
   modelDefinitions?: Record<string, ModelDefinition>;
   modelIdResolutions?: Record<string, ModelResolution>;
   classifierIdResolutions?: Record<string, ModelResolution>;
+  modelChains?: Record<string, ModelPolicy[]>;
 }
 
 const MAX_ALIAS_CHAIN_DEPTH = 100;
@@ -163,6 +167,8 @@ export class ModelConfigService {
       switch (key) {
         case 'useGemini3_1':
           return value === context.useGemini3_1;
+        case 'useGemini3_1FlashLite':
+          return value === context.useGemini3_1FlashLite;
         case 'useCustomTools':
           return value === context.useCustomTools;
         case 'hasAccessToPreview':
@@ -219,6 +225,29 @@ export class ModelConfigService {
     }
 
     return resolution.default;
+  }
+
+  getModelChain(chainName: string): ModelPolicy[] | undefined {
+    return this.config.modelChains?.[chainName];
+  }
+
+  /**
+   * Fetches a chain template and resolves all model IDs within it
+   * based on the provided context.
+   */
+  resolveChain(
+    chainName: string,
+    context: ResolutionContext = {},
+  ): ModelPolicy[] | undefined {
+    const template = this.config.modelChains?.[chainName];
+    if (!template) {
+      return undefined;
+    }
+    // Map through the template and resolve each model ID
+    return template.map((policy) => ({
+      ...policy,
+      model: this.resolveModelId(policy.model, context),
+    }));
   }
 
   registerRuntimeModelConfig(aliasName: string, alias: ModelConfigAlias): void {

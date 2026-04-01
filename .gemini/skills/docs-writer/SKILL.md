@@ -65,18 +65,60 @@ accessible.
 - **UI and code:** Use **bold** for UI elements and `code font` for filenames,
   snippets, commands, and API elements. Focus on the task when discussing
   interaction.
-- **Links:** Use descriptive anchor text; avoid "click here." Ensure the link
-  makes sense out of context.
 - **Accessibility:** Use semantic HTML elements correctly (headings, lists, 
   tables).
 - **Media:** Use lowercase hyphenated filenames. Provide descriptive alt text
   for all images.
+- **Details section:** Use the `<details>` tag to create a collapsible section.
+  This is useful for supplementary or data-heavy information that isn't critical
+  to the main flow.
+
+  Example:
+
+  <details>
+  <summary>Title</summary>
+
+  - First entry
+  - Second entry
+
+  </details>
+
+- **Callouts**: Use GitHub-flavored markdown alerts to highlight important
+  information. To ensure the formatting is preserved by `npm run format`, place
+  an empty line, then the `<!-- prettier-ignore -->` comment directly before
+  the callout block. The callout type (`[!TYPE]`) should be on the first line,
+  followed by a newline, and then the content, with each subsequent line of
+  content starting with `>`. Available types are `NOTE`, `TIP`, `IMPORTANT`,
+  `WARNING`, and `CAUTION`.
+
+  Example:
+
+<!-- prettier-ignore -->
+> [!NOTE]
+> This is an example of a multi-line note that will be preserved
+> by Prettier.
+
+### Links
+- **Accessibility:** Use descriptive anchor text; avoid "click here." Ensure the
+  link makes sense out of context, such as when being read by a screen reader.
+- **Use relative links in docs:** Use relative links in documentation (`/docs/`)
+  to ensure portability. Use paths relative to the current file's directory
+  (for example, `../tools/` from `docs/cli/`). Do not include the `/docs/`
+  section of a path, but do verify that the resulting relative link exists. This
+  does not apply to meta files such as README.MD and CONTRIBUTING.MD.
+- **When changing headings, check for deep links:** If a user is changing a
+  heading, check for deep links to that heading in other pages and update
+  accordingly.
 
 ### Structure
 - **BLUF:** Start with an introduction explaining what to expect.
 - **Experimental features:** If a feature is clearly noted as experimental,
-add the following note immediately after the introductory paragraph:
-  `> **Note:** This is a preview feature currently under active development.`
+  add the following note immediately after the introductory paragraph:
+
+<!-- prettier-ignore -->
+> [!NOTE]
+> This is an experimental feature currently under active development.
+
 - **Headings:** Use hierarchical headings to support the user journey.
 - **Procedures:** 
   - Introduce lists of steps with a complete sentence.
@@ -85,8 +127,7 @@ add the following note immediately after the introductory paragraph:
   - Put conditions before instructions (e.g., "On the Settings page, click...").
   - Provide clear context for where the action takes place.
   - Indicate optional steps clearly (e.g., "Optional: ...").
-- **Elements:** Use bullet lists, tables, notes (`> **Note:**`), and warnings 
-  (`> **Warning:**`).
+- **Elements:** Use bullet lists, tables, details, and callouts.
 - **Avoid using a table of contents:** If a table of contents is present, remove
   it.
 - **Next steps:** Conclude with a "Next steps" section if applicable.
@@ -125,7 +166,6 @@ documentation.
   sentences to make them easier for users to understand.
 - **Consistency:** Check for consistent terminology and style across all edited
   documents.
-
 
 ## Phase 4: Verification and finalization
 Perform a final quality check to ensure that all changes are correctly formatted

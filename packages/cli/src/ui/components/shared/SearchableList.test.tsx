@@ -79,7 +79,7 @@ describe('SearchableList', () => {
     mockOnClose = vi.fn();
   });
 
-  const renderList = (
+  const renderList = async (
     props: Partial<SearchableListProps<GenericListItem>> = {},
   ) => {
     const defaultProps: SearchableListProps<GenericListItem> = {
@@ -95,8 +95,7 @@ describe('SearchableList', () => {
   };
 
   it('should render all items initially', async () => {
-    const { lastFrame, waitUntilReady } = renderList();
-    await waitUntilReady();
+    const { lastFrame } = await renderList();
     const frame = lastFrame();
 
     expect(frame).toContain('Test List');
@@ -109,10 +108,9 @@ describe('SearchableList', () => {
   });
 
   it('should reset selection to top when items change if resetSelectionOnItemsChange is true', async () => {
-    const { lastFrame, stdin, waitUntilReady } = renderList({
+    const { lastFrame, stdin } = await renderList({
       resetSelectionOnItemsChange: true,
     });
-    await waitUntilReady();
 
     await React.act(async () => {
       stdin.write('\u001B[B'); // Down arrow
@@ -150,7 +148,7 @@ describe('SearchableList', () => {
   });
 
   it('should filter items based on search query', async () => {
-    const { lastFrame, stdin } = renderList();
+    const { lastFrame, stdin } = await renderList();
 
     await React.act(async () => {
       stdin.write('Two');
@@ -165,7 +163,7 @@ describe('SearchableList', () => {
   });
 
   it('should show "No items found." when no items match', async () => {
-    const { lastFrame, stdin } = renderList();
+    const { lastFrame, stdin } = await renderList();
 
     await React.act(async () => {
       stdin.write('xyz123');
@@ -178,7 +176,7 @@ describe('SearchableList', () => {
   });
 
   it('should handle selection with Enter', async () => {
-    const { stdin } = renderList();
+    const { stdin } = await renderList();
 
     await React.act(async () => {
       stdin.write('\r'); // Enter
@@ -190,7 +188,7 @@ describe('SearchableList', () => {
   });
 
   it('should handle navigation and selection', async () => {
-    const { stdin } = renderList();
+    const { stdin } = await renderList();
 
     await React.act(async () => {
       stdin.write('\u001B[B'); // Down arrow
@@ -206,7 +204,7 @@ describe('SearchableList', () => {
   });
 
   it('should handle close with Esc', async () => {
-    const { stdin } = renderList();
+    const { stdin } = await renderList();
 
     await React.act(async () => {
       stdin.write('\u001B'); // Esc
@@ -218,8 +216,7 @@ describe('SearchableList', () => {
   });
 
   it('should match snapshot', async () => {
-    const { lastFrame, waitUntilReady } = renderList();
-    await waitUntilReady();
+    const { lastFrame } = await renderList();
     expect(lastFrame()).toMatchSnapshot();
   });
 });
