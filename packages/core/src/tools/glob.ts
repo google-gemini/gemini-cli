@@ -169,7 +169,9 @@ class GlobToolInvocation extends BaseToolInvocation<
       // case-insensitive matching on a case-sensitive FS. Default to false
       // there to avoid expensive readdir storms.
       const nocase =
-        !this.params.case_sensitive && process.platform !== 'linux';
+        this.params.case_sensitive === undefined
+          ? process.platform !== 'linux'
+          : !this.params.case_sensitive;
 
       // Phase 1: Fast discovery without stat (avoids thousands of stat calls
       // on broad patterns). We stat only after filtering.
@@ -213,8 +215,9 @@ class GlobToolInvocation extends BaseToolInvocation<
         });
 
       // Phase 3: Stat only the filtered survivors in parallel for recency sorting
-      const statResults = await Promise.all(
+      const statResults: GlobPath[] = await Promise.all(
         filteredPaths.map(async (relativePath) => {
+          if (signal.aborted) throw signal.reason;
           const absPath = path.resolve(
             this.config.getTargetDir(),
             relativePath,
@@ -224,10 +227,10 @@ class GlobToolInvocation extends BaseToolInvocation<
             return {
               fullpath: () => absPath,
               mtimeMs: stats.mtimeMs,
-            } as GlobPath;
+            };
           } catch {
             // File may have been deleted between glob and stat
-            return { fullpath: () => absPath, mtimeMs: 0 } as GlobPath;
+            return { fullpath: () => absPath, mtimeMs: 0 };
           }
         }),
       );

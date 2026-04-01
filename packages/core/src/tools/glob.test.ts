@@ -162,19 +162,10 @@ describe('GlobTool', () => {
       };
       const invocation = globTool.build(params);
       const result = await invocation.execute(abortSignal);
+      // Explicit case_sensitive: false should enable nocase on all platforms
+      expect(result.llmContent).toContain('Found 2 file(s)');
       expect(result.llmContent).toContain(path.join(tempRootDir, 'FileB.TXT'));
-      if (process.platform === 'linux') {
-        // On Linux, nocase is disabled for performance so *.TXT won't match fileA.txt
-        expect(result.llmContent).toContain('Found 1 file(s)');
-        expect(result.llmContent).not.toContain(
-          path.join(tempRootDir, 'fileA.txt'),
-        );
-      } else {
-        expect(result.llmContent).toContain('Found 2 file(s)');
-        expect(result.llmContent).toContain(
-          path.join(tempRootDir, 'fileA.txt'),
-        );
-      }
+      expect(result.llmContent).toContain(path.join(tempRootDir, 'fileA.txt'));
     }, 30000);
 
     it('should find files using a pattern that includes a subdirectory', async () => {
