@@ -18,6 +18,8 @@ const {
   mockSendMessageStream,
   mockScheduleAgentTools,
   mockSetSystemInstruction,
+  mockRecordCompletedToolCalls,
+  mockSaveSummary,
   mockCompress,
   mockMaybeDiscoverMcpServer,
   mockStopMcp,
@@ -32,6 +34,8 @@ const {
   }),
   mockScheduleAgentTools: vi.fn(),
   mockSetSystemInstruction: vi.fn(),
+  mockRecordCompletedToolCalls: vi.fn(),
+  mockSaveSummary: vi.fn(),
   mockCompress: vi.fn(),
   mockMaybeDiscoverMcpServer: vi.fn().mockResolvedValue(undefined),
   mockStopMcp: vi.fn().mockResolvedValue(undefined),
@@ -108,7 +112,7 @@ import {
 } from '../scheduler/types.js';
 
 import { CompressionStatus } from '../core/turn.js';
-import { ChatCompressionService } from '../services/chatCompressionService.js';
+import { ChatCompressionService } from '../context/chatCompressionService.js';
 import type {
   ModelConfigKey,
   ResolvedModelConfig,
@@ -121,24 +125,27 @@ const mockSetHistory = vi.fn((newHistory: Content[]) => {
   mockChatHistory = newHistory;
 });
 
-vi.mock('../services/chatCompressionService.js', () => ({
+vi.mock('../context/chatCompressionService.js', () => ({
   ChatCompressionService: vi.fn().mockImplementation(() => ({
     compress: mockCompress,
   })),
 }));
 
-vi.mock('../core/geminiChat.js', async (importOriginal) => {
-  const actual = await importOriginal<typeof import('../core/geminiChat.js')>();
-  return {
-    ...actual,
-    GeminiChat: vi.fn().mockImplementation(() => ({
-      sendMessageStream: mockSendMessageStream,
-      getHistory: vi.fn((_curated?: boolean) => [...mockChatHistory]),
-      setHistory: mockSetHistory,
-      setSystemInstruction: mockSetSystemInstruction,
-    })),
-  };
-});
+vi.mock('../core/geminiChat.js', () => ({
+  StreamEventType: {
+    CHUNK: 'chunk',
+  },
+  GeminiChat: vi.fn().mockImplementation(() => ({
+    sendMessageStream: mockSendMessageStream,
+    getHistory: vi.fn((_curated?: boolean) => [...mockChatHistory]),
+    setHistory: mockSetHistory,
+    setSystemInstruction: mockSetSystemInstruction,
+    recordCompletedToolCalls: mockRecordCompletedToolCalls,
+    getChatRecordingService: vi.fn().mockReturnValue({
+      saveSummary: mockSaveSummary,
+    }),
+  })),
+}));
 
 vi.mock('./agent-scheduler.js', () => ({
   scheduleAgentTools: mockScheduleAgentTools,
@@ -337,6 +344,10 @@ describe('LocalAgentExecutor', () => {
           getHistory: vi.fn((_curated?: boolean) => [...mockChatHistory]),
           getLastPromptTokenCount: vi.fn(() => 100),
           setHistory: mockSetHistory,
+          recordCompletedToolCalls: mockRecordCompletedToolCalls,
+          getChatRecordingService: vi.fn().mockReturnValue({
+            saveSummary: mockSaveSummary,
+          }),
         }) as unknown as GeminiChat,
     );
 
@@ -348,10 +359,9 @@ describe('LocalAgentExecutor', () => {
       get: () => 'test-prompt-id',
       configurable: true,
     });
-    parentToolRegistry = new ToolRegistry(mockConfig, mockConfig.messageBus);
-    parentToolRegistry.registerTool(
-      new LSTool(mockConfig, mockConfig.messageBus),
-    );
+    const { messageBus } = mockConfig as unknown as { messageBus: MessageBus };
+    parentToolRegistry = new ToolRegistry(mockConfig, messageBus);
+    parentToolRegistry.registerTool(new LSTool(mockConfig, messageBus));
     parentToolRegistry.registerTool(
       new MockTool({ name: READ_FILE_TOOL_NAME }),
     );
@@ -779,6 +789,25 @@ describe('LocalAgentExecutor', () => {
       // Assert that there is exactly ONE schema for this tool
       expect(foundSchemas).toHaveLength(1);
     });
+
+    it('should provide tools to the model when toolConfig is OMITTED (default to all tools)', async () => {
+      const fullDefinition = createTestDefinition();
+      const { toolConfig: _, ...definition } = fullDefinition;
+
+      const executor = await LocalAgentExecutor.create(
+        definition as LocalAgentDefinition,
+        mockConfig,
+        onActivity,
+      );
+
+      const toolsList = (
+        executor as unknown as { prepareToolsList: () => FunctionDeclaration[] }
+      ).prepareToolsList();
+
+      // Verify that LS_TOOL_NAME is in the list (since LS was registered in beforeEach)
+      const toolNames = toolsList.map((t) => t.name);
+      expect(toolNames).toContain(LS_TOOL_NAME);
+    });
   });
 
   describe('run (Execution Loop and Logic)', () => {
@@ -924,6 +953,20 @@ describe('LocalAgentExecutor', () => {
 
       // Context checks
       expect(mockedPromptIdContext.run).toHaveBeenCalledTimes(2); // Two turns
+
+      // Recording checks
+      expect(mockRecordCompletedToolCalls).toHaveBeenCalledTimes(1);
+      expect(mockRecordCompletedToolCalls).toHaveBeenCalledWith(
+        expect.any(String), // model
+        expect.arrayContaining([
+          expect.objectContaining({
+            status: 'success',
+            request: expect.objectContaining({ name: LS_TOOL_NAME }),
+          }),
+        ]),
+      );
+      expect(mockSaveSummary).toHaveBeenCalledTimes(1);
+      expect(mockSaveSummary).toHaveBeenCalledWith('Found file1.txt');
       const agentId = executor['agentId'];
       expect(mockedPromptIdContext.run).toHaveBeenNthCalledWith(
         1,
@@ -2432,6 +2475,10 @@ describe('LocalAgentExecutor', () => {
       expect(recoveryEvent).toBeInstanceOf(RecoveryAttemptEvent);
       expect(recoveryEvent.success).toBe(true);
       expect(recoveryEvent.reason).toBe(AgentTerminateMode.MAX_TURNS);
+
+      // Verify that the summary is saved upon successful recovery
+      expect(mockSaveSummary).toHaveBeenCalledTimes(1);
+      expect(mockSaveSummary).toHaveBeenCalledWith('Recovered!');
     });
 
     describe('Model Steering', () => {

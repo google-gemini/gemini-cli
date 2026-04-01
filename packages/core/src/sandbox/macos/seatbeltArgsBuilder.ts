@@ -13,22 +13,21 @@ import {
 } from './baseProfile.js';
 import {
   type SandboxPermissions,
-  sanitizePaths,
   GOVERNANCE_FILES,
   SECRET_FILES,
 } from '../../services/sandboxManager.js';
 import { tryRealpath, resolveGitWorktreePaths } from '../utils/fsUtils.js';
 
 /**
- * Options for building macOS Seatbelt arguments.
+ * Options for building macOS Seatbelt profile.
  */
 export interface SeatbeltArgsOptions {
   /** The primary workspace path to allow access to. */
   workspace: string;
   /** Additional paths to allow access to. */
-  allowedPaths?: string[];
+  allowedPaths: string[];
   /** Absolute paths to explicitly deny read/write access to (overrides allowlists). */
-  forbiddenPaths?: string[];
+  forbiddenPaths: string[];
   /** Whether to allow network access. */
   networkAccess?: boolean;
   /** Granular additional permissions. */
@@ -38,28 +37,29 @@ export interface SeatbeltArgsOptions {
 }
 
 /**
- * Builds the arguments array for sandbox-exec using a strict allowlist profile.
- * It relies on parameters passed to sandbox-exec via the -D flag to avoid
- * string interpolation vulnerabilities, and normalizes paths against symlink escapes.
- *
- * Returns arguments up to the end of sandbox-exec configuration (e.g. ['-p', '<profile>', '-D', ...])
- * Does not include the final '--' separator or the command to run.
+ * Escapes a string for use within a Scheme string literal "..."
  */
-export function buildSeatbeltArgs(options: SeatbeltArgsOptions): string[] {
+export function escapeSchemeString(str: string): string {
+  return str.replace(/[\\"]/g, '\\$&');
+}
+
+/**
+ * Builds a complete macOS Seatbelt profile string using a strict allowlist.
+ * It embeds paths directly into the profile, properly escaped for Scheme.
+ */
+export function buildSeatbeltProfile(options: SeatbeltArgsOptions): string {
   let profile = BASE_SEATBELT_PROFILE + '\n';
-  const args: string[] = [];
 
   const workspacePath = tryRealpath(options.workspace);
-  args.push('-D', `WORKSPACE=${workspacePath}`);
-  args.push('-D', `WORKSPACE_RAW=${options.workspace}`);
-  profile += `(allow file-read* (subpath (param "WORKSPACE_RAW")))\n`;
+  profile += `(allow file-read* (subpath "${escapeSchemeString(options.workspace)}"))\n`;
+  profile += `(allow file-read* (subpath "${escapeSchemeString(workspacePath)}"))\n`;
   if (options.workspaceWrite) {
-    profile += `(allow file-write* (subpath (param "WORKSPACE_RAW")))\n`;
+    profile += `(allow file-write* (subpath "${escapeSchemeString(options.workspace)}"))\n`;
+    profile += `(allow file-write* (subpath "${escapeSchemeString(workspacePath)}"))\n`;
   }
 
-  if (options.workspaceWrite) {
-    profile += `(allow file-write* (subpath (param "WORKSPACE")))\n`;
-  }
+  const tmpPath = tryRealpath(os.tmpdir());
+  profile += `(allow file-read* file-write* (subpath "${escapeSchemeString(tmpPath)}"))\n`;
 
   // Add explicit deny rules for governance files in the workspace.
   // These are added after the workspace allow rule to ensure they take precedence
@@ -81,22 +81,17 @@ export function buildSeatbeltArgs(options: SeatbeltArgsOptions): string[] {
 
     const ruleType = isDirectory ? 'subpath' : 'literal';
 
-    args.push('-D', `GOVERNANCE_FILE_${i}=${governanceFile}`);
-    profile += `(deny file-write* (${ruleType} (param "GOVERNANCE_FILE_${i}")))\n`;
+    profile += `(deny file-write* (${ruleType} "${escapeSchemeString(governanceFile)}"))\n`;
 
     if (realGovernanceFile !== governanceFile) {
-      args.push('-D', `REAL_GOVERNANCE_FILE_${i}=${realGovernanceFile}`);
-      profile += `(deny file-write* (${ruleType} (param "REAL_GOVERNANCE_FILE_${i}")))\n`;
+      profile += `(deny file-write* (${ruleType} "${escapeSchemeString(realGovernanceFile)}"))\n`;
     }
   }
 
   // Add explicit deny rules for secret files (.env, .env.*) in the workspace and allowed paths.
   // We use regex rules to avoid expensive file discovery scans.
   // Anchoring to workspace/allowed paths to avoid over-blocking.
-  const searchPaths = sanitizePaths([
-    options.workspace,
-    ...(options.allowedPaths || []),
-  ]) || [options.workspace];
+  const searchPaths = [options.workspace, ...options.allowedPaths];
 
   for (const basePath of searchPaths) {
     const resolvedBase = tryRealpath(basePath);
@@ -121,27 +116,20 @@ export function buildSeatbeltArgs(options: SeatbeltArgsOptions): string[] {
   // Auto-detect and support git worktrees by granting read and write access to the underlying git directory
   const { worktreeGitDir, mainGitDir } = resolveGitWorktreePaths(workspacePath);
   if (worktreeGitDir) {
-    args.push('-D', `WORKTREE_GIT_DIR=${worktreeGitDir}`);
-    profile += `(allow file-read* file-write* (subpath (param "WORKTREE_GIT_DIR")))\n`;
+    profile += `(allow file-read* file-write* (subpath "${escapeSchemeString(worktreeGitDir)}"))\n`;
   }
   if (mainGitDir) {
-    args.push('-D', `MAIN_GIT_DIR=${mainGitDir}`);
-    profile += `(allow file-read* file-write* (subpath (param "MAIN_GIT_DIR")))\n`;
+    profile += `(allow file-read* file-write* (subpath "${escapeSchemeString(mainGitDir)}"))\n`;
   }
-
-  const tmpPath = tryRealpath(os.tmpdir());
-  args.push('-D', `TMPDIR=${tmpPath}`);
 
   const nodeRootPath = tryRealpath(
     path.dirname(path.dirname(process.execPath)),
   );
-  args.push('-D', `NODE_ROOT=${nodeRootPath}`);
-  profile += `(allow file-read* (subpath (param "NODE_ROOT")))\n`;
+  profile += `(allow file-read* (subpath "${escapeSchemeString(nodeRootPath)}"))\n`;
 
   // Add PATH directories as read-only to support nvm, homebrew, etc.
   if (process.env['PATH']) {
     const paths = process.env['PATH'].split(':');
-    let pathIndex = 0;
     const addedPaths = new Set();
 
     for (const p of paths) {
@@ -158,9 +146,7 @@ export function buildSeatbeltArgs(options: SeatbeltArgsOptions): string[] {
 
         if (!addedPaths.has(resolved)) {
           addedPaths.add(resolved);
-          args.push('-D', `SYS_PATH_${pathIndex}=${resolved}`);
-          profile += `(allow file-read* (subpath (param "SYS_PATH_${pathIndex}")))\n`;
-          pathIndex++;
+          profile += `(allow file-read* (subpath "${escapeSchemeString(resolved)}"))\n`;
         }
       } catch (_e) {
         // Ignore paths that do not exist or are inaccessible
@@ -169,13 +155,10 @@ export function buildSeatbeltArgs(options: SeatbeltArgsOptions): string[] {
   }
 
   // Handle allowedPaths
-  const allowedPaths = sanitizePaths(options.allowedPaths) || [];
-  const resolvedAllowedPaths: string[] = [];
+  const allowedPaths = options.allowedPaths;
   for (let i = 0; i < allowedPaths.length; i++) {
     const allowedPath = tryRealpath(allowedPaths[i]);
-    resolvedAllowedPaths.push(allowedPath);
-    args.push('-D', `ALLOWED_PATH_${i}=${allowedPath}`);
-    profile += `(allow file-read* file-write* (subpath (param "ALLOWED_PATH_${i}")))\n`;
+    profile += `(allow file-read* file-write* (subpath "${escapeSchemeString(allowedPath)}"))\n`;
   }
 
   // Handle granular additional permissions
@@ -184,8 +167,6 @@ export function buildSeatbeltArgs(options: SeatbeltArgsOptions): string[] {
     if (read) {
       for (let i = 0; i < read.length; i++) {
         const resolved = tryRealpath(read[i]);
-        const paramName = `ADDITIONAL_READ_${i}`;
-        args.push('-D', `${paramName}=${resolved}`);
         let isFile = false;
         try {
           isFile = fs.statSync(resolved).isFile();
@@ -193,17 +174,15 @@ export function buildSeatbeltArgs(options: SeatbeltArgsOptions): string[] {
           // Ignore error
         }
         if (isFile) {
-          profile += `(allow file-read* (literal (param "${paramName}")))\n`;
+          profile += `(allow file-read* (literal "${escapeSchemeString(resolved)}"))\n`;
         } else {
-          profile += `(allow file-read* (subpath (param "${paramName}")))\n`;
+          profile += `(allow file-read* (subpath "${escapeSchemeString(resolved)}"))\n`;
         }
       }
     }
     if (write) {
       for (let i = 0; i < write.length; i++) {
         const resolved = tryRealpath(write[i]);
-        const paramName = `ADDITIONAL_WRITE_${i}`;
-        args.push('-D', `${paramName}=${resolved}`);
         let isFile = false;
         try {
           isFile = fs.statSync(resolved).isFile();
@@ -211,29 +190,26 @@ export function buildSeatbeltArgs(options: SeatbeltArgsOptions): string[] {
           // Ignore error
         }
         if (isFile) {
-          profile += `(allow file-read* file-write* (literal (param "${paramName}")))\n`;
+          profile += `(allow file-read* file-write* (literal "${escapeSchemeString(resolved)}"))\n`;
         } else {
-          profile += `(allow file-read* file-write* (subpath (param "${paramName}")))\n`;
+          profile += `(allow file-read* file-write* (subpath "${escapeSchemeString(resolved)}"))\n`;
         }
       }
     }
   }
 
   // Handle forbiddenPaths
-  const forbiddenPaths = sanitizePaths(options.forbiddenPaths) || [];
+  const forbiddenPaths = options.forbiddenPaths;
   for (let i = 0; i < forbiddenPaths.length; i++) {
     const forbiddenPath = tryRealpath(forbiddenPaths[i]);
-    args.push('-D', `FORBIDDEN_PATH_${i}=${forbiddenPath}`);
-    profile += `(deny file-read* file-write* (subpath (param "FORBIDDEN_PATH_${i}")))\n`;
+    profile += `(deny file-read* file-write* (subpath "${escapeSchemeString(forbiddenPath)}"))\n`;
   }
 
   if (options.networkAccess || options.additionalPermissions?.network) {
     profile += NETWORK_SEATBELT_PROFILE;
   }
 
-  args.unshift('-p', profile);
-
-  return args;
+  return profile;
 }
 
 /**
