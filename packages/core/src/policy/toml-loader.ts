@@ -383,7 +383,7 @@ export async function loadPoliciesFromToml(
             message: 'Schema validation failed',
             details: formatSchemaError(validationResult.error, 0),
             suggestion:
-              'Ensure all required fields (decision, priority) are present with correct types',
+              'Ensure all required fields (decision, priority, toolName) are present with correct types',
           });
           continue;
         }

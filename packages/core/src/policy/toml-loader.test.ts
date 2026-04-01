@@ -490,6 +490,7 @@ name = "allowed-path"
       expect(error.errorType).toBe('schema_validation');
       expect(error.details).toContain('toolName');
       expect(error.details).toContain('Invalid input');
+      expect(error.suggestion).toContain('toolName');
     });
 
     it('should return a schema_validation error if priority is missing', async () => {
@@ -502,6 +503,7 @@ decision = "allow"
       const error = result.errors[0];
       expect(error.errorType).toBe('schema_validation');
       expect(error.details).toContain('priority');
+      expect(error.suggestion).toContain('toolName');
     });
 
     it('should return a schema_validation error if priority is a float', async () => {
@@ -598,6 +600,7 @@ priority = 100
       expect(error.errorType).toBe('schema_validation');
       expect(error.details).toContain('toolName');
       expect(error.details).toContain('Invalid input');
+      expect(error.suggestion).toContain('toolName');
     });
 
     it('should return a schema_validation error if toolName is not a string or array', async () => {
