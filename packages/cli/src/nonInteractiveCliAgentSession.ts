@@ -46,12 +46,7 @@ import stripAnsi from 'strip-ansi';
 import { handleSlashCommand } from './nonInteractiveCliCommands.js';
 import { ConsolePatcher } from './ui/utils/ConsolePatcher.js';
 import { handleAtCommand } from './ui/hooks/atCommandProcessor.js';
-import {
-  handleError,
-  handleToolError,
-  handleCancellationError,
-  handleMaxTurnsExceededError,
-} from './utils/errors.js';
+import { handleError, handleToolError } from './utils/errors.js';
 import { TextOutput } from './ui/utils/textOutput.js';
 
 interface RunNonInteractiveParams {
@@ -188,7 +183,6 @@ export async function runNonInteractive({
     };
 
     let errorToHandle: unknown | undefined;
-    let terminalProcessExitHandled = false;
     let abortSession = () => {};
     try {
       consolePatcher.patch();
@@ -213,6 +207,8 @@ export async function runNonInteractive({
       process.stdout.on('error', (err: NodeJS.ErrnoException) => {
         if (err.code === 'EPIPE') {
           // Exit gracefully if the pipe is closed.
+          cleanupStdinCancellation();
+          consolePatcher.cleanup();
           process.exit(0);
         }
       });
@@ -303,7 +299,7 @@ export async function runNonInteractive({
       };
       abortController.signal.addEventListener('abort', abortSession);
       if (abortController.signal.aborted) {
-        return handleCancellationError(config);
+        throw new FatalCancellationError('Operation cancelled.');
       }
 
       // Start the agentic loop (runs in background)
@@ -417,11 +413,6 @@ export async function runNonInteractive({
         return errToThrow;
       };
 
-      const runTerminalExitHandler = (handler: () => never): never => {
-        terminalProcessExitHandled = true;
-        return handler();
-      };
-
       // Consume AgentEvents for output formatting
       let responseText = '';
       let preToolResponseText: string | undefined;
@@ -515,17 +506,12 @@ export async function runNonInteractive({
               }
 
               if (event.data?.['errorType'] === ToolErrorType.NO_SPACE_LEFT) {
-                terminalProcessExitHandled = true;
-                handleToolError(
-                  event.name,
-                  new Error(errorMsg),
-                  config,
-                  typeof event.data?.['errorType'] === 'string'
-                    ? event.data['errorType']
-                    : undefined,
-                  displayText,
+                throw new FatalToolExecutionError(
+                  'Error executing tool ' +
+                    event.name +
+                    ': ' +
+                    (displayText || errorMsg),
                 );
-                return;
               }
               handleToolError(
                 event.name,
@@ -570,15 +556,15 @@ export async function runNonInteractive({
           }
           case 'agent_end': {
             if (event.reason === 'aborted') {
-              runTerminalExitHandler(() => handleCancellationError(config));
+              throw new FatalCancellationError('Operation cancelled.');
             } else if (event.reason === 'max_turns') {
               const isConfiguredTurnLimit =
                 typeof event.data?.['maxTurns'] === 'number' ||
                 typeof event.data?.['turnCount'] === 'number';
 
               if (isConfiguredTurnLimit) {
-                runTerminalExitHandler(() =>
-                  handleMaxTurnsExceededError(config),
+                throw new FatalTurnLimitedError(
+                  'Reached max session turns for this session. Increase the number of turns by specifying maxSessionTurns in settings.json.',
                 );
               } else if (streamFormatter) {
                 streamFormatter.emitEvent({
@@ -629,9 +615,6 @@ export async function runNonInteractive({
     }
 
     if (errorToHandle) {
-      if (terminalProcessExitHandled) {
-        throw errorToHandle;
-      }
       handleError(errorToHandle, config);
     }
   });

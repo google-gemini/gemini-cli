@@ -686,7 +686,7 @@ describe('runNonInteractive', () => {
         input: 'Trigger loop',
         prompt_id: 'prompt-id-6',
       }),
-    ).rejects.toThrow('process.exit(53) called');
+    ).rejects.toThrow('Reached max session turns for this session');
   });
 
   it('should preprocess @include commands before sending to the model', async () => {
@@ -1194,14 +1194,7 @@ describe('runNonInteractive', () => {
       () => process.stdin,
     );
 
-    // Spy on handleCancellationError to verify it's called
-    const errors = await import('./utils/errors.js');
-    const cancellationSentinel = new Error('Cancelled');
-    const handleCancellationErrorSpy = vi
-      .spyOn(errors, 'handleCancellationError')
-      .mockImplementation(() => {
-        throw cancellationSentinel;
-      });
+    // Cancellation will throw FatalCancellationError directly
 
     const events: ServerGeminiStreamEvent[] = [
       { type: GeminiEventType.Content, value: 'Thinking...' },
@@ -1249,10 +1242,7 @@ describe('runNonInteractive', () => {
       keypressHandler('\u0003', { ctrl: true, name: 'c' });
     }
 
-    // The Ctrl+C path should route through handleCancellationError rather than
-    // surfacing the raw stream abort.
-    await expect(runPromise).rejects.toBe(cancellationSentinel);
-    expect(handleCancellationErrorSpy).toHaveBeenCalledTimes(1);
+    await expect(runPromise).rejects.toThrow('Operation cancelled.');
 
     expect(
       processStderrSpy.mock.calls.some(
@@ -1260,8 +1250,6 @@ describe('runNonInteractive', () => {
         (call) => typeof call[0] === 'string' && call[0].includes('Cancelling'),
       ),
     ).toBe(true);
-
-    handleCancellationErrorSpy.mockRestore();
 
     // Restore original values
     Object.defineProperty(process.stdin, 'isTTY', {
@@ -1311,13 +1299,7 @@ describe('runNonInteractive', () => {
       () => process.stdin,
     );
 
-    const errors = await import('./utils/errors.js');
-    const cancellationSentinel = new Error('Cancelled before send');
-    const handleCancellationErrorSpy = vi
-      .spyOn(errors, 'handleCancellationError')
-      .mockImplementation(() => {
-        throw cancellationSentinel;
-      });
+    // Cancellation will throw FatalCancellationError directly
 
     const { LegacyAgentSession } = await import('@google/gemini-cli-core');
     const sendSpy = vi.spyOn(LegacyAgentSession.prototype, 'send');
@@ -1329,13 +1311,10 @@ describe('runNonInteractive', () => {
         input: 'Cancelled query',
         prompt_id: 'prompt-id-pre-send-cancel',
       }),
-    ).rejects.toBe(cancellationSentinel);
+    ).rejects.toThrow('Operation cancelled.');
 
-    expect(handleCancellationErrorSpy).toHaveBeenCalledTimes(1);
     expect(sendSpy).not.toHaveBeenCalled();
     expect(stdinOnSpy).toHaveBeenCalled();
-
-    handleCancellationErrorSpy.mockRestore();
     sendSpy.mockRestore();
 
     Object.defineProperty(process.stdin, 'isTTY', {
