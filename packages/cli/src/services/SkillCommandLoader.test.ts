@@ -7,6 +7,7 @@
 import { vi, describe, it, expect, beforeEach } from 'vitest';
 import { SkillCommandLoader } from './SkillCommandLoader.js';
 import { CommandKind } from '../ui/commands/types.js';
+import type { CommandContext } from '../ui/commands/types.js';
 import { ACTIVATE_SKILL_TOOL_NAME } from '@google/gemini-cli-core';
 
 describe('SkillCommandLoader', () => {
@@ -84,7 +85,7 @@ describe('SkillCommandLoader', () => {
 
     const actionResult = await commands[0].action!({
       invocation: { args: '' },
-    } as any);
+    } as unknown as CommandContext);
     expect(actionResult).toEqual({
       type: 'tool',
       toolName: ACTIVATE_SKILL_TOOL_NAME,
@@ -102,7 +103,7 @@ describe('SkillCommandLoader', () => {
 
     const actionResult = await commands[0].action!({
       invocation: { args: 'hello world' },
-    } as any);
+    } as unknown as CommandContext);
     expect(actionResult).toEqual({
       type: 'tool',
       toolName: ACTIVATE_SKILL_TOOL_NAME,
@@ -122,7 +123,9 @@ describe('SkillCommandLoader', () => {
 
     const actionResult = (await commands[0].action!({
       invocation: { args: '' },
-    } as any)) as any;
+    } as unknown as CommandContext)) as unknown as {
+      toolArgs: { name: string };
+    };
     expect(actionResult.toolArgs).toEqual({ name: 'my awesome skill' });
   });
 

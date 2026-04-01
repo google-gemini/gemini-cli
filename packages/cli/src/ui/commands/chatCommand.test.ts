@@ -211,7 +211,7 @@ describe('chatCommand', () => {
         args: tag,
       };
 
-      mockContext.invocation!.args = tag;
+      mockContext.invocation.args = tag;
       const result = await saveCommand?.action?.(mockContext);
 
       expect(mockCheckpointExists).toHaveBeenCalledWith(tag);
