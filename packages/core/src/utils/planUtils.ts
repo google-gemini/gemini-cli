@@ -5,8 +5,10 @@
  */
 
 import path from 'node:path';
+import fsPromises from 'node:fs/promises';
 import { isEmpty, fileExists } from './fileUtils.js';
 import { isSubpath, resolveToRealPath } from './paths.js';
+import { debugLogger } from './debugLogger.js';
 
 /**
  * Standard error messages for the plan approval workflow.
@@ -41,12 +43,31 @@ export async function validatePlanPath(
   if (!isSubpath(realPlansDir, realPath)) {
     return PlanErrorMessages.PATH_ACCESS_DENIED(planPath, realPlansDir);
   }
-
   if (!(await fileExists(resolvedPath))) {
     return PlanErrorMessages.FILE_NOT_FOUND(planPath);
   }
 
   return null;
+}
+
+/**
+ * Returns a list of version numbers for a plan file by scanning the directory.
+ * @param planPath The path to the plan file.
+ * @returns A promise that resolves to an array of version numbers.
+ */
+export async function getPlanVersions(planPath: string): Promise<number[]> {
+  const dir = path.dirname(planPath);
+  const base = path.basename(planPath);
+  try {
+    const files = await fsPromises.readdir(dir);
+    return files
+      .filter((f) => f.startsWith(`${base}.v`))
+      .map((f) => parseInt(f.slice(base.length + 2), 10))
+      .filter((v) => !isNaN(v));
+  } catch (err) {
+    debugLogger.error(`Failed to read plan versions in ${dir}:`, err);
+    return [];
+  }
 }
 
 /**

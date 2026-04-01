@@ -18,7 +18,11 @@ import type { MessageBus } from '../confirmation-bus/message-bus.js';
 import path from 'node:path';
 import type { Config } from '../config/config.js';
 import { EXIT_PLAN_MODE_TOOL_NAME } from './tool-names.js';
-import { validatePlanPath, validatePlanContent } from '../utils/planUtils.js';
+import {
+  validatePlanPath,
+  validatePlanContent,
+  getPlanVersions,
+} from '../utils/planUtils.js';
 import { ApprovalMode } from '../policy/types.js';
 import { resolveToRealPath, isSubpath } from '../utils/paths.js';
 import { logPlanExecution } from '../telemetry/loggers.js';
@@ -29,7 +33,6 @@ import { getPlanModeExitMessage } from '../utils/approvalModeUtils.js';
 import * as Diff from 'diff';
 import { DEFAULT_DIFF_OPTIONS } from './diffOptions.js';
 import { debugLogger } from '../utils/debugLogger.js';
-import * as fs from 'node:fs';
 import * as fsPromises from 'node:fs/promises';
 
 export interface ExitPlanModeParams {
@@ -160,12 +163,7 @@ export class ExitPlanModeInvocation extends BaseToolInvocation<
     // decision is 'ask_user'
     let diffContent: string | undefined;
     try {
-      const files = await fsPromises.readdir(path.dirname(resolvedPlanPath));
-      const base = path.basename(resolvedPlanPath);
-      const versions = files
-        .filter((f) => f.startsWith(`${base}.v`))
-        .map((f) => parseInt(f.slice(base.length + 2), 10))
-        .filter((v) => !isNaN(v));
+      const versions = await getPlanVersions(resolvedPlanPath);
       const latestVersion = versions.length > 0 ? Math.max(...versions) : 0;
 
       if (latestVersion > 0) {
@@ -270,14 +268,10 @@ Read and follow the plan strictly during implementation.`,
       };
     } else {
       try {
-        const files = await fsPromises.readdir(path.dirname(resolvedPlanPath));
-        const base = path.basename(resolvedPlanPath);
-        const versions = files
-          .filter((f) => f.startsWith(`${base}.v`))
-          .map((f) => parseInt(f.slice(base.length + 2), 10))
-          .filter((v) => !isNaN(v));
-        const nextVersion = (versions.length > 0 ? Math.max(...versions) : 0) + 1;
-        const backupPath = `${resolvedPlanPath}.v${nextVersion}`; 
+        const versions = await getPlanVersions(resolvedPlanPath);
+        const nextVersion =
+          (versions.length > 0 ? Math.max(...versions) : 0) + 1;
+        const backupPath = `${resolvedPlanPath}.v${nextVersion}`;
         const content = await fsPromises.readFile(resolvedPlanPath, 'utf8');
         await fsPromises.writeFile(backupPath, content, 'utf8');
       } catch (err) {
