@@ -1,5 +1,95 @@
 // Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
 
+exports[`InputPrompt > Highlighting and Cursor Display > multi-line scenarios > should display cursor correctly 'at the beginning of a line' in a multiline block 1`] = `
+"────────────────────────────────────────────────────────────────────────────────────────────────────
+│ > first line                                                                                     │
+│   second line                                                                                    │
+────────────────────────────────────────────────────────────────────────────────────────────────────"
+`;
+
+exports[`InputPrompt > Highlighting and Cursor Display > multi-line scenarios > should display cursor correctly 'at the end of a line' in a multiline block 1`] = `
+"────────────────────────────────────────────────────────────────────────────────────────────────────
+│ > first line                                                                                     │
+│   second line                                                                                    │
+────────────────────────────────────────────────────────────────────────────────────────────────────"
+`;
+
+exports[`InputPrompt > Highlighting and Cursor Display > multi-line scenarios > should display cursor correctly 'in the middle of a line' in a multiline block 1`] = `
+"────────────────────────────────────────────────────────────────────────────────────────────────────
+│ > first line                                                                                     │
+│   second line                                                                                    │
+│   third line                                                                                     │
+────────────────────────────────────────────────────────────────────────────────────────────────────"
+`;
+
+exports[`InputPrompt > Highlighting and Cursor Display > multi-line scenarios > should display cursor on a blank line in a multiline block 1`] = `
+"────────────────────────────────────────────────────────────────────────────────────────────────────
+│ > first line                                                                                     │
+│                                                                                                  │
+│   third line                                                                                     │
+────────────────────────────────────────────────────────────────────────────────────────────────────"
+`;
+
+exports[`InputPrompt > Highlighting and Cursor Display > single-line scenarios > should display cursor correctly 'after multi-byte unicode characters' 1`] = `
+"────────────────────────────────────────────────────────────────────────────────────────────────────
+│ > 👍A                                                                                            │
+────────────────────────────────────────────────────────────────────────────────────────────────────"
+`;
+
+exports[`InputPrompt > Highlighting and Cursor Display > single-line scenarios > should display cursor correctly 'at the beginning of the line' 1`] = `
+"────────────────────────────────────────────────────────────────────────────────────────────────────
+│ > hello                                                                                          │
+────────────────────────────────────────────────────────────────────────────────────────────────────"
+`;
+
+exports[`InputPrompt > Highlighting and Cursor Display > single-line scenarios > should display cursor correctly 'at the end of a line with unicode cha…' 1`] = `
+"────────────────────────────────────────────────────────────────────────────────────────────────────
+│ > hello 👍                                                                                       │
+────────────────────────────────────────────────────────────────────────────────────────────────────"
+`;
+
+exports[`InputPrompt > Highlighting and Cursor Display > single-line scenarios > should display cursor correctly 'at the end of a short line with unico…' 1`] = `
+"────────────────────────────────────────────────────────────────────────────────────────────────────
+│ > 👍                                                                                             │
+────────────────────────────────────────────────────────────────────────────────────────────────────"
+`;
+
+exports[`InputPrompt > Highlighting and Cursor Display > single-line scenarios > should display cursor correctly 'at the end of the line' 1`] = `
+"────────────────────────────────────────────────────────────────────────────────────────────────────
+│ > hello                                                                                          │
+────────────────────────────────────────────────────────────────────────────────────────────────────"
+`;
+
+exports[`InputPrompt > Highlighting and Cursor Display > single-line scenarios > should display cursor correctly 'for multi-byte unicode characters' 1`] = `
+"────────────────────────────────────────────────────────────────────────────────────────────────────
+│ > hello 👍 world                                                                                 │
+────────────────────────────────────────────────────────────────────────────────────────────────────"
+`;
+
+exports[`InputPrompt > Highlighting and Cursor Display > single-line scenarios > should display cursor correctly 'mid-word' 1`] = `
+"────────────────────────────────────────────────────────────────────────────────────────────────────
+│ > hello world                                                                                    │
+────────────────────────────────────────────────────────────────────────────────────────────────────"
+`;
+
+exports[`InputPrompt > Highlighting and Cursor Display > single-line scenarios > should display cursor correctly 'on a highlighted token' 1`] = `
+"────────────────────────────────────────────────────────────────────────────────────────────────────
+│ > run @path/to/file                                                                              │
+────────────────────────────────────────────────────────────────────────────────────────────────────"
+`;
+
+exports[`InputPrompt > Highlighting and Cursor Display > single-line scenarios > should display cursor correctly 'on a space between words' 1`] = `
+"────────────────────────────────────────────────────────────────────────────────────────────────────
+│ > hello world                                                                                    │
+────────────────────────────────────────────────────────────────────────────────────────────────────"
+`;
+
+exports[`InputPrompt > Highlighting and Cursor Display > single-line scenarios > should display cursor correctly 'on an empty line' 1`] = `
+"────────────────────────────────────────────────────────────────────────────────────────────────────
+│ >   Type your message or @path/to/file                                                           │
+────────────────────────────────────────────────────────────────────────────────────────────────────"
+`;
+
 exports[`InputPrompt > History Navigation and Completion Suppression > should not render suggestions during history navigation 1`] = `
 "▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀
  > second message                                                                                   
@@ -78,11 +168,18 @@ exports[`InputPrompt > mouse interaction > should toggle paste expansion on doub
 "
 `;
 
+exports[`InputPrompt > multiline rendering > should correctly render multiline input including blank lines 1`] = `
+"────────────────────────────────────────────────────────────────────────────────────────────────────
+│ > hello                                                                                          │
+│                                                                                                  │
+│   world                                                                                          │
+────────────────────────────────────────────────────────────────────────────────────────────────────"
+`;
+
 exports[`InputPrompt > snapshots > should not show inverted cursor when shell is focused 1`] = `
 "▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀
  >   Type your message or @path/to/file                                                             
-▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄
-"
+▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄"
 `;
 
 exports[`InputPrompt > snapshots > should render correctly in shell mode 1`] = `
