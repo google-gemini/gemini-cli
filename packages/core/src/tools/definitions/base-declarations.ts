@@ -92,6 +92,7 @@ export const READ_MANY_PARAM_USE_DEFAULT_EXCLUDES = 'useDefaultExcludes';
 // -- save_memory --
 export const MEMORY_TOOL_NAME = 'save_memory';
 export const MEMORY_PARAM_FACT = 'fact';
+export const MEMORY_PARAM_SCOPE = 'scope';
 
 // -- get_internal_docs --
 export const GET_INTERNAL_DOCS_TOOL_NAME = 'get_internal_docs';
@@ -125,3 +126,10 @@ export const PLAN_MODE_PARAM_REASON = 'reason';
 
 // -- sandbox --
 export const PARAM_ADDITIONAL_PERMISSIONS = 'additional_permissions';
+
+// -- update_topic --
+export const UPDATE_TOPIC_TOOL_NAME = 'update_topic';
+export const UPDATE_TOPIC_DISPLAY_NAME = 'Update Topic Context';
+export const TOPIC_PARAM_TITLE = 'title';
+export const TOPIC_PARAM_SUMMARY = 'summary';
+export const TOPIC_PARAM_STRATEGIC_INTENT = 'strategic_intent';

@@ -8,6 +8,7 @@ import {
   loadJitSubdirectoryMemory,
   concatenateInstructions,
   getGlobalMemoryPaths,
+  getUserProjectMemoryPaths,
   getExtensionMemoryPaths,
   getEnvironmentMemoryPaths,
   readGeminiMdFiles,
@@ -25,6 +26,7 @@ export class ContextManager {
   private globalMemory: string = '';
   private extensionMemory: string = '';
   private projectMemory: string = '';
+  private userProjectMemoryContent: string = '';
 
   constructor(config: Config) {
     this.config = config;
@@ -45,28 +47,36 @@ export class ContextManager {
   }
 
   private async discoverMemoryPaths() {
-    const [global, extension, project] = await Promise.all([
+    const [global, extension, project, userProjectMemory] = await Promise.all([
       getGlobalMemoryPaths(),
       Promise.resolve(
         getExtensionMemoryPaths(this.config.getExtensionLoader()),
       ),
       this.config.isTrustedFolder()
-        ? getEnvironmentMemoryPaths([
-            ...this.config.getWorkspaceContext().getDirectories(),
-          ])
+        ? getEnvironmentMemoryPaths(
+            [...this.config.getWorkspaceContext().getDirectories()],
+            this.config.getMemoryBoundaryMarkers(),
+          )
         : Promise.resolve([]),
+      getUserProjectMemoryPaths(this.config.storage.getProjectMemoryDir()),
     ]);
 
-    return { global, extension, project };
+    return { global, extension, project, userProjectMemory };
   }
 
   private async loadMemoryContents(paths: {
     global: string[];
     extension: string[];
     project: string[];
+    userProjectMemory: string[];
   }) {
     const allPathsStringDeduped = Array.from(
-      new Set([...paths.global, ...paths.extension, ...paths.project]),
+      new Set([
+        ...paths.global,
+        ...paths.extension,
+        ...paths.project,
+        ...paths.userProjectMemory,
+      ]),
     );
 
     // deduplicate by file identity to handle case-insensitive filesystems
@@ -76,6 +86,7 @@ export class ContextManager {
     const allContents = await readGeminiMdFiles(
       allPaths,
       this.config.getImportFormat(),
+      this.config.getMemoryBoundaryMarkers(),
     );
 
     const loadedFilePaths = allContents
@@ -95,13 +106,19 @@ export class ContextManager {
   }
 
   private categorizeMemoryContents(
-    paths: { global: string[]; extension: string[]; project: string[] },
+    paths: {
+      global: string[];
+      extension: string[];
+      project: string[];
+      userProjectMemory: string[];
+    },
     contentsMap: Map<string, GeminiFileContent>,
   ) {
     const hierarchicalMemory = categorizeAndConcatenate(paths, contentsMap);
 
     this.globalMemory = hierarchicalMemory.global || '';
     this.extensionMemory = hierarchicalMemory.extension || '';
+    this.userProjectMemoryContent = hierarchicalMemory.userProjectMemory || '';
 
     const mcpInstructions =
       this.config.getMcpClientManager()?.getMcpInstructions() || '';
@@ -133,6 +150,7 @@ export class ContextManager {
       trustedRoots,
       this.loadedPaths,
       this.loadedFileIdentities,
+      this.config.getMemoryBoundaryMarkers(),
     );
 
     if (result.files.length === 0) {
@@ -169,6 +187,10 @@ export class ContextManager {
 
   getEnvironmentMemory(): string {
     return this.projectMemory;
+  }
+
+  getUserProjectMemory(): string {
+    return this.userProjectMemoryContent;
   }
 
   private markAsLoaded(paths: string[]): void {
