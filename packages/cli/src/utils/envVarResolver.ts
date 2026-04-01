@@ -25,8 +25,7 @@ export function resolveEnvVarsInString(
   customEnv?: Record<string, string>,
 ): string {
   // Regex matches $VAR_NAME, ${VAR_NAME}, and ${VAR_NAME:-DEFAULT_VALUE}
-  const envVarRegex =
-    /\$(?:([a-zA-Z_][a-zA-Z0-9_]*)|{([a-zA-Z_][a-zA-Z0-9_]*)(?::-([^}]+))?})/g;
+  const envVarRegex = /\$(?:(\w+)|{([^}]+?)(?::-([^}]*))?})/g;
 
   return value.replace(
     envVarRegex,
