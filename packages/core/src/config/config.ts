@@ -2683,6 +2683,10 @@ export class Config implements McpContext, AgentLoopContext {
     return this.modelRouterService;
   }
 
+  getModelConfigService(): ModelConfigService {
+    return this.modelConfigService;
+  }
+
   getModelAvailabilityService(): ModelAvailabilityService {
     return this.modelAvailabilityService;
   }
