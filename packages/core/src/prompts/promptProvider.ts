@@ -185,7 +185,6 @@ export class PromptProvider {
             planModeToolsList,
             plansDir: context.config.storage.getPlansDir(),
             approvedPlanPath: context.config.getApprovedPlanPath(),
-            taskTracker: trackerDir,
           }),
           isPlanMode,
         ),

@@ -95,7 +95,6 @@ export interface PlanningWorkflowOptions {
   planModeToolsList: string;
   plansDir: string;
   approvedPlanPath?: string;
-  taskTracker?: string;
 }
 
 export interface AgentSkillOptions {
