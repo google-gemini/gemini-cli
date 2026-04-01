@@ -1153,8 +1153,14 @@ export class LocalAgentExecutor<TOutput extends z.ZodTypeAny> {
           });
 
           // Check if this was a completion tool call
+          const isCompletionTool =
+            call.request.name === COMPLETE_TASK_TOOL_NAME;
           const data = call.response.data;
-          if (!taskCompleted && data?.['taskCompleted'] === true) {
+          if (
+            isCompletionTool &&
+            !taskCompleted &&
+            data?.['taskCompleted'] === true
+          ) {
             taskCompleted = true;
             const output = data['submittedOutput'];
             if (typeof output === 'string') {
