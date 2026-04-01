@@ -4,6 +4,16 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+/**
+ * @fileoverview Executes a high-signal regression check for behavioral evaluations.
+ *
+ * This script runs a targeted set of stable tests in an optimistic first pass.
+ * If failures occur, it employs a "Best-of-4" retry logic to handle natural flakiness.
+ * For confirmed failures (0/3), it performs Dynamic Baseline Verification by
+ * checking the failure against the 'main' branch to distinguish between
+ * model drift and PR-introduced regressions.
+ */
+
 import { execSync } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
@@ -26,27 +36,20 @@ function runTests(files, pattern, model) {
   );
 
   try {
-    // We use JSON reporter to parse results easily
-    // We pass the files explicitly to Vitest to make it faster
     const cmd = `npx vitest run --config evals/vitest.config.ts ${filesToRun} -t "${pattern}" --reporter=json --reporter=default --outputFile="${path.join(outputDir, 'report.json')}"`;
     execSync(cmd, {
       stdio: 'inherit',
-      env: {
-        ...process.env,
-        RUN_EVALS: '1',
-        GEMINI_MODEL: model,
-      },
+      env: { ...process.env, RUN_EVALS: '1', GEMINI_MODEL: model },
     });
-  } catch (_error) {
-    // Vitest exits with non-zero if tests fail, which is expected
+  } catch {
+    // Vitest returns a non-zero exit code when tests fail. This is expected.
+    // We continue execution and handle the failures by parsing the JSON report.
   }
 
   const reportPath = path.join(outputDir, 'report.json');
-  if (!fs.existsSync(reportPath)) {
-    return null;
-  }
-
-  return JSON.parse(fs.readFileSync(reportPath, 'utf-8'));
+  return fs.existsSync(reportPath)
+    ? JSON.parse(fs.readFileSync(reportPath, 'utf-8'))
+    : null;
 }
 
 /**
@@ -64,231 +67,203 @@ function findAssertion(report, testName) {
 }
 
 /**
- * Main execution logic.
+ * Parses command line arguments to identify model, files, and test pattern.
  */
-async function main() {
+function parseArgs() {
   const modelArg = process.argv[2];
   const remainingArgs = process.argv.slice(3);
-
-  let files = '';
-  let pattern = '';
-  let model = modelArg;
-
-  // Check if we have --test-pattern explicitly in any argument
   const fullArgsString = remainingArgs.join(' ');
   const testPatternIndex = remainingArgs.indexOf('--test-pattern');
 
   if (testPatternIndex !== -1) {
-    // Standard case: each argument is separate
-    files = remainingArgs.slice(0, testPatternIndex).join(' ');
-    pattern = remainingArgs.slice(testPatternIndex + 1).join(' ');
-  } else if (fullArgsString.includes('--test-pattern')) {
-    // Case where arguments are combined into a single string (due to shell quoting)
-    const parts = fullArgsString.split('--test-pattern');
-    files = parts[0].trim();
-    pattern = parts[1].trim();
-  } else {
-    // Fallback if no --test-pattern is provided (manual mode: pattern model)
-    // node scripts/run_regression_check.js "Pattern" "Model"
-    pattern = modelArg;
-    model = process.argv[3];
-
-    if (!model) {
-      console.error('❌ Error: No target model specified.');
-      process.exit(1);
-    }
-
-    // Try to find the file surgically to avoid scanning everything
-    try {
-      const grepResult = execSync(
-        `grep -l ${quote([pattern])} evals/*.eval.ts`,
-        { encoding: 'utf-8' },
-      );
-      files = grepResult.split('\n').filter(Boolean).join(' ');
-    } catch (_e) {
-      // Fallback to evals/ if grep fails
-      files = 'evals/';
-    }
-
-    const firstPass = runTests(files, pattern, model);
-    const success = await processResults(firstPass, pattern, model, files);
-    process.exit(success ? 0 : 1);
+    return {
+      model: modelArg,
+      files: remainingArgs.slice(0, testPatternIndex).join(' '),
+      pattern: remainingArgs.slice(testPatternIndex + 1).join(' '),
+    };
   }
 
-  if (!model) {
+  if (fullArgsString.includes('--test-pattern')) {
+    const parts = fullArgsString.split('--test-pattern');
+    return {
+      model: modelArg,
+      files: parts[0].trim(),
+      pattern: parts[1].trim(),
+    };
+  }
+
+  // Fallback for manual mode: Pattern Model
+  const manualPattern = process.argv[2];
+  const manualModel = process.argv[3];
+  if (!manualModel) {
     console.error('❌ Error: No target model specified.');
     process.exit(1);
   }
 
-  if (!pattern) {
-    console.log('No trustworthy tests to run.');
-    process.exit(0);
+  let manualFiles = 'evals/';
+  try {
+    const grepResult = execSync(
+      `grep -l ${quote([manualPattern])} evals/*.eval.ts`,
+      { encoding: 'utf-8' },
+    );
+    manualFiles = grepResult.split('\n').filter(Boolean).join(' ');
+  } catch {
+    // Grep returns exit code 1 if no files match the pattern.
+    // In this case, we fall back to scanning all files in the evals/ directory.
   }
 
-  // --- Step 1: The Optimistic Run (N=1) ---
-  console.log('\n--- Step 1: Optimistic Run (N=1) ---');
-  const firstPass = runTests(files, pattern, model);
-  const success = await processResults(firstPass, pattern, model, files);
-  process.exit(success ? 0 : 1);
+  return {
+    model: manualModel,
+    files: manualFiles,
+    pattern: manualPattern,
+    isManual: true,
+  };
 }
 
-async function processResults(firstPass, pattern, model, files) {
-  if (!firstPass) {
-    console.error('Failed to get results from the first pass.');
-    return false;
-  }
+/**
+ * Runs the targeted retry logic (Best-of-4) for a failing test.
+ */
+async function runRetries(testName, results, files, model) {
+  console.log(`\nRe-evaluating: ${testName}`);
 
-  const results = {}; // { [testName]: { passed: number, total: number } }
+  while (
+    results[testName].passed < 2 &&
+    results[testName].total - results[testName].passed < 3 &&
+    results[testName].total < 4
+  ) {
+    const attemptNum = results[testName].total + 1;
+    console.log(`  Running attempt ${attemptNum}...`);
+
+    const retry = runTests(files, escapeRegex(testName), model);
+    const retryAssertion = findAssertion(retry, testName);
+
+    results[testName].total++;
+    if (retryAssertion?.status === 'passed') {
+      results[testName].passed++;
+      console.log(
+        `  ✅ Attempt ${attemptNum} passed. Score: ${results[testName].passed}/${results[testName].total}`,
+      );
+    } else {
+      console.log(
+        `  ❌ Attempt ${attemptNum} failed (${retryAssertion?.status || 'unknown'}). Score: ${results[testName].passed}/${results[testName].total}`,
+      );
+    }
+
+    if (results[testName].passed >= 2) {
+      console.log(
+        `  ✅ Test cleared as Noisy Pass (${results[testName].passed}/${results[testName].total})`,
+      );
+    } else if (results[testName].total - results[testName].passed >= 3) {
+      await verifyBaseline(testName, results, files, model);
+    }
+  }
+}
+
+/**
+ * Verifies a potential regression against the 'main' branch.
+ */
+async function verifyBaseline(testName, results, files, model) {
+  console.log(
+    `  ⚠️ Potential regression detected. Verifying baseline on 'main'...`,
+  );
+
+  try {
+    execSync('git stash push -m "eval-regression-check-stash"', {
+      stdio: 'inherit',
+    });
+    const hasStash = execSync('git stash list')
+      .toString()
+      .includes('eval-regression-check-stash');
+    execSync('git checkout main', { stdio: 'inherit' });
+
+    console.log(
+      `\n--- Running Baseline Verification on 'main' (Best-of-3) ---`,
+    );
+    let baselinePasses = 0;
+    let baselineTotal = 0;
+
+    while (baselinePasses === 0 && baselineTotal < 3) {
+      baselineTotal++;
+      console.log(`  Baseline Attempt ${baselineTotal}...`);
+      const baselineRun = runTests(files, escapeRegex(testName), model);
+      if (findAssertion(baselineRun, testName)?.status === 'passed') {
+        baselinePasses++;
+        console.log(`  ✅ Baseline Attempt ${baselineTotal} passed.`);
+      } else {
+        console.log(`  ❌ Baseline Attempt ${baselineTotal} failed.`);
+      }
+    }
+
+    execSync('git checkout -', { stdio: 'inherit' });
+    if (hasStash) execSync('git stash pop', { stdio: 'inherit' });
+
+    if (baselinePasses === 0) {
+      console.log(
+        `  ℹ️ Test also fails on 'main'. Marking as PRE-EXISTING (Cleared).`,
+      );
+      results[testName].status = 'pre-existing';
+      results[testName].passed = results[testName].total; // Clear for report
+    } else {
+      console.log(
+        `  ❌ Test passes on 'main' but fails in PR. Marking as CONFIRMED REGRESSION.`,
+      );
+      results[testName].status = 'regression';
+    }
+  } catch (error) {
+    console.error(`  ❌ Failed to verify baseline: ${error.message}`);
+
+    // Best-effort cleanup: try to return to the original branch.
+    try {
+      execSync('git checkout -', { stdio: 'ignore' });
+    } catch {
+      // Ignore checkout errors during cleanup to avoid hiding the original error.
+    }
+  }
+}
+
+/**
+ * Processes initial results and orchestrates retries/baseline checks.
+ */
+async function processResults(firstPass, pattern, model, files) {
+  if (!firstPass) return false;
+
+  const results = {};
   const failingTests = [];
   let totalProcessed = 0;
 
   for (const fileResult of firstPass.testResults) {
-    const filePath = fileResult.name;
     for (const assertion of fileResult.assertionResults) {
       const name = assertion.title;
-      if (assertion.status === 'passed') {
-        results[name] = { passed: 1, total: 1, file: filePath };
-        totalProcessed++;
-      } else if (assertion.status === 'failed') {
-        results[name] = { passed: 0, total: 1, file: filePath };
-        failingTests.push(name);
-        totalProcessed++;
-      }
+      results[name] = {
+        passed: assertion.status === 'passed' ? 1 : 0,
+        total: 1,
+        file: fileResult.name,
+      };
+      if (assertion.status === 'failed') failingTests.push(name);
+      totalProcessed++;
     }
   }
 
   if (totalProcessed === 0) {
-    console.error(
-      '❌ Error: No matching tests were found or executed. Please check your test name pattern.',
-    );
+    console.error('❌ Error: No matching tests were found or executed.');
     return false;
   }
 
   if (failingTests.length === 0) {
     console.log('✅ All trustworthy tests passed on the first try!');
-    saveResults(results);
-    return true;
-  }
-
-  console.log(`⚠️ ${failingTests.length} tests failed. Starting retries...`);
-
-  // --- Step 2, 3 & 4: Targeted Retries (Best-of-4) ---
-  // A test is cleared if it reaches 2 passes.
-  // A test is flagged as a regression if it reaches 3 failures.
-  for (const testName of failingTests) {
-    console.log(`\nRe-evaluating: ${testName}`);
-
-    while (
-      results[testName].passed < 2 &&
-      results[testName].total - results[testName].passed < 3 &&
-      results[testName].total < 4
-    ) {
-      const attemptNum = results[testName].total + 1;
-      console.log(`  Running attempt ${attemptNum}...`);
-
-      const retry = runTests(files, escapeRegex(testName), model);
-      const retryAssertion = findAssertion(retry, testName);
-
-      results[testName].total++;
-      if (retryAssertion?.status === 'passed') {
-        results[testName].passed++;
-        console.log(
-          `  ✅ Attempt ${attemptNum} passed. Score: ${results[testName].passed}/${results[testName].total}`,
-        );
-      } else {
-        const status = retryAssertion?.status || 'unknown/error';
-        console.log(
-          `  ❌ Attempt ${attemptNum} failed (${status}). Score: ${results[testName].passed}/${results[testName].total}`,
-        );
-      }
-
-      // Termination messages and Baseline Verification
-      if (results[testName].passed >= 2) {
-        console.log(
-          `  ✅ Test cleared as Noisy Pass (${results[testName].passed}/${results[testName].total})`,
-        );
-      } else if (results[testName].total - results[testName].passed >= 3) {
-        console.log(
-          `  ⚠️ Detected potential regression (${results[testName].passed}/${results[testName].total}). Verifying baseline...`,
-        );
-
-        // --- Step 5: Dynamic Baseline Verification ---
-        // Switch to 'main', run twice. If it fails there too, it's not our fault.
-        try {
-          // 1. Stash current changes to switch branches safely
-          execSync('git stash push -m "eval-regression-check-stash"', {
-            stdio: 'inherit',
-          });
-          const hasStash = execSync('git stash list')
-            .toString()
-            .includes('eval-regression-check-stash');
-
-          // 2. Checkout main and run the test up to 3 times
-          execSync('git checkout main', { stdio: 'inherit' });
-
-          console.log(
-            `\n--- Running Baseline Verification on 'main' (Best-of-3) ---`,
-          );
-          let baselinePasses = 0;
-          let baselineTotal = 0;
-
-          while (baselinePasses === 0 && baselineTotal < 3) {
-            baselineTotal++;
-            console.log(`  Baseline Attempt ${baselineTotal}...`);
-            const baselineRun = runTests(files, escapeRegex(testName), model);
-            const baselineAssertion = findAssertion(baselineRun, testName);
-
-            if (baselineAssertion?.status === 'passed') {
-              baselinePasses++;
-              console.log(
-                `  ✅ Baseline Attempt ${baselineTotal} passed. Score: ${baselinePasses}/${baselineTotal}`,
-              );
-            } else {
-              console.log(
-                `  ❌ Baseline Attempt ${baselineTotal} failed. Score: ${baselinePasses}/${baselineTotal}`,
-              );
-            }
-          }
-
-          // 3. Switch back and restore stash
-          execSync('git checkout -', { stdio: 'inherit' });
-          if (hasStash) {
-            execSync('git stash pop', { stdio: 'inherit' });
-          }
-
-          // 4. Decision Logic
-          if (baselinePasses === 0) {
-            console.log(
-              `  ℹ️ Test also fails on 'main' (0/${baselineTotal}). Marking as PRE-EXISTING (Cleared).`,
-            );
-            results[testName].status = 'pre-existing';
-            results[testName].passed = results[testName].total; // Effectively clear it
-          } else {
-            console.log(
-              `  ❌ Test passes on 'main' (${baselinePasses}/${baselineTotal}) but fails in PR. Marking as CONFIRMED REGRESSION.`,
-            );
-            results[testName].status = 'regression';
-          }
-        } catch (baselineError) {
-          console.error(
-            `  ❌ Failed to verify baseline: ${baselineError.message}`,
-          );
-          // If we can't verify baseline, assume it's a regression to be safe
-          execSync('git checkout -', { stdio: 'ignore' }).catch(() => {});
-        }
-      }
+  } else {
+    console.log(`⚠️ ${failingTests.length} tests failed. Starting retries...`);
+    for (const testName of failingTests) {
+      await runRetries(testName, results, files, model);
     }
   }
 
   saveResults(results);
-  return true; // We return true because we successfully ran the analysis, even if regressions were found
+  return true;
 }
 
 function saveResults(results) {
-  const finalReport = {
-    timestamp: new Date().toISOString(),
-    results,
-  };
+  const finalReport = { timestamp: new Date().toISOString(), results };
   fs.writeFileSync(
     'evals/logs/pr_final_report.json',
     JSON.stringify(finalReport, null, 2),
@@ -296,4 +271,27 @@ function saveResults(results) {
   console.log('\nFinal report saved to evals/logs/pr_final_report.json');
 }
 
-main();
+async function main() {
+  const { model, files, pattern, isManual } = parseArgs();
+
+  if (isManual) {
+    const firstPass = runTests(files, pattern, model);
+    const success = await processResults(firstPass, pattern, model, files);
+    process.exit(success ? 0 : 1);
+  }
+
+  if (!pattern) {
+    console.log('No trustworthy tests to run.');
+    process.exit(0);
+  }
+
+  console.log('\n--- Step 1: Optimistic Run (N=1) ---');
+  const firstPass = runTests(files, pattern, model);
+  const success = await processResults(firstPass, pattern, model, files);
+  process.exit(success ? 0 : 1);
+}
+
+main().catch((err) => {
+  console.error(err);
+  process.exit(1);
+});

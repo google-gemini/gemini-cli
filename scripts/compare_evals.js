@@ -4,11 +4,17 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+/**
+ * @fileoverview Compares PR evaluation results against historical nightly baselines.
+ *
+ * This script generates a Markdown report for use in PR comments. It aligns with
+ * the 6-day lookback logic to show accurate historical pass rates and filters out
+ * pre-existing or noisy failures to ensure only actionable regressions are reported.
+ */
+
 import fs from 'node:fs';
 import path from 'node:path';
-import { execSync } from 'node:child_process';
-import os from 'node:os';
-import { findReports, getModelFromPath } from './eval_utils.js';
+import { fetchNightlyHistory } from './eval_utils.js';
 
 /**
  * Main execution logic.
@@ -28,7 +34,8 @@ function main() {
   }
 
   const prReport = JSON.parse(fs.readFileSync(prReportPath, 'utf-8'));
-  const latestNightly = fetchLatestNightlyStats(targetModel);
+  const history = fetchNightlyHistory(6); // Use same 6-day lookback
+  const latestNightly = aggregateHistoricalStats(history, targetModel);
 
   const regressions = [];
   const passes = [];
@@ -53,6 +60,7 @@ function main() {
       passes.push(testName);
     }
   }
+
   if (regressions.length > 0) {
     let markdown = '### 🚨 Action Required: Eval Regressions Detected\n\n';
     markdown += `**Model:** \`${targetModel}\`\n\n`;
@@ -86,7 +94,8 @@ function main() {
       markdown += 'Run the following command to see the failure trajectory:\n';
       markdown += '```bash\n';
       const pattern = r.name.replace(/'/g, '.');
-      markdown += `GEMINI_MODEL=${targetModel} npm run test:eval -- ${r.file} --testNamePattern="${pattern}"\n`;
+      markdown += `GEMINI_MODEL=${targetModel} npm run test:all_evals -- ${r.file} --testNamePattern="${pattern}"\n`;
+
       markdown += '```\n\n';
 
       if (i < regressions.length - 1) {
@@ -100,61 +109,34 @@ function main() {
     markdown += '</details>\n';
 
     process.stdout.write(markdown);
+  } else if (passes.length > 0) {
+    // Success State
+    process.stdout.write(
+      `✅ **${passes.length}** tests passed successfully on **${targetModel}**.\n`,
+    );
   }
 }
 
 /**
- * Fetches the latest successful nightly run stats for the model.
+ * Aggregates stats from history for a specific model.
  */
-function fetchLatestNightlyStats(model) {
-  let tmpDir;
-  try {
-    const cmd = `gh run list --workflow evals-nightly.yml --branch main --limit 1 --json databaseId`;
-    const run = JSON.parse(execSync(cmd, { encoding: 'utf-8' }))[0];
-    if (!run) return {};
+function aggregateHistoricalStats(history, model) {
+  const stats = {};
+  for (const item of history) {
+    const modelStats = item.stats[model];
+    if (!modelStats) continue;
 
-    tmpDir = fs.mkdtempSync(
-      path.join(os.tmpdir(), `eval-latest-${run.databaseId}-`),
-    );
-    execSync(
-      `gh run download ${run.databaseId} -p "eval-logs-*" -D "${tmpDir}"`,
-      {
-        stdio: 'ignore',
-      },
-    );
-
-    const stats = {};
-    const reports = findReports(tmpDir);
-    for (const reportPath of reports) {
-      if (getModelFromPath(reportPath) !== model) continue;
-
-      const json = JSON.parse(fs.readFileSync(reportPath, 'utf-8'));
-      for (const testResult of json.testResults) {
-        for (const assertion of testResult.assertionResults) {
-          const name = assertion.title;
-          if (!stats[name]) stats[name] = { passed: 0, total: 0 };
-          stats[name].total++;
-          if (assertion.status === 'passed') stats[name].passed++;
-        }
-      }
-    }
-
-    for (const name in stats) {
-      stats[name].passRate = stats[name].passed / stats[name].total;
-    }
-    return stats;
-  } catch (error) {
-    console.error('Failed to fetch latest nightly:', error);
-    return {};
-  } finally {
-    if (typeof tmpDir !== 'undefined') {
-      try {
-        fs.rmSync(tmpDir, { recursive: true, force: true });
-      } catch (cleanupError) {
-        console.error(`Failed to clean up ${tmpDir}:`, cleanupError);
-      }
+    for (const [testName, stat] of Object.entries(modelStats)) {
+      if (!stats[testName]) stats[testName] = { passed: 0, total: 0 };
+      stats[testName].passed += stat.passed;
+      stats[testName].total += stat.total;
     }
   }
+
+  for (const name in stats) {
+    stats[name].passRate = stats[name].passed / stats[name].total;
+  }
+  return stats;
 }
 
 main();

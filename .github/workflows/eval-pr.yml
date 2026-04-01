@@ -83,53 +83,46 @@ jobs:
         env:
           GEMINI_API_KEY: '${{ secrets.GEMINI_API_KEY }}'
           GH_TOKEN: '${{ secrets.GITHUB_TOKEN }}'
+          MODEL_LIST: '${{ env.MODEL_LIST }}'
         run: |
-          IFS=',' read -ra MODELS <<< "${{ env.MODEL_LIST }}"
-          COMBINED_REPORT=""
-
-          for MODEL in "${MODELS[@]}"; do
-            echo "--- Processing Model: $MODEL ---"
-
-            # 1. Identify Trustworthy Evals
-            OUTPUT=$(node scripts/get_trustworthy_evals.js "$MODEL")
-
-            if [[ -z "$OUTPUT" ]]; then
-              echo "No trustworthy tests found for $MODEL. Skipping."
-              continue
-            fi
-
-            # 2. Run Frugal Regression Check
-            node scripts/run_regression_check.js "$MODEL" "$OUTPUT"
-
-            # 3. Generate Report
-            REPORT=$(node scripts/compare_evals.js "$MODEL")
-
-            if [[ -n "$REPORT" ]]; then
-              if [[ -n "$COMBINED_REPORT" ]]; then
-                COMBINED_REPORT="${COMBINED_REPORT}\n\n---\n\n"
-              fi
-              COMBINED_REPORT="${COMBINED_REPORT}${REPORT}"
-            fi
-          done
+          # Run the regression check loop and capture the Markdown report
+          # Use a temporary file to handle potential large outputs safely
+          node scripts/run_eval_regression.js > model_report.md
 
           echo "FINAL_REPORT<<EOF" >> "$GITHUB_ENV"
-          echo -e "$COMBINED_REPORT" >> "$GITHUB_ENV"
+          cat model_report.md >> "$GITHUB_ENV"
           echo "EOF" >> "$GITHUB_ENV"
 
-      - name: 'Combined Guidance & Regression Report'
+
+      - name: 'Post or Update PR Comment'
         if: "always() && steps.detect.outputs.STEERING_DETECTED == 'true'"
-        uses: 'thollander/actions-comment-pull-request@65f9e5c9a1f2cd378bd74b2e057c9736982a8e74' # ratchet:thollander/actions-comment-pull-request@v3
-        with:
-          comment-tag: 'eval-pr-report'
-          message: |
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          COMMENT_BODY: |
             ${{ env.FINAL_REPORT != '' && env.FINAL_REPORT || '' }}
 
             ### 🧠 Model Steering Guidance
 
             This PR modifies files that affect the model's behavior (prompts, tools, or instructions).
 
-            ${{ steps.analysis.outputs.MISSING_EVALS == 'true' && '- ⚠️ **Consider adding Evals:** No behavioral evaluations (`evals/*.eval.ts`) were added or updated in this PR. Consider adding a test case to verify the new behavior and prevent regressions.' || '' }}
+            ${{ steps.analysis.outputs.MISSING_EVALS == 'true' && '- ⚠️ **Consider adding Evals:** No behavioral evaluations (`evals/*.eval.ts`) were added or updated in this PR. Consider [adding a test case](https://github.com/google-gemini/gemini-cli/blob/main/evals/README.md#creating-an-evaluation) to verify the new behavior and prevent regressions.' || '' }}
             ${{ steps.analysis.outputs.IS_MAINTAINER == 'true' && '- 🚀 **Maintainer Reminder:** Please ensure that these changes do not regress results on benchmark evals before merging.' || '' }}
 
             ---
             *This is an automated guidance message triggered by steering logic signatures.*
+            <!-- eval-pr-report -->
+        run: |
+          # 1. Save the comment body to a file to handle multi-line content safely
+          echo "$COMMENT_BODY" > pr_comment.md
+
+          # 2. Find if a comment with our unique tag already exists
+          COMMENT_ID=$(gh pr view ${{ github.event.pull_request.number }} --json comments --jq '.comments[] | select(.body | contains("<!-- eval-pr-report -->")) | .id' | head -n 1)
+
+          # 3. Update or Create the comment
+          if [ -n "$COMMENT_ID" ]; then
+            echo "Updating existing comment $COMMENT_ID..."
+            gh pr comment ${{ github.event.pull_request.number }} --edit "$COMMENT_ID" -F pr_comment.md
+          else
+            echo "Creating new PR comment..."
+            gh pr comment ${{ github.event.pull_request.number }} -F pr_comment.md
+          fi
