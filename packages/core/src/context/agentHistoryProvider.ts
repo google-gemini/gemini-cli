@@ -9,7 +9,7 @@ import { getResponseText } from '../utils/partUtils.js';
 import { estimateTokenCountSync } from '../utils/tokenCalculation.js';
 import { LlmRole } from '../telemetry/llmRole.js';
 import { debugLogger } from '../utils/debugLogger.js';
-import type { AgentHistoryProviderConfig } from './types.js';
+import type { AgentHistoryProviderConfig } from '../services/types.js';
 import type { Config } from '../config/config.js';
 import {
   MIN_TARGET_TOKENS,
@@ -18,7 +18,7 @@ import {
   estimateCharsFromTokens,
   truncateProportionally,
   normalizeFunctionResponse,
-} from '../utils/truncation.js';
+} from './truncation.js';
 
 export class AgentHistoryProvider {
   // TODO(joshualitt): just pass the BaseLlmClient instead of the whole Config.

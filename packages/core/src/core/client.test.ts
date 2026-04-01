@@ -39,7 +39,7 @@ import { tokenLimit } from './tokenLimits.js';
 import { ideContextStore } from '../ide/ideContext.js';
 import type { ModelRouterService } from '../routing/modelRouterService.js';
 import { uiTelemetryService } from '../telemetry/uiTelemetry.js';
-import { ChatCompressionService } from '../services/chatCompressionService.js';
+import { ChatCompressionService } from '../context/chatCompressionService.js';
 import type { ChatRecordingService } from '../services/chatRecordingService.js';
 import { createAvailabilityServiceMock } from '../availability/testUtils.js';
 import type { ModelAvailabilityService } from '../availability/modelAvailabilityService.js';
