@@ -1047,21 +1047,29 @@ export class LocalAgentExecutor<TOutput extends z.ZodTypeAny> {
 
     for (const [index, functionCall] of functionCalls.entries()) {
       const callId = functionCall.id ?? `${promptId}-${index}`;
-      let args: Record<string, unknown> = {};
-      if (typeof functionCall.args === 'string') {
-        try {
-          const parsed: unknown = JSON.parse(functionCall.args);
-          if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) {
-            Object.assign(args, parsed);
-          }
-        } catch (_) {
-          debugLogger.warn(
-            `[LocalAgentExecutor] Failed to parse args for ${functionCall.name}: ${functionCall.args}`,
-          );
-        }
-      } else if (functionCall.args) {
-        args = functionCall.args;
+      const { args, error: parseError } = this.parseToolArguments(functionCall);
+
+      if (parseError) {
+        debugLogger.warn(`[LocalAgentExecutor] ${parseError}`);
+
+        syncResults.set(callId, {
+          functionResponse: {
+            name: functionCall.name,
+            id: callId,
+            response: { error: parseError },
+          },
+        });
+
+        this.emitActivity('ERROR', {
+          context: 'tool_call',
+          name: functionCall.name,
+          callId,
+          error: parseError,
+          errorType: SubagentActivityErrorType.GENERIC,
+        });
+        continue;
       }
+
       // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
       const toolName = functionCall.name as string;
 
@@ -1379,5 +1387,32 @@ Important Rules:
       return text;
     }
     return chars.slice(0, 197).join('') + '...';
+  }
+
+  /**
+   * Parses the arguments for a tool call, handling both JSON strings and objects.
+   */
+  private parseToolArguments(functionCall: FunctionCall): {
+    args: Record<string, unknown>;
+    error?: string;
+  } {
+    const args: Record<string, unknown> = {};
+    if (typeof functionCall.args === 'string') {
+      try {
+        const parsed: unknown = JSON.parse(functionCall.args);
+        if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) {
+          Object.assign(args, parsed);
+        }
+        return { args };
+      } catch (_) {
+        return {
+          args: {},
+          error: `Failed to parse JSON arguments for tool "${functionCall.name}": ${functionCall.args}. Ensure you provide a valid JSON object.`,
+        };
+      }
+    } else if (functionCall.args) {
+      return { args: functionCall.args };
+    }
+    return { args: {} };
   }
 }
