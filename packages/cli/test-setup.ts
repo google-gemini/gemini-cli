@@ -6,7 +6,7 @@
 
 import { vi, beforeEach, afterEach } from 'vitest';
 import { format } from 'node:util';
-import { coreEvents } from '@google/gemini-cli-core';
+import { coreEvents, debugLogger } from '@google/gemini-cli-core';
 import { themeManager } from './src/ui/themes/theme-manager.js';
 import { mockInkSpinner } from './src/test-utils/mockSpinner.js';
 
@@ -45,6 +45,12 @@ let actWarnings: Array<{ message: string; stack: string }> = [];
 beforeEach(() => {
   // Reset themeManager state to ensure test isolation
   themeManager.resetForTesting();
+
+  // Mock debugLogger to avoid test output noise
+  vi.spyOn(debugLogger, 'log').mockImplementation(() => {});
+  vi.spyOn(debugLogger, 'warn').mockImplementation(() => {});
+  vi.spyOn(debugLogger, 'error').mockImplementation(() => {});
+  vi.spyOn(debugLogger, 'debug').mockImplementation(() => {});
 
   actWarnings = [];
   consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation((...args) => {
@@ -88,6 +94,7 @@ beforeEach(() => {
 afterEach(() => {
   consoleErrorSpy.mockRestore();
 
+  vi.restoreAllMocks();
   vi.unstubAllEnvs();
 
   if (actWarnings.length > 0) {
