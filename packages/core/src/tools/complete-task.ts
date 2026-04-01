@@ -94,7 +94,11 @@ export class CompleteTaskTool<
       }
     } else {
       const resultArg = params['result'];
-      if (resultArg === undefined || resultArg === null || resultArg === '') {
+      if (
+        resultArg === undefined ||
+        resultArg === null ||
+        (typeof resultArg === 'string' && resultArg.trim() === '')
+      ) {
         return 'Missing required "result" argument. You must provide your findings when calling complete_task.';
       }
     }

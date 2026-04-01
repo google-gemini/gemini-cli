@@ -54,6 +54,13 @@ describe('CompleteTaskTool', () => {
       expect(result).toContain("must have required property 'result'");
     });
 
+    it('should fail validation if result is only whitespace', () => {
+      const result = tool.validateToolParams({ result: '   ' });
+      expect(result).toContain(
+        'Missing required "result" argument. You must provide your findings when calling complete_task.',
+      );
+    });
+
     it('should execute and return correct data', async () => {
       const invocation = tool.build({ result: 'Success message' });
       const result = await invocation.execute(new AbortController().signal);
