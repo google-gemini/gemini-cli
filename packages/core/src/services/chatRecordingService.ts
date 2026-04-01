@@ -218,12 +218,22 @@ export class ChatRecordingService {
         }
         this.conversationFile = path.join(chatsDir, filename);
 
+        const directories =
+          this.kind === 'subagent'
+            ? [
+                ...(this.context.config
+                  .getWorkspaceContext()
+                  ?.getDirectories() ?? []),
+              ]
+            : undefined;
+
         this.writeConversation({
           sessionId: this.sessionId,
           projectHash: this.projectHash,
           startTime: new Date().toISOString(),
           lastUpdated: new Date().toISOString(),
           messages: [],
+          directories,
           kind: this.kind,
         });
       }
@@ -518,6 +528,13 @@ export class ChatRecordingService {
   ): void {
     try {
       if (!this.conversationFile) return;
+
+      // Cache the conversation state even if we don't write to disk yet.
+      // This ensures that subsequent reads (e.g. during recordMessage)
+      // see the initial state (like directories) instead of trying to
+      // read a non-existent file from disk.
+      this.cachedConversation = conversation;
+
       // Don't write the file yet until there's at least one message.
       if (conversation.messages.length === 0 && !allowEmpty) return;
 
@@ -527,7 +544,6 @@ export class ChatRecordingService {
       // Compare before updating lastUpdated so the timestamp doesn't
       // cause a false diff.
       if (this.cachedLastConvData === newContent) return;
-      this.cachedConversation = conversation;
       conversation.lastUpdated = new Date().toISOString();
       const contentToWrite = JSON.stringify(conversation, null, 2);
       this.cachedLastConvData = contentToWrite;
