@@ -5,7 +5,7 @@
  */
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { BrowserManager } from './browserManager.js';
+import { BrowserManager, DomainNotAllowedError } from './browserManager.js';
 import { makeFakeConfig } from '../../test-utils/config.js';
 import type { Config } from '../../config/config.js';
 import { injectAutomationOverlay } from './automationOverlay.js';
@@ -79,6 +79,7 @@ import * as fs from 'node:fs';
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { StdioClientTransport } from '@modelcontextprotocol/sdk/client/stdio.js';
 import { getBrowserConsentIfNeeded } from '../../utils/browserConsent.js';
+import { debugLogger } from '../../utils/debugLogger.js';
 
 describe('BrowserManager', () => {
   let mockConfig: Config;
@@ -124,6 +125,16 @@ describe('BrowserManager', () => {
             content: [{ type: 'text', text: 'Tool result' }],
           }),
         }) as unknown as InstanceType<typeof Client>,
+    );
+
+    vi.mocked(StdioClientTransport).mockImplementation(
+      () =>
+        ({
+          close: vi.fn().mockResolvedValue(undefined),
+          stderr: {
+            on: vi.fn(),
+          },
+        }) as unknown as InstanceType<typeof StdioClientTransport>,
     );
   });
 
@@ -224,12 +235,9 @@ describe('BrowserManager', () => {
         },
       });
       const manager = new BrowserManager(restrictedConfig);
-      const result = await manager.callTool('navigate_page', {
-        url: 'https://evil.com',
-      });
-
-      expect(result.isError).toBe(true);
-      expect((result.content || [])[0]?.text).toContain('not permitted');
+      await expect(
+        manager.callTool('navigate_page', { url: 'https://evil.com' }),
+      ).rejects.toThrow(DomainNotAllowedError);
       expect(Client).not.toHaveBeenCalled();
     });
 
@@ -276,12 +284,9 @@ describe('BrowserManager', () => {
         },
       });
       const manager = new BrowserManager(restrictedConfig);
-      const result = await manager.callTool('new_page', {
-        url: 'https://evil.com',
-      });
-
-      expect(result.isError).toBe(true);
-      expect((result.content || [])[0]?.text).toContain('not permitted');
+      await expect(
+        manager.callTool('new_page', { url: 'https://evil.com' }),
+      ).rejects.toThrow(DomainNotAllowedError);
     });
 
     it('should block proxy URL with embedded disallowed domain in query params', async () => {
@@ -293,14 +298,11 @@ describe('BrowserManager', () => {
         },
       });
       const manager = new BrowserManager(restrictedConfig);
-      const result = await manager.callTool('new_page', {
-        url: 'https://translate.google.com/translate?sl=en&tl=en&u=https://blocked.org/page',
-      });
-
-      expect(result.isError).toBe(true);
-      expect((result.content || [])[0]?.text).toContain(
-        'an embedded URL targets a disallowed domain',
-      );
+      await expect(
+        manager.callTool('new_page', {
+          url: 'https://translate.google.com/translate?sl=en&tl=en&u=https://blocked.org/page',
+        }),
+      ).rejects.toThrow(DomainNotAllowedError);
     });
 
     it('should block proxy URL with embedded disallowed domain in URL fragment (hash)', async () => {
@@ -312,14 +314,11 @@ describe('BrowserManager', () => {
         },
       });
       const manager = new BrowserManager(restrictedConfig);
-      const result = await manager.callTool('new_page', {
-        url: 'https://translate.google.com/#view=home&op=translate&sl=en&tl=zh-CN&u=https://blocked.org',
-      });
-
-      expect(result.isError).toBe(true);
-      expect((result.content || [])[0]?.text).toContain(
-        'an embedded URL targets a disallowed domain',
-      );
+      await expect(
+        manager.callTool('new_page', {
+          url: 'https://translate.google.com/#view=home&op=translate&sl=en&tl=zh-CN&u=https://blocked.org',
+        }),
+      ).rejects.toThrow(DomainNotAllowedError);
     });
 
     it('should allow proxy URL when embedded domain is also allowed', async () => {
@@ -397,7 +396,7 @@ describe('BrowserManager', () => {
       const args = vi.mocked(StdioClientTransport).mock.calls[0]?.[0]
         ?.args as string[];
       expect(args).toContain(
-        '--chromeArg="--host-rules=MAP * 127.0.0.1, EXCLUDE google.com, EXCLUDE *.openai.com, EXCLUDE 127.0.0.1"',
+        '--chromeArg="--host-rules=MAP * ~NOTFOUND, EXCLUDE google.com, EXCLUDE *.openai.com"',
       );
     });
 
@@ -694,11 +693,29 @@ describe('BrowserManager', () => {
   describe('close', () => {
     it('should close MCP connections', async () => {
       const manager = new BrowserManager(mockConfig);
-      const client = await manager.getRawMcpClient();
+      await manager.getRawMcpClient();
+
+      await manager.close();
+      expect(manager.isConnected()).toBe(false);
+    });
+
+    it('should NOT log error when transport closes during intentional close()', async () => {
+      const manager = new BrowserManager(mockConfig);
+      await manager.ensureConnection();
+
+      const transportInstance =
+        vi.mocked(StdioClientTransport).mock.results[0]?.value;
+
+      // Trigger onclose during close()
+      vi.spyOn(transportInstance, 'close').mockImplementation(async () => {
+        transportInstance.onclose?.();
+      });
 
       await manager.close();
 
-      expect(client.close).toHaveBeenCalled();
+      expect(debugLogger.error).not.toHaveBeenCalledWith(
+        expect.stringContaining('transport closed unexpectedly'),
+      );
     });
   });
 
@@ -777,6 +794,25 @@ describe('BrowserManager', () => {
       // Should not throw
       await expect(BrowserManager.resetAll()).resolves.toBeUndefined();
     });
+
+    it('should NOT log error when transport closes during resetAll()', async () => {
+      const instance = BrowserManager.getInstance(mockConfig);
+      await instance.ensureConnection();
+
+      const transportInstance =
+        vi.mocked(StdioClientTransport).mock.results[0]?.value;
+
+      // Trigger onclose during close() which is called by resetAll()
+      vi.spyOn(transportInstance, 'close').mockImplementation(async () => {
+        transportInstance.onclose?.();
+      });
+
+      await BrowserManager.resetAll();
+
+      expect(debugLogger.error).not.toHaveBeenCalledWith(
+        expect.stringContaining('transport closed unexpectedly'),
+      );
+    });
   });
 
   describe('isConnected', () => {
@@ -800,7 +836,7 @@ describe('BrowserManager', () => {
   });
 
   describe('reconnection', () => {
-    it('should reconnect after unexpected disconnect', async () => {
+    it('should reconnect after unexpected disconnect and log error', async () => {
       const manager = new BrowserManager(mockConfig);
       await manager.ensureConnection();
 
@@ -810,6 +846,10 @@ describe('BrowserManager', () => {
       if (transportInstance?.onclose) {
         transportInstance.onclose();
       }
+
+      expect(debugLogger.error).toHaveBeenCalledWith(
+        expect.stringContaining('transport closed unexpectedly'),
+      );
 
       // Manager should recognize disconnection
       expect(manager.isConnected()).toBe(false);
@@ -956,6 +996,28 @@ describe('BrowserManager', () => {
       const manager = new BrowserManager(mockConfig);
       await manager.callTool('click', { uid: 'bad' });
     });
+
+    it('should NOT re-inject overlay if select_page is called with bringToFront: false', async () => {
+      mockConfig = makeFakeConfig({
+        agents: {
+          overrides: {
+            browser_agent: {
+              enabled: true,
+            },
+          },
+          browser: {
+            headless: false,
+            disableUserInput: true,
+          },
+        },
+      });
+
+      const manager = new BrowserManager(mockConfig);
+      await manager.callTool('select_page', { pageId: 1, bringToFront: false });
+
+      expect(injectAutomationOverlay).not.toHaveBeenCalled();
+      expect(injectInputBlocker).not.toHaveBeenCalled();
+    });
   });
 
   describe('Rate limiting', () => {
@@ -978,6 +1040,30 @@ describe('BrowserManager', () => {
       // 4th call should throw
       await expect(manager.callTool('take_snapshot', {})).rejects.toThrow(
         /maximum action limit \(3\)/,
+      );
+    });
+
+    it('should NOT increment action counter when shouldCount is false', async () => {
+      const limitedConfig = makeFakeConfig({
+        agents: {
+          browser: {
+            maxActionsPerTask: 1,
+          },
+        },
+      });
+      const manager = new BrowserManager(limitedConfig);
+
+      // Multiple calls with isInternal: true should NOT exhaust the limit
+      await manager.callTool('evaluate_script', {}, undefined, true);
+      await manager.callTool('evaluate_script', {}, undefined, true);
+      await manager.callTool('evaluate_script', {}, undefined, true);
+
+      // This should still work
+      await manager.callTool('take_snapshot', {});
+
+      // Next one should throw (limit 1 allows exactly 1 call with >= check)
+      await expect(manager.callTool('take_snapshot', {})).rejects.toThrow(
+        /maximum action limit \(1\)/,
       );
     });
   });

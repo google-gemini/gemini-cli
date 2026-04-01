@@ -37,6 +37,18 @@ const __dirname = path.dirname(__filename);
 // Default browser profile directory name within ~/.gemini/
 const BROWSER_PROFILE_DIR = 'cli-browser-profile';
 
+/**
+ * Typed error for domain restriction violations.
+ * Thrown when a navigation tool targets a domain not in allowedDomains.
+ * Caught by mcpToolWrapper to terminate the agent immediately.
+ */
+export class DomainNotAllowedError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = 'DomainNotAllowedError';
+  }
+}
+
 // Default timeout for MCP operations
 const MCP_TIMEOUT_MS = 60_000;
 
@@ -164,6 +176,7 @@ export class BrowserManager {
   private mcpTransport: StdioClientTransport | undefined;
   private discoveredTools: McpTool[] = [];
   private disconnected = false;
+  private isClosing = false;
   private connectionPromise: Promise<void> | undefined;
 
   /** State for action rate limiting */
@@ -215,38 +228,34 @@ export class BrowserManager {
    * @param toolName The name of the tool to call
    * @param args Arguments to pass to the tool
    * @param signal Optional AbortSignal to cancel the call
+   * @param isInternal Determine if the tool is for internal execution
    * @returns The result from the MCP server
    */
   async callTool(
     toolName: string,
     args: Record<string, unknown>,
     signal?: AbortSignal,
+    isInternal: boolean = false,
   ): Promise<McpToolCallResult> {
     if (signal?.aborted) {
       throw signal.reason ?? new Error('Operation cancelled');
     }
 
     // Hard enforcement of per-action rate limit
-    if (this.actionCounter > this.maxActionsPerTask) {
-      const error = new Error(
-        `Browser agent reached maximum action limit (${this.maxActionsPerTask}). ` +
-          `Task terminated to prevent runaway execution. To config the limit, use maxActionsPerTask in the settings.`,
-      );
-      throw error;
+    if (!isInternal) {
+      if (this.actionCounter >= this.maxActionsPerTask) {
+        const error = new Error(
+          `Browser agent reached maximum action limit (${this.maxActionsPerTask}). ` +
+            `Task terminated to prevent runaway execution. To config the limit, use maxActionsPerTask in the settings.`,
+        );
+        throw error;
+      }
+      this.actionCounter++;
     }
-    this.actionCounter++;
 
     const errorMessage = this.checkNavigationRestrictions(toolName, args);
     if (errorMessage) {
-      return {
-        content: [
-          {
-            type: 'text',
-            text: errorMessage,
-          },
-        ],
-        isError: true,
-      };
+      throw new DomainNotAllowedError(errorMessage);
     }
 
     const client = await this.getRawMcpClient();
@@ -293,6 +302,11 @@ export class BrowserManager {
       POTENTIALLY_NAVIGATING_TOOLS.has(toolName) &&
       !signal?.aborted
     ) {
+      // Don't re-inject if explicitly switching to a page in the background
+      if (toolName === 'select_page' && args['bringToFront'] === false) {
+        return result;
+      }
+
       try {
         if (this.shouldInjectOverlay) {
           await injectAutomationOverlay(this, signal);
@@ -352,7 +366,7 @@ export class BrowserManager {
    */
   async ensureConnection(): Promise<void> {
     // Already connected and healthy — nothing to do
-    if (this.rawMcpClient && !this.disconnected) {
+    if (this.isConnected()) {
       return;
     }
 
@@ -416,6 +430,7 @@ export class BrowserManager {
    * the transport will terminate the browser.
    */
   async close(): Promise<void> {
+    this.isClosing = true;
     // Close MCP client first
     if (this.rawMcpClient) {
       try {
@@ -455,6 +470,7 @@ export class BrowserManager {
    * BrowserManager instance.
    */
   private async connectMcp(): Promise<void> {
+    this.isClosing = false;
     debugLogger.log('Connecting isolated MCP client to chrome-devtools-mcp...');
 
     // Create raw MCP SDK Client (not the wrapper McpClient)
@@ -522,7 +538,7 @@ export class BrowserManager {
         })
         .join(', ');
       mcpArgs.push(
-        `--chromeArg="--host-rules=MAP * 127.0.0.1, ${exclusionRules}, EXCLUDE 127.0.0.1"`,
+        `--chromeArg="--host-rules=MAP * ~NOTFOUND, ${exclusionRules}"`,
       );
     }
 
@@ -563,11 +579,14 @@ export class BrowserManager {
     }
 
     this.mcpTransport.onclose = () => {
+      this.disconnected = true;
+      if (this.isClosing) {
+        return;
+      }
       debugLogger.error(
         'chrome-devtools-mcp transport closed unexpectedly. ' +
           'The MCP server process may have crashed.',
       );
-      this.disconnected = true;
     };
     this.mcpTransport.onerror = (error: Error) => {
       debugLogger.error(
@@ -587,7 +606,8 @@ export class BrowserManager {
           await this.rawMcpClient!.connect(this.mcpTransport!);
           debugLogger.log('MCP client connected to chrome-devtools-mcp');
           await this.discoverTools();
-          this.registerInputBlockerHandler();
+          // clear the action counter for each connection
+          this.actionCounter = 0;
         })(),
         new Promise<never>((_, reject) => {
           timeoutId = setTimeout(
@@ -733,8 +753,7 @@ export class BrowserManager {
       const urlHostname = parsedUrl.hostname;
 
       if (!this.isDomainAllowed(urlHostname, allowedDomains)) {
-        // If none matched, then deny
-        return `Tool '${toolName}' is not permitted for the requested URL/domain based on your current browser settings.`;
+        return 'Domain not allowed: The requested domain is not in the allowed list.';
       }
 
       // Check query parameters for embedded URLs that could bypass domain
@@ -753,7 +772,7 @@ export class BrowserManager {
           ) {
             const embeddedHostname = embeddedUrl.hostname.replace(/\.$/, '');
             if (!this.isDomainAllowed(embeddedHostname, allowedDomains)) {
-              return `Tool '${toolName}' is not permitted: an embedded URL targets a disallowed domain.`;
+              return 'Domain not allowed: Embedded URL targets a disallowed domain.';
             }
           }
         } catch {
@@ -789,46 +808,5 @@ export class BrowserManager {
     }
     // If none matched, then deny
     return false;
-  }
-
-  /**
-   * Registers a fallback notification handler on the MCP client to
-   * automatically re-inject the input blocker after any server-side
-   * notification (e.g. page navigation, resource updates).
-   *
-   * This covers ALL navigation types (link clicks, form submissions,
-   * history navigation) — not just explicit navigate_page tool calls.
-   */
-  private registerInputBlockerHandler(): void {
-    if (!this.rawMcpClient) {
-      return;
-    }
-
-    if (!this.config.shouldDisableBrowserUserInput()) {
-      return;
-    }
-
-    const existingHandler = this.rawMcpClient.fallbackNotificationHandler;
-    this.rawMcpClient.fallbackNotificationHandler = async (notification: {
-      method: string;
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      params?: any;
-    }) => {
-      // Chain with any existing handler first.
-      if (existingHandler) {
-        await existingHandler(notification);
-      }
-
-      // Only re-inject on resource update notifications which indicate
-      // page content has changed (navigation, new page, etc.)
-      if (notification.method === 'notifications/resources/updated') {
-        debugLogger.log('Page content changed, re-injecting input blocker...');
-        void injectInputBlocker(this);
-      }
-    };
-
-    debugLogger.log(
-      'Registered global notification handler for input blocker re-injection',
-    );
   }
 }

@@ -1,6 +1,6 @@
-# Latest stable release: v0.35.2
+# Latest stable release: v0.35.3
 
-Released: March 26, 2026
+Released: March 28, 2026
 
 For most users, our latest stable release is the recommended release. Install
 the latest stable version with:
@@ -29,6 +29,9 @@ npm install -g @google/gemini-cli
 
 ## What's Changed
 
+- fix(patch): cherry-pick 765fb67 to release/v0.35.2-pr-24055 [CONFLICTS] by
+  @gemini-cli-robot in
+  [#24063](https://github.com/google-gemini/gemini-cli/pull/24063)
 - fix(core): allow disabling environment variable redaction by @galz10 in
   [#23927](https://github.com/google-gemini/gemini-cli/pull/23927)
 - fix(a2a-server): A2A server should execute ask policies in interactive mode by
@@ -385,4 +388,4 @@ npm install -g @google/gemini-cli
   [#23585](https://github.com/google-gemini/gemini-cli/pull/23585)
 
 **Full Changelog**:
-https://github.com/google-gemini/gemini-cli/compare/v0.34.0...v0.35.2
+https://github.com/google-gemini/gemini-cli/compare/v0.34.0...v0.35.3

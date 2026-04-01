@@ -191,8 +191,9 @@ export const SubagentGroupDisplay: React.FC<SubagentGroupDisplayProps> = ({
           }
         }
 
+        const history = toolCall.subagentHistory ?? progress.recentActivity;
         const lastActivity: SubagentActivityItem | undefined =
-          progress.recentActivity[progress.recentActivity.length - 1];
+          history[history.length - 1];
 
         // Collapsed View: Show single compact line per agent
         if (!isExpanded) {
@@ -260,6 +261,7 @@ export const SubagentGroupDisplay: React.FC<SubagentGroupDisplayProps> = ({
             <SubagentProgressDisplay
               progress={progress}
               terminalWidth={terminalWidth}
+              historyOverrides={toolCall.subagentHistory}
             />
           </Box>
         );
