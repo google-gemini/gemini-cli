@@ -249,8 +249,8 @@ export class ShellToolInvocation extends BaseToolInvocation<
         const missingNetwork = !!proactive.network && !approved?.network;
 
         // Detect commands or sub-commands that definitely need network
-        const args = command.trim().split(/\s+/);
-        const subCommand = args[1];
+        const parsed = parseCommandDetails(command);
+        const subCommand = parsed?.details[0]?.args[0];
         const needsNetwork = isNetworkReliantCommand(rootCommand, subCommand);
 
         if (needsNetwork) {
