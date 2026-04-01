@@ -235,10 +235,7 @@ export const renderDiffLines = ({
 
   if (displayableLines.length === 0) {
     return [
-      <Box
-        key="no-changes"
-        padding={1}
-      >
+      <Box key="no-changes" padding={1}>
         <Text dimColor>No changes detected.</Text>
       </Box>,
     ];
