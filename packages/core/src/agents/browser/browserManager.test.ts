@@ -469,7 +469,7 @@ describe('BrowserManager', () => {
 
         expect(StdioClientTransport).toHaveBeenCalledWith(
           expect.objectContaining({
-            command: 'npx',
+            command: 'node',
             args: expect.arrayContaining(['--headless']),
           }),
         );
