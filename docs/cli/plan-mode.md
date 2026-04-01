@@ -483,6 +483,46 @@ scripts or CI/CD pipelines), Plan Mode optimizes for automated workflows:
 gemini --approval-mode plan -p "Analyze telemetry and suggest improvements"
 ```
 
+## FAQ
+
+#### Why are edits still being made to my files while in Plan Mode?
+
+Plan Mode is designed to be read-only for your project's source code, but it
+still allows writing to your
+[plans directory](#custom-plan-directory-and-policies). If you see edits
+occurring outside of your plans directory, it is likely due to a custom policy
+rule that is "always active."
+
+Any rule that does not explicitly specify `modes` is considered active in all
+modes, including Plan Mode. To see which rules are currently active in your
+session, use the **`/policies list`** command.
+
+To prevent a rule from applying to Plan Mode, ensure you explicitly list the
+modes it _should_ apply to:
+
+```toml
+[[rule]]
+toolName = "replace"
+# ...
+decision = "allow"
+priority = 100
+# By omitting "plan", this rule will not be active in Plan Mode.
+modes = ["default", "autoEdit"]
+```
+
+#### How can I improve the UI experience for long planning sessions and plan review?
+
+For complex tasks that involve extensive research and long plan drafts, we
+recommend enabling the **Alternate Screen Buffer**. This preserves your terminal
+history, provides a more stable, flicker-free UI, and allows you to view
+expanded plans and tool outputs without needing to use the **`Ctrl+O`**
+shortcut:
+
+1.  Use the `/settings` command.
+2.  Set **Use Alternate Screen Buffer** (`ui.useAlternateBuffer`) to `true`.
+3.  (Optional) Set **Incremental Rendering** (`ui.incrementalRendering`) to
+    `true` for even smoother updates.
+
 [`plan.toml`]:
   https://github.com/google-gemini/gemini-cli/blob/main/packages/core/src/policy/policies/plan.toml
 [Conductor]: https://github.com/gemini-cli-extensions/conductor
