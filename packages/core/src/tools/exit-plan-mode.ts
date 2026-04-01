@@ -270,12 +270,14 @@ Read and follow the plan strictly during implementation.`,
       };
     } else {
       try {
-        let version = 1;
-        let backupPath = `${resolvedPlanPath}.v${version}`;
-        while (fs.existsSync(backupPath)) {
-          version++;
-          backupPath = `${resolvedPlanPath}.v${version}`;
-        }
+        const files = await fsPromises.readdir(path.dirname(resolvedPlanPath));
+        const base = path.basename(resolvedPlanPath);
+        const versions = files
+          .filter((f) => f.startsWith(`${base}.v`))
+          .map((f) => parseInt(f.slice(base.length + 2), 10))
+          .filter((v) => !isNaN(v));
+        const nextVersion = (versions.length > 0 ? Math.max(...versions) : 0) + 1;
+        const backupPath = `${resolvedPlanPath}.v${nextVersion}`; 
         const content = await fsPromises.readFile(resolvedPlanPath, 'utf8');
         await fsPromises.writeFile(backupPath, content, 'utf8');
       } catch (err) {
