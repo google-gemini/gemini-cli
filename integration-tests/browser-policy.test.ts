@@ -142,7 +142,6 @@ priority = 200
       1000,
     );
     await run.sendKeys('1\r');
-    await new Promise((r) => setTimeout(r, 2000));
 
     // Handle privacy notice
     await poll(
@@ -151,7 +150,6 @@ priority = 200
       100,
     );
     await run.sendKeys('1\r');
-    await new Promise((r) => setTimeout(r, 5000));
 
     // new_page (MCP tool, should have 4 options, use option 3: Allow all server tools)
     await poll(
@@ -168,7 +166,18 @@ priority = 200
 
     // Select "Allow all server tools for this session" (option 3)
     await run.sendKeys('3\r');
-    await new Promise((r) => setTimeout(r, 30000));
+
+    // Poll for task completion instead of using a fixed timeout.
+    // In Docker, Chrome DevTools MCP connection timing is non-deterministic and
+    // a fixed 30 s sleep allows fake responses to be consumed out of order,
+    // causing ERROR_NO_COMPLETE_TASK_CALL.  Polling terminates as soon as the
+    // success text appears and fails fast if something goes wrong.
+    await poll(
+      () =>
+        stripAnsi(run.output).toLowerCase().includes('completed successfully'),
+      60000,
+      1000,
+    );
 
     const output = stripAnsi(run.output).toLowerCase();
 
