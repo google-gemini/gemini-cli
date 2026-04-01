@@ -160,12 +160,13 @@ export class ExitPlanModeInvocation extends BaseToolInvocation<
     // decision is 'ask_user'
     let diffContent: string | undefined;
     try {
-      let latestVersion = 0;
-      let version = 1;
-      while (fs.existsSync(`${resolvedPlanPath}.v${version}`)) {
-        latestVersion = version;
-        version++;
-      }
+      const files = await fsPromises.readdir(path.dirname(resolvedPlanPath));
+      const base = path.basename(resolvedPlanPath);
+      const versions = files
+        .filter((f) => f.startsWith(`${base}.v`))
+        .map((f) => parseInt(f.slice(base.length + 2), 10))
+        .filter((v) => !isNaN(v));
+      const latestVersion = versions.length > 0 ? Math.max(...versions) : 0;
 
       if (latestVersion > 0) {
         const previousPlanPath = `${resolvedPlanPath}.v${latestVersion}`;
