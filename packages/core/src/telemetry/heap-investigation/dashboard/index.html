@@ -708,6 +708,19 @@ html[data-theme="light"] .pill-yellow{color:#9a6700}
 </div><!-- /shell -->
 
 <script>
+const esc = (str) => {
+  if (str == null) return '';
+  return String(str).replace(/[&<>'"]/g, 
+    tag => ({
+      '&': '&amp;',
+      '<': '&lt;',
+      '>': '&gt;',
+      "'": '&#39;',
+      '"': '&quot;'
+    }[tag] || tag)
+  );
+};
+
 const PATTERNS = {
   event_listener_accumulation:{label:'Event Listener Accumulation',cls:'pat-red'},
   closure_scope_capture:{label:'Closure Scope Capture',cls:'pat-yellow'},
@@ -788,7 +801,7 @@ function render(r){
     pl.innerHTML='<span class="pat-none">No leak patterns detected</span>';
   } else {
     pl.innerHTML=pats.map(p=>{
-      const s=PATTERNS[p]||{label:p,cls:'pat-blue'};
+      const s=PATTERNS[p]||{label:esc(p),cls:'pat-blue'};
       return`<span class="pat ${s.cls}">${s.label}</span>`;
     }).join('');
   }
@@ -830,16 +843,16 @@ function render(r){
     tbody.innerHTML=ctors.slice(0,15).map((c,i)=>{
       const p=c.contributing_patterns?.[0];
       const ps=p?PATTERNS[p]:{};
-      const chip=p?`<span class="pat-chip ${ps.cls||'pat-blue'}" style="font-size:10px">${ps.label||p}</span>`:'<span style="color:#7d8590">—</span>';
+      const chip=p?`<span class="pat-chip ${ps.cls||'pat-blue'}" style="font-size:10px">${ps.label||esc(p)}</span>`:'<span style="color:#7d8590">—</span>';
       const pct2=Math.round((c.self_size_delta_bytes||0)/maxB*100);
       return`<tr>
         <td style="color:#7d8590;width:32px">${i+1}</td>
-        <td><span class="cell-name">${c.name||'?'}</span></td>
+        <td><span class="cell-name">${esc(c.name||'?')}</span></td>
         <td><span class="cell-delta">+${(c.instances_delta||0).toLocaleString()}</span></td>
         <td><span class="cell-size">+${fmtB(c.self_size_delta_bytes||0)}</span></td>
         <td><span class="cell-size">${fmtB(c.retained_size_bytes||0)}</span></td>
         <td>${chip}</td>
-        <td><span class="cell-path" title="${c.first_retained_path||''}">${c.first_retained_path||'—'}</span></td>
+        <td><span class="cell-path" title="${esc(c.first_retained_path||'')}">${esc(c.first_retained_path||'—')}</span></td>
         <td class="micro-bar-wrap"><div class="micro-bar"><div class="micro-bar-fill" data-w="${pct2}"></div></div></td>
       </tr>`;
     }).join('');
@@ -853,14 +866,14 @@ function render(r){
   // Detached
   const det=r.detached_nodes||{};
   setText('det-count',(det.count||0).toLocaleString());
-  document.getElementById('det-tags').innerHTML=(det.top_constructors||[]).map(n=>`<span class="det-tag">${n}</span>`).join('');
+  document.getElementById('det-tags').innerHTML=(det.top_constructors||[]).map(n=>`<span class="det-tag">${esc(n)}</span>`).join('');
 
   // Perfetto
   const pb=document.getElementById('perf-body');
   if(r.perfetto_path){
     pb.innerHTML=`
       <div style="font-size:12px;color:#7d8590;margin-bottom:6px">Trace file</div>
-      <div class="perf-path">${r.perfetto_path}</div>
+      <div class="perf-path">${esc(r.perfetto_path)}</div>
       <a href="https://ui.perfetto.dev" target="_blank" class="perf-link">
         <svg width="12" height="12" viewBox="0 0 16 16" fill="currentColor"><path d="M8.636 3.5a.5.5 0 0 0-.5-.5H1.5A1.5 1.5 0 0 0 0 4.5v10A1.5 1.5 0 0 0 1.5 16h10a1.5 1.5 0 0 0 1.5-1.5V7.864a.5.5 0 0 0-1 0V14.5a.5.5 0 0 1-.5.5h-10a.5.5 0 0 1-.5-.5v-10a.5.5 0 0 1 .5-.5h6.636a.5.5 0 0 0 .5-.5"/><path d="M16 .5a.5.5 0 0 0-.5-.5h-5a.5.5 0 0 0 0 1h3.793L6.146 9.146a.5.5 0 1 0 .708.708L15 1.707V5.5a.5.5 0 0 0 1 0z"/></svg>
         Open in Perfetto UI
@@ -1027,18 +1040,18 @@ function populateConstructorsTab(r){
   tbody.innerHTML=ctors.map((c,i)=>{
     const p=c.contributing_patterns?.[0];
     const ps=p?PATTERNS[p]:{};
-    const chip=p?`<span class="pat-chip ${ps.cls||'pat-blue'}" style="font-size:10px">${ps.label||p}</span>`:'—';
+    const chip=p?`<span class="pat-chip ${ps.cls||'pat-blue'}" style="font-size:10px">${ps.label||esc(p)}</span>`:'—';
     return`<tr>
       <td style="color:var(--text3)">${i+1}</td>
-      <td><span class="cell-name">${c.name}</span></td>
+      <td><span class="cell-name">${esc(c.name)}</span></td>
       <td class="cell-size">${(c.instances_s1||0).toLocaleString()}</td>
       <td class="cell-size">${(c.instances_s3||0).toLocaleString()}</td>
       <td class="cell-delta">+${(c.instances_delta||0).toLocaleString()}</td>
       <td class="cell-size">+${fmtB(c.self_size_delta_bytes||0)}</td>
       <td class="cell-size">${fmtB(c.retained_size_bytes||0)}</td>
-      <td><span style="font-size:11px;color:var(--text3)">${c.v8_space||'old_space'}</span></td>
+      <td><span style="font-size:11px;color:var(--text3)">${esc(c.v8_space||'old_space')}</span></td>
       <td>${chip}</td>
-      <td><span class="cell-path" title="${c.first_retained_path||''}">${c.first_retained_path||'—'}</span></td>
+      <td><span class="cell-path" title="${esc(c.first_retained_path||'')}">${esc(c.first_retained_path||'—')}</span></td>
     </tr>`;
   }).join('');
 }
@@ -1064,7 +1077,7 @@ function populatePatternsTab(r){
     circular_reference:{sev:'Low',fix:'Use WeakRef or WeakMap for back-references to break retention cycles.'},
   };
   el.innerHTML=pats.map(p=>{
-    const s=PATTERNS[p]||{label:p,cls:'pat-blue'};
+    const s=PATTERNS[p]||{label:esc(p),cls:'pat-blue'};
     const d=DETAILS[p]||{sev:'Unknown',fix:'Review retainer paths in the constructor table.'};
     const affected=ctors.filter(c=>(c.contributing_patterns||[]).includes(p)).map(c=>c.name).join(', ')||'—';
     const sevColor=d.sev==='High'?'#f85149':d.sev==='Medium'?'#d29922':'#7d8590';
@@ -1076,7 +1089,7 @@ function populatePatternsTab(r){
       <div class="card-body" style="display:grid;grid-template-columns:1fr 1fr;gap:16px">
         <div>
           <div style="font-size:11px;color:var(--text3);text-transform:uppercase;letter-spacing:.5px;margin-bottom:4px">Affected Constructors</div>
-          <div style="font-size:13px;color:var(--cell-name);font-family:'JetBrains Mono',monospace">${affected}</div>
+          <div style="font-size:13px;color:var(--cell-name);font-family:'JetBrains Mono',monospace">${esc(affected)}</div>
         </div>
         <div>
           <div style="font-size:11px;color:var(--text3);text-transform:uppercase;letter-spacing:.5px;margin-bottom:4px">Recommended Fix</div>
@@ -1092,7 +1105,7 @@ function populatePerfettoTab(r){
   const el=document.getElementById('perf-tab-body');
   if(r.perfetto_path){
     el.innerHTML=`<div style="font-size:12px;color:var(--text3);margin-bottom:6px">Trace file</div>
-      <div class="perf-path">${r.perfetto_path}</div>
+      <div class="perf-path">${esc(r.perfetto_path)}</div>
       <a href="https://ui.perfetto.dev" target="_blank" class="perf-link" style="margin-top:8px">
         <svg width="12" height="12" viewBox="0 0 16 16" fill="currentColor"><path d="M8.636 3.5a.5.5 0 0 0-.5-.5H1.5A1.5 1.5 0 0 0 0 4.5v10A1.5 1.5 0 0 0 1.5 16h10a1.5 1.5 0 0 0 1.5-1.5V7.864a.5.5 0 0 0-1 0V14.5a.5.5 0 0 1-.5.5h-10a.5.5 0 0 1-.5-.5v-10a.5.5 0 0 1 .5-.5h6.636a.5.5 0 0 0 .5-.5"/><path d="M16 .5a.5.5 0 0 0-.5-.5h-5a.5.5 0 0 0 0 1h3.793L6.146 9.146a.5.5 0 1 0 .708.708L15 1.707V5.5a.5.5 0 0 0 1 0z"/></svg>
         Open in Perfetto UI
@@ -1116,7 +1129,7 @@ function addToReports(r){
     return`<div style="display:flex;align-items:center;gap:12px;padding:10px 0;border-bottom:1px solid var(--border2);cursor:pointer" onclick="reloadReport(${i})">
       <div style="width:36px;height:36px;border-radius:6px;background:var(--bg3);display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:600;color:${confColor}">${conf}%</div>
       <div style="flex:1;min-width:0">
-        <div style="font-size:12px;font-family:'JetBrains Mono',monospace;color:var(--cell-name)">${rep.investigation_id}</div>
+        <div style="font-size:12px;font-family:'JetBrains Mono',monospace;color:var(--cell-name)">${esc(rep.investigation_id)}</div>
         <div style="font-size:11px;color:var(--text3)">${new Date(rep.timestamp_ms).toLocaleString()} · ${fmtMs(rep.duration_ms)} · ${(rep.patterns||[]).length} pattern(s)</div>
       </div>
       <div style="font-size:12px;color:var(--text2);white-space:nowrap">${fmtB(rep.trigger?.absolute_bytes||0)} growth</div>
@@ -1174,8 +1187,8 @@ function renderCpuProfile(prof){
     const selfMs=((hits.get(n.id)||0)/samples.length*totalTime/1000).toFixed(1);
     return`<tr>
       <td style="color:var(--text3)">${i+1}</td>
-      <td class="cell-name">${fn.functionName||'(anonymous)'}</td>
-      <td class="cell-path" style="max-width:200px">${url}:${fn.lineNumber||0}</td>
+      <td class="cell-name">${esc(fn.functionName||'(anonymous)')}</td>
+      <td class="cell-path" style="max-width:200px">${esc(url)}:${fn.lineNumber||0}</td>
       <td class="cell-size">${selfMs}ms</td>
       <td><div style="display:flex;align-items:center;gap:8px">${n.selfPct.toFixed(1)}%
         <div style="width:60px;height:3px;background:var(--micro-track);border-radius:2px;overflow:hidden">

@@ -55,7 +55,12 @@ export class HighWaterMarkTracker {
 
     if (currentValue > thresholdValue) {
       if (this.diagnosticCallback) {
-        this.diagnosticCallback(metricType, currentValue, currentWaterMark);
+        // Run asynchronously to avoid blocking the fast memory tracking loop
+        setImmediate(() => {
+          if (this.diagnosticCallback) {
+            this.diagnosticCallback(metricType, currentValue, currentWaterMark);
+          }
+        });
       }
       
       // Update high-water mark

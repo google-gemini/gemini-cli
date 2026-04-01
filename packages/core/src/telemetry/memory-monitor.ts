@@ -10,7 +10,7 @@ import type { Config } from '../config/config.js';
 import { bytesToMB } from '../utils/formatters.js';
 import { isUserActive } from './activity-detector.js';
 import { HighWaterMarkTracker } from './high-water-mark-tracker.js';
-import { initializeDiagnosticBridge } from './diagnostic-bridge.js';
+import { initializeDiagnosticBridge, getDiagnosticBridge } from './diagnostic-bridge.js';
 import {
   recordMemoryUsage,
   MemoryMetricType,
@@ -53,9 +53,14 @@ export class MemoryMonitor {
     this.rateLimiter = new RateLimiter(60000); // 1 minute minimum between recordings
 
     // Wire up the reactive diagnostic bridge
-    const bridge = initializeDiagnosticBridge();
+    initializeDiagnosticBridge();
     this.highWaterMarkTracker.setDiagnosticCallback((metricType, currentValue, previousWaterMark) => {
-      bridge.onThresholdExceeded(metricType, currentValue, previousWaterMark);
+      // Use getDiagnosticBridge() instead of captured local variable to prevent memory leak
+      // if MemoryMonitor is reinitialized while the bridge singleton persists.
+      const bridge = getDiagnosticBridge();
+      if (bridge) {
+        bridge.onThresholdExceeded(metricType, currentValue, previousWaterMark);
+      }
     });
   }
 
