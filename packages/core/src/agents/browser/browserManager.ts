@@ -488,11 +488,13 @@ export class BrowserManager {
     // name (Docker/Podman/gVisor/LXC) when running inside a sandbox.
     const sandboxType = process.env['SANDBOX'];
     const isContainerSandbox = sandboxType && sandboxType !== 'sandbox-exec';
+    const isSeatbeltSandbox =
+      sandboxType === 'sandbox-exec' && sessionMode !== 'existing';
 
     // Seatbelt sandbox: force isolated + headless for filesystem compatibility.
     // Chrome exists on the host, but persistent profiles may conflict with
     // seatbelt restrictions. Isolated mode uses tmpdir (always writable).
-    if (sandboxType === 'sandbox-exec' && sessionMode !== 'existing') {
+    if (isSeatbeltSandbox) {
       if (sessionMode !== 'isolated') {
         sessionMode = 'isolated';
         coreEvents.emitFeedback(
@@ -547,10 +549,7 @@ export class BrowserManager {
     // Add optional settings from config.
     // Force headless in seatbelt sandbox since Chrome profile/display access
     // may be restricted, and the user is running in a sandboxed environment.
-    if (
-      browserConfig.customConfig.headless ||
-      (sandboxType === 'sandbox-exec' && sessionMode !== 'existing')
-    ) {
+    if (browserConfig.customConfig.headless || isSeatbeltSandbox) {
       mcpArgs.push('--headless');
     }
     if (browserConfig.customConfig.profilePath) {

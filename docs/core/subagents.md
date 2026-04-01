@@ -240,7 +240,7 @@ Chrome is not available inside the container, so the browser agent is
 **disabled** unless `sessionMode` is set to `"existing"`. When enabled with
 `existing` mode, the agent automatically connects to Chrome on the host via the
 resolved IP of `host.docker.internal:9222` instead of using local pipe
-discovery.
+discovery. Port `9222` is currently hardcoded and cannot be customized.
 
 To use the browser agent in a Docker sandbox:
 
