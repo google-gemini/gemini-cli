@@ -7,6 +7,7 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { UpdateTopicTool } from './topicTool.js';
 import { TopicState } from '../config/topicState.js';
+import { coreEvents } from '../utils/events.js';
 import { MessageBus } from '../confirmation-bus/message-bus.js';
 import type { PolicyEngine } from '../policy/policy-engine.js';
 import {
@@ -24,36 +25,55 @@ describe('TopicState', () => {
     state = new TopicState();
   });
 
-  it('should store and retrieve topic title and intent', () => {
+  it('should store and retrieve topic title, summary and intent', () => {
     expect(state.getTopic()).toBeUndefined();
+    expect(state.getSummary()).toBeUndefined();
     expect(state.getIntent()).toBeUndefined();
-    const success = state.setTopic('Test Topic', 'Test Intent');
+    const success = state.setTopic('Test Topic', 'Test Summary', 'Test Intent');
     expect(success).toBe(true);
     expect(state.getTopic()).toBe('Test Topic');
+    expect(state.getSummary()).toBe('Test Summary');
     expect(state.getIntent()).toBe('Test Intent');
   });
 
   it('should sanitize newlines and carriage returns', () => {
-    state.setTopic('Topic\nWith\r\nLines', 'Intent\nWith\r\nLines');
+    state.setTopic(
+      'Topic\nWith\r\nLines',
+      'Summary\nWith\r\nLines',
+      'Intent\nWith\r\nLines',
+    );
     expect(state.getTopic()).toBe('Topic With Lines');
+    expect(state.getSummary()).toBe('Summary With Lines');
     expect(state.getIntent()).toBe('Intent With Lines');
   });
 
   it('should trim whitespace', () => {
-    state.setTopic('  Spaced Topic   ', '  Spaced Intent   ');
+    state.setTopic(
+      '  Spaced Topic   ',
+      '  Spaced Summary   ',
+      '  Spaced Intent   ',
+    );
     expect(state.getTopic()).toBe('Spaced Topic');
+    expect(state.getSummary()).toBe('Spaced Summary');
     expect(state.getIntent()).toBe('Spaced Intent');
   });
 
   it('should reject empty or whitespace-only inputs', () => {
-    expect(state.setTopic('', '')).toBe(false);
+    expect(state.setTopic('', '', '')).toBe(false);
   });
 
-  it('should reset topic and intent', () => {
-    state.setTopic('Test Topic', 'Test Intent');
+  it('should reset topic, summary and intent', () => {
+    state.setTopic('Test Topic', 'Test Summary', 'Test Intent');
     state.reset();
     expect(state.getTopic()).toBeUndefined();
+    expect(state.getSummary()).toBeUndefined();
     expect(state.getIntent()).toBeUndefined();
+  });
+
+  it('should emit TopicUpdated event when topic is set', () => {
+    const spy = vi.spyOn(coreEvents, 'emitTopicUpdated');
+    state.setTopic('Topic', 'Summary', 'Intent');
+    expect(spy).toHaveBeenCalledWith('Topic', 'Summary');
   });
 });
 

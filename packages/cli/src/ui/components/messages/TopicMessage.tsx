@@ -11,10 +11,35 @@ import {
   UPDATE_TOPIC_DISPLAY_NAME,
   TOPIC_PARAM_TITLE,
   TOPIC_PARAM_SUMMARY,
-  TOPIC_PARAM_STRATEGIC_INTENT,
 } from '@google/gemini-cli-core';
 import type { IndividualToolCallDisplay } from '../../types.js';
 import { theme } from '../../semantic-colors.js';
+
+interface TopicDisplayProps {
+  title?: string;
+  summary?: string;
+  marginLeft?: number;
+}
+
+export const TopicDisplay: React.FC<TopicDisplayProps> = ({
+  title,
+  summary,
+  marginLeft = 2,
+}) => {
+  return (
+    <Box flexDirection="row" marginLeft={marginLeft} flexWrap="wrap">
+      <Text color={theme.text.primary} bold wrap="wrap">
+        {title || 'Topic'}
+        {summary && <Text>: </Text>}
+      </Text>
+      {summary && (
+        <Text color={theme.text.secondary} wrap="wrap">
+          {summary}
+        </Text>
+      )}
+    </Box>
+  );
+};
 
 interface TopicMessageProps extends IndividualToolCallDisplay {
   terminalWidth: number;
@@ -26,21 +51,8 @@ export const isTopicTool = (name: string): boolean =>
 export const TopicMessage: React.FC<TopicMessageProps> = ({ args }) => {
   const rawTitle = args?.[TOPIC_PARAM_TITLE];
   const title = typeof rawTitle === 'string' ? rawTitle : undefined;
-  const rawIntent =
-    args?.[TOPIC_PARAM_STRATEGIC_INTENT] || args?.[TOPIC_PARAM_SUMMARY];
-  const intent = typeof rawIntent === 'string' ? rawIntent : undefined;
+  const rawSummary = args?.[TOPIC_PARAM_SUMMARY];
+  const summary = typeof rawSummary === 'string' ? rawSummary : undefined;
 
-  return (
-    <Box flexDirection="row" marginLeft={2} flexWrap="wrap">
-      <Text color={theme.text.primary} bold wrap="truncate-end">
-        {title || 'Topic'}
-        {intent && <Text>: </Text>}
-      </Text>
-      {intent && (
-        <Text color={theme.text.secondary} wrap="wrap">
-          {intent}
-        </Text>
-      )}
-    </Box>
-  );
+  return <TopicDisplay title={title} summary={summary} />;
 };

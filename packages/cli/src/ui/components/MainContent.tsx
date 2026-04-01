@@ -9,7 +9,6 @@ import { HistoryItemDisplay } from './HistoryItemDisplay.js';
 import { useUIState } from '../contexts/UIStateContext.js';
 import { useSettings } from '../contexts/SettingsContext.js';
 import { useAppContext } from '../contexts/AppContext.js';
-import { AppHeader } from './AppHeader.js';
 
 import { useAlternateBuffer } from '../hooks/useAlternateBuffer.js';
 import {
@@ -24,7 +23,6 @@ import { ToolConfirmationQueue } from './ToolConfirmationQueue.js';
 import { isTopicTool } from './messages/TopicMessage.js';
 
 const MemoizedHistoryItemDisplay = memo(HistoryItemDisplay);
-const MemoizedAppHeader = memo(AppHeader);
 
 // Limit Gemini messages to a very high number of lines to mitigate performance
 // issues in the worst case if we somehow get an enormous response from Gemini.
@@ -217,7 +215,6 @@ export const MainContent = () => {
 
   const virtualizedData = useMemo(
     () => [
-      { type: 'header' as const },
       ...augmentedHistory.map(
         ({
           item,
@@ -241,15 +238,7 @@ export const MainContent = () => {
 
   const renderItem = useCallback(
     ({ item }: { item: (typeof virtualizedData)[number] }) => {
-      if (item.type === 'header') {
-        return (
-          <MemoizedAppHeader
-            key="app-header"
-            version={version}
-            showDetails={showHeaderDetails}
-          />
-        );
-      } else if (item.type === 'history') {
+      if (item.type === 'history') {
         return (
           <MemoizedHistoryItemDisplay
             terminalWidth={mainAreaWidth}
@@ -273,15 +262,7 @@ export const MainContent = () => {
         return pendingItems;
       }
     },
-    [
-      showHeaderDetails,
-      version,
-      mainAreaWidth,
-      uiState.slashCommands,
-      pendingItems,
-      uiState.constrainHeight,
-      staticAreaMaxItemHeight,
-    ],
+    [mainAreaWidth, uiState.slashCommands, pendingItems, uiState.constrainHeight, staticAreaMaxItemHeight]
   );
 
   if (isAlternateBuffer) {
@@ -294,7 +275,6 @@ export const MainContent = () => {
         renderItem={renderItem}
         estimatedItemHeight={() => 100}
         keyExtractor={(item, _index) => {
-          if (item.type === 'header') return 'header';
           if (item.type === 'history') return item.item.id.toString();
           return 'pending';
         }}
@@ -308,11 +288,7 @@ export const MainContent = () => {
     <>
       <Static
         key={uiState.historyRemountKey}
-        items={[
-          <AppHeader key="app-header" version={version} />,
-          ...staticHistoryItems,
-          ...lastResponseHistoryItems,
-        ]}
+        items={[...staticHistoryItems, ...lastResponseHistoryItems]}
       >
         {(item) => item}
       </Static>

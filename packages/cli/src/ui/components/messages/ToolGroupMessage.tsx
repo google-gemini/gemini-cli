@@ -15,7 +15,7 @@ import type {
 import { ToolCallStatus, mapCoreStatusToDisplayStatus } from '../../types.js';
 import { ToolMessage } from './ToolMessage.js';
 import { ShellToolMessage } from './ShellToolMessage.js';
-import { TopicMessage, isTopicTool } from './TopicMessage.js';
+import { isTopicTool } from './TopicMessage.js';
 import { SubagentGroupDisplay } from './SubagentGroupDisplay.js';
 import { DenseToolMessage } from './DenseToolMessage.js';
 import { theme } from '../../semantic-colors.js';
@@ -143,7 +143,14 @@ export const ToolGroupMessage: React.FC<ToolGroupMessageProps> = ({
         ) {
           return false;
         }
+
+        // Hide topic tools from history as they are now sticky headers
+        if (isTopicTool(t.name)) {
+          return false;
+        }
+
         // Standard hiding logic (e.g. Plan Mode internal edits)
+
         if (
           shouldHideToolCall({
             displayName: t.name,
@@ -458,8 +465,6 @@ export const ToolGroupMessage: React.FC<ToolGroupMessageProps> = ({
             >
               {isCompact ? (
                 <DenseToolMessage {...commonProps} />
-              ) : isTopicToolCall ? (
-                <TopicMessage {...commonProps} />
               ) : isShellToolCall ? (
                 <ShellToolMessage {...commonProps} config={config} />
               ) : (

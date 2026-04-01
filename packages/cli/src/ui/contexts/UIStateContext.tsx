@@ -102,6 +102,11 @@ export interface AccountSuspensionInfo {
   appealLinkText?: string;
 }
 
+export interface TopicInfo {
+  title?: string;
+  summary?: string;
+}
+
 export interface UIState {
   history: HistoryItem[];
   historyManager: UseHistoryManagerReturn;
@@ -142,6 +147,7 @@ export interface UIState {
   initError: string | null;
   pendingGeminiHistoryItems: HistoryItemWithoutId[];
   thought: ThoughtSummary | null;
+  currentTopic: TopicInfo | null;
   shellModeActive: boolean;
   userMessages: string[];
   buffer: TextBuffer;

@@ -147,6 +147,14 @@ export interface AgentsDiscoveredPayload {
   agents: AgentDefinition[];
 }
 
+/**
+ * Payload for the 'topic-updated' event.
+ */
+export interface TopicUpdatedPayload {
+  title?: string;
+  summary?: string;
+}
+
 export interface SlashCommandConflict {
   name: string;
   renamedTo: string;
@@ -189,6 +197,7 @@ export enum CoreEvent {
   ConsentRequest = 'consent-request',
   McpProgress = 'mcp-progress',
   AgentsDiscovered = 'agents-discovered',
+  TopicUpdated = 'topic-updated',
   RequestEditorSelection = 'request-editor-selection',
   EditorSelected = 'editor-selected',
   SlashCommandConflicts = 'slash-command-conflicts',
@@ -223,6 +232,7 @@ export interface CoreEvents extends ExtensionEvents {
   [CoreEvent.ConsentRequest]: [ConsentRequestPayload];
   [CoreEvent.McpProgress]: [McpProgressPayload];
   [CoreEvent.AgentsDiscovered]: [AgentsDiscoveredPayload];
+  [CoreEvent.TopicUpdated]: [TopicUpdatedPayload];
   [CoreEvent.RequestEditorSelection]: never[];
   [CoreEvent.EditorSelected]: [EditorSelectedPayload];
   [CoreEvent.SlashCommandConflicts]: [SlashCommandConflictsPayload];
@@ -384,6 +394,14 @@ export class CoreEventEmitter extends EventEmitter<CoreEvents> {
   emitAgentsDiscovered(agents: AgentDefinition[]): void {
     const payload: AgentsDiscoveredPayload = { agents };
     this._emitOrQueue(CoreEvent.AgentsDiscovered, payload);
+  }
+
+  /**
+   * Notifies subscribers that the current topic has been updated.
+   */
+  emitTopicUpdated(title?: string, summary?: string): void {
+    const payload: TopicUpdatedPayload = { title, summary };
+    this.emit(CoreEvent.TopicUpdated, payload);
   }
 
   emitSlashCommandConflicts(conflicts: SlashCommandConflict[]): void {

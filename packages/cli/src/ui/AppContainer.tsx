@@ -22,7 +22,11 @@ import {
 } from 'ink';
 import { App } from './App.js';
 import { AppContext } from './contexts/AppContext.js';
-import { UIStateContext, type UIState } from './contexts/UIStateContext.js';
+import {
+  UIStateContext,
+  type UIState,
+  type TopicInfo,
+} from './contexts/UIStateContext.js';
 import {
   UIActionsContext,
   type UIActions,
@@ -201,6 +205,16 @@ const SHELL_WIDTH_FRACTION = 0.89;
  */
 const SHELL_HEIGHT_PADDING = 10;
 
+/**
+ * Approximate height of the AppHeader (logo, banner, tips).
+ */
+const APP_HEADER_HEIGHT = 8;
+
+/**
+ * Standard margin for various UI components.
+ */
+const UI_MARGIN = 2;
+
 export const AppContainer = (props: AppContainerProps) => {
   const isHelpDismissKey = useIsHelpDismissKey();
   const keyMatchers = useKeyMatchers();
@@ -236,6 +250,24 @@ export const AppContainer = (props: AppContainerProps) => {
   const toggleBackgroundTasksRef = useRef<() => void>(() => {});
   const isBackgroundTaskVisibleRef = useRef<boolean>(false);
   const backgroundTasksRef = useRef<Map<number, BackgroundTask>>(new Map());
+
+  const [currentTopic, setCurrentTopic] = useState<TopicInfo | null>(() => {
+    const topic = config.topicState.getTopic();
+    const summary = config.topicState.getSummary();
+    return topic || summary ? { title: topic, summary } : null;
+  });
+
+  useEffect(() => {
+    const handleTopicUpdated = (payload: { title?: string; summary?: string }) => {
+      setCurrentTopic({ title: payload.title, summary: payload.summary });
+      refreshStatic();
+    };
+
+    coreEvents.on(CoreEvent.TopicUpdated, handleTopicUpdated);
+    return () => {
+      coreEvents.off(CoreEvent.TopicUpdated, handleTopicUpdated);
+    };
+  }, [refreshStatic]);
 
   const [adminSettingsChanged, setAdminSettingsChanged] = useState(false);
 
@@ -1461,10 +1493,18 @@ Logging in with Google... Restarting Gemini CLI to continue.
     }
   }, []);
 
-  // Compute available terminal height based on stable controls measurement
+  // Compute available terminal height based on stable controls measurement.
+  // We subtract APP_HEADER_HEIGHT and UI_MARGIN as they are now dynamic
+  // components rendered above MainContent in alt-buffer mode.
+  // Topic header is now inside the measured controls box.
   const availableTerminalHeight = Math.max(
     0,
-    terminalHeight - stableControlsHeight - backgroundTaskHeight - 1,
+    terminalHeight -
+      stableControlsHeight -
+      backgroundTaskHeight -
+      APP_HEADER_HEIGHT -
+      UI_MARGIN -
+      1,
   );
 
   config.setShellExecutionConfig({
@@ -2293,8 +2333,10 @@ Logging in with Google... Restarting Gemini CLI to continue.
       initError,
       pendingGeminiHistoryItems,
       thought,
+      currentTopic,
       shellModeActive,
       userMessages: inputHistory,
+
       buffer,
       inputWidth,
       suggestionsWidth,
@@ -2419,6 +2461,7 @@ Logging in with Google... Restarting Gemini CLI to continue.
       initError,
       pendingGeminiHistoryItems,
       thought,
+      currentTopic,
       shellModeActive,
       inputHistory,
       buffer,

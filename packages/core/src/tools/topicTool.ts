@@ -62,9 +62,10 @@ class UpdateTopicInvocation extends BaseToolInvocation<
       title.trim() !== activeTopic
     );
 
-    this.config.topicState.setTopic(title, strategicIntent);
+    this.config.topicState.setTopic(title, summary, strategicIntent);
 
-    const currentTopic = this.config.topicState.getTopic() || '...';
+    const currentTopic = this.config.topicState.getTopic();
+
     const currentIntent =
       strategicIntent || this.config.topicState.getIntent() || '...';
 

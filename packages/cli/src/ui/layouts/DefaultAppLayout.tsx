@@ -10,19 +10,23 @@ import { Notifications } from '../components/Notifications.js';
 import { MainContent } from '../components/MainContent.js';
 import { DialogManager } from '../components/DialogManager.js';
 import { Composer } from '../components/Composer.js';
+import { AppHeader } from '../components/AppHeader.js';
+import { TopicStickyHeader } from '../components/TopicStickyHeader.js';
 import { ExitWarning } from '../components/ExitWarning.js';
 import { useUIState } from '../contexts/UIStateContext.js';
-import { useFlickerDetector } from '../hooks/useFlickerDetector.js';
 import { useAlternateBuffer } from '../hooks/useAlternateBuffer.js';
+import { useFlickerDetector } from '../hooks/useFlickerDetector.js';
 import { CopyModeWarning } from '../components/CopyModeWarning.js';
 import { BackgroundTaskDisplay } from '../components/BackgroundTaskDisplay.js';
 import { StreamingState } from '../types.js';
+import { useAppContext } from '../contexts/AppContext.js';
 
 export const DefaultAppLayout: React.FC = () => {
+  const { version } = useAppContext();
   const uiState = useUIState();
   const isAlternateBuffer = useAlternateBuffer();
 
-  const { rootUiRef, terminalHeight } = uiState;
+  const { rootUiRef, terminalHeight, cleanUiDetailsVisible } = uiState;
   useFlickerDetector(rootUiRef, terminalHeight);
   // If in alternate buffer mode, need to leave room to draw the scrollbar on
   // the right side of the terminal.
@@ -37,6 +41,7 @@ export const DefaultAppLayout: React.FC = () => {
       overflow="hidden"
       ref={uiState.rootUiRef}
     >
+      <AppHeader version={version} showDetails={cleanUiDetailsVisible} />
       <MainContent />
 
       {uiState.isBackgroundTaskVisible &&
@@ -80,6 +85,8 @@ export const DefaultAppLayout: React.FC = () => {
         ) : (
           <Composer isFocused={true} />
         )}
+
+        <TopicStickyHeader />
 
         <ExitWarning />
       </Box>
