@@ -30,7 +30,7 @@ import {
 } from '../tools/mcp-tool.js';
 import { CompressionStatus } from '../core/turn.js';
 import { type ToolCallRequestInfo } from '../scheduler/types.js';
-import { ChatCompressionService } from '../services/chatCompressionService.js';
+import { ChatCompressionService } from '../context/chatCompressionService.js';
 import { getDirectoryContextString } from '../utils/environmentContext.js';
 import { renderUserMemory } from '../prompts/snippets.js';
 import { promptIdContext } from '../utils/promptIdContext.js';
@@ -317,8 +317,14 @@ export class LocalAgentExecutor<TOutput extends z.ZodTypeAny> {
 
     await this.tryCompressChat(chat, promptId, combinedSignal);
 
-    const { functionCalls } = await promptIdContext.run(promptId, async () =>
-      this.callModel(chat, currentMessage, combinedSignal, promptId),
+    // Allow the agent definition to modify history before the model call
+    // (e.g., superseding stale tool outputs to reclaim context tokens).
+    await this.definition.onBeforeTurn?.(chat, combinedSignal);
+
+    const { functionCalls, modelToUse } = await promptIdContext.run(
+      promptId,
+      async () =>
+        this.callModel(chat, currentMessage, combinedSignal, promptId),
     );
 
     if (combinedSignal.aborted) {
@@ -348,6 +354,8 @@ export class LocalAgentExecutor<TOutput extends z.ZodTypeAny> {
 
     const { nextMessage, submittedOutput, taskCompleted, aborted } =
       await this.processFunctionCalls(
+        chat,
+        modelToUse,
         functionCalls,
         combinedSignal,
         promptId,
@@ -722,8 +730,17 @@ export class LocalAgentExecutor<TOutput extends z.ZodTypeAny> {
         }
       }
 
-      // === FINAL RETURN LOGIC ===
       if (terminateReason === AgentTerminateMode.GOAL) {
+        // Save the session summary upon completion
+        if (finalResult && chat) {
+          try {
+            const summary = this.getTruncatedSummary(finalResult);
+            chat.getChatRecordingService()?.saveSummary(summary);
+          } catch (error) {
+            debugLogger.warn('Failed to save subagent session summary.', error);
+          }
+        }
+
         return {
           result: finalResult || 'Task completed.',
           terminate_reason: terminateReason,
@@ -759,6 +776,18 @@ export class LocalAgentExecutor<TOutput extends z.ZodTypeAny> {
             // Recovery Succeeded
             terminateReason = AgentTerminateMode.GOAL;
             finalResult = recoveryResult;
+
+            // Save the session summary upon successful recovery
+            try {
+              const summary = this.getTruncatedSummary(finalResult);
+              chat.getChatRecordingService()?.saveSummary(summary);
+            } catch (summaryError) {
+              debugLogger.warn(
+                'Failed to save subagent session summary during recovery.',
+                summaryError,
+              );
+            }
+
             return {
               result: finalResult,
               terminate_reason: terminateReason,
@@ -846,7 +875,11 @@ export class LocalAgentExecutor<TOutput extends z.ZodTypeAny> {
     message: Content,
     signal: AbortSignal,
     promptId: string,
-  ): Promise<{ functionCalls: FunctionCall[]; textResponse: string }> {
+  ): Promise<{
+    functionCalls: FunctionCall[];
+    textResponse: string;
+    modelToUse: string;
+  }> {
     const modelConfigAlias = getModelConfigAlias(this.definition);
 
     // Resolve the model config early to get the concrete model string (which may be `auto`).
@@ -931,7 +964,7 @@ export class LocalAgentExecutor<TOutput extends z.ZodTypeAny> {
       }
     }
 
-    return { functionCalls, textResponse };
+    return { functionCalls, textResponse, modelToUse };
   }
 
   /** Initializes a `GeminiChat` instance for the agent run. */
@@ -985,6 +1018,8 @@ export class LocalAgentExecutor<TOutput extends z.ZodTypeAny> {
    * @returns A new `Content` object for history, any submitted output, and completion status.
    */
   private async processFunctionCalls(
+    chat: GeminiChat,
+    model: string,
     functionCalls: FunctionCall[],
     signal: AbortSignal,
     promptId: string,
@@ -1226,6 +1261,9 @@ export class LocalAgentExecutor<TOutput extends z.ZodTypeAny> {
         },
       );
 
+      // Record completed tool calls for persistent chat history
+      chat.recordCompletedToolCalls(model, completedCalls);
+
       for (const call of completedCalls) {
         const toolName =
           toolNameMap.get(call.request.callId) || call.request.name;
@@ -1329,9 +1367,13 @@ export class LocalAgentExecutor<TOutput extends z.ZodTypeAny> {
           toolsList.push(toolRef);
         }
       }
-      // Add schemas from tools that were explicitly registered by name, wildcard, or instance.
-      toolsList.push(...this.toolRegistry.getFunctionDeclarations());
     }
+    // Add schemas from tools that were explicitly registered by name, wildcard, or instance.
+    toolsList.push(
+      ...this.toolRegistry.getFunctionDeclarations(
+        this.definition.modelConfig.model,
+      ),
+    );
 
     // Always inject complete_task.
     // Configure its schema based on whether output is expected.
@@ -1470,5 +1512,16 @@ Important Rules:
       };
       this.onActivity(event);
     }
+  }
+
+  /**
+   * Truncates a string to 200 characters in a Unicode-safe way for session summaries.
+   */
+  private getTruncatedSummary(text: string): string {
+    const chars = Array.from(text);
+    if (chars.length <= 200) {
+      return text;
+    }
+    return chars.slice(0, 197).join('') + '...';
   }
 }

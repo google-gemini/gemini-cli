@@ -17,6 +17,7 @@ import {
   getSecretFileFindArgs,
   sanitizePaths,
   type ParsedSandboxDenial,
+  resolveSandboxPaths,
 } from '../../services/sandboxManager.js';
 import type { ShellExecutionResult } from '../../services/shellExecutionService.js';
 import {
@@ -40,6 +41,7 @@ import {
   isDangerousCommand,
 } from '../utils/commandSafety.js';
 import { parsePosixSandboxDenials } from '../utils/sandboxDenialUtils.js';
+import { handleReadWriteCommands } from '../utils/sandboxReadWriteUtils.js';
 
 let cachedBpfPath: string | undefined;
 
@@ -181,9 +183,23 @@ export class LinuxSandboxManager implements SandboxManager {
 
     verifySandboxOverrides(allowOverrides, req.policy);
 
-    const commandName = await getCommandName(req);
+    let command = req.command;
+    let args = req.args;
+
+    // Translate virtual commands for sandboxed file system access
+    if (command === '__read') {
+      command = 'cat';
+    } else if (command === '__write') {
+      command = 'sh';
+      args = ['-c', 'cat > "$1"', '_', ...args];
+    }
+
+    const commandName = await getCommandName({ ...req, command, args });
     const isApproved = allowOverrides
-      ? await isStrictlyApproved(req, this.options.modeConfig?.approvedTools)
+      ? await isStrictlyApproved(
+          { ...req, command, args },
+          this.options.modeConfig?.approvedTools,
+        )
       : false;
     const workspaceWrite = !isReadonlyMode || isApproved;
     const networkAccess =
@@ -210,6 +226,13 @@ export class LinuxSandboxManager implements SandboxManager {
         req.policy?.additionalPermissions?.network ||
         false,
     };
+
+    const { command: finalCommand, args: finalArgs } = handleReadWriteCommands(
+      req,
+      mergedAdditional,
+      this.options.workspace,
+      req.policy?.allowedPaths,
+    );
 
     const sanitizationConfig = getSecureSanitizationConfig(
       req.policy?.sanitizationConfig,
@@ -272,26 +295,44 @@ export class LinuxSandboxManager implements SandboxManager {
       bwrapArgs.push(bindFlag, mainGitDir, mainGitDir);
     }
 
-    const allowedPaths = sanitizePaths(req.policy?.allowedPaths) || [];
-    const normalizedWorkspace = normalize(workspacePath).replace(/\/$/, '');
-    for (const allowedPath of allowedPaths) {
-      const resolved = tryRealpath(allowedPath);
-      if (!fs.existsSync(resolved)) continue;
-      const normalizedAllowedPath = normalize(resolved).replace(/\/$/, '');
-      if (normalizedAllowedPath !== normalizedWorkspace) {
-        if (
-          !workspaceWrite &&
-          normalizedAllowedPath.startsWith(normalizedWorkspace + '/')
-        ) {
-          bwrapArgs.push('--ro-bind-try', resolved, resolved);
-        } else {
-          bwrapArgs.push('--bind-try', resolved, resolved);
-        }
+    const includeDirs = sanitizePaths(this.options.includeDirectories);
+    for (const includeDir of includeDirs) {
+      try {
+        const resolved = tryRealpath(includeDir);
+        bwrapArgs.push('--ro-bind-try', resolved, resolved);
+      } catch {
+        // Ignore
       }
     }
 
-    const additionalReads =
-      sanitizePaths(mergedAdditional.fileSystem?.read) || [];
+    const { allowed: allowedPaths, forbidden: forbiddenPaths } =
+      await resolveSandboxPaths(this.options, req);
+
+    const normalizedWorkspace = normalize(workspacePath).replace(/\/$/, '');
+    for (const allowedPath of allowedPaths) {
+      const resolved = tryRealpath(allowedPath);
+      if (!fs.existsSync(resolved)) {
+        // If the path doesn't exist, we still want to allow access to its parent
+        // if it's explicitly allowed, to enable creating it.
+        try {
+          const resolvedParent = tryRealpath(dirname(resolved));
+          bwrapArgs.push(
+            req.command === '__write' ? '--bind-try' : bindFlag,
+            resolvedParent,
+            resolvedParent,
+          );
+        } catch {
+          // Ignore
+        }
+        continue;
+      }
+      const normalizedAllowedPath = normalize(resolved).replace(/\/$/, '');
+      if (normalizedAllowedPath !== normalizedWorkspace) {
+        bwrapArgs.push('--bind-try', resolved, resolved);
+      }
+    }
+
+    const additionalReads = sanitizePaths(mergedAdditional.fileSystem?.read);
     for (const p of additionalReads) {
       try {
         const safeResolvedPath = tryRealpath(p);
@@ -301,8 +342,7 @@ export class LinuxSandboxManager implements SandboxManager {
       }
     }
 
-    const additionalWrites =
-      sanitizePaths(mergedAdditional.fileSystem?.write) || [];
+    const additionalWrites = sanitizePaths(mergedAdditional.fileSystem?.write);
     for (const p of additionalWrites) {
       try {
         const safeResolvedPath = tryRealpath(p);
@@ -322,7 +362,6 @@ export class LinuxSandboxManager implements SandboxManager {
       }
     }
 
-    const forbiddenPaths = sanitizePaths(this.options.forbiddenPaths) || [];
     for (const p of forbiddenPaths) {
       let resolved: string;
       try {
@@ -362,7 +401,7 @@ export class LinuxSandboxManager implements SandboxManager {
     const bpfPath = getSeccompBpfPath();
 
     bwrapArgs.push('--seccomp', '9');
-    bwrapArgs.push('--', req.command, ...req.args);
+    bwrapArgs.push('--', finalCommand, ...finalArgs);
 
     const shArgs = [
       '-c',
