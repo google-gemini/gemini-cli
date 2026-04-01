@@ -86,6 +86,35 @@ describe('WindowsSandboxManager', () => {
     expect(result.args[0]).toBe('1');
   });
 
+  it('should NOT whitelist drive roots in YOLO mode', async () => {
+    manager = new WindowsSandboxManager({
+      workspace: testCwd,
+      modeConfig: { readonly: false, allowOverrides: true, yolo: true },
+      forbiddenPaths: async () => [],
+    });
+
+    const req: SandboxRequest = {
+      command: 'whoami',
+      args: [],
+      cwd: testCwd,
+      env: {},
+    };
+
+    await manager.prepareCommand(req);
+
+    // Verify spawnAsync was called for icacls
+    const icaclsCalls = vi
+      .mocked(spawnAsync)
+      .mock.calls.filter((call) => call[0] === 'icacls');
+
+    // Should NOT have called icacls for C:\, D:\, etc.
+    const driveRootCalls = icaclsCalls.filter(
+      (call) =>
+        typeof call[1]?.[0] === 'string' && /^[A-Z]:\\$/.test(call[1][0]),
+    );
+    expect(driveRootCalls).toHaveLength(0);
+  });
+
   it('should handle network access from additionalPermissions', async () => {
     const req: SandboxRequest = {
       command: 'whoami',

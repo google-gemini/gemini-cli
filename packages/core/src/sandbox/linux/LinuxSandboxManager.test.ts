@@ -249,6 +249,35 @@ describe('LinuxSandboxManager', () => {
       expect(bwrapArgs).toContain('--share-net');
     });
 
+    it('should NOT whitelist root in YOLO mode', async () => {
+      const yoloManager = new LinuxSandboxManager({
+        workspace,
+        modeConfig: { readonly: false, allowOverrides: true, yolo: true },
+      });
+
+      const bwrapArgs = await getBwrapArgs(
+        {
+          command: 'ls',
+          args: ['/etc'],
+          cwd: workspace,
+          env: {},
+        },
+        yoloManager,
+      );
+
+      // Should NOT have multiple --ro-bind / / or --bind / / calls beyond the system-default one
+      const bindRootCalls = bwrapArgs.filter(
+        (arg, i) =>
+          (arg === '--ro-bind' || arg === '--bind') &&
+          bwrapArgs[i + 1] === '/' &&
+          bwrapArgs[i + 2] === '/',
+      );
+      // There is one default --ro-bind / / for system access, but it shouldn't have been duplicated
+      // or upgraded to --bind / /.
+      expect(bindRootCalls).toHaveLength(1);
+      expect(bwrapArgs).not.toContain('--bind'); // Should not have full write access to root
+    });
+
     describe('governance files', () => {
       it('should ensure governance files exist', async () => {
         vi.mocked(fs.existsSync).mockReturnValue(false);

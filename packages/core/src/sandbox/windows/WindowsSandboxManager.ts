@@ -248,18 +248,14 @@ export class WindowsSandboxManager implements SandboxManager {
       ? this.options.policyManager?.getCommandPermissions(commandName)
       : undefined;
 
-    const yoloPaths = isYolo ? ['C:\\', 'D:\\', 'E:\\'] : [];
-
     // Merge all permissions
     const mergedAdditional: SandboxPermissions = {
       fileSystem: {
         read: [
-          ...yoloPaths,
           ...(persistentPermissions?.fileSystem?.read ?? []),
           ...(req.policy?.additionalPermissions?.fileSystem?.read ?? []),
         ],
         write: [
-          ...yoloPaths,
           ...(persistentPermissions?.fileSystem?.write ?? []),
           ...(req.policy?.additionalPermissions?.fileSystem?.write ?? []),
         ],
@@ -308,7 +304,9 @@ export class WindowsSandboxManager implements SandboxManager {
     // Grant "Low Mandatory Level" read/write access to allowedPaths.
     for (const allowedPath of allowedPaths) {
       const resolved = await tryRealpath(allowedPath);
-      if (!fs.existsSync(resolved)) {
+      try {
+        await fs.promises.access(resolved, fs.constants.F_OK);
+      } catch {
         throw new Error(
           `Sandbox request rejected: Allowed path does not exist: ${resolved}. ` +
             'On Windows, granular sandbox access can only be granted to existing paths to avoid broad parent directory permissions.',
@@ -323,7 +321,9 @@ export class WindowsSandboxManager implements SandboxManager {
     );
     for (const writePath of additionalWritePaths) {
       const resolved = await tryRealpath(writePath);
-      if (!fs.existsSync(resolved)) {
+      try {
+        await fs.promises.access(resolved, fs.constants.F_OK);
+      } catch {
         throw new Error(
           `Sandbox request rejected: Additional write path does not exist: ${resolved}. ` +
             'On Windows, granular sandbox access can only be granted to existing paths to avoid broad parent directory permissions.',

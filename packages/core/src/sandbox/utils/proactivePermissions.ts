@@ -75,9 +75,13 @@ export function isNetworkReliantCommand(
  * Returns suggested additional permissions for network-reliant tools
  * based on common configuration and cache directories.
  */
-export function getProactiveToolSuggestions(
+/**
+ * Returns suggested additional permissions for network-reliant tools
+ * based on common configuration and cache directories.
+ */
+export async function getProactiveToolSuggestions(
   commandName: string,
-): SandboxPermissions | undefined {
+): Promise<SandboxPermissions | undefined> {
   const normalizedCommand = commandName.toLowerCase().replace(/\.exe$/, '');
   if (!NETWORK_RELIANT_TOOLS.has(normalizedCommand)) {
     return undefined;
@@ -138,13 +142,21 @@ export function getProactiveToolSuggestions(
   const finalReadOnly: string[] = [];
   const finalReadWrite: string[] = [];
 
-  for (const p of readOnlyPaths) {
+  const checkExists = async (p: string): Promise<boolean> => {
     try {
-      if (fs.existsSync(p)) {
-        finalReadOnly.push(p);
-      }
+      await fs.promises.access(p, fs.constants.F_OK);
+      return true;
     } catch {
-      /* ignore */
+      return false;
+    }
+  };
+
+  const readOnlyChecks = await Promise.all(
+    readOnlyPaths.map(async (p) => ({ path: p, exists: await checkExists(p) })),
+  );
+  for (const { path: p, exists } of readOnlyChecks) {
+    if (exists) {
+      finalReadOnly.push(p);
     }
   }
 
@@ -152,13 +164,15 @@ export function getProactiveToolSuggestions(
     finalReadWrite.push(p);
   }
 
-  for (const p of optionalCachePaths) {
-    try {
-      if (fs.existsSync(p)) {
-        finalReadWrite.push(p);
-      }
-    } catch {
-      /* ignore */
+  const optionalChecks = await Promise.all(
+    optionalCachePaths.map(async (p) => ({
+      path: p,
+      exists: await checkExists(p),
+    })),
+  );
+  for (const { path: p, exists } of optionalChecks) {
+    if (exists) {
+      finalReadWrite.push(p);
     }
   }
 

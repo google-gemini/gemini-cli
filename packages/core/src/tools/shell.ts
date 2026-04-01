@@ -240,7 +240,7 @@ export class ShellToolInvocation extends BaseToolInvocation<
     const rootCommand = rootCommands[0];
 
     if (rootCommand) {
-      const proactive = getProactiveToolSuggestions(rootCommand);
+      const proactive = await getProactiveToolSuggestions(rootCommand);
       if (proactive) {
         const approved =
           this.context.config.sandboxPolicyManager.getCommandPermissions(
@@ -701,7 +701,8 @@ export class ShellToolInvocation extends BaseToolInvocation<
           );
 
           // Proactive permission suggestions for Node ecosystem tools
-          const proactive = getProactiveToolSuggestions(rootCommandDisplay);
+          const proactive =
+            await getProactiveToolSuggestions(rootCommandDisplay);
           if (proactive) {
             if (proactive.network) {
               sandboxDenial.network = true;

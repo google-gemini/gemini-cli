@@ -14,7 +14,22 @@ import path from 'node:path';
 import fs from 'node:fs';
 
 vi.mock('node:os');
-vi.mock('node:fs');
+vi.mock('node:fs', () => ({
+  default: {
+    promises: {
+      access: vi.fn(),
+    },
+    constants: {
+      F_OK: 0,
+    },
+  },
+  promises: {
+    access: vi.fn(),
+  },
+  constants: {
+    F_OK: 0,
+  },
+}));
 
 describe('proactivePermissions', () => {
   const homeDir = '/Users/testuser';
@@ -49,24 +64,27 @@ describe('proactivePermissions', () => {
   });
 
   describe('getProactiveToolSuggestions', () => {
-    it('should return undefined for unknown tools', () => {
-      expect(getProactiveToolSuggestions('ls')).toBeUndefined();
-      expect(getProactiveToolSuggestions('node')).toBeUndefined();
+    it('should return undefined for unknown tools', async () => {
+      expect(await getProactiveToolSuggestions('ls')).toBeUndefined();
+      expect(await getProactiveToolSuggestions('node')).toBeUndefined();
     });
 
-    it('should return permissions for npm if paths exist', () => {
-      vi.mocked(fs.existsSync).mockImplementation(
-        (p: string | Buffer | URL) => {
+    it('should return permissions for npm if paths exist', async () => {
+      vi.mocked(fs.promises.access).mockImplementation(
+        (p: fs.PathLike, _mode?: number) => {
           const pathStr = p.toString();
-          return (
+          if (
             pathStr === path.join(homeDir, '.npm') ||
             pathStr === path.join(homeDir, '.cache') ||
             pathStr === path.join(homeDir, '.npmrc')
-          );
+          ) {
+            return Promise.resolve();
+          }
+          return Promise.reject(new Error('ENOENT'));
         },
       );
 
-      const permissions = getProactiveToolSuggestions('npm');
+      const permissions = await getProactiveToolSuggestions('npm');
       expect(permissions).toBeDefined();
       expect(permissions?.network).toBe(true);
       // .npmrc should be read-only
@@ -93,9 +111,9 @@ describe('proactivePermissions', () => {
       );
     });
 
-    it('should grant network access and suggest primary cache paths even if they do not exist', () => {
-      vi.mocked(fs.existsSync).mockReturnValue(false);
-      const permissions = getProactiveToolSuggestions('npm');
+    it('should grant network access and suggest primary cache paths even if they do not exist', async () => {
+      vi.mocked(fs.promises.access).mockRejectedValue(new Error('ENOENT'));
+      const permissions = await getProactiveToolSuggestions('npm');
       expect(permissions).toBeDefined();
       expect(permissions?.network).toBe(true);
       expect(permissions?.fileSystem?.write).toContain(
@@ -107,18 +125,21 @@ describe('proactivePermissions', () => {
       );
     });
 
-    it('should suggest .ssh and .gitconfig only for git', () => {
-      vi.mocked(fs.existsSync).mockImplementation(
-        (p: string | Buffer | URL) => {
+    it('should suggest .ssh and .gitconfig only for git', async () => {
+      vi.mocked(fs.promises.access).mockImplementation(
+        (p: fs.PathLike, _mode?: number) => {
           const pathStr = p.toString();
-          return (
+          if (
             pathStr === path.join(homeDir, '.ssh') ||
             pathStr === path.join(homeDir, '.gitconfig')
-          );
+          ) {
+            return Promise.resolve();
+          }
+          return Promise.reject(new Error('ENOENT'));
         },
       );
 
-      const permissions = getProactiveToolSuggestions('git');
+      const permissions = await getProactiveToolSuggestions('git');
       expect(permissions?.network).toBe(true);
       expect(permissions?.fileSystem?.read).toContain(
         path.join(homeDir, '.ssh'),
@@ -128,15 +149,18 @@ describe('proactivePermissions', () => {
       );
     });
 
-    it('should suggest .ssh but NOT .gitconfig for ssh', () => {
-      vi.mocked(fs.existsSync).mockImplementation(
-        (p: string | Buffer | URL) => {
+    it('should suggest .ssh but NOT .gitconfig for ssh', async () => {
+      vi.mocked(fs.promises.access).mockImplementation(
+        (p: fs.PathLike, _mode?: number) => {
           const pathStr = p.toString();
-          return pathStr === path.join(homeDir, '.ssh');
+          if (pathStr === path.join(homeDir, '.ssh')) {
+            return Promise.resolve();
+          }
+          return Promise.reject(new Error('ENOENT'));
         },
       );
 
-      const permissions = getProactiveToolSuggestions('ssh');
+      const permissions = await getProactiveToolSuggestions('ssh');
       expect(permissions?.network).toBe(true);
       expect(permissions?.fileSystem?.read).toContain(
         path.join(homeDir, '.ssh'),
@@ -146,33 +170,38 @@ describe('proactivePermissions', () => {
       );
     });
 
-    it('should handle Windows specific paths', () => {
+    it('should handle Windows specific paths', async () => {
       vi.mocked(os.platform).mockReturnValue('win32');
       const appData = 'C:\\Users\\testuser\\AppData\\Roaming';
       vi.stubEnv('AppData', appData);
 
-      vi.mocked(fs.existsSync).mockImplementation(
-        (p: string | Buffer | URL) => {
+      vi.mocked(fs.promises.access).mockImplementation(
+        (p: fs.PathLike, _mode?: number) => {
           const pathStr = p.toString();
-          return pathStr === path.join(appData, 'npm');
+          if (pathStr === path.join(appData, 'npm')) {
+            return Promise.resolve();
+          }
+          return Promise.reject(new Error('ENOENT'));
         },
       );
 
-      const permissions = getProactiveToolSuggestions('npm.exe');
+      const permissions = await getProactiveToolSuggestions('npm.exe');
       expect(permissions).toBeDefined();
       expect(permissions?.fileSystem?.read).toContain(
         path.join(appData, 'npm'),
       );
+
+      vi.unstubAllEnvs();
     });
 
-    it('should include bun, pnpm, and yarn specific paths', () => {
-      vi.mocked(fs.existsSync).mockReturnValue(true);
+    it('should include bun, pnpm, and yarn specific paths', async () => {
+      vi.mocked(fs.promises.access).mockResolvedValue(undefined);
 
-      const bun = getProactiveToolSuggestions('bun');
+      const bun = await getProactiveToolSuggestions('bun');
       expect(bun?.fileSystem?.read).toContain(path.join(homeDir, '.bun'));
       expect(bun?.fileSystem?.read).not.toContain(path.join(homeDir, '.yarn'));
 
-      const yarn = getProactiveToolSuggestions('yarn');
+      const yarn = await getProactiveToolSuggestions('yarn');
       expect(yarn?.fileSystem?.read).toContain(path.join(homeDir, '.yarn'));
     });
   });
