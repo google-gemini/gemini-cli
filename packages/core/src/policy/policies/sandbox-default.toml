@@ -6,7 +6,7 @@ allowOverrides = false
 
 [modes.default]
 network = false
-readonly = true
+readonly = false
 approvedTools = ['cat', 'ls', 'grep', 'head', 'tail', 'less', 'Get-Content', 'dir', 'type', 'findstr', 'Get-ChildItem', 'echo']
 allowOverrides = true
 

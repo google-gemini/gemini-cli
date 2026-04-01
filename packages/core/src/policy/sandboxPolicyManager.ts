@@ -19,6 +19,7 @@ export const SandboxModeConfigSchema = z.object({
   readonly: z.boolean(),
   approvedTools: z.array(z.string()),
   allowOverrides: z.boolean().optional(),
+  yolo: z.boolean().optional(),
 });
 
 export const PersistentCommandConfigSchema = z.object({
@@ -66,7 +67,7 @@ export class SandboxPolicyManager {
               },
               default: {
                 network: false,
-                readonly: true,
+                readonly: false,
                 approvedTools: [],
                 allowOverrides: true,
               },
@@ -132,8 +133,17 @@ export class SandboxPolicyManager {
   }
 
   getModeConfig(
-    mode: 'plan' | 'accepting_edits' | 'default' | string,
+    mode: 'plan' | 'accepting_edits' | 'default' | 'yolo' | string,
   ): SandboxModeConfig {
+    if (mode === 'yolo') {
+      return {
+        network: true,
+        readonly: false,
+        approvedTools: [],
+        allowOverrides: true,
+        yolo: true,
+      };
+    }
     if (mode === 'plan') return this.config.modes.plan;
     if (mode === 'accepting_edits' || mode === 'autoEdit')
       return this.config.modes.accepting_edits;

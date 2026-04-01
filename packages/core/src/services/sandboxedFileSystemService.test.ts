@@ -47,6 +47,10 @@ class MockSandboxManager implements SandboxManager {
   parseDenials(): undefined {
     return undefined;
   }
+
+  getWorkspace(): string {
+    return '/workspace';
+  }
 }
 
 describe('SandboxedFileSystemService', () => {

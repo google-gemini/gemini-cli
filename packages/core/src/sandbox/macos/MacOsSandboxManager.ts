@@ -55,6 +55,10 @@ export class MacOsSandboxManager implements SandboxManager {
     return parsePosixSandboxDenials(result);
   }
 
+  getWorkspace(): string {
+    return this.options.workspace;
+  }
+
   async prepareCommand(req: SandboxRequest): Promise<SandboxedCommand> {
     await initializeShellParsers();
     const sanitizationConfig = getSecureSanitizationConfig(
@@ -90,9 +94,11 @@ export class MacOsSandboxManager implements SandboxManager {
         )
       : false;
 
-    const workspaceWrite = !isReadonlyMode || isApproved;
+    const isYolo = this.options.modeConfig?.yolo ?? false;
+    const workspaceWrite = !isReadonlyMode || isApproved || isYolo;
+
     const defaultNetwork =
-      this.options.modeConfig?.network || req.policy?.networkAccess || false;
+      this.options.modeConfig?.network || req.policy?.networkAccess || isYolo;
 
     const { allowed: allowedPaths, forbidden: forbiddenPaths } =
       await resolveSandboxPaths(this.options, req);
@@ -103,7 +109,6 @@ export class MacOsSandboxManager implements SandboxManager {
       ? this.options.policyManager?.getCommandPermissions(commandName)
       : undefined;
 
-    // Merge all permissions
     const mergedAdditional: SandboxPermissions = {
       fileSystem: {
         read: [
