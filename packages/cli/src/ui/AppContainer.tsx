@@ -157,7 +157,7 @@ import {
   QUEUE_ERROR_DISPLAY_DURATION_MS,
   EXPAND_HINT_DURATION_MS,
 } from './constants.js';
-import { LoginWithGoogleRestartDialog } from './auth/LoginWithGoogleRestartDialog.js';
+import { LoginRestartDialog } from './auth/LoginRestartDialog.js';
 import { NewAgentsChoice } from './components/NewAgentsNotification.js';
 import { isSlashCommand } from './utils/commandUtils.js';
 import { parseSlashCommand } from '../utils/commands.js';
@@ -2665,13 +2665,19 @@ Logging in with Google... Restarting Gemini CLI to continue.
   );
 
   if (authState === AuthState.AwaitingGoogleLoginRestart) {
+    const isVertexInCloudShell =
+      settings.merged.security.auth.selectedType === AuthType.USE_VERTEX_AI;
+    const restartMessage = isVertexInCloudShell
+      ? 'Switching to Vertex AI in Cloud Shell requires a restart to apply project settings.'
+      : undefined;
     return (
-      <LoginWithGoogleRestartDialog
+      <LoginRestartDialog
         onDismiss={() => {
           setAuthContext({});
           setAuthState(AuthState.Updating);
         }}
         config={config}
+        message={restartMessage}
       />
     );
   }
