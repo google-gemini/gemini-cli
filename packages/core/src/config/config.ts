@@ -1528,9 +1528,6 @@ export class Config implements McpContext, AgentLoopContext {
     // Only assign to instance properties after successful initialization
     this.contentGeneratorConfig = newContentGeneratorConfig;
 
-    // Initialize BaseLlmClient now that the ContentGenerator is available
-    this.baseLlmClient = new BaseLlmClient(this.contentGenerator, this);
-
     const codeAssistServer = getCodeAssistServer(this);
     const quotaPromise = codeAssistServer?.projectId
       ? this.refreshUserQuota()
@@ -1545,6 +1542,17 @@ export class Config implements McpContext, AgentLoopContext {
         debugLogger.error('Failed to fetch experiments', e);
         return undefined;
       });
+
+    // Fetch experiments and update timeouts before continuing initialization
+    const experiments = await this.experimentsPromise;
+
+    const requestTimeoutMs = this.getRequestTimeoutMs();
+    if (requestTimeoutMs !== undefined) {
+      updateGlobalFetchTimeouts(requestTimeoutMs);
+    }
+
+    // Initialize BaseLlmClient now that the ContentGenerator and experiments are available
+    this.baseLlmClient = new BaseLlmClient(this.contentGenerator, this);
 
     await quotaPromise;
 
@@ -1563,14 +1571,6 @@ export class Config implements McpContext, AgentLoopContext {
       this.hasAccessToPreviewModel === false
     ) {
       this.setModel(DEFAULT_GEMINI_MODEL_AUTO);
-    }
-
-    // Fetch admin controls
-    const experiments = await this.experimentsPromise;
-
-    const requestTimeoutMs = this.getRequestTimeoutMs();
-    if (requestTimeoutMs !== undefined) {
-      updateGlobalFetchTimeouts(requestTimeoutMs);
     }
 
     const adminControlsEnabled =
