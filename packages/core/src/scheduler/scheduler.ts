@@ -909,9 +909,25 @@ export class Scheduler {
 
     if (
       result.status === CoreToolCallStatus.Error &&
-      result.response.errorType === ToolErrorType.PATH_NOT_IN_WORKSPACE
+      result.response.errorType === ToolErrorType.PATH_NOT_IN_WORKSPACE &&
+      activeCall.tool.isReadOnly &&
+      activeCall.request.args
     ) {
-      const args = activeCall.request.args;
+      let args: Record<string, unknown> = {};
+      try {
+        if (typeof activeCall.request.args === 'string') {
+          const parsed = JSON.parse(activeCall.request.args) as unknown;
+          if (typeof parsed === 'object' && parsed !== null) {
+            // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
+            args = parsed as Record<string, unknown>;
+          }
+        } else {
+          args = activeCall.request.args;
+        }
+      } catch (_e) {
+        // ignore
+      }
+
       const pathArg =
         args['path'] ||
         args['file_path'] ||
