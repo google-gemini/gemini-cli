@@ -279,8 +279,8 @@ describe('<ToolGroupMessage />', () => {
       );
 
       const output = lastFrame();
-      expect(output).toContain('Testing Topic');
-      expect(output).toContain('— This is the description');
+      expect(output).toContain('Testing Topic: ');
+      expect(output).toContain('This is the description');
       expect(output).toMatchSnapshot('update_topic_tool');
       unmount();
     });
@@ -307,8 +307,8 @@ describe('<ToolGroupMessage />', () => {
       );
 
       const output = lastFrame();
-      expect(output).toContain('Testing Topic');
-      expect(output).toContain('— This is the summary');
+      expect(output).toContain('Testing Topic: ');
+      expect(output).toContain('This is the summary');
       unmount();
     });
 
