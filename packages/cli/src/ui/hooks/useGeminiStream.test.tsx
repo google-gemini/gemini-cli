@@ -52,6 +52,7 @@ import {
   MCPDiscoveryState,
   GeminiCliOperation,
   getPlanModeExitMessage,
+  UPDATE_TOPIC_TOOL_NAME,
 } from '@google/gemini-cli-core';
 import type { Part, PartListUnion } from '@google/genai';
 import type { UseHistoryManagerReturn } from './useHistoryManager.js';
@@ -906,6 +907,30 @@ describe('useGeminiStream', () => {
     const cancelledToolCalls: TrackedToolCall[] = [
       {
         request: {
+          callId: 'topic1',
+          name: UPDATE_TOPIC_TOOL_NAME,
+          args: {},
+          isClientInitiated: false,
+          prompt_id: 'prompt-id-3',
+        },
+        status: CoreToolCallStatus.Success,
+        response: {
+          callId: 'topic1',
+          responseParts: [
+            {
+              functionResponse: {
+                name: UPDATE_TOPIC_TOOL_NAME,
+                id: 'topic1',
+                response: {},
+              },
+            },
+          ],
+        },
+        tool: { displayName: 'Update Topic Context' },
+        invocation: { getDescription: () => 'Updating topic' },
+      } as any,
+      {
+        request: {
           callId: '1',
           name: 'testTool',
           args: {},
@@ -924,8 +949,8 @@ describe('useGeminiStream', () => {
         },
         invocation: {
           getDescription: () => `Mock description`,
-        } as unknown as AnyToolInvocation,
-      } as TrackedCancelledToolCall,
+        },
+      } as any,
     ];
     const client = new MockedGeminiClientClass(mockConfig);
 
@@ -978,10 +1003,19 @@ describe('useGeminiStream', () => {
     });
 
     await waitFor(() => {
-      expect(mockMarkToolsAsSubmitted).toHaveBeenCalledWith(['1']);
+      expect(mockMarkToolsAsSubmitted).toHaveBeenCalledWith(['topic1', '1']);
       expect(client.addHistory).toHaveBeenCalledWith({
         role: 'user',
-        parts: [{ text: CoreToolCallStatus.Cancelled }],
+        parts: [
+          {
+            functionResponse: {
+              name: UPDATE_TOPIC_TOOL_NAME,
+              id: 'topic1',
+              response: {},
+            },
+          },
+          { text: CoreToolCallStatus.Cancelled },
+        ],
       });
       // Ensure we do NOT call back to the API
       expect(mockSendMessageStream).not.toHaveBeenCalled();
