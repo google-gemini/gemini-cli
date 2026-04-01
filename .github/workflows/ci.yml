@@ -125,7 +125,7 @@ jobs:
       - name: 'Checkout'
         uses: 'actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8' # ratchet:actions/checkout@v5
       - name: 'Link Checker'
-        uses: 'lycheeverse/lychee-action@885c65f3dc543b57c898c8099f4e08c8afd178a2' # ratchet: lycheeverse/lychee-action@v2.6.1
+        uses: 'lycheeverse/lychee-action@8646ba30535128ac92d33dfc9133794bfdd9b411' # ratchet: lycheeverse/lychee-action@v2.8.0
         with:
           args: '--verbose --accept 200,503 ./**/*.md'
           fail: true
@@ -358,7 +358,7 @@ jobs:
           ref: '${{ github.event.inputs.branch_ref || github.ref }}'
           fetch-depth: 1
 
-      - uses: 'preactjs/compressed-size-action@946a292cd35bd1088e0d7eb92b69d1a8d5b5d76a'
+      - uses: 'preactjs/compressed-size-action@66325aad6443cb7cf89c4bfcd414aea2367cda94'
         with:
           repo-token: '${{ secrets.GITHUB_TOKEN }}'
           pattern: './bundle/**/*.{js,sb}'
