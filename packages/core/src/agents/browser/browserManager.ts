@@ -486,7 +486,32 @@ export class BrowserManager {
 
     // Build args for chrome-devtools-mcp
     const browserConfig = this.config.getBrowserAgentConfig();
-    const sessionMode = browserConfig.customConfig.sessionMode ?? 'persistent';
+    let sessionMode = browserConfig.customConfig.sessionMode ?? 'persistent';
+
+    // Detect sandbox environment.
+    // SANDBOX env var is set to 'sandbox-exec' (seatbelt) or the container
+    // name (Docker/Podman/gVisor/LXC) when running inside a sandbox.
+    // CI uses 'sandbox:none' as a metadata label — not a real sandbox.
+    const sandboxType = process.env['SANDBOX'];
+    const isContainerSandbox =
+      !!sandboxType &&
+      sandboxType !== 'sandbox-exec' &&
+      sandboxType !== 'sandbox:none';
+    const isSeatbeltSandbox =
+      sandboxType === 'sandbox-exec' && sessionMode !== 'existing';
+
+    // Seatbelt sandbox: force isolated + headless for filesystem compatibility.
+    // Chrome exists on the host, but persistent profiles may conflict with
+    // seatbelt restrictions. Isolated mode uses tmpdir (always writable).
+    if (isSeatbeltSandbox) {
+      if (sessionMode !== 'isolated') {
+        sessionMode = 'isolated';
+        coreEvents.emitFeedback(
+          'info',
+          '🔒 Sandbox: Using isolated browser session for compatibility.',
+        );
+      }
+    }
 
     const mcpArgs = ['--experimental-vision'];
 
@@ -498,15 +523,42 @@ export class BrowserManager {
     if (sessionMode === 'isolated') {
       mcpArgs.push('--isolated');
     } else if (sessionMode === 'existing') {
-      mcpArgs.push('--autoConnect');
-      const message =
-        '🔒 Browsing with your signed-in Chrome profile — cookies and saved logins will be visible to the agent.';
-      coreEvents.emitFeedback('info', message);
-      coreEvents.emitConsoleLog('info', message);
+      if (isContainerSandbox) {
+        // In container sandboxes, --autoConnect can't discover Chrome on the
+        // host (it uses local pipes/sockets). Use --browser-url with the
+        // resolved IP of host.docker.internal instead of the hostname, because
+        // Chrome's DevTools protocol rejects HTTP requests where the Host
+        // header is not 'localhost' or an IP address.
+        const dns = await import('node:dns');
+        let browserHost = 'host.docker.internal';
+        try {
+          const { address } = await dns.promises.lookup(browserHost);
+          browserHost = address;
+        } catch {
+          // Fallback: use hostname as-is if DNS resolution fails
+          debugLogger.log(
+            `Could not resolve host.docker.internal, using hostname directly`,
+          );
+        }
+        const browserUrl = `http://${browserHost}:9222`;
+        mcpArgs.push('--browser-url', browserUrl);
+        coreEvents.emitFeedback(
+          'info',
+          `🔒 Container sandbox: Connecting to Chrome via ${browserHost}:9222.`,
+        );
+      } else {
+        mcpArgs.push('--autoConnect');
+        const message =
+          '🔒 Browsing with your signed-in Chrome profile — cookies and saved logins will be visible to the agent.';
+        coreEvents.emitFeedback('info', message);
+        coreEvents.emitConsoleLog('info', message);
+      }
     }
 
-    // Add optional settings from config
-    if (browserConfig.customConfig.headless) {
+    // Add optional settings from config.
+    // Force headless in seatbelt sandbox since Chrome profile/display access
+    // may be restricted, and the user is running in a sandboxed environment.
+    if (browserConfig.customConfig.headless || isSeatbeltSandbox) {
       mcpArgs.push('--headless');
     }
     if (browserConfig.customConfig.profilePath) {

@@ -222,6 +222,61 @@ the `click_at` tool for precise, coordinate-based interactions.
 > The visual agent requires API key or Vertex AI authentication. It is
 > not available when using "Sign in with Google".
 
+#### Sandbox support
+
+The browser agent adjusts its behavior automatically when running inside a
+sandbox.
+
+##### macOS seatbelt (`sandbox-exec`)
+
+When the CLI runs under the macOS seatbelt sandbox, `persistent` and `isolated`
+session modes are forced to `isolated` with `headless` enabled. This avoids
+permission errors caused by seatbelt file-system restrictions on persistent
+browser profiles. If `sessionMode` is set to `existing`, no override is applied.
+
+##### Container sandboxes (Docker / Podman)
+
+Chrome is not available inside the container, so the browser agent is
+**disabled** unless `sessionMode` is set to `"existing"`. When enabled with
+`existing` mode, the agent automatically connects to Chrome on the host via the
+resolved IP of `host.docker.internal:9222` instead of using local pipe
+discovery. Port `9222` is currently hardcoded and cannot be customized.
+
+To use the browser agent in a Docker sandbox:
+
+1. Start Chrome on the host with remote debugging enabled:
+
+   ```bash
+   # Option A: Launch Chrome from the command line
+   google-chrome --remote-debugging-port=9222
+
+   # Option B: Enable in Chrome settings
+   # Navigate to chrome://inspect/#remote-debugging and enable
+   ```
+
+2. Configure `sessionMode` and allowed domains in your project's
+   `.gemini/settings.json`:
+
+   ```json
+   {
+     "agents": {
+       "overrides": {
+         "browser_agent": { "enabled": true }
+       },
+       "browser": {
+         "sessionMode": "existing",
+         "allowedDomains": ["example.com"]
+       }
+     }
+   }
+   ```
+
+3. Launch the CLI with port forwarding:
+
+   ```bash
+   GEMINI_SANDBOX=docker SANDBOX_PORTS=9222 gemini
+   ```
+
 ## Creating custom subagents
 
 You can create your own subagents to automate specific workflows or enforce
