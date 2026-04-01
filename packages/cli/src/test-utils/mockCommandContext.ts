@@ -61,6 +61,7 @@ export const createMockCommandContext = (
       toggleCorgiMode: vi.fn(),
       toggleShortcutsHelp: vi.fn(),
       toggleVimEnabled: vi.fn(),
+      reloadCommands: vi.fn(),
       openAgentConfigDialog: vi.fn(),
       closeAgentConfigDialog: vi.fn(),
       extensionsUpdateState: new Map(),
