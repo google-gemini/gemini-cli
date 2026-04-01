@@ -92,6 +92,7 @@ describe('ShellTool', () => {
 
   let shellTool: ShellTool;
   let mockConfig: Config;
+  let mockSandboxManager: SandboxManager;
   let mockShellOutputCallback: (event: ShellOutputEvent) => void;
   let resolveExecutionPromise: (result: ShellExecutionResult) => void;
   let tempRootDir: string;
@@ -102,6 +103,7 @@ describe('ShellTool', () => {
     tempRootDir = fs.mkdtempSync(path.join(os.tmpdir(), 'shell-test-'));
     fs.mkdirSync(path.join(tempRootDir, 'subdir'));
 
+    mockSandboxManager = new NoopSandboxManager();
     mockConfig = {
       get config() {
         return this;
@@ -148,7 +150,9 @@ describe('ShellTool', () => {
       getEnableShellOutputEfficiency: vi.fn().mockReturnValue(true),
       getSandboxEnabled: vi.fn().mockReturnValue(false),
       sanitizationConfig: {},
-      sandboxManager: new NoopSandboxManager(),
+      get sandboxManager() {
+        return mockSandboxManager;
+      },
       sandboxPolicyManager: {
         getCommandPermissions: vi.fn().mockReturnValue(undefined),
         getModeConfig: vi.fn().mockReturnValue({ readonly: false }),
@@ -955,7 +959,7 @@ describe('ShellTool', () => {
         isKnownSafeCommand: vi.fn(),
         isDangerousCommand: vi.fn(),
       } as unknown as SandboxManager;
-      mockConfig.sandboxManager = sandboxManager;
+      mockSandboxManager = sandboxManager;
 
       const invocation = shellTool.build({ command: 'npm install' });
       const promise = invocation.execute(mockAbortSignal);
