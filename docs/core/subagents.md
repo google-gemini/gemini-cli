@@ -1,20 +1,16 @@
-# Subagents (experimental)
+# Subagents
 
 Subagents are specialized agents that operate within your main Gemini CLI
 session. They are designed to handle specific, complex tasks—like deep codebase
 analysis, documentation lookup, or domain-specific reasoning—without cluttering
 the main agent's context or toolset.
 
-<!-- prettier-ignore -->
-> [!NOTE]
-> Subagents are currently an experimental feature.
-> 
-To use custom subagents, you must ensure they are enabled in your
-`settings.json` (enabled by default):
+Subagents are enabled by default. To disable them, set `enableAgents` to `false`
+in your `settings.json`:
 
 ```json
 {
-  "experimental": { "enableAgents": true }
+  "experimental": { "enableAgents": false }
 }
 ```
 
@@ -226,19 +222,65 @@ the `click_at` tool for precise, coordinate-based interactions.
 > The visual agent requires API key or Vertex AI authentication. It is
 > not available when using "Sign in with Google".
 
+#### Sandbox support
+
+The browser agent adjusts its behavior automatically when running inside a
+sandbox.
+
+##### macOS seatbelt (`sandbox-exec`)
+
+When the CLI runs under the macOS seatbelt sandbox, `persistent` and `isolated`
+session modes are forced to `isolated` with `headless` enabled. This avoids
+permission errors caused by seatbelt file-system restrictions on persistent
+browser profiles. If `sessionMode` is set to `existing`, no override is applied.
+
+##### Container sandboxes (Docker / Podman)
+
+Chrome is not available inside the container, so the browser agent is
+**disabled** unless `sessionMode` is set to `"existing"`. When enabled with
+`existing` mode, the agent automatically connects to Chrome on the host via the
+resolved IP of `host.docker.internal:9222` instead of using local pipe
+discovery. Port `9222` is currently hardcoded and cannot be customized.
+
+To use the browser agent in a Docker sandbox:
+
+1. Start Chrome on the host with remote debugging enabled:
+
+   ```bash
+   # Option A: Launch Chrome from the command line
+   google-chrome --remote-debugging-port=9222
+
+   # Option B: Enable in Chrome settings
+   # Navigate to chrome://inspect/#remote-debugging and enable
+   ```
+
+2. Configure `sessionMode` and allowed domains in your project's
+   `.gemini/settings.json`:
+
+   ```json
+   {
+     "agents": {
+       "overrides": {
+         "browser_agent": { "enabled": true }
+       },
+       "browser": {
+         "sessionMode": "existing",
+         "allowedDomains": ["example.com"]
+       }
+     }
+   }
+   ```
+
+3. Launch the CLI with port forwarding:
+
+   ```bash
+   GEMINI_SANDBOX=docker SANDBOX_PORTS=9222 gemini
+   ```
+
 ## Creating custom subagents
 
 You can create your own subagents to automate specific workflows or enforce
-specific personas. To use custom subagents, you must enable them in your
-`settings.json`:
-
-```json
-{
-  "experimental": {
-    "enableAgents": true
-  }
-}
-```
+specific personas.
 
 ### Agent definition files
 
@@ -290,6 +332,7 @@ it yourself; just report it.
 | `description`  | string | Yes      | Short description of what the agent does. This is visible to the main agent to help it decide when to call this subagent.                                                                                     |
 | `kind`         | string | No       | `local` (default) or `remote`.                                                                                                                                                                                |
 | `tools`        | array  | No       | List of tool names this agent can use. Supports wildcards: `*` (all tools), `mcp_*` (all MCP tools), `mcp_server_*` (all tools from a server). **If omitted, it inherits all tools from the parent session.** |
+| `mcpServers`   | object | No       | Configuration for inline Model Context Protocol (MCP) servers isolated to this specific agent.                                                                                                                |
 | `model`        | string | No       | Specific model to use (e.g., `gemini-3-preview`). Defaults to `inherit` (uses the main session model).                                                                                                        |
 | `temperature`  | number | No       | Model temperature (0.0 - 2.0). Defaults to `1`.                                                                                                                                                               |
 | `max_turns`    | number | No       | Maximum number of conversation turns allowed for this agent before it must return. Defaults to `30`.                                                                                                          |
@@ -316,6 +359,78 @@ Each subagent runs in its own isolated context loop. This means:
 - **Recursion protection:** To prevent infinite loops and excessive token usage,
   subagents **cannot** call other subagents. If a subagent is granted the `*`
   tool wildcard, it will still be unable to see or invoke other agents.
+
+## Subagent tool isolation
+
+Subagent tool isolation moves Gemini CLI away from a single global tool
+registry. By providing isolated execution environments, you can ensure that
+subagents only interact with the parts of the system they are designed for. This
+prevents unintended side effects, improves reliability by avoiding state
+contamination, and enables fine-grained permission control.
+
+With this feature, you can:
+
+- **Specify tool access:** Define exactly which tools an agent can access using
+  a `tools` list in the agent definition.
+- **Define inline MCP servers:** Configure Model Context Protocol (MCP) servers
+  (which provide a standardized way to connect AI models to external tools and
+  data sources) directly in the subagent's markdown frontmatter, isolating them
+  to that specific agent.
+- **Maintain state isolation:** Ensure that subagents only interact with their
+  own set of tools and servers, preventing side effects and state contamination.
+- **Apply subagent-specific policies:** Enforce granular rules in your
+  [Policy Engine](../reference/policy-engine.md) TOML configuration based on the
+  executing subagent's name.
+
+### Configuring isolated tools and servers
+
+You can configure tool isolation for a subagent by updating its markdown
+frontmatter. This allows you to explicitly state which tools the subagent can
+use, rather than relying on the global registry.
+
+Add an `mcpServers` object to define inline MCP servers that are unique to the
+agent.
+
+**Example:**
+
+```yaml
+---
+name: my-isolated-agent
+tools:
+  - grep_search
+  - read_file
+mcpServers:
+  my-custom-server:
+    command: 'node'
+    args: ['path/to/server.js']
+---
+```
+
+### Subagent-specific policies
+
+You can enforce fine-grained control over subagents using the
+[Policy Engine's](../reference/policy-engine.md) TOML configuration. This allows
+you to grant or restrict permissions specifically for an agent, without
+affecting the rest of your CLI session.
+
+To restrict a policy rule to a specific subagent, add the `subagent` property to
+the `[[rules]]` block in your `policy.toml` file.
+
+**Example:**
+
+```toml
+[[rules]]
+name = "Allow pr-creator to push code"
+subagent = "pr-creator"
+description = "Permit pr-creator to push branches automatically."
+action = "allow"
+toolName = "run_shell_command"
+commandPrefix = "git push"
+```
+
+In this configuration, the policy rule only triggers if the executing subagent's
+name matches `pr-creator`. Rules without the `subagent` property apply
+universally to all agents.
 
 ## Managing subagents
 
@@ -406,14 +521,10 @@ If you need to further tune your subagent, you can do so by selecting the model
 to optimize for with `/model` and then asking the model why it does not think
 that your subagent was called with a specific prompt and the given description.
 
-## Remote subagents (Agent2Agent) (experimental)
+## Remote subagents (Agent2Agent)
 
 Gemini CLI can also delegate tasks to remote subagents using the Agent-to-Agent
 (A2A) protocol.
-
-<!-- prettier-ignore -->
-> [!NOTE]
-> Remote subagents are currently an experimental feature.
 
 See the [Remote Subagents documentation](remote-agents) for detailed
 configuration, authentication, and usage instructions.

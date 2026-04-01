@@ -24,6 +24,10 @@ import {
   EXIT_PLAN_PARAM_PLAN_FILENAME,
   SKILL_PARAM_NAME,
   PARAM_ADDITIONAL_PERMISSIONS,
+  UPDATE_TOPIC_TOOL_NAME,
+  TOPIC_PARAM_TITLE,
+  TOPIC_PARAM_SUMMARY,
+  TOPIC_PARAM_STRATEGIC_INTENT,
 } from './base-declarations.js';
 
 /**
@@ -157,7 +161,7 @@ export function getExitPlanModeDeclaration(): FunctionDeclaration {
   return {
     name: EXIT_PLAN_MODE_TOOL_NAME,
     description:
-      'Finalizes the planning phase and transitions to implementation by presenting the plan for user approval. This tool MUST be used to exit Plan Mode before any source code edits can be performed. Call this whenever a plan is ready or the user requests implementation.',
+      'Finalizes the planning phase and transitions to implementation by presenting the plan for formal user approval. You MUST reach an informal agreement with the user in the chat regarding the proposed strategy BEFORE calling this tool. This tool MUST be used to exit Plan Mode before any source code edits can be performed.',
     parametersJsonSchema: {
       type: 'object',
       required: [EXIT_PLAN_PARAM_PLAN_FILENAME],
@@ -202,5 +206,36 @@ export function getActivateSkillDeclaration(
     name: ACTIVATE_SKILL_TOOL_NAME,
     description: `Activates a specialized agent skill by name${availableSkillsHint}. Returns the skill's instructions wrapped in \`<activated_skill>\` tags. These provide specialized guidance for the current task. Use this when you identify a task that matches a skill's description. ONLY use names exactly as they appear in the \`<available_skills>\` section.`,
     parametersJsonSchema: zodToJsonSchema(schema),
+  };
+}
+
+/**
+ * Returns the FunctionDeclaration for updating the topic context.
+ */
+export function getUpdateTopicDeclaration(): FunctionDeclaration {
+  return {
+    name: UPDATE_TOPIC_TOOL_NAME,
+    description:
+      'Manages your narrative flow. Include `title` and `summary` only when starting a new Chapter (logical phase) or shifting strategic intent.',
+    parametersJsonSchema: {
+      type: 'object',
+      properties: {
+        [TOPIC_PARAM_TITLE]: {
+          type: 'string',
+          description: 'The title of the new topic or chapter.',
+        },
+        [TOPIC_PARAM_SUMMARY]: {
+          type: 'string',
+          description:
+            '(OPTIONAL) A detailed summary (5-10 sentences) covering both the work completed in the previous topic and the strategic intent of the new topic. This is required when transitioning between topics to maintain continuity.',
+        },
+        [TOPIC_PARAM_STRATEGIC_INTENT]: {
+          type: 'string',
+          description:
+            'A mandatory one-sentence statement of your immediate intent.',
+        },
+      },
+      required: [TOPIC_PARAM_STRATEGIC_INTENT],
+    },
   };
 }

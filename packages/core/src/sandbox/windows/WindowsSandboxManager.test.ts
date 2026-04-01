@@ -38,6 +38,7 @@ describe('WindowsSandboxManager', () => {
     manager = new WindowsSandboxManager({
       workspace: testCwd,
       modeConfig: { readonly: false, allowOverrides: true },
+      forbiddenPaths: async () => [],
     });
   });
 
@@ -60,7 +61,14 @@ describe('WindowsSandboxManager', () => {
     const result = await manager.prepareCommand(req);
 
     expect(result.program).toContain('GeminiSandbox.exe');
-    expect(result.args).toEqual(['0', testCwd, 'whoami', '/groups']);
+    expect(result.args).toEqual([
+      '0',
+      testCwd,
+      '--forbidden-manifest',
+      expect.stringMatching(/manifest\.txt$/),
+      'whoami',
+      '/groups',
+    ]);
   });
 
   it('should handle networkAccess from config', async () => {
@@ -99,6 +107,7 @@ describe('WindowsSandboxManager', () => {
     const planManager = new WindowsSandboxManager({
       workspace: testCwd,
       modeConfig: { readonly: true, allowOverrides: false },
+      forbiddenPaths: async () => [],
     });
     const req: SandboxRequest = {
       command: 'curl',
@@ -111,12 +120,14 @@ describe('WindowsSandboxManager', () => {
     };
 
     await expect(planManager.prepareCommand(req)).rejects.toThrow(
-      'Sandbox request rejected: Cannot override readonly/network restrictions in Plan mode.',
+      'Sandbox request rejected: Cannot override readonly/network/filesystem restrictions in Plan mode.',
     );
   });
 
   it('should handle persistent permissions from policyManager', async () => {
-    const persistentPath = path.resolve('/persistent/path');
+    const persistentPath = path.join(testCwd, 'persistent_path');
+    fs.mkdirSync(persistentPath, { recursive: true });
+
     const mockPolicyManager = {
       getCommandPermissions: vi.fn().mockReturnValue({
         fileSystem: { write: [persistentPath] },
@@ -128,6 +139,7 @@ describe('WindowsSandboxManager', () => {
       workspace: testCwd,
       modeConfig: { allowOverrides: true, network: false },
       policyManager: mockPolicyManager,
+      forbiddenPaths: async () => [],
     });
 
     const req: SandboxRequest = {
@@ -148,7 +160,7 @@ describe('WindowsSandboxManager', () => {
     expect(icaclsArgs).toContainEqual([
       persistentPath,
       '/setintegritylevel',
-      'Low',
+      '(OI)(CI)Low',
     ]);
   });
 
@@ -217,13 +229,13 @@ describe('WindowsSandboxManager', () => {
       expect(icaclsArgs).toContainEqual([
         path.resolve(testCwd),
         '/setintegritylevel',
-        'Low',
+        '(OI)(CI)Low',
       ]);
 
       expect(icaclsArgs).toContainEqual([
         path.resolve(allowedPath),
         '/setintegritylevel',
-        'Low',
+        '(OI)(CI)Low',
       ]);
     } finally {
       fs.rmSync(allowedPath, { recursive: true, force: true });
@@ -263,7 +275,7 @@ describe('WindowsSandboxManager', () => {
       expect(icaclsArgs).toContainEqual([
         path.resolve(extraWritePath),
         '/setintegritylevel',
-        'Low',
+        '(OI)(CI)Low',
       ]);
     } finally {
       fs.rmSync(extraWritePath, { recursive: true, force: true });
@@ -298,7 +310,7 @@ describe('WindowsSandboxManager', () => {
       expect(icaclsArgs).not.toContainEqual([
         uncPath,
         '/setintegritylevel',
-        'Low',
+        '(OI)(CI)Low',
       ]);
     },
   );
@@ -333,12 +345,12 @@ describe('WindowsSandboxManager', () => {
       expect(icaclsArgs).toContainEqual([
         longPath,
         '/setintegritylevel',
-        'Low',
+        '(OI)(CI)Low',
       ]);
       expect(icaclsArgs).toContainEqual([
         devicePath,
         '/setintegritylevel',
-        'Low',
+        '(OI)(CI)Low',
       ]);
     },
   );
@@ -355,17 +367,19 @@ describe('WindowsSandboxManager', () => {
       fs.rmSync(missingPath, { recursive: true, force: true });
     }
 
+    const managerWithForbidden = new WindowsSandboxManager({
+      workspace: testCwd,
+      forbiddenPaths: async () => [missingPath],
+    });
+
     const req: SandboxRequest = {
       command: 'test',
       args: [],
       cwd: testCwd,
       env: {},
-      policy: {
-        forbiddenPaths: [missingPath],
-      },
     };
 
-    await manager.prepareCommand(req);
+    await managerWithForbidden.prepareCommand(req);
 
     // Should NOT have called icacls to deny the missing path
     expect(spawnAsync).not.toHaveBeenCalledWith('icacls', [
@@ -381,17 +395,19 @@ describe('WindowsSandboxManager', () => {
       fs.mkdirSync(forbiddenPath);
     }
     try {
+      const managerWithForbidden = new WindowsSandboxManager({
+        workspace: testCwd,
+        forbiddenPaths: async () => [forbiddenPath],
+      });
+
       const req: SandboxRequest = {
         command: 'test',
         args: [],
         cwd: testCwd,
         env: {},
-        policy: {
-          forbiddenPaths: [forbiddenPath],
-        },
       };
 
-      await manager.prepareCommand(req);
+      await managerWithForbidden.prepareCommand(req);
 
       expect(spawnAsync).toHaveBeenCalledWith('icacls', [
         path.resolve(forbiddenPath),
@@ -409,6 +425,11 @@ describe('WindowsSandboxManager', () => {
       fs.mkdirSync(conflictPath);
     }
     try {
+      const managerWithForbidden = new WindowsSandboxManager({
+        workspace: testCwd,
+        forbiddenPaths: async () => [conflictPath],
+      });
+
       const req: SandboxRequest = {
         command: 'test',
         args: [],
@@ -416,11 +437,10 @@ describe('WindowsSandboxManager', () => {
         env: {},
         policy: {
           allowedPaths: [conflictPath],
-          forbiddenPaths: [conflictPath],
         },
       };
 
-      await manager.prepareCommand(req);
+      await managerWithForbidden.prepareCommand(req);
 
       const spawnMock = vi.mocked(spawnAsync);
       const allowCallIndex = spawnMock.mock.calls.findIndex(
@@ -438,14 +458,75 @@ describe('WindowsSandboxManager', () => {
           call[1][0] === path.resolve(conflictPath),
       );
 
-      // Both should have been called
-      expect(allowCallIndex).toBeGreaterThan(-1);
+      // Conflict should have been filtered out of allow calls
+      expect(allowCallIndex).toBe(-1);
       expect(denyCallIndex).toBeGreaterThan(-1);
-
-      // Verify order: explicitly denying must happen after the explicit allow
-      expect(allowCallIndex).toBeLessThan(denyCallIndex);
     } finally {
       fs.rmSync(conflictPath, { recursive: true, force: true });
     }
+  });
+
+  it('should translate __write to PowerShell safely using environment variables', async () => {
+    const filePath = path.join(testCwd, 'test.txt');
+    fs.writeFileSync(filePath, '');
+    const req: SandboxRequest = {
+      command: '__write',
+      args: [filePath],
+      cwd: testCwd,
+      env: {},
+    };
+
+    const result = await manager.prepareCommand(req);
+
+    // [network, cwd, --forbidden-manifest, manifestPath, command, ...args]
+    expect(result.args[4]).toBe('PowerShell.exe');
+    expect(result.args[7]).toBe('-Command');
+    const psCommand = result.args[8];
+    expect(psCommand).toBe(
+      '& { $Input | Out-File -FilePath $env:GEMINI_TARGET_PATH -Encoding utf8 }',
+    );
+    expect(result.env['GEMINI_TARGET_PATH']).toBe(filePath);
+  });
+
+  it('should safely handle special characters in __write path using environment variables', async () => {
+    const maliciousPath = path.join(testCwd, 'foo"; echo bar; ".txt');
+    fs.writeFileSync(maliciousPath, '');
+    const req: SandboxRequest = {
+      command: '__write',
+      args: [maliciousPath],
+      cwd: testCwd,
+      env: {},
+    };
+
+    const result = await manager.prepareCommand(req);
+
+    expect(result.args[4]).toBe('PowerShell.exe');
+    const psCommand = result.args[8];
+    expect(psCommand).toBe(
+      '& { $Input | Out-File -FilePath $env:GEMINI_TARGET_PATH -Encoding utf8 }',
+    );
+    // The malicious path should be injected safely via environment variable, not interpolated in args
+    expect(result.env['GEMINI_TARGET_PATH']).toBe(maliciousPath);
+  });
+
+  it('should translate __read to PowerShell safely using environment variables', async () => {
+    const filePath = path.join(testCwd, 'test.txt');
+    fs.writeFileSync(filePath, 'hello');
+    const req: SandboxRequest = {
+      command: '__read',
+      args: [filePath],
+      cwd: testCwd,
+      env: {},
+    };
+
+    const result = await manager.prepareCommand(req);
+
+    expect(result.args[4]).toBe('PowerShell.exe');
+    expect(result.args[7]).toBe('-Command');
+    const psCommand = result.args[8];
+    expect(psCommand).toBe(
+      '& { Get-Content -LiteralPath $env:GEMINI_TARGET_PATH -Raw }',
+    );
+    expect(result.env['GEMINI_TARGET_PATH']).toBe(filePath);
   });
 });

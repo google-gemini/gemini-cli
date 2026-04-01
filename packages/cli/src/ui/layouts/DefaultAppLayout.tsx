@@ -15,7 +15,7 @@ import { useUIState } from '../contexts/UIStateContext.js';
 import { useFlickerDetector } from '../hooks/useFlickerDetector.js';
 import { useAlternateBuffer } from '../hooks/useAlternateBuffer.js';
 import { CopyModeWarning } from '../components/CopyModeWarning.js';
-import { BackgroundShellDisplay } from '../components/BackgroundShellDisplay.js';
+import { BackgroundTaskDisplay } from '../components/BackgroundTaskDisplay.js';
 import { StreamingState } from '../types.js';
 
 export const DefaultAppLayout: React.FC = () => {
@@ -39,21 +39,21 @@ export const DefaultAppLayout: React.FC = () => {
     >
       <MainContent />
 
-      {uiState.isBackgroundShellVisible &&
-        uiState.backgroundShells.size > 0 &&
-        uiState.activeBackgroundShellPid &&
-        uiState.backgroundShellHeight > 0 &&
+      {uiState.isBackgroundTaskVisible &&
+        uiState.backgroundTasks.size > 0 &&
+        uiState.activeBackgroundTaskPid &&
+        uiState.backgroundTaskHeight > 0 &&
         uiState.streamingState !== StreamingState.WaitingForConfirmation && (
-          <Box height={uiState.backgroundShellHeight} flexShrink={0}>
-            <BackgroundShellDisplay
-              shells={uiState.backgroundShells}
-              activePid={uiState.activeBackgroundShellPid}
+          <Box height={uiState.backgroundTaskHeight} flexShrink={0}>
+            <BackgroundTaskDisplay
+              shells={uiState.backgroundTasks}
+              activePid={uiState.activeBackgroundTaskPid}
               width={uiState.terminalWidth}
-              height={uiState.backgroundShellHeight}
+              height={uiState.backgroundTaskHeight}
               isFocused={
                 uiState.embeddedShellFocused && !uiState.dialogsVisible
               }
-              isListOpenProp={uiState.isBackgroundShellListOpen}
+              isListOpenProp={uiState.isBackgroundTaskListOpen}
             />
           </Box>
         )}

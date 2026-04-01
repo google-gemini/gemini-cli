@@ -74,6 +74,7 @@ export enum Command {
 
   // Text Input
   SUBMIT = 'input.submit',
+  QUEUE_MESSAGE = 'input.queueMessage',
   NEWLINE = 'input.newline',
   OPEN_EXTERNAL_EDITOR = 'input.openExternalEditor',
   PASTE_CLIPBOARD = 'input.paste',
@@ -104,6 +105,10 @@ export enum Command {
   UNFOCUS_BACKGROUND_SHELL = 'background.unfocus',
   UNFOCUS_BACKGROUND_SHELL_LIST = 'background.unfocusList',
   SHOW_BACKGROUND_SHELL_UNFOCUS_WARNING = 'background.unfocusWarning',
+
+  // Extension Controls
+  UPDATE_EXTENSION = 'extension.update',
+  LINK_EXTENSION = 'extension.link',
 }
 
 /**
@@ -354,6 +359,7 @@ export const defaultKeyBindingConfig: KeyBindingConfig = new Map([
   // Text Input
   // Must also exclude shift to allow shift+enter for newline
   [Command.SUBMIT, [new KeyBinding('enter')]],
+  [Command.QUEUE_MESSAGE, [new KeyBinding('tab')]],
   [
     Command.NEWLINE,
     [
@@ -400,6 +406,10 @@ export const defaultKeyBindingConfig: KeyBindingConfig = new Map([
   [Command.UNFOCUS_BACKGROUND_SHELL, [new KeyBinding('shift+tab')]],
   [Command.UNFOCUS_BACKGROUND_SHELL_LIST, [new KeyBinding('tab')]],
   [Command.SHOW_BACKGROUND_SHELL_UNFOCUS_WARNING, [new KeyBinding('tab')]],
+
+  // Extension Controls
+  [Command.UPDATE_EXTENSION, [new KeyBinding('i')]],
+  [Command.LINK_EXTENSION, [new KeyBinding('l')]],
 ]);
 
 interface CommandCategory {
@@ -488,6 +498,7 @@ export const commandCategories: readonly CommandCategory[] = [
     title: 'Text Input',
     commands: [
       Command.SUBMIT,
+      Command.QUEUE_MESSAGE,
       Command.NEWLINE,
       Command.OPEN_EXTERNAL_EDITOR,
       Command.PASTE_CLIPBOARD,
@@ -525,6 +536,10 @@ export const commandCategories: readonly CommandCategory[] = [
       Command.UNFOCUS_BACKGROUND_SHELL_LIST,
       Command.SHOW_BACKGROUND_SHELL_UNFOCUS_WARNING,
     ],
+  },
+  {
+    title: 'Extension Controls',
+    commands: [Command.UPDATE_EXTENSION, Command.LINK_EXTENSION],
   },
 ];
 
@@ -593,6 +608,8 @@ export const commandDescriptions: Readonly<Record<Command, string>> = {
 
   // Text Input
   [Command.SUBMIT]: 'Submit the current prompt.',
+  [Command.QUEUE_MESSAGE]:
+    'Queue the current prompt to be processed after the current task finishes.',
   [Command.NEWLINE]: 'Insert a newline without submitting.',
   [Command.OPEN_EXTERNAL_EDITOR]:
     'Open the current prompt or the plan in an external editor.',
@@ -633,6 +650,10 @@ export const commandDescriptions: Readonly<Record<Command, string>> = {
     'Move focus from background shell list to Gemini.',
   [Command.SHOW_BACKGROUND_SHELL_UNFOCUS_WARNING]:
     'Show warning when trying to move focus away from background shell.',
+
+  // Extension Controls
+  [Command.UPDATE_EXTENSION]: 'Update the current extension if available.',
+  [Command.LINK_EXTENSION]: 'Link the current extension to a local path.',
 };
 
 const keybindingsSchema = z.array(

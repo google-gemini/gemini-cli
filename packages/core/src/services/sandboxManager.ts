@@ -10,7 +10,7 @@ import path from 'node:path';
 import {
   isKnownSafeCommand as isMacSafeCommand,
   isDangerousCommand as isMacDangerousCommand,
-} from '../sandbox/macos/commandSafety.js';
+} from '../sandbox/utils/commandSafety.js';
 import {
   isKnownSafeCommand as isWindowsSafeCommand,
   isDangerousCommand as isWindowsDangerousCommand,
@@ -21,6 +21,8 @@ import {
   getSecureSanitizationConfig,
   type EnvironmentSanitizationConfig,
 } from './environmentSanitization.js';
+import type { ShellExecutionResult } from './shellExecutionService.js';
+import type { SandboxPolicyManager } from '../policy/sandboxPolicyManager.js';
 export interface SandboxPermissions {
   /** Filesystem permissions. */
   fileSystem?: {
@@ -39,8 +41,6 @@ export interface SandboxPermissions {
 export interface ExecutionPolicy {
   /** Additional absolute paths to grant full read/write access to. */
   allowedPaths?: string[];
-  /** Absolute paths to explicitly deny read/write access to (overrides allowlists). */
-  forbiddenPaths?: string[];
   /** Whether network access is allowed. */
   networkAccess?: boolean;
   /** Rules for scrubbing sensitive environment variables. */
@@ -50,14 +50,29 @@ export interface ExecutionPolicy {
 }
 
 /**
+ * Configuration for the sandbox mode behavior.
+ */
+export interface SandboxModeConfig {
+  readonly?: boolean;
+  network?: boolean;
+  approvedTools?: string[];
+  allowOverrides?: boolean;
+}
+
+/**
  * Global configuration options used to initialize a SandboxManager.
  */
 export interface GlobalSandboxOptions {
-  /**
-   * The primary workspace path the sandbox is anchored to.
-   * This directory is granted full read and write access.
-   */
+  /** The absolute path to the primary workspace directory, granted full read/write access. */
   workspace: string;
+  /** Absolute paths to explicitly include in the workspace context. */
+  includeDirectories?: string[];
+  /** An optional asynchronous resolver function for paths that should be explicitly denied. */
+  forbiddenPaths?: () => Promise<string[]>;
+  /** The current sandbox mode behavior from config. */
+  modeConfig?: SandboxModeConfig;
+  /** The policy manager for persistent approvals. */
+  policyManager?: SandboxPolicyManager;
 }
 
 /**
@@ -88,6 +103,18 @@ export interface SandboxedCommand {
   env: NodeJS.ProcessEnv;
   /** The working directory. */
   cwd?: string;
+  /** An optional cleanup function to be called after the command terminates. */
+  cleanup?: () => void;
+}
+
+/**
+ * A structured result from parsing sandbox denials.
+ */
+export interface ParsedSandboxDenial {
+  /** If the denial is related to file system access, these are the paths that were blocked. */
+  filePaths?: string[];
+  /** If the denial is related to network access. */
+  network?: boolean;
 }
 
 /**
@@ -108,6 +135,11 @@ export interface SandboxManager {
    * Checks if a command with its arguments is explicitly known to be dangerous for this sandbox.
    */
   isDangerousCommand(args: string[]): boolean;
+
+  /**
+   * Parses the output of a command to detect sandbox denials.
+   */
+  parseDenials(result: ShellExecutionResult): ParsedSandboxDenial | undefined;
 }
 
 /**
@@ -119,6 +151,87 @@ export const GOVERNANCE_FILES = [
   { path: '.geminiignore', isDirectory: false },
   { path: '.git', isDirectory: true },
 ] as const;
+
+/**
+ * Files that contain sensitive secrets or credentials and should be
+ * completely hidden (deny read/write) in any sandbox.
+ */
+export const SECRET_FILES = [
+  { pattern: '.env' },
+  { pattern: '.env.*' },
+] as const;
+
+/**
+ * Checks if a given file name matches any of the secret file patterns.
+ */
+export function isSecretFile(fileName: string): boolean {
+  return SECRET_FILES.some((s) => {
+    if (s.pattern.endsWith('*')) {
+      const prefix = s.pattern.slice(0, -1);
+      return fileName.startsWith(prefix);
+    }
+    return fileName === s.pattern;
+  });
+}
+
+/**
+ * Returns arguments for the Linux 'find' command to locate secret files.
+ */
+export function getSecretFileFindArgs(): string[] {
+  const args: string[] = ['('];
+  SECRET_FILES.forEach((s, i) => {
+    if (i > 0) args.push('-o');
+    args.push('-name', s.pattern);
+  });
+  args.push(')');
+  return args;
+}
+
+/**
+ * Finds all secret files in a directory up to a certain depth.
+ * Default is shallow scan (depth 1) for performance.
+ */
+export async function findSecretFiles(
+  baseDir: string,
+  maxDepth = 1,
+): Promise<string[]> {
+  const secrets: string[] = [];
+  const skipDirs = new Set([
+    'node_modules',
+    '.git',
+    '.venv',
+    '__pycache__',
+    'dist',
+    'build',
+    '.next',
+    '.idea',
+    '.vscode',
+  ]);
+
+  async function walk(dir: string, depth: number) {
+    if (depth > maxDepth) return;
+    try {
+      const entries = await fs.readdir(dir, { withFileTypes: true });
+      for (const entry of entries) {
+        const fullPath = path.join(dir, entry.name);
+        if (entry.isDirectory()) {
+          if (!skipDirs.has(entry.name)) {
+            await walk(fullPath, depth + 1);
+          }
+        } else if (entry.isFile()) {
+          if (isSecretFile(entry.name)) {
+            secrets.push(fullPath);
+          }
+        }
+      }
+    } catch {
+      // Ignore read errors
+    }
+  }
+
+  await walk(baseDir, 1);
+  return secrets;
+}
 
 /**
  * A no-op implementation of SandboxManager that silently passes commands
@@ -154,10 +267,14 @@ export class NoopSandboxManager implements SandboxManager {
       ? isWindowsDangerousCommand(args)
       : isMacDangerousCommand(args);
   }
+
+  parseDenials(): undefined {
+    return undefined;
+  }
 }
 
 /**
- * SandboxManager that implements actual sandboxing.
+ * A SandboxManager implementation that just runs locally (no sandboxing yet).
  */
 export class LocalSandboxManager implements SandboxManager {
   async prepareCommand(_req: SandboxRequest): Promise<SandboxedCommand> {
@@ -171,38 +288,74 @@ export class LocalSandboxManager implements SandboxManager {
   isDangerousCommand(_args: string[]): boolean {
     return false;
   }
+
+  parseDenials(): undefined {
+    return undefined;
+  }
+}
+
+/**
+ * Resolves sanitized allowed and forbidden paths for a request.
+ * Filters the workspace from allowed paths and ensures forbidden paths take precedence.
+ */
+export async function resolveSandboxPaths(
+  options: GlobalSandboxOptions,
+  req: SandboxRequest,
+): Promise<{
+  allowed: string[];
+  forbidden: string[];
+}> {
+  const forbidden = sanitizePaths(await options.forbiddenPaths?.());
+  const allowed = sanitizePaths(req.policy?.allowedPaths);
+
+  const workspaceIdentity = getPathIdentity(options.workspace);
+  const forbiddenIdentities = new Set(forbidden.map(getPathIdentity));
+
+  const filteredAllowed = allowed.filter((p) => {
+    const identity = getPathIdentity(p);
+    return identity !== workspaceIdentity && !forbiddenIdentities.has(identity);
+  });
+
+  return {
+    allowed: filteredAllowed,
+    forbidden,
+  };
 }
 
 /**
  * Sanitizes an array of paths by deduplicating them and ensuring they are absolute.
+ * Always returns an array (empty if input is null/undefined).
  */
-export function sanitizePaths(paths?: string[]): string[] | undefined {
-  if (!paths) return undefined;
+export function sanitizePaths(paths?: string[] | null): string[] {
+  if (!paths || paths.length === 0) return [];
 
-  // We use a Map to deduplicate paths based on their normalized,
-  // platform-specific identity e.g. handling case-insensitivity on Windows)
-  // while preserving the original string casing.
   const uniquePathsMap = new Map<string, string>();
   for (const p of paths) {
     if (!path.isAbsolute(p)) {
       throw new Error(`Sandbox path must be absolute: ${p}`);
     }
 
-    // Normalize the path (resolves slashes and redundant components)
-    let key = path.normalize(p);
-
-    // Windows file systems are case-insensitive, so we lowercase the key for
-    // deduplication
-    if (os.platform() === 'win32') {
-      key = key.toLowerCase();
-    }
-
+    const key = getPathIdentity(p);
     if (!uniquePathsMap.has(key)) {
       uniquePathsMap.set(key, p);
     }
   }
 
   return Array.from(uniquePathsMap.values());
+}
+
+/** Returns a normalized identity for a path, stripping trailing slashes and handling case sensitivity. */
+export function getPathIdentity(p: string): string {
+  let norm = path.normalize(p);
+
+  // Strip trailing slashes (except for root paths)
+  if (norm.length > 1 && (norm.endsWith('/') || norm.endsWith('\\'))) {
+    norm = norm.slice(0, -1);
+  }
+
+  const platform = os.platform();
+  const isCaseInsensitive = platform === 'win32' || platform === 'darwin';
+  return isCaseInsensitive ? norm.toLowerCase() : norm;
 }
 
 /**
