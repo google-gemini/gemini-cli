@@ -322,6 +322,49 @@ describe('TerminalCapabilityManager', () => {
     });
   });
 
+  describe('isGhosttyTerminal', () => {
+    const manager = TerminalCapabilityManager.getInstance();
+
+    it.each([
+      {
+        name: 'Ghostty (terminal name)',
+        terminalName: 'Ghostty',
+        env: {},
+        expected: true,
+      },
+      {
+        name: 'ghostty (TERM_PROGRAM)',
+        terminalName: undefined,
+        env: { TERM_PROGRAM: 'ghostty' },
+        expected: true,
+      },
+      {
+        name: 'xterm-ghostty (TERM)',
+        terminalName: undefined,
+        env: { TERM: 'xterm-ghostty' },
+        expected: true,
+      },
+      {
+        name: 'iTerm.app (TERM_PROGRAM)',
+        terminalName: undefined,
+        env: { TERM_PROGRAM: 'iTerm.app' },
+        expected: false,
+      },
+      {
+        name: 'undefined env',
+        terminalName: undefined,
+        env: {},
+        expected: false,
+      },
+    ])(
+      'should return $expected for $name',
+      ({ terminalName, env, expected }) => {
+        vi.spyOn(manager, 'getTerminalName').mockReturnValue(terminalName);
+        expect(manager.isGhosttyTerminal(env)).toBe(expected);
+      },
+    );
+  });
+
   describe('supportsOsc9Notifications', () => {
     const manager = TerminalCapabilityManager.getInstance();
 

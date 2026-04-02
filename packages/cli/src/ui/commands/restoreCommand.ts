@@ -151,7 +151,7 @@ async function completion(
     const files = await fs.readdir(checkpointDir);
     const jsonFiles = files.filter((file) => file.endsWith('.json'));
     return getTruncatedCheckpointNames(jsonFiles);
-  } catch (_err) {
+  } catch {
     return [];
   }
 }
