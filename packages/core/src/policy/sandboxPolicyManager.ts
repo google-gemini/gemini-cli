@@ -13,6 +13,7 @@ import { fileURLToPath } from 'node:url';
 import { debugLogger } from '../utils/debugLogger.js';
 import { type SandboxPermissions } from '../services/sandboxManager.js';
 import { sanitizePaths } from '../services/sandboxManager.js';
+import { normalizeCommand } from '../utils/shell-utils.js';
 
 export const SandboxModeConfigSchema = z.object({
   network: z.boolean(),
@@ -154,8 +155,9 @@ export class SandboxPolicyManager {
   }
 
   getCommandPermissions(commandName: string): SandboxPermissions {
-    const persistent = this.config.commands[commandName];
-    const session = this.sessionApprovals[commandName];
+    const normalized = normalizeCommand(commandName);
+    const persistent = this.config.commands[normalized];
+    const session = this.sessionApprovals[normalized];
 
     return {
       fileSystem: {
@@ -176,25 +178,22 @@ export class SandboxPolicyManager {
     commandName: string,
     permissions: SandboxPermissions,
   ): void {
-    const existing = this.sessionApprovals[commandName] || {
+    const normalized = normalizeCommand(commandName);
+    const existing = this.sessionApprovals[normalized] || {
       fileSystem: { read: [], write: [] },
       network: false,
     };
 
-    this.sessionApprovals[commandName] = {
+    this.sessionApprovals[normalized] = {
       fileSystem: {
-        read: Array.from(
-          new Set([
-            ...(existing.fileSystem?.read ?? []),
-            ...(permissions.fileSystem?.read ?? []),
-          ]),
-        ),
-        write: Array.from(
-          new Set([
-            ...(existing.fileSystem?.write ?? []),
-            ...(permissions.fileSystem?.write ?? []),
-          ]),
-        ),
+        read: sanitizePaths([
+          ...(existing.fileSystem?.read ?? []),
+          ...(permissions.fileSystem?.read ?? []),
+        ]),
+        write: sanitizePaths([
+          ...(existing.fileSystem?.write ?? []),
+          ...(permissions.fileSystem?.write ?? []),
+        ]),
       },
       network: existing.network || permissions.network || false,
     };
@@ -204,7 +203,8 @@ export class SandboxPolicyManager {
     commandName: string,
     permissions: SandboxPermissions,
   ): void {
-    const existing = this.config.commands[commandName] || {
+    const normalized = normalizeCommand(commandName);
+    const existing = this.config.commands[normalized] || {
       allowed_paths: [],
       allow_network: false,
     };
@@ -216,7 +216,7 @@ export class SandboxPolicyManager {
     ];
     const newPaths = new Set(sanitizePaths(newPathsArray));
 
-    this.config.commands[commandName] = {
+    this.config.commands[normalized] = {
       allowed_paths: Array.from(newPaths),
       allow_network: existing.allow_network || permissions.network || false,
     };
