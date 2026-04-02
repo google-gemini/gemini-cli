@@ -182,15 +182,18 @@ rule that does not explicitly specify `modes` is considered "always active" and
 will apply to Plan Mode as well.
 
 To maintain the integrity of Plan Mode as a safe research environment,
-persistent tool approvals are context-aware by default:
+persistent tool approvals are context-aware by default. When you allow a tool
+for all future sessions, Gemini CLI automatically applies the current mode and
+all more permissive modes (the order of permissiveness is `plan` < `default` <
+`autoEdit` < `yolo`):
 
 - **Implementation-time approvals**: If you select **"Allow for all future
-  sessions"** while in an implementation mode (like Default or Auto-Edit),
-  Gemini CLI automatically restricts the rule to those modes. This ensures that
-  tools trusted for coding don't automatically execute while you're researching.
+  sessions"** while in `default` mode, Gemini CLI automatically restricts the
+  rule to `default`, `autoEdit`, and `yolo`. This ensures that tools trusted for
+  coding don't automatically execute while you're researching in `plan` mode.
 - **Planning-time approvals**: If you grant persistent approval while already in
-  Plan Mode, the rule is saved without mode restrictions (applying to all
-  modes), as it represents an intentional choice to trust the tool for planning.
+  `plan` mode, the rule is explicitly saved for all modes (`plan`, `default`,
+  `autoEdit`, and `yolo`).
 
 If you want to manually restrict a rule to other modes but _not_ to Plan Mode,
 you must explicitly specify the target modes. For example, to allow `npm test`
