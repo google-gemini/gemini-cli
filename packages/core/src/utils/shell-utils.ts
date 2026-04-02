@@ -455,7 +455,7 @@ export function parseBashCommandDetails(
         'Syntax Errors:',
         syntaxErrors,
       );
-    } catch (_e) {
+    } catch {
       // Ignore query errors
     } finally {
       query?.delete();
@@ -914,7 +914,7 @@ export async function* execStreaming(
     if (!finished && child.exitCode === null && !child.killed) {
       try {
         child.kill();
-      } catch (_e) {
+      } catch {
         // ignore error if process is already dead
       }
       killedByGenerator = true;

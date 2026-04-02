@@ -23,7 +23,7 @@ export const isGitHubRepository = (): boolean => {
     const pattern = /github\.com/;
 
     return pattern.test(remotes);
-  } catch (_error) {
+  } catch {
     // If any filesystem error occurs, assume not a git repo
     debugLogger.debug(`Failed to get git remote:`, _error);
     return false;
@@ -85,7 +85,7 @@ export const getLatestGitHubRelease = async (
     }
     // eslint-disable-next-line @typescript-eslint/no-unsafe-return
     return releaseTag;
-  } catch (_error) {
+  } catch {
     debugLogger.debug(
       `Failed to determine latest run-gemini-cli release:`,
       _error,

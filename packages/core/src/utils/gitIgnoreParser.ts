@@ -37,7 +37,7 @@ export class GitIgnoreParser implements GitIgnoreFilter {
     let content: string;
     try {
       content = fs.readFileSync(patternsFilePath, 'utf-8');
-    } catch (_error) {
+    } catch {
       return ignore();
     }
 
@@ -189,7 +189,7 @@ export class GitIgnoreParser implements GitIgnoreFilter {
 
       // Extra patterns (like .geminiignore) have final precedence
       return ig.add(this.processedExtraPatterns).ignores(normalizedPath);
-    } catch (_error) {
+    } catch {
       return false;
     }
   }

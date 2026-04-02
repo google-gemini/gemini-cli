@@ -76,7 +76,7 @@ export async function updateGitignore(gitRepoRoot: string): Promise<void> {
     let fileExists = true;
     try {
       existingContent = await fs.promises.readFile(gitignorePath, 'utf8');
-    } catch (_error) {
+    } catch {
       // File doesn't exist
       fileExists = false;
     }
@@ -168,7 +168,7 @@ async function downloadFiles({
 async function createDirectory(dirPath: string): Promise<void> {
   try {
     await fs.promises.mkdir(dirPath, { recursive: true });
-  } catch (_error) {
+  } catch {
     debugLogger.debug(`Failed to create ${dirPath} directory:`, _error);
     throw new Error(
       `Unable to create ${dirPath} directory. Do you have file permissions in the current directory?`,
@@ -222,7 +222,7 @@ export const setupGithubCommand: SlashCommand = {
     let gitRepoRoot: string;
     try {
       gitRepoRoot = getGitRepoRoot();
-    } catch (_error) {
+    } catch {
       debugLogger.debug(`Failed to get git repo root:`, _error);
       throw new Error(
         'Unable to determine the GitHub repository. /setup-github must be run from a git repository.',
