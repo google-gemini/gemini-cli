@@ -65,7 +65,7 @@ const getSavedChatTags = async (
     );
 
     return chatDetails;
-  } catch (_err) {
+  } catch {
     return [];
   }
 };

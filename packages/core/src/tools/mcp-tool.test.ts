@@ -830,7 +830,7 @@ describe('DiscoveredMCPTool', () => {
           if (expectError) {
             try {
               await invocation.execute(controller.signal);
-            } catch (_error) {
+            } catch {
               // Expected error
             }
           } else {
