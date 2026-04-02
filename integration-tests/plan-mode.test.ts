@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { writeFileSync, mkdirSync } from 'node:fs';
+import { writeFileSync, mkdirSync, existsSync } from 'node:fs';
 import { join } from 'node:path';
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { GEMINI_DIR, TestRig, checkModelOutputContent } from './test-helper.js';
@@ -147,6 +147,14 @@ describe('Plan Mode', () => {
         'Expected write_file to non-plans dir to fail',
       ).toBe(false);
     }
+
+    // Verify the file was not created regardless of whether write_file
+    // was attempted (covers both denial and model not attempting).
+    const helloPath = join(rig.testDir!, 'hello.txt');
+    expect(
+      existsSync(helloPath),
+      'hello.txt should not exist outside the plans directory',
+    ).toBe(false);
   });
 
   it('should be able to enter plan mode from default mode', async () => {
