@@ -600,6 +600,204 @@ describe('KeypressContext', () => {
 
       expect(keyHandler).not.toHaveBeenCalled();
     });
+
+    it('should preserve user keystrokes around slow split OSC 11 responses', async () => {
+      const keyHandler = vi.fn();
+      const { result } = renderHook(() => useKeypressContext(), { wrapper });
+
+      act(() => result.current.subscribe(keyHandler));
+
+      act(() => stdin.write('A'));
+      act(() => stdin.write('\x1b]11;rgb:c0c0/'));
+      await act(async () => {
+        vi.advanceTimersByTime(ESC_TIMEOUT + 10);
+      });
+      act(() => stdin.write('c0c0/c0c0\x1b\\'));
+      act(() => stdin.write('B'));
+
+      await waitFor(() => {
+        expect(keyHandler).toHaveBeenCalledTimes(2);
+      });
+
+      expect(keyHandler).toHaveBeenNthCalledWith(
+        1,
+        expect.objectContaining({
+          name: 'a',
+          sequence: 'A',
+          shift: true,
+        }),
+      );
+      expect(keyHandler).toHaveBeenNthCalledWith(
+        2,
+        expect.objectContaining({
+          name: 'b',
+          sequence: 'B',
+          shift: true,
+        }),
+      );
+    });
+
+    it('should ignore repeated fragmented OSC 11 responses', async () => {
+      const keyHandler = vi.fn();
+      const { result } = renderHook(() => useKeypressContext(), { wrapper });
+
+      act(() => result.current.subscribe(keyHandler));
+
+      for (let i = 0; i < 100; i += 1) {
+        act(() => stdin.write('\x1b]11;rgb:0c0c/'));
+        await act(async () => {
+          vi.advanceTimersByTime(ESC_TIMEOUT + 10);
+        });
+        act(() => stdin.write('0c0c/0c0c\x1b\\'));
+      }
+
+      await act(async () => {
+        vi.advanceTimersByTime(0);
+      });
+
+      expect(keyHandler).not.toHaveBeenCalled();
+    });
+
+    it('should ignore highly fragmented OSC 11 responses across repeated ESC timeouts', async () => {
+      const keyHandler = vi.fn();
+      const { result } = renderHook(() => useKeypressContext(), { wrapper });
+
+      act(() => result.current.subscribe(keyHandler));
+
+      const fragments = [
+        '\x1b]',
+        '1',
+        '1',
+        ';',
+        'r',
+        'g',
+        'b',
+        ':',
+        '0',
+        'c',
+        '0',
+        'c',
+        '/',
+        '0',
+        'c',
+        '0',
+        'c',
+        '/',
+        '0',
+        'c',
+        '0',
+        'c',
+        '\x1b',
+        '\\',
+      ];
+
+      for (const fragment of fragments) {
+        act(() => stdin.write(fragment));
+        await act(async () => {
+          vi.advanceTimersByTime(ESC_TIMEOUT + 10);
+        });
+      }
+
+      expect(keyHandler).not.toHaveBeenCalled();
+
+      act(() => stdin.write('X'));
+
+      await waitFor(() => {
+        expect(keyHandler).toHaveBeenCalledTimes(1);
+      });
+
+      expect(keyHandler).toHaveBeenCalledWith(
+        expect.objectContaining({
+          name: 'x',
+          sequence: 'X',
+          shift: true,
+        }),
+      );
+    });
+
+    it('should recover after discarding oversized OSC sequences', async () => {
+      const keyHandler = vi.fn();
+      const logSpy = vi.spyOn(debugLogger, 'log').mockImplementation(() => {});
+      const { result } = renderHook(() => useKeypressContext(), { wrapper });
+
+      try {
+        act(() => result.current.subscribe(keyHandler));
+
+        act(() => stdin.write(`\x1b]11;${'a'.repeat(5000)}`));
+        await act(async () => {
+          vi.advanceTimersByTime(ESC_TIMEOUT + 10);
+        });
+        act(() => stdin.write('Z'));
+
+        await waitFor(() => {
+          expect(keyHandler).toHaveBeenCalledTimes(1);
+        });
+
+        expect(logSpy).toHaveBeenCalledWith('Discarded oversized OSC sequence');
+        expect(keyHandler).toHaveBeenCalledWith(
+          expect.objectContaining({
+            name: 'z',
+            sequence: 'Z',
+            shift: true,
+          }),
+        );
+      } finally {
+        logSpy.mockRestore();
+      }
+    });
+
+    it('should recover after discarding oversized OSC sequences terminated by ESC \\', async () => {
+      const keyHandler = vi.fn();
+      const logSpy = vi.spyOn(debugLogger, 'log').mockImplementation(() => {});
+      const { result } = renderHook(() => useKeypressContext(), { wrapper });
+
+      try {
+        act(() => result.current.subscribe(keyHandler));
+
+        act(() => stdin.write(`\x1b]11;${'a'.repeat(5000)}`));
+        act(() => stdin.write('still-discarding'));
+        act(() => stdin.write('\x1b\\'));
+        act(() => stdin.write('Q'));
+
+        await waitFor(() => {
+          expect(keyHandler).toHaveBeenCalledTimes(1);
+        });
+
+        expect(logSpy).toHaveBeenCalledWith('Discarded oversized OSC sequence');
+        expect(keyHandler).toHaveBeenCalledWith(
+          expect.objectContaining({
+            name: 'q',
+            sequence: 'Q',
+            shift: true,
+          }),
+        );
+      } finally {
+        logSpy.mockRestore();
+      }
+    });
+
+    it('should ignore slow split OSC 11 terminal background responses terminated by BEL', async () => {
+      const keyHandler = vi.fn();
+      const { result } = renderHook(() => useKeypressContext(), { wrapper });
+
+      act(() => result.current.subscribe(keyHandler));
+
+      act(() => stdin.write('\x1b]11;rgb:0c0c/'));
+      await act(async () => {
+        vi.advanceTimersByTime(ESC_TIMEOUT + 10);
+      });
+      act(() => stdin.write('0c0c/0c0c'));
+      await act(async () => {
+        vi.advanceTimersByTime(ESC_TIMEOUT + 10);
+      });
+      act(() => stdin.write('\u0007'));
+
+      await act(async () => {
+        vi.advanceTimersByTime(0);
+      });
+
+      expect(keyHandler).not.toHaveBeenCalled();
+    });
   });
 
   describe('debug keystroke logging', () => {

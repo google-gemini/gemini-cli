@@ -409,6 +409,22 @@ function* emitKeys(
 
         if (overflowed) {
           debugLogger.log('Discarded oversized OSC sequence');
+          while (true) {
+            const next = yield;
+            if (next === '' || next === '\u0007') {
+              break;
+            }
+            if (sawEsc) {
+              sawEsc = false;
+              if (next === '\\') {
+                break;
+              }
+              continue;
+            }
+            if (next === ESC) {
+              sawEsc = true;
+            }
+          }
           continue; // resume main loop
         }
 
