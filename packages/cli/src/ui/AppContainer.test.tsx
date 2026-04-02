@@ -2648,6 +2648,20 @@ describe('AppContainer State Management', () => {
           unmount();
         });
 
+        it('should keep isInputActive true when copy mode is enabled', async () => {
+          await setupCopyModeTest(true);
+
+          // Enter copy mode
+          act(() => {
+            stdin.write('\x13'); // Ctrl+S
+          });
+          rerender();
+
+          expect(capturedUIState.copyModeEnabled).toBe(true);
+          expect(capturedUIState.isInputActive).toBe(true);
+          unmount();
+        });
+
         it('should have higher priority than other priority listeners when enabled', async () => {
           // 1. Initial state with a child component's priority listener (already subscribed)
           // It should NOT handle Ctrl+S so we can enter copy mode.
