@@ -131,6 +131,7 @@ reply with what you need, and exit. Do not search the codebase for the missing c
     modelConfig: {
       model: GEMINI_MODEL_ALIAS_FLASH,
     },
+    workspaceDirectories: [globalGeminiDir],
     toolConfig: {
       tools: [
         READ_FILE_TOOL_NAME,
