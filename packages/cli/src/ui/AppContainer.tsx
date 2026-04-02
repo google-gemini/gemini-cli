@@ -83,6 +83,7 @@ import {
   logBillingEvent,
   ApiKeyUpdatedEvent,
   type InjectionSource,
+  startMemoryService,
 } from '@google/gemini-cli-core';
 import { validateAuthMethod } from '../config/auth.js';
 import process from 'node:process';
@@ -446,6 +447,13 @@ export const AppContainer = (props: AppContainerProps) => {
       }
       setConfigInitialized(true);
       startupProfiler.flush(config);
+
+      // Fire-and-forget memory service (skill extraction from past sessions)
+      if (config.isMemoryManagerEnabled()) {
+        startMemoryService(config).catch((e) => {
+          debugLogger.error('Failed to start memory service:', e);
+        });
+      }
 
       const sessionStartSource = resumedSessionData
         ? SessionStartSource.Resume
@@ -1422,8 +1430,7 @@ Logging in with Google... Restarting Gemini CLI to continue.
     (streamingState === StreamingState.Idle ||
       streamingState === StreamingState.Responding ||
       streamingState === StreamingState.WaitingForConfirmation) &&
-    !proQuotaRequest &&
-    !copyModeEnabled;
+    !proQuotaRequest;
 
   const observerRef = useRef<ResizeObserver | null>(null);
   const [controlsHeight, setControlsHeight] = useState(0);

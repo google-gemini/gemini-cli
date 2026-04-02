@@ -37,7 +37,7 @@ export interface SystemPromptOptions {
   hookContext?: boolean;
   primaryWorkflows?: PrimaryWorkflowsOptions;
   planningWorkflow?: PlanningWorkflowOptions;
-  taskTracker?: boolean;
+  taskTracker?: string;
   operationalGuidelines?: OperationalGuidelinesOptions;
   sandbox?: SandboxOptions;
   interactiveYoloMode?: boolean;
@@ -63,7 +63,7 @@ export interface PrimaryWorkflowsOptions {
   enableWriteTodosTool: boolean;
   enableEnterPlanModeTool: boolean;
   approvedPlan?: { path: string };
-  taskTracker?: boolean;
+  taskTracker?: string;
   topicUpdateNarration?: boolean;
 }
 
@@ -95,7 +95,6 @@ export interface PlanningWorkflowOptions {
   planModeToolsList: string;
   plansDir: string;
   approvedPlanPath?: string;
-  taskTracker?: boolean;
 }
 
 export interface AgentSkillOptions {
@@ -132,7 +131,7 @@ ${
     : renderPrimaryWorkflows(options.primaryWorkflows)
 }
 
-${options.taskTracker ? renderTaskTracker() : ''}
+${options.taskTracker ? renderTaskTracker(options.taskTracker) : ''}
 
 ${renderOperationalGuidelines(options.operationalGuidelines)}
 
@@ -491,10 +490,10 @@ An approved plan is available for this task.
 `;
 }
 
-export function renderTaskTracker(): string {
+export function renderTaskTracker(trackerDir: string): string {
   return `
 # TASK MANAGEMENT PROTOCOL
-You are operating with a persistent file-based task tracking system located at \`.tracker/tasks/\`. You must adhere to the following rules:
+You are operating with a persistent file-based task tracking system located at \`${trackerDir}\`. You must adhere to the following rules:
 
 1.  **NO IN-MEMORY LISTS**: Do not maintain a mental list of tasks or write markdown checkboxes in the chat. Use the provided tools (\`${TRACKER_CREATE_TASK_TOOL_NAME}\`, \`${TRACKER_LIST_TASKS_TOOL_NAME}\`, \`${TRACKER_UPDATE_TASK_TOOL_NAME}\`) for all state management.
 2.  **IMMEDIATE DECOMPOSITION**: Upon receiving a task, evaluate its functional complexity and scope. If the request involves more than a single atomic modification, or necessitates research before execution, you MUST immediately decompose it into discrete entries using \`${TRACKER_CREATE_TASK_TOOL_NAME}\`.
