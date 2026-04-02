@@ -10,7 +10,7 @@ import { LegacyAgentSession } from './legacy-agent-session.js';
 import type { LegacyAgentSessionDeps } from './legacy-agent-session.js';
 import { GeminiEventType } from '../core/turn.js';
 import type { ServerGeminiStreamEvent } from '../core/turn.js';
-import type { AgentEvent } from './types.js';
+import type { AgentEvent, AgentSend } from './types.js';
 import { ToolErrorType } from '../tools/tool-error.js';
 import type {
   CompletedToolCall,
@@ -69,6 +69,18 @@ function makeToolRequest(callId: string, name: string): ToolCallRequestInfo {
     args: {},
     isClientInitiated: false,
     prompt_id: 'p1',
+  };
+}
+
+function makeMessageSend(
+  text: string,
+  displayContent?: string,
+): Extract<AgentSend, { message: unknown }> {
+  return {
+    message: {
+      content: [{ type: 'text', text }],
+      ...(displayContent ? { displayContent } : {}),
+    },
   };
 }
 
@@ -140,9 +152,7 @@ describe('LegacyAgentSession', () => {
       );
 
       const session = new LegacyAgentSession(deps);
-      const result = await session.send({
-        message: [{ type: 'text', text: 'hi' }],
-      });
+      const result = await session.send(makeMessageSend('hi'));
 
       expect(result.streamId).toBe('test-stream');
     });
@@ -162,7 +172,10 @@ describe('LegacyAgentSession', () => {
 
       const session = new LegacyAgentSession(deps);
       const { streamId } = await session.send({
-        message: [{ type: 'text', text: 'hi' }],
+        message: {
+          content: [{ type: 'text', text: 'hi' }],
+          displayContent: 'raw input',
+        },
         _meta: { source: 'user-test' },
       });
 
@@ -170,8 +183,19 @@ describe('LegacyAgentSession', () => {
         (e): e is AgentEvent<'message'> =>
           e.type === 'message' && e.role === 'user' && e.streamId === streamId,
       );
-      expect(userMessage?.content).toEqual([{ type: 'text', text: 'hi' }]);
+      expect(userMessage?.content).toEqual([
+        { type: 'text', text: 'raw input' },
+      ]);
       expect(userMessage?._meta).toEqual({ source: 'user-test' });
+      await vi.advanceTimersByTimeAsync(0);
+      expect(sendMock).toHaveBeenCalledWith(
+        [{ text: 'hi' }],
+        expect.any(AbortSignal),
+        'test-prompt',
+        undefined,
+        false,
+        'raw input',
+      );
 
       await collectEvents(session, { streamId: streamId ?? undefined });
     });
@@ -195,9 +219,7 @@ describe('LegacyAgentSession', () => {
         liveEvents.push(event);
       });
 
-      const { streamId } = await session.send({
-        message: [{ type: 'text', text: 'hi' }],
-      });
+      const { streamId } = await session.send(makeMessageSend('hi'));
 
       expect(streamId).toBe('test-stream');
       expect(liveEvents.some((event) => event.type === 'agent_start')).toBe(
@@ -235,14 +257,12 @@ describe('LegacyAgentSession', () => {
       );
 
       const session = new LegacyAgentSession(deps);
-      const { streamId } = await session.send({
-        message: [{ type: 'text', text: 'first' }],
-      });
+      const { streamId } = await session.send(makeMessageSend('first'));
       await vi.advanceTimersByTimeAsync(0);
 
-      await expect(
-        session.send({ message: [{ type: 'text', text: 'second' }] }),
-      ).rejects.toThrow('cannot be called while a stream is active');
+      await expect(session.send(makeMessageSend('second'))).rejects.toThrow(
+        'cannot be called while a stream is active',
+      );
 
       resolveHang?.();
       await collectEvents(session, { streamId: streamId ?? undefined });
@@ -273,16 +293,12 @@ describe('LegacyAgentSession', () => {
         );
 
       const session = new LegacyAgentSession(deps);
-      const first = await session.send({
-        message: [{ type: 'text', text: 'first' }],
-      });
+      const first = await session.send(makeMessageSend('first'));
       const firstEvents = await collectEvents(session, {
         streamId: first.streamId ?? undefined,
       });
 
-      const second = await session.send({
-        message: [{ type: 'text', text: 'second' }],
-      });
+      const second = await session.send(makeMessageSend('second'));
       const secondEvents = await collectEvents(session, {
         streamId: second.streamId ?? undefined,
       });
@@ -330,7 +346,7 @@ describe('LegacyAgentSession', () => {
       );
 
       const session = new LegacyAgentSession(deps);
-      await session.send({ message: [{ type: 'text', text: 'hi' }] });
+      await session.send(makeMessageSend('hi'));
       const events = await collectEvents(session);
 
       const types = events.map((e) => e.type);
@@ -387,7 +403,7 @@ describe('LegacyAgentSession', () => {
       ]);
 
       const session = new LegacyAgentSession(deps);
-      await session.send({ message: [{ type: 'text', text: 'read a file' }] });
+      await session.send(makeMessageSend('read a file'));
       const events = await collectEvents(session);
 
       const types = events.map((e) => e.type);
@@ -455,9 +471,7 @@ describe('LegacyAgentSession', () => {
       scheduleMock.mockResolvedValueOnce([errorToolCall]);
 
       const session = new LegacyAgentSession(deps);
-      await session.send({
-        message: [{ type: 'text', text: 'write file' }],
-      });
+      await session.send(makeMessageSend('write file'));
       const events = await collectEvents(session);
 
       const toolResp = events.find(
@@ -506,9 +520,7 @@ describe('LegacyAgentSession', () => {
       scheduleMock.mockResolvedValueOnce([stopToolCall]);
 
       const session = new LegacyAgentSession(deps);
-      await session.send({
-        message: [{ type: 'text', text: 'do something' }],
-      });
+      await session.send(makeMessageSend('do something'));
       const events = await collectEvents(session);
 
       const streamEnd = events.find(
@@ -552,9 +564,7 @@ describe('LegacyAgentSession', () => {
       scheduleMock.mockResolvedValueOnce([fatalToolCall]);
 
       const session = new LegacyAgentSession(deps);
-      await session.send({
-        message: [{ type: 'text', text: 'write file' }],
-      });
+      await session.send(makeMessageSend('write file'));
       const events = await collectEvents(session);
 
       const toolResp = events.find(
@@ -592,7 +602,7 @@ describe('LegacyAgentSession', () => {
       );
 
       const session = new LegacyAgentSession(deps);
-      await session.send({ message: [{ type: 'text', text: 'hi' }] });
+      await session.send(makeMessageSend('hi'));
       const events = await collectEvents(session);
 
       const streamEnd = events.find(
@@ -621,7 +631,7 @@ describe('LegacyAgentSession', () => {
       );
 
       const session = new LegacyAgentSession(deps);
-      await session.send({ message: [{ type: 'text', text: 'hi' }] });
+      await session.send(makeMessageSend('hi'));
       const events = await collectEvents(session);
 
       const blocked = events.find(
@@ -663,7 +673,7 @@ describe('LegacyAgentSession', () => {
       );
 
       const session = new LegacyAgentSession(deps);
-      await session.send({ message: [{ type: 'text', text: 'hi' }] });
+      await session.send(makeMessageSend('hi'));
       const events = await collectEvents(session);
 
       const err = events.find(
@@ -690,7 +700,7 @@ describe('LegacyAgentSession', () => {
       );
 
       const session = new LegacyAgentSession(deps);
-      await session.send({ message: [{ type: 'text', text: 'hi' }] });
+      await session.send(makeMessageSend('hi'));
       const events = await collectEvents(session);
 
       const warning = events.find(
@@ -738,7 +748,7 @@ describe('LegacyAgentSession', () => {
       );
 
       const session = new LegacyAgentSession(deps);
-      await session.send({ message: [{ type: 'text', text: 'hi' }] });
+      await session.send(makeMessageSend('hi'));
       const events = await collectEvents(session);
 
       const streamEnd = events.find(
@@ -762,7 +772,7 @@ describe('LegacyAgentSession', () => {
       );
 
       const session = new LegacyAgentSession(deps);
-      await session.send({ message: [{ type: 'text', text: 'hi' }] });
+      await session.send(makeMessageSend('hi'));
       const events = await collectEvents(session);
 
       const errorEvents = events.filter(
@@ -799,9 +809,7 @@ describe('LegacyAgentSession', () => {
       );
 
       const session = new LegacyAgentSession(deps);
-      const { streamId } = await session.send({
-        message: [{ type: 'text', text: 'hi' }],
-      });
+      const { streamId } = await session.send(makeMessageSend('hi'));
       await vi.advanceTimersByTimeAsync(0);
 
       await session.abort();
@@ -847,7 +855,7 @@ describe('LegacyAgentSession', () => {
       );
 
       const session = new LegacyAgentSession(deps);
-      await session.send({ message: [{ type: 'text', text: 'hi' }] });
+      await session.send(makeMessageSend('hi'));
 
       // Give the loop time to start processing
       await new Promise((r) => setTimeout(r, 50));
@@ -891,9 +899,7 @@ describe('LegacyAgentSession', () => {
       );
 
       const session = new LegacyAgentSession(deps);
-      const { streamId } = await session.send({
-        message: [{ type: 'text', text: 'hi' }],
-      });
+      const { streamId } = await session.send(makeMessageSend('hi'));
 
       await new Promise((resolve) => setTimeout(resolve, 25));
       await session.abort();
@@ -935,7 +941,7 @@ describe('LegacyAgentSession', () => {
       );
 
       const session = new LegacyAgentSession(deps);
-      await session.send({ message: [{ type: 'text', text: 'hi' }] });
+      await session.send(makeMessageSend('hi'));
       await collectEvents(session);
 
       expect(session.events.length).toBeGreaterThan(0);
@@ -964,9 +970,7 @@ describe('LegacyAgentSession', () => {
         liveEvents.push(event);
       });
 
-      const { streamId } = await session.send({
-        message: [{ type: 'text', text: 'hi' }],
-      });
+      const { streamId } = await session.send(makeMessageSend('hi'));
       await collectEvents(session, { streamId: streamId ?? undefined });
       unsubscribe();
 
@@ -1002,9 +1006,7 @@ describe('LegacyAgentSession', () => {
         );
 
       const session = new LegacyAgentSession(deps);
-      const first = await session.send({
-        message: [{ type: 'text', text: 'first request' }],
-      });
+      const first = await session.send(makeMessageSend('first request'));
       await collectEvents(session, { streamId: first.streamId ?? undefined });
 
       const liveEvents: AgentEvent[] = [];
@@ -1012,9 +1014,7 @@ describe('LegacyAgentSession', () => {
         liveEvents.push(event);
       });
 
-      const second = await session.send({
-        message: [{ type: 'text', text: 'second request' }],
-      });
+      const second = await session.send(makeMessageSend('second request'));
       await collectEvents(session, { streamId: second.streamId ?? undefined });
       unsubscribe();
 
@@ -1058,14 +1058,10 @@ describe('LegacyAgentSession', () => {
         );
 
       const session = new LegacyAgentSession(deps);
-      const first = await session.send({
-        message: [{ type: 'text', text: 'first request' }],
-      });
+      const first = await session.send(makeMessageSend('first request'));
       await collectEvents(session, { streamId: first.streamId ?? undefined });
 
-      const second = await session.send({
-        message: [{ type: 'text', text: 'second request' }],
-      });
+      const second = await session.send(makeMessageSend('second request'));
       await collectEvents(session, { streamId: second.streamId ?? undefined });
 
       const firstStreamEvents = await collectEvents(session, {
@@ -1120,14 +1116,10 @@ describe('LegacyAgentSession', () => {
         );
 
       const session = new LegacyAgentSession(deps);
-      const first = await session.send({
-        message: [{ type: 'text', text: 'first request' }],
-      });
+      const first = await session.send(makeMessageSend('first request'));
       await collectEvents(session, { streamId: first.streamId ?? undefined });
 
-      await session.send({
-        message: [{ type: 'text', text: 'second request' }],
-      });
+      await session.send(makeMessageSend('second request'));
       await collectEvents(session);
 
       const firstAgentMessage = session.events.find(
@@ -1175,7 +1167,7 @@ describe('LegacyAgentSession', () => {
       );
 
       const session = new LegacyAgentSession(deps);
-      await session.send({ message: [{ type: 'text', text: 'hi' }] });
+      await session.send(makeMessageSend('hi'));
       const events = await collectEvents(session);
 
       expect(events.length).toBeGreaterThan(0);
@@ -1196,7 +1188,7 @@ describe('LegacyAgentSession', () => {
       );
 
       const session = new LegacyAgentSession(deps);
-      await session.send({ message: [{ type: 'text', text: 'hi' }] });
+      await session.send(makeMessageSend('hi'));
       const events = await collectEvents(session);
 
       expect(events[events.length - 1]?.type).toBe('agent_end');
@@ -1244,7 +1236,7 @@ describe('LegacyAgentSession', () => {
       ]);
 
       const session = new LegacyAgentSession(deps);
-      await session.send({ message: [{ type: 'text', text: 'do it' }] });
+      await session.send(makeMessageSend('do it'));
       const events = await collectEvents(session);
 
       // Only one agent_end at the very end
@@ -1291,7 +1283,7 @@ describe('LegacyAgentSession', () => {
       ]);
 
       const session = new LegacyAgentSession(deps);
-      await session.send({ message: [{ type: 'text', text: 'go' }] });
+      await session.send(makeMessageSend('go'));
       const events = await collectEvents(session);
 
       // Should have at least one usage event from the intermediate Finished
@@ -1314,7 +1306,7 @@ describe('LegacyAgentSession', () => {
       });
 
       const session = new LegacyAgentSession(deps);
-      await session.send({ message: [{ type: 'text', text: 'hi' }] });
+      await session.send(makeMessageSend('hi'));
       const events = await collectEvents(session);
 
       const err = events.find(
@@ -1342,7 +1334,7 @@ describe('LegacyAgentSession', () => {
       });
 
       const session = new LegacyAgentSession(deps);
-      await session.send({ message: [{ type: 'text', text: 'hi' }] });
+      await session.send(makeMessageSend('hi'));
       const events = await collectEvents(session);
 
       const err = events.find(
@@ -1365,7 +1357,7 @@ describe('LegacyAgentSession', () => {
       });
 
       const session = new LegacyAgentSession(deps);
-      await session.send({ message: [{ type: 'text', text: 'hi' }] });
+      await session.send(makeMessageSend('hi'));
       const events = await collectEvents(session);
 
       const err = events.find(
@@ -1385,7 +1377,7 @@ describe('LegacyAgentSession', () => {
       });
 
       const session = new LegacyAgentSession(deps);
-      await session.send({ message: [{ type: 'text', text: 'hi' }] });
+      await session.send(makeMessageSend('hi'));
       const events = await collectEvents(session);
 
       const err = events.find(
@@ -1405,7 +1397,7 @@ describe('LegacyAgentSession', () => {
       });
 
       const session = new LegacyAgentSession(deps);
-      await session.send({ message: [{ type: 'text', text: 'hi' }] });
+      await session.send(makeMessageSend('hi'));
       const events = await collectEvents(session);
 
       const err = events.find(
