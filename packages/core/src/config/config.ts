@@ -132,6 +132,7 @@ import type { GenerateContentParameters } from '@google/genai';
 export type { MCPOAuthConfig, AnyToolInvocation, AnyDeclarativeTool };
 import type { AnyToolInvocation, AnyDeclarativeTool } from '../tools/tools.js';
 import { WorkspaceContext } from '../utils/workspaceContext.js';
+import { getWorkspaceContextOverride } from './scoped-config.js';
 import { Storage } from './storage.js';
 import type { ShellExecutionConfig } from '../services/shellExecutionService.js';
 import { FileExclusions } from '../utils/ignorePatterns.js';
@@ -2001,7 +2002,7 @@ export class Config implements McpContext, AgentLoopContext {
   }
 
   getWorkspaceContext(): WorkspaceContext {
-    return this.workspaceContext;
+    return getWorkspaceContextOverride() ?? this.workspaceContext;
   }
 
   getAgentRegistry(): AgentRegistry {
