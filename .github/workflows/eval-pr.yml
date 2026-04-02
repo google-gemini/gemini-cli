@@ -26,7 +26,7 @@ jobs:
   pr-evaluation:
     name: 'Evaluate Steering & Regressions'
     runs-on: 'gemini-cli-ubuntu-16-core'
-    if: "github.repository == 'google-gemini/gemini-cli' && github.event.pull_request.draft == false"
+    if: "github.repository == 'google-gemini/gemini-cli' && (github.event_name != 'pull_request' || (github.event.pull_request.draft == false && github.event.pull_request.head.repo.full_name == github.repository))"
     # External contributors' PRs will wait for approval in this environment
     environment: |-
       ${{ (github.event.pull_request.head.repo.full_name == github.repository) && 'internal' || 'external-evals' }}
