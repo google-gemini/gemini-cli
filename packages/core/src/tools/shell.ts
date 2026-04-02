@@ -661,33 +661,34 @@ export class ShellToolInvocation extends BaseToolInvocation<
         llmContent = llmContentParts.join('\n');
       }
 
-      let returnDisplayMessage = '';
+      let returnDisplay: string | AnsiOutput = '';
       if (this.context.config.getDebugMode()) {
-        returnDisplayMessage = llmContent;
+        returnDisplay = llmContent;
       } else {
         if (this.params.is_background || result.backgrounded) {
-          returnDisplayMessage = `Command moved to background (PID: ${result.pid}). Output hidden. Press Ctrl+B to view.`;
+          returnDisplay = `Command moved to background (PID: ${result.pid}). Output hidden. Press Ctrl+B to view.`;
         } else if (result.aborted) {
           const cancelMsg = timeoutMessage || 'Command cancelled by user.';
           if (result.output.trim()) {
-            returnDisplayMessage = `${cancelMsg}\n\nOutput before cancellation:\n${result.output}`;
+            returnDisplay = `${cancelMsg}\n\nOutput before cancellation:\n${result.output}`;
           } else {
-            returnDisplayMessage = cancelMsg;
+            returnDisplay = cancelMsg;
           }
-        } else if (result.output.trim()) {
-          returnDisplayMessage = result.output;
+        } else if (result.output.trim() || result.ansiOutput) {
+          returnDisplay =
+            result.ansiOutput && result.ansiOutput.length > 0
+              ? result.ansiOutput
+              : result.output;
         } else {
           if (result.signal) {
-            returnDisplayMessage = `Command terminated by signal: ${result.signal}`;
+            returnDisplay = `Command terminated by signal: ${result.signal}`;
           } else if (result.error) {
-            returnDisplayMessage = `Command failed: ${getErrorMessage(
-              result.error,
-            )}`;
+            returnDisplay = `Command failed: ${getErrorMessage(result.error)}`;
           } else if (result.exitCode !== null && result.exitCode !== 0) {
-            returnDisplayMessage = `Command exited with code: ${result.exitCode}`;
+            returnDisplay = `Command exited with code: ${result.exitCode}`;
           }
           // If output is empty and command succeeded (code 0, no error/signal/abort),
-          // returnDisplayMessage will remain empty, which is fine.
+          // returnDisplay will remain empty, which is fine.
         }
       }
 
@@ -824,7 +825,7 @@ export class ShellToolInvocation extends BaseToolInvocation<
 
             return {
               llmContent: 'Sandbox expansion required',
-              returnDisplay: returnDisplayMessage,
+              returnDisplay,
               error: {
                 type: ToolErrorType.SANDBOX_EXPANSION_REQUIRED,
                 message: JSON.stringify(confirmationDetails),
@@ -856,14 +857,14 @@ export class ShellToolInvocation extends BaseToolInvocation<
         );
         return {
           llmContent: summary,
-          returnDisplay: returnDisplayMessage,
+          returnDisplay,
           ...executionError,
         };
       }
 
       return {
         llmContent,
-        returnDisplay: returnDisplayMessage,
+        returnDisplay,
         data,
         ...executionError,
       };
