@@ -18,7 +18,7 @@ import {
   estimateCharsFromTokens,
   truncateProportionally,
   normalizeFunctionResponse,
-} from '../utils/truncation.js';
+} from './truncation.js';
 
 export class AgentHistoryProvider {
   // TODO(joshualitt): just pass the BaseLlmClient instead of the whole Config.
@@ -35,7 +35,7 @@ export class AgentHistoryProvider {
     history: readonly Content[],
     abortSignal?: AbortSignal,
   ): Promise<readonly Content[]> {
-    if (!this.providerConfig.isTruncationEnabled || history.length === 0) {
+    if (history.length === 0) {
       return history;
     }
 
@@ -287,13 +287,6 @@ export class AgentHistoryProvider {
     abortSignal?: AbortSignal,
   ): Promise<string> {
     if (messagesToTruncate.length === 0) return '';
-
-    if (!this.providerConfig.isSummarizationEnabled) {
-      debugLogger.log(
-        'AgentHistoryProvider: Summarization disabled, using fallback note.',
-      );
-      return this.getFallbackSummaryText(messagesToTruncate);
-    }
 
     try {
       // Use the first few messages of the Grace Zone as a "contextual bridge"
