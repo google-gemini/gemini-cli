@@ -9,10 +9,7 @@ import { evalTest } from './test-helper.js';
 import fs from 'node:fs';
 import path from 'node:path';
 
-// Set dummy API key to satisfy CLI checks if not present
-if (!process.env.GEMINI_API_KEY) {
-  process.env.GEMINI_API_KEY = 'dummy_key_for_eval';
-}
+
 
 describe('Background Process Monitoring', () => {
   evalTest('USUALLY_PASSES', {
