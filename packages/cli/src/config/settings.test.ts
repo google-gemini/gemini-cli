@@ -77,7 +77,6 @@ import {
   sanitizeEnvVar,
   createTestMergedSettings,
   resetSettingsCacheForTesting,
-  _resetOriginalGoogleCloudProjectForTesting,
 } from './settings.js';
 import {
   FatalConfigError,
@@ -2902,7 +2901,7 @@ describe('Settings Loading and Merging', () => {
       delete process.env['CLOUD_SHELL'];
       delete process.env['MALICIOUS_VAR'];
       delete process.env['FOO'];
-      _resetOriginalGoogleCloudProjectForTesting();
+      delete process.env['_GEMINI_USER_GCP_PROJECT'];
       vi.resetAllMocks();
       vi.mocked(fs.existsSync).mockReturnValue(false);
     });
@@ -3158,7 +3157,7 @@ MALICIOUS_VAR=allowed-because-trusted
         expect(process.env['GOOGLE_CLOUD_PROJECT']).toBe('my-vertex-project');
       });
 
-      it('should restore original env when switching to Vertex AI after Cloud Shell override', () => {
+      it('should clear cloudshell-gca when switching to Vertex AI without an original project', () => {
         process.env['CLOUD_SHELL'] = 'true';
         process.argv = ['node', 'gemini', '-s', 'prompt'];
         vi.mocked(isWorkspaceTrusted).mockReturnValue({
@@ -3175,7 +3174,6 @@ MALICIOUS_VAR=allowed-because-trusted
         expect(process.env['GOOGLE_CLOUD_PROJECT']).toBe('cloudshell-gca');
 
         // Second call: user switched to Vertex AI, should remove cloudshell-gca
-        // since GOOGLE_CLOUD_PROJECT was not originally set
         loadEnvironment(
           createMockSettings({
             tools: { sandbox: false },
@@ -3186,7 +3184,7 @@ MALICIOUS_VAR=allowed-because-trusted
         expect(process.env['GOOGLE_CLOUD_PROJECT']).toBeUndefined();
       });
 
-      it('should restore original project value when switching to Vertex AI after Cloud Shell override', () => {
+      it('should restore original project when switching to Vertex AI after Cloud Shell override', () => {
         process.env['CLOUD_SHELL'] = 'true';
         process.env['GOOGLE_CLOUD_PROJECT'] = 'my-real-project';
         process.argv = ['node', 'gemini', '-s', 'prompt'];
@@ -3196,14 +3194,38 @@ MALICIOUS_VAR=allowed-because-trusted
         });
         vi.mocked(fs.existsSync).mockReturnValue(false);
 
-        // First call: Cloud Shell override sets cloudshell-gca
+        // First call: saves original to _GEMINI_USER_GCP_PROJECT, sets cloudshell-gca
         loadEnvironment(
           createMockSettings({ tools: { sandbox: false } }).merged,
           MOCK_WORKSPACE_DIR,
         );
         expect(process.env['GOOGLE_CLOUD_PROJECT']).toBe('cloudshell-gca');
+        expect(process.env['_GEMINI_USER_GCP_PROJECT']).toBe('my-real-project');
 
-        // Second call: switching to Vertex AI should restore the original value
+        // Second call: switching to Vertex AI should restore the saved value
+        loadEnvironment(
+          createMockSettings({
+            tools: { sandbox: false },
+            security: { auth: { selectedType: AuthType.USE_VERTEX_AI } },
+          }).merged,
+          MOCK_WORKSPACE_DIR,
+        );
+        expect(process.env['GOOGLE_CLOUD_PROJECT']).toBe('my-real-project');
+      });
+
+      it('should restore project after restart when child inherits cloudshell-gca', () => {
+        // Simulate child process after restart: inherits cloudshell-gca and
+        // the saved original from the parent process.
+        process.env['CLOUD_SHELL'] = 'true';
+        process.env['GOOGLE_CLOUD_PROJECT'] = 'cloudshell-gca';
+        process.env['_GEMINI_USER_GCP_PROJECT'] = 'my-real-project';
+        process.argv = ['node', 'gemini', '-s', 'prompt'];
+        vi.mocked(isWorkspaceTrusted).mockReturnValue({
+          isTrusted: false,
+          source: 'file',
+        });
+        vi.mocked(fs.existsSync).mockReturnValue(false);
+
         loadEnvironment(
           createMockSettings({
             tools: { sandbox: false },
