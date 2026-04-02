@@ -141,7 +141,7 @@ export const usePermissionsModifyTrust = (
         const folders = loadTrustedFolders();
         try {
           await folders.setValue(cwd, trustLevel);
-        } catch (_e) {
+        } catch {
           coreEvents.emitFeedback(
             'error',
             'Failed to save trust settings. Your changes may not persist.',
@@ -159,7 +159,7 @@ export const usePermissionsModifyTrust = (
       try {
         await folders.setValue(cwd, pendingTrustLevel);
         return true;
-      } catch (_e) {
+      } catch {
         coreEvents.emitFeedback(
           'error',
           'Failed to save trust settings. Your changes may not persist.',

@@ -198,7 +198,7 @@ export const directoryCommand: SlashCommand = {
               alreadyAdded.push(trimmedPath);
               continue;
             }
-          } catch (_e) {
+          } catch {
             // Path might not exist or be inaccessible.
             // We'll let batchAddDirectories handle it later.
           }

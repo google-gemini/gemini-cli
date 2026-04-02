@@ -148,7 +148,7 @@ export function buildSeatbeltProfile(options: SeatbeltArgsOptions): string {
           addedPaths.add(resolved);
           profile += `(allow file-read* (subpath "${escapeSchemeString(resolved)}"))\n`;
         }
-      } catch (_e) {
+      } catch {
         // Ignore paths that do not exist or are inaccessible
       }
     }

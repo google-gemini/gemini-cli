@@ -147,7 +147,7 @@ export class BaseLlmClient {
         // We don't use the result, just check if it's valid JSON
         JSON.parse(this.cleanJsonResponse(text, model));
         return false; // It's valid, don't retry
-      } catch (_e) {
+      } catch {
         return true; // It's not valid, retry
       }
     };

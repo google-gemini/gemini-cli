@@ -73,7 +73,7 @@ function checkRateLimit(url: string): {
     history.push(now);
     hostRequestHistory.set(hostname, history);
     return { allowed: true };
-  } catch (_e) {
+  } catch {
     // If URL parsing fails, we fallback to allowed (should be caught by parsePrompt anyway)
     return { allowed: true };
   }
@@ -132,7 +132,7 @@ export function parsePrompt(text: string): {
             `Unsupported protocol in URL: "${token}". Only http and https are supported.`,
           );
         }
-      } catch (_) {
+      } catch {
         // new URL() threw, so it's malformed according to WHATWG standard
         errors.push(`Malformed URL detected: "${token}".`);
       }

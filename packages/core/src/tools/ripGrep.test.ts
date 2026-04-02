@@ -678,7 +678,7 @@ describe('RipGrepTool', () => {
               stdout.write(match + '\n');
               linesPushed++;
             }
-          } catch (_e) {
+          } catch {
             clearInterval(pushInterval);
           }
         }, 1);

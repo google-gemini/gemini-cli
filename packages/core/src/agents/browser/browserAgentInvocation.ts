@@ -404,12 +404,12 @@ ${output.result}`;
                 );
                 await removeInputBlocker(browserManager, signal);
                 await removeAutomationOverlay(browserManager, signal);
-              } catch (_err) {
+              } catch {
                 // Ignore errors for individual pages
               }
             }
           }
-        } catch (_) {
+        } catch {
           // Ignore errors for removing the overlays.
         }
       }

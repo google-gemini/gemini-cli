@@ -60,7 +60,7 @@ export class IgnoreFileParser implements IgnoreFileFilter {
     let content: string;
     try {
       content = fs.readFileSync(patternsFilePath, 'utf-8');
-    } catch (_error) {
+    } catch {
       debugLogger.debug(
         `Ignore file not found: ${patternsFilePath}, continue without it.`,
       );

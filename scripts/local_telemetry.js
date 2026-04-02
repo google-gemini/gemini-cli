@@ -105,11 +105,11 @@ async function main() {
   try {
     execSync('pkill -f "otelcol-contrib"');
     console.log('✅ Stopped existing otelcol-contrib process.');
-  } catch (_e) {} // eslint-disable-line no-empty
+  } catch {} // eslint-disable-line no-empty
   try {
     execSync('pkill -f "jaeger"');
     console.log('✅ Stopped existing jaeger process.');
-  } catch (_e) {} // eslint-disable-line no-empty
+  } catch {} // eslint-disable-line no-empty
   try {
     if (fileExists(OTEL_LOG_FILE)) fs.unlinkSync(OTEL_LOG_FILE);
     console.log('✅ Deleted old collector log.');
@@ -155,7 +155,7 @@ async function main() {
   try {
     await waitForPort(JAEGER_PORT);
     console.log(`✅ Jaeger started successfully.`);
-  } catch (_) {
+  } catch {
     console.error(`🛑 Error: Jaeger failed to start on port ${JAEGER_PORT}.`);
     if (jaegerProcess && jaegerProcess.pid) {
       process.kill(jaegerProcess.pid, 'SIGKILL');
@@ -180,7 +180,7 @@ async function main() {
   try {
     await waitForPort(4317);
     console.log(`✅ OTEL collector started successfully.`);
-  } catch (_) {
+  } catch {
     console.error(`🛑 Error: OTEL collector failed to start on port 4317.`);
     if (collectorProcess && collectorProcess.pid) {
       process.kill(collectorProcess.pid, 'SIGKILL');

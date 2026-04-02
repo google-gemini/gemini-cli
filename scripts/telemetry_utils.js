@@ -438,7 +438,7 @@ export function registerCleanup(
       if (fd) {
         try {
           fs.closeSync(fd);
-        } catch (_) {
+        } catch {
           /* no-op */
         }
       }

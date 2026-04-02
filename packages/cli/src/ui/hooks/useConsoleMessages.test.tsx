@@ -51,7 +51,7 @@ describe('useConsoleMessages', () => {
     for (const unmount of unmounts) {
       try {
         unmount();
-      } catch (_e) {
+      } catch {
         // Ignore unmount errors
       }
     }
@@ -161,7 +161,7 @@ describe('useErrorCount', () => {
     for (const unmount of unmounts) {
       try {
         unmount();
-      } catch (_e) {
+      } catch {
         // Ignore unmount errors
       }
     }
