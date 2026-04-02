@@ -6,9 +6,14 @@
 
 import net from 'node:net';
 import fs from 'node:fs';
+import crypto from 'node:crypto';
 import os from 'node:os';
 import path from 'node:path';
-import { getDaemonSocketPath, checkDaemonStatus } from './daemonClient.js';
+import {
+  getDaemonSocketPath,
+  getDaemonTokenPath,
+  checkDaemonStatus,
+} from './daemonClient.js';
 import {
   type Config,
   debugLogger,
@@ -32,9 +37,17 @@ interface DaemonSession {
   id: string;
   config: Config;
   abortController: AbortController;
+  lastActivityMs: number;
+  activeTurn?: Promise<void>;
+  closing?: boolean;
 }
 
 const activeSessions = new Map<string, DaemonSession>();
+const sessionLocks = new Map<string, Promise<void>>();
+
+const SESSION_IDLE_MS = 30 * 60 * 1000; // 30 minutes
+const SESSION_LIMIT = 5;
+const MAX_IPC_MESSAGE_BYTES = 256 * 1024; // 256 KiB
 
 export async function startDaemon(
   settings: LoadedSettings,
@@ -64,66 +77,166 @@ export async function startDaemon(
     await baseConfig.refreshAuth(authType);
   }
 
+  // Base config is only used for pre-validating auth; dispose it to avoid
+  // leaking resources (MCP clients, etc.).
+  await baseConfig.dispose();
+
   const socketPath = getDaemonSocketPath();
+  const tokenPath = getDaemonTokenPath();
+  const daemonDir = path.dirname(socketPath); // ~/.gemini
+
+  // Ensure daemon directory is not group/world accessible.
+  if (!fs.existsSync(daemonDir)) {
+    fs.mkdirSync(daemonDir, { recursive: true, mode: 0o700 });
+  } else {
+    try {
+      fs.chmodSync(daemonDir, 0o700);
+    } catch {
+      // Best-effort; ignore if chmod is not permitted.
+    }
+  }
+
+  // Generate a fresh per-daemon token and persist it for the client.
+  const daemonToken = crypto.randomBytes(32).toString('hex');
+  fs.writeFileSync(tokenPath, daemonToken, { mode: 0o600 });
+
   if (fs.existsSync(socketPath)) {
     fs.unlinkSync(socketPath);
   }
 
-  const server = net.createServer((socket) => {
+  const server = net.createServer((socket: net.Socket) => {
     let buffer = '';
+    let requestChain = Promise.resolve();
 
-    socket.on('data', async (data) => {
-      buffer += data.toString();
+    socket.on('data', (data: Buffer) => {
+      buffer += data.toString('utf8');
+      if (Buffer.byteLength(buffer, 'utf8') > MAX_IPC_MESSAGE_BYTES) {
+        socket.destroy(new Error('IPC message too large'));
+        return;
+      }
+
       const parts = buffer.split('\n');
       buffer = parts.pop() || ''; // Keep the incomplete line
 
       for (const line of parts) {
         if (!line.trim()) continue;
-        try {
-          const raw: unknown = JSON.parse(line);
-          const payload: DaemonPayload =
-            raw !== null && typeof raw === 'object'
-              ? (raw as DaemonPayload)
-              : {};
-          await handleClientRequest(payload, socket, settings, baseArgv);
-        } catch (e) {
-          debugLogger.error('Failed to parse IPC message from client', e);
-          socket.write(
-            JSON.stringify({ type: 'error', content: 'Invalid JSON request' }) +
-              '\n',
-          );
-        }
+        requestChain = requestChain
+          .then(async () => {
+            if (socket.destroyed) return;
+            const raw: unknown = JSON.parse(line);
+            if (!isValidDaemonPayload(raw)) {
+              safeWrite(socket, {
+                type: 'error',
+                content: 'Invalid request payload.',
+              });
+              safeWrite(socket, { type: 'end' });
+              socket.end();
+              return;
+            }
+            await handleClientRequest(
+              raw,
+              socket,
+              settings,
+              baseArgv,
+              daemonToken,
+              () => shutdownDaemon(server, socketPath, tokenPath),
+            );
+          })
+          .catch((err) => {
+            debugLogger.error('Daemon request handling error:', err);
+            safeWrite(socket, {
+              type: 'error',
+              content: 'Error handling daemon request.',
+            });
+            safeWrite(socket, { type: 'end' });
+            socket.end();
+          });
       }
     });
 
-    socket.on('error', (err) => {
+    socket.on('error', (err: unknown) => {
       debugLogger.error('Daemon client connection error:', err);
     });
   });
 
+  // Set restrictive permissions during socket creation to avoid a TOCTOU
+  // window before permissions are corrected.
+  const previousUmask = process.umask(0o077);
   server.listen(socketPath, () => {
+    process.umask(previousUmask);
     fs.chmodSync(socketPath, 0o600);
     writeToStdout(`Daemon started, listening on ${socketPath}\n`);
   });
 
+  // Session TTL cleanup: sessions are closed when idle to avoid keeping
+  // background MCP connections open forever.
+  const ttlTimer = setInterval(() => {
+    const now = Date.now();
+    for (const [sessionName, session] of activeSessions.entries()) {
+      if (now - session.lastActivityMs <= SESSION_IDLE_MS) continue;
+
+      session.abortController.abort();
+      activeSessions.delete(sessionName);
+
+      void (async () => {
+        try {
+          await session.activeTurn;
+        } finally {
+          try {
+            await session.config.dispose();
+          } catch {
+            // best-effort
+          }
+        }
+      })();
+    }
+  }, 60 * 1000);
+
+  server.on('close', () => {
+    clearInterval(ttlTimer);
+  });
+
   process.on('SIGINT', async () => {
-    await shutdownDaemon(server, socketPath);
+    await shutdownDaemon(server, socketPath, tokenPath);
   });
 
   process.on('SIGTERM', async () => {
-    await shutdownDaemon(server, socketPath);
+    await shutdownDaemon(server, socketPath, tokenPath);
   });
 }
 
-async function shutdownDaemon(server: net.Server, socketPath: string) {
+async function shutdownDaemon(
+  server: net.Server,
+  socketPath: string,
+  tokenPath: string,
+) {
   writeToStdout('\nShutting down daemon...\n');
   await new Promise<void>((resolve) => {
     server.close(() => {
       resolve();
     });
   });
+
+  // Dispose any active sessions to close MCP connections, etc.
+  const sessions = Array.from(activeSessions.values());
+  await Promise.allSettled(
+    sessions.map(async (s) => {
+      try {
+        s.abortController.abort();
+        await s.config.dispose();
+      } catch {
+        // Best-effort cleanup.
+      }
+    }),
+  );
+  activeSessions.clear();
+
   if (fs.existsSync(socketPath)) {
     fs.unlinkSync(socketPath);
+  }
+
+  if (fs.existsSync(tokenPath)) {
+    fs.unlinkSync(tokenPath);
   }
   await runExitCleanup();
   process.exit(ExitCodes.SUCCESS);
@@ -135,6 +248,7 @@ interface DaemonPayload {
   cwd?: string;
   input?: string;
   verbose?: boolean;
+  token?: string;
 }
 
 const SESSION_NAME_RE = /^[a-zA-Z0-9_-]{1,64}$/;
@@ -143,166 +257,298 @@ function isValidSessionName(name: string): boolean {
   return SESSION_NAME_RE.test(name);
 }
 
+type DaemonResponse =
+  | { type: 'error'; content: string }
+  | { type: 'output'; content: string }
+  | { type: 'verbose'; content: string }
+  | { type: 'end' };
+
+function safeWrite(socket: net.Socket, response: DaemonResponse): void {
+  if (socket.destroyed) return;
+  try {
+    socket.write(JSON.stringify(response) + '\n');
+  } catch {
+    // Ignore write errors (e.g. socket already closed).
+  }
+}
+
+function isValidDaemonPayload(value: unknown): value is DaemonPayload {
+  if (value === null || typeof value !== 'object') return false;
+  const obj = value as Record<string, unknown>;
+
+  const action = obj['action'];
+  if (typeof action !== 'string') return false;
+  if (!['prompt', 'close_session', 'stop'].includes(action)) return false;
+
+  if (
+    'token' in obj &&
+    obj['token'] !== undefined &&
+    typeof obj['token'] !== 'string'
+  )
+    return false;
+  if (
+    'session' in obj &&
+    obj['session'] !== undefined &&
+    typeof obj['session'] !== 'string'
+  )
+    return false;
+  if ('cwd' in obj && obj['cwd'] !== undefined && typeof obj['cwd'] !== 'string')
+    return false;
+  if (
+    'input' in obj &&
+    obj['input'] !== undefined &&
+    typeof obj['input'] !== 'string'
+  )
+    return false;
+  if (
+    'verbose' in obj &&
+    obj['verbose'] !== undefined &&
+    typeof obj['verbose'] !== 'boolean'
+  )
+    return false;
+  return true;
+}
+
+async function withSessionLock<T>(
+  sessionName: string,
+  fn: () => Promise<T>,
+): Promise<T> {
+  const previous = sessionLocks.get(sessionName) ?? Promise.resolve();
+  let next: Promise<T>;
+  next = previous.then(fn, fn);
+
+  const completion = next.then(
+    () => undefined,
+    () => undefined,
+  );
+  sessionLocks.set(sessionName, completion);
+
+  try {
+    return await next;
+  } finally {
+    if (sessionLocks.get(sessionName) === completion) {
+      sessionLocks.delete(sessionName);
+    }
+  }
+}
+
 async function handleClientRequest(
   payload: DaemonPayload,
   socket: net.Socket,
   settings: LoadedSettings,
   baseArgv: CliArgs,
+  daemonToken: string,
+  shutdownFn: () => Promise<void>,
 ): Promise<void> {
-  if (payload.action === 'stop') {
+  if (socket.destroyed) return;
+
+  // Authenticate every IPC message (prevents local session hijacking).
+  if (payload.token !== daemonToken) {
+    safeWrite(socket, {
+      type: 'error',
+      content: 'Unauthorized daemon request.',
+    });
+    safeWrite(socket, { type: 'end' });
     socket.end();
-    // Trigger graceful shutdown to run all cleanup handlers
-    process.kill(process.pid, 'SIGTERM');
     return;
   }
 
-  if (payload.action === 'close_session') {
+  const action = payload.action;
+  if (action === 'stop') {
+    safeWrite(socket, { type: 'end' });
+    socket.end();
+    // Trigger graceful shutdown to run all cleanup handlers.
+    void shutdownFn();
+    return;
+  }
+
+  if (action === 'close_session') {
     const sessionName = payload.session;
     if (!sessionName || !isValidSessionName(sessionName)) {
-      socket.write(
-        JSON.stringify({
-          type: 'error',
-          content:
-            'Missing or invalid session name. Use 1-64 alphanumeric, dash, or underscore characters.\n',
-        }) + '\n',
-      );
+      safeWrite(socket, {
+        type: 'error',
+        content:
+          'Missing or invalid session name. Use 1-64 alphanumeric, dash, or underscore characters.',
+      });
+      safeWrite(socket, { type: 'end' });
       socket.end();
       return;
     }
-    if (activeSessions.has(sessionName)) {
-      const session = activeSessions.get(sessionName)!;
-      session.abortController.abort();
-      activeSessions.delete(sessionName);
-      socket.write(
-        JSON.stringify({
-          type: 'output',
-          content: `Session ${sessionName} closed.\n`,
-        }) + '\n',
-      );
-    } else {
-      socket.write(
-        JSON.stringify({
-          type: 'error',
-          content: `Session ${sessionName} not found.\n`,
-        }) + '\n',
-      );
+
+    const session = activeSessions.get(sessionName);
+    if (!session) {
+      safeWrite(socket, {
+        type: 'error',
+        content: `Session ${sessionName} not found.`,
+      });
+      safeWrite(socket, { type: 'end' });
+      socket.end();
+      return;
     }
+
+    session.closing = true;
+    session.abortController.abort();
+    activeSessions.delete(sessionName);
+
+    safeWrite(socket, {
+      type: 'output',
+      content: `Session ${sessionName} closed.\n`,
+    });
+    safeWrite(socket, { type: 'end' });
+    socket.end();
+
+    // Dispose resources after the in-flight turn (if any).
+    void (async () => {
+      try {
+        await session.activeTurn;
+      } catch {
+        // Ignore; we're closing.
+      } finally {
+        try {
+          await session.config.dispose();
+        } catch {
+          // Best-effort cleanup.
+        }
+      }
+    })();
+
+    return;
+  }
+
+  if (action === 'prompt') {
+    const { session: sessionName, cwd, input, verbose } = payload;
+    if (!sessionName || !input || !cwd) {
+      safeWrite(socket, {
+        type: 'error',
+        content: 'Missing required prompt parameters.',
+      });
+      safeWrite(socket, { type: 'end' });
+      socket.end();
+      return;
+    }
+
+    if (!isValidSessionName(sessionName)) {
+      safeWrite(socket, {
+        type: 'error',
+        content:
+          'Invalid session name. Use 1-64 alphanumeric, dash, or underscore characters.',
+      });
+      safeWrite(socket, { type: 'end' });
+      socket.end();
+      return;
+    }
+
+    // Hardening: resolve symlinks to prevent escaping `$HOME` via symlinks.
+    let resolvedCwd: string;
+    let resolvedHome: string;
+    try {
+      resolvedCwd = fs.realpathSync(cwd);
+      resolvedHome = fs.realpathSync(os.homedir());
+      const stat = fs.statSync(resolvedCwd);
+      if (!stat.isDirectory()) {
+        throw new Error('Working directory is not a directory.');
+      }
+    } catch {
+      safeWrite(socket, {
+        type: 'error',
+        content: 'Error: Invalid working directory.',
+      });
+      safeWrite(socket, { type: 'end' });
+      socket.end();
+      return;
+    }
+
+    if (resolvedCwd !== resolvedHome) {
+      const homePrefix = resolvedHome.endsWith(path.sep)
+        ? resolvedHome
+        : resolvedHome + path.sep;
+      if (!resolvedCwd.startsWith(homePrefix)) {
+        safeWrite(socket, {
+          type: 'error',
+          content:
+            'Error: Security restriction - session cwd must be within the user home directory.',
+        });
+        safeWrite(socket, { type: 'end' });
+        socket.end();
+        return;
+      }
+    }
+
+    try {
+      await withSessionLock(sessionName, async () => {
+        let session = activeSessions.get(sessionName);
+        if (!session) {
+          // Enforce session limit.
+          if (activeSessions.size >= SESSION_LIMIT) {
+            safeWrite(socket, {
+              type: 'error',
+              content: `Error: Session limit reached (${SESSION_LIMIT}/${SESSION_LIMIT}). Close an existing session.`,
+            });
+            return;
+          }
+
+          // Initialize a new config for this session tied to its cwd.
+          const sessionArgv = { ...baseArgv, prompt: input };
+          const sessionConfig = await loadCliConfig(
+            settings.merged,
+            sessionName,
+            sessionArgv,
+            {
+              cwd: resolvedCwd,
+              mcpInitializationInBackground: true,
+            },
+          );
+          await sessionConfig.initialize();
+          if (settings.merged.security.auth.selectedType) {
+            const authType = await validateNonInteractiveAuth(
+              settings.merged.security.auth.selectedType,
+              settings.merged.security.auth.useExternal,
+              sessionConfig,
+              settings,
+            );
+            await sessionConfig.refreshAuth(authType);
+          }
+
+          session = {
+            id: sessionName,
+            config: sessionConfig,
+            abortController: new AbortController(),
+            lastActivityMs: Date.now(),
+          };
+          activeSessions.set(sessionName, session);
+        }
+
+        session.lastActivityMs = Date.now();
+        // Fresh abort controller for this turn.
+        session.abortController = new AbortController();
+        session.closing = false;
+
+        const turnPromise = runDaemonTurn(
+          session,
+          input,
+          socket,
+          verbose ?? false,
+        );
+        session.activeTurn = turnPromise;
+        await turnPromise;
+      });
+    } catch (err: unknown) {
+      const errorMessage = err instanceof Error ? err.message : String(err);
+      debugLogger.error(`Daemon session error: ${errorMessage}`, err);
+      safeWrite(socket, {
+        type: 'error',
+        content: 'Error executing prompt.',
+      });
+    }
+
+    safeWrite(socket, { type: 'end' });
     socket.end();
     return;
   }
 
-  if (payload.action === 'prompt') {
-    const { session: sessionName, cwd, input, verbose } = payload;
-    if (!sessionName || !input || !cwd) {
-      socket.write(
-        JSON.stringify({
-          type: 'error',
-          content: 'Missing required prompt parameters.',
-        }) + '\n',
-      );
-      socket.write(JSON.stringify({ type: 'end' }) + '\n');
-      return;
-    }
-    if (!isValidSessionName(sessionName)) {
-      socket.write(
-        JSON.stringify({
-          type: 'error',
-          content:
-            'Invalid session name. Use 1-64 alphanumeric, dash, or underscore characters.',
-        }) + '\n',
-      );
-      socket.write(JSON.stringify({ type: 'end' }) + '\n');
-      return;
-    }
-
-    const resolvedCwd = path.resolve(cwd);
-    const homeDir = os.homedir();
-    if (
-      resolvedCwd !== homeDir &&
-      !resolvedCwd.startsWith(homeDir + path.sep)
-    ) {
-      socket.write(
-        JSON.stringify({
-          type: 'error',
-          content:
-            'Error: Security restriction - session cwd must be within the user home directory.',
-        }) + '\n',
-      );
-      socket.write(JSON.stringify({ type: 'end' }) + '\n');
-      return;
-    }
-
-    if (!fs.existsSync(resolvedCwd)) {
-      socket.write(
-        JSON.stringify({
-          type: 'error',
-          content: `Error: Working directory does not exist: ${resolvedCwd}`,
-        }) + '\n',
-      );
-      socket.write(JSON.stringify({ type: 'end' }) + '\n');
-      return;
-    }
-
-    try {
-      let session = activeSessions.get(sessionName);
-      if (!session) {
-        // Enforce session limit of 5
-        if (activeSessions.size >= 5) {
-          socket.write(
-            JSON.stringify({
-              type: 'error',
-              content:
-                'Error: Session limit reached (5/5). Close an existing session.',
-            }) + '\n',
-          );
-          socket.write(JSON.stringify({ type: 'end' }) + '\n');
-          return;
-        }
-
-        // Initialize a new config for this session tied to its cwd
-        const sessionArgv = { ...baseArgv, prompt: input }; // Override prompt
-        const sessionConfig = await loadCliConfig(
-          settings.merged,
-          sessionName,
-          sessionArgv,
-          { cwd, forceInteractive: true },
-        );
-        await sessionConfig.initialize();
-        if (settings.merged.security.auth.selectedType) {
-          const authType = await validateNonInteractiveAuth(
-            settings.merged.security.auth.selectedType,
-            settings.merged.security.auth.useExternal,
-            sessionConfig,
-            settings,
-          );
-          await sessionConfig.refreshAuth(authType);
-        }
-
-        session = {
-          id: sessionName,
-          config: sessionConfig,
-          abortController: new AbortController(),
-        };
-        activeSessions.set(sessionName, session);
-      } else {
-        // Ensure its internal abortController is fresh for new request or cancel previous
-        session.abortController = new AbortController();
-      }
-
-      await runDaemonTurn(session, input, socket, verbose ?? false);
-    } catch (err: unknown) {
-      const errorMessage = err instanceof Error ? err.message : String(err);
-      debugLogger.error(`Daemon session error: ${errorMessage}`, err);
-      socket.write(
-        JSON.stringify({
-          type: 'error',
-          content: errorMessage || 'Unknown handler error',
-        }) + '\n',
-      );
-    } finally {
-      socket.write(JSON.stringify({ type: 'end' }) + '\n');
-    }
-  }
+  safeWrite(socket, { type: 'error', content: 'Invalid daemon action.' });
+  safeWrite(socket, { type: 'end' });
+  socket.end();
 }
 
 async function runDaemonTurn(
@@ -312,7 +558,7 @@ async function runDaemonTurn(
   verbose: boolean,
 ) {
   const { config, abortController } = session;
-  const prompt_id = Math.random().toString(16).slice(2);
+  const prompt_id = crypto.randomUUID();
 
   return promptIdContext.run(prompt_id, async () => {
     try {
@@ -334,12 +580,10 @@ async function runDaemonTurn(
           config.getMaxSessionTurns() >= 0 &&
           turnCount > config.getMaxSessionTurns()
         ) {
-          socket.write(
-            JSON.stringify({
-              type: 'error',
-              content: 'Maximum session turns exceeded',
-            }) + '\n',
-          );
+          safeWrite(socket, {
+            type: 'error',
+            content: 'Maximum session turns exceeded',
+          });
           return;
         }
 
@@ -352,30 +596,27 @@ async function runDaemonTurn(
           turnCount === 1 ? input : undefined,
         );
 
-        const toolCallRequests: Parameters<Scheduler['schedule']>[0] = [];
+        // Scheduler types are intentionally permissive here because the daemon
+        // IPC path is headless and should fail safely rather than crash on
+        // unexpected shapes.
+        const toolCallRequests: any[] = [];
 
         for await (const event of responseStream) {
           if (abortController.signal.aborted) {
-            socket.write(
-              JSON.stringify({ type: 'error', content: 'Cancelled' }) + '\n',
-            );
+            safeWrite(socket, { type: 'error', content: 'Cancelled' });
             return;
           }
 
           if (event.type === GeminiEventType.Content) {
             if (event.value) {
-              socket.write(
-                JSON.stringify({ type: 'output', content: event.value }) + '\n',
-              );
+              safeWrite(socket, { type: 'output', content: event.value });
             }
           } else if (event.type === GeminiEventType.ToolCallRequest) {
             if (verbose) {
-              socket.write(
-                JSON.stringify({
-                  type: 'verbose',
-                  content: `[Daemon] Calling tool: ${event.value.name}`,
-                }) + '\n',
-              );
+              safeWrite(socket, {
+                type: 'verbose',
+                content: `[Daemon] Calling tool: ${event.value.name}`,
+              });
             }
             toolCallRequests.push(event.value);
           } else if (event.type === GeminiEventType.Error) {
@@ -414,7 +655,7 @@ async function runDaemonTurn(
           }
 
           const stopExecutionTool = completedToolCalls.find(
-            (tc) => tc.response.errorType === ToolErrorType.STOP_EXECUTION,
+            (tc: any) => tc.response.errorType === ToolErrorType.STOP_EXECUTION,
           );
           if (stopExecutionTool) {
             return;
@@ -426,14 +667,11 @@ async function runDaemonTurn(
         }
       }
     } catch (error: unknown) {
-      const errorMessage =
-        error instanceof Error ? error.message : String(error);
-      socket.write(
-        JSON.stringify({
-          type: 'error',
-          content: `Error executing prompt: ${errorMessage}`,
-        }) + '\n',
-      );
+      debugLogger.error('Error executing daemon prompt:', error);
+      safeWrite(socket, {
+        type: 'error',
+        content: 'Error executing prompt.',
+      });
     }
   });
 }

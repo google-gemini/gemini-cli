@@ -486,6 +486,14 @@ export interface LoadCliConfigOptions {
    * or unavailable MCP servers.
    */
   forceInteractive?: boolean;
+
+  /**
+   * When true, MCP initialization will run in the background even when the
+   * config is treated as non-interactive. Used by daemon/headless mode to
+   * avoid waiting on MCP startup latency, without relaxing interactive
+   * safety posture.
+   */
+  mcpInitializationInBackground?: boolean;
 }
 
 export async function loadCliConfig(
@@ -494,7 +502,12 @@ export async function loadCliConfig(
   argv: CliArgs,
   options: LoadCliConfigOptions = {},
 ): Promise<Config> {
-  const { cwd = process.cwd(), projectHooks, forceInteractive } = options;
+  const {
+    cwd = process.cwd(),
+    projectHooks,
+    forceInteractive,
+    mcpInitializationInBackground,
+  } = options;
   const debugMode = isDebugMode(argv);
 
   const loadedSettings = loadSettings(cwd);
@@ -889,6 +902,7 @@ export async function loadCliConfig(
     compressionThreshold: settings.model?.compressionThreshold,
     folderTrust,
     interactive,
+    mcpInitializationInBackground,
     trustedFolder,
     useBackgroundColor: settings.ui?.useBackgroundColor,
     useAlternateBuffer: settings.ui?.useAlternateBuffer,

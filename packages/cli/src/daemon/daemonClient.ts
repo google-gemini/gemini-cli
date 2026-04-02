@@ -5,6 +5,7 @@
  */
 
 import net from 'node:net';
+import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import {
@@ -35,6 +36,31 @@ export function getDaemonSocketPath(): string {
   return path.join(os.homedir(), '.gemini', 'daemon.sock');
 }
 
+export function getDaemonTokenPath(): string {
+  if (process.platform === 'win32') {
+    throw new Error('Daemon mode is currently not supported on Windows.');
+  }
+  return path.join(os.homedir(), '.gemini', 'daemon.token');
+}
+
+function readDaemonAuthToken(): string {
+  const tokenPath = getDaemonTokenPath();
+  if (!fs.existsSync(tokenPath)) {
+    throw new Error(
+      'Daemon auth token missing. Start the daemon first with `gemini --daemon`.',
+    );
+  }
+  const token = fs.readFileSync(tokenPath, 'utf8').trim();
+  if (!token) {
+    throw new Error('Daemon auth token is empty.');
+  }
+  // Basic sanity: token should be printable and stable.
+  if (token.length < 16 || token.length > 1024) {
+    throw new Error('Daemon auth token has unexpected length.');
+  }
+  return token;
+}
+
 export async function checkDaemonStatus(): Promise<boolean> {
   const socketPath = getDaemonSocketPath();
   return new Promise((resolve) => {
@@ -53,7 +79,7 @@ function connectToDaemon(socketPath: string): Promise<net.Socket> {
     const client = net.createConnection(socketPath, () => {
       resolve(client);
     });
-    client.on('error', (err) => {
+    client.on('error', (err: Error) => {
       reject(err);
     });
   });
@@ -64,6 +90,14 @@ export async function runDaemonClientCommands(
   input: string | undefined,
 ): Promise<void> {
   const socketPath = getDaemonSocketPath();
+  // Token is required for all state-changing operations.
+  const daemonToken = (() => {
+    try {
+      return readDaemonAuthToken();
+    } catch (_e) {
+      return undefined;
+    }
+  })();
 
   if (argv.daemonStatus) {
     const isRunning = await checkDaemonStatus();
@@ -78,8 +112,12 @@ export async function runDaemonClientCommands(
 
   if (argv.daemonStop) {
     try {
+      if (!daemonToken) {
+        writeToStderr('Error: Daemon not running or unauthorized.\n');
+        process.exit(1);
+      }
       const client = await connectToDaemon(socketPath);
-      client.write(JSON.stringify({ action: 'stop' }) + '\n');
+      client.write(JSON.stringify({ action: 'stop', token: daemonToken }) + '\n');
       client.end();
       writeToStdout('Daemon stop signal sent.\n');
       process.exit(ExitCodes.SUCCESS);
@@ -97,14 +135,21 @@ export async function runDaemonClientCommands(
       process.exit(1);
     }
     try {
+      if (!daemonToken) {
+        writeToStderr('Error: Daemon not running or unauthorized.\n');
+        process.exit(1);
+      }
       const client = await connectToDaemon(socketPath);
       client.write(
-        JSON.stringify({ action: 'close_session', session: argv.session }) +
-          '\n',
+        JSON.stringify({
+          action: 'close_session',
+          session: argv.session,
+          token: daemonToken,
+        }) + '\n',
       );
       await new Promise<void>((resolve) => {
         let buffer = '';
-        client.on('data', (d) => {
+        client.on('data', (d: Buffer) => {
           buffer += d.toString();
           const lines = buffer.split('\n');
           buffer = lines.pop() || '';
@@ -144,6 +189,10 @@ export async function runDaemonClientCommands(
     }
 
     try {
+      if (!daemonToken) {
+        writeToStderr('Error: Daemon not running or unauthorized.\n');
+        process.exit(1);
+      }
       const client = await connectToDaemon(socketPath);
 
       const payload = {
@@ -152,6 +201,7 @@ export async function runDaemonClientCommands(
         cwd: process.cwd(),
         input,
         verbose: argv.verbose || false,
+        token: daemonToken,
       };
 
       client.write(JSON.stringify(payload) + '\n');
@@ -177,7 +227,7 @@ export async function runDaemonClientCommands(
         };
 
         let buffer = '';
-        client.on('data', (data) => {
+        client.on('data', (data: Buffer) => {
           buffer += data.toString();
           const lines = buffer.split('\n');
           buffer = lines.pop() || ''; // Keep incomplete line for next data event
@@ -211,7 +261,7 @@ export async function runDaemonClientCommands(
           exit(ExitCodes.SUCCESS);
         });
 
-        client.on('error', (err) => {
+        client.on('error', (err: Error) => {
           writeToStderr(`Stream error: ${err.message}\n`);
           exit(1);
         });

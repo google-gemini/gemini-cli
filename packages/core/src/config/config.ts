@@ -520,6 +520,13 @@ export interface ConfigParameters {
   discoveryMaxDirs?: number;
   compressionThreshold?: number;
   interactive?: boolean;
+  /**
+   * When true, MCP initialization will run in the background even when
+   * `interactive` is false. This is useful for daemon/headless mode where we
+   * want to avoid waiting on MCP server startup, without changing the
+   * interactive safety posture.
+   */
+  mcpInitializationInBackground?: boolean;
   trustedFolder?: boolean;
   useBackgroundColor?: boolean;
   useAlternateBuffer?: boolean;
@@ -702,6 +709,7 @@ export class Config implements McpContext {
   private readonly compressionThreshold: number | undefined;
   /** Public for testing only */
   readonly interactive: boolean;
+  private readonly mcpInitializationInBackground: boolean;
   private readonly ptyInfo: string;
   private readonly trustedFolder: boolean | undefined;
   private readonly directWebFetch: boolean;
@@ -908,6 +916,8 @@ export class Config implements McpContext {
     this.discoveryMaxDirs = params.discoveryMaxDirs ?? 200;
     this.compressionThreshold = params.compressionThreshold;
     this.interactive = params.interactive ?? false;
+    this.mcpInitializationInBackground =
+      params.mcpInitializationInBackground ?? false;
     this.ptyInfo = params.ptyInfo ?? 'child_process';
     this.trustedFolder = params.trustedFolder;
     this.directWebFetch = params.directWebFetch ?? false;
@@ -1136,7 +1146,10 @@ export class Config implements McpContext {
       }
     });
 
-    if (!this.interactive || this.experimentalZedIntegration) {
+    if (
+      this.experimentalZedIntegration ||
+      (!this.interactive && !this.mcpInitializationInBackground)
+    ) {
       await this.mcpInitializationPromise;
     }
 
