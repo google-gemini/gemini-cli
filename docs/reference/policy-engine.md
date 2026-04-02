@@ -172,18 +172,22 @@ modes specified, it is always active.
 - `yolo`: A mode where all tools are auto-approved (use with extreme caution).
 
 To maintain the integrity of Plan Mode as a safe research environment,
-persistent tool approvals are context-aware by default. When you allow a tool
-for all future sessions, Gemini CLI automatically applies the current mode and
-all more permissive modes (the order of permissiveness is `plan` < `default` <
-`autoEdit` < `yolo`):
+persistent tool approvals are context-aware. When you select **"Allow for all
+future sessions"**, the policy engine explicitly includes the current mode and
+all more permissive modes in the hierarchy (`plan` < `default` < `autoEdit` <
+`yolo`).
 
-- **Implementation-time approvals**: If you select **"Allow for all future
-  sessions"** while in `default` mode, Gemini CLI automatically restricts the
-  rule to `default`, `autoEdit`, and `yolo`. This ensures that tools trusted for
-  coding don't automatically execute while you're researching in `plan` mode.
-- **Planning-time approvals**: If you grant persistent approval while already in
-  `plan` mode, the rule is explicitly saved for all modes (`plan`, `default`,
-  `autoEdit`, and `yolo`).
+- **Approvals in `plan` mode**: These represent an intentional choice to trust a
+  tool globally. The resulting rule explicitly includes all modes (`plan`,
+  `default`, `autoEdit`, and `yolo`).
+- **Approvals in other modes**: These only apply to the current mode and those
+  more permissive. For example:
+  - An approval granted in **`default`** mode applies to `default`, `autoEdit`,
+    and `yolo`.
+  - An approval granted in **`autoEdit`** mode applies to `autoEdit` and `yolo`.
+  - An approval granted in **`yolo`** mode applies only to `yolo`. This ensures
+    that trust flows correctly to more permissive environments while maintaining
+    the safety of more restricted modes like `plan`.
 
 ## Rule matching
 
