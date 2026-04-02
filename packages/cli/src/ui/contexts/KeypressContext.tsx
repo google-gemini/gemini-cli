@@ -205,6 +205,8 @@ const MAC_ALT_KEY_CHARACTER_MAP: Record<string, string> = {
   '\u03A9': 'z', // "Ω" Option+z
   '\u00B8': 'Z', // "¸" Option+Shift+z
   '\u2202': 'd', // "∂" delete word forward
+  '\u2020': 't', // "†" toggle full screen buffer
+  '\u00E5': 'a', // "å" Option+a for alternate buffer
 };
 
 function nonKeyboardEventFilter(

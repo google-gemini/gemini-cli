@@ -534,6 +534,7 @@ export const mockAppState: AppState = {
 };
 
 const mockUIActions: UIActions = {
+  toggleAlternateBuffer: vi.fn(),
   handleThemeSelect: vi.fn(),
   closeThemeDialog: vi.fn(),
   handleThemeHighlight: vi.fn(),

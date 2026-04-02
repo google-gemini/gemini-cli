@@ -4,14 +4,14 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { useConfig } from '../contexts/ConfigContext.js';
+import { useUIState } from '../contexts/UIStateContext.js';
 import type { Config } from '@google/gemini-cli-core';
 
 export const isAlternateBufferEnabled = (config: Config): boolean =>
   config.getUseAlternateBuffer();
 
-// This is read from Config so that the UI reads the same value per application session
+// This is read from UIState so that the UI can toggle dynamically
 export const useAlternateBuffer = (): boolean => {
-  const config = useConfig();
-  return isAlternateBufferEnabled(config);
+  const uiState = useUIState();
+  return uiState.isAlternateBuffer;
 };

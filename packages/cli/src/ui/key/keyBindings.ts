@@ -95,6 +95,7 @@ export enum Command {
   RESTART_APP = 'app.restart',
   SUSPEND_APP = 'app.suspend',
   SHOW_SHELL_INPUT_UNFOCUS_WARNING = 'app.showShellUnfocusWarning',
+  TOGGLE_BUFFER_MODE = 'app.toggleBufferMode',
 
   // Background Shell Controls
   BACKGROUND_SHELL_ESCAPE = 'background.escape',
@@ -396,6 +397,7 @@ export const defaultKeyBindingConfig: KeyBindingConfig = new Map([
   [Command.RESTART_APP, [new KeyBinding('r'), new KeyBinding('shift+r')]],
   [Command.SUSPEND_APP, [new KeyBinding('ctrl+z')]],
   [Command.SHOW_SHELL_INPUT_UNFOCUS_WARNING, [new KeyBinding('tab')]],
+  [Command.TOGGLE_BUFFER_MODE, [new KeyBinding('alt+a')]],
 
   // Background Shell Controls
   [Command.BACKGROUND_SHELL_ESCAPE, [new KeyBinding('escape')]],
@@ -621,6 +623,7 @@ export const commandDescriptions: Readonly<Record<Command, string>> = {
   [Command.SHOW_IDE_CONTEXT_DETAIL]: 'Show IDE context details.',
   [Command.TOGGLE_MARKDOWN]: 'Toggle Markdown rendering.',
   [Command.TOGGLE_COPY_MODE]: 'Toggle copy mode when in alternate buffer mode.',
+  [Command.TOGGLE_BUFFER_MODE]: 'Toggle between regular and full screen (alternate buffer) mode.',
   [Command.TOGGLE_YOLO]: 'Toggle YOLO (auto-approval) mode for tool calls.',
   [Command.CYCLE_APPROVAL_MODE]:
     'Cycle through approval modes: default (prompt), auto_edit (auto-approve edits), and plan (read-only). Plan mode is skipped when the agent is busy.',
