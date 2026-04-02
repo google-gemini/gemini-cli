@@ -558,13 +558,14 @@ function findMatchingRule(
     argsPattern?: string;
   },
 ): TomlRule | undefined {
-  return rules.find((r) => (
+  return rules.find(
+    (r) =>
       r.toolName === criteria.toolName &&
       r.mcpName === criteria.mcpName &&
       JSON.stringify(r.commandPrefix) ===
         JSON.stringify(criteria.commandPrefix) &&
-      r.argsPattern === criteria.argsPattern
-    ));
+      r.argsPattern === criteria.argsPattern,
+  );
 }
 
 /**
