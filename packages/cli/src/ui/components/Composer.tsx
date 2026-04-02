@@ -172,9 +172,7 @@ export const Composer = ({ isFocused = true }: { isFocused?: boolean }) => {
 
       {showUiDetails &&
         !settings.merged.ui.hideFooter &&
-        !isScreenReaderEnabled && (
-          <Footer copyModeEnabled={uiState.copyModeEnabled} />
-        )}
+        !isScreenReaderEnabled && <Footer />}
     </Box>
   );
 };

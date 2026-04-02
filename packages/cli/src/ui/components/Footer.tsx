@@ -178,9 +178,7 @@ interface FooterColumn {
   isHighPriority: boolean;
 }
 
-export const Footer: React.FC<{ copyModeEnabled?: boolean }> = ({
-  copyModeEnabled = false,
-}) => {
+export const Footer: React.FC = () => {
   const uiState = useUIState();
   const config = useConfig();
   const settings = useSettings();
@@ -197,10 +195,6 @@ export const Footer: React.FC<{ copyModeEnabled?: boolean }> = ({
       setEmail(undefined);
     }
   }, [authType]);
-
-  if (copyModeEnabled) {
-    return <Box height={1} />;
-  }
 
   const {
     model,
