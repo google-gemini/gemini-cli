@@ -26,6 +26,7 @@ vi.mock('../../utils/debugLogger.js', () => ({
 
 vi.mock('./browserAgentFactory.js', () => ({
   createBrowserAgentDefinition: vi.fn(),
+  cleanupBrowserAgent: vi.fn(),
 }));
 
 vi.mock('./inputBlocker.js', () => ({
@@ -46,7 +47,10 @@ vi.mock('../local-executor.js', () => ({
   },
 }));
 
-import { createBrowserAgentDefinition } from './browserAgentFactory.js';
+import {
+  createBrowserAgentDefinition,
+  cleanupBrowserAgent,
+} from './browserAgentFactory.js';
 import { removeInputBlocker } from './inputBlocker.js';
 import { removeAutomationOverlay } from './automationOverlay.js';
 import { LocalAgentExecutor } from '../local-executor.js';
@@ -782,6 +786,8 @@ describe('BrowserAgentInvocation', () => {
           toolConfig: { tools: [] },
         },
         browserManager: mockBrowserManager as never,
+        visionEnabled: true,
+        sessionMode: 'persistent',
       });
 
       const mockExecutor = {
