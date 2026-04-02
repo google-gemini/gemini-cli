@@ -119,6 +119,29 @@ export function startCallbackServer(
   const responsePromise = new Promise<OAuthAuthorizationResponse>(
     (resolve, reject) => {
       let serverPort: number;
+      let serverClosed = false;
+      let promiseSettled = false;
+
+      const closeServer = (): void => {
+        if (!serverClosed) {
+          serverClosed = true;
+          server.close();
+        }
+      };
+
+      const safeResolve = (value: OAuthAuthorizationResponse): void => {
+        if (!promiseSettled) {
+          promiseSettled = true;
+          resolve(value);
+        }
+      };
+
+      const safeReject = (error: Error): void => {
+        if (!promiseSettled) {
+          promiseSettled = true;
+          reject(error);
+        }
+      };
 
       const server = http.createServer(
         async (req: http.IncomingMessage, res: http.ServerResponse) => {
@@ -147,8 +170,8 @@ export function startCallbackServer(
                 </body>
               </html>
             `);
-              server.close();
-              reject(new Error(`OAuth error: ${error}`));
+              closeServer();
+              safeReject(new Error(`OAuth error: ${error}`));
               return;
             }
 
@@ -161,8 +184,8 @@ export function startCallbackServer(
             if (state !== expectedState) {
               res.writeHead(400);
               res.end('Invalid state parameter');
-              server.close();
-              reject(new Error('State mismatch - possible CSRF attack'));
+              closeServer();
+              safeReject(new Error('State mismatch - possible CSRF attack'));
               return;
             }
 
@@ -178,18 +201,18 @@ export function startCallbackServer(
             </html>
           `);
 
-            server.close();
-            resolve({ code, state });
+            closeServer();
+            safeResolve({ code, state });
           } catch (error) {
-            server.close();
-            reject(error);
+            closeServer();
+            safeReject(error instanceof Error ? error : new Error(String(error)));
           }
         },
       );
 
       server.on('error', (error) => {
         portReject(error);
-        reject(error);
+        safeReject(error);
       });
 
       // Determine which port to use (env var, argument, or OS-assigned)
@@ -224,8 +247,8 @@ export function startCallbackServer(
       // Timeout after 5 minutes
       setTimeout(
         () => {
-          server.close();
-          reject(new Error('OAuth callback timeout'));
+          closeServer();
+          safeReject(new Error('OAuth callback timeout'));
         },
         5 * 60 * 1000,
       );

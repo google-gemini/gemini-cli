@@ -305,6 +305,94 @@ describe('oauth-flow', () => {
         'Invalid value for OAUTH_CALLBACK_PORT',
       );
     });
+
+    it('should handle multiple concurrent requests without double-closing server', async () => {
+      const server = startCallbackServer('test-state');
+      const port = await server.port;
+
+      // Send multiple concurrent requests
+      const requests = [
+        realFetch(
+          `http://localhost:${port}${REDIRECT_PATH}?code=abc&state=test-state`,
+        ),
+        realFetch(
+          `http://localhost:${port}${REDIRECT_PATH}?code=def&state=test-state`,
+        ),
+        realFetch(
+          `http://localhost:${port}${REDIRECT_PATH}?code=ghi&state=test-state`,
+        ),
+      ];
+
+      // All requests should complete without ERR_SERVER_NOT_RUNNING
+      const results = await Promise.allSettled(requests);
+
+      // At least one should succeed
+      const successCount = results.filter(
+        (r) => r.status === 'fulfilled' && r.value.status === 200,
+      ).length;
+      expect(successCount).toBeGreaterThanOrEqual(1);
+
+      // Response should resolve successfully
+      const response = await server.response;
+      expect(response.code).toBeDefined();
+      expect(response.state).toBe('test-state');
+    });
+
+    it('should handle rapid error and success without double rejection', async () => {
+      const server = startCallbackServer('test-state');
+      const port = await server.port;
+
+      // Attach handlers BEFORE triggering requests to prevent unhandled rejection
+      const responseHandled = server.response.then(
+        () => ({ type: 'resolved' as const }),
+        (e: Error) => ({ type: 'rejected' as const, error: e }),
+      );
+
+      // Send error request first, then success
+      const errorRequest = realFetch(
+        `http://localhost:${port}${REDIRECT_PATH}?error=access_denied`,
+      ).catch(() => {
+        // Expected
+      });
+
+      const successRequest = realFetch(
+        `http://localhost:${port}${REDIRECT_PATH}?code=abc&state=test-state`,
+      ).catch(() => {
+        // May fail if server already closed
+      });
+
+      await Promise.allSettled([errorRequest, successRequest]);
+
+      // Wait for response to settle
+      const result = await responseHandled;
+
+      // Should get either an error or success, but not crash
+      if (result.type === 'rejected') {
+        expect(result.error.message).toMatch(/OAuth error|State mismatch/);
+      }
+      // If resolved, that's also valid
+    });
+
+    it('should not throw ERR_SERVER_NOT_RUNNING on state mismatch', async () => {
+      const server = startCallbackServer('expected-state');
+      const port = await server.port;
+
+      const responseResult = server.response.then(
+        () => new Error('Expected rejection'),
+        (e: Error) => e,
+      );
+
+      await realFetch(
+        `http://localhost:${port}${REDIRECT_PATH}?code=abc&state=wrong-state`,
+      ).catch(() => {
+        // Connection may be reset - expected
+      });
+
+      const error = await responseResult;
+      expect(error.message).toContain('State mismatch');
+      // Should NOT contain ERR_SERVER_NOT_RUNNING
+      expect(error.message).not.toContain('ERR_SERVER_NOT_RUNNING');
+    });
   });
 
   describe('exchangeCodeForToken', () => {
