@@ -118,6 +118,13 @@ export interface RetryAttemptPayload {
   delayMs: number;
   error?: string;
   model: string;
+  /**
+   * Normalized error code for UI classification.
+   * 'QUOTA_EXCEEDED' indicates a 429 capacity/quota error.
+   * 'SERVER_ERROR' indicates a 5xx server-side error.
+   * 'NETWORK_ERROR' indicates a transient network issue.
+   */
+  errorCode?: 'QUOTA_EXCEEDED' | 'SERVER_ERROR' | 'NETWORK_ERROR' | string;
 }
 
 /**
