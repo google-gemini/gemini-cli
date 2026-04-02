@@ -12,7 +12,7 @@ import { type UIState } from '../contexts/UIStateContext.js';
 import { type TextBuffer } from '../components/shared/text-buffer.js';
 import { type SessionStatsState } from '../contexts/SessionContext.js';
 import { type ThoughtSummary } from '../types.js';
-import { ApprovalMode } from '@google/gemini-cli-core';
+import { ApprovalMode, makeFakeConfig } from '@google/gemini-cli-core';
 
 vi.mock('../hooks/useComposerStatus.js', () => ({
   useComposerStatus: vi.fn(),
@@ -141,5 +141,53 @@ describe('<StatusRow />', () => {
 
     await waitUntilReady();
     expect(lastFrame()).toContain('Tip: Test Tip');
+  });
+
+  it('renders ActiveTeamIndicator with provider letters', async () => {
+    (useComposerStatus as Mock).mockReturnValue({
+      isInteractiveShellWaiting: false,
+      showLoadingIndicator: false,
+      showTips: false,
+      showWit: false,
+      modeContentObj: null,
+      showMinimalContext: false,
+    });
+
+    const mockTeam = {
+      name: 'poly-team',
+      displayName: 'Polyglot',
+      agents: [
+        { kind: 'local', name: 'g' },
+        { kind: 'external', name: 'c', provider: 'claude-code' },
+        { kind: 'external', name: 'x', provider: 'codex' },
+      ],
+    };
+
+    const config = makeFakeConfig();
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    config.getActiveTeam = () => mockTeam as any;
+
+    const { lastFrame, waitUntilReady } = await renderWithProviders(
+      <StatusRow
+        showUiDetails={true}
+        isNarrow={false}
+        terminalWidth={100}
+        hideContextSummary={false}
+        hideUiDetailsForSuggestions={false}
+        hasPendingActionRequired={false}
+      />,
+      {
+        width: 100,
+        uiState: defaultUiState,
+        config,
+      },
+    );
+
+    await waitUntilReady();
+    const output = lastFrame();
+    expect(output).toContain('[ Team: Polyglot');
+    expect(output).toContain('Claude Cod');
+    expect(output).toContain('Codex');
+    expect(output).toContain('Gemini CLI');
   });
 });

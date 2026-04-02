@@ -76,6 +76,30 @@ describe('ExternalAgentInvocation', () => {
     );
   });
 
+  it('should support Antigravity provider', () => {
+    const antigravityDef: ExternalAgentDefinition = {
+      ...externalDef,
+      provider: 'antigravity',
+    };
+    const polyfilled = polyfillExternalAgent(antigravityDef);
+
+    expect(polyfilled.promptConfig.systemPrompt).toContain(
+      'Antigravity Personality Overlay',
+    );
+  });
+
+  it('should support Gemma provider', () => {
+    const gemmaDef: ExternalAgentDefinition = {
+      ...externalDef,
+      provider: 'gemma',
+    };
+    const polyfilled = polyfillExternalAgent(gemmaDef);
+
+    expect(polyfilled.promptConfig.systemPrompt).toContain(
+      'Gemma Personality Overlay',
+    );
+  });
+
   it('should include styleInstructions from providerConfig', () => {
     const customDef: ExternalAgentDefinition = {
       ...externalDef,

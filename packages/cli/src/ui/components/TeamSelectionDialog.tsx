@@ -5,66 +5,277 @@
  */
 
 import type React from 'react';
-import { useCallback, useMemo } from 'react';
+import { useCallback, useMemo, useState } from 'react';
 import { Box, Text } from 'ink';
-import { type TeamDefinition } from '@google/gemini-cli-core';
+import {
+  type TeamDefinition,
+  type AgentDefinition,
+} from '@google/gemini-cli-core';
 import { theme } from '../semantic-colors.js';
 import { DescriptiveRadioButtonSelect } from './shared/DescriptiveRadioButtonSelect.js';
+import { useKeypress } from '../hooks/useKeypress.js';
 
 interface TeamSelectionDialogProps {
   teams: TeamDefinition[];
   onSelect: (teamName: string | undefined) => void;
 }
 
+const PROVIDER_COLORS: Record<string, string> = {
+  'claude-code': '#C15F3C', // Claude Orange (Exact)
+  codex: '#FFFFFF', // Codex White
+  gemini: '#A855F7', // Gemini Purple
+  antigravity: '#93C5FD', // Antigravity Light Blue
+  gemma: '#60A5FA', // Gemma Blue
+};
+
+const ProviderTag: React.FC<{ provider: string }> = ({ provider }) => {
+  const label =
+    provider === 'claude-code'
+      ? 'Claude Code'
+      : provider === 'codex'
+        ? 'Codex'
+        : provider === 'antigravity'
+          ? 'Antigravity'
+          : provider === 'gemma'
+            ? 'Gemma'
+            : 'Gemini CLI';
+  const color = PROVIDER_COLORS[provider] || theme.text.secondary;
+
+  return (
+    <Text color={color} bold>
+      [{label}]
+    </Text>
+  );
+};
+
+const MultiModelBadge: React.FC = () => (
+  <Box marginLeft={1}>
+    <Text color={theme.text.secondary} italic>
+      Multi-Model
+    </Text>
+  </Box>
+);
+
+function getProviderTags(agents: AgentDefinition[]): React.ReactNode {
+  const providers = new Set<string>();
+  for (const agent of agents) {
+    if (agent.kind === 'external') {
+      providers.add(agent.provider);
+    } else {
+      providers.add('gemini');
+    }
+  }
+
+  const sortedProviders = Array.from(providers).sort();
+  const isMulti = providers.size > 1;
+
+  return (
+    <Box flexDirection="row" alignItems="center">
+      <Box flexDirection="row">
+        {sortedProviders.map((p, i) => (
+          <Box key={p} marginLeft={i === 0 ? 0 : 1}>
+            <ProviderTag provider={p} />
+          </Box>
+        ))}
+      </Box>
+      {isMulti && <MultiModelBadge />}
+    </Box>
+  );
+}
+
 export function TeamSelectionDialog({
-  teams,
+  teams: discoveredTeams,
   onSelect,
 }: TeamSelectionDialogProps): React.JSX.Element {
+  const [view, setView] = useState<'select' | 'marketplace' | 'create'>(
+    'select',
+  );
+
+  useKeypress(
+    () => {
+      setView('select');
+      return true;
+    },
+    { isActive: view !== 'select' },
+  );
+
   const options = useMemo(() => {
-    const list = teams.map((team) => ({
+    const list = discoveredTeams.map((team) => ({
       value: team.name,
-      title: team.displayName,
+      title: team.displayName || team.name,
       description: team.description,
       key: team.name,
+      titleSuffix: getProviderTags(team.agents),
     }));
+
+    // Curated "Marketplace" Teams (Hardcoded MVP)
+    const polyglotTeam: TeamDefinition = {
+      name: 'curated-polyglot',
+      displayName: 'The Polyglot Team',
+      description:
+        'Advanced multi-model orchestration with Gemini, Claude Code, and Codex.',
+      instructions: 'Orchestrate across multiple specialized models.',
+      agents: [
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
+        {
+          kind: 'local',
+          name: 'gemini-expert',
+          description: 'Gemini Expert',
+          inputConfig: { type: 'object', properties: {}, required: [] },
+        } as unknown as AgentDefinition,
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
+        {
+          kind: 'external',
+          name: 'claude-coder',
+          provider: 'claude-code',
+          description: 'Claude Coder',
+          inputConfig: { type: 'object', properties: {}, required: [] },
+        } as unknown as AgentDefinition,
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
+        {
+          kind: 'external',
+          name: 'codex-architect',
+          provider: 'codex',
+          description: 'Codex Architect',
+          inputConfig: { type: 'object', properties: {}, required: [] },
+        } as unknown as AgentDefinition,
+      ],
+    };
+
+    list.push({
+      value: polyglotTeam.name,
+      title: `${polyglotTeam.displayName} (Curated)`,
+      description: polyglotTeam.description,
+      key: polyglotTeam.name,
+      titleSuffix: getProviderTags(polyglotTeam.agents),
+    });
 
     list.push({
       value: 'none',
       title: 'No Team',
       description: 'Continue with standard Gemini CLI experience',
       key: 'none',
+      titleSuffix: undefined,
     });
 
     list.push({
       value: 'marketplace',
-      title: 'Browse Marketplace (Coming Soon)',
+      title: 'Browse Team Marketplace',
       description: 'Discover and install teams from the community',
       key: 'marketplace',
+      titleSuffix: undefined,
     });
 
     list.push({
       value: 'create',
-      title: 'Create Team (Coming Soon)',
+      title: 'Create Team',
       description: 'Define your own agent team and orchestration instructions',
       key: 'create',
+      titleSuffix: undefined,
     });
 
     return list;
-  }, [teams]);
+  }, [discoveredTeams]);
 
   const handleSelect = useCallback(
     (value: string) => {
       if (value === 'none') {
         onSelect(undefined);
-      } else if (value === 'marketplace' || value === 'create') {
-        // No-op for coming soon features
-        return;
+      } else if (value === 'marketplace') {
+        setView('marketplace');
+      } else if (value === 'create') {
+        setView('create');
       } else {
         onSelect(value);
       }
     },
     [onSelect],
   );
+
+  if (view === 'marketplace') {
+    return (
+      <Box
+        borderStyle="round"
+        borderColor={theme.border.default}
+        flexDirection="column"
+        padding={1}
+        width="100%"
+      >
+        <Text bold color={theme.text.primary}>
+          Agent Team Marketplace
+        </Text>
+        <Box marginTop={1} flexDirection="column">
+          <Text color={theme.text.secondary}>
+            Explore and download community-contributed agent teams.
+          </Text>
+          <Box
+            marginTop={1}
+            padding={1}
+            borderStyle="single"
+            borderColor={theme.ui.comment}
+          >
+            <Text color={theme.ui.comment}>
+              The community marketplace is currently under development. Soon you
+              will be able to browse hundreds of specialized teams.
+            </Text>
+          </Box>
+          <Box marginTop={1}>
+            <Text color={theme.text.accent}>
+              Press any key to go back to selection...
+            </Text>
+          </Box>
+        </Box>
+      </Box>
+    );
+  }
+
+  if (view === 'create') {
+    return (
+      <Box
+        borderStyle="round"
+        borderColor={theme.border.default}
+        flexDirection="column"
+        padding={1}
+        width="100%"
+      >
+        <Text bold color={theme.text.primary}>
+          Create New Agent Team
+        </Text>
+        <Box marginTop={1} flexDirection="column">
+          <Text color={theme.text.secondary}>
+            To create a new team, follow these simple steps:
+          </Text>
+          <Text color={theme.text.primary}>
+            1. Create a directory in .gemini/teams/ (e.g.,
+            .gemini/teams/my-team/)
+          </Text>
+          <Text color={theme.text.primary}>
+            2. Create a TEAM.md file with name, display_name, and description.
+          </Text>
+          <Text color={theme.text.primary}>
+            3. (Optional) Add specialized agents to an agents/ sub-directory.
+          </Text>
+
+          <Box
+            marginTop={1}
+            padding={1}
+            borderStyle="single"
+            borderColor={theme.ui.focus}
+          >
+            <Text color={theme.ui.focus}>
+              Tip: You can now specify external agents directly in TEAM.md!
+            </Text>
+          </Box>
+
+          <Box marginTop={1}>
+            <Text color={theme.text.accent}>
+              Press any key to go back to selection...
+            </Text>
+          </Box>
+        </Box>
+      </Box>
+    );
+  }
 
   return (
     <Box

@@ -4,8 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import type React from 'react';
-import { useCallback, useRef, useState } from 'react';
+import React, { useCallback, useRef, useState } from 'react';
 import { Box, Text, ResizeObserver, type DOMElement } from 'ink';
 import {
   isUserVisibleHook,
@@ -147,6 +146,14 @@ export const StatusNode: React.FC<{
   );
 };
 
+const PROVIDER_COLORS: Record<string, string> = {
+  'claude-code': '#C15F3C', // Claude Orange (Exact)
+  codex: '#FFFFFF', // Codex White
+  gemini: '#A855F7', // Gemini Purple
+  antigravity: '#93C5FD', // Antigravity Light Blue
+  gemma: '#60A5FA', // Gemma Blue
+};
+
 /**
  * Renders an indicator for the currently active agent team.
  */
@@ -156,9 +163,44 @@ const ActiveTeamIndicator: React.FC = () => {
 
   if (!activeTeam) return null;
 
+  const providers = new Set<string>();
+  for (const agent of activeTeam.agents) {
+    if (agent.kind === 'external') {
+      providers.add(agent.provider);
+    } else {
+      providers.add('gemini');
+    }
+  }
+
+  const sortedProviders = Array.from(providers).sort();
+
   return (
-    <Box marginLeft={LAYOUT.INDICATOR_LEFT_MARGIN}>
-      <Text color={theme.text.accent}>[ Team: {activeTeam.displayName} ]</Text>
+    <Box marginLeft={LAYOUT.INDICATOR_LEFT_MARGIN} flexDirection="row">
+      <Text color={theme.text.accent}>[ Team: {activeTeam.displayName} (</Text>
+      {sortedProviders.map((p, i) => {
+        const label =
+          p === 'claude-code'
+            ? 'Claude Code'
+            : p === 'codex'
+              ? 'Codex'
+              : p === 'antigravity'
+                ? 'Antigravity'
+                : p === 'gemma'
+                  ? 'Gemma'
+                  : 'Gemini CLI';
+        const color = PROVIDER_COLORS[p] || theme.text.secondary;
+        return (
+          <React.Fragment key={p}>
+            <Text color={color} bold>
+              {label}
+            </Text>
+            {i < sortedProviders.length - 1 && (
+              <Text color={theme.text.accent}>, </Text>
+            )}
+          </React.Fragment>
+        );
+      })}
+      <Text color={theme.text.accent}>) ]</Text>
     </Box>
   );
 };

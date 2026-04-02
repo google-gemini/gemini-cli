@@ -49,9 +49,10 @@ describe('<TeamSelectionDialog />', () => {
     expect(output).toContain('First team description');
     expect(output).toContain('Team Two');
     expect(output).toContain('Second team description');
+    expect(output).toContain('The Polyglot Team (Curated)');
     expect(output).toContain('No Team');
-    expect(output).toContain('Browse Marketplace (Coming Soon)');
-    expect(output).toContain('Create Team (Coming Soon)');
+    expect(output).toContain('Browse Team Marketplace');
+    expect(output).toContain('Create Team');
     unmount();
   });
 
@@ -73,15 +74,13 @@ describe('<TeamSelectionDialog />', () => {
   it('calls onSelect with undefined when "No Team" is selected', async () => {
     const { stdin, waitUntilReady, unmount } = await renderComponent();
 
-    // Navigate to "No Team" (index 2)
-    await act(async () => {
-      stdin.write('\u001B[B'); // Down
-    });
-    await waitUntilReady();
-    await act(async () => {
-      stdin.write('\u001B[B'); // Down
-    });
-    await waitUntilReady();
+    // Navigate to "No Team" (index 3: Team 1, Team 2, Polyglot, No Team)
+    for (let i = 0; i < 3; i++) {
+      await act(async () => {
+        stdin.write('\u001B[B'); // Down
+      });
+      await waitUntilReady();
+    }
 
     await act(async () => {
       stdin.write('\r'); // Enter
@@ -97,8 +96,8 @@ describe('<TeamSelectionDialog />', () => {
   it('does not call onSelect for placeholder options', async () => {
     const { stdin, waitUntilReady, unmount } = await renderComponent();
 
-    // Navigate to "Browse Marketplace" (index 3)
-    for (let i = 0; i < 3; i++) {
+    // Navigate to "Browse Team Marketplace" (index 4)
+    for (let i = 0; i < 4; i++) {
       await act(async () => {
         stdin.write('\u001B[B'); // Down
       });
@@ -111,6 +110,64 @@ describe('<TeamSelectionDialog />', () => {
     await waitUntilReady();
 
     expect(mockOnSelect).not.toHaveBeenCalled();
+    unmount();
+  });
+
+  it('shows marketplace sub-view when selected', async () => {
+    const { stdin, lastFrame, waitUntilReady, unmount } =
+      await renderComponent();
+
+    // Navigate to Marketplace (index 4)
+    for (let i = 0; i < 4; i++) {
+      await act(async () => {
+        stdin.write('\u001B[B'); // Down
+      });
+      await waitUntilReady();
+    }
+
+    await act(async () => {
+      stdin.write('\r'); // Enter
+    });
+    await waitUntilReady();
+
+    expect(lastFrame()).toContain('Agent Team Marketplace');
+    expect(lastFrame()).toContain('under development');
+
+    // Go back
+    await act(async () => {
+      stdin.write('a');
+    });
+    await waitUntilReady();
+    expect(lastFrame()).toContain('Select an Agent Team');
+    unmount();
+  });
+
+  it('shows create team sub-view when selected', async () => {
+    const { stdin, lastFrame, waitUntilReady, unmount } =
+      await renderComponent();
+
+    // Navigate to Create Team (index 5)
+    for (let i = 0; i < 5; i++) {
+      await act(async () => {
+        stdin.write('\u001B[B'); // Down
+      });
+      await waitUntilReady();
+    }
+
+    await act(async () => {
+      stdin.write('\r'); // Enter
+    });
+    await waitUntilReady();
+
+    expect(lastFrame()).toContain('Create New Agent Team');
+    expect(lastFrame()).toContain('Create a directory in .gemini/teams/');
+
+    // Go back
+    await act(async () => {
+      stdin.write('a');
+    });
+    await waitUntilReady();
+    expect(lastFrame()).toContain('Select an Agent Team');
     unmount();
   });
 });

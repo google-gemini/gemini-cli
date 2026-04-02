@@ -11,7 +11,12 @@ import * as path from 'node:path';
 import * as crypto from 'node:crypto';
 import { z } from 'zod';
 import { type TeamDefinition } from './types.js';
-import { AgentLoadError, loadAgentsFromDirectory } from './agentLoader.js';
+import {
+  AgentLoadError,
+  loadAgentsFromDirectory,
+  externalAgentSchema,
+  markdownToAgentDefinition,
+} from './agentLoader.js';
 import { FRONTMATTER_REGEX } from '../skills/skillLoader.js';
 import { getErrorMessage } from '../utils/errors.js';
 
@@ -32,6 +37,7 @@ const teamSchema = z
     name: nameSchema,
     display_name: z.string().min(1),
     description: z.string().min(1),
+    agents: z.array(externalAgentSchema).optional(),
   })
   .strict();
 
@@ -121,18 +127,45 @@ export async function loadTeamsFromDirectory(
         );
       }
 
-      const { name, display_name, description } = parsedFrontmatter.data;
+      const {
+        name,
+        display_name,
+        description,
+        agents: inlineAgentsRaw,
+      } = parsedFrontmatter.data;
 
       // Load agents from agents/ subfolder
       const agentsResult = await loadAgentsFromDirectory(agentsDirPath);
       result.errors.push(...agentsResult.errors);
+
+      const allAgents = [...agentsResult.agents];
+
+      // Add inline agents
+      if (inlineAgentsRaw) {
+        for (const inline of inlineAgentsRaw) {
+          try {
+            const agent = markdownToAgentDefinition(inline, {
+              hash,
+              filePath: teamMdPath,
+            });
+            allAgents.push(agent);
+          } catch (error) {
+            result.errors.push(
+              new AgentLoadError(
+                teamMdPath,
+                `Error loading inline agent "${inline.name}": ${getErrorMessage(error)}`,
+              ),
+            );
+          }
+        }
+      }
 
       result.teams.push({
         name,
         displayName: display_name,
         description,
         instructions,
-        agents: agentsResult.agents,
+        agents: allAgents,
         metadata: {
           hash,
           filePath: teamMdPath,

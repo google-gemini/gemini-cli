@@ -211,7 +211,7 @@ const remoteAgentSchema = z.union([
 
 type FrontmatterRemoteAgentDefinition = z.infer<typeof remoteAgentSchema>;
 
-const externalAgentSchema = z
+export const externalAgentSchema = z
   .object({
     kind: z.literal('external'),
     name: nameSchema,

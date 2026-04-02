@@ -575,6 +575,11 @@ function* emitKeys(
         } else if ((match = /^(\d+)?(?:;(\d+))?([A-Za-z])$/.exec(cmd))) {
           code += match[3];
           modifier = parseInt(match[2] ?? match[1] ?? '1', 10) - 1;
+
+          // Skip focus-in/out events from useFocus hook
+          if (code === '[I' || code === '[O') {
+            continue;
+          }
         } else {
           code += cmd;
         }
@@ -854,10 +859,9 @@ export function KeypressProvider({
   useEffect(() => {
     terminalCapabilityManager.enableSupportedModes();
 
-    const wasRaw = stdin.isRaw;
-    if (wasRaw === false) {
-      setRawMode(true);
-    }
+    // Always ensure raw mode is on while we are active.
+    // Ink handles reference counting for setRawMode(true/false) calls.
+    setRawMode(true);
 
     process.stdin.setEncoding('utf8'); // Make data events emit strings
 
@@ -882,9 +886,7 @@ export function KeypressProvider({
     stdin.on('data', dataListener);
     return () => {
       stdin.removeListener('data', dataListener);
-      if (wasRaw === false) {
-        setRawMode(false);
-      }
+      setRawMode(false);
     };
   }, [stdin, setRawMode, config, debugKeystrokeLogging, broadcast]);
 
