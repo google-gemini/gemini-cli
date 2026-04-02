@@ -312,7 +312,7 @@ export function classifyGoogleError(error: unknown): unknown {
 
   if (retryInfo?.retryDelay) {
     const parsedDelay = parseDurationInSeconds(retryInfo.retryDelay);
-    if (parsedDelay) {
+    if (parsedDelay !== null) {
       delaySeconds = parsedDelay;
     }
   }
