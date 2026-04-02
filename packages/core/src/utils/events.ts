@@ -193,6 +193,7 @@ export enum CoreEvent {
   EditorSelected = 'editor-selected',
   SlashCommandConflicts = 'slash-command-conflicts',
   QuotaChanged = 'quota-changed',
+  OauthCancelRequest = 'oauth-cancel-request',
   TelemetryKeychainAvailability = 'telemetry-keychain-availability',
   TelemetryTokenStorageType = 'telemetry-token-storage-type',
 }
@@ -226,6 +227,7 @@ export interface CoreEvents extends ExtensionEvents {
   [CoreEvent.RequestEditorSelection]: never[];
   [CoreEvent.EditorSelected]: [EditorSelectedPayload];
   [CoreEvent.SlashCommandConflicts]: [SlashCommandConflictsPayload];
+  [CoreEvent.OauthCancelRequest]: never[];
   [CoreEvent.TelemetryKeychainAvailability]: [KeychainAvailabilityEvent];
   [CoreEvent.TelemetryTokenStorageType]: [TokenStorageInitializationEvent];
 }
@@ -389,6 +391,13 @@ export class CoreEventEmitter extends EventEmitter<CoreEvents> {
   emitSlashCommandConflicts(conflicts: SlashCommandConflict[]): void {
     const payload: SlashCommandConflictsPayload = { conflicts };
     this._emitOrQueue(CoreEvent.SlashCommandConflicts, payload);
+  }
+
+  /**
+   * Notifies subscribers that an OAuth authentication flow was cancelled by the user.
+   */
+  emitOauthCancelRequest(): void {
+    this.emit(CoreEvent.OauthCancelRequest);
   }
 
   /**

@@ -26,6 +26,7 @@ import { SessionBrowser } from './SessionBrowser.js';
 import { PermissionsModifyTrustDialog } from './PermissionsModifyTrustDialog.js';
 import { ModelDialog } from './ModelDialog.js';
 import { theme } from '../semantic-colors.js';
+import { coreEvents } from '@google/gemini-cli-core';
 import { useUIState } from '../contexts/UIStateContext.js';
 import { useUIActions } from '../contexts/UIActionsContext.js';
 import { useConfig } from '../contexts/ConfigContext.js';
@@ -286,6 +287,7 @@ export const DialogManager = ({
       <AuthInProgress
         onTimeout={() => {
           uiActions.onAuthError('Authentication cancelled.');
+          coreEvents.emitOauthCancelRequest();
         }}
       />
     );
