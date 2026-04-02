@@ -5,6 +5,10 @@
  */
 
 import type { AnsiOutput, CompletionBehavior } from '@google/gemini-cli-core';
+import {
+  MAX_SHELL_OUTPUT_SIZE,
+  SHELL_OUTPUT_TRUNCATION_BUFFER,
+} from '../constants.js';
 
 export interface BackgroundTask {
   pid: number;
@@ -98,13 +102,44 @@ export function shellReducer(
       // This is an intentional performance optimization for the CLI.
       let newOutput = task.output;
       if (typeof action.chunk === 'string') {
-        newOutput =
-          typeof task.output === 'string'
-            ? task.output + action.chunk
-            : action.chunk;
-      } else {
+        // Check combined length BEFORE concatenation — the + operator itself
+        // can throw if the resulting string would exceed ~1 GB.
+        const currentOutput =
+          typeof task.output === 'string' ? task.output : '';
+        const combinedLength = currentOutput.length + action.chunk.length;
+
+        if (
+          combinedLength >
+          MAX_SHELL_OUTPUT_SIZE + SHELL_OUTPUT_TRUNCATION_BUFFER
+        ) {
+          if (action.chunk.length >= MAX_SHELL_OUTPUT_SIZE) {
+            // Incoming chunk alone exceeds the cap — keep its tail.
+            newOutput = action.chunk.slice(-MAX_SHELL_OUTPUT_SIZE);
+          } else {
+            // Keep as much of the existing output as possible, then append.
+            const keepFromCurrent = MAX_SHELL_OUTPUT_SIZE - action.chunk.length;
+            newOutput = currentOutput.slice(-keepFromCurrent) + action.chunk;
+          }
+
+          // Native slice operates on UTF-16 code units, so it may split a
+          // surrogate pair at the truncation boundary. If the first code unit
+          // of the result is a low surrogate (\uDC00-\uDFFF), trim it off to
+          // avoid emitting a broken character.
+          if (newOutput.length > 0) {
+            const firstCharCode = newOutput.charCodeAt(0);
+            if (firstCharCode >= 0xdc00 && firstCharCode <= 0xdfff) {
+              newOutput = newOutput.slice(1);
+            }
+          }
+        } else {
+          newOutput = currentOutput + action.chunk;
+        }
+      } else if (action.chunk) {
+        // AnsiOutput replaces the whole buffer.
         newOutput = action.chunk;
       }
+      // If action.chunk is falsy (e.g. empty string already handled above via
+      // typeof gate), newOutput remains unchanged — no data loss.
       task.output = newOutput;
 
       const nextState = { ...state, lastShellOutputTime: Date.now() };

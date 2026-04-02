@@ -108,7 +108,7 @@ function highlightAndRenderLine(
     const renderedNode = renderHastNode(getHighlightedLine(), theme, undefined);
 
     return renderedNode !== null ? renderedNode : strippedLine;
-  } catch (_error) {
+  } catch {
     return stripAnsi(line);
   }
 }

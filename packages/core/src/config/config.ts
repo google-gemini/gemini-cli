@@ -41,6 +41,10 @@ import { UpdateTopicTool } from '../tools/topicTool.js';
 import { TopicState } from './topicState.js';
 import { ExitPlanModeTool } from '../tools/exit-plan-mode.js';
 import { EnterPlanModeTool } from '../tools/enter-plan-mode.js';
+import {
+  ListBackgroundProcessesTool,
+  ReadBackgroundOutputTool,
+} from '../tools/shellBackgroundTools.js';
 import { GeminiClient } from '../core/client.js';
 import { BaseLlmClient } from '../core/baseLlmClient.js';
 import { LocalLiteRtLmClient } from '../core/localLiteRtLmClient.js';
@@ -206,6 +210,12 @@ export interface OutputSettings {
   format?: OutputFormat;
 }
 
+export interface ToolOutputMaskingConfig {
+  protectionThresholdTokens: number;
+  minPrunableThresholdTokens: number;
+  protectLatestTurn: boolean;
+}
+
 export interface ContextManagementConfig {
   enabled: boolean;
   historyWindow: {
@@ -217,17 +227,13 @@ export interface ContextManagementConfig {
     retainedMaxTokens: number;
     normalizationHeadRatio: number;
   };
-  toolDistillation: {
-    maxOutputTokens: number;
-    summarizationThresholdTokens: number;
+  tools: {
+    distillation: {
+      maxOutputTokens: number;
+      summarizationThresholdTokens: number;
+    };
+    outputMasking: ToolOutputMaskingConfig;
   };
-}
-
-export interface ToolOutputMaskingConfig {
-  enabled: boolean;
-  toolProtectionThreshold: number;
-  minPrunableTokensThreshold: number;
-  protectLatestTurn: boolean;
 }
 
 export interface GemmaModelRouterSettings {
@@ -236,6 +242,10 @@ export interface GemmaModelRouterSettings {
     host?: string;
     model?: string;
   };
+}
+
+export interface ADKSettings {
+  agentSessionNoninteractiveEnabled?: boolean;
 }
 
 export interface ExtensionSetting {
@@ -367,7 +377,7 @@ export interface BrowserAgentCustomConfig {
   headless?: boolean;
   /** Path to Chrome profile directory for session persistence. */
   profilePath?: string;
-  /** Model override for the visual agent. */
+  /** Model for the visual agent's analyze_screenshot tool. When set, enables the tool. */
   visualModel?: string;
   /** List of allowed domains for the browser agent (e.g., ["github.com", "*.google.com"]). */
   allowedDomains?: string[];
@@ -675,6 +685,7 @@ export interface ConfigParameters {
   policyUpdateConfirmationRequest?: PolicyUpdateConfirmationRequest;
   output?: OutputSettings;
   gemmaModelRouter?: GemmaModelRouterSettings;
+  adk?: ADKSettings;
   disableModelRouterForAuth?: AuthType[];
   continueOnFailedApiCall?: boolean;
   retryFetchErrors?: boolean;
@@ -711,7 +722,7 @@ export interface ConfigParameters {
   experimentalAgentHistorySummarization?: boolean;
   memoryBoundaryMarkers?: string[];
   topicUpdateNarration?: boolean;
-  toolOutputMasking?: Partial<ToolOutputMaskingConfig>;
+
   disableLLMCorrection?: boolean;
   plan?: boolean;
   tracker?: boolean;
@@ -758,6 +769,7 @@ export class Config implements McpContext, AgentLoopContext {
   readonly modelConfigService: ModelConfigService;
   private readonly embeddingModel: string;
   private readonly sandbox: SandboxConfig | undefined;
+  private _sandboxForbiddenPaths: string[] | undefined;
   private readonly targetDir: string;
   private workspaceContext: WorkspaceContext;
   private readonly debugMode: boolean;
@@ -896,6 +908,7 @@ export class Config implements McpContext, AgentLoopContext {
   private readonly outputSettings: OutputSettings;
 
   private readonly gemmaModelRouter: GemmaModelRouterSettings;
+  private readonly agentSessionNoninteractiveEnabled: boolean;
 
   private readonly continueOnFailedApiCall: boolean;
   private readonly retryFetchErrors: boolean;
@@ -912,7 +925,7 @@ export class Config implements McpContext, AgentLoopContext {
   private pendingIncludeDirectories: string[];
   private readonly enableHooks: boolean;
   private readonly enableHooksUI: boolean;
-  private readonly toolOutputMasking: ToolOutputMaskingConfig;
+
   private hooks: { [K in HookEventName]?: HookDefinition[] } | undefined;
   private projectHooks:
     | ({ [K in HookEventName]?: HookDefinition[] } & { disabled?: string[] })
@@ -997,6 +1010,7 @@ export class Config implements McpContext, AgentLoopContext {
       this.sandbox,
       {
         workspace: this.targetDir,
+        forbiddenPaths: this.getSandboxForbiddenPaths.bind(this),
         includeDirectories: this.pendingIncludeDirectories,
         policyManager: this._sandboxPolicyManager,
       },
@@ -1160,12 +1174,27 @@ export class Config implements McpContext, AgentLoopContext {
           params.contextManagement?.messageLimits?.normalizationHeadRatio ??
           0.25,
       },
-      toolDistillation: {
-        maxOutputTokens:
-          params.contextManagement?.toolDistillation?.maxOutputTokens ?? 10000,
-        summarizationThresholdTokens:
-          params.contextManagement?.toolDistillation
-            ?.summarizationThresholdTokens ?? 20000,
+      tools: {
+        distillation: {
+          maxOutputTokens:
+            params.contextManagement?.tools?.distillation?.maxOutputTokens ??
+            10000,
+          summarizationThresholdTokens:
+            params.contextManagement?.tools?.distillation
+              ?.summarizationThresholdTokens ?? 20000,
+        },
+        outputMasking: {
+          protectionThresholdTokens:
+            params.contextManagement?.tools?.outputMasking
+              ?.protectionThresholdTokens ?? DEFAULT_TOOL_PROTECTION_THRESHOLD,
+          minPrunableThresholdTokens:
+            params.contextManagement?.tools?.outputMasking
+              ?.minPrunableThresholdTokens ??
+            DEFAULT_MIN_PRUNABLE_TOKENS_THRESHOLD,
+          protectLatestTurn:
+            params.contextManagement?.tools?.outputMasking?.protectLatestTurn ??
+            DEFAULT_PROTECT_LATEST_TURN,
+        },
       },
     };
     this.topicUpdateNarration = params.topicUpdateNarration ?? false;
@@ -1174,18 +1203,6 @@ export class Config implements McpContext, AgentLoopContext {
       this.isModelSteeringEnabled(),
     );
     ExecutionLifecycleService.setInjectionService(this.injectionService);
-    this.toolOutputMasking = {
-      enabled: params.toolOutputMasking?.enabled ?? true,
-      toolProtectionThreshold:
-        params.toolOutputMasking?.toolProtectionThreshold ??
-        DEFAULT_TOOL_PROTECTION_THRESHOLD,
-      minPrunableTokensThreshold:
-        params.toolOutputMasking?.minPrunableTokensThreshold ??
-        DEFAULT_MIN_PRUNABLE_TOKENS_THRESHOLD,
-      protectLatestTurn:
-        params.toolOutputMasking?.protectLatestTurn ??
-        DEFAULT_PROTECT_LATEST_TURN,
-    };
     this.maxSessionTurns = params.maxSessionTurns ?? -1;
     this.acpMode = params.acpMode ?? false;
     this.listSessions = params.listSessions ?? false;
@@ -1309,6 +1326,9 @@ export class Config implements McpContext, AgentLoopContext {
           params.gemmaModelRouter?.classifier?.model ?? 'gemma3-1b-gpu-custom',
       },
     };
+
+    this.agentSessionNoninteractiveEnabled =
+      params.adk?.agentSessionNoninteractiveEnabled ?? false;
     this.retryFetchErrors = params.retryFetchErrors ?? true;
     this.maxAttempts = Math.min(
       params.maxAttempts ?? DEFAULT_MAX_ATTEMPTS,
@@ -1678,11 +1698,25 @@ export class Config implements McpContext, AgentLoopContext {
     return this._geminiClient;
   }
 
+  private async getSandboxForbiddenPaths(): Promise<string[]> {
+    if (this._sandboxForbiddenPaths) {
+      return this._sandboxForbiddenPaths;
+    }
+
+    this._sandboxForbiddenPaths = await this.getFileService().getIgnoredPaths({
+      respectGitIgnore: false,
+      respectGeminiIgnore: true,
+    });
+
+    return this._sandboxForbiddenPaths;
+  }
+
   private refreshSandboxManager(): void {
     this._sandboxManager = createSandboxManager(
       this.sandbox,
       {
         workspace: this.targetDir,
+        forbiddenPaths: this.getSandboxForbiddenPaths.bind(this),
         policyManager: this._sandboxPolicyManager,
       },
       this.getApprovalMode(),
@@ -2399,10 +2433,6 @@ export class Config implements McpContext, AgentLoopContext {
     return this.modelSteering;
   }
 
-  getToolOutputMaskingEnabled(): boolean {
-    return this.toolOutputMasking.enabled;
-  }
-
   async getToolOutputMaskingConfig(): Promise<ToolOutputMaskingConfig> {
     await this.ensureExperimentsLoaded();
 
@@ -2424,17 +2454,19 @@ export class Config implements McpContext, AgentLoopContext {
       : undefined;
 
     return {
-      enabled: this.toolOutputMasking.enabled,
-      toolProtectionThreshold:
+      protectionThresholdTokens:
         parsedProtection !== undefined && !isNaN(parsedProtection)
           ? parsedProtection
-          : this.toolOutputMasking.toolProtectionThreshold,
-      minPrunableTokensThreshold:
+          : this.contextManagement.tools.outputMasking
+              .protectionThresholdTokens,
+      minPrunableThresholdTokens:
         parsedPrunable !== undefined && !isNaN(parsedPrunable)
           ? parsedPrunable
-          : this.toolOutputMasking.minPrunableTokensThreshold,
+          : this.contextManagement.tools.outputMasking
+              .minPrunableThresholdTokens,
       protectLatestTurn:
-        remoteProtectLatest ?? this.toolOutputMasking.protectLatestTurn,
+        remoteProtectLatest ??
+        this.contextManagement.tools.outputMasking.protectLatestTurn,
     };
   }
 
@@ -2662,6 +2694,10 @@ export class Config implements McpContext, AgentLoopContext {
 
   getModelRouterService(): ModelRouterService {
     return this.modelRouterService;
+  }
+
+  getModelConfigService(): ModelConfigService {
+    return this.modelConfigService;
   }
 
   getModelAvailabilityService(): ModelAvailabilityService {
@@ -3285,11 +3321,12 @@ export class Config implements McpContext, AgentLoopContext {
   }
 
   getToolMaxOutputTokens(): number {
-    return this.contextManagement.toolDistillation.maxOutputTokens;
+    return this.contextManagement.tools.distillation.maxOutputTokens;
   }
 
   getToolSummarizationThresholdTokens(): number {
-    return this.contextManagement.toolDistillation.summarizationThresholdTokens;
+    return this.contextManagement.tools.distillation
+      .summarizationThresholdTokens;
   }
 
   getNextCompressionTruncationId(): number {
@@ -3341,6 +3378,10 @@ export class Config implements McpContext, AgentLoopContext {
 
   getGemmaModelRouterSettings(): GemmaModelRouterSettings {
     return this.gemmaModelRouter;
+  }
+
+  getAgentSessionNoninteractiveEnabled(): boolean {
+    return this.agentSessionNoninteractiveEnabled;
   }
 
   /**
@@ -3478,6 +3519,16 @@ export class Config implements McpContext, AgentLoopContext {
     );
     maybeRegister(ShellTool, () =>
       registry.registerTool(new ShellTool(this, this.messageBus)),
+    );
+    maybeRegister(ListBackgroundProcessesTool, () =>
+      registry.registerTool(
+        new ListBackgroundProcessesTool(this, this.messageBus),
+      ),
+    );
+    maybeRegister(ReadBackgroundOutputTool, () =>
+      registry.registerTool(
+        new ReadBackgroundOutputTool(this, this.messageBus),
+      ),
     );
     if (!this.isMemoryManagerEnabled()) {
       maybeRegister(MemoryTool, () =>
