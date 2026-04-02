@@ -154,7 +154,9 @@ describe('BrowserManager', () => {
         expect.objectContaining({
           command: 'node',
           args: expect.arrayContaining([
-            expect.stringMatching(/bundled\/chrome-devtools-mcp\.mjs$/),
+            expect.stringMatching(
+              /(dist[\\/])?bundled[\\/]chrome-devtools-mcp\.mjs$/,
+            ),
           ]),
         }),
       );
@@ -170,7 +172,7 @@ describe('BrowserManager', () => {
           command: 'node',
           args: expect.arrayContaining([
             expect.stringMatching(
-              /(dist\/)?bundled\/chrome-devtools-mcp\.mjs$/,
+              /(dist[\\/])?bundled[\\/]chrome-devtools-mcp\.mjs$/,
             ),
           ]),
         }),
