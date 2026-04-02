@@ -318,7 +318,13 @@ export class Storage {
     if (customDir) {
       const resolvedPath = path.resolve(this.getProjectRoot(), customDir);
       const realProjectRoot = resolveToRealPath(this.getProjectRoot());
-      const realResolvedPath = resolveToRealPath(resolvedPath);
+
+      let realResolvedPath = resolvedPath;
+      try {
+        realResolvedPath = resolveToRealPath(resolvedPath);
+      } catch (_e) {
+        // Fallback to resolvedPath if resolveToRealPath fails unexpectedly (e.g. permissions)
+      }
 
       if (!isSubpath(realProjectRoot, realResolvedPath)) {
         throw new Error(
