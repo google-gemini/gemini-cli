@@ -271,8 +271,12 @@ export class Storage {
     return path.join(Storage.getGlobalGeminiDir(), 'memory', identifier);
   }
 
+  getProjectMemoryTempDir(): string {
+    return path.join(this.getProjectTempDir(), 'memory');
+  }
+
   getProjectSkillsMemoryDir(): string {
-    return path.join(this.getProjectTempDir(), 'memory', 'skills');
+    return path.join(this.getProjectMemoryTempDir(), 'skills');
   }
 
   getWorkspaceSettingsPath(): string {

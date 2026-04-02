@@ -318,6 +318,7 @@ describe('memoryService', () => {
       const mockConfig = {
         storage: {
           getProjectMemoryDir: vi.fn().mockReturnValue(memoryDir),
+          getProjectMemoryTempDir: vi.fn().mockReturnValue(memoryDir),
           getProjectSkillsMemoryDir: vi.fn().mockReturnValue(skillsDir),
           getProjectTempDir: vi.fn().mockReturnValue(projectTempDir),
         },
@@ -349,6 +350,7 @@ describe('memoryService', () => {
       const mockConfig = {
         storage: {
           getProjectMemoryDir: vi.fn().mockReturnValue(memoryDir),
+          getProjectMemoryTempDir: vi.fn().mockReturnValue(memoryDir),
           getProjectSkillsMemoryDir: vi.fn().mockReturnValue(skillsDir),
           getProjectTempDir: vi.fn().mockReturnValue(projectTempDir),
         },
@@ -401,6 +403,7 @@ describe('memoryService', () => {
       const mockConfig = {
         storage: {
           getProjectMemoryDir: vi.fn().mockReturnValue(memoryDir),
+          getProjectMemoryTempDir: vi.fn().mockReturnValue(memoryDir),
           getProjectSkillsMemoryDir: vi.fn().mockReturnValue(skillsDir),
           getProjectTempDir: vi.fn().mockReturnValue(projectTempDir),
         },
