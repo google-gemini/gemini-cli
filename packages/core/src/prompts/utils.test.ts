@@ -14,7 +14,7 @@ import type { Config } from '../config/config.js';
 import type { ToolRegistry } from '../tools/tool-registry.js';
 
 vi.mock('../utils/paths.js', () => ({
-  homedir: vi.fn().mockReturnValue('/mock/home'),
+  realHomedir: vi.fn().mockReturnValue('/mock/home'),
 }));
 
 vi.mock('../utils/debugLogger.js', () => ({
@@ -145,8 +145,8 @@ describe('resolvePathFromEnv', () => {
   });
 
   it('should handle home directory resolution failure gracefully', async () => {
-    const { homedir } = await import('../utils/paths.js');
-    vi.mocked(homedir).mockImplementationOnce(() => {
+    const { realHomedir } = await import('../utils/paths.js');
+    vi.mocked(realHomedir).mockImplementationOnce(() => {
       throw new Error('No home directory');
     });
 

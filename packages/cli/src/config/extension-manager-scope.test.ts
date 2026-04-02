@@ -13,7 +13,9 @@ import { createTestMergedSettings } from './settings.js';
 import {
   loadAgentsFromDirectory,
   loadSkillsFromDir,
+  Storage,
 } from '@google/gemini-cli-core';
+import { INSTALL_METADATA_FILENAME } from './extensions/variables.js';
 
 let currentTempHome = '';
 
@@ -22,7 +24,7 @@ vi.mock('@google/gemini-cli-core', async (importOriginal) => {
     await importOriginal<typeof import('@google/gemini-cli-core')>();
   return {
     ...actual,
-    homedir: () => currentTempHome,
+    realHomedir: () => currentTempHome,
     debugLogger: {
       log: vi.fn(),
       error: vi.fn(),
@@ -50,6 +52,9 @@ describe('ExtensionManager Settings Scope', () => {
     vi.mocked(loadSkillsFromDir).mockResolvedValue([]);
     currentTempHome = fs.mkdtempSync(
       path.join(os.tmpdir(), 'gemini-cli-test-home-'),
+    );
+    vi.spyOn(Storage, 'getGlobalGeminiDir').mockReturnValue(
+      path.join(currentTempHome, '.gemini'),
     );
     tempWorkspace = fs.mkdtempSync(
       path.join(os.tmpdir(), 'gemini-cli-test-workspace-'),
@@ -82,7 +87,7 @@ describe('ExtensionManager Settings Scope', () => {
       type: 'local',
     };
     fs.writeFileSync(
-      path.join(extensionDir, 'install-metadata.json'),
+      path.join(extensionDir, INSTALL_METADATA_FILENAME),
       JSON.stringify(installMetadata),
     );
   });

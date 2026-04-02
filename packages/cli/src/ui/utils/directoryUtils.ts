@@ -7,7 +7,7 @@
 import * as path from 'node:path';
 import * as fs from 'node:fs';
 import { opendir } from 'node:fs/promises';
-import { homedir, type WorkspaceContext } from '@google/gemini-cli-core';
+import { realHomedir, type WorkspaceContext } from '@google/gemini-cli-core';
 
 const MAX_SUGGESTIONS = 50;
 const MATCH_BUFFER_MULTIPLIER = 3;
@@ -18,9 +18,9 @@ export function expandHomeDir(p: string): string {
   }
   let expandedPath = p;
   if (p.toLowerCase().startsWith('%userprofile%')) {
-    expandedPath = homedir() + p.substring('%userprofile%'.length);
+    expandedPath = realHomedir() + p.substring('%userprofile%'.length);
   } else if (p === '~' || p.startsWith('~/')) {
-    expandedPath = homedir() + p.substring(1);
+    expandedPath = realHomedir() + p.substring(1);
   }
   return path.normalize(expandedPath);
 }
@@ -56,7 +56,7 @@ function parsePartialPath(partialPath: string): ParsedPath {
       !partialPath.includes('/') &&
       !partialPath.includes(path.sep)
     ) {
-      searchDir = homedir();
+      searchDir = realHomedir();
       filter = partialPath.substring(1);
     }
   }

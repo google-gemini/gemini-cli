@@ -101,7 +101,7 @@ vi.mock('@google/gemini-cli-core', async (importOriginal) => {
       }
     },
     GEMINI_DIR: '.gemini',
-    homedir: mockedHomedir,
+    realHomedir: mockedHomedir,
   };
 });
 
@@ -400,7 +400,11 @@ describe('sandbox', () => {
           '--volume',
           '/host/path:/container/path:ro',
           '--volume',
-          expect.stringMatching(/[\\/]home[\\/]user[\\/]\.gemini/),
+          '/home/user/.config/gemini-cli:/home/user/.config/gemini-cli',
+          '--volume',
+          '/home/user/.cache/gemini-cli:/home/user/.cache/gemini-cli',
+          '--volume',
+          '/home/user/.cache/gemini-cli/tmp:/home/user/.cache/gemini-cli/tmp',
         ]),
         expect.any(Object),
       );

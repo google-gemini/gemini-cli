@@ -8,7 +8,7 @@ import fs from 'node:fs/promises';
 import path from 'node:path';
 import process from 'node:process';
 import {
-  homedir,
+  realHomedir,
   getCompatibilityWarnings,
   WarningPriority,
   type StartupWarning,
@@ -37,7 +37,7 @@ const homeDirectoryCheck: WarningCheck = {
     try {
       const [workspaceRealPath, homeRealPath] = await Promise.all([
         fs.realpath(workspaceRoot),
-        fs.realpath(homedir()),
+        fs.realpath(realHomedir()),
       ]);
 
       if (workspaceRealPath === homeRealPath) {

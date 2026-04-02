@@ -54,10 +54,14 @@ describe('Memory Manager Policy', () => {
     expect(result.decision).toBe(PolicyDecision.ALLOW);
   });
 
-  it('should allow save_memory to list the user config folder', async () => {
+  it('should allow save_memory to replace the user config GEMINI.md', async () => {
     const toolCall = {
-      name: 'list_directory',
-      args: { dir_path: '~/.config/gemini-cli/' },
+      name: 'replace',
+      args: {
+        file_path: '~/.config/gemini-cli/GEMINI.md',
+        old_string: 'old',
+        new_string: 'new',
+      },
     };
     const result = await engine.check(
       toolCall,
@@ -68,7 +72,24 @@ describe('Memory Manager Policy', () => {
     expect(result.decision).toBe(PolicyDecision.ALLOW);
   });
 
-  it('should fall through to global allow rule for save_memory reading non-.gemini files', async () => {
+  it('should deny save_memory reading non-GEMINI files in the user config dir', async () => {
+    const toolCall = {
+      name: 'read_file',
+      args: { file_path: '~/.config/gemini-cli/settings.json' },
+    };
+    const result = await engine.check(
+      toolCall,
+      undefined,
+      undefined,
+      'save_memory',
+    );
+    expect(result.decision).toBe(PolicyDecision.DENY);
+    expect(result.rule?.denyMessage).toContain(
+      'Memory Manager may only access GEMINI.md files.',
+    );
+  });
+
+  it('should deny save_memory reading non-GEMINI files outside the user config dir', async () => {
     const toolCall = {
       name: 'read_file',
       args: { file_path: '/etc/passwd' },
@@ -79,12 +100,13 @@ describe('Memory Manager Policy', () => {
       undefined,
       'save_memory',
     );
-    // The memory-manager policy only matches the user config folder.
-    // Other paths fall through to the global read_file allow rule (priority 50).
-    expect(result.decision).toBe(PolicyDecision.ALLOW);
+    expect(result.decision).toBe(PolicyDecision.DENY);
+    expect(result.rule?.denyMessage).toContain(
+      'Memory Manager may only access GEMINI.md files.',
+    );
   });
 
-  it('should not match paths where .gemini is a substring (e.g. not.gemini)', async () => {
+  it('should deny save_memory when the path is not a GEMINI.md file', async () => {
     const toolCall = {
       name: 'read_file',
       args: { file_path: '/tmp/not.gemini/evil' },
@@ -95,10 +117,7 @@ describe('Memory Manager Policy', () => {
       undefined,
       'save_memory',
     );
-    // The tighter argsPattern requires the config folder to be preceded by
-    // start-of-string or a path separator, so "not.gemini/" should NOT match.
-    // It falls through to the global read_file allow rule instead.
-    expect(result.decision).toBe(PolicyDecision.ALLOW);
+    expect(result.decision).toBe(PolicyDecision.DENY);
   });
 
   it('should fall through to global allow rule for other agents accessing the user config folder', async () => {

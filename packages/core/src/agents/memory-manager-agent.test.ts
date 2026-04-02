@@ -9,9 +9,6 @@ import { MemoryManagerAgent } from './memory-manager-agent.js';
 import {
   ASK_USER_TOOL_NAME,
   EDIT_TOOL_NAME,
-  GLOB_TOOL_NAME,
-  GREP_TOOL_NAME,
-  LS_TOOL_NAME,
   READ_FILE_TOOL_NAME,
   WRITE_FILE_TOOL_NAME,
 } from '../tools/tool-names.js';
@@ -122,7 +119,7 @@ describe('MemoryManagerAgent', () => {
     expect(query).not.toContain('# Initial Context');
   });
 
-  it('should have file-management and search tools', () => {
+  it('should have only the file-management tools required for GEMINI.md maintenance', () => {
     const agent = MemoryManagerAgent(createMockConfig());
     expect(agent.toolConfig).toBeDefined();
     expect(agent.toolConfig!.tools).toEqual(
@@ -130,11 +127,11 @@ describe('MemoryManagerAgent', () => {
         READ_FILE_TOOL_NAME,
         EDIT_TOOL_NAME,
         WRITE_FILE_TOOL_NAME,
-        LS_TOOL_NAME,
-        GLOB_TOOL_NAME,
-        GREP_TOOL_NAME,
         ASK_USER_TOOL_NAME,
       ]),
+    );
+    expect(agent.toolConfig!.tools).not.toEqual(
+      expect.arrayContaining(['list_directory', 'glob', 'grep_search']),
     );
   });
 

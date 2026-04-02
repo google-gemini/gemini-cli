@@ -6,7 +6,7 @@
 
 import path from 'node:path';
 import process from 'node:process';
-import { homedir } from '../utils/paths.js';
+import { realHomedir } from '../utils/paths.js';
 import { debugLogger } from '../utils/debugLogger.js';
 import * as snippets from './snippets.js';
 import * as legacySnippets from './snippets.legacy.js';
@@ -36,7 +36,7 @@ export function resolvePathFromEnv(envVar?: string): ResolvedPath {
   let customPath = trimmedEnvVar;
   if (customPath.startsWith('~/') || customPath === '~') {
     try {
-      const home = homedir();
+      const home = realHomedir();
       if (customPath === '~') {
         customPath = home;
       } else {

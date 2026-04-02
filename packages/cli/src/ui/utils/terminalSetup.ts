@@ -31,7 +31,7 @@ import { exec } from 'node:child_process';
 import { promisify } from 'node:util';
 import { terminalCapabilityManager } from './terminalCapabilityManager.js';
 
-import { debugLogger, homedir } from '@google/gemini-cli-core';
+import { debugLogger, realHomedir } from '@google/gemini-cli-core';
 import { useEffect } from 'react';
 import { persistentState } from '../../utils/persistentState.js';
 import { requestConsentInteractive } from '../../config/extensions/consent.js';
@@ -195,7 +195,7 @@ function getVSCodeStyleConfigDir(appName: string): string | null {
 
   if (platform === 'darwin') {
     return path.join(
-      homedir(),
+      realHomedir(),
       'Library',
       'Application Support',
       appName,
@@ -207,7 +207,7 @@ function getVSCodeStyleConfigDir(appName: string): string | null {
     }
     return path.join(process.env['APPDATA'], appName, 'User');
   } else {
-    return path.join(homedir(), '.config', appName, 'User');
+    return path.join(realHomedir(), '.config', appName, 'User');
   }
 }
 

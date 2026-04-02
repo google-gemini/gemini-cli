@@ -24,7 +24,7 @@ vi.mock('fs', async (importOriginal) => {
 });
 
 import { Storage } from './storage.js';
-import { GEMINI_DIR, homedir, resolveToRealPath } from '../utils/paths.js';
+import { GEMINI_DIR, realHomedir, resolveToRealPath } from '../utils/paths.js';
 import { ProjectRegistry } from './projectRegistry.js';
 import { StorageMigration } from './storageMigration.js';
 
@@ -76,7 +76,7 @@ vi.mock('../utils/paths.js', async (importOriginal) => {
   const actual = await importOriginal<typeof import('../utils/paths.js')>();
   return {
     ...actual,
-    homedir: vi.fn(actual.homedir),
+    realHomedir: vi.fn(actual.realHomedir),
     getUserConfigDir: vi.fn(() => '/mock/home/.config/gemini-cli'),
     getUserCacheDir: vi.fn(() => '/mock/home/.cache/gemini-cli'),
     getUserTmpDir: vi.fn(() => '/mock/home/.cache/gemini-cli/tmp'),
@@ -95,12 +95,12 @@ describe('Storage – getGlobalSettingsPath', () => {
 
 describe('Storage - Security', () => {
   it('falls back to tmp for gemini but returns empty for agents if the home directory cannot be determined', () => {
-    vi.mocked(homedir).mockReturnValue('');
+    vi.mocked(realHomedir).mockReturnValue('');
 
     // .agents returns empty to avoid insecure fallback WITHOUT throwing error
     expect(Storage.getGlobalAgentsDir()).toBe('');
 
-    vi.mocked(homedir).mockReturnValue(os.homedir());
+    vi.mocked(realHomedir).mockReturnValue(os.homedir());
   });
 });
 

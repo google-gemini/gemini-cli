@@ -10,7 +10,7 @@ import * as crypto from 'node:crypto';
 import * as fs from 'node:fs';
 import {
   GEMINI_DIR,
-  homedir,
+  realHomedir,
   GOOGLE_ACCOUNTS_FILENAME,
   getUserConfigDir,
   getUserCacheDir,
@@ -63,7 +63,7 @@ export class Storage {
   }
 
   static getGlobalAgentsDir(): string {
-    const homeDir = homedir();
+    const homeDir = realHomedir();
     if (!homeDir) {
       return '';
     }
@@ -180,7 +180,7 @@ export class Storage {
   isWorkspaceHomeDir(): boolean {
     return (
       normalizePath(resolveToRealPath(this.targetDir)) ===
-      normalizePath(resolveToRealPath(homedir()))
+      normalizePath(resolveToRealPath(realHomedir()))
     );
   }
 

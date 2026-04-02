@@ -10,7 +10,7 @@ import * as path from 'node:path';
 import * as fs from 'node:fs';
 import { IDE_DEFINITIONS, type IdeInfo } from './detect-ide.js';
 import { GEMINI_CLI_COMPANION_EXTENSION_NAME } from './constants.js';
-import { homedir } from '../utils/paths.js';
+import { realHomedir } from '../utils/paths.js';
 
 export interface IdeInstaller {
   install(): Promise<InstallResult>;
@@ -49,7 +49,7 @@ async function findCommand(
 
   // 2. Check common installation locations.
   const locations: string[] = [];
-  const homeDir = homedir();
+  const homeDir = realHomedir();
 
   interface AppConfigEntry {
     mac?: { appName: string; supportDirName: string };

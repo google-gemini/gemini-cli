@@ -9,12 +9,16 @@ import * as fs from 'node:fs';
 import * as path from 'node:path';
 import * as os from 'node:os';
 import { ExtensionManager } from './extension-manager.js';
-import { debugLogger } from '@google/gemini-cli-core';
+import { debugLogger, Storage } from '@google/gemini-cli-core';
 import { createTestMergedSettings } from './settings.js';
 import { createExtension } from '../test-utils/createExtension.js';
 import { EXTENSIONS_DIRECTORY_NAME } from './extensions/variables.js';
 
 const mockHomedir = vi.hoisted(() => vi.fn(() => '/tmp/mock-home'));
+const mockIntegrityManager = vi.hoisted(() => ({
+  verify: vi.fn().mockResolvedValue('verified'),
+  store: vi.fn().mockResolvedValue(undefined),
+}));
 
 vi.mock('node:os', async (importOriginal) => {
   const actual = await importOriginal<typeof import('node:os')>();
@@ -29,7 +33,7 @@ vi.mock('@google/gemini-cli-core', async (importOriginal) => {
   const core = await importOriginal<typeof import('@google/gemini-cli-core')>();
   return {
     ...core,
-    homedir: mockHomedir,
+    realHomedir: mockHomedir,
     loadAgentsFromDirectory: core.loadAgentsFromDirectory,
     loadSkillsFromDir: core.loadSkillsFromDir,
   };
@@ -46,9 +50,12 @@ describe('ExtensionManager agents loading', () => {
 
     tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'gemini-test-agents-'));
     mockHomedir.mockReturnValue(tempDir);
+    vi.spyOn(Storage, 'getGlobalGeminiDir').mockReturnValue(
+      path.join(tempDir, '.gemini'),
+    );
 
     // Create the extensions directory that ExtensionManager expects
-    extensionsDir = path.join(tempDir, '.gemini', EXTENSIONS_DIRECTORY_NAME);
+    extensionsDir = path.join(tempDir, EXTENSIONS_DIRECTORY_NAME);
     fs.mkdirSync(extensionsDir, { recursive: true });
 
     extensionManager = new ExtensionManager({
@@ -58,6 +65,7 @@ describe('ExtensionManager agents loading', () => {
       requestConsent: vi.fn().mockResolvedValue(true),
       requestSetting: vi.fn(),
       workspaceDir: tempDir,
+      integrityManager: mockIntegrityManager,
     });
   });
 

@@ -5,7 +5,7 @@
  */
 
 import * as path from 'node:path';
-import { homedir } from '@google/gemini-cli-core';
+import { realHomedir } from '@google/gemini-cli-core';
 
 export function resolvePath(p: string): string {
   if (!p) {
@@ -13,9 +13,9 @@ export function resolvePath(p: string): string {
   }
   let expandedPath = p;
   if (p.toLowerCase().startsWith('%userprofile%')) {
-    expandedPath = homedir() + p.substring('%userprofile%'.length);
+    expandedPath = realHomedir() + p.substring('%userprofile%'.length);
   } else if (p === '~' || p.startsWith('~/')) {
-    expandedPath = homedir() + p.substring(1);
+    expandedPath = realHomedir() + p.substring(1);
   }
   return path.normalize(expandedPath);
 }
