@@ -12,9 +12,9 @@ import { AnsiOutputText, AnsiLineText } from '../AnsiOutput.js';
 import { SlicingMaxSizedBox } from '../shared/SlicingMaxSizedBox.js';
 import { theme } from '../../semantic-colors.js';
 import {
-  type AnsiOutput,
   type AnsiLine,
   isSubagentProgress,
+  type ToolResultDisplay as CoreToolResultDisplay,
 } from '@google/gemini-cli-core';
 import { useUIState } from '../../contexts/UIStateContext.js';
 import { tryParseJSON } from '../../../utils/jsonoutput.js';
@@ -27,18 +27,13 @@ import { calculateToolContentMaxLines } from '../../utils/toolLayoutUtils.js';
 import { SubagentProgressDisplay } from './SubagentProgressDisplay.js';
 
 export interface ToolResultDisplayProps {
-  resultDisplay: string | object | undefined;
+  resultDisplay: CoreToolResultDisplay | undefined;
   availableTerminalHeight?: number;
   terminalWidth: number;
   renderOutputAsMarkdown?: boolean;
   maxLines?: number;
   hasFocus?: boolean;
   overflowDirection?: 'top' | 'bottom';
-}
-
-interface FileDiffResult {
-  fileDiff: string;
-  fileName: string;
 }
 
 export const ToolResultDisplay: React.FC<ToolResultDisplayProps> = ({
@@ -84,7 +79,7 @@ export const ToolResultDisplay: React.FC<ToolResultDisplayProps> = ({
     return null;
   }
 
-  const renderContent = (contentData: string | object | undefined) => {
+  const renderContent = (contentData: CoreToolResultDisplay | undefined) => {
     // Check if string content is valid JSON and pretty-print it
     const prettyJSON =
       typeof contentData === 'string' ? tryParseJSON(contentData) : null;
@@ -123,28 +118,27 @@ export const ToolResultDisplay: React.FC<ToolResultDisplayProps> = ({
           {contentData}
         </Text>
       );
-    } else if (typeof contentData === 'object' && 'fileDiff' in contentData) {
+    } else if (
+      contentData &&
+      typeof contentData === 'object' &&
+      'fileDiff' in contentData
+    ) {
       content = (
         <DiffRenderer
-          diffContent={
-            // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
-            (contentData as FileDiffResult).fileDiff
-          }
-          // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
-          filename={(contentData as FileDiffResult).fileName}
+          diffContent={contentData.fileDiff}
+          filename={contentData.fileName}
           availableTerminalHeight={availableHeight}
           terminalWidth={childWidth}
         />
       );
-    } else {
+    } else if (Array.isArray(contentData)) {
       const shouldDisableTruncation =
         isAlternateBuffer ||
         (availableTerminalHeight === undefined && maxLines === undefined);
 
       content = (
         <AnsiOutputText
-          // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
-          data={contentData as AnsiOutput}
+          data={contentData}
           availableTerminalHeight={
             isAlternateBuffer ? undefined : availableHeight
           }
@@ -152,6 +146,12 @@ export const ToolResultDisplay: React.FC<ToolResultDisplayProps> = ({
           maxLines={isAlternateBuffer ? undefined : maxLines}
           disableTruncation={shouldDisableTruncation}
         />
+      );
+    } else {
+      content = (
+        <Text wrap="wrap" color={theme.text.primary}>
+          {JSON.stringify(contentData, null, 2)}
+        </Text>
       );
     }
 
@@ -178,18 +178,13 @@ export const ToolResultDisplay: React.FC<ToolResultDisplayProps> = ({
     // Virtualized path for large ANSI arrays
     if (Array.isArray(resultDisplay)) {
       const limit = maxLines ?? availableHeight ?? ACTIVE_SHELL_MAX_LINES;
-      const listHeight = Math.min(
-        // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
-        (resultDisplay as AnsiOutput).length,
-        limit,
-      );
+      const listHeight = Math.min(resultDisplay.length, limit);
 
       return (
         <Box width={childWidth} flexDirection="column" maxHeight={listHeight}>
           <ScrollableList
             width={childWidth}
-            // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
-            data={resultDisplay as AnsiOutput}
+            data={resultDisplay}
             renderItem={renderVirtualizedAnsiLine}
             estimatedItemHeight={() => 1}
             keyExtractor={keyExtractor}

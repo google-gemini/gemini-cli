@@ -36,6 +36,16 @@ exports[`ToolResultDisplay > renders string result as plain text when renderOutp
 "
 `;
 
+exports[`ToolResultDisplay > renders unknown objects as stringified JSON 1`] = `
+"{
+  "hello": "world",
+  "nested": {
+    "value": 42
+  }
+}
+"
+`;
+
 exports[`ToolResultDisplay > truncates very long string results 1`] = `
 "... 249 hidden (Ctrl+O) ...
 aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa

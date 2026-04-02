@@ -35,11 +35,12 @@ export const AnsiOutputText: React.FC<AnsiOutputProps> = ({
       ? Math.min(availableHeightLimit, maxLines)
       : (availableHeightLimit ?? maxLines ?? DEFAULT_HEIGHT);
 
+  const arrayData = Array.isArray(data) ? data : [];
   const lastLines = disableTruncation
-    ? data
+    ? arrayData
     : numLinesRetained === 0
       ? []
-      : data.slice(-numLinesRetained);
+      : arrayData.slice(-numLinesRetained);
   return (
     <Box flexDirection="column" width={width} flexShrink={0} overflow="hidden">
       {lastLines.map((line: AnsiLine, lineIndex: number) => (

@@ -148,6 +148,9 @@ describe('ToolResultDisplay', () => {
     const diffResult = {
       fileDiff: 'diff content',
       fileName: 'test.ts',
+      filePath: 'test.ts',
+      originalContent: null,
+      newContent: 'new',
     };
     const { lastFrame, waitUntilReady, unmount } = await renderWithProviders(
       <ToolResultDisplay
@@ -218,6 +221,34 @@ describe('ToolResultDisplay', () => {
     await waitUntilReady();
     const output = lastFrame({ allowEmpty: true });
 
+    expect(output).toMatchSnapshot();
+    unmount();
+  });
+
+  it('renders unknown objects as stringified JSON', async () => {
+    const unknownObject = {
+      hello: 'world',
+      nested: {
+        value: 42,
+      },
+    };
+    const { lastFrame, waitUntilReady, unmount } = await renderWithProviders(
+      <ToolResultDisplay
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        resultDisplay={unknownObject as any}
+        terminalWidth={80}
+        availableTerminalHeight={20}
+      />,
+      {
+        config: makeFakeConfig({ useAlternateBuffer: false }),
+        settings: createMockSettings({ ui: { useAlternateBuffer: false } }),
+      },
+    );
+    await waitUntilReady();
+    const output = lastFrame();
+
+    expect(output).toContain('"hello": "world"');
+    expect(output).toContain('"value": 42');
     expect(output).toMatchSnapshot();
     unmount();
   });
