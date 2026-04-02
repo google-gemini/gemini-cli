@@ -42,6 +42,14 @@ export const MaxSizedBox: React.FC<MaxSizedBoxProps> = ({
   const id = useId();
   const { addOverflowingId, removeOverflowingId } = useOverflowActions() || {};
   const observerRef = useRef<ResizeObserver | null>(null);
+
+  useEffect(
+    () => () => {
+      observerRef.current?.disconnect();
+    },
+    [],
+  );
+
   const [contentHeight, setContentHeight] = useState(0);
 
   const onRefChange = useCallback(

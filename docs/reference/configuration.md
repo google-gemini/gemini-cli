@@ -339,6 +339,16 @@ their corresponding top-level category object in your `settings.json` file.
   - **Default:** `false`
   - **Requires restart:** Yes
 
+- **`ui.renderProcess`** (boolean):
+  - **Description:** Enable Ink render process for the UI.
+  - **Default:** `true`
+  - **Requires restart:** Yes
+
+- **`ui.terminalBuffer`** (boolean):
+  - **Description:** Use the new terminal buffer architecture for rendering.
+  - **Default:** `true`
+  - **Requires restart:** Yes
+
 - **`ui.useBackgroundColor`** (boolean):
   - **Description:** Whether to use background colors in the UI.
   - **Default:** `true`

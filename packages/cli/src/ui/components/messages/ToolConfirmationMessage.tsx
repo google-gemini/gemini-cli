@@ -90,6 +90,13 @@ export const ToolConfirmationMessage: React.FC<
     useState(0);
   const observerRef = useRef<ResizeObserver | null>(null);
 
+  useEffect(
+    () => () => {
+      observerRef.current?.disconnect();
+    },
+    [],
+  );
+
   const deceptiveUrlWarnings = useMemo(() => {
     const urls: string[] = [];
     if (confirmationDetails.type === 'info' && confirmationDetails.urls) {
