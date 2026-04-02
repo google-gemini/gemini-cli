@@ -48,9 +48,7 @@ describe('LoginRestartDialog', () => {
     const { lastFrame, unmount } = await render(
       <LoginRestartDialog onDismiss={onDismiss} config={mockConfig} />,
     );
-    expect(lastFrame()).toContain(
-      "You've successfully signed in with Google. Gemini CLI needs to be restarted.",
-    );
+    expect(lastFrame()).toMatchSnapshot();
     unmount();
   });
 
@@ -62,12 +60,7 @@ describe('LoginRestartDialog', () => {
         message="Switching to Vertex AI in Cloud Shell requires a restart to apply project settings."
       />,
     );
-    expect(lastFrame()).toContain(
-      'Switching to Vertex AI in Cloud Shell requires a restart to apply project settings.',
-    );
-    expect(lastFrame()).not.toContain(
-      "You've successfully signed in with Google",
-    );
+    expect(lastFrame()).toMatchSnapshot();
     unmount();
   });
 

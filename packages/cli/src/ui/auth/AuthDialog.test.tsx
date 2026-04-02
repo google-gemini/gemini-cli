@@ -258,7 +258,7 @@ describe('AuthDialog', () => {
     });
 
     it('sets auth context with empty object for USE_VERTEX_AI outside Cloud Shell', async () => {
-      vi.stubEnv('CLOUD_SHELL', undefined as unknown as string);
+      vi.stubEnv('CLOUD_SHELL', '');
       mockedValidateAuthMethod.mockReturnValue(null);
       const { unmount } = await renderWithProviders(<AuthDialog {...props} />);
       const { onSelect: handleAuthSelect } =

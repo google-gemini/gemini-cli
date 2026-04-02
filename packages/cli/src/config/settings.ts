@@ -18,6 +18,7 @@ import {
   Storage,
   coreEvents,
   homedir,
+  AuthType,
   type AdminControlsSettings,
   createCache,
 } from '@google/gemini-cli-core';
@@ -538,7 +539,7 @@ export function setUpCloudShellEnvironment(
   // However, if the user has explicitly selected Vertex AI auth, they intend
   // to use their own GCP project, so we skip the Cloud Shell override to
   // respect their shell environment or .env settings.
-  if (selectedAuthType === 'vertex-ai') {
+  if (selectedAuthType === AuthType.USE_VERTEX_AI) {
     return;
   }
 

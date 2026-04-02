@@ -82,6 +82,7 @@ import {
   FatalConfigError,
   GEMINI_DIR,
   Storage,
+  AuthType,
   type MCPServerConfig,
 } from '@google/gemini-cli-core';
 import { updateSettingsFilePreservingFormat } from '../utils/commentJson.js';
@@ -202,6 +203,7 @@ describe('Settings Loading and Merging', () => {
 
   afterEach(() => {
     vi.restoreAllMocks();
+    vi.unstubAllEnvs();
   });
 
   describe('loadSettings', () => {
@@ -3132,8 +3134,8 @@ MALICIOUS_VAR=allowed-because-trusted
       });
 
       it('should not override GOOGLE_CLOUD_PROJECT in Cloud Shell when auth type is vertex-ai', () => {
-        process.env['CLOUD_SHELL'] = 'true';
-        process.env['GOOGLE_CLOUD_PROJECT'] = 'my-vertex-project';
+        vi.stubEnv('CLOUD_SHELL', 'true');
+        vi.stubEnv('GOOGLE_CLOUD_PROJECT', 'my-vertex-project');
         process.argv = ['node', 'gemini', '-s', 'prompt'];
         vi.mocked(isWorkspaceTrusted).mockReturnValue({
           isTrusted: false,
@@ -3146,7 +3148,7 @@ MALICIOUS_VAR=allowed-because-trusted
         loadEnvironment(
           createMockSettings({
             tools: { sandbox: false },
-            security: { auth: { selectedType: 'vertex-ai' } },
+            security: { auth: { selectedType: AuthType.USE_VERTEX_AI } },
           }).merged,
           MOCK_WORKSPACE_DIR,
         );

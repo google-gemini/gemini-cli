@@ -2053,7 +2053,6 @@ Logging in with Google... Restarting Gemini CLI to continue.
 
   const dialogsVisible =
     shouldShowIdePrompt ||
-    shouldShowIdePrompt ||
     isFolderTrustDialogOpen ||
     isPolicyUpdateDialogOpen ||
     adminSettingsChanged ||
