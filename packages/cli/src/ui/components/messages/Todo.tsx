@@ -5,18 +5,20 @@
  */
 
 import type React from 'react';
+import { useMemo } from 'react';
 import { type TodoList } from '@google/gemini-cli-core';
 import { useUIState } from '../../contexts/UIStateContext.js';
-import { useMemo } from 'react';
 import type { HistoryItemToolGroup } from '../../types.js';
 import { Checklist } from '../Checklist.js';
 import type { ChecklistItemData } from '../ChecklistItem.js';
+import { formatCommand } from '../../key/keybindingUtils.js';
+import { Command } from '../../key/keyBindings.js';
 
 export const TodoTray: React.FC = () => {
   const uiState = useUIState();
 
   const todos: TodoList | null = useMemo(() => {
-    // Find the most recent todo list written by the WriteTodosTool
+    // Find the most recent todo list written by tools that output a TodoList (e.g., WriteTodosTool or Tracker tools)
     for (let i = uiState.history.length - 1; i >= 0; i--) {
       const entry = uiState.history[i];
       if (entry.type !== 'tool_group') {
@@ -55,7 +57,7 @@ export const TodoTray: React.FC = () => {
       title="Todo"
       items={checklistItems}
       isExpanded={uiState.showFullTodos}
-      toggleHint="ctrl+t to toggle"
+      toggleHint={`${formatCommand(Command.SHOW_FULL_TODOS)} to toggle`}
     />
   );
 };

@@ -19,6 +19,11 @@ import {
   SYNTHETIC_THOUGHT_SIGNATURE,
   type StreamEvent,
 } from './geminiChat.js';
+import {
+  type CompletedToolCall,
+  CoreToolCallStatus,
+} from '../scheduler/types.js';
+import { MockTool } from '../test-utils/mock-tool.js';
 import type { Config } from '../config/config.js';
 import { setSimulate429 } from '../utils/testUtils.js';
 import { DEFAULT_THINKING_MODE } from '../config/models.js';
@@ -85,14 +90,20 @@ vi.mock('../fallback/handler.js', () => ({
   handleFallback: mockHandleFallback,
 }));
 
-const { mockLogContentRetry, mockLogContentRetryFailure } = vi.hoisted(() => ({
+const {
+  mockLogContentRetry,
+  mockLogContentRetryFailure,
+  mockLogNetworkRetryAttempt,
+} = vi.hoisted(() => ({
   mockLogContentRetry: vi.fn(),
   mockLogContentRetryFailure: vi.fn(),
+  mockLogNetworkRetryAttempt: vi.fn(),
 }));
 
 vi.mock('../telemetry/loggers.js', () => ({
   logContentRetry: mockLogContentRetry,
   logContentRetryFailure: mockLogContentRetryFailure,
+  logNetworkRetryAttempt: mockLogNetworkRetryAttempt,
 }));
 
 vi.mock('../telemetry/uiTelemetry.js', () => ({
@@ -131,6 +142,10 @@ describe('GeminiChat', () => {
     let currentActiveModel = 'gemini-pro';
 
     mockConfig = {
+      get config() {
+        return this;
+      },
+      promptId: 'test-session-id',
       getSessionId: () => 'test-session-id',
       getTelemetryLogPromptsEnabled: () => true,
       getUsageStatisticsEnabled: () => true,
@@ -155,6 +170,9 @@ describe('GeminiChat', () => {
       getToolRegistry: vi.fn().mockReturnValue({
         getTool: vi.fn(),
       }),
+      toolRegistry: {
+        getTool: vi.fn(),
+      },
       getContentGenerator: vi.fn().mockReturnValue(mockContentGenerator),
       getRetryFetchErrors: vi.fn().mockReturnValue(false),
       getMaxAttempts: vi.fn().mockReturnValue(10),
@@ -1122,40 +1140,6 @@ describe('GeminiChat', () => {
   });
 
   describe('sendMessageStream with retries', () => {
-    it('should not retry on invalid content if model does not start with gemini-2', async () => {
-      // Mock the stream to fail.
-      vi.mocked(mockContentGenerator.generateContentStream).mockImplementation(
-        async () =>
-          (async function* () {
-            yield {
-              candidates: [{ content: { parts: [{ text: '' }] } }],
-            } as unknown as GenerateContentResponse;
-          })(),
-      );
-
-      const stream = await chat.sendMessageStream(
-        { model: 'gemini-1.5-pro' },
-        'test',
-        'prompt-id-no-retry',
-        new AbortController().signal,
-        LlmRole.MAIN,
-      );
-
-      await expect(
-        (async () => {
-          for await (const _ of stream) {
-            // Must loop to trigger the internal logic that throws.
-          }
-        })(),
-      ).rejects.toThrow(InvalidStreamError);
-
-      // Should be called only 1 time (no retry)
-      expect(mockContentGenerator.generateContentStream).toHaveBeenCalledTimes(
-        1,
-      );
-      expect(mockLogContentRetry).not.toHaveBeenCalled();
-    });
-
     it('should yield a RETRY event when an invalid stream is encountered', async () => {
       // ARRANGE: Mock the stream to fail once, then succeed.
       vi.mocked(mockContentGenerator.generateContentStream)
@@ -1373,11 +1357,11 @@ describe('GeminiChat', () => {
         }
       }).rejects.toThrow(InvalidStreamError);
 
-      // Should be called 2 times (initial + 1 retry)
+      // Should be called 4 times (initial + 3 retries)
       expect(mockContentGenerator.generateContentStream).toHaveBeenCalledTimes(
-        2,
+        4,
       );
-      expect(mockLogContentRetry).toHaveBeenCalledTimes(1);
+      expect(mockLogContentRetry).toHaveBeenCalledTimes(3);
       expect(mockLogContentRetryFailure).toHaveBeenCalledTimes(1);
 
       // History should still contain the user message.
@@ -2556,6 +2540,80 @@ describe('GeminiChat', () => {
         type: StreamEventType.CHUNK,
         value: response,
       });
+    });
+  });
+
+  describe('recordCompletedToolCalls', () => {
+    it('should use originalRequestName and originalRequestArgs if present', () => {
+      const completedCall: CompletedToolCall = {
+        status: CoreToolCallStatus.Success,
+        request: {
+          callId: 'call-1',
+          name: 'tail-tool',
+          args: { tail: 'args' },
+          originalRequestName: 'original-tool',
+          originalRequestArgs: { original: 'args' },
+          isClientInitiated: false,
+          prompt_id: 'p1',
+        },
+        response: {
+          callId: 'call-1',
+          responseParts: [{ text: 'response' }],
+          resultDisplay: undefined,
+          error: undefined,
+          errorType: undefined,
+        },
+        tool: new MockTool({ name: 'mock-tool' }),
+        invocation: new MockTool({ name: 'mock-tool' }).build({ key: 'value' }),
+      };
+
+      const spy = vi.spyOn(chat.getChatRecordingService(), 'recordToolCalls');
+
+      chat.recordCompletedToolCalls('test-model', [completedCall]);
+
+      expect(spy).toHaveBeenCalledWith('test-model', [
+        expect.objectContaining({
+          id: 'call-1',
+          name: 'original-tool',
+          args: { original: 'args' },
+          result: [{ text: 'response' }],
+        }),
+      ]);
+    });
+
+    it('should fall back to request name and args if original are not present', () => {
+      const completedCall: CompletedToolCall = {
+        status: CoreToolCallStatus.Success,
+        request: {
+          callId: 'call-1',
+          name: 'tool-name',
+          args: { key: 'value' },
+          isClientInitiated: false,
+          prompt_id: 'p1',
+        },
+        response: {
+          callId: 'call-1',
+          responseParts: [{ text: 'response' }],
+          resultDisplay: undefined,
+          error: undefined,
+          errorType: undefined,
+        },
+        tool: new MockTool({ name: 'mock-tool' }),
+        invocation: new MockTool({ name: 'mock-tool' }).build({ key: 'value' }),
+      };
+
+      const spy = vi.spyOn(chat.getChatRecordingService(), 'recordToolCalls');
+
+      chat.recordCompletedToolCalls('test-model', [completedCall]);
+
+      expect(spy).toHaveBeenCalledWith('test-model', [
+        expect.objectContaining({
+          id: 'call-1',
+          name: 'tool-name',
+          args: { key: 'value' },
+          result: [{ text: 'response' }],
+        }),
+      ]);
     });
   });
 });

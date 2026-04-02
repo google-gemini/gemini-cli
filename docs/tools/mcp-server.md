@@ -176,8 +176,8 @@ Each server configuration supports the following properties:
   enabled by default.
 - **`excludeTools`** (string[]): List of tool names to exclude from this MCP
   server. Tools listed here will not be available to the model, even if they are
-  exposed by the server. **Note:** `excludeTools` takes precedence over
-  `includeTools` - if a tool is in both lists, it will be excluded.
+  exposed by the server. `excludeTools` takes precedence over `includeTools`. If
+  a tool is in both lists, it will be excluded.
 - **`targetAudience`** (string): The OAuth Client ID allowlisted on the
   IAP-protected application you are trying to access. Used with
   `authProviderType: 'service_account_impersonation'`.
@@ -238,7 +238,9 @@ This follows the security principle that if a variable is explicitly configured
 by the user for a specific server, it constitutes informed consent to share that
 specific data with that server.
 
-> **Note:** Even when explicitly defined, you should avoid hardcoding secrets.
+<!-- prettier-ignore -->
+> [!NOTE]
+> Even when explicitly defined, you should avoid hardcoding secrets.
 > Instead, use environment variable expansion (e.g., `"MY_KEY": "$MY_KEY"`) to
 > securely pull the value from your host environment at runtime.
 
@@ -283,10 +285,12 @@ When connecting to an OAuth-enabled server:
 
 #### Browser redirect requirements
 
-**Important:** OAuth authentication requires that your local machine can:
-
-- Open a web browser for authentication
-- Receive redirects on `http://localhost:7777/oauth/callback`
+<!-- prettier-ignore -->
+> [!IMPORTANT]
+> OAuth authentication requires that your local machine can:
+>
+> - Open a web browser for authentication
+> - Receive redirects on `http://localhost:7777/oauth/callback`
 
 This feature will not work in:
 
@@ -372,7 +376,7 @@ To authenticate with a server using Service Account Impersonation, you must set
 the `authProviderType` to `service_account_impersonation` and provide the
 following properties:
 
-- **`targetAudience`** (string): The OAuth Client ID allowslisted on the
+- **`targetAudience`** (string): The OAuth Client ID allowlisted on the
   IAP-protected application you are trying to access.
 - **`targetServiceAccount`** (string): The email address of the Google Cloud
   Service Account to impersonate.
@@ -555,21 +559,36 @@ Upon successful connection:
    `excludeTools` configuration
 4. **Name sanitization:** Tool names are cleaned to meet Gemini API
    requirements:
-   - Invalid characters (non-alphanumeric, underscore, dot, hyphen) are replaced
-     with underscores
+   - Characters other than letters, numbers, underscore (`_`), hyphen (`-`), dot
+     (`.`), and colon (`:`) are replaced with underscores
    - Names longer than 63 characters are truncated with middle replacement
-     (`___`)
+     (`...`)
 
-### 3. Conflict resolution
+### 3. Tool naming and namespaces
 
-When multiple servers expose tools with the same name:
+To prevent collisions across multiple servers or conflicting built-in tools,
+every discovered MCP tool is assigned a strict namespace.
 
-1. **First registration wins:** The first server to register a tool name gets
-   the unprefixed name
-2. **Automatic prefixing:** Subsequent servers get prefixed names:
-   `serverName__toolName`
-3. **Registry tracking:** The tool registry maintains mappings between server
-   names and their tools
+1. **Automatic FQN:** All MCP tools are unconditionally assigned a fully
+   qualified name (FQN) using the format `mcp_{serverName}_{toolName}`.
+2. **Registry tracking:** The tool registry maintains metadata mappings between
+   these FQNs and their original server identities.
+3. **Overwrites:** If two servers share the exact same alias in your
+   configuration and provide tools with the exact same name, the last registered
+   tool overwrites the previous one.
+4. **Policies:** To configure permissions (like auto-approval or denial) for MCP
+   tools, see
+   [Special syntax for MCP tools](../reference/policy-engine.md#special-syntax-for-mcp-tools)
+   in the Policy Engine documentation.
+
+<!-- prettier-ignore -->
+> [!WARNING]
+> Do not use underscores (`_`) in your MCP server names (e.g., use
+> `my-server` rather than `my_server`). The policy parser splits Fully Qualified
+> Names (`mcp_server_tool`) on the _first_ underscore following the `mcp_`
+> prefix. If your server name contains an underscore, the parser will
+> misinterpret the server identity, which can cause wildcard rules and security
+> policies to fail silently.
 
 ### 4. Schema processing
 
@@ -695,7 +714,7 @@ MCP Servers Status:
 
 🐳 dockerizedServer (CONNECTED)
   Command: docker run -i --rm -e API_KEY my-mcp-server:latest
-  Tools: docker__deploy, docker__status
+  Tools: mcp_dockerizedServer_docker_deploy, mcp_dockerizedServer_docker_status
 
 Discovery State: COMPLETED
 ```
@@ -715,6 +734,43 @@ tools. The model will automatically:
 ### Connection states
 
 The MCP integration tracks several states:
+
+#### Overriding extension configurations
+
+If an MCP server is provided by an extension (for example, the
+`google-workspace` extension), you can still override its settings in your local
+`settings.json`. Gemini CLI merges your local configuration with the extension's
+defaults:
+
+- **Tool lists:** Tool lists are merged securely to ensure the most restrictive
+  policy wins:
+  - **Exclusions (`excludeTools`):** Arrays are combined (unioned). If either
+    source blocks a tool, it remains disabled.
+  - **Inclusions (`includeTools`):** Arrays are intersected. If both sources
+    provide an allowlist, only tools present in **both** lists are enabled. If
+    only one source provides an allowlist, that list is respected.
+  - **Precedence:** `excludeTools` always takes precedence over `includeTools`.
+
+  This ensures you always have veto power over tools provided by an extension
+  and that an extension cannot re-enable tools you have omitted from your
+  personal allowlist.
+
+- **Environment variables:** The `env` objects are merged. If the same variable
+  is defined in both places, your local value takes precedence.
+- **Scalar properties:** Properties like `command`, `url`, and `timeout` are
+  replaced by your local values if provided.
+
+**Example override:**
+
+```json
+{
+  "mcpServers": {
+    "google-workspace": {
+      "excludeTools": ["gmail.send"]
+    }
+  }
+}
+```
 
 #### Server status (`MCPServerStatus`)
 
@@ -1066,7 +1122,9 @@ command has no flags.
 gemini mcp list
 ```
 
-> **Note on Trust:** For security, `stdio` MCP servers (those using the
+<!-- prettier-ignore -->
+> [!NOTE]
+> For security, `stdio` MCP servers (those using the
 > `command` property) are only tested and displayed as "Connected" if the
 > current folder is trusted. If the folder is untrusted, they will show as
 > "Disconnected". Use `gemini trust` to trust the current folder.

@@ -14,14 +14,16 @@ import {
   FatalConfigError,
   GEMINI_DIR,
   getErrorMessage,
+  getFsErrorMessage,
   Storage,
   coreEvents,
   homedir,
   type AdminControlsSettings,
+  createCache,
 } from '@google/gemini-cli-core';
 import stripJsonComments from 'strip-json-comments';
-import { DefaultLight } from '../ui/themes/default-light.js';
-import { DefaultDark } from '../ui/themes/default.js';
+import { DefaultLight } from '../ui/themes/builtin/light/default-light.js';
+import { DefaultDark } from '../ui/themes/builtin/dark/default-dark.js';
 import { isWorkspaceTrusted } from './trustedFolders.js';
 import {
   type Settings,
@@ -478,6 +480,7 @@ export class LoadedSettings {
     admin.mcp = {
       enabled: mcpSetting?.mcpEnabled,
       config: mcpSetting?.mcpConfig?.mcpServers,
+      requiredConfig: mcpSetting?.requiredMcpConfig,
     };
     admin.extensions = {
       enabled: cliFeatureSetting?.extensionsSetting?.extensionsEnabled,
@@ -609,10 +612,28 @@ export function loadEnvironment(
           }
         }
       }
-    } catch (_e) {
+    } catch {
       // Errors are ignored to match the behavior of `dotenv.config({ quiet: true })`.
     }
   }
+}
+
+// Cache to store the results of loadSettings to avoid redundant disk I/O.
+const settingsCache = createCache<string, LoadedSettings>({
+  storage: 'map',
+  defaultTtl: 10000, // 10 seconds
+});
+
+/**
+ * Resets the settings cache. Used exclusively for test isolation.
+ * @internal
+ */
+export function resetSettingsCacheForTesting() {
+  settingsCache.clear();
+}
+
+export function isWorktreeEnabled(settings: LoadedSettings): boolean {
+  return settings.merged.experimental.worktrees;
 }
 
 /**
@@ -622,6 +643,16 @@ export function loadEnvironment(
 export function loadSettings(
   workspaceDir: string = process.cwd(),
 ): LoadedSettings {
+  const normalizedWorkspaceDir = path.resolve(workspaceDir);
+  return settingsCache.getOrCreate(normalizedWorkspaceDir, () =>
+    _doLoadSettings(normalizedWorkspaceDir),
+  );
+}
+
+/**
+ * Internal implementation of the settings loading logic.
+ */
+function _doLoadSettings(workspaceDir: string): LoadedSettings {
   let systemSettings: Settings = {};
   let systemDefaultSettings: Settings = {};
   let userSettings: Settings = {};
@@ -1029,6 +1060,9 @@ export function migrateDeprecatedSettings(
 }
 
 export function saveSettings(settingsFile: SettingsFile): void {
+  // Clear the entire cache on any save.
+  settingsCache.clear();
+
   try {
     // Ensure the directory exists
     const dirPath = path.dirname(settingsFile.path);
@@ -1044,9 +1078,10 @@ export function saveSettings(settingsFile: SettingsFile): void {
       settingsToSave as Record<string, unknown>,
     );
   } catch (error) {
+    const detailedErrorMessage = getFsErrorMessage(error);
     coreEvents.emitFeedback(
       'error',
-      'There was an error saving your latest settings changes.',
+      `Failed to save settings: ${detailedErrorMessage}`,
       error,
     );
   }
@@ -1059,9 +1094,10 @@ export function saveModelChange(
   try {
     loadedSettings.setValue(SettingScope.User, 'model.name', model);
   } catch (error) {
+    const detailedErrorMessage = getFsErrorMessage(error);
     coreEvents.emitFeedback(
       'error',
-      'There was an error saving your preferred model.',
+      `Failed to save preferred model: ${detailedErrorMessage}`,
       error,
     );
   }
@@ -1088,15 +1124,15 @@ function migrateExperimentalSettings(
     };
     let modified = false;
 
-    const migrateExperimental = (
+    const migrateExperimental = <T = Record<string, unknown>>(
       oldKey: string,
-      migrateFn: (oldValue: Record<string, unknown>) => void,
+      migrateFn: (oldValue: T) => void,
     ) => {
       const old = experimentalSettings[oldKey];
-      if (old) {
+      if (old !== undefined) {
         foundDeprecated?.push(`experimental.${oldKey}`);
         // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
-        migrateFn(old as Record<string, unknown>);
+        migrateFn(old as T);
         modified = true;
       }
     };
@@ -1161,6 +1197,24 @@ function migrateExperimentalSettings(
       agentsOverrides['cli_help'] = override;
     });
 
+    // Migrate experimental.plan -> general.plan.enabled
+    migrateExperimental<boolean>('plan', (planValue) => {
+      const generalSettings =
+        (settings.general as Record<string, unknown> | undefined) || {};
+      const newGeneral = { ...generalSettings };
+      const planSettings =
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
+        (newGeneral['plan'] as Record<string, unknown> | undefined) || {};
+      const newPlan = { ...planSettings };
+
+      if (newPlan['enabled'] === undefined) {
+        newPlan['enabled'] = planValue;
+        newGeneral['plan'] = newPlan;
+        loadedSettings.setValue(scope, 'general', newGeneral);
+        modified = true;
+      }
+    });
+
     if (modified) {
       agentsSettings['overrides'] = agentsOverrides;
       loadedSettings.setValue(scope, 'agents', agentsSettings);
@@ -1169,6 +1223,7 @@ function migrateExperimentalSettings(
         const newExperimental = { ...experimentalSettings };
         delete newExperimental['codebaseInvestigatorSettings'];
         delete newExperimental['cliHelpAgentSettings'];
+        delete newExperimental['plan'];
         loadedSettings.setValue(scope, 'experimental', newExperimental);
       }
       return true;

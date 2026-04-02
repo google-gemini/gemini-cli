@@ -32,6 +32,7 @@ import {
   type SerializableConfirmationDetails,
 } from '../confirmation-bus/types.js';
 import { isToolCallResponseInfo } from '../utils/tool-utils.js';
+import { getDiffStatFromPatch } from '../tools/diffOptions.js';
 
 /**
  * Handler for terminal tool calls.
@@ -473,17 +474,30 @@ export class SchedulerStateManager {
           filePath: details.filePath,
           originalContent: details.originalContent,
           newContent: details.newContent,
+          // Derive stats from the patch if they aren't already present
+          diffStat: details.diffStat ?? getDiffStatFromPatch(details.fileDiff),
         };
       }
     }
 
+    // Capture any existing live output so it isn't lost when forcing cancellation.
+    let existingOutput: ToolResultDisplay | undefined = undefined;
+    if (call.status === CoreToolCallStatus.Executing && call.liveOutput) {
+      existingOutput = call.liveOutput;
+    }
+
     if (isToolCallResponseInfo(reason)) {
+      const finalResponse = { ...reason };
+      if (!finalResponse.resultDisplay) {
+        finalResponse.resultDisplay = resultDisplay ?? existingOutput;
+      }
+
       return {
         request: call.request,
         tool: call.tool,
         invocation: call.invocation,
         status: CoreToolCallStatus.Cancelled,
-        response: reason,
+        response: finalResponse,
         durationMs: startTime ? Date.now() - startTime : undefined,
         outcome: call.outcome,
         schedulerId: call.schedulerId,
@@ -503,12 +517,12 @@ export class SchedulerStateManager {
           {
             functionResponse: {
               id: call.request.callId,
-              name: call.request.name,
+              name: call.request.originalRequestName ?? call.request.name,
               response: { error: errorMessage },
             },
           },
         ],
-        resultDisplay,
+        resultDisplay: resultDisplay ?? existingOutput,
         error: undefined,
         errorType: undefined,
         contentLength: errorMessage.length,

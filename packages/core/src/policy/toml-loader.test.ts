@@ -123,13 +123,14 @@ priority = 70
     it('should transform mcpName = "*" to wildcard toolName', async () => {
       const result = await runLoadPoliciesFromToml(`
 [[rule]]
+toolName = "*"
 mcpName = "*"
 decision = "ask_user"
 priority = 10
 `);
 
       expect(result.rules).toHaveLength(1);
-      expect(result.rules[0].toolName).toBe('*__*');
+      expect(result.rules[0].toolName).toBe('mcp_*');
       expect(result.rules[0].decision).toBe(PolicyDecision.ASK_USER);
       expect(result.errors).toHaveLength(0);
     });
@@ -144,7 +145,7 @@ priority = 10
 `);
 
       expect(result.rules).toHaveLength(1);
-      expect(result.rules[0].toolName).toBe('*__search');
+      expect(result.rules[0].toolName).toBe('mcp_*_search');
       expect(result.errors).toHaveLength(0);
     });
 
@@ -215,8 +216,12 @@ priority = 100
 `);
 
       expect(result.rules).toHaveLength(2);
-      expect(result.rules[0].toolName).toBe('google-workspace__calendar.list');
-      expect(result.rules[1].toolName).toBe('google-workspace__calendar.get');
+      expect(result.rules[0].toolName).toBe(
+        'mcp_google-workspace_calendar.list',
+      );
+      expect(result.rules[1].toolName).toBe(
+        'mcp_google-workspace_calendar.get',
+      );
       expect(result.errors).toHaveLength(0);
     });
 
@@ -259,6 +264,20 @@ allow_redirection = true
       expect(result.errors).toHaveLength(0);
     });
 
+    it('should parse and transform allowRedirection property (camelCase)', async () => {
+      const result = await runLoadPoliciesFromToml(`
+[[rule]]
+toolName = "run_shell_command"
+commandPrefix = "echo"
+decision = "allow"
+priority = 100
+allowRedirection = true
+`);
+
+      expect(result.rules).toHaveLength(1);
+      expect(result.rules[0].allowRedirection).toBe(true);
+      expect(result.errors).toHaveLength(0);
+    });
     it('should parse deny_message property', async () => {
       const result = await runLoadPoliciesFromToml(`
 [[rule]]
@@ -269,7 +288,21 @@ deny_message = "Deletion is permanent"
 `);
 
       expect(result.rules).toHaveLength(1);
-      expect(result.rules[0].toolName).toBe('rm');
+      expect(result.rules[0].decision).toBe(PolicyDecision.DENY);
+      expect(result.rules[0].denyMessage).toBe('Deletion is permanent');
+      expect(getErrors(result)).toHaveLength(0);
+    });
+
+    it('should parse denyMessage property (camelCase)', async () => {
+      const result = await runLoadPoliciesFromToml(`
+[[rule]]
+toolName = "rm"
+decision = "deny"
+priority = 100
+denyMessage = "Deletion is permanent"
+`);
+
+      expect(result.rules).toHaveLength(1);
       expect(result.rules[0].decision).toBe(PolicyDecision.DENY);
       expect(result.rules[0].denyMessage).toBe('Deletion is permanent');
       expect(getErrors(result)).toHaveLength(0);
@@ -444,6 +477,21 @@ name = "allowed-path"
   });
 
   describe('Negative Tests', () => {
+    it('should return a schema_validation error if toolName is missing in safety_checker', async () => {
+      const result = await runLoadPoliciesFromToml(`
+[[safety_checker]]
+priority = 100
+[safety_checker.checker]
+type = "in-process"
+name = "allowed-path"
+`);
+      expect(result.errors).toHaveLength(1);
+      const error = result.errors[0];
+      expect(error.errorType).toBe('schema_validation');
+      expect(error.details).toContain('toolName');
+      expect(error.details).toContain('Invalid input');
+    });
+
     it('should return a schema_validation error if priority is missing', async () => {
       const result = await runLoadPoliciesFromToml(`
 [[rule]]
@@ -537,6 +585,19 @@ priority = 100
       const error = result.errors[0];
       expect(error.errorType).toBe('schema_validation');
       expect(error.details).toContain('decision');
+    });
+
+    it('should return a schema_validation error if toolName is missing', async () => {
+      const result = await runLoadPoliciesFromToml(`
+[[rule]]
+decision = "allow"
+priority = 100
+`);
+      expect(result.errors).toHaveLength(1);
+      const error = result.errors[0];
+      expect(error.errorType).toBe('schema_validation');
+      expect(error.details).toContain('toolName');
+      expect(error.details).toContain('Invalid input');
     });
 
     it('should return a schema_validation error if toolName is not a string or array', async () => {
@@ -678,12 +739,12 @@ priority = 100
     it('should not warn for MCP format tool names', async () => {
       const result = await runLoadPoliciesFromToml(`
 [[rule]]
-toolName = "my-server__my-tool"
+toolName = "mcp_my-server_my-tool"
 decision = "allow"
 priority = 100
 
 [[rule]]
-toolName = "my-server__*"
+toolName = "mcp_my-server_*"
 decision = "allow"
 priority = 100
 `);
@@ -763,9 +824,10 @@ priority = 100
       expect(result.rules).toHaveLength(2);
     });
 
-    it('should not warn for catch-all rules (no toolName)', async () => {
+    it('should not warn for catch-all rules (toolName = "*")', async () => {
       const result = await runLoadPoliciesFromToml(`
 [[rule]]
+toolName = "*"
 decision = "deny"
 priority = 100
 `);
@@ -822,7 +884,8 @@ priority = 100
           annotationRule,
           'Should have loaded a rule with toolAnnotations',
         ).toBeDefined();
-        expect(annotationRule!.toolName).toBe('*__*');
+        expect(annotationRule!.toolName).toBe('mcp_*');
+        expect(annotationRule!.mcpName).toBe('*');
         expect(annotationRule!.toolAnnotations).toEqual({
           readOnlyHint: true,
         });
@@ -834,7 +897,7 @@ priority = 100
         const denyRule = result.rules.find(
           (r) =>
             r.decision === PolicyDecision.DENY &&
-            r.toolName === undefined &&
+            r.toolName === '*' &&
             r.denyMessage?.includes('Plan Mode'),
         );
         expect(
@@ -863,7 +926,7 @@ priority = 100
 
         // 4. MCP tool WITHOUT annotations should be DENIED
         const denyResult = await engine.check(
-          { name: 'github__create_issue' },
+          { name: 'mcp_github_create_issue' },
           'github',
           undefined,
         );
@@ -874,7 +937,7 @@ priority = 100
 
         // 5. MCP tool with readOnlyHint=false should also be DENIED
         const denyResult2 = await engine.check(
-          { name: 'github__delete_issue' },
+          { name: 'mcp_github_delete_issue' },
           'github',
           { readOnlyHint: false },
         );
@@ -883,9 +946,9 @@ priority = 100
           'MCP tool with readOnlyHint=false should be DENIED in Plan Mode',
         ).toBe(PolicyDecision.DENY);
 
-        // 6. Test with qualified tool name format (server__tool) but no separate serverName
+        // 6. Test with qualified tool name format (mcp_server_tool) but no separate serverName
         const qualifiedResult = await engine.check(
-          { name: 'github__list_repos' },
+          { name: 'mcp_github_list_repos' },
           undefined,
           { readOnlyHint: true },
         );
@@ -990,7 +1053,8 @@ priority = 100
         ['people.getMe', 'calendar.list', 'calendar.get'],
         [
           {
-            toolName: 'google-workspace__people.getxMe',
+            toolName: 'mcp_google-workspace_people.getxMe',
+            mcpName: 'google-workspace',
             source: 'User: workspace.toml',
           },
         ],
@@ -1007,8 +1071,14 @@ priority = 100
         'google-workspace',
         ['people.getMe', 'calendar.list'],
         [
-          { toolName: 'google-workspace__people.getMe' },
-          { toolName: 'google-workspace__calendar.list' },
+          {
+            toolName: 'mcp_google-workspace_people.getMe',
+            mcpName: 'google-workspace',
+          },
+          {
+            toolName: 'mcp_google-workspace_calendar.list',
+            mcpName: 'google-workspace',
+          },
         ],
       );
 
@@ -1019,7 +1089,7 @@ priority = 100
       const warnings = validateMcpPolicyToolNames(
         'my-server',
         ['tool1', 'tool2'],
-        [{ toolName: 'my-server__*' }],
+        [{ toolName: 'mcp_my-server_*', mcpName: 'my-server' }],
       );
 
       expect(warnings).toHaveLength(0);
@@ -1029,7 +1099,7 @@ priority = 100
       const warnings = validateMcpPolicyToolNames(
         'server-a',
         ['tool1'],
-        [{ toolName: 'server-b__toolx' }],
+        [{ toolName: 'mcp_server-b_toolx', mcpName: 'server-b' }],
       );
 
       expect(warnings).toHaveLength(0);
@@ -1039,19 +1109,23 @@ priority = 100
       const warnings = validateMcpPolicyToolNames(
         'my-server',
         ['tool1', 'tool2'],
-        [{ toolName: 'my-server__completely_different_name' }],
+        [
+          {
+            toolName: 'mcp_my-server_completely_different_name',
+            mcpName: 'my-server',
+          },
+        ],
       );
 
       expect(warnings).toHaveLength(0);
     });
 
-    it('should skip rules without toolName', () => {
+    it('should skip wildcard rules (matching all tools)', () => {
       const warnings = validateMcpPolicyToolNames(
         'my-server',
         ['tool1'],
-        [{ toolName: undefined }],
+        [{ toolName: '*', mcpName: 'my-server' }],
       );
-
       expect(warnings).toHaveLength(0);
     });
 
@@ -1059,7 +1133,13 @@ priority = 100
       const warnings = validateMcpPolicyToolNames(
         'my-server',
         ['tool1'],
-        [{ toolName: 'my-server__tol1', source: 'User: custom.toml' }],
+        [
+          {
+            toolName: 'mcp_my-server_tol1',
+            mcpName: 'my-server',
+            source: 'User: custom.toml',
+          },
+        ],
       );
 
       expect(warnings).toHaveLength(1);

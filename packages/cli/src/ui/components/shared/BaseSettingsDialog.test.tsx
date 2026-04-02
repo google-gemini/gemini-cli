@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { render } from '../../../test-utils/render.js';
+import { renderWithProviders } from '../../../test-utils/render.js';
 import { waitFor } from '../../../test-utils/async.js';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { act } from 'react';
@@ -14,14 +14,7 @@ import {
   type BaseSettingsDialogProps,
   type SettingsDialogItem,
 } from './BaseSettingsDialog.js';
-import { KeypressProvider } from '../../contexts/KeypressContext.js';
 import { SettingScope } from '../../../config/settings.js';
-
-vi.mock('../../contexts/UIStateContext.js', () => ({
-  useUIState: () => ({
-    mainAreaWidth: 100,
-  }),
-}));
 
 enum TerminalKeys {
   ENTER = '\u000D',
@@ -115,10 +108,8 @@ describe('BaseSettingsDialog', () => {
       ...props,
     };
 
-    const result = render(
-      <KeypressProvider>
-        <BaseSettingsDialog {...defaultProps} />
-      </KeypressProvider>,
+    const result = await renderWithProviders(
+      <BaseSettingsDialog {...defaultProps} />,
     );
     await result.waitUntilReady();
     return result;
@@ -174,7 +165,10 @@ describe('BaseSettingsDialog', () => {
 
     it('should render footer content when provided', async () => {
       const { lastFrame, unmount } = await renderDialog({
-        footerContent: <Text>Custom Footer</Text>,
+        footer: {
+          content: <Text>Custom Footer</Text>,
+          height: 1,
+        },
       });
 
       expect(lastFrame()).toContain('Custom Footer');
@@ -328,22 +322,18 @@ describe('BaseSettingsDialog', () => {
       const filteredItems = [items[0], items[2], items[4]];
       await act(async () => {
         rerender(
-          <KeypressProvider>
-            <BaseSettingsDialog
-              title="Test Settings"
-              items={filteredItems}
-              selectedScope={SettingScope.User}
-              maxItemsToShow={5}
-              onItemToggle={mockOnItemToggle}
-              onEditCommit={mockOnEditCommit}
-              onItemClear={mockOnItemClear}
-              onClose={mockOnClose}
-            />
-          </KeypressProvider>,
+          <BaseSettingsDialog
+            title="Test Settings"
+            items={filteredItems}
+            selectedScope={SettingScope.User}
+            maxItemsToShow={5}
+            onItemToggle={mockOnItemToggle}
+            onEditCommit={mockOnEditCommit}
+            onItemClear={mockOnItemClear}
+            onClose={mockOnClose}
+          />,
         );
       });
-      await waitUntilReady();
-
       // Verify the dialog hasn't crashed and the items are displayed
       await waitFor(() => {
         const frame = lastFrame();
@@ -388,22 +378,18 @@ describe('BaseSettingsDialog', () => {
       const filteredItems = [items[0], items[1]];
       await act(async () => {
         rerender(
-          <KeypressProvider>
-            <BaseSettingsDialog
-              title="Test Settings"
-              items={filteredItems}
-              selectedScope={SettingScope.User}
-              maxItemsToShow={5}
-              onItemToggle={mockOnItemToggle}
-              onEditCommit={mockOnEditCommit}
-              onItemClear={mockOnItemClear}
-              onClose={mockOnClose}
-            />
-          </KeypressProvider>,
+          <BaseSettingsDialog
+            title="Test Settings"
+            items={filteredItems}
+            selectedScope={SettingScope.User}
+            maxItemsToShow={5}
+            onItemToggle={mockOnItemToggle}
+            onEditCommit={mockOnEditCommit}
+            onItemClear={mockOnItemClear}
+            onClose={mockOnClose}
+          />,
         );
       });
-      await waitUntilReady();
-
       await waitFor(() => {
         const frame = lastFrame();
         expect(frame).toContain('Boolean Setting');
@@ -757,6 +743,48 @@ describe('BaseSettingsDialog', () => {
       });
       unmount();
     });
+
+    it('should allow j and k characters to be typed in string edit fields without triggering navigation', async () => {
+      const items = createMockItems(4);
+      const stringItem = items.find((i) => i.type === 'string')!;
+      const { stdin, waitUntilReady, unmount } = await renderDialog({
+        items: [stringItem],
+      });
+
+      // Enter edit mode
+      await act(async () => {
+        stdin.write(TerminalKeys.ENTER);
+      });
+      await waitUntilReady();
+
+      // Type 'j' - should appear in field, NOT trigger navigation
+      await act(async () => {
+        stdin.write('j');
+      });
+      await waitUntilReady();
+
+      // Type 'k' - should appear in field, NOT trigger navigation
+      await act(async () => {
+        stdin.write('k');
+      });
+      await waitUntilReady();
+
+      // Commit with Enter
+      await act(async () => {
+        stdin.write(TerminalKeys.ENTER);
+      });
+      await waitUntilReady();
+
+      // j and k should be typed into the field
+      await waitFor(() => {
+        expect(mockOnEditCommit).toHaveBeenCalledWith(
+          'string-setting',
+          'test-valuejk', // entered value + j and k
+          expect.objectContaining({ type: 'string' }),
+        );
+      });
+      unmount();
+    });
   });
 
   describe('custom key handling', () => {
@@ -798,6 +826,59 @@ describe('BaseSettingsDialog', () => {
         // Should still show settings as focused
         expect(lastFrame()).toContain('> Test Settings');
       });
+      unmount();
+    });
+  });
+
+  describe('responsiveness', () => {
+    it('should show the scope selector when availableHeight is sufficient (25)', async () => {
+      const { lastFrame, unmount } = await renderDialog({
+        availableHeight: 25,
+        showScopeSelector: true,
+      });
+
+      const frame = lastFrame();
+      expect(frame).toContain('Apply To');
+      unmount();
+    });
+
+    it('should hide the scope selector when availableHeight is small (24) to show more items', async () => {
+      const { lastFrame, unmount } = await renderDialog({
+        availableHeight: 24,
+        showScopeSelector: true,
+      });
+
+      const frame = lastFrame();
+      expect(frame).not.toContain('Apply To');
+      unmount();
+    });
+
+    it('should reduce the number of visible items based on height', async () => {
+      // At height 25, it should show 2 items (math: (25-4 - (10+5))/3 = 2)
+      const { lastFrame, unmount } = await renderDialog({
+        availableHeight: 25,
+        items: createMockItems(10),
+      });
+
+      const frame = lastFrame();
+      // Items 0 and 1 should be there
+      expect(frame).toContain('Boolean Setting');
+      expect(frame).toContain('String Setting');
+      // Item 2 should NOT be there
+      expect(frame).not.toContain('Number Setting');
+      unmount();
+    });
+
+    it('should show scroll indicators when list is truncated by height', async () => {
+      const { lastFrame, unmount } = await renderDialog({
+        availableHeight: 25,
+        items: createMockItems(10),
+      });
+
+      const frame = lastFrame();
+      // Shows both scroll indicators when the list is truncated by height
+      expect(frame).toContain('▼');
+      expect(frame).toContain('▲');
       unmount();
     });
   });

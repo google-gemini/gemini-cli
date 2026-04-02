@@ -128,7 +128,7 @@ async function main() {
   let commentBody;
 
   if (success) {
-    commentBody = `✅ **Patch Release Complete!**
+    commentBody = `✅ **[Step 4/4] Patch Release Complete!**
 
 **📦 Release Details:**
 - **Version**: [\`${releaseVersion}\`](https://github.com/${repo.owner}/${repo.repo}/releases/tag/${releaseTag})
@@ -144,9 +144,10 @@ async function main() {
 
 **🔗 Links:**
 - [GitHub Release](https://github.com/${repo.owner}/${repo.repo}/releases/tag/${releaseTag})
-- [Workflow Run](https://github.com/${repo.owner}/${repo.repo}/actions/runs/${runId})`;
+- [This release workflow run](https://github.com/${repo.owner}/${repo.repo}/actions/runs/${runId})
+- [Workflow History](https://github.com/${repo.owner}/${repo.repo}/actions/workflows/release-patch-3-release.yml)`;
   } else if (raceConditionFailure) {
-    commentBody = `⚠️ **Patch Release Cancelled - Concurrent Release Detected**
+    commentBody = `⚠️ **[Step 4/4] Patch Release Cancelled - Concurrent Release Detected**
 
 **🚦 What Happened:**
 Another patch release completed while this one was in progress, causing a version conflict.
@@ -163,7 +164,7 @@ Another patch release completed while this one was in progress, causing a versio
 - **Next patch should be**: \`${currentReleaseVersion}\`
 - **New release tag**: \`${currentReleaseTag || 'unknown'}\``
         : `
-- **Status**: Version information updated since this release started`
+- **Status**: Version information updated since this release was triggered`
     }
 
 **🔄 Next Steps:**
@@ -175,9 +176,10 @@ Another patch release completed while this one was in progress, causing a versio
 Multiple patch releases can't run simultaneously. When they do, the second one is automatically cancelled to maintain version consistency.
 
 **🔗 Details:**
-- [View cancelled workflow run](https://github.com/${repo.owner}/${repo.repo}/actions/runs/${runId})`;
+- [This release workflow run](https://github.com/${repo.owner}/${repo.repo}/actions/runs/${runId})
+- [Workflow History](https://github.com/${repo.owner}/${repo.repo}/actions/workflows/release-patch-3-release.yml)`;
   } else {
-    commentBody = `❌ **Patch Release Failed!**
+    commentBody = `❌ **[Step 4/4] Patch Release Failed!**
 
 **📋 Details:**
 - **Version**: \`${releaseVersion || 'Unknown'}\`
@@ -190,8 +192,9 @@ Multiple patch releases can't run simultaneously. When they do, the second one i
 3. You may need to retry the patch once the issue is resolved
 
 **🔗 Troubleshooting:**
-- [View workflow run](https://github.com/${repo.owner}/${repo.repo}/actions/runs/${runId})
-- [View workflow logs](https://github.com/${repo.owner}/${repo.repo}/actions/runs/${runId})`;
+- [This release workflow run](https://github.com/${repo.owner}/${repo.repo}/actions/runs/${runId})
+- [View workflow logs](https://github.com/${repo.owner}/${repo.repo}/actions/runs/${runId})
+- [Workflow History](https://github.com/${repo.owner}/${repo.repo}/actions/workflows/release-patch-3-release.yml)`;
   }
 
   if (testMode) {

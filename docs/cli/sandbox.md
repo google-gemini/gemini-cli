@@ -50,7 +50,49 @@ Cross-platform sandboxing with complete process isolation.
 **Note**: Requires building the sandbox image locally or using a published image
 from your organization's registry.
 
-### 3. LXC/LXD (Linux only, experimental)
+### 3. Windows Native Sandbox (Windows only)
+
+... **Troubleshooting and Side Effects:**
+
+The Windows Native sandbox uses the `icacls` command to set a "Low Mandatory
+Level" on files and directories it needs to write to.
+
+- **Persistence**: These integrity level changes are persistent on the
+  filesystem. Even after the sandbox session ends, files created or modified by
+  the sandbox will retain their "Low" integrity level.
+- **Manual Reset**: If you need to reset the integrity level of a file or
+  directory, you can use:
+  ```powershell
+  icacls "C:\path\to\dir" /setintegritylevel Medium
+  ```
+- **System Folders**: The sandbox manager automatically skips setting integrity
+  levels on system folders (like `C:\Windows`) for safety.
+
+### 4. gVisor / runsc (Linux only)
+
+Strongest isolation available: runs containers inside a user-space kernel via
+[gVisor](https://github.com/google/gvisor). gVisor intercepts all container
+system calls and handles them in a sandboxed kernel written in Go, providing a
+strong security barrier between AI operations and the host OS.
+
+**Prerequisites:**
+
+- Linux (gVisor supports Linux only)
+- Docker installed and running
+- gVisor/runsc runtime configured
+
+When you set `sandbox: "runsc"`, Gemini CLI runs
+`docker run --runtime=runsc ...` to execute containers with gVisor isolation.
+runsc is not auto-detected; you must specify it explicitly (e.g.
+`GEMINI_SANDBOX=runsc` or `sandbox: "runsc"`).
+
+To set up runsc:
+
+1.  Install the runsc binary.
+2.  Configure the Docker daemon to use the runsc runtime.
+3.  Verify the installation.
+
+### 5. LXC/LXD (Linux only, experimental)
 
 Full-system container sandboxing using LXC/LXD. Unlike Docker/Podman, LXC
 containers run a complete Linux system with `systemd`, `snapd`, and other system
@@ -133,7 +175,7 @@ gemini -p "run the test suite"
 
 1. **Command flag**: `-s` or `--sandbox`
 2. **Environment variable**:
-   `GEMINI_SANDBOX=true|docker|podman|sandbox-exec|lxc`
+   `GEMINI_SANDBOX=true|docker|podman|sandbox-exec|runsc|lxc`
 3. **Settings file**: `"sandbox": true` in the `tools` object of your
    `settings.json` file (e.g., `{"tools": {"sandbox": true}}`).
 
@@ -229,9 +271,11 @@ $env:SANDBOX_SET_UID_GID="false"  # Disable UID/GID mapping
 DEBUG=1 gemini -s -p "debug command"
 ```
 
-**Note:** If you have `DEBUG=true` in a project's `.env` file, it won't affect
-gemini-cli due to automatic exclusion. Use `.gemini/.env` files for gemini-cli
-specific debug settings.
+<!-- prettier-ignore -->
+> [!NOTE]
+> If you have `DEBUG=true` in a project's `.env` file, it won't affect
+> gemini-cli due to automatic exclusion. Use `.gemini/.env` files for
+> gemini-cli specific debug settings.
 
 ### Inspect sandbox
 

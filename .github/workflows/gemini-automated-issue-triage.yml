@@ -121,6 +121,7 @@ jobs:
               'area/security',
               'area/platform',
               'area/extensions',
+              'area/documentation',
               'area/unknown'
             ];
             const labelNames = labels.map(label => label.name).filter(name => allowedLabels.includes(name));
@@ -254,6 +255,14 @@ jobs:
               "Bugs related to the extension marketplace website."
               "Issues with a specific extension."
               "Feature request for the extension ecosystem."
+
+            area/documentation
+            - Description: Issues related to user-facing documentation and other content on the documentation website.
+            - Example Issues:
+              "A typo in a README file."
+              "DOCS: A command is not working as described in the documentation."
+              "A request for a new documentation page."
+              "Instructions missing for skills feature"
 
             area/unknown
             - Description: Issues that do not clearly fit into any other defined area/ category, or where information is too limited to make a determination. Use this when no other area is appropriate.
