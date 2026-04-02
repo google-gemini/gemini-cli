@@ -2712,8 +2712,8 @@
         "autoConfigureMemory": {
           "title": "Auto Configure Max Old Space Size",
           "description": "Automatically configure Node.js memory limits",
-          "markdownDescription": "Automatically configure Node.js memory limits\n\n- Category: `Advanced`\n- Requires restart: `yes`\n- Default: `false`",
-          "default": false,
+          "markdownDescription": "Automatically configure Node.js memory limits\n\n- Category: `Advanced`\n- Requires restart: `yes`\n- Default: `true`",
+          "default": true,
           "type": "boolean"
         },
         "dnsResolutionOrder": {
