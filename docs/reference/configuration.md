@@ -1565,7 +1565,7 @@ their corresponding top-level category object in your `settings.json` file.
 
 - **`advanced.autoConfigureMemory`** (boolean):
   - **Description:** Automatically configure Node.js memory limits
-  - **Default:** `false`
+  - **Default:** `true`
   - **Requires restart:** Yes
 
 - **`advanced.dnsResolutionOrder`** (string):
