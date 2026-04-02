@@ -134,15 +134,11 @@ export function createAgentConversation(
     // Assistant response (possibly with tool calls)
     // Deterministic tool usage based on turn index (not random).
     // This ensures scenarios are reproducible across runs.
-    let useTool: boolean;
-    if (toolCallFraction >= 1.0) {
-      useTool = true;
-    } else if (toolCallFraction <= 0) {
-      useTool = false;
-    } else {
-      const period = Math.round(1 / toolCallFraction);
-      useTool = turn % period === 0;
-    }
+    const useTool =
+      toolCallFraction >= 1.0 ||
+      (toolCallFraction > 0 &&
+        Math.floor((turn + 1) * toolCallFraction) >
+          Math.floor(turn * toolCallFraction));
 
     if (useTool) {
       const toolName = pickToolForTurn(turn, turnCount);
