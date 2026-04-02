@@ -25,6 +25,7 @@ import {
   FatalSandboxError,
   GEMINI_DIR,
   homedir,
+  parseSandboxEnv,
 } from '@google/gemini-cli-core';
 import { ConsolePatcher } from '../ui/utils/ConsolePatcher.js';
 import { randomBytes } from 'node:crypto';
@@ -140,47 +141,19 @@ export async function start_sandbox(
         args.push('-D', `INCLUDE_DIR_${i}=${dirPath}`);
       }
 
-      const finalArgv = cliArgs;
       const shCommandParts = [
-        `SANDBOX=sandbox-exec`,
-        `NODE_OPTIONS="${nodeOptions}"`,
+        'SANDBOX=sandbox-exec',
+        `NODE_OPTIONS=${quote([nodeOptions])}`,
       ];
 
       // copy additional environment variables from SANDBOX_ENV
-      if (process.env['SANDBOX_ENV']) {
-        let currentEnv = '';
-        for (let part of process.env['SANDBOX_ENV'].split(',')) {
-          part = part.trim();
-          if (!part) continue;
-          if (part.includes('=')) {
-            if (currentEnv) {
-              debugLogger.log(`SANDBOX_ENV: ${currentEnv}`);
-              const [k, ...vParts] = currentEnv.split('=');
-              const v = vParts.join('=');
-              shCommandParts.push(`${k}=${quote([v])}`);
-            }
-            currentEnv = part;
-          } else {
-            if (currentEnv) {
-              currentEnv += ',' + part;
-            } else {
-              debugLogger.log(`SANDBOX_ENV: ${part} (forwarded)`);
-              const val = process.env[part];
-              if (val !== undefined) {
-                shCommandParts.push(`${part}=${quote([val])}`);
-              }
-            }
-          }
-        }
-        if (currentEnv) {
-          debugLogger.log(`SANDBOX_ENV: ${currentEnv}`);
-          const [k, ...vParts] = currentEnv.split('=');
-          const v = vParts.join('=');
-          shCommandParts.push(`${k}=${quote([v])}`);
-        }
+      const parsedSandboxEnv = parseSandboxEnv(process.env['SANDBOX_ENV']);
+      for (const [key, value] of Object.entries(parsedSandboxEnv)) {
+        debugLogger.log(`SANDBOX_ENV: ${key}=${value}`);
+        shCommandParts.push(`${key}=${quote([value])}`);
       }
 
-      shCommandParts.push(...finalArgv.map((arg) => quote([arg])));
+      shCommandParts.push(...cliArgs.map((arg) => quote([arg])));
 
       args.push('-f', profileFile, 'sh', '-c', shCommandParts.join(' '));
       // start and set up proxy if GEMINI_SANDBOX_PROXY_COMMAND is set
@@ -645,30 +618,10 @@ export async function start_sandbox(
     }
 
     // copy additional environment variables from SANDBOX_ENV
-    if (process.env['SANDBOX_ENV']) {
-      let currentEnv = '';
-      for (let part of process.env['SANDBOX_ENV'].split(',')) {
-        part = part.trim();
-        if (!part) continue;
-        if (part.includes('=')) {
-          if (currentEnv) {
-            debugLogger.log(`SANDBOX_ENV: ${currentEnv}`);
-            args.push('--env', currentEnv);
-          }
-          currentEnv = part;
-        } else {
-          if (currentEnv) {
-            currentEnv += ',' + part;
-          } else {
-            debugLogger.log(`SANDBOX_ENV: ${part} (forwarded)`);
-            args.push('--env', part);
-          }
-        }
-      }
-      if (currentEnv) {
-        debugLogger.log(`SANDBOX_ENV: ${currentEnv}`);
-        args.push('--env', currentEnv);
-      }
+    const parsedSandboxEnv = parseSandboxEnv(process.env['SANDBOX_ENV']);
+    for (const [key, value] of Object.entries(parsedSandboxEnv)) {
+      debugLogger.log(`SANDBOX_ENV: ${key}=${value}`);
+      args.push('--env', `${key}=${value}`);
     }
 
     // copy NODE_OPTIONS
@@ -1019,31 +972,10 @@ async function start_lxc_sandbox(
     }
 
     // Forward SANDBOX_ENV key=value pairs
-    if (process.env['SANDBOX_ENV']) {
-      let currentEnv = '';
-      for (let part of process.env['SANDBOX_ENV'].split(',')) {
-        part = part.trim();
-        if (!part) continue;
-        if (part.includes('=')) {
-          if (currentEnv) {
-            envArgs.push('--env', currentEnv);
-          }
-          currentEnv = part;
-        } else {
-          if (currentEnv) {
-            currentEnv += ',' + part;
-          } else {
-            // LXC doesn't automatically forward from host, so we look it up
-            const val = process.env[part];
-            if (val !== undefined) {
-              envArgs.push('--env', `${part}=${val}`);
-            }
-          }
-        }
-      }
-      if (currentEnv) {
-        envArgs.push('--env', currentEnv);
-      }
+    const parsedSandboxEnv = parseSandboxEnv(process.env['SANDBOX_ENV']);
+    for (const [key, value] of Object.entries(parsedSandboxEnv)) {
+      debugLogger.log(`SANDBOX_ENV: ${key}=${value}`);
+      envArgs.push('--env', `${key}=${value}`);
     }
     // Forward NODE_OPTIONS (e.g. from --inspect flags)
     const existingNodeOptions = process.env['NODE_OPTIONS'] || '';

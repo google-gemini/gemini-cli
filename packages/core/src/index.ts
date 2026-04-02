@@ -105,6 +105,8 @@ export * from './utils/filesearch/fileSearch.js';
 export * from './utils/errorParsing.js';
 export * from './utils/fastAckHelper.js';
 export * from './utils/workspaceContext.js';
+export * from './utils/envUtils.js';
+export * from './utils/envExpansion.js';
 export * from './utils/environmentContext.js';
 export * from './utils/ignorePatterns.js';
 export * from './utils/partUtils.js';

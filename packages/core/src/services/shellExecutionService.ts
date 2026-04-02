@@ -22,6 +22,7 @@ import {
 import { isBinary, truncateString } from '../utils/textUtils.js';
 import pkg from '@xterm/headless';
 import { debugLogger } from '../utils/debugLogger.js';
+import { parseSandboxEnv } from '../utils/envUtils.js';
 import { Storage } from '../config/storage.js';
 import {
   serializeTerminalToObject,
@@ -426,17 +427,9 @@ export class ShellExecutionService {
     };
 
     // Forward SANDBOX_ENV key=value pairs
-    if (process.env['SANDBOX_ENV']) {
-      for (let env of process.env['SANDBOX_ENV'].split(',')) {
-        if ((env = env.trim())) {
-          const index = env.indexOf('=');
-          if (index > 0) {
-            const key = env.substring(0, index);
-            const value = env.substring(index + 1);
-            baseEnv[key] = value;
-          }
-        }
-      }
+    const sandboxEnv = parseSandboxEnv(process.env['SANDBOX_ENV']);
+    for (const [key, value] of Object.entries(sandboxEnv)) {
+      baseEnv[key] = value;
     }
 
     if (!isInteractive) {
