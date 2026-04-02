@@ -1310,10 +1310,7 @@ export class Config implements McpContext, AgentLoopContext {
       },
     };
     this.retryFetchErrors = params.retryFetchErrors ?? true;
-    this.maxAttempts = Math.min(
-      params.maxAttempts ?? DEFAULT_MAX_ATTEMPTS,
-      DEFAULT_MAX_ATTEMPTS,
-    );
+    this.maxAttempts = params.maxAttempts ?? DEFAULT_MAX_ATTEMPTS;
     this.disableYoloMode = params.disableYoloMode ?? false;
     this.rawOutput = params.rawOutput ?? false;
     this.acceptRawOutputRisk = params.acceptRawOutputRisk ?? false;
@@ -3261,6 +3258,14 @@ export class Config implements McpContext, AgentLoopContext {
   }
 
   getMaxAttempts(): number {
+    const flagVal =
+      this.experiments?.flags?.[ExperimentFlags.MAX_ATTEMPTS]?.intValue;
+    if (flagVal !== undefined) {
+      const parsed = parseInt(flagVal, 10);
+      if (!isNaN(parsed) && parsed > 0) {
+        return parsed;
+      }
+    }
     return this.maxAttempts;
   }
 

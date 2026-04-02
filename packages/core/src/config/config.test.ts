@@ -20,7 +20,6 @@ import {
   type SandboxConfig,
 } from './config.js';
 import { createMockSandboxConfig } from '@google/gemini-cli-test-utils';
-import { DEFAULT_MAX_ATTEMPTS } from '../utils/retry.js';
 import { ExperimentFlags } from '../code_assist/experiments/flagNames.js';
 import { debugLogger } from '../utils/debugLogger.js';
 import { ApprovalMode } from '../policy/types.js';
@@ -281,12 +280,12 @@ describe('Server Config (config.ts)', () => {
   };
 
   describe('maxAttempts', () => {
-    it('should default to DEFAULT_MAX_ATTEMPTS', () => {
+    it('should default to 10', () => {
       const config = new Config(baseParams);
-      expect(config.getMaxAttempts()).toBe(DEFAULT_MAX_ATTEMPTS);
+      expect(config.getMaxAttempts()).toBe(10);
     });
 
-    it('should use provided maxAttempts if <= DEFAULT_MAX_ATTEMPTS', () => {
+    it('should use provided maxAttempts if <= 10', () => {
       const config = new Config({
         ...baseParams,
         maxAttempts: 5,
@@ -294,12 +293,12 @@ describe('Server Config (config.ts)', () => {
       expect(config.getMaxAttempts()).toBe(5);
     });
 
-    it('should cap maxAttempts at DEFAULT_MAX_ATTEMPTS', () => {
+    it('should use provided maxAttempts if > 10', () => {
       const config = new Config({
         ...baseParams,
         maxAttempts: 20,
       });
-      expect(config.getMaxAttempts()).toBe(DEFAULT_MAX_ATTEMPTS);
+      expect(config.getMaxAttempts()).toBe(20);
     });
   });
 

@@ -17,25 +17,48 @@ import { getErrorStatus, ModelNotFoundError } from './httpErrors.js';
 import type { RetryAvailabilityContext } from '../availability/modelPolicy.js';
 
 export type { RetryAvailabilityContext };
+
+/**
+ * Global fallback for maximum retry attempts when not explicitly provided.
+ * Most callers should use config.getMaxAttempts() instead.
+ */
 export const DEFAULT_MAX_ATTEMPTS = 10;
 
+/**
+ * Options for the retryWithBackoff utility.
+ */
 export interface RetryOptions {
+  /**
+   * Total number of attempts (1 initial + N retries).
+   * Defaults to DEFAULT_MAX_ATTEMPTS (10) if not specified.
+   */
   maxAttempts: number;
+  /** Initial delay between retries in milliseconds. */
   initialDelayMs: number;
+  /** Maximum cumulative delay in milliseconds. */
   maxDelayMs: number;
+  /** Callback to determine if an error is retryable. */
   shouldRetryOnError: (error: Error, retryFetchErrors?: boolean) => boolean;
+  /** Callback to determine if the response content requires a retry. */
   shouldRetryOnContent?: (content: GenerateContentResponse) => boolean;
+  /** Handler for persistent 429 errors. */
   onPersistent429?: (
     authType?: string,
     error?: unknown,
   ) => Promise<string | boolean | null>;
+  /** Handler for quota validation requirements. */
   onValidationRequired?: (
     error: ValidationRequiredError,
   ) => Promise<'verify' | 'change_auth' | 'cancel'>;
+  /** Authentication type for logging. */
   authType?: string;
+  /** Whether to retry on generic fetch errors. */
   retryFetchErrors?: boolean;
+  /** Signal for cancellation. */
   signal?: AbortSignal;
+  /** Context provider for availability checks. */
   getAvailabilityContext?: () => RetryAvailabilityContext | undefined;
+  /** Callback fired on each retry attempt. */
   onRetry?: (attempt: number, error: unknown, delayMs: number) => void;
 }
 

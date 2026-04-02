@@ -309,6 +309,7 @@ class WebFetchToolInvocation extends BaseToolInvocation<
         return res;
       },
       {
+        maxAttempts: this.context.config.getMaxAttempts(),
         retryFetchErrors: this.context.config.getRetryFetchErrors(),
         onRetry: (attempt, error, delayMs) =>
           this.handleRetry(attempt, error, delayMs),
@@ -643,6 +644,7 @@ ${aggregatedContent}
           return res;
         },
         {
+          maxAttempts: this.context.config.getMaxAttempts(),
           retryFetchErrors: this.context.config.getRetryFetchErrors(),
           onRetry: (attempt, error, delayMs) =>
             this.handleRetry(attempt, error, delayMs),
