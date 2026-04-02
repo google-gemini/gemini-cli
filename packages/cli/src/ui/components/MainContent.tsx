@@ -244,27 +244,14 @@ export const MainContent = () => {
   const virtualizedData = useMemo(
     () => [
       { type: 'header' as const },
-      ...augmentedHistory.map(
-        ({
-          item,
-          isExpandable,
-          isFirstThinking,
-          isFirstAfterThinking,
-          isToolGroupBoundary,
-          suppressNarration,
-        }) => ({
-          type: 'history' as const,
-          item,
-          isExpandable,
-          isFirstThinking,
-          isFirstAfterThinking,
-          isToolGroupBoundary,
-          suppressNarration,
-        }),
-      ),
+      ...augmentedHistory.map((data, index) => ({
+        type: 'history' as const,
+        item: data.item,
+        element: historyItems[index],
+      })),
       { type: 'pending' as const },
     ],
-    [augmentedHistory],
+    [augmentedHistory, historyItems],
   );
 
   const renderItem = useCallback(
@@ -278,39 +265,12 @@ export const MainContent = () => {
           />
         );
       } else if (item.type === 'history') {
-        return (
-          <MemoizedHistoryItemDisplay
-            terminalWidth={mainAreaWidth}
-            availableTerminalHeight={
-              uiState.constrainHeight || !item.isExpandable
-                ? staticAreaMaxItemHeight
-                : undefined
-            }
-            availableTerminalHeightGemini={MAX_GEMINI_MESSAGE_LINES}
-            key={item.item.id}
-            item={item.item}
-            isPending={false}
-            commands={uiState.slashCommands}
-            isExpandable={item.isExpandable}
-            isFirstThinking={item.isFirstThinking}
-            isFirstAfterThinking={item.isFirstAfterThinking}
-            isToolGroupBoundary={item.isToolGroupBoundary}
-            suppressNarration={item.suppressNarration}
-          />
-        );
+        return item.element;
       } else {
         return pendingItems;
       }
     },
-    [
-      showHeaderDetails,
-      version,
-      mainAreaWidth,
-      uiState.slashCommands,
-      pendingItems,
-      uiState.constrainHeight,
-      staticAreaMaxItemHeight,
-    ],
+    [showHeaderDetails, version, pendingItems],
   );
 
   const estimatedItemHeight = useCallback(() => 100, []);
