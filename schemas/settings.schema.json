@@ -2205,8 +2205,8 @@
             },
             "visualModel": {
               "title": "Browser Visual Model",
-              "description": "Model override for the visual agent.",
-              "markdownDescription": "Model override for the visual agent.\n\n- Category: `Advanced`\n- Requires restart: `yes`",
+              "description": "Model for the visual agent's analyze_screenshot tool. When set, enables the tool.",
+              "markdownDescription": "Model for the visual agent's analyze_screenshot tool. When set, enables the tool.\n\n- Category: `Advanced`\n- Requires restart: `yes`",
               "type": "string"
             },
             "allowedDomains": {
