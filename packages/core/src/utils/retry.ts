@@ -232,6 +232,11 @@ export async function retryWithBackoff<T>(
 
   let attempt = 0;
   let currentDelay = initialDelayMs;
+  const throwIfAborted = () => {
+    if (signal?.aborted) {
+      throw createAbortError();
+    }
+  };
 
   while (attempt < maxAttempts) {
     if (signal?.aborted) {
@@ -246,6 +251,7 @@ export async function retryWithBackoff<T>(
         // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
         shouldRetryOnContent(result as GenerateContentResponse)
       ) {
+        throwIfAborted();
         const jitter = currentDelay * 0.3 * (Math.random() * 2 - 1);
         const delayWithJitter = Math.max(0, currentDelay + jitter);
         if (onRetry) {
@@ -266,6 +272,7 @@ export async function retryWithBackoff<T>(
       if (error instanceof Error && error.name === 'AbortError') {
         throw error;
       }
+      throwIfAborted();
 
       const classifiedError = classifyGoogleError(error);
 
