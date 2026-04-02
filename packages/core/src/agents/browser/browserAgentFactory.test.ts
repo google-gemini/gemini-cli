@@ -166,7 +166,7 @@ describe('browserAgentFactory', () => {
       expect(browserManager).toBeDefined();
     });
 
-    it('should call printOutput when provided', async () => {
+    it('should not call printOutput for internal setup messages', async () => {
       const printOutput = vi.fn();
 
       await createBrowserAgentDefinition(
@@ -175,7 +175,7 @@ describe('browserAgentFactory', () => {
         printOutput,
       );
 
-      expect(printOutput).toHaveBeenCalled();
+      expect(printOutput).not.toHaveBeenCalled();
     });
 
     it('should create definition with correct structure', async () => {

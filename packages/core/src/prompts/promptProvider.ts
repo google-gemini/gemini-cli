@@ -72,6 +72,16 @@ export class PromptProvider {
     const activeSnippets = isModernModel ? snippets : legacySnippets;
     const contextFilenames = getAllGeminiMdFilenames();
 
+    let trackerDir = context.config.isTrackerEnabled()
+      ? context.config.storage.getProjectTempTrackerDir()
+      : undefined;
+
+    if (trackerDir) {
+      // Sanitize path to prevent prompt injection
+      trackerDir = trackerDir.replace(/\n/g, ' ').replace(/\]/g, '');
+    }
+
+    // --- Context Gathering ---
     let planModeToolsList = '';
     if (isPlanMode) {
       const allTools = context.toolRegistry.getAllTools();
@@ -149,7 +159,7 @@ export class PromptProvider {
             })),
           skills.length > 0,
         ),
-        taskTracker: context.config.isTrackerEnabled(),
+        taskTracker: trackerDir,
         hookContext: isSectionEnabled('hookContext') || undefined,
         primaryWorkflows: this.withSection(
           'primaryWorkflows',
@@ -167,7 +177,7 @@ export class PromptProvider {
             approvedPlan: approvedPlanPath
               ? { path: approvedPlanPath }
               : undefined,
-            taskTracker: context.config.isTrackerEnabled(),
+            taskTracker: trackerDir,
             topicUpdateNarration:
               context.config.isTopicUpdateNarrationEnabled(),
           }),
@@ -180,7 +190,6 @@ export class PromptProvider {
             planModeToolsList,
             plansDir: context.config.storage.getPlansDir(),
             approvedPlanPath: context.config.getApprovedPlanPath(),
-            taskTracker: context.config.isTrackerEnabled(),
           }),
           isPlanMode,
         ),
