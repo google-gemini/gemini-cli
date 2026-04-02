@@ -268,6 +268,20 @@ describe('isSubpath on Windows', () => {
   });
 });
 
+describe('isSubpath on Darwin', () => {
+  afterEach(() => vi.unstubAllGlobals());
+
+  beforeEach(() => mockPlatform('darwin'));
+
+  it('should be case-insensitive for path components on Darwin', () => {
+    expect(isSubpath('/PROJECT', '/project/src')).toBe(true);
+  });
+
+  it('should return true for a direct subpath on Darwin', () => {
+    expect(isSubpath('/Users/Test', '/Users/Test/file.txt')).toBe(true);
+  });
+});
+
 describe('shortenPath', () => {
   describe.skipIf(process.platform === 'win32')('on POSIX', () => {
     it('should not shorten a path that is shorter than maxLen', () => {
@@ -615,7 +629,19 @@ describe('normalizePath', () => {
     });
   });
 
-  describe.skipIf(process.platform === 'win32')('on POSIX', () => {
+  describe('on Darwin', () => {
+    beforeEach(() => mockPlatform('darwin'));
+    afterEach(() => vi.unstubAllGlobals());
+
+    it('should lowercase the entire path', () => {
+      const result = normalizePath('/Users/TEST');
+      expect(result).toBe('/users/test');
+    });
+  });
+
+  describe.skipIf(
+    process.platform === 'win32' || process.platform === 'darwin',
+  )('on Linux', () => {
     it('should preserve case', () => {
       const result = normalizePath('/usr/Local/Bin');
       expect(result).toContain('Local');

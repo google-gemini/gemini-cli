@@ -318,8 +318,9 @@ function normalizeCommandName(raw: string): string {
  * @returns The normalized command name.
  */
 export function normalizeCommand(commandName: string): string {
-  const normalizedPath = commandName.replace(/[\\/]+$/, '');
-  const base = normalizedPath.split(/[\\/]/).pop() ?? '';
+  // Split by both separators and get the last non-empty part
+  const parts = commandName.split(/[\\/]/).filter(Boolean);
+  const base = parts.length > 0 ? parts[parts.length - 1] : '';
   return base.toLowerCase().replace(/\.exe$/, '');
 }
 

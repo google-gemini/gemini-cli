@@ -20,7 +20,11 @@ function testPath(...segments: string[]): string {
   for (let i = 1; i < segments.length; i++) {
     if (segments[i].startsWith('/') || segments[i].startsWith('\\')) {
       // If segment starts with a separator, remove the trailing separator from the result
-      result = path.normalize(result.replace(/[\\/]+$/, '') + segments[i]);
+      let base = result;
+      while (base.endsWith('/') || base.endsWith('\\')) {
+        base = base.slice(0, -1);
+      }
+      result = path.normalize(base + segments[i]);
     } else {
       // Otherwise join with the platform separator
       result = path.join(result, segments[i]);
