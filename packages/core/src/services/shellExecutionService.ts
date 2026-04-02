@@ -1123,9 +1123,21 @@ export class ShellExecutionService {
               ShellExecutionService.activePtys.delete(ptyPid);
             });
 
+            const endLine = headlessTerminal.buffer.active.length;
+            const startLine = Math.max(
+              0,
+              endLine - (shellExecutionConfig.maxSerializedLines ?? 2000),
+            );
+            const ansiOutputSnapshot = serializeTerminalToObject(
+              headlessTerminal,
+              startLine,
+              endLine,
+            );
+
             ExecutionLifecycleService.completeWithResult(ptyPid, {
               rawOutput: Buffer.from(''),
               output: getFullBufferText(headlessTerminal),
+              ansiOutput: ansiOutputSnapshot,
               exitCode,
               signal: signal ?? null,
               error,
