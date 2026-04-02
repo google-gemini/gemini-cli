@@ -126,6 +126,8 @@ export * from './utils/cache.js';
 export * from './utils/markdownUtils.js';
 
 // Export services
+export * from './services/agentHistoryProvider.js';
+export * from './services/chatCompressionService.js';
 export * from './services/fileDiscoveryService.js';
 export * from './services/gitService.js';
 export * from './services/FolderTrustDiscoveryService.js';
