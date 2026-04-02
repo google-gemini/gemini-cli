@@ -156,4 +156,30 @@ describe('<AnsiOutputText />', () => {
     expect(lastFrame()).toBeDefined();
     unmount();
   });
+
+  describe('robustness', () => {
+    it('does NOT crash when data is undefined', async () => {
+      const { lastFrame, unmount } = await render(
+        <AnsiOutputText
+          data={undefined as unknown as AnsiOutput}
+          width={80}
+          disableTruncation={true}
+        />,
+      );
+      expect(lastFrame({ allowEmpty: true }).trim()).toBe('');
+      unmount();
+    });
+
+    it('does NOT crash when data is an object but not an array', async () => {
+      const { lastFrame, unmount } = await render(
+        <AnsiOutputText
+          data={{ summary: 'test' } as unknown as AnsiOutput}
+          width={80}
+          disableTruncation={true}
+        />,
+      );
+      expect(lastFrame({ allowEmpty: true }).trim()).toBe('');
+      unmount();
+    });
+  });
 });

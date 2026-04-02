@@ -158,7 +158,7 @@ export const ToolResultDisplay: React.FC<ToolResultDisplayProps> = ({
           terminalWidth={childWidth}
         />
       );
-    } else {
+    } else if (Array.isArray(contentData)) {
       const shouldDisableTruncation =
         isAlternateBuffer ||
         (availableTerminalHeight === undefined && maxLines === undefined);
@@ -175,6 +175,15 @@ export const ToolResultDisplay: React.FC<ToolResultDisplayProps> = ({
           disableTruncation={shouldDisableTruncation}
         />
       );
+    } else if (typeof contentData === 'object' && contentData !== null) {
+      // Render as JSON for other non-null objects
+      content = (
+        <Text wrap="wrap" color={theme.text.primary}>
+          {JSON.stringify(contentData, null, 2)}
+        </Text>
+      );
+    } else {
+      content = null;
     }
 
     // Final render based on session mode
