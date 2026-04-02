@@ -35,6 +35,18 @@ interface CompressionRecordJSON {
   end_line?: number;
 }
 
+function hashStringSlice(
+  content: string,
+  start: number = 0,
+  end: number = 12,
+): string {
+  return crypto
+    .createHash('sha256')
+    .update(content)
+    .digest('hex')
+    .slice(start, end);
+}
+
 export class ContextCompressionService {
   private config: Config;
   private state: Map<string, FileRecord> = new Map();
@@ -175,11 +187,7 @@ export class ContextCompressionService {
 
         if (!filepath || protectedFiles.has(filepath)) continue;
 
-        const hash = crypto
-          .createHash('sha256')
-          .update(output)
-          .digest('hex')
-          .slice(0, 12);
+        const hash = hashStringSlice(output);
         const existing = this.state.get(filepath);
         if (
           existing?.level === 'SUMMARY' &&
@@ -231,11 +239,7 @@ export class ContextCompressionService {
       const record = this.state.get(f.filepath) ?? {
         level: 'FULL' as FileLevel,
       };
-      const hash = crypto
-        .createHash('sha256')
-        .update(f.rawContent)
-        .digest('hex')
-        .slice(0, 12);
+      const hash = hashStringSlice(f.rawContent);
       if (record.contentHash && record.contentHash !== hash) {
         record.cachedSummary = undefined;
       }
