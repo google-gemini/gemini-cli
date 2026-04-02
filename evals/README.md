@@ -212,6 +212,56 @@ The nightly workflow executes the full evaluation suite multiple times
 (currently 3 attempts) to account for non-determinism. These results are
 aggregated into a **Nightly Summary** attached to the workflow run.
 
+## Regression Check Scripts
+
+The project includes several scripts to automate high-signal regression checking
+in Pull Requests. These can also be run locally for debugging.
+
+- **`scripts/get_trustworthy_evals.js`**: Analyzes nightly history to identify
+  stable tests (80%+ aggregate pass rate).
+- **`scripts/run_regression_check.js`**: Runs a specific set of tests using the
+  "Best-of-4" logic and "Dynamic Baseline Verification".
+- **`scripts/run_eval_regression.js`**: The main orchestrator that loops through
+  models and generates the final PR report.
+
+### Running Regression Checks Locally
+
+You can simulate the PR regression check locally to verify your changes before
+pushing:
+
+```bash
+# Run the full regression loop for a specific model
+MODEL_LIST=gemini-3-flash-preview node scripts/run_eval_regression.js
+```
+
+To debug a specific failing test with the same logic used in CI:
+
+```bash
+# 1. Get the Vitest pattern for trustworthy tests
+OUTPUT=$(node scripts/get_trustworthy_evals.js "gemini-3-flash-preview")
+
+# 2. Run the regression logic for those tests
+node scripts/run_regression_check.js "gemini-3-flash-preview" "$OUTPUT"
+```
+
+### The Regression Quality Bar
+
+Because LLMs are non-deterministic, the PR regression check uses a high-signal
+probabilistic approach rather than a 100% pass requirement:
+
+1.  **Trustworthiness (60/80 Filter):** Only tests with a proven track record
+    are run. A test must score at least **60% (2/3)** every single night and
+    maintain an **80% aggregate** pass rate over the last 6 days.
+2.  **The 50% Pass Rule:** In a PR, a test is considered a **Pass** if the model
+    correctly performs the behavior at least half the time (**2 successes** out
+    of up to 4 attempts).
+3.  **Dynamic Baseline Verification:** If a test fails in a PR (e.g., 0/3), the
+    system automatically checks the `main` branch. If it fails there too, it is
+    marked as **Pre-existing** and cleared for the PR, ensuring you are only
+    blocked by regressions caused by your specific changes.
+
+## Fixing Evaluations
+
 #### How to interpret the report:
 
 - **Pass Rate (%)**: Each cell represents the percentage of successful runs for
