@@ -191,7 +191,8 @@ public class GeminiSandbox {
 
         IntPtr hToken = IntPtr.Zero;
         IntPtr hRestrictedToken = IntPtr.Zero;
-        IntPtr lowIntegritySid = IntPtr.Zero;
+        IntPtr hJob = IntPtr.Zero;
+        PROCESS_INFORMATION pi = new PROCESS_INFORMATION();
 
         try {
             // 1. Duplicate Primary Token
@@ -208,6 +209,7 @@ public class GeminiSandbox {
 
             // 2. Lower Integrity Level to Low
             // S-1-16-4096 is the SID for "Low Mandatory Level"
+            IntPtr lowIntegritySid = IntPtr.Zero;
             if (ConvertStringSidToSid("S-1-16-4096", out lowIntegritySid)) {
                 TOKEN_MANDATORY_LABEL tml = new TOKEN_MANDATORY_LABEL();
                 tml.Label.Sid = lowIntegritySid;
@@ -226,10 +228,10 @@ public class GeminiSandbox {
             }
 
             // 3. Setup Job Object for cleanup
-            IntPtr hJob = CreateJobObject(IntPtr.Zero, null);
+            hJob = CreateJobObject(IntPtr.Zero, null);
             JOBOBJECT_EXTENDED_LIMIT_INFORMATION jobLimits = new JOBOBJECT_EXTENDED_LIMIT_INFORMATION();
             jobLimits.BasicLimitInformation.LimitFlags = JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE | JOB_OBJECT_LIMIT_DIE_ON_UNHANDLED_EXCEPTION;
-            
+
             IntPtr lpJobLimits = Marshal.AllocHGlobal(Marshal.SizeOf(jobLimits));
             Marshal.StructureToPtr(jobLimits, lpJobLimits, false);
             SetInformationJobObject(hJob, 9 /* JobObjectExtendedLimitInformation */, lpJobLimits, (uint)Marshal.SizeOf(jobLimits));
@@ -240,7 +242,7 @@ public class GeminiSandbox {
                 netLimits.MaxBandwidth = 1;
                 netLimits.ControlFlags = 0x1 | 0x2; // ENABLE | MAX_BANDWIDTH
                 netLimits.DscpTag = 0;
-                
+
                 IntPtr lpNetLimits = Marshal.AllocHGlobal(Marshal.SizeOf(netLimits));
                 Marshal.StructureToPtr(netLimits, lpNetLimits, false);
                 SetInformationJobObject(hJob, 32 /* JobObjectNetRateControlInformation */, lpNetLimits, (uint)Marshal.SizeOf(netLimits));
@@ -310,11 +312,10 @@ public class GeminiSandbox {
                 commandLine += QuoteArgument(args[i]);
             }
 
-            PROCESS_INFORMATION pi = new PROCESS_INFORMATION();
             // Creation Flags: 0x01000000 (CREATE_BREAKAWAY_FROM_JOB) to allow job assignment if parent is in job
             uint creationFlags = 0x01000000;
             if (!CreateProcessAsUser(hRestrictedToken, null, commandLine, IntPtr.Zero, IntPtr.Zero, true, creationFlags, IntPtr.Zero, cwd, ref si, out pi)) {
-                Console.Error.WriteLine("Error: CreateProcessAsUser failed (" + Marshal.GetLastWin32Error() + ") Command: " + commandLine);
+                Console.Error.WriteLine("Error: CreateProcessAsUser failed (" + Marshal.GetLastWin32Error() + ") Command: " + commandLine);        
                 return 1;
             }
 
@@ -323,20 +324,19 @@ public class GeminiSandbox {
                 TerminateProcess(pi.hProcess, 1);
                 return 1;
             }
-            
+
             // Wait for exit
             uint waitResult = WaitForSingleObject(pi.hProcess, 0xFFFFFFFF);
             uint exitCode = 0;
             GetExitCodeProcess(pi.hProcess, out exitCode);
 
-            CloseHandle(pi.hProcess);
-            CloseHandle(pi.hThread);
-            CloseHandle(hJob);
-
             return (int)exitCode;
         } finally {
             if (hToken != IntPtr.Zero) CloseHandle(hToken);
             if (hRestrictedToken != IntPtr.Zero) CloseHandle(hRestrictedToken);
+            if (hJob != IntPtr.Zero) CloseHandle(hJob);
+            if (pi.hProcess != IntPtr.Zero) CloseHandle(pi.hProcess);
+            if (pi.hThread != IntPtr.Zero) CloseHandle(pi.hThread);
         }
     }
 

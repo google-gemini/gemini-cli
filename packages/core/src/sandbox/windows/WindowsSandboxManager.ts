@@ -16,7 +16,6 @@ import {
   findSecretFiles,
   type GlobalSandboxOptions,
   sanitizePaths,
-  tryRealpath,
   type SandboxPermissions,
   type ParsedSandboxDenial,
   resolveSandboxPaths,
@@ -36,7 +35,8 @@ import {
 } from './commandSafety.js';
 import { verifySandboxOverrides } from '../utils/commandUtils.js';
 import { parseWindowsSandboxDenials } from './windowsSandboxDenialUtils.js';
-import { isWithinRoot, getRealPath } from '../../utils/fileUtils.js';
+import { isWithinRoot } from '../../utils/fileUtils.js';
+import { resolveToRealPath } from '../../utils/paths.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -294,9 +294,13 @@ export class WindowsSandboxManager implements SandboxManager {
     // 3. Explicitly allowed paths from the request policy
     for (const allowedPath of allowedPaths) {
       const resolved = await tryRealpath(allowedPath);
+      let exists = false;
       try {
         await fs.promises.access(resolved, fs.constants.F_OK);
-      } catch {
+        exists = true;
+      } catch {}
+
+      if (!exists) {
         throw new Error(
           `Sandbox request rejected: Allowed path does not exist: ${resolved}. ` +
             'On Windows, granular sandbox access can only be granted to existing paths to avoid broad parent directory permissions.',
@@ -444,7 +448,7 @@ export class WindowsSandboxManager implements SandboxManager {
       return;
     }
 
-    const resolvedPath = getRealPath(targetPath);
+    const resolvedPath = resolveToRealPath(targetPath);
     if (this.allowedCache.has(resolvedPath)) {
       return;
     }
@@ -468,12 +472,12 @@ export class WindowsSandboxManager implements SandboxManager {
     }
 
     try {
-      // 1. Grant explicit Full Control to the Low Integrity SID
+      // 1. Grant explicit Modify access to the Low Integrity SID
       // 2. Set the Mandatory Label to Low to allow "Write Up" from Low processes
       await spawnAsync('icacls', [
         resolvedPath,
         '/grant',
-        `${LOW_INTEGRITY_SID}:(OI)(CI)(F)`,
+        `${LOW_INTEGRITY_SID}:(OI)(CI)(M)`,
         '/setintegritylevel',
         '(OI)(CI)Low',
       ]);
@@ -495,7 +499,7 @@ export class WindowsSandboxManager implements SandboxManager {
       return;
     }
 
-    const resolvedPath = getRealPath(targetPath);
+    const resolvedPath = resolveToRealPath(targetPath);
     if (this.deniedCache.has(resolvedPath)) {
       return;
     }
