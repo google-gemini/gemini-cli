@@ -354,8 +354,8 @@ their corresponding top-level category object in your `settings.json` file.
 
 - **`ui.loadingPhrases`** (enum):
   - **Description:** What to show while the model is working: tips, witty
-    comments, both, or nothing.
-  - **Default:** `"tips"`
+    comments, all, or off.
+  - **Default:** `"off"`
   - **Values:** `"tips"`, `"witty"`, `"all"`, `"off"`
 
 - **`ui.errorVerbosity`** (enum):
@@ -1565,7 +1565,7 @@ their corresponding top-level category object in your `settings.json` file.
 
 - **`advanced.autoConfigureMemory`** (boolean):
   - **Description:** Automatically configure Node.js memory limits
-  - **Default:** `false`
+  - **Default:** `true`
   - **Requires restart:** Yes
 
 - **`advanced.dnsResolutionOrder`** (string):
@@ -1586,6 +1586,11 @@ their corresponding top-level category object in your `settings.json` file.
   - **Default:** `undefined`
 
 #### `experimental`
+
+- **`experimental.adk.agentSessionNoninteractiveEnabled`** (boolean):
+  - **Description:** Enable non-interactive agent sessions.
+  - **Default:** `false`
+  - **Requires restart:** Yes
 
 - **`experimental.enableAgents`** (boolean):
   - **Description:** Enable local and remote subagents.
