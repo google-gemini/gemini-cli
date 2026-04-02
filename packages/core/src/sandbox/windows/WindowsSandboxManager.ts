@@ -294,13 +294,9 @@ export class WindowsSandboxManager implements SandboxManager {
     // 3. Explicitly allowed paths from the request policy
     for (const allowedPath of allowedPaths) {
       const resolved = await tryRealpath(allowedPath);
-      let exists = false;
       try {
         await fs.promises.access(resolved, fs.constants.F_OK);
-        exists = true;
-      } catch {}
-
-      if (!exists) {
+      } catch {
         throw new Error(
           `Sandbox request rejected: Allowed path does not exist: ${resolved}. ` +
             'On Windows, granular sandbox access can only be granted to existing paths to avoid broad parent directory permissions.',
@@ -316,27 +312,22 @@ export class WindowsSandboxManager implements SandboxManager {
     );
     for (const writePath of additionalWritePaths) {
       const resolved = await tryRealpath(writePath);
-      let exists = false;
       try {
         await fs.promises.access(resolved, fs.constants.F_OK);
-        exists = true;
-      } catch {}
-
-      if (exists) {
         await this.grantLowIntegrityAccess(resolved);
         continue;
-      }
-
-      // If the file doesn't exist, it's only allowed if it resides within a granted root.
-      const isInherited = writableRoots.some((root) =>
-        isWithinRoot(resolved, root),
-      );
-
-      if (!isInherited) {
-        throw new Error(
-          `Sandbox request rejected: Additional write path does not exist and its parent directory is not allowed: ${resolved}. ` +
-            'On Windows, granular sandbox access can only be granted to existing paths to avoid broad parent directory permissions.',
+      } catch {
+        // If the file doesn't exist, it's only allowed if it resides within a granted root.
+        const isInherited = writableRoots.some((root) =>
+          isWithinRoot(resolved, root),
         );
+
+        if (!isInherited) {
+          throw new Error(
+            `Sandbox request rejected: Additional write path does not exist and its parent directory is not allowed: ${resolved}. ` +
+              'On Windows, granular sandbox access can only be granted to existing paths to avoid broad parent directory permissions.',
+          );
+        }
       }
     }
 
