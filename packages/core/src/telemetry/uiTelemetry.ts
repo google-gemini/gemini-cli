@@ -9,15 +9,14 @@ import {
   EVENT_API_ERROR,
   EVENT_API_RESPONSE,
   EVENT_TOOL_CALL,
+  type ApiErrorEvent,
+  type ApiResponseEvent,
+  type ToolCallEvent,
+  type LlmRole,
 } from './types.js';
 
 import { ToolCallDecision } from './tool-call-decision.js';
-import type {
-  ApiErrorEvent,
-  ApiResponseEvent,
-  ToolCallEvent,
-  LlmRole,
-} from './types.js';
+import { type ConversationRecord } from '../services/chatRecordingService.js';
 
 export type UiEvent =
   | (ApiResponseEvent & { 'event.name': typeof EVENT_API_RESPONSE })
@@ -181,6 +180,96 @@ export class UiTelemetryService extends EventEmitter {
 
   setLastPromptTokenCount(lastPromptTokenCount: number): void {
     this.#lastPromptTokenCount = lastPromptTokenCount;
+    this.emit('update', {
+      metrics: this.#metrics,
+      lastPromptTokenCount: this.#lastPromptTokenCount,
+    });
+  }
+
+  clear(newSessionId?: string): void {
+    this.#metrics = createInitialMetrics();
+    this.#lastPromptTokenCount = 0;
+    this.emit('clear', newSessionId);
+    this.emit('update', {
+      metrics: this.#metrics,
+      lastPromptTokenCount: this.#lastPromptTokenCount,
+    });
+  }
+
+  /**
+   * Hydrates the telemetry metrics from a historical conversation record.
+   * This is used when resuming a session to restore token counts and tool stats.
+   */
+  hydrate(conversation: ConversationRecord): void {
+    this.clear(conversation.sessionId);
+
+    let totalTokensInContext = 0;
+
+    for (const message of conversation.messages) {
+      if (message.type === 'gemini') {
+        const model = message.model || 'unknown';
+        const modelMetrics = this.getOrCreateModelMetrics(model);
+
+        // Restore API request stats
+        modelMetrics.api.totalRequests++;
+
+        // Restore token metrics
+        if (message.tokens) {
+          modelMetrics.tokens.prompt += message.tokens.input;
+          modelMetrics.tokens.candidates += message.tokens.output;
+          modelMetrics.tokens.total += message.tokens.total;
+          modelMetrics.tokens.cached += message.tokens.cached;
+          modelMetrics.tokens.thoughts += message.tokens.thoughts || 0;
+          modelMetrics.tokens.tool += message.tokens.tool || 0;
+          modelMetrics.tokens.input = Math.max(
+            0,
+            modelMetrics.tokens.prompt - modelMetrics.tokens.cached,
+          );
+
+          // The total tokens of the last Gemini message represents the context
+          // size at that point in time.
+          totalTokensInContext = message.tokens.total;
+        }
+
+        // Restore tool metrics
+        if (message.toolCalls) {
+          for (const toolCall of message.toolCalls) {
+            this.#metrics.tools.totalCalls++;
+            if (toolCall.status === 'success') {
+              this.#metrics.tools.totalSuccess++;
+            } else if (toolCall.status === 'error') {
+              this.#metrics.tools.totalFail++;
+            }
+
+            if (!this.#metrics.tools.byName[toolCall.name]) {
+              this.#metrics.tools.byName[toolCall.name] = {
+                count: 0,
+                success: 0,
+                fail: 0,
+                durationMs: 0,
+                decisions: {
+                  [ToolCallDecision.ACCEPT]: 0,
+                  [ToolCallDecision.REJECT]: 0,
+                  [ToolCallDecision.MODIFY]: 0,
+                  [ToolCallDecision.AUTO_ACCEPT]: 0,
+                },
+              };
+            }
+
+            const toolStats = this.#metrics.tools.byName[toolCall.name];
+            toolStats.count++;
+            if (toolCall.status === 'success') {
+              toolStats.success++;
+            } else if (toolCall.status === 'error') {
+              toolStats.fail++;
+            }
+          }
+        }
+      }
+    }
+
+    this.#lastPromptTokenCount = totalTokensInContext;
+
     this.emit('update', {
       metrics: this.#metrics,
       lastPromptTokenCount: this.#lastPromptTokenCount,

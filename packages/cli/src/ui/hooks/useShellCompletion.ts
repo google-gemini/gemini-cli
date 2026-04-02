@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { useEffect, useRef, useCallback, useMemo } from 'react';
+import { useEffect, useRef, useCallback, useMemo, useState } from 'react';
 import * as fs from 'node:fs/promises';
 import * as path from 'node:path';
 import * as os from 'node:os';
@@ -435,6 +435,7 @@ export interface UseShellCompletionReturn {
   completionStart: number;
   completionEnd: number;
   query: string;
+  activeStart: number;
 }
 
 const EMPTY_TOKENS: string[] = [];
@@ -451,6 +452,7 @@ export function useShellCompletion({
   const pathEnvRef = useRef<string>(process.env['PATH'] ?? '');
   const abortRef = useRef<AbortController | null>(null);
   const debounceRef = useRef<NodeJS.Timeout | null>(null);
+  const [activeStart, setActiveStart] = useState<number>(-1);
 
   const tokenInfo = useMemo(
     () => (enabled ? getTokenAtCursor(line, cursorCol) : null),
@@ -466,6 +468,14 @@ export function useShellCompletion({
     cursorIndex = -1,
     commandToken = '',
   } = tokenInfo || {};
+
+  // Immediately clear suggestions if the token range has changed.
+  // This avoids a frame of flickering with stale suggestions (e.g. "ls ls")
+  // when moving to a new token.
+  if (enabled && activeStart !== -1 && completionStart !== activeStart) {
+    setSuggestions([]);
+    setActiveStart(-1);
+  }
 
   // Invalidate PATH cache when $PATH changes
   useEffect(() => {
@@ -558,6 +568,7 @@ export function useShellCompletion({
       if (signal.aborted) return;
 
       setSuggestions(results);
+      setActiveStart(completionStart);
     } catch (error) {
       if (
         !(
@@ -571,6 +582,7 @@ export function useShellCompletion({
       }
       if (!signal.aborted) {
         setSuggestions([]);
+        setActiveStart(completionStart);
       }
     } finally {
       if (!signal.aborted) {
@@ -586,6 +598,7 @@ export function useShellCompletion({
     cursorIndex,
     commandToken,
     cwd,
+    completionStart,
     setSuggestions,
     setIsLoadingSuggestions,
   ]);
@@ -594,6 +607,7 @@ export function useShellCompletion({
     if (!enabled) {
       abortRef.current?.abort();
       setSuggestions([]);
+      setActiveStart(-1);
       setIsLoadingSuggestions(false);
     }
   }, [enabled, setSuggestions, setIsLoadingSuggestions]);
@@ -633,5 +647,6 @@ export function useShellCompletion({
     completionStart,
     completionEnd,
     query,
+    activeStart,
   };
 }

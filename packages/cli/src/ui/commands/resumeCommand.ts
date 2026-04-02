@@ -10,10 +10,11 @@ import type {
   SlashCommand,
 } from './types.js';
 import { CommandKind } from './types.js';
+import { chatResumeSubCommands } from './chatCommand.js';
 
 export const resumeCommand: SlashCommand = {
   name: 'resume',
-  description: 'Browse and resume auto-saved conversations',
+  description: 'Browse auto-saved conversations and manage chat checkpoints',
   kind: CommandKind.BUILT_IN,
   autoExecute: true,
   action: async (
@@ -23,4 +24,5 @@ export const resumeCommand: SlashCommand = {
     type: 'dialog',
     dialog: 'sessionBrowser',
   }),
+  subCommands: chatResumeSubCommands,
 };

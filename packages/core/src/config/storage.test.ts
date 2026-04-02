@@ -24,7 +24,7 @@ vi.mock('fs', async (importOriginal) => {
 });
 
 import { Storage } from './storage.js';
-import { GEMINI_DIR, homedir } from '../utils/paths.js';
+import { GEMINI_DIR, homedir, resolveToRealPath } from '../utils/paths.js';
 import { ProjectRegistry } from './projectRegistry.js';
 import { StorageMigration } from './storageMigration.js';
 
@@ -147,6 +147,17 @@ describe('Storage – additional helpers', () => {
     expect(storage.getProjectAgentsDir()).toBe(expected);
   });
 
+  it('getProjectMemoryDir returns ~/.gemini/memory/<identifier>', async () => {
+    await storage.initialize();
+    const expected = path.join(
+      os.homedir(),
+      GEMINI_DIR,
+      'memory',
+      PROJECT_SLUG,
+    );
+    expect(storage.getProjectMemoryDir()).toBe(expected);
+  });
+
   it('getMcpOAuthTokensPath returns ~/.gemini/mcp-oauth-tokens.json', () => {
     const expected = path.join(
       os.homedir(),
@@ -178,6 +189,25 @@ describe('Storage – additional helpers', () => {
     const tempDir = storageWithSession.getProjectTempDir();
     const expected = path.join(tempDir, sessionId, 'plans');
     expect(storageWithSession.getProjectTempPlansDir()).toBe(expected);
+  });
+
+  it('getProjectTempTrackerDir returns ~/.gemini/tmp/<identifier>/tracker when no sessionId is provided', async () => {
+    await storage.initialize();
+    const tempDir = storage.getProjectTempDir();
+    const expected = path.join(tempDir, 'tracker');
+    expect(storage.getProjectTempTrackerDir()).toBe(expected);
+  });
+
+  it('getProjectTempTrackerDir returns ~/.gemini/tmp/<identifier>/<sessionId>/tracker when sessionId is provided', async () => {
+    const sessionId = 'test-session-id';
+    const storageWithSession = new Storage(projectRoot, sessionId);
+    ProjectRegistry.prototype.getShortId = vi
+      .fn()
+      .mockReturnValue(PROJECT_SLUG);
+    await storageWithSession.initialize();
+    const tempDir = storageWithSession.getProjectTempDir();
+    const expected = path.join(tempDir, sessionId, 'tracker');
+    expect(storageWithSession.getProjectTempTrackerDir()).toBe(expected);
   });
 
   describe('Session and JSON Loading', () => {
@@ -279,8 +309,7 @@ describe('Storage – additional helpers', () => {
         name: 'custom absolute path outside throws',
         customDir: '/absolute/path/to/plans',
         expected: '',
-        expectedError:
-          "Custom plans directory '/absolute/path/to/plans' resolves to '/absolute/path/to/plans', which is outside the project root '/tmp/project'.",
+        expectedError: `Custom plans directory '/absolute/path/to/plans' resolves to '/absolute/path/to/plans', which is outside the project root '${resolveToRealPath(projectRoot)}'.`,
       },
       {
         name: 'absolute path that happens to be inside project root',
@@ -306,8 +335,7 @@ describe('Storage – additional helpers', () => {
         name: 'escaping relative path throws',
         customDir: '../escaped-plans',
         expected: '',
-        expectedError:
-          "Custom plans directory '../escaped-plans' resolves to '/tmp/escaped-plans', which is outside the project root '/tmp/project'.",
+        expectedError: `Custom plans directory '../escaped-plans' resolves to '${resolveToRealPath(path.resolve(projectRoot, '../escaped-plans'))}', which is outside the project root '${resolveToRealPath(projectRoot)}'.`,
       },
       {
         name: 'hidden directory starting with ..',

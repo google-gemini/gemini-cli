@@ -6,8 +6,7 @@
 
 import type { Content } from '@google/genai';
 import { createHash } from 'node:crypto';
-import type { ServerGeminiStreamEvent } from '../core/turn.js';
-import { GeminiEventType } from '../core/turn.js';
+import { GeminiEventType, type ServerGeminiStreamEvent } from '../core/turn.js';
 import {
   logLoopDetected,
   logLoopDetectionDisabled,
@@ -20,12 +19,12 @@ import {
   LlmLoopCheckEvent,
   LlmRole,
 } from '../telemetry/types.js';
-import type { Config } from '../config/config.js';
 import {
   isFunctionCall,
   isFunctionResponse,
 } from '../utils/messageInspectors.js';
 import { debugLogger } from '../utils/debugLogger.js';
+import type { AgentLoopContext } from '../config/agent-loop-context.js';
 
 const TOOL_CALL_LOOP_THRESHOLD = 5;
 const CONTENT_LOOP_THRESHOLD = 10;
@@ -46,7 +45,7 @@ const LLM_CHECK_AFTER_TURNS = 30;
  * The default interval, in number of turns, at which the LLM-based loop check is performed.
  * This value is adjusted dynamically based on the LLM's confidence.
  */
-const DEFAULT_LLM_CHECK_INTERVAL = 3;
+const DEFAULT_LLM_CHECK_INTERVAL = 10;
 
 /**
  * The minimum interval for LLM-based loop checks.
@@ -66,16 +65,40 @@ const MAX_LLM_CHECK_INTERVAL = 15;
 const LLM_CONFIDENCE_THRESHOLD = 0.9;
 const DOUBLE_CHECK_MODEL_ALIAS = 'loop-detection-double-check';
 
-const LOOP_DETECTION_SYSTEM_PROMPT = `You are a sophisticated AI diagnostic agent specializing in identifying when a conversational AI is stuck in an unproductive state. Your task is to analyze the provided conversation history and determine if the assistant has ceased to make meaningful progress.
+const LOOP_DETECTION_SYSTEM_PROMPT = `You are a diagnostic agent that determines whether a conversational AI assistant is stuck in an unproductive loop. Analyze the conversation history (and, if provided, the original user request) to make this determination.
 
-An unproductive state is characterized by one or more of the following patterns over the last 5 or more assistant turns:
+## What constitutes an unproductive state
 
-Repetitive Actions: The assistant repeats the same tool calls or conversational responses a decent number of times. This includes simple loops (e.g., tool_A, tool_A, tool_A) and alternating patterns (e.g., tool_A, tool_B, tool_A, tool_B, ...).
+An unproductive state requires BOTH of the following to be true:
+1. The assistant has exhibited a repetitive pattern over at least 5 consecutive model actions (tool calls or text responses, counting only model-role turns).
+2. The repetition produces NO net change or forward progress toward the user's goal.
 
-Cognitive Loop: The assistant seems unable to determine the next logical step. It might express confusion, repeatedly ask the same questions, or generate responses that don't logically follow from the previous turns, indicating it's stuck and not advancing the task.
+Specific patterns to look for:
+- **Alternating cycles with no net effect:** The assistant cycles between the same actions (e.g., edit_file → run_build → edit_file → run_build) where each iteration applies the same edit and encounters the same error, making zero progress. Note: alternating between actions is only a loop if the arguments and outcomes are substantively identical each cycle. If the assistant is modifying different code or getting different errors, that is debugging progress, not a loop.
+- **Semantic repetition with identical outcomes:** The assistant calls the same tool with semantically equivalent arguments (same file, same line range, same content) multiple times consecutively, and each call produces the same outcome. This does NOT include build/test commands that are re-run after making code changes between invocations — re-running a build to verify a fix is normal workflow.
+- **Stuck reasoning:** The assistant produces multiple consecutive text responses that restate the same plan, question, or analysis without taking any new action or making a decision. This does NOT include command output that happens to contain repeated status lines or warnings.
 
-Crucially, differentiate between a true unproductive state and legitimate, incremental progress.
-For example, a series of 'tool_A' or 'tool_B' tool calls that make small, distinct changes to the same file (like adding docstrings to functions one by one) is considered forward progress and is NOT a loop. A loop would be repeatedly replacing the same text with the same content, or cycling between a small set of files with no net change.`;
+## What is NOT an unproductive state
+
+You MUST distinguish repetitive-looking but productive work from true loops. The following are examples of forward progress and must NOT be flagged:
+
+- **Cross-file batch operations:** A series of tool calls with the same tool name but targeting different files (different file paths in the arguments). For example, adding license headers to 20 files, or running the same refactoring across multiple modules.
+- **Incremental same-file edits:** Multiple edits to the same file that target different line ranges, different functions, or different text content (e.g., adding docstrings to functions one by one).
+- **Sequential processing:** A series of read or search operations on different files/paths to gather information.
+- **Retry with variation:** Re-attempting a failed operation with modified arguments or a different approach.
+
+## Argument analysis (critical)
+
+When evaluating tool calls, you MUST compare the **arguments** of each call, not just the tool name. Pay close attention to:
+- **File paths:** Different file paths mean different targets — this is distinct work, not repetition.
+- **Line numbers and text content:** Different line ranges or different old_string/new_string values indicate distinct edits.
+- **Search queries and patterns:** Different search terms indicate information gathering, not looping.
+
+A loop exists only when the same tool is called with semantically equivalent arguments repeatedly, indicating no forward progress.
+
+## Using the original user request
+
+If the original user request is provided, use it to contextualize the assistant's behavior. If the request implies a batch or multi-step operation (e.g., "update all files", "refactor every module", "add tests for each function"), then repetitive tool calls with varying arguments are expected and should weigh heavily against flagging a loop.`;
 
 const LOOP_DETECTION_SCHEMA: Record<string, unknown> = {
   type: 'object',
@@ -95,12 +118,22 @@ const LOOP_DETECTION_SCHEMA: Record<string, unknown> = {
 };
 
 /**
+ * Result of a loop detection check.
+ */
+export interface LoopDetectionResult {
+  count: number;
+  type?: LoopType;
+  detail?: string;
+  confirmedByModel?: string;
+}
+/**
  * Service for detecting and preventing infinite loops in AI responses.
  * Monitors tool call repetitions and content sentence repetitions.
  */
 export class LoopDetectionService {
-  private readonly config: Config;
+  private readonly context: AgentLoopContext;
   private promptId = '';
+  private userPrompt = '';
 
   // Tool call tracking
   private lastToolCallKey: string | null = null;
@@ -111,8 +144,11 @@ export class LoopDetectionService {
   private contentStats = new Map<string, number[]>();
   private lastContentIndex = 0;
   private loopDetected = false;
+  private detectedCount = 0;
+  private lastLoopDetail?: string;
   private inCodeBlock = false;
 
+  private lastLoopType?: LoopType;
   // LLM loop track tracking
   private turnsInCurrentPrompt = 0;
   private llmCheckInterval = DEFAULT_LLM_CHECK_INTERVAL;
@@ -121,8 +157,8 @@ export class LoopDetectionService {
   // Session-level disable flag
   private disabledForSession = false;
 
-  constructor(config: Config) {
-    this.config = config;
+  constructor(context: AgentLoopContext) {
+    this.context = context;
   }
 
   /**
@@ -131,7 +167,7 @@ export class LoopDetectionService {
   disableForSession(): void {
     this.disabledForSession = true;
     logLoopDetectionDisabled(
-      this.config,
+      this.context.config,
       new LoopDetectionDisabledEvent(this.promptId),
     );
   }
@@ -145,31 +181,71 @@ export class LoopDetectionService {
   /**
    * Processes a stream event and checks for loop conditions.
    * @param event - The stream event to process
-   * @returns true if a loop is detected, false otherwise
+   * @returns A LoopDetectionResult
    */
-  addAndCheck(event: ServerGeminiStreamEvent): boolean {
-    if (this.disabledForSession || this.config.getDisableLoopDetection()) {
-      return false;
+  addAndCheck(event: ServerGeminiStreamEvent): LoopDetectionResult {
+    if (
+      this.disabledForSession ||
+      this.context.config.getDisableLoopDetection()
+    ) {
+      return { count: 0 };
+    }
+    if (this.loopDetected) {
+      return {
+        count: this.detectedCount,
+        type: this.lastLoopType,
+        detail: this.lastLoopDetail,
+      };
     }
 
-    if (this.loopDetected) {
-      return this.loopDetected;
-    }
+    let isLoop = false;
+    let detail: string | undefined;
 
     switch (event.type) {
       case GeminiEventType.ToolCallRequest:
         // content chanting only happens in one single stream, reset if there
         // is a tool call in between
         this.resetContentTracking();
-        this.loopDetected = this.checkToolCallLoop(event.value);
+        isLoop = this.checkToolCallLoop(event.value);
+        if (isLoop) {
+          detail = `Repeated tool call: ${event.value.name} with arguments ${JSON.stringify(event.value.args)}`;
+        }
         break;
       case GeminiEventType.Content:
-        this.loopDetected = this.checkContentLoop(event.value);
+        isLoop = this.checkContentLoop(event.value);
+        if (isLoop) {
+          detail = `Repeating content detected: "${this.streamContentHistory.substring(Math.max(0, this.lastContentIndex - 20), this.lastContentIndex + CONTENT_CHUNK_SIZE).trim()}..."`;
+        }
         break;
       default:
         break;
     }
-    return this.loopDetected;
+
+    if (isLoop) {
+      this.loopDetected = true;
+      this.detectedCount++;
+      this.lastLoopDetail = detail;
+      this.lastLoopType =
+        event.type === GeminiEventType.ToolCallRequest
+          ? LoopType.CONSECUTIVE_IDENTICAL_TOOL_CALLS
+          : LoopType.CONTENT_CHANTING_LOOP;
+
+      logLoopDetected(
+        this.context.config,
+        new LoopDetectedEvent(
+          this.lastLoopType,
+          this.promptId,
+          this.detectedCount,
+        ),
+      );
+    }
+    return isLoop
+      ? {
+          count: this.detectedCount,
+          type: this.lastLoopType,
+          detail: this.lastLoopDetail,
+        }
+      : { count: 0 };
   }
 
   /**
@@ -180,12 +256,23 @@ export class LoopDetectionService {
    * is performed periodically based on the `llmCheckInterval`.
    *
    * @param signal - An AbortSignal to allow for cancellation of the asynchronous LLM check.
-   * @returns A promise that resolves to `true` if a loop is detected, and `false` otherwise.
+   * @returns A promise that resolves to a LoopDetectionResult.
    */
-  async turnStarted(signal: AbortSignal) {
-    if (this.disabledForSession || this.config.getDisableLoopDetection()) {
-      return false;
+  async turnStarted(signal: AbortSignal): Promise<LoopDetectionResult> {
+    if (
+      this.disabledForSession ||
+      this.context.config.getDisableLoopDetection()
+    ) {
+      return { count: 0 };
     }
+    if (this.loopDetected) {
+      return {
+        count: this.detectedCount,
+        type: this.lastLoopType,
+        detail: this.lastLoopDetail,
+      };
+    }
+
     this.turnsInCurrentPrompt++;
 
     if (
@@ -193,10 +280,35 @@ export class LoopDetectionService {
       this.turnsInCurrentPrompt - this.lastCheckTurn >= this.llmCheckInterval
     ) {
       this.lastCheckTurn = this.turnsInCurrentPrompt;
-      return this.checkForLoopWithLLM(signal);
-    }
+      const { isLoop, analysis, confirmedByModel } =
+        await this.checkForLoopWithLLM(signal);
+      if (isLoop) {
+        this.loopDetected = true;
+        this.detectedCount++;
+        this.lastLoopDetail = analysis;
+        this.lastLoopType = LoopType.LLM_DETECTED_LOOP;
 
-    return false;
+        logLoopDetected(
+          this.context.config,
+          new LoopDetectedEvent(
+            this.lastLoopType,
+            this.promptId,
+            this.detectedCount,
+            confirmedByModel,
+            analysis,
+            LLM_CONFIDENCE_THRESHOLD,
+          ),
+        );
+
+        return {
+          count: this.detectedCount,
+          type: this.lastLoopType,
+          detail: this.lastLoopDetail,
+          confirmedByModel,
+        };
+      }
+    }
+    return { count: 0 };
   }
 
   private checkToolCallLoop(toolCall: { name: string; args: object }): boolean {
@@ -208,13 +320,6 @@ export class LoopDetectionService {
       this.toolCallRepetitionCount = 1;
     }
     if (this.toolCallRepetitionCount >= TOOL_CALL_LOOP_THRESHOLD) {
-      logLoopDetected(
-        this.config,
-        new LoopDetectedEvent(
-          LoopType.CONSECUTIVE_IDENTICAL_TOOL_CALLS,
-          this.promptId,
-        ),
-      );
       return true;
     }
     return false;
@@ -321,13 +426,6 @@ export class LoopDetectionService {
       const chunkHash = createHash('sha256').update(currentChunk).digest('hex');
 
       if (this.isLoopDetectedForChunk(currentChunk, chunkHash)) {
-        logLoopDetected(
-          this.config,
-          new LoopDetectedEvent(
-            LoopType.CHANTING_IDENTICAL_SENTENCES,
-            this.promptId,
-          ),
-        );
         return true;
       }
 
@@ -421,38 +519,50 @@ export class LoopDetectionService {
     return originalChunk === currentChunk;
   }
 
-  private trimRecentHistory(recentHistory: Content[]): Content[] {
+  private trimRecentHistory(history: Content[]): Content[] {
     // A function response must be preceded by a function call.
     // Continuously removes dangling function calls from the end of the history
     // until the last turn is not a function call.
-    while (
-      recentHistory.length > 0 &&
-      isFunctionCall(recentHistory[recentHistory.length - 1])
-    ) {
-      recentHistory.pop();
+    while (history.length > 0 && isFunctionCall(history[history.length - 1])) {
+      history.pop();
     }
 
     // A function response should follow a function call.
     // Continuously removes leading function responses from the beginning of history
     // until the first turn is not a function response.
-    while (recentHistory.length > 0 && isFunctionResponse(recentHistory[0])) {
-      recentHistory.shift();
+    while (history.length > 0 && isFunctionResponse(history[0])) {
+      history.shift();
     }
 
-    return recentHistory;
+    return history;
   }
 
-  private async checkForLoopWithLLM(signal: AbortSignal) {
-    const recentHistory = this.config
-      .getGeminiClient()
+  private async checkForLoopWithLLM(signal: AbortSignal): Promise<{
+    isLoop: boolean;
+    analysis?: string;
+    confirmedByModel?: string;
+  }> {
+    const recentHistory = this.context.geminiClient
       .getHistory()
       .slice(-LLM_LOOP_CHECK_HISTORY_COUNT);
 
     const trimmedHistory = this.trimRecentHistory(recentHistory);
 
-    const taskPrompt = `Please analyze the conversation history to determine the possibility that the conversation is stuck in a repetitive, non-productive state. Provide your response in the requested JSON format.`;
+    const taskPrompt = `Please analyze the conversation history to determine the possibility that the conversation is stuck in a repetitive, non-productive state. Consider the original user request when evaluating whether repeated tool calls represent legitimate batch work or an actual loop. Provide your response in the requested JSON format.`;
 
     const contents = [
+      ...(this.userPrompt
+        ? [
+            {
+              role: 'user' as const,
+              parts: [
+                {
+                  text: `<original_user_request>\n${this.userPrompt}\n</original_user_request>`,
+                },
+              ],
+            },
+          ]
+        : []),
       ...trimmedHistory,
       { role: 'user', parts: [{ text: taskPrompt }] },
     ];
@@ -470,22 +580,28 @@ export class LoopDetectionService {
     );
 
     if (!flashResult) {
-      return false;
+      return { isLoop: false };
     }
 
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
-    const flashConfidence = flashResult[
-      'unproductive_state_confidence'
-    ] as number;
+    const flashConfidence =
+      // eslint-disable-next-line no-restricted-syntax
+      typeof flashResult['unproductive_state_confidence'] === 'number'
+        ? flashResult['unproductive_state_confidence']
+        : 0;
+    const flashAnalysis =
+      // eslint-disable-next-line no-restricted-syntax
+      typeof flashResult['unproductive_state_analysis'] === 'string'
+        ? flashResult['unproductive_state_analysis']
+        : '';
 
     const doubleCheckModelName =
-      this.config.modelConfigService.getResolvedConfig({
+      this.context.config.modelConfigService.getResolvedConfig({
         model: DOUBLE_CHECK_MODEL_ALIAS,
       }).model;
 
     if (flashConfidence < LLM_CONFIDENCE_THRESHOLD) {
       logLlmLoopCheck(
-        this.config,
+        this.context.config,
         new LlmLoopCheckEvent(
           this.promptId,
           flashConfidence,
@@ -494,17 +610,21 @@ export class LoopDetectionService {
         ),
       );
       this.updateCheckInterval(flashConfidence);
-      return false;
+      return { isLoop: false };
     }
 
-    const availability = this.config.getModelAvailabilityService();
+    const availability = this.context.config.getModelAvailabilityService();
 
     if (!availability.snapshot(doubleCheckModelName).available) {
-      const flashModelName = this.config.modelConfigService.getResolvedConfig({
-        model: 'loop-detection',
-      }).model;
-      this.handleConfirmedLoop(flashResult, flashModelName);
-      return true;
+      const flashModelName =
+        this.context.config.modelConfigService.getResolvedConfig({
+          model: 'loop-detection',
+        }).model;
+      return {
+        isLoop: true,
+        analysis: flashAnalysis,
+        confirmedByModel: flashModelName,
+      };
     }
 
     // Double check with configured model
@@ -514,13 +634,21 @@ export class LoopDetectionService {
       signal,
     );
 
-    const mainModelConfidence = mainModelResult
-      ? // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
-        (mainModelResult['unproductive_state_confidence'] as number)
-      : 0;
+    const mainModelConfidence =
+      mainModelResult &&
+      // eslint-disable-next-line no-restricted-syntax
+      typeof mainModelResult['unproductive_state_confidence'] === 'number'
+        ? mainModelResult['unproductive_state_confidence']
+        : 0;
+    const mainModelAnalysis =
+      mainModelResult &&
+      // eslint-disable-next-line no-restricted-syntax
+      typeof mainModelResult['unproductive_state_analysis'] === 'string'
+        ? mainModelResult['unproductive_state_analysis']
+        : undefined;
 
     logLlmLoopCheck(
-      this.config,
+      this.context.config,
       new LlmLoopCheckEvent(
         this.promptId,
         flashConfidence,
@@ -531,14 +659,17 @@ export class LoopDetectionService {
 
     if (mainModelResult) {
       if (mainModelConfidence >= LLM_CONFIDENCE_THRESHOLD) {
-        this.handleConfirmedLoop(mainModelResult, doubleCheckModelName);
-        return true;
+        return {
+          isLoop: true,
+          analysis: mainModelAnalysis,
+          confirmedByModel: doubleCheckModelName,
+        };
       } else {
         this.updateCheckInterval(mainModelConfidence);
       }
     }
 
-    return false;
+    return { isLoop: false };
   }
 
   private async queryLoopDetectionModel(
@@ -547,7 +678,7 @@ export class LoopDetectionService {
     signal: AbortSignal,
   ): Promise<Record<string, unknown> | null> {
     try {
-      const result = await this.config.getBaseLlmClient().generateJson({
+      const result = await this.context.config.getBaseLlmClient().generateJson({
         modelConfigKey: { model },
         contents,
         schema: LOOP_DETECTION_SCHEMA,
@@ -560,35 +691,20 @@ export class LoopDetectionService {
 
       if (
         result &&
+        // eslint-disable-next-line no-restricted-syntax
         typeof result['unproductive_state_confidence'] === 'number'
       ) {
         return result;
       }
       return null;
-    } catch (e) {
-      this.config.getDebugMode() ? debugLogger.warn(e) : debugLogger.debug(e);
+    } catch (error) {
+      if (this.context.config.getDebugMode()) {
+        debugLogger.warn(
+          `Error querying loop detection model (${model}): ${String(error)}`,
+        );
+      }
       return null;
     }
-  }
-
-  private handleConfirmedLoop(
-    result: Record<string, unknown>,
-    modelName: string,
-  ): void {
-    if (
-      typeof result['unproductive_state_analysis'] === 'string' &&
-      result['unproductive_state_analysis']
-    ) {
-      debugLogger.warn(result['unproductive_state_analysis']);
-    }
-    logLoopDetected(
-      this.config,
-      new LoopDetectedEvent(
-        LoopType.LLM_DETECTED_LOOP,
-        this.promptId,
-        modelName,
-      ),
-    );
   }
 
   private updateCheckInterval(unproductive_state_confidence: number): void {
@@ -602,11 +718,23 @@ export class LoopDetectionService {
   /**
    * Resets all loop detection state.
    */
-  reset(promptId: string): void {
+  reset(promptId: string, userPrompt?: string): void {
     this.promptId = promptId;
+    this.userPrompt = userPrompt ?? '';
     this.resetToolCallCount();
     this.resetContentTracking();
     this.resetLlmCheckTracking();
+    this.loopDetected = false;
+    this.detectedCount = 0;
+    this.lastLoopDetail = undefined;
+    this.lastLoopType = undefined;
+  }
+
+  /**
+   * Resets the loop detected flag to allow a recovery turn to proceed.
+   * This preserves the detectedCount so that the next detection will be count 2.
+   */
+  clearDetection(): void {
     this.loopDetected = false;
   }
 

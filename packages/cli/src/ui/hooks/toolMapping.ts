@@ -10,11 +10,18 @@ import {
   type ToolResultDisplay,
   debugLogger,
   CoreToolCallStatus,
+  type SubagentActivityItem,
 } from '@google/gemini-cli-core';
 import {
   type HistoryItemToolGroup,
   type IndividualToolCallDisplay,
 } from '../types.js';
+
+function hasSubagentHistory(
+  call: ToolCall,
+): call is ToolCall & { subagentHistory: SubagentActivityItem[] } {
+  return 'subagentHistory' in call && call.subagentHistory !== undefined;
+}
 
 /**
  * Transforms `ToolCall` objects into `HistoryItemToolGroup` objects for UI
@@ -48,7 +55,9 @@ export function mapToDisplay(
 
     const baseDisplayProperties = {
       callId: call.request.callId,
+      parentCallId: call.request.parentCallId,
       name: displayName,
+      args: call.request.args,
       description,
       renderOutputAsMarkdown,
     };
@@ -102,6 +111,7 @@ export function mapToDisplay(
       ...baseDisplayProperties,
       status: call.status,
       isClientInitiated: !!call.request.isClientInitiated,
+      kind: call.tool?.kind,
       resultDisplay,
       confirmationDetails,
       outputFile,
@@ -112,6 +122,9 @@ export function mapToDisplay(
       progressTotal,
       approvalMode: call.approvalMode,
       originalRequestName: call.request.originalRequestName,
+      subagentHistory: hasSubagentHistory(call)
+        ? call.subagentHistory
+        : undefined,
     };
   });
 

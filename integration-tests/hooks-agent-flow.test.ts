@@ -165,14 +165,15 @@ describe('Hooks Agent Flow', () => {
 
       // BeforeModel hook to track message counts across LLM calls
       const messageCountFile = join(rig.testDir!, 'message-counts.json');
+      const escapedPath = JSON.stringify(messageCountFile);
       const beforeModelScript = `
         const fs = require('fs');
         const input = JSON.parse(fs.readFileSync(0, 'utf-8'));
         const messageCount = input.llm_request?.contents?.length || 0;
         let counts = [];
-        try { counts = JSON.parse(fs.readFileSync(${JSON.stringify(messageCountFile)}, 'utf-8')); } catch (e) {}
+        try { counts = JSON.parse(fs.readFileSync(${escapedPath}, 'utf-8')); } catch (e) {}
         counts.push(messageCount);
-        fs.writeFileSync(${JSON.stringify(messageCountFile)}, JSON.stringify(counts));
+        fs.writeFileSync(${escapedPath}, JSON.stringify(counts));
         console.log(JSON.stringify({ decision: 'allow' }));
       `;
       const beforeModelScriptPath = rig.createScript(
@@ -181,14 +182,22 @@ describe('Hooks Agent Flow', () => {
       );
 
       const afterAgentScript = `
-        console.log(JSON.stringify({
-          decision: 'block',
-          reason: 'Security policy triggered',
-          hookSpecificOutput: {
-            hookEventName: 'AfterAgent',
-            clearContext: true
-          }
-        }));
+        const fs = require('fs');
+        const input = JSON.parse(fs.readFileSync(0, 'utf-8'));
+        if (input.stop_hook_active) {
+          // Retry turn: allow execution to proceed (breaks the loop)
+          console.log(JSON.stringify({ decision: 'allow' }));
+        } else {
+          // First call: block and clear context to trigger the retry
+          console.log(JSON.stringify({
+            decision: 'block',
+            reason: 'Security policy triggered',
+            hookSpecificOutput: {
+              hookEventName: 'AfterAgent',
+              clearContext: true
+            }
+          }));
+        }
       `;
       const afterAgentScriptPath = rig.createScript(
         'after_agent_clear.cjs',
@@ -197,8 +206,10 @@ describe('Hooks Agent Flow', () => {
 
       rig.setup('should process clearContext in AfterAgent hook output', {
         settings: {
-          hooks: {
+          hooksConfig: {
             enabled: true,
+          },
+          hooks: {
             BeforeModel: [
               {
                 hooks: [

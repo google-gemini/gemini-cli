@@ -16,11 +16,12 @@ import type {
   GenerateContentResponseUsageMetadata,
   GenerateContentResponse,
 } from '@google/genai';
-import type { ServerDetails, ContextBreakdown } from '../telemetry/types.js';
 import {
   ApiRequestEvent,
   ApiResponseEvent,
   ApiErrorEvent,
+  type ServerDetails,
+  type ContextBreakdown,
 } from '../telemetry/types.js';
 import type { LlmRole } from '../telemetry/llmRole.js';
 import type { Config } from '../config/config.js';
@@ -36,7 +37,7 @@ import { toContents } from '../code_assist/converter.js';
 import { isStructuredError } from '../utils/quotaErrorDetection.js';
 import { runInDevTraceSpan, type SpanMetadata } from '../telemetry/trace.js';
 import { debugLogger } from '../utils/debugLogger.js';
-import { getErrorType } from '../utils/errors.js';
+import { isAbortError, getErrorType } from '../utils/errors.js';
 import {
   GeminiCliOperation,
   GEN_AI_PROMPT_NAME,
@@ -310,6 +311,10 @@ export class LoggingContentGenerator implements ContentGenerator {
     generationConfig?: GenerateContentConfig,
     serverDetails?: ServerDetails,
   ): void {
+    if (isAbortError(error)) {
+      // Don't log aborted requests (e.g., user cancellation, internal timeouts) as API errors.
+      return;
+    }
     const errorMessage = error instanceof Error ? error.message : String(error);
     const errorType = getErrorType(error);
 
@@ -344,6 +349,7 @@ export class LoggingContentGenerator implements ContentGenerator {
     return runInDevTraceSpan(
       {
         operation: GeminiCliOperation.LLMCall,
+        logPrompts: this.config.getTelemetryLogPromptsEnabled(),
         attributes: {
           [GEN_AI_REQUEST_MODEL]: req.model,
           [GEN_AI_PROMPT_NAME]: userPromptId,
@@ -433,7 +439,7 @@ export class LoggingContentGenerator implements ContentGenerator {
     return runInDevTraceSpan(
       {
         operation: GeminiCliOperation.LLMCall,
-        noAutoEnd: true,
+        logPrompts: this.config.getTelemetryLogPromptsEnabled(),
         attributes: {
           [GEN_AI_REQUEST_MODEL]: req.model,
           [GEN_AI_PROMPT_NAME]: userPromptId,
@@ -443,7 +449,7 @@ export class LoggingContentGenerator implements ContentGenerator {
           [GEN_AI_TOOL_DEFINITIONS]: safeJsonStringify(req.config?.tools ?? []),
         },
       },
-      async ({ metadata: spanMetadata, endSpan }) => {
+      async ({ metadata: spanMetadata }) => {
         spanMetadata.input = req.contents;
 
         const startTime = Date.now();
@@ -499,7 +505,6 @@ export class LoggingContentGenerator implements ContentGenerator {
           userPromptId,
           role,
           spanMetadata,
-          endSpan,
         );
       },
     );
@@ -512,7 +517,6 @@ export class LoggingContentGenerator implements ContentGenerator {
     userPromptId: string,
     role: LlmRole,
     spanMetadata: SpanMetadata,
-    endSpan: () => void,
   ): AsyncGenerator<GenerateContentResponse> {
     const responses: GenerateContentResponse[] = [];
 
@@ -576,8 +580,6 @@ export class LoggingContentGenerator implements ContentGenerator {
         serverDetails,
       );
       throw error;
-    } finally {
-      endSpan();
     }
   }
 
@@ -591,6 +593,7 @@ export class LoggingContentGenerator implements ContentGenerator {
     return runInDevTraceSpan(
       {
         operation: GeminiCliOperation.LLMCall,
+        logPrompts: this.config.getTelemetryLogPromptsEnabled(),
         attributes: {
           [GEN_AI_REQUEST_MODEL]: req.model,
         },

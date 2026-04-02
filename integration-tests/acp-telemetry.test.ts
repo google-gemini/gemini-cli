@@ -58,7 +58,7 @@ describe('ACP telemetry', () => {
       'node',
       [
         bundlePath,
-        '--experimental-acp',
+        '--acp',
         '--fake-responses',
         join(rig.testDir!, 'fake-responses.json'),
       ],

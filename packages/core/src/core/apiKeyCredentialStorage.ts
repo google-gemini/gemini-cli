@@ -7,29 +7,46 @@
 import { HybridTokenStorage } from '../mcp/token-storage/hybrid-token-storage.js';
 import type { OAuthCredentials } from '../mcp/token-storage/types.js';
 import { debugLogger } from '../utils/debugLogger.js';
+import { createCache } from '../utils/cache.js';
 
 const KEYCHAIN_SERVICE_NAME = 'gemini-cli-api-key';
 const DEFAULT_API_KEY_ENTRY = 'default-api-key';
 
 const storage = new HybridTokenStorage(KEYCHAIN_SERVICE_NAME);
 
+// Cache to store the results of loadApiKey to avoid redundant keychain access.
+const apiKeyCache = createCache<string, Promise<string | null>>({
+  storage: 'map',
+  defaultTtl: 30000, // 30 seconds
+});
+
+/**
+ * Resets the API key cache. Used exclusively for test isolation.
+ * @internal
+ */
+export function resetApiKeyCacheForTesting() {
+  apiKeyCache.clear();
+}
+
 /**
  * Load cached API key
  */
 export async function loadApiKey(): Promise<string | null> {
-  try {
-    const credentials = await storage.getCredentials(DEFAULT_API_KEY_ENTRY);
+  return apiKeyCache.getOrCreate(DEFAULT_API_KEY_ENTRY, async () => {
+    try {
+      const credentials = await storage.getCredentials(DEFAULT_API_KEY_ENTRY);
 
-    if (credentials?.token?.accessToken) {
-      return credentials.token.accessToken;
+      if (credentials?.token?.accessToken) {
+        return credentials.token.accessToken;
+      }
+
+      return null;
+    } catch (error: unknown) {
+      // Log other errors but don't crash, just return null so user can re-enter key
+      debugLogger.error('Failed to load API key from storage:', error);
+      return null;
     }
-
-    return null;
-  } catch (error: unknown) {
-    // Log other errors but don't crash, just return null so user can re-enter key
-    debugLogger.error('Failed to load API key from storage:', error);
-    return null;
-  }
+  });
 }
 
 /**
@@ -38,6 +55,7 @@ export async function loadApiKey(): Promise<string | null> {
 export async function saveApiKey(
   apiKey: string | null | undefined,
 ): Promise<void> {
+  apiKeyCache.delete(DEFAULT_API_KEY_ENTRY);
   if (!apiKey || apiKey.trim() === '') {
     try {
       await storage.deleteCredentials(DEFAULT_API_KEY_ENTRY);
@@ -65,6 +83,7 @@ export async function saveApiKey(
  * Clear cached API key
  */
 export async function clearApiKey(): Promise<void> {
+  apiKeyCache.delete(DEFAULT_API_KEY_ENTRY);
   try {
     await storage.deleteCredentials(DEFAULT_API_KEY_ENTRY);
   } catch (error: unknown) {

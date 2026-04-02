@@ -4,8 +4,15 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { vi, describe, it, expect, beforeEach, afterEach } from 'vitest';
-import type { Mock } from 'vitest';
+import {
+  vi,
+  describe,
+  it,
+  expect,
+  beforeEach,
+  afterEach,
+  type Mock,
+} from 'vitest';
 import { directoryCommand } from './directoryCommand.js';
 import {
   expandHomeDir,
@@ -78,11 +85,14 @@ describe('directoryCommand', () => {
       getFileFilteringOptions: () => ({ ignore: [], include: [] }),
       setUserMemory: vi.fn(),
       setGeminiMdFileCount: vi.fn(),
+      get config() {
+        return this;
+      },
     } as unknown as Config;
 
     mockContext = {
       services: {
-        config: mockConfig,
+        agentContext: mockConfig,
         settings: {
           merged: {
             memoryDiscoveryMaxDirs: 1000,
