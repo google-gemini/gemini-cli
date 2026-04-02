@@ -1,0 +1,859 @@
+{
+  "scenarioId": "scenario-spatial-scattering",
+  "description": "Tests if the agent remembers its assigned subsystem/directory focus after compression. Targets \"Goal Drift\".",
+  "history": [
+    {
+      "role": "user",
+      "parts": [
+        {
+          "text": "Your task is strictly limited to the \"packages/core/src/services/\" directory. Do not wander into other packages."
+        }
+      ]
+    },
+    {
+      "role": "model",
+      "parts": [
+        {
+          "text": "I will focus exclusively on packages/core/src/services/."
+        }
+      ]
+    },
+    {
+      "role": "user",
+      "parts": [
+        {
+          "text": "List files in packages/core/src/services/subdir_0"
+        }
+      ]
+    },
+    {
+      "role": "model",
+      "parts": [
+        {
+          "functionCall": {
+            "name": "list_directory",
+            "args": {
+              "dir_path": "packages/core/src/services/subdir_0"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "role": "user",
+      "parts": [
+        {
+          "functionResponse": {
+            "name": "list_directory",
+            "response": {
+              "files": ["service.ts", "types.ts"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "role": "user",
+      "parts": [
+        {
+          "text": "List files in packages/core/src/services/subdir_1"
+        }
+      ]
+    },
+    {
+      "role": "model",
+      "parts": [
+        {
+          "functionCall": {
+            "name": "list_directory",
+            "args": {
+              "dir_path": "packages/core/src/services/subdir_1"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "role": "user",
+      "parts": [
+        {
+          "functionResponse": {
+            "name": "list_directory",
+            "response": {
+              "files": ["service.ts", "types.ts"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "role": "user",
+      "parts": [
+        {
+          "text": "List files in packages/core/src/services/subdir_2"
+        }
+      ]
+    },
+    {
+      "role": "model",
+      "parts": [
+        {
+          "functionCall": {
+            "name": "list_directory",
+            "args": {
+              "dir_path": "packages/core/src/services/subdir_2"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "role": "user",
+      "parts": [
+        {
+          "functionResponse": {
+            "name": "list_directory",
+            "response": {
+              "files": ["service.ts", "types.ts"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "role": "user",
+      "parts": [
+        {
+          "text": "List files in packages/core/src/services/subdir_3"
+        }
+      ]
+    },
+    {
+      "role": "model",
+      "parts": [
+        {
+          "functionCall": {
+            "name": "list_directory",
+            "args": {
+              "dir_path": "packages/core/src/services/subdir_3"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "role": "user",
+      "parts": [
+        {
+          "functionResponse": {
+            "name": "list_directory",
+            "response": {
+              "files": ["service.ts", "types.ts"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "role": "user",
+      "parts": [
+        {
+          "text": "List files in packages/core/src/services/subdir_4"
+        }
+      ]
+    },
+    {
+      "role": "model",
+      "parts": [
+        {
+          "functionCall": {
+            "name": "list_directory",
+            "args": {
+              "dir_path": "packages/core/src/services/subdir_4"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "role": "user",
+      "parts": [
+        {
+          "functionResponse": {
+            "name": "list_directory",
+            "response": {
+              "files": ["service.ts", "types.ts"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "role": "user",
+      "parts": [
+        {
+          "text": "List files in packages/core/src/services/subdir_5"
+        }
+      ]
+    },
+    {
+      "role": "model",
+      "parts": [
+        {
+          "functionCall": {
+            "name": "list_directory",
+            "args": {
+              "dir_path": "packages/core/src/services/subdir_5"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "role": "user",
+      "parts": [
+        {
+          "functionResponse": {
+            "name": "list_directory",
+            "response": {
+              "files": ["service.ts", "types.ts"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "role": "user",
+      "parts": [
+        {
+          "text": "List files in packages/core/src/services/subdir_6"
+        }
+      ]
+    },
+    {
+      "role": "model",
+      "parts": [
+        {
+          "functionCall": {
+            "name": "list_directory",
+            "args": {
+              "dir_path": "packages/core/src/services/subdir_6"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "role": "user",
+      "parts": [
+        {
+          "functionResponse": {
+            "name": "list_directory",
+            "response": {
+              "files": ["service.ts", "types.ts"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "role": "user",
+      "parts": [
+        {
+          "text": "List files in packages/core/src/services/subdir_7"
+        }
+      ]
+    },
+    {
+      "role": "model",
+      "parts": [
+        {
+          "functionCall": {
+            "name": "list_directory",
+            "args": {
+              "dir_path": "packages/core/src/services/subdir_7"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "role": "user",
+      "parts": [
+        {
+          "functionResponse": {
+            "name": "list_directory",
+            "response": {
+              "files": ["service.ts", "types.ts"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "role": "user",
+      "parts": [
+        {
+          "text": "List files in packages/core/src/services/subdir_8"
+        }
+      ]
+    },
+    {
+      "role": "model",
+      "parts": [
+        {
+          "functionCall": {
+            "name": "list_directory",
+            "args": {
+              "dir_path": "packages/core/src/services/subdir_8"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "role": "user",
+      "parts": [
+        {
+          "functionResponse": {
+            "name": "list_directory",
+            "response": {
+              "files": ["service.ts", "types.ts"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "role": "user",
+      "parts": [
+        {
+          "text": "List files in packages/core/src/services/subdir_9"
+        }
+      ]
+    },
+    {
+      "role": "model",
+      "parts": [
+        {
+          "functionCall": {
+            "name": "list_directory",
+            "args": {
+              "dir_path": "packages/core/src/services/subdir_9"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "role": "user",
+      "parts": [
+        {
+          "functionResponse": {
+            "name": "list_directory",
+            "response": {
+              "files": ["service.ts", "types.ts"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "role": "user",
+      "parts": [
+        {
+          "text": "List files in packages/core/src/services/subdir_10"
+        }
+      ]
+    },
+    {
+      "role": "model",
+      "parts": [
+        {
+          "functionCall": {
+            "name": "list_directory",
+            "args": {
+              "dir_path": "packages/core/src/services/subdir_10"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "role": "user",
+      "parts": [
+        {
+          "functionResponse": {
+            "name": "list_directory",
+            "response": {
+              "files": ["service.ts", "types.ts"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "role": "user",
+      "parts": [
+        {
+          "text": "List files in packages/core/src/services/subdir_11"
+        }
+      ]
+    },
+    {
+      "role": "model",
+      "parts": [
+        {
+          "functionCall": {
+            "name": "list_directory",
+            "args": {
+              "dir_path": "packages/core/src/services/subdir_11"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "role": "user",
+      "parts": [
+        {
+          "functionResponse": {
+            "name": "list_directory",
+            "response": {
+              "files": ["service.ts", "types.ts"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "role": "user",
+      "parts": [
+        {
+          "text": "List files in packages/core/src/services/subdir_12"
+        }
+      ]
+    },
+    {
+      "role": "model",
+      "parts": [
+        {
+          "functionCall": {
+            "name": "list_directory",
+            "args": {
+              "dir_path": "packages/core/src/services/subdir_12"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "role": "user",
+      "parts": [
+        {
+          "functionResponse": {
+            "name": "list_directory",
+            "response": {
+              "files": ["service.ts", "types.ts"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "role": "user",
+      "parts": [
+        {
+          "text": "List files in packages/core/src/services/subdir_13"
+        }
+      ]
+    },
+    {
+      "role": "model",
+      "parts": [
+        {
+          "functionCall": {
+            "name": "list_directory",
+            "args": {
+              "dir_path": "packages/core/src/services/subdir_13"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "role": "user",
+      "parts": [
+        {
+          "functionResponse": {
+            "name": "list_directory",
+            "response": {
+              "files": ["service.ts", "types.ts"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "role": "user",
+      "parts": [
+        {
+          "text": "List files in packages/core/src/services/subdir_14"
+        }
+      ]
+    },
+    {
+      "role": "model",
+      "parts": [
+        {
+          "functionCall": {
+            "name": "list_directory",
+            "args": {
+              "dir_path": "packages/core/src/services/subdir_14"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "role": "user",
+      "parts": [
+        {
+          "functionResponse": {
+            "name": "list_directory",
+            "response": {
+              "files": ["service.ts", "types.ts"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "role": "user",
+      "parts": [
+        {
+          "text": "Analyze service metadata 0..."
+        }
+      ]
+    },
+    {
+      "role": "model",
+      "parts": [
+        {
+          "text": "Metadata 0 analyzed."
+        }
+      ]
+    },
+    {
+      "role": "user",
+      "parts": [
+        {
+          "text": "Analyze service metadata 1..."
+        }
+      ]
+    },
+    {
+      "role": "model",
+      "parts": [
+        {
+          "text": "Metadata 1 analyzed."
+        }
+      ]
+    },
+    {
+      "role": "user",
+      "parts": [
+        {
+          "text": "Analyze service metadata 2..."
+        }
+      ]
+    },
+    {
+      "role": "model",
+      "parts": [
+        {
+          "text": "Metadata 2 analyzed."
+        }
+      ]
+    },
+    {
+      "role": "user",
+      "parts": [
+        {
+          "text": "Analyze service metadata 3..."
+        }
+      ]
+    },
+    {
+      "role": "model",
+      "parts": [
+        {
+          "text": "Metadata 3 analyzed."
+        }
+      ]
+    },
+    {
+      "role": "user",
+      "parts": [
+        {
+          "text": "Analyze service metadata 4..."
+        }
+      ]
+    },
+    {
+      "role": "model",
+      "parts": [
+        {
+          "text": "Metadata 4 analyzed."
+        }
+      ]
+    },
+    {
+      "role": "user",
+      "parts": [
+        {
+          "text": "Analyze service metadata 5..."
+        }
+      ]
+    },
+    {
+      "role": "model",
+      "parts": [
+        {
+          "text": "Metadata 5 analyzed."
+        }
+      ]
+    },
+    {
+      "role": "user",
+      "parts": [
+        {
+          "text": "Analyze service metadata 6..."
+        }
+      ]
+    },
+    {
+      "role": "model",
+      "parts": [
+        {
+          "text": "Metadata 6 analyzed."
+        }
+      ]
+    },
+    {
+      "role": "user",
+      "parts": [
+        {
+          "text": "Analyze service metadata 7..."
+        }
+      ]
+    },
+    {
+      "role": "model",
+      "parts": [
+        {
+          "text": "Metadata 7 analyzed."
+        }
+      ]
+    },
+    {
+      "role": "user",
+      "parts": [
+        {
+          "text": "Analyze service metadata 8..."
+        }
+      ]
+    },
+    {
+      "role": "model",
+      "parts": [
+        {
+          "text": "Metadata 8 analyzed."
+        }
+      ]
+    },
+    {
+      "role": "user",
+      "parts": [
+        {
+          "text": "Analyze service metadata 9..."
+        }
+      ]
+    },
+    {
+      "role": "model",
+      "parts": [
+        {
+          "text": "Metadata 9 analyzed."
+        }
+      ]
+    },
+    {
+      "role": "user",
+      "parts": [
+        {
+          "text": "Analyze service metadata 10..."
+        }
+      ]
+    },
+    {
+      "role": "model",
+      "parts": [
+        {
+          "text": "Metadata 10 analyzed."
+        }
+      ]
+    },
+    {
+      "role": "user",
+      "parts": [
+        {
+          "text": "Analyze service metadata 11..."
+        }
+      ]
+    },
+    {
+      "role": "model",
+      "parts": [
+        {
+          "text": "Metadata 11 analyzed."
+        }
+      ]
+    },
+    {
+      "role": "user",
+      "parts": [
+        {
+          "text": "Analyze service metadata 12..."
+        }
+      ]
+    },
+    {
+      "role": "model",
+      "parts": [
+        {
+          "text": "Metadata 12 analyzed."
+        }
+      ]
+    },
+    {
+      "role": "user",
+      "parts": [
+        {
+          "text": "Analyze service metadata 13..."
+        }
+      ]
+    },
+    {
+      "role": "model",
+      "parts": [
+        {
+          "text": "Metadata 13 analyzed."
+        }
+      ]
+    },
+    {
+      "role": "user",
+      "parts": [
+        {
+          "text": "Analyze service metadata 14..."
+        }
+      ]
+    },
+    {
+      "role": "model",
+      "parts": [
+        {
+          "text": "Metadata 14 analyzed."
+        }
+      ]
+    },
+    {
+      "role": "user",
+      "parts": [
+        {
+          "text": "Analyze service metadata 15..."
+        }
+      ]
+    },
+    {
+      "role": "model",
+      "parts": [
+        {
+          "text": "Metadata 15 analyzed."
+        }
+      ]
+    },
+    {
+      "role": "user",
+      "parts": [
+        {
+          "text": "Analyze service metadata 16..."
+        }
+      ]
+    },
+    {
+      "role": "model",
+      "parts": [
+        {
+          "text": "Metadata 16 analyzed."
+        }
+      ]
+    },
+    {
+      "role": "user",
+      "parts": [
+        {
+          "text": "Analyze service metadata 17..."
+        }
+      ]
+    },
+    {
+      "role": "model",
+      "parts": [
+        {
+          "text": "Metadata 17 analyzed."
+        }
+      ]
+    },
+    {
+      "role": "user",
+      "parts": [
+        {
+          "text": "Analyze service metadata 18..."
+        }
+      ]
+    },
+    {
+      "role": "model",
+      "parts": [
+        {
+          "text": "Metadata 18 analyzed."
+        }
+      ]
+    },
+    {
+      "role": "user",
+      "parts": [
+        {
+          "text": "Analyze service metadata 19..."
+        }
+      ]
+    },
+    {
+      "role": "model",
+      "parts": [
+        {
+          "text": "Metadata 19 analyzed."
+        }
+      ]
+    }
+  ],
+  "questions": [
+    {
+      "id": "recall-target-directory",
+      "prompt": "Which specific directory or subsystem are we assigned to work in?",
+      "expectedSubstring": "packages/core/src/services"
+    }
+  ]
+}

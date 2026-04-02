@@ -1,0 +1,205 @@
+{
+  "scenarioId": "scenario-middle-reasoning",
+  "description": "Tests preservation of reasoning buried in a long message. AgentHistoryProvider cuts the middle.",
+  "history": [
+    {
+      "role": "user",
+      "parts": [
+        {
+          "text": "Analyze this diagnostic log."
+        }
+      ]
+    },
+    {
+      "role": "model",
+      "parts": [
+        {
+          "text": "I am analyzing the log."
+        }
+      ]
+    },
+    {
+      "role": "user",
+      "parts": [
+        {
+          "text": "\nSTART OF LOG\nREPETITIVE NOISE\nREPETITIVE NOISE\nREPETITIVE NOISE\nREPETITIVE NOISE\nREPETITIVE NOISE\nREPETITIVE NOISE\nREPETITIVE NOISE\nREPETITIVE NOISE\nREPETITIVE NOISE\nREPETITIVE NOISE\nREPETITIVE NOISE\nREPETITIVE NOISE\nREPETITIVE NOISE\nREPETITIVE NOISE\nREPETITIVE NOISE\nREPETITIVE NOISE\nREPETITIVE NOISE\nREPETITIVE NOISE\nREPETITIVE NOISE\nREPETITIVE NOISE\nREPETITIVE NOISE\nREPETITIVE NOISE\nREPETITIVE NOISE\nREPETITIVE NOISE\nREPETITIVE NOISE\nREPETITIVE NOISE\nREPETITIVE NOISE\nREPETITIVE NOISE\nREPETITIVE NOISE\nREPETITIVE NOISE\nREPETITIVE NOISE\nREPETITIVE NOISE\nREPETITIVE NOISE\nREPETITIVE NOISE\nREPETITIVE NOISE\nREPETITIVE NOISE\nREPETITIVE NOISE\nREPETITIVE NOISE\nREPETITIVE NOISE\nREPETITIVE NOISE\nREPETITIVE NOISE\nREPETITIVE NOISE\nREPETITIVE NOISE\nREPETITIVE NOISE\nREPETITIVE NOISE\nREPETITIVE NOISE\nREPETITIVE NOISE\nREPETITIVE NOISE\nREPETITIVE NOISE\nREPETITIVE NOISE\nREPETITIVE NOISE\nREPETITIVE NOISE\nREPETITIVE NOISE\nREPETITIVE NOISE\nREPETITIVE NOISE\nREPETITIVE NOISE\nREPETITIVE NOISE\nREPETITIVE NOISE\nREPETITIVE NOISE\nREPETITIVE NOISE\nREPETITIVE NOISE\nREPETITIVE NOISE\nREPETITIVE NOISE\nREPETITIVE NOISE\nREPETITIVE NOISE\nREPETITIVE NOISE\nREPETITIVE NOISE\nREPETITIVE NOISE\nREPETITIVE NOISE\nREPETITIVE NOISE\nREPETITIVE NOISE\nREPETITIVE NOISE\nREPETITIVE NOISE\nREPETITIVE NOISE\nREPETITIVE NOISE\nREPETITIVE NOISE\nREPETITIVE NOISE\nREPETITIVE NOISE\nREPETITIVE NOISE\nREPETITIVE NOISE\nREPETITIVE NOISE\nREPETITIVE NOISE\nREPETITIVE NOISE\nREPETITIVE NOISE\nREPETITIVE NOISE\nREPETITIVE NOISE\nREPETITIVE NOISE\nREPETITIVE NOISE\nREPETITIVE NOISE\nREPETITIVE NOISE\nREPETITIVE NOISE\nREPETITIVE NOISE\nREPETITIVE NOISE\nREPETITIVE NOISE\nREPETITIVE NOISE\nREPETITIVE NOISE\nREPETITIVE NOISE\nREPETITIVE NOISE\nREPETITIVE NOISE\nREPETITIVE NOISE\n\nCRITICAL ANALYSIS: We found that the conflict is caused by Process ID PID-9876-CONFLICT. \nThis process is holding the port lock. We must kill it before proceeding.\nREPETITIVE NOISE\nREPETITIVE NOISE\nREPETITIVE NOISE\nREPETITIVE NOISE\nREPETITIVE NOISE\nREPETITIVE NOISE\nREPETITIVE NOISE\nREPETITIVE NOISE\nREPETITIVE NOISE\nREPETITIVE NOISE\nREPETITIVE NOISE\nREPETITIVE NOISE\nREPETITIVE NOISE\nREPETITIVE NOISE\nREPETITIVE NOISE\nREPETITIVE NOISE\nREPETITIVE NOISE\nREPETITIVE NOISE\nREPETITIVE NOISE\nREPETITIVE NOISE\nREPETITIVE NOISE\nREPETITIVE NOISE\nREPETITIVE NOISE\nREPETITIVE NOISE\nREPETITIVE NOISE\nREPETITIVE NOISE\nREPETITIVE NOISE\nREPETITIVE NOISE\nREPETITIVE NOISE\nREPETITIVE NOISE\nREPETITIVE NOISE\nREPETITIVE NOISE\nREPETITIVE NOISE\nREPETITIVE NOISE\nREPETITIVE NOISE\nREPETITIVE NOISE\nREPETITIVE NOISE\nREPETITIVE NOISE\nREPETITIVE NOISE\nREPETITIVE NOISE\nREPETITIVE NOISE\nREPETITIVE NOISE\nREPETITIVE NOISE\nREPETITIVE NOISE\nREPETITIVE NOISE\nREPETITIVE NOISE\nREPETITIVE NOISE\nREPETITIVE NOISE\nREPETITIVE NOISE\nREPETITIVE NOISE\nREPETITIVE NOISE\nREPETITIVE NOISE\nREPETITIVE NOISE\nREPETITIVE NOISE\nREPETITIVE NOISE\nREPETITIVE NOISE\nREPETITIVE NOISE\nREPETITIVE NOISE\nREPETITIVE NOISE\nREPETITIVE NOISE\nREPETITIVE NOISE\nREPETITIVE NOISE\nREPETITIVE NOISE\nREPETITIVE NOISE\nREPETITIVE NOISE\nREPETITIVE NOISE\nREPETITIVE NOISE\nREPETITIVE NOISE\nREPETITIVE NOISE\nREPETITIVE NOISE\nREPETITIVE NOISE\nREPETITIVE NOISE\nREPETITIVE NOISE\nREPETITIVE NOISE\nREPETITIVE NOISE\nREPETITIVE NOISE\nREPETITIVE NOISE\nREPETITIVE NOISE\nREPETITIVE NOISE\nREPETITIVE NOISE\nREPETITIVE NOISE\nREPETITIVE NOISE\nREPETITIVE NOISE\nREPETITIVE NOISE\nREPETITIVE NOISE\nREPETITIVE NOISE\nREPETITIVE NOISE\nREPETITIVE NOISE\nREPETITIVE NOISE\nREPETITIVE NOISE\nREPETITIVE NOISE\nREPETITIVE NOISE\nREPETITIVE NOISE\nREPETITIVE NOISE\nREPETITIVE NOISE\nREPETITIVE NOISE\nREPETITIVE NOISE\nREPETITIVE NOISE\nREPETITIVE NOISE\nREPETITIVE NOISE\n\nEND OF LOG\n      "
+        }
+      ]
+    },
+    {
+      "role": "model",
+      "parts": [
+        {
+          "text": "I see. What should I do next?"
+        }
+      ]
+    },
+    {
+      "role": "user",
+      "parts": [
+        {
+          "text": "Filler turn 0"
+        }
+      ]
+    },
+    {
+      "role": "model",
+      "parts": [
+        {
+          "text": "Acknowledged 0"
+        }
+      ]
+    },
+    {
+      "role": "user",
+      "parts": [
+        {
+          "text": "Filler turn 1"
+        }
+      ]
+    },
+    {
+      "role": "model",
+      "parts": [
+        {
+          "text": "Acknowledged 1"
+        }
+      ]
+    },
+    {
+      "role": "user",
+      "parts": [
+        {
+          "text": "Filler turn 2"
+        }
+      ]
+    },
+    {
+      "role": "model",
+      "parts": [
+        {
+          "text": "Acknowledged 2"
+        }
+      ]
+    },
+    {
+      "role": "user",
+      "parts": [
+        {
+          "text": "Filler turn 3"
+        }
+      ]
+    },
+    {
+      "role": "model",
+      "parts": [
+        {
+          "text": "Acknowledged 3"
+        }
+      ]
+    },
+    {
+      "role": "user",
+      "parts": [
+        {
+          "text": "Filler turn 4"
+        }
+      ]
+    },
+    {
+      "role": "model",
+      "parts": [
+        {
+          "text": "Acknowledged 4"
+        }
+      ]
+    },
+    {
+      "role": "user",
+      "parts": [
+        {
+          "text": "Filler turn 5"
+        }
+      ]
+    },
+    {
+      "role": "model",
+      "parts": [
+        {
+          "text": "Acknowledged 5"
+        }
+      ]
+    },
+    {
+      "role": "user",
+      "parts": [
+        {
+          "text": "Filler turn 6"
+        }
+      ]
+    },
+    {
+      "role": "model",
+      "parts": [
+        {
+          "text": "Acknowledged 6"
+        }
+      ]
+    },
+    {
+      "role": "user",
+      "parts": [
+        {
+          "text": "Filler turn 7"
+        }
+      ]
+    },
+    {
+      "role": "model",
+      "parts": [
+        {
+          "text": "Acknowledged 7"
+        }
+      ]
+    },
+    {
+      "role": "user",
+      "parts": [
+        {
+          "text": "Filler turn 8"
+        }
+      ]
+    },
+    {
+      "role": "model",
+      "parts": [
+        {
+          "text": "Acknowledged 8"
+        }
+      ]
+    },
+    {
+      "role": "user",
+      "parts": [
+        {
+          "text": "Filler turn 9"
+        }
+      ]
+    },
+    {
+      "role": "model",
+      "parts": [
+        {
+          "text": "Acknowledged 9"
+        }
+      ]
+    }
+  ],
+  "questions": [
+    {
+      "id": "conflict-pid",
+      "prompt": "What is the exact PID that is causing the conflict?",
+      "expectedSubstring": "PID-9876-CONFLICT"
+    }
+  ]
+}

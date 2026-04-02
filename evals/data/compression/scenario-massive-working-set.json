@@ -1,0 +1,269 @@
+{
+  "scenarioId": "scenario-massive-working-set",
+  "description": "Tests capacity of \"Working Set\" context.",
+  "history": [
+    {
+      "role": "user",
+      "parts": [
+        {
+          "text": "We are refactoring these 30 files: src/lib/module_0.ts, src/lib/module_1.ts, src/lib/module_2.ts, src/lib/module_3.ts, src/lib/module_4.ts, src/lib/module_5.ts, src/lib/module_6.ts, src/lib/module_7.ts, src/lib/module_8.ts, src/lib/module_9.ts, src/lib/module_10.ts, src/lib/module_11.ts, src/lib/module_12.ts, src/lib/module_13.ts, src/lib/module_14.ts, src/lib/module_15.ts, src/lib/module_16.ts, src/lib/module_17.ts, src/lib/module_18.ts, src/lib/module_19.ts, src/lib/module_20.ts, src/lib/module_21.ts, src/lib/module_22.ts, src/lib/module_23.ts, src/lib/module_24.ts, src/lib/module_25.ts, src/lib/module_26.ts, src/lib/module_27.ts, src/lib/module_28.ts, src/lib/module_29.ts"
+        }
+      ]
+    },
+    {
+      "role": "model",
+      "parts": [
+        {
+          "text": "I have listed all 30 files in my working set."
+        }
+      ]
+    },
+    {
+      "role": "user",
+      "parts": [
+        {
+          "text": "Refactoring src/lib/module_0.ts..."
+        }
+      ]
+    },
+    {
+      "role": "model",
+      "parts": [
+        {
+          "text": "Done with 0."
+        }
+      ]
+    },
+    {
+      "role": "user",
+      "parts": [
+        {
+          "text": "Refactoring src/lib/module_1.ts..."
+        }
+      ]
+    },
+    {
+      "role": "model",
+      "parts": [
+        {
+          "text": "Done with 1."
+        }
+      ]
+    },
+    {
+      "role": "user",
+      "parts": [
+        {
+          "text": "Refactoring src/lib/module_2.ts..."
+        }
+      ]
+    },
+    {
+      "role": "model",
+      "parts": [
+        {
+          "text": "Done with 2."
+        }
+      ]
+    },
+    {
+      "role": "user",
+      "parts": [
+        {
+          "text": "Refactoring src/lib/module_3.ts..."
+        }
+      ]
+    },
+    {
+      "role": "model",
+      "parts": [
+        {
+          "text": "Done with 3."
+        }
+      ]
+    },
+    {
+      "role": "user",
+      "parts": [
+        {
+          "text": "Refactoring src/lib/module_4.ts..."
+        }
+      ]
+    },
+    {
+      "role": "model",
+      "parts": [
+        {
+          "text": "Done with 4."
+        }
+      ]
+    },
+    {
+      "role": "user",
+      "parts": [
+        {
+          "text": "Refactoring src/lib/module_5.ts..."
+        }
+      ]
+    },
+    {
+      "role": "model",
+      "parts": [
+        {
+          "text": "Done with 5."
+        }
+      ]
+    },
+    {
+      "role": "user",
+      "parts": [
+        {
+          "text": "Refactoring src/lib/module_6.ts..."
+        }
+      ]
+    },
+    {
+      "role": "model",
+      "parts": [
+        {
+          "text": "Done with 6."
+        }
+      ]
+    },
+    {
+      "role": "user",
+      "parts": [
+        {
+          "text": "Refactoring src/lib/module_7.ts..."
+        }
+      ]
+    },
+    {
+      "role": "model",
+      "parts": [
+        {
+          "text": "Done with 7."
+        }
+      ]
+    },
+    {
+      "role": "user",
+      "parts": [
+        {
+          "text": "Refactoring src/lib/module_8.ts..."
+        }
+      ]
+    },
+    {
+      "role": "model",
+      "parts": [
+        {
+          "text": "Done with 8."
+        }
+      ]
+    },
+    {
+      "role": "user",
+      "parts": [
+        {
+          "text": "Refactoring src/lib/module_9.ts..."
+        }
+      ]
+    },
+    {
+      "role": "model",
+      "parts": [
+        {
+          "text": "Done with 9."
+        }
+      ]
+    },
+    {
+      "role": "user",
+      "parts": [
+        {
+          "text": "Refactoring src/lib/module_10.ts..."
+        }
+      ]
+    },
+    {
+      "role": "model",
+      "parts": [
+        {
+          "text": "Done with 10."
+        }
+      ]
+    },
+    {
+      "role": "user",
+      "parts": [
+        {
+          "text": "Refactoring src/lib/module_11.ts..."
+        }
+      ]
+    },
+    {
+      "role": "model",
+      "parts": [
+        {
+          "text": "Done with 11."
+        }
+      ]
+    },
+    {
+      "role": "user",
+      "parts": [
+        {
+          "text": "Refactoring src/lib/module_12.ts..."
+        }
+      ]
+    },
+    {
+      "role": "model",
+      "parts": [
+        {
+          "text": "Done with 12."
+        }
+      ]
+    },
+    {
+      "role": "user",
+      "parts": [
+        {
+          "text": "Refactoring src/lib/module_13.ts..."
+        }
+      ]
+    },
+    {
+      "role": "model",
+      "parts": [
+        {
+          "text": "Done with 13."
+        }
+      ]
+    },
+    {
+      "role": "user",
+      "parts": [
+        {
+          "text": "Refactoring src/lib/module_14.ts..."
+        }
+      ]
+    },
+    {
+      "role": "model",
+      "parts": [
+        {
+          "text": "Done with 14."
+        }
+      ]
+    }
+  ],
+  "questions": [
+    {
+      "id": "file-25-presence",
+      "prompt": "Is \"src/lib/module_25.ts\" part of our working set?",
+      "expectedSubstring": "yes"
+    }
+  ]
+}

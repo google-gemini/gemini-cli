@@ -1,0 +1,197 @@
+{
+  "scenarioId": "scenario-state-tracking",
+  "description": "Tests state tracking of a 10-step plan after several steps are completed.",
+  "history": [
+    {
+      "role": "user",
+      "parts": [
+        {
+          "text": "Here is our 10-step plan:\n1. Init repo\n2. Install deps\n3. Config lint\n4. Write tests\n5. Implement core\n6. Write UI\n7. Build\n8. Deploy\n9. Verify\n10. Announce"
+        }
+      ]
+    },
+    {
+      "role": "model",
+      "parts": [
+        {
+          "text": "Plan accepted. Let's begin step 1."
+        }
+      ]
+    },
+    {
+      "role": "user",
+      "parts": [
+        {
+          "text": "Execute step: Init repo"
+        }
+      ]
+    },
+    {
+      "role": "model",
+      "parts": [
+        {
+          "functionCall": {
+            "name": "run_shell_command",
+            "args": {
+              "command": "echo 'Doing Init repo'"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "role": "user",
+      "parts": [
+        {
+          "functionResponse": {
+            "name": "run_shell_command",
+            "response": {
+              "output": "\n> npm install pkg-0\n\nadded 14 packages, and audited 15 packages in 0.08s\nfound 0 vulnerabilities\n[0/50] Fetching... https://registry.npmjs.org/@types/node/-/node-20.11.24.tgz\n[1/50] Fetching... https://registry.npmjs.org/@types/node/-/node-20.11.24.tgz\n[2/50] Fetching... https://registry.npmjs.org/@types/node/-/node-20.11.24.tgz\n[3/50] Fetching... https://registry.npmjs.org/@types/node/-/node-20.11.24.tgz\n[4/50] Fetching... https://registry.npmjs.org/@types/node/-/node-20.11.24.tgz\n[5/50] Fetching... https://registry.npmjs.org/@types/node/-/node-20.11.24.tgz\n[6/50] Fetching... https://registry.npmjs.org/@types/node/-/node-20.11.24.tgz\n[7/50] Fetching... https://registry.npmjs.org/@types/node/-/node-20.11.24.tgz\n[8/50] Fetching... https://registry.npmjs.org/@types/node/-/node-20.11.24.tgz\n[9/50] Fetching... https://registry.npmjs.org/@types/node/-/node-20.11.24.tgz\n[10/50] Fetching... https://registry.npmjs.org/@types/node/-/node-20.11.24.tgz\n[11/50] Fetching... https://registry.npmjs.org/@types/node/-/node-20.11.24.tgz\n[12/50] Fetching... https://registry.npmjs.org/@types/node/-/node-20.11.24.tgz\n[13/50] Fetching... https://registry.npmjs.org/@types/node/-/node-20.11.24.tgz\n[14/50] Fetching... https://registry.npmjs.org/@types/node/-/node-20.11.24.tgz\n[15/50] Fetching... https://registry.npmjs.org/@types/node/-/node-20.11.24.tgz\n[16/50] Fetching... https://registry.npmjs.org/@types/node/-/node-20.11.24.tgz\n[17/50] Fetching... https://registry.npmjs.org/@types/node/-/node-20.11.24.tgz\n[18/50] Fetching... https://registry.npmjs.org/@types/node/-/node-20.11.24.tgz\n[19/50] Fetching... https://registry.npmjs.org/@types/node/-/node-20.11.24.tgz\n[20/50] Fetching... https://registry.npmjs.org/@types/node/-/node-20.11.24.tgz\n[21/50] Fetching... https://registry.npmjs.org/@types/node/-/node-20.11.24.tgz\n[22/50] Fetching... https://registry.npmjs.org/@types/node/-/node-20.11.24.tgz\n[23/50] Fetching... https://registry.npmjs.org/@types/node/-/node-20.11.24.tgz\n[24/50] Fetching... https://registry.npmjs.org/@types/node/-/node-20.11.24.tgz\n[25/50] Fetching... https://registry.npmjs.org/@types/node/-/node-20.11.24.tgz\n[26/50] Fetching... https://registry.npmjs.org/@types/node/-/node-20.11.24.tgz\n[27/50] Fetching... https://registry.npmjs.org/@types/node/-/node-20.11.24.tgz\n[28/50] Fetching... https://registry.npmjs.org/@types/node/-/node-20.11.24.tgz\n[29/50] Fetching... https://registry.npmjs.org/@types/node/-/node-20.11.24.tgz\n[30/50] Fetching... https://registry.npmjs.org/@types/node/-/node-20.11.24.tgz\n[31/50] Fetching... https://registry.npmjs.org/@types/node/-/node-20.11.24.tgz\n[32/50] Fetching... https://registry.npmjs.org/@types/node/-/node-20.11.24.tgz\n[33/50] Fetching... https://registry.npmjs.org/@types/node/-/node-20.11.24.tgz\n[34/50] Fetching... https://registry.npmjs.org/@types/node/-/node-20.11.24.tgz\n[35/50] Fetching... https://registry.npmjs.org/@types/node/-/node-20.11.24.tgz\n[36/50] Fetching... https://registry.npmjs.org/@types/node/-/node-20.11.24.tgz\n[37/50] Fetching... https://registry.npmjs.org/@types/node/-/node-20.11.24.tgz\n[38/50] Fetching... https://registry.npmjs.org/@types/node/-/node-20.11.24.tgz\n[39/50] Fetching... https://registry.npmjs.org/@types/node/-/node-20.11.24.tgz\n[40/50] Fetching... https://registry.npmjs.org/@types/node/-/node-20.11.24.tgz\n[41/50] Fetching... https://registry.npmjs.org/@types/node/-/node-20.11.24.tgz\n[42/50] Fetching... https://registry.npmjs.org/@types/node/-/node-20.11.24.tgz\n[43/50] Fetching... https://registry.npmjs.org/@types/node/-/node-20.11.24.tgz\n[44/50] Fetching... https://registry.npmjs.org/@types/node/-/node-20.11.24.tgz\n[45/50] Fetching... https://registry.npmjs.org/@types/node/-/node-20.11.24.tgz\n[46/50] Fetching... https://registry.npmjs.org/@types/node/-/node-20.11.24.tgz\n[47/50] Fetching... https://registry.npmjs.org/@types/node/-/node-20.11.24.tgz\n[48/50] Fetching... https://registry.npmjs.org/@types/node/-/node-20.11.24.tgz\n[49/50] Fetching... https://registry.npmjs.org/@types/node/-/node-20.11.24.tgz\n"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "role": "model",
+      "parts": [
+        {
+          "text": "Step 1 (Init repo) complete."
+        }
+      ]
+    },
+    {
+      "role": "user",
+      "parts": [
+        {
+          "text": "Execute step: Install deps"
+        }
+      ]
+    },
+    {
+      "role": "model",
+      "parts": [
+        {
+          "functionCall": {
+            "name": "run_shell_command",
+            "args": {
+              "command": "echo 'Doing Install deps'"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "role": "user",
+      "parts": [
+        {
+          "functionResponse": {
+            "name": "run_shell_command",
+            "response": {
+              "output": "\n> npm install pkg-1\n\nadded 14 packages, and audited 15 packages in 0.28s\nfound 0 vulnerabilities\n[0/50] Fetching... https://registry.npmjs.org/@types/node/-/node-20.11.24.tgz\n[1/50] Fetching... https://registry.npmjs.org/@types/node/-/node-20.11.24.tgz\n[2/50] Fetching... https://registry.npmjs.org/@types/node/-/node-20.11.24.tgz\n[3/50] Fetching... https://registry.npmjs.org/@types/node/-/node-20.11.24.tgz\n[4/50] Fetching... https://registry.npmjs.org/@types/node/-/node-20.11.24.tgz\n[5/50] Fetching... https://registry.npmjs.org/@types/node/-/node-20.11.24.tgz\n[6/50] Fetching... https://registry.npmjs.org/@types/node/-/node-20.11.24.tgz\n[7/50] Fetching... https://registry.npmjs.org/@types/node/-/node-20.11.24.tgz\n[8/50] Fetching... https://registry.npmjs.org/@types/node/-/node-20.11.24.tgz\n[9/50] Fetching... https://registry.npmjs.org/@types/node/-/node-20.11.24.tgz\n[10/50] Fetching... https://registry.npmjs.org/@types/node/-/node-20.11.24.tgz\n[11/50] Fetching... https://registry.npmjs.org/@types/node/-/node-20.11.24.tgz\n[12/50] Fetching... https://registry.npmjs.org/@types/node/-/node-20.11.24.tgz\n[13/50] Fetching... https://registry.npmjs.org/@types/node/-/node-20.11.24.tgz\n[14/50] Fetching... https://registry.npmjs.org/@types/node/-/node-20.11.24.tgz\n[15/50] Fetching... https://registry.npmjs.org/@types/node/-/node-20.11.24.tgz\n[16/50] Fetching... https://registry.npmjs.org/@types/node/-/node-20.11.24.tgz\n[17/50] Fetching... https://registry.npmjs.org/@types/node/-/node-20.11.24.tgz\n[18/50] Fetching... https://registry.npmjs.org/@types/node/-/node-20.11.24.tgz\n[19/50] Fetching... https://registry.npmjs.org/@types/node/-/node-20.11.24.tgz\n[20/50] Fetching... https://registry.npmjs.org/@types/node/-/node-20.11.24.tgz\n[21/50] Fetching... https://registry.npmjs.org/@types/node/-/node-20.11.24.tgz\n[22/50] Fetching... https://registry.npmjs.org/@types/node/-/node-20.11.24.tgz\n[23/50] Fetching... https://registry.npmjs.org/@types/node/-/node-20.11.24.tgz\n[24/50] Fetching... https://registry.npmjs.org/@types/node/-/node-20.11.24.tgz\n[25/50] Fetching... https://registry.npmjs.org/@types/node/-/node-20.11.24.tgz\n[26/50] Fetching... https://registry.npmjs.org/@types/node/-/node-20.11.24.tgz\n[27/50] Fetching... https://registry.npmjs.org/@types/node/-/node-20.11.24.tgz\n[28/50] Fetching... https://registry.npmjs.org/@types/node/-/node-20.11.24.tgz\n[29/50] Fetching... https://registry.npmjs.org/@types/node/-/node-20.11.24.tgz\n[30/50] Fetching... https://registry.npmjs.org/@types/node/-/node-20.11.24.tgz\n[31/50] Fetching... https://registry.npmjs.org/@types/node/-/node-20.11.24.tgz\n[32/50] Fetching... https://registry.npmjs.org/@types/node/-/node-20.11.24.tgz\n[33/50] Fetching... https://registry.npmjs.org/@types/node/-/node-20.11.24.tgz\n[34/50] Fetching... https://registry.npmjs.org/@types/node/-/node-20.11.24.tgz\n[35/50] Fetching... https://registry.npmjs.org/@types/node/-/node-20.11.24.tgz\n[36/50] Fetching... https://registry.npmjs.org/@types/node/-/node-20.11.24.tgz\n[37/50] Fetching... https://registry.npmjs.org/@types/node/-/node-20.11.24.tgz\n[38/50] Fetching... https://registry.npmjs.org/@types/node/-/node-20.11.24.tgz\n[39/50] Fetching... https://registry.npmjs.org/@types/node/-/node-20.11.24.tgz\n[40/50] Fetching... https://registry.npmjs.org/@types/node/-/node-20.11.24.tgz\n[41/50] Fetching... https://registry.npmjs.org/@types/node/-/node-20.11.24.tgz\n[42/50] Fetching... https://registry.npmjs.org/@types/node/-/node-20.11.24.tgz\n[43/50] Fetching... https://registry.npmjs.org/@types/node/-/node-20.11.24.tgz\n[44/50] Fetching... https://registry.npmjs.org/@types/node/-/node-20.11.24.tgz\n[45/50] Fetching... https://registry.npmjs.org/@types/node/-/node-20.11.24.tgz\n[46/50] Fetching... https://registry.npmjs.org/@types/node/-/node-20.11.24.tgz\n[47/50] Fetching... https://registry.npmjs.org/@types/node/-/node-20.11.24.tgz\n[48/50] Fetching... https://registry.npmjs.org/@types/node/-/node-20.11.24.tgz\n[49/50] Fetching... https://registry.npmjs.org/@types/node/-/node-20.11.24.tgz\n"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "role": "model",
+      "parts": [
+        {
+          "text": "Step 2 (Install deps) complete."
+        }
+      ]
+    },
+    {
+      "role": "user",
+      "parts": [
+        {
+          "text": "Execute step: Config lint"
+        }
+      ]
+    },
+    {
+      "role": "model",
+      "parts": [
+        {
+          "functionCall": {
+            "name": "run_shell_command",
+            "args": {
+              "command": "echo 'Doing Config lint'"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "role": "user",
+      "parts": [
+        {
+          "functionResponse": {
+            "name": "run_shell_command",
+            "response": {
+              "output": "\n> npm install pkg-2\n\nadded 14 packages, and audited 15 packages in 0.86s\nfound 0 vulnerabilities\n[0/50] Fetching... https://registry.npmjs.org/@types/node/-/node-20.11.24.tgz\n[1/50] Fetching... https://registry.npmjs.org/@types/node/-/node-20.11.24.tgz\n[2/50] Fetching... https://registry.npmjs.org/@types/node/-/node-20.11.24.tgz\n[3/50] Fetching... https://registry.npmjs.org/@types/node/-/node-20.11.24.tgz\n[4/50] Fetching... https://registry.npmjs.org/@types/node/-/node-20.11.24.tgz\n[5/50] Fetching... https://registry.npmjs.org/@types/node/-/node-20.11.24.tgz\n[6/50] Fetching... https://registry.npmjs.org/@types/node/-/node-20.11.24.tgz\n[7/50] Fetching... https://registry.npmjs.org/@types/node/-/node-20.11.24.tgz\n[8/50] Fetching... https://registry.npmjs.org/@types/node/-/node-20.11.24.tgz\n[9/50] Fetching... https://registry.npmjs.org/@types/node/-/node-20.11.24.tgz\n[10/50] Fetching... https://registry.npmjs.org/@types/node/-/node-20.11.24.tgz\n[11/50] Fetching... https://registry.npmjs.org/@types/node/-/node-20.11.24.tgz\n[12/50] Fetching... https://registry.npmjs.org/@types/node/-/node-20.11.24.tgz\n[13/50] Fetching... https://registry.npmjs.org/@types/node/-/node-20.11.24.tgz\n[14/50] Fetching... https://registry.npmjs.org/@types/node/-/node-20.11.24.tgz\n[15/50] Fetching... https://registry.npmjs.org/@types/node/-/node-20.11.24.tgz\n[16/50] Fetching... https://registry.npmjs.org/@types/node/-/node-20.11.24.tgz\n[17/50] Fetching... https://registry.npmjs.org/@types/node/-/node-20.11.24.tgz\n[18/50] Fetching... https://registry.npmjs.org/@types/node/-/node-20.11.24.tgz\n[19/50] Fetching... https://registry.npmjs.org/@types/node/-/node-20.11.24.tgz\n[20/50] Fetching... https://registry.npmjs.org/@types/node/-/node-20.11.24.tgz\n[21/50] Fetching... https://registry.npmjs.org/@types/node/-/node-20.11.24.tgz\n[22/50] Fetching... https://registry.npmjs.org/@types/node/-/node-20.11.24.tgz\n[23/50] Fetching... https://registry.npmjs.org/@types/node/-/node-20.11.24.tgz\n[24/50] Fetching... https://registry.npmjs.org/@types/node/-/node-20.11.24.tgz\n[25/50] Fetching... https://registry.npmjs.org/@types/node/-/node-20.11.24.tgz\n[26/50] Fetching... https://registry.npmjs.org/@types/node/-/node-20.11.24.tgz\n[27/50] Fetching... https://registry.npmjs.org/@types/node/-/node-20.11.24.tgz\n[28/50] Fetching... https://registry.npmjs.org/@types/node/-/node-20.11.24.tgz\n[29/50] Fetching... https://registry.npmjs.org/@types/node/-/node-20.11.24.tgz\n[30/50] Fetching... https://registry.npmjs.org/@types/node/-/node-20.11.24.tgz\n[31/50] Fetching... https://registry.npmjs.org/@types/node/-/node-20.11.24.tgz\n[32/50] Fetching... https://registry.npmjs.org/@types/node/-/node-20.11.24.tgz\n[33/50] Fetching... https://registry.npmjs.org/@types/node/-/node-20.11.24.tgz\n[34/50] Fetching... https://registry.npmjs.org/@types/node/-/node-20.11.24.tgz\n[35/50] Fetching... https://registry.npmjs.org/@types/node/-/node-20.11.24.tgz\n[36/50] Fetching... https://registry.npmjs.org/@types/node/-/node-20.11.24.tgz\n[37/50] Fetching... https://registry.npmjs.org/@types/node/-/node-20.11.24.tgz\n[38/50] Fetching... https://registry.npmjs.org/@types/node/-/node-20.11.24.tgz\n[39/50] Fetching... https://registry.npmjs.org/@types/node/-/node-20.11.24.tgz\n[40/50] Fetching... https://registry.npmjs.org/@types/node/-/node-20.11.24.tgz\n[41/50] Fetching... https://registry.npmjs.org/@types/node/-/node-20.11.24.tgz\n[42/50] Fetching... https://registry.npmjs.org/@types/node/-/node-20.11.24.tgz\n[43/50] Fetching... https://registry.npmjs.org/@types/node/-/node-20.11.24.tgz\n[44/50] Fetching... https://registry.npmjs.org/@types/node/-/node-20.11.24.tgz\n[45/50] Fetching... https://registry.npmjs.org/@types/node/-/node-20.11.24.tgz\n[46/50] Fetching... https://registry.npmjs.org/@types/node/-/node-20.11.24.tgz\n[47/50] Fetching... https://registry.npmjs.org/@types/node/-/node-20.11.24.tgz\n[48/50] Fetching... https://registry.npmjs.org/@types/node/-/node-20.11.24.tgz\n[49/50] Fetching... https://registry.npmjs.org/@types/node/-/node-20.11.24.tgz\n"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "role": "model",
+      "parts": [
+        {
+          "text": "Step 3 (Config lint) complete."
+        }
+      ]
+    },
+    {
+      "role": "user",
+      "parts": [
+        {
+          "text": "Execute step: Write tests"
+        }
+      ]
+    },
+    {
+      "role": "model",
+      "parts": [
+        {
+          "functionCall": {
+            "name": "run_shell_command",
+            "args": {
+              "command": "echo 'Doing Write tests'"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "role": "user",
+      "parts": [
+        {
+          "functionResponse": {
+            "name": "run_shell_command",
+            "response": {
+              "output": "\n> npm install pkg-3\n\nadded 14 packages, and audited 15 packages in 0.15s\nfound 0 vulnerabilities\n[0/50] Fetching... https://registry.npmjs.org/@types/node/-/node-20.11.24.tgz\n[1/50] Fetching... https://registry.npmjs.org/@types/node/-/node-20.11.24.tgz\n[2/50] Fetching... https://registry.npmjs.org/@types/node/-/node-20.11.24.tgz\n[3/50] Fetching... https://registry.npmjs.org/@types/node/-/node-20.11.24.tgz\n[4/50] Fetching... https://registry.npmjs.org/@types/node/-/node-20.11.24.tgz\n[5/50] Fetching... https://registry.npmjs.org/@types/node/-/node-20.11.24.tgz\n[6/50] Fetching... https://registry.npmjs.org/@types/node/-/node-20.11.24.tgz\n[7/50] Fetching... https://registry.npmjs.org/@types/node/-/node-20.11.24.tgz\n[8/50] Fetching... https://registry.npmjs.org/@types/node/-/node-20.11.24.tgz\n[9/50] Fetching... https://registry.npmjs.org/@types/node/-/node-20.11.24.tgz\n[10/50] Fetching... https://registry.npmjs.org/@types/node/-/node-20.11.24.tgz\n[11/50] Fetching... https://registry.npmjs.org/@types/node/-/node-20.11.24.tgz\n[12/50] Fetching... https://registry.npmjs.org/@types/node/-/node-20.11.24.tgz\n[13/50] Fetching... https://registry.npmjs.org/@types/node/-/node-20.11.24.tgz\n[14/50] Fetching... https://registry.npmjs.org/@types/node/-/node-20.11.24.tgz\n[15/50] Fetching... https://registry.npmjs.org/@types/node/-/node-20.11.24.tgz\n[16/50] Fetching... https://registry.npmjs.org/@types/node/-/node-20.11.24.tgz\n[17/50] Fetching... https://registry.npmjs.org/@types/node/-/node-20.11.24.tgz\n[18/50] Fetching... https://registry.npmjs.org/@types/node/-/node-20.11.24.tgz\n[19/50] Fetching... https://registry.npmjs.org/@types/node/-/node-20.11.24.tgz\n[20/50] Fetching... https://registry.npmjs.org/@types/node/-/node-20.11.24.tgz\n[21/50] Fetching... https://registry.npmjs.org/@types/node/-/node-20.11.24.tgz\n[22/50] Fetching... https://registry.npmjs.org/@types/node/-/node-20.11.24.tgz\n[23/50] Fetching... https://registry.npmjs.org/@types/node/-/node-20.11.24.tgz\n[24/50] Fetching... https://registry.npmjs.org/@types/node/-/node-20.11.24.tgz\n[25/50] Fetching... https://registry.npmjs.org/@types/node/-/node-20.11.24.tgz\n[26/50] Fetching... https://registry.npmjs.org/@types/node/-/node-20.11.24.tgz\n[27/50] Fetching... https://registry.npmjs.org/@types/node/-/node-20.11.24.tgz\n[28/50] Fetching... https://registry.npmjs.org/@types/node/-/node-20.11.24.tgz\n[29/50] Fetching... https://registry.npmjs.org/@types/node/-/node-20.11.24.tgz\n[30/50] Fetching... https://registry.npmjs.org/@types/node/-/node-20.11.24.tgz\n[31/50] Fetching... https://registry.npmjs.org/@types/node/-/node-20.11.24.tgz\n[32/50] Fetching... https://registry.npmjs.org/@types/node/-/node-20.11.24.tgz\n[33/50] Fetching... https://registry.npmjs.org/@types/node/-/node-20.11.24.tgz\n[34/50] Fetching... https://registry.npmjs.org/@types/node/-/node-20.11.24.tgz\n[35/50] Fetching... https://registry.npmjs.org/@types/node/-/node-20.11.24.tgz\n[36/50] Fetching... https://registry.npmjs.org/@types/node/-/node-20.11.24.tgz\n[37/50] Fetching... https://registry.npmjs.org/@types/node/-/node-20.11.24.tgz\n[38/50] Fetching... https://registry.npmjs.org/@types/node/-/node-20.11.24.tgz\n[39/50] Fetching... https://registry.npmjs.org/@types/node/-/node-20.11.24.tgz\n[40/50] Fetching... https://registry.npmjs.org/@types/node/-/node-20.11.24.tgz\n[41/50] Fetching... https://registry.npmjs.org/@types/node/-/node-20.11.24.tgz\n[42/50] Fetching... https://registry.npmjs.org/@types/node/-/node-20.11.24.tgz\n[43/50] Fetching... https://registry.npmjs.org/@types/node/-/node-20.11.24.tgz\n[44/50] Fetching... https://registry.npmjs.org/@types/node/-/node-20.11.24.tgz\n[45/50] Fetching... https://registry.npmjs.org/@types/node/-/node-20.11.24.tgz\n[46/50] Fetching... https://registry.npmjs.org/@types/node/-/node-20.11.24.tgz\n[47/50] Fetching... https://registry.npmjs.org/@types/node/-/node-20.11.24.tgz\n[48/50] Fetching... https://registry.npmjs.org/@types/node/-/node-20.11.24.tgz\n[49/50] Fetching... https://registry.npmjs.org/@types/node/-/node-20.11.24.tgz\n"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "role": "model",
+      "parts": [
+        {
+          "text": "Step 4 (Write tests) complete."
+        }
+      ]
+    }
+  ],
+  "questions": [
+    {
+      "id": "next-step",
+      "prompt": "Which exact step number and name are we on next?",
+      "expectedSubstring": "Implement core"
+    }
+  ]
+}
