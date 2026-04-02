@@ -39,10 +39,14 @@ async function startFixtureServer(): Promise<number> {
   return new Promise((resolve, reject) => {
     const server = createServer(async (req, res) => {
       const urlPath = req.url?.split('?')[0] || '/';
-      const filePath = join(
-        FIXTURE_DIR,
-        urlPath === '/' ? 'index.html' : urlPath,
-      );
+      const relativePath = urlPath === '/' ? 'index.html' : urlPath;
+      const filePath = join(FIXTURE_DIR, relativePath);
+
+      if (!filePath.startsWith(FIXTURE_DIR)) {
+        res.writeHead(403, { 'Content-Type': 'text/html' });
+        res.end('<h1>403 Forbidden</h1>');
+        return;
+      }
 
       try {
         const content = await readFile(filePath);
