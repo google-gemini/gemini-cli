@@ -11,8 +11,7 @@ This extension will exclude the following core tools: tool1,tool2
 The extension you are about to install may have been created by a third-party developer and sourced
 from a public repository. Google does not vet, endorse, or guarantee the functionality or security
 of extensions. Please carefully inspect any extension and its source code before installing to
-understand the permissions it requires and the actions it may perform.
-"
+understand the permissions it requires and the actions it may perform."
 `;
 
 exports[`consent > maybeRequestConsentOrFail > consent string generation > should include warning when hooks are present 1`] = `
@@ -22,8 +21,7 @@ exports[`consent > maybeRequestConsentOrFail > consent string generation > shoul
 The extension you are about to install may have been created by a third-party developer and sourced
 from a public repository. Google does not vet, endorse, or guarantee the functionality or security
 of extensions. Please carefully inspect any extension and its source code before installing to
-understand the permissions it requires and the actions it may perform.
-"
+understand the permissions it requires and the actions it may perform."
 `;
 
 exports[`consent > maybeRequestConsentOrFail > consent string generation > should request consent if extension is migrated 1`] = `
@@ -32,8 +30,7 @@ exports[`consent > maybeRequestConsentOrFail > consent string generation > shoul
 The extension you are about to install may have been created by a third-party developer and sourced
 from a public repository. Google does not vet, endorse, or guarantee the functionality or security
 of extensions. Please carefully inspect any extension and its source code before installing to
-understand the permissions it requires and the actions it may perform.
-"
+understand the permissions it requires and the actions it may perform."
 `;
 
 exports[`consent > maybeRequestConsentOrFail > consent string generation > should request consent if skills change 1`] = `
@@ -63,8 +60,7 @@ understand the permissions it requires and the actions it may perform.
 Agent skills inject specialized instructions and domain-specific knowledge into the agent's system
 prompt. This can change how the agent interprets your requests and interacts with your environment.
 Review the skill definitions at the location(s) provided below to ensure they meet your security
-standards.
-"
+standards."
 `;
 
 exports[`consent > maybeRequestConsentOrFail > consent string generation > should show a warning if the skill directory cannot be read 1`] = `
@@ -86,8 +82,7 @@ understand the permissions it requires and the actions it may perform.
 Agent skills inject specialized instructions and domain-specific knowledge into the agent's system
 prompt. This can change how the agent interprets your requests and interacts with your environment.
 Review the skill definitions at the location(s) provided below to ensure they meet your security
-standards.
-"
+standards."
 `;
 
 exports[`consent > skillsConsentString > should generate a consent string for skills 1`] = `
@@ -103,6 +98,5 @@ Install Destination: /mock/target/dir
 Agent skills inject specialized instructions and domain-specific knowledge into the agent's system
 prompt. This can change how the agent interprets your requests and interacts with your environment.
 Review the skill definitions at the location(s) provided below to ensure they meet your security
-standards.
-"
+standards."
 `;

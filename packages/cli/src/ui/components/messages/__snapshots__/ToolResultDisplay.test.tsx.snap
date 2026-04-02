@@ -68,8 +68,7 @@ Line 46                                                                    █
 Line 47                                                                    █
 Line 48                                                                    █
 Line 49                                                                    █
-Line 50                                                                    █
-"
+Line 50                                                                    █"
 `;
 
 exports[`ToolResultDisplay > truncates very long string results 1`] = `
