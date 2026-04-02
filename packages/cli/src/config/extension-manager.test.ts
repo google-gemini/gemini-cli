@@ -22,6 +22,7 @@ import {
   getRealPath,
   type CustomTheme,
   IntegrityDataStatus,
+  Storage,
 } from '@google/gemini-cli-core';
 
 const mockHomedir = vi.hoisted(() => vi.fn(() => '/tmp/mock-home'));
@@ -43,7 +44,7 @@ vi.mock('@google/gemini-cli-core', async (importOriginal) => {
     await importOriginal<typeof import('@google/gemini-cli-core')>();
   return {
     ...actual,
-    homedir: mockHomedir,
+    realHomedir: mockHomedir,
     ExtensionIntegrityManager: vi
       .fn()
       .mockImplementation(() => mockIntegrityManager),
@@ -85,6 +86,9 @@ describe('ExtensionManager', () => {
       path.join(tempHomeDir, 'gemini-cli-test-workspace-'),
     );
     mockHomedir.mockReturnValue(tempHomeDir);
+    vi.spyOn(Storage, 'getGlobalGeminiDir').mockReturnValue(
+      path.join(tempHomeDir, '.gemini'),
+    );
     userExtensionsDir = path.join(tempHomeDir, EXTENSIONS_DIRECTORY_NAME);
     fs.mkdirSync(userExtensionsDir, { recursive: true });
 

@@ -22,7 +22,11 @@ import {
 } from '../tools/memoryTool.js';
 import { flattenMemory, type HierarchicalMemory } from '../config/memory.js';
 import { FileDiscoveryService } from '../services/fileDiscoveryService.js';
-import { GEMINI_DIR, normalizePath, homedir as pathsHomedir } from './paths.js';
+import {
+  GEMINI_DIR,
+  normalizePath,
+  realHomedir as pathsRealHomedir,
+} from './paths.js';
 
 function flattenResult(result: {
   memoryContent: HierarchicalMemory;
@@ -56,7 +60,7 @@ vi.mock('../utils/paths.js', async (importOriginal) => {
       const resolved = path.resolve(p);
       return process.platform === 'win32' ? resolved.toLowerCase() : resolved;
     },
-    homedir: vi.fn(),
+    realHomedir: vi.fn(),
   };
 });
 
@@ -94,7 +98,10 @@ describe('memoryDiscovery', () => {
     cwd = await createEmptyDir(path.join(projectRoot, 'src'));
     homedir = await createEmptyDir(path.join(testRootDir, 'userhome'));
     vi.mocked(os.homedir).mockReturnValue(homedir);
-    vi.mocked(pathsHomedir).mockReturnValue(homedir);
+    vi.mocked(pathsRealHomedir).mockReturnValue(homedir);
+    vi.spyOn(Storage, 'getGlobalGeminiDir').mockReturnValue(
+      path.join(homedir, GEMINI_DIR),
+    );
   });
 
   const normMarker = (p: string) =>

@@ -16,7 +16,7 @@ import {
   type FileFilteringOptions,
 } from '../config/constants.js';
 import { Storage } from '../config/storage.js';
-import { GEMINI_DIR, homedir, normalizePath, isSubpath } from './paths.js';
+import { realHomedir, normalizePath, isSubpath } from './paths.js';
 import type { ExtensionLoader } from './extensionLoader.js';
 import { debugLogger } from './debugLogger.js';
 import type { Config } from '../config/config.js';
@@ -277,7 +277,7 @@ async function getGeminiMdFilePathsInternalForEachDir(
 
   for (const geminiMdFilename of geminiMdFilenames) {
     const resolvedHome = normalizePath(userHomePath);
-    const globalGeminiDir = normalizePath(path.join(resolvedHome, GEMINI_DIR));
+    const globalGeminiDir = normalizePath(Storage.getGlobalGeminiDir());
     const globalMemoryPath = normalizePath(
       path.join(globalGeminiDir, geminiMdFilename),
     );
@@ -464,11 +464,11 @@ export interface MemoryLoadResult {
 }
 
 export async function getGlobalMemoryPaths(): Promise<string[]> {
-  const userHome = homedir();
+  const globalGeminiDir = Storage.getGlobalGeminiDir();
   const geminiMdFilenames = getAllGeminiMdFilenames();
 
   const accessChecks = geminiMdFilenames.map(async (filename) => {
-    const globalPath = normalizePath(path.join(userHome, GEMINI_DIR, filename));
+    const globalPath = normalizePath(path.join(globalGeminiDir, filename));
     try {
       await fs.access(globalPath, fsSync.constants.R_OK);
       debugLogger.debug(
@@ -653,7 +653,9 @@ export async function loadServerHierarchicalMemory(
   const realCwd = normalizePath(
     await fs.realpath(path.resolve(currentWorkingDirectory)),
   );
-  const realHome = normalizePath(await fs.realpath(path.resolve(homedir())));
+  const realHome = normalizePath(
+    await fs.realpath(path.resolve(realHomedir())),
+  );
   const isHomeDirectory = realCwd === realHome;
 
   // If it is the home directory, pass an empty string to the core memory
@@ -666,9 +668,7 @@ export async function loadServerHierarchicalMemory(
     `(importFormat: ${importFormat})`,
   );
 
-  // For the server, homedir() refers to the server process's home.
-  // This is consistent with how MemoryTool already finds the global path.
-  const userHomePath = homedir();
+  const userHomePath = realHomedir();
 
   // 1. SCATTER: Gather all paths
   const [discoveryResult, extensionPaths] = await Promise.all([

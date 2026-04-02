@@ -14,7 +14,7 @@ vi.mock('node:os', () => ({
 }));
 
 vi.mock('@google/gemini-cli-core', () => ({
-  homedir: () => os.homedir(),
+  realHomedir: () => os.homedir(),
 }));
 
 describe('resolvePath', () => {

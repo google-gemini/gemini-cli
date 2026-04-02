@@ -26,16 +26,27 @@ export function resetUserConfigDirWarningForTesting(): void {
 }
 
 /**
- * Returns the home directory.
- * If the deprecated GEMINI_CLI_HOME environment variable is set, it returns its value.
- * Otherwise, it returns the user's home directory.
+ * Returns the operating system's real home directory without applying Gemini's
+ * deprecated root-override compatibility semantics.
+ */
+export function realHomedir(): string {
+  return os.homedir();
+}
+
+/**
+ * Returns the legacy Gemini root-override home directory abstraction.
+ * If the deprecated GEMINI_CLI_HOME environment variable is set, it returns its
+ * value. Otherwise, it returns the operating system's real home directory.
+ *
+ * Prefer realHomedir() for genuine home-directory behaviour, and explicit
+ * storage helpers for Gemini-owned config/cache/tmp paths.
  */
 export function homedir(): string {
   const envHome = process.env[GEMINI_CLI_HOME_ENV];
   if (envHome) {
     return envHome;
   }
-  return os.homedir();
+  return realHomedir();
 }
 
 function getAbsoluteEnvPath(envVar: string): string | undefined {
@@ -85,7 +96,7 @@ export function getUserConfigDir(): string {
     return path.join(envHome, GEMINI_DIR);
   }
 
-  const homeDir = os.homedir();
+  const homeDir = realHomedir();
   if (!homeDir) {
     return path.join(os.tmpdir(), GEMINI_DIR);
   }
@@ -144,7 +155,7 @@ export function getUserCacheDir(): string {
     return explicitCacheDir;
   }
 
-  const homeDir = os.homedir();
+  const homeDir = realHomedir();
   if (!homeDir) {
     return path.join(os.tmpdir(), USER_CONFIG_DIR_NAME);
   }
@@ -176,7 +187,7 @@ export function tmpdir(): string {
  * @returns The tildeified path.
  */
 export function tildeifyPath(path: string): string {
-  const homeDir = homedir();
+  const homeDir = realHomedir();
   if (path.startsWith(homeDir)) {
     return path.replace(homeDir, '~');
   }
