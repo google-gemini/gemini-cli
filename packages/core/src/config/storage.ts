@@ -267,8 +267,7 @@ export class Storage {
   }
 
   getProjectMemoryDir(): string {
-    const identifier = this.getProjectIdentifier();
-    return path.join(Storage.getGlobalGeminiDir(), 'memory', identifier);
+    return this.getProjectMemoryTempDir();
   }
 
   getProjectMemoryTempDir(): string {
