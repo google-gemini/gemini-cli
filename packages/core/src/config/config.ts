@@ -3385,7 +3385,7 @@ export class Config implements McpContext, AgentLoopContext {
     model?: string;
     customConfig: BrowserAgentCustomConfig;
   } {
-    const override = this.getAgentOverride('browser_agent');
+    const override = this.getAgentOverride('browser');
     const customConfig = this.getAgentsSettings()?.browser ?? {};
     return {
       enabled: override?.enabled ?? false,
@@ -3591,9 +3591,15 @@ export class Config implements McpContext, AgentLoopContext {
           !this.isAgentsEnabled() ||
           agentsOverrides[definition.name]?.enabled === false
         ) {
+          process.stderr.write(
+            `[Config] Skipping disabled subagent tool: ${definition.name}\n`,
+          );
           continue;
         }
 
+        process.stderr.write(
+          `[Config] Registering subagent tool: ${definition.name}\n`,
+        );
         const tool = new SubagentTool(definition, this, this.messageBus);
         registry.registerTool(tool);
       } catch (e: unknown) {

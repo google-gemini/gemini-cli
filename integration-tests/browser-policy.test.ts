@@ -72,7 +72,7 @@ describe.skipIf(!chromeAvailable)('browser-policy', () => {
         settings: {
           agents: {
             overrides: {
-              browser_agent: {
+              browser: {
                 enabled: true,
               },
             },
@@ -111,8 +111,8 @@ describe.skipIf(!chromeAvailable)('browser-policy', () => {
         policyFile,
         `
 [[rule]]
-name = "Force confirm browser_agent"
-toolName = "browser_agent"
+name = "Force confirm browser"
+toolName = "browser"
 decision = "ask_user"
 priority = 200
 `,
@@ -145,7 +145,7 @@ priority = 200
       await run.sendKeys('\r');
 
       // Handle confirmations.
-      // 1. Initial browser_agent delegation (likely only 3 options, so use option 1: Allow once)
+      // 1. Initial browser delegation (likely only 3 options, so use option 1: Allow once)
       await poll(
         () => stripAnsi(run.output).toLowerCase().includes('action required'),
         60000,
@@ -194,7 +194,7 @@ priority = 200
 
       const output = stripAnsi(run.output).toLowerCase();
 
-      expect(output).toContain('browser_agent');
+      expect(output).toContain('browser');
       // The test validates that "Allow all server tools" skips subsequent
       // tool confirmations — the browser agent may still fail due to
       // Chrome/MCP issues in CI, which is acceptable for this policy test.
@@ -209,12 +209,15 @@ priority = 200
     rig.setup('browser-session-warning', {
       fakeResponsesPath: join(__dirname, 'browser-agent.cleanup.responses'),
       settings: {
+        model: {
+          name: 'gemini-2.5-pro',
+        },
         general: {
           enableAutoUpdateNotification: false,
         },
         agents: {
           overrides: {
-            browser_agent: {
+            browser: {
               enabled: true,
             },
           },

@@ -59,7 +59,7 @@ describe('BrowserAgentInvocation', () => {
     mockConfig = makeFakeConfig({
       agents: {
         overrides: {
-          browser_agent: {
+          browser: {
             enabled: true,
           },
         },
@@ -96,14 +96,14 @@ describe('BrowserAgentInvocation', () => {
       expect(invocation.params).toEqual(mockParams);
     });
 
-    it('should use browser_agent as default tool name', () => {
+    it('should use browser as default tool name', () => {
       const invocation = new BrowserAgentInvocation(
         mockConfig,
         mockParams,
         mockMessageBus,
       );
 
-      expect(invocation['_toolName']).toBe('browser_agent');
+      expect(invocation['_toolName']).toBe('browser');
     });
 
     it('should use custom tool name if provided', () => {
@@ -172,7 +172,7 @@ describe('BrowserAgentInvocation', () => {
     beforeEach(() => {
       vi.mocked(createBrowserAgentDefinition).mockResolvedValue({
         definition: {
-          name: 'browser_agent',
+          name: 'browser',
           description: 'mock definition',
           kind: 'local',
           inputConfig: {} as never,
@@ -331,7 +331,7 @@ describe('BrowserAgentInvocation', () => {
 
       fireActivity({
         isSubagentActivityEvent: true,
-        agentName: 'browser_agent',
+        agentName: 'browser',
         type: 'THOUGHT_CHUNK',
         data: { text: 'Navigating to the page...' },
       });
@@ -374,13 +374,13 @@ describe('BrowserAgentInvocation', () => {
 
       fireActivity({
         isSubagentActivityEvent: true,
-        agentName: 'browser_agent',
+        agentName: 'browser',
         type: 'THOUGHT_CHUNK',
         data: { text: 'I am thinking.' },
       });
       fireActivity({
         isSubagentActivityEvent: true,
-        agentName: 'browser_agent',
+        agentName: 'browser',
         type: 'THOUGHT_CHUNK',
         data: { text: 'Now I will act.' },
       });
@@ -420,7 +420,7 @@ describe('BrowserAgentInvocation', () => {
 
       fireActivity({
         isSubagentActivityEvent: true,
-        agentName: 'browser_agent',
+        agentName: 'browser',
         type: 'TOOL_CALL_START',
         data: {
           name: 'navigate_browser',
@@ -431,7 +431,7 @@ describe('BrowserAgentInvocation', () => {
 
       fireActivity({
         isSubagentActivityEvent: true,
-        agentName: 'browser_agent',
+        agentName: 'browser',
         type: 'TOOL_CALL_END',
         data: { name: 'navigate_browser', id: 'call-1' },
       });
@@ -471,7 +471,7 @@ describe('BrowserAgentInvocation', () => {
 
       fireActivity({
         isSubagentActivityEvent: true,
-        agentName: 'browser_agent',
+        agentName: 'browser',
         type: 'TOOL_CALL_START',
         data: {
           name: 'fill_form',
@@ -515,14 +515,14 @@ describe('BrowserAgentInvocation', () => {
 
       fireActivity({
         isSubagentActivityEvent: true,
-        agentName: 'browser_agent',
+        agentName: 'browser',
         type: 'TOOL_CALL_START',
         data: { name: 'click_element', callId: 'call-3', args: {} },
       });
 
       fireActivity({
         isSubagentActivityEvent: true,
-        agentName: 'browser_agent',
+        agentName: 'browser',
         type: 'ERROR',
         data: { error: 'Element not found', callId: 'call-3' },
       });
@@ -560,7 +560,7 @@ describe('BrowserAgentInvocation', () => {
 
       fireActivity({
         isSubagentActivityEvent: true,
-        agentName: 'browser_agent',
+        agentName: 'browser',
         type: 'ERROR',
         data: { error: 'Auth failed: api_key=sk-secret-abc1234567890' },
       });
@@ -600,7 +600,7 @@ describe('BrowserAgentInvocation', () => {
 
       fireActivity({
         isSubagentActivityEvent: true,
-        agentName: 'browser_agent',
+        agentName: 'browser',
         type: 'ERROR',
         data: {
           error:
@@ -643,14 +643,14 @@ describe('BrowserAgentInvocation', () => {
 
       fireActivity({
         isSubagentActivityEvent: true,
-        agentName: 'browser_agent',
+        agentName: 'browser',
         type: 'TOOL_CALL_START',
         data: { name: 'tool_a', callId: 'c1', args: {} },
       });
 
       fireActivity({
         isSubagentActivityEvent: true,
-        agentName: 'browser_agent',
+        agentName: 'browser',
         type: 'TOOL_CALL_START',
         data: { name: 'tool_b', callId: 'c2', args: {} },
       });
@@ -658,7 +658,7 @@ describe('BrowserAgentInvocation', () => {
       // ERROR with no callId should mark ALL running tools as error
       fireActivity({
         isSubagentActivityEvent: true,
-        agentName: 'browser_agent',
+        agentName: 'browser',
         type: 'ERROR',
         data: { error: 'Agent crashed' },
       });
@@ -699,7 +699,7 @@ describe('BrowserAgentInvocation', () => {
 
       vi.mocked(createBrowserAgentDefinition).mockResolvedValue({
         definition: {
-          name: 'browser_agent',
+          name: 'browser',
           description: 'mock definition',
           kind: 'local',
           inputConfig: {} as never,

@@ -24,7 +24,7 @@ import {
 } from '../../config/models.js';
 
 /** Canonical agent name — used for routing and configuration lookup. */
-export const BROWSER_AGENT_NAME = 'browser_agent';
+export const BROWSER_AGENT_NAME = 'browser';
 
 /**
  * Output schema for browser agent results.

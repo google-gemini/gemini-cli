@@ -8,7 +8,7 @@
  * Integration tests for the browser agent.
  *
  * These tests verify the complete end-to-end flow from CLI prompt through
- * browser_agent delegation to MCP/Chrome DevTools and back. Unlike the unit
+ * browser delegation to MCP/Chrome DevTools and back. Unlike the unit
  * tests in packages/core/src/agents/browser/ which mock all MCP components,
  * these tests launch real Chrome instances in headless mode.
  *
@@ -77,7 +77,12 @@ describe.skipIf(!chromeAvailable)('browser-agent', () => {
       ),
       settings: {
         agents: {
-          browser_agent: {
+          overrides: {
+            browser: {
+              enabled: true,
+            },
+          },
+          browser: {
             headless: true,
             sessionMode: 'isolated',
           },
@@ -93,12 +98,9 @@ describe.skipIf(!chromeAvailable)('browser-agent', () => {
 
     const toolLogs = rig.readToolLogs();
     const browserAgentCall = toolLogs.find(
-      (t) => t.toolRequest.name === 'browser_agent',
+      (t) => t.toolRequest.name === 'browser',
     );
-    expect(
-      browserAgentCall,
-      'Expected browser_agent to be called',
-    ).toBeDefined();
+    expect(browserAgentCall, 'Expected browser to be called').toBeDefined();
   });
 
   it('should take screenshots of web pages', async () => {
@@ -106,7 +108,12 @@ describe.skipIf(!chromeAvailable)('browser-agent', () => {
       fakeResponsesPath: join(__dirname, 'browser-agent.screenshot.responses'),
       settings: {
         agents: {
-          browser_agent: {
+          overrides: {
+            browser: {
+              enabled: true,
+            },
+          },
+          browser: {
             headless: true,
             sessionMode: 'isolated',
           },
@@ -120,7 +127,7 @@ describe.skipIf(!chromeAvailable)('browser-agent', () => {
 
     const toolLogs = rig.readToolLogs();
     const browserCalls = toolLogs.filter(
-      (t) => t.toolRequest.name === 'browser_agent',
+      (t) => t.toolRequest.name === 'browser',
     );
     expect(browserCalls.length).toBeGreaterThan(0);
 
@@ -132,7 +139,12 @@ describe.skipIf(!chromeAvailable)('browser-agent', () => {
       fakeResponsesPath: join(__dirname, 'browser-agent.interaction.responses'),
       settings: {
         agents: {
-          browser_agent: {
+          overrides: {
+            browser: {
+              enabled: true,
+            },
+          },
+          browser: {
             headless: true,
             sessionMode: 'isolated',
           },
@@ -146,12 +158,9 @@ describe.skipIf(!chromeAvailable)('browser-agent', () => {
 
     const toolLogs = rig.readToolLogs();
     const browserAgentCall = toolLogs.find(
-      (t) => t.toolRequest.name === 'browser_agent',
+      (t) => t.toolRequest.name === 'browser',
     );
-    expect(
-      browserAgentCall,
-      'Expected browser_agent to be called',
-    ).toBeDefined();
+    expect(browserAgentCall, 'Expected browser to be called').toBeDefined();
 
     assertModelHasOutput(result);
   });
@@ -161,7 +170,12 @@ describe.skipIf(!chromeAvailable)('browser-agent', () => {
       fakeResponsesPath: join(__dirname, 'browser-agent.cleanup.responses'),
       settings: {
         agents: {
-          browser_agent: {
+          overrides: {
+            browser: {
+              enabled: true,
+            },
+          },
+          browser: {
             headless: true,
             sessionMode: 'isolated',
           },
@@ -182,7 +196,12 @@ describe.skipIf(!chromeAvailable)('browser-agent', () => {
       fakeResponsesPath: join(__dirname, 'browser-agent.sequential.responses'),
       settings: {
         agents: {
-          browser_agent: {
+          overrides: {
+            browser: {
+              enabled: true,
+            },
+          },
+          browser: {
             headless: true,
             sessionMode: 'isolated',
           },
@@ -196,7 +215,7 @@ describe.skipIf(!chromeAvailable)('browser-agent', () => {
 
     const toolLogs = rig.readToolLogs();
     const browserCalls = toolLogs.filter(
-      (t) => t.toolRequest.name === 'browser_agent',
+      (t) => t.toolRequest.name === 'browser',
     );
     expect(browserCalls.length).toBeGreaterThan(0);
 
@@ -212,7 +231,12 @@ describe.skipIf(!chromeAvailable)('browser-agent', () => {
       ),
       settings: {
         agents: {
-          browser_agent: {
+          overrides: {
+            browser: {
+              enabled: true,
+            },
+          },
+          browser: {
             headless: true,
             sessionMode: 'isolated',
           },

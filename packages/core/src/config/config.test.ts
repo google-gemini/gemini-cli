@@ -1505,7 +1505,7 @@ describe('Server Config (config.ts)', () => {
         ...baseParams,
         agents: {
           overrides: {
-            browser_agent: {
+            browser: {
               enabled: true,
               modelConfig: { model: 'custom-model' },
             },
@@ -1552,7 +1552,7 @@ describe('Server Config (config.ts)', () => {
         ...baseParams,
         agents: {
           overrides: {
-            browser_agent: {
+            browser: {
               enabled: true,
             },
           },

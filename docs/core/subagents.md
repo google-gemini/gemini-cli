@@ -104,7 +104,7 @@ Gemini CLI comes with the following built-in subagents:
 
 ### Browser Agent (experimental)
 
-- **Name:** `browser_agent`
+- **Name:** `browser`
 - **Purpose:** Automate web browser tasks — navigating websites, filling forms,
   clicking buttons, and extracting information from web pages — using the
   accessibility tree.
@@ -133,7 +133,7 @@ The browser agent is disabled by default. Enable it in your `settings.json`:
 {
   "agents": {
     "overrides": {
-      "browser_agent": {
+      "browser": {
         "enabled": true
       }
     }
@@ -150,7 +150,7 @@ under `agents.browser`:
 {
   "agents": {
     "overrides": {
-      "browser_agent": {
+      "browser": {
         "enabled": true
       }
     },
@@ -201,7 +201,7 @@ can enable the visual agent by setting a `visualModel`:
 {
   "agents": {
     "overrides": {
-      "browser_agent": {
+      "browser": {
         "enabled": true
       }
     },
@@ -261,7 +261,7 @@ To use the browser agent in a Docker sandbox:
    {
      "agents": {
        "overrides": {
-         "browser_agent": { "enabled": true }
+         "browser": { "enabled": true }
        },
        "browser": {
          "sessionMode": "existing",

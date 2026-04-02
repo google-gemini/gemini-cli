@@ -97,7 +97,7 @@ describe('BrowserManager', () => {
     mockConfig = makeFakeConfig({
       agents: {
         overrides: {
-          browser_agent: {
+          browser: {
             enabled: true,
           },
         },
@@ -419,7 +419,7 @@ describe('BrowserManager', () => {
       const headlessConfig = makeFakeConfig({
         agents: {
           overrides: {
-            browser_agent: {
+            browser: {
               enabled: true,
             },
           },
@@ -444,7 +444,7 @@ describe('BrowserManager', () => {
       const profileConfig = makeFakeConfig({
         agents: {
           overrides: {
-            browser_agent: {
+            browser: {
               enabled: true,
             },
           },
@@ -469,7 +469,7 @@ describe('BrowserManager', () => {
       const isolatedConfig = makeFakeConfig({
         agents: {
           overrides: {
-            browser_agent: {
+            browser: {
               enabled: true,
             },
           },
@@ -492,7 +492,7 @@ describe('BrowserManager', () => {
       const existingConfig = makeFakeConfig({
         agents: {
           overrides: {
-            browser_agent: {
+            browser: {
               enabled: true,
             },
           },
@@ -531,7 +531,7 @@ describe('BrowserManager', () => {
       const existingConfig = makeFakeConfig({
         agents: {
           overrides: {
-            browser_agent: {
+            browser: {
               enabled: true,
             },
           },
@@ -628,7 +628,7 @@ describe('BrowserManager', () => {
       const privacyDisabledConfig = makeFakeConfig({
         agents: {
           overrides: {
-            browser_agent: {
+            browser: {
               enabled: true,
             },
           },
@@ -730,7 +730,7 @@ describe('BrowserManager', () => {
     it('should return different instances for different session modes', () => {
       const isolatedConfig = makeFakeConfig({
         agents: {
-          overrides: { browser_agent: { enabled: true } },
+          overrides: { browser: { enabled: true } },
           browser: { sessionMode: 'isolated' },
         },
       });
@@ -744,13 +744,13 @@ describe('BrowserManager', () => {
     it('should return different instances for different profile paths', () => {
       const config1 = makeFakeConfig({
         agents: {
-          overrides: { browser_agent: { enabled: true } },
+          overrides: { browser: { enabled: true } },
           browser: { profilePath: '/path/a' },
         },
       });
       const config2 = makeFakeConfig({
         agents: {
-          overrides: { browser_agent: { enabled: true } },
+          overrides: { browser: { enabled: true } },
           browser: { profilePath: '/path/b' },
         },
       });
@@ -769,7 +769,7 @@ describe('BrowserManager', () => {
 
       const isolatedConfig = makeFakeConfig({
         agents: {
-          overrides: { browser_agent: { enabled: true } },
+          overrides: { browser: { enabled: true } },
           browser: { sessionMode: 'isolated' },
         },
       });
@@ -879,7 +879,7 @@ describe('BrowserManager', () => {
       mockConfig = makeFakeConfig({
         agents: {
           overrides: {
-            browser_agent: {
+            browser: {
               enabled: true,
             },
           },
@@ -901,7 +901,7 @@ describe('BrowserManager', () => {
       mockConfig = makeFakeConfig({
         agents: {
           overrides: {
-            browser_agent: {
+            browser: {
               enabled: true,
             },
           },
@@ -923,7 +923,7 @@ describe('BrowserManager', () => {
       mockConfig = makeFakeConfig({
         agents: {
           overrides: {
-            browser_agent: {
+            browser: {
               enabled: true,
             },
           },
@@ -969,7 +969,7 @@ describe('BrowserManager', () => {
     it('should NOT re-inject overlay when headless is true', async () => {
       const headlessConfig = makeFakeConfig({
         agents: {
-          overrides: { browser_agent: { enabled: true } },
+          overrides: { browser: { enabled: true } },
           browser: { headless: true },
         },
       });
@@ -1001,7 +1001,7 @@ describe('BrowserManager', () => {
       mockConfig = makeFakeConfig({
         agents: {
           overrides: {
-            browser_agent: {
+            browser: {
               enabled: true,
             },
           },
@@ -1098,7 +1098,7 @@ describe('BrowserManager', () => {
       vi.stubEnv('SANDBOX', 'sandbox-exec');
       const existingConfig = makeFakeConfig({
         agents: {
-          overrides: { browser_agent: { enabled: true } },
+          overrides: { browser: { enabled: true } },
           browser: { sessionMode: 'existing' },
         },
       });
@@ -1127,7 +1127,7 @@ describe('BrowserManager', () => {
         .mockImplementation(() => {});
       const existingConfig = makeFakeConfig({
         agents: {
-          overrides: { browser_agent: { enabled: true } },
+          overrides: { browser: { enabled: true } },
           browser: { sessionMode: 'existing' },
         },
       });

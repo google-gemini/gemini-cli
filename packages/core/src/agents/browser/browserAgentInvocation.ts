@@ -66,7 +66,7 @@ export class BrowserAgentInvocation extends BaseToolInvocation<
     _toolName?: string,
     _toolDisplayName?: string,
   ) {
-    const resolvedName = _toolName ?? 'browser_agent';
+    const resolvedName = _toolName ?? 'browser';
     // Note: BrowserAgentDefinition is a factory function, so we use hardcoded names
     super(
       params,

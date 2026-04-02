@@ -96,7 +96,7 @@ describe('browserAgentFactory', () => {
     mockConfig = makeFakeConfig({
       agents: {
         overrides: {
-          browser_agent: {
+          browser: {
             enabled: true,
           },
         },
@@ -133,7 +133,7 @@ describe('browserAgentFactory', () => {
       const headlessConfig = makeFakeConfig({
         agents: {
           overrides: {
-            browser_agent: {
+            browser: {
               enabled: true,
             },
           },
@@ -205,7 +205,7 @@ describe('browserAgentFactory', () => {
       const configWithVision = makeFakeConfig({
         agents: {
           overrides: {
-            browser_agent: {
+            browser: {
               enabled: true,
             },
           },
@@ -230,7 +230,7 @@ describe('browserAgentFactory', () => {
       const configWithVision = makeFakeConfig({
         agents: {
           overrides: {
-            browser_agent: {
+            browser: {
               enabled: true,
             },
           },
@@ -369,7 +369,7 @@ describe('browserAgentFactory', () => {
 
       expect(mockPolicyEngine.addRule).toHaveBeenCalledWith(
         expect.objectContaining({
-          toolName: 'mcp_browser_agent_fill',
+          toolName: 'mcp_browser_fill',
           decision: PolicyDecision.ASK_USER,
           priority: 999,
         }),
@@ -377,7 +377,7 @@ describe('browserAgentFactory', () => {
 
       expect(mockPolicyEngine.addRule).toHaveBeenCalledWith(
         expect.objectContaining({
-          toolName: 'mcp_browser_agent_upload_file',
+          toolName: 'mcp_browser_upload_file',
           decision: PolicyDecision.ASK_USER,
           priority: 999,
         }),
@@ -385,7 +385,7 @@ describe('browserAgentFactory', () => {
 
       expect(mockPolicyEngine.addRule).toHaveBeenCalledWith(
         expect.objectContaining({
-          toolName: 'mcp_browser_agent_evaluate_script',
+          toolName: 'mcp_browser_evaluate_script',
           decision: PolicyDecision.ASK_USER,
           priority: 999,
         }),
@@ -397,13 +397,13 @@ describe('browserAgentFactory', () => {
 
       expect(mockPolicyEngine.addRule).toHaveBeenCalledWith(
         expect.objectContaining({
-          toolName: 'mcp_browser_agent_fill',
+          toolName: 'mcp_browser_fill',
         }),
       );
 
       expect(mockPolicyEngine.addRule).not.toHaveBeenCalledWith(
         expect.objectContaining({
-          toolName: 'mcp_browser_agent_upload_file',
+          toolName: 'mcp_browser_upload_file',
         }),
       );
     });
@@ -429,7 +429,7 @@ describe('browserAgentFactory', () => {
 
       expect(mockPolicyEngine.addRule).toHaveBeenCalledWith(
         expect.objectContaining({
-          toolName: 'mcp_browser_agent_take_snapshot',
+          toolName: 'mcp_browser_take_snapshot',
           decision: PolicyDecision.ALLOW,
           priority: PRIORITY_SUBAGENT_TOOL,
         }),
@@ -437,7 +437,7 @@ describe('browserAgentFactory', () => {
 
       expect(mockPolicyEngine.addRule).toHaveBeenCalledWith(
         expect.objectContaining({
-          toolName: 'mcp_browser_agent_take_screenshot',
+          toolName: 'mcp_browser_take_screenshot',
           decision: PolicyDecision.ALLOW,
           priority: PRIORITY_SUBAGENT_TOOL,
         }),
@@ -445,7 +445,7 @@ describe('browserAgentFactory', () => {
 
       expect(mockPolicyEngine.addRule).toHaveBeenCalledWith(
         expect.objectContaining({
-          toolName: 'mcp_browser_agent_list_pages',
+          toolName: 'mcp_browser_list_pages',
           decision: PolicyDecision.ALLOW,
           priority: PRIORITY_SUBAGENT_TOOL,
         }),

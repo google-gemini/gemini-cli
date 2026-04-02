@@ -1549,7 +1549,7 @@ describe('AgentRegistry', () => {
       const config = makeMockedConfig({
         agents: {
           overrides: {
-            browser_agent: { enabled: true },
+            browser: { enabled: true },
           },
           browser: {
             sessionMode: 'persistent',
@@ -1559,7 +1559,7 @@ describe('AgentRegistry', () => {
       const registry = new TestableAgentRegistry(config);
       await registry.initialize();
 
-      expect(registry.getDefinition('browser_agent')).toBeUndefined();
+      expect(registry.getDefinition('browser')).toBeUndefined();
       expect(feedbackSpy).toHaveBeenCalledWith(
         'info',
         expect.stringContaining('Browser agent disabled in container sandbox'),
@@ -1572,7 +1572,7 @@ describe('AgentRegistry', () => {
       const config = makeMockedConfig({
         agents: {
           overrides: {
-            browser_agent: { enabled: true },
+            browser: { enabled: true },
           },
           browser: {
             sessionMode: 'existing',
@@ -1582,7 +1582,7 @@ describe('AgentRegistry', () => {
       const registry = new TestableAgentRegistry(config);
       await registry.initialize();
 
-      expect(registry.getDefinition('browser_agent')).toBeDefined();
+      expect(registry.getDefinition('browser')).toBeDefined();
     });
 
     it('should register browser agent normally in seatbelt sandbox', async () => {
@@ -1591,14 +1591,14 @@ describe('AgentRegistry', () => {
       const config = makeMockedConfig({
         agents: {
           overrides: {
-            browser_agent: { enabled: true },
+            browser: { enabled: true },
           },
         },
       });
       const registry = new TestableAgentRegistry(config);
       await registry.initialize();
 
-      expect(registry.getDefinition('browser_agent')).toBeDefined();
+      expect(registry.getDefinition('browser')).toBeDefined();
     });
 
     it('should register browser agent normally when not in sandbox', async () => {
@@ -1607,14 +1607,14 @@ describe('AgentRegistry', () => {
       const config = makeMockedConfig({
         agents: {
           overrides: {
-            browser_agent: { enabled: true },
+            browser: { enabled: true },
           },
         },
       });
       const registry = new TestableAgentRegistry(config);
       await registry.initialize();
 
-      expect(registry.getDefinition('browser_agent')).toBeDefined();
+      expect(registry.getDefinition('browser')).toBeDefined();
     });
   });
 });
