@@ -56,19 +56,21 @@ Gemini CLI takes action.
 
 1.  **Provide a goal:** Start by describing what you want to achieve. Gemini CLI
     will then enter Plan Mode (if it's not already) to research the task.
-2.  **Review research and provide input:** As Gemini CLI analyzes your codebase,
-    it may ask you questions or present different implementation options using
-    [`ask_user`](../tools/ask-user.md). Provide your preferences to help guide
-    the design.
-3.  **Review the plan:** Once Gemini CLI has a proposed strategy, it creates a
-    detailed implementation plan as a Markdown file in your plans directory.
+2.  **Discuss and agree on strategy:** As Gemini CLI analyzes your codebase, it
+    will discuss its findings and proposed strategy with you to ensure
+    alignment. It may ask you questions or present different implementation
+    options using [`ask_user`](../tools/ask-user.md). **Gemini CLI will stop and
+    wait for your confirmation** before drafting the formal plan. You should
+    reach an informal agreement on the approach before proceeding.
+3.  **Review the plan:** Once you've agreed on the strategy, Gemini CLI creates
+    a detailed implementation plan as a Markdown file in your plans directory.
     - **View:** You can open and read this file to understand the proposed
       changes.
     - **Edit:** Press `Ctrl+X` to open the plan directly in your configured
       external editor.
 
 4.  **Approve or iterate:** Gemini CLI will present the finalized plan for your
-    approval.
+    formal approval.
     - **Approve:** If you're satisfied with the plan, approve it to start the
       implementation immediately: **Yes, automatically accept edits** or **Yes,
       manually accept edits**.
@@ -121,6 +123,7 @@ These are the only allowed tools:
   [`glob`](../tools/file-system.md#4-glob-findfiles)
 - **Search:** [`grep_search`](../tools/file-system.md#5-grep_search-searchtext),
   [`google_web_search`](../tools/web-search.md),
+  [`web_fetch`](../tools/web-fetch.md) (requires explicit confirmation),
   [`get_internal_docs`](../tools/internal-docs.md)
 - **Research Subagents:**
   [`codebase_investigator`](../core/subagents.md#codebase-investigator),

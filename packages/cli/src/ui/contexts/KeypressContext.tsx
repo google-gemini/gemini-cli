@@ -450,7 +450,7 @@ function* emitKeys(
               insertable: true,
               sequence: decoded,
             });
-          } catch (_e) {
+          } catch {
             debugLogger.log('Failed to decode OSC 52 clipboard data');
           }
         }

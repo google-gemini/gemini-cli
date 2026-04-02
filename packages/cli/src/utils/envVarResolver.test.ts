@@ -11,18 +11,16 @@ import {
 } from './envVarResolver.js';
 
 describe('resolveEnvVarsInString', () => {
-  let originalEnv: NodeJS.ProcessEnv;
-
   beforeEach(() => {
-    originalEnv = { ...process.env };
+    vi.stubEnv('TEST_VAR', '');
   });
 
   afterEach(() => {
-    process.env = originalEnv;
+    vi.unstubAllEnvs();
   });
 
   it('should resolve $VAR_NAME format', () => {
-    process.env['TEST_VAR'] = 'test-value';
+    vi.stubEnv('TEST_VAR', 'test-value');
 
     const result = resolveEnvVarsInString('Value is $TEST_VAR');
 
@@ -30,20 +28,26 @@ describe('resolveEnvVarsInString', () => {
   });
 
   it('should resolve ${VAR_NAME} format', () => {
-    process.env['TEST_VAR'] = 'test-value';
+    vi.stubEnv('TEST_VAR', 'test-value');
 
     const result = resolveEnvVarsInString('Value is ${TEST_VAR}');
 
     expect(result).toBe('Value is test-value');
   });
 
-  it('should resolve multiple variables in the same string', () => {
-    process.env['HOST'] = 'localhost';
-    process.env['PORT'] = '3000';
+  it('should resolve multiple variables', () => {
+    vi.stubEnv('HOST', 'localhost');
+    vi.stubEnv('PORT', '8080');
 
     const result = resolveEnvVarsInString('URL: http://$HOST:${PORT}/api');
 
-    expect(result).toBe('URL: http://localhost:3000/api');
+    expect(result).toBe('URL: http://localhost:8080/api');
+  });
+
+  it('should support environment variables with dots', () => {
+    vi.stubEnv('FOO.BAR', 'baz');
+    const result = resolveEnvVarsInString('Value: ${FOO.BAR}');
+    expect(result).toBe('Value: baz');
   });
 
   it('should leave undefined variables unchanged', () => {
@@ -71,28 +75,49 @@ describe('resolveEnvVarsInString', () => {
   });
 
   it('should handle mixed defined and undefined variables', () => {
-    process.env['DEFINED'] = 'value';
+    vi.stubEnv('DEFINED', 'value');
 
     const result = resolveEnvVarsInString('$DEFINED and $UNDEFINED mixed');
 
     expect(result).toBe('value and $UNDEFINED mixed');
   });
+
+  it('should use default value when environment variable is missing', () => {
+    const result = resolveEnvVarsInString(
+      'URL: ${MISSING_VAR:-https://default.example.com}/api',
+    );
+    expect(result).toBe('URL: https://default.example.com/api');
+  });
+
+  it('should ignore default value when environment variable is present', () => {
+    vi.stubEnv('PRESENT_VAR', 'https://actual.example.com');
+    const result = resolveEnvVarsInString(
+      'URL: ${PRESENT_VAR:-https://default.example.com}/api',
+    );
+    expect(result).toBe('URL: https://actual.example.com/api');
+  });
+
+  it('should support empty default value', () => {
+    const result = resolveEnvVarsInString('Value: ${MISSING_VAR:-}');
+    expect(result).toBe('Value: ');
+  });
+
+  it('should correctly handle default values that contain colons or dashes', () => {
+    const result = resolveEnvVarsInString(
+      'Value: ${MISSING_VAR:-val:-123-abc}',
+    );
+    expect(result).toBe('Value: val:-123-abc');
+  });
 });
 
 describe('resolveEnvVarsInObject', () => {
-  let originalEnv: NodeJS.ProcessEnv;
-
-  beforeEach(() => {
-    originalEnv = { ...process.env };
-  });
-
   afterEach(() => {
-    process.env = originalEnv;
+    vi.unstubAllEnvs();
   });
 
   it('should resolve variables in nested objects', () => {
-    process.env['API_KEY'] = 'secret-123';
-    process.env['DB_URL'] = 'postgresql://localhost/test';
+    vi.stubEnv('API_KEY', 'secret-123');
+    vi.stubEnv('DB_URL', 'postgresql://localhost/test');
 
     const config = {
       server: {
@@ -118,8 +143,8 @@ describe('resolveEnvVarsInObject', () => {
   });
 
   it('should resolve variables in arrays', () => {
-    process.env['ENV'] = 'production';
-    process.env['VERSION'] = '1.0.0';
+    vi.stubEnv('ENV', 'production');
+    vi.stubEnv('VERSION', '1.0.0');
 
     const config = {
       tags: ['$ENV', 'app', '${VERSION}'],
@@ -153,8 +178,8 @@ describe('resolveEnvVarsInObject', () => {
   });
 
   it('should handle MCP server config structure', () => {
-    process.env['API_TOKEN'] = 'token-123';
-    process.env['SERVER_PORT'] = '8080';
+    vi.stubEnv('API_TOKEN', 'token-123');
+    vi.stubEnv('SERVER_PORT', '8080');
 
     const extensionConfig = {
       name: 'test-extension',
@@ -206,7 +231,7 @@ describe('resolveEnvVarsInObject', () => {
   });
 
   it('should handle circular references in objects without infinite recursion', () => {
-    process.env['TEST_VAR'] = 'resolved-value';
+    vi.stubEnv('TEST_VAR', 'resolved-value');
 
     type ConfigWithCircularRef = {
       name: string;
@@ -233,7 +258,7 @@ describe('resolveEnvVarsInObject', () => {
   });
 
   it('should handle circular references in arrays without infinite recursion', () => {
-    process.env['ARRAY_VAR'] = 'array-value';
+    vi.stubEnv('ARRAY_VAR', 'array-value');
 
     type ArrayWithCircularRef = Array<string | number | ArrayWithCircularRef>;
     const arr: ArrayWithCircularRef = ['$ARRAY_VAR', 123];
@@ -253,7 +278,7 @@ describe('resolveEnvVarsInObject', () => {
   });
 
   it('should handle complex nested circular references', () => {
-    process.env['NESTED_VAR'] = 'nested-resolved';
+    vi.stubEnv('NESTED_VAR', 'nested-resolved');
 
     type ObjWithRef = {
       name: string;
