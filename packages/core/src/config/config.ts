@@ -1399,7 +1399,7 @@ export class Config implements McpContext, AgentLoopContext {
     if (this.planEnabled) {
       const plansDir = this.getPlansDir();
       try {
-        await fs.promises.mkdir(plansDir, { recursive: true });
+        await fs.promises.access(plansDir);
         this.workspaceContext.addDirectory(plansDir);
       } catch {
         // Directory does not exist yet, so we don't add it to the workspace context.
