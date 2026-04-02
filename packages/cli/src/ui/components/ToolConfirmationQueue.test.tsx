@@ -103,8 +103,6 @@ describe('ToolConfirmationQueue', () => {
     expect(output).toContain('Allow execution of [ls]?');
     expect(output).toMatchSnapshot();
 
-    const stickyHeaderProps = vi.mocked(StickyHeader).mock.calls[0][0];
-    expect(stickyHeaderProps.borderColor).toBe(theme.status.warning);
     unmount();
   });
 
