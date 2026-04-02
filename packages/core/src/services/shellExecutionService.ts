@@ -313,7 +313,7 @@ export class ShellExecutionService {
             shellExecutionConfig,
             ptyInfo,
           );
-        } catch (_e) {
+        } catch {
           // Fallback to child_process
         }
       }

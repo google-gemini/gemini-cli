@@ -65,3 +65,16 @@ export const SKILLS_DOCS_URL =
 
 /** Max lines to show for a compact tool subview (e.g. diff) */
 export const COMPACT_TOOL_SUBVIEW_MAX_LINES = 15;
+
+// Maximum number of UTF-16 code units to retain in a background task's output
+// buffer. Beyond this, the oldest output is dropped to keep memory bounded.
+// 10 MB is large enough for ~200,000 lines of terminal output and stays well
+// below the V8 string length limit (~1 GB) even with multiple concurrent tasks.
+export const MAX_SHELL_OUTPUT_SIZE = 10_000_000; // 10 MB
+
+// Truncation is triggered only once the output exceeds
+// MAX_SHELL_OUTPUT_SIZE + SHELL_OUTPUT_TRUNCATION_BUFFER, then sliced back to
+// MAX_SHELL_OUTPUT_SIZE. This avoids an O(n) string copy on every appended
+// chunk, amortizing the cost to once per SHELL_OUTPUT_TRUNCATION_BUFFER bytes
+// of new input (i.e. once per ~1 MB on a busy shell).
+export const SHELL_OUTPUT_TRUNCATION_BUFFER = 1_000_000; // 1 MB

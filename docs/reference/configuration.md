@@ -354,8 +354,8 @@ their corresponding top-level category object in your `settings.json` file.
 
 - **`ui.loadingPhrases`** (enum):
   - **Description:** What to show while the model is working: tips, witty
-    comments, both, or nothing.
-  - **Default:** `"tips"`
+    comments, all, or off.
+  - **Default:** `"off"`
   - **Values:** `"tips"`, `"witty"`, `"all"`, `"off"`
 
 - **`ui.errorVerbosity`** (enum):
@@ -1565,7 +1565,7 @@ their corresponding top-level category object in your `settings.json` file.
 
 - **`advanced.autoConfigureMemory`** (boolean):
   - **Description:** Automatically configure Node.js memory limits
-  - **Default:** `false`
+  - **Default:** `true`
   - **Requires restart:** Yes
 
 - **`advanced.dnsResolutionOrder`** (string):
@@ -1587,26 +1587,9 @@ their corresponding top-level category object in your `settings.json` file.
 
 #### `experimental`
 
-- **`experimental.toolOutputMasking.enabled`** (boolean):
-  - **Description:** Enables tool output masking to save tokens.
-  - **Default:** `true`
-  - **Requires restart:** Yes
-
-- **`experimental.toolOutputMasking.toolProtectionThreshold`** (number):
-  - **Description:** Minimum number of tokens to protect from masking (most
-    recent tool outputs).
-  - **Default:** `50000`
-  - **Requires restart:** Yes
-
-- **`experimental.toolOutputMasking.minPrunableTokensThreshold`** (number):
-  - **Description:** Minimum prunable tokens required to trigger a masking pass.
-  - **Default:** `30000`
-  - **Requires restart:** Yes
-
-- **`experimental.toolOutputMasking.protectLatestTurn`** (boolean):
-  - **Description:** Ensures the absolute latest turn is never masked,
-    regardless of token count.
-  - **Default:** `true`
+- **`experimental.adk.agentSessionNoninteractiveEnabled`** (boolean):
+  - **Description:** Enable non-interactive agent sessions.
+  - **Default:** `false`
   - **Requires restart:** Yes
 
 - **`experimental.enableAgents`** (boolean):
@@ -1834,16 +1817,36 @@ their corresponding top-level category object in your `settings.json` file.
   - **Default:** `0.25`
   - **Requires restart:** Yes
 
-- **`contextManagement.toolDistillation.maxOutputTokens`** (number):
-  - **Description:** Maximum tokens to show when truncating large tool outputs.
+- **`contextManagement.tools.distillation.maxOutputTokens`** (number):
+  - **Description:** Maximum tokens to show to the model when truncating large
+    tool outputs.
   - **Default:** `10000`
   - **Requires restart:** Yes
 
-- **`contextManagement.toolDistillation.summarizationThresholdTokens`**
+- **`contextManagement.tools.distillation.summarizationThresholdTokens`**
   (number):
   - **Description:** Threshold above which truncated tool outputs will be
     summarized by an LLM.
   - **Default:** `20000`
+  - **Requires restart:** Yes
+
+- **`contextManagement.tools.outputMasking.protectionThresholdTokens`**
+  (number):
+  - **Description:** Minimum number of tokens to protect from masking (most
+    recent tool outputs).
+  - **Default:** `50000`
+  - **Requires restart:** Yes
+
+- **`contextManagement.tools.outputMasking.minPrunableThresholdTokens`**
+  (number):
+  - **Description:** Minimum prunable tokens required to trigger a masking pass.
+  - **Default:** `30000`
+  - **Requires restart:** Yes
+
+- **`contextManagement.tools.outputMasking.protectLatestTurn`** (boolean):
+  - **Description:** Ensures the absolute latest turn is never masked,
+    regardless of token count.
+  - **Default:** `true`
   - **Requires restart:** Yes
 
 #### `admin`

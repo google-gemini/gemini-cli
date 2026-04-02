@@ -42,7 +42,7 @@ export function tryParseJSON(input: string): object | null {
 
     // eslint-disable-next-line @typescript-eslint/no-unsafe-return
     return parsed;
-  } catch (_err) {
+  } catch {
     return null;
   }
 }
