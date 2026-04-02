@@ -293,6 +293,16 @@ const SETTINGS_SCHEMA = {
         description: 'Planning features configuration.',
         showInDialog: false,
         properties: {
+          enabled: {
+            type: 'boolean',
+            label: 'Enable Plan Mode',
+            category: 'General',
+            requiresRestart: true,
+            default: true,
+            description:
+              'Enable Plan Mode for read-only safety during planning.',
+            showInDialog: true,
+          },
           directory: {
             type: 'string',
             label: 'Plan Directory',
@@ -561,6 +571,16 @@ const SETTINGS_SCHEMA = {
         description: 'Show the "? for shortcuts" hint above the input.',
         showInDialog: true,
       },
+      compactToolOutput: {
+        type: 'boolean',
+        label: 'Compact Tool Output',
+        category: 'UI',
+        requiresRestart: false,
+        default: false,
+        description:
+          'Display tool outputs (like directory listings and file reads) in a compact, structured format.',
+        showInDialog: true,
+      },
       hideBanner: {
         type: 'boolean',
         label: 'Hide Banner',
@@ -756,9 +776,9 @@ const SETTINGS_SCHEMA = {
         label: 'Loading Phrases',
         category: 'UI',
         requiresRestart: false,
-        default: 'tips',
+        default: 'off',
         description:
-          'What to show while the model is working: tips, witty comments, both, or nothing.',
+          'What to show while the model is working: tips, witty comments, all, or off.',
         showInDialog: true,
         options: [
           { value: 'tips', label: 'Tips' },
@@ -1291,6 +1311,19 @@ const SETTINGS_SCHEMA = {
         description: 'Maximum number of directories to search for memory.',
         showInDialog: true,
       },
+      memoryBoundaryMarkers: {
+        type: 'array',
+        label: 'Memory Boundary Markers',
+        category: 'Context',
+        requiresRestart: true,
+        default: ['.git'] as string[],
+        description:
+          'File or directory names that mark the boundary for GEMINI.md discovery. ' +
+          'The upward traversal stops at the first directory containing any of these markers. ' +
+          'An empty array disables parent traversal.',
+        showInDialog: false,
+        items: { type: 'string' },
+      },
       includeDirectories: {
         type: 'array',
         label: 'Include Directories',
@@ -1444,6 +1477,21 @@ const SETTINGS_SCHEMA = {
               Fallback to child_process still applies.
             `,
             showInDialog: true,
+          },
+          backgroundCompletionBehavior: {
+            type: 'enum',
+            label: 'Background Completion Behavior',
+            category: 'Tools',
+            requiresRestart: false,
+            default: 'silent',
+            description:
+              "Controls what happens when a background shell command finishes. 'silent' (default): quietly exits in background. 'inject': automatically returns output to agent. 'notify': shows brief message in chat.",
+            showInDialog: false,
+            options: [
+              { label: 'Silent', value: 'silent' },
+              { label: 'Inject', value: 'inject' },
+              { label: 'Notify', value: 'notify' },
+            ],
           },
           pager: {
             type: 'string',
@@ -1839,7 +1887,7 @@ const SETTINGS_SCHEMA = {
         label: 'Auto Configure Max Old Space Size',
         category: 'Advanced',
         requiresRestart: true,
-        default: false,
+        default: true,
         description: 'Automatically configure Node.js memory limits',
         showInDialog: true,
       },
@@ -1885,54 +1933,22 @@ const SETTINGS_SCHEMA = {
     description: 'Setting to enable experimental features',
     showInDialog: false,
     properties: {
-      toolOutputMasking: {
+      adk: {
         type: 'object',
-        label: 'Tool Output Masking',
+        label: 'ADK',
         category: 'Experimental',
         requiresRestart: true,
-        ignoreInDocs: false,
         default: {},
-        description:
-          'Advanced settings for tool output masking to manage context window efficiency.',
+        description: 'Settings for the Agent Development Kit (ADK).',
         showInDialog: false,
         properties: {
-          enabled: {
+          agentSessionNoninteractiveEnabled: {
             type: 'boolean',
-            label: 'Enable Tool Output Masking',
+            label: 'Agent Session Non-interactive Enabled',
             category: 'Experimental',
             requiresRestart: true,
-            default: true,
-            description: 'Enables tool output masking to save tokens.',
-            showInDialog: true,
-          },
-          toolProtectionThreshold: {
-            type: 'number',
-            label: 'Tool Protection Threshold',
-            category: 'Experimental',
-            requiresRestart: true,
-            default: 50000,
-            description:
-              'Minimum number of tokens to protect from masking (most recent tool outputs).',
-            showInDialog: false,
-          },
-          minPrunableTokensThreshold: {
-            type: 'number',
-            label: 'Min Prunable Tokens Threshold',
-            category: 'Experimental',
-            requiresRestart: true,
-            default: 30000,
-            description:
-              'Minimum prunable tokens required to trigger a masking pass.',
-            showInDialog: false,
-          },
-          protectLatestTurn: {
-            type: 'boolean',
-            label: 'Protect Latest Turn',
-            category: 'Experimental',
-            requiresRestart: true,
-            default: true,
-            description:
-              'Ensures the absolute latest turn is never masked, regardless of token count.',
+            default: false,
+            description: 'Enable non-interactive agent sessions.',
             showInDialog: false,
           },
         },
@@ -2008,7 +2024,7 @@ const SETTINGS_SCHEMA = {
         label: 'JIT Context Loading',
         category: 'Experimental',
         requiresRestart: true,
-        default: true,
+        default: false,
         description: 'Enable Just-In-Time (JIT) context loading.',
         showInDialog: false,
       },
@@ -2030,15 +2046,6 @@ const SETTINGS_SCHEMA = {
         default: false,
         description:
           'Use OSC 52 for copying. This may be more robust than the default system when using remote terminal sessions (if your terminal is configured to allow it).',
-        showInDialog: true,
-      },
-      plan: {
-        type: 'boolean',
-        label: 'Plan',
-        category: 'Experimental',
-        requiresRestart: true,
-        default: true,
-        description: 'Enable Plan Mode.',
         showInDialog: true,
       },
       taskTracker: {
@@ -2139,6 +2146,15 @@ const SETTINGS_SCHEMA = {
         default: false,
         description:
           'Replace the built-in save_memory tool with a memory manager subagent that supports adding, removing, de-duplicating, and organizing memories.',
+        showInDialog: true,
+      },
+      contextManagement: {
+        type: 'boolean',
+        label: 'Enable Context Management',
+        category: 'Experimental',
+        requiresRestart: true,
+        default: false,
+        description: 'Enable logic for context management.',
         showInDialog: true,
       },
       topicUpdateNarration: {
@@ -2414,6 +2430,171 @@ const SETTINGS_SCHEMA = {
       description:
         'Custom hook event arrays that contain hook definitions for user-defined events',
       mergeStrategy: MergeStrategy.CONCAT,
+    },
+  },
+
+  contextManagement: {
+    type: 'object',
+    label: 'Context Management',
+    category: 'Experimental',
+    requiresRestart: true,
+    default: {},
+    description:
+      'Settings for agent history and tool distillation context management.',
+    showInDialog: false,
+    properties: {
+      historyWindow: {
+        type: 'object',
+        label: 'History Window Settings',
+        category: 'Context Management',
+        requiresRestart: true,
+        default: {},
+        showInDialog: false,
+        properties: {
+          maxTokens: {
+            type: 'number',
+            label: 'Max Tokens',
+            category: 'Context Management',
+            requiresRestart: true,
+            default: 150_000,
+            description:
+              'The number of tokens to allow before triggering compression.',
+            showInDialog: false,
+          },
+          retainedTokens: {
+            type: 'number',
+            label: 'Retained Tokens',
+            category: 'Context Management',
+            requiresRestart: true,
+            default: 40_000,
+            description: 'The number of tokens to always retain.',
+            showInDialog: false,
+          },
+        },
+      },
+      messageLimits: {
+        type: 'object',
+        label: 'Message Limits',
+        category: 'Context Management',
+        requiresRestart: true,
+        default: {},
+        showInDialog: false,
+        properties: {
+          normalMaxTokens: {
+            type: 'number',
+            label: 'Normal Maximum Tokens',
+            category: 'Context Management',
+            requiresRestart: true,
+            default: 2500,
+            description:
+              'The target number of tokens to budget for a normal conversation turn.',
+            showInDialog: false,
+          },
+          retainedMaxTokens: {
+            type: 'number',
+            label: 'Retained Maximum Tokens',
+            category: 'Context Management',
+            requiresRestart: true,
+            default: 12000,
+            description:
+              'The maximum number of tokens a single conversation turn can consume before truncation.',
+            showInDialog: false,
+          },
+          normalizationHeadRatio: {
+            type: 'number',
+            label: 'Normalization Head Ratio',
+            category: 'Context Management',
+            requiresRestart: true,
+            default: 0.25,
+            description:
+              'The ratio of tokens to retain from the beginning of a truncated message (0.0 to 1.0).',
+            showInDialog: false,
+          },
+        },
+      },
+      tools: {
+        type: 'object',
+        label: 'Context Management Tools',
+        category: 'Context Management',
+        requiresRestart: true,
+        default: {},
+        showInDialog: false,
+        properties: {
+          distillation: {
+            type: 'object',
+            label: 'Tool Distillation',
+            category: 'Context Management',
+            requiresRestart: true,
+            default: {},
+            showInDialog: false,
+            properties: {
+              maxOutputTokens: {
+                type: 'number',
+                label: 'Max Output Tokens',
+                category: 'Context Management',
+                requiresRestart: true,
+                default: 10_000,
+                description:
+                  'Maximum tokens to show to the model when truncating large tool outputs.',
+                showInDialog: false,
+              },
+              summarizationThresholdTokens: {
+                type: 'number',
+                label: 'Tool Summarization Threshold',
+                category: 'Context Management',
+                requiresRestart: true,
+                default: 20_000,
+                description:
+                  'Threshold above which truncated tool outputs will be summarized by an LLM.',
+                showInDialog: false,
+              },
+            },
+          },
+          outputMasking: {
+            type: 'object',
+            label: 'Tool Output Masking',
+            category: 'Context Management',
+            requiresRestart: true,
+            ignoreInDocs: false,
+            default: {},
+            description:
+              'Advanced settings for tool output masking to manage context window efficiency.',
+            showInDialog: false,
+            properties: {
+              protectionThresholdTokens: {
+                type: 'number',
+                label: 'Tool Protection Threshold (Tokens)',
+                category: 'Context Management',
+                requiresRestart: true,
+                default: 50_000,
+                description:
+                  'Minimum number of tokens to protect from masking (most recent tool outputs).',
+                showInDialog: false,
+              },
+              minPrunableThresholdTokens: {
+                type: 'number',
+                label: 'Min Prunable Tokens Threshold',
+                category: 'Context Management',
+                requiresRestart: true,
+                default: 30_000,
+                description:
+                  'Minimum prunable tokens required to trigger a masking pass.',
+                showInDialog: false,
+              },
+              protectLatestTurn: {
+                type: 'boolean',
+                label: 'Protect Latest Turn',
+                category: 'Context Management',
+                requiresRestart: true,
+                default: true,
+                description:
+                  'Ensures the absolute latest turn is never masked, regardless of token count.',
+                showInDialog: false,
+              },
+            },
+          },
+        },
+      },
     },
   },
 
