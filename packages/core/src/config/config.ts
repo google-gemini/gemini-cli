@@ -3591,15 +3591,9 @@ export class Config implements McpContext, AgentLoopContext {
           !this.isAgentsEnabled() ||
           agentsOverrides[definition.name]?.enabled === false
         ) {
-          process.stderr.write(
-            `[Config] Skipping disabled subagent tool: ${definition.name}\n`,
-          );
           continue;
         }
 
-        process.stderr.write(
-          `[Config] Registering subagent tool: ${definition.name}\n`,
-        );
         const tool = new SubagentTool(definition, this, this.messageBus);
         registry.registerTool(tool);
       } catch (e: unknown) {

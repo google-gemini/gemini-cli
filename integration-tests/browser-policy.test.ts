@@ -209,9 +209,6 @@ priority = 200
     rig.setup('browser-session-warning', {
       fakeResponsesPath: join(__dirname, 'browser-agent.cleanup.responses'),
       settings: {
-        model: {
-          name: 'gemini-2.5-pro',
-        },
         general: {
           enableAutoUpdateNotification: false,
         },
