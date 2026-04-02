@@ -274,7 +274,7 @@ describe('Turn', () => {
       expect(reportError).toHaveBeenCalledWith(
         error,
         'Error when talking to Gemini API',
-        [...historyContent, { role: 'user', parts: reqParts }],
+        [...historyContent],
         'Turn.run-sendMessageStream',
       );
     });

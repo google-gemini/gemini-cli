@@ -567,6 +567,14 @@ export class ModelConfigService {
       );
     }
 
+    // Automatically strip thinkingConfig if the model does not support thinking.
+    const modelDefinition = this.getModelDefinition(resolved.model);
+    if (modelDefinition && modelDefinition.features?.thinking === false) {
+      if (resolved.generateContentConfig.thinkingConfig) {
+        delete resolved.generateContentConfig.thinkingConfig;
+      }
+    }
+
     // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
     return {
       model: resolved.model,

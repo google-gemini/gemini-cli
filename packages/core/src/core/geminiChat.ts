@@ -163,34 +163,90 @@ function extractCuratedHistory(comprehensiveHistory: Content[]): Content[] {
     return [];
   }
   const curatedHistory: Content[] = [];
-  const length = comprehensiveHistory.length;
-  let i = 0;
-  while (i < length) {
-    if (comprehensiveHistory[i].role === 'user') {
-      curatedHistory.push(comprehensiveHistory[i]);
-      i++;
-    } else {
-      const modelOutput: Content[] = [];
-      let isValid = true;
-      while (i < length && comprehensiveHistory[i].role === 'model') {
-        modelOutput.push(comprehensiveHistory[i]);
-        if (isValid && !isValidContent(comprehensiveHistory[i])) {
-          isValid = false;
-        }
-        i++;
+
+  for (const entry of comprehensiveHistory) {
+    const role = entry.role;
+    const rawParts = entry.parts || [];
+
+    // Filter out invalid/empty parts
+    const validParts = rawParts.filter((part) => {
+      if (part === undefined || Object.keys(part).length === 0) {
+        return false;
       }
-      if (isValid) {
-        curatedHistory.push(...modelOutput);
+      // Thought parts must be non-empty strings
+      if (part.thought !== undefined) {
+        return (
+          typeof part.thought === 'string' &&
+          (part.thought as string).trim() !== ''
+        );
+      }
+      // Text parts must be non-empty strings
+      if (part.text !== undefined) {
+        return typeof part.text === 'string' && part.text.trim() !== '';
+      }
+      // Keep other parts (functionCall, functionResponse, etc.)
+      return true;
+    });
+
+    if (validParts.length === 0) {
+      continue;
+    }
+
+    let lastEntry = curatedHistory[curatedHistory.length - 1];
+    if (!lastEntry || lastEntry.role !== role) {
+      // Create new entry
+      lastEntry = {
+        role,
+        parts: [],
+      };
+      curatedHistory.push(lastEntry);
+    }
+
+    const lastEntryParts = lastEntry.parts || [];
+    for (const part of validParts) {
+      if (part.text !== undefined) {
+        // Coalesce text into the last text part of this turn
+        const existingTextPart = lastEntryParts.find(
+          (p) => p.text !== undefined,
+        );
+        if (existingTextPart) {
+          // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
+          const lastText = existingTextPart.text as string;
+          const separator = lastText.endsWith('\n') ? '' : '\n';
+
+          existingTextPart.text = lastText + separator + part.text;
+        } else {
+          lastEntryParts.push({ ...part });
+        }
+      } else if (part.thought !== undefined) {
+        // Coalesce thought into the last thought part of this turn
+        const existingThoughtPart = lastEntryParts.find(
+          (p) => p.thought !== undefined,
+        );
+        if (existingThoughtPart) {
+          // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
+          const lastThought = existingThoughtPart.thought as unknown as string;
+          const separator = lastThought.endsWith('\n') ? '' : '\n';
+          // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
+          existingThoughtPart.thought = (lastThought +
+            separator +
+            // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
+            (part.thought as unknown as string)) as unknown as boolean;
+        } else {
+          // Insert thought at the beginning for model consistency
+          lastEntryParts.unshift({ ...part });
+        }
+      } else {
+        // Add as is (functionCall, functionResponse)
+        lastEntryParts.push({ ...part });
       }
     }
+    lastEntry.parts = lastEntryParts;
   }
+
   return curatedHistory;
 }
 
-/**
- * Custom error to signal that a stream completed with invalid content,
- * which should trigger a retry.
- */
 export class InvalidStreamError extends Error {
   readonly type:
     | 'NO_FINISH_REASON'
@@ -342,7 +398,17 @@ export class GeminiChat {
     }
 
     // Add user content to history ONCE before any attempts.
-    this.history.push(userContent);
+    if (
+      this.history.length > 0 &&
+      this.history[this.history.length - 1].role === 'user'
+    ) {
+      const lastUser = this.history[this.history.length - 1];
+      const lastUserParts = lastUser.parts || [];
+      const currentUserParts = userContent.parts || [];
+      lastUser.parts = [...lastUserParts, ...currentUserParts];
+    } else {
+      this.history.push(userContent);
+    }
     const requestContents = this.getHistory(true);
 
     const streamWithRetries = async function* (
@@ -935,7 +1001,8 @@ export class GeminiChat {
         isValidNonThoughtTextPart(lastPart) &&
         isValidNonThoughtTextPart(part)
       ) {
-        lastPart.text += part.text;
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
+        (lastPart as { text: string }).text += part.text as string;
       } else {
         consolidatedParts.push(part);
       }
@@ -943,7 +1010,8 @@ export class GeminiChat {
 
     const responseText = consolidatedParts
       .filter((part) => part.text)
-      .map((part) => part.text)
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
+      .map((part) => part.text as string)
       .join('')
       .trim();
 
@@ -1049,7 +1117,6 @@ export class GeminiChat {
 
     const thoughtPart = content.parts[0];
     if (thoughtPart.text) {
-      // Extract subject and description using the same logic as turn.ts
       const rawText = thoughtPart.text;
       const subjectStringMatches = rawText.match(/\*\*(.*?)\*\*/s);
       const subject = subjectStringMatches

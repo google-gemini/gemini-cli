@@ -5,7 +5,6 @@
  */
 
 import {
-  createUserContent,
   type PartListUnion,
   type GenerateContentResponse,
   type FunctionCall,
@@ -375,10 +374,7 @@ export class Turn {
         throw error;
       }
 
-      const contextForReport = [
-        ...this.chat.getHistory(/*curated*/ true),
-        createUserContent(req),
-      ];
+      const contextForReport = [...this.chat.getHistory(/*curated*/ true)];
       await reportError(
         error,
         'Error when talking to Gemini API',
