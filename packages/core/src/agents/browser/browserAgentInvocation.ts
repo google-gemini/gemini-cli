@@ -15,6 +15,7 @@
  */
 
 import { randomUUID } from 'node:crypto';
+import { debugLogger } from '../../utils/debugLogger.js';
 import type { Config } from '../../config/config.js';
 import { type AgentLoopContext } from '../../config/agent-loop-context.js';
 import { LocalAgentExecutor } from '../local-executor.js';
@@ -312,14 +313,17 @@ export class BrowserAgentInvocation extends BaseToolInvocation<
 
       const output = await executor.run(this.params, signal);
 
-
       try {
         // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
         const parsed = JSON.parse(output.result);
 
         taskSuccess = parsed?.success === true;
-      } catch {
+      } catch (parseError) {
         // non-JSON result -> treat as unknown, default false
+        debugLogger.log(
+          'Failed to parse browser agent output as JSON:',
+          parseError,
+        );
       }
 
       const resultContent = `Browser agent finished.

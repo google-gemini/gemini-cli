@@ -694,20 +694,7 @@ export class BrowserManager {
 
       const rawErrorMessage =
         error instanceof Error ? error.message : String(error);
-      const lowerMessage = rawErrorMessage.toLowerCase();
-      let errorType:
-        | 'profile_locked'
-        | 'timeout'
-        | 'connection_refused'
-        | 'unknown' = 'unknown';
-
-      if (lowerMessage.includes('already running')) {
-        errorType = 'profile_locked';
-      } else if (lowerMessage.includes('timed out')) {
-        errorType = 'timeout';
-      } else if (lowerMessage.includes('connection refused')) {
-        errorType = 'connection_refused';
-      }
+      const errorType = BrowserManager.classifyConnectionError(rawErrorMessage);
 
       recordBrowserAgentConnection(this.config, Date.now() - connectStartMs, {
         session_mode: sessionMode,
@@ -726,14 +713,33 @@ export class BrowserManager {
   }
 
   /**
+   * Classifies a connection error message into a known error type.
+   * Shared between connectMcp error recording and createConnectionError
+   * to ensure consistent error categorization across the browser agent.
+   */
+  private static classifyConnectionError(
+    message: string,
+  ): 'profile_locked' | 'timeout' | 'connection_refused' | 'unknown' {
+    const lowerMessage = message.toLowerCase();
+    if (lowerMessage.includes('already running')) {
+      return 'profile_locked';
+    } else if (lowerMessage.includes('timed out')) {
+      return 'timeout';
+    } else if (lowerMessage.includes('connection refused')) {
+      return 'connection_refused';
+    }
+    return 'unknown';
+  }
+
+  /**
    * Creates an Error with context-specific remediation based on the actual
    * error message and the current sessionMode.
    */
   private createConnectionError(message: string, sessionMode: string): Error {
-    const lowerMessage = message.toLowerCase();
+    const errorType = BrowserManager.classifyConnectionError(message);
 
     // "already running for the current profile" — persistent mode profile lock
-    if (lowerMessage.includes('already running')) {
+    if (errorType === 'profile_locked') {
       if (sessionMode === 'persistent' || sessionMode === 'isolated') {
         return new Error(
           `Could not connect to Chrome: ${message}\n\n` +
@@ -753,7 +759,7 @@ export class BrowserManager {
     }
 
     // Timeout errors
-    if (lowerMessage.includes('timed out')) {
+    if (errorType === 'timeout') {
       if (sessionMode === 'existing') {
         return new Error(
           `Timed out connecting to Chrome: ${message}\n\n` +
