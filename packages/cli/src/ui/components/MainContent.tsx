@@ -297,39 +297,49 @@ export const MainContent = () => {
     ],
   );
 
-  if (isAlternateBuffer) {
-    return (
-      <ScrollableList
-        ref={scrollableListRef}
-        hasFocus={!uiState.isEditorDialogOpen && !uiState.embeddedShellFocused}
-        width={uiState.terminalWidth}
-        data={virtualizedData}
-        renderItem={renderItem}
-        estimatedItemHeight={() => 100}
-        keyExtractor={(item, _index) => {
-          if (item.type === 'header') return 'header';
-          if (item.type === 'history') return item.item.id.toString();
-          return 'pending';
-        }}
-        initialScrollIndex={SCROLL_TO_ITEM_END}
-        initialScrollOffsetInIndex={SCROLL_TO_ITEM_END}
-      />
-    );
-  }
+  const allStaticItems = useMemo(
+    () => [
+      <AppHeader key="app-header" version={version} />,
+      ...staticHistoryItems,
+      ...lastResponseHistoryItems,
+    ],
+    [version, staticHistoryItems, lastResponseHistoryItems],
+  );
+
+  const actuallyInAltBuffer =
+    isAlternateBuffer || uiState.isTransitioningAltBuffer;
+
+  const itemsToRender = actuallyInAltBuffer ? [] : allStaticItems;
 
   return (
     <>
       <Static
-        key={uiState.historyRemountKey}
-        items={[
-          <AppHeader key="app-header" version={version} />,
-          ...staticHistoryItems,
-          ...lastResponseHistoryItems,
-        ]}
+        key={`main-history-static-${uiState.historyRemountKey}`}
+        items={itemsToRender}
       >
         {(item) => item}
       </Static>
-      {pendingItems}
+      {actuallyInAltBuffer && !uiState.isTransitioningAltBuffer ? (
+        <ScrollableList
+          ref={scrollableListRef}
+          hasFocus={
+            !uiState.isEditorDialogOpen && !uiState.embeddedShellFocused
+          }
+          width={uiState.terminalWidth}
+          data={virtualizedData}
+          renderItem={renderItem}
+          estimatedItemHeight={() => 100}
+          keyExtractor={(item, _index) => {
+            if (item.type === 'header') return 'header';
+            if (item.type === 'history') return item.item.id.toString();
+            return 'pending';
+          }}
+          initialScrollIndex={SCROLL_TO_ITEM_END}
+          initialScrollOffsetInIndex={SCROLL_TO_ITEM_END}
+        />
+      ) : (
+        pendingItems
+      )}
     </>
   );
 };

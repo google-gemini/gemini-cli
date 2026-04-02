@@ -72,7 +72,7 @@ describe('<ShellToolMessage />', () => {
       const { lastFrame, simulateClick, unmount, waitUntilReady } =
         await renderWithProviders(
           <ShellToolMessage {...baseProps} name={name} />,
-          { uiActions, mouseEventsEnabled: true },
+          { uiActions },
         );
 
       await waitUntilReady();
@@ -257,6 +257,7 @@ describe('<ShellToolMessage />', () => {
                 activePtyId: focused ? 1 : 2,
                 embeddedShellFocused: focused,
                 constrainHeight,
+                isAlternateBuffer: true,
               },
             },
           );
@@ -309,6 +310,7 @@ describe('<ShellToolMessage />', () => {
           settings: createMockSettings({ ui: { useAlternateBuffer: true } }),
           uiState: {
             constrainHeight: false,
+            isAlternateBuffer: true,
           },
         },
       );
@@ -337,6 +339,7 @@ describe('<ShellToolMessage />', () => {
           settings: createMockSettings({ ui: { useAlternateBuffer: true } }),
           uiState: {
             constrainHeight: false,
+            isAlternateBuffer: true,
           },
         },
       );

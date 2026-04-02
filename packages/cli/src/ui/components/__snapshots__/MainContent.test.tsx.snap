@@ -215,7 +215,8 @@ AppHeader(full)
 `;
 
 exports[`MainContent > renders multiple thinking messages sequentially correctly 2`] = `
-"ScrollableList
+"
+ScrollableList
 AppHeader(full)
 ▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀
  > Plan a solution                                                                                  

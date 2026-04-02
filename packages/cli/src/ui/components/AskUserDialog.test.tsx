@@ -317,6 +317,7 @@ describe('AskUserDialog', () => {
           {
             config: makeFakeConfig({ useAlternateBuffer }),
             settings: createMockSettings({ ui: { useAlternateBuffer } }),
+            uiState: { isAlternateBuffer: useAlternateBuffer },
           },
         );
 
@@ -1290,6 +1291,7 @@ describe('AskUserDialog', () => {
       {
         config: makeFakeConfig({ useAlternateBuffer: false }),
         settings: createMockSettings({ ui: { useAlternateBuffer: false } }),
+        uiState: { isAlternateBuffer: false },
       },
     );
 
@@ -1329,6 +1331,7 @@ describe('AskUserDialog', () => {
       {
         config: makeFakeConfig({ useAlternateBuffer: true }),
         settings: createMockSettings({ ui: { useAlternateBuffer: true } }),
+        uiState: { isAlternateBuffer: true },
       },
     );
 

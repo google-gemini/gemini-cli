@@ -1078,7 +1078,7 @@ describe('KeypressContext', () => {
 
       // Advance timers to trigger the backslash timeout
       act(() => {
-        vi.runAllTimers();
+        vi.advanceTimersByTime(500);
       });
 
       expect(keyHandler).toHaveBeenCalledWith(
