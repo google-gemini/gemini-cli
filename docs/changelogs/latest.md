@@ -379,4 +379,4 @@ npm install -g @google/gemini-cli
   [#24061](https://github.com/google-gemini/gemini-cli/pull/24061)
 
 **Full Changelog**:
-[https://github.com/google-gemini/gemini-cli/compare/v0.35.3...v0.36.0](https://github.com/google-gemini/gemini-cli/compare/v0.35.3...v0.36.0)
+https://github.com/google-gemini/gemini-cli/compare/v0.35.3...v0.36.0
