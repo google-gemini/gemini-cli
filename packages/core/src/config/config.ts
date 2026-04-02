@@ -706,6 +706,7 @@ export interface ConfigParameters {
   plan?: boolean;
   tracker?: boolean;
   planSettings?: PlanSettings;
+  extensionPlanDirs?: Record<string, string>;
   worktreeSettings?: WorktreeSettings;
   modelSteering?: boolean;
   onModelChange?: (model: string) => void;
@@ -769,6 +770,8 @@ export class Config implements McpContext, AgentLoopContext {
   private readonly extensionsEnabled: boolean;
   private mcpServers: Record<string, MCPServerConfig> | undefined;
   private readonly mcpEnablementCallbacks?: McpEnablementCallbacks;
+  private activeExtensionContext?: string;
+  private readonly extensionPlanDirs: Record<string, string>;
   private userMemory: string | HierarchicalMemory;
   private geminiMdFileCount: number;
   private geminiMdFilePaths: string[];
@@ -1021,6 +1024,7 @@ export class Config implements McpContext, AgentLoopContext {
     this.mcpServerCommand = params.mcpServerCommand;
     this.mcpServers = params.mcpServers;
     this.mcpEnablementCallbacks = params.mcpEnablementCallbacks;
+    this.extensionPlanDirs = params.extensionPlanDirs ?? {};
     this.mcpEnabled = params.mcpEnabled ?? true;
     this.extensionsEnabled = params.extensionsEnabled ?? true;
     this.allowedMcpServers = params.allowedMcpServers ?? [];
@@ -1390,9 +1394,9 @@ export class Config implements McpContext, AgentLoopContext {
 
     // Add plans directory to workspace context for plan file storage
     if (this.planEnabled) {
-      const plansDir = this.storage.getPlansDir();
+      const plansDir = this.getPlansDir();
       try {
-        await fs.promises.access(plansDir);
+        await fs.promises.mkdir(plansDir, { recursive: true });
         this.workspaceContext.addDirectory(plansDir);
       } catch {
         // Directory does not exist yet, so we don't add it to the workspace context.
@@ -2210,6 +2214,25 @@ export class Config implements McpContext, AgentLoopContext {
 
   getMcpEnabled(): boolean {
     return this.mcpEnabled;
+  }
+
+  getActiveExtensionContext(): string | undefined {
+    return this.activeExtensionContext;
+  }
+
+  setActiveExtensionContext(context: string | undefined): void {
+    this.activeExtensionContext = context;
+  }
+
+  getActiveExtensionPlanDir(): string | undefined {
+    if (this.activeExtensionContext) {
+      return this.extensionPlanDirs[this.activeExtensionContext];
+    }
+    return undefined;
+  }
+
+  getPlansDir(): string {
+    return this.storage.getPlansDir(this.getActiveExtensionPlanDir());
   }
 
   getMcpEnablementCallbacks(): McpEnablementCallbacks | undefined {

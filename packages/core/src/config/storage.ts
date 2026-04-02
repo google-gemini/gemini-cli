@@ -320,18 +320,16 @@ export class Storage {
     return path.join(this.getProjectTempDir(), 'tracker');
   }
 
-  getPlansDir(): string {
-    if (this.customPlansDir) {
-      const resolvedPath = path.resolve(
-        this.getProjectRoot(),
-        this.customPlansDir,
-      );
+  getPlansDir(extensionPlanDir?: string): string {
+    const customDir = extensionPlanDir || this.customPlansDir;
+    if (customDir) {
+      const resolvedPath = path.resolve(this.getProjectRoot(), customDir);
       const realProjectRoot = resolveToRealPath(this.getProjectRoot());
       const realResolvedPath = resolveToRealPath(resolvedPath);
 
       if (!isSubpath(realProjectRoot, realResolvedPath)) {
         throw new Error(
-          `Custom plans directory '${this.customPlansDir}' resolves to '${realResolvedPath}', which is outside the project root '${realProjectRoot}'.`,
+          `Custom plans directory '${customDir}' resolves to '${realResolvedPath}', which is outside the project root '${realProjectRoot}'.`,
         );
       }
 
