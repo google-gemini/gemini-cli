@@ -13,7 +13,6 @@ import {
   type ConversationRecord,
 } from './chatRecordingService.js';
 import type { ExtractionState, ExtractionRun } from './memoryService.js';
-import { CoreToolCallStatus } from '../scheduler/types.js';
 
 // Mock external modules used by startMemoryService
 vi.mock('../agents/local-executor.js', () => ({
@@ -58,20 +57,6 @@ vi.mock('../utils/debugLogger.js', () => ({
     log: vi.fn(),
     warn: vi.fn(),
   },
-}));
-
-vi.mock('../core/geminiRequest.js', () => ({
-  partListUnionToString: vi.fn((content: unknown) => {
-    if (typeof content === 'string') return content;
-    if (Array.isArray(content)) {
-      return content
-        .map((p: Record<string, unknown>) =>
-          typeof p === 'string' ? p : ((p['text'] as string) ?? ''),
-        )
-        .join('');
-    }
-    return '';
-  }),
 }));
 
 // Helper to create a minimal ConversationRecord
@@ -305,158 +290,6 @@ describe('memoryService', () => {
       // Verify the final file is readable
       const readBack = await readExtractionState(statePath);
       expect(readBack).toEqual(state);
-    });
-  });
-
-  describe('serializeSessionForExtraction', () => {
-    it('includes summary and user/gemini messages', async () => {
-      const { serializeSessionForExtraction } = await import(
-        './memoryService.js'
-      );
-
-      const conversation = createConversation({
-        sessionId: 'test-session',
-        summary: 'Debugging a CI pipeline',
-        messageCount: 4,
-      });
-
-      const result = serializeSessionForExtraction(conversation);
-
-      expect(result).toContain('## Session: test-session');
-      expect(result).toContain('Summary: Debugging a CI pipeline');
-      expect(result).toContain('**User:**');
-      expect(result).toContain('**Assistant:**');
-    });
-
-    it('excludes non-user/gemini messages', async () => {
-      const { serializeSessionForExtraction } = await import(
-        './memoryService.js'
-      );
-
-      const conversation: ConversationRecord = {
-        sessionId: 'test-session',
-        projectHash: 'abc123',
-        startTime: '2025-01-01T00:00:00Z',
-        lastUpdated: '2025-01-01T01:00:00Z',
-        messages: [
-          {
-            id: '1',
-            timestamp: '2025-01-01T00:00:00Z',
-            content: [{ text: 'Hello' }],
-            type: 'user',
-          },
-          {
-            id: '2',
-            timestamp: '2025-01-01T00:01:00Z',
-            content: [{ text: 'System info' }],
-            type: 'info',
-          },
-          {
-            id: '3',
-            timestamp: '2025-01-01T00:02:00Z',
-            content: [{ text: 'An error' }],
-            type: 'error',
-          },
-          {
-            id: '4',
-            timestamp: '2025-01-01T00:03:00Z',
-            content: [{ text: 'A warning' }],
-            type: 'warning',
-          },
-          {
-            id: '5',
-            timestamp: '2025-01-01T00:04:00Z',
-            content: [{ text: 'Response' }],
-            type: 'gemini',
-          },
-        ],
-      };
-
-      const result = serializeSessionForExtraction(conversation);
-
-      expect(result).toContain('**User:** Hello');
-      expect(result).toContain('**Assistant:** Response');
-      expect(result).not.toContain('System info');
-      expect(result).not.toContain('An error');
-      expect(result).not.toContain('A warning');
-    });
-
-    it('caps at 30 messages (first 10 + last 20)', async () => {
-      const { serializeSessionForExtraction } = await import(
-        './memoryService.js'
-      );
-
-      // Create 40 user/gemini messages
-      const messages = Array.from({ length: 40 }, (_, i) => ({
-        id: String(i + 1),
-        timestamp: new Date().toISOString(),
-        content: [{ text: `Msg-${i}` }],
-        type: i % 2 === 0 ? ('user' as const) : ('gemini' as const),
-      }));
-
-      const conversation: ConversationRecord = {
-        sessionId: 'long-session',
-        projectHash: 'abc123',
-        startTime: '2025-01-01T00:00:00Z',
-        lastUpdated: '2025-01-01T01:00:00Z',
-        messages,
-      };
-
-      const result = serializeSessionForExtraction(conversation);
-
-      // First window: messages 0–9 should appear
-      expect(result).toContain('Msg-0');
-      expect(result).toContain('Msg-9');
-
-      // Gap: messages 10–19 should NOT appear
-      expect(result).not.toContain('Msg-10');
-      expect(result).not.toContain('Msg-19');
-
-      // Last window: messages 20–39 should appear
-      expect(result).toContain('Msg-20');
-      expect(result).toContain('Msg-39');
-    });
-
-    it('includes tool call summaries', async () => {
-      const { serializeSessionForExtraction } = await import(
-        './memoryService.js'
-      );
-
-      const conversation: ConversationRecord = {
-        sessionId: 'tool-session',
-        projectHash: 'abc123',
-        startTime: '2025-01-01T00:00:00Z',
-        lastUpdated: '2025-01-01T01:00:00Z',
-        messages: [
-          {
-            id: '1',
-            timestamp: '2025-01-01T00:00:00Z',
-            content: [{ text: 'Fix the bug' }],
-            type: 'user',
-          },
-          {
-            id: '2',
-            timestamp: '2025-01-01T00:01:00Z',
-            content: [{ text: 'Looking at the code' }],
-            type: 'gemini',
-            toolCalls: [
-              {
-                id: 'tc-1',
-                name: 'read_file',
-                displayName: 'Read File',
-                description: 'Reading main.ts',
-                args: { path: 'main.ts' },
-                status: CoreToolCallStatus.Success,
-                timestamp: '2025-01-01T00:01:00Z',
-              },
-            ],
-          },
-        ],
-      };
-
-      const result = serializeSessionForExtraction(conversation);
-
-      expect(result).toContain('[Tool: Read File — Reading main.ts]');
     });
   });
 

@@ -12,9 +12,7 @@ import type { Config } from '../config/config.js';
 import {
   SESSION_FILE_PREFIX,
   type ConversationRecord,
-  type MessageRecord,
 } from './chatRecordingService.js';
-import { partListUnionToString } from '../core/geminiRequest.js';
 import { debugLogger } from '../utils/debugLogger.js';
 import { isNodeError } from '../utils/errors.js';
 import { FRONTMATTER_REGEX, parseFrontmatter } from '../skills/skillLoader.js';
@@ -324,57 +322,6 @@ async function scanEligibleSessions(
   }
 
   return results;
-}
-
-/**
- * Serializes a conversation record into a text representation for the extraction agent.
- * Caps messages per session and excludes binary/metadata content.
- */
-export function serializeSessionForExtraction(
-  conversation: ConversationRecord,
-): string {
-  const parts: string[] = [];
-
-  parts.push(`## Session: ${conversation.sessionId}`);
-  if (conversation.summary) {
-    parts.push(`Summary: ${conversation.summary}`);
-  }
-  parts.push(`Started: ${conversation.startTime}`);
-  parts.push('');
-
-  // Select messages: first 10 + last 20 for long conversations
-  const maxMessages = 30;
-  const firstWindow = 10;
-  let selectedMessages: MessageRecord[];
-  if (conversation.messages.length <= maxMessages) {
-    selectedMessages = conversation.messages;
-  } else {
-    const lastWindowSize = maxMessages - firstWindow;
-    const first = conversation.messages.slice(0, firstWindow);
-    const last = conversation.messages.slice(-lastWindowSize);
-    selectedMessages = [...first, ...last];
-  }
-
-  for (const msg of selectedMessages) {
-    if (msg.type === 'user' || msg.type === 'gemini') {
-      const role = msg.type === 'user' ? 'User' : 'Assistant';
-      const text = partListUnionToString(msg.content);
-      if (text.trim()) {
-        parts.push(`**${role}:** ${text}`);
-      }
-
-      // Include tool call summaries for gemini messages
-      if (msg.type === 'gemini' && 'toolCalls' in msg && msg.toolCalls) {
-        for (const tc of msg.toolCalls) {
-          const desc = tc.description ? ` — ${tc.description}` : '';
-          parts.push(`  [Tool: ${tc.displayName ?? tc.name}${desc}]`);
-        }
-      }
-      parts.push('');
-    }
-  }
-
-  return parts.join('\n');
 }
 
 /**
