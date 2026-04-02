@@ -40,6 +40,7 @@ import {
   sanitizeToolArgs,
   sanitizeErrorMessage,
 } from '../../utils/agent-sanitization-utils.js';
+import { removeAutomationOverlay } from './automationOverlay.js';
 
 const INPUT_PREVIEW_MAX_LENGTH = 50;
 const DESCRIPTION_MAX_LENGTH = 200;
@@ -377,7 +378,40 @@ ${output.result}`;
     } finally {
       // Clean up input blocker, but keep browserManager alive for persistent sessions
       if (browserManager) {
-        await removeInputBlocker(browserManager);
+        await removeInputBlocker(browserManager, signal);
+        await removeAutomationOverlay(browserManager, signal);
+
+        // try cleaning up overlays in previous opened pages if any
+        try {
+          const listResult = await browserManager.callTool(
+            'list_pages',
+            {},
+            signal,
+            true,
+          );
+          const pagesText =
+            listResult.content?.find((c) => c.type === 'text')?.text || '';
+          const pageMatches = Array.from(pagesText.matchAll(/^(\d+):/gm));
+          const pageIds = pageMatches.map((m) => parseInt(m[1], 10));
+          if (pageIds.length > 1) {
+            for (const pageId of pageIds) {
+              try {
+                await browserManager.callTool(
+                  'select_page',
+                  { pageId, bringToFront: false },
+                  signal,
+                  true,
+                );
+                await removeInputBlocker(browserManager, signal);
+                await removeAutomationOverlay(browserManager, signal);
+              } catch (_err) {
+                // Ignore errors for individual pages
+              }
+            }
+          }
+        } catch (_) {
+          // Ignore errors for removing the overlays.
+        }
       }
     }
   }

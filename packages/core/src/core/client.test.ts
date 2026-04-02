@@ -220,8 +220,12 @@ describe('Gemini Client (client.ts)', () => {
       getSessionMemory: vi.fn().mockReturnValue(''),
       isJitContextEnabled: vi.fn().mockReturnValue(false),
       getContextManager: vi.fn().mockReturnValue(undefined),
-      getToolOutputMaskingEnabled: vi.fn().mockReturnValue(false),
       getDisableLoopDetection: vi.fn().mockReturnValue(false),
+      getToolOutputMaskingConfig: vi.fn().mockReturnValue({
+        protectionThresholdTokens: 50000,
+        minPrunableThresholdTokens: 30000,
+        protectLatestTurn: true,
+      }),
 
       getSessionId: vi.fn().mockReturnValue('test-session-id'),
       getProxy: vi.fn().mockReturnValue(undefined),

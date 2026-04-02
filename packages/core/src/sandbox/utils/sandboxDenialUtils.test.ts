@@ -40,4 +40,80 @@ describe('parsePosixSandboxDenials', () => {
     } as unknown as ShellExecutionResult);
     expect(parsed).toBeUndefined();
   });
+
+  it('should detect npm specific file system denials', () => {
+    const output = `
+npm verbose logfile could not be created: Error: EPERM: operation not permitted, open '/Users/galzahavi/.npm/_logs/2026-04-01T02_47_18_624Z-debug-0.log'
+    `;
+    const parsed = parsePosixSandboxDenials({
+      output,
+    } as unknown as ShellExecutionResult);
+    expect(parsed).toBeDefined();
+    expect(parsed?.filePaths).toContain(
+      '/Users/galzahavi/.npm/_logs/2026-04-01T02_47_18_624Z-debug-0.log',
+    );
+  });
+
+  it('should detect npm specific path errors', () => {
+    const output = `
+npm error code EPERM
+npm error syscall open
+npm error path /Users/galzahavi/.npm/_cacache/tmp/ccf579a2
+    `;
+    const parsed = parsePosixSandboxDenials({
+      output,
+    } as unknown as ShellExecutionResult);
+    expect(parsed).toBeDefined();
+    expect(parsed?.filePaths).toContain(
+      '/Users/galzahavi/.npm/_cacache/tmp/ccf579a2',
+    );
+  });
+
+  it('should detect network denials with ENOTFOUND', () => {
+    const output = `
+npm http fetch GET https://registry.npmjs.org/2 attempt 1 failed with ENOTFOUND
+    `;
+    const parsed = parsePosixSandboxDenials({
+      output,
+    } as unknown as ShellExecutionResult);
+    expect(parsed).toBeDefined();
+    expect(parsed?.network).toBe(true);
+  });
+
+  it('should detect non-verbose npm path errors', () => {
+    const output = `
+npm ERR! code EPERM
+npm ERR! syscall open
+npm ERR! path /Users/galzahavi/.npm/_cacache/tmp/ccf579a2
+    `;
+    const parsed = parsePosixSandboxDenials({
+      output,
+    } as unknown as ShellExecutionResult);
+    expect(parsed).toBeDefined();
+    expect(parsed?.filePaths).toContain(
+      '/Users/galzahavi/.npm/_cacache/tmp/ccf579a2',
+    );
+  });
+
+  it('should detect pnpm specific network errors', () => {
+    const output = `
+ERR_PNPM_FETCH_404 GET https://registry.npmjs.org/nonexistent: Not Found
+    `;
+    const parsed = parsePosixSandboxDenials({
+      output,
+    } as unknown as ShellExecutionResult);
+    expect(parsed).toBeDefined();
+    expect(parsed?.network).toBe(true);
+  });
+
+  it('should detect pnpm specific file system errors', () => {
+    const output = `
+EACCES: permission denied, mkdir '/Users/galzahavi/.pnpm-store/v3'
+    `;
+    const parsed = parsePosixSandboxDenials({
+      output,
+    } as unknown as ShellExecutionResult);
+    expect(parsed).toBeDefined();
+    expect(parsed?.filePaths).toContain('/Users/galzahavi/.pnpm-store/v3');
+  });
 });

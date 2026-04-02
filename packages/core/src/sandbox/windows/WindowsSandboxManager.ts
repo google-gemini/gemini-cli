@@ -19,6 +19,7 @@ import {
   tryRealpath,
   type SandboxPermissions,
   type ParsedSandboxDenial,
+  resolveSandboxPaths,
 } from '../../services/sandboxManager.js';
 import type { ShellExecutionResult } from '../../services/shellExecutionService.js';
 import {
@@ -69,6 +70,10 @@ export class WindowsSandboxManager implements SandboxManager {
 
   parseDenials(result: ShellExecutionResult): ParsedSandboxDenial | undefined {
     return parseWindowsSandboxDenials(result);
+  }
+
+  getWorkspace(): string {
+    return this.options.workspace;
   }
 
   /**
@@ -239,6 +244,8 @@ export class WindowsSandboxManager implements SandboxManager {
       ];
     }
 
+    const isYolo = this.options.modeConfig?.yolo ?? false;
+
     // Fetch persistent approvals for this command
     const commandName = await getCommandName(command, args);
     const persistentPermissions = allowOverrides
@@ -258,6 +265,7 @@ export class WindowsSandboxManager implements SandboxManager {
         ],
       },
       network:
+        isYolo ||
         persistentPermissions?.network ||
         req.policy?.additionalPermissions?.network ||
         false,
@@ -288,17 +296,21 @@ export class WindowsSandboxManager implements SandboxManager {
       await this.grantLowIntegrityAccess(this.options.workspace);
     }
 
+    const { allowed: allowedPaths, forbidden: forbiddenPaths } =
+      await resolveSandboxPaths(this.options, req);
+
     // Grant "Low Mandatory Level" access to includeDirectories.
-    const includeDirs = sanitizePaths(this.options.includeDirectories) || [];
+    const includeDirs = sanitizePaths(this.options.includeDirectories);
     for (const includeDir of includeDirs) {
       await this.grantLowIntegrityAccess(includeDir);
     }
 
     // Grant "Low Mandatory Level" read/write access to allowedPaths.
-    const allowedPaths = sanitizePaths(req.policy?.allowedPaths) || [];
     for (const allowedPath of allowedPaths) {
       const resolved = await tryRealpath(allowedPath);
-      if (!fs.existsSync(resolved)) {
+      try {
+        await fs.promises.access(resolved, fs.constants.F_OK);
+      } catch {
         throw new Error(
           `Sandbox request rejected: Allowed path does not exist: ${resolved}. ` +
             'On Windows, granular sandbox access can only be granted to existing paths to avoid broad parent directory permissions.',
@@ -308,11 +320,14 @@ export class WindowsSandboxManager implements SandboxManager {
     }
 
     // Grant "Low Mandatory Level" write access to additional permissions write paths.
-    const additionalWritePaths =
-      sanitizePaths(mergedAdditional.fileSystem?.write) || [];
+    const additionalWritePaths = sanitizePaths(
+      mergedAdditional.fileSystem?.write,
+    );
     for (const writePath of additionalWritePaths) {
       const resolved = await tryRealpath(writePath);
-      if (!fs.existsSync(resolved)) {
+      try {
+        await fs.promises.access(resolved, fs.constants.F_OK);
+      } catch {
         throw new Error(
           `Sandbox request rejected: Additional write path does not exist: ${resolved}. ` +
             'On Windows, granular sandbox access can only be granted to existing paths to avoid broad parent directory permissions.',
@@ -358,7 +373,6 @@ export class WindowsSandboxManager implements SandboxManager {
     // is restricted to avoid host corruption. External commands rely on
     // Low Integrity read/write restrictions, while internal commands
     // use the manifest for enforcement.
-    const forbiddenPaths = sanitizePaths(this.options.forbiddenPaths) || [];
     for (const forbiddenPath of forbiddenPaths) {
       try {
         await this.denyLowIntegrityAccess(forbiddenPath);
