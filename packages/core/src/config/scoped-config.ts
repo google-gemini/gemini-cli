@@ -56,6 +56,10 @@ export function createScopedWorkspaceContext(
   parentContext: WorkspaceContext,
   additionalDirectories: string[],
 ): WorkspaceContext {
+  if (additionalDirectories.length === 0) {
+    return parentContext;
+  }
+
   const parentDirs = [...parentContext.getDirectories()];
   if (parentDirs.length === 0) {
     throw new Error(
@@ -73,6 +77,8 @@ export function createScopedWorkspaceContext(
     }
   }
 
+  // WorkspaceContext's first constructor argument is the primary targetDir.
+  // getDirectories() returns targetDir first, so parentDirs[0] is always it.
   return new WorkspaceContext(parentDirs[0], [
     ...parentDirs.slice(1),
     ...additionalDirectories,

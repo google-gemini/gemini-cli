@@ -84,6 +84,12 @@ describe('createScopedWorkspaceContext', () => {
     );
   });
 
+  it('should return parent context unchanged when additionalDirectories is empty', () => {
+    const parentCtx = config.getWorkspaceContext();
+    const scoped = createScopedWorkspaceContext(parentCtx, []);
+    expect(scoped).toBe(parentCtx);
+  });
+
   it('should throw when adding a filesystem root directory', () => {
     expect(() =>
       createScopedWorkspaceContext(config.getWorkspaceContext(), ['/']),
