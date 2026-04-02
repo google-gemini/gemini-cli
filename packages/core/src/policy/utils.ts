@@ -4,6 +4,8 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+import path from 'node:path';
+
 /**
  * Escapes a string for use in a regular expression.
  */
@@ -117,6 +119,36 @@ export function buildParamArgsPattern(
  */
 export function buildFilePathArgsPattern(filePath: string): string {
   return buildParamArgsPattern('file_path', filePath);
+}
+
+/**
+ * Builds a regex pattern to match any file_path argument that points to a file
+ * directly under a specific directory.
+ *
+ * @param dirPath The absolute directory path.
+ * @returns A regex string that matches "file_path":"<dir>/<file>" in a JSON string.
+ */
+export function buildFilePathWithinDirArgsPattern(dirPath: string): string {
+  const encodedDir = JSON.stringify(dirPath).slice(1, -1);
+  const encodedSep = JSON.stringify(path.sep).slice(1, -1);
+  return `\\\\0${escapeRegex(`"file_path":"`)}${escapeRegex(encodedDir)}${escapeRegex(encodedSep)}[^"]+${escapeRegex('"')}\\\\0`;
+}
+
+/**
+ * Builds a regex pattern to match any file_path argument whose basename is the
+ * provided filename.
+ *
+ * @param fileName The basename to match, for example "GEMINI.md".
+ * @returns A regex string that matches "file_path":".../<fileName>" or
+ *          "file_path":"<fileName>" in a JSON string.
+ */
+export function buildFilePathWithBaseNameArgsPattern(fileName: string): string {
+  const encodedFileName = JSON.stringify(fileName).slice(1, -1);
+  const prefix = `\\\\0${escapeRegex(`"file_path":"`)}`;
+  const suffix = `${escapeRegex(encodedFileName)}${escapeRegex('"')}\\\\0`;
+  const exactMatch = `${prefix}${escapeRegex(encodedFileName)}${escapeRegex('"')}\\\\0`;
+  const nestedMatch = `${prefix}[^"]+(?:/|\\\\)${suffix}`;
+  return `${exactMatch}|${nestedMatch}`;
 }
 
 /**

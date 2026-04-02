@@ -143,22 +143,29 @@ describe('AgentRegistry', () => {
       expect(dynamicRules).toHaveLength(6);
 
       const readRule = dynamicRules.find(
-        (rule) => rule.toolName === 'read_file',
+        (rule) =>
+          rule.toolName === 'read_file' &&
+          rule.decision === PolicyDecision.ALLOW,
       );
-      expect(readRule?.argsPattern?.source).toMatch(
-        /custom\\-xdg.*gemini\\-cli/,
+      expect(readRule?.argsPattern?.source).toMatch(/GEMINI\\\.md/);
+
+      const denyRule = dynamicRules.find(
+        (rule) =>
+          rule.toolName === 'read_file' &&
+          rule.decision === PolicyDecision.DENY,
       );
-      expect(readRule?.argsPattern?.source).not.toMatch(
-        /home\/user\/code\/gemini\\-cli/,
+      expect(denyRule?.argsPattern).toBeUndefined();
+      expect(denyRule?.denyMessage).toBe(
+        'Memory Manager may only access GEMINI.md files.',
       );
 
-      const globRule = dynamicRules.find((rule) => rule.toolName === 'glob');
-      expect(globRule?.argsPattern?.source).toMatch(
-        /custom\\-xdg.*gemini\\-cli/,
+      expect(dynamicRules.some((rule) => rule.toolName === 'glob')).toBe(false);
+      expect(dynamicRules.some((rule) => rule.toolName === 'grep_search')).toBe(
+        false,
       );
-      expect(globRule?.argsPattern?.source).not.toMatch(
-        /home\/user\/code\/gemini\\-cli/,
-      );
+      expect(
+        dynamicRules.some((rule) => rule.toolName === 'list_directory'),
+      ).toBe(false);
     });
 
     // TODO: Add this test once we actually have a built-in agent configured.

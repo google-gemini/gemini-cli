@@ -9,9 +9,6 @@ import type { LocalAgentDefinition } from './types.js';
 import {
   ASK_USER_TOOL_NAME,
   EDIT_TOOL_NAME,
-  GLOB_TOOL_NAME,
-  GREP_TOOL_NAME,
-  LS_TOOL_NAME,
   READ_FILE_TOOL_NAME,
   WRITE_FILE_TOOL_NAME,
 } from '../tools/tool-names.js';
@@ -137,9 +134,6 @@ reply with what you need, and exit. Do not search the codebase for the missing c
         READ_FILE_TOOL_NAME,
         EDIT_TOOL_NAME,
         WRITE_FILE_TOOL_NAME,
-        LS_TOOL_NAME,
-        GLOB_TOOL_NAME,
-        GREP_TOOL_NAME,
         ASK_USER_TOOL_NAME,
       ],
     },

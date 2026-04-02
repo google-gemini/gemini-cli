@@ -11,7 +11,7 @@ import {
   EXTENSION_SETTINGS_FILENAME,
   EXTENSIONS_CONFIG_FILENAME,
 } from './variables.js';
-import { Storage, homedir } from '@google/gemini-cli-core';
+import { Storage } from '@google/gemini-cli-core';
 
 export class ExtensionStorage {
   private readonly extensionName: string;
@@ -36,7 +36,7 @@ export class ExtensionStorage {
   }
 
   static getUserExtensionsDir(): string {
-    return new Storage(homedir()).getExtensionsDir();
+    return path.join(Storage.getGlobalGeminiDir(), 'extensions');
   }
 
   static async createTmpDir(): Promise<string> {

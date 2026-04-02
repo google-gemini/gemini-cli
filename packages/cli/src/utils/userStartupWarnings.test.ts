@@ -32,7 +32,7 @@ vi.mock('@google/gemini-cli-core', async (importOriginal) => {
     await importOriginal<typeof import('@google/gemini-cli-core')>();
   return {
     ...actual,
-    homedir: () => os.homedir(),
+    realHomedir: () => os.homedir(),
     getCompatibilityWarnings: vi.fn().mockReturnValue([]),
     WarningPriority: {
       Low: 'low',

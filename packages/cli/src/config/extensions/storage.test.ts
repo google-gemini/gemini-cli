@@ -35,12 +35,8 @@ describe('ExtensionStorage', () => {
 
   beforeEach(() => {
     vi.mocked(os.homedir).mockReturnValue(mockHomeDir);
-    vi.mocked(Storage).mockImplementation(
-      () =>
-        ({
-          getExtensionsDir: () =>
-            path.join(mockHomeDir, '.gemini', 'extensions'),
-        }) as any, // eslint-disable-line @typescript-eslint/no-explicit-any
+    vi.mocked(Storage.getGlobalGeminiDir).mockReturnValue(
+      path.join(mockHomeDir, '.gemini'),
     );
     storage = new ExtensionStorage(extensionName);
   });

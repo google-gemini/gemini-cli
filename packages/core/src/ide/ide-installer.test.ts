@@ -20,7 +20,7 @@ vi.mock('../utils/paths.js', async (importOriginal) => {
   const actual = await importOriginal<typeof import('../utils/paths.js')>();
   return {
     ...actual,
-    homedir: vi.fn(),
+    realHomedir: vi.fn(),
   };
 });
 
@@ -30,14 +30,14 @@ import * as fs from 'node:fs';
 import * as os from 'node:os';
 import * as path from 'node:path';
 import { IDE_DEFINITIONS, type IdeInfo } from './detect-ide.js';
-import { homedir as pathsHomedir } from '../utils/paths.js';
+import { realHomedir as pathsRealHomedir } from '../utils/paths.js';
 
 describe('ide-installer', () => {
   const HOME_DIR = '/home/user';
 
   beforeEach(() => {
     vi.spyOn(os, 'homedir').mockReturnValue(HOME_DIR);
-    vi.mocked(pathsHomedir).mockReturnValue(HOME_DIR);
+    vi.mocked(pathsRealHomedir).mockReturnValue(HOME_DIR);
   });
 
   afterEach(() => {

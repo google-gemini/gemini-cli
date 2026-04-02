@@ -24,7 +24,7 @@ import {
   debugLogger,
   FatalSandboxError,
   GEMINI_DIR,
-  homedir,
+  realHomedir,
   Storage,
 } from '@google/gemini-cli-core';
 import { ConsolePatcher } from '../ui/utils/ConsolePatcher.js';
@@ -104,7 +104,7 @@ export async function start_sandbox(
         '-D',
         `TMP_DIR=${fs.realpathSync(os.tmpdir())}`,
         '-D',
-        `HOME_DIR=${fs.realpathSync(homedir())}`,
+        `HOME_DIR=${fs.realpathSync(realHomedir())}`,
         '-D',
         `CACHE_DIR=${fs.realpathSync((await execAsync('getconf DARWIN_USER_CACHE_DIR')).stdout.trim())}`,
         '-D',
@@ -350,33 +350,50 @@ export async function start_sandbox(
 
     // mount user settings directory inside container, after creating if missing
     // note user/home changes inside sandbox and we mount at BOTH paths for consistency
-    const userHomeDirOnHost = homedir();
+    const userHomeDirOnHost = realHomedir();
+    const userConfigDirOnHost = Storage.getGlobalGeminiDir();
+    const userCacheDirOnHost = Storage.getGlobalCacheDir();
+    const userTmpDirOnHost = Storage.getGlobalTempDir();
     const userSettingsDirInSandbox = getContainerPath(
       `/home/node/${GEMINI_DIR}`,
     );
     if (!fs.existsSync(userHomeDirOnHost)) {
       fs.mkdirSync(userHomeDirOnHost, { recursive: true });
     }
-    const userSettingsDirOnHost = path.join(userHomeDirOnHost, GEMINI_DIR);
-    if (!fs.existsSync(userSettingsDirOnHost)) {
-      fs.mkdirSync(userSettingsDirOnHost, { recursive: true });
+    for (const dir of [
+      userConfigDirOnHost,
+      userCacheDirOnHost,
+      userTmpDirOnHost,
+    ]) {
+      if (!fs.existsSync(dir)) {
+        fs.mkdirSync(dir, { recursive: true });
+      }
     }
 
     args.push(
       '--volume',
-      `${userSettingsDirOnHost}:${userSettingsDirInSandbox}`,
+      `${userConfigDirOnHost}:${getContainerPath(userConfigDirOnHost)}`,
     );
-    if (userSettingsDirInSandbox !== getContainerPath(userSettingsDirOnHost)) {
+    if (userConfigDirOnHost === path.join(userHomeDirOnHost, GEMINI_DIR)) {
       args.push(
         '--volume',
-        `${userSettingsDirOnHost}:${getContainerPath(userSettingsDirOnHost)}`,
+        `${userConfigDirOnHost}:${userSettingsDirInSandbox}`,
       );
     }
+    args.push(
+      '--volume',
+      `${userCacheDirOnHost}:${getContainerPath(userCacheDirOnHost)}`,
+    );
+    args.push(
+      '--volume',
+      `${userTmpDirOnHost}:${getContainerPath(userTmpDirOnHost)}`,
+    );
 
     // mount os.tmpdir() as os.tmpdir() inside container
     args.push('--volume', `${os.tmpdir()}:${getContainerPath(os.tmpdir())}`);
 
-    // mount homedir() as homedir() inside container
+    // mount the real user home at the same path inside the container only when
+    // it differs from the process home on the host
     if (userHomeDirOnHost !== os.homedir()) {
       args.push(
         '--volume',
@@ -385,7 +402,7 @@ export async function start_sandbox(
     }
 
     // mount gcloud config directory if it exists
-    const gcloudConfigDir = path.join(homedir(), '.config', 'gcloud');
+    const gcloudConfigDir = path.join(realHomedir(), '.config', 'gcloud');
     if (fs.existsSync(gcloudConfigDir)) {
       args.push(
         '--volume',
@@ -693,7 +710,7 @@ export async function start_sandbox(
       // necessary on Linux to ensure the user exists within the
       // container's /etc/passwd file, which is required by os.userInfo().
       const username = 'gemini';
-      const homeDir = getContainerPath(homedir());
+      const homeDir = getContainerPath(realHomedir());
 
       const setupUserCommands = [
         // Use -f with groupadd to avoid errors if the group already exists.
@@ -714,7 +731,7 @@ export async function start_sandbox(
       // We still need userFlag for the simpler proxy container, which does not have this issue.
       userFlag = `--user ${uid}:${gid}`;
       // When forcing a UID in the sandbox, $HOME can be reset to '/', so we copy $HOME as well.
-      args.push('--env', `HOME=${homedir()}`);
+      args.push('--env', `HOME=${realHomedir()}`);
     }
 
     // push container image name

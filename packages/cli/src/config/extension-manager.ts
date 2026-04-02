@@ -40,7 +40,7 @@ import {
   logExtensionUpdateEvent,
   loadSkillsFromDir,
   loadAgentsFromDirectory,
-  homedir,
+  realHomedir,
   ExtensionIntegrityManager,
   type IExtensionIntegrity,
   type IntegrityDataStatus,
@@ -377,7 +377,7 @@ Would you like to attempt to install via "git clone" instead?`,
           if (newExtensionName !== previousName) {
             wasEnabledGlobally = this.extensionEnablementManager.isEnabled(
               previousName,
-              homedir(),
+              realHomedir(),
             );
             wasEnabledWorkspace = this.extensionEnablementManager.isEnabled(
               previousName,
@@ -1102,7 +1102,7 @@ Would you like to attempt to install via "git clone" instead?`,
   toOutputString(extension: GeminiCLIExtension): string {
     const userEnabled = this.extensionEnablementManager.isEnabled(
       extension.name,
-      homedir(),
+      realHomedir(),
     );
     const workspaceEnabled = this.extensionEnablementManager.isEnabled(
       extension.name,
@@ -1184,7 +1184,7 @@ Would you like to attempt to install via "git clone" instead?`,
 
     if (scope !== SettingScope.Session) {
       const scopePath =
-        scope === SettingScope.Workspace ? this.workspaceDir : homedir();
+        scope === SettingScope.Workspace ? this.workspaceDir : realHomedir();
       this.extensionEnablementManager.disable(name, true, scopePath);
     }
     await logExtensionDisable(
@@ -1219,7 +1219,7 @@ Would you like to attempt to install via "git clone" instead?`,
 
     if (scope !== SettingScope.Session) {
       const scopePath =
-        scope === SettingScope.Workspace ? this.workspaceDir : homedir();
+        scope === SettingScope.Workspace ? this.workspaceDir : realHomedir();
       this.extensionEnablementManager.enable(name, true, scopePath);
     }
     await logExtensionEnable(
