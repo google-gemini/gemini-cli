@@ -546,6 +546,58 @@ interface TomlRule {
   [key: string]: unknown;
 }
 
+/**
+ * Finds a rule in the rule array that matches the given criteria.
+ */
+function findMatchingRule(
+  rules: TomlRule[],
+  criteria: {
+    toolName: string;
+    mcpName?: string;
+    commandPrefix?: string | string[];
+    argsPattern?: string;
+  },
+): TomlRule | undefined {
+  return rules.find((r) => (
+      r.toolName === criteria.toolName &&
+      r.mcpName === criteria.mcpName &&
+      JSON.stringify(r.commandPrefix) ===
+        JSON.stringify(criteria.commandPrefix) &&
+      r.argsPattern === criteria.argsPattern
+    ));
+}
+
+/**
+ * Creates a new TOML rule object from the given tool name and message.
+ */
+function createTomlRule(toolName: string, message: UpdatePolicy): TomlRule {
+  const rule: TomlRule = {
+    decision: 'allow',
+    priority: getAlwaysAllowPriorityFraction(),
+    toolName,
+  };
+
+  if (message.mcpName) {
+    rule.mcpName = message.mcpName;
+  }
+
+  if (message.commandPrefix) {
+    rule.commandPrefix = message.commandPrefix;
+  } else if (message.argsPattern) {
+    rule.argsPattern = message.argsPattern;
+  }
+
+  if (message.allowRedirection !== undefined) {
+    rule.allowRedirection = message.allowRedirection;
+  }
+
+  if (message.modes) {
+    rule.modes = message.modes;
+  }
+
+  return rule;
+}
+
 export function createPolicyUpdater(
   policyEngine: PolicyEngine,
   messageBus: MessageBus,
@@ -664,42 +716,35 @@ export function createPolicyUpdater(
               existingData.rule = [];
             }
 
-            // Create new rule object
-            const newRule: TomlRule = {
-              decision: 'allow',
-              priority: getAlwaysAllowPriorityFraction(),
-            };
-
+            // Normalize tool name for MCP
+            let normalizedToolName = toolName;
             if (message.mcpName) {
-              newRule.mcpName = message.mcpName;
-
               const expectedPrefix = `${MCP_TOOL_PREFIX}${message.mcpName}_`;
               if (toolName.startsWith(expectedPrefix)) {
-                newRule.toolName = toolName.slice(expectedPrefix.length);
-              } else {
-                newRule.toolName = toolName;
+                normalizedToolName = toolName.slice(expectedPrefix.length);
+              }
+            }
+
+            // Look for an existing rule to update
+            const existingRule = findMatchingRule(existingData.rule, {
+              toolName: normalizedToolName,
+              mcpName: message.mcpName,
+              commandPrefix: message.commandPrefix,
+              argsPattern: message.argsPattern,
+            });
+
+            if (existingRule) {
+              if (message.allowRedirection !== undefined) {
+                existingRule.allowRedirection = message.allowRedirection;
+              }
+              if (message.modes) {
+                existingRule.modes = message.modes;
               }
             } else {
-              newRule.toolName = toolName;
+              existingData.rule.push(
+                createTomlRule(normalizedToolName, message),
+              );
             }
-
-            if (message.commandPrefix) {
-              newRule.commandPrefix = message.commandPrefix;
-            } else if (message.argsPattern) {
-              // message.argsPattern was already validated above
-              newRule.argsPattern = message.argsPattern;
-            }
-
-            if (message.allowRedirection !== undefined) {
-              newRule.allowRedirection = message.allowRedirection;
-            }
-
-            if (message.modes) {
-              newRule.modes = message.modes;
-            }
-
-            // Add to rules
-            existingData.rule.push(newRule);
 
             // Serialize back to TOML
             // @iarna/toml stringify might not produce beautiful output but it handles escaping correctly
