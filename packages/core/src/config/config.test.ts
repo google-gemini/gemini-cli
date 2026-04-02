@@ -221,8 +221,8 @@ vi.mock('../utils/fetch.js', () => ({
   setGlobalProxy: mockSetGlobalProxy,
 }));
 
-vi.mock('../context/contextManager.js', () => ({
-  ContextManager: vi.fn().mockImplementation(() => ({
+vi.mock('../context/memoryContextManager.js', () => ({
+  MemoryContextManager: vi.fn().mockImplementation(() => ({
     refresh: vi.fn(),
     getGlobalMemory: vi.fn().mockReturnValue(''),
     getExtensionMemory: vi.fn().mockReturnValue(''),
@@ -237,7 +237,7 @@ import { tokenLimit } from '../core/tokenLimits.js';
 import { getCodeAssistServer } from '../code_assist/codeAssist.js';
 import { getExperiments } from '../code_assist/experiments/experiments.js';
 import type { CodeAssistServer } from '../code_assist/server.js';
-import { ContextManager } from '../context/contextManager.js';
+import { MemoryContextManager } from '../context/memoryContextManager.js';
 import { UserTierId } from '../code_assist/types.js';
 import type {
   ModelConfigService,
@@ -3022,11 +3022,11 @@ describe('Config Quota & Preview Model Access', () => {
 
 describe('Config JIT Initialization', () => {
   let config: Config;
-  let mockContextManager: ContextManager;
+  let mockMemoryContextManager: MemoryContextManager;
 
   beforeEach(() => {
     vi.clearAllMocks();
-    mockContextManager = {
+    mockMemoryContextManager = {
       refresh: vi.fn(),
       getGlobalMemory: vi.fn().mockReturnValue('Global Memory'),
       getExtensionMemory: vi.fn().mockReturnValue('Extension Memory'),
@@ -3035,13 +3035,13 @@ describe('Config JIT Initialization', () => {
         .mockReturnValue('Environment Memory\n\nMCP Instructions'),
       getUserProjectMemory: vi.fn().mockReturnValue(''),
       getLoadedPaths: vi.fn().mockReturnValue(new Set(['/path/to/GEMINI.md'])),
-    } as unknown as ContextManager;
-    (ContextManager as unknown as Mock).mockImplementation(
-      () => mockContextManager,
+    } as unknown as MemoryContextManager;
+    (MemoryContextManager as unknown as Mock).mockImplementation(
+      () => mockMemoryContextManager,
     );
   });
 
-  it('should initialize ContextManager, load memory, and delegate to it when experimentalJitContext is enabled', async () => {
+  it('should initialize MemoryContextManager, load memory, and delegate to it when experimentalJitContext is enabled', async () => {
     const params: ConfigParameters = {
       sessionId: 'test-session',
       targetDir: '/tmp/test',
@@ -3055,8 +3055,8 @@ describe('Config JIT Initialization', () => {
     config = new Config(params);
     await config.initialize();
 
-    expect(ContextManager).toHaveBeenCalledWith(config);
-    expect(mockContextManager.refresh).toHaveBeenCalled();
+    expect(MemoryContextManager).toHaveBeenCalledWith(config);
+    expect(mockMemoryContextManager.refresh).toHaveBeenCalled();
     expect(config.getUserMemory()).toEqual({
       global: 'Global Memory',
       extension: 'Extension Memory',
@@ -3079,12 +3079,12 @@ describe('Config JIT Initialization', () => {
     expect(sessionMemory).toContain('</project_context>');
     expect(sessionMemory).toContain('</loaded_context>');
 
-    // Verify state update (delegated to ContextManager)
+    // Verify state update (delegated to MemoryContextManager)
     expect(config.getGeminiMdFileCount()).toBe(1);
     expect(config.getGeminiMdFilePaths()).toEqual(['/path/to/GEMINI.md']);
   });
 
-  it('should NOT initialize ContextManager when experimentalJitContext is disabled', async () => {
+  it('should NOT initialize MemoryContextManager when experimentalJitContext is disabled', async () => {
     const params: ConfigParameters = {
       sessionId: 'test-session',
       targetDir: '/tmp/test',
@@ -3098,7 +3098,7 @@ describe('Config JIT Initialization', () => {
     config = new Config(params);
     await config.initialize();
 
-    expect(ContextManager).not.toHaveBeenCalled();
+    expect(MemoryContextManager).not.toHaveBeenCalled();
     expect(config.getUserMemory()).toBe('Initial Memory');
   });
 

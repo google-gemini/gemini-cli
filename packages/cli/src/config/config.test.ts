@@ -21,6 +21,8 @@ import {
   type MCPServerConfig,
   type GeminiCLIExtension,
   Storage,
+  generalistProfile,
+  type ContextManagementConfig,
 } from '@google/gemini-cli-core';
 import { loadCliConfig, parseArguments, type CliArgs } from './config.js';
 import {
@@ -2171,6 +2173,89 @@ describe('loadCliConfig directWebFetch', () => {
     });
     const config = await loadCliConfig(settings, 'test-session', argv);
     expect(config.getDirectWebFetch()).toBe(true);
+  });
+});
+
+describe('loadCliConfig context management', () => {
+  beforeEach(() => {
+    vi.resetAllMocks();
+    vi.mocked(os.homedir).mockReturnValue('/mock/home/user');
+    vi.stubEnv('GEMINI_API_KEY', 'test-api-key');
+    vi.spyOn(ExtensionManager.prototype, 'getExtensions').mockReturnValue([]);
+  });
+
+  afterEach(() => {
+    vi.unstubAllEnvs();
+    vi.restoreAllMocks();
+  });
+
+  it('should be false by default when generalistProfile / context management is not set in settings', async () => {
+    process.argv = ['node', 'script.js'];
+    const argv = await parseArguments(createTestMergedSettings());
+    const settings = createTestMergedSettings();
+    const config = await loadCliConfig(settings, 'test-session', argv);
+    expect(config.getContextManagementConfig()).haveOwnProperty(
+      'enabled',
+      false,
+    );
+    expect(config.isContextManagementEnabled()).toBe(false);
+  });
+
+  it('should be true when generalistProfile is set to true in settings', async () => {
+    process.argv = ['node', 'script.js'];
+    const argv = await parseArguments(createTestMergedSettings());
+    const settings = createTestMergedSettings({
+      experimental: {
+        generalistProfile: true,
+      },
+    });
+    const config = await loadCliConfig(settings, 'test-session', argv);
+    expect(config.getContextManagementConfig()).toStrictEqual(
+      generalistProfile,
+    );
+    expect(config.isContextManagementEnabled()).toBe(true);
+  });
+
+  it('should be true when contextManagement is set to true in settings', async () => {
+    process.argv = ['node', 'script.js'];
+    const argv = await parseArguments(createTestMergedSettings());
+    const contextManagementConfig: Partial<ContextManagementConfig> = {
+      historyWindow: {
+        maxTokens: 100_000,
+        retainedTokens: 50_000,
+      },
+      messageLimits: {
+        normalMaxTokens: 1000,
+        retainedMaxTokens: 10_000,
+        normalizationHeadRatio: 0.25,
+      },
+      tools: {
+        distillation: {
+          maxOutputTokens: 10_000,
+          summarizationThresholdTokens: 15_000,
+        },
+        outputMasking: {
+          protectionThresholdTokens: 30_000,
+          minPrunableThresholdTokens: 10_000,
+          protectLatestTurn: false,
+        },
+      },
+    };
+    const settings = createTestMergedSettings({
+      experimental: {
+        contextManagement: true,
+      },
+      // The type of numbers is being inferred strangely, and so we have to cast
+      // to `any` here.
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      contextManagement: contextManagementConfig as any,
+    });
+    const config = await loadCliConfig(settings, 'test-session', argv);
+    expect(config.getContextManagementConfig()).toStrictEqual({
+      enabled: true,
+      ...contextManagementConfig,
+    });
+    expect(config.isContextManagementEnabled()).toBe(true);
   });
 });
 

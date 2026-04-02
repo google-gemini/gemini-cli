@@ -9,7 +9,7 @@ import { getResponseText } from '../utils/partUtils.js';
 import { estimateTokenCountSync } from '../utils/tokenCalculation.js';
 import { LlmRole } from '../telemetry/llmRole.js';
 import { debugLogger } from '../utils/debugLogger.js';
-import type { AgentHistoryProviderConfig } from '../services/types.js';
+import type { AgentHistoryProviderConfig } from './types.js';
 import type { Config } from '../config/config.js';
 import {
   MIN_TARGET_TOKENS,
@@ -35,7 +35,7 @@ export class AgentHistoryProvider {
     history: readonly Content[],
     abortSignal?: AbortSignal,
   ): Promise<readonly Content[]> {
-    if (!this.providerConfig.isTruncationEnabled || history.length === 0) {
+    if (history.length === 0) {
       return history;
     }
 
@@ -287,13 +287,6 @@ export class AgentHistoryProvider {
     abortSignal?: AbortSignal,
   ): Promise<string> {
     if (messagesToTruncate.length === 0) return '';
-
-    if (!this.providerConfig.isSummarizationEnabled) {
-      debugLogger.log(
-        'AgentHistoryProvider: Summarization disabled, using fallback note.',
-      );
-      return this.getFallbackSummaryText(messagesToTruncate);
-    }
 
     try {
       // Use the first few messages of the Grace Zone as a "contextual bridge"
