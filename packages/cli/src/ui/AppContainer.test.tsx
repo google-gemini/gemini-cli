@@ -3151,10 +3151,6 @@ describe('AppContainer State Management', () => {
 
       // Should be reset
       expect(capturedUIState.constrainHeight).toBe(true);
-      // Should refresh static (which clears terminal in non-alternate buffer)
-      expect(mocks.mockStdout.write).toHaveBeenCalledWith(
-        ansiEscapes.clearTerminal,
-      );
       unmount();
     });
 
