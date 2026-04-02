@@ -8,9 +8,6 @@ import { describe, expect } from 'vitest';
 import { evalTest } from './test-helper.js';
 import { READ_FILE_TOOL_NAME, EDIT_TOOL_NAME } from '@google/gemini-cli-core';
 
-// READ_FILE_TOOL_NAME = 'read_file'
-// EDIT_TOOL_NAME      = 'replace'
-
 const FILES = {
   'package.json': JSON.stringify({
     name: 'score-api',
@@ -161,6 +158,7 @@ describe('cross_module_reasoning', () => {
         }
       });
 
+      // If repository.ts was never edited, scan all logs — assertion 1 will catch the missing edit
       const logsBeforeEdit =
         firstRepoEditIndex >= 0
           ? toolLogs.slice(0, firstRepoEditIndex)
@@ -188,6 +186,9 @@ describe('cross_module_reasoning', () => {
       ).toBeGreaterThanOrEqual(2);
 
       // --- Assertion 4: fix is correct — broken pattern removed ---
+      // repository.ts always exists on disk (written from FILES before the agent runs),
+      // so readFile will not throw. If the agent never edited it, the original content
+      // still contains r.id.length and this assertion will fail correctly.
       const repoContent = rig.readFile('repository.ts');
       expect(
         repoContent,
