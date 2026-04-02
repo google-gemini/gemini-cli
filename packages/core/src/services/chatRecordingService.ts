@@ -148,54 +148,60 @@ interface PartialMetadataRecord {
   kind?: 'main' | 'subagent';
 }
 
-function isRewindRecord(record: unknown): record is RewindRecord {
+function hasProperty<T extends string>(
+  obj: unknown,
+  prop: T,
+): obj is { [key in T]: unknown } {
+  return obj !== null && typeof obj === 'object' && prop in obj;
+}
+
+function isStringProperty<T extends string>(
+  obj: unknown,
+  prop: T,
+): obj is { [key in T]: string } {
+  return hasProperty(obj, prop) && typeof obj[prop] === 'string';
+}
+
+function isObjectProperty<T extends string>(
+  obj: unknown,
+  prop: T,
+): obj is { [key in T]: object } {
   return (
-    record !== null &&
-    typeof record === 'object' &&
-    '$rewindTo' in record &&
-    typeof (record as Record<string, unknown>).$rewindTo === 'string'
+    hasProperty(obj, prop) &&
+    obj[prop] !== null &&
+    typeof obj[prop] === 'object'
   );
+}
+
+function isRewindRecord(record: unknown): record is RewindRecord {
+  return isStringProperty(record, '$rewindTo');
 }
 
 function isMessageRecord(record: unknown): record is MessageRecord {
-  return (
-    record !== null &&
-    typeof record === 'object' &&
-    'id' in record &&
-    typeof (record as Record<string, unknown>).id === 'string'
-  );
+  return isStringProperty(record, 'id');
 }
 
-function isMetadataUpdateRecord(record: unknown): record is MetadataUpdateRecord {
-  return (
-    record !== null &&
-    typeof record === 'object' &&
-    '$set' in record &&
-    (record as Record<string, unknown>).$set !== null &&
-    typeof (record as Record<string, unknown>).$set === 'object'
-  );
+function isMetadataUpdateRecord(
+  record: unknown,
+): record is MetadataUpdateRecord {
+  return isObjectProperty(record, '$set');
 }
 
 function isPartialMetadataRecord(
   record: unknown,
 ): record is PartialMetadataRecord {
   return (
-    record !== null &&
-    typeof record === 'object' &&
-    'sessionId' in record &&
-    typeof (record as Record<string, unknown>).sessionId === 'string' &&
-    'projectHash' in record &&
-    typeof (record as Record<string, unknown>).projectHash === 'string'
+    isStringProperty(record, 'sessionId') &&
+    isStringProperty(record, 'projectHash')
   );
 }
 
 function isTextPart(part: unknown): part is { text: string } {
-  return (
-    part !== null &&
-    typeof part === 'object' &&
-    'text' in part &&
-    typeof (part as Record<string, unknown>).text === 'string'
-  );
+  return isStringProperty(part, 'text');
+}
+
+function isSessionIdRecord(record: unknown): record is { sessionId: string } {
+  return isStringProperty(record, 'sessionId');
 }
 
 export async function loadConversationRecord(
@@ -257,16 +263,16 @@ export async function loadConversationRecord(
           }
           if (
             !firstUserMessageStr &&
-            'type' in record &&
-            record.type === 'user' &&
-            'content' in record &&
-            record.content
+            hasProperty(record, 'type') &&
+            record['type'] === 'user' &&
+            hasProperty(record, 'content') &&
+            record['content']
           ) {
             // Basic extraction of first user message for display
-            const rawContent = record.content;
+            const rawContent = record['content'];
             if (Array.isArray(rawContent)) {
               firstUserMessageStr = rawContent
-                .map((p: unknown) => (isTextPart(p) ? p.text : ''))
+                .map((p: unknown) => (isTextPart(p) ? p['text'] : ''))
                 .join('');
             } else if (typeof rawContent === 'string') {
               firstUserMessageStr = rawContent;
@@ -293,7 +299,7 @@ export async function loadConversationRecord(
           // Initial metadata line
           metadata = { ...metadata, ...record };
         }
-      } catch (_e) {
+      } catch {
         // ignore parse errors on individual lines
       }
     }
@@ -810,6 +816,7 @@ export class ChatRecordingService {
         fd = await fs.promises.open(filePath, 'r');
         const { bytesRead } = await fd.read(buffer, 0, CHUNK_SIZE, 0);
         if (bytesRead === 0) {
+          await fd.close();
           await fs.promises.unlink(filePath);
           return;
         }
@@ -827,13 +834,8 @@ export class ChatRecordingService {
       const content = JSON.parse(firstLine) as unknown;
 
       let fullSessionId: string | undefined;
-      if (
-        content &&
-        typeof content === 'object' &&
-        'sessionId' in content &&
-        typeof (content as Record<string, unknown>).sessionId === 'string'
-      ) {
-        fullSessionId = (content as Record<string, unknown>).sessionId as string;
+      if (isSessionIdRecord(content)) {
+        fullSessionId = content['sessionId'];
       }
 
       // Delete the session file
