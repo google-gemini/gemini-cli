@@ -154,6 +154,48 @@ Slash commands provide meta-level control over the CLI itself.
       `--include-directories`.
     - **Usage:** `/directory show`
 
+### `/discuss`
+
+- **Description:** Run an **experimental** moderated multi-agent discussion in
+  the CLI. Three panelists (`builder`, `skeptic`, `explorer`) respond in
+  parallel to your chime-ins; a `moderator` reviews each round, can steer
+  follow-up work, and can ask you for input when needed.
+- **Status:** Experimental. Behavior and prompts may change.
+- **Sub-commands:**
+  - **`start <topic>`**:
+    - **Description:** Start a discussion session and record the initial topic.
+      Multi-line topics are supported. The session is stored as
+      `.gemini/discuss-session.json` in the project directory and is tied to
+      your current CLI session (it is not resumed across unrelated sessions).
+    - **Usage:** `/discuss start How should we structure this feature?`
+    - **Markdown file as topic:** If the entire argument is a single reference
+      like `@path/to/file.md`, the CLI reads that file (relative to the project
+      root) and uses its contents as the topic.
+    - **Note:** Starting a session does not automatically run the first panelist
+      round; send a normal message or `/discuss <text>` to begin the discussion.
+  - **`status`**:
+    - **Description:** Report whether a discuss session is active for this
+      project and CLI session.
+  - **`summary`** (or **`summarize`**):
+    - **Description:** Ask the model for a short synthesis of the current thread
+      (insights, risks, next steps). Output appears as a normal assistant-style
+      message in the history.
+  - **`stop`** (or **`end`**):
+    - **Description:** End the session and remove the saved discuss state file.
+- **Chime-ins while a session is active:**
+  - **Normal input:** Any message that is **not** a slash command is routed into
+    discuss mode instead of the default single-assistant flow.
+  - **`/discuss <message>`:** Same as a chime-in when a session is already
+    active (useful if you prefer an explicit prefix).
+- **Behavior (high level):**
+  - Panelists run in parallel; their `speak` replies are shown as they complete,
+    subject to a fixed per-session message budget.
+  - After each panelist round, the moderator runs and may request up to two
+    additional internal panel rounds without a new human message, or escalate
+    with a question for you.
+  - If you send a new message while a turn is in progress, the in-flight work is
+    aborted so the agents can react to your latest input.
+
 ### `/docs`
 
 - **Description:** Open the Gemini CLI documentation in your browser.

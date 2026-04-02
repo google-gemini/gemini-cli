@@ -287,6 +287,17 @@ export type HistoryItemHint = HistoryItemBase & {
   text: string;
 };
 
+export type HistoryItemDiscussAgent = HistoryItemBase & {
+  type: 'discuss_agent';
+  agent: 'builder' | 'skeptic' | 'explorer' | 'moderator';
+  text: string;
+};
+
+export type HistoryItemDiscussThinking = HistoryItemBase & {
+  type: 'discuss_thinking';
+  agent: 'builder' | 'skeptic' | 'explorer' | 'moderator';
+};
+
 export type HistoryItemChatList = HistoryItemBase & {
   type: 'chat_list';
   chats: ChatDetail[];
@@ -404,6 +415,8 @@ export type HistoryItemWithoutId =
   | HistoryItemChatList
   | HistoryItemThinking
   | HistoryItemHint
+  | HistoryItemDiscussAgent
+  | HistoryItemDiscussThinking
   | HistoryItemSubagent;
 
 export type HistoryItem = HistoryItemWithoutId & { id: number };

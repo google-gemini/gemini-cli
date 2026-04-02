@@ -36,6 +36,8 @@ import { ChatList } from './views/ChatList.js';
 import { ModelMessage } from './messages/ModelMessage.js';
 import { ThinkingMessage } from './messages/ThinkingMessage.js';
 import { HintMessage } from './messages/HintMessage.js';
+import { DiscussAgentMessage } from './messages/DiscussAgentMessage.js';
+import { DiscussThinkingMessage } from './messages/DiscussThinkingMessage.js';
 import { getInlineThinkingMode } from '../utils/inlineThinkingMode.js';
 import { useSettings } from '../contexts/SettingsContext.js';
 
@@ -104,8 +106,22 @@ export const HistoryItemDisplay: React.FC<HistoryItemDisplayProps> = ({
       {itemForDisplay.type === 'hint' && (
         <HintMessage text={itemForDisplay.text} />
       )}
+      {itemForDisplay.type === 'discuss_thinking' && (
+        <DiscussThinkingMessage agent={itemForDisplay.agent} />
+      )}
       {itemForDisplay.type === 'user' && (
         <UserMessage text={itemForDisplay.text} width={terminalWidth} />
+      )}
+      {itemForDisplay.type === 'discuss_agent' && (
+        <DiscussAgentMessage
+          agent={itemForDisplay.agent}
+          text={itemForDisplay.text}
+          isPending={isPending}
+          availableTerminalHeight={
+            availableTerminalHeightGemini ?? availableTerminalHeight
+          }
+          terminalWidth={terminalWidth}
+        />
       )}
       {itemForDisplay.type === 'user_shell' && (
         <UserShellMessage text={itemForDisplay.text} width={terminalWidth} />
