@@ -2546,7 +2546,7 @@ export class Config implements McpContext, AgentLoopContext {
       mode !== ApprovalMode.PLAN
     ) {
       throw new Error(
-        'Cannot enable privileged approval modes in an untrusted folder.',
+        'Cannot enable privileged approval modes in an untrusted folder. Please mark the folder as trusted or disable privileged approval modes in your configuration.',
       );
     }
 
