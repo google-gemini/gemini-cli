@@ -32,7 +32,8 @@ vi.mock('../utils.js', () => ({
 describe('skills list command', () => {
   const mockLoadSettings = vi.mocked(loadSettings);
   const mockLoadCliConfig = vi.mocked(loadCliConfig);
-  let stdoutWriteSpy: MockInstance;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  let stdoutWriteSpy: any;
 
   beforeEach(async () => {
     vi.clearAllMocks();
