@@ -265,10 +265,9 @@ describe('Background Tools', () => {
     fs.writeFileSync(logPath, 'dummy content');
 
     // Mock open to throw ELOOP error for symbolic link
-    vi.spyOn(fs.promises, 'open').mockRejectedValue({
-      code: 'ELOOP',
-      message: 'ELOOP: too many symbolic links encountered',
-    });
+    const mockError = new Error('ELOOP: too many symbolic links encountered');
+    (mockError as any).code = 'ELOOP';
+    vi.spyOn(fs.promises, 'open').mockRejectedValue(mockError);
 
     const invocation = readTool.build({ pid });
     // eslint-disable-next-line @typescript-eslint/no-explicit-any

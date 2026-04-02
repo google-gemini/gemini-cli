@@ -236,6 +236,19 @@ const writeBufferToLogStream = (
  *
  */
 
+export type BackgroundProcess = {
+  pid: number;
+  command: string;
+  status: 'running' | 'exited';
+  exitCode?: number | null;
+  signal?: number | null;
+};
+
+export type BackgroundProcessRecord = Omit<BackgroundProcess, 'pid'> & {
+  startTime: number;
+  endTime?: number;
+};
+
 export class ShellExecutionService {
   private static activePtys = new Map<number, ActivePty>();
   private static activeChildProcesses = new Map<number, ActiveChildProcess>();
@@ -243,17 +256,7 @@ export class ShellExecutionService {
   private static backgroundLogStreams = new Map<number, fs.WriteStream>();
   private static backgroundProcessHistory = new Map<
     string, // sessionId
-    Map<
-      number,
-      {
-        command: string;
-        status: 'running' | 'exited';
-        exitCode?: number | null;
-        signal?: number | null;
-        startTime: number;
-        endTime?: number;
-      }
-    >
+    Map<number, BackgroundProcessRecord>
   >();
 
   static getLogDir(): string {
@@ -1479,13 +1482,7 @@ export class ShellExecutionService {
     }
   }
 
-  static listBackgroundProcesses(sessionId: string): Array<{
-    pid: number;
-    command: string;
-    status: 'running' | 'exited';
-    exitCode?: number | null;
-    signal?: number | null;
-  }> {
+  static listBackgroundProcesses(sessionId: string): Array<BackgroundProcess> {
     if (!sessionId) {
       throw new Error('Session ID is required');
     }

@@ -15,6 +15,7 @@ import {
 import { ToolErrorType } from './tool-error.js';
 import type { MessageBus } from '../confirmation-bus/message-bus.js';
 import type { AgentLoopContext } from '../config/agent-loop-context.js';
+import { isNodeError } from '../utils/errors.js';
 
 const MAX_BUFFER_LOAD_CAP_BYTES = 64 * 1024; // Safe 64KB buffer load Cap
 const DEFAULT_TAIL_LINES_COUNT = 100;
@@ -29,14 +30,14 @@ class ListBackgroundProcessesInvocation extends BaseToolInvocation<
     private readonly context: AgentLoopContext,
     params: Record<string, never>,
     messageBus: MessageBus,
-    _toolName?: string,
-    _toolDisplayName?: string,
+    toolName?: string,
+    toolDisplayName?: string,
   ) {
-    super(params, messageBus, _toolName, _toolDisplayName);
+    super(params, messageBus, toolName, toolDisplayName);
   }
 
   getDescription(): string {
-    return '';
+    return 'Lists all active and recently completed background processes for the current session.';
   }
 
   async execute(_signal: AbortSignal): Promise<ToolResult> {
@@ -106,6 +107,7 @@ export class ListBackgroundProcessesTool extends BaseDeclarativeTool<
 interface ReadBackgroundOutputParams {
   pid: number;
   lines?: number;
+  delay_ms?: number;
 }
 
 class ReadBackgroundOutputInvocation extends BaseToolInvocation<
@@ -116,10 +118,10 @@ class ReadBackgroundOutputInvocation extends BaseToolInvocation<
     private readonly context: AgentLoopContext,
     params: ReadBackgroundOutputParams,
     messageBus: MessageBus,
-    _toolName?: string,
-    _toolDisplayName?: string,
+    toolName?: string,
+    toolDisplayName?: string,
   ) {
-    super(params, messageBus, _toolName, _toolDisplayName);
+    super(params, messageBus, toolName, toolDisplayName);
   }
 
   getDescription(): string {
@@ -128,6 +130,10 @@ class ReadBackgroundOutputInvocation extends BaseToolInvocation<
 
   async execute(_signal: AbortSignal): Promise<ToolResult> {
     const pid = this.params.pid;
+
+    if (this.params.delay_ms && this.params.delay_ms > 0) {
+      await new Promise((resolve) => setTimeout(resolve, this.params.delay_ms));
+    }
 
     // Verify process belongs to this session to prevent reading logs of processes from other sessions/users
     const processes = ShellExecutionService.listBackgroundProcesses(
@@ -212,12 +218,7 @@ class ReadBackgroundOutputInvocation extends BaseToolInvocation<
         returnDisplay: responseContent,
       };
     } catch (error) {
-      if (
-        typeof error === 'object' &&
-        error !== null &&
-        'code' in error &&
-        error.code === 'ELOOP'
-      ) {
+      if (isNodeError(error) && error.code === 'ELOOP') {
         return {
           llmContent:
             'Symbolic link detected at predicted log path. Access is denied for security reasons.',
@@ -271,6 +272,11 @@ export class ReadBackgroundOutputTool extends BaseDeclarativeTool<
             minimum: 1,
             description:
               'Optional. Number of lines to read from the end of the log. Defaults to 100.',
+          },
+          delay_ms: {
+            type: 'integer',
+            description:
+              'Optional. Delay in milliseconds to wait before reading the output. Useful to allow the process to start and generate initial output.',
           },
         },
         required: ['pid'],

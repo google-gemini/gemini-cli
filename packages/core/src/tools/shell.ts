@@ -65,6 +65,7 @@ export interface ShellToolParams {
   description?: string;
   dir_path?: string;
   is_background?: boolean;
+  delay_ms?: number;
   [PARAM_ADDITIONAL_PERMISSIONS]?: SandboxPermissions;
 }
 
@@ -558,11 +559,30 @@ export class ShellToolInvocation extends BaseToolInvocation<
         }
 
         // If the model requested to run in the background, do so after a short delay.
+        let completed = false;
         if (this.params.is_background) {
+          resultPromise.then(() => {
+            completed = true;
+          }).catch(() => {
+            completed = true; // Also mark completed if it failed
+          });
+
           const sessionId = this.context.config?.getSessionId?.() ?? 'default';
+          const delay = this.params.delay_ms ?? BACKGROUND_DELAY_MS;
           setTimeout(() => {
             ShellExecutionService.background(pid, sessionId, strippedCommand);
-          }, BACKGROUND_DELAY_MS);
+          }, delay);
+
+          // Wait for the delay amount to see if command returns quickly
+          await new Promise((resolve) => setTimeout(resolve, delay));
+
+          if (!completed) {
+            // Return early with initial output if still running
+            return {
+              llmContent: `Command is running in background. PID: ${pid}. Initial output:\n${cumulativeOutput}`,
+              returnDisplay: `Background process started with PID ${pid}.`,
+            };
+          }
         }
       }
 
