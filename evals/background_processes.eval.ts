@@ -52,4 +52,30 @@ sleep 100
       ).toBe(true);
     },
   });
+
+  evalTest('USUALLY_PASSES', {
+    name: 'should naturally use list tool to verify multiple processes',
+    prompt: "Start three background processes that run 'sleep 100', 'sleep 200', and 'sleep 300' respectively. Verify that all three are currently running.",
+    setup: async (rig) => {
+      // Create .gemini directory to avoid file system error in test rig
+      if (rig.homeDir) {
+        const geminiDir = path.join(rig.homeDir, '.gemini');
+        fs.mkdirSync(geminiDir, { recursive: true });
+      }
+    },
+    assert: async (rig, result) => {
+      const toolCalls = rig.readToolLogs();
+      
+      // Check if list_background_processes was called
+      const hasListCall = toolCalls.some(
+        (call) => call.toolRequest.name === 'list_background_processes',
+      );
+
+      expect(
+        hasListCall,
+        'Expected agent to call list_background_processes',
+      ).toBe(true);
+    },
+  });
 });
+
