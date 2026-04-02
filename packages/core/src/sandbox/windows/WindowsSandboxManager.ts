@@ -19,6 +19,7 @@ import {
   tryRealpath,
   type SandboxPermissions,
   type ParsedSandboxDenial,
+  resolveSandboxPaths,
 } from '../../services/sandboxManager.js';
 import type { ShellExecutionResult } from '../../services/shellExecutionService.js';
 import {
@@ -76,6 +77,10 @@ export class WindowsSandboxManager implements SandboxManager {
 
   parseDenials(result: ShellExecutionResult): ParsedSandboxDenial | undefined {
     return parseWindowsSandboxDenials(result);
+  }
+
+  getWorkspace(): string {
+    return this.options.workspace;
   }
 
   /**
@@ -219,8 +224,37 @@ export class WindowsSandboxManager implements SandboxManager {
     // Reject override attempts in plan mode
     verifySandboxOverrides(allowOverrides, req.policy);
 
+    let command = req.command;
+    let args = req.args;
+    let targetPathEnv: string | undefined;
+
+    // Translate virtual commands for sandboxed file system access
+    if (command === '__read') {
+      // Use PowerShell for safe argument passing via env var
+      targetPathEnv = args[0] || '';
+      command = 'PowerShell.exe';
+      args = [
+        '-NoProfile',
+        '-NonInteractive',
+        '-Command',
+        '& { Get-Content -LiteralPath $env:GEMINI_TARGET_PATH -Raw }',
+      ];
+    } else if (command === '__write') {
+      // Use PowerShell for piping stdin to a file via env var
+      targetPathEnv = args[0] || '';
+      command = 'PowerShell.exe';
+      args = [
+        '-NoProfile',
+        '-NonInteractive',
+        '-Command',
+        '& { $Input | Out-File -FilePath $env:GEMINI_TARGET_PATH -Encoding utf8 }',
+      ];
+    }
+
+    const isYolo = this.options.modeConfig?.yolo ?? false;
+
     // Fetch persistent approvals for this command
-    const commandName = await getCommandName(req.command, req.args);
+    const commandName = await getCommandName(command, args);
     const persistentPermissions = allowOverrides
       ? this.options.policyManager?.getCommandPermissions(commandName)
       : undefined;
@@ -238,10 +272,21 @@ export class WindowsSandboxManager implements SandboxManager {
         ],
       },
       network:
+        isYolo ||
         persistentPermissions?.network ||
         req.policy?.additionalPermissions?.network ||
         false,
     };
+
+    if (req.command === '__read' && req.args[0]) {
+      mergedAdditional.fileSystem!.read!.push(req.args[0]);
+    } else if (req.command === '__write' && req.args[0]) {
+      mergedAdditional.fileSystem!.write!.push(req.args[0]);
+    }
+
+    const defaultNetwork =
+      this.options.modeConfig?.network ?? req.policy?.networkAccess ?? false;
+    const networkAccess = defaultNetwork || mergedAdditional.network;
 
     // 1. Determine filesystem permissions to grant
     const pathsToGrant = new Set<string>();
@@ -249,8 +294,8 @@ export class WindowsSandboxManager implements SandboxManager {
     // Grant write access if not readonly or tool is strictly approved
     const isApproved = allowOverrides
       ? await isStrictlyApproved(
-          req.command,
-          req.args,
+          command,
+          args,
           this.options.modeConfig?.approvedTools,
         )
       : false;
@@ -259,22 +304,32 @@ export class WindowsSandboxManager implements SandboxManager {
       pathsToGrant.add(this.options.workspace);
     }
 
-    const allowedPaths = sanitizePaths(req.policy?.allowedPaths) || [];
+    const { allowed: allowedPaths, forbidden: forbiddenPaths } =
+      await resolveSandboxPaths(this.options, req);
+
     allowedPaths.forEach((p) => pathsToGrant.add(p));
 
     const extraWritePaths =
       sanitizePaths(mergedAdditional.fileSystem?.write) || [];
     extraWritePaths.forEach((p) => pathsToGrant.add(p));
 
+    const includeDirs = sanitizePaths(this.options.includeDirectories);
+    includeDirs.forEach((p) => pathsToGrant.add(p));
+
     // 2. Identify forbidden paths and secrets to deny
     const pathsToDeny = new Set<string>();
-    const forbiddenPaths = sanitizePaths(this.options.forbiddenPaths) || [];
     forbiddenPaths.forEach((p) => pathsToDeny.add(p));
 
-    const searchDirs = new Set([this.options.workspace, ...allowedPaths]);
+    // Scoped scan for secrets to explicitly block for Low Integrity processes
+    const searchDirs = new Set([
+      this.options.workspace,
+      ...allowedPaths,
+      ...includeDirs,
+    ]);
     await Promise.all(
       Array.from(searchDirs).map(async (dir) => {
         try {
+          // We use maxDepth 3 to catch common nested secrets while keeping performance high.
           const secrets = await findSecretFiles(dir, 3);
           secrets.forEach((s) => pathsToDeny.add(s));
         } catch (e) {
@@ -285,6 +340,24 @@ export class WindowsSandboxManager implements SandboxManager {
         }
       }),
     );
+
+    // On Windows, granular sandbox access can only be granted to existing paths
+    // to avoid broad parent directory permissions. Ensure all grant paths exist.
+    for (const p of pathsToGrant) {
+      if (pathsToDeny.has(p)) {
+        pathsToGrant.delete(p);
+        continue;
+      }
+
+      try {
+        const resolved = await tryRealpath(p);
+        await fs.promises.access(resolved, fs.constants.F_OK);
+      } catch {
+        // If it doesn't exist, we can't grant access on Windows.
+        // This matches main branch behavior of throwing/skipping.
+        pathsToGrant.delete(p);
+      }
+    }
 
     // 3. Generate setup manifest operations (L = Grant, D = Deny)
     const opResults = await Promise.all([
@@ -321,10 +394,10 @@ export class WindowsSandboxManager implements SandboxManager {
       fs.writeFileSync(manifestPath, pendingAcls.join('\n'));
     }
 
-    // 6. Final command construction
-    const defaultNetwork =
-      this.options.modeConfig?.network ?? req.policy?.networkAccess ?? false;
-    const networkAccess = defaultNetwork || mergedAdditional.network;
+    const finalEnv = { ...sanitizedEnv };
+    if (targetPathEnv !== undefined) {
+      finalEnv['GEMINI_TARGET_PATH'] = targetPathEnv;
+    }
 
     return {
       program: this.helperPath,
@@ -332,10 +405,10 @@ export class WindowsSandboxManager implements SandboxManager {
         networkAccess ? '1' : '0',
         req.cwd,
         ...(manifestPath ? ['--setup-manifest', manifestPath] : []),
-        req.command,
-        ...req.args,
+        command,
+        ...args,
       ],
-      env: sanitizedEnv,
+      env: finalEnv,
       cwd: req.cwd,
     };
   }

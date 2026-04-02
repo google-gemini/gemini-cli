@@ -18,8 +18,8 @@ import {
   isFatalToolError,
   debugLogger,
   coreEvents,
-  getErrorMessage,
   getErrorType,
+  getErrorMessage,
 } from '@google/gemini-cli-core';
 import { runSyncCleanup } from './cleanup.js';
 
