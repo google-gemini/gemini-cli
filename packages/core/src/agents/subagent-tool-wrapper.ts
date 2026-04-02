@@ -15,6 +15,7 @@ import { type AgentLoopContext } from '../config/agent-loop-context.js';
 import type { AgentDefinition, AgentInputs } from './types.js';
 import { LocalSubagentInvocation } from './local-invocation.js';
 import { RemoteAgentInvocation } from './remote-invocation.js';
+import { ExternalAgentInvocation } from './external-invocation.js';
 import { BrowserAgentInvocation } from './browser/browserAgentInvocation.js';
 import { BROWSER_AGENT_NAME } from './browser/browserAgentDefinition.js';
 import type { MessageBus } from '../confirmation-bus/message-bus.js';
@@ -72,35 +73,54 @@ export class SubagentToolWrapper extends BaseDeclarativeTool<
     const definition = this.definition;
     const effectiveMessageBus = messageBus;
 
-    if (definition.kind === 'remote') {
-      return new RemoteAgentInvocation(
-        definition,
-        this.context,
-        params,
-        effectiveMessageBus,
-        _toolName,
-        _toolDisplayName,
-      );
-    }
+    switch (definition.kind) {
+      case 'remote':
+        return new RemoteAgentInvocation(
+          definition,
+          this.context,
+          params,
+          effectiveMessageBus,
+          _toolName,
+          _toolDisplayName,
+        );
 
-    // Special handling for browser agent - needs async MCP setup
-    if (definition.name === BROWSER_AGENT_NAME) {
-      return new BrowserAgentInvocation(
-        this.context,
-        params,
-        effectiveMessageBus,
-        _toolName,
-        _toolDisplayName,
-      );
-    }
+      case 'external':
+        return new ExternalAgentInvocation(
+          definition,
+          this.context,
+          params,
+          effectiveMessageBus,
+          _toolName,
+          _toolDisplayName,
+        );
 
-    return new LocalSubagentInvocation(
-      definition,
-      this.context,
-      params,
-      effectiveMessageBus,
-      _toolName,
-      _toolDisplayName,
-    );
+      case 'local':
+        // Special handling for browser agent - needs async MCP setup
+        if (definition.name === BROWSER_AGENT_NAME) {
+          return new BrowserAgentInvocation(
+            this.context,
+            params,
+            effectiveMessageBus,
+            _toolName,
+            _toolDisplayName,
+          );
+        }
+
+        return new LocalSubagentInvocation(
+          definition,
+          this.context,
+          params,
+          effectiveMessageBus,
+          _toolName,
+          _toolDisplayName,
+        );
+
+      default: {
+        const exhaustive: never = definition;
+        throw new Error(
+          `Unsupported agent kind: ${String((exhaustive as { kind: string }).kind)}`,
+        );
+      }
+    }
   }
 }

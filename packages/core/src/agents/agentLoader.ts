@@ -211,9 +211,35 @@ const remoteAgentSchema = z.union([
 
 type FrontmatterRemoteAgentDefinition = z.infer<typeof remoteAgentSchema>;
 
+const externalAgentSchema = z
+  .object({
+    kind: z.literal('external'),
+    name: nameSchema,
+    provider: z.string().min(1),
+    description: z.string().min(1),
+    display_name: z.string().optional(),
+    provider_config: z.record(z.any()).optional(),
+    instructions: z.string().optional(),
+    tools: z
+
+      .array(
+        z
+          .string()
+          .refine((val) => isValidToolName(val, { allowWildcards: true }), {
+            message: 'Invalid tool name',
+          }),
+      )
+      .optional(),
+    mcp_servers: z.record(mcpServerSchema).optional(),
+  })
+  .strict();
+
+type FrontmatterExternalAgentDefinition = z.infer<typeof externalAgentSchema>;
+
 type FrontmatterAgentDefinition =
   | FrontmatterLocalAgentDefinition
-  | FrontmatterRemoteAgentDefinition;
+  | FrontmatterRemoteAgentDefinition
+  | FrontmatterExternalAgentDefinition;
 
 const agentUnionOptions = [
   { label: 'Local Agent' },
@@ -222,11 +248,10 @@ const agentUnionOptions = [
 ];
 
 const remoteAgentsListSchema = z.array(remoteAgentSchema);
-
 const markdownFrontmatterSchema = z.union([
   localAgentSchema,
-  remoteAgentUrlSchema,
-  remoteAgentJsonSchema,
+  remoteAgentSchema,
+  externalAgentSchema,
 ]);
 
 function guessIntendedKind(rawInput: unknown): 'local' | 'remote' | undefined {
@@ -368,6 +393,17 @@ export async function parseAgentMarkdown(
     ];
   }
 
+  if (frontmatter.kind === 'external') {
+    const instr = body.trim();
+    return [
+      {
+        ...frontmatter,
+        kind: 'external',
+        instructions: instr,
+      },
+    ];
+  }
+
   // Construct the local agent definition
   return [
     {
@@ -474,91 +510,147 @@ export function markdownToAgentDefinition(
     },
   };
 
-  if (markdown.kind === 'remote') {
-    const base: RemoteAgentDefinition = {
-      kind: 'remote',
-      name: markdown.name,
-      description: markdown.description || '',
-      displayName: markdown.display_name,
-      auth: markdown.auth
-        ? convertFrontmatterAuthToConfig(markdown.auth)
-        : undefined,
-      inputConfig,
-      metadata,
-    };
+  switch (markdown.kind) {
+    case 'remote': {
+      const base: RemoteAgentDefinition = {
+        kind: 'remote',
+        name: markdown.name,
+        description: markdown.description || '',
+        displayName: markdown.display_name,
+        auth: markdown.auth
+          ? convertFrontmatterAuthToConfig(markdown.auth)
+          : undefined,
+        inputConfig,
+        metadata,
+      };
 
-    if (
-      'agent_card_json' in markdown &&
-      markdown.agent_card_json !== undefined
-    ) {
-      base.agentCardJson = markdown.agent_card_json;
-      return base;
+      if (
+        'agent_card_json' in markdown &&
+        markdown.agent_card_json !== undefined
+      ) {
+        base.agentCardJson = markdown.agent_card_json;
+        return base;
+      }
+      if (
+        'agent_card_url' in markdown &&
+        markdown.agent_card_url !== undefined
+      ) {
+        base.agentCardUrl = markdown.agent_card_url;
+        return base;
+      }
+
+      throw new AgentLoadError(
+        metadata?.filePath || 'unknown',
+        'Unexpected state: neither agent_card_json nor agent_card_url present on remote agent',
+      );
     }
-    if ('agent_card_url' in markdown && markdown.agent_card_url !== undefined) {
-      base.agentCardUrl = markdown.agent_card_url;
-      return base;
+
+    case 'external': {
+      const mcpServers: Record<string, MCPServerConfig> = {};
+      if (markdown.mcp_servers) {
+        for (const [name, config] of Object.entries(markdown.mcp_servers)) {
+          mcpServers[name] = new MCPServerConfig(
+            config.command,
+            config.args,
+            config.env,
+            config.cwd,
+            config.url,
+            config.http_url,
+            config.headers,
+            config.tcp,
+            config.type,
+            config.timeout,
+            config.trust,
+            config.description,
+            config.include_tools,
+            config.exclude_tools,
+          );
+        }
+      }
+
+      return {
+        kind: 'external',
+        name: markdown.name,
+        provider: markdown.provider,
+        description: markdown.description,
+        displayName: markdown.display_name,
+        providerConfig: markdown.provider_config,
+        instructions: markdown.instructions,
+        toolConfig: markdown.tools
+          ? {
+              tools: markdown.tools,
+            }
+          : undefined,
+        mcpServers: Object.keys(mcpServers).length > 0 ? mcpServers : undefined,
+        inputConfig,
+        metadata,
+      };
     }
 
-    throw new AgentLoadError(
-      metadata?.filePath || 'unknown',
-      'Unexpected state: neither agent_card_json nor agent_card_url present on remote agent',
-    );
-  }
+    case 'local': {
+      // If a model is specified, use it. Otherwise, inherit
+      const modelName = markdown.model || 'inherit';
 
-  // If a model is specified, use it. Otherwise, inherit
-  const modelName = markdown.model || 'inherit';
+      const mcpServers: Record<string, MCPServerConfig> = {};
+      if (markdown.mcp_servers) {
+        for (const [name, config] of Object.entries(markdown.mcp_servers)) {
+          mcpServers[name] = new MCPServerConfig(
+            config.command,
+            config.args,
+            config.env,
+            config.cwd,
+            config.url,
+            config.http_url,
+            config.headers,
+            config.tcp,
+            config.type,
+            config.timeout,
+            config.trust,
+            config.description,
+            config.include_tools,
+            config.exclude_tools,
+          );
+        }
+      }
 
-  const mcpServers: Record<string, MCPServerConfig> = {};
-  if (markdown.mcp_servers) {
-    for (const [name, config] of Object.entries(markdown.mcp_servers)) {
-      mcpServers[name] = new MCPServerConfig(
-        config.command,
-        config.args,
-        config.env,
-        config.cwd,
-        config.url,
-        config.http_url,
-        config.headers,
-        config.tcp,
-        config.type,
-        config.timeout,
-        config.trust,
-        config.description,
-        config.include_tools,
-        config.exclude_tools,
+      return {
+        kind: 'local',
+        name: markdown.name,
+        description: markdown.description,
+        displayName: markdown.display_name,
+        promptConfig: {
+          systemPrompt: markdown.system_prompt,
+          query: '${query}',
+        },
+        modelConfig: {
+          model: modelName,
+          generateContentConfig: {
+            temperature: markdown.temperature ?? 1,
+            topP: 0.95,
+          },
+        },
+        runConfig: {
+          maxTurns: markdown.max_turns ?? DEFAULT_MAX_TURNS,
+          maxTimeMinutes: markdown.timeout_mins ?? DEFAULT_MAX_TIME_MINUTES,
+        },
+        toolConfig: markdown.tools
+          ? {
+              tools: markdown.tools,
+            }
+          : undefined,
+        mcpServers: Object.keys(mcpServers).length > 0 ? mcpServers : undefined,
+        inputConfig,
+        metadata,
+      };
+    }
+
+    default: {
+      const exhaustive: never = markdown;
+      throw new Error(
+        `Unsupported agent kind: ${String((exhaustive as { kind: string }).kind)}`,
       );
     }
   }
-
-  return {
-    kind: 'local',
-    name: markdown.name,
-    description: markdown.description,
-    displayName: markdown.display_name,
-    promptConfig: {
-      systemPrompt: markdown.system_prompt,
-      query: '${query}',
-    },
-    modelConfig: {
-      model: modelName,
-      generateContentConfig: {
-        temperature: markdown.temperature ?? 1,
-        topP: 0.95,
-      },
-    },
-    runConfig: {
-      maxTurns: markdown.max_turns ?? DEFAULT_MAX_TURNS,
-      maxTimeMinutes: markdown.timeout_mins ?? DEFAULT_MAX_TIME_MINUTES,
-    },
-    toolConfig: markdown.tools
-      ? {
-          tools: markdown.tools,
-        }
-      : undefined,
-    mcpServers: Object.keys(mcpServers).length > 0 ? mcpServers : undefined,
-    inputConfig,
-    metadata,
-  };
 }
 
 /**

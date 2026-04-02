@@ -324,7 +324,45 @@ export class AgentRegistry {
       this.registerLocalAgent(definition);
     } else if (definition.kind === 'remote') {
       await this.registerRemoteAgent(definition);
+    } else if (definition.kind === 'external') {
+      this.registerExternalAgent(definition);
     }
+  }
+
+  /**
+   * Registers an external agent definition synchronously.
+   */
+  protected registerExternalAgent<TOutput extends z.ZodTypeAny>(
+    definition: AgentDefinition<TOutput>,
+  ): void {
+    if (definition.kind !== 'external') {
+      return;
+    }
+
+    // Basic validation
+    if (!definition.name || !definition.description || !definition.provider) {
+      debugLogger.warn(
+        `[AgentRegistry] Skipping invalid external agent definition. Missing name, description, or provider.`,
+      );
+      return;
+    }
+
+    this.allDefinitions.set(definition.name, definition);
+
+    const settingsOverrides =
+      this.config.getAgentsSettings().overrides?.[definition.name];
+
+    if (!this.isAgentEnabled(definition, settingsOverrides)) {
+      if (this.config.getDebugMode()) {
+        debugLogger.log(
+          `[AgentRegistry] Skipping disabled external agent '${definition.name}'`,
+        );
+      }
+      return;
+    }
+
+    this.agents.set(definition.name, definition);
+    this.addAgentPolicy(definition);
   }
 
   /**

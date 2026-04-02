@@ -263,9 +263,41 @@ export interface RemoteAgentDefinition<
   agentCardJson?: string;
 }
 
+export interface ExternalAgentDefinition<
+  TOutput extends z.ZodTypeAny = z.ZodUnknown,
+> extends BaseAgentDefinition<TOutput> {
+  kind: 'external';
+
+  /**
+   * The external agent provider (e.g., 'claude-code', 'codex').
+   */
+  provider: string;
+
+  /**
+   * Optional provider-specific configuration.
+   */
+  providerConfig?: Record<string, unknown>;
+
+  /**
+   * Optional instructions (e.g., from markdown body).
+   */
+  instructions?: string;
+
+  /**
+   * Optional configs.
+   */
+  toolConfig?: ToolConfig;
+
+  /**
+   * Optional inline MCP servers for this agent.
+   */
+  mcpServers?: Record<string, MCPServerConfig>;
+}
+
 export type AgentDefinition<TOutput extends z.ZodTypeAny = z.ZodUnknown> =
   | LocalAgentDefinition<TOutput>
-  | RemoteAgentDefinition<TOutput>;
+  | RemoteAgentDefinition<TOutput>
+  | ExternalAgentDefinition<TOutput>;
 
 /**
  * Configures the initial prompt for the agent.

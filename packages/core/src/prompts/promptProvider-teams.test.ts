@@ -70,7 +70,7 @@ describe('PromptProvider with Agent Teams', () => {
     expect(prompt).toContain('# Active Agent Team: Test Team');
     expect(prompt).toContain('These are the team instructions.');
     expect(prompt).toContain(
-      "You should prioritize delegating tasks to this team's agents whenever appropriate.",
+      "**Orchestration Mandate:** You must prioritize delegating tasks to this team's specialized agents for their respective roles.",
     );
   });
 });

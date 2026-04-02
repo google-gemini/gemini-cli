@@ -35,7 +35,8 @@ describe('<TeamSelectionDialog />', () => {
     mockOnSelect.mockReset();
   });
 
-  const renderComponent = async () => renderWithProviders(
+  const renderComponent = async () =>
+    renderWithProviders(
       <TeamSelectionDialog teams={mockTeams} onSelect={mockOnSelect} />,
     );
 

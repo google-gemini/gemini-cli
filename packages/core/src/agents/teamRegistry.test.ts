@@ -80,7 +80,10 @@ describe('TeamRegistry', () => {
 
     expect(registry.getAllTeams()).toHaveLength(1);
     expect(registry.getTeam('test-team')).toEqual(mockTeam);
-    expect(mockAgentRegistry.registerAgent).toHaveBeenCalledWith(mockAgent);
+    expect(mockAgentRegistry.registerAgent).toHaveBeenCalledWith({
+      ...mockAgent,
+      description: `MANDATORY for undefined tasks: Agent in a team (Team Agent: Test Team). You MUST delegate all undefined tasks to this agent.`,
+    });
     expect(loadTeamsFromDirectory).toHaveBeenCalledTimes(2);
   });
 
