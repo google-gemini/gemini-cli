@@ -14,6 +14,7 @@ describe('CliHelpAgent Delegation', () => {
     prompt: 'Help me create a subagent in this project',
     timeout: 60000,
     assert: async (rig, _result) => {
+      await rig.waitForTelemetryReady();
       const toolLogs = rig.readToolLogs();
       const toolCallIndex = toolLogs.findIndex(
         (log) => log.toolRequest.name === 'cli_help',

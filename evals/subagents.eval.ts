@@ -89,6 +89,7 @@ describe('subagent eval test cases', () => {
       'index.ts': INDEX_TS,
     },
     assert: async (rig, _result) => {
+      await rig.waitForTelemetryReady();
       const updatedIndex = readProjectFile(rig, 'index.ts');
       const toolLogs = rig.readToolLogs() as Array<{
         toolRequest: { name: string };
@@ -133,11 +134,11 @@ describe('subagent eval test cases', () => {
       'package.json': MOCK_PACKAGE_JSON,
     },
     assert: async (rig, _result) => {
+      await rig.expectToolCallSuccess([TEST_AGENTS.TESTING_AGENT.name]);
       const toolLogs = rig.readToolLogs() as Array<{
         toolRequest: { name: string };
       }>;
 
-      await rig.expectToolCallSuccess([TEST_AGENTS.TESTING_AGENT.name]);
       expect(toolLogs.some((l) => l.toolRequest.name === 'generalist')).toBe(
         false,
       );
@@ -172,15 +173,14 @@ describe('subagent eval test cases', () => {
       'package.json': MOCK_PACKAGE_JSON,
     },
     assert: async (rig, _result) => {
-      const toolLogs = rig.readToolLogs() as Array<{
-        toolRequest: { name: string };
-      }>;
-      const readme = readProjectFile(rig, 'README.md');
-
       await rig.expectToolCallSuccess([
         TEST_AGENTS.DOCS_AGENT.name,
         TEST_AGENTS.TESTING_AGENT.name,
       ]);
+      const toolLogs = rig.readToolLogs() as Array<{
+        toolRequest: { name: string };
+      }>;
+      const readme = readProjectFile(rig, 'README.md');
       expect(readme).not.toContain('TODO: update the README.');
       expect(toolLogs.some((l) => l.toolRequest.name === 'generalist')).toBe(
         false,

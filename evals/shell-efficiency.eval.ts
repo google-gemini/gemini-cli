@@ -24,6 +24,7 @@ describe('Shell Efficiency', () => {
     name: 'should use --silent/--quiet flags when installing packages',
     prompt: 'Install the "lodash" package using npm.',
     assert: async (rig) => {
+      await rig.waitForTelemetryReady();
       const toolCalls = rig.readToolLogs();
       const shellCalls = toolCalls.filter(
         (call) => call.toolRequest.name === 'run_shell_command',
@@ -53,6 +54,7 @@ describe('Shell Efficiency', () => {
     name: 'should use --no-pager with git commands',
     prompt: 'Show the git log.',
     assert: async (rig) => {
+      await rig.waitForTelemetryReady();
       const toolCalls = rig.readToolLogs();
       const shellCalls = toolCalls.filter(
         (call) => call.toolRequest.name === 'run_shell_command',
@@ -85,6 +87,7 @@ describe('Shell Efficiency', () => {
     },
     prompt: 'Install the "lodash" package using npm.',
     assert: async (rig) => {
+      await rig.waitForTelemetryReady();
       const toolCalls = rig.readToolLogs();
       const shellCalls = toolCalls.filter(
         (call) => call.toolRequest.name === 'run_shell_command',

@@ -67,7 +67,7 @@ describe('Automated tool use', () => {
     prompt:
       'Fix the linter errors in this project. Make sure to avoid interactive commands.',
     assert: async (rig) => {
-      // Check if run_shell_command was used with --fix
+      await rig.waitForTelemetryReady();
       const toolCalls = rig.readToolLogs();
       const shellCommands = toolCalls.filter(
         (call) => call.toolRequest.name === 'run_shell_command',
@@ -138,7 +138,7 @@ console.log(data)
     prompt:
       'Fix the formatting errors in this project. Make sure to avoid interactive commands.',
     assert: async (rig) => {
-      // Check if run_shell_command was used with --write
+      await rig.waitForTelemetryReady();
       const toolCalls = rig.readToolLogs();
       const shellCommands = toolCalls.filter(
         (call) => call.toolRequest.name === 'run_shell_command',

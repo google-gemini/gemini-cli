@@ -31,6 +31,7 @@ describe('git repo eval', () => {
       'Finish this up for me by just making a targeted fix for the bug in index.ts. Do not build, install anything, or add tests',
     files: FILES,
     assert: async (rig, _result) => {
+      await rig.waitForTelemetryReady();
       const toolLogs = rig.readToolLogs();
       const commitCalls = toolLogs.filter((log) => {
         if (log.toolRequest.name !== 'run_shell_command') return false;
@@ -60,6 +61,7 @@ describe('git repo eval', () => {
       'Make a targeted fix for the bug in index.ts without building, installing anything, or adding tests. Then, commit your changes.',
     files: FILES,
     assert: async (rig, _result) => {
+      await rig.waitForTelemetryReady();
       const toolLogs = rig.readToolLogs();
       const commitCalls = toolLogs.filter((log) => {
         if (log.toolRequest.name !== 'run_shell_command') return false;

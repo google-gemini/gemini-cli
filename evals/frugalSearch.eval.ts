@@ -49,6 +49,7 @@ describe('Frugal Search', () => {
       'README.md': '# Project documentation',
     },
     assert: async (rig) => {
+      await rig.waitForTelemetryReady();
       const toolCalls = rig.readToolLogs();
       const getParams = (call: any) => {
         let args = call.toolRequest.args;
