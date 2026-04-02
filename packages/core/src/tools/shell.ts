@@ -53,7 +53,7 @@ import type { MessageBus } from '../confirmation-bus/message-bus.js';
 import { getShellDefinition } from './definitions/coreTools.js';
 import { resolveToolDeclaration } from './definitions/resolver.js';
 import type { AgentLoopContext } from '../config/agent-loop-context.js';
-import { isSubpath } from '../utils/paths.js';
+import { isSubpath, resolveToRealPath } from '../utils/paths.js';
 import {
   getProactiveToolSuggestions,
   isNetworkReliantCommand,
@@ -308,7 +308,10 @@ export class ShellToolInvocation extends BaseToolInvocation<
               return approvedPaths.some(
                 (p) =>
                   requestedIdentity === getPathIdentity(p) ||
-                  isSubpath(p, requestedPath),
+                  isSubpath(
+                    getPathIdentity(resolveToRealPath(p)),
+                    requestedIdentity,
+                  ),
               );
             };
 

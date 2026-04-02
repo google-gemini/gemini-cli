@@ -105,6 +105,10 @@ export class SandboxPolicyManager {
     this.config = this.loadConfig();
   }
 
+  private isProtectedKey(key: string): boolean {
+    return key === '__proto__' || key === 'constructor' || key === 'prototype';
+  }
+
   private loadConfig(): SandboxTomlSchemaType {
     if (!fs.existsSync(this.configPath)) {
       return SandboxPolicyManager.DEFAULT_CONFIG;
@@ -156,6 +160,12 @@ export class SandboxPolicyManager {
 
   getCommandPermissions(commandName: string): SandboxPermissions {
     const normalized = normalizeCommand(commandName);
+    if (this.isProtectedKey(normalized)) {
+      return {
+        fileSystem: { read: [], write: [] },
+        network: false,
+      };
+    }
     const persistent = this.config.commands[normalized];
     const session = this.sessionApprovals[normalized];
 
@@ -179,6 +189,9 @@ export class SandboxPolicyManager {
     permissions: SandboxPermissions,
   ): void {
     const normalized = normalizeCommand(commandName);
+    if (this.isProtectedKey(normalized)) {
+      return;
+    }
     const existing = this.sessionApprovals[normalized] || {
       fileSystem: { read: [], write: [] },
       network: false,
@@ -204,6 +217,9 @@ export class SandboxPolicyManager {
     permissions: SandboxPermissions,
   ): void {
     const normalized = normalizeCommand(commandName);
+    if (this.isProtectedKey(normalized)) {
+      return;
+    }
     const existing = this.config.commands[normalized] || {
       allowed_paths: [],
       allow_network: false,

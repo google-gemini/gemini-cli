@@ -318,7 +318,9 @@ function normalizeCommandName(raw: string): string {
  * @returns The normalized command name.
  */
 export function normalizeCommand(commandName: string): string {
-  return commandName.toLowerCase().replace(/\.exe$/, '');
+  const normalizedPath = commandName.replace(/[\\/]+$/, '');
+  const base = normalizedPath.split(/[\\/]/).pop() ?? '';
+  return base.toLowerCase().replace(/\.exe$/, '');
 }
 
 function extractNameFromNode(node: Node): string | null {

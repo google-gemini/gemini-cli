@@ -103,4 +103,38 @@ describe('ShellTool Proactive Expansion', () => {
       proactivePermissions.getProactiveToolSuggestions,
     ).toHaveBeenCalledWith('npm');
   });
+
+  it('should NOT request expansion if paths are already approved (case-insensitive subpath)', async () => {
+    // This test assumes Darwin or Windows for case-insensitivity
+    vi.mocked(mockConfig.getSandboxEnabled).mockReturnValue(true);
+    vi.mocked(
+      proactivePermissions.getProactiveToolSuggestions,
+    ).mockResolvedValue({
+      fileSystem: { read: ['/project/src'], write: [] },
+    });
+    vi.mocked(proactivePermissions.isNetworkReliantCommand).mockReturnValue(
+      true,
+    );
+
+    // Current approval is for the parent dir, with different casing
+    vi.mocked(
+      mockConfig.sandboxPolicyManager.getCommandPermissions,
+    ).mockReturnValue({
+      fileSystem: { read: ['/PROJECT'], write: [] },
+      network: false,
+    });
+
+    const invocation = shellTool.build({ command: 'npm install' });
+    const result = await invocation.shouldConfirmExecute(
+      new AbortController().signal,
+    );
+
+    // If it's correctly approved, result should be false (no expansion needed)
+    // or a normal 'exec' confirmation, but NOT 'sandbox_expansion'.
+    if (result) {
+      expect(result.type).not.toBe('sandbox_expansion');
+    } else {
+      expect(result).toBe(false);
+    }
+  });
 });
