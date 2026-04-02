@@ -5,6 +5,7 @@
  */
 
 import { AsyncLocalStorage } from 'node:async_hooks';
+import * as path from 'node:path';
 import { WorkspaceContext } from '../utils/workspaceContext.js';
 
 /**
@@ -56,6 +57,22 @@ export function createScopedWorkspaceContext(
   additionalDirectories: string[],
 ): WorkspaceContext {
   const parentDirs = [...parentContext.getDirectories()];
+  if (parentDirs.length === 0) {
+    throw new Error(
+      'Cannot create scoped workspace context: parent has no directories',
+    );
+  }
+
+  // Reject overly broad directories (filesystem roots) to prevent
+  // accidentally granting access to the entire filesystem.
+  for (const dir of additionalDirectories) {
+    if (path.resolve(dir) === path.parse(path.resolve(dir)).root) {
+      throw new Error(
+        `Cannot add filesystem root "${dir}" as a workspace directory`,
+      );
+    }
+  }
+
   return new WorkspaceContext(parentDirs[0], [
     ...parentDirs.slice(1),
     ...additionalDirectories,

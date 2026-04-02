@@ -220,6 +220,9 @@ export interface LocalAgentDefinition<
    * the parent's with these directories. Other agents and the main
    * session are unaffected. If omitted, the parent workspace context
    * is inherited unchanged.
+   *
+   * Note: Filesystem root paths (e.g. `/` or `C:\`) are rejected at
+   * runtime to prevent accidentally granting access to the entire filesystem.
    */
   workspaceDirectories?: string[];
 

@@ -74,6 +74,21 @@ describe('createScopedWorkspaceContext', () => {
     expect(parentDirsAfter).toEqual(parentDirsBefore);
     expect(parentDirsAfter).not.toContain(fs.realpathSync(extraDir));
   });
+
+  it('should throw when parent context has no directories', () => {
+    const emptyCtx = { getDirectories: () => [] } as unknown as ReturnType<
+      typeof config.getWorkspaceContext
+    >;
+    expect(() => createScopedWorkspaceContext(emptyCtx, [extraDir])).toThrow(
+      'parent has no directories',
+    );
+  });
+
+  it('should throw when adding a filesystem root directory', () => {
+    expect(() =>
+      createScopedWorkspaceContext(config.getWorkspaceContext(), ['/']),
+    ).toThrow('Cannot add filesystem root');
+  });
 });
 
 describe('runWithScopedWorkspaceContext', () => {
