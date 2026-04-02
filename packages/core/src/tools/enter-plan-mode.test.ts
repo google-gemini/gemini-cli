@@ -39,6 +39,7 @@ describe('EnterPlanModeTool', () => {
 
     mockConfig = {
       setApprovalMode: vi.fn(),
+      getPlansDir: vi.fn().mockReturnValue('/mock/plans/dir'),
       storage: {
         getPlansDir: vi.fn().mockReturnValue('/mock/plans/dir'),
       } as unknown as Config['storage'],
