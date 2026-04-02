@@ -338,7 +338,7 @@ class WebFetchToolInvocation extends BaseToolInvocation<
       textContent = rawContent;
     }
 
-    if (!this.context.config.isAutoDistillationEnabled()) {
+    if (!this.context.config.isContextManagementEnabled()) {
       return truncateString(
         textContent,
         MAX_CONTENT_LENGTH,
@@ -413,7 +413,7 @@ class WebFetchToolInvocation extends BaseToolInvocation<
     }
 
     const finalContentsByUrl = new Map<string, string>();
-    if (this.context.config.isAutoDistillationEnabled()) {
+    if (this.context.config.isContextManagementEnabled()) {
       successes.forEach((success) =>
         finalContentsByUrl.set(success.url, success.content),
       );
@@ -659,7 +659,7 @@ ${aggregatedContent}
 
       if (status >= 400) {
         let rawResponseText = bodyBuffer.toString('utf8');
-        if (!this.context.config.isAutoDistillationEnabled()) {
+        if (!this.context.config.isContextManagementEnabled()) {
           rawResponseText = truncateString(
             rawResponseText,
             10000,
@@ -689,7 +689,7 @@ Response: ${rawResponseText}`;
         lowContentType.includes('application/json')
       ) {
         let text = bodyBuffer.toString('utf8');
-        if (!this.context.config.isAutoDistillationEnabled()) {
+        if (!this.context.config.isContextManagementEnabled()) {
           text = truncateString(text, MAX_CONTENT_LENGTH, TRUNCATION_WARNING);
         }
         return {
@@ -706,7 +706,7 @@ Response: ${rawResponseText}`;
             { selector: 'a', options: { ignoreHref: false, baseUrl: url } },
           ],
         });
-        if (!this.context.config.isAutoDistillationEnabled()) {
+        if (!this.context.config.isContextManagementEnabled()) {
           textContent = truncateString(
             textContent,
             MAX_CONTENT_LENGTH,
@@ -738,7 +738,7 @@ Response: ${rawResponseText}`;
 
       // Fallback for unknown types - try as text
       let text = bodyBuffer.toString('utf8');
-      if (!this.context.config.isAutoDistillationEnabled()) {
+      if (!this.context.config.isContextManagementEnabled()) {
         text = truncateString(text, MAX_CONTENT_LENGTH, TRUNCATION_WARNING);
       }
       return {

@@ -2911,6 +2911,13 @@
           "default": false,
           "type": "boolean"
         },
+        "generalistProfile": {
+          "title": "Use the generalist profile to manage agent contexts.",
+          "description": "Suitable for general coding and software development tasks.",
+          "markdownDescription": "Suitable for general coding and software development tasks.\n\n- Category: `Experimental`\n- Requires restart: `yes`\n- Default: `false`",
+          "default": false,
+          "type": "boolean"
+        },
         "contextManagement": {
           "title": "Enable Context Management",
           "description": "Enable logic for context management.",

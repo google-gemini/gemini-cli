@@ -15,9 +15,12 @@ vi.mock('../utils/tokenCalculation.js', () => ({
 }));
 
 import type { Content, GenerateContentResponse, Part } from '@google/genai';
-import type { Config, ContextManagementConfig } from '../config/config.js';
+import type { Config } from '../config/config.js';
 import type { BaseLlmClient } from '../core/baseLlmClient.js';
-import type { AgentHistoryProviderConfig } from '../services/types.js';
+import type {
+  AgentHistoryProviderConfig,
+  ContextManagementConfig,
+} from './types.js';
 import {
   TEXT_TRUNCATION_PREFIX,
   TOOL_TRUNCATION_PREFIX,
@@ -56,8 +59,6 @@ describe('AgentHistoryProvider', () => {
       normalMessageTokens: 2500,
       maximumMessageTokens: 10000,
       normalizationHeadRatio: 0.2,
-      isSummarizationEnabled: false,
-      isTruncationEnabled: false,
     };
     provider = new AgentHistoryProvider(providerConfig, config);
   });
@@ -68,19 +69,7 @@ describe('AgentHistoryProvider', () => {
       parts: [{ text: `Message ${i}` }],
     }));
 
-  it('should return history unchanged if truncation is disabled', async () => {
-    providerConfig.isTruncationEnabled = false;
-
-    const history = createMockHistory(40);
-    const result = await provider.manageHistory(history);
-
-    expect(result).toBe(history);
-    expect(result.length).toBe(40);
-  });
-
   it('should return history unchanged if length is under threshold', async () => {
-    providerConfig.isTruncationEnabled = true;
-
     const history = createMockHistory(20); // Threshold is 30
     const result = await provider.manageHistory(history);
 
@@ -89,7 +78,6 @@ describe('AgentHistoryProvider', () => {
   });
 
   it('should truncate when total tokens exceed budget, preserving structural integrity', async () => {
-    providerConfig.isTruncationEnabled = true;
     providerConfig.maxTokens = 60000;
     providerConfig.retainedTokens = 60000;
     vi.spyOn(config, 'getContextManagementConfig').mockReturnValue({
@@ -102,28 +90,10 @@ describe('AgentHistoryProvider', () => {
     );
     const history = createMockHistory(35); // 35 * 4000 = 140,000 total tokens > maxTokens
     const result = await provider.manageHistory(history);
-    // Budget = 60000. Each message costs 4000. 60000 / 4000 = 15.
-    // However, some messages get normalized.
-    // The grace period is 15 messages. Their target is MAXIMUM_MESSAGE_TOKENS (10000).
-    // So the 15 newest messages remain at 4000 tokens each.
-    // That's 15 * 4000 = 60000 tokens EXACTLY!
-    // The next older message will push it over budget.
-    // So EXACTLY 15 messages will be retained.
-    // If the 15th newest message is a user message with a functionResponse, it might pull in the model call.
-    // In our createMockHistory, we don't use functionResponses.
-
-    expect(result.length).toBe(15);
-    expect(generateContentMock).not.toHaveBeenCalled();
-
-    expect(result[0].role).toBe('user');
-    expect(result[0].parts![0].text).toContain(
-      '### [System Note: Conversation History Truncated]',
-    );
+    expect(result.length).toBe(15); // Budget = 60000. Each message costs 4000. 60000 / 4000 = 15.
   });
 
-  it('should call summarizer and prepend summary when summarization is enabled', async () => {
-    providerConfig.isTruncationEnabled = true;
-    providerConfig.isSummarizationEnabled = true;
+  it('should call summarizer and prepend summary', async () => {
     providerConfig.maxTokens = 60000;
     providerConfig.retainedTokens = 60000;
     vi.spyOn(config, 'getContextManagementConfig').mockReturnValue({
@@ -144,8 +114,6 @@ describe('AgentHistoryProvider', () => {
   });
 
   it('should handle summarizer failures gracefully', async () => {
-    providerConfig.isTruncationEnabled = true;
-    providerConfig.isSummarizationEnabled = true;
     providerConfig.maxTokens = 60000;
     providerConfig.retainedTokens = 60000;
     vi.spyOn(config, 'getContextManagementConfig').mockReturnValue({
@@ -168,8 +136,6 @@ describe('AgentHistoryProvider', () => {
   });
 
   it('should pass the contextual bridge to the summarizer', async () => {
-    providerConfig.isTruncationEnabled = true;
-    providerConfig.isSummarizationEnabled = true;
     vi.spyOn(config, 'getContextManagementConfig').mockReturnValue({
       enabled: true,
     } as unknown as ContextManagementConfig);
@@ -201,8 +167,6 @@ describe('AgentHistoryProvider', () => {
   });
 
   it('should detect a previous summary in the truncated head', async () => {
-    providerConfig.isTruncationEnabled = true;
-    providerConfig.isSummarizationEnabled = true;
     vi.spyOn(config, 'getContextManagementConfig').mockReturnValue({
       enabled: true,
     } as unknown as ContextManagementConfig);
@@ -233,8 +197,6 @@ describe('AgentHistoryProvider', () => {
   });
 
   it('should include the Action Path (necklace of function names) in the prompt', async () => {
-    providerConfig.isTruncationEnabled = true;
-    providerConfig.isSummarizationEnabled = true;
     vi.spyOn(config, 'getContextManagementConfig').mockReturnValue({
       enabled: true,
     } as unknown as ContextManagementConfig);
@@ -268,7 +230,6 @@ describe('AgentHistoryProvider', () => {
 
   describe('Tiered Normalization Logic', () => {
     it('normalizes large messages incrementally: newest and exit-grace', async () => {
-      providerConfig.isTruncationEnabled = true;
       providerConfig.retainedTokens = 30000;
       providerConfig.maximumMessageTokens = 10000;
       providerConfig.normalMessageTokens = 2500; // History of 35 messages.
@@ -312,7 +273,6 @@ describe('AgentHistoryProvider', () => {
     });
 
     it('normalize function responses correctly by targeting large string values', async () => {
-      providerConfig.isTruncationEnabled = true;
       providerConfig.maximumMessageTokens = 1000;
 
       const hugeValue = 'O'.repeat(5000);
@@ -410,7 +370,6 @@ describe('AgentHistoryProvider', () => {
 
   describe('Multi-part Proportional Normalization', () => {
     it('distributes token budget proportionally across multiple large parts', async () => {
-      providerConfig.isTruncationEnabled = true;
       providerConfig.maximumMessageTokens = 2500; // Small limit to trigger normalization on last msg
 
       const history = createMockHistory(35);
@@ -459,7 +418,6 @@ describe('AgentHistoryProvider', () => {
     });
 
     it('preserves small parts while truncating large parts in the same message', async () => {
-      providerConfig.isTruncationEnabled = true;
       providerConfig.maximumMessageTokens = 2500;
 
       const history = createMockHistory(35);

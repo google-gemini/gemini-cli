@@ -46,6 +46,7 @@ import {
   type HookEventName,
   type OutputFormat,
   detectIdeFromEnv,
+  generalistProfile,
 } from '@google/gemini-cli-core';
 import {
   type Settings,
@@ -883,6 +884,16 @@ export async function loadCliConfig(
     }
   }
 
+  const useGeneralistProfile =
+    settings.experimental?.generalistProfile ?? false;
+  const useContextManagement =
+    settings.experimental?.contextManagement ?? false;
+  const contextManagement = {
+    ...(useGeneralistProfile ? generalistProfile : {}),
+    ...(useContextManagement ? settings?.contextManagement : {}),
+    enabled: useContextManagement || useGeneralistProfile,
+  };
+
   return new Config({
     acpMode: isAcpMode,
     clientName,
@@ -977,10 +988,7 @@ export async function loadCliConfig(
     disabledSkills: settings.skills?.disabled,
     experimentalJitContext: settings.experimental?.jitContext,
     experimentalMemoryManager: settings.experimental?.memoryManager,
-    contextManagement: {
-      enabled: settings.experimental?.contextManagement,
-      ...settings?.contextManagement,
-    },
+    contextManagement,
     modelSteering: settings.experimental?.modelSteering,
     topicUpdateNarration: settings.experimental?.topicUpdateNarration,
     noBrowser: !!process.env['NO_BROWSER'],

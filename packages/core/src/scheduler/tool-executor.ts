@@ -197,7 +197,7 @@ export class ToolExecutor {
     call: ToolCall,
     content: PartListUnion,
   ): Promise<{ truncatedContent: PartListUnion; outputFile?: string }> {
-    if (this.config.isAutoDistillationEnabled()) {
+    if (this.config.isContextManagementEnabled()) {
       const distiller = new ToolOutputDistillationService(
         this.config,
         this.context.geminiClient,
