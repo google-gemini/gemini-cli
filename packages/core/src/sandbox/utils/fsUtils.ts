@@ -14,15 +14,15 @@ export function isErrnoException(e: unknown): e is NodeJS.ErrnoException {
 export function tryRealpath(p: string): string {
   try {
     return fs.realpathSync(p);
-  } catch {
-    if (isErrnoException(_e) && _e.code === 'ENOENT') {
+  } catch (e) {
+    if (isErrnoException(e) && e.code === 'ENOENT') {
       const parentDir = path.dirname(p);
       if (parentDir === p) {
         return p;
       }
       return path.join(tryRealpath(parentDir), path.basename(p));
     }
-    throw _e;
+    throw e;
   }
 }
 

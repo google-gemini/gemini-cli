@@ -41,6 +41,11 @@ const commonRestrictedSyntaxRules = [
     message:
       'Do not use typeof to check object properties. Define a TypeScript interface and a type guard function instead.',
   },
+  {
+    selector: 'CatchClause > Identifier[name=/^_/]',
+    message:
+      'Do not use underscored identifiers in catch blocks. If the error is unused, use "catch {}". If it is used, remove the underscore.',
+  },
 ];
 
 export default tseslint.config(
