@@ -41,6 +41,10 @@ import { UpdateTopicTool } from '../tools/topicTool.js';
 import { TopicState } from './topicState.js';
 import { ExitPlanModeTool } from '../tools/exit-plan-mode.js';
 import { EnterPlanModeTool } from '../tools/enter-plan-mode.js';
+import {
+  ListBackgroundProcessesTool,
+  ReadBackgroundOutputTool,
+} from '../tools/shellBackgroundTools.js';
 import { GeminiClient } from '../core/client.js';
 import { BaseLlmClient } from '../core/baseLlmClient.js';
 import { LocalLiteRtLmClient } from '../core/localLiteRtLmClient.js';
@@ -3515,6 +3519,16 @@ export class Config implements McpContext, AgentLoopContext {
     );
     maybeRegister(ShellTool, () =>
       registry.registerTool(new ShellTool(this, this.messageBus)),
+    );
+    maybeRegister(ListBackgroundProcessesTool, () =>
+      registry.registerTool(
+        new ListBackgroundProcessesTool(this, this.messageBus),
+      ),
+    );
+    maybeRegister(ReadBackgroundOutputTool, () =>
+      registry.registerTool(
+        new ReadBackgroundOutputTool(this, this.messageBus),
+      ),
     );
     if (!this.isMemoryManagerEnabled()) {
       maybeRegister(MemoryTool, () =>
