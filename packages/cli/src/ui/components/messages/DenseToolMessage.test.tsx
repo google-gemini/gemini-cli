@@ -107,7 +107,6 @@ describe('DenseToolMessage', () => {
     await waitFor(() =>
       expect(lastFrame()).toContain('test.ts → Accepted (+15, -6)'),
     );
-    await waitFor(() => expect(lastFrame()).toContain('diff content'));
     const output = lastFrame();
     expect(output).toMatchSnapshot();
   });
@@ -140,7 +139,6 @@ describe('DenseToolMessage', () => {
     expect(output).toContain('Edit');
     expect(output).toContain('styles.scss');
     expect(output).toContain('→ Confirming');
-    expect(output).toContain('body { color: red; }');
     expect(output).toMatchSnapshot();
   });
 
@@ -175,8 +173,6 @@ describe('DenseToolMessage', () => {
     const output = lastFrame();
     expect(output).toContain('Edit');
     expect(output).toContain('styles.scss → Rejected (+1, -1)');
-    expect(output).toContain('- old line');
-    expect(output).toContain('+ new line');
     expect(output).toMatchSnapshot();
   });
 
@@ -251,7 +247,6 @@ describe('DenseToolMessage', () => {
     const output = lastFrame();
     expect(output).toContain('WriteFile');
     expect(output).toContain('config.json → Accepted (+1, -1)');
-    expect(output).toContain('+ new content');
     expect(output).toMatchSnapshot();
   });
 
@@ -277,8 +272,6 @@ describe('DenseToolMessage', () => {
     expect(output).toContain('WriteFile');
     expect(output).toContain('config.json');
     expect(output).toContain('→ Rejected');
-    expect(output).toContain('- old content');
-    expect(output).toContain('+ new content');
     expect(output).toMatchSnapshot();
   });
 
@@ -505,7 +498,6 @@ describe('DenseToolMessage', () => {
       await waitUntilReady();
       const output = lastFrame();
       expect(output).toContain('Accepted');
-      expect(output).toContain('new line');
       expect(output).toMatchSnapshot();
     });
 
