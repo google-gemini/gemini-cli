@@ -1915,6 +1915,7 @@ describe('ShellExecutionService environment variables', () => {
       isKnownSafeCommand: vi.fn().mockReturnValue(false),
       isDangerousCommand: vi.fn().mockReturnValue(false),
       parseDenials: vi.fn().mockReturnValue(undefined),
+      getWorkspace: vi.fn().mockReturnValue('/workspace'),
     };
 
     const configWithSandbox: ShellExecutionConfig = {

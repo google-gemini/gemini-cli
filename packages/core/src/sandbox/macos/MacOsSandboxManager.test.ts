@@ -140,6 +140,31 @@ describe('MacOsSandboxManager', () => {
       );
     });
 
+    it('should NOT whitelist root in YOLO mode', async () => {
+      manager = new MacOsSandboxManager({
+        workspace: mockWorkspace,
+        modeConfig: { readonly: false, allowOverrides: true, yolo: true },
+      });
+
+      await manager.prepareCommand({
+        command: 'ls',
+        args: ['/'],
+        cwd: mockWorkspace,
+        env: {},
+      });
+
+      expect(seatbeltArgsBuilder.buildSeatbeltProfile).toHaveBeenCalledWith(
+        expect.objectContaining({
+          additionalPermissions: expect.objectContaining({
+            fileSystem: expect.objectContaining({
+              read: expect.not.arrayContaining(['/']),
+              write: expect.not.arrayContaining(['/']),
+            }),
+          }),
+        }),
+      );
+    });
+
     describe('virtual commands', () => {
       it('should translate __read to /bin/cat', async () => {
         const testFile = path.join(mockWorkspace, 'file.txt');
