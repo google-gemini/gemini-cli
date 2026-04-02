@@ -120,6 +120,19 @@ implements the approved changes.
         attention to `old_string` for exact matches, including whitespace and
         newlines. For multiple occurrences of the same simple string (e.g.,
         "e.g."), use `allow_multiple: true`.
+      - **String replacement safeguards:** When applying these fixes across the
+        docset, you must verify the following:
+        - **Preserve Code Blocks:** Explicitly verify that no code blocks,
+          inline code snippets, terminal commands, or file paths have been
+          erroneously capitalized or modified.
+        - **Preserve Literal Strings:** Never alter the wording of literal error
+          messages, UI quotes, or system logs. For example, if a style rule says
+          to remove the word "please", you must NOT remove it if it appears
+          inside a quoted error message (e.g.,
+          `Error: Please contact your administrator`).
+        - **Verify Sentence Casing:** When removing filler words (like "please")
+          from the beginning of a sentence or list item, always verify that the
+          new first word of the sentence is properly capitalized.
       - For structural changes (e.g., adding an overview paragraph), use
         `replace` or `write_file` as appropriate.
       - For broken links, determine the correct new path or update the link
