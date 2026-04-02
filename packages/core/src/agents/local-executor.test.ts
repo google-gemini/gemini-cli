@@ -921,7 +921,7 @@ describe('LocalAgentExecutor', () => {
       // Mock a simple complete_task response so run() terminates
       mockModelResponse([
         {
-          name: TASK_COMPLETE_TOOL_NAME,
+          name: COMPLETE_TASK_TOOL_NAME,
           args: { finalResult: 'done' },
           id: 'c1',
         },
@@ -944,7 +944,7 @@ describe('LocalAgentExecutor', () => {
       // Mock a simple complete_task response so run() terminates
       mockModelResponse([
         {
-          name: TASK_COMPLETE_TOOL_NAME,
+          name: COMPLETE_TASK_TOOL_NAME,
           args: { finalResult: 'done' },
           id: 'c1',
         },
