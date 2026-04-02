@@ -398,8 +398,8 @@ on this page.
 
 ## Running in headless mode <a id="headless"></a>
 
-[Headless mode](../cli/headless) will use your existing authentication method,
-if an existing authentication credential is cached.
+[Headless mode](../cli/headless.md) will use your existing authentication
+method, if an existing authentication credential is cached.
 
 If you have not already signed in with an authentication credential, you must
 configure authentication using environment variables:
