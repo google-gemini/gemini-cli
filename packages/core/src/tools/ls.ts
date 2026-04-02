@@ -22,7 +22,6 @@ import { DEFAULT_FILE_FILTERING_OPTIONS } from '../config/constants.js';
 import { ToolErrorType } from './tool-error.js';
 import { LS_TOOL_NAME, LS_DISPLAY_NAME } from './tool-names.js';
 import { buildDirPathArgsPattern } from '../policy/utils.js';
-import { debugLogger } from '../utils/debugLogger.js';
 import { LS_DEFINITION } from './definitions/coreTools.js';
 import { resolveToolDeclaration } from './definitions/resolver.js';
 import { discoverJitContext, appendJitContext } from './jit-context.js';
@@ -224,40 +223,48 @@ class LSToolInvocation extends BaseToolInvocation<LSToolParams, ToolResult> {
             DEFAULT_FILE_FILTERING_OPTIONS.respectGeminiIgnore,
         });
 
-      const entryResults = await Promise.all(
-        filteredPaths
-          .filter(
-            (relativePath) =>
-              !this.shouldIgnore(
-                path.basename(relativePath),
-                this.params.ignore,
-              ),
-          )
-          .map(async (relativePath) => {
-            if (signal.aborted) throw signal.reason;
+      const pathsToStat = filteredPaths.filter(
+        (relativePath) =>
+          !this.shouldIgnore(path.basename(relativePath), this.params.ignore),
+      );
+
+      // Batch stat calls to avoid opening too many file descriptors at once
+      const CONCURRENT_LIMIT = 20;
+      type LSEntry = {
+        name: string;
+        path: string;
+        isDirectory: boolean;
+        size: number;
+        modifiedTime: Date;
+      };
+      const entries: LSEntry[] = [];
+      for (let i = 0; i < pathsToStat.length; i += CONCURRENT_LIMIT) {
+        if (signal.aborted) throw signal.reason;
+        const batch = pathsToStat.slice(i, i + CONCURRENT_LIMIT);
+        const batchResults = await Promise.allSettled(
+          batch.map(async (relativePath) => {
             const fullPath = path.resolve(
               this.config.getTargetDir(),
               relativePath,
             );
-            try {
-              const stats = await fs.stat(fullPath);
-              const isDir = stats.isDirectory();
-              return {
-                name: path.basename(fullPath),
-                path: fullPath,
-                isDirectory: isDir,
-                size: isDir ? 0 : stats.size,
-                modifiedTime: stats.mtime,
-              };
-            } catch (error) {
-              debugLogger.debug(`Error accessing ${fullPath}: ${error}`);
-              return null;
-            }
+            const stats = await fs.stat(fullPath);
+            const isDir = stats.isDirectory();
+            return {
+              name: path.basename(fullPath),
+              path: fullPath,
+              isDirectory: isDir,
+              size: isDir ? 0 : stats.size,
+              modifiedTime: stats.mtime,
+            };
           }),
-      );
-      const entries = entryResults.filter(
-        (e): e is NonNullable<typeof e> => e !== null,
-      );
+        );
+        for (const result of batchResults) {
+          if (result.status === 'fulfilled') {
+            entries.push(result.value);
+          }
+          // Files that disappeared between listing and stat are silently dropped
+        }
+      }
 
       // Sort entries (directories first, then alphabetically)
       entries.sort((a, b) => {

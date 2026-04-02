@@ -214,26 +214,33 @@ class GlobToolInvocation extends BaseToolInvocation<
             DEFAULT_FILE_FILTERING_OPTIONS.respectGeminiIgnore,
         });
 
-      // Phase 3: Stat only the filtered survivors in parallel for recency sorting
-      const statResults: GlobPath[] = await Promise.all(
-        filteredPaths.map(async (relativePath) => {
-          if (signal.aborted) throw signal.reason;
-          const absPath = path.resolve(
-            this.config.getTargetDir(),
-            relativePath,
-          );
-          try {
+      // Phase 3: Stat only the filtered survivors in batches for recency sorting.
+      // Cap concurrency to avoid opening too many file descriptors at once.
+      const CONCURRENT_LIMIT = 20;
+      const statResults: GlobPath[] = [];
+      for (let i = 0; i < filteredPaths.length; i += CONCURRENT_LIMIT) {
+        if (signal.aborted) throw signal.reason;
+        const batch = filteredPaths.slice(i, i + CONCURRENT_LIMIT);
+        const batchResults = await Promise.allSettled(
+          batch.map(async (relativePath) => {
+            const absPath = path.resolve(
+              this.config.getTargetDir(),
+              relativePath,
+            );
             const stats = await fsPromises.stat(absPath);
             return {
               fullpath: () => absPath,
               mtimeMs: stats.mtimeMs,
             };
-          } catch {
-            // File may have been deleted between glob and stat
-            return { fullpath: () => absPath, mtimeMs: 0 };
+          }),
+        );
+        for (const result of batchResults) {
+          if (result.status === 'fulfilled') {
+            statResults.push(result.value);
           }
-        }),
-      );
+          // Files deleted between glob and stat are silently dropped
+        }
+      }
 
       if (!statResults || statResults.length === 0) {
         let message = `No files found matching pattern "${this.params.pattern}"`;
