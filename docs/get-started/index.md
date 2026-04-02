@@ -118,7 +118,7 @@ Result: Gemini performs a sequence of actions to answer your request.
     them.
 3.  Finally, after analyzing the code, it provides a summary.
 
-Gemini CLI returns an explanation based on the actual source code:
+Result: Gemini CLI returns an explanation based on the actual source code:
 
 ```markdown
 The `chalk` library is a popular npm package for styling terminal output with
@@ -138,6 +138,30 @@ colors. After analyzing the source code, here's how it works:
   a reset code at the end. This produces the final, styled string that the
   terminal can render.
 ```
+
+### Map a large codebase across multiple directories
+
+Gemini CLI can analyze complex monorepos or multi-directory projects by
+leveraging the 1M+ token context window of Gemini 1.5 Pro.
+
+Scenario: You are working in a monorepo and need to understand how the `Core`
+logic is shared between the `CLI` and the `A2A-Server` packages.
+
+Give Gemini CLI the following prompt:
+
+```cli
+@packages/core @packages/cli @packages/a2a-server Map the implementation of the PolicyEngine across these packages and explain any architectural differences.
+```
+
+Result: Gemini CLI reads all requested directories and provides a cross-package
+analysis:
+
+- **Core Package:** Defines the base `PolicyEngine` interface and shared logic
+  for decision making.
+- **CLI Package:** Implements a specialized version of the engine that handles
+  user-interactive prompts and terminal-specific security policies.
+- **A2A-Server Package:** Uses the core engine to enforce programmatic security
+  constraints for automated agent-to-agent communication.
 
 ### Combine two spreadsheets into one spreadsheet
 
