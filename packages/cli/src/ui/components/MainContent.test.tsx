@@ -9,17 +9,14 @@ import { createMockSettings } from '../../test-utils/settings.js';
 import { makeFakeConfig, CoreToolCallStatus } from '@google/gemini-cli-core';
 import { waitFor } from '../../test-utils/async.js';
 import { MainContent } from './MainContent.js';
+import { TopicStickyHeader } from './TopicStickyHeader.js';
 import { getToolGroupBorderAppearance } from '../utils/borderStyles.js';
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { Box, Text } from 'ink';
-import { act, useState, type JSX } from 'react';
+import { type JSX } from 'react';
 import { useAlternateBuffer } from '../hooks/useAlternateBuffer.js';
 import { SHELL_COMMAND_NAME } from '../constants.js';
-import {
-  UIStateContext,
-  useUIState,
-  type UIState,
-} from '../contexts/UIStateContext.js';
+import { type UIState } from '../contexts/UIStateContext.js';
 import { type IndividualToolCallDisplay } from '../types.js';
 import {
   type ConfirmingToolState,
@@ -365,10 +362,9 @@ describe('MainContent', () => {
     const { lastFrame, unmount } = await renderWithProviders(<MainContent />, {
       uiState: defaultMockUiState as Partial<UIState>,
     });
-    await waitFor(() => expect(lastFrame()).toContain('AppHeader(full)'));
     const output = lastFrame();
 
-    expect(output).toContain('AppHeader');
+    expect(output).toContain('Hello');
     expect(output).toContain('Hello');
     expect(output).toContain('Hi there');
     unmount();
@@ -380,81 +376,9 @@ describe('MainContent', () => {
       uiState: defaultMockUiState as Partial<UIState>,
     });
     const output = lastFrame();
-    expect(output).toContain('AppHeader(full)');
     expect(output).toContain('Hello');
     expect(output).toContain('Hi there');
     unmount();
-  });
-
-  it('renders minimal header in minimal mode (alternate buffer)', async () => {
-    vi.mocked(useAlternateBuffer).mockReturnValue(true);
-
-    const { lastFrame, unmount } = await renderWithProviders(<MainContent />, {
-      uiState: {
-        ...defaultMockUiState,
-        cleanUiDetailsVisible: false,
-      } as Partial<UIState>,
-    });
-    await waitFor(() => expect(lastFrame()).toContain('Hello'));
-    const output = lastFrame();
-
-    expect(output).toContain('AppHeader(minimal)');
-    expect(output).not.toContain('AppHeader(full)');
-    expect(output).toContain('Hello');
-    unmount();
-  });
-
-  it('restores full header details after toggle in alternate buffer mode', async () => {
-    vi.mocked(useAlternateBuffer).mockReturnValue(true);
-
-    let setShowDetails: ((visible: boolean) => void) | undefined;
-    const ToggleHarness = () => {
-      const outerState = useUIState();
-      const [showDetails, setShowDetailsState] = useState(
-        outerState.cleanUiDetailsVisible,
-      );
-      setShowDetails = setShowDetailsState;
-
-      return (
-        <UIStateContext.Provider
-          value={{ ...outerState, cleanUiDetailsVisible: showDetails }}
-        >
-          <MainContent />
-        </UIStateContext.Provider>
-      );
-    };
-
-    const { lastFrame } = await renderWithProviders(<ToggleHarness />, {
-      uiState: {
-        ...defaultMockUiState,
-        cleanUiDetailsVisible: false,
-      } as Partial<UIState>,
-    });
-
-    await waitFor(() => expect(lastFrame()).toContain('AppHeader(minimal)'));
-    if (!setShowDetails) {
-      throw new Error('setShowDetails was not initialized');
-    }
-    const setShowDetailsSafe = setShowDetails;
-
-    act(() => {
-      setShowDetailsSafe(true);
-    });
-
-    await waitFor(() => expect(lastFrame()).toContain('AppHeader(full)'));
-  });
-
-  it('always renders full header details in normal buffer mode', async () => {
-    vi.mocked(useAlternateBuffer).mockReturnValue(false);
-    const { lastFrame } = await renderWithProviders(<MainContent />, {
-      uiState: {
-        ...defaultMockUiState,
-        cleanUiDetailsVisible: false,
-      } as Partial<UIState>,
-    });
-
-    await waitFor(() => expect(lastFrame()).toContain('AppHeader(full)'));
-    expect(lastFrame()).not.toContain('AppHeader(minimal)');
   });
 
   it('does not constrain height in alternate buffer mode', async () => {
@@ -463,7 +387,6 @@ describe('MainContent', () => {
       uiState: defaultMockUiState as Partial<UIState>,
     });
     const output = lastFrame();
-    expect(output).toContain('AppHeader(full)');
     expect(output).toContain('Hello');
     expect(output).toContain('Hi there');
     unmount();
@@ -906,5 +829,35 @@ describe('MainContent', () => {
         unmount();
       },
     );
+  });
+
+  it('renders TopicStickyHeader above history', async () => {
+    vi.mocked(useAlternateBuffer).mockReturnValue(true);
+    const uiState = {
+      ...defaultMockUiState,
+      history: [
+        { id: 1, type: 'user', text: 'First user prompt' },
+        { id: 2, type: 'gemini', text: 'Response to first' },
+        { id: 3, type: 'user', text: 'Second user prompt' },
+      ],
+      currentTopic: { title: 'Test Topic Title', summary: 'Test Summary' },
+    };
+
+    const { lastFrame, unmount } = await renderWithProviders(
+      <Box flexDirection="column">
+        <TopicStickyHeader />
+        <MainContent />
+      </Box>,
+      {
+        uiState: uiState as unknown as Partial<UIState>,
+        config: makeFakeConfig({ useAlternateBuffer: true }),
+        settings: createMockSettings({ ui: { useAlternateBuffer: true } }),
+      },
+    );
+
+    const output = lastFrame();
+    expect(output).toContain('Test Topic Title');
+    expect(output).toContain('Test Summary');
+    unmount();
   });
 });

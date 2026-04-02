@@ -42,6 +42,7 @@ export const DefaultAppLayout: React.FC = () => {
       ref={uiState.rootUiRef}
     >
       <AppHeader version={version} showDetails={cleanUiDetailsVisible} />
+      <TopicStickyHeader />
       <MainContent />
 
       {uiState.isBackgroundTaskVisible &&
@@ -85,8 +86,6 @@ export const DefaultAppLayout: React.FC = () => {
         ) : (
           <Composer isFocused={true} />
         )}
-
-        <TopicStickyHeader />
 
         <ExitWarning />
       </Box>

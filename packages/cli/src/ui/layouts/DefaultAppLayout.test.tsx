@@ -41,6 +41,10 @@ vi.mock('../contexts/UIStateContext.js', () => ({
   useUIState: () => mockUIState,
 }));
 
+vi.mock('../contexts/AppContext.js', () => ({
+  useAppContext: () => ({ version: '1.2.3', startupWarnings: [] }),
+}));
+
 vi.mock('../hooks/useFlickerDetector.js', () => ({
   useFlickerDetector: vi.fn(),
 }));

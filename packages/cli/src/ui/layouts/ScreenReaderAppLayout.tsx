@@ -32,6 +32,7 @@ export const ScreenReaderAppLayout: React.FC = () => {
       ref={uiState.rootUiRef}
     >
       <AppHeader version={version} showDetails={cleanUiDetailsVisible} />
+      <TopicStickyHeader />
       <Notifications />
       <Footer />
       <Box flexGrow={1} overflow="hidden">
@@ -45,8 +46,6 @@ export const ScreenReaderAppLayout: React.FC = () => {
       ) : (
         <Composer />
       )}
-
-      <TopicStickyHeader />
 
       <ExitWarning />
     </Box>

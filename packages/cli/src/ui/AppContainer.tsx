@@ -687,7 +687,10 @@ export const AppContainer = (props: AppContainerProps) => {
   }, [bannerVisible, bannerText, settings, config, refreshStatic]);
 
   useEffect(() => {
-    const handleTopicUpdated = (payload: { title?: string; summary?: string }) => {
+    const handleTopicUpdated = (payload: {
+      title?: string;
+      summary?: string;
+    }) => {
       setCurrentTopic({ title: payload.title, summary: payload.summary });
       refreshStatic();
     };

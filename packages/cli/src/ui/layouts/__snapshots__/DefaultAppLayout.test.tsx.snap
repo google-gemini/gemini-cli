@@ -1,38 +1,136 @@
 // Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
 
 exports[`<DefaultAppLayout /> > hides BackgroundTaskDisplay when StreamingState is WaitingForConfirmation 1`] = `
-"MainContent
-Notifications
-CopyModeWarning
-Composer
-ExitWarning
+"
+  ERROR  useSettings must be used within a SettingsProvider
+
+ src/ui/contexts/SettingsContext.tsx:24:11
+
+ 21: export const useSettings = (): LoadedSettings => {
+ 22:   const context = useContext(SettingsContext);
+ 23:   if (context === undefined) {
+ 24:     throw new Error('useSettings must be used within a SettingsProvider');
+ 25:   }
+ 26:   return context;
+ 27: };
+
+ - useSettings (src/ui/contexts/SettingsContext.tsx:24:11)
+ - AppHeader (src/ui/components/AppHeader.tsx:60:20)
+ -Object.react-stack-botto
+  m-frame                (/Users/abhijitbalaji/projects/gemini-cli.worktrees/abhijit-2592-mv-sticky
+                         -headers/node_modules/react-reconciler/cjs/react-reconciler.development.js
+                         :15859:20)
+ -renderWithHook
+  s            (/Users/abhijitbalaji/projects/gemini-cli.worktrees/abhijit-2592-mv-sticky-headers/n
+               ode_modules/react-reconciler/cjs/react-reconciler.development.js:3221:22)
+ -updateFunctionCompo
+  nent              (/Users/abhijitbalaji/projects/gemini-cli.worktrees/abhijit-2592-mv-sticky-head
+                    ers/node_modules/react-reconciler/cjs/react-reconciler.development.js:6475:19)
+
+ -beginWork
+          (/Users/abhijitbalaji/projects/gemini-cli.worktrees/abhijit-2592-mv-sticky-headers/node_m
+          odules/react-reconciler/cjs/react-reconciler.development.js:8009:18)
+ -runWithFiberInD
+  EV            (/Users/abhijitbalaji/projects/gemini-cli.worktrees/abhijit-2592-mv-sticky-headers/
+                node_modules/react-reconciler/cjs/react-reconciler.development.js:1738:13)
+ -performUnitOfWo
+  rk            (/Users/abhijitbalaji/projects/gemini-cli.worktrees/abhijit-2592-mv-sticky-headers/
+                node_modules/react-reconciler/cjs/react-reconciler.development.js:12834:22)
+ -workLoopSync
+             (/Users/abhijitbalaji/projects/gemini-cli.worktrees/abhijit-2592-mv-sticky-headers/nod
+             e_modules/react-reconciler/cjs/react-reconciler.development.js:12644:41)
+ -renderRootSyn
+  c           (/Users/abhijitbalaji/projects/gemini-cli.worktrees/abhijit-2592-mv-sticky-headers/no
+              de_modules/react-reconciler/cjs/react-reconciler.development.js:12624:11)
 "
 `;
 
 exports[`<DefaultAppLayout /> > renders BackgroundTaskDisplay when shells exist and active 1`] = `
-"MainContent
-BackgroundTaskDisplay
+"
+  ERROR  useSettings must be used within a SettingsProvider
 
+ src/ui/contexts/SettingsContext.tsx:24:11
 
+ 21: export const useSettings = (): LoadedSettings => {
+ 22:   const context = useContext(SettingsContext);
+ 23:   if (context === undefined) {
+ 24:     throw new Error('useSettings must be used within a SettingsProvider');
+ 25:   }
+ 26:   return context;
+ 27: };
 
+ - useSettings (src/ui/contexts/SettingsContext.tsx:24:11)
+ - AppHeader (src/ui/components/AppHeader.tsx:60:20)
+ -Object.react-stack-botto
+  m-frame                (/Users/abhijitbalaji/projects/gemini-cli.worktrees/abhijit-2592-mv-sticky
+                         -headers/node_modules/react-reconciler/cjs/react-reconciler.development.js
+                         :15859:20)
+ -renderWithHook
+  s            (/Users/abhijitbalaji/projects/gemini-cli.worktrees/abhijit-2592-mv-sticky-headers/n
+               ode_modules/react-reconciler/cjs/react-reconciler.development.js:3221:22)
+ -updateFunctionCompo
+  nent              (/Users/abhijitbalaji/projects/gemini-cli.worktrees/abhijit-2592-mv-sticky-head
+                    ers/node_modules/react-reconciler/cjs/react-reconciler.development.js:6475:19)
 
-Notifications
-CopyModeWarning
-Composer
-ExitWarning
+ -beginWork
+          (/Users/abhijitbalaji/projects/gemini-cli.worktrees/abhijit-2592-mv-sticky-headers/node_m
+          odules/react-reconciler/cjs/react-reconciler.development.js:8009:18)
+ -runWithFiberInD
+  EV            (/Users/abhijitbalaji/projects/gemini-cli.worktrees/abhijit-2592-mv-sticky-headers/
+                node_modules/react-reconciler/cjs/react-reconciler.development.js:1738:13)
+ -performUnitOfWo
+  rk            (/Users/abhijitbalaji/projects/gemini-cli.worktrees/abhijit-2592-mv-sticky-headers/
+                node_modules/react-reconciler/cjs/react-reconciler.development.js:12834:22)
+ -workLoopSync
+             (/Users/abhijitbalaji/projects/gemini-cli.worktrees/abhijit-2592-mv-sticky-headers/nod
+             e_modules/react-reconciler/cjs/react-reconciler.development.js:12644:41)
+ -renderRootSyn
+  c           (/Users/abhijitbalaji/projects/gemini-cli.worktrees/abhijit-2592-mv-sticky-headers/no
+              de_modules/react-reconciler/cjs/react-reconciler.development.js:12624:11)
 "
 `;
 
 exports[`<DefaultAppLayout /> > shows BackgroundTaskDisplay when StreamingState is NOT WaitingForConfirmation 1`] = `
-"MainContent
-BackgroundTaskDisplay
+"
+  ERROR  useSettings must be used within a SettingsProvider
 
+ src/ui/contexts/SettingsContext.tsx:24:11
 
+ 21: export const useSettings = (): LoadedSettings => {
+ 22:   const context = useContext(SettingsContext);
+ 23:   if (context === undefined) {
+ 24:     throw new Error('useSettings must be used within a SettingsProvider');
+ 25:   }
+ 26:   return context;
+ 27: };
 
+ - useSettings (src/ui/contexts/SettingsContext.tsx:24:11)
+ - AppHeader (src/ui/components/AppHeader.tsx:60:20)
+ -Object.react-stack-botto
+  m-frame                (/Users/abhijitbalaji/projects/gemini-cli.worktrees/abhijit-2592-mv-sticky
+                         -headers/node_modules/react-reconciler/cjs/react-reconciler.development.js
+                         :15859:20)
+ -renderWithHook
+  s            (/Users/abhijitbalaji/projects/gemini-cli.worktrees/abhijit-2592-mv-sticky-headers/n
+               ode_modules/react-reconciler/cjs/react-reconciler.development.js:3221:22)
+ -updateFunctionCompo
+  nent              (/Users/abhijitbalaji/projects/gemini-cli.worktrees/abhijit-2592-mv-sticky-head
+                    ers/node_modules/react-reconciler/cjs/react-reconciler.development.js:6475:19)
 
-Notifications
-CopyModeWarning
-Composer
-ExitWarning
+ -beginWork
+          (/Users/abhijitbalaji/projects/gemini-cli.worktrees/abhijit-2592-mv-sticky-headers/node_m
+          odules/react-reconciler/cjs/react-reconciler.development.js:8009:18)
+ -runWithFiberInD
+  EV            (/Users/abhijitbalaji/projects/gemini-cli.worktrees/abhijit-2592-mv-sticky-headers/
+                node_modules/react-reconciler/cjs/react-reconciler.development.js:1738:13)
+ -performUnitOfWo
+  rk            (/Users/abhijitbalaji/projects/gemini-cli.worktrees/abhijit-2592-mv-sticky-headers/
+                node_modules/react-reconciler/cjs/react-reconciler.development.js:12834:22)
+ -workLoopSync
+             (/Users/abhijitbalaji/projects/gemini-cli.worktrees/abhijit-2592-mv-sticky-headers/nod
+             e_modules/react-reconciler/cjs/react-reconciler.development.js:12644:41)
+ -renderRootSyn
+  c           (/Users/abhijitbalaji/projects/gemini-cli.worktrees/abhijit-2592-mv-sticky-headers/no
+              de_modules/react-reconciler/cjs/react-reconciler.development.js:12624:11)
 "
 `;

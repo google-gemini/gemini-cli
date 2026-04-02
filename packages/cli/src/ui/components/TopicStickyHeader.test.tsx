@@ -63,9 +63,9 @@ describe('<TopicStickyHeader />', () => {
 
   it('should render topic title and summary', async () => {
     const uiState = {
-      currentTopic: { 
+      currentTopic: {
         title: 'My Awesome Topic',
-        summary: 'This is a brief summary'
+        summary: 'This is a brief summary',
       },
       terminalWidth: 100,
     };
@@ -84,8 +84,8 @@ describe('<TopicStickyHeader />', () => {
 
   it('should render default title when only summary is present', async () => {
     const uiState = {
-      currentTopic: { 
-        summary: 'Just a summary'
+      currentTopic: {
+        summary: 'Just a summary',
       },
       terminalWidth: 100,
     };

@@ -15,7 +15,7 @@ import {
   type VirtualizedListRef,
 } from './shared/VirtualizedList.js';
 import { ScrollableList } from './shared/ScrollableList.js';
-import { useMemo, memo, useCallback, useEffect, useRef } from 'react';
+import { useMemo, memo, useEffect, useRef } from 'react';
 import { MAX_GEMINI_MESSAGE_LINES } from '../constants.js';
 import { useConfirmingTool } from '../hooks/useConfirmingTool.js';
 import { ToolConfirmationQueue } from './ToolConfirmationQueue.js';
@@ -147,16 +147,6 @@ export const MainContent = () => {
     ],
   );
 
-  const staticHistoryItems = useMemo(
-    () => historyItems.slice(0, lastUserPromptIndex + 1),
-    [historyItems, lastUserPromptIndex],
-  );
-
-  const lastResponseHistoryItems = useMemo(
-    () => historyItems.slice(lastUserPromptIndex + 1),
-    [historyItems, lastUserPromptIndex],
-  );
-
   const pendingItems = useMemo(
     () => (
       <Box flexDirection="column" key="pending-items-group">
@@ -209,31 +199,17 @@ export const MainContent = () => {
     ],
   );
 
-  const virtualizedData = useMemo(
-    () => [
-      ...augmentedHistory.map(
-        ({
-          item,
-          isExpandable,
-          isFirstThinking,
-          isFirstAfterThinking,
-          suppressNarration,
-        }) => ({
-          type: 'history' as const,
-          item,
-          isExpandable,
-          isFirstThinking,
-          isFirstAfterThinking,
-          suppressNarration,
-        }),
-      ),
+  if (isAlternateBuffer) {
+    const virtualizedData = [
+      ...augmentedHistory.map((ah) => ({ type: 'history' as const, ...ah })),
       { type: 'pending' as const },
-    ],
-    [augmentedHistory],
-  );
+    ];
 
-  const renderItem = useCallback(
-    ({ item }: { item: (typeof virtualizedData)[number] }) => {
+    const renderItem = ({
+      item,
+    }: {
+      item: (typeof virtualizedData)[number];
+    }) => {
       if (item.type === 'history') {
         return (
           <MemoizedHistoryItemDisplay
@@ -257,11 +233,8 @@ export const MainContent = () => {
       } else {
         return pendingItems;
       }
-    },
-    [mainAreaWidth, uiState.slashCommands, pendingItems, uiState.constrainHeight, staticAreaMaxItemHeight]
-  );
+    };
 
-  if (isAlternateBuffer) {
     return (
       <ScrollableList
         ref={scrollableListRef}
@@ -279,6 +252,9 @@ export const MainContent = () => {
       />
     );
   }
+
+  const staticHistoryItems = historyItems.slice(0, lastUserPromptIndex + 1);
+  const lastResponseHistoryItems = historyItems.slice(lastUserPromptIndex + 1);
 
   return (
     <>

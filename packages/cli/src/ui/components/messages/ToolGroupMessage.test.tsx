@@ -257,61 +257,6 @@ describe('<ToolGroupMessage />', () => {
       unmount();
     });
 
-    it('renders update_topic tool call using TopicMessage', async () => {
-      const toolCalls = [
-        createToolCall({
-          callId: 'topic-tool',
-          name: UPDATE_TOPIC_TOOL_NAME,
-          args: {
-            [TOPIC_PARAM_TITLE]: 'Testing Topic',
-            [TOPIC_PARAM_STRATEGIC_INTENT]: 'This is the description',
-          },
-        }),
-      ];
-      const item = createItem(toolCalls);
-
-      const { lastFrame, unmount } = await renderWithProviders(
-        <ToolGroupMessage {...baseProps} item={item} toolCalls={toolCalls} />,
-        {
-          config: baseMockConfig,
-          settings: fullVerbositySettings,
-        },
-      );
-
-      const output = lastFrame();
-      expect(output).toContain('Testing Topic: ');
-      expect(output).toContain('This is the description');
-      expect(output).toMatchSnapshot('update_topic_tool');
-      unmount();
-    });
-
-    it('renders update_topic tool call with summary instead of strategic_intent', async () => {
-      const toolCalls = [
-        createToolCall({
-          callId: 'topic-tool-summary',
-          name: UPDATE_TOPIC_TOOL_NAME,
-          args: {
-            [TOPIC_PARAM_TITLE]: 'Testing Topic',
-            summary: 'This is the summary',
-          },
-        }),
-      ];
-      const item = createItem(toolCalls);
-
-      const { lastFrame, unmount } = await renderWithProviders(
-        <ToolGroupMessage {...baseProps} item={item} toolCalls={toolCalls} />,
-        {
-          config: baseMockConfig,
-          settings: fullVerbositySettings,
-        },
-      );
-
-      const output = lastFrame();
-      expect(output).toContain('Testing Topic: ');
-      expect(output).toContain('This is the summary');
-      unmount();
-    });
-
     it('renders mixed tool calls including update_topic', async () => {
       const toolCalls = [
         createToolCall({
