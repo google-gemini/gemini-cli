@@ -103,12 +103,16 @@ export const MainContent = () => {
           item.type === 'thinking' && prevType !== 'thinking';
         const isFirstAfterThinking =
           item.type !== 'thinking' && prevType === 'thinking';
+        const isToolGroupBoundary =
+          (item.type !== 'tool_group' && prevType === 'tool_group') ||
+          (item.type === 'tool_group' && prevType !== 'tool_group');
 
         return {
           item,
           isExpandable: i > lastUserPromptIndex,
           isFirstThinking,
           isFirstAfterThinking,
+          isToolGroupBoundary,
           suppressNarration: suppressNarrationFlags[i] ?? false,
         };
       }),
@@ -123,6 +127,7 @@ export const MainContent = () => {
           isExpandable,
           isFirstThinking,
           isFirstAfterThinking,
+          isToolGroupBoundary,
           suppressNarration,
         }) => (
           <MemoizedHistoryItemDisplay
@@ -140,6 +145,7 @@ export const MainContent = () => {
             isExpandable={isExpandable}
             isFirstThinking={isFirstThinking}
             isFirstAfterThinking={isFirstAfterThinking}
+            isToolGroupBoundary={isToolGroupBoundary}
             suppressNarration={suppressNarration}
           />
         ),
@@ -175,6 +181,9 @@ export const MainContent = () => {
             item.type === 'thinking' && prevType !== 'thinking';
           const isFirstAfterThinking =
             item.type !== 'thinking' && prevType === 'thinking';
+          const isToolGroupBoundary =
+            (item.type !== 'tool_group' && prevType === 'tool_group') ||
+            (item.type === 'tool_group' && prevType !== 'tool_group');
 
           const suppressNarration =
             suppressNarrationFlags[uiState.history.length + i] ?? false;
@@ -191,6 +200,7 @@ export const MainContent = () => {
               isExpandable={true}
               isFirstThinking={isFirstThinking}
               isFirstAfterThinking={isFirstAfterThinking}
+              isToolGroupBoundary={isToolGroupBoundary}
               suppressNarration={suppressNarration}
             />
           );
@@ -224,6 +234,7 @@ export const MainContent = () => {
           isExpandable,
           isFirstThinking,
           isFirstAfterThinking,
+          isToolGroupBoundary,
           suppressNarration,
         }) => ({
           type: 'history' as const,
@@ -231,6 +242,7 @@ export const MainContent = () => {
           isExpandable,
           isFirstThinking,
           isFirstAfterThinking,
+          isToolGroupBoundary,
           suppressNarration,
         }),
       ),
@@ -266,6 +278,7 @@ export const MainContent = () => {
             isExpandable={item.isExpandable}
             isFirstThinking={item.isFirstThinking}
             isFirstAfterThinking={item.isFirstAfterThinking}
+            isToolGroupBoundary={item.isToolGroupBoundary}
             suppressNarration={item.suppressNarration}
           />
         );
