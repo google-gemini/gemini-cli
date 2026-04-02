@@ -4,7 +4,15 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { vi, describe, it, expect, beforeEach, afterEach } from 'vitest';
+import {
+  vi,
+  describe,
+  it,
+  expect,
+  beforeEach,
+  afterEach,
+  type MockInstance,
+} from 'vitest';
 import { type Config } from '@google/gemini-cli-core';
 import { handleList, listCommand } from './list.js';
 import { loadSettings, type LoadedSettings } from '../../config/settings.js';
@@ -32,8 +40,7 @@ vi.mock('../utils.js', () => ({
 describe('skills list command', () => {
   const mockLoadSettings = vi.mocked(loadSettings);
   const mockLoadCliConfig = vi.mocked(loadCliConfig);
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  let stdoutWriteSpy: any;
+  let stdoutWriteSpy: MockInstance<typeof process.stdout.write>;
 
   beforeEach(async () => {
     vi.clearAllMocks();
