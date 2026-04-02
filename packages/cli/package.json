@@ -75,7 +75,7 @@
     "@google/gemini-cli-test-utils": "file:../test-utils",
     "@types/command-exists": "^1.2.3",
     "@types/hast": "^3.0.4",
-    "@types/node": "^20.11.24",
+    "@types/node": "^25.5.0",
     "@types/react": "^19.2.0",
     "@types/semver": "^7.7.0",
     "@types/shell-quote": "^1.7.5",

@@ -63,7 +63,7 @@ jobs:
 
       - name: 'Setup Windows SDK (Windows)'
         if: "matrix.os == 'windows-latest'"
-        uses: 'microsoft/setup-msbuild@6fb02220983dee41ce7ae257b6f4d8f9bf5ed4ce' # ratchet:microsoft/setup-msbuild@v2
+        uses: 'microsoft/setup-msbuild@30375c66a4eea26614e0d39710365f22f8b0af57' # ratchet:microsoft/setup-msbuild@v3.0.0
 
       - name: 'Add Signtool to Path (Windows)'
         if: "matrix.os == 'windows-latest'"

@@ -67,7 +67,7 @@ jobs:
           cache: 'npm'
 
       - name: 'Cache Linters'
-        uses: 'actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830' # ratchet:actions/cache@v4
+        uses: 'actions/cache@668228422ae6a00e4ad889ee87cd7109ec5666a7' # ratchet:actions/cache@v5.0.4
         with:
           path: '${{ env.GEMINI_LINT_TEMP_DIR }}'
           key: "${{ runner.os }}-${{ runner.arch }}-linters-${{ hashFiles('scripts/lint.js') }}"
@@ -76,7 +76,7 @@ jobs:
         run: 'npm ci'
 
       - name: 'Cache ESLint'
-        uses: 'actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830' # ratchet:actions/cache@v4
+        uses: 'actions/cache@668228422ae6a00e4ad889ee87cd7109ec5666a7' # ratchet:actions/cache@v5.0.4
         with:
           path: '.eslintcache'
           key: "${{ runner.os }}-eslint-${{ hashFiles('package-lock.json', 'eslint.config.js') }}"
@@ -125,7 +125,7 @@ jobs:
       - name: 'Checkout'
         uses: 'actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8' # ratchet:actions/checkout@v5
       - name: 'Link Checker'
-        uses: 'lycheeverse/lychee-action@885c65f3dc543b57c898c8099f4e08c8afd178a2' # ratchet: lycheeverse/lychee-action@v2.6.1
+        uses: 'lycheeverse/lychee-action@8646ba30535128ac92d33dfc9133794bfdd9b411' # ratchet: lycheeverse/lychee-action@v2.8.0
         with:
           args: '--verbose --accept 200,503 ./**/*.md'
           fail: true
@@ -334,12 +334,12 @@ jobs:
           ref: '${{ github.event.inputs.branch_ref || github.ref }}'
 
       - name: 'Initialize CodeQL'
-        uses: 'github/codeql-action/init@df559355d593797519d70b90fc8edd5db049e7a2' # ratchet:github/codeql-action/init@v3
+        uses: 'github/codeql-action/init@c10b8064de6f491fea524254123dbe5e09572f13' # ratchet:github/codeql-action/init@v3
         with:
           languages: 'javascript'
 
       - name: 'Perform CodeQL Analysis'
-        uses: 'github/codeql-action/analyze@df559355d593797519d70b90fc8edd5db049e7a2' # ratchet:github/codeql-action/analyze@v3
+        uses: 'github/codeql-action/analyze@c10b8064de6f491fea524254123dbe5e09572f13' # ratchet:github/codeql-action/analyze@v3
 
   # Check for changes in bundle size.
   bundle_size:
@@ -358,7 +358,7 @@ jobs:
           ref: '${{ github.event.inputs.branch_ref || github.ref }}'
           fetch-depth: 1
 
-      - uses: 'preactjs/compressed-size-action@946a292cd35bd1088e0d7eb92b69d1a8d5b5d76a'
+      - uses: 'preactjs/compressed-size-action@66325aad6443cb7cf89c4bfcd414aea2367cda94'
         with:
           repo-token: '${{ secrets.GITHUB_TOKEN }}'
           pattern: './bundle/**/*.{js,sb}'

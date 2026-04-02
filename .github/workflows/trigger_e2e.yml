@@ -1,5 +1,8 @@
 name: 'Trigger E2E'
 
+permissions:
+  contents: read
+
 on:
   workflow_dispatch:
     inputs:

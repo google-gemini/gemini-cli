@@ -21,7 +21,7 @@ jobs:
 
       - name: 'Slash Command Dispatch'
         id: 'slash_command'
-        uses: 'peter-evans/slash-command-dispatch@40877f718dce0101edfc7aea2b3800cc192f9ed5'
+        uses: 'peter-evans/slash-command-dispatch@9bdcd7914ec1b75590b790b844aa3b8eee7c683a'
         with:
           token: '${{ secrets.GITHUB_TOKEN }}'
           commands: 'patch'
