@@ -214,6 +214,8 @@ export interface UIState {
   bannerVisible: boolean;
   customDialog: React.ReactNode | null;
   terminalBackgroundColor: TerminalBackgroundColor;
+  isAlternateBuffer: boolean;
+  isTransitioningAltBuffer: boolean;
   settingsNonce: number;
   backgroundTasks: Map<number, BackgroundTask>;
   activeBackgroundTaskPid: number | null;

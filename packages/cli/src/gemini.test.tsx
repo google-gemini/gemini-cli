@@ -28,7 +28,10 @@ import {
 } from './config/config.js';
 import { loadSandboxConfig } from './config/sandboxConfig.js';
 import { createMockSandboxConfig } from '@google/gemini-cli-test-utils';
-import { terminalCapabilityManager } from './ui/utils/terminalCapabilityManager.js';
+import {
+  terminalCapabilityManager,
+  cleanupTerminalOnExit,
+} from './ui/utils/terminalCapabilityManager.js';
 import { start_sandbox } from './utils/sandbox.js';
 import { validateNonInteractiveAuth } from './validateNonInterActiveAuth.js';
 import os from 'node:os';
@@ -170,7 +173,6 @@ class MockProcessExitError extends Error {
   }
 }
 
-// Mock dependencies
 vi.mock('./config/settings.js', async (importOriginal) => {
   const actual = await importOriginal<typeof import('./config/settings.js')>();
   return {
@@ -186,6 +188,7 @@ vi.mock('./config/settings.js', async (importOriginal) => {
 });
 
 vi.mock('./ui/utils/terminalCapabilityManager.js', () => ({
+  cleanupTerminalOnExit: vi.fn(),
   terminalCapabilityManager: {
     detectCapabilities: vi.fn(),
     getTerminalBackgroundColor: vi.fn(),
@@ -1448,9 +1451,7 @@ describe('startInteractiveUI', () => {
     // Verify render options
     expect(options).toEqual(
       expect.objectContaining({
-        alternateBuffer: true,
         exitOnCtrlC: false,
-        incrementalRendering: true,
         isScreenReaderEnabled: false,
         onRender: expect.any(Function),
         patchConsole: false,
@@ -1504,12 +1505,15 @@ describe('startInteractiveUI', () => {
 
     // Verify all startup tasks were called
     expect(getVersion).toHaveBeenCalledTimes(1);
-    // 5 cleanups: mouseEvents, consolePatcher, lineWrapping, instance.unmount, and TTY check
-    expect(registerCleanup).toHaveBeenCalledTimes(5);
+    // 4 cleanups: consolePatcher, instance.unmount, TTY check, and terminal mode cleanup
+    expect(registerCleanup).toHaveBeenCalledTimes(4);
 
     // Verify cleanup handler is registered with unmount function
-    const cleanupFn = vi.mocked(registerCleanup).mock.calls[0][0];
-    expect(typeof cleanupFn).toBe('function');
+    const cleanupCalls = vi.mocked(registerCleanup).mock.calls;
+    expect(cleanupCalls.some((call) => call[0] instanceof Function)).toBe(true);
+    expect(cleanupCalls.some((call) => call[0] === cleanupTerminalOnExit)).toBe(
+      true,
+    );
 
     // checkForUpdates should be called asynchronously (not waited for)
     // We need a small delay to let it execute
@@ -1561,9 +1565,9 @@ describe('startInteractiveUI', () => {
       name: 'should disable line wrapping when not in screen reader mode',
     },
   ])('$name', async ({ screenReader, expectedCalls }) => {
-    const writeSpy = vi
-      .spyOn(process.stdout, 'write')
-      .mockImplementation(() => true);
+    const { disableLineWrapping } = await import('@google/gemini-cli-core');
+    const disableLineWrappingSpy = vi.mocked(disableLineWrapping);
+
     const mockConfigWithScreenReader = {
       // eslint-disable-next-line @typescript-eslint/no-misused-spread
       ...mockConfig,
@@ -1580,10 +1584,9 @@ describe('startInteractiveUI', () => {
     );
 
     if (expectedCalls.length > 0) {
-      expect(writeSpy).toHaveBeenCalledWith(expectedCalls[0][0]);
+      expect(disableLineWrappingSpy).toHaveBeenCalled();
     } else {
-      expect(writeSpy).not.toHaveBeenCalledWith('\x1b[?7l');
+      expect(disableLineWrappingSpy).not.toHaveBeenCalled();
     }
-    writeSpy.mockRestore();
   });
 });

@@ -86,7 +86,7 @@ const Demo = () => {
   });
 
   return (
-    <MouseProvider mouseEventsEnabled={true}>
+    <MouseProvider>
       <KeypressProvider>
         <ScrollProvider>
           <Box

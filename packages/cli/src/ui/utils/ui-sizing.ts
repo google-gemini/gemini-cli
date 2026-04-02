@@ -4,14 +4,11 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import type { Config } from '@google/gemini-cli-core';
-import { isAlternateBufferEnabled } from '../hooks/useAlternateBuffer.js';
-
 export const calculateMainAreaWidth = (
   terminalWidth: number,
-  config: Config,
+  isAlternateBuffer: boolean,
 ): number => {
-  if (isAlternateBufferEnabled(config)) {
+  if (isAlternateBuffer) {
     return terminalWidth - 1;
   }
   return terminalWidth;
