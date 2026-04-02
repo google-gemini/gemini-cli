@@ -1408,7 +1408,7 @@ Important Rules:
           Object.assign(args, parsed);
         }
         return { args };
-      } catch (_) {
+      } catch {
         return {
           args: {},
           error: `Failed to parse JSON arguments for tool "${functionCall.name}": ${functionCall.args}. Ensure you provide a valid JSON object.`,

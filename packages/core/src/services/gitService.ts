@@ -46,7 +46,7 @@ export class GitService {
     try {
       await spawnAsync('git', ['--version']);
       return true;
-    } catch (_error) {
+    } catch {
       return false;
     }
   }

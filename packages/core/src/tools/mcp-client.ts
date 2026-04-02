@@ -1817,7 +1817,7 @@ export async function connectToMcpServer(
         await mcpClient.notification({
           method: 'notifications/roots/list_changed',
         });
-      } catch (_) {
+      } catch {
         // If this fails, its almost certainly because the connection was closed
         // and we should just stop listening for future directory changes.
         unlistenDirectories?.();

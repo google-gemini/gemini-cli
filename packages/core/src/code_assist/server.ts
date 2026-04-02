@@ -491,7 +491,7 @@ export class CodeAssistServer implements ContentGenerator {
           const chunk = bufferedLines.join('\n');
           try {
             yield JSON.parse(chunk);
-          } catch (_e) {
+          } catch {
             if (server.config) {
               logInvalidChunk(
                 server.config,

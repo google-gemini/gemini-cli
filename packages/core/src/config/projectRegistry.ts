@@ -258,7 +258,7 @@ export class ProjectRegistry {
               diskCollision = true;
               break;
             }
-          } catch (_e) {
+          } catch {
             // If we can't read it, assume it's someone else's to be safe
             diskCollision = true;
             break;
@@ -274,7 +274,7 @@ export class ProjectRegistry {
       try {
         await this.ensureOwnershipMarkers(candidate, projectPath);
         return candidate;
-      } catch (_e) {
+      } catch {
         // Someone might have claimed it between our check and our write.
         // Try next candidate.
         continue;

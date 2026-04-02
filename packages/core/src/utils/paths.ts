@@ -368,7 +368,7 @@ export function resolveToRealPath(pathStr: string): string {
     }
 
     resolvedPath = decodeURIComponent(resolvedPath);
-  } catch (_e) {
+  } catch {
     // Ignore error (e.g. malformed URI), keep path from previous step
   }
 

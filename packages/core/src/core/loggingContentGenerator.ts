@@ -294,7 +294,7 @@ export class LoggingContentGenerator implements ContentGenerator {
           if (charCodes.every((code) => !isNaN(code))) {
             response.data = String.fromCharCode(...charCodes);
           }
-        } catch (_e) {
+        } catch {
           // If parsing fails, just leave it alone
         }
       }

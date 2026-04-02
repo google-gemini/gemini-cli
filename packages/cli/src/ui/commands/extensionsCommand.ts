@@ -321,7 +321,7 @@ async function exploreAction(
     });
     try {
       await open(extensionsUrl);
-    } catch (_error) {
+    } catch {
       context.ui.addItem({
         type: MessageType.ERROR,
         text: `Failed to open browser. Check out the extensions gallery at ${extensionsUrl}`,

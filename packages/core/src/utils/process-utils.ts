@@ -49,7 +49,7 @@ export async function killProcessGroup(options: KillOptions): Promise<void> {
     // Invoke taskkill to ensure the entire tree is terminated and any orphaned descendant processes are reaped.
     try {
       await spawnAsync('taskkill', ['/pid', pid.toString(), '/f', '/t']);
-    } catch (_e) {
+    } catch {
       // Ignore errors if the process tree is already dead
     }
     return;
@@ -72,7 +72,7 @@ export async function killProcessGroup(options: KillOptions): Promise<void> {
         }
       }
     }
-  } catch (_e) {
+  } catch {
     // Fallback to specific process kill if group kill fails or on error
     if (!isExited()) {
       if (pty) {
