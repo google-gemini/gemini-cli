@@ -162,6 +162,8 @@ export function serializeTerminalToObject(
   const effectiveStart = startLine ?? buffer.viewportY;
   const effectiveEnd = endLine ?? buffer.viewportY + terminal.rows;
 
+  const cellBuffer = terminal.buffer.active.getNullCell();
+
   for (let y = effectiveStart; y < effectiveEnd; y++) {
     const line = buffer.getLine(y);
     const currentLine: AnsiLine = [];
@@ -175,7 +177,7 @@ export function serializeTerminalToObject(
     let currentText = '';
 
     for (let x = 0; x < terminal.cols; x++) {
-      const cellData = line.getCell(x);
+      const cellData = line.getCell(x, cellBuffer);
       currentCell.update(cellData || null, x, y, cursorX, cursorY);
 
       if (x > 0 && !currentCell.equals(lastCell)) {
