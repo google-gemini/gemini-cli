@@ -198,33 +198,35 @@ export const ToolResultDisplay: React.FC<ToolResultDisplayProps> = ({
     return content;
   };
 
+  if (Array.isArray(resultDisplay)) {
+    const limit = maxLines ?? availableHeight ?? ACTIVE_SHELL_MAX_LINES;
+    const listHeight = Math.min(
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
+      (resultDisplay as AnsiOutput).length,
+      limit,
+    );
+
+    const initialScrollIndex =
+      overflowDirection === 'bottom' ? 0 : SCROLL_TO_ITEM_END;
+
+    return (
+      <Box width={childWidth} flexDirection="column" maxHeight={listHeight}>
+        <ScrollableList
+          width={childWidth}
+          // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
+          data={resultDisplay as AnsiOutput}
+          renderItem={renderVirtualizedAnsiLine}
+          estimatedItemHeight={() => 1}
+          keyExtractor={keyExtractor}
+          initialScrollIndex={initialScrollIndex}
+          hasFocus={hasFocus}
+        />
+      </Box>
+    );
+  }
+
   // ASB Mode Handling (Interactive/Fullscreen)
   if (isAlternateBuffer) {
-    // Virtualized path for large ANSI arrays
-    if (Array.isArray(resultDisplay)) {
-      const limit = maxLines ?? availableHeight ?? ACTIVE_SHELL_MAX_LINES;
-      const listHeight = Math.min(
-        // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
-        (resultDisplay as AnsiOutput).length,
-        limit,
-      );
-
-      return (
-        <Box width={childWidth} flexDirection="column" maxHeight={listHeight}>
-          <ScrollableList
-            width={childWidth}
-            // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
-            data={resultDisplay as AnsiOutput}
-            renderItem={renderVirtualizedAnsiLine}
-            estimatedItemHeight={() => 1}
-            keyExtractor={keyExtractor}
-            initialScrollIndex={SCROLL_TO_ITEM_END}
-            hasFocus={hasFocus}
-          />
-        </Box>
-      );
-    }
-
     // Standard path for strings/diffs in ASB
     return (
       <Box width={childWidth} flexDirection="column">

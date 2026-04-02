@@ -96,10 +96,11 @@ describe('ToolResultDisplay Overflow', () => {
 
     expect(output).toContain('Line 1');
     expect(output).toContain('Line 2');
-    expect(output).not.toContain('Line 3');
+    expect(output).toContain('Line 3');
     expect(output).not.toContain('Line 4');
     expect(output).not.toContain('Line 5');
-    expect(output).toContain('hidden');
+    // ScrollableList uses a scroll thumb rather than writing "hidden"
+    expect(output).toContain('█');
     unmount();
   });
 });
