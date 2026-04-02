@@ -468,11 +468,12 @@ describe('memoryCommand', () => {
       expect(inboxCommand).toBeDefined();
     });
 
-    it('should return custom_dialog when config is available', () => {
+    it('should return custom_dialog when config is available and flag is enabled', () => {
       if (!inboxCommand.action) throw new Error('Command has no action');
 
       const mockConfig = {
         reloadSkills: vi.fn(),
+        isMemoryManagerEnabled: vi.fn().mockReturnValue(true),
       };
       const context = createMockCommandContext({
         services: {
@@ -488,6 +489,28 @@ describe('memoryCommand', () => {
 
       expect(result).toHaveProperty('type', 'custom_dialog');
       expect(result).toHaveProperty('component');
+    });
+
+    it('should return info message when memory manager is disabled', () => {
+      if (!inboxCommand.action) throw new Error('Command has no action');
+
+      const mockConfig = {
+        isMemoryManagerEnabled: vi.fn().mockReturnValue(false),
+      };
+      const context = createMockCommandContext({
+        services: {
+          agentContext: { config: mockConfig },
+        },
+      });
+
+      const result = inboxCommand.action(context, '');
+
+      expect(result).toEqual({
+        type: 'message',
+        messageType: 'info',
+        content:
+          'The memory inbox requires the experimental memory manager. Enable it with: experimental.memoryManager = true in settings.',
+      });
     });
 
     it('should return error when config is not loaded', () => {

@@ -134,6 +134,13 @@ export class InboxMemoryCommand implements Command {
     context: CommandContext,
     _: string[],
   ): Promise<CommandExecutionResponse> {
+    if (!context.agentContext.config.isMemoryManagerEnabled()) {
+      return {
+        name: this.name,
+        data: 'The memory inbox requires the experimental memory manager. Enable it with: experimental.memoryManager = true in settings.',
+      };
+    }
+
     const skills = await listInboxSkills(context.agentContext.config);
 
     if (skills.length === 0) {

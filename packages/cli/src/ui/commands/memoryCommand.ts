@@ -145,6 +145,15 @@ export const memoryCommand: SlashCommand = {
           };
         }
 
+        if (!config.isMemoryManagerEnabled()) {
+          return {
+            type: 'message',
+            messageType: 'info',
+            content:
+              'The memory inbox requires the experimental memory manager. Enable it with: experimental.memoryManager = true in settings.',
+          };
+        }
+
         return {
           type: 'custom_dialog',
           component: React.createElement(SkillInboxDialog, {
