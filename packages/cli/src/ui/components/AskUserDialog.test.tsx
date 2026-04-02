@@ -1409,6 +1409,53 @@ describe('AskUserDialog', () => {
         expect(lastFrame()).toMatchSnapshot();
       });
     });
+
+    it('supports "Other" option for yesno questions', async () => {
+      const questions: Question[] = [
+        {
+          question: 'Is this correct?',
+          header: 'Confirm',
+          type: QuestionType.YESNO,
+        },
+      ];
+
+      const onSubmit = vi.fn();
+      const { stdin, lastFrame, waitUntilReady } = await renderWithProviders(
+        <AskUserDialog
+          questions={questions}
+          onSubmit={onSubmit}
+          onCancel={vi.fn()}
+          width={80}
+        />,
+        { width: 80 },
+      );
+
+      // Navigate to "Other" (3rd option: 1. Yes, 2. No, 3. Other)
+      writeKey(stdin, '\x1b[B'); // Down to No
+      writeKey(stdin, '\x1b[B'); // Down to Other
+
+      await waitFor(async () => {
+        await waitUntilReady();
+        expect(lastFrame()).toContain('Enter a custom value');
+      });
+
+      // Type feedback
+      for (const char of 'Yes, but with caveats') {
+        writeKey(stdin, char);
+      }
+
+      await waitFor(async () => {
+        await waitUntilReady();
+        expect(lastFrame()).toContain('Yes, but with caveats');
+      });
+
+      // Submit
+      writeKey(stdin, '\r');
+
+      await waitFor(async () => {
+        expect(onSubmit).toHaveBeenCalledWith({ '0': 'Yes, but with caveats' });
+      });
+    });
   });
 
   it('expands paste placeholders in multi-select custom option via Done', async () => {

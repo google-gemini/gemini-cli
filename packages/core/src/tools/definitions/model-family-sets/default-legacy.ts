@@ -695,12 +695,12 @@ The agent did not use the todo list because this task could be completed by a ti
                 enum: ['choice', 'text', 'yesno'],
                 default: 'choice',
                 description:
-                  "Question type: 'choice' (default) for multiple-choice with options, 'text' for free-form input, 'yesno' for Yes/No confirmation.",
+                  "Question type: 'choice' (default) for multiple-choice with options, 'text' for free-form input, 'yesno' for Yes/No confirmation with optional 'Other' feedback.",
               },
               [ASK_USER_QUESTION_PARAM_OPTIONS]: {
                 type: 'array',
                 description:
-                  "The selectable choices for 'choice' type questions. Provide 2-4 options. An 'Other' option is automatically added. Not needed for 'text' or 'yesno' types.",
+                  "The selectable choices for 'choice' type questions. Provide 2-4 options. An 'Other' option is automatically added for 'choice' and 'yesno' types. Not needed for 'text' or 'yesno'.",
                 items: {
                   type: 'object',
                   required: [
@@ -729,7 +729,7 @@ The agent did not use the todo list because this task could be completed by a ti
               [ASK_USER_QUESTION_PARAM_PLACEHOLDER]: {
                 type: 'string',
                 description:
-                  "Hint text shown in the input field. For type='text', shown in the main input. For type='choice', shown in the 'Other' custom input.",
+                  "Hint text shown in the input field. For type='text', shown in the main input. For type='choice' and 'yesno', shown in the 'Other' custom input.",
               },
             },
           },

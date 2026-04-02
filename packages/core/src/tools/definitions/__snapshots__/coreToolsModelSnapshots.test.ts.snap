@@ -88,7 +88,7 @@ exports[`coreTools snapshots for specific models > Model: gemini-2.5-pro > snaps
               "type": "boolean",
             },
             "options": {
-              "description": "The selectable choices for 'choice' type questions. Provide 2-4 options. An 'Other' option is automatically added. Not needed for 'text' or 'yesno' types.",
+              "description": "The selectable choices for 'choice' type questions. Provide 2-4 options. An 'Other' option is automatically added for 'choice' and 'yesno' types. Not needed for 'text' or 'yesno'.",
               "items": {
                 "properties": {
                   "description": {
@@ -109,7 +109,7 @@ exports[`coreTools snapshots for specific models > Model: gemini-2.5-pro > snaps
               "type": "array",
             },
             "placeholder": {
-              "description": "Hint text shown in the input field. For type='text', shown in the main input. For type='choice', shown in the 'Other' custom input.",
+              "description": "Hint text shown in the input field. For type='text', shown in the main input. For type='choice' and 'yesno', shown in the 'Other' custom input.",
               "type": "string",
             },
             "question": {
@@ -118,7 +118,7 @@ exports[`coreTools snapshots for specific models > Model: gemini-2.5-pro > snaps
             },
             "type": {
               "default": "choice",
-              "description": "Question type: 'choice' (default) for multiple-choice with options, 'text' for free-form input, 'yesno' for Yes/No confirmation.",
+              "description": "Question type: 'choice' (default) for multiple-choice with options, 'text' for free-form input, 'yesno' for Yes/No confirmation with optional 'Other' feedback.",
               "enum": [
                 "choice",
                 "text",
@@ -918,7 +918,7 @@ exports[`coreTools snapshots for specific models > Model: gemini-3-pro-preview >
               "type": "boolean",
             },
             "options": {
-              "description": "The selectable choices for 'choice' type questions. Provide 2-4 options. An 'Other' option is automatically added. Not needed for 'text' or 'yesno' types.",
+              "description": "The selectable choices for 'choice' type questions. Provide 2-4 options. An 'Other' option is automatically added for 'choice' and 'yesno' types. Not needed for 'text' or 'yesno'.",
               "items": {
                 "properties": {
                   "description": {
@@ -939,7 +939,7 @@ exports[`coreTools snapshots for specific models > Model: gemini-3-pro-preview >
               "type": "array",
             },
             "placeholder": {
-              "description": "Hint text shown in the input field. For type='text', shown in the main input. For type='choice', shown in the 'Other' custom input.",
+              "description": "Hint text shown in the input field. For type='text', shown in the main input. For type='choice' and 'yesno', shown in the 'Other' custom input.",
               "type": "string",
             },
             "question": {
@@ -948,7 +948,7 @@ exports[`coreTools snapshots for specific models > Model: gemini-3-pro-preview >
             },
             "type": {
               "default": "choice",
-              "description": "Question type: 'choice' (default) for multiple-choice with options, 'text' for free-form input, 'yesno' for Yes/No confirmation.",
+              "description": "Question type: 'choice' (default) for multiple-choice with options, 'text' for free-form input, 'yesno' for Yes/No confirmation with optional 'Other' feedback.",
               "enum": [
                 "choice",
                 "text",
