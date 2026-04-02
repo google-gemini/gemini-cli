@@ -266,7 +266,7 @@ describe('Background Tools', () => {
 
     // Mock open to throw ELOOP error for symbolic link
     const mockError = new Error('ELOOP: too many symbolic links encountered');
-    (mockError as any).code = 'ELOOP';
+    Object.assign(mockError, { code: 'ELOOP' });
     vi.spyOn(fs.promises, 'open').mockRejectedValue(mockError);
 
     const invocation = readTool.build({ pid });

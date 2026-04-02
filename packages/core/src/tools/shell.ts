@@ -561,11 +561,13 @@ export class ShellToolInvocation extends BaseToolInvocation<
         // If the model requested to run in the background, do so after a short delay.
         let completed = false;
         if (this.params.is_background) {
-          resultPromise.then(() => {
-            completed = true;
-          }).catch(() => {
-            completed = true; // Also mark completed if it failed
-          });
+          resultPromise
+            .then(() => {
+              completed = true;
+            })
+            .catch(() => {
+              completed = true; // Also mark completed if it failed
+            });
 
           const sessionId = this.context.config?.getSessionId?.() ?? 'default';
           const delay = this.params.delay_ms ?? BACKGROUND_DELAY_MS;

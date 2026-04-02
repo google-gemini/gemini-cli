@@ -1482,7 +1482,7 @@ export class ShellExecutionService {
     }
   }
 
-  static listBackgroundProcesses(sessionId: string): Array<BackgroundProcess> {
+  static listBackgroundProcesses(sessionId: string): BackgroundProcess[] {
     if (!sessionId) {
       throw new Error('Session ID is required');
     }

@@ -9,12 +9,11 @@ import { evalTest } from './test-helper.js';
 import fs from 'node:fs';
 import path from 'node:path';
 
-
-
 describe('Background Process Monitoring', () => {
   evalTest('USUALLY_PASSES', {
     name: 'should naturally use read output tool to find token',
-    prompt: "Run the script using 'bash generate_token.sh'. It will emit a token after a short delay and continue running. Find the token and tell me what it is.",
+    prompt:
+      "Run the script using 'bash generate_token.sh'. It will emit a token after a short delay and continue running. Find the token and tell me what it is.",
     files: {
       'generate_token.sh': `#!/bin/bash
 sleep 2
@@ -31,7 +30,7 @@ sleep 100
     },
     assert: async (rig, result) => {
       const toolCalls = rig.readToolLogs();
-      
+
       // Check if read_background_output was called
       const hasReadCall = toolCalls.some(
         (call) => call.toolRequest.name === 'read_background_output',
@@ -52,7 +51,8 @@ sleep 100
 
   evalTest('USUALLY_PASSES', {
     name: 'should naturally use list tool to verify multiple processes',
-    prompt: "Start three background processes that run 'sleep 100', 'sleep 200', and 'sleep 300' respectively. Verify that all three are currently running.",
+    prompt:
+      "Start three background processes that run 'sleep 100', 'sleep 200', and 'sleep 300' respectively. Verify that all three are currently running.",
     setup: async (rig) => {
       // Create .gemini directory to avoid file system error in test rig
       if (rig.homeDir) {
@@ -62,7 +62,7 @@ sleep 100
     },
     assert: async (rig, result) => {
       const toolCalls = rig.readToolLogs();
-      
+
       // Check if list_background_processes was called
       const hasListCall = toolCalls.some(
         (call) => call.toolRequest.name === 'list_background_processes',
@@ -75,4 +75,3 @@ sleep 100
     },
   });
 });
-
