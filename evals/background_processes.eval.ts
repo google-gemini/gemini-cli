@@ -14,7 +14,7 @@ if (!process.env.GEMINI_API_KEY) {
   process.env.GEMINI_API_KEY = 'dummy_key_for_eval';
 }
 
-describe('Background Tools', () => {
+describe('Background Process Monitoring', () => {
   evalTest('USUALLY_PASSES', {
     name: 'should use list and read output tools',
     prompt: "Start a background process that prints 'Task Started' immediately, sleeps for 10 seconds, and then prints 'Task Finished'. After starting it, use the background process tools to find its PID and read its output to verify 'Task Started' was printed.",
