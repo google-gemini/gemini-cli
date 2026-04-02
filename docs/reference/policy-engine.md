@@ -159,9 +159,9 @@ For example:
 
 Approval modes allow the policy engine to apply different sets of rules based on
 the CLI's operational mode. A rule in a TOML policy file can be associated with
-one or more modes (e.g., `autoEdit`, `plan`). The rule will only be
-active if the CLI is running in one of its specified modes. If a rule has no
-modes specified, it is always active.
+one or more modes (e.g., `autoEdit`, `plan`). The rule will only be active if
+the CLI is running in one of its specified modes. If a rule has no modes
+specified, it is always active.
 
 - `default`: The standard interactive mode where most write tools require
   confirmation.
