@@ -1,9 +1,9 @@
 // Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
 
 exports[`Full Terminal Tool Confirmation Snapshot > renders tool confirmation box in the frame of the entire terminal 1`] = `
-"▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀
- > Can you edit InputPrompt.tsx for me?                                                             
+" > Can you edit InputPrompt.tsx for me?                                                             
 ▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄
+
 ╭─────────────────────────────────────────────────────────────────────────────────────────────────╮
 │ Action Required                                                                                 │
 │                                                                                                 │
@@ -12,7 +12,7 @@ exports[`Full Terminal Tool Confirmation Snapshot > renders tool confirmation bo
 │ ... first 44 lines hidden (Ctrl+O to show) ...                                                  │
 │ 45   const line45 = true;                                                                       │
 │ 46   const line46 = true;                                                                       │
-│ 47   const line47 = true;                                                                       │█
+│ 47   const line47 = true;                                                                       │▄
 │ 48   const line48 = true;                                                                       │█
 │ 49   const line49 = true;                                                                       │█
 │ 50   const line50 = true;                                                                       │█

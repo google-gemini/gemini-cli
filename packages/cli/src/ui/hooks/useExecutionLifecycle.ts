@@ -534,31 +534,68 @@ export const useExecutionLifecycle = (
               result.output.trim() || '(Command produced no output)';
           }
 
-          let finalOutput = mainContent;
+          let finalOutput: string | AnsiOutput =
+            result.ansiOutput && result.ansiOutput.length > 0
+              ? result.ansiOutput
+              : mainContent;
           let finalStatus = CoreToolCallStatus.Success;
+
+          const prependToAnsiOutput = (
+            output: AnsiOutput,
+            text: string,
+          ): AnsiOutput => {
+            const newLines: AnsiOutput = text.split('\n').map((line) => [
+              {
+                text: line,
+                fg: '',
+                bg: '',
+                dim: false,
+                bold: false,
+                italic: false,
+                underline: false,
+                inverse: false,
+              },
+            ]);
+            return [...newLines, [], ...output];
+          };
+
+          let prefix = '';
 
           if (result.error) {
             finalStatus = CoreToolCallStatus.Error;
-            finalOutput = `${result.error.message}\n${finalOutput}`;
+            prefix = result.error.message;
           } else if (result.aborted) {
             finalStatus = CoreToolCallStatus.Cancelled;
-            finalOutput = `Command was cancelled.\n${finalOutput}`;
+            prefix = 'Command was cancelled.';
           } else if (result.backgrounded) {
             finalStatus = CoreToolCallStatus.Success;
             finalOutput = `Command moved to background (PID: ${result.pid}). Output hidden. Press Ctrl+B to view.`;
+            mainContent = finalOutput;
           } else if (result.signal) {
             finalStatus = CoreToolCallStatus.Error;
-            finalOutput = `Command terminated by signal: ${result.signal}.\n${finalOutput}`;
+            prefix = `Command terminated by signal: ${result.signal}.`;
           } else if (result.exitCode !== 0) {
             finalStatus = CoreToolCallStatus.Error;
-            finalOutput = `Command exited with code ${result.exitCode}.\n${finalOutput}`;
+            prefix = `Command exited with code ${result.exitCode}.`;
+          }
+
+          if (prefix) {
+            finalOutput =
+              typeof finalOutput === 'string'
+                ? `${prefix}\n${finalOutput}`
+                : prependToAnsiOutput(finalOutput, prefix);
+            mainContent = `${prefix}\n${mainContent}`;
           }
 
           if (pwdFilePath && fs.existsSync(pwdFilePath)) {
             const finalPwd = fs.readFileSync(pwdFilePath, 'utf8').trim();
             if (finalPwd && finalPwd !== targetDir) {
               const warning = `WARNING: shell mode is stateless; the directory change to '${finalPwd}' will not persist.`;
-              finalOutput = `${warning}\n\n${finalOutput}`;
+              finalOutput =
+                typeof finalOutput === 'string'
+                  ? `${warning}\n\n${finalOutput}`
+                  : prependToAnsiOutput(finalOutput, warning);
+              mainContent = `${warning}\n\n${mainContent}`;
             }
           }
 
@@ -578,7 +615,7 @@ export const useExecutionLifecycle = (
             );
           }
 
-          addShellCommandToGeminiHistory(geminiClient, rawQuery, finalOutput);
+          addShellCommandToGeminiHistory(geminiClient, rawQuery, mainContent);
         } catch (err) {
           setPendingHistoryItem(null);
           const errorMessage = err instanceof Error ? err.message : String(err);
