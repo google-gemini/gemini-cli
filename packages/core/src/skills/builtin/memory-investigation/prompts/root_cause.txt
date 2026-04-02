@@ -1,0 +1,30 @@
+You are analyzing a heap memory growth report from a Node.js CLI application.
+The JSON below contains the top memory-growing constructors and their retainer chains,
+detected by comparing two V8 heap snapshots.
+
+=== ANALYSIS RULES ===
+1. Focus on the TOP 3 anomalies by sizeDelta
+2. Use retainer chains to explain WHY objects survive garbage collection
+3. Cross-reference constructor names with Node.js patterns:
+   - "Object" + high count = accumulating contexts
+   - "Buffer" = binary data not released
+   - "(closure)" = event handlers holding references
+   - "Map" / "Set" = caches without eviction
+4. If multiple types grow at the same rate, they are part of the same object graph
+5. Suggest specific code patterns to investigate
+
+=== HEAP DIFF SUMMARY ===
+
+${JSON_SUMMARY}
+
+=== RETAINER CHAINS ===
+
+${RETAINER_CHAINS}
+
+=== OUTPUT FORMAT ===
+1. PRIMARY LEAK SUSPECT: [constructor] - [why it's leaking]
+2. RETENTION PATH: [retainer chain explaining why GC cannot collect it]
+3. CORRELATED TYPES: [types growing at same rate]
+4. INVESTIGATION STEPS: [specific files/patterns to search]
+5. SUGGESTED FIX: [concrete code change]
+6. CONFIDENCE: [high/medium/low]
