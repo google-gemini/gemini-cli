@@ -18,8 +18,6 @@ on GitHub.
 | [Preview](preview.md) | Experimental features ready for early feedback. |
 | [Stable](latest.md)   | Stable, recommended for general use.            |
 
-## Announcements: v0.35.0 - 2026-03-24
-
 ## Announcements: v0.36.0 - 2026-04-01
 
 - **Multi-Registry Architecture and Sandboxing:** Introduced a multi-registry
