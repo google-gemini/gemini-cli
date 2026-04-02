@@ -41,6 +41,11 @@ interface ScrollContextType {
 
 const ScrollContext = createContext<ScrollContextType | null>(null);
 
+/**
+ * The minimum fractional scroll delta to track.
+ */
+const SCROLL_STATIC_FRICTION = 0.001;
+
 const findScrollableCandidates = (
   mouseEvent: MouseEvent,
   scrollables: Map<string, ScrollableEntry>,
@@ -119,15 +124,15 @@ export const ScrollProvider: React.FC<{ children: React.ReactNode }> = ({
         for (const [id, delta] of pendingScrollsRef.current.entries()) {
           const entry = scrollablesRef.current.get(id);
           if (entry) {
-            const truncatedDelta = Math.trunc(delta);
-            if (truncatedDelta !== 0) {
-              entry.scrollBy(truncatedDelta);
+            const roundedDelta = Math.round(delta);
+            if (roundedDelta !== 0) {
+              entry.scrollBy(roundedDelta);
             }
 
-            const remainder = delta - truncatedDelta;
+            const remainder = delta - roundedDelta;
             // Keep the fractional remainder for the next scroll event to ensure
             // smooth accumulation across flushes.
-            if (Math.abs(remainder) > 0.001) {
+            if (Math.abs(remainder) > SCROLL_STATIC_FRICTION) {
               pendingScrollsRef.current.set(id, remainder);
             } else {
               pendingScrollsRef.current.delete(id);
@@ -184,9 +189,10 @@ export const ScrollProvider: React.FC<{ children: React.ReactNode }> = ({
       const effectiveScrollTop = scrollTop + pendingDelta;
 
       // Epsilon to handle floating point inaccuracies.
-      const canScrollUp = effectiveScrollTop > 0.001;
+      const canScrollUp = effectiveScrollTop > SCROLL_STATIC_FRICTION;
       const canScrollDown =
-        effectiveScrollTop < scrollHeight - innerHeight - 0.001;
+        effectiveScrollTop <
+        scrollHeight - innerHeight - SCROLL_STATIC_FRICTION;
       const totalDelta = pendingDelta + delta;
 
       if (direction === 'up' && canScrollUp) {
