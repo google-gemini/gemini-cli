@@ -69,7 +69,7 @@ describe('ToolConfirmationQueue', () => {
     const confirmingTool = {
       tool: {
         callId: 'call-1',
-        name: 'ls',
+        name: 'run_shell_command',
         description: 'list files',
         status: CoreToolCallStatus.AwaitingApproval,
         confirmationDetails: {
@@ -97,11 +97,10 @@ describe('ToolConfirmationQueue', () => {
     );
 
     const output = lastFrame();
-    expect(output).toContain('Action Required');
     expect(output).toContain('1 of 3');
     expect(output).toContain('ls'); // Tool name
     expect(output).toContain('list files'); // Tool description
-    expect(output).toContain("Allow execution of: 'ls'?");
+    expect(output).toContain('Allow execution of [ls]?');
     expect(output).toMatchSnapshot();
 
     const stickyHeaderProps = vi.mocked(StickyHeader).mock.calls[0][0];

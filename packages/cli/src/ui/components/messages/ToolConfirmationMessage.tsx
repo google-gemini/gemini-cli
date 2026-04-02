@@ -839,7 +839,7 @@ export const ToolConfirmationMessage: React.FC<
                 {isMcpToolDetailsExpanded ? (
                   <>
                     <Text color={theme.text.secondary}>
-                      (press ${expandDetailsHintKey} to collapse MCP tool
+                      (press {expandDetailsHintKey} to collapse MCP tool
                       details)
                     </Text>
                     <Box
@@ -865,7 +865,7 @@ export const ToolConfirmationMessage: React.FC<
                   </>
                 ) : (
                   <Text color={theme.text.secondary}>
-                    (press ${expandDetailsHintKey} to expand MCP tool details)
+                    (press {expandDetailsHintKey} to expand MCP tool details)
                   </Text>
                 )}
               </Box>
