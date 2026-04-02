@@ -849,7 +849,8 @@ describe('ChatRecordingService', () => {
       const enospcError = new Error('ENOSPC: no space left on device');
       (enospcError as NodeJS.ErrnoException).code = 'ENOSPC';
 
-      const appendFileSyncSpy = vi.mocked(fs.appendFileSync)
+      const appendFileSyncSpy = vi
+        .mocked(fs.appendFileSync)
         .mockImplementationOnce(() => {
           throw enospcError;
         });
