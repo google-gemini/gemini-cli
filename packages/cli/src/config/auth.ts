@@ -27,8 +27,10 @@ export function validateAuthMethod(authMethod: string): string | null {
   }
 
   if (authMethod === AuthType.USE_VERTEX_AI) {
+    const project = process.env['GOOGLE_CLOUD_PROJECT'];
     const hasVertexProjectLocationConfig =
-      !!process.env['GOOGLE_CLOUD_PROJECT'] &&
+      !!project &&
+      project !== 'cloudshell-gca' &&
       !!process.env['GOOGLE_CLOUD_LOCATION'];
     const hasGoogleApiKey = !!process.env['GOOGLE_API_KEY'];
     if (!hasVertexProjectLocationConfig && !hasGoogleApiKey) {

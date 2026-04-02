@@ -84,6 +84,20 @@ describe('validateAuthMethod', () => {
         'Update your environment and try again (no reload needed if using .env)!',
     },
     {
+      description:
+        'should return an error for USE_VERTEX_AI when GOOGLE_CLOUD_PROJECT is cloudshell-gca',
+      authType: AuthType.USE_VERTEX_AI,
+      envs: {
+        GOOGLE_CLOUD_PROJECT: 'cloudshell-gca',
+        GOOGLE_CLOUD_LOCATION: 'us-central1',
+      },
+      expected:
+        'When using Vertex AI, you must specify either:\n' +
+        '• GOOGLE_CLOUD_PROJECT and GOOGLE_CLOUD_LOCATION environment variables.\n' +
+        '• GOOGLE_API_KEY environment variable (if using express mode).\n' +
+        'Update your environment and try again (no reload needed if using .env)!',
+    },
+    {
       description: 'should return an error message for an invalid auth method',
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       authType: 'invalid-method' as any,

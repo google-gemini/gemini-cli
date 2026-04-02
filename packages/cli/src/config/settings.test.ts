@@ -77,6 +77,7 @@ import {
   sanitizeEnvVar,
   createTestMergedSettings,
   resetSettingsCacheForTesting,
+  _resetOriginalGoogleCloudProjectForTesting,
 } from './settings.js';
 import {
   FatalConfigError,
@@ -2901,6 +2902,7 @@ describe('Settings Loading and Merging', () => {
       delete process.env['CLOUD_SHELL'];
       delete process.env['MALICIOUS_VAR'];
       delete process.env['FOO'];
+      _resetOriginalGoogleCloudProjectForTesting();
       vi.resetAllMocks();
       vi.mocked(fs.existsSync).mockReturnValue(false);
     });
@@ -3154,6 +3156,62 @@ MALICIOUS_VAR=allowed-because-trusted
         );
 
         expect(process.env['GOOGLE_CLOUD_PROJECT']).toBe('my-vertex-project');
+      });
+
+      it('should restore original env when switching to Vertex AI after Cloud Shell override', () => {
+        process.env['CLOUD_SHELL'] = 'true';
+        process.argv = ['node', 'gemini', '-s', 'prompt'];
+        vi.mocked(isWorkspaceTrusted).mockReturnValue({
+          isTrusted: false,
+          source: 'file',
+        });
+        vi.mocked(fs.existsSync).mockReturnValue(false);
+
+        // First call: normal Cloud Shell auth sets cloudshell-gca
+        loadEnvironment(
+          createMockSettings({ tools: { sandbox: false } }).merged,
+          MOCK_WORKSPACE_DIR,
+        );
+        expect(process.env['GOOGLE_CLOUD_PROJECT']).toBe('cloudshell-gca');
+
+        // Second call: user switched to Vertex AI, should remove cloudshell-gca
+        // since GOOGLE_CLOUD_PROJECT was not originally set
+        loadEnvironment(
+          createMockSettings({
+            tools: { sandbox: false },
+            security: { auth: { selectedType: AuthType.USE_VERTEX_AI } },
+          }).merged,
+          MOCK_WORKSPACE_DIR,
+        );
+        expect(process.env['GOOGLE_CLOUD_PROJECT']).toBeUndefined();
+      });
+
+      it('should restore original project value when switching to Vertex AI after Cloud Shell override', () => {
+        process.env['CLOUD_SHELL'] = 'true';
+        process.env['GOOGLE_CLOUD_PROJECT'] = 'my-real-project';
+        process.argv = ['node', 'gemini', '-s', 'prompt'];
+        vi.mocked(isWorkspaceTrusted).mockReturnValue({
+          isTrusted: false,
+          source: 'file',
+        });
+        vi.mocked(fs.existsSync).mockReturnValue(false);
+
+        // First call: Cloud Shell override sets cloudshell-gca
+        loadEnvironment(
+          createMockSettings({ tools: { sandbox: false } }).merged,
+          MOCK_WORKSPACE_DIR,
+        );
+        expect(process.env['GOOGLE_CLOUD_PROJECT']).toBe('cloudshell-gca');
+
+        // Second call: switching to Vertex AI should restore the original value
+        loadEnvironment(
+          createMockSettings({
+            tools: { sandbox: false },
+            security: { auth: { selectedType: AuthType.USE_VERTEX_AI } },
+          }).merged,
+          MOCK_WORKSPACE_DIR,
+        );
+        expect(process.env['GOOGLE_CLOUD_PROJECT']).toBe('my-real-project');
       });
 
       it('should sanitize GOOGLE_CLOUD_PROJECT in Cloud Shell when loaded from .env in untrusted mode', () => {

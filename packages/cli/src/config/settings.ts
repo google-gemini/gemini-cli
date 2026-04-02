@@ -524,12 +524,26 @@ function findEnvFile(startDir: string): string | null {
   }
 }
 
+// Tracks the original GOOGLE_CLOUD_PROJECT value before Cloud Shell override.
+// Used to restore the value when switching to Vertex AI auth.
+let originalGoogleCloudProject: string | undefined | null = null;
+
+/** @internal */
+export function _resetOriginalGoogleCloudProjectForTesting(): void {
+  originalGoogleCloudProject = null;
+}
+
 export function setUpCloudShellEnvironment(
   envFilePath: string | null,
   isTrusted: boolean,
   isSandboxed: boolean,
   selectedAuthType?: string,
 ): void {
+  // Capture the original value on first call so we can restore it later.
+  if (originalGoogleCloudProject === null) {
+    originalGoogleCloudProject = process.env['GOOGLE_CLOUD_PROJECT'];
+  }
+
   // Special handling for GOOGLE_CLOUD_PROJECT in Cloud Shell:
   // Because GOOGLE_CLOUD_PROJECT in Cloud Shell tracks the project
   // set by the user using "gcloud config set project" we do not want to
@@ -537,9 +551,14 @@ export function setUpCloudShellEnvironment(
   // one of the .env files, we set the Cloud Shell-specific default here.
   //
   // However, if the user has explicitly selected Vertex AI auth, they intend
-  // to use their own GCP project, so we skip the Cloud Shell override to
-  // respect their shell environment or .env settings.
+  // to use their own GCP project, so we restore the original value and skip
+  // the Cloud Shell override to respect their shell environment or .env settings.
   if (selectedAuthType === AuthType.USE_VERTEX_AI) {
+    if (originalGoogleCloudProject === undefined) {
+      delete process.env['GOOGLE_CLOUD_PROJECT'];
+    } else {
+      process.env['GOOGLE_CLOUD_PROJECT'] = originalGoogleCloudProject;
+    }
     return;
   }
 
