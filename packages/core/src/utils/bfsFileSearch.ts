@@ -10,6 +10,7 @@ import * as path from 'node:path';
 import type { FileDiscoveryService } from '../services/fileDiscoveryService.js';
 import type { FileFilteringOptions } from '../config/constants.js';
 import { debugLogger } from './debugLogger.js';
+import { getErrorMessage } from './errors.js';
 // Simple console logger for now.
 // TODO: Integrate with a more robust server-side logger.
 const logger = {
@@ -80,10 +81,8 @@ export async function bfsFileSearch(
         return { currentDir, entries };
       } catch (error) {
         // Warn user that a directory could not be read, as this affects search results.
-        // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
-        const message = (error as Error)?.message ?? 'Unknown error';
         debugLogger.warn(
-          `[WARN] Skipping unreadable directory: ${currentDir} (${message})`,
+          `[WARN] Skipping unreadable directory: ${currentDir} (${getErrorMessage(error)})`,
         );
         if (debug) {
           logger.debug(`Full error for ${currentDir}:`, error);
@@ -154,10 +153,8 @@ export function bfsFileSearchSync(
           foundFiles,
         );
       } catch (error) {
-        // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
-        const message = (error as Error)?.message ?? 'Unknown error';
         debugLogger.warn(
-          `[WARN] Skipping unreadable directory: ${currentDir} (${message})`,
+          `[WARN] Skipping unreadable directory: ${currentDir} (${getErrorMessage(error)})`,
         );
       }
     }
