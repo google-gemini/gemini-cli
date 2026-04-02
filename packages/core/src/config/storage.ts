@@ -266,6 +266,19 @@ export class Storage {
     return path.join(historyDir, identifier);
   }
 
+  getProjectMemoryDir(): string {
+    const identifier = this.getProjectIdentifier();
+    return path.join(Storage.getGlobalGeminiDir(), 'memory', identifier);
+  }
+
+  getProjectMemoryTempDir(): string {
+    return path.join(this.getProjectTempDir(), 'memory');
+  }
+
+  getProjectSkillsMemoryDir(): string {
+    return path.join(this.getProjectMemoryTempDir(), 'skills');
+  }
+
   getWorkspaceSettingsPath(): string {
     return path.join(this.getGeminiDir(), 'settings.json');
   }

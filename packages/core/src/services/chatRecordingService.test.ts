@@ -14,6 +14,7 @@ import {
   type ToolCallRecord,
   type MessageRecord,
 } from './chatRecordingService.js';
+import type { WorkspaceContext } from '../utils/workspaceContext.js';
 import { CoreToolCallStatus } from '../scheduler/types.js';
 import type { Content, Part } from '@google/genai';
 import type { Config } from '../config/config.js';
@@ -57,6 +58,9 @@ describe('ChatRecordingService', () => {
       },
       getModel: vi.fn().mockReturnValue('gemini-pro'),
       getDebugMode: vi.fn().mockReturnValue(false),
+      getWorkspaceContext: vi.fn().mockReturnValue({
+        getDirectories: vi.fn().mockReturnValue([]),
+      }),
       getToolRegistry: vi.fn().mockReturnValue({
         getTool: vi.fn().mockReturnValue({
           displayName: 'Test Tool',
@@ -65,6 +69,13 @@ describe('ChatRecordingService', () => {
         }),
       }),
     } as unknown as Config;
+
+    // Ensure mockConfig.config points to itself for AgentLoopContext parity
+    Object.defineProperty(mockConfig, 'config', {
+      get() {
+        return mockConfig;
+      },
+    });
 
     vi.mocked(getProjectHash).mockReturnValue('test-project-hash');
     chatRecordingService = new ChatRecordingService(mockConfig);
@@ -130,6 +141,31 @@ describe('ChatRecordingService', () => {
       const files = fs.readdirSync(subagentDir);
       expect(files.length).toBeGreaterThan(0);
       expect(files[0]).toBe('test-session-id.json');
+    });
+
+    it('should inherit workspace directories for subagents during initialization', () => {
+      const mockDirectories = ['/project/dir1', '/project/dir2'];
+      vi.mocked(mockConfig.getWorkspaceContext).mockReturnValue({
+        getDirectories: vi.fn().mockReturnValue(mockDirectories),
+      } as unknown as WorkspaceContext);
+
+      // Initialize as a subagent
+      chatRecordingService.initialize(undefined, 'subagent');
+
+      // Recording a message triggers the disk write (deferred until then)
+      chatRecordingService.recordMessage({
+        type: 'user',
+        content: 'ping',
+        model: 'm',
+      });
+
+      const sessionFile = chatRecordingService.getConversationFilePath()!;
+      const conversation = JSON.parse(
+        fs.readFileSync(sessionFile, 'utf8'),
+      ) as ConversationRecord;
+
+      expect(conversation.kind).toBe('subagent');
+      expect(conversation.directories).toEqual(mockDirectories);
     });
 
     it('should resume from an existing session if provided', () => {

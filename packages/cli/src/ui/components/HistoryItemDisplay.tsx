@@ -17,6 +17,7 @@ import { ToolGroupMessage } from './messages/ToolGroupMessage.js';
 import { GeminiMessageContent } from './messages/GeminiMessageContent.js';
 import { CompressionMessage } from './messages/CompressionMessage.js';
 import { WarningMessage } from './messages/WarningMessage.js';
+import { SubagentHistoryMessage } from './messages/SubagentHistoryMessage.js';
 import { Box } from 'ink';
 import { AboutBox } from './AboutBox.js';
 import { StatsDisplay } from './StatsDisplay.js';
@@ -48,6 +49,7 @@ interface HistoryItemDisplayProps {
   isExpandable?: boolean;
   isFirstThinking?: boolean;
   isFirstAfterThinking?: boolean;
+  isToolGroupBoundary?: boolean;
   suppressNarration?: boolean;
 }
 
@@ -61,14 +63,17 @@ export const HistoryItemDisplay: React.FC<HistoryItemDisplayProps> = ({
   isExpandable,
   isFirstThinking = false,
   isFirstAfterThinking = false,
+  isToolGroupBoundary = false,
   suppressNarration = false,
 }) => {
   const settings = useSettings();
   const inlineThinkingMode = getInlineThinkingMode(settings);
   const itemForDisplay = useMemo(() => escapeAnsiCtrlCodes(item), [item]);
 
-  const needsTopMarginAfterThinking =
-    isFirstAfterThinking && inlineThinkingMode !== 'off';
+  const needTopMargin = !!(
+    (isFirstAfterThinking && inlineThinkingMode !== 'off') ||
+    isToolGroupBoundary
+  );
 
   // If there's a topic update in this turn, we suppress the regular narration
   // and thoughts as they are being "replaced" by the update_topic tool.
@@ -86,7 +91,7 @@ export const HistoryItemDisplay: React.FC<HistoryItemDisplayProps> = ({
       flexDirection="column"
       key={itemForDisplay.id}
       width={terminalWidth}
-      marginTop={needsTopMarginAfterThinking ? 1 : 0}
+      marginTop={needTopMargin ? 1 : 0}
     >
       {/* Render standard message types */}
       {itemForDisplay.type === 'thinking' && inlineThinkingMode !== 'off' && (
@@ -213,6 +218,13 @@ export const HistoryItemDisplay: React.FC<HistoryItemDisplayProps> = ({
           borderTop={itemForDisplay.borderTop}
           borderBottom={itemForDisplay.borderBottom}
           isExpandable={isExpandable}
+          isToolGroupBoundary={isToolGroupBoundary}
+        />
+      )}
+      {itemForDisplay.type === 'subagent' && (
+        <SubagentHistoryMessage
+          item={itemForDisplay}
+          terminalWidth={terminalWidth}
         />
       )}
       {itemForDisplay.type === 'compression' && (
