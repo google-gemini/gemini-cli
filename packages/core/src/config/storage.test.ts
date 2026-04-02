@@ -147,13 +147,14 @@ describe('Storage – additional helpers', () => {
     expect(storage.getProjectAgentsDir()).toBe(expected);
   });
 
-  it('getProjectMemoryDir returns ~/.gemini/memory/<identifier>', async () => {
+  it('getProjectMemoryDir returns ~/.gemini/tmp/<identifier>/memory', async () => {
     await storage.initialize();
     const expected = path.join(
       os.homedir(),
       GEMINI_DIR,
-      'memory',
+      'tmp',
       PROJECT_SLUG,
+      'memory',
     );
     expect(storage.getProjectMemoryDir()).toBe(expected);
   });
