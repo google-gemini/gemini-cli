@@ -8,7 +8,6 @@ import { Box, Static } from 'ink';
 import { HistoryItemDisplay } from './HistoryItemDisplay.js';
 import { useUIState } from '../contexts/UIStateContext.js';
 import { useSettings } from '../contexts/SettingsContext.js';
-import { useAppContext } from '../contexts/AppContext.js';
 
 import { useAlternateBuffer } from '../hooks/useAlternateBuffer.js';
 import {
@@ -29,7 +28,6 @@ const MemoizedHistoryItemDisplay = memo(HistoryItemDisplay);
 // This threshold is arbitrary but should be high enough to never impact normal
 // usage.
 export const MainContent = () => {
-  const { version } = useAppContext();
   const uiState = useUIState();
   const isAlternateBuffer = useAlternateBuffer();
 
@@ -50,9 +48,7 @@ export const MainContent = () => {
     mainAreaWidth,
     staticAreaMaxItemHeight,
     availableTerminalHeight,
-    cleanUiDetailsVisible,
   } = uiState;
-  const showHeaderDetails = cleanUiDetailsVisible;
 
   const lastUserPromptIndex = useMemo(() => {
     for (let i = uiState.history.length - 1; i >= 0; i--) {

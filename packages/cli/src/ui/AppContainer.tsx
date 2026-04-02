@@ -257,18 +257,6 @@ export const AppContainer = (props: AppContainerProps) => {
     return topic || summary ? { title: topic, summary } : null;
   });
 
-  useEffect(() => {
-    const handleTopicUpdated = (payload: { title?: string; summary?: string }) => {
-      setCurrentTopic({ title: payload.title, summary: payload.summary });
-      refreshStatic();
-    };
-
-    coreEvents.on(CoreEvent.TopicUpdated, handleTopicUpdated);
-    return () => {
-      coreEvents.off(CoreEvent.TopicUpdated, handleTopicUpdated);
-    };
-  }, [refreshStatic]);
-
   const [adminSettingsChanged, setAdminSettingsChanged] = useState(false);
 
   const [expandedTools, setExpandedTools] = useState<Set<string>>(new Set());
@@ -697,6 +685,18 @@ export const AppContainer = (props: AppContainerProps) => {
       refreshStatic();
     }
   }, [bannerVisible, bannerText, settings, config, refreshStatic]);
+
+  useEffect(() => {
+    const handleTopicUpdated = (payload: { title?: string; summary?: string }) => {
+      setCurrentTopic({ title: payload.title, summary: payload.summary });
+      refreshStatic();
+    };
+
+    coreEvents.on(CoreEvent.TopicUpdated, handleTopicUpdated);
+    return () => {
+      coreEvents.off(CoreEvent.TopicUpdated, handleTopicUpdated);
+    };
+  }, [refreshStatic]);
 
   const { isSettingsDialogOpen, openSettingsDialog, closeSettingsDialog } =
     useSettingsCommand();
