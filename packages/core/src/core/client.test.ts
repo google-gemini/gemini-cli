@@ -1487,7 +1487,7 @@ ${JSON.stringify(
             break;
           }
         }
-      } catch (_) {
+      } catch {
         // If the test framework times out, that also demonstrates the infinite loop
       }
 
