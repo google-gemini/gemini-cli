@@ -13,10 +13,9 @@ npm install -g @google/gemini-cli@preview
 
 ## Highlights
 
-- **Plan Mode Promotion & Enhancements**: Plan Mode has been promoted to a
-  stable feature, now including support for untrusted folders, prioritized
-  pre-approval discussions, and a resolve for sandbox-related deadlocks during
-  file creation.
+- **Plan Mode Enhancements**: Plan now includes support for untrusted folders,
+  prioritized pre-approval discussions, and a resolve for sandbox-related
+  deadlocks during file creation.
 - **Browser Agent Evolved**: Significant updates to the browser agent, including
   persistent session management, dynamic discovery of read-only tools,
   sandbox-aware initialization, and automated reclamation of stale snapshots to
