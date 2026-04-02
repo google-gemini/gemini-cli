@@ -498,6 +498,31 @@ describe('KeypressContext', () => {
       });
     });
 
+    it('should handle slow split OSC 52 response across ESC timeouts', async () => {
+      const keyHandler = vi.fn();
+      const { result } = renderHook(() => useKeypressContext(), { wrapper });
+
+      act(() => result.current.subscribe(keyHandler));
+
+      const base64Data = Buffer.from('Slow Split Paste').toString('base64');
+      const sequence = `\x1b]52;c;${base64Data}\x07`;
+
+      act(() => stdin.write(sequence.slice(0, 8)));
+      await act(async () => {
+        vi.advanceTimersByTime(ESC_TIMEOUT + 10);
+      });
+      act(() => stdin.write(sequence.slice(8)));
+
+      await waitFor(() => {
+        expect(keyHandler).toHaveBeenCalledWith(
+          expect.objectContaining({
+            name: 'paste',
+            sequence: 'Slow Split Paste',
+          }),
+        );
+      });
+    });
+
     it('should handle OSC 52 response terminated by ESC \\', async () => {
       const keyHandler = vi.fn();
       const { result } = renderHook(() => useKeypressContext(), { wrapper });
@@ -545,6 +570,29 @@ describe('KeypressContext', () => {
       const sequence = `\x1b]52;x;notbase64\x07`;
 
       act(() => stdin.write(sequence));
+
+      await act(async () => {
+        vi.advanceTimersByTime(0);
+      });
+
+      expect(keyHandler).not.toHaveBeenCalled();
+    });
+
+    it('should ignore slow split OSC 11 terminal background responses', async () => {
+      const keyHandler = vi.fn();
+      const { result } = renderHook(() => useKeypressContext(), { wrapper });
+
+      act(() => result.current.subscribe(keyHandler));
+
+      act(() => stdin.write('\x1b]11;rgb:0c0c/'));
+      await act(async () => {
+        vi.advanceTimersByTime(ESC_TIMEOUT + 10);
+      });
+      act(() => stdin.write('0c0c/0c0c\x1b'));
+      await act(async () => {
+        vi.advanceTimersByTime(ESC_TIMEOUT + 10);
+      });
+      act(() => stdin.write('\\'));
 
       await act(async () => {
         vi.advanceTimersByTime(0);

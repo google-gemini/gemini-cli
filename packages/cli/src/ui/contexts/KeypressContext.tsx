@@ -26,6 +26,7 @@ export const BACKSLASH_ENTER_TIMEOUT = 5;
 export const ESC_TIMEOUT = 50;
 export const PASTE_TIMEOUT = 30_000;
 export const FAST_RETURN_TIMEOUT = 30;
+const MAX_OSC_SEQUENCE_LENGTH = 4096;
 
 export enum KeypressPriority {
   Low = -100,
@@ -374,21 +375,41 @@ function* emitKeys(
         // ESC ] <params> ; <data> BEL
         // ESC ] <params> ; <data> ESC \
         let buffer = '';
+        let sawEsc = false;
+        let overflowed = false;
 
-        // Read until BEL, `ESC \`, or timeout (empty string)
+        // Read until BEL or ST (ESC \). Ignore parser timeouts so slow
+        // terminal responses do not leak their payload into the prompt.
         while (true) {
           const next = yield;
-          if (next === '' || next === '\u0007') {
-            break;
-          } else if (next === ESC) {
-            const afterEsc = yield;
-            if (afterEsc === '' || afterEsc === '\\') {
-              break;
-            }
-            buffer += next + afterEsc;
+          if (next === '') {
             continue;
           }
-          buffer += next;
+
+          if (sawEsc) {
+            sawEsc = false;
+            if (next === '\\') {
+              break;
+            }
+            buffer += ESC + next;
+          } else if (next === '\u0007') {
+            break;
+          } else if (next === ESC) {
+            sawEsc = true;
+            continue;
+          } else {
+            buffer += next;
+          }
+
+          if (buffer.length > MAX_OSC_SEQUENCE_LENGTH) {
+            overflowed = true;
+            break;
+          }
+        }
+
+        if (overflowed) {
+          debugLogger.log('Discarded oversized OSC sequence');
+          continue; // resume main loop
         }
 
         // Check for OSC 52 (Clipboard) response
