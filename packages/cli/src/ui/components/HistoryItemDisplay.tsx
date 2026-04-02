@@ -17,6 +17,7 @@ import { ToolGroupMessage } from './messages/ToolGroupMessage.js';
 import { GeminiMessageContent } from './messages/GeminiMessageContent.js';
 import { CompressionMessage } from './messages/CompressionMessage.js';
 import { WarningMessage } from './messages/WarningMessage.js';
+import { SubagentHistoryMessage } from './messages/SubagentHistoryMessage.js';
 import { Box } from 'ink';
 import { AboutBox } from './AboutBox.js';
 import { StatsDisplay } from './StatsDisplay.js';
@@ -213,6 +214,12 @@ export const HistoryItemDisplay: React.FC<HistoryItemDisplayProps> = ({
           borderTop={itemForDisplay.borderTop}
           borderBottom={itemForDisplay.borderBottom}
           isExpandable={isExpandable}
+        />
+      )}
+      {itemForDisplay.type === 'subagent' && (
+        <SubagentHistoryMessage
+          item={itemForDisplay}
+          terminalWidth={terminalWidth}
         />
       )}
       {itemForDisplay.type === 'compression' && (

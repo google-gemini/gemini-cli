@@ -13,8 +13,21 @@ import { evalTest, TEST_AGENTS } from './test-helper.js';
 
 const INDEX_TS = 'export const add = (a: number, b: number) => a + b;\n';
 
+// A minimal package.json is used to provide a realistic workspace anchor.
+// This prevents the agent from making incorrect assumptions about the environment
+// and helps it properly navigate or act as if it is in a standard Node.js project.
+const MOCK_PACKAGE_JSON = JSON.stringify(
+  {
+    name: 'subagent-eval-project',
+    version: '1.0.0',
+    type: 'module',
+  },
+  null,
+  2,
+);
+
 function readProjectFile(
-  rig: { testDir?: string },
+  rig: { testDir: string | null },
   relativePath: string,
 ): string {
   return fs.readFileSync(path.join(rig.testDir!, relativePath), 'utf8');
@@ -117,15 +130,7 @@ describe('subagent eval test cases', () => {
     files: {
       ...TEST_AGENTS.TESTING_AGENT.asFile(),
       'index.ts': INDEX_TS,
-      'package.json': JSON.stringify(
-        {
-          name: 'subagent-eval-project',
-          version: '1.0.0',
-          type: 'module',
-        },
-        null,
-        2,
-      ),
+      'package.json': MOCK_PACKAGE_JSON,
     },
     assert: async (rig, _result) => {
       const toolLogs = rig.readToolLogs() as Array<{
@@ -164,15 +169,7 @@ describe('subagent eval test cases', () => {
       ...TEST_AGENTS.TESTING_AGENT.asFile(),
       'index.ts': INDEX_TS,
       'README.md': 'TODO: update the README.\n',
-      'package.json': JSON.stringify(
-        {
-          name: 'subagent-eval-project',
-          version: '1.0.0',
-          type: 'module',
-        },
-        null,
-        2,
-      ),
+      'package.json': MOCK_PACKAGE_JSON,
     },
     assert: async (rig, _result) => {
       const toolLogs = rig.readToolLogs() as Array<{
@@ -188,6 +185,107 @@ describe('subagent eval test cases', () => {
       expect(toolLogs.some((l) => l.toolRequest.name === 'generalist')).toBe(
         false,
       );
+    },
+  });
+
+  /**
+   * Checks that the main agent can correctly select the appropriate subagent
+   * from a large pool of available subagents (10 total).
+   */
+  evalTest('USUALLY_PASSES', {
+    name: 'should select the correct subagent from a pool of 10 different agents',
+    prompt: 'Please add a new SQL table migration for a user profile.',
+    files: {
+      ...TEST_AGENTS.DOCS_AGENT.asFile(),
+      ...TEST_AGENTS.TESTING_AGENT.asFile(),
+      ...TEST_AGENTS.DATABASE_AGENT.asFile(),
+      ...TEST_AGENTS.CSS_AGENT.asFile(),
+      ...TEST_AGENTS.I18N_AGENT.asFile(),
+      ...TEST_AGENTS.SECURITY_AGENT.asFile(),
+      ...TEST_AGENTS.DEVOPS_AGENT.asFile(),
+      ...TEST_AGENTS.ANALYTICS_AGENT.asFile(),
+      ...TEST_AGENTS.ACCESSIBILITY_AGENT.asFile(),
+      ...TEST_AGENTS.MOBILE_AGENT.asFile(),
+      'package.json': MOCK_PACKAGE_JSON,
+    },
+    assert: async (rig, _result) => {
+      const toolLogs = rig.readToolLogs() as Array<{
+        toolRequest: { name: string };
+      }>;
+      await rig.expectToolCallSuccess(['database-agent']);
+
+      // Ensure the generalist and other irrelevant specialists were not invoked
+      const uncalledAgents = [
+        'generalist',
+        TEST_AGENTS.DOCS_AGENT.name,
+        TEST_AGENTS.TESTING_AGENT.name,
+        TEST_AGENTS.CSS_AGENT.name,
+        TEST_AGENTS.I18N_AGENT.name,
+        TEST_AGENTS.SECURITY_AGENT.name,
+        TEST_AGENTS.DEVOPS_AGENT.name,
+        TEST_AGENTS.ANALYTICS_AGENT.name,
+        TEST_AGENTS.ACCESSIBILITY_AGENT.name,
+        TEST_AGENTS.MOBILE_AGENT.name,
+      ];
+
+      for (const agentName of uncalledAgents) {
+        expect(toolLogs.some((l) => l.toolRequest.name === agentName)).toBe(
+          false,
+        );
+      }
+    },
+  });
+
+  /**
+   * Checks that the main agent can correctly select the appropriate subagent
+   * from a large pool of available subagents, even when many irrelevant MCP tools are present.
+   *
+   * This test includes stress tests the subagent delegation with ~80 tools.
+   */
+  evalTest('USUALLY_PASSES', {
+    name: 'should select the correct subagent from a pool of 10 different agents with MCP tools present',
+    prompt: 'Please add a new SQL table migration for a user profile.',
+    setup: async (rig) => {
+      rig.addTestMcpServer('workspace-server', 'google-workspace');
+    },
+    files: {
+      ...TEST_AGENTS.DOCS_AGENT.asFile(),
+      ...TEST_AGENTS.TESTING_AGENT.asFile(),
+      ...TEST_AGENTS.DATABASE_AGENT.asFile(),
+      ...TEST_AGENTS.CSS_AGENT.asFile(),
+      ...TEST_AGENTS.I18N_AGENT.asFile(),
+      ...TEST_AGENTS.SECURITY_AGENT.asFile(),
+      ...TEST_AGENTS.DEVOPS_AGENT.asFile(),
+      ...TEST_AGENTS.ANALYTICS_AGENT.asFile(),
+      ...TEST_AGENTS.ACCESSIBILITY_AGENT.asFile(),
+      ...TEST_AGENTS.MOBILE_AGENT.asFile(),
+      'package.json': MOCK_PACKAGE_JSON,
+    },
+    assert: async (rig, _result) => {
+      const toolLogs = rig.readToolLogs() as Array<{
+        toolRequest: { name: string };
+      }>;
+      await rig.expectToolCallSuccess(['database-agent']);
+
+      // Ensure the generalist and other irrelevant specialists were not invoked
+      const uncalledAgents = [
+        'generalist',
+        TEST_AGENTS.DOCS_AGENT.name,
+        TEST_AGENTS.TESTING_AGENT.name,
+        TEST_AGENTS.CSS_AGENT.name,
+        TEST_AGENTS.I18N_AGENT.name,
+        TEST_AGENTS.SECURITY_AGENT.name,
+        TEST_AGENTS.DEVOPS_AGENT.name,
+        TEST_AGENTS.ANALYTICS_AGENT.name,
+        TEST_AGENTS.ACCESSIBILITY_AGENT.name,
+        TEST_AGENTS.MOBILE_AGENT.name,
+      ];
+
+      for (const agentName of uncalledAgents) {
+        expect(toolLogs.some((l) => l.toolRequest.name === agentName)).toBe(
+          false,
+        );
+      }
     },
   });
 });
