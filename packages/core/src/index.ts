@@ -276,3 +276,10 @@ export * from './voice/responseFormatter.js';
 
 // Export types from @google/genai
 export type { Content, Part, FunctionCall } from '@google/genai';
+export * from './voice/audioRecorder.js';
+export * from './voice/transcriptionProvider.js';
+export * from './voice/geminiLiveTranscriptionProvider.js';
+export * from './voice/whisperTranscriptionProvider.js';
+export * from './voice/transcriptionFactory.js';
+export * from './voice/whisperModelManager.js';
+export { isBinaryAvailable } from './utils/binaryCheck.js';
