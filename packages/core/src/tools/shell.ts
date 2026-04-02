@@ -305,10 +305,11 @@ export class ShellToolInvocation extends BaseToolInvocation<
               const requestedIdentity = getPathIdentity(requestedPath);
 
               // Identity check is fast, subpath check is slower
-              return approvedPaths.some((p) => (
+              return approvedPaths.some(
+                (p) =>
                   requestedIdentity === getPathIdentity(p) ||
-                  isSubpath(p, requestedPath)
-                ));
+                  isSubpath(p, requestedPath),
+              );
             };
 
             const missingRead = (proactive.fileSystem?.read || []).filter(
