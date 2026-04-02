@@ -100,7 +100,7 @@ each tool.
 
 | Tool                                            | Kind    | Description                                                                 |
 | :---------------------------------------------- | :------ | :-------------------------------------------------------------------------- |
-| [`tracker_create_task`](../tools/tracker.md)    | `Other` | Creates a new task in the persistent tracker.                               |
+| [`tracker_create_task`](../tools/tracker.md)    | `Other` | Creates a new task in the experimental tracker.                             |
 | [`tracker_update_task`](../tools/tracker.md)    | `Other` | Updates an existing task's status, description, or dependencies.            |
 | [`tracker_get_task`](../tools/tracker.md)       | `Other` | Retrieves the full details of a specific task.                              |
 | [`tracker_list_tasks`](../tools/tracker.md)     | `Other` | Lists tasks in the tracker, optionally filtered by status, type, or parent. |
