@@ -73,6 +73,10 @@ import {
   formatBackgroundCompletionForModel,
 } from '../utils/fastAckHelper.js';
 import type { InjectionSource } from '../config/injectionService.js';
+import {
+  createScopedWorkspaceContext,
+  runWithScopedWorkspaceContext,
+} from '../config/scoped-config.js';
 import { CompleteTaskTool } from '../tools/complete-task.js';
 import { COMPLETE_TASK_TOOL_NAME } from '../tools/definitions/base-declarations.js';
 
@@ -521,6 +525,27 @@ export class LocalAgentExecutor<TOutput extends z.ZodTypeAny> {
    * @returns A promise that resolves to the agent's final output.
    */
   async run(inputs: AgentInputs, signal: AbortSignal): Promise<OutputObject> {
+    // If the agent definition declares additional workspace directories,
+    // wrap execution in a scoped workspace context. All calls to
+    // Config.getWorkspaceContext() within this scope will see the extended
+    // directories, without mutating the shared Config.
+    const dirs = this.definition.workspaceDirectories;
+    if (dirs && dirs.length > 0) {
+      const scopedCtx = createScopedWorkspaceContext(
+        this.context.config.getWorkspaceContext(),
+        dirs,
+      );
+      return runWithScopedWorkspaceContext(scopedCtx, () =>
+        this.runInternal(inputs, signal),
+      );
+    }
+    return this.runInternal(inputs, signal);
+  }
+
+  private async runInternal(
+    inputs: AgentInputs,
+    signal: AbortSignal,
+  ): Promise<OutputObject> {
     const startTime = Date.now();
     let turnCounter = 0;
     let terminateReason: AgentTerminateMode = AgentTerminateMode.ERROR;
