@@ -43,7 +43,7 @@ describe('SessionSelector', () => {
     // Clean up test files
     try {
       await fs.rm(tmpDir, { recursive: true, force: true });
-    } catch (_error) {
+    } catch {
       // Ignore cleanup errors
     }
   });

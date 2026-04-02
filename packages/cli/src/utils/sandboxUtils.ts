@@ -60,7 +60,7 @@ export async function shouldUseCurrentUserInSandbox(): Promise<boolean> {
         );
         return true;
       }
-    } catch (_err) {
+    } catch {
       // Silently ignore if /etc/os-release is not found or unreadable.
       // The default (false) will be applied in this case.
       debugLogger.warn(
