@@ -57,7 +57,7 @@ describe('LoginRestartDialog', () => {
       <LoginRestartDialog
         onDismiss={onDismiss}
         config={mockConfig}
-        message="Switching to Vertex AI in Cloud Shell requires a restart to apply project settings."
+        message="Authenticating to Vertex AI in Cloud Shell requires a restart to apply project settings."
       />,
     );
     expect(lastFrame()).toMatchSnapshot();

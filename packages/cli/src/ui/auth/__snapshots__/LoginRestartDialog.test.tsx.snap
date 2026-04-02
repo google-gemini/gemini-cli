@@ -2,7 +2,7 @@
 
 exports[`LoginRestartDialog > renders correctly with custom message 1`] = `
 "╭──────────────────────────────────────────────────────────────────────────────────────────────────╮
-│ Switching to Vertex AI in Cloud Shell requires a restart to apply project settings.              │
+│ Authenticating to Vertex AI in Cloud Shell requires a restart to apply project settings.         │
 │ Press R to restart, or Esc to choose a different authentication method.                          │
 ╰──────────────────────────────────────────────────────────────────────────────────────────────────╯
 "

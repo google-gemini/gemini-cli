@@ -704,7 +704,7 @@ export const AppContainer = (props: AppContainerProps) => {
 
   useEffect(() => {
     if (authState === AuthState.Authenticated && authContext.requiresRestart) {
-      setAuthState(AuthState.AwaitingGoogleLoginRestart);
+      setAuthState(AuthState.AwaitingLoginRestart);
       setAuthContext({});
     }
   }, [authState, authContext, setAuthState]);
@@ -2044,11 +2044,10 @@ Logging in with Google... Restarting Gemini CLI to continue.
 
   const nightly = props.version.includes('nightly');
 
-  const isAwaitingLoginRestart =
-    authState === AuthState.AwaitingGoogleLoginRestart;
+  const isAwaitingLoginRestart = authState === AuthState.AwaitingLoginRestart;
   const loginRestartMessage =
     settings.merged.security.auth.selectedType === AuthType.USE_VERTEX_AI
-      ? 'Switching to Vertex AI in Cloud Shell requires a restart to apply project settings.'
+      ? 'Authenticating to Vertex AI in Cloud Shell requires a restart to apply project settings.'
       : undefined;
 
   const dialogsVisible =
