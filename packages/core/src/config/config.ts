@@ -716,6 +716,8 @@ export interface ConfigParameters {
   experimentalAgentHistoryTruncationThreshold?: number;
   experimentalAgentHistoryRetainedMessages?: number;
   experimentalAgentHistorySummarization?: boolean;
+  experimentalWatcher?: boolean;
+  experimentalWatcherInterval?: number;
   memoryBoundaryMarkers?: string[];
   topicUpdateNarration?: boolean;
 
@@ -951,6 +953,12 @@ export class Config implements McpContext, AgentLoopContext {
   private readonly adminSkillsEnabled: boolean;
   private readonly experimentalJitContext: boolean;
   private readonly experimentalMemoryManager: boolean;
+  private readonly experimentalAgentHistoryTruncation: boolean;
+  private readonly experimentalAgentHistoryTruncationThreshold: number;
+  private readonly experimentalAgentHistoryRetainedMessages: number;
+  private readonly experimentalAgentHistorySummarization: boolean;
+  private readonly experimentalWatcher: boolean;
+  private readonly experimentalWatcherInterval: number;
   private readonly memoryBoundaryMarkers: readonly string[];
   private readonly topicUpdateNarration: boolean;
   private readonly disableLLMCorrection: boolean;
@@ -1153,6 +1161,16 @@ export class Config implements McpContext, AgentLoopContext {
 
     this.experimentalJitContext = params.experimentalJitContext ?? false;
     this.experimentalMemoryManager = params.experimentalMemoryManager ?? false;
+    this.experimentalAgentHistoryTruncation =
+      params.experimentalAgentHistoryTruncation ?? false;
+    this.experimentalAgentHistoryTruncationThreshold =
+      params.experimentalAgentHistoryTruncationThreshold ?? 30;
+    this.experimentalAgentHistoryRetainedMessages =
+      params.experimentalAgentHistoryRetainedMessages ?? 15;
+    this.experimentalAgentHistorySummarization =
+      params.experimentalAgentHistorySummarization ?? false;
+    this.experimentalWatcher = params.experimentalWatcher ?? false;
+    this.experimentalWatcherInterval = params.experimentalWatcherInterval ?? 20;
     this.memoryBoundaryMarkers = params.memoryBoundaryMarkers ?? ['.git'];
     this.contextManagement = {
       enabled: params.contextManagement?.enabled ?? false,
@@ -2419,6 +2437,30 @@ export class Config implements McpContext, AgentLoopContext {
       normalizationHeadRatio:
         this.contextManagement.messageLimits.normalizationHeadRatio,
     };
+  }
+
+  isExperimentalAgentHistoryTruncationEnabled(): boolean {
+    return this.experimentalAgentHistoryTruncation;
+  }
+
+  getExperimentalAgentHistoryTruncationThreshold(): number {
+    return this.experimentalAgentHistoryTruncationThreshold;
+  }
+
+  getExperimentalAgentHistoryRetainedMessages(): number {
+    return this.experimentalAgentHistoryRetainedMessages;
+  }
+
+  isExperimentalAgentHistorySummarizationEnabled(): boolean {
+    return this.experimentalAgentHistorySummarization;
+  }
+
+  isExperimentalWatcherEnabled(): boolean {
+    return this.experimentalWatcher;
+  }
+
+  getExperimentalWatcherInterval(): number {
+    return this.experimentalWatcherInterval;
   }
 
   isTopicUpdateNarrationEnabled(): boolean {
