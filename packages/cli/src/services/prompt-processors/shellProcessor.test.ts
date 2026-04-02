@@ -225,7 +225,9 @@ describe('ShellProcessor', () => {
       decision: PolicyDecision.ALLOW,
     });
     // Override the approval mode for this test (though PolicyEngine mock handles the decision)
-    (mockConfig.getApprovalMode as Mock).mockReturnValue(ApprovalMode.YOLO);
+    (mockConfig.getApprovalMode as Mock).mockReturnValue(
+      ApprovalMode.AUTO_EDIT,
+    );
     mockShellExecute.mockReturnValue({
       result: Promise.resolve({ ...SUCCESS_RESULT, output: 'deleted' }),
     });
@@ -253,7 +255,9 @@ describe('ShellProcessor', () => {
       decision: PolicyDecision.DENY,
     });
     // Set approval mode to YOLO
-    (mockConfig.getApprovalMode as Mock).mockReturnValue(ApprovalMode.YOLO);
+    (mockConfig.getApprovalMode as Mock).mockReturnValue(
+      ApprovalMode.AUTO_EDIT,
+    );
 
     await expect(processor.process(prompt, context)).rejects.toThrow(
       /Blocked command: "reboot". Reason: Blocked by policy/,

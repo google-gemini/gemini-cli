@@ -4033,8 +4033,8 @@ describe('InputPrompt', () => {
       unmount();
     });
 
-    it('should render correctly in yolo mode', async () => {
-      props.approvalMode = ApprovalMode.YOLO;
+    it('should render correctly with wildcard policy enabled', async () => {
+      props.isWildcardPolicyEnabled = true;
       const { stdout, unmount } = await renderWithProviders(
         <InputPrompt {...props} />,
       );
@@ -4042,6 +4042,7 @@ describe('InputPrompt', () => {
       expect(stdout.lastFrame()).toMatchSnapshot();
       unmount();
     });
+
     it('should not show inverted cursor when shell is focused', async () => {
       props.isEmbeddedShellFocused = true;
       props.focus = false;

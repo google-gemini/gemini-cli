@@ -1738,10 +1738,10 @@ describe('setApprovalMode with folder trust', () => {
     cwd: '.',
   };
 
-  it('should throw an error when setting YOLO mode in an untrusted folder', () => {
+  it('should throw an error when setting PLAN mode in an untrusted folder', () => {
     const config = new Config(baseParams);
     vi.spyOn(config, 'isTrustedFolder').mockReturnValue(false);
-    expect(() => config.setApprovalMode(ApprovalMode.YOLO)).toThrow(
+    expect(() => config.setApprovalMode(ApprovalMode.PLAN)).toThrow(
       'Cannot enable privileged approval modes in an untrusted folder.',
     );
   });
@@ -1769,7 +1769,7 @@ describe('setApprovalMode with folder trust', () => {
   it('should NOT throw an error when setting any mode in a trusted folder', () => {
     const config = new Config(baseParams);
     vi.spyOn(config, 'isTrustedFolder').mockReturnValue(true);
-    expect(() => config.setApprovalMode(ApprovalMode.YOLO)).not.toThrow();
+    expect(() => config.setApprovalMode(ApprovalMode.PLAN)).not.toThrow();
     expect(() => config.setApprovalMode(ApprovalMode.AUTO_EDIT)).not.toThrow();
     expect(() => config.setApprovalMode(ApprovalMode.DEFAULT)).not.toThrow();
   });
@@ -1777,7 +1777,7 @@ describe('setApprovalMode with folder trust', () => {
   it('should NOT throw an error when setting any mode if trustedFolder is undefined', () => {
     const config = new Config(baseParams);
     vi.spyOn(config, 'isTrustedFolder').mockReturnValue(true); // isTrustedFolder defaults to true
-    expect(() => config.setApprovalMode(ApprovalMode.YOLO)).not.toThrow();
+    expect(() => config.setApprovalMode(ApprovalMode.PLAN)).not.toThrow();
     expect(() => config.setApprovalMode(ApprovalMode.AUTO_EDIT)).not.toThrow();
     expect(() => config.setApprovalMode(ApprovalMode.DEFAULT)).not.toThrow();
   });
@@ -1825,7 +1825,7 @@ describe('setApprovalMode with folder trust', () => {
     } as Partial<ToolRegistry> as ToolRegistry);
     const updateSpy = vi.spyOn(config, 'updateSystemInstructionIfInitialized');
 
-    config.setApprovalMode(ApprovalMode.YOLO);
+    config.setApprovalMode(ApprovalMode.PLAN);
 
     expect(updateSpy).toHaveBeenCalled();
   });
@@ -1906,7 +1906,7 @@ describe('setApprovalMode with folder trust', () => {
       vi.mocked(logApprovalModeDuration).mockClear();
 
       performanceSpy.mockReturnValueOnce(time3);
-      config.setApprovalMode(ApprovalMode.YOLO);
+      config.setApprovalMode(ApprovalMode.AUTO_EDIT);
       expect(logApprovalModeDuration).toHaveBeenCalledWith(
         config,
         expect.objectContaining({

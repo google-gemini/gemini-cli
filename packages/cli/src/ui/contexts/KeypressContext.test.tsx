@@ -9,7 +9,17 @@ import { act } from 'react';
 import { renderHookWithProviders } from '../../test-utils/render.js';
 import { createMockSettings } from '../../test-utils/settings.js';
 import { waitFor } from '../../test-utils/async.js';
-import { vi, afterAll, beforeAll, type Mock } from 'vitest';
+import {
+  describe,
+  it,
+  expect,
+  vi,
+  beforeEach,
+  afterEach,
+  afterAll,
+  beforeAll,
+  type Mock,
+} from 'vitest';
 import {
   useKeypressContext,
   ESC_TIMEOUT,
@@ -1078,7 +1088,7 @@ describe('KeypressContext', () => {
 
       // Advance timers to trigger the backslash timeout
       act(() => {
-        vi.runAllTimers();
+        vi.advanceTimersByTime(100);
       });
 
       expect(keyHandler).toHaveBeenCalledWith(
