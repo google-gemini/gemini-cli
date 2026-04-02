@@ -209,8 +209,9 @@ The browser agent enforces several layers of security:
 - **Domain restrictions:** When `allowedDomains` is set, the agent can only
   navigate to the listed domains (and their subdomains when using `*.` prefix).
   Attempting to visit a disallowed domain throws a fatal error that immediately
-  terminates the agent. The agent is also blocked from using allowed domains as
-  proxies (for example, Google Translate) to access restricted content.
+  terminates the agent. The agent also attempts to detect and block the use of
+  allowed domains as proxies (e.g., via query parameters or fragments) to access
+  restricted content.
 - **Blocked URL patterns:** The underlying MCP server blocks dangerous URL
   schemes including `file://`, `javascript:`, `data:text/html`,
   `chrome://extensions`, and `chrome://settings/passwords`.
