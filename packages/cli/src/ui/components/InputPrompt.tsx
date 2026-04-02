@@ -1342,7 +1342,7 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
   );
 
   useKeypress(handleInput, {
-    isActive: !isEmbeddedShellFocused,
+    isActive: !isEmbeddedShellFocused && !copyModeEnabled,
     priority: true,
   });
 

@@ -1430,8 +1430,7 @@ Logging in with Google... Restarting Gemini CLI to continue.
     (streamingState === StreamingState.Idle ||
       streamingState === StreamingState.Responding ||
       streamingState === StreamingState.WaitingForConfirmation) &&
-    !proQuotaRequest &&
-    !copyModeEnabled;
+    !proQuotaRequest;
 
   const observerRef = useRef<ResizeObserver | null>(null);
   const [controlsHeight, setControlsHeight] = useState(0);
