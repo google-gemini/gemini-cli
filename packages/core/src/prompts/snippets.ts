@@ -4,7 +4,6 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-// Dummy change to trigger Evals workflows.
 import {
   ACTIVATE_SKILL_TOOL_NAME,
   ASK_USER_TOOL_NAME,
