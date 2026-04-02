@@ -749,7 +749,7 @@ export class ShellToolInvocation extends BaseToolInvocation<
                   ) {
                     currentPath = path.dirname(currentPath);
                   }
-                } catch (_e) {
+                } catch {
                   /* ignore */
                 }
                 while (currentPath.length > 1) {
@@ -770,7 +770,7 @@ export class ShellToolInvocation extends BaseToolInvocation<
                   }
                   currentPath = path.dirname(currentPath);
                 }
-              } catch (_e) {
+              } catch {
                 // ignore
               }
             }
