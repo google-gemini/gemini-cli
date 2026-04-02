@@ -6,6 +6,15 @@
 
 import { type FunctionCall } from '@google/genai';
 import {
+  SHELL_TOOL_NAMES,
+  initializeShellParsers,
+  splitCommands,
+  hasRedirection,
+  extractStringFromParseEntry,
+} from '../utils/shell-utils.js';
+import { parse as shellParse } from 'shell-quote';
+import { isSubpath } from '../utils/paths.js';
+import {
   PolicyDecision,
   type PolicyEngineConfig,
   type PolicyRule,
@@ -19,13 +28,8 @@ import { stableStringify } from './stable-stringify.js';
 import { debugLogger } from '../utils/debugLogger.js';
 import type { CheckerRunner } from '../safety/checker-runner.js';
 import { SafetyCheckDecision } from '../safety/protocol.js';
-import {
-  SHELL_TOOL_NAMES,
-  initializeShellParsers,
-  splitCommands,
-  hasRedirection,
-} from '../utils/shell-utils.js';
 import { getToolAliases } from '../tools/tool-names.js';
+import { PARAM_ADDITIONAL_PERMISSIONS } from '../tools/definitions/base-declarations.js';
 import {
   MCP_TOOL_PREFIX,
   isMcpToolAnnotation,
@@ -33,6 +37,11 @@ import {
   formatMcpToolName,
   isMcpToolName,
 } from '../tools/mcp-tool.js';
+import {
+  type SandboxManager,
+  NoopSandboxManager,
+  type SandboxPermissions,
+} from '../services/sandboxManager.js';
 
 function isWildcardPattern(name: string): boolean {
   return name === '*' || name.includes('*');
@@ -192,6 +201,7 @@ export class PolicyEngine {
   private readonly disableAlwaysAllow: boolean;
   private readonly checkerRunner?: CheckerRunner;
   private approvalMode: ApprovalMode;
+  private readonly sandboxManager: SandboxManager;
 
   constructor(config: PolicyEngineConfig = {}, checkerRunner?: CheckerRunner) {
     this.rules = (config.rules ?? []).sort(
@@ -237,11 +247,14 @@ export class PolicyEngine {
       }
     }
 
-    this.defaultDecision = config.defaultDecision ?? PolicyDecision.ASK_USER;
     this.nonInteractive = config.nonInteractive ?? false;
+    this.defaultDecision =
+      config.defaultDecision ??
+      (this.nonInteractive ? PolicyDecision.DENY : PolicyDecision.ASK_USER);
     this.disableAlwaysAllow = config.disableAlwaysAllow ?? false;
     this.checkerRunner = checkerRunner;
     this.approvalMode = config.approvalMode ?? ApprovalMode.DEFAULT;
+    this.sandboxManager = config.sandboxManager ?? new NoopSandboxManager();
   }
 
   /**
@@ -269,17 +282,56 @@ export class PolicyEngine {
     command: string,
     allowRedirection?: boolean,
   ): boolean {
-    return (
-      !allowRedirection &&
-      hasRedirection(command) &&
-      this.approvalMode !== ApprovalMode.AUTO_EDIT &&
-      this.approvalMode !== ApprovalMode.YOLO
-    );
+    if (allowRedirection) return false;
+    if (!hasRedirection(command)) return false;
+
+    // Do not downgrade (do not ask user) if sandboxing is enabled and in AUTO_EDIT or YOLO
+    const sandboxEnabled = !(this.sandboxManager instanceof NoopSandboxManager);
+    if (
+      sandboxEnabled &&
+      (this.approvalMode === ApprovalMode.AUTO_EDIT ||
+        this.approvalMode === ApprovalMode.YOLO)
+    ) {
+      return false;
+    }
+
+    return true;
   }
 
   /**
    * Check if a shell command is allowed.
    */
+  private async applyShellHeuristics(
+    command: string,
+    decision: PolicyDecision,
+  ): Promise<PolicyDecision> {
+    await initializeShellParsers();
+    try {
+      const parsedObjArgs = shellParse(command);
+      const parsedArgs = parsedObjArgs.map(extractStringFromParseEntry);
+
+      if (this.sandboxManager.isDangerousCommand(parsedArgs)) {
+        debugLogger.debug(
+          `[PolicyEngine.check] Command evaluated as dangerous, forcing ASK_USER: ${command}`,
+        );
+        return PolicyDecision.ASK_USER;
+      }
+
+      if (
+        this.sandboxManager.isKnownSafeCommand(parsedArgs) &&
+        decision === PolicyDecision.ASK_USER
+      ) {
+        debugLogger.debug(
+          `[PolicyEngine.check] Command evaluated as known safe, overriding ASK_USER to ALLOW: ${command}`,
+        );
+        return PolicyDecision.ALLOW;
+      }
+    } catch {
+      // Ignore parsing errors
+    }
+    return decision;
+  }
+
   private async checkShellCommand(
     toolName: string,
     command: string | undefined,
@@ -293,7 +345,7 @@ export class PolicyEngine {
   ): Promise<CheckResult> {
     if (!command) {
       return {
-        decision: this.applyNonInteractiveMode(ruleDecision),
+        decision: ruleDecision,
         rule,
       };
     }
@@ -316,13 +368,13 @@ export class PolicyEngine {
       }
 
       debugLogger.debug(
-        `[PolicyEngine.check] Command parsing failed for: ${command}. Falling back to ASK_USER.`,
+        `[PolicyEngine.check] Command parsing failed for: ${command}. Falling back to ${this.defaultDecision}.`,
       );
 
-      // Parsing logic failed, we can't trust it. Force ASK_USER (or DENY).
+      // Parsing logic failed, we can't trust it. Use default decision ASK_USER (or DENY in non-interactive).
       // We return the rule that matched so the evaluation loop terminates.
       return {
-        decision: this.applyNonInteractiveMode(PolicyDecision.ASK_USER),
+        decision: this.defaultDecision,
         rule,
       };
     }
@@ -419,7 +471,7 @@ export class PolicyEngine {
       }
 
       return {
-        decision: this.applyNonInteractiveMode(aggregateDecision),
+        decision: aggregateDecision,
         // If we stayed at ALLOW, we return the original rule (if any).
         // If we downgraded, we return the responsible rule (or undefined if implicit).
         rule: aggregateDecision === ruleDecision ? rule : responsibleRule,
@@ -427,7 +479,7 @@ export class PolicyEngine {
     }
 
     return {
-      decision: this.applyNonInteractiveMode(ruleDecision),
+      decision: ruleDecision,
       rule,
     };
   }
@@ -522,11 +574,21 @@ export class PolicyEngine {
           `[PolicyEngine.check] MATCHED rule: toolName=${rule.toolName}, decision=${rule.decision}, priority=${rule.priority}, argsPattern=${rule.argsPattern?.source || 'none'}`,
         );
 
+        let ruleDecision = rule.decision;
+        if (
+          isShellCommand &&
+          command &&
+          !('commandPrefix' in rule) &&
+          !rule.argsPattern
+        ) {
+          ruleDecision = await this.applyShellHeuristics(command, ruleDecision);
+        }
+
         if (isShellCommand && toolName) {
           const shellResult = await this.checkShellCommand(
             toolName,
             command,
-            rule.decision,
+            ruleDecision,
             serverName,
             shellDirPath,
             rule.allowRedirection,
@@ -540,7 +602,7 @@ export class PolicyEngine {
             break;
           }
         } else {
-          decision = this.applyNonInteractiveMode(rule.decision);
+          decision = rule.decision;
           matchedRule = rule;
           break;
         }
@@ -562,10 +624,18 @@ export class PolicyEngine {
         `[PolicyEngine.check] NO MATCH - using default decision: ${this.defaultDecision}`,
       );
       if (toolName && SHELL_TOOL_NAMES.includes(toolName)) {
+        let heuristicDecision = this.defaultDecision;
+        if (command) {
+          heuristicDecision = await this.applyShellHeuristics(
+            command,
+            heuristicDecision,
+          );
+        }
+
         const shellResult = await this.checkShellCommand(
           toolName,
           command,
-          this.defaultDecision,
+          heuristicDecision,
           serverName,
           shellDirPath,
           false,
@@ -576,7 +646,37 @@ export class PolicyEngine {
         decision = shellResult.decision;
         matchedRule = shellResult.rule;
       } else {
-        decision = this.applyNonInteractiveMode(this.defaultDecision);
+        decision = this.defaultDecision;
+      }
+    }
+
+    if (decision === PolicyDecision.ALLOW) {
+      const args = toolCall.args;
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
+      const additionalPermissions = args?.[PARAM_ADDITIONAL_PERMISSIONS] as
+        | SandboxPermissions
+        | undefined;
+
+      const fsPerms = additionalPermissions?.fileSystem;
+      if (fsPerms) {
+        const workspace = this.sandboxManager.getWorkspace();
+        const readPaths = Array.isArray(fsPerms.read) ? fsPerms.read : [];
+        const writePaths = Array.isArray(fsPerms.write) ? fsPerms.write : [];
+        const allPaths = [...readPaths, ...writePaths];
+
+        for (const p of allPaths) {
+          if (
+            typeof p === 'string' &&
+            !isSubpath(workspace, p) &&
+            workspace !== p
+          ) {
+            debugLogger.debug(
+              `[PolicyEngine.check] Additional permission path '${p}' is outside workspace '${workspace}'. Downgrading to ASK_USER.`,
+            );
+            decision = PolicyDecision.ASK_USER;
+            break;
+          }
+        }
       }
     }
 
@@ -632,7 +732,7 @@ export class PolicyEngine {
     }
 
     return {
-      decision: this.applyNonInteractiveMode(decision),
+      decision,
       rule: matchedRule,
     };
   }
@@ -801,7 +901,7 @@ export class PolicyEngine {
             continue;
           } else {
             // Unconditional rule for this tool
-            const decision = this.applyNonInteractiveMode(rule.decision);
+            const decision = rule.decision;
             staticallyExcluded = decision === PolicyDecision.DENY;
             matchFound = true;
             break;
@@ -811,7 +911,7 @@ export class PolicyEngine {
 
       if (!matchFound) {
         // Fallback to default decision if no rule matches
-        const defaultDec = this.applyNonInteractiveMode(this.defaultDecision);
+        const defaultDec = this.defaultDecision;
         if (defaultDec === PolicyDecision.DENY) {
           staticallyExcluded = true;
         }
@@ -823,13 +923,5 @@ export class PolicyEngine {
     }
 
     return excludedTools;
-  }
-
-  private applyNonInteractiveMode(decision: PolicyDecision): PolicyDecision {
-    // In non-interactive mode, ASK_USER becomes DENY
-    if (this.nonInteractive && decision === PolicyDecision.ASK_USER) {
-      return PolicyDecision.DENY;
-    }
-    return decision;
   }
 }

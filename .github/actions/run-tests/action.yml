@@ -18,6 +18,13 @@ runs:
       env:
         JSON_INPUTS: '${{ toJSON(inputs) }}'
       run: 'echo "$JSON_INPUTS"'
+    - name: 'Install system dependencies'
+      if: "runner.os == 'Linux'"
+      run: |
+        sudo apt-get update -qq && sudo DEBIAN_FRONTEND=noninteractive apt-get install -y -qq bubblewrap
+        # Ubuntu 24.04+ requires this to allow bwrap to function in CI
+        sudo sysctl -w kernel.apparmor_restrict_unprivileged_userns=0 || true
+      shell: 'bash'
     - name: 'Run Tests'
       env:
         GEMINI_API_KEY: '${{ inputs.gemini_api_key }}'

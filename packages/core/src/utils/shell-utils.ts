@@ -7,12 +7,47 @@
 import os from 'node:os';
 import fs from 'node:fs';
 import path from 'node:path';
-import { quote } from 'shell-quote';
+import { quote, type ParseEntry } from 'shell-quote';
 import {
   spawn,
   spawnSync,
   type SpawnOptionsWithoutStdio,
 } from 'node:child_process';
+
+/**
+ * Extracts the primary command name from a potentially wrapped shell command.
+ * Strips shell wrappers and handles shopt/set/etc.
+ *
+ * @param command - The full command string.
+ * @param args - The arguments for the command.
+ * @returns The primary command name.
+ */
+export async function getCommandName(
+  command: string,
+  args: string[],
+): Promise<string> {
+  await initializeShellParsers();
+  const fullCmd = [command, ...args].join(' ');
+  const stripped = stripShellWrapper(fullCmd);
+  const roots = getCommandRoots(stripped).filter(
+    (r) => r !== 'shopt' && r !== 'set',
+  );
+  if (roots.length > 0) {
+    return roots[0];
+  }
+  return path.basename(command);
+}
+
+/**
+ * Extracts a string representation from a shell-quote ParseEntry.
+ */
+export function extractStringFromParseEntry(entry: ParseEntry): string {
+  if (typeof entry === 'string') return entry;
+  if ('pattern' in entry) return entry.pattern;
+  if ('op' in entry) return entry.op;
+  if ('comment' in entry) return ''; // We can typically ignore comments for safety checks
+  return '';
+}
 import * as readline from 'node:readline';
 import { Language, Parser, Query, type Node, type Tree } from 'web-tree-sitter';
 import { loadWasmBinary } from './fileUtils.js';
@@ -144,6 +179,7 @@ export interface ParsedCommandDetail {
   name: string;
   text: string;
   startIndex: number;
+  args?: string[];
 }
 
 interface CommandParseResult {
@@ -183,9 +219,16 @@ foreach ($commandAst in $commandAsts) {
   if ([string]::IsNullOrWhiteSpace($name)) {
     continue
   }
+  $args = @()
+  if ($commandAst.CommandElements.Count -gt 1) {
+    for ($i = 1; $i -lt $commandAst.CommandElements.Count; $i++) {
+      $args += $commandAst.CommandElements[$i].Extent.Text.Trim()
+    }
+  }
   $commandObjects += [PSCustomObject]@{
     name = $name
     text = $commandAst.Extent.Text.Trim()
+    args = $args
   }
 }
 [PSCustomObject]@{
@@ -320,11 +363,31 @@ function collectCommandDetails(
 
     const name = extractNameFromNode(current);
     if (name) {
-      details.push({
+      const detail: ParsedCommandDetail = {
         name,
         text: source.slice(current.startIndex, current.endIndex).trim(),
         startIndex: current.startIndex,
-      });
+      };
+
+      if (current.type === 'command') {
+        const args: string[] = [];
+        const nameNode = current.childForFieldName('name');
+        for (let i = 0; i < current.childCount; i += 1) {
+          const child = current.child(i);
+          if (
+            child &&
+            child.type === 'word' &&
+            child.startIndex !== nameNode?.startIndex
+          ) {
+            args.push(child.text);
+          }
+        }
+        if (args.length > 0) {
+          detail.args = args;
+        }
+      }
+
+      details.push(detail);
     }
 
     // Traverse all children to find all sub-components (commands, redirections, etc.)
@@ -373,7 +436,9 @@ function hasPromptCommandTransform(root: Node): boolean {
   return false;
 }
 
-function parseBashCommandDetails(command: string): CommandParseResult | null {
+export function parseBashCommandDetails(
+  command: string,
+): CommandParseResult | null {
   if (treeSitterInitializationError) {
     debugLogger.debug(
       'Bash parser not initialized:',
@@ -472,7 +537,7 @@ function parsePowerShellCommandDetails(
 
     let parsed: {
       success?: boolean;
-      commands?: Array<{ name?: string; text?: string }>;
+      commands?: Array<{ name?: string; text?: string; args?: string[] }>;
       hasRedirection?: boolean;
     } | null = null;
     try {
@@ -487,7 +552,7 @@ function parsePowerShellCommandDetails(
     }
 
     const details = (parsed.commands ?? [])
-      .map((commandDetail) => {
+      .map((commandDetail): ParsedCommandDetail | null => {
         if (!commandDetail || typeof commandDetail.name !== 'string') {
           return null;
         }
@@ -502,6 +567,9 @@ function parsePowerShellCommandDetails(
           name,
           text,
           startIndex: 0,
+          args: Array.isArray(commandDetail.args)
+            ? commandDetail.args
+            : undefined,
         };
       })
       .filter((detail): detail is ParsedCommandDetail => detail !== null);
@@ -522,7 +590,19 @@ export function parseCommandDetails(
   const configuration = getShellConfiguration();
 
   if (configuration.shell === 'powershell') {
-    return parsePowerShellCommandDetails(command, configuration.executable);
+    const result = parsePowerShellCommandDetails(
+      command,
+      configuration.executable,
+    );
+    if (!result || result.hasError) {
+      // Fallback to bash parser which is usually good enough for simple commands
+      // and doesn't rely on the host PowerShell environment restrictions (e.g., ConstrainedLanguage)
+      const bashResult = parseBashCommandDetails(command);
+      if (bashResult && !bashResult.hasError) {
+        return bashResult;
+      }
+    }
+    return result;
   }
 
   if (configuration.shell === 'bash') {
@@ -704,7 +784,7 @@ export function getCommandRoots(command: string): string[] {
 
 export function stripShellWrapper(command: string): string {
   const pattern =
-    /^\s*(?:(?:sh|bash|zsh)\s+-c|cmd\.exe\s+\/c|powershell(?:\.exe)?\s+(?:-NoProfile\s+)?-Command|pwsh(?:\.exe)?\s+(?:-NoProfile\s+)?-Command)\s+/i;
+    /^\s*(?:(?:(?:\S+\/)?(?:sh|bash|zsh))\s+-c|cmd\.exe\s+\/c|powershell(?:\.exe)?\s+(?:-NoProfile\s+)?-Command|pwsh(?:\.exe)?\s+(?:-NoProfile\s+)?-Command)\s+/i;
   const match = command.match(pattern);
   if (match) {
     let newCommand = command.substring(match[0].length).trim();

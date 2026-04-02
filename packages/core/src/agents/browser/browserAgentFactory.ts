@@ -53,7 +53,7 @@ import {
 export async function createBrowserAgentDefinition(
   config: Config,
   messageBus: MessageBus,
-  printOutput?: (msg: string) => void,
+  _printOutput?: (msg: string) => void,
 ): Promise<{
   definition: LocalAgentDefinition<typeof BrowserTaskResultSchema>;
   browserManager: BrowserManager;
@@ -62,27 +62,21 @@ export async function createBrowserAgentDefinition(
     'Creating browser agent definition with isolated MCP tools...',
   );
 
-  // Create and initialize browser manager with isolated MCP client
-  const browserManager = new BrowserManager(config);
+  // Get or create browser manager singleton for this session mode/profile
+  const browserManager = BrowserManager.getInstance(config);
   await browserManager.ensureConnection();
 
-  if (printOutput) {
-    printOutput('Browser connected with isolated MCP client.');
-  }
+  debugLogger.log('Browser connected with isolated MCP client.');
 
   // Determine if input blocker should be active (non-headless + enabled)
   const shouldDisableInput = config.shouldDisableBrowserUserInput();
   // Inject automation overlay and input blocker if not in headless mode
   const browserConfig = config.getBrowserAgentConfig();
   if (!browserConfig?.customConfig?.headless) {
-    if (printOutput) {
-      printOutput('Injecting automation overlay...');
-    }
+    debugLogger.log('Injecting automation overlay...');
     await injectAutomationOverlay(browserManager);
     if (shouldDisableInput) {
-      if (printOutput) {
-        printOutput('Injecting input blocker...');
-      }
+      debugLogger.log('Injecting input blocker...');
       await injectInputBlocker(browserManager);
     }
   }
@@ -120,13 +114,12 @@ export async function createBrowserAgentDefinition(
     }
 
     // Reduce noise for read-only tools in default mode
-    const readOnlyTools = [
-      'take_snapshot',
-      'take_screenshot',
-      'list_pages',
-      'list_network_requests',
-    ];
-    for (const toolName of readOnlyTools) {
+    const readOnlyTools = (await browserManager.getDiscoveredTools())
+      .filter((t) => !!t.annotations?.readOnlyHint)
+      .map((t) => t.name);
+    const allowlistedReadonlyTools = ['take_snapshot', 'take_screenshot'];
+
+    for (const toolName of [...readOnlyTools, ...allowlistedReadonlyTools]) {
       if (availableToolNames.includes(toolName)) {
         const rule = generateAllowRules(toolName);
         if (!existingRules.some((r) => isRuleEqual(r, rule))) {
@@ -243,19 +236,10 @@ export async function createBrowserAgentDefinition(
 }
 
 /**
- * Cleans up browser resources after agent execution.
+ * Closes all persistent browser sessions and cleans up resources.
  *
- * @param browserManager The browser manager to clean up
+ * Call this on /clear commands and CLI exit to reset browser state.
  */
-export async function cleanupBrowserAgent(
-  browserManager: BrowserManager,
-): Promise<void> {
-  try {
-    await browserManager.close();
-    debugLogger.log('Browser agent cleanup complete');
-  } catch (error) {
-    debugLogger.error(
-      `Error during browser cleanup: ${error instanceof Error ? error.message : String(error)}`,
-    );
-  }
+export async function resetBrowserSession(): Promise<void> {
+  await BrowserManager.resetAll();
 }

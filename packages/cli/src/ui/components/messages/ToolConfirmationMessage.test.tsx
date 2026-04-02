@@ -34,12 +34,16 @@ describe('ToolConfirmationMessage', () => {
     confirm: mockConfirm,
     cancel: vi.fn(),
     isDiffingEnabled: false,
+    isExpanded: vi.fn().mockReturnValue(false),
+    toggleExpansion: vi.fn(),
+    toggleAllExpansion: vi.fn(),
   });
 
   const mockConfig = {
     isTrustedFolder: () => true,
     getIdeMode: () => false,
     getDisableAlwaysAllow: () => false,
+    getApprovalMode: () => 'default',
   } as unknown as Config;
 
   it('should not display urls if prompt and url are the same', async () => {
@@ -324,6 +328,7 @@ describe('ToolConfirmationMessage', () => {
           isTrustedFolder: () => true,
           getIdeMode: () => false,
           getDisableAlwaysAllow: () => false,
+          getApprovalMode: () => 'default',
         } as unknown as Config;
         const { lastFrame, unmount } = await renderWithProviders(
           <ToolConfirmationMessage
@@ -345,6 +350,7 @@ describe('ToolConfirmationMessage', () => {
           isTrustedFolder: () => false,
           getIdeMode: () => false,
           getDisableAlwaysAllow: () => false,
+          getApprovalMode: () => 'default',
         } as unknown as Config;
 
         const { lastFrame, unmount } = await renderWithProviders(
@@ -380,6 +386,7 @@ describe('ToolConfirmationMessage', () => {
         isTrustedFolder: () => true,
         getIdeMode: () => false,
         getDisableAlwaysAllow: () => false,
+        getApprovalMode: () => 'default',
       } as unknown as Config;
       const { lastFrame, unmount } = await renderWithProviders(
         <ToolConfirmationMessage
@@ -406,6 +413,7 @@ describe('ToolConfirmationMessage', () => {
         isTrustedFolder: () => true,
         getIdeMode: () => false,
         getDisableAlwaysAllow: () => false,
+        getApprovalMode: () => 'default',
       } as unknown as Config;
       const { lastFrame, unmount } = await renderWithProviders(
         <ToolConfirmationMessage
@@ -447,11 +455,15 @@ describe('ToolConfirmationMessage', () => {
         isTrustedFolder: () => true,
         getIdeMode: () => false,
         getDisableAlwaysAllow: () => false,
+        getApprovalMode: () => 'default',
       } as unknown as Config;
       vi.mocked(useToolActions).mockReturnValue({
         confirm: vi.fn(),
         cancel: vi.fn(),
         isDiffingEnabled: false,
+        isExpanded: vi.fn().mockReturnValue(false),
+        toggleExpansion: vi.fn(),
+        toggleAllExpansion: vi.fn(),
       });
 
       const { lastFrame, unmount } = await renderWithProviders(
@@ -474,11 +486,15 @@ describe('ToolConfirmationMessage', () => {
         isTrustedFolder: () => true,
         getIdeMode: () => true,
         getDisableAlwaysAllow: () => false,
+        getApprovalMode: () => 'default',
       } as unknown as Config;
       vi.mocked(useToolActions).mockReturnValue({
         confirm: vi.fn(),
         cancel: vi.fn(),
         isDiffingEnabled: false,
+        isExpanded: vi.fn().mockReturnValue(false),
+        toggleExpansion: vi.fn(),
+        toggleAllExpansion: vi.fn(),
       });
 
       const { lastFrame, unmount } = await renderWithProviders(
@@ -501,11 +517,15 @@ describe('ToolConfirmationMessage', () => {
         isTrustedFolder: () => true,
         getIdeMode: () => true,
         getDisableAlwaysAllow: () => false,
+        getApprovalMode: () => 'default',
       } as unknown as Config;
       vi.mocked(useToolActions).mockReturnValue({
         confirm: vi.fn(),
         cancel: vi.fn(),
         isDiffingEnabled: true,
+        isExpanded: vi.fn().mockReturnValue(false),
+        toggleExpansion: vi.fn(),
+        toggleAllExpansion: vi.fn(),
       });
 
       const { lastFrame, unmount } = await renderWithProviders(
@@ -722,8 +742,10 @@ describe('ToolConfirmationMessage', () => {
         confirm: mockConfirm,
         cancel: vi.fn(),
         isDiffingEnabled: false,
+        isExpanded: vi.fn().mockReturnValue(false),
+        toggleExpansion: vi.fn(),
+        toggleAllExpansion: vi.fn(),
       });
-
       const confirmationDetails: SerializableConfirmationDetails = {
         type: 'info',
         title: 'Confirm Web Fetch',

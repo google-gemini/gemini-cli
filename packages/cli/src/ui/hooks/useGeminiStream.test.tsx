@@ -52,6 +52,7 @@ import {
   MCPDiscoveryState,
   GeminiCliOperation,
   getPlanModeExitMessage,
+  UPDATE_TOPIC_TOOL_NAME,
 } from '@google/gemini-cli-core';
 import type { Part, PartListUnion } from '@google/genai';
 import type { UseHistoryManagerReturn } from './useHistoryManager.js';
@@ -145,7 +146,6 @@ const mockRunInDevTraceSpan = vi.hoisted(() =>
     };
     return await fn({
       metadata,
-      endSpan: vi.fn(),
     });
   }),
 );
@@ -180,11 +180,18 @@ vi.mock('./useKeypress.js', () => ({
   useKeypress: vi.fn(),
 }));
 
-vi.mock('./shellCommandProcessor.js', () => ({
-  useShellCommandProcessor: vi.fn().mockReturnValue({
+vi.mock('./useExecutionLifecycle.js', () => ({
+  useExecutionLifecycle: vi.fn().mockReturnValue({
     handleShellCommand: vi.fn(),
     activeShellPtyId: null,
     lastShellOutputTime: 0,
+    backgroundTaskCount: 0,
+    isBackgroundTaskVisible: false,
+    toggleBackgroundTasks: vi.fn(),
+    backgroundCurrentExecution: vi.fn(),
+    backgroundTasks: new Map(),
+    dismissBackgroundTask: vi.fn(),
+    registerBackgroundTask: vi.fn(),
   }),
 }));
 
@@ -889,7 +896,7 @@ describe('useGeminiStream', () => {
     const fn = spanArgs[1];
     const metadata = { attributes: {} };
     await act(async () => {
-      await fn({ metadata, endSpan: vi.fn() });
+      await fn({ metadata });
     });
     expect(metadata).toMatchObject({
       input: sentParts,
@@ -898,6 +905,30 @@ describe('useGeminiStream', () => {
 
   it('should handle all tool calls being cancelled', async () => {
     const cancelledToolCalls: TrackedToolCall[] = [
+      {
+        request: {
+          callId: 'topic1',
+          name: UPDATE_TOPIC_TOOL_NAME,
+          args: {},
+          isClientInitiated: false,
+          prompt_id: 'prompt-id-3',
+        },
+        status: CoreToolCallStatus.Success,
+        response: {
+          callId: 'topic1',
+          responseParts: [
+            {
+              functionResponse: {
+                name: UPDATE_TOPIC_TOOL_NAME,
+                id: 'topic1',
+                response: {},
+              },
+            },
+          ],
+        },
+        tool: { displayName: 'Update Topic Context' },
+        invocation: { getDescription: () => 'Updating topic' },
+      } as any,
       {
         request: {
           callId: '1',
@@ -918,8 +949,8 @@ describe('useGeminiStream', () => {
         },
         invocation: {
           getDescription: () => `Mock description`,
-        } as unknown as AnyToolInvocation,
-      } as TrackedCancelledToolCall,
+        },
+      } as any,
     ];
     const client = new MockedGeminiClientClass(mockConfig);
 
@@ -972,13 +1003,106 @@ describe('useGeminiStream', () => {
     });
 
     await waitFor(() => {
-      expect(mockMarkToolsAsSubmitted).toHaveBeenCalledWith(['1']);
+      expect(mockMarkToolsAsSubmitted).toHaveBeenCalledWith(['topic1', '1']);
       expect(client.addHistory).toHaveBeenCalledWith({
         role: 'user',
-        parts: [{ text: CoreToolCallStatus.Cancelled }],
+        parts: [
+          {
+            functionResponse: {
+              name: UPDATE_TOPIC_TOOL_NAME,
+              id: 'topic1',
+              response: {},
+            },
+          },
+          { text: CoreToolCallStatus.Cancelled },
+        ],
       });
       // Ensure we do NOT call back to the API
       expect(mockSendMessageStream).not.toHaveBeenCalled();
+    });
+  });
+
+  it('should NOT stop responding when only update_topic is called', async () => {
+    const topicToolCalls: TrackedToolCall[] = [
+      {
+        request: {
+          callId: 'topic1',
+          name: UPDATE_TOPIC_TOOL_NAME,
+          args: {},
+          isClientInitiated: false,
+          prompt_id: 'prompt-id-3',
+        },
+        status: CoreToolCallStatus.Success,
+        response: {
+          callId: 'topic1',
+          responseParts: [
+            {
+              functionResponse: {
+                name: UPDATE_TOPIC_TOOL_NAME,
+                id: 'topic1',
+                response: {},
+              },
+            },
+          ],
+        },
+        tool: { displayName: 'Update Topic Context' },
+        invocation: { getDescription: () => 'Updating topic' },
+      } as any,
+    ];
+    const client = new MockedGeminiClientClass(mockConfig);
+
+    // Capture the onComplete callback
+    let capturedOnComplete:
+      | ((completedTools: TrackedToolCall[]) => Promise<void>)
+      | null = null;
+
+    mockUseToolScheduler.mockImplementation((onComplete) => {
+      capturedOnComplete = onComplete;
+      return [
+        topicToolCalls,
+        vi.fn(),
+        mockMarkToolsAsSubmitted,
+        vi.fn(),
+        vi.fn(),
+        0,
+      ];
+    });
+
+    await renderHookWithProviders(() =>
+      useGeminiStream(
+        client,
+        [],
+        mockAddItem,
+        mockConfig,
+        mockLoadedSettings,
+        mockOnDebugMessage,
+        mockHandleSlashCommand,
+        false,
+        () => 'vscode' as EditorType,
+        () => {},
+        () => Promise.resolve(),
+        false,
+        () => {},
+        () => {},
+        () => {},
+        80,
+        24,
+      ),
+    );
+
+    // Trigger the onComplete callback with the topic tool
+    await act(async () => {
+      if (capturedOnComplete) {
+        await capturedOnComplete(topicToolCalls);
+      }
+    });
+
+    await waitFor(() => {
+      // The streaming state should still be Responding because we didn't cancel anything important
+      // and we expect a continuation.
+      expect(mockMarkToolsAsSubmitted).toHaveBeenCalledWith(['topic1']);
+      // Should HAVE called back to the API for continuation
+      expect(mockSendMessageStream).toHaveBeenCalled();
     });
   });
 
@@ -4037,7 +4161,7 @@ describe('useGeminiStream', () => {
 
     const spanMetadata = {} as SpanMetadata;
     await act(async () => {
-      await userPromptCall![1]({ metadata: spanMetadata, endSpan: vi.fn() });
+      await userPromptCall![1]({ metadata: spanMetadata });
     });
     expect(spanMetadata.input).toBe('telemetry test query');
   });
