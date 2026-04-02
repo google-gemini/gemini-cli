@@ -115,6 +115,11 @@ export function getShellDeclaration(
           description:
             'Set to true if this command should be run in the background (e.g. for long-running servers or watchers). The command will be started, allowed to run for a brief moment to check for immediate errors, and then moved to the background.',
         },
+        delay_ms: {
+          type: 'integer',
+          description:
+            'Optional. Delay in milliseconds to wait after starting the process in the background. Useful to allow the process to start and generate initial output before returning.',
+        },
         ...(enableToolSandboxing
           ? {
               [PARAM_ADDITIONAL_PERMISSIONS]: {

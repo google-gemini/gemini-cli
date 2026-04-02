@@ -616,6 +616,10 @@ exports[`coreTools snapshots for specific models > Model: gemini-2.5-pro > snaps
         "description": "Exact bash command to execute as \`bash -c <command>\`",
         "type": "string",
       },
+      "delay_ms": {
+        "description": "Optional. Delay in milliseconds to wait after starting the process in the background. Useful to allow the process to start and generate initial output before returning.",
+        "type": "integer",
+      },
       "description": {
         "description": "Brief description of the command for the user. Be specific and concise. Ideally a single sentence. Can be up to 3 sentences for clarity. No line breaks.",
         "type": "string",
@@ -1417,6 +1421,10 @@ exports[`coreTools snapshots for specific models > Model: gemini-3-pro-preview >
       "command": {
         "description": "Exact bash command to execute as \`bash -c <command>\`",
         "type": "string",
+      },
+      "delay_ms": {
+        "description": "Optional. Delay in milliseconds to wait after starting the process in the background. Useful to allow the process to start and generate initial output before returning.",
+        "type": "integer",
       },
       "description": {
         "description": "Brief description of the command for the user. Be specific and concise. Ideally a single sentence. Can be up to 3 sentences for clarity. No line breaks.",
