@@ -257,7 +257,27 @@ export class AgentRegistry {
     // Tools are configured dynamically at invocation time via browserAgentFactory.
     const browserConfig = this.config.getBrowserAgentConfig();
     if (browserConfig.enabled) {
-      this.registerLocalAgent(BrowserAgentDefinition(this.config));
+      // In container sandboxes (Docker/Podman/gVisor/LXC), Chrome is not
+      // available inside the container. The browser agent can only work with
+      // sessionMode "existing" (connecting to a host Chrome instance).
+      const sandboxType = process.env['SANDBOX'];
+      const isContainerSandbox =
+        !!sandboxType &&
+        sandboxType !== 'sandbox-exec' &&
+        sandboxType !== 'sandbox:none';
+      const sessionMode =
+        browserConfig.customConfig.sessionMode ?? 'persistent';
+
+      if (isContainerSandbox && sessionMode !== 'existing') {
+        coreEvents.emitFeedback(
+          'info',
+          'Browser agent disabled in container sandbox. ' +
+            'To use it, set sessionMode to "existing" in settings and start Chrome ' +
+            'with --remote-debugging-port=9222 on the host.',
+        );
+      } else {
+        this.registerLocalAgent(BrowserAgentDefinition(this.config));
+      }
     }
 
     // Register the memory manager agent as a replacement for the save_memory tool.
