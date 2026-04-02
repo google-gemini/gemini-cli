@@ -6,7 +6,7 @@
 
 import type React from 'react';
 import { useCallback, useEffect, useState, useRef, useMemo } from 'react';
-import clipboardy from 'clipboardy';
+import { readClipboard } from '../../utils/clipboardWrapper.js';
 import { Box, Text, useStdout, type DOMElement } from 'ink';
 import { SuggestionsDisplay, MAX_WIDTH } from './SuggestionsDisplay.js';
 import { theme } from '../semantic-colors.js';
@@ -520,7 +520,7 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
       if (settings.experimental?.useOSC52Paste) {
         stdout.write('\x1b]52;c;?\x07');
       } else {
-        const textToInsert = await clipboardy.read();
+        const textToInsert = await readClipboard();
         const escapedText = settings.ui?.escapePastedAtSymbols
           ? escapeAtSymbols(textToInsert)
           : textToInsert;
