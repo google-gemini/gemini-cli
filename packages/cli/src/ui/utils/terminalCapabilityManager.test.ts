@@ -30,6 +30,13 @@ vi.mock('@google/gemini-cli-core', () => ({
   disableModifyOtherKeys: vi.fn(),
   enableBracketedPasteMode: vi.fn(),
   disableBracketedPasteMode: vi.fn(),
+  enableMouseEvents: vi.fn(),
+  disableMouseEvents: vi.fn(),
+  enableLineWrapping: vi.fn(),
+  disableLineWrapping: vi.fn(),
+  enterAlternateScreen: vi.fn(),
+  exitAlternateScreen: vi.fn(),
+  writeToStdout: vi.fn(),
 }));
 
 describe('TerminalCapabilityManager', () => {

@@ -474,6 +474,7 @@ describe('DenseToolMessage', () => {
         {
           config: makeFakeConfig({ useAlternateBuffer: true }),
           settings: createMockSettings({ ui: { useAlternateBuffer: true } }),
+          uiState: { isAlternateBuffer: true },
         },
       );
       await waitUntilReady();
