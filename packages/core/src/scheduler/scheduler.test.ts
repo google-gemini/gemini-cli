@@ -74,6 +74,7 @@ import {
   type AnyDeclarativeTool,
   type AnyToolInvocation,
 } from '../tools/tools.js';
+import { UPDATE_TOPIC_TOOL_NAME } from '../tools/tool-names.js';
 import {
   CoreToolCallStatus,
   ROOT_SCHEDULER_ID,
@@ -440,6 +441,44 @@ describe('Scheduler (Orchestrator)', () => {
           }),
         ]),
       );
+    });
+
+    it('should sort UPDATE_TOPIC_TOOL_NAME to the front of the batch', async () => {
+      const topicReq: ToolCallRequestInfo = {
+        callId: 'call-topic',
+        name: UPDATE_TOPIC_TOOL_NAME,
+        args: { title: 'New Chapter' },
+        prompt_id: 'p1',
+        isClientInitiated: false,
+      };
+      const otherReq: ToolCallRequestInfo = {
+        callId: 'call-other',
+        name: 'test-tool',
+        args: {},
+        prompt_id: 'p1',
+        isClientInitiated: false,
+      };
+
+      // Mock tool registry to return a tool for update_topic
+      vi.mocked(mockToolRegistry.getTool).mockImplementation((name) => {
+        if (name === UPDATE_TOPIC_TOOL_NAME) {
+          return {
+            name: UPDATE_TOPIC_TOOL_NAME,
+            build: vi.fn().mockReturnValue({}),
+          } as unknown as AnyDeclarativeTool;
+        }
+        return mockTool;
+      });
+
+      // Schedule in reverse order (other first, topic second)
+      await scheduler.schedule([otherReq, topicReq], signal);
+
+      // Verify they were enqueued in the correct sorted order (topic first)
+      const enqueueCalls = vi.mocked(mockStateManager.enqueue).mock.calls;
+      const lastCall = enqueueCalls[enqueueCalls.length - 1][0];
+
+      expect(lastCall[0].request.callId).toBe('call-topic');
+      expect(lastCall[1].request.callId).toBe('call-other');
     });
   });
 

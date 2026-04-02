@@ -10,11 +10,13 @@ import fsPromises from 'node:fs/promises';
 import { afterEach, describe, expect, it, vi, beforeEach } from 'vitest';
 import {
   NoopSandboxManager,
-  LocalSandboxManager,
   sanitizePaths,
   findSecretFiles,
   isSecretFile,
   tryRealpath,
+  resolveSandboxPaths,
+  getPathIdentity,
+  type SandboxRequest,
 } from './sandboxManager.js';
 import { createSandboxManager } from './sandboxManagerFactory.js';
 import { LinuxSandboxManager } from '../sandbox/linux/LinuxSandboxManager.js';
@@ -122,8 +124,10 @@ describe('SandboxManager', () => {
   afterEach(() => vi.restoreAllMocks());
 
   describe('sanitizePaths', () => {
-    it('should return undefined if no paths are provided', () => {
-      expect(sanitizePaths(undefined)).toBeUndefined();
+    it('should return an empty array if no paths are provided', () => {
+      expect(sanitizePaths(undefined)).toEqual([]);
+      expect(sanitizePaths(null)).toEqual([]);
+      expect(sanitizePaths([])).toEqual([]);
     });
 
     it('should deduplicate paths and return them', () => {
@@ -134,11 +138,129 @@ describe('SandboxManager', () => {
       ]);
     });
 
+    it('should deduplicate case-insensitively on Windows and macOS', () => {
+      vi.spyOn(os, 'platform').mockReturnValue('win32');
+      const paths = ['/workspace/foo', '/WORKSPACE/FOO'];
+      expect(sanitizePaths(paths)).toEqual(['/workspace/foo']);
+
+      vi.spyOn(os, 'platform').mockReturnValue('darwin');
+      const macPaths = ['/tmp/foo', '/tmp/FOO'];
+      expect(sanitizePaths(macPaths)).toEqual(['/tmp/foo']);
+
+      vi.spyOn(os, 'platform').mockReturnValue('linux');
+      const linuxPaths = ['/tmp/foo', '/tmp/FOO'];
+      expect(sanitizePaths(linuxPaths)).toEqual(['/tmp/foo', '/tmp/FOO']);
+    });
+
     it('should throw an error if a path is not absolute', () => {
       const paths = ['/workspace/foo', 'relative/path'];
       expect(() => sanitizePaths(paths)).toThrow(
         'Sandbox path must be absolute: relative/path',
       );
+    });
+  });
+
+  describe('getPathIdentity', () => {
+    it('should normalize slashes and strip trailing slashes', () => {
+      expect(getPathIdentity('/foo/bar//baz/')).toBe(
+        path.normalize('/foo/bar/baz'),
+      );
+    });
+
+    it('should handle case sensitivity correctly per platform', () => {
+      vi.spyOn(os, 'platform').mockReturnValue('win32');
+      expect(getPathIdentity('/Workspace/Foo')).toBe('/workspace/foo');
+
+      vi.spyOn(os, 'platform').mockReturnValue('darwin');
+      expect(getPathIdentity('/Tmp/Foo')).toBe('/tmp/foo');
+
+      vi.spyOn(os, 'platform').mockReturnValue('linux');
+      expect(getPathIdentity('/Tmp/Foo')).toBe('/Tmp/Foo');
+    });
+  });
+
+  describe('resolveSandboxPaths', () => {
+    it('should resolve allowed and forbidden paths', async () => {
+      const options = {
+        workspace: '/workspace',
+        forbiddenPaths: async () => ['/workspace/forbidden'],
+      };
+      const req = {
+        command: 'ls',
+        args: [],
+        cwd: '/workspace',
+        env: {},
+        policy: {
+          allowedPaths: ['/workspace/allowed'],
+        },
+      };
+
+      const result = await resolveSandboxPaths(options, req as SandboxRequest);
+
+      expect(result.allowed).toEqual(['/workspace/allowed']);
+      expect(result.forbidden).toEqual(['/workspace/forbidden']);
+    });
+
+    it('should filter out workspace from allowed paths', async () => {
+      const options = {
+        workspace: '/workspace',
+      };
+      const req = {
+        command: 'ls',
+        args: [],
+        cwd: '/workspace',
+        env: {},
+        policy: {
+          allowedPaths: ['/workspace', '/workspace/', '/other/path'],
+        },
+      };
+
+      const result = await resolveSandboxPaths(options, req as SandboxRequest);
+
+      expect(result.allowed).toEqual(['/other/path']);
+    });
+
+    it('should prioritize forbidden paths over allowed paths', async () => {
+      const options = {
+        workspace: '/workspace',
+        forbiddenPaths: async () => ['/workspace/secret'],
+      };
+      const req = {
+        command: 'ls',
+        args: [],
+        cwd: '/workspace',
+        env: {},
+        policy: {
+          allowedPaths: ['/workspace/secret', '/workspace/normal'],
+        },
+      };
+
+      const result = await resolveSandboxPaths(options, req as SandboxRequest);
+
+      expect(result.allowed).toEqual(['/workspace/normal']);
+      expect(result.forbidden).toEqual(['/workspace/secret']);
+    });
+
+    it('should handle case-insensitive conflicts on supported platforms', async () => {
+      vi.spyOn(os, 'platform').mockReturnValue('darwin');
+      const options = {
+        workspace: '/workspace',
+        forbiddenPaths: async () => ['/workspace/SECRET'],
+      };
+      const req = {
+        command: 'ls',
+        args: [],
+        cwd: '/workspace',
+        env: {},
+        policy: {
+          allowedPaths: ['/workspace/secret'],
+        },
+      };
+
+      const result = await resolveSandboxPaths(options, req as SandboxRequest);
+
+      expect(result.allowed).toEqual([]);
+      expect(result.forbidden).toEqual(['/workspace/SECRET']);
     });
   });
 
@@ -364,38 +486,36 @@ describe('SandboxManager', () => {
 
   describe('createSandboxManager', () => {
     it('should return NoopSandboxManager if sandboxing is disabled', () => {
-      const manager = createSandboxManager({ enabled: false }, '/workspace');
+      const manager = createSandboxManager(
+        { enabled: false },
+        { workspace: '/workspace' },
+      );
       expect(manager).toBeInstanceOf(NoopSandboxManager);
     });
 
     it.each([
       { platform: 'linux', expected: LinuxSandboxManager },
       { platform: 'darwin', expected: MacOsSandboxManager },
+      { platform: 'win32', expected: WindowsSandboxManager },
     ] as const)(
       'should return $expected.name if sandboxing is enabled and platform is $platform',
       ({ platform, expected }) => {
         vi.spyOn(os, 'platform').mockReturnValue(platform);
-        const manager = createSandboxManager({ enabled: true }, '/workspace');
+        const manager = createSandboxManager(
+          { enabled: true },
+          { workspace: '/workspace' },
+        );
         expect(manager).toBeInstanceOf(expected);
       },
     );
 
-    it("should return WindowsSandboxManager if sandboxing is enabled with 'windows-native' command on win32", () => {
+    it('should return WindowsSandboxManager if sandboxing is enabled on win32', () => {
       vi.spyOn(os, 'platform').mockReturnValue('win32');
       const manager = createSandboxManager(
-        { enabled: true, command: 'windows-native' },
-        '/workspace',
+        { enabled: true },
+        { workspace: '/workspace' },
       );
       expect(manager).toBeInstanceOf(WindowsSandboxManager);
-    });
-
-    it('should return LocalSandboxManager on win32 if command is not windows-native', () => {
-      vi.spyOn(os, 'platform').mockReturnValue('win32');
-      const manager = createSandboxManager(
-        { enabled: true, command: 'docker' as unknown as 'windows-native' },
-        '/workspace',
-      );
-      expect(manager).toBeInstanceOf(LocalSandboxManager);
     });
   });
 });

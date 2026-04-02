@@ -57,6 +57,7 @@ export class PromptProvider {
     const skills = context.config.getSkillManager().getSkills();
     const toolNames = context.toolRegistry.getAllToolNames();
     const enabledToolNames = new Set(toolNames);
+
     const approvedPlanPath = context.config.getApprovedPlanPath();
 
     const desiredModel = resolveModel(
@@ -70,6 +71,15 @@ export class PromptProvider {
     const isModernModel = supportsModernFeatures(desiredModel);
     const activeSnippets = isModernModel ? snippets : legacySnippets;
     const contextFilenames = getAllGeminiMdFilenames();
+
+    let trackerDir = context.config.isTrackerEnabled()
+      ? context.config.storage.getProjectTempTrackerDir()
+      : undefined;
+
+    if (trackerDir) {
+      // Sanitize path to prevent prompt injection
+      trackerDir = trackerDir.replace(/\n/g, ' ').replace(/\]/g, '');
+    }
 
     // --- Context Gathering ---
     let planModeToolsList = '';
@@ -149,7 +159,7 @@ export class PromptProvider {
             })),
           skills.length > 0,
         ),
-        taskTracker: context.config.isTrackerEnabled(),
+        taskTracker: trackerDir,
         hookContext: isSectionEnabled('hookContext') || undefined,
         primaryWorkflows: this.withSection(
           'primaryWorkflows',
@@ -167,7 +177,7 @@ export class PromptProvider {
             approvedPlan: approvedPlanPath
               ? { path: approvedPlanPath }
               : undefined,
-            taskTracker: context.config.isTrackerEnabled(),
+            taskTracker: trackerDir,
             topicUpdateNarration:
               context.config.isTopicUpdateNarrationEnabled(),
           }),
@@ -180,7 +190,6 @@ export class PromptProvider {
             planModeToolsList,
             plansDir: context.config.storage.getPlansDir(),
             approvedPlanPath: context.config.getApprovedPlanPath(),
-            taskTracker: context.config.isTrackerEnabled(),
           }),
           isPlanMode,
         ),
@@ -232,7 +241,18 @@ export class PromptProvider {
     );
 
     // Sanitize erratic newlines from composition
-    const sanitizedPrompt = finalPrompt.replace(/\n{3,}/g, '\n\n');
+    let sanitizedPrompt = finalPrompt.replace(/\n{3,}/g, '\n\n');
+
+    // Context Reinjection (Active Topic)
+    if (context.config.isTopicUpdateNarrationEnabled()) {
+      const activeTopic = context.config.topicState.getTopic();
+      if (activeTopic) {
+        const sanitizedTopic = activeTopic
+          .replace(/\n/g, ' ')
+          .replace(/\]/g, '');
+        sanitizedPrompt += `\n\n[Active Topic: ${sanitizedTopic}]`;
+      }
+    }
 
     // Write back to file if requested
     this.maybeWriteSystemMd(

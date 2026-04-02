@@ -1,100 +1,83 @@
 // Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
 
 exports[`TableRenderer > 'calculates column widths based on ren…' 1`] = `
-"
-┌────────┬────────┬────────┐
+"┌────────┬────────┬────────┐
 │ Col 1  │ Col 2  │ Col 3  │
 ├────────┼────────┼────────┤
 │ 123456 │ Normal │ Short  │
 │ Short  │ 123456 │ Normal │
 │ Normal │ Short  │ 123456 │
-└────────┴────────┴────────┘
-"
+└────────┴────────┴────────┘"
 `;
 
 exports[`TableRenderer > 'calculates width correctly for conten…' 1`] = `
-"
-┌───────────────────────────────────┬───────────────────────────────┬─────────────────────────────────┐
+"┌───────────────────────────────────┬───────────────────────────────┬─────────────────────────────────┐
 │ Col 1                             │ Col 2                         │ Col 3                           │
 ├───────────────────────────────────┼───────────────────────────────┼─────────────────────────────────┤
 │ Visit Google (https://google.com) │ Plain Text                    │ More Info                       │
 │ Info Here                         │ Visit Bing (https://bing.com) │ Links                           │
 │ Check This                        │ Search                        │ Visit Yahoo (https://yahoo.com) │
-└───────────────────────────────────┴───────────────────────────────┴─────────────────────────────────┘
-"
+└───────────────────────────────────┴───────────────────────────────┴─────────────────────────────────┘"
 `;
 
 exports[`TableRenderer > 'does not parse markdown inside code s…' 1`] = `
-"
-┌─────────────────┬──────────────────────┬──────────────────┐
+"┌─────────────────┬──────────────────────┬──────────────────┐
 │ Col 1           │ Col 2                │ Col 3            │
 ├─────────────────┼──────────────────────┼──────────────────┤
 │ **not bold**    │ _not italic_         │ ~~not strike~~   │
 │ [not link](url) │ <u>not underline</u> │ https://not.link │
 │ Normal Text     │ More Code: *test*    │ ***nested***     │
-└─────────────────┴──────────────────────┴──────────────────┘
-"
+└─────────────────┴──────────────────────┴──────────────────┘"
 `;
 
 exports[`TableRenderer > 'handles nested markdown styles recurs…' 1`] = `
-"
-┌─────────────────────────────┬─────────────────────────────┬─────────────────────────────┐
+"┌─────────────────────────────┬─────────────────────────────┬─────────────────────────────┐
 │ Header 1                    │ Header 2                    │ Header 3                    │
 ├─────────────────────────────┼─────────────────────────────┼─────────────────────────────┤
 │ Bold with Italic and Strike │ Normal                      │ Short                       │
 │ Short                       │ Bold with Italic and Strike │ Normal                      │
 │ Normal                      │ Short                       │ Bold with Italic and Strike │
-└─────────────────────────────┴─────────────────────────────┴─────────────────────────────┘
-"
+└─────────────────────────────┴─────────────────────────────┴─────────────────────────────┘"
 `;
 
 exports[`TableRenderer > 'handles non-ASCII characters (emojis …' 1`] = `
-"
-┌──────────────┬────────────┬───────────────┐
+"┌──────────────┬────────────┬───────────────┐
 │ Emoji 😃     │ Asian 汉字 │ Mixed 🚀 Text │
 ├──────────────┼────────────┼───────────────┤
 │ Start 🌟 End │ 你好世界   │ Rocket 🚀 Man │
 │ Thumbs 👍 Up │ こんにちは │ Fire 🔥       │
-└──────────────┴────────────┴───────────────┘
-"
+└──────────────┴────────────┴───────────────┘"
 `;
 
 exports[`TableRenderer > 'renders a table with mixed emojis, As…' 1`] = `
-"
-┌───────────────┬───────────────────┬────────────────┐
+"┌───────────────┬───────────────────┬────────────────┐
 │ Mixed 😃 中文 │ Complex 🚀 日本語 │ Text 📝 한국어 │
 ├───────────────┼───────────────────┼────────────────┤
 │ 你好 😃       │ こんにちは 🚀     │ 안녕하세요 📝  │
 │ World 🌍      │ Code 💻           │ Pizza 🍕       │
-└───────────────┴───────────────────┴────────────────┘
-"
+└───────────────┴───────────────────┴────────────────┘"
 `;
 
 exports[`TableRenderer > 'renders a table with only Asian chara…' 1`] = `
-"
-┌──────────────┬─────────────────┬───────────────┐
+"┌──────────────┬─────────────────┬───────────────┐
 │ Chinese 中文 │ Japanese 日本語 │ Korean 한국어 │
 ├──────────────┼─────────────────┼───────────────┤
 │ 你好         │ こんにちは      │ 안녕하세요    │
 │ 世界         │ 世界            │ 세계          │
-└──────────────┴─────────────────┴───────────────┘
-"
+└──────────────┴─────────────────┴───────────────┘"
 `;
 
 exports[`TableRenderer > 'renders a table with only emojis and …' 1`] = `
-"
-┌──────────┬───────────┬──────────┐
+"┌──────────┬───────────┬──────────┐
 │ Happy 😀 │ Rocket 🚀 │ Heart ❤️ │
 ├──────────┼───────────┼──────────┤
 │ Smile 😃 │ Fire 🔥   │ Love 💖  │
 │ Cool 😎  │ Star ⭐   │ Blue 💙  │
-└──────────┴───────────┴──────────┘
-"
+└──────────┴───────────┴──────────┘"
 `;
 
 exports[`TableRenderer > 'renders complex markdown in rows and …' 1`] = `
-"
-┌───────────────┬─────────────────────────────┐
+"┌───────────────┬─────────────────────────────┐
 │ Feature       │ Markdown                    │
 ├───────────────┼─────────────────────────────┤
 │ Bold          │ Bold Text                   │
@@ -104,33 +87,27 @@ exports[`TableRenderer > 'renders complex markdown in rows and …' 1`] = `
 │ Code          │ const x = 1                 │
 │ Strikethrough │ Strike                      │
 │ Underline     │ Underline                   │
-└───────────────┴─────────────────────────────┘
-"
+└───────────────┴─────────────────────────────┘"
 `;
 
 exports[`TableRenderer > 'renders correctly when headers are em…' 1`] = `
-"
-┌────────┬────────┐
+"┌────────┬────────┐
 │        │        │
 ├────────┼────────┤
 │ Data 1 │ Data 2 │
-└────────┴────────┘
-"
+└────────┴────────┘"
 `;
 
 exports[`TableRenderer > 'renders correctly when there are more…' 1`] = `
-"
-┌──────────┬──────────┬──────────┐
+"┌──────────┬──────────┬──────────┐
 │ Header 1 │ Header 2 │ Header 3 │
 ├──────────┼──────────┼──────────┤
 │ Data 1   │ Data 2   │          │
-└──────────┴──────────┴──────────┘
-"
+└──────────┴──────────┴──────────┘"
 `;
 
 exports[`TableRenderer > handles wrapped bold headers without showing markers 1`] = `
-"
-┌─────────────┬───────┬─────────┐
+"┌─────────────┬───────┬─────────┐
 │ Very Long   │ Short │ Another │
 │ Bold Header │       │ Long    │
 │ That Will   │       │ Header  │
@@ -138,25 +115,21 @@ exports[`TableRenderer > handles wrapped bold headers without showing markers 1`
 ├─────────────┼───────┼─────────┤
 │ Data 1      │ Data  │ Data 3  │
 │             │ 2     │         │
-└─────────────┴───────┴─────────┘
-"
+└─────────────┴───────┴─────────┘"
 `;
 
 exports[`TableRenderer > renders a 3x3 table correctly 1`] = `
-"
-┌──────────────┬──────────────┬──────────────┐
+"┌──────────────┬──────────────┬──────────────┐
 │ Header 1     │ Header 2     │ Header 3     │
 ├──────────────┼──────────────┼──────────────┤
 │ Row 1, Col 1 │ Row 1, Col 2 │ Row 1, Col 3 │
 │ Row 2, Col 1 │ Row 2, Col 2 │ Row 2, Col 3 │
 │ Row 3, Col 1 │ Row 3, Col 2 │ Row 3, Col 3 │
-└──────────────┴──────────────┴──────────────┘
-"
+└──────────────┴──────────────┴──────────────┘"
 `;
 
 exports[`TableRenderer > renders a complex table with mixed content lengths correctly 1`] = `
-"
-┌─────────────────────────────┬──────────────────────────────┬─────────────────────────────┬──────────────────────────────┬─────┬────────┬─────────┬───────┐
+"┌─────────────────────────────┬──────────────────────────────┬─────────────────────────────┬──────────────────────────────┬─────┬────────┬─────────┬───────┐
 │ Comprehensive Architectural │ Implementation Details for   │ Longitudinal Performance    │ Strategic Security Framework │ Key │ Status │ Version │ Owner │
 │ Specification for the       │ the High-Throughput          │ Analysis Across             │ for Mitigating Sophisticated │     │        │         │       │
 │ Distributed Infrastructure  │ Asynchronous Message         │ Multi-Regional Cloud        │ Cross-Site Scripting         │     │        │         │       │
@@ -189,13 +162,11 @@ exports[`TableRenderer > renders a complex table with mixed content lengths corr
 │ identification of           │ during unexpected traffic    │ percent cost optimization.  │ environments.                │     │        │         │       │
 │ bottlenecks within the      │ spikes.                      │                             │                              │     │        │         │       │
 │ service mesh.               │                              │                             │                              │     │        │         │       │
-└─────────────────────────────┴──────────────────────────────┴─────────────────────────────┴──────────────────────────────┴─────┴────────┴─────────┴───────┘
-"
+└─────────────────────────────┴──────────────────────────────┴─────────────────────────────┴──────────────────────────────┴─────┴────────┴─────────┴───────┘"
 `;
 
 exports[`TableRenderer > renders a table with long headers and 4 columns correctly 1`] = `
-"
-┌───────────────┬───────────────┬──────────────────┬──────────────────┐
+"┌───────────────┬───────────────┬──────────────────┬──────────────────┐
 │ Very Long     │ Very Long     │ Very Long Column │ Very Long Column │
 │ Column Header │ Column Header │ Header Three     │ Header Four      │
 │ One           │ Two           │                  │                  │
@@ -203,23 +174,19 @@ exports[`TableRenderer > renders a table with long headers and 4 columns correct
 │ Data 1.1      │ Data 1.2      │ Data 1.3         │ Data 1.4         │
 │ Data 2.1      │ Data 2.2      │ Data 2.3         │ Data 2.4         │
 │ Data 3.1      │ Data 3.2      │ Data 3.3         │ Data 3.4         │
-└───────────────┴───────────────┴──────────────────┴──────────────────┘
-"
+└───────────────┴───────────────┴──────────────────┴──────────────────┘"
 `;
 
 exports[`TableRenderer > strips bold markers from headers and renders them correctly 1`] = `
-"
-┌─────────────┬───────────────┬──────────────┐
+"┌─────────────┬───────────────┬──────────────┐
 │ Bold Header │ Normal Header │ Another Bold │
 ├─────────────┼───────────────┼──────────────┤
 │ Data 1      │ Data 2        │ Data 3       │
-└─────────────┴───────────────┴──────────────┘
-"
+└─────────────┴───────────────┴──────────────┘"
 `;
 
 exports[`TableRenderer > wraps all long columns correctly 1`] = `
-"
-┌────────────────┬────────────────┬─────────────────┐
+"┌────────────────┬────────────────┬─────────────────┐
 │ Col 1          │ Col 2          │ Col 3           │
 ├────────────────┼────────────────┼─────────────────┤
 │ This is a very │ This is also a │ And this is the │
@@ -227,13 +194,11 @@ exports[`TableRenderer > wraps all long columns correctly 1`] = `
 │ needs wrapping │ that needs     │ that needs      │
 │ in column 1    │ wrapping in    │ wrapping in     │
 │                │ column 2       │ column 3        │
-└────────────────┴────────────────┴─────────────────┘
-"
+└────────────────┴────────────────┴─────────────────┘"
 `;
 
 exports[`TableRenderer > wraps columns with punctuation correctly 1`] = `
-"
-┌───────────────────┬───────────────┬─────────────────┐
+"┌───────────────────┬───────────────┬─────────────────┐
 │ Punctuation 1     │ Punctuation 2 │ Punctuation 3   │
 ├───────────────────┼───────────────┼─────────────────┤
 │ Start. Stop.      │ Semi; colon:  │ At@ Hash#       │
@@ -241,30 +206,25 @@ exports[`TableRenderer > wraps columns with punctuation correctly 1`] = `
 │ Exclamation!      │ Backslash\\    │ Percent% Caret^ │
 │ Question?         │               │ Ampersand&      │
 │ hyphen-ated       │               │ Asterisk*       │
-└───────────────────┴───────────────┴─────────────────┘
-"
+└───────────────────┴───────────────┴─────────────────┘"
 `;
 
 exports[`TableRenderer > wraps long cell content correctly 1`] = `
-"
-┌───────┬─────────────────────────────┬───────┐
+"┌───────┬─────────────────────────────┬───────┐
 │ Col 1 │ Col 2                       │ Col 3 │
 ├───────┼─────────────────────────────┼───────┤
 │ Short │ This is a very long cell    │ Short │
 │       │ content that should wrap to │       │
 │       │ multiple lines              │       │
-└───────┴─────────────────────────────┴───────┘
-"
+└───────┴─────────────────────────────┴───────┘"
 `;
 
 exports[`TableRenderer > wraps mixed long and short columns correctly 1`] = `
-"
-┌───────┬──────────────────────────┬────────┐
+"┌───────┬──────────────────────────┬────────┐
 │ Short │ Long                     │ Medium │
 ├───────┼──────────────────────────┼────────┤
 │ Tiny  │ This is a very long text │ Not so │
 │       │ that definitely needs to │ long   │
 │       │ wrap to the next line    │        │
-└───────┴──────────────────────────┴────────┘
-"
+└───────┴──────────────────────────┴────────┘"
 `;
