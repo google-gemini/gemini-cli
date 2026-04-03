@@ -624,6 +624,7 @@ export interface ConfigParameters {
   fileDiscoveryService?: FileDiscoveryService;
   includeDirectories?: string[];
   bugCommand?: BugCommandSettings;
+  saveSession?: boolean;
   model: string;
   disableLoopDetection?: boolean;
   maxSessionTurns?: number;
@@ -946,6 +947,7 @@ export class Config implements McpContext, AgentLoopContext {
   private readonly experimentalMemoryManager: boolean;
   private readonly memoryBoundaryMarkers: readonly string[];
   private readonly topicUpdateNarration: boolean;
+  private readonly saveSession: boolean;
   private readonly disableLLMCorrection: boolean;
   private readonly planEnabled: boolean;
   private readonly trackerEnabled: boolean;
@@ -1198,6 +1200,7 @@ export class Config implements McpContext, AgentLoopContext {
       },
     };
     this.topicUpdateNarration = params.topicUpdateNarration ?? false;
+    this.saveSession = params.saveSession ?? true;
     this.modelSteering = params.modelSteering ?? false;
     this.injectionService = new InjectionService(() =>
       this.isModelSteeringEnabled(),
@@ -1798,6 +1801,10 @@ export class Config implements McpContext, AgentLoopContext {
 
   getSkipPreflightRequests(): boolean {
     return this.skipPreflightRequests;
+  }
+
+  getSaveSession(): boolean {
+    return this.saveSession;
   }
 
   getIncludeDirectoryTree(): boolean {

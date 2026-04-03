@@ -157,6 +157,10 @@ export class ChatRecordingService {
     resumedSessionData?: ResumedSessionData,
     kind?: 'main' | 'subagent',
   ): void {
+    if (!this.context.config.getSaveSession()) {
+      this.conversationFile = null;
+      return;
+    }
     try {
       this.kind = kind;
       if (resumedSessionData) {

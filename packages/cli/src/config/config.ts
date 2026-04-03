@@ -107,6 +107,7 @@ export interface CliArgs {
   acceptRawOutputRisk: boolean | undefined;
   isCommand: boolean | undefined;
   fast?: boolean;
+  saveSession?: boolean;
 }
 
 /**
@@ -449,6 +450,11 @@ export async function parseArguments(
           type: 'boolean',
           description:
             'Enable fast mode: minimize request payload and skip preflight requests (quota, experiments).',
+        })
+        .option('save-session', {
+          type: 'boolean',
+          default: true,
+          description: 'Persist the chat session to disk.',
         }),
     )
     .version(await getVersion()) // This will enable the --version flag based on package.json
@@ -922,6 +928,7 @@ export async function loadCliConfig(
     worktreeSettings,
     minimalPayload: !!argv.fast,
     skipPreflightRequests: !!argv.fast,
+    saveSession: argv.saveSession,
 
     coreTools: settings.tools?.core || undefined,
     allowedTools: allowedTools.length > 0 ? allowedTools : undefined,

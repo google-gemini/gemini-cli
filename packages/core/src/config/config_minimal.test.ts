@@ -100,4 +100,15 @@ describe('Config Minimal Mode', () => {
     const userData = await setupUser(mockAuthClient, config);
     expect(userData.projectId).toBe('cached-project');
   });
+
+  it('should respect saveSession flag', () => {
+    const configOn = new Config({ ...baseParams, saveSession: true });
+    expect(configOn.getSaveSession()).toBe(true);
+
+    const configOff = new Config({ ...baseParams, saveSession: false });
+    expect(configOff.getSaveSession()).toBe(false);
+
+    const configDefault = new Config({ ...baseParams });
+    expect(configDefault.getSaveSession()).toBe(true);
+  });
 });
