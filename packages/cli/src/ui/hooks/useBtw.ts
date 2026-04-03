@@ -215,6 +215,9 @@ export const useBtw = (
       if (abortControllerRef.current) {
         abortControllerRef.current.abort();
       }
+      if (flushTimerRef.current) {
+        clearTimeout(flushTimerRef.current);
+      }
     },
     [],
   );
