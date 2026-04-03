@@ -875,6 +875,32 @@ describe('Session', () => {
     expect(result).toMatchObject({ stopReason: 'end_turn' });
   });
 
+  it('should handle prompt with no finish reason (InvalidStreamError)', async () => {
+    mockChat.sendMessageStream.mockRejectedValue(
+      new InvalidStreamError('No finish reason', 'NO_FINISH_REASON'),
+    );
+
+    const result = await session.prompt({
+      sessionId: 'session-1',
+      prompt: [{ type: 'text', text: 'Hi' }],
+    });
+
+    expect(mockChat.sendMessageStream).toHaveBeenCalled();
+    expect(result).toMatchObject({ stopReason: 'end_turn' });
+  });
+
+  it('should handle prompt with no finish reason (NO_FINISH_REASON anomaly)', async () => {
+    mockChat.sendMessageStream.mockRejectedValue({ type: 'NO_FINISH_REASON' });
+
+    const result = await session.prompt({
+      sessionId: 'session-1',
+      prompt: [{ type: 'text', text: 'Hi' }],
+    });
+
+    expect(mockChat.sendMessageStream).toHaveBeenCalled();
+    expect(result).toMatchObject({ stopReason: 'end_turn' });
+  });
+
   it('should handle /memory command', async () => {
     const handleCommandSpy = vi
       .spyOn(

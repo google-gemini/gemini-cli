@@ -416,7 +416,11 @@ describe('ShellTool', () => {
       // Advance time to trigger the background timeout
       await vi.advanceTimersByTimeAsync(250);
 
-      expect(mockShellBackground).toHaveBeenCalledWith(12345);
+      expect(mockShellBackground).toHaveBeenCalledWith(
+        12345,
+        'default',
+        'sleep 10',
+      );
 
       await promise;
     });
@@ -444,11 +448,11 @@ describe('ShellTool', () => {
           expect.any(Function),
           expect.any(AbortSignal),
           false,
-          {
+          expect.objectContaining({
             pager: 'cat',
             sanitizationConfig: {},
-            sandboxManager: new NoopSandboxManager(),
-          },
+            sandboxManager: expect.any(NoopSandboxManager),
+          }),
         );
       },
       20000,
@@ -656,7 +660,11 @@ describe('ShellTool', () => {
         // Advance time to trigger the background timeout
         await vi.advanceTimersByTimeAsync(250);
 
-        expect(mockShellBackground).toHaveBeenCalledWith(12345);
+        expect(mockShellBackground).toHaveBeenCalledWith(
+          12345,
+          'default',
+          'sleep 10',
+        );
 
         await promise;
       });

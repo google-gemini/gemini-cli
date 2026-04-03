@@ -53,6 +53,18 @@ export enum ApprovalMode {
 }
 
 /**
+ * The order of permissiveness for approval modes.
+ * Tools allowed in a less permissive mode should also be allowed
+ * in more permissive modes.
+ */
+export const MODES_BY_PERMISSIVENESS = [
+  ApprovalMode.PLAN,
+  ApprovalMode.DEFAULT,
+  ApprovalMode.AUTO_EDIT,
+  ApprovalMode.YOLO,
+];
+
+/**
  * Configuration for the built-in allowed-path checker.
  */
 export interface AllowedPathConfig {

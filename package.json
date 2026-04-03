@@ -18,6 +18,7 @@
   },
   "scripts": {
     "start": "cross-env NODE_ENV=development node scripts/start.js",
+    "start:prod": "cross-env NODE_ENV=production node scripts/start.js",
     "start:a2a-server": "CODER_AGENT_PORT=41242 npm run start --workspace @google/gemini-cli-a2a-server",
     "debug": "cross-env DEBUG=1 node --inspect-brk scripts/start.js",
     "deflake": "node scripts/deflake.js",
@@ -68,7 +69,7 @@
     "pre-commit": "node scripts/pre-commit.js"
   },
   "overrides": {
-    "ink": "npm:@jrichman/ink@6.6.3",
+    "ink": "npm:@jrichman/ink@6.6.7",
     "wrap-ansi": "9.0.2",
     "cliui": {
       "wrap-ansi": "7.0.0"
@@ -136,7 +137,7 @@
     "yargs": "^17.7.2"
   },
   "dependencies": {
-    "ink": "npm:@jrichman/ink@6.6.3",
+    "ink": "npm:@jrichman/ink@6.6.7",
     "latest-version": "^9.0.0",
     "node-fetch-native": "^1.6.7",
     "proper-lockfile": "^4.1.2",

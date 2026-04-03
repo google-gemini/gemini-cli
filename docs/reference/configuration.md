@@ -62,11 +62,13 @@ locations for these files:
 
 **Note on environment variables in settings:** String values within your
 `settings.json` and `gemini-extension.json` files can reference environment
-variables using either `$VAR_NAME` or `${VAR_NAME}` syntax. These variables will
-be automatically resolved when the settings are loaded. For example, if you have
-an environment variable `MY_API_TOKEN`, you could use it in `settings.json` like
-this: `"apiKey": "$MY_API_TOKEN"`. Additionally, each extension can have its own
-`.env` file in its directory, which will be loaded automatically.
+variables using `$VAR_NAME`, `${VAR_NAME}`, or `${VAR_NAME:-DEFAULT_VALUE}`
+syntax. These variables will be automatically resolved when the settings are
+loaded. For example, if you have an environment variable `MY_API_TOKEN`, you
+could use it in `settings.json` like this: `"apiKey": "$MY_API_TOKEN"`. If you
+want to provide a fallback value, use `${MY_API_TOKEN:-default-token}`.
+Additionally, each extension can have its own `.env` file in its directory,
+which will be loaded automatically.
 
 **Note for Enterprise Users:** For guidance on deploying and managing Gemini CLI
 in a corporate environment, please see the
@@ -265,7 +267,7 @@ their corresponding top-level category object in your `settings.json` file.
 - **`ui.compactToolOutput`** (boolean):
   - **Description:** Display tool outputs (like directory listings and file
     reads) in a compact, structured format.
-  - **Default:** `false`
+  - **Default:** `true`
 
 - **`ui.hideBanner`** (boolean):
   - **Description:** Hide the application banner
@@ -335,6 +337,16 @@ their corresponding top-level category object in your `settings.json` file.
   - **Description:** Use an alternate screen buffer for the UI, preserving shell
     history.
   - **Default:** `false`
+  - **Requires restart:** Yes
+
+- **`ui.renderProcess`** (boolean):
+  - **Description:** Enable Ink render process for the UI.
+  - **Default:** `true`
+  - **Requires restart:** Yes
+
+- **`ui.terminalBuffer`** (boolean):
+  - **Description:** Use the new terminal buffer architecture for rendering.
+  - **Default:** `true`
   - **Requires restart:** Yes
 
 - **`ui.useBackgroundColor`** (boolean):
@@ -1242,7 +1254,8 @@ their corresponding top-level category object in your `settings.json` file.
   - **Requires restart:** Yes
 
 - **`agents.browser.visualModel`** (string):
-  - **Description:** Model override for the visual agent.
+  - **Description:** Model for the visual agent's analyze_screenshot tool. When
+    set, enables the tool.
   - **Default:** `undefined`
   - **Requires restart:** Yes
 
@@ -1391,7 +1404,7 @@ their corresponding top-level category object in your `settings.json` file.
 
 - **`tools.shell.showColor`** (boolean):
   - **Description:** Show color in shell output.
-  - **Default:** `false`
+  - **Default:** `true`
 
 - **`tools.shell.inactivityTimeout`** (number):
   - **Description:** The maximum time in seconds allowed without output from the
@@ -1687,6 +1700,11 @@ their corresponding top-level category object in your `settings.json` file.
   - **Description:** Replace the built-in save_memory tool with a memory manager
     subagent that supports adding, removing, de-duplicating, and organizing
     memories.
+  - **Default:** `false`
+  - **Requires restart:** Yes
+
+- **`experimental.generalistProfile`** (boolean):
+  - **Description:** Suitable for general coding and software development tasks.
   - **Default:** `false`
   - **Requires restart:** Yes
 
