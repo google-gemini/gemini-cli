@@ -344,8 +344,10 @@ export function isSubpath(parentPath: string, childPath: string): boolean {
   const isDarwin = platform === 'darwin';
   const pathModule = isWindows ? path.win32 : path;
 
-  let p = parentPath;
-  let c = childPath;
+  // Resolve both paths to absolute to ensure consistent comparison,
+  // especially when mixing relative and absolute paths or when casing differs.
+  let p = pathModule.resolve(parentPath);
+  let c = pathModule.resolve(childPath);
 
   // On Windows, path.relative is case-insensitive.
   // On POSIX (including Darwin), path.relative is case-sensitive.
