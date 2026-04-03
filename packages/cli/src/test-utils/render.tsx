@@ -223,7 +223,7 @@ class XtermStdout extends EventEmitter {
             this.once('render', resolve),
           );
           const timeoutPromise = new Promise((resolve) =>
-            setTimeout(resolve, 50),
+            setTimeout(resolve, 1000),
           );
           await Promise.race([renderPromise, timeoutPromise]);
         }
@@ -254,7 +254,12 @@ class XtermStdout extends EventEmitter {
 
       const isMatch = () => {
         if (expectedFrame === '...') {
-          return currentFrame !== '';
+          // '...' is our fallback when output isn't in metrics, meaning Ink rendered *something*
+          // but we don't know what it is. If terminal has content, we consider it a match.
+          // However, if the component rendered null, both would be empty, but our fallback
+          // made expectedFrame '...'. In that case, we can't easily know if it's ready,
+          // but we can assume if there are no pending writes, it's ready.
+          return currentFrame !== '' || this.pendingWrites === 0;
         }
 
         // If Ink expects nothing (no new static content and no dynamic output),

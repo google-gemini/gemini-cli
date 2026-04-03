@@ -22,7 +22,7 @@ import * as processUtils from '../../utils/processUtils.js';
 import { usePermissionsModifyTrust } from '../hooks/usePermissionsModifyTrust.js';
 
 // Hoist mocks for dependencies of the usePermissionsModifyTrust hook
-const mockedCwd = vi.hoisted(() => vi.fn());
+const mockedCwd = vi.hoisted(() => vi.fn().mockReturnValue('/mock/cwd'));
 const mockedLoadTrustedFolders = vi.hoisted(() => vi.fn());
 const mockedIsWorkspaceTrusted = vi.hoisted(() => vi.fn());
 

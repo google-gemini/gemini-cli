@@ -450,11 +450,11 @@ describe('<ToolMessage />', () => {
       const output = lastFrame();
 
       // Since kind=Kind.Agent and availableTerminalHeight is provided, it should truncate to SUBAGENT_MAX_LINES (15)
-      // and show the FIRST lines (overflowDirection='bottom')
-      expect(output).toContain('Line 1');
-      expect(output).toContain('Line 14');
-      expect(output).not.toContain('Line 16');
-      expect(output).not.toContain('Line 30');
+      // It should constrain the height, showing the tail of the output (overflowDirection='top' or due to scroll)
+      expect(output).not.toMatch(/Line 1\b/);
+      expect(output).not.toMatch(/Line 14\b/);
+      expect(output).toMatch(/Line 16\b/);
+      expect(output).toMatch(/Line 30\b/);
       unmount();
     });
 

@@ -26,6 +26,7 @@ import { OverflowProvider } from '../contexts/OverflowContext.js';
 import { ConfigInitDisplay } from './ConfigInitDisplay.js';
 import { TodoTray } from './messages/Todo.js';
 import { useComposerStatus } from '../hooks/useComposerStatus.js';
+import { appEvents, AppEvent } from '../../utils/events.js';
 
 export const Composer = ({ isFocused = true }: { isFocused?: boolean }) => {
   const uiState = useUIState();
@@ -54,6 +55,12 @@ export const Composer = ({ isFocused = true }: { isFocused?: boolean }) => {
     !hasPendingActionRequired;
 
   const { setShortcutsHelpVisible } = uiActions;
+
+  useEffect(() => {
+    if (hasPendingActionRequired) {
+      appEvents.emit(AppEvent.ScrollToBottom);
+    }
+  }, [hasPendingActionRequired]);
 
   useEffect(() => {
     if (uiState.shortcutsHelpVisible && !isPassiveShortcutsHelpState) {

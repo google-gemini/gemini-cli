@@ -1001,6 +1001,8 @@ export async function loadCliConfig(
     trustedFolder,
     useBackgroundColor: settings.ui?.useBackgroundColor,
     useAlternateBuffer: settings.ui?.useAlternateBuffer,
+    useTerminalBuffer: settings.ui?.terminalBuffer,
+    useRenderProcess: settings.ui?.renderProcess,
     useRipgrep: settings.tools?.useRipgrep,
     enableInteractiveShell: settings.tools?.shell?.enableInteractiveShell,
     shellBackgroundCompletionBehavior: settings.tools?.shell

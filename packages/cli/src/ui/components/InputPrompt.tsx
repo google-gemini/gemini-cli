@@ -338,6 +338,10 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
   const showCursor =
     focus && isShellFocused && !isEmbeddedShellFocused && !copyModeEnabled;
 
+  useEffect(() => {
+    appEvents.emit(AppEvent.ScrollToBottom);
+  }, [buffer.text, buffer.cursor]);
+
   // Notify parent component about escape prompt state changes
   useEffect(() => {
     if (onEscapePromptChange) {

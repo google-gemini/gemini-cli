@@ -33,6 +33,9 @@ interface ScrollableProps {
   scrollToBottom?: boolean;
   flexGrow?: number;
   reportOverflow?: boolean;
+  overflowToBackbuffer?: boolean;
+  scrollbar?: boolean;
+  stableScrollback?: boolean;
 }
 
 export const Scrollable: React.FC<ScrollableProps> = ({
@@ -45,6 +48,9 @@ export const Scrollable: React.FC<ScrollableProps> = ({
   scrollToBottom,
   flexGrow,
   reportOverflow = false,
+  overflowToBackbuffer,
+  scrollbar = true,
+  stableScrollback,
 }) => {
   const keyMatchers = useKeyMatchers();
   const [scrollTop, setScrollTop] = useState(0);
@@ -90,6 +96,14 @@ export const Scrollable: React.FC<ScrollableProps> = ({
 
   const viewportObserverRef = useRef<ResizeObserver | null>(null);
   const contentObserverRef = useRef<ResizeObserver | null>(null);
+
+  useEffect(
+    () => () => {
+      viewportObserverRef.current?.disconnect();
+      contentObserverRef.current?.disconnect();
+    },
+    [],
+  );
 
   const viewportRefCallback = useCallback((node: DOMElement | null) => {
     viewportObserverRef.current?.disconnect();
@@ -247,6 +261,9 @@ export const Scrollable: React.FC<ScrollableProps> = ({
       scrollTop={scrollTop}
       flexGrow={flexGrow}
       scrollbarThumbColor={scrollbarColor}
+      overflowToBackbuffer={overflowToBackbuffer}
+      scrollbar={scrollbar}
+      stableScrollback={stableScrollback}
     >
       {/*
         This inner box is necessary to prevent the parent from shrinking

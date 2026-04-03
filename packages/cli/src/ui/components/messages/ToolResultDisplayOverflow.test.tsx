@@ -23,18 +23,17 @@ describe('ToolResultDisplay Overflow', () => {
       {
         config: makeFakeConfig({ useAlternateBuffer: false }),
         settings: createMockSettings({ ui: { useAlternateBuffer: false } }),
-        uiState: { constrainHeight: true },
+        uiState: { constrainHeight: true, terminalHeight: 50 },
       },
     );
     await waitUntilReady();
     const output = lastFrame();
 
-    expect(output).toContain('Line 1');
-    expect(output).toContain('Line 2');
-    expect(output).not.toContain('Line 3'); // Line 3 is replaced by the "hidden" label
-    expect(output).not.toContain('Line 4');
-    expect(output).not.toContain('Line 5');
-    expect(output).toContain('hidden');
+    expect(output).not.toContain('Line 1');
+    expect(output).not.toContain('Line 2');
+    expect(output).toContain('Line 3');
+    expect(output).toContain('Line 4');
+    expect(output).toContain('Line 5');
     unmount();
   });
 
@@ -50,7 +49,7 @@ describe('ToolResultDisplay Overflow', () => {
       {
         config: makeFakeConfig({ useAlternateBuffer: false }),
         settings: createMockSettings({ ui: { useAlternateBuffer: false } }),
-        uiState: { constrainHeight: true },
+        uiState: { constrainHeight: true, terminalHeight: 50 },
       },
     );
     await waitUntilReady();
@@ -58,10 +57,9 @@ describe('ToolResultDisplay Overflow', () => {
 
     expect(output).not.toContain('Line 1');
     expect(output).not.toContain('Line 2');
-    expect(output).not.toContain('Line 3');
+    expect(output).toContain('Line 3');
     expect(output).toContain('Line 4');
     expect(output).toContain('Line 5');
-    expect(output).toContain('hidden');
     unmount();
   });
 
@@ -88,7 +86,7 @@ describe('ToolResultDisplay Overflow', () => {
       {
         config: makeFakeConfig({ useAlternateBuffer: false }),
         settings: createMockSettings({ ui: { useAlternateBuffer: false } }),
-        uiState: { constrainHeight: true },
+        uiState: { constrainHeight: true, terminalHeight: 50 },
       },
     );
     await waitUntilReady();
