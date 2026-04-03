@@ -32,7 +32,7 @@ vi.mock('../utils/shell-utils.js', () => ({
 }));
 interface ParsedPolicy {
   rule?: Array<{
-    commandPrefix?: string | string[];
+    commandPrefix?: string | string[] | string[][];
     mcpName?: string;
     toolName?: string;
   }>;

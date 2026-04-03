@@ -554,7 +554,7 @@ function findMatchingRule(
   criteria: {
     toolName: string;
     mcpName?: string;
-    commandPrefix?: string | string[];
+    commandPrefix?: string | string[] | string[][];
     argsPattern?: string;
   },
 ): TomlRule | undefined {
