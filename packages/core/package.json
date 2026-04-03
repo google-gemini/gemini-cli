@@ -12,6 +12,7 @@
   "scripts": {
     "bundle:browser-mcp": "node scripts/bundle-browser-mcp.mjs",
     "build": "node ../../scripts/build_package.js",
+    "test:memory": "ts-node src/diagnostics/test.ts",
     "lint": "eslint . --ext .ts,.tsx",
     "format": "prettier --write .",
     "test": "vitest run",
