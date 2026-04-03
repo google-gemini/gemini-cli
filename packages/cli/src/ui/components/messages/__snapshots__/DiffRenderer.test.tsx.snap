@@ -151,15 +151,6 @@ exports[`<OverflowProvider><DiffRenderer /></OverflowProvider> > with useAlterna
 "
 `;
 
-exports[`<OverflowProvider><DiffRenderer /></OverflowProvider> > with useAlternateBuffer = true > should handle diff with only header and no changes 2`] = `
-"╭──────────────────────────────────────────────────────────────────────────────────────────────────╮
-│                                                                                                  │
-│ No changes detected.                                                                             │
-│                                                                                                  │
-╰──────────────────────────────────────────────────────────────────────────────────────────────────╯
-"
-`;
-
 exports[`<OverflowProvider><DiffRenderer /></OverflowProvider> > with useAlternateBuffer = true > should handle empty diff content 1`] = `
 "No diff content.
 "

@@ -225,6 +225,7 @@ export interface GemmaModelRouterSettings {
 
 export interface ADKSettings {
   agentSessionNoninteractiveEnabled?: boolean;
+  interactiveAgentSessionEnabled?: boolean;
 }
 
 export interface ExtensionSetting {
@@ -697,7 +698,6 @@ export interface ConfigParameters {
   experimentalJitContext?: boolean;
   autoDistillation?: boolean;
   experimentalMemoryManager?: boolean;
-  useAgentProtocol?: boolean;
   experimentalAgentHistoryTruncation?: boolean;
   experimentalAgentHistoryTruncationThreshold?: number;
   experimentalAgentHistoryRetainedMessages?: number;
@@ -893,6 +893,7 @@ export class Config implements McpContext, AgentLoopContext {
 
   private readonly gemmaModelRouter: GemmaModelRouterSettings;
   private readonly agentSessionNoninteractiveEnabled: boolean;
+  private readonly interactiveAgentSessionEnabled: boolean;
 
   private readonly continueOnFailedApiCall: boolean;
   private readonly retryFetchErrors: boolean;
@@ -939,11 +940,6 @@ export class Config implements McpContext, AgentLoopContext {
   private readonly adminSkillsEnabled: boolean;
   private readonly experimentalJitContext: boolean;
   private readonly experimentalMemoryManager: boolean;
-  private readonly useAgentProtocol: boolean;
-  private readonly experimentalAgentHistoryTruncation: boolean;
-  private readonly experimentalAgentHistoryTruncationThreshold: number;
-  private readonly experimentalAgentHistoryRetainedMessages: number;
-  private readonly experimentalAgentHistorySummarization: boolean;
   private readonly memoryBoundaryMarkers: readonly string[];
   private readonly topicUpdateNarration: boolean;
   private readonly disableLLMCorrection: boolean;
@@ -1146,15 +1142,6 @@ export class Config implements McpContext, AgentLoopContext {
 
     this.experimentalJitContext = params.experimentalJitContext ?? false;
     this.experimentalMemoryManager = params.experimentalMemoryManager ?? false;
-    this.useAgentProtocol = params.useAgentProtocol ?? false;
-    this.experimentalAgentHistoryTruncation =
-      params.experimentalAgentHistoryTruncation ?? false;
-    this.experimentalAgentHistoryTruncationThreshold =
-      params.experimentalAgentHistoryTruncationThreshold ?? 30;
-    this.experimentalAgentHistoryRetainedMessages =
-      params.experimentalAgentHistoryRetainedMessages ?? 15;
-    this.experimentalAgentHistorySummarization =
-      params.experimentalAgentHistorySummarization ?? false;
     this.memoryBoundaryMarkers = params.memoryBoundaryMarkers ?? ['.git'];
     this.contextManagement = {
       enabled: params.contextManagement?.enabled ?? false,
@@ -1329,6 +1316,8 @@ export class Config implements McpContext, AgentLoopContext {
 
     this.agentSessionNoninteractiveEnabled =
       params.adk?.agentSessionNoninteractiveEnabled ?? false;
+    this.interactiveAgentSessionEnabled =
+      params.adk?.interactiveAgentSessionEnabled ?? false;
     this.retryFetchErrors = params.retryFetchErrors ?? true;
     this.maxAttempts = Math.min(
       params.maxAttempts ?? DEFAULT_MAX_ATTEMPTS,
@@ -2409,28 +2398,6 @@ export class Config implements McpContext, AgentLoopContext {
     return this.experimentalMemoryManager;
   }
 
-  getExperimentalUseAgentProtocol(): boolean {
-    return (
-      this.useAgentProtocol ||
-      process.env['GEMINI_CLI_USE_AGENT_PROTOCOL'] === 'true'
-    );
-  }
-  isExperimentalAgentHistoryTruncationEnabled(): boolean {
-    return this.experimentalAgentHistoryTruncation;
-  }
-
-  getExperimentalAgentHistoryTruncationThreshold(): number {
-    return this.experimentalAgentHistoryTruncationThreshold;
-  }
-
-  getExperimentalAgentHistoryRetainedMessages(): number {
-    return this.experimentalAgentHistoryRetainedMessages;
-  }
-
-  isExperimentalAgentHistorySummarizationEnabled(): boolean {
-    return this.experimentalAgentHistorySummarization;
-  }
-
   getContextManagementConfig(): ContextManagementConfig {
     return this.contextManagement;
   }
@@ -3412,6 +3379,10 @@ export class Config implements McpContext, AgentLoopContext {
 
   getAgentSessionNoninteractiveEnabled(): boolean {
     return this.agentSessionNoninteractiveEnabled;
+  }
+
+  getInteractiveAgentSessionEnabled(): boolean {
+    return this.interactiveAgentSessionEnabled;
   }
 
   /**
