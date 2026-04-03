@@ -106,6 +106,7 @@ export interface CliArgs {
   rawOutput: boolean | undefined;
   acceptRawOutputRisk: boolean | undefined;
   isCommand: boolean | undefined;
+  fast?: boolean;
 }
 
 /**
@@ -443,6 +444,11 @@ export async function parseArguments(
         .option('accept-raw-output-risk', {
           type: 'boolean',
           description: 'Suppress the security warning when using --raw-output.',
+        })
+        .option('fast', {
+          type: 'boolean',
+          description:
+            'Enable fast mode: minimize request payload and skip preflight requests (quota, experiments).',
         }),
     )
     .version(await getVersion()) // This will enable the --version flag based on package.json
@@ -534,7 +540,8 @@ export async function loadCliConfig(
   }
 
   const memoryImportFormat = settings.context?.importFormat || 'tree';
-  const includeDirectoryTree = settings.context?.includeDirectoryTree ?? true;
+  const includeDirectoryTree =
+    (settings.context?.includeDirectoryTree ?? true) && !argv.fast;
 
   const ideMode = settings.ide?.enabled ?? false;
 
@@ -614,7 +621,7 @@ export async function loadCliConfig(
     .getExtensions()
     .find((ext) => ext.isActive && ext.plan?.directory)?.plan;
 
-  const experimentalJitContext = settings.experimental.jitContext;
+  const experimentalJitContext = settings.experimental.jitContext && !argv.fast;
 
   let extensionRegistryURI =
     process.env['GEMINI_CLI_EXTENSION_REGISTRY_URI'] ??
@@ -887,7 +894,7 @@ export async function loadCliConfig(
   const useGeneralistProfile =
     settings.experimental?.generalistProfile ?? false;
   const useContextManagement =
-    settings.experimental?.contextManagement ?? false;
+    (settings.experimental?.contextManagement ?? false) && !argv.fast;
   const contextManagement = {
     ...(useGeneralistProfile ? generalistProfile : {}),
     ...(useContextManagement ? settings?.contextManagement : {}),
@@ -913,6 +920,8 @@ export async function loadCliConfig(
     debugMode,
     question,
     worktreeSettings,
+    minimalPayload: !!argv.fast,
+    skipPreflightRequests: !!argv.fast,
 
     coreTools: settings.tools?.core || undefined,
     allowedTools: allowedTools.length > 0 ? allowedTools : undefined,
@@ -977,20 +986,23 @@ export async function loadCliConfig(
     extensionRegistryURI,
     enableExtensionReloading: settings.experimental?.extensionReloading,
     enableAgents: settings.experimental?.enableAgents,
-    plan: settings.general?.plan?.enabled ?? true,
-    tracker: settings.experimental?.taskTracker,
+    plan: (settings.general?.plan?.enabled ?? true) && !argv.fast,
+    tracker: (settings.experimental?.taskTracker ?? false) && !argv.fast,
     directWebFetch: settings.experimental?.directWebFetch,
     planSettings: settings.general?.plan?.directory
       ? settings.general.plan
       : (extensionPlanSettings ?? settings.general?.plan),
     enableEventDrivenScheduler: true,
-    skillsSupport: settings.skills?.enabled ?? true,
+    skillsSupport: (settings.skills?.enabled ?? true) && !argv.fast,
     disabledSkills: settings.skills?.disabled,
-    experimentalJitContext: settings.experimental?.jitContext,
-    experimentalMemoryManager: settings.experimental?.memoryManager,
+    experimentalJitContext: experimentalJitContext,
+    experimentalMemoryManager:
+      (settings.experimental?.memoryManager ?? false) && !argv.fast,
     contextManagement,
-    modelSteering: settings.experimental?.modelSteering,
-    topicUpdateNarration: settings.experimental?.topicUpdateNarration,
+    modelSteering:
+      (settings.experimental?.modelSteering ?? false) && !argv.fast,
+    topicUpdateNarration:
+      (settings.experimental?.topicUpdateNarration ?? false) && !argv.fast,
     noBrowser: !!process.env['NO_BROWSER'],
     summarizeToolOutput: settings.model?.summarizeToolOutput,
     ideMode,
@@ -1032,8 +1044,8 @@ export async function loadCliConfig(
     dynamicModelConfiguration: settings.experimental?.dynamicModelConfiguration,
     modelConfigServiceConfig: settings.modelConfigs,
     // TODO: loading of hooks based on workspace trust
-    enableHooks: settings.hooksConfig.enabled,
-    enableHooksUI: settings.hooksConfig.enabled,
+    enableHooks: (settings.hooksConfig.enabled ?? true) && !argv.fast,
+    enableHooksUI: (settings.hooksConfig.enabled ?? true) && !argv.fast,
     hooks: settings.hooks || {},
     disabledHooks: settings.hooksConfig?.disabled || [],
     projectHooks: projectHooks || {},

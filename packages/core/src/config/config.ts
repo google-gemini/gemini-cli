@@ -587,6 +587,8 @@ export interface ConfigParameters {
   debugMode: boolean;
   question?: string;
 
+  skipPreflightRequests?: boolean;
+  minimalPayload?: boolean;
   coreTools?: string[];
   mainAgentTools?: string[];
   /** @deprecated Use Policy Engine instead */
@@ -760,6 +762,8 @@ export class Config implements McpContext, AgentLoopContext {
   private readonly worktreeSettings: WorktreeSettings | undefined;
   readonly enableConseca: boolean;
 
+  private readonly skipPreflightRequests: boolean;
+  private readonly minimalPayload: boolean;
   private readonly coreTools: string[] | undefined;
   private readonly mainAgentTools: string[] | undefined;
   /** @deprecated Use Policy Engine instead */
@@ -990,6 +994,8 @@ export class Config implements McpContext, AgentLoopContext {
     this.debugMode = params.debugMode;
     this.question = params.question;
     this.worktreeSettings = params.worktreeSettings;
+    this.minimalPayload = params.minimalPayload ?? false;
+    this.skipPreflightRequests = params.skipPreflightRequests ?? false;
 
     this._sandboxPolicyManager = new SandboxPolicyManager();
     const initialApprovalMode =
@@ -1548,19 +1554,24 @@ export class Config implements McpContext, AgentLoopContext {
     this.baseLlmClient = new BaseLlmClient(this.contentGenerator, this);
 
     const codeAssistServer = getCodeAssistServer(this);
-    const quotaPromise = codeAssistServer?.projectId
-      ? this.refreshUserQuota()
-      : Promise.resolve();
+    const quotaPromise =
+      codeAssistServer?.projectId && !this.skipPreflightRequests
+        ? this.refreshUserQuota()
+        : Promise.resolve();
 
-    this.experimentsPromise = getExperiments(codeAssistServer)
-      .then((experiments) => {
-        this.setExperiments(experiments);
-        return experiments;
-      })
-      .catch((e) => {
-        debugLogger.error('Failed to fetch experiments', e);
-        return undefined;
-      });
+    if (!this.skipPreflightRequests) {
+      this.experimentsPromise = getExperiments(codeAssistServer)
+        .then((experiments) => {
+          this.setExperiments(experiments);
+          return experiments;
+        })
+        .catch((e) => {
+          debugLogger.error('Failed to fetch experiments', e);
+          return undefined;
+        });
+    } else {
+      this.experimentsPromise = Promise.resolve(undefined);
+    }
 
     await quotaPromise;
 
@@ -1584,19 +1595,21 @@ export class Config implements McpContext, AgentLoopContext {
     // Fetch admin controls
     const experiments = await this.experimentsPromise;
 
-    const adminControlsEnabled =
-      experiments?.flags[ExperimentFlags.ENABLE_ADMIN_CONTROLS]?.boolValue ??
-      false;
-    const adminControls = await fetchAdminControls(
-      codeAssistServer,
-      this.getRemoteAdminSettings(),
-      adminControlsEnabled,
-      (newSettings: AdminControlsSettings) => {
-        this.setRemoteAdminSettings(newSettings);
-        coreEvents.emitAdminSettingsChanged();
-      },
-    );
-    this.setRemoteAdminSettings(adminControls);
+    if (!this.skipPreflightRequests) {
+      const adminControlsEnabled =
+        experiments?.flags[ExperimentFlags.ENABLE_ADMIN_CONTROLS]?.boolValue ??
+        false;
+      const adminControls = await fetchAdminControls(
+        codeAssistServer,
+        this.getRemoteAdminSettings(),
+        adminControlsEnabled,
+        (newSettings: AdminControlsSettings) => {
+          this.setRemoteAdminSettings(newSettings);
+          coreEvents.emitAdminSettingsChanged();
+        },
+      );
+      this.setRemoteAdminSettings(adminControls);
+    }
 
     if ((await this.getProModelNoAccess()) && isAutoModel(this.model)) {
       this.setModel(PREVIEW_GEMINI_FLASH_MODEL);
@@ -1606,6 +1619,9 @@ export class Config implements McpContext, AgentLoopContext {
   async getExperimentsAsync(): Promise<Experiments | undefined> {
     if (this.experiments) {
       return this.experiments;
+    }
+    if (this.skipPreflightRequests) {
+      return undefined;
     }
     const codeAssistServer = getCodeAssistServer(this);
     return getExperiments(codeAssistServer);
@@ -1774,6 +1790,14 @@ export class Config implements McpContext, AgentLoopContext {
 
   shouldLoadMemoryFromIncludeDirectories(): boolean {
     return this.loadMemoryFromIncludeDirectories;
+  }
+
+  getMinimalPayload(): boolean {
+    return this.minimalPayload;
+  }
+
+  getSkipPreflightRequests(): boolean {
+    return this.skipPreflightRequests;
   }
 
   getIncludeDirectoryTree(): boolean {
@@ -2072,6 +2096,9 @@ export class Config implements McpContext, AgentLoopContext {
   }
 
   async refreshAvailableCredits(): Promise<void> {
+    if (this.skipPreflightRequests) {
+      return;
+    }
     const codeAssistServer = getCodeAssistServer(this);
     if (!codeAssistServer) {
       return;
@@ -2085,6 +2112,9 @@ export class Config implements McpContext, AgentLoopContext {
   }
 
   async refreshUserQuota(): Promise<RetrieveUserQuotaResponse | undefined> {
+    if (this.skipPreflightRequests) {
+      return undefined;
+    }
     const codeAssistServer = getCodeAssistServer(this);
     if (!codeAssistServer || !codeAssistServer.projectId) {
       return undefined;
@@ -2349,6 +2379,9 @@ export class Config implements McpContext, AgentLoopContext {
    * via system instruction updates.
    */
   getSystemInstructionMemory(): string | HierarchicalMemory {
+    if (this.minimalPayload) {
+      return '';
+    }
     if (this.experimentalJitContext && this.memoryContextManager) {
       const global = this.memoryContextManager.getGlobalMemory();
       const userProjectMemory =
@@ -2367,7 +2400,11 @@ export class Config implements McpContext, AgentLoopContext {
    * disabled (Tier 2 memory is already in the system instruction).
    */
   getSessionMemory(): string {
-    if (!this.experimentalJitContext || !this.memoryContextManager) {
+    if (
+      this.minimalPayload ||
+      !this.experimentalJitContext ||
+      !this.memoryContextManager
+    ) {
       return '';
     }
     const sections: string[] = [];

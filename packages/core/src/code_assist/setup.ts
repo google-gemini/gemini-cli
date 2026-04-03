@@ -27,6 +27,10 @@ import {
   OnboardingSuccessEvent,
 } from '../telemetry/index.js';
 
+import { Storage } from '../config/storage.js';
+import * as fs from 'node:fs/promises';
+import * as path from 'node:path';
+
 export class ProjectIdRequiredError extends Error {
   constructor() {
     super(
@@ -89,6 +93,27 @@ export function resetUserDataCacheForTesting() {
   });
 }
 
+async function loadPersistentUserData(): Promise<UserData | undefined> {
+  const filePath = path.join(Storage.getGlobalGeminiDir(), 'user_data.json');
+  try {
+    const content = await fs.readFile(filePath, 'utf-8');
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
+    return JSON.parse(content) as UserData;
+  } catch {
+    return undefined;
+  }
+}
+
+async function savePersistentUserData(userData: UserData): Promise<void> {
+  const filePath = path.join(Storage.getGlobalGeminiDir(), 'user_data.json');
+  try {
+    await fs.mkdir(path.dirname(filePath), { recursive: true });
+    await fs.writeFile(filePath, JSON.stringify(userData, null, 2), 'utf-8');
+  } catch (e) {
+    debugLogger.debug('Failed to save persistent user data', e);
+  }
+}
+
 /**
  * Sets up the user by loading their Code Assist configuration and onboarding if needed.
  *
@@ -122,6 +147,19 @@ export async function setupUser(
     process.env['GOOGLE_CLOUD_PROJECT_ID'] ||
     undefined;
 
+  if (config.getSkipPreflightRequests()) {
+    const cached = await loadPersistentUserData();
+    if (cached) {
+      return cached;
+    }
+    return {
+      projectId: projectId || 'unknown-project',
+      userTier: UserTierId.STANDARD,
+      userTierName: 'Standard',
+      hasOnboardedPreviously: true,
+    };
+  }
+
   const projectCache = userDataCache.getOrCreate(client, () =>
     createCache<string | undefined, Promise<UserData>>({
       storage: 'map',
@@ -129,9 +167,12 @@ export async function setupUser(
     }),
   );
 
-  return projectCache.getOrCreate(projectId, () =>
+  const userData = await projectCache.getOrCreate(projectId, () =>
     _doSetupUser(client, projectId, config, httpOptions),
   );
+
+  void savePersistentUserData(userData);
+  return userData;
 }
 
 /**
@@ -150,6 +191,8 @@ async function _doSetupUser(
     '',
     undefined,
     undefined,
+    undefined,
+    config,
   );
   const coreClientMetadata: ClientMetadata = {
     ideType: 'IDE_UNSPECIFIED',

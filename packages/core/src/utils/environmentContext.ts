@@ -46,6 +46,9 @@ ${folderStructure}`;
  * @returns A promise that resolves to an array of `Part` objects containing environment information.
  */
 export async function getEnvironmentContext(config: Config): Promise<Part[]> {
+  if (config.getMinimalPayload()) {
+    return [];
+  }
   const today = new Date().toLocaleDateString(undefined, {
     weekday: 'long',
     year: 'numeric',
@@ -89,13 +92,19 @@ export async function getInitialChatHistory(
   extraHistory?: Content[],
 ): Promise<Content[]> {
   const envParts = await getEnvironmentContext(config);
-  const envContextString = envParts.map((part) => part.text || '').join('\n\n');
+  const history: Content[] = [];
 
-  return [
-    {
-      role: 'user',
-      parts: [{ text: envContextString }],
-    },
-    ...(extraHistory ?? []),
-  ];
+  if (envParts.length > 0) {
+    const envContextString = envParts
+      .map((part) => part.text || '')
+      .join('\n\n');
+    if (envContextString.trim()) {
+      history.push({
+        role: 'user',
+        parts: [{ text: envContextString }],
+      });
+    }
+  }
+
+  return [...history, ...(extraHistory ?? [])];
 }

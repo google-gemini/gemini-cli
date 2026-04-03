@@ -172,10 +172,15 @@ async function initOauthClient(
       // This will verify locally that the credentials look good.
       const { token } = await client.getAccessToken();
       if (token) {
-        // This will check with the server to see if it hasn't been revoked.
-        await client.getTokenInfo(token);
+        if (!config.getSkipPreflightRequests()) {
+          // This will check with the server to see if it hasn't been revoked.
+          await client.getTokenInfo(token);
+        }
 
-        if (!userAccountManager.getCachedGoogleAccount()) {
+        if (
+          !userAccountManager.getCachedGoogleAccount() &&
+          !config.getSkipPreflightRequests()
+        ) {
           try {
             await fetchAndCacheUserInfo(client);
           } catch (error) {

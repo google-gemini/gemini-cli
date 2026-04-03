@@ -301,6 +301,11 @@ export class GeminiClient {
     }
     this.lastUsedModelId = modelId;
 
+    if (this.config.getMinimalPayload()) {
+      this.getChat().setTools([]);
+      return;
+    }
+
     const toolRegistry = this.context.toolRegistry;
     const toolDeclarations = toolRegistry.getFunctionDeclarations(modelId);
     const tools: Tool[] = [{ functionDeclarations: toolDeclarations }];
@@ -370,8 +375,9 @@ export class GeminiClient {
     this.lastUsedModelId = undefined;
 
     const toolRegistry = this.context.toolRegistry;
-    const toolDeclarations = toolRegistry.getFunctionDeclarations();
-    const tools: Tool[] = [{ functionDeclarations: toolDeclarations }];
+    const tools: Tool[] = this.config.getMinimalPayload()
+      ? []
+      : [{ functionDeclarations: toolRegistry.getFunctionDeclarations() }];
 
     const history = await getInitialChatHistory(this.config, extraHistory);
 

@@ -25,6 +25,9 @@ let experimentsPromise: Promise<Experiments> | undefined;
 export async function getExperiments(
   server?: CodeAssistServer,
 ): Promise<Experiments> {
+  if (server?.config?.getSkipPreflightRequests()) {
+    return { flags: {}, experimentIds: [] };
+  }
   if (experimentsPromise) {
     return experimentsPromise;
   }

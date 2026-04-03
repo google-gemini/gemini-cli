@@ -44,6 +44,9 @@ export class PromptProvider {
     userMemory?: string | HierarchicalMemory,
     interactiveOverride?: boolean,
   ): string {
+    if (context.config.getMinimalPayload()) {
+      return '';
+    }
     const systemMdResolution = resolvePathFromEnv(
       process.env['GEMINI_SYSTEM_MD'],
     );
@@ -265,6 +268,9 @@ export class PromptProvider {
   }
 
   getCompressionPrompt(context: AgentLoopContext): string {
+    if (context.config.getMinimalPayload()) {
+      return '';
+    }
     const desiredModel = resolveModel(
       context.config.getActiveModel(),
       context.config.getGemini31LaunchedSync?.() ?? false,

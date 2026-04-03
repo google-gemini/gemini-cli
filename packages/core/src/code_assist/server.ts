@@ -404,6 +404,12 @@ export class CodeAssistServer implements ContentGenerator {
     signal?: AbortSignal,
     retryDelay: number = 100,
   ): Promise<T> {
+    if (
+      this.config?.getSkipPreflightRequests() &&
+      method !== 'generateContent'
+    ) {
+      return {} as T;
+    }
     const res = await this.client.request<T>({
       url: this.getMethodUrl(method),
       method: 'POST',
@@ -432,6 +438,9 @@ export class CodeAssistServer implements ContentGenerator {
     url: string,
     signal?: AbortSignal,
   ): Promise<T> {
+    if (this.config?.getSkipPreflightRequests()) {
+      return {} as T;
+    }
     const res = await this.client.request<T>({
       url,
       method: 'GET',
@@ -458,6 +467,12 @@ export class CodeAssistServer implements ContentGenerator {
     req: object,
     signal?: AbortSignal,
   ): Promise<AsyncGenerator<T>> {
+    if (
+      this.config?.getSkipPreflightRequests() &&
+      method !== 'streamGenerateContent'
+    ) {
+      return (async function* () {})() as AsyncGenerator<T>;
+    }
     const res = await this.client.request<AsyncIterable<unknown>>({
       url: this.getMethodUrl(method),
       method: 'POST',
