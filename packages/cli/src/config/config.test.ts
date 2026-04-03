@@ -21,7 +21,7 @@ import {
   type MCPServerConfig,
   type GeminiCLIExtension,
   Storage,
-  generalistProfile,
+  GENERALIST_PROFILE,
   type ContextManagementConfig,
 } from '@google/gemini-cli-core';
 import { loadCliConfig, parseArguments, type CliArgs } from './config.js';
@@ -2211,7 +2211,7 @@ describe('loadCliConfig context management', () => {
     });
     const config = await loadCliConfig(settings, 'test-session', argv);
     expect(config.getContextManagementConfig()).toStrictEqual(
-      generalistProfile,
+      GENERALIST_PROFILE,
     );
     expect(config.isContextManagementEnabled()).toBe(true);
   });
@@ -2220,24 +2220,19 @@ describe('loadCliConfig context management', () => {
     process.argv = ['node', 'script.js'];
     const argv = await parseArguments(createTestMergedSettings());
     const contextManagementConfig: Partial<ContextManagementConfig> = {
-      historyWindow: {
+      budget: {
+        incrementalGc: false,
         maxTokens: 100_000,
         retainedTokens: 50_000,
+        protectedEpisodes: 1,
+        protectSystemEpisode: true,
       },
-      messageLimits: {
-        normalMaxTokens: 1000,
-        retainedMaxTokens: 10_000,
-        normalizationHeadRatio: 0.25,
-      },
-      tools: {
-        distillation: {
-          maxOutputTokens: 10_000,
-          summarizationThresholdTokens: 15_000,
-        },
-        outputMasking: {
-          protectionThresholdTokens: 30_000,
-          minPrunableThresholdTokens: 10_000,
-          protectLatestTurn: false,
+      strategies: {
+        historySquashing: { maxTokensPerNode: 12000 },
+        toolMasking: { stringLengthThresholdTokens: 10000 },
+        semanticCompression: {
+          nodeThresholdTokens: 5000,
+          compressionModel: 'chat-compression-2.5-flash-lite',
         },
       },
     };

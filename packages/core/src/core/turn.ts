@@ -12,6 +12,7 @@ import {
   type FunctionDeclaration,
   type FinishReason,
   type GenerateContentResponseUsageMetadata,
+  type Content,
 } from '@google/genai';
 import type {
   ToolCallConfirmationDetails,
@@ -256,6 +257,7 @@ export class Turn {
     signal: AbortSignal,
     displayContent?: PartListUnion,
     role: LlmRole = LlmRole.MAIN,
+    activeHistory?: readonly Content[], // Optional projected history
   ): AsyncGenerator<ServerGeminiStreamEvent> {
     try {
       // Note: This assumes `sendMessageStream` yields events like
@@ -267,6 +269,7 @@ export class Turn {
         signal,
         role,
         displayContent,
+        activeHistory,
       );
 
       for await (const streamEvent of responseStream) {
