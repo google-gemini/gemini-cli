@@ -190,7 +190,7 @@ describe('useBtw', () => {
       // wait for the catch/finally blocks inside submitBtw to finish
       try {
         await submitPromise;
-      } catch (_e) {
+      } catch {
         // ignore AbortError
       }
     });

@@ -2996,6 +2996,21 @@ describe('Config Quota & Preview Model Access', () => {
     });
   });
 
+  describe('isBtwEnabled', () => {
+    it('should return false for isBtwEnabled by default', () => {
+      const config = new Config(baseParams);
+      expect(config.isBtwEnabled()).toBe(false);
+    });
+
+    it('should return true for isBtwEnabled when experimentalBtw is true', () => {
+      const config = new Config({
+        ...baseParams,
+        experimentalBtw: true,
+      });
+      expect(config.isBtwEnabled()).toBe(true);
+    });
+  });
+
   describe('getPlanModeRoutingEnabled', () => {
     it('should default to true when not provided', async () => {
       const config = new Config(baseParams);

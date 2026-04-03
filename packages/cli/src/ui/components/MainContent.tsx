@@ -272,22 +272,36 @@ export const MainContent = () => {
       | {
           type: 'history';
           item: (typeof augmentedHistory)[0]['item'];
-          element: React.ReactNode;
+          isExpandable: boolean;
+          isFirstThinking: boolean;
+          isFirstAfterThinking: boolean;
+          suppressNarration: boolean;
         }
     > = [
       { type: 'header' as const },
-      ...augmentedHistory.map((data, index) => ({
-        type: 'history' as const,
-        item: data.item,
-        element: historyItems[index],
-      })),
+      ...augmentedHistory.map(
+        ({
+          item,
+          isExpandable,
+          isFirstThinking,
+          isFirstAfterThinking,
+          suppressNarration,
+        }) => ({
+          type: 'history' as const,
+          item,
+          isExpandable,
+          isFirstThinking,
+          isFirstAfterThinking,
+          suppressNarration,
+        }),
+      ),
       { type: 'pending' as const },
     ];
     if (uiState.btwState.isActive) {
       data.push({ type: 'btw' as const });
     }
     return data;
-  }, [augmentedHistory, historyItems, uiState.btwState.isActive]);
+  }, [augmentedHistory, uiState.btwState.isActive]);
 
   const renderItem = useCallback(
     ({ item }: { item: (typeof virtualizedData)[number] }) => {
@@ -300,8 +314,25 @@ export const MainContent = () => {
           />
         );
       } else if (item.type === 'history') {
-        // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
-        return (item as any).element;
+        return (
+          <MemoizedHistoryItemDisplay
+            terminalWidth={mainAreaWidth}
+            availableTerminalHeight={
+              uiState.constrainHeight || !item.isExpandable
+                ? staticAreaMaxItemHeight
+                : undefined
+            }
+            availableTerminalHeightGemini={MAX_GEMINI_MESSAGE_LINES}
+            key={item.item.id}
+            item={item.item}
+            isPending={false}
+            commands={uiState.slashCommands}
+            isExpandable={item.isExpandable}
+            isFirstThinking={item.isFirstThinking}
+            isFirstAfterThinking={item.isFirstAfterThinking}
+            suppressNarration={item.suppressNarration}
+          />
+        );
       } else if (item.type === 'btw') {
         return <>{btwDisplayNode}</>;
       } else {
@@ -311,7 +342,11 @@ export const MainContent = () => {
     [
       showHeaderDetails,
       version,
+      mainAreaWidth,
+      uiState.slashCommands,
       pendingItems,
+      uiState.constrainHeight,
+      staticAreaMaxItemHeight,
       btwDisplayNode,
     ],
   );
