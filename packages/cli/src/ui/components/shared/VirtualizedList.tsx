@@ -39,7 +39,6 @@ export type VirtualizedListProps<T> = {
   overflowToBackbuffer?: boolean;
   scrollbar?: boolean;
   stableScrollback?: boolean;
-  copyModeEnabled?: boolean;
   fixedItemHeight?: boolean;
   containerHeight?: number;
 };
@@ -144,7 +143,6 @@ function VirtualizedList<T>(
     overflowToBackbuffer,
     scrollbar = true,
     stableScrollback,
-    copyModeEnabled = false,
     fixedItemHeight = false,
   } = props;
   const dataRef = useRef(data);
@@ -727,25 +725,20 @@ function VirtualizedList<T>(
   return (
     <Box
       ref={containerRefCallback}
-      overflowY={copyModeEnabled ? 'hidden' : 'scroll'}
+      overflowY="scroll"
       overflowX="hidden"
-      scrollTop={copyModeEnabled ? 0 : scrollTop}
+      scrollTop={scrollTop}
       scrollbarThumbColor={props.scrollbarThumbColor ?? theme.text.secondary}
       backgroundColor={props.backgroundColor}
       width="100%"
       height="100%"
       flexDirection="column"
-      paddingRight={copyModeEnabled ? 0 : 1}
+      paddingRight={1}
       overflowToBackbuffer={overflowToBackbuffer}
       scrollbar={scrollbar}
       stableScrollback={stableScrollback}
     >
-      <Box
-        flexShrink={0}
-        width="100%"
-        flexDirection="column"
-        marginTop={copyModeEnabled ? -actualScrollTop : 0}
-      >
+      <Box flexShrink={0} width="100%" flexDirection="column">
         <Box height={topSpacerHeight} flexShrink={0} />
         {renderedItems}
         <Box height={bottomSpacerHeight} flexShrink={0} />

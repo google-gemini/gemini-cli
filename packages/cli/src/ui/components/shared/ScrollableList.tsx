@@ -33,7 +33,6 @@ interface ScrollableListProps<T> extends VirtualizedListProps<T> {
   width?: string | number;
   scrollbar?: boolean;
   stableScrollback?: boolean;
-  copyModeEnabled?: boolean;
   isStatic?: boolean;
   fixedItemHeight?: boolean;
   targetScrollIndex?: number;

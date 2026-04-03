@@ -316,9 +316,8 @@ describe('<VirtualizedList />', () => {
     unmount();
   });
 
-  it('renders correctly in copyModeEnabled when scrolled', async () => {
+  it('renders correctly with scrollbar={false} when scrolled', async () => {
     const longData = Array.from({ length: 100 }, (_, i) => `Item ${i}`);
-    // Use copy mode
     const { lastFrame, unmount } = await render(
       <Box height={10} width={100}>
         <VirtualizedList
@@ -331,7 +330,7 @@ describe('<VirtualizedList />', () => {
           keyExtractor={(item) => item}
           estimatedItemHeight={() => 1}
           initialScrollIndex={50}
-          copyModeEnabled={true}
+          scrollbar={false}
         />
       </Box>,
     );
