@@ -5,7 +5,11 @@
  */
 
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
-import { ReadFileTool, type ReadFileToolParams } from './read-file.js';
+import {
+  ReadFileTool,
+  type ReadFileToolParams,
+  isYouTubeUrl,
+} from './read-file.js';
 import { ToolErrorType } from './tool-error.js';
 import path from 'node:path';
 import { isSubpath } from '../utils/paths.js';
@@ -684,6 +688,124 @@ describe('ReadFileTool', () => {
       expect(jitTextPart!['text']).toContain(
         'Auth rules: use httpOnly cookies.',
       );
+    });
+  });
+
+  describe('YouTube URL support', () => {
+    describe('isYouTubeUrl', () => {
+      it('should detect standard YouTube watch URLs', () => {
+        expect(
+          isYouTubeUrl('https://www.youtube.com/watch?v=dQw4w9WgXcQ'),
+        ).toBe(true);
+        expect(isYouTubeUrl('http://youtube.com/watch?v=dQw4w9WgXcQ')).toBe(
+          true,
+        );
+        expect(
+          isYouTubeUrl('https://www.youtube.com/watch?v=dQw4w9WgXcQ&t=120'),
+        ).toBe(true);
+      });
+
+      it('should detect short YouTube URLs', () => {
+        expect(isYouTubeUrl('https://youtu.be/dQw4w9WgXcQ')).toBe(true);
+      });
+
+      it('should detect YouTube Shorts URLs', () => {
+        expect(isYouTubeUrl('https://www.youtube.com/shorts/dQw4w9WgXcQ')).toBe(
+          true,
+        );
+      });
+
+      it('should detect YouTube live URLs', () => {
+        expect(isYouTubeUrl('https://www.youtube.com/live/dQw4w9WgXcQ')).toBe(
+          true,
+        );
+      });
+
+      it('should detect YouTube embed URLs', () => {
+        expect(isYouTubeUrl('https://www.youtube.com/embed/dQw4w9WgXcQ')).toBe(
+          true,
+        );
+      });
+
+      it('should detect mobile YouTube URLs', () => {
+        expect(isYouTubeUrl('https://m.youtube.com/watch?v=dQw4w9WgXcQ')).toBe(
+          true,
+        );
+      });
+
+      it('should detect YouTube Music URLs', () => {
+        expect(
+          isYouTubeUrl('https://music.youtube.com/watch?v=dQw4w9WgXcQ'),
+        ).toBe(true);
+      });
+
+      it('should not match non-YouTube URLs', () => {
+        expect(isYouTubeUrl('https://example.com/video.mp4')).toBe(false);
+        expect(isYouTubeUrl('/path/to/file.txt')).toBe(false);
+        expect(isYouTubeUrl('relative/path.ts')).toBe(false);
+      });
+
+      it('should handle URLs with leading/trailing whitespace', () => {
+        expect(
+          isYouTubeUrl('  https://www.youtube.com/watch?v=dQw4w9WgXcQ  '),
+        ).toBe(true);
+      });
+    });
+
+    describe('build', () => {
+      it('should accept a YouTube URL as file_path without throwing', () => {
+        const params: ReadFileToolParams = {
+          file_path: 'https://www.youtube.com/watch?v=dQw4w9WgXcQ',
+        };
+        const result = tool.build(params);
+        expect(typeof result).not.toBe('string');
+      });
+
+      it('should return empty toolLocations for YouTube URLs', () => {
+        const params: ReadFileToolParams = {
+          file_path: 'https://www.youtube.com/watch?v=dQw4w9WgXcQ',
+        };
+        const invocation = tool.build(params);
+        expect(invocation.toolLocations()).toEqual([]);
+      });
+
+      it('should return YouTube URL as description', () => {
+        const url = 'https://www.youtube.com/watch?v=dQw4w9WgXcQ';
+        const params: ReadFileToolParams = { file_path: url };
+        const invocation = tool.build(params);
+        expect(invocation.getDescription()).toBe(url);
+      });
+    });
+
+    describe('execute', () => {
+      it('should return fileData for a YouTube URL', async () => {
+        const url = 'https://www.youtube.com/watch?v=dQw4w9WgXcQ';
+        const params: ReadFileToolParams = { file_path: url };
+        const invocation = tool.build(params);
+        const result = await invocation.execute(abortSignal);
+        expect(result).toEqual({
+          llmContent: {
+            fileData: {
+              fileUri: url,
+              mimeType: 'video/mp4',
+            },
+          },
+          returnDisplay: `Reading YouTube video: ${url}`,
+        });
+      });
+
+      it('should trim whitespace from YouTube URL', async () => {
+        const url = '  https://youtu.be/dQw4w9WgXcQ  ';
+        const params: ReadFileToolParams = { file_path: url };
+        const invocation = tool.build(params);
+        const result = await invocation.execute(abortSignal);
+        expect(result.llmContent).toEqual({
+          fileData: {
+            fileUri: url.trim(),
+            mimeType: 'video/mp4',
+          },
+        });
+      });
     });
   });
 });

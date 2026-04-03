@@ -410,7 +410,7 @@ exports[`coreTools snapshots for specific models > Model: gemini-2.5-pro > snaps
 
 exports[`coreTools snapshots for specific models > Model: gemini-2.5-pro > snapshot for tool: read_file 1`] = `
 {
-  "description": "Reads and returns the content of a specified file. If the file is large, the content will be truncated. The tool's response will clearly indicate if truncation has occurred and will provide details on how to read more of the file using the 'start_line' and 'end_line' parameters. Handles text, images (PNG, JPG, GIF, WEBP, SVG, BMP), audio files (MP3, WAV, AIFF, AAC, OGG, FLAC), and PDF files. For text files, it can read specific line ranges.",
+  "description": "Reads and returns the content of a specified file or YouTube video. If the file is large, the content will be truncated. The tool's response will clearly indicate if truncation has occurred and will provide details on how to read more of the file using the 'start_line' and 'end_line' parameters. Handles text, images (PNG, JPG, GIF, WEBP, SVG, BMP), audio files (MP3, WAV, AIFF, AAC, OGG, FLAC), PDF files, and YouTube video URLs. For text files, it can read specific line ranges. For YouTube URLs, pass the full URL as file_path to analyze the video content.",
   "name": "read_file",
   "parametersJsonSchema": {
     "properties": {
@@ -419,7 +419,7 @@ exports[`coreTools snapshots for specific models > Model: gemini-2.5-pro > snaps
         "type": "number",
       },
       "file_path": {
-        "description": "The path to the file to read.",
+        "description": "The path to the file to read, or a YouTube video URL (e.g. https://www.youtube.com/watch?v=VIDEO_ID).",
         "type": "string",
       },
       "start_line": {
@@ -1240,7 +1240,7 @@ exports[`coreTools snapshots for specific models > Model: gemini-3-pro-preview >
 
 exports[`coreTools snapshots for specific models > Model: gemini-3-pro-preview > snapshot for tool: read_file 1`] = `
 {
-  "description": "Reads and returns the content of a specified file. To maintain context efficiency, you MUST use 'start_line' and 'end_line' for targeted, surgical reads of specific sections. For your safety, the tool will automatically truncate output exceeding 2000 lines, 2000 characters per line, or 20MB in size; however, triggering these limits is considered token-inefficient. Always retrieve only the minimum content necessary for your next step. Handles text, images (PNG, JPG, GIF, WEBP, SVG, BMP), audio files (MP3, WAV, AIFF, AAC, OGG, FLAC), and PDF files.",
+  "description": "Reads and returns the content of a specified file or YouTube video. To maintain context efficiency, you MUST use 'start_line' and 'end_line' for targeted, surgical reads of specific sections. For your safety, the tool will automatically truncate output exceeding 2000 lines, 2000 characters per line, or 20MB in size; however, triggering these limits is considered token-inefficient. Always retrieve only the minimum content necessary for your next step. Handles text, images (PNG, JPG, GIF, WEBP, SVG, BMP), audio files (MP3, WAV, AIFF, AAC, OGG, FLAC), PDF files, and YouTube video URLs. For YouTube URLs, pass the full URL as file_path to analyze the video content.",
   "name": "read_file",
   "parametersJsonSchema": {
     "properties": {
@@ -1249,7 +1249,7 @@ exports[`coreTools snapshots for specific models > Model: gemini-3-pro-preview >
         "type": "number",
       },
       "file_path": {
-        "description": "The path to the file to read.",
+        "description": "The path to the file to read, or a YouTube video URL (e.g. https://www.youtube.com/watch?v=VIDEO_ID).",
         "type": "string",
       },
       "start_line": {

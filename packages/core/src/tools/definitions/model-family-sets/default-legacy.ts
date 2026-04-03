@@ -84,12 +84,13 @@ import {
 export const DEFAULT_LEGACY_SET: CoreToolSet = {
   read_file: {
     name: READ_FILE_TOOL_NAME,
-    description: `Reads and returns the content of a specified file. If the file is large, the content will be truncated. The tool's response will clearly indicate if truncation has occurred and will provide details on how to read more of the file using the 'start_line' and 'end_line' parameters. Handles text, images (PNG, JPG, GIF, WEBP, SVG, BMP), audio files (MP3, WAV, AIFF, AAC, OGG, FLAC), and PDF files. For text files, it can read specific line ranges.`,
+    description: `Reads and returns the content of a specified file or YouTube video. If the file is large, the content will be truncated. The tool's response will clearly indicate if truncation has occurred and will provide details on how to read more of the file using the 'start_line' and 'end_line' parameters. Handles text, images (PNG, JPG, GIF, WEBP, SVG, BMP), audio files (MP3, WAV, AIFF, AAC, OGG, FLAC), PDF files, and YouTube video URLs. For text files, it can read specific line ranges. For YouTube URLs, pass the full URL as file_path to analyze the video content.`,
     parametersJsonSchema: {
       type: 'object',
       properties: {
         [PARAM_FILE_PATH]: {
-          description: 'The path to the file to read.',
+          description:
+            'The path to the file to read, or a YouTube video URL (e.g. https://www.youtube.com/watch?v=VIDEO_ID).',
           type: 'string',
         },
         [READ_FILE_PARAM_START_LINE]: {
