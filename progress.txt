@@ -1,0 +1,1 @@
+2026-04-03: Completed Phase 1. Implemented scripts/simulate-long-session.ts to reproduce memory growth. Identified ChatRecordingService and GeminiChat history as primary growth sources. Captured baseline metrics showing ~180MB growth per 200MB of tool output data.
