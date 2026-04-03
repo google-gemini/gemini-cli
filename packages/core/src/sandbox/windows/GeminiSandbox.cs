@@ -338,21 +338,31 @@ public class GeminiSandbox {
             // 0x00000004 (CREATE_SUSPENDED) to prevent the process from executing before being placed in the job
             uint creationFlags = 0x01000000 | 0x00000004;
             if (!CreateProcessAsUser(hRestrictedToken, null, commandLine, IntPtr.Zero, IntPtr.Zero, true, creationFlags, IntPtr.Zero, cwd, ref si, out pi)) {
-                Console.Error.WriteLine("Error: CreateProcessAsUser failed (" + Marshal.GetLastWin32Error() + ") Command: " + commandLine);
+                int err = Marshal.GetLastWin32Error();
+                Console.Error.WriteLine("Error: CreateProcessAsUser failed (" + err + ") Command: " + commandLine);
                 return 1;
             }
 
             if (!AssignProcessToJobObject(hJob, pi.hProcess)) {
-                Console.Error.WriteLine("Error: AssignProcessToJobObject failed (" + Marshal.GetLastWin32Error() + ") Command: " + commandLine);
+                int err = Marshal.GetLastWin32Error();
+                Console.Error.WriteLine("Error: AssignProcessToJobObject failed (" + err + ") Command: " + commandLine);
                 TerminateProcess(pi.hProcess, 1);
                 return 1;
             }
 
             ResumeThread(pi.hThread);
 
-            // Wait for exit            uint waitResult = WaitForSingleObject(pi.hProcess, 0xFFFFFFFF);
+            if (WaitForSingleObject(pi.hProcess, 0xFFFFFFFF) == 0xFFFFFFFF) {
+                int err = Marshal.GetLastWin32Error();
+                Console.Error.WriteLine("Error: WaitForSingleObject failed (" + err + ")");
+            }
+            
             uint exitCode = 0;
-            GetExitCodeProcess(pi.hProcess, out exitCode);
+            if (!GetExitCodeProcess(pi.hProcess, out exitCode)) {
+                int err = Marshal.GetLastWin32Error();
+                Console.Error.WriteLine("Error: GetExitCodeProcess failed (" + err + ")");
+                return 1;
+            }
 
             return (int)exitCode;
         } finally {
