@@ -696,7 +696,7 @@ describe('policy.ts', () => {
         expect.objectContaining({
           toolName: 'write_file',
           argsPattern:
-            '\\\\0' + escapeRegex('"file_path":"src/foo.ts"') + '\\\\0',
+            '\\x00' + escapeRegex('"file_path":"src/foo.ts"') + '\\x00',
         }),
       );
     });

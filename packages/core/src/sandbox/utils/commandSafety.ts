@@ -77,8 +77,28 @@ export function isKnownSafeCommand(args: string[]): boolean {
   // Normalize zsh to bash
   const normalizedArgs = args.map((a) => (a === 'zsh' ? 'bash' : a));
 
+  const shellMetaCharacters = [
+    '&',
+    '|',
+    ';',
+    '<',
+    '>',
+    '(',
+    ')',
+    '$',
+    '`',
+    '\\\\',
+    '\\n',
+    '\\r',
+  ];
+  const hasShellMeta = (str: string) =>
+    shellMetaCharacters.some((meta) => str.includes(meta));
+
   if (isSafeToCallWithExec(normalizedArgs)) {
-    return true;
+    // Ensure no arguments contain shell metacharacters that could lead to injection
+    // when this is called from a shell context (like PolicyEngine).
+    // We allow the root command itself (normalizedArgs[0]) but check all arguments.
+    return !normalizedArgs.slice(1).some(hasShellMeta);
   }
 
   // Support `bash -lc "..."`

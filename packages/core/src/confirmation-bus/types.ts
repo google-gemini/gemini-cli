@@ -147,7 +147,7 @@ export interface UpdatePolicy {
   persist?: boolean;
   persistScope?: 'workspace' | 'user';
   argsPattern?: string;
-  commandPrefix?: string | string[];
+  commandPrefix?: string | string[] | string[][];
   mcpName?: string;
   allowRedirection?: boolean;
 }
