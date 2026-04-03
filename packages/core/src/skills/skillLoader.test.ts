@@ -255,6 +255,44 @@ description:no-space-desc
     expect(skills[0].description).toBe('no-space-desc');
   });
 
+  it('should load skills from nested subdirectories (two-level folders)', async () => {
+    const skillDir = path.join(testRootDir, 'category', 'my-skill');
+    await fs.mkdir(skillDir, { recursive: true });
+    const skillFile = path.join(skillDir, 'SKILL.md');
+    await fs.writeFile(
+      skillFile,
+      `---\nname: nested-skill\ndescription: A nested skill\n---\n# Instructions\nDo something nested.\n`,
+    );
+
+    const skills = await loadSkillsFromDir(testRootDir);
+
+    expect(skills).toHaveLength(1);
+    expect(skills[0].name).toBe('nested-skill');
+    expect(skills[0].location).toBe(skillFile);
+  });
+
+  it('should load skills from both flat and nested directories', async () => {
+    const flatSkillDir = path.join(testRootDir, 'flat-skill');
+    await fs.mkdir(flatSkillDir, { recursive: true });
+    await fs.writeFile(
+      path.join(flatSkillDir, 'SKILL.md'),
+      `---\nname: flat-skill\ndescription: A flat skill\n---\nFlat body.\n`,
+    );
+
+    const nestedSkillDir = path.join(testRootDir, 'category', 'nested-skill');
+    await fs.mkdir(nestedSkillDir, { recursive: true });
+    await fs.writeFile(
+      path.join(nestedSkillDir, 'SKILL.md'),
+      `---\nname: nested-skill\ndescription: A nested skill\n---\nNested body.\n`,
+    );
+
+    const skills = await loadSkillsFromDir(testRootDir);
+
+    expect(skills).toHaveLength(2);
+    const names = skills.map((s) => s.name).sort();
+    expect(names).toEqual(['flat-skill', 'nested-skill']);
+  });
+
   it('should sanitize skill names containing invalid filename characters', async () => {
     const skillFile = path.join(testRootDir, 'SKILL.md');
     await fs.writeFile(
