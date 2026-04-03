@@ -302,17 +302,20 @@ export class ShellToolInvocation extends BaseToolInvocation<
               approvedPaths?: string[],
             ): boolean => {
               if (!approvedPaths || approvedPaths.length === 0) return false;
-              const requestedIdentity = getPathIdentity(requestedPath);
+              const requestedRealIdentity = getPathIdentity(
+                resolveToRealPath(requestedPath),
+              );
 
               // Identity check is fast, subpath check is slower
-              return approvedPaths.some(
-                (p) =>
-                  requestedIdentity === getPathIdentity(p) ||
-                  isSubpath(
-                    getPathIdentity(resolveToRealPath(p)),
-                    requestedIdentity,
-                  ),
-              );
+              return approvedPaths.some((p) => {
+                const approvedRealIdentity = getPathIdentity(
+                  resolveToRealPath(p),
+                );
+                return (
+                  requestedRealIdentity === approvedRealIdentity ||
+                  isSubpath(approvedRealIdentity, requestedRealIdentity)
+                );
+              });
             };
 
             const missingRead = (proactive.fileSystem?.read || []).filter(

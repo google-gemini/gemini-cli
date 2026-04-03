@@ -4,7 +4,17 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { vi, describe, it, expect, beforeEach, beforeAll } from 'vitest';
+import {
+  vi,
+  describe,
+  it,
+  expect,
+  beforeEach,
+  beforeAll,
+  afterEach,
+} from 'vitest';
+import os from 'node:os';
+import type _fs from 'node:fs';
 import { ShellTool } from './shell.js';
 import { type Config } from '../config/config.js';
 import { createMockMessageBus } from '../test-utils/mock-message-bus.js';
@@ -12,10 +22,30 @@ import * as proactivePermissions from '../sandbox/utils/proactivePermissions.js'
 
 import { initializeShellParsers } from '../utils/shell-utils.js';
 
+vi.mock('node:fs', async (importOriginal) => {
+  const original = (await importOriginal());
+  return {
+    ...original,
+    realpathSync: vi.fn((p) => p),
+  };
+});
+
 vi.mock('../sandbox/utils/proactivePermissions.js', () => ({
   getProactiveToolSuggestions: vi.fn(),
   isNetworkReliantCommand: vi.fn(),
 }));
+
+const mockPlatform = (platform: string) => {
+  vi.stubGlobal(
+    'process',
+    Object.create(process, {
+      platform: {
+        get: () => platform,
+      },
+    }),
+  );
+  vi.spyOn(os, 'platform').mockReturnValue(platform as NodeJS.Platform);
+};
 
 describe('ShellTool Proactive Expansion', () => {
   let mockConfig: Config;
@@ -25,8 +55,14 @@ describe('ShellTool Proactive Expansion', () => {
     await initializeShellParsers();
   });
 
+  afterEach(() => {
+    vi.unstubAllGlobals();
+    vi.restoreAllMocks();
+  });
+
   beforeEach(() => {
     vi.clearAllMocks();
+    mockPlatform('darwin');
 
     mockConfig = {
       get config() {
