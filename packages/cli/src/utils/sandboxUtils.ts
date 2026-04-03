@@ -15,11 +15,11 @@ export const SANDBOX_NETWORK_NAME = 'gemini-cli-sandbox';
 export const SANDBOX_PROXY_NAME = 'gemini-cli-sandbox-proxy';
 export const BUILTIN_SEATBELT_PROFILES = [
   'permissive-open',
-  'permissive-closed',
   'permissive-proxied',
   'restrictive-open',
-  'restrictive-closed',
   'restrictive-proxied',
+  'strict-open',
+  'strict-proxied',
 ];
 
 export function getContainerPath(hostPath: string): string {
@@ -60,7 +60,7 @@ export async function shouldUseCurrentUserInSandbox(): Promise<boolean> {
         );
         return true;
       }
-    } catch (_err) {
+    } catch {
       // Silently ignore if /etc/os-release is not found or unreadable.
       // The default (false) will be applied in this case.
       debugLogger.warn(

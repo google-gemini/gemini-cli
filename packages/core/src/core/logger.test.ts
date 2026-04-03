@@ -13,31 +13,33 @@ import {
   afterEach,
   afterAll,
 } from 'vitest';
-import type { LogEntry } from './logger.js';
 import {
   Logger,
   MessageSenderType,
   encodeTagName,
   decodeTagName,
+  type LogEntry,
 } from './logger.js';
 import { AuthType } from './contentGenerator.js';
 import { Storage } from '../config/storage.js';
 import { promises as fs, existsSync } from 'node:fs';
 import path from 'node:path';
 import type { Content } from '@google/genai';
-
-import crypto from 'node:crypto';
 import os from 'node:os';
 import { GEMINI_DIR } from '../utils/paths.js';
 import { debugLogger } from '../utils/debugLogger.js';
 
+const PROJECT_SLUG = 'project-slug';
 const TMP_DIR_NAME = 'tmp';
 const LOG_FILE_NAME = 'logs.json';
 const CHECKPOINT_FILE_NAME = 'checkpoint.json';
 
-const projectDir = process.cwd();
-const hash = crypto.createHash('sha256').update(projectDir).digest('hex');
-const TEST_GEMINI_DIR = path.join(os.homedir(), GEMINI_DIR, TMP_DIR_NAME, hash);
+const TEST_GEMINI_DIR = path.join(
+  os.homedir(),
+  GEMINI_DIR,
+  TMP_DIR_NAME,
+  PROJECT_SLUG,
+);
 
 const TEST_LOG_FILE_PATH = path.join(TEST_GEMINI_DIR, LOG_FILE_NAME);
 const TEST_CHECKPOINT_FILE_PATH = path.join(
@@ -48,7 +50,7 @@ const TEST_CHECKPOINT_FILE_PATH = path.join(
 async function cleanupLogAndCheckpointFiles() {
   try {
     await fs.rm(TEST_GEMINI_DIR, { recursive: true, force: true });
-  } catch (_error) {
+  } catch {
     // Ignore errors, as the directory may not exist, which is fine.
   }
 }

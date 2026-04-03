@@ -7,6 +7,7 @@
 import type React from 'react';
 import { Text, Box } from 'ink';
 import { theme } from '../../semantic-colors.js';
+import { getDisplayString } from '@google/gemini-cli-core';
 
 interface ModelMessageProps {
   model: string;
@@ -15,7 +16,7 @@ interface ModelMessageProps {
 export const ModelMessage: React.FC<ModelMessageProps> = ({ model }) => (
   <Box marginLeft={2}>
     <Text color={theme.ui.comment} italic>
-      Responding with {model}
+      Responding with {getDisplayString(model)}
     </Text>
   </Box>
 );

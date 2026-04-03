@@ -6,16 +6,17 @@
 
 import { expect } from 'vitest';
 import { execSync, spawn, type ChildProcess } from 'node:child_process';
-import { mkdirSync, writeFileSync, readFileSync } from 'node:fs';
+import fs, { mkdirSync, writeFileSync, readFileSync } from 'node:fs';
 import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { env } from 'node:process';
 import { setTimeout as sleep } from 'node:timers/promises';
-import { DEFAULT_GEMINI_MODEL, GEMINI_DIR } from '@google/gemini-cli-core';
-import fs from 'node:fs';
+import { PREVIEW_GEMINI_MODEL, GEMINI_DIR } from '@google/gemini-cli-core';
+export { GEMINI_DIR };
 import * as pty from '@lydell/node-pty';
 import stripAnsi from 'strip-ansi';
 import * as os from 'node:os';
+import type { TestMcpConfig } from './test-mcp-server.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const BUNDLE_PATH = join(__dirname, '..', '..', '..', 'bundle/gemini.js');
@@ -105,51 +106,91 @@ export function printDebugInfo(
   return allTools;
 }
 
-// Helper to validate model output and warn about unexpected content
-export function validateModelOutput(
-  result: string,
-  expectedContent: string | (string | RegExp)[] | null = null,
-  testName = '',
-) {
-  // First, check if there's any output at all (this should fail the test if missing)
+// Helper to assert that the model returned some output
+export function assertModelHasOutput(result: string) {
   if (!result || result.trim().length === 0) {
     throw new Error('Expected LLM to return some output');
   }
+}
+
+function contentExists(result: string, content: string | RegExp): boolean {
+  if (typeof content === 'string') {
+    return result.toLowerCase().includes(content.toLowerCase());
+  } else if (content instanceof RegExp) {
+    return content.test(result);
+  }
+  return false;
+}
+
+function findMismatchedContent(
+  result: string,
+  content: string | (string | RegExp)[],
+  shouldExist: boolean,
+): (string | RegExp)[] {
+  const contents = Array.isArray(content) ? content : [content];
+  return contents.filter((c) => contentExists(result, c) !== shouldExist);
+}
+
+function logContentWarning(
+  problematicContent: (string | RegExp)[],
+  isMissing: boolean,
+  originalContent: string | (string | RegExp)[] | null | undefined,
+  result: string,
+) {
+  const message = isMissing
+    ? 'LLM did not include expected content in response'
+    : 'LLM included forbidden content in response';
+
+  console.warn(
+    `Warning: ${message}: ${problematicContent.join(', ')}.`,
+    'This is not ideal but not a test failure.',
+  );
+
+  const label = isMissing ? 'Expected content' : 'Forbidden content';
+  console.warn(`${label}:`, originalContent);
+  console.warn('Actual output:', result);
+}
+
+// Helper to check model output and warn about unexpected content
+export function checkModelOutputContent(
+  result: string,
+  {
+    expectedContent = null,
+    testName = '',
+    forbiddenContent = null,
+  }: {
+    expectedContent?: string | (string | RegExp)[] | null;
+    testName?: string;
+    forbiddenContent?: string | (string | RegExp)[] | null;
+  } = {},
+): boolean {
+  let isValid = true;
 
   // If expectedContent is provided, check for it and warn if missing
   if (expectedContent) {
-    const contents = Array.isArray(expectedContent)
-      ? expectedContent
-      : [expectedContent];
-    const missingContent = contents.filter((content) => {
-      if (typeof content === 'string') {
-        return !result.toLowerCase().includes(content.toLowerCase());
-      } else if (content instanceof RegExp) {
-        return !content.test(result);
-      }
-      return false;
-    });
+    const missingContent = findMismatchedContent(result, expectedContent, true);
 
     if (missingContent.length > 0) {
-      console.warn(
-        `Warning: LLM did not include expected content in response: ${missingContent.join(
-          ', ',
-        )}.`,
-        'This is not ideal but not a test failure.',
-      );
-      console.warn(
-        'The tool was called successfully, which is the main requirement.',
-      );
-      console.warn('Expected content:', expectedContent);
-      console.warn('Actual output:', result);
-      return false;
-    } else if (env['VERBOSE'] === 'true') {
-      console.log(`${testName}: Model output validated successfully.`);
+      logContentWarning(missingContent, true, expectedContent, result);
+      isValid = false;
     }
-    return true;
   }
 
-  return true;
+  // If forbiddenContent is provided, check for it and warn if present
+  if (forbiddenContent) {
+    const foundContent = findMismatchedContent(result, forbiddenContent, false);
+
+    if (foundContent.length > 0) {
+      logContentWarning(foundContent, false, forbiddenContent, result);
+      isValid = false;
+    }
+  }
+
+  if (isValid && env['VERBOSE'] === 'true') {
+    console.log(`${testName}: Model output content checked successfully.`);
+  }
+
+  return isValid;
 }
 
 export interface ParsedLog {
@@ -168,6 +209,8 @@ export interface ParsedLog {
     stdout?: string;
     stderr?: string;
     error?: string;
+    error_type?: string;
+    prompt_id?: string;
   };
   scopeMetrics?: {
     metrics: {
@@ -272,22 +315,46 @@ export class InteractiveRun {
   }
 }
 
+function isObject(item: any): item is Record<string, any> {
+  return !!(item && typeof item === 'object' && !Array.isArray(item));
+}
+
+function deepMerge(target: any, source: any): any {
+  if (!isObject(target) || !isObject(source)) {
+    return source;
+  }
+  const output = { ...target };
+  Object.keys(source).forEach((key) => {
+    const targetValue = target[key];
+    const sourceValue = source[key];
+    if (isObject(targetValue) && isObject(sourceValue)) {
+      output[key] = deepMerge(targetValue, sourceValue);
+    } else {
+      output[key] = sourceValue;
+    }
+  });
+  return output;
+}
+
 export class TestRig {
   testDir: string | null = null;
   homeDir: string | null = null;
   testName?: string;
   _lastRunStdout?: string;
+  _lastRunStderr?: string;
   // Path to the copied fake responses file for this test.
   fakeResponsesPath?: string;
   // Original fake responses file path for rewriting goldens in record mode.
   originalFakeResponsesPath?: string;
   private _interactiveRuns: InteractiveRun[] = [];
   private _spawnedProcesses: ChildProcess[] = [];
+  private _initialized = false;
 
   setup(
     testName: string,
     options: {
       settings?: Record<string, unknown>;
+      state?: Record<string, unknown>;
       fakeResponsesPath?: string;
     } = {},
   ) {
@@ -297,6 +364,14 @@ export class TestRig {
       env['INTEGRATION_TEST_FILE_DIR'] || join(os.tmpdir(), 'gemini-cli-tests');
     this.testDir = join(testFileDir, sanitizedName);
     this.homeDir = join(testFileDir, sanitizedName + '-home');
+
+    if (!this._initialized) {
+      // Clean up existing directories from previous runs (e.g. retries)
+      this._cleanDir(this.testDir);
+      this._cleanDir(this.homeDir);
+      this._initialized = true;
+    }
+
     mkdirSync(this.testDir, { recursive: true });
     mkdirSync(this.homeDir, { recursive: true });
     if (options.fakeResponsesPath) {
@@ -309,49 +384,115 @@ export class TestRig {
 
     // Create a settings file to point the CLI to the local collector
     this._createSettingsFile(options.settings);
+
+    // Create persistent state file
+    this._createStateFile(options.state);
+  }
+
+  private _cleanDir(dir: string) {
+    if (fs.existsSync(dir)) {
+      for (let i = 0; i < 10; i++) {
+        try {
+          fs.rmSync(dir, { recursive: true, force: true });
+          return;
+        } catch (err) {
+          if (i === 9) {
+            console.error(
+              `Failed to clean directory ${dir} after 10 attempts:`,
+              err,
+            );
+            throw err;
+          }
+          const delay = Math.min(Math.pow(2, i) * 1000, 10000); // Max 10s delay
+          try {
+            const sharedBuffer = new Int32Array(new SharedArrayBuffer(4));
+            Atomics.wait(sharedBuffer, 0, 0, delay);
+          } catch {
+            // Fallback for environments where SharedArrayBuffer might be restricted
+            const start = Date.now();
+            while (Date.now() - start < delay) {
+              /* busy wait */
+            }
+          }
+        }
+      }
+    }
   }
 
   private _createSettingsFile(overrideSettings?: Record<string, unknown>) {
     const projectGeminiDir = join(this.testDir!, GEMINI_DIR);
     mkdirSync(projectGeminiDir, { recursive: true });
 
+    const userGeminiDir = join(this.homeDir!, GEMINI_DIR);
+    mkdirSync(userGeminiDir, { recursive: true });
+
     // In sandbox mode, use an absolute path for telemetry inside the container
     // The container mounts the test directory at the same path as the host
     const telemetryPath = join(this.homeDir!, 'telemetry.log'); // Always use home directory for telemetry
 
-    const settings = {
-      general: {
-        // Nightly releases sometimes becomes out of sync with local code and
-        // triggers auto-update, which causes tests to fail.
-        disableAutoUpdate: true,
-        previewFeatures: false,
-      },
-      telemetry: {
-        enabled: true,
-        target: 'local',
-        otlpEndpoint: '',
-        outfile: telemetryPath,
-      },
-      security: {
-        auth: {
-          selectedType: 'gemini-api-key',
+    const settings = deepMerge(
+      {
+        general: {
+          // Nightly releases sometimes becomes out of sync with local code and
+          // triggers auto-update, which causes tests to fail.
+          enableAutoUpdate: false,
         },
+        telemetry: {
+          enabled: true,
+          target: 'local',
+          otlpEndpoint: '',
+          outfile: telemetryPath,
+        },
+        security: {
+          auth: {
+            selectedType: 'gemini-api-key',
+          },
+          folderTrust: {
+            enabled: false,
+          },
+        },
+        ui: {
+          useAlternateBuffer: true,
+        },
+        ...(env['GEMINI_TEST_TYPE'] === 'integration'
+          ? {
+              model: {
+                name: PREVIEW_GEMINI_MODEL,
+              },
+            }
+          : {}),
+        sandbox:
+          env['GEMINI_SANDBOX'] !== 'false' ? env['GEMINI_SANDBOX'] : false,
+        // Don't show the IDE connection dialog when running from VsCode
+        ide: { enabled: false, hasSeenNudge: true },
       },
-      ui: {
-        useAlternateBuffer: true,
-      },
-      model: {
-        name: DEFAULT_GEMINI_MODEL,
-      },
-      sandbox:
-        env['GEMINI_SANDBOX'] !== 'false' ? env['GEMINI_SANDBOX'] : false,
-      // Don't show the IDE connection dialog when running from VsCode
-      ide: { enabled: false, hasSeenNudge: true },
-      ...overrideSettings, // Allow tests to override/add settings
-    };
+      overrideSettings ?? {},
+    );
     writeFileSync(
       join(projectGeminiDir, 'settings.json'),
       JSON.stringify(settings, null, 2),
+    );
+    writeFileSync(
+      join(userGeminiDir, 'settings.json'),
+      JSON.stringify(settings, null, 2),
+    );
+  }
+
+  private _createStateFile(overrideState?: Record<string, unknown>) {
+    if (!this.homeDir) throw new Error('TestRig homeDir is not initialized');
+    const userGeminiDir = join(this.homeDir, GEMINI_DIR);
+    mkdirSync(userGeminiDir, { recursive: true });
+
+    const state = deepMerge(
+      {
+        terminalSetupPromptShown: true, // Default to true in tests to avoid blocking prompts
+      },
+      overrideState ?? {},
+    );
+
+    writeFileSync(
+      join(userGeminiDir, 'state.json'),
+      JSON.stringify(state, null, 2),
     );
   }
 
@@ -380,12 +521,19 @@ export class TestRig {
     command: string;
     initialArgs: string[];
   } {
+    const binaryPath = env['INTEGRATION_TEST_GEMINI_BINARY_PATH'];
     const isNpmReleaseTest =
       env['INTEGRATION_TEST_USE_INSTALLED_GEMINI'] === 'true';
-    const command = isNpmReleaseTest ? 'gemini' : 'node';
-    const initialArgs = isNpmReleaseTest
-      ? extraInitialArgs
-      : [BUNDLE_PATH, ...extraInitialArgs];
+    const geminiCommand = os.platform() === 'win32' ? 'gemini.cmd' : 'gemini';
+    let command = 'node';
+    let initialArgs = [BUNDLE_PATH, ...extraInitialArgs];
+    if (binaryPath) {
+      command = binaryPath;
+      initialArgs = extraInitialArgs;
+    } else if (isNpmReleaseTest) {
+      command = geminiCommand;
+      initialArgs = extraInitialArgs;
+    }
     if (this.fakeResponsesPath) {
       if (process.env['REGENERATE_MODEL_GOLDENS'] === 'true') {
         initialArgs.push('--record-responses', this.fakeResponsesPath);
@@ -394,6 +542,135 @@ export class TestRig {
       }
     }
     return { command, initialArgs };
+  }
+
+  createScript(fileName: string, content: string) {
+    if (!this.testDir) {
+      throw new Error(
+        'TestRig.setup must be called before creating files or scripts',
+      );
+    }
+    const scriptPath = join(this.testDir, fileName);
+    writeFileSync(scriptPath, content);
+    return normalizePath(scriptPath)!;
+  }
+
+  /**
+   * Adds a test MCP server to the test workspace.
+   * @param name The name of the server
+   * @param config Configuration object or name of predefined config (e.g. 'github')
+   */
+  addTestMcpServer(name: string, config: TestMcpConfig | string) {
+    if (!this.testDir) {
+      throw new Error(
+        'TestRig.setup must be called before adding test servers',
+      );
+    }
+
+    let testConfig: TestMcpConfig;
+    if (typeof config === 'string') {
+      const assetsDir = join(__dirname, '..', 'assets', 'test-servers');
+      const configPath = join(assetsDir, `${config}.json`);
+      if (!fs.existsSync(configPath)) {
+        throw new Error(
+          `Predefined test server config not found: ${configPath}`,
+        );
+      }
+      testConfig = JSON.parse(fs.readFileSync(configPath, 'utf-8'));
+      testConfig.name = name; // Override name
+    } else {
+      testConfig = config;
+    }
+
+    const configFileName = `test-mcp-${name}.json`;
+    const scriptFileName = `test-mcp-${name}.mjs`;
+
+    const configFilePath = join(this.testDir, configFileName);
+    const scriptFilePath = join(this.testDir, scriptFileName);
+
+    // Write config
+    fs.writeFileSync(configFilePath, JSON.stringify(testConfig, null, 2));
+
+    // Copy template script
+    const templatePath = join(__dirname, 'test-mcp-server-template.mjs');
+    if (!fs.existsSync(templatePath)) {
+      throw new Error(`Test template not found at ${templatePath}`);
+    }
+
+    fs.copyFileSync(templatePath, scriptFilePath);
+
+    // Calculate path to monorepo node_modules
+    const monorepoNodeModules = join(
+      __dirname,
+      '..',
+      '..',
+      '..',
+      'node_modules',
+    );
+
+    // Create symlink to node_modules in testDir for ESM resolution
+    const testNodeModules = join(this.testDir, 'node_modules');
+    if (!fs.existsSync(testNodeModules)) {
+      fs.symlinkSync(monorepoNodeModules, testNodeModules, 'dir');
+    }
+
+    // Update settings in workspace and home
+    const updateSettings = (dir: string) => {
+      const settingsPath = join(dir, GEMINI_DIR, 'settings.json');
+      let settings: any = {};
+      if (fs.existsSync(settingsPath)) {
+        settings = JSON.parse(fs.readFileSync(settingsPath, 'utf-8'));
+      } else {
+        fs.mkdirSync(join(dir, GEMINI_DIR), { recursive: true });
+      }
+
+      if (!settings.mcpServers) {
+        settings.mcpServers = {};
+      }
+
+      settings.mcpServers[name] = {
+        command: 'node',
+        args: [scriptFilePath, configFilePath],
+        // Removed env.NODE_PATH as it is ignored in ESM
+      };
+
+      fs.writeFileSync(settingsPath, JSON.stringify(settings, null, 2));
+    };
+
+    updateSettings(this.testDir);
+    if (this.homeDir) {
+      updateSettings(this.homeDir);
+    }
+  }
+
+  private _getCleanEnv(
+    extraEnv?: Record<string, string | undefined>,
+  ): Record<string, string | undefined> {
+    const cleanEnv: Record<string, string | undefined> = { ...process.env };
+
+    // Clear all GEMINI_ environment variables that might interfere with tests
+    // except for those we explicitly want to keep or set.
+    for (const key of Object.keys(cleanEnv)) {
+      if (
+        (key.startsWith('GEMINI_') || key.startsWith('GOOGLE_GEMINI_')) &&
+        key !== 'GEMINI_API_KEY' &&
+        key !== 'GOOGLE_API_KEY' &&
+        key !== 'GEMINI_MODEL' &&
+        key !== 'GEMINI_DEBUG' &&
+        key !== 'GEMINI_CLI_TEST_VAR' &&
+        key !== 'GEMINI_CLI_INTEGRATION_TEST' &&
+        !key.startsWith('GEMINI_CLI_ACTIVITY_LOG')
+      ) {
+        delete cleanEnv[key];
+      }
+    }
+
+    return {
+      ...cleanEnv,
+      GEMINI_CLI_HOME: this.homeDir!,
+      GEMINI_PTY_INFO: 'child_process',
+      ...extraEnv,
+    };
   }
 
   run(options: {
@@ -433,11 +710,7 @@ export class TestRig {
     const child = spawn(command, commandArgs, {
       cwd: this.testDir!,
       stdio: 'pipe',
-      env: {
-        ...process.env,
-        GEMINI_CLI_HOME: this.homeDir!,
-        ...options.env,
-      },
+      env: this._getCleanEnv(options.env),
     });
     this._spawnedProcesses.push(child);
 
@@ -487,6 +760,7 @@ export class TestRig {
 
       child.on('close', (code: number) => {
         clearTimeout(timer);
+        this._lastRunStderr = stderr;
         if (code === 0) {
           // Store the raw stdout for Podman telemetry parsing
           this._lastRunStdout = stdout;
@@ -573,7 +847,7 @@ export class TestRig {
       const child = spawn(command, allArgs, {
         cwd: this.testDir!,
         stdio: 'pipe',
-        env: { ...process.env, GEMINI_CLI_HOME: this.homeDir! },
+        env: this._getCleanEnv(),
         signal: options?.signal,
       });
       this._spawnedProcesses.push(child);
@@ -611,11 +885,7 @@ export class TestRig {
     const child = spawn(command, commandArgs, {
       cwd: this.testDir!,
       stdio: 'pipe',
-      env: {
-        ...process.env,
-        GEMINI_CLI_HOME: this.homeDir!,
-        ...options.env,
-      },
+      env: this._getCleanEnv(options.env),
     });
     this._spawnedProcesses.push(child);
 
@@ -661,6 +931,7 @@ export class TestRig {
 
       child.on('close', (code: number) => {
         clearTimeout(timer);
+        this._lastRunStderr = stderr;
         if (code === 0) {
           this._lastRunStdout = stdout;
           const result = this._filterPodmanTelemetry(stdout);
@@ -700,6 +971,13 @@ export class TestRig {
     // Kill any interactive runs that are still active
     for (const run of this._interactiveRuns) {
       try {
+        if (process.platform === 'win32') {
+          // @ts-ignore - access private ptyProcess
+          const pid = run.ptyProcess?.pid;
+          if (pid) {
+            execSync(`taskkill /F /T /PID ${pid}`, { stdio: 'ignore' });
+          }
+        }
         await run.kill();
       } catch (error) {
         if (env['VERBOSE'] === 'true') {
@@ -713,6 +991,9 @@ export class TestRig {
     for (const child of this._spawnedProcesses) {
       if (child.exitCode === null && child.signalCode === null) {
         try {
+          if (process.platform === 'win32' && child.pid) {
+            execSync(`taskkill /F /T /PID ${child.pid}`, { stdio: 'ignore' });
+          }
           child.kill('SIGKILL');
         } catch (error) {
           if (env['VERBOSE'] === 'true') {
@@ -735,21 +1016,21 @@ export class TestRig {
     // Clean up test directory and home directory
     if (this.testDir && !env['KEEP_OUTPUT']) {
       try {
-        fs.rmSync(this.testDir, { recursive: true, force: true });
+        this._cleanDir(this.testDir);
       } catch (error) {
         // Ignore cleanup errors
-        if (env['VERBOSE'] === 'true') {
-          console.warn('Cleanup warning:', (error as Error).message);
+        if (env['VERBOSE'] === 'true' || env['CI'] === 'true') {
+          console.warn('Cleanup warning (testDir):', (error as Error).message);
         }
       }
     }
     if (this.homeDir && !env['KEEP_OUTPUT']) {
       try {
-        fs.rmSync(this.homeDir, { recursive: true, force: true });
+        this._cleanDir(this.homeDir);
       } catch (error) {
         // Ignore cleanup errors
-        if (env['VERBOSE'] === 'true') {
-          console.warn('Cleanup warning:', (error as Error).message);
+        if (env['VERBOSE'] === 'true' || env['CI'] === 'true') {
+          console.warn('Cleanup warning (homeDir):', (error as Error).message);
         }
       }
     }
@@ -889,6 +1170,7 @@ export class TestRig {
         args: string;
         success: boolean;
         duration_ms: number;
+        prompt_id?: string;
       };
     }[] = [];
 
@@ -917,6 +1199,13 @@ export class TestRig {
         args = argsMatch[1];
       }
 
+      // Look for prompt_id in the context
+      let promptId = undefined;
+      const promptIdMatch = context.match(/prompt_id:\s*'([^']+)'/);
+      if (promptIdMatch) {
+        promptId = promptIdMatch[1];
+      }
+
       // Also try to find function_name to double-check
       // Updated regex to handle tool names with hyphens and underscores
       const nameMatch = context.match(/function_name:\s*'([\w-]+)'/);
@@ -929,6 +1218,7 @@ export class TestRig {
           args: args,
           success: success,
           duration_ms: duration,
+          prompt_id: promptId,
         },
       });
     }
@@ -976,6 +1266,7 @@ export class TestRig {
                       args: obj.attributes.function_args || '{}',
                       success: obj.attributes.success !== false,
                       duration_ms: obj.attributes.duration_ms || 0,
+                      prompt_id: obj.attributes.prompt_id,
                     },
                   });
                 }
@@ -990,6 +1281,7 @@ export class TestRig {
                     args: obj.attributes.function_args,
                     success: obj.attributes.success,
                     duration_ms: obj.attributes.duration_ms,
+                    prompt_id: obj.attributes.prompt_id,
                   },
                 });
               }
@@ -1080,6 +1372,9 @@ export class TestRig {
         args: string;
         success: boolean;
         duration_ms: number;
+        prompt_id?: string;
+        error?: string;
+        error_type?: string;
       };
     }[] = [];
 
@@ -1096,6 +1391,9 @@ export class TestRig {
             args: logData.attributes.function_args ?? '{}',
             success: logData.attributes.success ?? false,
             duration_ms: logData.attributes.duration_ms ?? 0,
+            prompt_id: logData.attributes.prompt_id,
+            error: logData.attributes.error,
+            error_type: logData.attributes.error_type,
           },
         });
       }
@@ -1179,11 +1477,24 @@ export class TestRig {
     ]);
     const commandArgs = [...initialArgs];
 
-    const envVars = {
-      ...process.env,
-      GEMINI_CLI_HOME: this.homeDir!,
-      ...options?.env,
-    };
+    const envVars = this._getCleanEnv(options?.env);
+
+    // node-pty on windows often needs these to spawn correctly
+    if (process.platform === 'win32') {
+      const windowsCriticalVars = [
+        'SystemRoot',
+        'COMSPEC',
+        'windir',
+        'PATHEXT',
+        'TEMP',
+        'TMP',
+      ];
+      for (const v of windowsCriticalVars) {
+        if (process.env[v] && !envVars[v]) {
+          envVars[v] = process.env[v]!;
+        }
+      }
+    }
 
     const ptyOptions: pty.IPtyForkOptions = {
       name: 'xterm-color',
@@ -1266,4 +1577,12 @@ export class TestRig {
     }
     throw new Error(`pollCommand timed out after ${timeout}ms`);
   }
+}
+
+/**
+ * Normalizes a path for cross-platform matching (replaces backslashes with forward slashes).
+ */
+export function normalizePath(p: string | undefined): string | undefined {
+  if (!p) return p;
+  return p.replace(/\\/g, '/');
 }

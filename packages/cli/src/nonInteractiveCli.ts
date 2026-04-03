@@ -13,6 +13,7 @@ import type {
 import { isSlashCommand } from './ui/utils/commandUtils.js';
 import type { LoadedSettings } from './config/settings.js';
 import {
+  convertSessionToClientHistory,
   GeminiEventType,
   FatalInputError,
   promptIdContext,
@@ -35,7 +36,6 @@ import type { Content, Part } from '@google/genai';
 import readline from 'node:readline';
 import stripAnsi from 'strip-ansi';
 
-import { convertSessionToHistoryFormats } from './ui/hooks/useSessionBrowser.js';
 import { handleSlashCommand } from './nonInteractiveCliCommands.js';
 import { ConsolePatcher } from './ui/utils/ConsolePatcher.js';
 import { handleAtCommand } from './ui/hooks/atCommandProcessor.js';
@@ -46,6 +46,7 @@ import {
   handleMaxTurnsExceededError,
 } from './utils/errors.js';
 import { TextOutput } from './ui/utils/textOutput.js';
+import { runNonInteractive as runNonInteractiveAgentSession } from './nonInteractiveCliAgentSession.js';
 
 interface RunNonInteractiveParams {
   config: Config;
@@ -55,27 +56,31 @@ interface RunNonInteractiveParams {
   resumedSessionData?: ResumedSessionData;
 }
 
-export async function runNonInteractive({
-  config,
-  settings,
-  input,
-  prompt_id,
-  resumedSessionData,
-}: RunNonInteractiveParams): Promise<void> {
+export async function runNonInteractive(
+  params: RunNonInteractiveParams,
+): Promise<void> {
+  const useAgentSession = params.config.getAgentSessionNoninteractiveEnabled();
+  if (useAgentSession) {
+    return runNonInteractiveAgentSession(params);
+  }
+
+  const { config, settings, input, prompt_id, resumedSessionData } = params;
+
   return promptIdContext.run(prompt_id, async () => {
     const consolePatcher = new ConsolePatcher({
       stderr: true,
+      interactive: false,
       debugMode: config.getDebugMode(),
       onNewMessage: (msg) => {
         coreEvents.emitConsoleLog(msg.type, msg.content);
       },
     });
 
-    if (config.storage && process.env['GEMINI_CLI_ACTIVITY_LOG_FILE']) {
-      const { registerActivityLogger } = await import(
-        './utils/activityLogger.js'
+    if (process.env['GEMINI_CLI_ACTIVITY_LOG_TARGET']) {
+      const { setupInitialActivityLogger } = await import(
+        './utils/devtoolsService.js'
       );
-      registerActivityLogger(config);
+      await setupInitialActivityLogger(config);
     }
 
     const { stdout: workingStdout } = createWorkingStdio();
@@ -211,7 +216,7 @@ export async function runNonInteractive({
 
       const geminiClient = config.getGeminiClient();
       const scheduler = new Scheduler({
-        config,
+        context: config,
         messageBus: config.getMessageBus(),
         getPreferredEditor: () => undefined,
         schedulerId: ROOT_SCHEDULER_ID,
@@ -220,9 +225,9 @@ export async function runNonInteractive({
       // Initialize chat.  Resume if resume data is passed.
       if (resumedSessionData) {
         await geminiClient.resumeChat(
-          convertSessionToHistoryFormats(
+          convertSessionToClientHistory(
             resumedSessionData.conversation.messages,
-          ).clientHistory,
+          ),
           resumedSessionData,
         );
       }
@@ -250,6 +255,7 @@ export async function runNonInteractive({
         // Otherwise, slashCommandResult falls through to the default prompt
         // handling.
         if (slashCommandResult) {
+          // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
           query = slashCommandResult as Part[];
         }
       }
@@ -262,8 +268,8 @@ export async function runNonInteractive({
           onDebugMessage: () => {},
           messageId: Date.now(),
           signal: abortController.signal,
+          escapePastedAtSymbols: false,
         });
-
         if (error || !processedQuery) {
           // An error occurred during @include processing (e.g., file not found).
           // The error message is already logged by handleAtCommand.
@@ -271,6 +277,7 @@ export async function runNonInteractive({
             error || 'Exiting due to an error processing the @ command.',
           );
         }
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
         query = processedQuery as Part[];
       }
 

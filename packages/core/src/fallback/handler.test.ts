@@ -44,6 +44,7 @@ vi.mock('../telemetry/index.js', () => ({
 }));
 vi.mock('../utils/secure-browser-launcher.js', () => ({
   openBrowserSecurely: vi.fn(),
+  shouldLaunchBrowser: vi.fn().mockReturnValue(true),
 }));
 
 // Mock debugLogger to prevent console pollution and allow spying
@@ -58,7 +59,6 @@ vi.mock('../utils/debugLogger.js', () => ({
 const MOCK_PRO_MODEL = DEFAULT_GEMINI_MODEL;
 const FALLBACK_MODEL = DEFAULT_GEMINI_FLASH_MODEL;
 const AUTH_OAUTH = AuthType.LOGIN_WITH_GOOGLE;
-const AUTH_API_KEY = AuthType.USE_GEMINI;
 
 const createMockConfig = (overrides: Partial<Config> = {}): Config =>
   ({
@@ -75,7 +75,6 @@ const createMockConfig = (overrides: Partial<Config> = {}): Config =>
     ),
     getActiveModel: vi.fn(() => MOCK_PRO_MODEL),
     getModel: vi.fn(() => MOCK_PRO_MODEL),
-    getPreviewFeatures: vi.fn(() => false),
     getUserTier: vi.fn(() => undefined),
     isInteractive: vi.fn(() => false),
     ...overrides,
@@ -129,19 +128,8 @@ describe('handleFallback', () => {
       );
     });
 
-    it('should return null immediately if authType is not OAuth', async () => {
-      const result = await handleFallback(
-        policyConfig,
-        MOCK_PRO_MODEL,
-        AUTH_API_KEY,
-      );
-      expect(result).toBeNull();
-      expect(policyHandler).not.toHaveBeenCalled();
-    });
-
     it('uses availability selection with correct candidates when enabled', async () => {
       // Direct mock manipulation since it's already a vi.fn()
-      vi.mocked(policyConfig.getPreviewFeatures).mockReturnValue(true);
       vi.mocked(policyConfig.getModel).mockReturnValue(
         DEFAULT_GEMINI_MODEL_AUTO,
       );
@@ -210,7 +198,6 @@ describe('handleFallback', () => {
 
     it('does not wrap around to upgrade candidates if the current model was selected at the end (e.g. by router)', async () => {
       // Last-resort failure (Flash) in [Preview, Pro, Flash] checks Preview then Pro (all upstream).
-      vi.mocked(policyConfig.getPreviewFeatures).mockReturnValue(true);
       vi.mocked(policyConfig.getModel).mockReturnValue(
         DEFAULT_GEMINI_MODEL_AUTO,
       );
@@ -241,7 +228,6 @@ describe('handleFallback', () => {
         skipped: [],
       });
       policyHandler.mockResolvedValue('retry_once');
-      vi.mocked(policyConfig.getPreviewFeatures).mockReturnValue(true);
       vi.mocked(policyConfig.getActiveModel).mockReturnValue(
         PREVIEW_GEMINI_MODEL,
       );

@@ -11,23 +11,46 @@ import type {
   ToolCallConfirmationDetails,
   ToolConfirmationOutcome,
   ToolResultDisplay,
+  ToolLiveOutput,
 } from '../tools/tools.js';
-import type { AnsiOutput } from '../utils/terminalSerializer.js';
 import type { ToolErrorType } from '../tools/tool-error.js';
 import type { SerializableConfirmationDetails } from '../confirmation-bus/types.js';
+import { type ApprovalMode } from '../policy/types.js';
 
 export const ROOT_SCHEDULER_ID = 'root';
+
+/**
+ * Internal core statuses for the tool call state machine.
+ */
+export enum CoreToolCallStatus {
+  Validating = 'validating',
+  Scheduled = 'scheduled',
+  Error = 'error',
+  Success = 'success',
+  Executing = 'executing',
+  Cancelled = 'cancelled',
+  AwaitingApproval = 'awaiting_approval',
+}
 
 export interface ToolCallRequestInfo {
   callId: string;
   name: string;
   args: Record<string, unknown>;
+  /**
+   * The original name and arguments of the tool requested by the model.
+   * This is used for tail calls to ensure the final response and log retains
+   * the original values.
+   */
+  originalRequestName?: string;
+  originalRequestArgs?: Record<string, unknown>;
   isClientInitiated: boolean;
   prompt_id: string;
   checkpoint?: string;
   traceId?: string;
   parentCallId?: string;
   schedulerId?: string;
+  inputModifiedByHook?: boolean;
+  forcedAsk?: boolean;
 }
 
 export interface ToolCallResponseInfo {
@@ -44,72 +67,97 @@ export interface ToolCallResponseInfo {
   data?: Record<string, unknown>;
 }
 
+/** Request to execute another tool immediately after a completed one. */
+export interface TailToolCallRequest {
+  name: string;
+  args: Record<string, unknown>;
+}
+
 export type ValidatingToolCall = {
-  status: 'validating';
+  status: CoreToolCallStatus.Validating;
   request: ToolCallRequestInfo;
   tool: AnyDeclarativeTool;
   invocation: AnyToolInvocation;
   startTime?: number;
   outcome?: ToolConfirmationOutcome;
   schedulerId?: string;
+  approvalMode?: ApprovalMode;
 };
 
 export type ScheduledToolCall = {
-  status: 'scheduled';
+  status: CoreToolCallStatus.Scheduled;
   request: ToolCallRequestInfo;
   tool: AnyDeclarativeTool;
   invocation: AnyToolInvocation;
   startTime?: number;
   outcome?: ToolConfirmationOutcome;
   schedulerId?: string;
+  approvalMode?: ApprovalMode;
 };
 
 export type ErroredToolCall = {
-  status: 'error';
+  status: CoreToolCallStatus.Error;
   request: ToolCallRequestInfo;
   response: ToolCallResponseInfo;
   tool?: AnyDeclarativeTool;
   durationMs?: number;
+  startTime?: number;
+  endTime?: number;
   outcome?: ToolConfirmationOutcome;
   schedulerId?: string;
+  approvalMode?: ApprovalMode;
+  tailToolCallRequest?: TailToolCallRequest;
 };
 
 export type SuccessfulToolCall = {
-  status: 'success';
+  status: CoreToolCallStatus.Success;
   request: ToolCallRequestInfo;
   tool: AnyDeclarativeTool;
   response: ToolCallResponseInfo;
   invocation: AnyToolInvocation;
   durationMs?: number;
+  startTime?: number;
+  endTime?: number;
   outcome?: ToolConfirmationOutcome;
   schedulerId?: string;
+  approvalMode?: ApprovalMode;
+  tailToolCallRequest?: TailToolCallRequest;
 };
 
 export type ExecutingToolCall = {
-  status: 'executing';
+  status: CoreToolCallStatus.Executing;
   request: ToolCallRequestInfo;
   tool: AnyDeclarativeTool;
   invocation: AnyToolInvocation;
-  liveOutput?: string | AnsiOutput;
+  liveOutput?: ToolLiveOutput;
+  progressMessage?: string;
+  progressPercent?: number;
+  progress?: number;
+  progressTotal?: number;
   startTime?: number;
   outcome?: ToolConfirmationOutcome;
   pid?: number;
   schedulerId?: string;
+  approvalMode?: ApprovalMode;
+  tailToolCallRequest?: TailToolCallRequest;
 };
 
 export type CancelledToolCall = {
-  status: 'cancelled';
+  status: CoreToolCallStatus.Cancelled;
   request: ToolCallRequestInfo;
   response: ToolCallResponseInfo;
   tool: AnyDeclarativeTool;
   invocation: AnyToolInvocation;
   durationMs?: number;
+  startTime?: number;
+  endTime?: number;
   outcome?: ToolConfirmationOutcome;
   schedulerId?: string;
+  approvalMode?: ApprovalMode;
 };
 
 export type WaitingToolCall = {
-  status: 'awaiting_approval';
+  status: CoreToolCallStatus.AwaitingApproval;
   request: ToolCallRequestInfo;
   tool: AnyDeclarativeTool;
   invocation: AnyToolInvocation;
@@ -128,6 +176,7 @@ export type WaitingToolCall = {
   startTime?: number;
   outcome?: ToolConfirmationOutcome;
   schedulerId?: string;
+  approvalMode?: ApprovalMode;
 };
 
 export type Status = ToolCall['status'];
@@ -152,7 +201,7 @@ export type ConfirmHandler = (
 
 export type OutputUpdateHandler = (
   toolCallId: string,
-  outputChunk: string | AnsiOutput,
+  outputChunk: ToolLiveOutput,
 ) => void;
 
 export type AllToolCallsCompleteHandler = (

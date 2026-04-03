@@ -63,7 +63,13 @@ export async function runDeferredCommand(settings: MergedSettings) {
     process.exit(ExitCodes.FATAL_CONFIG_ERROR);
   }
 
-  await deferredCommand.handler(deferredCommand.argv);
+  // Inject settings into argv
+  const argvWithSettings = {
+    ...deferredCommand.argv,
+    settings,
+  };
+
+  await deferredCommand.handler(argvWithSettings);
   await runExitCleanup();
   process.exit(ExitCodes.SUCCESS);
 }
@@ -80,9 +86,11 @@ export function defer<T = object, U = object>(
     ...commandModule,
     handler: (argv: ArgumentsCamelCase<U>) => {
       setDeferredCommand({
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
         handler: commandModule.handler as (
           argv: ArgumentsCamelCase,
         ) => void | Promise<void>,
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
         argv: argv as unknown as ArgumentsCamelCase,
         commandName: parentCommandName || 'unknown',
       });

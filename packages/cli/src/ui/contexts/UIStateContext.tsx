@@ -1,6 +1,6 @@
 /**
  * @license
- * Copyright 2025 Google LLC
+ * Copyright 2026 Google LLC
  * SPDX-License-Identifier: Apache-2.0
  */
 
@@ -8,12 +8,13 @@ import { createContext, useContext } from 'react';
 import type {
   HistoryItem,
   ThoughtSummary,
-  ConsoleMessageItem,
   ConfirmationRequest,
+  QuotaStats,
   LoopDetectionConfirmationRequest,
   HistoryItemWithoutId,
   StreamingState,
   ActiveHook,
+  PermissionConfirmationRequest,
 } from '../types.js';
 import type { CommandContext, SlashCommand } from '../commands/types.js';
 import type { TextBuffer } from '../components/shared/text-buffer.js';
@@ -22,10 +23,14 @@ import type {
   ApprovalMode,
   UserTierId,
   IdeInfo,
+  AuthType,
   FallbackIntent,
   ValidationIntent,
   AgentDefinition,
+  FolderDiscoveryResults,
+  PolicyUpdateConfirmationRequest,
 } from '@google/gemini-cli-core';
+import { type TransientMessageType } from '../../utils/events.js';
 import type { DOMElement } from 'ink';
 import type { SessionStatsState } from '../contexts/SessionContext.js';
 import type { ExtensionUpdateState } from '../state/extensions.js';
@@ -37,6 +42,7 @@ export interface ProQuotaDialogRequest {
   message: string;
   isTerminalQuotaError: boolean;
   isModelNotFoundError?: boolean;
+  authType?: AuthType;
   resolve: (intent: FallbackIntent) => void;
 }
 
@@ -47,10 +53,54 @@ export interface ValidationDialogRequest {
   resolve: (intent: ValidationIntent) => void;
 }
 
+/** Intent for overage menu dialog */
+export type OverageMenuIntent =
+  | 'use_credits'
+  | 'use_fallback'
+  | 'manage'
+  | 'stop';
+
+export interface OverageMenuDialogRequest {
+  failedModel: string;
+  fallbackModel?: string;
+  resetTime?: string;
+  creditBalance: number;
+  userEmail?: string;
+  resolve: (intent: OverageMenuIntent) => void;
+}
+
+/** Intent for empty wallet dialog */
+export type EmptyWalletIntent = 'get_credits' | 'use_fallback' | 'stop';
+
+export interface EmptyWalletDialogRequest {
+  failedModel: string;
+  fallbackModel?: string;
+  resetTime?: string;
+  userEmail?: string;
+  onGetCredits: () => void;
+  resolve: (intent: EmptyWalletIntent) => void;
+}
+
 import { type UseHistoryManagerReturn } from '../hooks/useHistoryManager.js';
 import { type RestartReason } from '../hooks/useIdeTrustListener.js';
 import type { TerminalBackgroundColor } from '../utils/terminalCapabilityManager.js';
-import type { BackgroundShell } from '../hooks/shellCommandProcessor.js';
+import type { BackgroundTask } from '../hooks/useExecutionLifecycle.js';
+
+export interface QuotaState {
+  userTier: UserTierId | undefined;
+  stats: QuotaStats | undefined;
+  proQuotaRequest: ProQuotaDialogRequest | null;
+  validationRequest: ValidationDialogRequest | null;
+  // G1 AI Credits overage flow
+  overageMenuRequest: OverageMenuDialogRequest | null;
+  emptyWalletRequest: EmptyWalletDialogRequest | null;
+}
+
+export interface AccountSuspensionInfo {
+  message: string;
+  appealUrl?: string;
+  appealLinkText?: string;
+}
 
 export interface UIState {
   history: HistoryItem[];
@@ -60,12 +110,14 @@ export interface UIState {
   isAuthenticating: boolean;
   isConfigInitialized: boolean;
   authError: string | null;
+  accountSuspensionInfo: AccountSuspensionInfo | null;
   isAuthDialogOpen: boolean;
   isAwaitingApiKeyInput: boolean;
   apiKeyDefaultValue?: string;
   editorError: string | null;
   isEditorDialogOpen: boolean;
   showPrivacyNotice: boolean;
+  mouseMode: boolean;
   corgiMode: boolean;
   debugMessage: string;
   quittingMessages: HistoryItem[] | null;
@@ -85,6 +137,7 @@ export interface UIState {
   authConsentRequest: ConfirmationRequest | null;
   confirmUpdateExtensionRequests: ConfirmationRequest[];
   loopDetectionConfirmationRequest: LoopDetectionConfirmationRequest | null;
+  permissionConfirmationRequest: PermissionConfirmationRequest | null;
   geminiMdFileCount: number;
   streamingState: StreamingState;
   initError: string | null;
@@ -99,30 +152,36 @@ export interface UIState {
   isResuming: boolean;
   shouldShowIdePrompt: boolean;
   isFolderTrustDialogOpen: boolean;
+  folderDiscoveryResults: FolderDiscoveryResults | null;
+  isPolicyUpdateDialogOpen: boolean;
+  policyUpdateConfirmationRequest: PolicyUpdateConfirmationRequest | undefined;
   isTrustedFolder: boolean | undefined;
   constrainHeight: boolean;
   showErrorDetails: boolean;
-  filteredConsoleMessages: ConsoleMessageItem[];
   ideContextState: IdeContext | undefined;
   renderMarkdown: boolean;
   ctrlCPressedOnce: boolean;
   ctrlDPressedOnce: boolean;
   showEscapePrompt: boolean;
+  shortcutsHelpVisible: boolean;
+  cleanUiDetailsVisible: boolean;
   elapsedTime: number;
-  currentLoadingPhrase: string;
+  currentLoadingPhrase: string | undefined;
+  currentTip: string | undefined;
+  currentWittyPhrase: string | undefined;
   historyRemountKey: number;
   activeHooks: ActiveHook[];
   messageQueue: string[];
   queueErrorMessage: string | null;
   showApprovalModeIndicator: ApprovalMode;
+  allowPlanMode: boolean;
   // Quota-related state
-  userTier: UserTierId | undefined;
-  proQuotaRequest: ProQuotaDialogRequest | null;
-  validationRequest: ValidationDialogRequest | null;
+  quota: QuotaState;
   currentModel: string;
   contextFileNames: string[];
   errorCount: number;
   availableTerminalHeight: number | undefined;
+  stableControlsHeight: number;
   mainAreaWidth: number;
   staticAreaMaxItemHeight: number;
   staticExtraHeight: number;
@@ -133,7 +192,7 @@ export interface UIState {
   sessionStats: SessionStatsState;
   terminalWidth: number;
   terminalHeight: number;
-  mainControlsRef: React.MutableRefObject<DOMElement | null>;
+  mainControlsRef: (node: DOMElement | null) => void;
   // NOTE: This is for performance profiling only.
   rootUiRef: React.MutableRefObject<DOMElement | null>;
   currentIDE: IdeInfo | null;
@@ -143,13 +202,12 @@ export interface UIState {
   isRestarting: boolean;
   extensionsUpdateState: Map<string, ExtensionUpdateState>;
   activePtyId: number | undefined;
-  backgroundShellCount: number;
-  isBackgroundShellVisible: boolean;
+  backgroundTaskCount: number;
+  isBackgroundTaskVisible: boolean;
   embeddedShellFocused: boolean;
   showDebugProfiler: boolean;
   showFullTodos: boolean;
   copyModeEnabled: boolean;
-  warningMessage: string | null;
   bannerData: {
     defaultText: string;
     warningText: string;
@@ -158,12 +216,19 @@ export interface UIState {
   customDialog: React.ReactNode | null;
   terminalBackgroundColor: TerminalBackgroundColor;
   settingsNonce: number;
-  backgroundShells: Map<number, BackgroundShell>;
-  activeBackgroundShellPid: number | null;
-  backgroundShellHeight: number;
-  isBackgroundShellListOpen: boolean;
+  backgroundTasks: Map<number, BackgroundTask>;
+  activeBackgroundTaskPid: number | null;
+  backgroundTaskHeight: number;
+  isBackgroundTaskListOpen: boolean;
   adminSettingsChanged: boolean;
   newAgents: AgentDefinition[] | null;
+  showIsExpandableHint: boolean;
+  hintMode: boolean;
+  hintBuffer: string;
+  transientMessage: {
+    text: string;
+    type: TransientMessageType;
+  } | null;
 }
 
 export const UIStateContext = createContext<UIState | null>(null);

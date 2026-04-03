@@ -8,7 +8,9 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { getCoreSystemPrompt } from './prompts.js';
 import fs from 'node:fs';
 import type { Config } from '../config/config.js';
+import type { AgentDefinition } from '../agents/types.js';
 import * as toolNames from '../tools/tool-names.js';
+import type { ToolRegistry } from '../tools/tool-registry.js';
 
 vi.mock('node:fs');
 vi.mock('../utils/gitUtils', () => ({
@@ -21,6 +23,17 @@ describe('Core System Prompt Substitution', () => {
     vi.resetAllMocks();
     vi.stubEnv('GEMINI_SYSTEM_MD', 'true');
     mockConfig = {
+      get config() {
+        return this;
+      },
+      toolRegistry: {
+        getAllToolNames: vi
+          .fn()
+          .mockReturnValue([
+            toolNames.WRITE_FILE_TOOL_NAME,
+            toolNames.READ_FILE_TOOL_NAME,
+          ]),
+      },
       getToolRegistry: vi.fn().mockReturnValue({
         getAllToolNames: vi
           .fn()
@@ -38,13 +51,19 @@ describe('Core System Prompt Substitution', () => {
       isAgentsEnabled: vi.fn().mockReturnValue(false),
       getModel: vi.fn().mockReturnValue('auto'),
       getActiveModel: vi.fn().mockReturnValue('gemini-1.5-pro'),
-      getPreviewFeatures: vi.fn().mockReturnValue(false),
       getAgentRegistry: vi.fn().mockReturnValue({
         getDirectoryContext: vi.fn().mockReturnValue('Mock Agent Directory'),
+        getAllDefinitions: vi.fn().mockReturnValue([]),
       }),
       getSkillManager: vi.fn().mockReturnValue({
         getSkills: vi.fn().mockReturnValue([]),
       }),
+      getApprovedPlanPath: vi.fn().mockReturnValue(undefined),
+      isTopicUpdateNarrationEnabled: vi.fn().mockReturnValue(false),
+      isTrackerEnabled: vi.fn().mockReturnValue(false),
+      isModelSteeringEnabled: vi.fn().mockReturnValue(false),
+      getHasAccessToPreviewModel: vi.fn().mockReturnValue(true),
+      getGemini31LaunchedSync: vi.fn().mockReturnValue(true),
     } as unknown as Config;
   });
 
@@ -74,13 +93,19 @@ describe('Core System Prompt Substitution', () => {
   it('should substitute ${SubAgents} in custom system prompt', () => {
     vi.mocked(fs.existsSync).mockReturnValue(true);
     vi.mocked(fs.readFileSync).mockReturnValue('Agents: ${SubAgents}');
-    vi.mocked(
-      mockConfig.getAgentRegistry().getDirectoryContext,
-    ).mockReturnValue('Actual Agent Directory');
+
+    vi.mocked(mockConfig.getAgentRegistry().getAllDefinitions).mockReturnValue([
+      {
+        name: 'test-agent',
+        description: 'Test Agent Description',
+      } as unknown as AgentDefinition,
+    ]);
 
     const prompt = getCoreSystemPrompt(mockConfig);
 
-    expect(prompt).toContain('Agents: Actual Agent Directory');
+    expect(prompt).toContain('Agents:');
+    expect(prompt).toContain('# Available Sub-Agents');
+    expect(prompt).toContain('- test-agent -> Test Agent Description');
     expect(prompt).not.toContain('${SubAgents}');
   });
 
@@ -123,7 +148,10 @@ describe('Core System Prompt Substitution', () => {
   });
 
   it('should not substitute disabled tool names', () => {
-    vi.mocked(mockConfig.getToolRegistry().getAllToolNames).mockReturnValue([]);
+    vi.mocked(
+      (mockConfig as unknown as { toolRegistry: ToolRegistry }).toolRegistry
+        .getAllToolNames,
+    ).mockReturnValue([]);
     vi.mocked(fs.existsSync).mockReturnValue(true);
     vi.mocked(fs.readFileSync).mockReturnValue('Use ${write_file_ToolName}.');
 

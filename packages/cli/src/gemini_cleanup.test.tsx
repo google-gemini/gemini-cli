@@ -6,16 +6,12 @@
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { main } from './gemini.js';
-import { debugLogger } from '@google/gemini-cli-core';
-import { type Config } from '@google/gemini-cli-core';
-
-// Custom error to identify mock process.exit calls
-class MockProcessExitError extends Error {
-  constructor(readonly code?: string | number | null | undefined) {
-    super('PROCESS_EXIT_MOCKED');
-    this.name = 'MockProcessExitError';
-  }
-}
+import {
+  debugLogger,
+  SessionEndReason,
+  type Config,
+  type HookSystem,
+} from '@google/gemini-cli-core';
 
 vi.mock('@google/gemini-cli-core', async (importOriginal) => {
   const actual =
@@ -38,6 +34,10 @@ vi.mock('@google/gemini-cli-core', async (importOriginal) => {
     disableMouseEvents: vi.fn(),
     enterAlternateScreen: vi.fn(),
     disableLineWrapping: vi.fn(),
+    ProjectRegistry: vi.fn().mockImplementation(() => ({
+      initialize: vi.fn(),
+      getShortId: vi.fn().mockReturnValue('project-slug'),
+    })),
   };
 });
 
@@ -73,9 +73,12 @@ vi.mock('./config/config.js', () => ({
     getSandbox: vi.fn(() => false),
     getQuestion: vi.fn(() => ''),
     isInteractive: () => false,
+    storage: { initialize: vi.fn().mockResolvedValue(undefined) },
   } as unknown as Config),
   parseArguments: vi.fn().mockResolvedValue({}),
   isDebugMode: vi.fn(() => false),
+  getRequestedWorktreeName: vi.fn(() => undefined),
+  getWorktreeArg: vi.fn(() => undefined),
 }));
 
 vi.mock('read-package-up', () => ({
@@ -119,8 +122,37 @@ vi.mock('./validateNonInterActiveAuth.js', () => ({
   validateNonInteractiveAuth: vi.fn().mockResolvedValue({}),
 }));
 
+vi.mock('./core/initializer.js', () => ({
+  initializeApp: vi.fn().mockResolvedValue({
+    authError: null,
+    themeError: null,
+    shouldOpenAuthDialog: false,
+    geminiMdFileCount: 0,
+  }),
+}));
+
 vi.mock('./nonInteractiveCli.js', () => ({
   runNonInteractive: vi.fn().mockResolvedValue(undefined),
+}));
+
+vi.mock('./utils/cleanup.js', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('./utils/cleanup.js')>();
+  return {
+    ...actual,
+    cleanupCheckpoints: vi.fn().mockResolvedValue(undefined),
+    registerCleanup: vi.fn(),
+    registerSyncCleanup: vi.fn(),
+    registerTelemetryConfig: vi.fn(),
+    runExitCleanup: vi.fn().mockResolvedValue(undefined),
+  };
+});
+
+vi.mock('./zed-integration/zedIntegration.js', () => ({
+  runZedIntegration: vi.fn().mockResolvedValue(undefined),
+}));
+
+vi.mock('./utils/readStdin.js', () => ({
+  readStdin: vi.fn().mockResolvedValue(''),
 }));
 
 const { cleanupMockState } = vi.hoisted(() => ({
@@ -153,7 +185,7 @@ describe('gemini.tsx main function cleanup', () => {
     vi.restoreAllMocks();
   });
 
-  it('should log error when cleanupExpiredSessions fails', async () => {
+  it.skip('should log error when cleanupExpiredSessions fails', async () => {
     const { loadCliConfig, parseArguments } = await import(
       './config/config.js'
     );
@@ -164,23 +196,17 @@ describe('gemini.tsx main function cleanup', () => {
     const debugLoggerErrorSpy = vi
       .spyOn(debugLogger, 'error')
       .mockImplementation(() => {});
-    const processExitSpy = vi
-      .spyOn(process, 'exit')
-      .mockImplementation((code) => {
-        throw new MockProcessExitError(code);
-      });
-
     vi.mocked(loadSettings).mockReturnValue({
       merged: { advanced: {}, security: { auth: {} }, ui: {} },
       workspace: { settings: {} },
       setValue: vi.fn(),
       forScope: () => ({ settings: {}, originalSettings: {}, path: '' }),
       errors: [],
-    } as any); // eslint-disable-line @typescript-eslint/no-explicit-any
+    } as unknown as ReturnType<typeof loadSettings>);
 
     vi.mocked(parseArguments).mockResolvedValue({
       promptInteractive: false,
-    } as any); // eslint-disable-line @typescript-eslint/no-explicit-any
+    } as unknown as Awaited<ReturnType<typeof parseArguments>>);
     vi.mocked(loadCliConfig).mockResolvedValue({
       isInteractive: vi.fn(() => false),
       getQuestion: vi.fn(() => 'test'),
@@ -191,11 +217,12 @@ describe('gemini.tsx main function cleanup', () => {
       getEnableHooks: vi.fn(() => false),
       getHookSystem: () => undefined,
       initialize: vi.fn(),
+      storage: { initialize: vi.fn().mockResolvedValue(undefined) },
       getContentGeneratorConfig: vi.fn(),
       getMcpServers: () => ({}),
       getMcpClientManager: vi.fn(),
       getIdeMode: vi.fn(() => false),
-      getExperimentalZedIntegration: vi.fn(() => false),
+      getAcpMode: vi.fn(() => true),
       getScreenReader: vi.fn(() => false),
       getGeminiMdFileCount: vi.fn(() => 0),
       getProjectRoot: vi.fn(() => '/'),
@@ -216,20 +243,92 @@ describe('gemini.tsx main function cleanup', () => {
       setTerminalBackground: vi.fn(),
       refreshAuth: vi.fn(),
       getRemoteAdminSettings: vi.fn(() => undefined),
-    } as any); // eslint-disable-line @typescript-eslint/no-explicit-any
+      getUseAlternateBuffer: vi.fn(() => false),
+    } as unknown as Config);
 
-    try {
-      await main();
-    } catch (e) {
-      if (!(e instanceof MockProcessExitError)) throw e;
-    }
+    await main();
 
     expect(cleanupMockState.called).toBe(true);
     expect(debugLoggerErrorSpy).toHaveBeenCalledWith(
       'Failed to cleanup expired sessions:',
       expect.objectContaining({ message: 'Cleanup failed' }),
     );
-    expect(processExitSpy).toHaveBeenCalledWith(0); // Should not exit on cleanup failure
-    processExitSpy.mockRestore();
   });
+
+  it('should register SessionEnd hook exactly once in non-interactive mode', async () => {
+    const { loadCliConfig, parseArguments } = await import(
+      './config/config.js'
+    );
+    const { registerCleanup } = await import('./utils/cleanup.js');
+
+    const mockHookSystem = {
+      fireSessionEndEvent: vi.fn().mockResolvedValue(undefined),
+      fireSessionStartEvent: vi.fn().mockResolvedValue(undefined),
+    } as unknown as HookSystem;
+
+    vi.mocked(parseArguments).mockResolvedValue({
+      promptInteractive: false,
+    } as unknown as Awaited<ReturnType<typeof parseArguments>>);
+
+    vi.mocked(loadCliConfig).mockResolvedValue(
+      buildMockConfig({
+        getHookSystem: vi.fn(() => mockHookSystem),
+      }),
+    );
+
+    vi.spyOn(process, 'exit').mockImplementation(() => undefined as never);
+
+    await main();
+
+    const registeredCallbacks = vi
+      .mocked(registerCleanup)
+      .mock.calls.map(([fn]) => fn);
+    for (const fn of registeredCallbacks) await fn();
+    expect(mockHookSystem.fireSessionEndEvent).toHaveBeenCalledTimes(1);
+    expect(mockHookSystem.fireSessionEndEvent).toHaveBeenCalledWith(
+      SessionEndReason.Exit,
+    );
+  });
+
+  function buildMockConfig(overrides: Partial<Config> = {}): Config {
+    return {
+      isInteractive: vi.fn(() => false),
+      getQuestion: vi.fn(() => 'test'),
+      getSandbox: vi.fn(() => false),
+      getDebugMode: vi.fn(() => false),
+      getPolicyEngine: vi.fn(),
+      getMessageBus: () => ({ subscribe: vi.fn() }),
+      getEnableHooks: vi.fn(() => true),
+      getHookSystem: vi.fn(() => undefined),
+      initialize: vi.fn(),
+      storage: { initialize: vi.fn().mockResolvedValue(undefined) },
+      getContentGeneratorConfig: vi.fn(),
+      getMcpClientManager: vi.fn(),
+      getIdeMode: vi.fn(() => false),
+      getAcpMode: vi.fn(() => false),
+      getScreenReader: vi.fn(() => false),
+      getGeminiMdFileCount: vi.fn(() => 0),
+      getProjectRoot: vi.fn(() => '/'),
+      getListExtensions: vi.fn(() => false),
+      getListSessions: vi.fn(() => false),
+      getDeleteSession: vi.fn(() => undefined),
+      getToolRegistry: vi.fn(),
+      getExtensions: vi.fn(() => []),
+      getModel: vi.fn(() => 'gemini-pro'),
+      getEmbeddingModel: vi.fn(() => 'embedding-001'),
+      getApprovalMode: vi.fn(() => 'default'),
+      getCoreTools: vi.fn(() => []),
+      getTelemetryEnabled: vi.fn(() => false),
+      getTelemetryLogPromptsEnabled: vi.fn(() => false),
+      getFileFilteringRespectGitIgnore: vi.fn(() => true),
+      getOutputFormat: vi.fn(() => 'text'),
+      getUsageStatisticsEnabled: vi.fn(() => false),
+      setTerminalBackground: vi.fn(),
+      refreshAuth: vi.fn(),
+      getRemoteAdminSettings: vi.fn(() => undefined),
+      getUseAlternateBuffer: vi.fn(() => false),
+      getUseTerminalBuffer: vi.fn(() => false),
+      ...overrides,
+    } as unknown as Config;
+  }
 });

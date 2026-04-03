@@ -1,15 +1,15 @@
 /**
  * @license
- * Copyright 2025 Google LLC
+ * Copyright 2026 Google LLC
  * SPDX-License-Identifier: Apache-2.0
  */
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import type { ContentGenerator } from './contentGenerator.js';
 import {
   createContentGenerator,
   AuthType,
   createContentGeneratorConfig,
+  type ContentGenerator,
 } from './contentGenerator.js';
 import { createCodeAssistContentGenerator } from '../code_assist/codeAssist.js';
 import { GoogleGenAI } from '@google/genai';
@@ -18,6 +18,7 @@ import { LoggingContentGenerator } from './loggingContentGenerator.js';
 import { loadApiKey } from './apiKeyCredentialStorage.js';
 import { FakeContentGenerator } from './fakeContentGenerator.js';
 import { RecordingContentGenerator } from './recordingContentGenerator.js';
+import { resetVersionCache } from '../utils/version.js';
 
 vi.mock('../code_assist/codeAssist.js');
 vi.mock('@google/genai');
@@ -31,11 +32,12 @@ const mockConfig = {
   getModel: vi.fn().mockReturnValue('gemini-pro'),
   getProxy: vi.fn().mockReturnValue(undefined),
   getUsageStatisticsEnabled: vi.fn().mockReturnValue(true),
-  getPreviewFeatures: vi.fn().mockReturnValue(false),
+  getClientName: vi.fn().mockReturnValue(undefined),
 } as unknown as Config;
 
 describe('createContentGenerator', () => {
   beforeEach(() => {
+    resetVersionCache();
     vi.clearAllMocks();
   });
 
@@ -51,6 +53,7 @@ describe('createContentGenerator', () => {
     const fakeResponsesFile = 'fake/responses.yaml';
     const mockConfigWithFake = {
       fakeResponses: fakeResponsesFile,
+      getClientName: vi.fn().mockReturnValue(undefined),
     } as unknown as Config;
     const generator = await createContentGenerator(
       {
@@ -72,6 +75,7 @@ describe('createContentGenerator', () => {
     const mockConfigWithRecordResponses = {
       fakeResponses: fakeResponsesFile,
       recordResponses: recordResponsesFile,
+      getClientName: vi.fn().mockReturnValue(undefined),
     } as unknown as Config;
     const generator = await createContentGenerator(
       {
@@ -121,11 +125,15 @@ describe('createContentGenerator', () => {
       getModel: vi.fn().mockReturnValue('gemini-pro'),
       getProxy: vi.fn().mockReturnValue(undefined),
       getUsageStatisticsEnabled: () => true,
-      getPreviewFeatures: vi.fn().mockReturnValue(false),
+      getClientName: vi.fn().mockReturnValue(undefined),
     } as unknown as Config;
 
     // Set a fixed version for testing
     vi.stubEnv('CLI_VERSION', '1.2.3');
+    vi.stubEnv('TERM_PROGRAM', 'iTerm.app');
+    vi.stubEnv('VSCODE_PID', '');
+    vi.stubEnv('GITHUB_SHA', '');
+    vi.stubEnv('GEMINI_CLI_SURFACE', '');
 
     const mockGenerator = {
       models: {},
@@ -141,15 +149,161 @@ describe('createContentGenerator', () => {
     expect(GoogleGenAI).toHaveBeenCalledWith({
       apiKey: 'test-api-key',
       vertexai: undefined,
-      httpOptions: {
-        headers: {
-          'User-Agent': expect.stringContaining('GeminiCLI/1.2.3/gemini-pro'),
-          'x-gemini-api-privileged-user-id': expect.any(String),
-        },
-      },
+      httpOptions: expect.objectContaining({
+        headers: expect.objectContaining({
+          'User-Agent': expect.stringMatching(
+            /GeminiCLI\/1\.2\.3\/gemini-pro \(.*; .*; terminal\)/,
+          ),
+        }),
+      }),
     });
     expect(generator).toEqual(
       new LoggingContentGenerator(mockGenerator.models, mockConfig),
+    );
+  });
+
+  it('should use standard User-Agent for a2a-server running outside VS Code', async () => {
+    const mockConfig = {
+      getModel: vi.fn().mockReturnValue('gemini-pro'),
+      getProxy: vi.fn().mockReturnValue(undefined),
+      getUsageStatisticsEnabled: () => true,
+      getClientName: vi.fn().mockReturnValue('a2a-server'),
+    } as unknown as Config;
+
+    // Set a fixed version for testing
+    vi.stubEnv('CLI_VERSION', '1.2.3');
+    vi.stubEnv('TERM_PROGRAM', 'iTerm.app');
+    vi.stubEnv('VSCODE_PID', '');
+    vi.stubEnv('GITHUB_SHA', '');
+    vi.stubEnv('GEMINI_CLI_SURFACE', '');
+
+    const mockGenerator = {
+      models: {},
+    } as unknown as GoogleGenAI;
+    vi.mocked(GoogleGenAI).mockImplementation(() => mockGenerator as never);
+    await createContentGenerator(
+      { apiKey: 'test-api-key', authType: AuthType.USE_GEMINI },
+      mockConfig,
+      undefined,
+    );
+
+    expect(GoogleGenAI).toHaveBeenCalledWith(
+      expect.objectContaining({
+        httpOptions: expect.objectContaining({
+          headers: expect.objectContaining({
+            'User-Agent': expect.stringMatching(
+              /GeminiCLI-a2a-server\/1\.2\.3\/gemini-pro \(.*; .*; terminal\)/,
+            ),
+          }),
+        }),
+      }),
+    );
+  });
+
+  it('should include unified User-Agent for a2a-server (VS Code Agent Mode)', async () => {
+    const mockConfig = {
+      getModel: vi.fn().mockReturnValue('gemini-pro'),
+      getProxy: vi.fn().mockReturnValue(undefined),
+      getUsageStatisticsEnabled: () => true,
+      getClientName: vi.fn().mockReturnValue('a2a-server'),
+    } as unknown as Config;
+
+    // Set a fixed version for testing
+    vi.stubEnv('CLI_VERSION', '1.2.3');
+    // Mock the environment variable that the VS Code extension host would provide to the a2a-server process
+    vi.stubEnv('VSCODE_PID', '12345');
+    vi.stubEnv('TERM_PROGRAM', 'vscode');
+    vi.stubEnv('TERM_PROGRAM_VERSION', '1.85.0');
+
+    const mockGenerator = {
+      models: {},
+    } as unknown as GoogleGenAI;
+    vi.mocked(GoogleGenAI).mockImplementation(() => mockGenerator as never);
+    await createContentGenerator(
+      { apiKey: 'test-api-key', authType: AuthType.USE_GEMINI },
+      mockConfig,
+      undefined,
+    );
+
+    expect(GoogleGenAI).toHaveBeenCalledWith(
+      expect.objectContaining({
+        httpOptions: expect.objectContaining({
+          headers: expect.objectContaining({
+            'User-Agent': expect.stringMatching(
+              /CloudCodeVSCode\/1\.2\.3 \(aidev_client; os_type=.*; os_version=.*; arch=.*; host_path=VSCode\/1\.85\.0; proxy_client=geminicli\)/,
+            ),
+          }),
+        }),
+      }),
+    );
+  });
+
+  it('should include clientName prefix in User-Agent when specified (non-VSCode)', async () => {
+    const mockConfig = {
+      getModel: vi.fn().mockReturnValue('gemini-pro'),
+      getProxy: vi.fn().mockReturnValue(undefined),
+      getUsageStatisticsEnabled: () => true,
+      getClientName: vi.fn().mockReturnValue('my-client'),
+    } as unknown as Config;
+
+    // Set a fixed version for testing
+    vi.stubEnv('CLI_VERSION', '1.2.3');
+    vi.stubEnv('TERM_PROGRAM', 'iTerm.app');
+    vi.stubEnv('VSCODE_PID', '');
+    vi.stubEnv('GITHUB_SHA', '');
+    vi.stubEnv('GEMINI_CLI_SURFACE', '');
+
+    const mockGenerator = {
+      models: {},
+    } as unknown as GoogleGenAI;
+    vi.mocked(GoogleGenAI).mockImplementation(() => mockGenerator as never);
+    await createContentGenerator(
+      { apiKey: 'test-api-key', authType: AuthType.USE_GEMINI },
+      mockConfig,
+      undefined,
+    );
+
+    expect(GoogleGenAI).toHaveBeenCalledWith(
+      expect.objectContaining({
+        httpOptions: expect.objectContaining({
+          headers: expect.objectContaining({
+            'User-Agent': expect.stringMatching(
+              /GeminiCLI-my-client\/1\.2\.3\/gemini-pro \(.*; .*; terminal\)/,
+            ),
+          }),
+        }),
+      }),
+    );
+  });
+
+  it('should allow custom headers to override User-Agent', async () => {
+    const mockConfig = {
+      getModel: vi.fn().mockReturnValue('gemini-pro'),
+      getProxy: vi.fn().mockReturnValue(undefined),
+      getUsageStatisticsEnabled: () => true,
+      getClientName: vi.fn().mockReturnValue(undefined),
+    } as unknown as Config;
+
+    vi.stubEnv('GEMINI_CLI_CUSTOM_HEADERS', 'User-Agent:MyCustomUA');
+
+    const mockGenerator = {
+      models: {},
+    } as unknown as GoogleGenAI;
+    vi.mocked(GoogleGenAI).mockImplementation(() => mockGenerator as never);
+    await createContentGenerator(
+      { apiKey: 'test-api-key', authType: AuthType.USE_GEMINI },
+      mockConfig,
+      undefined,
+    );
+
+    expect(GoogleGenAI).toHaveBeenCalledWith(
+      expect.objectContaining({
+        httpOptions: expect.objectContaining({
+          headers: expect.objectContaining({
+            'User-Agent': 'MyCustomUA',
+          }),
+        }),
+      }),
     );
   });
 
@@ -189,7 +343,7 @@ describe('createContentGenerator', () => {
       getModel: vi.fn().mockReturnValue('gemini-pro'),
       getProxy: vi.fn().mockReturnValue(undefined),
       getUsageStatisticsEnabled: () => false,
-      getPreviewFeatures: vi.fn().mockReturnValue(false),
+      getClientName: vi.fn().mockReturnValue(undefined),
     } as unknown as Config;
 
     const mockGenerator = {
@@ -212,21 +366,21 @@ describe('createContentGenerator', () => {
     expect(GoogleGenAI).toHaveBeenCalledWith({
       apiKey: 'test-api-key',
       vertexai: undefined,
-      httpOptions: {
+      httpOptions: expect.objectContaining({
         headers: expect.objectContaining({
           'User-Agent': expect.any(String),
           'X-Test-Header': 'test',
           Another: 'value',
         }),
-      },
+      }),
     });
     expect(GoogleGenAI).toHaveBeenCalledWith(
       expect.not.objectContaining({
-        httpOptions: {
+        httpOptions: expect.objectContaining({
           headers: expect.objectContaining({
             Authorization: expect.any(String),
           }),
-        },
+        }),
       }),
     );
   });
@@ -236,7 +390,7 @@ describe('createContentGenerator', () => {
       getModel: vi.fn().mockReturnValue('gemini-pro'),
       getProxy: vi.fn().mockReturnValue(undefined),
       getUsageStatisticsEnabled: () => false,
-      getPreviewFeatures: vi.fn().mockReturnValue(false),
+      getClientName: vi.fn().mockReturnValue(undefined),
     } as unknown as Config;
 
     const mockGenerator = {
@@ -256,12 +410,12 @@ describe('createContentGenerator', () => {
     expect(GoogleGenAI).toHaveBeenCalledWith({
       apiKey: 'test-api-key',
       vertexai: undefined,
-      httpOptions: {
+      httpOptions: expect.objectContaining({
         headers: expect.objectContaining({
           'User-Agent': expect.any(String),
           Authorization: 'Bearer test-api-key',
         }),
-      },
+      }),
     });
   });
 
@@ -270,7 +424,7 @@ describe('createContentGenerator', () => {
       getModel: vi.fn().mockReturnValue('gemini-pro'),
       getProxy: vi.fn().mockReturnValue(undefined),
       getUsageStatisticsEnabled: () => false,
-      getPreviewFeatures: vi.fn().mockReturnValue(false),
+      getClientName: vi.fn().mockReturnValue(undefined),
     } as unknown as Config;
 
     const mockGenerator = {
@@ -290,20 +444,20 @@ describe('createContentGenerator', () => {
     expect(GoogleGenAI).toHaveBeenCalledWith({
       apiKey: 'test-api-key',
       vertexai: undefined,
-      httpOptions: {
+      httpOptions: expect.objectContaining({
         headers: expect.objectContaining({
           'User-Agent': expect.any(String),
         }),
-      },
+      }),
     });
     // Explicitly assert that Authorization header is NOT present
     expect(GoogleGenAI).toHaveBeenCalledWith(
       expect.not.objectContaining({
-        httpOptions: {
+        httpOptions: expect.objectContaining({
           headers: expect.objectContaining({
             Authorization: expect.any(String),
           }),
-        },
+        }),
       }),
     );
   });
@@ -312,7 +466,7 @@ describe('createContentGenerator', () => {
     const mockConfig = {
       getModel: vi.fn().mockReturnValue('gemini-pro'),
       getUsageStatisticsEnabled: () => false,
-      getPreviewFeatures: vi.fn().mockReturnValue(false),
+      getClientName: vi.fn().mockReturnValue(undefined),
     } as unknown as Config;
     const mockGenerator = {
       models: {},
@@ -328,11 +482,11 @@ describe('createContentGenerator', () => {
     expect(GoogleGenAI).toHaveBeenCalledWith({
       apiKey: 'test-api-key',
       vertexai: undefined,
-      httpOptions: {
+      httpOptions: expect.objectContaining({
         headers: {
           'User-Agent': expect.any(String),
         },
-      },
+      }),
     });
     expect(generator).toEqual(
       new LoggingContentGenerator(mockGenerator.models, mockConfig),
@@ -344,7 +498,7 @@ describe('createContentGenerator', () => {
       getModel: vi.fn().mockReturnValue('gemini-pro'),
       getProxy: vi.fn().mockReturnValue(undefined),
       getUsageStatisticsEnabled: () => false,
-      getPreviewFeatures: vi.fn().mockReturnValue(false),
+      getClientName: vi.fn().mockReturnValue(undefined),
     } as unknown as Config;
 
     const mockGenerator = {
@@ -364,11 +518,11 @@ describe('createContentGenerator', () => {
     expect(GoogleGenAI).toHaveBeenCalledWith({
       apiKey: 'test-api-key',
       vertexai: undefined,
-      httpOptions: {
+      httpOptions: expect.objectContaining({
         headers: expect.objectContaining({
           'User-Agent': expect.any(String),
         }),
-      },
+      }),
       apiVersion: 'v1',
     });
   });
@@ -378,7 +532,7 @@ describe('createContentGenerator', () => {
       getModel: vi.fn().mockReturnValue('gemini-pro'),
       getProxy: vi.fn().mockReturnValue(undefined),
       getUsageStatisticsEnabled: () => false,
-      getPreviewFeatures: vi.fn().mockReturnValue(false),
+      getClientName: vi.fn().mockReturnValue(undefined),
     } as unknown as Config;
 
     const mockGenerator = {
@@ -397,11 +551,11 @@ describe('createContentGenerator', () => {
     expect(GoogleGenAI).toHaveBeenCalledWith({
       apiKey: 'test-api-key',
       vertexai: undefined,
-      httpOptions: {
+      httpOptions: expect.objectContaining({
         headers: expect.objectContaining({
           'User-Agent': expect.any(String),
         }),
-      },
+      }),
     });
 
     expect(GoogleGenAI).toHaveBeenCalledWith(
@@ -416,7 +570,7 @@ describe('createContentGenerator', () => {
       getModel: vi.fn().mockReturnValue('gemini-pro'),
       getProxy: vi.fn().mockReturnValue(undefined),
       getUsageStatisticsEnabled: () => false,
-      getPreviewFeatures: vi.fn().mockReturnValue(false),
+      getClientName: vi.fn().mockReturnValue(undefined),
     } as unknown as Config;
 
     const mockGenerator = {
@@ -436,11 +590,11 @@ describe('createContentGenerator', () => {
     expect(GoogleGenAI).toHaveBeenCalledWith({
       apiKey: 'test-api-key',
       vertexai: undefined,
-      httpOptions: {
+      httpOptions: expect.objectContaining({
         headers: expect.objectContaining({
           'User-Agent': expect.any(String),
         }),
-      },
+      }),
     });
 
     expect(GoogleGenAI).toHaveBeenCalledWith(
@@ -455,7 +609,7 @@ describe('createContentGenerator', () => {
       getModel: vi.fn().mockReturnValue('gemini-pro'),
       getProxy: vi.fn().mockReturnValue(undefined),
       getUsageStatisticsEnabled: () => false,
-      getPreviewFeatures: vi.fn().mockReturnValue(false),
+      getClientName: vi.fn().mockReturnValue(undefined),
     } as unknown as Config;
 
     const mockGenerator = {
@@ -476,11 +630,11 @@ describe('createContentGenerator', () => {
     expect(GoogleGenAI).toHaveBeenCalledWith({
       apiKey: 'test-api-key',
       vertexai: true,
-      httpOptions: {
+      httpOptions: expect.objectContaining({
         headers: expect.objectContaining({
           'User-Agent': expect.any(String),
         }),
-      },
+      }),
       apiVersion: 'v1alpha',
     });
   });
@@ -492,6 +646,7 @@ describe('createContentGeneratorConfig', () => {
     setModel: vi.fn(),
     flashFallbackHandler: vi.fn(),
     getProxy: vi.fn(),
+    getClientName: vi.fn().mockReturnValue(undefined),
   } as unknown as Config;
 
   beforeEach(() => {
@@ -567,5 +722,25 @@ describe('createContentGeneratorConfig', () => {
     );
     expect(config.apiKey).toBeUndefined();
     expect(config.vertexai).toBeUndefined();
+  });
+  it('should configure for GATEWAY using dummy placeholder if GEMINI_API_KEY is set', async () => {
+    vi.stubEnv('GEMINI_API_KEY', 'env-gemini-key');
+    const config = await createContentGeneratorConfig(
+      mockConfig,
+      AuthType.GATEWAY,
+    );
+    expect(config.apiKey).toBe('gateway-placeholder-key');
+    expect(config.vertexai).toBe(false);
+  });
+
+  it('should configure for GATEWAY using dummy placeholder if GEMINI_API_KEY is not set', async () => {
+    vi.stubEnv('GEMINI_API_KEY', '');
+    vi.mocked(loadApiKey).mockResolvedValue(null);
+    const config = await createContentGeneratorConfig(
+      mockConfig,
+      AuthType.GATEWAY,
+    );
+    expect(config.apiKey).toBe('gateway-placeholder-key');
+    expect(config.vertexai).toBe(false);
   });
 });

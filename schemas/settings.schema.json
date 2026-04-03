@@ -22,6 +22,26 @@
         "$ref": "#/$defs/MCPServerConfig"
       }
     },
+    "policyPaths": {
+      "title": "Policy Paths",
+      "description": "Additional policy files or directories to load.",
+      "markdownDescription": "Additional policy files or directories to load.\n\n- Category: `Advanced`\n- Requires restart: `yes`\n- Default: `[]`",
+      "default": [],
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "adminPolicyPaths": {
+      "title": "Admin Policy Paths",
+      "description": "Additional admin policy files or directories to load.",
+      "markdownDescription": "Additional admin policy files or directories to load.\n\n- Category: `Advanced`\n- Requires restart: `yes`\n- Default: `[]`",
+      "default": [],
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
     "general": {
       "title": "General",
       "description": "General application settings.",
@@ -29,13 +49,6 @@
       "default": {},
       "type": "object",
       "properties": {
-        "previewFeatures": {
-          "title": "Preview Features (e.g., models)",
-          "description": "Enable preview features (e.g., preview models).",
-          "markdownDescription": "Enable preview features (e.g., preview models).\n\n- Category: `General`\n- Requires restart: `no`\n- Default: `false`",
-          "default": false,
-          "type": "boolean"
-        },
         "preferredEditor": {
           "title": "Preferred Editor",
           "description": "The preferred editor to open files in.",
@@ -46,6 +59,21 @@
           "title": "Vim Mode",
           "description": "Enable Vim keybindings",
           "markdownDescription": "Enable Vim keybindings\n\n- Category: `General`\n- Requires restart: `no`\n- Default: `false`",
+          "default": false,
+          "type": "boolean"
+        },
+        "defaultApprovalMode": {
+          "title": "Default Approval Mode",
+          "description": "The default approval mode for tool execution. 'default' prompts for approval, 'auto_edit' auto-approves edit tools, and 'plan' is read-only mode. YOLO mode (auto-approve all actions) can only be enabled via command line (--yolo or --approval-mode=yolo).",
+          "markdownDescription": "The default approval mode for tool execution. 'default' prompts for approval, 'auto_edit' auto-approves edit tools, and 'plan' is read-only mode. YOLO mode (auto-approve all actions) can only be enabled via command line (--yolo or --approval-mode=yolo).\n\n- Category: `General`\n- Requires restart: `no`\n- Default: `default`",
+          "default": "default",
+          "type": "string",
+          "enum": ["default", "auto_edit", "plan"]
+        },
+        "devtools": {
+          "title": "DevTools",
+          "description": "Enable DevTools inspector on launch.",
+          "markdownDescription": "Enable DevTools inspector on launch.\n\n- Category: `General`\n- Requires restart: `no`\n- Default: `false`",
           "default": false,
           "type": "boolean"
         },
@@ -61,6 +89,13 @@
           "description": "Enable update notification prompts.",
           "markdownDescription": "Enable update notification prompts.\n\n- Category: `General`\n- Requires restart: `no`\n- Default: `true`",
           "default": true,
+          "type": "boolean"
+        },
+        "enableNotifications": {
+          "title": "Enable Notifications",
+          "description": "Enable run-event notifications for action-required prompts and session completion.",
+          "markdownDescription": "Enable run-event notifications for action-required prompts and session completion.\n\n- Category: `General`\n- Requires restart: `no`\n- Default: `false`",
+          "default": false,
           "type": "boolean"
         },
         "checkpointing": {
@@ -80,19 +115,49 @@
           },
           "additionalProperties": false
         },
-        "enablePromptCompletion": {
-          "title": "Enable Prompt Completion",
-          "description": "Enable AI-powered prompt completion suggestions while typing.",
-          "markdownDescription": "Enable AI-powered prompt completion suggestions while typing.\n\n- Category: `General`\n- Requires restart: `yes`\n- Default: `false`",
-          "default": false,
-          "type": "boolean"
+        "plan": {
+          "title": "Plan",
+          "description": "Planning features configuration.",
+          "markdownDescription": "Planning features configuration.\n\n- Category: `General`\n- Requires restart: `yes`\n- Default: `{}`",
+          "default": {},
+          "type": "object",
+          "properties": {
+            "enabled": {
+              "title": "Enable Plan Mode",
+              "description": "Enable Plan Mode for read-only safety during planning.",
+              "markdownDescription": "Enable Plan Mode for read-only safety during planning.\n\n- Category: `General`\n- Requires restart: `yes`\n- Default: `true`",
+              "default": true,
+              "type": "boolean"
+            },
+            "directory": {
+              "title": "Plan Directory",
+              "description": "The directory where planning artifacts are stored. If not specified, defaults to the system temporary directory. A custom directory requires a policy to allow write access in Plan Mode.",
+              "markdownDescription": "The directory where planning artifacts are stored. If not specified, defaults to the system temporary directory. A custom directory requires a policy to allow write access in Plan Mode.\n\n- Category: `General`\n- Requires restart: `yes`",
+              "type": "string"
+            },
+            "modelRouting": {
+              "title": "Plan Model Routing",
+              "description": "Automatically switch between Pro and Flash models based on Plan Mode status. Uses Pro for the planning phase and Flash for the implementation phase.",
+              "markdownDescription": "Automatically switch between Pro and Flash models based on Plan Mode status. Uses Pro for the planning phase and Flash for the implementation phase.\n\n- Category: `General`\n- Requires restart: `no`\n- Default: `true`",
+              "default": true,
+              "type": "boolean"
+            }
+          },
+          "additionalProperties": false
         },
         "retryFetchErrors": {
           "title": "Retry Fetch Errors",
           "description": "Retry on \"exception TypeError: fetch failed sending request\" errors.",
-          "markdownDescription": "Retry on \"exception TypeError: fetch failed sending request\" errors.\n\n- Category: `General`\n- Requires restart: `no`\n- Default: `false`",
-          "default": false,
+          "markdownDescription": "Retry on \"exception TypeError: fetch failed sending request\" errors.\n\n- Category: `General`\n- Requires restart: `no`\n- Default: `true`",
+          "default": true,
           "type": "boolean"
+        },
+        "maxAttempts": {
+          "title": "Max Chat Model Attempts",
+          "description": "Maximum number of attempts for requests to the main chat model. Cannot exceed 10.",
+          "markdownDescription": "Maximum number of attempts for requests to the main chat model. Cannot exceed 10.\n\n- Category: `General`\n- Requires restart: `no`\n- Default: `10`",
+          "default": 10,
+          "type": "number"
         },
         "debugKeystrokeLogging": {
           "title": "Debug Keystroke Logging",
@@ -110,14 +175,15 @@
             "enabled": {
               "title": "Enable Session Cleanup",
               "description": "Enable automatic session cleanup",
-              "markdownDescription": "Enable automatic session cleanup\n\n- Category: `General`\n- Requires restart: `no`\n- Default: `false`",
-              "default": false,
+              "markdownDescription": "Enable automatic session cleanup\n\n- Category: `General`\n- Requires restart: `no`\n- Default: `true`",
+              "default": true,
               "type": "boolean"
             },
             "maxAge": {
-              "title": "Max Session Age",
-              "description": "Maximum age of sessions to keep (e.g., \"30d\", \"7d\", \"24h\", \"1w\")",
-              "markdownDescription": "Maximum age of sessions to keep (e.g., \"30d\", \"7d\", \"24h\", \"1w\")\n\n- Category: `General`\n- Requires restart: `no`",
+              "title": "Keep chat history",
+              "description": "Automatically delete chats older than this time period (e.g., \"30d\", \"7d\", \"24h\", \"1w\")",
+              "markdownDescription": "Automatically delete chats older than this time period (e.g., \"30d\", \"7d\", \"24h\", \"1w\")\n\n- Category: `General`\n- Requires restart: `no`\n- Default: `30d`",
+              "default": "30d",
               "type": "string"
             },
             "maxCount": {
@@ -170,6 +236,20 @@
           "markdownDescription": "The color theme for the UI. See the CLI themes guide for available options.\n\n- Category: `UI`\n- Requires restart: `no`",
           "type": "string"
         },
+        "autoThemeSwitching": {
+          "title": "Auto Theme Switching",
+          "description": "Automatically switch between default light and dark themes based on terminal background color.",
+          "markdownDescription": "Automatically switch between default light and dark themes based on terminal background color.\n\n- Category: `UI`\n- Requires restart: `no`\n- Default: `true`",
+          "default": true,
+          "type": "boolean"
+        },
+        "terminalBackgroundPollingInterval": {
+          "title": "Terminal Background Polling Interval",
+          "description": "Interval in seconds to poll the terminal background color.",
+          "markdownDescription": "Interval in seconds to poll the terminal background color.\n\n- Category: `UI`\n- Requires restart: `no`\n- Default: `60`",
+          "default": 60,
+          "type": "number"
+        },
         "customThemes": {
           "title": "Custom Themes",
           "description": "Custom theme definitions.",
@@ -186,6 +266,14 @@
           "markdownDescription": "Hide the window title bar\n\n- Category: `UI`\n- Requires restart: `yes`\n- Default: `false`",
           "default": false,
           "type": "boolean"
+        },
+        "inlineThinkingMode": {
+          "title": "Inline Thinking",
+          "description": "Display model thinking inline: off or full.",
+          "markdownDescription": "Display model thinking inline: off or full.\n\n- Category: `UI`\n- Requires restart: `no`\n- Default: `off`",
+          "default": "off",
+          "type": "string",
+          "enum": ["off", "full"]
         },
         "showStatusInTitle": {
           "title": "Show Thoughts in Title",
@@ -208,10 +296,38 @@
           "default": true,
           "type": "boolean"
         },
+        "showCompatibilityWarnings": {
+          "title": "Show Compatibility Warnings",
+          "description": "Show warnings about terminal or OS compatibility issues.",
+          "markdownDescription": "Show warnings about terminal or OS compatibility issues.\n\n- Category: `UI`\n- Requires restart: `yes`\n- Default: `true`",
+          "default": true,
+          "type": "boolean"
+        },
         "hideTips": {
           "title": "Hide Tips",
           "description": "Hide helpful tips in the UI",
           "markdownDescription": "Hide helpful tips in the UI\n\n- Category: `UI`\n- Requires restart: `no`\n- Default: `false`",
+          "default": false,
+          "type": "boolean"
+        },
+        "escapePastedAtSymbols": {
+          "title": "Escape Pasted @ Symbols",
+          "description": "When enabled, @ symbols in pasted text are escaped to prevent unintended @path expansion.",
+          "markdownDescription": "When enabled, @ symbols in pasted text are escaped to prevent unintended @path expansion.\n\n- Category: `UI`\n- Requires restart: `no`\n- Default: `false`",
+          "default": false,
+          "type": "boolean"
+        },
+        "showShortcutsHint": {
+          "title": "Show Shortcuts Hint",
+          "description": "Show the \"? for shortcuts\" hint above the input.",
+          "markdownDescription": "Show the \"? for shortcuts\" hint above the input.\n\n- Category: `UI`\n- Requires restart: `no`\n- Default: `true`",
+          "default": true,
+          "type": "boolean"
+        },
+        "compactToolOutput": {
+          "title": "Compact Tool Output",
+          "description": "Display tool outputs (like directory listings and file reads) in a compact, structured format.",
+          "markdownDescription": "Display tool outputs (like directory listings and file reads) in a compact, structured format.\n\n- Category: `UI`\n- Requires restart: `no`\n- Default: `false`",
           "default": false,
           "type": "boolean"
         },
@@ -236,10 +352,26 @@
           "default": {},
           "type": "object",
           "properties": {
+            "items": {
+              "title": "Footer Items",
+              "description": "List of item IDs to display in the footer. Rendered in order",
+              "markdownDescription": "List of item IDs to display in the footer. Rendered in order\n\n- Category: `UI`\n- Requires restart: `no`",
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "showLabels": {
+              "title": "Show Footer Labels",
+              "description": "Display a second line above the footer items with descriptive headers (e.g., /model).",
+              "markdownDescription": "Display a second line above the footer items with descriptive headers (e.g., /model).\n\n- Category: `UI`\n- Requires restart: `no`\n- Default: `true`",
+              "default": true,
+              "type": "boolean"
+            },
             "hideCWD": {
               "title": "Hide CWD",
-              "description": "Hide the current working directory path in the footer.",
-              "markdownDescription": "Hide the current working directory path in the footer.\n\n- Category: `UI`\n- Requires restart: `no`\n- Default: `false`",
+              "description": "Hide the current working directory in the footer.",
+              "markdownDescription": "Hide the current working directory in the footer.\n\n- Category: `UI`\n- Requires restart: `no`\n- Default: `false`",
               "default": false,
               "type": "boolean"
             },
@@ -259,8 +391,8 @@
             },
             "hideContextPercentage": {
               "title": "Hide Context Window Percentage",
-              "description": "Hides the context window remaining percentage.",
-              "markdownDescription": "Hides the context window remaining percentage.\n\n- Category: `UI`\n- Requires restart: `no`\n- Default: `true`",
+              "description": "Hides the context window usage percentage.",
+              "markdownDescription": "Hides the context window usage percentage.\n\n- Category: `UI`\n- Requires restart: `no`\n- Default: `true`",
               "default": true,
               "type": "boolean"
             }
@@ -272,6 +404,13 @@
           "description": "Hide the footer from the UI",
           "markdownDescription": "Hide the footer from the UI\n\n- Category: `UI`\n- Requires restart: `no`\n- Default: `false`",
           "default": false,
+          "type": "boolean"
+        },
+        "collapseDrawerDuringApproval": {
+          "title": "Collapse Drawer During Approval",
+          "description": "Whether to collapse the UI drawer when a tool is awaiting confirmation.",
+          "markdownDescription": "Whether to collapse the UI drawer when a tool is awaiting confirmation.\n\n- Category: `UI`\n- Requires restart: `no`\n- Default: `true`",
+          "default": true,
           "type": "boolean"
         },
         "showMemoryUsage": {
@@ -304,8 +443,8 @@
         },
         "showUserIdentity": {
           "title": "Show User Identity",
-          "description": "Show the logged-in user's identity (e.g. email) in the UI.",
-          "markdownDescription": "Show the logged-in user's identity (e.g. email) in the UI.\n\n- Category: `UI`\n- Requires restart: `no`\n- Default: `true`",
+          "description": "Show the signed-in user's identity (e.g. email) in the UI.",
+          "markdownDescription": "Show the signed-in user's identity (e.g. email) in the UI.\n\n- Category: `UI`\n- Requires restart: `no`\n- Default: `true`",
           "default": true,
           "type": "boolean"
         },
@@ -314,6 +453,20 @@
           "description": "Use an alternate screen buffer for the UI, preserving shell history.",
           "markdownDescription": "Use an alternate screen buffer for the UI, preserving shell history.\n\n- Category: `UI`\n- Requires restart: `yes`\n- Default: `false`",
           "default": false,
+          "type": "boolean"
+        },
+        "renderProcess": {
+          "title": "Render Process",
+          "description": "Enable Ink render process for the UI.",
+          "markdownDescription": "Enable Ink render process for the UI.\n\n- Category: `UI`\n- Requires restart: `yes`\n- Default: `true`",
+          "default": true,
+          "type": "boolean"
+        },
+        "terminalBuffer": {
+          "title": "Terminal Buffer",
+          "description": "Use the new terminal buffer architecture for rendering.",
+          "markdownDescription": "Use the new terminal buffer architecture for rendering.\n\n- Category: `UI`\n- Requires restart: `yes`\n- Default: `true`",
+          "default": true,
           "type": "boolean"
         },
         "useBackgroundColor": {
@@ -337,6 +490,22 @@
           "default": true,
           "type": "boolean"
         },
+        "loadingPhrases": {
+          "title": "Loading Phrases",
+          "description": "What to show while the model is working: tips, witty comments, all, or off.",
+          "markdownDescription": "What to show while the model is working: tips, witty comments, all, or off.\n\n- Category: `UI`\n- Requires restart: `no`\n- Default: `off`",
+          "default": "off",
+          "type": "string",
+          "enum": ["tips", "witty", "all", "off"]
+        },
+        "errorVerbosity": {
+          "title": "Error Verbosity",
+          "description": "Controls whether recoverable errors are hidden (low) or fully shown (full).",
+          "markdownDescription": "Controls whether recoverable errors are hidden (low) or fully shown (full).\n\n- Category: `UI`\n- Requires restart: `no`\n- Default: `low`",
+          "default": "low",
+          "type": "string",
+          "enum": ["low", "full"]
+        },
         "customWittyPhrases": {
           "title": "Custom Witty Phrases",
           "description": "Custom witty phrases to display during loading. When provided, the CLI cycles through these instead of the defaults.",
@@ -356,8 +525,8 @@
           "properties": {
             "enableLoadingPhrases": {
               "title": "Enable Loading Phrases",
-              "description": "Enable loading phrases during operations.",
-              "markdownDescription": "Enable loading phrases during operations.\n\n- Category: `UI`\n- Requires restart: `yes`\n- Default: `true`",
+              "description": "@deprecated Use ui.loadingPhrases instead. Enable loading phrases during operations.",
+              "markdownDescription": "@deprecated Use ui.loadingPhrases instead. Enable loading phrases during operations.\n\n- Category: `UI`\n- Requires restart: `yes`\n- Default: `true`",
               "default": true,
               "type": "boolean"
             },
@@ -421,6 +590,24 @@
       "markdownDescription": "Telemetry configuration.\n\n- Category: `Advanced`\n- Requires restart: `yes`",
       "$ref": "#/$defs/TelemetrySettings"
     },
+    "billing": {
+      "title": "Billing",
+      "description": "Billing and AI credits settings.",
+      "markdownDescription": "Billing and AI credits settings.\n\n- Category: `Advanced`\n- Requires restart: `no`\n- Default: `{}`",
+      "default": {},
+      "type": "object",
+      "properties": {
+        "overageStrategy": {
+          "title": "Overage Strategy",
+          "description": "How to handle quota exhaustion when AI credits are available. 'ask' prompts each time, 'always' automatically uses credits, 'never' disables credit usage.",
+          "markdownDescription": "How to handle quota exhaustion when AI credits are available. 'ask' prompts each time, 'always' automatically uses credits, 'never' disables credit usage.\n\n- Category: `Advanced`\n- Requires restart: `no`\n- Default: `ask`",
+          "default": "ask",
+          "type": "string",
+          "enum": ["ask", "always", "never"]
+        }
+      },
+      "additionalProperties": false
+    },
     "model": {
       "title": "Model",
       "description": "Settings related to the generative model.",
@@ -451,11 +638,18 @@
           }
         },
         "compressionThreshold": {
-          "title": "Compression Threshold",
+          "title": "Context Compression Threshold",
           "description": "The fraction of context usage at which to trigger context compression (e.g. 0.2, 0.3).",
           "markdownDescription": "The fraction of context usage at which to trigger context compression (e.g. 0.2, 0.3).\n\n- Category: `Model`\n- Requires restart: `yes`\n- Default: `0.5`",
           "default": 0.5,
           "type": "number"
+        },
+        "disableLoopDetection": {
+          "title": "Disable Loop Detection",
+          "description": "Disable automatic detection and prevention of infinite loops.",
+          "markdownDescription": "Disable automatic detection and prevention of infinite loops.\n\n- Category: `Model`\n- Requires restart: `yes`\n- Default: `false`",
+          "default": false,
+          "type": "boolean"
         },
         "skipNextSpeakerCheck": {
           "title": "Skip Next Speaker Check",
@@ -470,7 +664,7 @@
     "modelConfigs": {
       "title": "Model Configs",
       "description": "Model configurations.",
-      "markdownDescription": "Model configurations.\n\n- Category: `Model`\n- Requires restart: `no`\n- Default: `{\n  \"aliases\": {\n    \"base\": {\n      \"modelConfig\": {\n        \"generateContentConfig\": {\n          \"temperature\": 0,\n          \"topP\": 1\n        }\n      }\n    },\n    \"chat-base\": {\n      \"extends\": \"base\",\n      \"modelConfig\": {\n        \"generateContentConfig\": {\n          \"thinkingConfig\": {\n            \"includeThoughts\": true\n          },\n          \"temperature\": 1,\n          \"topP\": 0.95,\n          \"topK\": 64\n        }\n      }\n    },\n    \"chat-base-2.5\": {\n      \"extends\": \"chat-base\",\n      \"modelConfig\": {\n        \"generateContentConfig\": {\n          \"thinkingConfig\": {\n            \"thinkingBudget\": 8192\n          }\n        }\n      }\n    },\n    \"chat-base-3\": {\n      \"extends\": \"chat-base\",\n      \"modelConfig\": {\n        \"generateContentConfig\": {\n          \"thinkingConfig\": {\n            \"thinkingLevel\": \"HIGH\"\n          }\n        }\n      }\n    },\n    \"gemini-3-pro-preview\": {\n      \"extends\": \"chat-base-3\",\n      \"modelConfig\": {\n        \"model\": \"gemini-3-pro-preview\"\n      }\n    },\n    \"gemini-3-flash-preview\": {\n      \"extends\": \"chat-base-3\",\n      \"modelConfig\": {\n        \"model\": \"gemini-3-flash-preview\"\n      }\n    },\n    \"gemini-2.5-pro\": {\n      \"extends\": \"chat-base-2.5\",\n      \"modelConfig\": {\n        \"model\": \"gemini-2.5-pro\"\n      }\n    },\n    \"gemini-2.5-flash\": {\n      \"extends\": \"chat-base-2.5\",\n      \"modelConfig\": {\n        \"model\": \"gemini-2.5-flash\"\n      }\n    },\n    \"gemini-2.5-flash-lite\": {\n      \"extends\": \"chat-base-2.5\",\n      \"modelConfig\": {\n        \"model\": \"gemini-2.5-flash-lite\"\n      }\n    },\n    \"gemini-2.5-flash-base\": {\n      \"extends\": \"base\",\n      \"modelConfig\": {\n        \"model\": \"gemini-2.5-flash\"\n      }\n    },\n    \"classifier\": {\n      \"extends\": \"base\",\n      \"modelConfig\": {\n        \"model\": \"gemini-2.5-flash-lite\",\n        \"generateContentConfig\": {\n          \"maxOutputTokens\": 1024,\n          \"thinkingConfig\": {\n            \"thinkingBudget\": 512\n          }\n        }\n      }\n    },\n    \"prompt-completion\": {\n      \"extends\": \"base\",\n      \"modelConfig\": {\n        \"model\": \"gemini-2.5-flash-lite\",\n        \"generateContentConfig\": {\n          \"temperature\": 0.3,\n          \"maxOutputTokens\": 16000,\n          \"thinkingConfig\": {\n            \"thinkingBudget\": 0\n          }\n        }\n      }\n    },\n    \"edit-corrector\": {\n      \"extends\": \"base\",\n      \"modelConfig\": {\n        \"model\": \"gemini-2.5-flash-lite\",\n        \"generateContentConfig\": {\n          \"thinkingConfig\": {\n            \"thinkingBudget\": 0\n          }\n        }\n      }\n    },\n    \"summarizer-default\": {\n      \"extends\": \"base\",\n      \"modelConfig\": {\n        \"model\": \"gemini-2.5-flash-lite\",\n        \"generateContentConfig\": {\n          \"maxOutputTokens\": 2000\n        }\n      }\n    },\n    \"summarizer-shell\": {\n      \"extends\": \"base\",\n      \"modelConfig\": {\n        \"model\": \"gemini-2.5-flash-lite\",\n        \"generateContentConfig\": {\n          \"maxOutputTokens\": 2000\n        }\n      }\n    },\n    \"web-search\": {\n      \"extends\": \"gemini-2.5-flash-base\",\n      \"modelConfig\": {\n        \"generateContentConfig\": {\n          \"tools\": [\n            {\n              \"googleSearch\": {}\n            }\n          ]\n        }\n      }\n    },\n    \"web-fetch\": {\n      \"extends\": \"gemini-2.5-flash-base\",\n      \"modelConfig\": {\n        \"generateContentConfig\": {\n          \"tools\": [\n            {\n              \"urlContext\": {}\n            }\n          ]\n        }\n      }\n    },\n    \"web-fetch-fallback\": {\n      \"extends\": \"gemini-2.5-flash-base\",\n      \"modelConfig\": {}\n    },\n    \"loop-detection\": {\n      \"extends\": \"gemini-2.5-flash-base\",\n      \"modelConfig\": {}\n    },\n    \"loop-detection-double-check\": {\n      \"extends\": \"base\",\n      \"modelConfig\": {\n        \"model\": \"gemini-2.5-pro\"\n      }\n    },\n    \"llm-edit-fixer\": {\n      \"extends\": \"gemini-2.5-flash-base\",\n      \"modelConfig\": {}\n    },\n    \"next-speaker-checker\": {\n      \"extends\": \"gemini-2.5-flash-base\",\n      \"modelConfig\": {}\n    },\n    \"chat-compression-3-pro\": {\n      \"modelConfig\": {\n        \"model\": \"gemini-3-pro-preview\"\n      }\n    },\n    \"chat-compression-3-flash\": {\n      \"modelConfig\": {\n        \"model\": \"gemini-3-flash-preview\"\n      }\n    },\n    \"chat-compression-2.5-pro\": {\n      \"modelConfig\": {\n        \"model\": \"gemini-2.5-pro\"\n      }\n    },\n    \"chat-compression-2.5-flash\": {\n      \"modelConfig\": {\n        \"model\": \"gemini-2.5-flash\"\n      }\n    },\n    \"chat-compression-2.5-flash-lite\": {\n      \"modelConfig\": {\n        \"model\": \"gemini-2.5-flash-lite\"\n      }\n    },\n    \"chat-compression-default\": {\n      \"modelConfig\": {\n        \"model\": \"gemini-2.5-pro\"\n      }\n    }\n  },\n  \"overrides\": [\n    {\n      \"match\": {\n        \"model\": \"chat-base\",\n        \"isRetry\": true\n      },\n      \"modelConfig\": {\n        \"generateContentConfig\": {\n          \"temperature\": 1\n        }\n      }\n    }\n  ]\n}`",
+      "markdownDescription": "Model configurations.\n\n- Category: `Model`\n- Requires restart: `no`\n- Default: `{\n  \"aliases\": {\n    \"base\": {\n      \"modelConfig\": {\n        \"generateContentConfig\": {\n          \"temperature\": 0,\n          \"topP\": 1\n        }\n      }\n    },\n    \"chat-base\": {\n      \"extends\": \"base\",\n      \"modelConfig\": {\n        \"generateContentConfig\": {\n          \"thinkingConfig\": {\n            \"includeThoughts\": true\n          },\n          \"temperature\": 1,\n          \"topP\": 0.95,\n          \"topK\": 64\n        }\n      }\n    },\n    \"chat-base-2.5\": {\n      \"extends\": \"chat-base\",\n      \"modelConfig\": {\n        \"generateContentConfig\": {\n          \"thinkingConfig\": {\n            \"thinkingBudget\": 8192\n          }\n        }\n      }\n    },\n    \"chat-base-3\": {\n      \"extends\": \"chat-base\",\n      \"modelConfig\": {\n        \"generateContentConfig\": {\n          \"thinkingConfig\": {\n            \"thinkingLevel\": \"HIGH\"\n          }\n        }\n      }\n    },\n    \"gemini-3-pro-preview\": {\n      \"extends\": \"chat-base-3\",\n      \"modelConfig\": {\n        \"model\": \"gemini-3-pro-preview\"\n      }\n    },\n    \"gemini-3-flash-preview\": {\n      \"extends\": \"chat-base-3\",\n      \"modelConfig\": {\n        \"model\": \"gemini-3-flash-preview\"\n      }\n    },\n    \"gemini-2.5-pro\": {\n      \"extends\": \"chat-base-2.5\",\n      \"modelConfig\": {\n        \"model\": \"gemini-2.5-pro\"\n      }\n    },\n    \"gemini-2.5-flash\": {\n      \"extends\": \"chat-base-2.5\",\n      \"modelConfig\": {\n        \"model\": \"gemini-2.5-flash\"\n      }\n    },\n    \"gemini-2.5-flash-lite\": {\n      \"extends\": \"chat-base-2.5\",\n      \"modelConfig\": {\n        \"model\": \"gemini-2.5-flash-lite\"\n      }\n    },\n    \"gemini-2.5-flash-base\": {\n      \"extends\": \"base\",\n      \"modelConfig\": {\n        \"model\": \"gemini-2.5-flash\"\n      }\n    },\n    \"gemini-3-flash-base\": {\n      \"extends\": \"base\",\n      \"modelConfig\": {\n        \"model\": \"gemini-3-flash-preview\"\n      }\n    },\n    \"classifier\": {\n      \"extends\": \"base\",\n      \"modelConfig\": {\n        \"model\": \"gemini-2.5-flash-lite\",\n        \"generateContentConfig\": {\n          \"maxOutputTokens\": 1024,\n          \"thinkingConfig\": {\n            \"thinkingBudget\": 512\n          }\n        }\n      }\n    },\n    \"prompt-completion\": {\n      \"extends\": \"base\",\n      \"modelConfig\": {\n        \"model\": \"gemini-2.5-flash-lite\",\n        \"generateContentConfig\": {\n          \"temperature\": 0.3,\n          \"maxOutputTokens\": 16000,\n          \"thinkingConfig\": {\n            \"thinkingBudget\": 0\n          }\n        }\n      }\n    },\n    \"fast-ack-helper\": {\n      \"extends\": \"base\",\n      \"modelConfig\": {\n        \"model\": \"gemini-2.5-flash-lite\",\n        \"generateContentConfig\": {\n          \"temperature\": 0.2,\n          \"maxOutputTokens\": 120,\n          \"thinkingConfig\": {\n            \"thinkingBudget\": 0\n          }\n        }\n      }\n    },\n    \"edit-corrector\": {\n      \"extends\": \"base\",\n      \"modelConfig\": {\n        \"model\": \"gemini-2.5-flash-lite\",\n        \"generateContentConfig\": {\n          \"thinkingConfig\": {\n            \"thinkingBudget\": 0\n          }\n        }\n      }\n    },\n    \"summarizer-default\": {\n      \"extends\": \"base\",\n      \"modelConfig\": {\n        \"model\": \"gemini-2.5-flash-lite\",\n        \"generateContentConfig\": {\n          \"maxOutputTokens\": 2000\n        }\n      }\n    },\n    \"summarizer-shell\": {\n      \"extends\": \"base\",\n      \"modelConfig\": {\n        \"model\": \"gemini-2.5-flash-lite\",\n        \"generateContentConfig\": {\n          \"maxOutputTokens\": 2000\n        }\n      }\n    },\n    \"web-search\": {\n      \"extends\": \"gemini-3-flash-base\",\n      \"modelConfig\": {\n        \"generateContentConfig\": {\n          \"tools\": [\n            {\n              \"googleSearch\": {}\n            }\n          ]\n        }\n      }\n    },\n    \"web-fetch\": {\n      \"extends\": \"gemini-3-flash-base\",\n      \"modelConfig\": {\n        \"generateContentConfig\": {\n          \"tools\": [\n            {\n              \"urlContext\": {}\n            }\n          ]\n        }\n      }\n    },\n    \"web-fetch-fallback\": {\n      \"extends\": \"gemini-3-flash-base\",\n      \"modelConfig\": {}\n    },\n    \"loop-detection\": {\n      \"extends\": \"gemini-3-flash-base\",\n      \"modelConfig\": {}\n    },\n    \"loop-detection-double-check\": {\n      \"extends\": \"base\",\n      \"modelConfig\": {\n        \"model\": \"gemini-3-pro-preview\"\n      }\n    },\n    \"llm-edit-fixer\": {\n      \"extends\": \"gemini-3-flash-base\",\n      \"modelConfig\": {}\n    },\n    \"next-speaker-checker\": {\n      \"extends\": \"gemini-3-flash-base\",\n      \"modelConfig\": {}\n    },\n    \"chat-compression-3-pro\": {\n      \"modelConfig\": {\n        \"model\": \"gemini-3-pro-preview\"\n      }\n    },\n    \"chat-compression-3-flash\": {\n      \"modelConfig\": {\n        \"model\": \"gemini-3-flash-preview\"\n      }\n    },\n    \"chat-compression-3.1-flash-lite\": {\n      \"modelConfig\": {\n        \"model\": \"gemini-3.1-flash-lite-preview\"\n      }\n    },\n    \"chat-compression-2.5-pro\": {\n      \"modelConfig\": {\n        \"model\": \"gemini-2.5-pro\"\n      }\n    },\n    \"chat-compression-2.5-flash\": {\n      \"modelConfig\": {\n        \"model\": \"gemini-2.5-flash\"\n      }\n    },\n    \"chat-compression-2.5-flash-lite\": {\n      \"modelConfig\": {\n        \"model\": \"gemini-2.5-flash-lite\"\n      }\n    },\n    \"chat-compression-default\": {\n      \"modelConfig\": {\n        \"model\": \"gemini-3-pro-preview\"\n      }\n    },\n    \"agent-history-provider-summarizer\": {\n      \"modelConfig\": {\n        \"model\": \"gemini-3-flash-preview\"\n      }\n    }\n  },\n  \"overrides\": [\n    {\n      \"match\": {\n        \"model\": \"chat-base\",\n        \"isRetry\": true\n      },\n      \"modelConfig\": {\n        \"generateContentConfig\": {\n          \"temperature\": 1\n        }\n      }\n    }\n  ],\n  \"modelDefinitions\": {\n    \"gemini-3.1-flash-lite-preview\": {\n      \"tier\": \"flash-lite\",\n      \"family\": \"gemini-3\",\n      \"isPreview\": true,\n      \"isVisible\": true,\n      \"features\": {\n        \"thinking\": false,\n        \"multimodalToolUse\": true\n      }\n    },\n    \"gemini-3.1-pro-preview\": {\n      \"tier\": \"pro\",\n      \"family\": \"gemini-3\",\n      \"isPreview\": true,\n      \"isVisible\": true,\n      \"features\": {\n        \"thinking\": true,\n        \"multimodalToolUse\": true\n      }\n    },\n    \"gemini-3.1-pro-preview-customtools\": {\n      \"tier\": \"pro\",\n      \"family\": \"gemini-3\",\n      \"isPreview\": true,\n      \"isVisible\": false,\n      \"features\": {\n        \"thinking\": true,\n        \"multimodalToolUse\": true\n      }\n    },\n    \"gemini-3-pro-preview\": {\n      \"tier\": \"pro\",\n      \"family\": \"gemini-3\",\n      \"isPreview\": true,\n      \"isVisible\": true,\n      \"features\": {\n        \"thinking\": true,\n        \"multimodalToolUse\": true\n      }\n    },\n    \"gemini-3-flash-preview\": {\n      \"tier\": \"flash\",\n      \"family\": \"gemini-3\",\n      \"isPreview\": true,\n      \"isVisible\": true,\n      \"features\": {\n        \"thinking\": false,\n        \"multimodalToolUse\": true\n      }\n    },\n    \"gemini-2.5-pro\": {\n      \"tier\": \"pro\",\n      \"family\": \"gemini-2.5\",\n      \"isPreview\": false,\n      \"isVisible\": true,\n      \"features\": {\n        \"thinking\": false,\n        \"multimodalToolUse\": false\n      }\n    },\n    \"gemini-2.5-flash\": {\n      \"tier\": \"flash\",\n      \"family\": \"gemini-2.5\",\n      \"isPreview\": false,\n      \"isVisible\": true,\n      \"features\": {\n        \"thinking\": false,\n        \"multimodalToolUse\": false\n      }\n    },\n    \"gemini-2.5-flash-lite\": {\n      \"tier\": \"flash-lite\",\n      \"family\": \"gemini-2.5\",\n      \"isPreview\": false,\n      \"isVisible\": true,\n      \"features\": {\n        \"thinking\": false,\n        \"multimodalToolUse\": false\n      }\n    },\n    \"auto\": {\n      \"tier\": \"auto\",\n      \"isPreview\": true,\n      \"isVisible\": false,\n      \"features\": {\n        \"thinking\": true,\n        \"multimodalToolUse\": false\n      }\n    },\n    \"pro\": {\n      \"tier\": \"pro\",\n      \"isPreview\": false,\n      \"isVisible\": false,\n      \"features\": {\n        \"thinking\": true,\n        \"multimodalToolUse\": false\n      }\n    },\n    \"flash\": {\n      \"tier\": \"flash\",\n      \"isPreview\": false,\n      \"isVisible\": false,\n      \"features\": {\n        \"thinking\": false,\n        \"multimodalToolUse\": false\n      }\n    },\n    \"flash-lite\": {\n      \"tier\": \"flash-lite\",\n      \"isPreview\": false,\n      \"isVisible\": false,\n      \"features\": {\n        \"thinking\": false,\n        \"multimodalToolUse\": false\n      }\n    },\n    \"auto-gemini-3\": {\n      \"displayName\": \"Auto (Gemini 3)\",\n      \"tier\": \"auto\",\n      \"isPreview\": true,\n      \"isVisible\": true,\n      \"dialogDescription\": \"Let Gemini CLI decide the best model for the task: gemini-3-pro, gemini-3-flash\",\n      \"features\": {\n        \"thinking\": true,\n        \"multimodalToolUse\": false\n      }\n    },\n    \"auto-gemini-2.5\": {\n      \"displayName\": \"Auto (Gemini 2.5)\",\n      \"tier\": \"auto\",\n      \"isPreview\": false,\n      \"isVisible\": true,\n      \"dialogDescription\": \"Let Gemini CLI decide the best model for the task: gemini-2.5-pro, gemini-2.5-flash\",\n      \"features\": {\n        \"thinking\": false,\n        \"multimodalToolUse\": false\n      }\n    }\n  },\n  \"modelIdResolutions\": {\n    \"gemini-3.1-pro-preview\": {\n      \"default\": \"gemini-3.1-pro-preview\",\n      \"contexts\": [\n        {\n          \"condition\": {\n            \"hasAccessToPreview\": false\n          },\n          \"target\": \"gemini-2.5-pro\"\n        },\n        {\n          \"condition\": {\n            \"useCustomTools\": true\n          },\n          \"target\": \"gemini-3.1-pro-preview-customtools\"\n        }\n      ]\n    },\n    \"gemini-3.1-pro-preview-customtools\": {\n      \"default\": \"gemini-3.1-pro-preview-customtools\",\n      \"contexts\": [\n        {\n          \"condition\": {\n            \"hasAccessToPreview\": false\n          },\n          \"target\": \"gemini-2.5-pro\"\n        }\n      ]\n    },\n    \"gemini-3-flash-preview\": {\n      \"default\": \"gemini-3-flash-preview\",\n      \"contexts\": [\n        {\n          \"condition\": {\n            \"hasAccessToPreview\": false\n          },\n          \"target\": \"gemini-2.5-flash\"\n        }\n      ]\n    },\n    \"gemini-3-pro-preview\": {\n      \"default\": \"gemini-3-pro-preview\",\n      \"contexts\": [\n        {\n          \"condition\": {\n            \"hasAccessToPreview\": false\n          },\n          \"target\": \"gemini-2.5-pro\"\n        },\n        {\n          \"condition\": {\n            \"useGemini3_1\": true,\n            \"useCustomTools\": true\n          },\n          \"target\": \"gemini-3.1-pro-preview-customtools\"\n        },\n        {\n          \"condition\": {\n            \"useGemini3_1\": true\n          },\n          \"target\": \"gemini-3.1-pro-preview\"\n        }\n      ]\n    },\n    \"auto-gemini-3\": {\n      \"default\": \"gemini-3-pro-preview\",\n      \"contexts\": [\n        {\n          \"condition\": {\n            \"hasAccessToPreview\": false\n          },\n          \"target\": \"gemini-2.5-pro\"\n        },\n        {\n          \"condition\": {\n            \"useGemini3_1\": true,\n            \"useCustomTools\": true\n          },\n          \"target\": \"gemini-3.1-pro-preview-customtools\"\n        },\n        {\n          \"condition\": {\n            \"useGemini3_1\": true\n          },\n          \"target\": \"gemini-3.1-pro-preview\"\n        }\n      ]\n    },\n    \"auto\": {\n      \"default\": \"gemini-3-pro-preview\",\n      \"contexts\": [\n        {\n          \"condition\": {\n            \"hasAccessToPreview\": false\n          },\n          \"target\": \"gemini-2.5-pro\"\n        },\n        {\n          \"condition\": {\n            \"useGemini3_1\": true,\n            \"useCustomTools\": true\n          },\n          \"target\": \"gemini-3.1-pro-preview-customtools\"\n        },\n        {\n          \"condition\": {\n            \"useGemini3_1\": true\n          },\n          \"target\": \"gemini-3.1-pro-preview\"\n        }\n      ]\n    },\n    \"pro\": {\n      \"default\": \"gemini-3-pro-preview\",\n      \"contexts\": [\n        {\n          \"condition\": {\n            \"hasAccessToPreview\": false\n          },\n          \"target\": \"gemini-2.5-pro\"\n        },\n        {\n          \"condition\": {\n            \"useGemini3_1\": true,\n            \"useCustomTools\": true\n          },\n          \"target\": \"gemini-3.1-pro-preview-customtools\"\n        },\n        {\n          \"condition\": {\n            \"useGemini3_1\": true\n          },\n          \"target\": \"gemini-3.1-pro-preview\"\n        }\n      ]\n    },\n    \"auto-gemini-2.5\": {\n      \"default\": \"gemini-2.5-pro\"\n    },\n    \"gemini-3.1-flash-lite-preview\": {\n      \"default\": \"gemini-3.1-flash-lite-preview\",\n      \"contexts\": [\n        {\n          \"condition\": {\n            \"useGemini3_1FlashLite\": false\n          },\n          \"target\": \"gemini-2.5-flash-lite\"\n        }\n      ]\n    },\n    \"flash\": {\n      \"default\": \"gemini-3-flash-preview\",\n      \"contexts\": [\n        {\n          \"condition\": {\n            \"hasAccessToPreview\": false\n          },\n          \"target\": \"gemini-2.5-flash\"\n        }\n      ]\n    },\n    \"flash-lite\": {\n      \"default\": \"gemini-2.5-flash-lite\",\n      \"contexts\": [\n        {\n          \"condition\": {\n            \"useGemini3_1FlashLite\": true\n          },\n          \"target\": \"gemini-3.1-flash-lite-preview\"\n        }\n      ]\n    }\n  },\n  \"classifierIdResolutions\": {\n    \"flash\": {\n      \"default\": \"gemini-3-flash-preview\",\n      \"contexts\": [\n        {\n          \"condition\": {\n            \"requestedModels\": [\n              \"auto-gemini-2.5\",\n              \"gemini-2.5-pro\"\n            ]\n          },\n          \"target\": \"gemini-2.5-flash\"\n        },\n        {\n          \"condition\": {\n            \"requestedModels\": [\n              \"auto-gemini-3\",\n              \"gemini-3-pro-preview\"\n            ]\n          },\n          \"target\": \"gemini-3-flash-preview\"\n        }\n      ]\n    },\n    \"pro\": {\n      \"default\": \"gemini-3-pro-preview\",\n      \"contexts\": [\n        {\n          \"condition\": {\n            \"requestedModels\": [\n              \"auto-gemini-2.5\",\n              \"gemini-2.5-pro\"\n            ]\n          },\n          \"target\": \"gemini-2.5-pro\"\n        },\n        {\n          \"condition\": {\n            \"useGemini3_1\": true,\n            \"useCustomTools\": true\n          },\n          \"target\": \"gemini-3.1-pro-preview-customtools\"\n        },\n        {\n          \"condition\": {\n            \"useGemini3_1\": true\n          },\n          \"target\": \"gemini-3.1-pro-preview\"\n        }\n      ]\n    }\n  },\n  \"modelChains\": {\n    \"preview\": [\n      {\n        \"model\": \"gemini-3-pro-preview\",\n        \"actions\": {\n          \"terminal\": \"prompt\",\n          \"transient\": \"prompt\",\n          \"not_found\": \"prompt\",\n          \"unknown\": \"prompt\"\n        },\n        \"stateTransitions\": {\n          \"terminal\": \"terminal\",\n          \"transient\": \"terminal\",\n          \"not_found\": \"terminal\",\n          \"unknown\": \"terminal\"\n        }\n      },\n      {\n        \"model\": \"gemini-3-flash-preview\",\n        \"isLastResort\": true,\n        \"actions\": {\n          \"terminal\": \"prompt\",\n          \"transient\": \"prompt\",\n          \"not_found\": \"prompt\",\n          \"unknown\": \"prompt\"\n        },\n        \"stateTransitions\": {\n          \"terminal\": \"terminal\",\n          \"transient\": \"terminal\",\n          \"not_found\": \"terminal\",\n          \"unknown\": \"terminal\"\n        }\n      }\n    ],\n    \"default\": [\n      {\n        \"model\": \"gemini-2.5-pro\",\n        \"actions\": {\n          \"terminal\": \"prompt\",\n          \"transient\": \"prompt\",\n          \"not_found\": \"prompt\",\n          \"unknown\": \"prompt\"\n        },\n        \"stateTransitions\": {\n          \"terminal\": \"terminal\",\n          \"transient\": \"terminal\",\n          \"not_found\": \"terminal\",\n          \"unknown\": \"terminal\"\n        }\n      },\n      {\n        \"model\": \"gemini-2.5-flash\",\n        \"isLastResort\": true,\n        \"actions\": {\n          \"terminal\": \"prompt\",\n          \"transient\": \"prompt\",\n          \"not_found\": \"prompt\",\n          \"unknown\": \"prompt\"\n        },\n        \"stateTransitions\": {\n          \"terminal\": \"terminal\",\n          \"transient\": \"terminal\",\n          \"not_found\": \"terminal\",\n          \"unknown\": \"terminal\"\n        }\n      }\n    ],\n    \"lite\": [\n      {\n        \"model\": \"gemini-2.5-flash-lite\",\n        \"actions\": {\n          \"terminal\": \"silent\",\n          \"transient\": \"silent\",\n          \"not_found\": \"silent\",\n          \"unknown\": \"silent\"\n        },\n        \"stateTransitions\": {\n          \"terminal\": \"terminal\",\n          \"transient\": \"terminal\",\n          \"not_found\": \"terminal\",\n          \"unknown\": \"terminal\"\n        }\n      },\n      {\n        \"model\": \"gemini-2.5-flash\",\n        \"actions\": {\n          \"terminal\": \"silent\",\n          \"transient\": \"silent\",\n          \"not_found\": \"silent\",\n          \"unknown\": \"silent\"\n        },\n        \"stateTransitions\": {\n          \"terminal\": \"terminal\",\n          \"transient\": \"terminal\",\n          \"not_found\": \"terminal\",\n          \"unknown\": \"terminal\"\n        }\n      },\n      {\n        \"model\": \"gemini-2.5-pro\",\n        \"isLastResort\": true,\n        \"actions\": {\n          \"terminal\": \"silent\",\n          \"transient\": \"silent\",\n          \"not_found\": \"silent\",\n          \"unknown\": \"silent\"\n        },\n        \"stateTransitions\": {\n          \"terminal\": \"terminal\",\n          \"transient\": \"terminal\",\n          \"not_found\": \"terminal\",\n          \"unknown\": \"terminal\"\n        }\n      }\n    ]\n  }\n}`",
       "default": {
         "aliases": {
           "base": {
@@ -550,6 +744,12 @@
               "model": "gemini-2.5-flash"
             }
           },
+          "gemini-3-flash-base": {
+            "extends": "base",
+            "modelConfig": {
+              "model": "gemini-3-flash-preview"
+            }
+          },
           "classifier": {
             "extends": "base",
             "modelConfig": {
@@ -569,6 +769,19 @@
               "generateContentConfig": {
                 "temperature": 0.3,
                 "maxOutputTokens": 16000,
+                "thinkingConfig": {
+                  "thinkingBudget": 0
+                }
+              }
+            }
+          },
+          "fast-ack-helper": {
+            "extends": "base",
+            "modelConfig": {
+              "model": "gemini-2.5-flash-lite",
+              "generateContentConfig": {
+                "temperature": 0.2,
+                "maxOutputTokens": 120,
                 "thinkingConfig": {
                   "thinkingBudget": 0
                 }
@@ -605,7 +818,7 @@
             }
           },
           "web-search": {
-            "extends": "gemini-2.5-flash-base",
+            "extends": "gemini-3-flash-base",
             "modelConfig": {
               "generateContentConfig": {
                 "tools": [
@@ -617,7 +830,7 @@
             }
           },
           "web-fetch": {
-            "extends": "gemini-2.5-flash-base",
+            "extends": "gemini-3-flash-base",
             "modelConfig": {
               "generateContentConfig": {
                 "tools": [
@@ -629,25 +842,25 @@
             }
           },
           "web-fetch-fallback": {
-            "extends": "gemini-2.5-flash-base",
+            "extends": "gemini-3-flash-base",
             "modelConfig": {}
           },
           "loop-detection": {
-            "extends": "gemini-2.5-flash-base",
+            "extends": "gemini-3-flash-base",
             "modelConfig": {}
           },
           "loop-detection-double-check": {
             "extends": "base",
             "modelConfig": {
-              "model": "gemini-2.5-pro"
+              "model": "gemini-3-pro-preview"
             }
           },
           "llm-edit-fixer": {
-            "extends": "gemini-2.5-flash-base",
+            "extends": "gemini-3-flash-base",
             "modelConfig": {}
           },
           "next-speaker-checker": {
-            "extends": "gemini-2.5-flash-base",
+            "extends": "gemini-3-flash-base",
             "modelConfig": {}
           },
           "chat-compression-3-pro": {
@@ -658,6 +871,11 @@
           "chat-compression-3-flash": {
             "modelConfig": {
               "model": "gemini-3-flash-preview"
+            }
+          },
+          "chat-compression-3.1-flash-lite": {
+            "modelConfig": {
+              "model": "gemini-3.1-flash-lite-preview"
             }
           },
           "chat-compression-2.5-pro": {
@@ -677,7 +895,12 @@
           },
           "chat-compression-default": {
             "modelConfig": {
-              "model": "gemini-2.5-pro"
+              "model": "gemini-3-pro-preview"
+            }
+          },
+          "agent-history-provider-summarizer": {
+            "modelConfig": {
+              "model": "gemini-3-flash-preview"
             }
           }
         },
@@ -693,14 +916,486 @@
               }
             }
           }
-        ]
+        ],
+        "modelDefinitions": {
+          "gemini-3.1-flash-lite-preview": {
+            "tier": "flash-lite",
+            "family": "gemini-3",
+            "isPreview": true,
+            "isVisible": true,
+            "features": {
+              "thinking": false,
+              "multimodalToolUse": true
+            }
+          },
+          "gemini-3.1-pro-preview": {
+            "tier": "pro",
+            "family": "gemini-3",
+            "isPreview": true,
+            "isVisible": true,
+            "features": {
+              "thinking": true,
+              "multimodalToolUse": true
+            }
+          },
+          "gemini-3.1-pro-preview-customtools": {
+            "tier": "pro",
+            "family": "gemini-3",
+            "isPreview": true,
+            "isVisible": false,
+            "features": {
+              "thinking": true,
+              "multimodalToolUse": true
+            }
+          },
+          "gemini-3-pro-preview": {
+            "tier": "pro",
+            "family": "gemini-3",
+            "isPreview": true,
+            "isVisible": true,
+            "features": {
+              "thinking": true,
+              "multimodalToolUse": true
+            }
+          },
+          "gemini-3-flash-preview": {
+            "tier": "flash",
+            "family": "gemini-3",
+            "isPreview": true,
+            "isVisible": true,
+            "features": {
+              "thinking": false,
+              "multimodalToolUse": true
+            }
+          },
+          "gemini-2.5-pro": {
+            "tier": "pro",
+            "family": "gemini-2.5",
+            "isPreview": false,
+            "isVisible": true,
+            "features": {
+              "thinking": false,
+              "multimodalToolUse": false
+            }
+          },
+          "gemini-2.5-flash": {
+            "tier": "flash",
+            "family": "gemini-2.5",
+            "isPreview": false,
+            "isVisible": true,
+            "features": {
+              "thinking": false,
+              "multimodalToolUse": false
+            }
+          },
+          "gemini-2.5-flash-lite": {
+            "tier": "flash-lite",
+            "family": "gemini-2.5",
+            "isPreview": false,
+            "isVisible": true,
+            "features": {
+              "thinking": false,
+              "multimodalToolUse": false
+            }
+          },
+          "auto": {
+            "tier": "auto",
+            "isPreview": true,
+            "isVisible": false,
+            "features": {
+              "thinking": true,
+              "multimodalToolUse": false
+            }
+          },
+          "pro": {
+            "tier": "pro",
+            "isPreview": false,
+            "isVisible": false,
+            "features": {
+              "thinking": true,
+              "multimodalToolUse": false
+            }
+          },
+          "flash": {
+            "tier": "flash",
+            "isPreview": false,
+            "isVisible": false,
+            "features": {
+              "thinking": false,
+              "multimodalToolUse": false
+            }
+          },
+          "flash-lite": {
+            "tier": "flash-lite",
+            "isPreview": false,
+            "isVisible": false,
+            "features": {
+              "thinking": false,
+              "multimodalToolUse": false
+            }
+          },
+          "auto-gemini-3": {
+            "displayName": "Auto (Gemini 3)",
+            "tier": "auto",
+            "isPreview": true,
+            "isVisible": true,
+            "dialogDescription": "Let Gemini CLI decide the best model for the task: gemini-3-pro, gemini-3-flash",
+            "features": {
+              "thinking": true,
+              "multimodalToolUse": false
+            }
+          },
+          "auto-gemini-2.5": {
+            "displayName": "Auto (Gemini 2.5)",
+            "tier": "auto",
+            "isPreview": false,
+            "isVisible": true,
+            "dialogDescription": "Let Gemini CLI decide the best model for the task: gemini-2.5-pro, gemini-2.5-flash",
+            "features": {
+              "thinking": false,
+              "multimodalToolUse": false
+            }
+          }
+        },
+        "modelIdResolutions": {
+          "gemini-3.1-pro-preview": {
+            "default": "gemini-3.1-pro-preview",
+            "contexts": [
+              {
+                "condition": {
+                  "hasAccessToPreview": false
+                },
+                "target": "gemini-2.5-pro"
+              },
+              {
+                "condition": {
+                  "useCustomTools": true
+                },
+                "target": "gemini-3.1-pro-preview-customtools"
+              }
+            ]
+          },
+          "gemini-3.1-pro-preview-customtools": {
+            "default": "gemini-3.1-pro-preview-customtools",
+            "contexts": [
+              {
+                "condition": {
+                  "hasAccessToPreview": false
+                },
+                "target": "gemini-2.5-pro"
+              }
+            ]
+          },
+          "gemini-3-flash-preview": {
+            "default": "gemini-3-flash-preview",
+            "contexts": [
+              {
+                "condition": {
+                  "hasAccessToPreview": false
+                },
+                "target": "gemini-2.5-flash"
+              }
+            ]
+          },
+          "gemini-3-pro-preview": {
+            "default": "gemini-3-pro-preview",
+            "contexts": [
+              {
+                "condition": {
+                  "hasAccessToPreview": false
+                },
+                "target": "gemini-2.5-pro"
+              },
+              {
+                "condition": {
+                  "useGemini3_1": true,
+                  "useCustomTools": true
+                },
+                "target": "gemini-3.1-pro-preview-customtools"
+              },
+              {
+                "condition": {
+                  "useGemini3_1": true
+                },
+                "target": "gemini-3.1-pro-preview"
+              }
+            ]
+          },
+          "auto-gemini-3": {
+            "default": "gemini-3-pro-preview",
+            "contexts": [
+              {
+                "condition": {
+                  "hasAccessToPreview": false
+                },
+                "target": "gemini-2.5-pro"
+              },
+              {
+                "condition": {
+                  "useGemini3_1": true,
+                  "useCustomTools": true
+                },
+                "target": "gemini-3.1-pro-preview-customtools"
+              },
+              {
+                "condition": {
+                  "useGemini3_1": true
+                },
+                "target": "gemini-3.1-pro-preview"
+              }
+            ]
+          },
+          "auto": {
+            "default": "gemini-3-pro-preview",
+            "contexts": [
+              {
+                "condition": {
+                  "hasAccessToPreview": false
+                },
+                "target": "gemini-2.5-pro"
+              },
+              {
+                "condition": {
+                  "useGemini3_1": true,
+                  "useCustomTools": true
+                },
+                "target": "gemini-3.1-pro-preview-customtools"
+              },
+              {
+                "condition": {
+                  "useGemini3_1": true
+                },
+                "target": "gemini-3.1-pro-preview"
+              }
+            ]
+          },
+          "pro": {
+            "default": "gemini-3-pro-preview",
+            "contexts": [
+              {
+                "condition": {
+                  "hasAccessToPreview": false
+                },
+                "target": "gemini-2.5-pro"
+              },
+              {
+                "condition": {
+                  "useGemini3_1": true,
+                  "useCustomTools": true
+                },
+                "target": "gemini-3.1-pro-preview-customtools"
+              },
+              {
+                "condition": {
+                  "useGemini3_1": true
+                },
+                "target": "gemini-3.1-pro-preview"
+              }
+            ]
+          },
+          "auto-gemini-2.5": {
+            "default": "gemini-2.5-pro"
+          },
+          "gemini-3.1-flash-lite-preview": {
+            "default": "gemini-3.1-flash-lite-preview",
+            "contexts": [
+              {
+                "condition": {
+                  "useGemini3_1FlashLite": false
+                },
+                "target": "gemini-2.5-flash-lite"
+              }
+            ]
+          },
+          "flash": {
+            "default": "gemini-3-flash-preview",
+            "contexts": [
+              {
+                "condition": {
+                  "hasAccessToPreview": false
+                },
+                "target": "gemini-2.5-flash"
+              }
+            ]
+          },
+          "flash-lite": {
+            "default": "gemini-2.5-flash-lite",
+            "contexts": [
+              {
+                "condition": {
+                  "useGemini3_1FlashLite": true
+                },
+                "target": "gemini-3.1-flash-lite-preview"
+              }
+            ]
+          }
+        },
+        "classifierIdResolutions": {
+          "flash": {
+            "default": "gemini-3-flash-preview",
+            "contexts": [
+              {
+                "condition": {
+                  "requestedModels": ["auto-gemini-2.5", "gemini-2.5-pro"]
+                },
+                "target": "gemini-2.5-flash"
+              },
+              {
+                "condition": {
+                  "requestedModels": ["auto-gemini-3", "gemini-3-pro-preview"]
+                },
+                "target": "gemini-3-flash-preview"
+              }
+            ]
+          },
+          "pro": {
+            "default": "gemini-3-pro-preview",
+            "contexts": [
+              {
+                "condition": {
+                  "requestedModels": ["auto-gemini-2.5", "gemini-2.5-pro"]
+                },
+                "target": "gemini-2.5-pro"
+              },
+              {
+                "condition": {
+                  "useGemini3_1": true,
+                  "useCustomTools": true
+                },
+                "target": "gemini-3.1-pro-preview-customtools"
+              },
+              {
+                "condition": {
+                  "useGemini3_1": true
+                },
+                "target": "gemini-3.1-pro-preview"
+              }
+            ]
+          }
+        },
+        "modelChains": {
+          "preview": [
+            {
+              "model": "gemini-3-pro-preview",
+              "actions": {
+                "terminal": "prompt",
+                "transient": "prompt",
+                "not_found": "prompt",
+                "unknown": "prompt"
+              },
+              "stateTransitions": {
+                "terminal": "terminal",
+                "transient": "terminal",
+                "not_found": "terminal",
+                "unknown": "terminal"
+              }
+            },
+            {
+              "model": "gemini-3-flash-preview",
+              "isLastResort": true,
+              "actions": {
+                "terminal": "prompt",
+                "transient": "prompt",
+                "not_found": "prompt",
+                "unknown": "prompt"
+              },
+              "stateTransitions": {
+                "terminal": "terminal",
+                "transient": "terminal",
+                "not_found": "terminal",
+                "unknown": "terminal"
+              }
+            }
+          ],
+          "default": [
+            {
+              "model": "gemini-2.5-pro",
+              "actions": {
+                "terminal": "prompt",
+                "transient": "prompt",
+                "not_found": "prompt",
+                "unknown": "prompt"
+              },
+              "stateTransitions": {
+                "terminal": "terminal",
+                "transient": "terminal",
+                "not_found": "terminal",
+                "unknown": "terminal"
+              }
+            },
+            {
+              "model": "gemini-2.5-flash",
+              "isLastResort": true,
+              "actions": {
+                "terminal": "prompt",
+                "transient": "prompt",
+                "not_found": "prompt",
+                "unknown": "prompt"
+              },
+              "stateTransitions": {
+                "terminal": "terminal",
+                "transient": "terminal",
+                "not_found": "terminal",
+                "unknown": "terminal"
+              }
+            }
+          ],
+          "lite": [
+            {
+              "model": "gemini-2.5-flash-lite",
+              "actions": {
+                "terminal": "silent",
+                "transient": "silent",
+                "not_found": "silent",
+                "unknown": "silent"
+              },
+              "stateTransitions": {
+                "terminal": "terminal",
+                "transient": "terminal",
+                "not_found": "terminal",
+                "unknown": "terminal"
+              }
+            },
+            {
+              "model": "gemini-2.5-flash",
+              "actions": {
+                "terminal": "silent",
+                "transient": "silent",
+                "not_found": "silent",
+                "unknown": "silent"
+              },
+              "stateTransitions": {
+                "terminal": "terminal",
+                "transient": "terminal",
+                "not_found": "terminal",
+                "unknown": "terminal"
+              }
+            },
+            {
+              "model": "gemini-2.5-pro",
+              "isLastResort": true,
+              "actions": {
+                "terminal": "silent",
+                "transient": "silent",
+                "not_found": "silent",
+                "unknown": "silent"
+              },
+              "stateTransitions": {
+                "terminal": "terminal",
+                "transient": "terminal",
+                "not_found": "terminal",
+                "unknown": "terminal"
+              }
+            }
+          ]
+        }
       },
       "type": "object",
       "properties": {
         "aliases": {
           "title": "Model Config Aliases",
           "description": "Named presets for model configs. Can be used in place of a model name and can inherit from other aliases using an `extends` property.",
-          "markdownDescription": "Named presets for model configs. Can be used in place of a model name and can inherit from other aliases using an `extends` property.\n\n- Category: `Model`\n- Requires restart: `no`\n- Default: `{\n  \"base\": {\n    \"modelConfig\": {\n      \"generateContentConfig\": {\n        \"temperature\": 0,\n        \"topP\": 1\n      }\n    }\n  },\n  \"chat-base\": {\n    \"extends\": \"base\",\n    \"modelConfig\": {\n      \"generateContentConfig\": {\n        \"thinkingConfig\": {\n          \"includeThoughts\": true\n        },\n        \"temperature\": 1,\n        \"topP\": 0.95,\n        \"topK\": 64\n      }\n    }\n  },\n  \"chat-base-2.5\": {\n    \"extends\": \"chat-base\",\n    \"modelConfig\": {\n      \"generateContentConfig\": {\n        \"thinkingConfig\": {\n          \"thinkingBudget\": 8192\n        }\n      }\n    }\n  },\n  \"chat-base-3\": {\n    \"extends\": \"chat-base\",\n    \"modelConfig\": {\n      \"generateContentConfig\": {\n        \"thinkingConfig\": {\n          \"thinkingLevel\": \"HIGH\"\n        }\n      }\n    }\n  },\n  \"gemini-3-pro-preview\": {\n    \"extends\": \"chat-base-3\",\n    \"modelConfig\": {\n      \"model\": \"gemini-3-pro-preview\"\n    }\n  },\n  \"gemini-3-flash-preview\": {\n    \"extends\": \"chat-base-3\",\n    \"modelConfig\": {\n      \"model\": \"gemini-3-flash-preview\"\n    }\n  },\n  \"gemini-2.5-pro\": {\n    \"extends\": \"chat-base-2.5\",\n    \"modelConfig\": {\n      \"model\": \"gemini-2.5-pro\"\n    }\n  },\n  \"gemini-2.5-flash\": {\n    \"extends\": \"chat-base-2.5\",\n    \"modelConfig\": {\n      \"model\": \"gemini-2.5-flash\"\n    }\n  },\n  \"gemini-2.5-flash-lite\": {\n    \"extends\": \"chat-base-2.5\",\n    \"modelConfig\": {\n      \"model\": \"gemini-2.5-flash-lite\"\n    }\n  },\n  \"gemini-2.5-flash-base\": {\n    \"extends\": \"base\",\n    \"modelConfig\": {\n      \"model\": \"gemini-2.5-flash\"\n    }\n  },\n  \"classifier\": {\n    \"extends\": \"base\",\n    \"modelConfig\": {\n      \"model\": \"gemini-2.5-flash-lite\",\n      \"generateContentConfig\": {\n        \"maxOutputTokens\": 1024,\n        \"thinkingConfig\": {\n          \"thinkingBudget\": 512\n        }\n      }\n    }\n  },\n  \"prompt-completion\": {\n    \"extends\": \"base\",\n    \"modelConfig\": {\n      \"model\": \"gemini-2.5-flash-lite\",\n      \"generateContentConfig\": {\n        \"temperature\": 0.3,\n        \"maxOutputTokens\": 16000,\n        \"thinkingConfig\": {\n          \"thinkingBudget\": 0\n        }\n      }\n    }\n  },\n  \"edit-corrector\": {\n    \"extends\": \"base\",\n    \"modelConfig\": {\n      \"model\": \"gemini-2.5-flash-lite\",\n      \"generateContentConfig\": {\n        \"thinkingConfig\": {\n          \"thinkingBudget\": 0\n        }\n      }\n    }\n  },\n  \"summarizer-default\": {\n    \"extends\": \"base\",\n    \"modelConfig\": {\n      \"model\": \"gemini-2.5-flash-lite\",\n      \"generateContentConfig\": {\n        \"maxOutputTokens\": 2000\n      }\n    }\n  },\n  \"summarizer-shell\": {\n    \"extends\": \"base\",\n    \"modelConfig\": {\n      \"model\": \"gemini-2.5-flash-lite\",\n      \"generateContentConfig\": {\n        \"maxOutputTokens\": 2000\n      }\n    }\n  },\n  \"web-search\": {\n    \"extends\": \"gemini-2.5-flash-base\",\n    \"modelConfig\": {\n      \"generateContentConfig\": {\n        \"tools\": [\n          {\n            \"googleSearch\": {}\n          }\n        ]\n      }\n    }\n  },\n  \"web-fetch\": {\n    \"extends\": \"gemini-2.5-flash-base\",\n    \"modelConfig\": {\n      \"generateContentConfig\": {\n        \"tools\": [\n          {\n            \"urlContext\": {}\n          }\n        ]\n      }\n    }\n  },\n  \"web-fetch-fallback\": {\n    \"extends\": \"gemini-2.5-flash-base\",\n    \"modelConfig\": {}\n  },\n  \"loop-detection\": {\n    \"extends\": \"gemini-2.5-flash-base\",\n    \"modelConfig\": {}\n  },\n  \"loop-detection-double-check\": {\n    \"extends\": \"base\",\n    \"modelConfig\": {\n      \"model\": \"gemini-2.5-pro\"\n    }\n  },\n  \"llm-edit-fixer\": {\n    \"extends\": \"gemini-2.5-flash-base\",\n    \"modelConfig\": {}\n  },\n  \"next-speaker-checker\": {\n    \"extends\": \"gemini-2.5-flash-base\",\n    \"modelConfig\": {}\n  },\n  \"chat-compression-3-pro\": {\n    \"modelConfig\": {\n      \"model\": \"gemini-3-pro-preview\"\n    }\n  },\n  \"chat-compression-3-flash\": {\n    \"modelConfig\": {\n      \"model\": \"gemini-3-flash-preview\"\n    }\n  },\n  \"chat-compression-2.5-pro\": {\n    \"modelConfig\": {\n      \"model\": \"gemini-2.5-pro\"\n    }\n  },\n  \"chat-compression-2.5-flash\": {\n    \"modelConfig\": {\n      \"model\": \"gemini-2.5-flash\"\n    }\n  },\n  \"chat-compression-2.5-flash-lite\": {\n    \"modelConfig\": {\n      \"model\": \"gemini-2.5-flash-lite\"\n    }\n  },\n  \"chat-compression-default\": {\n    \"modelConfig\": {\n      \"model\": \"gemini-2.5-pro\"\n    }\n  }\n}`",
+          "markdownDescription": "Named presets for model configs. Can be used in place of a model name and can inherit from other aliases using an `extends` property.\n\n- Category: `Model`\n- Requires restart: `no`\n- Default: `{\n  \"base\": {\n    \"modelConfig\": {\n      \"generateContentConfig\": {\n        \"temperature\": 0,\n        \"topP\": 1\n      }\n    }\n  },\n  \"chat-base\": {\n    \"extends\": \"base\",\n    \"modelConfig\": {\n      \"generateContentConfig\": {\n        \"thinkingConfig\": {\n          \"includeThoughts\": true\n        },\n        \"temperature\": 1,\n        \"topP\": 0.95,\n        \"topK\": 64\n      }\n    }\n  },\n  \"chat-base-2.5\": {\n    \"extends\": \"chat-base\",\n    \"modelConfig\": {\n      \"generateContentConfig\": {\n        \"thinkingConfig\": {\n          \"thinkingBudget\": 8192\n        }\n      }\n    }\n  },\n  \"chat-base-3\": {\n    \"extends\": \"chat-base\",\n    \"modelConfig\": {\n      \"generateContentConfig\": {\n        \"thinkingConfig\": {\n          \"thinkingLevel\": \"HIGH\"\n        }\n      }\n    }\n  },\n  \"gemini-3-pro-preview\": {\n    \"extends\": \"chat-base-3\",\n    \"modelConfig\": {\n      \"model\": \"gemini-3-pro-preview\"\n    }\n  },\n  \"gemini-3-flash-preview\": {\n    \"extends\": \"chat-base-3\",\n    \"modelConfig\": {\n      \"model\": \"gemini-3-flash-preview\"\n    }\n  },\n  \"gemini-2.5-pro\": {\n    \"extends\": \"chat-base-2.5\",\n    \"modelConfig\": {\n      \"model\": \"gemini-2.5-pro\"\n    }\n  },\n  \"gemini-2.5-flash\": {\n    \"extends\": \"chat-base-2.5\",\n    \"modelConfig\": {\n      \"model\": \"gemini-2.5-flash\"\n    }\n  },\n  \"gemini-2.5-flash-lite\": {\n    \"extends\": \"chat-base-2.5\",\n    \"modelConfig\": {\n      \"model\": \"gemini-2.5-flash-lite\"\n    }\n  },\n  \"gemini-2.5-flash-base\": {\n    \"extends\": \"base\",\n    \"modelConfig\": {\n      \"model\": \"gemini-2.5-flash\"\n    }\n  },\n  \"gemini-3-flash-base\": {\n    \"extends\": \"base\",\n    \"modelConfig\": {\n      \"model\": \"gemini-3-flash-preview\"\n    }\n  },\n  \"classifier\": {\n    \"extends\": \"base\",\n    \"modelConfig\": {\n      \"model\": \"gemini-2.5-flash-lite\",\n      \"generateContentConfig\": {\n        \"maxOutputTokens\": 1024,\n        \"thinkingConfig\": {\n          \"thinkingBudget\": 512\n        }\n      }\n    }\n  },\n  \"prompt-completion\": {\n    \"extends\": \"base\",\n    \"modelConfig\": {\n      \"model\": \"gemini-2.5-flash-lite\",\n      \"generateContentConfig\": {\n        \"temperature\": 0.3,\n        \"maxOutputTokens\": 16000,\n        \"thinkingConfig\": {\n          \"thinkingBudget\": 0\n        }\n      }\n    }\n  },\n  \"fast-ack-helper\": {\n    \"extends\": \"base\",\n    \"modelConfig\": {\n      \"model\": \"gemini-2.5-flash-lite\",\n      \"generateContentConfig\": {\n        \"temperature\": 0.2,\n        \"maxOutputTokens\": 120,\n        \"thinkingConfig\": {\n          \"thinkingBudget\": 0\n        }\n      }\n    }\n  },\n  \"edit-corrector\": {\n    \"extends\": \"base\",\n    \"modelConfig\": {\n      \"model\": \"gemini-2.5-flash-lite\",\n      \"generateContentConfig\": {\n        \"thinkingConfig\": {\n          \"thinkingBudget\": 0\n        }\n      }\n    }\n  },\n  \"summarizer-default\": {\n    \"extends\": \"base\",\n    \"modelConfig\": {\n      \"model\": \"gemini-2.5-flash-lite\",\n      \"generateContentConfig\": {\n        \"maxOutputTokens\": 2000\n      }\n    }\n  },\n  \"summarizer-shell\": {\n    \"extends\": \"base\",\n    \"modelConfig\": {\n      \"model\": \"gemini-2.5-flash-lite\",\n      \"generateContentConfig\": {\n        \"maxOutputTokens\": 2000\n      }\n    }\n  },\n  \"web-search\": {\n    \"extends\": \"gemini-3-flash-base\",\n    \"modelConfig\": {\n      \"generateContentConfig\": {\n        \"tools\": [\n          {\n            \"googleSearch\": {}\n          }\n        ]\n      }\n    }\n  },\n  \"web-fetch\": {\n    \"extends\": \"gemini-3-flash-base\",\n    \"modelConfig\": {\n      \"generateContentConfig\": {\n        \"tools\": [\n          {\n            \"urlContext\": {}\n          }\n        ]\n      }\n    }\n  },\n  \"web-fetch-fallback\": {\n    \"extends\": \"gemini-3-flash-base\",\n    \"modelConfig\": {}\n  },\n  \"loop-detection\": {\n    \"extends\": \"gemini-3-flash-base\",\n    \"modelConfig\": {}\n  },\n  \"loop-detection-double-check\": {\n    \"extends\": \"base\",\n    \"modelConfig\": {\n      \"model\": \"gemini-3-pro-preview\"\n    }\n  },\n  \"llm-edit-fixer\": {\n    \"extends\": \"gemini-3-flash-base\",\n    \"modelConfig\": {}\n  },\n  \"next-speaker-checker\": {\n    \"extends\": \"gemini-3-flash-base\",\n    \"modelConfig\": {}\n  },\n  \"chat-compression-3-pro\": {\n    \"modelConfig\": {\n      \"model\": \"gemini-3-pro-preview\"\n    }\n  },\n  \"chat-compression-3-flash\": {\n    \"modelConfig\": {\n      \"model\": \"gemini-3-flash-preview\"\n    }\n  },\n  \"chat-compression-3.1-flash-lite\": {\n    \"modelConfig\": {\n      \"model\": \"gemini-3.1-flash-lite-preview\"\n    }\n  },\n  \"chat-compression-2.5-pro\": {\n    \"modelConfig\": {\n      \"model\": \"gemini-2.5-pro\"\n    }\n  },\n  \"chat-compression-2.5-flash\": {\n    \"modelConfig\": {\n      \"model\": \"gemini-2.5-flash\"\n    }\n  },\n  \"chat-compression-2.5-flash-lite\": {\n    \"modelConfig\": {\n      \"model\": \"gemini-2.5-flash-lite\"\n    }\n  },\n  \"chat-compression-default\": {\n    \"modelConfig\": {\n      \"model\": \"gemini-3-pro-preview\"\n    }\n  },\n  \"agent-history-provider-summarizer\": {\n    \"modelConfig\": {\n      \"model\": \"gemini-3-flash-preview\"\n    }\n  }\n}`",
           "default": {
             "base": {
               "modelConfig": {
@@ -779,6 +1474,12 @@
                 "model": "gemini-2.5-flash"
               }
             },
+            "gemini-3-flash-base": {
+              "extends": "base",
+              "modelConfig": {
+                "model": "gemini-3-flash-preview"
+              }
+            },
             "classifier": {
               "extends": "base",
               "modelConfig": {
@@ -798,6 +1499,19 @@
                 "generateContentConfig": {
                   "temperature": 0.3,
                   "maxOutputTokens": 16000,
+                  "thinkingConfig": {
+                    "thinkingBudget": 0
+                  }
+                }
+              }
+            },
+            "fast-ack-helper": {
+              "extends": "base",
+              "modelConfig": {
+                "model": "gemini-2.5-flash-lite",
+                "generateContentConfig": {
+                  "temperature": 0.2,
+                  "maxOutputTokens": 120,
                   "thinkingConfig": {
                     "thinkingBudget": 0
                   }
@@ -834,7 +1548,7 @@
               }
             },
             "web-search": {
-              "extends": "gemini-2.5-flash-base",
+              "extends": "gemini-3-flash-base",
               "modelConfig": {
                 "generateContentConfig": {
                   "tools": [
@@ -846,7 +1560,7 @@
               }
             },
             "web-fetch": {
-              "extends": "gemini-2.5-flash-base",
+              "extends": "gemini-3-flash-base",
               "modelConfig": {
                 "generateContentConfig": {
                   "tools": [
@@ -858,25 +1572,25 @@
               }
             },
             "web-fetch-fallback": {
-              "extends": "gemini-2.5-flash-base",
+              "extends": "gemini-3-flash-base",
               "modelConfig": {}
             },
             "loop-detection": {
-              "extends": "gemini-2.5-flash-base",
+              "extends": "gemini-3-flash-base",
               "modelConfig": {}
             },
             "loop-detection-double-check": {
               "extends": "base",
               "modelConfig": {
-                "model": "gemini-2.5-pro"
+                "model": "gemini-3-pro-preview"
               }
             },
             "llm-edit-fixer": {
-              "extends": "gemini-2.5-flash-base",
+              "extends": "gemini-3-flash-base",
               "modelConfig": {}
             },
             "next-speaker-checker": {
-              "extends": "gemini-2.5-flash-base",
+              "extends": "gemini-3-flash-base",
               "modelConfig": {}
             },
             "chat-compression-3-pro": {
@@ -887,6 +1601,11 @@
             "chat-compression-3-flash": {
               "modelConfig": {
                 "model": "gemini-3-flash-preview"
+              }
+            },
+            "chat-compression-3.1-flash-lite": {
+              "modelConfig": {
+                "model": "gemini-3.1-flash-lite-preview"
               }
             },
             "chat-compression-2.5-pro": {
@@ -906,7 +1625,12 @@
             },
             "chat-compression-default": {
               "modelConfig": {
-                "model": "gemini-2.5-pro"
+                "model": "gemini-3-pro-preview"
+              }
+            },
+            "agent-history-provider-summarizer": {
+              "modelConfig": {
+                "model": "gemini-3-flash-preview"
               }
             }
           },
@@ -936,6 +1660,514 @@
           "default": [],
           "type": "array",
           "items": {}
+        },
+        "modelDefinitions": {
+          "title": "Model Definitions",
+          "description": "Registry of model metadata, including tier, family, and features.",
+          "markdownDescription": "Registry of model metadata, including tier, family, and features.\n\n- Category: `Model`\n- Requires restart: `yes`\n- Default: `{\n  \"gemini-3.1-flash-lite-preview\": {\n    \"tier\": \"flash-lite\",\n    \"family\": \"gemini-3\",\n    \"isPreview\": true,\n    \"isVisible\": true,\n    \"features\": {\n      \"thinking\": false,\n      \"multimodalToolUse\": true\n    }\n  },\n  \"gemini-3.1-pro-preview\": {\n    \"tier\": \"pro\",\n    \"family\": \"gemini-3\",\n    \"isPreview\": true,\n    \"isVisible\": true,\n    \"features\": {\n      \"thinking\": true,\n      \"multimodalToolUse\": true\n    }\n  },\n  \"gemini-3.1-pro-preview-customtools\": {\n    \"tier\": \"pro\",\n    \"family\": \"gemini-3\",\n    \"isPreview\": true,\n    \"isVisible\": false,\n    \"features\": {\n      \"thinking\": true,\n      \"multimodalToolUse\": true\n    }\n  },\n  \"gemini-3-pro-preview\": {\n    \"tier\": \"pro\",\n    \"family\": \"gemini-3\",\n    \"isPreview\": true,\n    \"isVisible\": true,\n    \"features\": {\n      \"thinking\": true,\n      \"multimodalToolUse\": true\n    }\n  },\n  \"gemini-3-flash-preview\": {\n    \"tier\": \"flash\",\n    \"family\": \"gemini-3\",\n    \"isPreview\": true,\n    \"isVisible\": true,\n    \"features\": {\n      \"thinking\": false,\n      \"multimodalToolUse\": true\n    }\n  },\n  \"gemini-2.5-pro\": {\n    \"tier\": \"pro\",\n    \"family\": \"gemini-2.5\",\n    \"isPreview\": false,\n    \"isVisible\": true,\n    \"features\": {\n      \"thinking\": false,\n      \"multimodalToolUse\": false\n    }\n  },\n  \"gemini-2.5-flash\": {\n    \"tier\": \"flash\",\n    \"family\": \"gemini-2.5\",\n    \"isPreview\": false,\n    \"isVisible\": true,\n    \"features\": {\n      \"thinking\": false,\n      \"multimodalToolUse\": false\n    }\n  },\n  \"gemini-2.5-flash-lite\": {\n    \"tier\": \"flash-lite\",\n    \"family\": \"gemini-2.5\",\n    \"isPreview\": false,\n    \"isVisible\": true,\n    \"features\": {\n      \"thinking\": false,\n      \"multimodalToolUse\": false\n    }\n  },\n  \"auto\": {\n    \"tier\": \"auto\",\n    \"isPreview\": true,\n    \"isVisible\": false,\n    \"features\": {\n      \"thinking\": true,\n      \"multimodalToolUse\": false\n    }\n  },\n  \"pro\": {\n    \"tier\": \"pro\",\n    \"isPreview\": false,\n    \"isVisible\": false,\n    \"features\": {\n      \"thinking\": true,\n      \"multimodalToolUse\": false\n    }\n  },\n  \"flash\": {\n    \"tier\": \"flash\",\n    \"isPreview\": false,\n    \"isVisible\": false,\n    \"features\": {\n      \"thinking\": false,\n      \"multimodalToolUse\": false\n    }\n  },\n  \"flash-lite\": {\n    \"tier\": \"flash-lite\",\n    \"isPreview\": false,\n    \"isVisible\": false,\n    \"features\": {\n      \"thinking\": false,\n      \"multimodalToolUse\": false\n    }\n  },\n  \"auto-gemini-3\": {\n    \"displayName\": \"Auto (Gemini 3)\",\n    \"tier\": \"auto\",\n    \"isPreview\": true,\n    \"isVisible\": true,\n    \"dialogDescription\": \"Let Gemini CLI decide the best model for the task: gemini-3-pro, gemini-3-flash\",\n    \"features\": {\n      \"thinking\": true,\n      \"multimodalToolUse\": false\n    }\n  },\n  \"auto-gemini-2.5\": {\n    \"displayName\": \"Auto (Gemini 2.5)\",\n    \"tier\": \"auto\",\n    \"isPreview\": false,\n    \"isVisible\": true,\n    \"dialogDescription\": \"Let Gemini CLI decide the best model for the task: gemini-2.5-pro, gemini-2.5-flash\",\n    \"features\": {\n      \"thinking\": false,\n      \"multimodalToolUse\": false\n    }\n  }\n}`",
+          "default": {
+            "gemini-3.1-flash-lite-preview": {
+              "tier": "flash-lite",
+              "family": "gemini-3",
+              "isPreview": true,
+              "isVisible": true,
+              "features": {
+                "thinking": false,
+                "multimodalToolUse": true
+              }
+            },
+            "gemini-3.1-pro-preview": {
+              "tier": "pro",
+              "family": "gemini-3",
+              "isPreview": true,
+              "isVisible": true,
+              "features": {
+                "thinking": true,
+                "multimodalToolUse": true
+              }
+            },
+            "gemini-3.1-pro-preview-customtools": {
+              "tier": "pro",
+              "family": "gemini-3",
+              "isPreview": true,
+              "isVisible": false,
+              "features": {
+                "thinking": true,
+                "multimodalToolUse": true
+              }
+            },
+            "gemini-3-pro-preview": {
+              "tier": "pro",
+              "family": "gemini-3",
+              "isPreview": true,
+              "isVisible": true,
+              "features": {
+                "thinking": true,
+                "multimodalToolUse": true
+              }
+            },
+            "gemini-3-flash-preview": {
+              "tier": "flash",
+              "family": "gemini-3",
+              "isPreview": true,
+              "isVisible": true,
+              "features": {
+                "thinking": false,
+                "multimodalToolUse": true
+              }
+            },
+            "gemini-2.5-pro": {
+              "tier": "pro",
+              "family": "gemini-2.5",
+              "isPreview": false,
+              "isVisible": true,
+              "features": {
+                "thinking": false,
+                "multimodalToolUse": false
+              }
+            },
+            "gemini-2.5-flash": {
+              "tier": "flash",
+              "family": "gemini-2.5",
+              "isPreview": false,
+              "isVisible": true,
+              "features": {
+                "thinking": false,
+                "multimodalToolUse": false
+              }
+            },
+            "gemini-2.5-flash-lite": {
+              "tier": "flash-lite",
+              "family": "gemini-2.5",
+              "isPreview": false,
+              "isVisible": true,
+              "features": {
+                "thinking": false,
+                "multimodalToolUse": false
+              }
+            },
+            "auto": {
+              "tier": "auto",
+              "isPreview": true,
+              "isVisible": false,
+              "features": {
+                "thinking": true,
+                "multimodalToolUse": false
+              }
+            },
+            "pro": {
+              "tier": "pro",
+              "isPreview": false,
+              "isVisible": false,
+              "features": {
+                "thinking": true,
+                "multimodalToolUse": false
+              }
+            },
+            "flash": {
+              "tier": "flash",
+              "isPreview": false,
+              "isVisible": false,
+              "features": {
+                "thinking": false,
+                "multimodalToolUse": false
+              }
+            },
+            "flash-lite": {
+              "tier": "flash-lite",
+              "isPreview": false,
+              "isVisible": false,
+              "features": {
+                "thinking": false,
+                "multimodalToolUse": false
+              }
+            },
+            "auto-gemini-3": {
+              "displayName": "Auto (Gemini 3)",
+              "tier": "auto",
+              "isPreview": true,
+              "isVisible": true,
+              "dialogDescription": "Let Gemini CLI decide the best model for the task: gemini-3-pro, gemini-3-flash",
+              "features": {
+                "thinking": true,
+                "multimodalToolUse": false
+              }
+            },
+            "auto-gemini-2.5": {
+              "displayName": "Auto (Gemini 2.5)",
+              "tier": "auto",
+              "isPreview": false,
+              "isVisible": true,
+              "dialogDescription": "Let Gemini CLI decide the best model for the task: gemini-2.5-pro, gemini-2.5-flash",
+              "features": {
+                "thinking": false,
+                "multimodalToolUse": false
+              }
+            }
+          },
+          "type": "object",
+          "additionalProperties": {
+            "$ref": "#/$defs/ModelDefinition"
+          }
+        },
+        "modelIdResolutions": {
+          "title": "Model ID Resolutions",
+          "description": "Rules for resolving requested model names to concrete model IDs based on context.",
+          "markdownDescription": "Rules for resolving requested model names to concrete model IDs based on context.\n\n- Category: `Model`\n- Requires restart: `yes`\n- Default: `{\n  \"gemini-3.1-pro-preview\": {\n    \"default\": \"gemini-3.1-pro-preview\",\n    \"contexts\": [\n      {\n        \"condition\": {\n          \"hasAccessToPreview\": false\n        },\n        \"target\": \"gemini-2.5-pro\"\n      },\n      {\n        \"condition\": {\n          \"useCustomTools\": true\n        },\n        \"target\": \"gemini-3.1-pro-preview-customtools\"\n      }\n    ]\n  },\n  \"gemini-3.1-pro-preview-customtools\": {\n    \"default\": \"gemini-3.1-pro-preview-customtools\",\n    \"contexts\": [\n      {\n        \"condition\": {\n          \"hasAccessToPreview\": false\n        },\n        \"target\": \"gemini-2.5-pro\"\n      }\n    ]\n  },\n  \"gemini-3-flash-preview\": {\n    \"default\": \"gemini-3-flash-preview\",\n    \"contexts\": [\n      {\n        \"condition\": {\n          \"hasAccessToPreview\": false\n        },\n        \"target\": \"gemini-2.5-flash\"\n      }\n    ]\n  },\n  \"gemini-3-pro-preview\": {\n    \"default\": \"gemini-3-pro-preview\",\n    \"contexts\": [\n      {\n        \"condition\": {\n          \"hasAccessToPreview\": false\n        },\n        \"target\": \"gemini-2.5-pro\"\n      },\n      {\n        \"condition\": {\n          \"useGemini3_1\": true,\n          \"useCustomTools\": true\n        },\n        \"target\": \"gemini-3.1-pro-preview-customtools\"\n      },\n      {\n        \"condition\": {\n          \"useGemini3_1\": true\n        },\n        \"target\": \"gemini-3.1-pro-preview\"\n      }\n    ]\n  },\n  \"auto-gemini-3\": {\n    \"default\": \"gemini-3-pro-preview\",\n    \"contexts\": [\n      {\n        \"condition\": {\n          \"hasAccessToPreview\": false\n        },\n        \"target\": \"gemini-2.5-pro\"\n      },\n      {\n        \"condition\": {\n          \"useGemini3_1\": true,\n          \"useCustomTools\": true\n        },\n        \"target\": \"gemini-3.1-pro-preview-customtools\"\n      },\n      {\n        \"condition\": {\n          \"useGemini3_1\": true\n        },\n        \"target\": \"gemini-3.1-pro-preview\"\n      }\n    ]\n  },\n  \"auto\": {\n    \"default\": \"gemini-3-pro-preview\",\n    \"contexts\": [\n      {\n        \"condition\": {\n          \"hasAccessToPreview\": false\n        },\n        \"target\": \"gemini-2.5-pro\"\n      },\n      {\n        \"condition\": {\n          \"useGemini3_1\": true,\n          \"useCustomTools\": true\n        },\n        \"target\": \"gemini-3.1-pro-preview-customtools\"\n      },\n      {\n        \"condition\": {\n          \"useGemini3_1\": true\n        },\n        \"target\": \"gemini-3.1-pro-preview\"\n      }\n    ]\n  },\n  \"pro\": {\n    \"default\": \"gemini-3-pro-preview\",\n    \"contexts\": [\n      {\n        \"condition\": {\n          \"hasAccessToPreview\": false\n        },\n        \"target\": \"gemini-2.5-pro\"\n      },\n      {\n        \"condition\": {\n          \"useGemini3_1\": true,\n          \"useCustomTools\": true\n        },\n        \"target\": \"gemini-3.1-pro-preview-customtools\"\n      },\n      {\n        \"condition\": {\n          \"useGemini3_1\": true\n        },\n        \"target\": \"gemini-3.1-pro-preview\"\n      }\n    ]\n  },\n  \"auto-gemini-2.5\": {\n    \"default\": \"gemini-2.5-pro\"\n  },\n  \"gemini-3.1-flash-lite-preview\": {\n    \"default\": \"gemini-3.1-flash-lite-preview\",\n    \"contexts\": [\n      {\n        \"condition\": {\n          \"useGemini3_1FlashLite\": false\n        },\n        \"target\": \"gemini-2.5-flash-lite\"\n      }\n    ]\n  },\n  \"flash\": {\n    \"default\": \"gemini-3-flash-preview\",\n    \"contexts\": [\n      {\n        \"condition\": {\n          \"hasAccessToPreview\": false\n        },\n        \"target\": \"gemini-2.5-flash\"\n      }\n    ]\n  },\n  \"flash-lite\": {\n    \"default\": \"gemini-2.5-flash-lite\",\n    \"contexts\": [\n      {\n        \"condition\": {\n          \"useGemini3_1FlashLite\": true\n        },\n        \"target\": \"gemini-3.1-flash-lite-preview\"\n      }\n    ]\n  }\n}`",
+          "default": {
+            "gemini-3.1-pro-preview": {
+              "default": "gemini-3.1-pro-preview",
+              "contexts": [
+                {
+                  "condition": {
+                    "hasAccessToPreview": false
+                  },
+                  "target": "gemini-2.5-pro"
+                },
+                {
+                  "condition": {
+                    "useCustomTools": true
+                  },
+                  "target": "gemini-3.1-pro-preview-customtools"
+                }
+              ]
+            },
+            "gemini-3.1-pro-preview-customtools": {
+              "default": "gemini-3.1-pro-preview-customtools",
+              "contexts": [
+                {
+                  "condition": {
+                    "hasAccessToPreview": false
+                  },
+                  "target": "gemini-2.5-pro"
+                }
+              ]
+            },
+            "gemini-3-flash-preview": {
+              "default": "gemini-3-flash-preview",
+              "contexts": [
+                {
+                  "condition": {
+                    "hasAccessToPreview": false
+                  },
+                  "target": "gemini-2.5-flash"
+                }
+              ]
+            },
+            "gemini-3-pro-preview": {
+              "default": "gemini-3-pro-preview",
+              "contexts": [
+                {
+                  "condition": {
+                    "hasAccessToPreview": false
+                  },
+                  "target": "gemini-2.5-pro"
+                },
+                {
+                  "condition": {
+                    "useGemini3_1": true,
+                    "useCustomTools": true
+                  },
+                  "target": "gemini-3.1-pro-preview-customtools"
+                },
+                {
+                  "condition": {
+                    "useGemini3_1": true
+                  },
+                  "target": "gemini-3.1-pro-preview"
+                }
+              ]
+            },
+            "auto-gemini-3": {
+              "default": "gemini-3-pro-preview",
+              "contexts": [
+                {
+                  "condition": {
+                    "hasAccessToPreview": false
+                  },
+                  "target": "gemini-2.5-pro"
+                },
+                {
+                  "condition": {
+                    "useGemini3_1": true,
+                    "useCustomTools": true
+                  },
+                  "target": "gemini-3.1-pro-preview-customtools"
+                },
+                {
+                  "condition": {
+                    "useGemini3_1": true
+                  },
+                  "target": "gemini-3.1-pro-preview"
+                }
+              ]
+            },
+            "auto": {
+              "default": "gemini-3-pro-preview",
+              "contexts": [
+                {
+                  "condition": {
+                    "hasAccessToPreview": false
+                  },
+                  "target": "gemini-2.5-pro"
+                },
+                {
+                  "condition": {
+                    "useGemini3_1": true,
+                    "useCustomTools": true
+                  },
+                  "target": "gemini-3.1-pro-preview-customtools"
+                },
+                {
+                  "condition": {
+                    "useGemini3_1": true
+                  },
+                  "target": "gemini-3.1-pro-preview"
+                }
+              ]
+            },
+            "pro": {
+              "default": "gemini-3-pro-preview",
+              "contexts": [
+                {
+                  "condition": {
+                    "hasAccessToPreview": false
+                  },
+                  "target": "gemini-2.5-pro"
+                },
+                {
+                  "condition": {
+                    "useGemini3_1": true,
+                    "useCustomTools": true
+                  },
+                  "target": "gemini-3.1-pro-preview-customtools"
+                },
+                {
+                  "condition": {
+                    "useGemini3_1": true
+                  },
+                  "target": "gemini-3.1-pro-preview"
+                }
+              ]
+            },
+            "auto-gemini-2.5": {
+              "default": "gemini-2.5-pro"
+            },
+            "gemini-3.1-flash-lite-preview": {
+              "default": "gemini-3.1-flash-lite-preview",
+              "contexts": [
+                {
+                  "condition": {
+                    "useGemini3_1FlashLite": false
+                  },
+                  "target": "gemini-2.5-flash-lite"
+                }
+              ]
+            },
+            "flash": {
+              "default": "gemini-3-flash-preview",
+              "contexts": [
+                {
+                  "condition": {
+                    "hasAccessToPreview": false
+                  },
+                  "target": "gemini-2.5-flash"
+                }
+              ]
+            },
+            "flash-lite": {
+              "default": "gemini-2.5-flash-lite",
+              "contexts": [
+                {
+                  "condition": {
+                    "useGemini3_1FlashLite": true
+                  },
+                  "target": "gemini-3.1-flash-lite-preview"
+                }
+              ]
+            }
+          },
+          "type": "object",
+          "additionalProperties": {
+            "$ref": "#/$defs/ModelResolution"
+          }
+        },
+        "classifierIdResolutions": {
+          "title": "Classifier ID Resolutions",
+          "description": "Rules for resolving classifier tiers (flash, pro) to concrete model IDs.",
+          "markdownDescription": "Rules for resolving classifier tiers (flash, pro) to concrete model IDs.\n\n- Category: `Model`\n- Requires restart: `yes`\n- Default: `{\n  \"flash\": {\n    \"default\": \"gemini-3-flash-preview\",\n    \"contexts\": [\n      {\n        \"condition\": {\n          \"requestedModels\": [\n            \"auto-gemini-2.5\",\n            \"gemini-2.5-pro\"\n          ]\n        },\n        \"target\": \"gemini-2.5-flash\"\n      },\n      {\n        \"condition\": {\n          \"requestedModels\": [\n            \"auto-gemini-3\",\n            \"gemini-3-pro-preview\"\n          ]\n        },\n        \"target\": \"gemini-3-flash-preview\"\n      }\n    ]\n  },\n  \"pro\": {\n    \"default\": \"gemini-3-pro-preview\",\n    \"contexts\": [\n      {\n        \"condition\": {\n          \"requestedModels\": [\n            \"auto-gemini-2.5\",\n            \"gemini-2.5-pro\"\n          ]\n        },\n        \"target\": \"gemini-2.5-pro\"\n      },\n      {\n        \"condition\": {\n          \"useGemini3_1\": true,\n          \"useCustomTools\": true\n        },\n        \"target\": \"gemini-3.1-pro-preview-customtools\"\n      },\n      {\n        \"condition\": {\n          \"useGemini3_1\": true\n        },\n        \"target\": \"gemini-3.1-pro-preview\"\n      }\n    ]\n  }\n}`",
+          "default": {
+            "flash": {
+              "default": "gemini-3-flash-preview",
+              "contexts": [
+                {
+                  "condition": {
+                    "requestedModels": ["auto-gemini-2.5", "gemini-2.5-pro"]
+                  },
+                  "target": "gemini-2.5-flash"
+                },
+                {
+                  "condition": {
+                    "requestedModels": ["auto-gemini-3", "gemini-3-pro-preview"]
+                  },
+                  "target": "gemini-3-flash-preview"
+                }
+              ]
+            },
+            "pro": {
+              "default": "gemini-3-pro-preview",
+              "contexts": [
+                {
+                  "condition": {
+                    "requestedModels": ["auto-gemini-2.5", "gemini-2.5-pro"]
+                  },
+                  "target": "gemini-2.5-pro"
+                },
+                {
+                  "condition": {
+                    "useGemini3_1": true,
+                    "useCustomTools": true
+                  },
+                  "target": "gemini-3.1-pro-preview-customtools"
+                },
+                {
+                  "condition": {
+                    "useGemini3_1": true
+                  },
+                  "target": "gemini-3.1-pro-preview"
+                }
+              ]
+            }
+          },
+          "type": "object",
+          "additionalProperties": {
+            "$ref": "#/$defs/ModelResolution"
+          }
+        },
+        "modelChains": {
+          "title": "Model Chains",
+          "description": "Availability policy chains defining fallback behavior for models.",
+          "markdownDescription": "Availability policy chains defining fallback behavior for models.\n\n- Category: `Model`\n- Requires restart: `yes`\n- Default: `{\n  \"preview\": [\n    {\n      \"model\": \"gemini-3-pro-preview\",\n      \"actions\": {\n        \"terminal\": \"prompt\",\n        \"transient\": \"prompt\",\n        \"not_found\": \"prompt\",\n        \"unknown\": \"prompt\"\n      },\n      \"stateTransitions\": {\n        \"terminal\": \"terminal\",\n        \"transient\": \"terminal\",\n        \"not_found\": \"terminal\",\n        \"unknown\": \"terminal\"\n      }\n    },\n    {\n      \"model\": \"gemini-3-flash-preview\",\n      \"isLastResort\": true,\n      \"actions\": {\n        \"terminal\": \"prompt\",\n        \"transient\": \"prompt\",\n        \"not_found\": \"prompt\",\n        \"unknown\": \"prompt\"\n      },\n      \"stateTransitions\": {\n        \"terminal\": \"terminal\",\n        \"transient\": \"terminal\",\n        \"not_found\": \"terminal\",\n        \"unknown\": \"terminal\"\n      }\n    }\n  ],\n  \"default\": [\n    {\n      \"model\": \"gemini-2.5-pro\",\n      \"actions\": {\n        \"terminal\": \"prompt\",\n        \"transient\": \"prompt\",\n        \"not_found\": \"prompt\",\n        \"unknown\": \"prompt\"\n      },\n      \"stateTransitions\": {\n        \"terminal\": \"terminal\",\n        \"transient\": \"terminal\",\n        \"not_found\": \"terminal\",\n        \"unknown\": \"terminal\"\n      }\n    },\n    {\n      \"model\": \"gemini-2.5-flash\",\n      \"isLastResort\": true,\n      \"actions\": {\n        \"terminal\": \"prompt\",\n        \"transient\": \"prompt\",\n        \"not_found\": \"prompt\",\n        \"unknown\": \"prompt\"\n      },\n      \"stateTransitions\": {\n        \"terminal\": \"terminal\",\n        \"transient\": \"terminal\",\n        \"not_found\": \"terminal\",\n        \"unknown\": \"terminal\"\n      }\n    }\n  ],\n  \"lite\": [\n    {\n      \"model\": \"gemini-2.5-flash-lite\",\n      \"actions\": {\n        \"terminal\": \"silent\",\n        \"transient\": \"silent\",\n        \"not_found\": \"silent\",\n        \"unknown\": \"silent\"\n      },\n      \"stateTransitions\": {\n        \"terminal\": \"terminal\",\n        \"transient\": \"terminal\",\n        \"not_found\": \"terminal\",\n        \"unknown\": \"terminal\"\n      }\n    },\n    {\n      \"model\": \"gemini-2.5-flash\",\n      \"actions\": {\n        \"terminal\": \"silent\",\n        \"transient\": \"silent\",\n        \"not_found\": \"silent\",\n        \"unknown\": \"silent\"\n      },\n      \"stateTransitions\": {\n        \"terminal\": \"terminal\",\n        \"transient\": \"terminal\",\n        \"not_found\": \"terminal\",\n        \"unknown\": \"terminal\"\n      }\n    },\n    {\n      \"model\": \"gemini-2.5-pro\",\n      \"isLastResort\": true,\n      \"actions\": {\n        \"terminal\": \"silent\",\n        \"transient\": \"silent\",\n        \"not_found\": \"silent\",\n        \"unknown\": \"silent\"\n      },\n      \"stateTransitions\": {\n        \"terminal\": \"terminal\",\n        \"transient\": \"terminal\",\n        \"not_found\": \"terminal\",\n        \"unknown\": \"terminal\"\n      }\n    }\n  ]\n}`",
+          "default": {
+            "preview": [
+              {
+                "model": "gemini-3-pro-preview",
+                "actions": {
+                  "terminal": "prompt",
+                  "transient": "prompt",
+                  "not_found": "prompt",
+                  "unknown": "prompt"
+                },
+                "stateTransitions": {
+                  "terminal": "terminal",
+                  "transient": "terminal",
+                  "not_found": "terminal",
+                  "unknown": "terminal"
+                }
+              },
+              {
+                "model": "gemini-3-flash-preview",
+                "isLastResort": true,
+                "actions": {
+                  "terminal": "prompt",
+                  "transient": "prompt",
+                  "not_found": "prompt",
+                  "unknown": "prompt"
+                },
+                "stateTransitions": {
+                  "terminal": "terminal",
+                  "transient": "terminal",
+                  "not_found": "terminal",
+                  "unknown": "terminal"
+                }
+              }
+            ],
+            "default": [
+              {
+                "model": "gemini-2.5-pro",
+                "actions": {
+                  "terminal": "prompt",
+                  "transient": "prompt",
+                  "not_found": "prompt",
+                  "unknown": "prompt"
+                },
+                "stateTransitions": {
+                  "terminal": "terminal",
+                  "transient": "terminal",
+                  "not_found": "terminal",
+                  "unknown": "terminal"
+                }
+              },
+              {
+                "model": "gemini-2.5-flash",
+                "isLastResort": true,
+                "actions": {
+                  "terminal": "prompt",
+                  "transient": "prompt",
+                  "not_found": "prompt",
+                  "unknown": "prompt"
+                },
+                "stateTransitions": {
+                  "terminal": "terminal",
+                  "transient": "terminal",
+                  "not_found": "terminal",
+                  "unknown": "terminal"
+                }
+              }
+            ],
+            "lite": [
+              {
+                "model": "gemini-2.5-flash-lite",
+                "actions": {
+                  "terminal": "silent",
+                  "transient": "silent",
+                  "not_found": "silent",
+                  "unknown": "silent"
+                },
+                "stateTransitions": {
+                  "terminal": "terminal",
+                  "transient": "terminal",
+                  "not_found": "terminal",
+                  "unknown": "terminal"
+                }
+              },
+              {
+                "model": "gemini-2.5-flash",
+                "actions": {
+                  "terminal": "silent",
+                  "transient": "silent",
+                  "not_found": "silent",
+                  "unknown": "silent"
+                },
+                "stateTransitions": {
+                  "terminal": "terminal",
+                  "transient": "terminal",
+                  "not_found": "terminal",
+                  "unknown": "terminal"
+                }
+              },
+              {
+                "model": "gemini-2.5-pro",
+                "isLastResort": true,
+                "actions": {
+                  "terminal": "silent",
+                  "transient": "silent",
+                  "not_found": "silent",
+                  "unknown": "silent"
+                },
+                "stateTransitions": {
+                  "terminal": "terminal",
+                  "transient": "terminal",
+                  "not_found": "terminal",
+                  "unknown": "terminal"
+                }
+              }
+            ]
+          },
+          "type": "object",
+          "additionalProperties": {
+            "$ref": "#/$defs/ModelPolicyChain"
+          }
         }
       },
       "additionalProperties": false
@@ -956,6 +2188,81 @@
           "additionalProperties": {
             "$ref": "#/$defs/AgentOverride"
           }
+        },
+        "browser": {
+          "title": "Browser Agent",
+          "description": "Settings specific to the browser agent.",
+          "markdownDescription": "Settings specific to the browser agent.\n\n- Category: `Advanced`\n- Requires restart: `yes`\n- Default: `{}`",
+          "default": {},
+          "type": "object",
+          "properties": {
+            "sessionMode": {
+              "title": "Browser Session Mode",
+              "description": "Session mode: 'persistent', 'isolated', or 'existing'.",
+              "markdownDescription": "Session mode: 'persistent', 'isolated', or 'existing'.\n\n- Category: `Advanced`\n- Requires restart: `yes`\n- Default: `persistent`",
+              "default": "persistent",
+              "type": "string",
+              "enum": ["persistent", "isolated", "existing"]
+            },
+            "headless": {
+              "title": "Browser Headless",
+              "description": "Run browser in headless mode.",
+              "markdownDescription": "Run browser in headless mode.\n\n- Category: `Advanced`\n- Requires restart: `yes`\n- Default: `false`",
+              "default": false,
+              "type": "boolean"
+            },
+            "profilePath": {
+              "title": "Browser Profile Path",
+              "description": "Path to browser profile directory for session persistence.",
+              "markdownDescription": "Path to browser profile directory for session persistence.\n\n- Category: `Advanced`\n- Requires restart: `yes`",
+              "type": "string"
+            },
+            "visualModel": {
+              "title": "Browser Visual Model",
+              "description": "Model for the visual agent's analyze_screenshot tool. When set, enables the tool.",
+              "markdownDescription": "Model for the visual agent's analyze_screenshot tool. When set, enables the tool.\n\n- Category: `Advanced`\n- Requires restart: `yes`",
+              "type": "string"
+            },
+            "allowedDomains": {
+              "title": "Allowed Domains",
+              "description": "A list of allowed domains for the browser agent (e.g., [\"github.com\", \"*.google.com\"]).",
+              "markdownDescription": "A list of allowed domains for the browser agent (e.g., [\"github.com\", \"*.google.com\"]).\n\n- Category: `Advanced`\n- Requires restart: `yes`\n- Default: `[\n  \"github.com\",\n  \"*.google.com\",\n  \"localhost\"\n]`",
+              "default": ["github.com", "*.google.com", "localhost"],
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "disableUserInput": {
+              "title": "Disable User Input",
+              "description": "Disable user input on browser window during automation.",
+              "markdownDescription": "Disable user input on browser window during automation.\n\n- Category: `Advanced`\n- Requires restart: `no`\n- Default: `true`",
+              "default": true,
+              "type": "boolean"
+            },
+            "maxActionsPerTask": {
+              "title": "Max Actions Per Task",
+              "description": "The maximum number of tool calls allowed per browser task. Enforcement is hard: the agent will be terminated when the limit is reached.",
+              "markdownDescription": "The maximum number of tool calls allowed per browser task. Enforcement is hard: the agent will be terminated when the limit is reached.\n\n- Category: `Advanced`\n- Requires restart: `no`\n- Default: `100`",
+              "default": 100,
+              "type": "number"
+            },
+            "confirmSensitiveActions": {
+              "title": "Confirm Sensitive Actions",
+              "description": "Require manual confirmation for sensitive browser actions (e.g., fill_form, evaluate_script).",
+              "markdownDescription": "Require manual confirmation for sensitive browser actions (e.g., fill_form, evaluate_script).\n\n- Category: `Advanced`\n- Requires restart: `yes`\n- Default: `false`",
+              "default": false,
+              "type": "boolean"
+            },
+            "blockFileUploads": {
+              "title": "Block File Uploads",
+              "description": "Hard-block file upload requests from the browser agent.",
+              "markdownDescription": "Hard-block file upload requests from the browser agent.\n\n- Category: `Advanced`\n- Requires restart: `yes`\n- Default: `false`",
+              "default": false,
+              "type": "boolean"
+            }
+          },
+          "additionalProperties": false
         }
       },
       "additionalProperties": false
@@ -979,12 +2286,29 @@
           "markdownDescription": "The format to use when importing memory.\n\n- Category: `Context`\n- Requires restart: `no`",
           "type": "string"
         },
+        "includeDirectoryTree": {
+          "title": "Include Directory Tree",
+          "description": "Whether to include the directory tree of the current working directory in the initial request to the model.",
+          "markdownDescription": "Whether to include the directory tree of the current working directory in the initial request to the model.\n\n- Category: `Context`\n- Requires restart: `no`\n- Default: `true`",
+          "default": true,
+          "type": "boolean"
+        },
         "discoveryMaxDirs": {
           "title": "Memory Discovery Max Dirs",
           "description": "Maximum number of directories to search for memory.",
           "markdownDescription": "Maximum number of directories to search for memory.\n\n- Category: `Context`\n- Requires restart: `no`\n- Default: `200`",
           "default": 200,
           "type": "number"
+        },
+        "memoryBoundaryMarkers": {
+          "title": "Memory Boundary Markers",
+          "description": "File or directory names that mark the boundary for GEMINI.md discovery. The upward traversal stops at the first directory containing any of these markers. An empty array disables parent traversal.",
+          "markdownDescription": "File or directory names that mark the boundary for GEMINI.md discovery. The upward traversal stops at the first directory containing any of these markers. An empty array disables parent traversal.\n\n- Category: `Context`\n- Requires restart: `yes`\n- Default: `[\n  \".git\"\n]`",
+          "default": [".git"],
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
         },
         "includeDirectories": {
           "title": "Include Directories",
@@ -998,8 +2322,8 @@
         },
         "loadMemoryFromIncludeDirectories": {
           "title": "Load Memory From Include Directories",
-          "description": "Controls how /memory refresh loads GEMINI.md files. When true, include directories are scanned; when false, only the current directory is used.",
-          "markdownDescription": "Controls how /memory refresh loads GEMINI.md files. When true, include directories are scanned; when false, only the current directory is used.\n\n- Category: `Context`\n- Requires restart: `no`\n- Default: `false`",
+          "description": "Controls how /memory reload loads GEMINI.md files. When true, include directories are scanned; when false, only the current directory is used.",
+          "markdownDescription": "Controls how /memory reload loads GEMINI.md files. When true, include directories are scanned; when false, only the current directory is used.\n\n- Category: `Context`\n- Requires restart: `no`\n- Default: `false`",
           "default": false,
           "type": "boolean"
         },
@@ -1063,9 +2387,26 @@
       "properties": {
         "sandbox": {
           "title": "Sandbox",
-          "description": "Sandbox execution environment. Set to a boolean to enable or disable the sandbox, or provide a string path to a sandbox profile.",
-          "markdownDescription": "Sandbox execution environment. Set to a boolean to enable or disable the sandbox, or provide a string path to a sandbox profile.\n\n- Category: `Tools`\n- Requires restart: `yes`",
-          "$ref": "#/$defs/BooleanOrString"
+          "description": "Legacy full-process sandbox execution environment. Set to a boolean to enable or disable the sandbox, provide a string path to a sandbox profile, or specify an explicit sandbox command (e.g., \"docker\", \"podman\", \"lxc\", \"windows-native\").",
+          "markdownDescription": "Legacy full-process sandbox execution environment. Set to a boolean to enable or disable the sandbox, provide a string path to a sandbox profile, or specify an explicit sandbox command (e.g., \"docker\", \"podman\", \"lxc\", \"windows-native\").\n\n- Category: `Tools`\n- Requires restart: `yes`",
+          "$ref": "#/$defs/BooleanOrStringOrObject"
+        },
+        "sandboxAllowedPaths": {
+          "title": "Sandbox Allowed Paths",
+          "description": "List of additional paths that the sandbox is allowed to access.",
+          "markdownDescription": "List of additional paths that the sandbox is allowed to access.\n\n- Category: `Tools`\n- Requires restart: `yes`\n- Default: `[]`",
+          "default": [],
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "sandboxNetworkAccess": {
+          "title": "Sandbox Network Access",
+          "description": "Whether the sandbox is allowed to access the network.",
+          "markdownDescription": "Whether the sandbox is allowed to access the network.\n\n- Category: `Tools`\n- Requires restart: `yes`\n- Default: `false`",
+          "default": false,
+          "type": "boolean"
         },
         "shell": {
           "title": "Shell",
@@ -1080,6 +2421,14 @@
               "markdownDescription": "Use node-pty for an interactive shell experience. Fallback to child_process still applies.\n\n- Category: `Tools`\n- Requires restart: `yes`\n- Default: `true`",
               "default": true,
               "type": "boolean"
+            },
+            "backgroundCompletionBehavior": {
+              "title": "Background Completion Behavior",
+              "description": "Controls what happens when a background shell command finishes. 'silent' (default): quietly exits in background. 'inject': automatically returns output to agent. 'notify': shows brief message in chat.",
+              "markdownDescription": "Controls what happens when a background shell command finishes. 'silent' (default): quietly exits in background. 'inject': automatically returns output to agent. 'notify': shows brief message in chat.\n\n- Category: `Tools`\n- Requires restart: `no`\n- Default: `silent`",
+              "default": "silent",
+              "type": "string",
+              "enum": ["silent", "inject", "notify"]
             },
             "pager": {
               "title": "Pager",
@@ -1111,21 +2460,6 @@
             }
           },
           "additionalProperties": false
-        },
-        "autoAccept": {
-          "title": "Auto Accept",
-          "description": "Automatically accept and execute tool calls that are considered safe (e.g., read-only operations).",
-          "markdownDescription": "Automatically accept and execute tool calls that are considered safe (e.g., read-only operations).\n\n- Category: `Tools`\n- Requires restart: `no`\n- Default: `false`",
-          "default": false,
-          "type": "boolean"
-        },
-        "approvalMode": {
-          "title": "Approval Mode",
-          "description": "The default approval mode for tool execution. 'default' prompts for approval, 'auto_edit' auto-approves edit tools, and 'plan' is read-only mode. 'yolo' is not supported yet.",
-          "markdownDescription": "The default approval mode for tool execution. 'default' prompts for approval, 'auto_edit' auto-approves edit tools, and 'plan' is read-only mode. 'yolo' is not supported yet.\n\n- Category: `Tools`\n- Requires restart: `no`\n- Default: `default`",
-          "default": "default",
-          "type": "string",
-          "enum": ["default", "auto_edit", "plan"]
         },
         "core": {
           "title": "Core Tools",
@@ -1173,25 +2507,11 @@
           "default": true,
           "type": "boolean"
         },
-        "enableToolOutputTruncation": {
-          "title": "Enable Tool Output Truncation",
-          "description": "Enable truncation of large tool outputs.",
-          "markdownDescription": "Enable truncation of large tool outputs.\n\n- Category: `General`\n- Requires restart: `yes`\n- Default: `true`",
-          "default": true,
-          "type": "boolean"
-        },
         "truncateToolOutputThreshold": {
           "title": "Tool Output Truncation Threshold",
-          "description": "Truncate tool output if it is larger than this many characters. Set to -1 to disable.",
-          "markdownDescription": "Truncate tool output if it is larger than this many characters. Set to -1 to disable.\n\n- Category: `General`\n- Requires restart: `yes`\n- Default: `4000000`",
-          "default": 4000000,
-          "type": "number"
-        },
-        "truncateToolOutputLines": {
-          "title": "Tool Output Truncation Lines",
-          "description": "The number of lines to keep when truncating tool output.",
-          "markdownDescription": "The number of lines to keep when truncating tool output.\n\n- Category: `General`\n- Requires restart: `yes`\n- Default: `1000`",
-          "default": 1000,
+          "description": "Maximum characters to show when truncating large tool outputs. Set to 0 or negative to disable truncation.",
+          "markdownDescription": "Maximum characters to show when truncating large tool outputs. Set to 0 or negative to disable truncation.\n\n- Category: `General`\n- Requires restart: `yes`\n- Default: `40000`",
+          "default": 40000,
           "type": "number"
         },
         "disableLLMCorrection": {
@@ -1252,6 +2572,13 @@
       "default": {},
       "type": "object",
       "properties": {
+        "toolSandboxing": {
+          "title": "Tool Sandboxing",
+          "description": "Experimental tool-level sandboxing (implementation in progress).",
+          "markdownDescription": "Experimental tool-level sandboxing (implementation in progress).\n\n- Category: `Security`\n- Requires restart: `no`\n- Default: `false`",
+          "default": false,
+          "type": "boolean"
+        },
         "disableYoloMode": {
           "title": "Disable YOLO Mode",
           "description": "Disable YOLO mode, even if enabled by a flag.",
@@ -1259,10 +2586,24 @@
           "default": false,
           "type": "boolean"
         },
+        "disableAlwaysAllow": {
+          "title": "Disable Always Allow",
+          "description": "Disable \"Always allow\" options in tool confirmation dialogs.",
+          "markdownDescription": "Disable \"Always allow\" options in tool confirmation dialogs.\n\n- Category: `Security`\n- Requires restart: `yes`\n- Default: `false`",
+          "default": false,
+          "type": "boolean"
+        },
         "enablePermanentToolApproval": {
           "title": "Allow Permanent Tool Approval",
           "description": "Enable the \"Allow for all future sessions\" option in tool confirmation dialogs.",
           "markdownDescription": "Enable the \"Allow for all future sessions\" option in tool confirmation dialogs.\n\n- Category: `Security`\n- Requires restart: `no`\n- Default: `false`",
+          "default": false,
+          "type": "boolean"
+        },
+        "autoAddToPolicyByDefault": {
+          "title": "Auto-add to Policy by Default",
+          "description": "When enabled, the \"Allow for all future sessions\" option becomes the default choice for low-risk tools in trusted workspaces.",
+          "markdownDescription": "When enabled, the \"Allow for all future sessions\" option becomes the default choice for low-risk tools in trusted workspaces.\n\n- Category: `Security`\n- Requires restart: `no`\n- Default: `false`",
           "default": false,
           "type": "boolean"
         },
@@ -1293,8 +2634,8 @@
             "enabled": {
               "title": "Folder Trust",
               "description": "Setting to track whether Folder trust is enabled.",
-              "markdownDescription": "Setting to track whether Folder trust is enabled.\n\n- Category: `Security`\n- Requires restart: `yes`\n- Default: `false`",
-              "default": false,
+              "markdownDescription": "Setting to track whether Folder trust is enabled.\n\n- Category: `Security`\n- Requires restart: `yes`\n- Default: `true`",
+              "default": true,
               "type": "boolean"
             }
           },
@@ -1364,6 +2705,13 @@
             }
           },
           "additionalProperties": false
+        },
+        "enableConseca": {
+          "title": "Enable Context-Aware Security",
+          "description": "Enable the context-aware security checker. This feature uses an LLM to dynamically generate and enforce security policies for tool use based on your prompt, providing an additional layer of protection against unintended actions.",
+          "markdownDescription": "Enable the context-aware security checker. This feature uses an LLM to dynamically generate and enforce security policies for tool use based on your prompt, providing an additional layer of protection against unintended actions.\n\n- Category: `Security`\n- Requires restart: `yes`\n- Default: `false`",
+          "default": false,
+          "type": "boolean"
         }
       },
       "additionalProperties": false
@@ -1378,8 +2726,8 @@
         "autoConfigureMemory": {
           "title": "Auto Configure Max Old Space Size",
           "description": "Automatically configure Node.js memory limits",
-          "markdownDescription": "Automatically configure Node.js memory limits\n\n- Category: `Advanced`\n- Requires restart: `yes`\n- Default: `false`",
-          "default": false,
+          "markdownDescription": "Automatically configure Node.js memory limits\n\n- Category: `Advanced`\n- Requires restart: `yes`\n- Default: `true`",
+          "default": true,
           "type": "boolean"
         },
         "dnsResolutionOrder": {
@@ -1414,10 +2762,34 @@
       "default": {},
       "type": "object",
       "properties": {
+        "adk": {
+          "title": "ADK",
+          "description": "Settings for the Agent Development Kit (ADK).",
+          "markdownDescription": "Settings for the Agent Development Kit (ADK).\n\n- Category: `Experimental`\n- Requires restart: `yes`\n- Default: `{}`",
+          "default": {},
+          "type": "object",
+          "properties": {
+            "agentSessionNoninteractiveEnabled": {
+              "title": "Agent Session Non-interactive Enabled",
+              "description": "Enable non-interactive agent sessions.",
+              "markdownDescription": "Enable non-interactive agent sessions.\n\n- Category: `Experimental`\n- Requires restart: `yes`\n- Default: `false`",
+              "default": false,
+              "type": "boolean"
+            }
+          },
+          "additionalProperties": false
+        },
         "enableAgents": {
           "title": "Enable Agents",
-          "description": "Enable local and remote subagents. Warning: Experimental feature, uses YOLO mode for subagents",
-          "markdownDescription": "Enable local and remote subagents. Warning: Experimental feature, uses YOLO mode for subagents\n\n- Category: `Experimental`\n- Requires restart: `yes`\n- Default: `false`",
+          "description": "Enable local and remote subagents.",
+          "markdownDescription": "Enable local and remote subagents.\n\n- Category: `Experimental`\n- Requires restart: `yes`\n- Default: `true`",
+          "default": true,
+          "type": "boolean"
+        },
+        "worktrees": {
+          "title": "Enable Git Worktrees",
+          "description": "Enable automated Git worktree management for parallel work.",
+          "markdownDescription": "Enable automated Git worktree management for parallel work.\n\n- Category: `Experimental`\n- Requires restart: `yes`\n- Default: `false`",
           "default": false,
           "type": "boolean"
         },
@@ -1431,16 +2803,23 @@
         "extensionConfig": {
           "title": "Extension Configuration",
           "description": "Enable requesting and fetching of extension settings.",
-          "markdownDescription": "Enable requesting and fetching of extension settings.\n\n- Category: `Experimental`\n- Requires restart: `yes`\n- Default: `false`",
+          "markdownDescription": "Enable requesting and fetching of extension settings.\n\n- Category: `Experimental`\n- Requires restart: `yes`\n- Default: `true`",
+          "default": true,
+          "type": "boolean"
+        },
+        "extensionRegistry": {
+          "title": "Extension Registry Explore UI",
+          "description": "Enable extension registry explore UI.",
+          "markdownDescription": "Enable extension registry explore UI.\n\n- Category: `Experimental`\n- Requires restart: `yes`\n- Default: `false`",
           "default": false,
           "type": "boolean"
         },
-        "enableEventDrivenScheduler": {
-          "title": "Event Driven Scheduler",
-          "description": "Enables event-driven scheduler within the CLI session.",
-          "markdownDescription": "Enables event-driven scheduler within the CLI session.\n\n- Category: `Experimental`\n- Requires restart: `yes`\n- Default: `true`",
-          "default": true,
-          "type": "boolean"
+        "extensionRegistryURI": {
+          "title": "Extension Registry URI",
+          "description": "The URI (web URL or local file path) of the extension registry.",
+          "markdownDescription": "The URI (web URL or local file path) of the extension registry.\n\n- Category: `Experimental`\n- Requires restart: `yes`\n- Default: `https://geminicli.com/extensions.json`",
+          "default": "https://geminicli.com/extensions.json",
+          "type": "string"
         },
         "extensionReloading": {
           "title": "Extension Reloading",
@@ -1458,15 +2837,112 @@
         },
         "useOSC52Paste": {
           "title": "Use OSC 52 Paste",
-          "description": "Use OSC 52 sequence for pasting instead of clipboardy (useful for remote sessions).",
-          "markdownDescription": "Use OSC 52 sequence for pasting instead of clipboardy (useful for remote sessions).\n\n- Category: `Experimental`\n- Requires restart: `no`\n- Default: `false`",
+          "description": "Use OSC 52 for pasting. This may be more robust than the default system when using remote terminal sessions (if your terminal is configured to allow it).",
+          "markdownDescription": "Use OSC 52 for pasting. This may be more robust than the default system when using remote terminal sessions (if your terminal is configured to allow it).\n\n- Category: `Experimental`\n- Requires restart: `no`\n- Default: `false`",
           "default": false,
           "type": "boolean"
         },
-        "plan": {
-          "title": "Plan",
-          "description": "Enable planning features (Plan Mode and tools).",
-          "markdownDescription": "Enable planning features (Plan Mode and tools).\n\n- Category: `Experimental`\n- Requires restart: `yes`\n- Default: `false`",
+        "useOSC52Copy": {
+          "title": "Use OSC 52 Copy",
+          "description": "Use OSC 52 for copying. This may be more robust than the default system when using remote terminal sessions (if your terminal is configured to allow it).",
+          "markdownDescription": "Use OSC 52 for copying. This may be more robust than the default system when using remote terminal sessions (if your terminal is configured to allow it).\n\n- Category: `Experimental`\n- Requires restart: `no`\n- Default: `false`",
+          "default": false,
+          "type": "boolean"
+        },
+        "taskTracker": {
+          "title": "Task Tracker",
+          "description": "Enable task tracker tools.",
+          "markdownDescription": "Enable task tracker tools.\n\n- Category: `Experimental`\n- Requires restart: `yes`\n- Default: `false`",
+          "default": false,
+          "type": "boolean"
+        },
+        "modelSteering": {
+          "title": "Model Steering",
+          "description": "Enable model steering (user hints) to guide the model during tool execution.",
+          "markdownDescription": "Enable model steering (user hints) to guide the model during tool execution.\n\n- Category: `Experimental`\n- Requires restart: `no`\n- Default: `false`",
+          "default": false,
+          "type": "boolean"
+        },
+        "directWebFetch": {
+          "title": "Direct Web Fetch",
+          "description": "Enable web fetch behavior that bypasses LLM summarization.",
+          "markdownDescription": "Enable web fetch behavior that bypasses LLM summarization.\n\n- Category: `Experimental`\n- Requires restart: `yes`\n- Default: `false`",
+          "default": false,
+          "type": "boolean"
+        },
+        "dynamicModelConfiguration": {
+          "title": "Dynamic Model Configuration",
+          "description": "Enable dynamic model configuration (definitions, resolutions, and chains) via settings.",
+          "markdownDescription": "Enable dynamic model configuration (definitions, resolutions, and chains) via settings.\n\n- Category: `Experimental`\n- Requires restart: `yes`\n- Default: `false`",
+          "default": false,
+          "type": "boolean"
+        },
+        "gemmaModelRouter": {
+          "title": "Gemma Model Router",
+          "description": "Enable Gemma model router (experimental).",
+          "markdownDescription": "Enable Gemma model router (experimental).\n\n- Category: `Experimental`\n- Requires restart: `yes`\n- Default: `{}`",
+          "default": {},
+          "type": "object",
+          "properties": {
+            "enabled": {
+              "title": "Enable Gemma Model Router",
+              "description": "Enable the Gemma Model Router (experimental). Requires a local endpoint serving Gemma via the Gemini API using LiteRT-LM shim.",
+              "markdownDescription": "Enable the Gemma Model Router (experimental). Requires a local endpoint serving Gemma via the Gemini API using LiteRT-LM shim.\n\n- Category: `Experimental`\n- Requires restart: `yes`\n- Default: `false`",
+              "default": false,
+              "type": "boolean"
+            },
+            "classifier": {
+              "title": "Classifier",
+              "description": "Classifier configuration.",
+              "markdownDescription": "Classifier configuration.\n\n- Category: `Experimental`\n- Requires restart: `yes`\n- Default: `{}`",
+              "default": {},
+              "type": "object",
+              "properties": {
+                "host": {
+                  "title": "Host",
+                  "description": "The host of the classifier.",
+                  "markdownDescription": "The host of the classifier.\n\n- Category: `Experimental`\n- Requires restart: `yes`\n- Default: `http://localhost:9379`",
+                  "default": "http://localhost:9379",
+                  "type": "string"
+                },
+                "model": {
+                  "title": "Model",
+                  "description": "The model to use for the classifier. Only tested on `gemma3-1b-gpu-custom`.",
+                  "markdownDescription": "The model to use for the classifier. Only tested on `gemma3-1b-gpu-custom`.\n\n- Category: `Experimental`\n- Requires restart: `yes`\n- Default: `gemma3-1b-gpu-custom`",
+                  "default": "gemma3-1b-gpu-custom",
+                  "type": "string"
+                }
+              },
+              "additionalProperties": false
+            }
+          },
+          "additionalProperties": false
+        },
+        "memoryManager": {
+          "title": "Memory Manager Agent",
+          "description": "Replace the built-in save_memory tool with a memory manager subagent that supports adding, removing, de-duplicating, and organizing memories.",
+          "markdownDescription": "Replace the built-in save_memory tool with a memory manager subagent that supports adding, removing, de-duplicating, and organizing memories.\n\n- Category: `Experimental`\n- Requires restart: `yes`\n- Default: `false`",
+          "default": false,
+          "type": "boolean"
+        },
+        "generalistProfile": {
+          "title": "Use the generalist profile to manage agent contexts.",
+          "description": "Suitable for general coding and software development tasks.",
+          "markdownDescription": "Suitable for general coding and software development tasks.\n\n- Category: `Experimental`\n- Requires restart: `yes`\n- Default: `false`",
+          "default": false,
+          "type": "boolean"
+        },
+        "contextManagement": {
+          "title": "Enable Context Management",
+          "description": "Enable logic for context management.",
+          "markdownDescription": "Enable logic for context management.\n\n- Category: `Experimental`\n- Requires restart: `yes`\n- Default: `false`",
+          "default": false,
+          "type": "boolean"
+        },
+        "topicUpdateNarration": {
+          "title": "Topic & Update Narration",
+          "description": "Enable the experimental Topic & Update communication model for reduced chattiness and structured progress reporting.",
+          "markdownDescription": "Enable the experimental Topic & Update communication model for reduced chattiness and structured progress reporting.\n\n- Category: `Experimental`\n- Requires restart: `no`\n- Default: `false`",
           "default": false,
           "type": "boolean"
         }
@@ -1654,6 +3130,132 @@
         "items": {}
       }
     },
+    "contextManagement": {
+      "title": "Context Management",
+      "description": "Settings for agent history and tool distillation context management.",
+      "markdownDescription": "Settings for agent history and tool distillation context management.\n\n- Category: `Experimental`\n- Requires restart: `yes`\n- Default: `{}`",
+      "default": {},
+      "type": "object",
+      "properties": {
+        "historyWindow": {
+          "title": "History Window Settings",
+          "markdownDescription": "Description not provided.\n\n- Category: `Context Management`\n- Requires restart: `yes`\n- Default: `{}`",
+          "default": {},
+          "type": "object",
+          "properties": {
+            "maxTokens": {
+              "title": "Max Tokens",
+              "description": "The number of tokens to allow before triggering compression.",
+              "markdownDescription": "The number of tokens to allow before triggering compression.\n\n- Category: `Context Management`\n- Requires restart: `yes`\n- Default: `150000`",
+              "default": 150000,
+              "type": "number"
+            },
+            "retainedTokens": {
+              "title": "Retained Tokens",
+              "description": "The number of tokens to always retain.",
+              "markdownDescription": "The number of tokens to always retain.\n\n- Category: `Context Management`\n- Requires restart: `yes`\n- Default: `40000`",
+              "default": 40000,
+              "type": "number"
+            }
+          },
+          "additionalProperties": false
+        },
+        "messageLimits": {
+          "title": "Message Limits",
+          "markdownDescription": "Description not provided.\n\n- Category: `Context Management`\n- Requires restart: `yes`\n- Default: `{}`",
+          "default": {},
+          "type": "object",
+          "properties": {
+            "normalMaxTokens": {
+              "title": "Normal Maximum Tokens",
+              "description": "The target number of tokens to budget for a normal conversation turn.",
+              "markdownDescription": "The target number of tokens to budget for a normal conversation turn.\n\n- Category: `Context Management`\n- Requires restart: `yes`\n- Default: `2500`",
+              "default": 2500,
+              "type": "number"
+            },
+            "retainedMaxTokens": {
+              "title": "Retained Maximum Tokens",
+              "description": "The maximum number of tokens a single conversation turn can consume before truncation.",
+              "markdownDescription": "The maximum number of tokens a single conversation turn can consume before truncation.\n\n- Category: `Context Management`\n- Requires restart: `yes`\n- Default: `12000`",
+              "default": 12000,
+              "type": "number"
+            },
+            "normalizationHeadRatio": {
+              "title": "Normalization Head Ratio",
+              "description": "The ratio of tokens to retain from the beginning of a truncated message (0.0 to 1.0).",
+              "markdownDescription": "The ratio of tokens to retain from the beginning of a truncated message (0.0 to 1.0).\n\n- Category: `Context Management`\n- Requires restart: `yes`\n- Default: `0.25`",
+              "default": 0.25,
+              "type": "number"
+            }
+          },
+          "additionalProperties": false
+        },
+        "tools": {
+          "title": "Context Management Tools",
+          "markdownDescription": "Description not provided.\n\n- Category: `Context Management`\n- Requires restart: `yes`\n- Default: `{}`",
+          "default": {},
+          "type": "object",
+          "properties": {
+            "distillation": {
+              "title": "Tool Distillation",
+              "markdownDescription": "Description not provided.\n\n- Category: `Context Management`\n- Requires restart: `yes`\n- Default: `{}`",
+              "default": {},
+              "type": "object",
+              "properties": {
+                "maxOutputTokens": {
+                  "title": "Max Output Tokens",
+                  "description": "Maximum tokens to show to the model when truncating large tool outputs.",
+                  "markdownDescription": "Maximum tokens to show to the model when truncating large tool outputs.\n\n- Category: `Context Management`\n- Requires restart: `yes`\n- Default: `10000`",
+                  "default": 10000,
+                  "type": "number"
+                },
+                "summarizationThresholdTokens": {
+                  "title": "Tool Summarization Threshold",
+                  "description": "Threshold above which truncated tool outputs will be summarized by an LLM.",
+                  "markdownDescription": "Threshold above which truncated tool outputs will be summarized by an LLM.\n\n- Category: `Context Management`\n- Requires restart: `yes`\n- Default: `20000`",
+                  "default": 20000,
+                  "type": "number"
+                }
+              },
+              "additionalProperties": false
+            },
+            "outputMasking": {
+              "title": "Tool Output Masking",
+              "description": "Advanced settings for tool output masking to manage context window efficiency.",
+              "markdownDescription": "Advanced settings for tool output masking to manage context window efficiency.\n\n- Category: `Context Management`\n- Requires restart: `yes`\n- Default: `{}`",
+              "default": {},
+              "type": "object",
+              "properties": {
+                "protectionThresholdTokens": {
+                  "title": "Tool Protection Threshold (Tokens)",
+                  "description": "Minimum number of tokens to protect from masking (most recent tool outputs).",
+                  "markdownDescription": "Minimum number of tokens to protect from masking (most recent tool outputs).\n\n- Category: `Context Management`\n- Requires restart: `yes`\n- Default: `50000`",
+                  "default": 50000,
+                  "type": "number"
+                },
+                "minPrunableThresholdTokens": {
+                  "title": "Min Prunable Tokens Threshold",
+                  "description": "Minimum prunable tokens required to trigger a masking pass.",
+                  "markdownDescription": "Minimum prunable tokens required to trigger a masking pass.\n\n- Category: `Context Management`\n- Requires restart: `yes`\n- Default: `30000`",
+                  "default": 30000,
+                  "type": "number"
+                },
+                "protectLatestTurn": {
+                  "title": "Protect Latest Turn",
+                  "description": "Ensures the absolute latest turn is never masked, regardless of token count.",
+                  "markdownDescription": "Ensures the absolute latest turn is never masked, regardless of token count.\n\n- Category: `Context Management`\n- Requires restart: `yes`\n- Default: `true`",
+                  "default": true,
+                  "type": "boolean"
+                }
+              },
+              "additionalProperties": false
+            }
+          },
+          "additionalProperties": false
+        }
+      },
+      "additionalProperties": false
+    },
     "admin": {
       "title": "Admin",
       "description": "Settings configured remotely by enterprise admins.",
@@ -1663,8 +3265,8 @@
       "properties": {
         "secureModeEnabled": {
           "title": "Secure Mode Enabled",
-          "description": "If true, disallows yolo mode from being used.",
-          "markdownDescription": "If true, disallows yolo mode from being used.\n\n- Category: `Admin`\n- Requires restart: `no`\n- Default: `false`",
+          "description": "If true, disallows YOLO mode and \"Always allow\" options from being used.",
+          "markdownDescription": "If true, disallows YOLO mode and \"Always allow\" options from being used.\n\n- Category: `Admin`\n- Requires restart: `no`\n- Default: `false`",
           "default": false,
           "type": "boolean"
         },
@@ -1698,6 +3300,26 @@
               "markdownDescription": "If false, disallows MCP servers from being used.\n\n- Category: `Admin`\n- Requires restart: `no`\n- Default: `true`",
               "default": true,
               "type": "boolean"
+            },
+            "config": {
+              "title": "MCP Config",
+              "description": "Admin-configured MCP servers (allowlist).",
+              "markdownDescription": "Admin-configured MCP servers (allowlist).\n\n- Category: `Admin`\n- Requires restart: `no`\n- Default: `{}`",
+              "default": {},
+              "type": "object",
+              "additionalProperties": {
+                "$ref": "#/$defs/MCPServerConfig"
+              }
+            },
+            "requiredConfig": {
+              "title": "Required MCP Config",
+              "description": "Admin-required MCP servers that are always injected.",
+              "markdownDescription": "Admin-required MCP servers that are always injected.\n\n- Category: `Admin`\n- Requires restart: `no`\n- Default: `{}`",
+              "default": {},
+              "type": "object",
+              "additionalProperties": {
+                "$ref": "#/$defs/RequiredMcpServerConfig"
+              }
             }
           },
           "additionalProperties": false
@@ -1816,6 +3438,77 @@
         "authProviderType": {
           "type": "string",
           "description": "Authentication provider used for acquiring credentials (for example `dynamic_discovery`).",
+          "enum": [
+            "dynamic_discovery",
+            "google_credentials",
+            "service_account_impersonation"
+          ]
+        },
+        "targetAudience": {
+          "type": "string",
+          "description": "OAuth target audience (CLIENT_ID.apps.googleusercontent.com)."
+        },
+        "targetServiceAccount": {
+          "type": "string",
+          "description": "Service account email to impersonate (name@project.iam.gserviceaccount.com)."
+        }
+      }
+    },
+    "RequiredMcpServerConfig": {
+      "type": "object",
+      "description": "Admin-required MCP server configuration (remote transports only).",
+      "additionalProperties": false,
+      "properties": {
+        "url": {
+          "type": "string",
+          "description": "URL for the required MCP server."
+        },
+        "type": {
+          "type": "string",
+          "description": "Transport type for the required server.",
+          "enum": ["sse", "http"]
+        },
+        "headers": {
+          "type": "object",
+          "description": "Additional HTTP headers sent to the server.",
+          "additionalProperties": {
+            "type": "string"
+          }
+        },
+        "timeout": {
+          "type": "number",
+          "description": "Timeout in milliseconds for MCP requests."
+        },
+        "trust": {
+          "type": "boolean",
+          "description": "Marks the server as trusted. Defaults to true for admin-required servers."
+        },
+        "description": {
+          "type": "string",
+          "description": "Human-readable description of the server."
+        },
+        "includeTools": {
+          "type": "array",
+          "description": "Subset of tools enabled for this server.",
+          "items": {
+            "type": "string"
+          }
+        },
+        "excludeTools": {
+          "type": "array",
+          "description": "Tools disabled for this server.",
+          "items": {
+            "type": "string"
+          }
+        },
+        "oauth": {
+          "type": "object",
+          "description": "OAuth configuration for authenticating with the server.",
+          "additionalProperties": true
+        },
+        "authProviderType": {
+          "type": "string",
+          "description": "Authentication provider used for acquiring credentials.",
           "enum": [
             "dynamic_discovery",
             "google_credentials",
@@ -2088,14 +3781,45 @@
         }
       ]
     },
-    "BooleanOrString": {
-      "description": "Accepts either a boolean flag or a string command name.",
+    "BooleanOrStringOrObject": {
+      "description": "Accepts either a boolean flag, a string command name, or a configuration object.",
       "anyOf": [
         {
           "type": "boolean"
         },
         {
           "type": "string"
+        },
+        {
+          "type": "object",
+          "description": "Sandbox configuration object.",
+          "additionalProperties": false,
+          "properties": {
+            "enabled": {
+              "type": "boolean",
+              "description": "Enables or disables the sandbox."
+            },
+            "command": {
+              "type": "string",
+              "description": "The sandbox command to use (docker, podman, sandbox-exec, runsc, lxc).",
+              "enum": ["docker", "podman", "sandbox-exec", "runsc", "lxc"]
+            },
+            "image": {
+              "type": "string",
+              "description": "The sandbox image to use."
+            },
+            "allowedPaths": {
+              "type": "array",
+              "description": "A list of absolute host paths that should be accessible within the sandbox.",
+              "items": {
+                "type": "string"
+              }
+            },
+            "networkAccess": {
+              "type": "boolean",
+              "description": "Whether the sandbox should have internet access."
+            }
+          }
         }
       ]
     },
@@ -2142,6 +3866,147 @@
           }
         }
       }
+    },
+    "ModelDefinition": {
+      "type": "object",
+      "description": "Model metadata registry entry.",
+      "properties": {
+        "displayName": {
+          "type": "string"
+        },
+        "tier": {
+          "enum": ["pro", "flash", "flash-lite", "custom", "auto"]
+        },
+        "family": {
+          "type": "string"
+        },
+        "isPreview": {
+          "type": "boolean"
+        },
+        "isVisible": {
+          "type": "boolean"
+        },
+        "dialogDescription": {
+          "type": "string"
+        },
+        "features": {
+          "type": "object",
+          "properties": {
+            "thinking": {
+              "type": "boolean"
+            },
+            "multimodalToolUse": {
+              "type": "boolean"
+            }
+          }
+        }
+      }
+    },
+    "ModelResolution": {
+      "type": "object",
+      "description": "Model resolution rule.",
+      "properties": {
+        "default": {
+          "type": "string"
+        },
+        "contexts": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "condition": {
+                "type": "object",
+                "properties": {
+                  "useGemini3_1": {
+                    "type": "boolean"
+                  },
+                  "useGemini3_1FlashLite": {
+                    "type": "boolean"
+                  },
+                  "useCustomTools": {
+                    "type": "boolean"
+                  },
+                  "hasAccessToPreview": {
+                    "type": "boolean"
+                  },
+                  "requestedModels": {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    }
+                  }
+                }
+              },
+              "target": {
+                "type": "string"
+              }
+            }
+          }
+        }
+      }
+    },
+    "ModelPolicyChain": {
+      "type": "array",
+      "description": "A chain of model policies for fallback behavior.",
+      "items": {
+        "type": "object",
+        "ref": "ModelPolicy"
+      }
+    },
+    "ModelPolicy": {
+      "type": "object",
+      "description": "Defines the policy for a single model in the availability chain.",
+      "properties": {
+        "model": {
+          "type": "string"
+        },
+        "isLastResort": {
+          "type": "boolean"
+        },
+        "actions": {
+          "type": "object",
+          "properties": {
+            "terminal": {
+              "type": "string",
+              "enum": ["silent", "prompt"]
+            },
+            "transient": {
+              "type": "string",
+              "enum": ["silent", "prompt"]
+            },
+            "not_found": {
+              "type": "string",
+              "enum": ["silent", "prompt"]
+            },
+            "unknown": {
+              "type": "string",
+              "enum": ["silent", "prompt"]
+            }
+          }
+        },
+        "stateTransitions": {
+          "type": "object",
+          "properties": {
+            "terminal": {
+              "type": "string",
+              "enum": ["terminal", "sticky_retry"]
+            },
+            "transient": {
+              "type": "string",
+              "enum": ["terminal", "sticky_retry"]
+            },
+            "not_found": {
+              "type": "string",
+              "enum": ["terminal", "sticky_retry"]
+            },
+            "unknown": {
+              "type": "string",
+              "enum": ["terminal", "sticky_retry"]
+            }
+          }
+        }
+      },
+      "required": ["model"]
     }
   }
 }

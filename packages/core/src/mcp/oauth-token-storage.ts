@@ -21,14 +21,23 @@ import {
 } from './token-storage/index.js';
 
 /**
- * Class for managing MCP OAuth token storage and retrieval.
+ * Class for managing OAuth token storage and retrieval.
+ * Used by both MCP and A2A OAuth providers. Pass a custom `tokenFilePath`
+ * to store tokens in a protocol-specific file.
  */
 export class MCPOAuthTokenStorage implements TokenStorage {
-  private readonly hybridTokenStorage = new HybridTokenStorage(
-    DEFAULT_SERVICE_NAME,
-  );
+  private readonly hybridTokenStorage: HybridTokenStorage;
   private readonly useEncryptedFile =
     process.env[FORCE_ENCRYPTED_FILE_ENV_VAR] === 'true';
+  private readonly customTokenFilePath?: string;
+
+  constructor(
+    tokenFilePath?: string,
+    serviceName: string = DEFAULT_SERVICE_NAME,
+  ) {
+    this.customTokenFilePath = tokenFilePath;
+    this.hybridTokenStorage = new HybridTokenStorage(serviceName);
+  }
 
   /**
    * Get the path to the token storage file.
@@ -36,7 +45,7 @@ export class MCPOAuthTokenStorage implements TokenStorage {
    * @returns The full path to the token storage file
    */
   private getTokenFilePath(): string {
-    return Storage.getMcpOAuthTokensPath();
+    return this.customTokenFilePath ?? Storage.getMcpOAuthTokensPath();
   }
 
   /**
@@ -61,6 +70,7 @@ export class MCPOAuthTokenStorage implements TokenStorage {
     try {
       const tokenFile = this.getTokenFilePath();
       const data = await fs.readFile(tokenFile, 'utf-8');
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
       const tokens = JSON.parse(data) as OAuthCredentials[];
 
       for (const credential of tokens) {
@@ -68,6 +78,7 @@ export class MCPOAuthTokenStorage implements TokenStorage {
       }
     } catch (error) {
       // File doesn't exist or is invalid, return empty map
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
       if ((error as NodeJS.ErrnoException).code !== 'ENOENT') {
         coreEvents.emitFeedback(
           'error',
@@ -222,6 +233,7 @@ export class MCPOAuthTokenStorage implements TokenStorage {
       const tokenFile = this.getTokenFilePath();
       await fs.unlink(tokenFile);
     } catch (error) {
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
       if ((error as NodeJS.ErrnoException).code !== 'ENOENT') {
         coreEvents.emitFeedback(
           'error',

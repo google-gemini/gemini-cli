@@ -8,6 +8,7 @@ import { describe, it, expect, vi } from 'vitest';
 import { DefaultStrategy } from './defaultStrategy.js';
 import type { RoutingContext } from '../routingStrategy.js';
 import type { BaseLlmClient } from '../../core/baseLlmClient.js';
+import type { LocalLiteRtLmClient } from '../../core/localLiteRtLmClient.js';
 import {
   DEFAULT_GEMINI_MODEL,
   PREVIEW_GEMINI_MODEL,
@@ -24,11 +25,16 @@ describe('DefaultStrategy', () => {
     const mockContext = {} as RoutingContext;
     const mockConfig = {
       getModel: vi.fn().mockReturnValue(DEFAULT_GEMINI_MODEL_AUTO),
-      getPreviewFeatures: vi.fn().mockReturnValue(false),
     } as unknown as Config;
     const mockClient = {} as BaseLlmClient;
+    const mockLocalLiteRtLmClient = {} as LocalLiteRtLmClient;
 
-    const decision = await strategy.route(mockContext, mockConfig, mockClient);
+    const decision = await strategy.route(
+      mockContext,
+      mockConfig,
+      mockClient,
+      mockLocalLiteRtLmClient,
+    );
 
     expect(decision).toEqual({
       model: DEFAULT_GEMINI_MODEL,
@@ -45,11 +51,16 @@ describe('DefaultStrategy', () => {
     const mockContext = {} as RoutingContext;
     const mockConfig = {
       getModel: vi.fn().mockReturnValue(PREVIEW_GEMINI_MODEL_AUTO),
-      getPreviewFeatures: vi.fn().mockReturnValue(false),
     } as unknown as Config;
     const mockClient = {} as BaseLlmClient;
+    const mockLocalLiteRtLmClient = {} as LocalLiteRtLmClient;
 
-    const decision = await strategy.route(mockContext, mockConfig, mockClient);
+    const decision = await strategy.route(
+      mockContext,
+      mockConfig,
+      mockClient,
+      mockLocalLiteRtLmClient,
+    );
 
     expect(decision).toEqual({
       model: PREVIEW_GEMINI_MODEL,
@@ -61,16 +72,21 @@ describe('DefaultStrategy', () => {
     });
   });
 
-  it('should route to the preview model when requested model is auto and previewfeature is on', async () => {
+  it('should route to the default model when requested model is auto', async () => {
     const strategy = new DefaultStrategy();
     const mockContext = {} as RoutingContext;
     const mockConfig = {
       getModel: vi.fn().mockReturnValue(GEMINI_MODEL_ALIAS_AUTO),
-      getPreviewFeatures: vi.fn().mockReturnValue(true),
     } as unknown as Config;
     const mockClient = {} as BaseLlmClient;
+    const mockLocalLiteRtLmClient = {} as LocalLiteRtLmClient;
 
-    const decision = await strategy.route(mockContext, mockConfig, mockClient);
+    const decision = await strategy.route(
+      mockContext,
+      mockConfig,
+      mockClient,
+      mockLocalLiteRtLmClient,
+    );
 
     expect(decision).toEqual({
       model: PREVIEW_GEMINI_MODEL,
@@ -78,27 +94,6 @@ describe('DefaultStrategy', () => {
         source: 'default',
         latencyMs: 0,
         reasoning: `Routing to default model: ${PREVIEW_GEMINI_MODEL}`,
-      },
-    });
-  });
-
-  it('should route to the default model when requested model is auto and previewfeature is off', async () => {
-    const strategy = new DefaultStrategy();
-    const mockContext = {} as RoutingContext;
-    const mockConfig = {
-      getModel: vi.fn().mockReturnValue(GEMINI_MODEL_ALIAS_AUTO),
-      getPreviewFeatures: vi.fn().mockReturnValue(false),
-    } as unknown as Config;
-    const mockClient = {} as BaseLlmClient;
-
-    const decision = await strategy.route(mockContext, mockConfig, mockClient);
-
-    expect(decision).toEqual({
-      model: DEFAULT_GEMINI_MODEL,
-      metadata: {
-        source: 'default',
-        latencyMs: 0,
-        reasoning: `Routing to default model: ${DEFAULT_GEMINI_MODEL}`,
       },
     });
   });
@@ -109,11 +104,16 @@ describe('DefaultStrategy', () => {
     const mockContext = {} as RoutingContext;
     const mockConfig = {
       getModel: vi.fn().mockReturnValue(PREVIEW_GEMINI_FLASH_MODEL),
-      getPreviewFeatures: vi.fn().mockReturnValue(false),
     } as unknown as Config;
     const mockClient = {} as BaseLlmClient;
+    const mockLocalLiteRtLmClient = {} as LocalLiteRtLmClient;
 
-    const decision = await strategy.route(mockContext, mockConfig, mockClient);
+    const decision = await strategy.route(
+      mockContext,
+      mockConfig,
+      mockClient,
+      mockLocalLiteRtLmClient,
+    );
 
     expect(decision).toEqual({
       model: PREVIEW_GEMINI_FLASH_MODEL,

@@ -11,6 +11,7 @@ import {
   enableKittyKeyboardProtocol,
   enableModifyOtherKeys,
 } from '@google/gemini-cli-core';
+import * as fs from 'node:fs';
 
 // Mock fs
 vi.mock('node:fs', () => ({
@@ -97,6 +98,7 @@ describe('TerminalCapabilityManager', () => {
     stdin.emit('data', Buffer.from('\x1b[?62c'));
 
     await promise;
+    manager.enableSupportedModes();
     expect(manager.isKittyProtocolEnabled()).toBe(true);
   });
 
@@ -140,6 +142,8 @@ describe('TerminalCapabilityManager', () => {
     // Should resolve without waiting for timeout
     await promise;
 
+    manager.enableSupportedModes();
+
     expect(manager.isKittyProtocolEnabled()).toBe(true);
     expect(manager.getTerminalBackgroundColor()).toBe('#000000');
   });
@@ -155,6 +159,7 @@ describe('TerminalCapabilityManager', () => {
     vi.advanceTimersByTime(1000);
 
     await promise;
+    manager.enableSupportedModes();
     expect(manager.isKittyProtocolEnabled()).toBe(true);
   });
 
@@ -166,6 +171,7 @@ describe('TerminalCapabilityManager', () => {
     stdin.emit('data', Buffer.from('\x1b[?62c'));
 
     await promise;
+    manager.enableSupportedModes();
     expect(manager.isKittyProtocolEnabled()).toBe(false);
   });
 
@@ -180,6 +186,7 @@ describe('TerminalCapabilityManager', () => {
     stdin.emit('data', Buffer.from('\x1b[?62c'));
 
     await promise;
+    manager.enableSupportedModes();
     expect(manager.isKittyProtocolEnabled()).toBe(true);
   });
 
@@ -195,6 +202,8 @@ describe('TerminalCapabilityManager', () => {
 
       await promise;
 
+      manager.enableSupportedModes();
+
       expect(enableModifyOtherKeys).toHaveBeenCalled();
     });
 
@@ -208,6 +217,8 @@ describe('TerminalCapabilityManager', () => {
       stdin.emit('data', Buffer.from('\x1b[?62c'));
 
       await promise;
+
+      manager.enableSupportedModes();
 
       expect(enableModifyOtherKeys).not.toHaveBeenCalled();
     });
@@ -223,6 +234,7 @@ describe('TerminalCapabilityManager', () => {
       stdin.emit('data', Buffer.from('\x1b[?62c'));
 
       await promise;
+      manager.enableSupportedModes();
       expect(manager.isKittyProtocolEnabled()).toBe(true);
 
       expect(enableKittyKeyboardProtocol).toHaveBeenCalled();
@@ -240,6 +252,8 @@ describe('TerminalCapabilityManager', () => {
 
       await promise;
 
+      manager.enableSupportedModes();
+
       expect(manager.isKittyProtocolEnabled()).toBe(false);
       expect(enableModifyOtherKeys).toHaveBeenCalled();
     });
@@ -256,6 +270,8 @@ describe('TerminalCapabilityManager', () => {
 
       await promise;
 
+      manager.enableSupportedModes();
+
       expect(enableModifyOtherKeys).toHaveBeenCalled();
     });
 
@@ -270,6 +286,8 @@ describe('TerminalCapabilityManager', () => {
       stdin.emit('data', Buffer.from('\x1b[?62c'));
 
       await promise;
+
+      manager.enableSupportedModes();
 
       expect(manager.getTerminalBackgroundColor()).toBe('#1a1a1a');
       expect(manager.getTerminalName()).toBe('tmux');
@@ -286,8 +304,137 @@ describe('TerminalCapabilityManager', () => {
 
       await promise;
 
+      manager.enableSupportedModes();
+
       expect(manager.isKittyProtocolEnabled()).toBe(false);
       expect(enableModifyOtherKeys).not.toHaveBeenCalled();
     });
+
+    it('should wrap queries in hidden/clear sequence', async () => {
+      const manager = TerminalCapabilityManager.getInstance();
+      void manager.detectCapabilities();
+
+      expect(fs.writeSync).toHaveBeenCalledWith(
+        expect.anything(),
+        // eslint-disable-next-line no-control-regex
+        expect.stringMatching(/^\x1b\[8m.*\x1b\[2K\r\x1b\[0m$/s),
+      );
+    });
+  });
+
+  describe('isGhosttyTerminal', () => {
+    const manager = TerminalCapabilityManager.getInstance();
+
+    it.each([
+      {
+        name: 'Ghostty (terminal name)',
+        terminalName: 'Ghostty',
+        env: {},
+        expected: true,
+      },
+      {
+        name: 'ghostty (TERM_PROGRAM)',
+        terminalName: undefined,
+        env: { TERM_PROGRAM: 'ghostty' },
+        expected: true,
+      },
+      {
+        name: 'xterm-ghostty (TERM)',
+        terminalName: undefined,
+        env: { TERM: 'xterm-ghostty' },
+        expected: true,
+      },
+      {
+        name: 'iTerm.app (TERM_PROGRAM)',
+        terminalName: undefined,
+        env: { TERM_PROGRAM: 'iTerm.app' },
+        expected: false,
+      },
+      {
+        name: 'undefined env',
+        terminalName: undefined,
+        env: {},
+        expected: false,
+      },
+    ])(
+      'should return $expected for $name',
+      ({ terminalName, env, expected }) => {
+        vi.spyOn(manager, 'getTerminalName').mockReturnValue(terminalName);
+        expect(manager.isGhosttyTerminal(env)).toBe(expected);
+      },
+    );
+  });
+
+  describe('supportsOsc9Notifications', () => {
+    const manager = TerminalCapabilityManager.getInstance();
+
+    it.each([
+      {
+        name: 'WezTerm (terminal name)',
+        terminalName: 'WezTerm',
+        env: {},
+        expected: true,
+      },
+      {
+        name: 'iTerm.app (terminal name)',
+        terminalName: 'iTerm.app',
+        env: {},
+        expected: true,
+      },
+      {
+        name: 'ghostty (terminal name)',
+        terminalName: 'ghostty',
+        env: {},
+        expected: true,
+      },
+      {
+        name: 'kitty (terminal name)',
+        terminalName: 'kitty',
+        env: {},
+        expected: true,
+      },
+      {
+        name: 'some-other-term (terminal name)',
+        terminalName: 'some-other-term',
+        env: {},
+        expected: false,
+      },
+      {
+        name: 'iTerm.app (TERM_PROGRAM)',
+        terminalName: undefined,
+        env: { TERM_PROGRAM: 'iTerm.app' },
+        expected: true,
+      },
+      {
+        name: 'vscode (TERM_PROGRAM)',
+        terminalName: undefined,
+        env: { TERM_PROGRAM: 'vscode' },
+        expected: false,
+      },
+      {
+        name: 'xterm-kitty (TERM)',
+        terminalName: undefined,
+        env: { TERM: 'xterm-kitty' },
+        expected: true,
+      },
+      {
+        name: 'xterm-256color (TERM)',
+        terminalName: undefined,
+        env: { TERM: 'xterm-256color' },
+        expected: false,
+      },
+      {
+        name: 'Windows Terminal (WT_SESSION)',
+        terminalName: 'iTerm.app',
+        env: { WT_SESSION: 'some-guid' },
+        expected: false,
+      },
+    ])(
+      'should return $expected for $name',
+      ({ terminalName, env, expected }) => {
+        vi.spyOn(manager, 'getTerminalName').mockReturnValue(terminalName);
+        expect(manager.supportsOsc9Notifications(env)).toBe(expected);
+      },
+    );
   });
 });

@@ -17,6 +17,27 @@ import {
   type MergedSettings,
 } from '../../config/settings.js';
 
+vi.mock('../../utils/skillUtils.js', async (importOriginal) => {
+  const actual =
+    await importOriginal<typeof import('../../utils/skillUtils.js')>();
+  return {
+    ...actual,
+    linkSkill: vi.fn(),
+  };
+});
+
+vi.mock('../../config/extensions/consent.js', async (importOriginal) => {
+  const actual =
+    await importOriginal<typeof import('../../config/extensions/consent.js')>();
+  return {
+    ...actual,
+    requestConsentInteractive: vi.fn().mockResolvedValue(true),
+    skillsConsentString: vi.fn().mockResolvedValue('Mock Consent'),
+  };
+});
+
+import { linkSkill } from '../../utils/skillUtils.js';
+
 vi.mock('../../config/settings.js', async (importOriginal) => {
   const actual =
     await importOriginal<typeof import('../../config/settings.js')>();
@@ -47,7 +68,7 @@ describe('skillsCommand', () => {
     ];
     context = createMockCommandContext({
       services: {
-        config: {
+        agentContext: {
           getSkillManager: vi.fn().mockReturnValue({
             getAllSkills: vi.fn().mockReturnValue(skills),
             getSkills: vi.fn().mockReturnValue(skills),
@@ -59,6 +80,9 @@ describe('skillsCommand', () => {
               ),
           }),
           getContentGenerator: vi.fn(),
+          get config() {
+            return this;
+          },
         } as unknown as Config,
         settings: {
           merged: createTestMergedSettings({ skills: { disabled: [] } }),
@@ -141,7 +165,8 @@ describe('skillsCommand', () => {
   });
 
   it('should filter built-in skills by default and show them with "all"', async () => {
-    const skillManager = context.services.config!.getSkillManager();
+    const skillManager =
+      context.services.agentContext!.config.getSkillManager();
     const mockSkills = [
       {
         name: 'regular',
@@ -183,6 +208,80 @@ describe('skillsCommand', () => {
       .mocked(context.ui.addItem)
       .mock.calls.at(-1)![0] as HistoryItemSkillsList;
     expect(lastCall.skills).toHaveLength(2);
+  });
+
+  describe('link', () => {
+    it('should link a skill successfully', async () => {
+      const linkCmd = skillsCommand.subCommands!.find(
+        (s) => s.name === 'link',
+      )!;
+      vi.mocked(linkSkill).mockResolvedValue([
+        { name: 'test-skill', location: '/path' },
+      ]);
+
+      await linkCmd.action!(context, '/some/path');
+
+      expect(linkSkill).toHaveBeenCalledWith(
+        '/some/path',
+        'user',
+        expect.any(Function),
+        expect.any(Function),
+      );
+      expect(context.ui.addItem).toHaveBeenCalledWith(
+        expect.objectContaining({
+          type: MessageType.INFO,
+          text: 'Successfully linked skills from "/some/path" (user).',
+        }),
+      );
+    });
+
+    it('should link a skill with workspace scope', async () => {
+      const linkCmd = skillsCommand.subCommands!.find(
+        (s) => s.name === 'link',
+      )!;
+      vi.mocked(linkSkill).mockResolvedValue([
+        { name: 'test-skill', location: '/path' },
+      ]);
+
+      await linkCmd.action!(context, '/some/path --scope workspace');
+
+      expect(linkSkill).toHaveBeenCalledWith(
+        '/some/path',
+        'workspace',
+        expect.any(Function),
+        expect.any(Function),
+      );
+    });
+
+    it('should show error if link fails', async () => {
+      const linkCmd = skillsCommand.subCommands!.find(
+        (s) => s.name === 'link',
+      )!;
+      vi.mocked(linkSkill).mockRejectedValue(new Error('Link failed'));
+
+      await linkCmd.action!(context, '/some/path');
+
+      expect(context.ui.addItem).toHaveBeenCalledWith(
+        expect.objectContaining({
+          type: MessageType.ERROR,
+          text: 'Failed to link skills: Link failed',
+        }),
+      );
+    });
+
+    it('should show error if path is missing', async () => {
+      const linkCmd = skillsCommand.subCommands!.find(
+        (s) => s.name === 'link',
+      )!;
+      await linkCmd.action!(context, '');
+
+      expect(context.ui.addItem).toHaveBeenCalledWith(
+        expect.objectContaining({
+          type: MessageType.ERROR,
+          text: 'Usage: /skills link <path> [--scope user|workspace]',
+        }),
+      );
+    });
   });
 
   describe('disable/enable', () => {
@@ -357,7 +456,8 @@ describe('skillsCommand', () => {
     });
 
     it('should show error if skills are disabled by admin during disable', async () => {
-      const skillManager = context.services.config!.getSkillManager();
+      const skillManager =
+        context.services.agentContext!.config.getSkillManager();
       vi.mocked(skillManager.isAdminEnabled).mockReturnValue(false);
 
       const disableCmd = skillsCommand.subCommands!.find(
@@ -375,7 +475,8 @@ describe('skillsCommand', () => {
     });
 
     it('should show error if skills are disabled by admin during enable', async () => {
-      const skillManager = context.services.config!.getSkillManager();
+      const skillManager =
+        context.services.agentContext!.config.getSkillManager();
       vi.mocked(skillManager.isAdminEnabled).mockReturnValue(false);
 
       const enableCmd = skillsCommand.subCommands!.find(
@@ -402,8 +503,7 @@ describe('skillsCommand', () => {
       const reloadSkillsMock = vi.fn().mockImplementation(async () => {
         await new Promise((resolve) => setTimeout(resolve, 200));
       });
-      // @ts-expect-error Mocking reloadSkills
-      context.services.config.reloadSkills = reloadSkillsMock;
+      context.services.agentContext!.config.reloadSkills = reloadSkillsMock;
 
       const actionPromise = reloadCmd.action!(context, '');
 
@@ -428,6 +528,7 @@ describe('skillsCommand', () => {
       await actionPromise;
 
       expect(reloadSkillsMock).toHaveBeenCalled();
+      expect(context.ui.reloadCommands).toHaveBeenCalled();
       expect(context.ui.setPendingItem).toHaveBeenCalledWith(null);
       expect(context.ui.addItem).toHaveBeenCalledWith(
         expect.objectContaining({
@@ -442,15 +543,15 @@ describe('skillsCommand', () => {
         (s) => s.name === 'reload',
       )!;
       const reloadSkillsMock = vi.fn().mockImplementation(async () => {
-        const skillManager = context.services.config!.getSkillManager();
+        const skillManager =
+          context.services.agentContext!.config.getSkillManager();
         vi.mocked(skillManager.getSkills).mockReturnValue([
           { name: 'skill1' },
           { name: 'skill2' },
           { name: 'skill3' },
         ] as SkillDefinition[]);
       });
-      // @ts-expect-error Mocking reloadSkills
-      context.services.config.reloadSkills = reloadSkillsMock;
+      context.services.agentContext!.config.reloadSkills = reloadSkillsMock;
 
       await reloadCmd.action!(context, '');
 
@@ -467,13 +568,13 @@ describe('skillsCommand', () => {
         (s) => s.name === 'reload',
       )!;
       const reloadSkillsMock = vi.fn().mockImplementation(async () => {
-        const skillManager = context.services.config!.getSkillManager();
+        const skillManager =
+          context.services.agentContext!.config.getSkillManager();
         vi.mocked(skillManager.getSkills).mockReturnValue([
           { name: 'skill1' },
         ] as SkillDefinition[]);
       });
-      // @ts-expect-error Mocking reloadSkills
-      context.services.config.reloadSkills = reloadSkillsMock;
+      context.services.agentContext!.config.reloadSkills = reloadSkillsMock;
 
       await reloadCmd.action!(context, '');
 
@@ -490,14 +591,14 @@ describe('skillsCommand', () => {
         (s) => s.name === 'reload',
       )!;
       const reloadSkillsMock = vi.fn().mockImplementation(async () => {
-        const skillManager = context.services.config!.getSkillManager();
+        const skillManager =
+          context.services.agentContext!.config.getSkillManager();
         vi.mocked(skillManager.getSkills).mockReturnValue([
           { name: 'skill2' }, // skill1 removed, skill3 added
           { name: 'skill3' },
         ] as SkillDefinition[]);
       });
-      // @ts-expect-error Mocking reloadSkills
-      context.services.config.reloadSkills = reloadSkillsMock;
+      context.services.agentContext!.config.reloadSkills = reloadSkillsMock;
 
       await reloadCmd.action!(context, '');
 
@@ -513,7 +614,7 @@ describe('skillsCommand', () => {
       const reloadCmd = skillsCommand.subCommands!.find(
         (s) => s.name === 'reload',
       )!;
-      context.services.config = null;
+      context.services.agentContext = null;
 
       await reloadCmd.action!(context, '');
 
@@ -533,8 +634,7 @@ describe('skillsCommand', () => {
       const reloadSkillsMock = vi.fn().mockImplementation(async () => {
         await new Promise((_, reject) => setTimeout(() => reject(error), 200));
       });
-      // @ts-expect-error Mocking reloadSkills
-      context.services.config.reloadSkills = reloadSkillsMock;
+      context.services.agentContext!.config.reloadSkills = reloadSkillsMock;
 
       const actionPromise = reloadCmd.action!(context, '');
       await vi.advanceTimersByTimeAsync(100);
@@ -556,7 +656,8 @@ describe('skillsCommand', () => {
       const disableCmd = skillsCommand.subCommands!.find(
         (s) => s.name === 'disable',
       )!;
-      const skillManager = context.services.config!.getSkillManager();
+      const skillManager =
+        context.services.agentContext!.config.getSkillManager();
       const mockSkills = [
         {
           name: 'skill1',
@@ -586,7 +687,8 @@ describe('skillsCommand', () => {
       const enableCmd = skillsCommand.subCommands!.find(
         (s) => s.name === 'enable',
       )!;
-      const skillManager = context.services.config!.getSkillManager();
+      const skillManager =
+        context.services.agentContext!.config.getSkillManager();
       const mockSkills = [
         {
           name: 'skill1',

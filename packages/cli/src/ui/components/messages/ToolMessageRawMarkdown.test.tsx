@@ -4,11 +4,13 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import type { ToolMessageProps } from './ToolMessage.js';
-import { ToolMessage } from './ToolMessage.js';
-import { StreamingState, ToolCallStatus } from '../../types.js';
+import { describe, it, expect } from 'vitest';
+import { type ToolMessageProps, ToolMessage } from './ToolMessage.js';
+import { StreamingState } from '../../types.js';
 import { StreamingContext } from '../../contexts/StreamingContext.js';
 import { renderWithProviders } from '../../../test-utils/render.js';
+import { createMockSettings } from '../../../test-utils/settings.js';
+import { CoreToolCallStatus, makeFakeConfig } from '@google/gemini-cli-core';
 
 describe('<ToolMessage /> - Raw Markdown Display Snapshots', () => {
   const baseProps: ToolMessageProps = {
@@ -16,7 +18,7 @@ describe('<ToolMessage /> - Raw Markdown Display Snapshots', () => {
     name: 'test-tool',
     description: 'A tool for testing',
     resultDisplay: 'Test **bold** and `code` markdown',
-    status: ToolCallStatus.Success,
+    status: CoreToolCallStatus.Success,
     terminalWidth: 80,
     confirmationDetails: undefined,
     emphasis: 'medium',
@@ -61,8 +63,8 @@ describe('<ToolMessage /> - Raw Markdown Display Snapshots', () => {
     },
   ])(
     'renders with renderMarkdown=$renderMarkdown, useAlternateBuffer=$useAlternateBuffer $description',
-    ({ renderMarkdown, useAlternateBuffer, availableTerminalHeight }) => {
-      const { lastFrame } = renderWithProviders(
+    async ({ renderMarkdown, useAlternateBuffer, availableTerminalHeight }) => {
+      const { lastFrame, unmount } = await renderWithProviders(
         <StreamingContext.Provider value={StreamingState.Idle}>
           <ToolMessage
             {...baseProps}
@@ -71,10 +73,12 @@ describe('<ToolMessage /> - Raw Markdown Display Snapshots', () => {
         </StreamingContext.Provider>,
         {
           uiState: { renderMarkdown, streamingState: StreamingState.Idle },
-          useAlternateBuffer,
+          config: makeFakeConfig({ useAlternateBuffer }),
+          settings: createMockSettings({ ui: { useAlternateBuffer } }),
         },
       );
       expect(lastFrame()).toMatchSnapshot();
+      unmount();
     },
   );
 });

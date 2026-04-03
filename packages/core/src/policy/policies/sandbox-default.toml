@@ -1,0 +1,20 @@
+[modes.plan]
+network = false
+readonly = true
+approvedTools = []
+allowOverrides = false
+
+[modes.default]
+network = false
+readonly = false
+approvedTools = ['cat', 'ls', 'grep', 'head', 'tail', 'less', 'Get-Content', 'dir', 'type', 'findstr', 'Get-ChildItem', 'echo']
+allowOverrides = true
+
+[modes.accepting_edits]
+network = false
+readonly = false
+approvedTools = ['sed', 'grep', 'awk', 'perl', 'cat', 'echo', 'Add-Content', 'Set-Content']
+allowOverrides = true
+
+[commands]
+

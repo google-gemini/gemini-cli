@@ -9,4 +9,5 @@ code_review:
     help: false
     summary: true
     code_review: true
+    include_drafts: false
 ignore_patterns: []

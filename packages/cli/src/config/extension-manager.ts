@@ -32,6 +32,7 @@ import {
   ExtensionUninstallEvent,
   ExtensionUpdateEvent,
   getErrorMessage,
+  getRealPath,
   logExtensionDisable,
   logExtensionEnable,
   logExtensionInstallEvent,
@@ -40,6 +41,9 @@ import {
   loadSkillsFromDir,
   loadAgentsFromDirectory,
   homedir,
+  ExtensionIntegrityManager,
+  type IExtensionIntegrity,
+  type IntegrityDataStatus,
   type ExtensionEvents,
   type MCPServerConfig,
   type ExtensionInstallMetadata,
@@ -48,6 +52,14 @@ import {
   type HookEventName,
   type ResolvedExtensionSetting,
   coreEvents,
+  applyAdminAllowlist,
+  getAdminBlockedMcpServersMessage,
+  CoreToolCallStatus,
+  loadExtensionPolicies,
+  isSubpath,
+  type PolicyRule,
+  type SafetyCheckerRule,
+  HookType,
 } from '@google/gemini-cli-core';
 import { maybeRequestConsentOrFail } from './extensions/consent.js';
 import { resolveEnvVarsInObject } from '../utils/envVarResolver.js';
@@ -70,6 +82,7 @@ import {
 } from './extensions/extensionSettings.js';
 import type { EventEmitter } from 'node:stream';
 import { themeManager } from '../ui/themes/theme-manager.js';
+import { getFormattedSettingValue } from '../commands/extensions/utils.js';
 
 interface ExtensionManagerParams {
   enabledExtensionOverrides?: string[];
@@ -79,6 +92,7 @@ interface ExtensionManagerParams {
   workspaceDir: string;
   eventEmitter?: EventEmitter<ExtensionEvents>;
   clientVersion?: string;
+  integrityManager?: IExtensionIntegrity;
 }
 
 /**
@@ -88,6 +102,7 @@ interface ExtensionManagerParams {
  */
 export class ExtensionManager extends ExtensionLoader {
   private extensionEnablementManager: ExtensionEnablementManager;
+  private integrityManager: IExtensionIntegrity;
   private settings: MergedSettings;
   private requestConsent: (consent: string) => Promise<boolean>;
   private requestSetting:
@@ -96,6 +111,7 @@ export class ExtensionManager extends ExtensionLoader {
   private telemetryConfig: Config;
   private workspaceDir: string;
   private loadedExtensions: GeminiCLIExtension[] | undefined;
+  private loadingPromise: Promise<GeminiCLIExtension[]> | null = null;
 
   constructor(options: ExtensionManagerParams) {
     super(options.eventEmitter);
@@ -116,6 +132,26 @@ export class ExtensionManager extends ExtensionLoader {
     });
     this.requestConsent = options.requestConsent;
     this.requestSetting = options.requestSetting ?? undefined;
+    this.integrityManager =
+      options.integrityManager ?? new ExtensionIntegrityManager();
+  }
+
+  getEnablementManager(): ExtensionEnablementManager {
+    return this.extensionEnablementManager;
+  }
+
+  async verifyExtensionIntegrity(
+    extensionName: string,
+    metadata: ExtensionInstallMetadata | undefined,
+  ): Promise<IntegrityDataStatus> {
+    return this.integrityManager.verify(extensionName, metadata);
+  }
+
+  async storeExtensionIntegrity(
+    extensionName: string,
+    metadata: ExtensionInstallMetadata,
+  ): Promise<void> {
+    return this.integrityManager.store(extensionName, metadata);
   }
 
   setRequestConsent(
@@ -142,15 +178,15 @@ export class ExtensionManager extends ExtensionLoader {
   async installOrUpdateExtension(
     installMetadata: ExtensionInstallMetadata,
     previousExtensionConfig?: ExtensionConfig,
+    requestConsentOverride?: (consent: string) => Promise<boolean>,
   ): Promise<GeminiCLIExtension> {
-    if (
-      this.settings.security?.allowedExtensions &&
-      this.settings.security?.allowedExtensions.length > 0
-    ) {
+    if ((this.settings.security?.allowedExtensions?.length ?? 0) > 0) {
       const extensionAllowed = this.settings.security?.allowedExtensions.some(
         (pattern) => {
           try {
-            return new RegExp(pattern).test(installMetadata.source);
+            return new RegExp(pattern).test(
+              getRealPath(installMetadata.source),
+            );
           } catch (e) {
             throw new Error(
               `Invalid regex pattern in allowedExtensions setting: "${pattern}. Error: ${getErrorMessage(e)}`,
@@ -185,7 +221,10 @@ export class ExtensionManager extends ExtensionLoader {
           )
         ) {
           const trustedFolders = loadTrustedFolders();
-          trustedFolders.setValue(this.workspaceDir, TrustLevel.TRUST_FOLDER);
+          await trustedFolders.setValue(
+            this.workspaceDir,
+            TrustLevel.TRUST_FOLDER,
+          );
         } else {
           throw new Error(
             `Could not install extension because the current workspace at ${this.workspaceDir} is not trusted.`,
@@ -195,14 +234,10 @@ export class ExtensionManager extends ExtensionLoader {
       const extensionsDir = ExtensionStorage.getUserExtensionsDir();
       await fs.promises.mkdir(extensionsDir, { recursive: true });
 
-      if (
-        !path.isAbsolute(installMetadata.source) &&
-        (installMetadata.type === 'local' || installMetadata.type === 'link')
-      ) {
-        installMetadata.source = path.resolve(
-          this.workspaceDir,
-          installMetadata.source,
-        );
+      if (installMetadata.type === 'local' || installMetadata.type === 'link') {
+        installMetadata.source = path.isAbsolute(installMetadata.source)
+          ? installMetadata.source
+          : path.resolve(this.workspaceDir, installMetadata.source);
       }
 
       let tempDir: string | undefined;
@@ -231,7 +266,7 @@ export class ExtensionManager extends ExtensionLoader {
             (result.failureReason === 'no release data' &&
               installMetadata.type === 'git') ||
             // Otherwise ask the user if they would like to try a git clone.
-            (await this.requestConsent(
+            (await (requestConsentOverride ?? this.requestConsent)(
               `Error downloading github release for ${installMetadata.source} with the following error: ${result.errorMessage}.
 
 Would you like to attempt to install via "git clone" instead?`,
@@ -250,7 +285,7 @@ Would you like to attempt to install via "git clone" instead?`,
         installMetadata.type === 'local' ||
         installMetadata.type === 'link'
       ) {
-        localSourcePath = installMetadata.source;
+        localSourcePath = getRealPath(installMetadata.source);
       } else {
         throw new Error(`Unsupported install type: ${installMetadata.type}`);
       }
@@ -259,16 +294,27 @@ Would you like to attempt to install via "git clone" instead?`,
         newExtensionConfig = await this.loadExtensionConfig(localSourcePath);
 
         const newExtensionName = newExtensionConfig.name;
+        const previousName = previousExtensionConfig?.name ?? newExtensionName;
         const previous = this.getExtensions().find(
-          (installed) => installed.name === newExtensionName,
+          (installed) => installed.name === previousName,
         );
+        const nameConflict = this.getExtensions().find(
+          (installed) =>
+            installed.name === newExtensionName &&
+            installed.name !== previousName,
+        );
+
         if (isUpdate && !previous) {
           throw new Error(
-            `Extension "${newExtensionName}" was not already installed, cannot update it.`,
+            `Extension "${previousName}" was not already installed, cannot update it.`,
           );
         } else if (!isUpdate && previous) {
           throw new Error(
             `Extension "${newExtensionName}" is already installed. Please uninstall it first.`,
+          );
+        } else if (isUpdate && nameConflict) {
+          throw new Error(
+            `Cannot update to "${newExtensionName}" because an extension with that name is already installed.`,
           );
         }
 
@@ -286,28 +332,60 @@ Would you like to attempt to install via "git clone" instead?`,
           path.join(localSourcePath, 'skills'),
         );
         const previousSkills = previous?.skills ?? [];
+        const isMigrating = Boolean(
+          previous &&
+            previous.installMetadata &&
+            previous.installMetadata.source !== installMetadata.source,
+        );
 
         await maybeRequestConsentOrFail(
           newExtensionConfig,
-          this.requestConsent,
+          requestConsentOverride ?? this.requestConsent,
           newHasHooks,
           previousExtensionConfig,
           previousHasHooks,
           newSkills,
           previousSkills,
+          isMigrating,
         );
         const extensionId = getExtensionId(newExtensionConfig, installMetadata);
         const destinationPath = new ExtensionStorage(
           newExtensionName,
         ).getExtensionDir();
+
+        if (
+          (!isUpdate || newExtensionName !== previousName) &&
+          fs.existsSync(destinationPath)
+        ) {
+          throw new Error(
+            `Cannot install extension "${newExtensionName}" because a directory with that name already exists. Please remove it manually.`,
+          );
+        }
+
         let previousSettings: Record<string, string> | undefined;
-        if (isUpdate) {
+        let wasEnabledGlobally = false;
+        let wasEnabledWorkspace = false;
+        if (isUpdate && previousExtensionConfig) {
+          const previousExtensionId = previous?.installMetadata
+            ? getExtensionId(previousExtensionConfig, previous.installMetadata)
+            : extensionId;
           previousSettings = await getEnvContents(
             previousExtensionConfig,
-            extensionId,
+            previousExtensionId,
             this.workspaceDir,
           );
-          await this.uninstallExtension(newExtensionName, isUpdate);
+          if (newExtensionName !== previousName) {
+            wasEnabledGlobally = this.extensionEnablementManager.isEnabled(
+              previousName,
+              homedir(),
+            );
+            wasEnabledWorkspace = this.extensionEnablementManager.isEnabled(
+              previousName,
+              this.workspaceDir,
+            );
+            this.extensionEnablementManager.remove(previousName);
+          }
+          await this.uninstallExtension(previousName, isUpdate);
         }
 
         await fs.promises.mkdir(destinationPath, { recursive: true });
@@ -361,6 +439,12 @@ Would you like to attempt to install via "git clone" instead?`,
         );
         await fs.promises.writeFile(metadataPath, metadataString);
 
+        // Establish trust at point of installation
+        await this.storeExtensionIntegrity(
+          newExtensionConfig.name,
+          installMetadata,
+        );
+
         // TODO: Gracefully handle this call failing, we should back up the old
         // extension prior to overwriting it and then restore and restart it.
         extension = await this.loadExtension(destinationPath);
@@ -377,9 +461,21 @@ Would you like to attempt to install via "git clone" instead?`,
               newExtensionConfig.version,
               previousExtensionConfig.version,
               installMetadata.type,
-              'success',
+              CoreToolCallStatus.Success,
             ),
           );
+
+          if (newExtensionName !== previousName) {
+            if (wasEnabledGlobally) {
+              await this.enableExtension(newExtensionName, SettingScope.User);
+            }
+            if (wasEnabledWorkspace) {
+              await this.enableExtension(
+                newExtensionName,
+                SettingScope.Workspace,
+              );
+            }
+          }
         } else {
           await logExtensionInstallEvent(
             this.telemetryConfig,
@@ -389,7 +485,7 @@ Would you like to attempt to install via "git clone" instead?`,
               getExtensionId(newExtensionConfig, installMetadata),
               newExtensionConfig.version,
               installMetadata.type,
-              'success',
+              CoreToolCallStatus.Success,
             ),
           );
           await this.enableExtension(
@@ -427,7 +523,7 @@ Would you like to attempt to install via "git clone" instead?`,
             newExtensionConfig?.version ?? '',
             previousExtensionConfig.version,
             installMetadata.type,
-            'error',
+            CoreToolCallStatus.Error,
           ),
         );
       } else {
@@ -439,7 +535,7 @@ Would you like to attempt to install via "git clone" instead?`,
             extensionId ?? '',
             newExtensionConfig?.version ?? '',
             installMetadata.type,
-            'error',
+            CoreToolCallStatus.Error,
           ),
         );
       }
@@ -485,14 +581,14 @@ Would you like to attempt to install via "git clone" instead?`,
         extension.name,
         hashValue(extension.name),
         extension.id,
-        'success',
+        CoreToolCallStatus.Success,
       ),
     );
   }
 
   protected override async startExtension(extension: GeminiCLIExtension) {
     await super.startExtension(extension);
-    if (extension.themes) {
+    if (extension.themes && !themeManager.hasExtensionThemes(extension.name)) {
       themeManager.registerExtensionThemes(extension.name, extension.themes);
     }
   }
@@ -512,40 +608,116 @@ Would you like to attempt to install via "git clone" instead?`,
       throw new Error('Extensions already loaded, only load extensions once.');
     }
 
-    if (this.settings.admin.extensions.enabled === false) {
-      this.loadedExtensions = [];
-      return this.loadedExtensions;
+    if (this.loadingPromise) {
+      return this.loadingPromise;
     }
 
-    const extensionsDir = ExtensionStorage.getUserExtensionsDir();
-    this.loadedExtensions = [];
-    if (!fs.existsSync(extensionsDir)) {
-      return this.loadedExtensions;
-    }
-    for (const subdir of fs.readdirSync(extensionsDir)) {
-      const extensionDir = path.join(extensionsDir, subdir);
-      await this.loadExtension(extensionDir);
-    }
-    return this.loadedExtensions;
+    this.loadingPromise = (async () => {
+      try {
+        if (this.settings.admin?.extensions?.enabled === false) {
+          this.loadedExtensions = [];
+          return this.loadedExtensions;
+        }
+
+        const extensionsDir = ExtensionStorage.getUserExtensionsDir();
+        if (!fs.existsSync(extensionsDir)) {
+          this.loadedExtensions = [];
+          return this.loadedExtensions;
+        }
+
+        const subdirs = await fs.promises.readdir(extensionsDir);
+        const extensionPromises = subdirs.map((subdir) => {
+          const extensionDir = path.join(extensionsDir, subdir);
+          return this._buildExtension(extensionDir);
+        });
+
+        const builtExtensionsOrNull = await Promise.all(extensionPromises);
+        const builtExtensions = builtExtensionsOrNull.filter(
+          (ext): ext is GeminiCLIExtension => ext !== null,
+        );
+
+        const seenNames = new Set<string>();
+        for (const ext of builtExtensions) {
+          if (seenNames.has(ext.name)) {
+            throw new Error(
+              `Extension with name ${ext.name} already was loaded.`,
+            );
+          }
+          seenNames.add(ext.name);
+        }
+
+        this.loadedExtensions = builtExtensions;
+
+        // Register extension themes early so they're available at startup.
+        for (const ext of this.loadedExtensions) {
+          if (ext.isActive && ext.themes) {
+            themeManager.registerExtensionThemes(ext.name, ext.themes);
+          }
+        }
+
+        await Promise.all(
+          this.loadedExtensions.map((ext) => this.maybeStartExtension(ext)),
+        );
+
+        return this.loadedExtensions;
+      } finally {
+        this.loadingPromise = null;
+      }
+    })();
+
+    return this.loadingPromise;
   }
 
   /**
    * Adds `extension` to the list of extensions and starts it if appropriate.
+   *
+   * @internal visible for testing only
    */
-  private async loadExtension(
+  async loadExtension(
     extensionDir: string,
   ): Promise<GeminiCLIExtension | null> {
+    if (this.loadingPromise) {
+      await this.loadingPromise;
+    }
     this.loadedExtensions ??= [];
-    if (!fs.statSync(extensionDir).isDirectory()) {
+    const extension = await this._buildExtension(extensionDir);
+    if (!extension) {
+      return null;
+    }
+
+    if (
+      this.getExtensions().find(
+        (installed) => installed.name === extension.name,
+      )
+    ) {
+      throw new Error(
+        `Extension with name ${extension.name} already was loaded.`,
+      );
+    }
+
+    this.loadedExtensions = [...this.loadedExtensions, extension];
+    await this.maybeStartExtension(extension);
+    return extension;
+  }
+
+  /**
+   * Builds an extension without side effects (does not mutate loadedExtensions or start it).
+   */
+  private async _buildExtension(
+    extensionDir: string,
+  ): Promise<GeminiCLIExtension | null> {
+    try {
+      const stats = await fs.promises.stat(extensionDir);
+      if (!stats.isDirectory()) {
+        return null;
+      }
+    } catch {
       return null;
     }
 
     const installMetadata = loadInstallMetadata(extensionDir);
     let effectiveExtensionPath = extensionDir;
-    if (
-      this.settings.security?.allowedExtensions &&
-      this.settings.security?.allowedExtensions.length > 0
-    ) {
+    if ((this.settings.security?.allowedExtensions?.length ?? 0) > 0) {
       if (!installMetadata?.source) {
         throw new Error(
           `Failed to load extension ${extensionDir}. The ${INSTALL_METADATA_FILENAME} file is missing or misconfigured.`,
@@ -554,7 +726,9 @@ Would you like to attempt to install via "git clone" instead?`,
       const extensionAllowed = this.settings.security?.allowedExtensions.some(
         (pattern) => {
           try {
-            return new RegExp(pattern).test(installMetadata?.source);
+            return new RegExp(pattern).test(
+              getRealPath(installMetadata?.source ?? ''),
+            );
           } catch (e) {
             throw new Error(
               `Invalid regex pattern in allowedExtensions setting: "${pattern}. Error: ${getErrorMessage(e)}`,
@@ -585,13 +759,6 @@ Would you like to attempt to install via "git clone" instead?`,
 
     try {
       let config = await this.loadExtensionConfig(effectiveExtensionPath);
-      if (
-        this.getExtensions().find((extension) => extension.name === config.name)
-      ) {
-        throw new Error(
-          `Extension with name ${config.name} already was loaded.`,
-        );
-      }
 
       const extensionId = getExtensionId(config, installMetadata);
 
@@ -648,12 +815,7 @@ Would you like to attempt to install via "git clone" instead?`,
           resolvedSettings.push({
             name: setting.name,
             envVar: setting.envVar,
-            value:
-              value === undefined
-                ? '[not set]'
-                : setting.sensitive
-                  ? '***'
-                  : value,
+            value,
             sensitive: setting.sensitive ?? false,
             scope,
             source,
@@ -662,22 +824,52 @@ Would you like to attempt to install via "git clone" instead?`,
       }
 
       if (config.mcpServers) {
-        if (this.settings.admin.mcp.enabled === false) {
+        if (this.settings.admin?.mcp?.enabled === false) {
           config.mcpServers = undefined;
         } else {
-          config.mcpServers = Object.fromEntries(
-            Object.entries(config.mcpServers).map(([key, value]) => [
-              key,
-              filterMcpConfig(value),
-            ]),
-          );
+          // Apply admin allowlist if configured
+          const adminAllowlist = this.settings.admin?.mcp?.config;
+          if (adminAllowlist && Object.keys(adminAllowlist).length > 0) {
+            const result = applyAdminAllowlist(
+              config.mcpServers,
+              adminAllowlist,
+            );
+            config.mcpServers = result.mcpServers;
+
+            if (result.blockedServerNames.length > 0) {
+              const message = getAdminBlockedMcpServersMessage(
+                result.blockedServerNames,
+                undefined,
+              );
+              coreEvents.emitConsoleLog('warn', message);
+            }
+          }
+
+          // Then apply local filtering/sanitization
+          if (config.mcpServers) {
+            config.mcpServers = Object.fromEntries(
+              Object.entries(config.mcpServers).map(([key, value]) => [
+                key,
+                filterMcpConfig(value),
+              ]),
+            );
+          }
         }
       }
 
       const contextFiles = getContextFileNames(config)
-        .map((contextFileName) =>
-          path.join(effectiveExtensionPath, contextFileName),
-        )
+        .map((contextFileName) => {
+          const contextFilePath = path.join(
+            effectiveExtensionPath,
+            contextFileName,
+          );
+          if (!isSubpath(effectiveExtensionPath, contextFilePath)) {
+            throw new Error(
+              `Invalid context file path: "${contextFileName}". Context files must be within the extension directory.`,
+            );
+          }
+          return contextFilePath;
+        })
         .filter((contextFilePath) => fs.existsSync(contextFilePath));
 
       const hydrationContext: VariableContext = {
@@ -708,12 +900,15 @@ Would you like to attempt to install via "git clone" instead?`,
 
         if (Object.keys(hookEnv).length > 0) {
           for (const eventName of Object.keys(hooks)) {
+            // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
             const eventHooks = hooks[eventName as HookEventName];
             if (eventHooks) {
               for (const definition of eventHooks) {
                 for (const hook of definition.hooks) {
-                  // Merge existing env with new env vars, giving extension settings precedence.
-                  hook.env = { ...hook.env, ...hookEnv };
+                  if (hook.type === HookType.Command) {
+                    // Merge existing env with new env vars, giving extension settings precedence.
+                    hook.env = { ...hook.env, ...hookEnv };
+                  }
                 }
               }
             }
@@ -724,16 +919,36 @@ Would you like to attempt to install via "git clone" instead?`,
       let skills = await loadSkillsFromDir(
         path.join(effectiveExtensionPath, 'skills'),
       );
-      skills = skills.map((skill) =>
-        recursivelyHydrateStrings(skill, hydrationContext),
-      );
+      skills = skills.map((skill) => ({
+        ...recursivelyHydrateStrings(skill, hydrationContext),
+        extensionName: config.name,
+      }));
+
+      let rules: PolicyRule[] | undefined;
+      let checkers: SafetyCheckerRule[] | undefined;
+
+      const policyDir = path.join(effectiveExtensionPath, 'policies');
+      if (fs.existsSync(policyDir)) {
+        const result = await loadExtensionPolicies(config.name, policyDir);
+        rules = result.rules;
+        checkers = result.checkers;
+
+        if (result.errors.length > 0) {
+          for (const error of result.errors) {
+            debugLogger.warn(
+              `[ExtensionManager] Error loading policies from ${config.name}: ${error.message}${error.details ? `\nDetails: ${error.details}` : ''}`,
+            );
+          }
+        }
+      }
 
       const agentLoadResult = await loadAgentsFromDirectory(
         path.join(effectiveExtensionPath, 'agents'),
       );
-      agentLoadResult.agents = agentLoadResult.agents.map((agent) =>
-        recursivelyHydrateStrings(agent, hydrationContext),
-      );
+      agentLoadResult.agents = agentLoadResult.agents.map((agent) => ({
+        ...recursivelyHydrateStrings(agent, hydrationContext),
+        extensionName: config.name,
+      }));
 
       // Log errors but don't fail the entire extension load
       for (const error of agentLoadResult.errors) {
@@ -742,12 +957,13 @@ Would you like to attempt to install via "git clone" instead?`,
         );
       }
 
-      const extension: GeminiCLIExtension = {
+      return {
         name: config.name,
         version: config.version,
         path: effectiveExtensionPath,
         contextFiles,
         installMetadata,
+        migratedTo: config.migratedTo,
         mcpServers: config.mcpServers,
         excludeTools: config.excludeTools,
         hooks,
@@ -761,11 +977,10 @@ Would you like to attempt to install via "git clone" instead?`,
         skills,
         agents: agentLoadResult.agents,
         themes: config.themes,
+        rules,
+        checkers,
+        plan: config.plan,
       };
-      this.loadedExtensions = [...this.loadedExtensions, extension];
-
-      await this.maybeStartExtension(extension);
-      return extension;
     } catch (e) {
       debugLogger.error(
         `Warning: Skipping extension in ${effectiveExtensionPath}: ${getErrorMessage(
@@ -804,13 +1019,16 @@ Would you like to attempt to install via "git clone" instead?`,
     }
     try {
       const configContent = await fs.promises.readFile(configFilePath, 'utf-8');
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
       const rawConfig = JSON.parse(configContent) as ExtensionConfig;
       if (!rawConfig.name || !rawConfig.version) {
         throw new Error(
           `Invalid configuration in ${configFilePath}: missing ${!rawConfig.name ? '"name"' : '"version"'}`,
         );
       }
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
       const config = recursivelyHydrateStrings(
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
         rawConfig as unknown as JsonObject,
         {
           extensionPath: extensionDir,
@@ -839,6 +1057,7 @@ Would you like to attempt to install via "git clone" instead?`,
 
     try {
       const hooksContent = await fs.promises.readFile(hooksFilePath, 'utf-8');
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
       const rawHooks = JSON.parse(hooksContent);
 
       if (
@@ -856,6 +1075,7 @@ Would you like to attempt to install via "git clone" instead?`,
 
       // Hydrate variables in the hooks configuration
       const hydratedHooks = recursivelyHydrateStrings(
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
         rawHooks.hooks as unknown as JsonObject,
         {
           ...context,
@@ -866,6 +1086,7 @@ Would you like to attempt to install via "git clone" instead?`,
 
       return hydratedHooks;
     } catch (e) {
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
       if ((e as NodeJS.ErrnoException).code === 'ENOENT') {
         return undefined; // File not found is not an error here.
       }
@@ -941,7 +1162,7 @@ Would you like to attempt to install via "git clone" instead?`,
           }
           scope += ')';
         }
-        output += `\n  ${setting.name}: ${setting.value} ${scope}`;
+        output += `\n  ${setting.name}: ${getFormattedSettingValue(setting)} ${scope}`;
       });
     }
     return output;
@@ -1020,11 +1241,32 @@ function filterMcpConfig(original: MCPServerConfig): MCPServerConfig {
   return Object.freeze(rest);
 }
 
+/**
+ * Recursively ensures that the owner has write permissions for all files
+ * and directories within the target path.
+ */
+async function makeWritableRecursive(targetPath: string): Promise<void> {
+  const stats = await fs.promises.lstat(targetPath);
+
+  if (stats.isDirectory()) {
+    // Ensure directory is rwx for the owner (0o700)
+    await fs.promises.chmod(targetPath, stats.mode | 0o700);
+    const children = await fs.promises.readdir(targetPath);
+    for (const child of children) {
+      await makeWritableRecursive(path.join(targetPath, child));
+    }
+  } else if (stats.isFile()) {
+    // Ensure file is rw for the owner (0o600)
+    await fs.promises.chmod(targetPath, stats.mode | 0o600);
+  }
+}
+
 export async function copyExtension(
   source: string,
   destination: string,
 ): Promise<void> {
   await fs.promises.cp(source, destination, { recursive: true });
+  await makeWritableRecursive(destination);
 }
 
 function getContextFileNames(config: ExtensionConfig): string[] {
@@ -1056,7 +1298,9 @@ export async function inferInstallMetadata(
     source.startsWith('http://') ||
     source.startsWith('https://') ||
     source.startsWith('git@') ||
-    source.startsWith('sso://')
+    source.startsWith('sso://') ||
+    source.startsWith('github:') ||
+    source.startsWith('gitlab:')
   ) {
     return {
       source,

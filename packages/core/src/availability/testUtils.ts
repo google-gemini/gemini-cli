@@ -26,5 +26,6 @@ export function createAvailabilityServiceMock(
     selectFirstAvailable: vi.fn().mockReturnValue(selection),
   };
 
+  // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
   return service as unknown as ModelAvailabilityService;
 }

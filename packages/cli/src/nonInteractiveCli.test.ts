@@ -20,6 +20,7 @@ import {
   uiTelemetryService,
   FatalInputError,
   CoreEvent,
+  CoreToolCallStatus,
 } from '@google/gemini-cli-core';
 import type { Part } from '@google/genai';
 import { runNonInteractive } from './nonInteractiveCli.js';
@@ -38,9 +39,9 @@ import type { LoadedSettings } from './config/settings.js';
 // Mock core modules
 vi.mock('./ui/hooks/atCommandProcessor.js');
 
-const mockRegisterActivityLogger = vi.hoisted(() => vi.fn());
-vi.mock('./utils/activityLogger.js', () => ({
-  registerActivityLogger: mockRegisterActivityLogger,
+const mockSetupInitialActivityLogger = vi.hoisted(() => vi.fn());
+vi.mock('./utils/devtoolsService.js', () => ({
+  setupInitialActivityLogger: mockSetupInitialActivityLogger,
 }));
 
 const mockCoreEvents = vi.hoisted(() => ({
@@ -165,7 +166,7 @@ describe('runNonInteractive', () => {
     };
 
     mockConfig = {
-      initialize: vi.fn().mockResolvedValue(undefined),
+      initialize: vi.fn().mockReturnValue(Promise.resolve(undefined)),
       getMessageBus: vi.fn().mockReturnValue({
         subscribe: vi.fn(),
         unsubscribe: vi.fn(),
@@ -189,6 +190,7 @@ describe('runNonInteractive', () => {
       isTrustedFolder: vi.fn().mockReturnValue(false),
       getRawOutput: vi.fn().mockReturnValue(false),
       getAcceptRawOutputRisk: vi.fn().mockReturnValue(false),
+      getAgentSessionNoninteractiveEnabled: vi.fn().mockReturnValue(false),
     } as unknown as Config;
 
     mockSettings = {
@@ -267,8 +269,8 @@ describe('runNonInteractive', () => {
     // so we no longer expect shutdownTelemetry to be called directly here
   });
 
-  it('should register activity logger when GEMINI_CLI_ACTIVITY_LOG_FILE is set', async () => {
-    vi.stubEnv('GEMINI_CLI_ACTIVITY_LOG_FILE', '/tmp/test.jsonl');
+  it('should register activity logger when GEMINI_CLI_ACTIVITY_LOG_TARGET is set', async () => {
+    vi.stubEnv('GEMINI_CLI_ACTIVITY_LOG_TARGET', '/tmp/test.jsonl');
     const events: ServerGeminiStreamEvent[] = [
       {
         type: GeminiEventType.Finished,
@@ -286,12 +288,12 @@ describe('runNonInteractive', () => {
       prompt_id: 'prompt-id-activity-logger',
     });
 
-    expect(mockRegisterActivityLogger).toHaveBeenCalledWith(mockConfig);
+    expect(mockSetupInitialActivityLogger).toHaveBeenCalledWith(mockConfig);
     vi.unstubAllEnvs();
   });
 
-  it('should not register activity logger when GEMINI_CLI_ACTIVITY_LOG_FILE is not set', async () => {
-    vi.stubEnv('GEMINI_CLI_ACTIVITY_LOG_FILE', '');
+  it('should not register activity logger when GEMINI_CLI_ACTIVITY_LOG_TARGET is not set', async () => {
+    vi.stubEnv('GEMINI_CLI_ACTIVITY_LOG_TARGET', '');
     const events: ServerGeminiStreamEvent[] = [
       {
         type: GeminiEventType.Finished,
@@ -309,7 +311,7 @@ describe('runNonInteractive', () => {
       prompt_id: 'prompt-id-activity-logger-off',
     });
 
-    expect(mockRegisterActivityLogger).not.toHaveBeenCalled();
+    expect(mockSetupInitialActivityLogger).not.toHaveBeenCalled();
     vi.unstubAllEnvs();
   });
 
@@ -327,7 +329,7 @@ describe('runNonInteractive', () => {
     const toolResponse: Part[] = [{ text: 'Tool response' }];
     mockSchedulerSchedule.mockResolvedValue([
       {
-        status: 'success',
+        status: CoreToolCallStatus.Success,
         request: {
           callId: 'tool-1',
           name: 'testTool',
@@ -403,7 +405,7 @@ describe('runNonInteractive', () => {
     // 2. Mock the execution of the tools. We just need them to succeed.
     mockSchedulerSchedule.mockResolvedValue([
       {
-        status: 'success',
+        status: CoreToolCallStatus.Success,
         request: toolCallEvent.value, // This is generic enough for both calls
         tool: {} as AnyDeclarativeTool,
         invocation: {} as AnyToolInvocation,
@@ -469,7 +471,7 @@ describe('runNonInteractive', () => {
     };
     mockSchedulerSchedule.mockResolvedValue([
       {
-        status: 'error',
+        status: CoreToolCallStatus.Error,
         request: {
           callId: 'tool-1',
           name: 'errorTool',
@@ -573,7 +575,7 @@ describe('runNonInteractive', () => {
     };
     mockSchedulerSchedule.mockResolvedValue([
       {
-        status: 'error',
+        status: CoreToolCallStatus.Error,
         request: {
           callId: 'tool-1',
           name: 'nonexistentTool',
@@ -748,7 +750,7 @@ describe('runNonInteractive', () => {
     const toolResponse: Part[] = [{ text: 'Tool executed successfully' }];
     mockSchedulerSchedule.mockResolvedValue([
       {
-        status: 'success',
+        status: CoreToolCallStatus.Success,
         request: {
           callId: 'tool-1',
           name: 'testTool',
@@ -1136,6 +1138,7 @@ describe('runNonInteractive', () => {
 
     expect(
       processStderrSpy.mock.calls.some(
+        // eslint-disable-next-line no-restricted-syntax
         (call) => typeof call[0] === 'string' && call[0].includes('Cancelling'),
       ),
     ).toBe(true);
@@ -1344,7 +1347,7 @@ describe('runNonInteractive', () => {
     const toolResponse: Part[] = [{ text: 'file.txt' }];
     mockSchedulerSchedule.mockResolvedValue([
       {
-        status: 'success',
+        status: CoreToolCallStatus.Success,
         request: {
           callId: 'tool-shell-1',
           name: 'ShellTool',
@@ -1543,7 +1546,7 @@ describe('runNonInteractive', () => {
 
     mockSchedulerSchedule.mockResolvedValue([
       {
-        status: 'success',
+        status: CoreToolCallStatus.Success,
         request: toolCallEvent.value,
         tool: {} as AnyDeclarativeTool,
         invocation: {} as AnyToolInvocation,
@@ -1710,7 +1713,7 @@ describe('runNonInteractive', () => {
           input,
           prompt_id: promptId,
         });
-      } catch (_error) {
+      } catch {
         // Expected exit
       }
 
@@ -1735,7 +1738,7 @@ describe('runNonInteractive', () => {
     };
     mockSchedulerSchedule.mockResolvedValue([
       {
-        status: 'success',
+        status: CoreToolCallStatus.Success,
         request: toolCallEvent.value,
         tool: {} as AnyDeclarativeTool,
         invocation: {} as AnyToolInvocation,
@@ -1818,7 +1821,7 @@ describe('runNonInteractive', () => {
     // Mock tool execution returning STOP_EXECUTION
     mockSchedulerSchedule.mockResolvedValue([
       {
-        status: 'error',
+        status: CoreToolCallStatus.Error,
         request: toolCallEvent.value,
         tool: {} as AnyDeclarativeTool,
         invocation: {} as AnyToolInvocation,
@@ -1880,7 +1883,7 @@ describe('runNonInteractive', () => {
 
     mockSchedulerSchedule.mockResolvedValue([
       {
-        status: 'error',
+        status: CoreToolCallStatus.Error,
         request: toolCallEvent.value,
         tool: {} as AnyDeclarativeTool,
         invocation: {} as AnyToolInvocation,
@@ -1944,7 +1947,7 @@ describe('runNonInteractive', () => {
 
     mockSchedulerSchedule.mockResolvedValue([
       {
-        status: 'error',
+        status: CoreToolCallStatus.Error,
         request: toolCallEvent.value,
         tool: {} as AnyDeclarativeTool,
         invocation: {} as AnyToolInvocation,
@@ -2187,7 +2190,7 @@ describe('runNonInteractive', () => {
       // Mock the scheduler to return a cancelled status
       mockSchedulerSchedule.mockResolvedValue([
         {
-          status: 'cancelled',
+          status: CoreToolCallStatus.Cancelled,
           request: toolCallEvent.value,
           tool: {} as AnyDeclarativeTool,
           invocation: {} as AnyToolInvocation,

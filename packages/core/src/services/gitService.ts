@@ -8,8 +8,7 @@ import * as fs from 'node:fs/promises';
 import * as path from 'node:path';
 import { isNodeError } from '../utils/errors.js';
 import { spawnAsync } from '../utils/shell-utils.js';
-import type { SimpleGit } from 'simple-git';
-import { simpleGit, CheckRepoActions } from 'simple-git';
+import { simpleGit, CheckRepoActions, type SimpleGit } from 'simple-git';
 import type { Storage } from '../config/storage.js';
 import { debugLogger } from '../utils/debugLogger.js';
 
@@ -33,6 +32,7 @@ export class GitService {
         'Checkpointing is enabled, but Git is not installed. Please install Git or disable checkpointing to continue.',
       );
     }
+    await this.storage.initialize();
     try {
       await this.setupShadowGitRepository();
     } catch (error) {
@@ -46,7 +46,7 @@ export class GitService {
     try {
       await spawnAsync('git', ['--version']);
       return true;
-    } catch (_error) {
+    } catch {
       return false;
     }
   }

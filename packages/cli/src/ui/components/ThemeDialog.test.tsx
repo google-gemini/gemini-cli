@@ -8,51 +8,25 @@ import { renderWithProviders } from '../../test-utils/render.js';
 import { waitFor } from '../../test-utils/async.js';
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { ThemeDialog } from './ThemeDialog.js';
-import { LoadedSettings } from '../../config/settings.js';
+
+const { mockIsDevelopment } = vi.hoisted(() => ({
+  mockIsDevelopment: { value: false },
+}));
+
+vi.mock('../../utils/installationInfo.js', async (importOriginal) => {
+  const actual =
+    await importOriginal<typeof import('../../utils/installationInfo.js')>();
+  return {
+    ...actual,
+    get isDevelopment() {
+      return mockIsDevelopment.value;
+    },
+  };
+});
+
+import { createMockSettings } from '../../test-utils/settings.js';
 import { DEFAULT_THEME, themeManager } from '../themes/theme-manager.js';
 import { act } from 'react';
-
-const createMockSettings = (
-  userSettings = {},
-  workspaceSettings = {},
-  systemSettings = {},
-): LoadedSettings =>
-  new LoadedSettings(
-    {
-      settings: { ui: { customThemes: {} }, ...systemSettings },
-      originalSettings: { ui: { customThemes: {} }, ...systemSettings },
-      path: '/system/settings.json',
-    },
-    {
-      settings: {},
-      originalSettings: {},
-      path: '/system/system-defaults.json',
-    },
-    {
-      settings: {
-        ui: { customThemes: {} },
-        ...userSettings,
-      },
-      originalSettings: {
-        ui: { customThemes: {} },
-        ...userSettings,
-      },
-      path: '/user/settings.json',
-    },
-    {
-      settings: {
-        ui: { customThemes: {} },
-        ...workspaceSettings,
-      },
-      originalSettings: {
-        ui: { customThemes: {} },
-        ...workspaceSettings,
-      },
-      path: '/workspace/settings.json',
-    },
-    true,
-    [],
-  );
 
 describe('ThemeDialog Snapshots', () => {
   const baseProps = {
@@ -72,38 +46,45 @@ describe('ThemeDialog Snapshots', () => {
     vi.restoreAllMocks();
   });
 
-  it('should render correctly in theme selection mode', () => {
-    const settings = createMockSettings();
-    const { lastFrame } = renderWithProviders(
-      <ThemeDialog {...baseProps} settings={settings} />,
-      { settings },
-    );
+  it.each([true, false])(
+    'should render correctly in theme selection mode (isDevelopment: %s)',
+    async (isDev) => {
+      mockIsDevelopment.value = isDev;
+      const settings = createMockSettings();
+      const { lastFrame, unmount } = await renderWithProviders(
+        <ThemeDialog {...baseProps} settings={settings} />,
+        { settings },
+      );
 
-    expect(lastFrame()).toMatchSnapshot();
-  });
+      expect(lastFrame()).toMatchSnapshot();
+      unmount();
+    },
+  );
 
   it('should render correctly in scope selector mode', async () => {
     const settings = createMockSettings();
-    const { lastFrame, stdin } = renderWithProviders(
-      <ThemeDialog {...baseProps} settings={settings} />,
-      { settings },
-    );
+    const { lastFrame, stdin, waitUntilReady, unmount } =
+      await renderWithProviders(
+        <ThemeDialog {...baseProps} settings={settings} />,
+        { settings },
+      );
 
     // Press Tab to switch to scope selector mode
-    act(() => {
+    await act(async () => {
       stdin.write('\t');
     });
 
     // Need to wait for the state update to propagate
-    await new Promise((resolve) => setTimeout(resolve, 100));
+    await waitUntilReady();
 
     expect(lastFrame()).toMatchSnapshot();
+    unmount();
   });
 
   it('should call onCancel when ESC is pressed', async () => {
     const mockOnCancel = vi.fn();
     const settings = createMockSettings();
-    const { stdin } = renderWithProviders(
+    const { stdin, waitUntilReady, unmount } = await renderWithProviders(
       <ThemeDialog
         {...baseProps}
         onCancel={mockOnCancel}
@@ -112,35 +93,40 @@ describe('ThemeDialog Snapshots', () => {
       { settings },
     );
 
-    act(() => {
+    await act(async () => {
       stdin.write('\x1b');
+    });
+
+    // ESC key has a 50ms timeout in KeypressContext, so we need to wrap waitUntilReady in act
+    await act(async () => {
+      await waitUntilReady();
     });
 
     await waitFor(() => {
       expect(mockOnCancel).toHaveBeenCalled();
     });
+    unmount();
   });
 
-  it('should call refreshStatic when a theme is selected', async () => {
-    const mockRefreshStatic = vi.fn();
+  it('should call onSelect when a theme is selected', async () => {
     const settings = createMockSettings();
-    const { stdin } = renderWithProviders(
+    const { stdin, waitUntilReady, unmount } = await renderWithProviders(
       <ThemeDialog {...baseProps} settings={settings} />,
       {
         settings,
-        uiActions: { refreshStatic: mockRefreshStatic },
       },
     );
 
     // Press Enter to select the theme
-    act(() => {
+    await act(async () => {
       stdin.write('\r');
     });
+    await waitUntilReady();
 
     await waitFor(() => {
-      expect(mockRefreshStatic).toHaveBeenCalled();
       expect(baseProps.onSelect).toHaveBeenCalled();
     });
+    unmount();
   });
 });
 
@@ -157,9 +143,9 @@ describe('Initial Theme Selection', () => {
     vi.restoreAllMocks();
   });
 
-  it('should default to a light theme when terminal background is light and no theme is set', () => {
+  it('should default to a light theme when terminal background is light and no theme is set', async () => {
     const settings = createMockSettings(); // No theme set
-    const { lastFrame } = renderWithProviders(
+    const { lastFrame, unmount } = await renderWithProviders(
       <ThemeDialog {...baseProps} settings={settings} />,
       {
         settings,
@@ -170,11 +156,12 @@ describe('Initial Theme Selection', () => {
     // The snapshot will show which theme is highlighted.
     // We expect 'DefaultLight' to be the one with the '>' indicator.
     expect(lastFrame()).toMatchSnapshot();
+    unmount();
   });
 
-  it('should default to a dark theme when terminal background is dark and no theme is set', () => {
+  it('should default to a dark theme when terminal background is dark and no theme is set', async () => {
     const settings = createMockSettings(); // No theme set
-    const { lastFrame } = renderWithProviders(
+    const { lastFrame, unmount } = await renderWithProviders(
       <ThemeDialog {...baseProps} settings={settings} />,
       {
         settings,
@@ -184,11 +171,12 @@ describe('Initial Theme Selection', () => {
 
     // We expect 'DefaultDark' to be highlighted.
     expect(lastFrame()).toMatchSnapshot();
+    unmount();
   });
 
-  it('should use the theme from settings even if terminal background suggests a different theme type', () => {
+  it('should use the theme from settings even if terminal background suggests a different theme type', async () => {
     const settings = createMockSettings({ ui: { theme: 'DefaultLight' } }); // Light theme set
-    const { lastFrame } = renderWithProviders(
+    const { lastFrame, unmount } = await renderWithProviders(
       <ThemeDialog {...baseProps} settings={settings} />,
       {
         settings,
@@ -198,6 +186,7 @@ describe('Initial Theme Selection', () => {
 
     // We expect 'DefaultLight' to be highlighted, respecting the settings.
     expect(lastFrame()).toMatchSnapshot();
+    unmount();
   });
 });
 
@@ -210,22 +199,23 @@ describe('Hint Visibility', () => {
     terminalWidth: 120,
   };
 
-  it('should show hint when theme background matches terminal background', () => {
+  it('should show hint when theme background matches terminal background', async () => {
     const settings = createMockSettings({ ui: { theme: 'Default' } });
-    const { lastFrame } = renderWithProviders(
+    const { lastFrame, unmount } = await renderWithProviders(
       <ThemeDialog {...baseProps} settings={settings} />,
       {
         settings,
-        uiState: { terminalBackgroundColor: '#1E1E2E' },
+        uiState: { terminalBackgroundColor: '#000000' },
       },
     );
 
     expect(lastFrame()).toContain('(Matches terminal)');
+    unmount();
   });
 
-  it('should not show hint when theme background does not match terminal background', () => {
+  it('should not show hint when theme background does not match terminal background', async () => {
     const settings = createMockSettings({ ui: { theme: 'Default' } });
-    const { lastFrame } = renderWithProviders(
+    const { lastFrame, unmount } = await renderWithProviders(
       <ThemeDialog {...baseProps} settings={settings} />,
       {
         settings,
@@ -234,5 +224,6 @@ describe('Hint Visibility', () => {
     );
 
     expect(lastFrame()).not.toContain('(Matches terminal)');
+    unmount();
   });
 });

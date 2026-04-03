@@ -10,21 +10,31 @@ import type {
   ToolConfig as GenAIToolConfig,
   ToolListUnion,
 } from '@google/genai';
-import type {
-  LLMRequest,
-  LLMResponse,
-  HookToolConfig,
+import {
+  defaultHookTranslator,
+  type LLMRequest,
+  type LLMResponse,
+  type HookToolConfig,
 } from './hookTranslator.js';
-import { defaultHookTranslator } from './hookTranslator.js';
 
 /**
  * Configuration source levels in precedence order (highest to lowest)
  */
 export enum ConfigSource {
+  Runtime = 'runtime',
   Project = 'project',
   User = 'user',
   System = 'system',
   Extensions = 'extensions',
+}
+
+/**
+ * Returns true if a hook source implies it is a user-visible hook.
+ * Only System hooks are hidden by default to reduce noise.
+ */
+export function isUserVisibleHook(source?: string | ConfigSource): boolean {
+  if (!source) return true; // Treat unknown/legacy hooks as user-visible
+  return source !== ConfigSource.System;
 }
 
 /**
@@ -50,11 +60,43 @@ export enum HookEventName {
 export const HOOKS_CONFIG_FIELDS = ['enabled', 'disabled', 'notifications'];
 
 /**
- * Hook configuration entry
+ * Hook implementation types
+ */
+export enum HookType {
+  Command = 'command',
+  Runtime = 'runtime',
+}
+
+/**
+ * Hook action function
+ */
+export type HookAction = (
+  input: HookInput,
+  options?: { signal: AbortSignal },
+) => Promise<HookOutput | void | null>;
+
+/**
+ * Runtime hook configuration
+ */
+export interface RuntimeHookConfig {
+  type: HookType.Runtime;
+  /** Unique name for the runtime hook */
+  name: string;
+  /** Function to execute when the hook is triggered */
+  action: HookAction;
+  command?: never;
+  source?: ConfigSource;
+  /** Maximum time allowed for hook execution in milliseconds */
+  timeout?: number;
+}
+
+/**
+ * Command hook configuration entry
  */
 export interface CommandHookConfig {
   type: HookType.Command;
   command: string;
+  action?: never;
   name?: string;
   description?: string;
   timeout?: number;
@@ -62,7 +104,7 @@ export interface CommandHookConfig {
   env?: Record<string, string>;
 }
 
-export type HookConfig = CommandHookConfig;
+export type HookConfig = CommandHookConfig | RuntimeHookConfig;
 
 /**
  * Hook definition with matcher
@@ -74,18 +116,11 @@ export interface HookDefinition {
 }
 
 /**
- * Hook implementation types
- */
-export enum HookType {
-  Command = 'command',
-}
-
-/**
  * Generate a unique key for a hook configuration
  */
 export function getHookKey(hook: HookConfig): string {
   const name = hook.name || '';
-  const command = hook.command || '';
+  const command = hook.type === HookType.Command ? hook.command : '';
   return `${name}:${command}`;
 }
 
@@ -171,10 +206,17 @@ export class DefaultHookOutput implements HookOutput {
   }
 
   /**
-   * Check if this output represents a blocking decision
+   * Check if this output represents a blocking decision (block or deny)
    */
   isBlockingDecision(): boolean {
     return this.decision === 'block' || this.decision === 'deny';
+  }
+
+  /**
+   * Check if this output represents an 'ask' decision
+   */
+  isAskDecision(): boolean {
+    return this.decision === 'ask';
   }
 
   /**
@@ -253,6 +295,33 @@ export class DefaultHookOutput implements HookOutput {
   shouldClearContext(): boolean {
     return false;
   }
+
+  /**
+   * Optional request to execute another tool immediately after this one.
+   * The result of this tail call will replace the original tool's response.
+   */
+  getTailToolCallRequest():
+    | {
+        name: string;
+        args: Record<string, unknown>;
+      }
+    | undefined {
+    if (
+      this.hookSpecificOutput &&
+      'tailToolCallRequest' in this.hookSpecificOutput
+    ) {
+      const request = this.hookSpecificOutput['tailToolCallRequest'];
+      if (
+        typeof request === 'object' &&
+        request !== null &&
+        !Array.isArray(request)
+      ) {
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
+        return request as { name: string; args: Record<string, unknown> };
+      }
+    }
+    return undefined;
+  }
 }
 
 /**
@@ -270,6 +339,7 @@ export class BeforeToolHookOutput extends DefaultHookOutput {
         input !== null &&
         !Array.isArray(input)
       ) {
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
         return input as Record<string, unknown>;
       }
     }
@@ -286,6 +356,7 @@ export class BeforeModelHookOutput extends DefaultHookOutput {
    */
   getSyntheticResponse(): GenerateContentResponse | undefined {
     if (this.hookSpecificOutput && 'llm_response' in this.hookSpecificOutput) {
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
       const hookResponse = this.hookSpecificOutput[
         'llm_response'
       ] as LLMResponse;
@@ -304,12 +375,14 @@ export class BeforeModelHookOutput extends DefaultHookOutput {
     target: GenerateContentParameters,
   ): GenerateContentParameters {
     if (this.hookSpecificOutput && 'llm_request' in this.hookSpecificOutput) {
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
       const hookRequest = this.hookSpecificOutput[
         'llm_request'
       ] as Partial<LLMRequest>;
       if (hookRequest) {
         // Convert hook format to SDK format
         const sdkRequest = defaultHookTranslator.fromHookLLMRequest(
+          // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
           hookRequest as LLMRequest,
           target,
         );
@@ -335,6 +408,7 @@ export class BeforeToolSelectionHookOutput extends DefaultHookOutput {
     tools?: ToolListUnion;
   }): { toolConfig?: GenAIToolConfig; tools?: ToolListUnion } {
     if (this.hookSpecificOutput && 'toolConfig' in this.hookSpecificOutput) {
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
       const hookToolConfig = this.hookSpecificOutput[
         'toolConfig'
       ] as HookToolConfig;
@@ -362,12 +436,14 @@ export class AfterModelHookOutput extends DefaultHookOutput {
    */
   getModifiedResponse(): GenerateContentResponse | undefined {
     if (this.hookSpecificOutput && 'llm_response' in this.hookSpecificOutput) {
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
       const hookResponse = this.hookSpecificOutput[
         'llm_response'
       ] as Partial<LLMResponse>;
       if (hookResponse?.candidates?.[0]?.content?.parts?.length) {
         // Convert hook format to SDK format
         return defaultHookTranslator.fromHookLLMResponse(
+          // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
           hookResponse as LLMResponse,
         );
       }
@@ -423,6 +499,7 @@ export interface BeforeToolInput extends HookInput {
   tool_name: string;
   tool_input: Record<string, unknown>;
   mcp_context?: McpToolContext; // Only present for MCP tools
+  original_request_name?: string;
 }
 
 /**
@@ -443,6 +520,7 @@ export interface AfterToolInput extends HookInput {
   tool_input: Record<string, unknown>;
   tool_response: Record<string, unknown>;
   mcp_context?: McpToolContext; // Only present for MCP tools
+  original_request_name?: string;
 }
 
 /**
@@ -452,6 +530,14 @@ export interface AfterToolOutput extends HookOutput {
   hookSpecificOutput?: {
     hookEventName: 'AfterTool';
     additionalContext?: string;
+    /**
+     * Optional request to execute another tool immediately after this one.
+     * The result of this tail call will replace the original tool's response.
+     */
+    tailToolCallRequest?: {
+      name: string;
+      args: Record<string, unknown>;
+    };
   };
 }
 

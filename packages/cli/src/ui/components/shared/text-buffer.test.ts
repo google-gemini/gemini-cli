@@ -7,10 +7,14 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import stripAnsi from 'strip-ansi';
 import { act } from 'react';
+import * as fs from 'node:fs';
+import * as path from 'node:path';
+import * as os from 'node:os';
 import {
   renderHook,
   renderHookWithProviders,
 } from '../../../test-utils/render.js';
+
 import type {
   Viewport,
   TextBuffer,
@@ -27,6 +31,9 @@ import {
   textBufferReducer,
   findWordEndInLine,
   findNextWordStartInLine,
+  findNextBigWordStartInLine,
+  findPrevBigWordStartInLine,
+  findBigWordEndInLine,
   isWordCharStrict,
   calculateTransformationsForLine,
   calculateTransformedLine,
@@ -34,6 +41,7 @@ import {
   getTransformedImagePath,
 } from './text-buffer.js';
 import { cpLen } from '../../utils/textUtils.js';
+import { escapePath } from '@google/gemini-cli-core';
 
 const defaultVisualLayout: VisualLayout = {
   visualLines: [''],
@@ -58,6 +66,7 @@ const initialState: TextBufferState = {
   visualLayout: defaultVisualLayout,
   pastedContent: {},
   expandedPaste: null,
+  yankRegister: null,
 };
 
 /**
@@ -80,15 +89,52 @@ describe('textBufferReducer', () => {
     vi.restoreAllMocks();
   });
 
-  it('should return the initial state if state is undefined', () => {
+  it('should return the initial state if state is undefined', async () => {
     const action = { type: 'unknown_action' } as unknown as TextBufferAction;
     const state = textBufferReducer(initialState, action);
     expect(state).toHaveOnlyValidCharacters();
     expect(state).toEqual(initialState);
   });
 
+  describe('Big Word Navigation Helpers', () => {
+    describe('findNextBigWordStartInLine (W)', () => {
+      it('should skip non-whitespace and then whitespace', async () => {
+        expect(findNextBigWordStartInLine('hello world', 0)).toBe(6);
+        expect(findNextBigWordStartInLine('hello.world test', 0)).toBe(12);
+        expect(findNextBigWordStartInLine('   test', 0)).toBe(3);
+        expect(findNextBigWordStartInLine('test   ', 0)).toBe(null);
+      });
+    });
+
+    describe('findPrevBigWordStartInLine (B)', () => {
+      it('should skip whitespace backwards then non-whitespace', async () => {
+        expect(findPrevBigWordStartInLine('hello world', 6)).toBe(0);
+        expect(findPrevBigWordStartInLine('hello.world test', 12)).toBe(0);
+        expect(findPrevBigWordStartInLine('   test', 3)).toBe(null); // At start of word
+        expect(findPrevBigWordStartInLine('   test', 4)).toBe(3); // Inside word
+        expect(findPrevBigWordStartInLine('test   ', 6)).toBe(0);
+      });
+    });
+
+    describe('findBigWordEndInLine (E)', () => {
+      it('should find end of current big word', async () => {
+        expect(findBigWordEndInLine('hello world', 0)).toBe(4);
+        expect(findBigWordEndInLine('hello.world test', 0)).toBe(10);
+        expect(findBigWordEndInLine('hello.world test', 11)).toBe(15);
+      });
+
+      it('should skip whitespace if currently on whitespace', async () => {
+        expect(findBigWordEndInLine('hello   world', 5)).toBe(12);
+      });
+
+      it('should find next big word end if at end of current', async () => {
+        expect(findBigWordEndInLine('hello world', 4)).toBe(10);
+      });
+    });
+  });
+
   describe('set_text action', () => {
-    it('should set new text and move cursor to the end', () => {
+    it('should set new text and move cursor to the end', async () => {
       const action: TextBufferAction = {
         type: 'set_text',
         payload: 'hello\nworld',
@@ -101,7 +147,7 @@ describe('textBufferReducer', () => {
       expect(state.undoStack.length).toBe(1);
     });
 
-    it('should not create an undo snapshot if pushToUndo is false', () => {
+    it('should not create an undo snapshot if pushToUndo is false', async () => {
       const action: TextBufferAction = {
         type: 'set_text',
         payload: 'no undo',
@@ -115,7 +161,7 @@ describe('textBufferReducer', () => {
   });
 
   describe('insert action', () => {
-    it('should insert a character', () => {
+    it('should insert a character', async () => {
       const action: TextBufferAction = { type: 'insert', payload: 'a' };
       const state = textBufferReducer(initialState, action);
       expect(state).toHaveOnlyValidCharacters();
@@ -123,7 +169,7 @@ describe('textBufferReducer', () => {
       expect(state.cursorCol).toBe(1);
     });
 
-    it('should insert a newline', () => {
+    it('should insert a newline', async () => {
       const stateWithText = { ...initialState, lines: ['hello'] };
       const action: TextBufferAction = { type: 'insert', payload: '\n' };
       const state = textBufferReducer(stateWithText, action);
@@ -135,7 +181,7 @@ describe('textBufferReducer', () => {
   });
 
   describe('insert action with options', () => {
-    it('should filter input using inputFilter option', () => {
+    it('should filter input using inputFilter option', async () => {
       const action: TextBufferAction = { type: 'insert', payload: 'a1b2c3' };
       const options: TextBufferOptions = {
         inputFilter: (text) => text.replace(/[0-9]/g, ''),
@@ -145,7 +191,7 @@ describe('textBufferReducer', () => {
       expect(state.cursorCol).toBe(3);
     });
 
-    it('should strip newlines when singleLine option is true', () => {
+    it('should strip newlines when singleLine option is true', async () => {
       const action: TextBufferAction = {
         type: 'insert',
         payload: 'hello\nworld',
@@ -156,7 +202,7 @@ describe('textBufferReducer', () => {
       expect(state.cursorCol).toBe(10);
     });
 
-    it('should apply both inputFilter and singleLine options', () => {
+    it('should apply both inputFilter and singleLine options', async () => {
       const action: TextBufferAction = {
         type: 'insert',
         payload: 'h\ne\nl\nl\no\n1\n2\n3',
@@ -172,7 +218,7 @@ describe('textBufferReducer', () => {
   });
 
   describe('add_pasted_content action', () => {
-    it('should add content to pastedContent Record', () => {
+    it('should add content to pastedContent Record', async () => {
       const action: TextBufferAction = {
         type: 'add_pasted_content',
         payload: { id: '[Pasted Text: 6 lines]', text: 'large content' },
@@ -185,7 +231,7 @@ describe('textBufferReducer', () => {
   });
 
   describe('backspace action', () => {
-    it('should remove a character', () => {
+    it('should remove a character', async () => {
       const stateWithText: TextBufferState = {
         ...initialState,
         lines: ['a'],
@@ -199,7 +245,7 @@ describe('textBufferReducer', () => {
       expect(state.cursorCol).toBe(0);
     });
 
-    it('should join lines if at the beginning of a line', () => {
+    it('should join lines if at the beginning of a line', async () => {
       const stateWithText: TextBufferState = {
         ...initialState,
         lines: ['hello', 'world'],
@@ -217,7 +263,7 @@ describe('textBufferReducer', () => {
 
   describe('atomic placeholder deletion', () => {
     describe('paste placeholders', () => {
-      it('backspace at end of paste placeholder removes entire placeholder', () => {
+      it('backspace at end of paste placeholder removes entire placeholder', async () => {
         const placeholder = '[Pasted Text: 6 lines]';
         const stateWithPlaceholder = createStateWithTransformations({
           lines: [placeholder],
@@ -236,7 +282,7 @@ describe('textBufferReducer', () => {
         expect(state.pastedContent[placeholder]).toBeUndefined();
       });
 
-      it('delete at start of paste placeholder removes entire placeholder', () => {
+      it('delete at start of paste placeholder removes entire placeholder', async () => {
         const placeholder = '[Pasted Text: 6 lines]';
         const stateWithPlaceholder = createStateWithTransformations({
           lines: [placeholder],
@@ -255,7 +301,7 @@ describe('textBufferReducer', () => {
         expect(state.pastedContent[placeholder]).toBeUndefined();
       });
 
-      it('backspace inside paste placeholder does normal deletion', () => {
+      it('backspace inside paste placeholder does normal deletion', async () => {
         const placeholder = '[Pasted Text: 6 lines]';
         const stateWithPlaceholder = createStateWithTransformations({
           lines: [placeholder],
@@ -277,7 +323,7 @@ describe('textBufferReducer', () => {
     });
 
     describe('image placeholders', () => {
-      it('backspace at end of image path removes entire path', () => {
+      it('backspace at end of image path removes entire path', async () => {
         const imagePath = '@test.png';
         const stateWithImage = createStateWithTransformations({
           lines: [imagePath],
@@ -291,7 +337,7 @@ describe('textBufferReducer', () => {
         expect(state.cursorCol).toBe(0);
       });
 
-      it('delete at start of image path removes entire path', () => {
+      it('delete at start of image path removes entire path', async () => {
         const imagePath = '@test.png';
         const stateWithImage = createStateWithTransformations({
           lines: [imagePath],
@@ -305,7 +351,7 @@ describe('textBufferReducer', () => {
         expect(state.cursorCol).toBe(0);
       });
 
-      it('backspace inside image path does normal deletion', () => {
+      it('backspace inside image path does normal deletion', async () => {
         const imagePath = '@test.png';
         const stateWithImage = createStateWithTransformations({
           lines: [imagePath],
@@ -322,7 +368,7 @@ describe('textBufferReducer', () => {
     });
 
     describe('undo behavior', () => {
-      it('undo after placeholder deletion restores everything', () => {
+      it('undo after placeholder deletion restores everything', async () => {
         const placeholder = '[Pasted Text: 6 lines]';
         const pasteContent = 'line1\nline2\nline3\nline4\nline5\nline6';
         const stateWithPlaceholder = createStateWithTransformations({
@@ -352,7 +398,7 @@ describe('textBufferReducer', () => {
   });
 
   describe('undo/redo actions', () => {
-    it('should undo and redo a change', () => {
+    it('should undo and redo a change', async () => {
       // 1. Insert text
       const insertAction: TextBufferAction = {
         type: 'insert',
@@ -382,7 +428,7 @@ describe('textBufferReducer', () => {
   });
 
   describe('create_undo_snapshot action', () => {
-    it('should create a snapshot without changing state', () => {
+    it('should create a snapshot without changing state', async () => {
       const stateWithText: TextBufferState = {
         ...initialState,
         lines: ['hello'],
@@ -448,7 +494,7 @@ describe('textBufferReducer', () => {
       },
     );
 
-    it('should act like backspace at the beginning of a line', () => {
+    it('should act like backspace at the beginning of a line', async () => {
       const stateWithText: TextBufferState = {
         ...initialState,
         lines: ['hello', 'world'],
@@ -502,7 +548,7 @@ describe('textBufferReducer', () => {
       },
     );
 
-    it('should delete path segments progressively', () => {
+    it('should delete path segments progressively', async () => {
       const stateWithText: TextBufferState = {
         ...initialState,
         lines: ['path/to/file'],
@@ -517,7 +563,7 @@ describe('textBufferReducer', () => {
       expect(state.lines).toEqual(['to/file']);
     });
 
-    it('should act like delete at the end of a line', () => {
+    it('should act like delete at the end of a line', async () => {
       const stateWithText: TextBufferState = {
         ...initialState,
         lines: ['hello', 'world'],
@@ -533,11 +579,52 @@ describe('textBufferReducer', () => {
     });
   });
 
+  describe('kill_line_left action', () => {
+    it('should clean up pastedContent when deleting a placeholder line-left', async () => {
+      const placeholder = '[Pasted Text: 6 lines]';
+      const stateWithPlaceholder = createStateWithTransformations({
+        lines: [placeholder],
+        cursorRow: 0,
+        cursorCol: cpLen(placeholder),
+        pastedContent: {
+          [placeholder]: 'line1\nline2\nline3\nline4\nline5\nline6',
+        },
+      });
+
+      const state = textBufferReducer(stateWithPlaceholder, {
+        type: 'kill_line_left',
+      });
+
+      expect(state.lines).toEqual(['']);
+      expect(state.cursorCol).toBe(0);
+      expect(Object.keys(state.pastedContent)).toHaveLength(0);
+    });
+  });
+
+  describe('kill_line_right action', () => {
+    it('should reset preferredCol when deleting to end of line', async () => {
+      const stateWithText: TextBufferState = {
+        ...initialState,
+        lines: ['hello world'],
+        cursorRow: 0,
+        cursorCol: 5,
+        preferredCol: 9,
+      };
+
+      const state = textBufferReducer(stateWithText, {
+        type: 'kill_line_right',
+      });
+
+      expect(state.lines).toEqual(['hello']);
+      expect(state.preferredCol).toBe(null);
+    });
+  });
+
   describe('toggle_paste_expansion action', () => {
     const placeholder = '[Pasted Text: 6 lines]';
     const content = 'line1\nline2\nline3\nline4\nline5\nline6';
 
-    it('should expand a placeholder correctly', () => {
+    it('should expand a placeholder correctly', async () => {
       const stateWithPlaceholder = createStateWithTransformations({
         lines: ['prefix ' + placeholder + ' suffix'],
         cursorRow: 0,
@@ -574,7 +661,7 @@ describe('textBufferReducer', () => {
       expect(state.cursorCol).toBe(5); // length of 'line6'
     });
 
-    it('should collapse an expanded placeholder correctly', () => {
+    it('should collapse an expanded placeholder correctly', async () => {
       const expandedState = createStateWithTransformations({
         lines: [
           'prefix line1',
@@ -610,7 +697,7 @@ describe('textBufferReducer', () => {
       expect(state.cursorCol).toBe(('prefix ' + placeholder).length);
     });
 
-    it('should expand single-line content correctly', () => {
+    it('should expand single-line content correctly', async () => {
       const singleLinePlaceholder = '[Pasted Text: 10 chars]';
       const singleLineContent = 'some text';
       const stateWithPlaceholder = createStateWithTransformations({
@@ -630,7 +717,7 @@ describe('textBufferReducer', () => {
       expect(state.cursorCol).toBe(9);
     });
 
-    it('should return current state if placeholder ID not found in pastedContent', () => {
+    it('should return current state if placeholder ID not found in pastedContent', async () => {
       const action: TextBufferAction = {
         type: 'toggle_paste_expansion',
         payload: { id: 'unknown', row: 0, col: 0 },
@@ -639,7 +726,7 @@ describe('textBufferReducer', () => {
       expect(state).toBe(initialState);
     });
 
-    it('should preserve expandedPaste when lines change from edits outside the region', () => {
+    it('should preserve expandedPaste when lines change from edits outside the region', async () => {
       // Start with an expanded paste at line 0 (3 lines long)
       const placeholder = '[Pasted Text: 3 lines]';
       const expandedState = createStateWithTransformations({
@@ -697,10 +784,8 @@ describe('useTextBuffer', () => {
   });
 
   describe('Initialization', () => {
-    it('should initialize with empty text and cursor at (0,0) by default', () => {
-      const { result } = renderHook(() =>
-        useTextBuffer({ viewport, isValidPath: () => false }),
-      );
+    it('should initialize with empty text and cursor at (0,0) by default', async () => {
+      const { result } = await renderHook(() => useTextBuffer({ viewport }));
       const state = getBufferState(result);
       expect(state.text).toBe('');
       expect(state.lines).toEqual(['']);
@@ -711,12 +796,11 @@ describe('useTextBuffer', () => {
       expect(state.visualScrollRow).toBe(0);
     });
 
-    it('should initialize with provided initialText', () => {
-      const { result } = renderHook(() =>
+    it('should initialize with provided initialText', async () => {
+      const { result } = await renderHook(() =>
         useTextBuffer({
           initialText: 'hello',
           viewport,
-          isValidPath: () => false,
         }),
       );
       const state = getBufferState(result);
@@ -728,13 +812,12 @@ describe('useTextBuffer', () => {
       expect(state.visualCursor).toEqual([0, 0]);
     });
 
-    it('should initialize with initialText and initialCursorOffset', () => {
-      const { result } = renderHook(() =>
+    it('should initialize with initialText and initialCursorOffset', async () => {
+      const { result } = await renderHook(() =>
         useTextBuffer({
           initialText: 'hello\nworld',
           initialCursorOffset: 7, // Should be at 'o' in 'world'
           viewport,
-          isValidPath: () => false,
         }),
       );
       const state = getBufferState(result);
@@ -747,13 +830,12 @@ describe('useTextBuffer', () => {
       expect(state.visualCursor[1]).toBe(1); // At 'o' in "world"
     });
 
-    it('should wrap visual lines', () => {
-      const { result } = renderHook(() =>
+    it('should wrap visual lines', async () => {
+      const { result } = await renderHook(() =>
         useTextBuffer({
           initialText: 'The quick brown fox jumps over the lazy dog.',
           initialCursorOffset: 2, // After '好'
           viewport: { width: 15, height: 4 },
-          isValidPath: () => false,
         }),
       );
       const state = getBufferState(result);
@@ -765,12 +847,11 @@ describe('useTextBuffer', () => {
       ]);
     });
 
-    it('should wrap visual lines with multiple spaces', () => {
-      const { result } = renderHook(() =>
+    it('should wrap visual lines with multiple spaces', async () => {
+      const { result } = await renderHook(() =>
         useTextBuffer({
           initialText: 'The  quick  brown fox    jumps over the lazy dog.',
           viewport: { width: 15, height: 4 },
-          isValidPath: () => false,
         }),
       );
       const state = getBufferState(result);
@@ -785,12 +866,11 @@ describe('useTextBuffer', () => {
       ]);
     });
 
-    it('should wrap visual lines even without spaces', () => {
-      const { result } = renderHook(() =>
+    it('should wrap visual lines even without spaces', async () => {
+      const { result } = await renderHook(() =>
         useTextBuffer({
           initialText: '123456789012345ABCDEFG', // 4 chars, 12 bytes
           viewport: { width: 15, height: 2 },
-          isValidPath: () => false,
         }),
       );
       const state = getBufferState(result);
@@ -800,13 +880,12 @@ describe('useTextBuffer', () => {
       expect(state.allVisualLines).toEqual(['123456789012345', 'ABCDEFG']);
     });
 
-    it('should initialize with multi-byte unicode characters and correct cursor offset', () => {
-      const { result } = renderHook(() =>
+    it('should initialize with multi-byte unicode characters and correct cursor offset', async () => {
+      const { result } = await renderHook(() =>
         useTextBuffer({
           initialText: '你好世界', // 4 chars, 12 bytes
           initialCursorOffset: 2, // After '好'
           viewport: { width: 5, height: 2 },
-          isValidPath: () => false,
         }),
       );
       const state = getBufferState(result);
@@ -820,10 +899,8 @@ describe('useTextBuffer', () => {
   });
 
   describe('Basic Editing', () => {
-    it('insert: should insert a character and update cursor', () => {
-      const { result } = renderHook(() =>
-        useTextBuffer({ viewport, isValidPath: () => false }),
-      );
+    it('insert: should insert a character and update cursor', async () => {
+      const { result } = await renderHook(() => useTextBuffer({ viewport }));
       act(() => result.current.insert('a'));
       let state = getBufferState(result);
       expect(state.text).toBe('a');
@@ -837,12 +914,11 @@ describe('useTextBuffer', () => {
       expect(state.visualCursor).toEqual([0, 2]);
     });
 
-    it('insert: should insert text in the middle of a line', () => {
-      const { result } = renderHook(() =>
+    it('insert: should insert text in the middle of a line', async () => {
+      const { result } = await renderHook(() =>
         useTextBuffer({
           initialText: 'abc',
           viewport,
-          isValidPath: () => false,
         }),
       );
       act(() => result.current.move('right'));
@@ -852,10 +928,8 @@ describe('useTextBuffer', () => {
       expect(state.cursor).toEqual([0, 6]);
     });
 
-    it('insert: should use placeholder for large text paste', () => {
-      const { result } = renderHook(() =>
-        useTextBuffer({ viewport, isValidPath: () => false }),
-      );
+    it('insert: should use placeholder for large text paste', async () => {
+      const { result } = await renderHook(() => useTextBuffer({ viewport }));
       const largeText = '1\n2\n3\n4\n5\n6';
       act(() => result.current.insert(largeText, { paste: true }));
       const state = getBufferState(result);
@@ -865,20 +939,16 @@ describe('useTextBuffer', () => {
       );
     });
 
-    it('insert: should NOT use placeholder for large text if NOT a paste', () => {
-      const { result } = renderHook(() =>
-        useTextBuffer({ viewport, isValidPath: () => false }),
-      );
+    it('insert: should NOT use placeholder for large text if NOT a paste', async () => {
+      const { result } = await renderHook(() => useTextBuffer({ viewport }));
       const largeText = '1\n2\n3\n4\n5\n6';
       act(() => result.current.insert(largeText, { paste: false }));
       const state = getBufferState(result);
       expect(state.text).toBe(largeText);
     });
 
-    it('insert: should clean up pastedContent when placeholder is deleted', () => {
-      const { result } = renderHook(() =>
-        useTextBuffer({ viewport, isValidPath: () => false }),
-      );
+    it('insert: should clean up pastedContent when placeholder is deleted', async () => {
+      const { result } = await renderHook(() => useTextBuffer({ viewport }));
       const largeText = '1\n2\n3\n4\n5\n6';
       act(() => result.current.insert(largeText, { paste: true }));
       expect(result.current.pastedContent['[Pasted Text: 6 lines]']).toBe(
@@ -890,10 +960,8 @@ describe('useTextBuffer', () => {
       expect(Object.keys(result.current.pastedContent)).toHaveLength(0);
     });
 
-    it('insert: should clean up pastedContent when placeholder is removed via atomic backspace', () => {
-      const { result } = renderHook(() =>
-        useTextBuffer({ viewport, isValidPath: () => false }),
-      );
+    it('insert: should clean up pastedContent when placeholder is removed via atomic backspace', async () => {
+      const { result } = await renderHook(() => useTextBuffer({ viewport }));
       const largeText = '1\n2\n3\n4\n5\n6';
       act(() => result.current.insert(largeText, { paste: true }));
       expect(result.current.pastedContent['[Pasted Text: 6 lines]']).toBe(
@@ -910,12 +978,112 @@ describe('useTextBuffer', () => {
       expect(Object.keys(result.current.pastedContent)).toHaveLength(0);
     });
 
-    it('newline: should create a new line and move cursor', () => {
-      const { result } = renderHook(() =>
+    it('deleteWordLeft: should clean up pastedContent and avoid #2 suffix on repaste', async () => {
+      const { result } = await renderHook(() => useTextBuffer({ viewport }));
+      const largeText = '1\n2\n3\n4\n5\n6';
+
+      act(() => result.current.insert(largeText, { paste: true }));
+      expect(getBufferState(result).text).toBe('[Pasted Text: 6 lines]');
+      expect(result.current.pastedContent['[Pasted Text: 6 lines]']).toBe(
+        largeText,
+      );
+
+      act(() => {
+        for (let i = 0; i < 12; i++) {
+          result.current.deleteWordLeft();
+        }
+      });
+      expect(getBufferState(result).text).toBe('');
+      expect(Object.keys(result.current.pastedContent)).toHaveLength(0);
+
+      act(() => result.current.insert(largeText, { paste: true }));
+      expect(getBufferState(result).text).toBe('[Pasted Text: 6 lines]');
+      expect(result.current.pastedContent['[Pasted Text: 6 lines]']).toBe(
+        largeText,
+      );
+    });
+
+    it('deleteWordRight: should clean up pastedContent and avoid #2 suffix on repaste', async () => {
+      const { result } = await renderHook(() => useTextBuffer({ viewport }));
+      const largeText = '1\n2\n3\n4\n5\n6';
+
+      act(() => result.current.insert(largeText, { paste: true }));
+      expect(getBufferState(result).text).toBe('[Pasted Text: 6 lines]');
+      expect(result.current.pastedContent['[Pasted Text: 6 lines]']).toBe(
+        largeText,
+      );
+
+      act(() => result.current.move('home'));
+      act(() => {
+        for (let i = 0; i < 12; i++) {
+          result.current.deleteWordRight();
+        }
+      });
+      expect(getBufferState(result).text).not.toContain(
+        '[Pasted Text: 6 lines]',
+      );
+      expect(Object.keys(result.current.pastedContent)).toHaveLength(0);
+
+      act(() => result.current.insert(largeText, { paste: true }));
+      expect(getBufferState(result).text).toContain('[Pasted Text: 6 lines]');
+      expect(getBufferState(result).text).not.toContain('#2');
+      expect(result.current.pastedContent['[Pasted Text: 6 lines]']).toBe(
+        largeText,
+      );
+    });
+
+    it('killLineLeft: should clean up pastedContent and avoid #2 suffix on repaste', async () => {
+      const { result } = await renderHook(() => useTextBuffer({ viewport }));
+      const largeText = '1\n2\n3\n4\n5\n6';
+
+      act(() => result.current.insert(largeText, { paste: true }));
+      expect(getBufferState(result).text).toBe('[Pasted Text: 6 lines]');
+      expect(result.current.pastedContent['[Pasted Text: 6 lines]']).toBe(
+        largeText,
+      );
+
+      act(() => result.current.killLineLeft());
+      expect(getBufferState(result).text).toBe('');
+      expect(Object.keys(result.current.pastedContent)).toHaveLength(0);
+
+      act(() => result.current.insert(largeText, { paste: true }));
+      expect(getBufferState(result).text).toBe('[Pasted Text: 6 lines]');
+      expect(result.current.pastedContent['[Pasted Text: 6 lines]']).toBe(
+        largeText,
+      );
+    });
+
+    it('killLineRight: should clean up pastedContent and avoid #2 suffix on repaste', async () => {
+      const { result } = await renderHook(() => useTextBuffer({ viewport }));
+      const largeText = '1\n2\n3\n4\n5\n6';
+
+      act(() => result.current.insert(largeText, { paste: true }));
+      expect(getBufferState(result).text).toBe('[Pasted Text: 6 lines]');
+      expect(result.current.pastedContent['[Pasted Text: 6 lines]']).toBe(
+        largeText,
+      );
+
+      act(() => {
+        for (let i = 0; i < 40; i++) {
+          result.current.move('left');
+        }
+      });
+      act(() => result.current.killLineRight());
+      expect(getBufferState(result).text).toBe('');
+      expect(Object.keys(result.current.pastedContent)).toHaveLength(0);
+
+      act(() => result.current.insert(largeText, { paste: true }));
+      expect(getBufferState(result).text).toBe('[Pasted Text: 6 lines]');
+      expect(result.current.pastedContent['[Pasted Text: 6 lines]']).toBe(
+        largeText,
+      );
+    });
+
+    it('newline: should create a new line and move cursor', async () => {
+      const { result } = await renderHook(() =>
         useTextBuffer({
           initialText: 'ab',
           viewport,
-          isValidPath: () => false,
         }),
       );
       act(() => result.current.move('end')); // cursor at [0,2]
@@ -929,12 +1097,11 @@ describe('useTextBuffer', () => {
       expect(state.visualCursor).toEqual([1, 0]); // On the new visual line
     });
 
-    it('backspace: should delete char to the left or merge lines', () => {
-      const { result } = renderHook(() =>
+    it('backspace: should delete char to the left or merge lines', async () => {
+      const { result } = await renderHook(() =>
         useTextBuffer({
           initialText: 'a\nb',
           viewport,
-          isValidPath: () => false,
         }),
       );
       act(() => {
@@ -957,12 +1124,11 @@ describe('useTextBuffer', () => {
       expect(state.visualCursor).toEqual([0, 1]);
     });
 
-    it('del: should delete char to the right or merge lines', () => {
-      const { result } = renderHook(() =>
+    it('del: should delete char to the right or merge lines', async () => {
+      const { result } = await renderHook(() =>
         useTextBuffer({
           initialText: 'a\nb',
           viewport,
-          isValidPath: () => false,
         }),
       );
       // cursor at [0,0]
@@ -982,89 +1148,113 @@ describe('useTextBuffer', () => {
   });
 
   describe('Drag and Drop File Paths', () => {
-    it('should prepend @ to a valid file path on insert', () => {
-      const { result } = renderHook(() =>
-        useTextBuffer({ viewport, isValidPath: () => true }),
-      );
-      const filePath = '/path/to/a/valid/file.txt';
-      act(() => result.current.insert(filePath, { paste: true }));
-      expect(getBufferState(result).text).toBe(`@${filePath} `);
+    let tempDir: string;
+
+    beforeEach(() => {
+      tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'gemini-cli-test-'));
     });
 
-    it('should not prepend @ to an invalid file path on insert', () => {
-      const { result } = renderHook(() =>
-        useTextBuffer({ viewport, isValidPath: () => false }),
+    afterEach(() => {
+      fs.rmSync(tempDir, { recursive: true, force: true });
+    });
+
+    it('should prepend @ to a valid file path on insert', async () => {
+      const filePath = path.join(tempDir, 'file.txt');
+      fs.writeFileSync(filePath, '');
+
+      const { result } = await renderHook(() =>
+        useTextBuffer({ viewport, escapePastedPaths: true }),
       );
-      const notAPath = 'this is just some long text';
+      act(() => result.current.insert(filePath, { paste: true }));
+      expect(getBufferState(result).text).toBe(`@${escapePath(filePath)} `);
+    });
+
+    it('should not prepend @ to an invalid file path on insert', async () => {
+      const { result } = await renderHook(() => useTextBuffer({ viewport }));
+      const notAPath = path.join(tempDir, 'non_existent.txt');
       act(() => result.current.insert(notAPath, { paste: true }));
       expect(getBufferState(result).text).toBe(notAPath);
     });
 
-    it('should handle quoted paths', () => {
-      const { result } = renderHook(() =>
-        useTextBuffer({ viewport, isValidPath: () => true }),
+    it('should handle quoted paths', async () => {
+      const filePath = path.join(tempDir, 'file.txt');
+      fs.writeFileSync(filePath, '');
+
+      const { result } = await renderHook(() =>
+        useTextBuffer({ viewport, escapePastedPaths: true }),
       );
-      const filePath = "'/path/to/a/valid/file.txt'";
-      act(() => result.current.insert(filePath, { paste: true }));
-      expect(getBufferState(result).text).toBe(`@/path/to/a/valid/file.txt `);
+      const quotedPath = `'${filePath}'`;
+      act(() => result.current.insert(quotedPath, { paste: true }));
+      expect(getBufferState(result).text).toBe(`@${escapePath(filePath)} `);
     });
 
-    it('should not prepend @ to short text that is not a path', () => {
-      const { result } = renderHook(() =>
-        useTextBuffer({ viewport, isValidPath: () => true }),
+    it('should not prepend @ to short text that is not a path', async () => {
+      const { result } = await renderHook(() =>
+        useTextBuffer({ viewport, escapePastedPaths: true }),
       );
       const shortText = 'ab';
       act(() => result.current.insert(shortText, { paste: true }));
       expect(getBufferState(result).text).toBe(shortText);
     });
 
-    it('should prepend @ to multiple valid file paths on insert', () => {
-      // Use Set to model reality: individual paths exist, combined string doesn't
-      const validPaths = new Set(['/path/to/file1.txt', '/path/to/file2.txt']);
-      const { result } = renderHook(() =>
-        useTextBuffer({ viewport, isValidPath: (p) => validPaths.has(p) }),
+    it('should prepend @ to multiple valid file paths on insert', async () => {
+      const file1 = path.join(tempDir, 'file1.txt');
+      const file2 = path.join(tempDir, 'file2.txt');
+      fs.writeFileSync(file1, '');
+      fs.writeFileSync(file2, '');
+
+      const { result } = await renderHook(() =>
+        useTextBuffer({ viewport, escapePastedPaths: true }),
       );
-      const filePaths = '/path/to/file1.txt /path/to/file2.txt';
+      const filePaths = `${escapePath(file1)} ${escapePath(file2)}`;
       act(() => result.current.insert(filePaths, { paste: true }));
       expect(getBufferState(result).text).toBe(
-        '@/path/to/file1.txt @/path/to/file2.txt ',
+        `@${escapePath(file1)} @${escapePath(file2)} `,
       );
     });
 
-    it('should handle multiple paths with escaped spaces', () => {
-      // Use Set to model reality: individual paths exist, combined string doesn't
-      const validPaths = new Set(['/path/to/my file.txt', '/other/path.txt']);
-      const { result } = renderHook(() =>
-        useTextBuffer({ viewport, isValidPath: (p) => validPaths.has(p) }),
+    it('should handle multiple paths with escaped spaces', async () => {
+      const file1 = path.join(tempDir, 'my file.txt');
+      const file2 = path.join(tempDir, 'other.txt');
+      fs.writeFileSync(file1, '');
+      fs.writeFileSync(file2, '');
+
+      const { result } = await renderHook(() =>
+        useTextBuffer({ viewport, escapePastedPaths: true }),
       );
-      const filePaths = '/path/to/my\\ file.txt /other/path.txt';
+
+      const filePaths = `${escapePath(file1)} ${escapePath(file2)}`;
+
       act(() => result.current.insert(filePaths, { paste: true }));
       expect(getBufferState(result).text).toBe(
-        '@/path/to/my\\ file.txt @/other/path.txt ',
+        `@${escapePath(file1)} @${escapePath(file2)} `,
       );
     });
 
-    it('should only prepend @ to valid paths in multi-path paste', () => {
-      const { result } = renderHook(() =>
+    it('should not prepend @ unless all paths are valid', async () => {
+      const validFile = path.join(tempDir, 'valid.txt');
+      const invalidFile = path.join(tempDir, 'invalid.jpg');
+      fs.writeFileSync(validFile, '');
+      // Do not create invalidFile
+
+      const { result } = await renderHook(() =>
         useTextBuffer({
           viewport,
-          isValidPath: (p) => p.endsWith('.txt'),
+          escapePastedPaths: true,
         }),
       );
-      const filePaths = '/valid/file.txt /invalid/file.jpg';
+      const filePaths = `${validFile} ${invalidFile}`;
       act(() => result.current.insert(filePaths, { paste: true }));
-      expect(getBufferState(result).text).toBe(
-        '@/valid/file.txt /invalid/file.jpg ',
-      );
+      expect(getBufferState(result).text).toBe(`${validFile} ${invalidFile}`);
     });
   });
 
   describe('Shell Mode Behavior', () => {
-    it('should not prepend @ to valid file paths when shellModeActive is true', () => {
-      const { result } = renderHook(() =>
+    it('should not prepend @ to valid file paths when shellModeActive is true', async () => {
+      const { result } = await renderHook(() =>
         useTextBuffer({
           viewport,
-          isValidPath: () => true,
+          escapePastedPaths: true,
           shellModeActive: true,
         }),
       );
@@ -1073,11 +1263,11 @@ describe('useTextBuffer', () => {
       expect(getBufferState(result).text).toBe(filePath); // No @ prefix
     });
 
-    it('should not prepend @ to quoted paths when shellModeActive is true', () => {
-      const { result } = renderHook(() =>
+    it('should not prepend @ to quoted paths when shellModeActive is true', async () => {
+      const { result } = await renderHook(() =>
         useTextBuffer({
           viewport,
-          isValidPath: () => true,
+          escapePastedPaths: true,
           shellModeActive: true,
         }),
       );
@@ -1086,11 +1276,11 @@ describe('useTextBuffer', () => {
       expect(getBufferState(result).text).toBe(quotedFilePath); // No @ prefix, keeps quotes
     });
 
-    it('should behave normally with invalid paths when shellModeActive is true', () => {
-      const { result } = renderHook(() =>
+    it('should behave normally with invalid paths when shellModeActive is true', async () => {
+      const { result } = await renderHook(() =>
         useTextBuffer({
           viewport,
-          isValidPath: () => false,
+
           shellModeActive: true,
         }),
       );
@@ -1099,11 +1289,11 @@ describe('useTextBuffer', () => {
       expect(getBufferState(result).text).toBe(notAPath);
     });
 
-    it('should behave normally with short text when shellModeActive is true', () => {
-      const { result } = renderHook(() =>
+    it('should behave normally with short text when shellModeActive is true', async () => {
+      const { result } = await renderHook(() =>
         useTextBuffer({
           viewport,
-          isValidPath: () => true,
+          escapePastedPaths: true,
           shellModeActive: true,
         }),
       );
@@ -1114,18 +1304,17 @@ describe('useTextBuffer', () => {
   });
 
   describe('Cursor Movement', () => {
-    it('move: left/right should work within and across visual lines (due to wrapping)', () => {
+    it('move: left/right should work within and across visual lines (due to wrapping)', async () => {
       // Text: "long line1next line2" (20 chars)
       // Viewport width 5. Word wrapping should produce:
       // "long " (5)
       // "line1" (5)
       // "next " (5)
       // "line2" (5)
-      const { result } = renderHook(() =>
+      const { result } = await renderHook(() =>
         useTextBuffer({
           initialText: 'long line1next line2', // Corrected: was 'long line1next line2'
           viewport: { width: 5, height: 4 },
-          isValidPath: () => false,
         }),
       );
       // Initial cursor [0,0] logical, visual [0,0] ("l" of "long ")
@@ -1146,13 +1335,12 @@ describe('useTextBuffer', () => {
       expect(getBufferState(result).cursor).toEqual([0, 4]); // logical cursor
     });
 
-    it('move: up/down should preserve preferred visual column', () => {
+    it('move: up/down should preserve preferred visual column', async () => {
       const text = 'abcde\nxy\n12345';
-      const { result } = renderHook(() =>
+      const { result } = await renderHook(() =>
         useTextBuffer({
           initialText: text,
           viewport,
-          isValidPath: () => false,
         }),
       );
       expect(result.current.allVisualLines).toEqual(['abcde', 'xy', '12345']);
@@ -1188,13 +1376,12 @@ describe('useTextBuffer', () => {
       expect(state.preferredCol).toBe(null);
     });
 
-    it('move: home/end should go to visual line start/end', () => {
+    it('move: home/end should go to visual line start/end', async () => {
       const initialText = 'line one\nsecond line';
-      const { result } = renderHook(() =>
+      const { result } = await renderHook(() =>
         useTextBuffer({
           initialText,
           viewport: { width: 5, height: 5 },
-          isValidPath: () => false,
         }),
       );
       expect(result.current.allVisualLines).toEqual([
@@ -1218,12 +1405,11 @@ describe('useTextBuffer', () => {
   });
 
   describe('Visual Layout & Viewport', () => {
-    it('should wrap long lines correctly into visualLines', () => {
-      const { result } = renderHook(() =>
+    it('should wrap long lines correctly into visualLines', async () => {
+      const { result } = await renderHook(() =>
         useTextBuffer({
           initialText: 'This is a very long line of text.', // 33 chars
           viewport: { width: 10, height: 5 },
-          isValidPath: () => false,
         }),
       );
       const state = getBufferState(result);
@@ -1239,12 +1425,11 @@ describe('useTextBuffer', () => {
       expect(state.allVisualLines[3]).toBe('text.');
     });
 
-    it('should update visualScrollRow when visualCursor moves out of viewport', () => {
-      const { result } = renderHook(() =>
+    it('should update visualScrollRow when visualCursor moves out of viewport', async () => {
+      const { result } = await renderHook(() =>
         useTextBuffer({
           initialText: 'l1\nl2\nl3\nl4\nl5',
           viewport: { width: 5, height: 3 }, // Can show 3 visual lines
-          isValidPath: () => false,
         }),
       );
       // Initial: l1, l2, l3 visible. visualScrollRow = 0. visualCursor = [0,0]
@@ -1289,10 +1474,8 @@ describe('useTextBuffer', () => {
   });
 
   describe('Undo/Redo', () => {
-    it('should undo and redo an insert operation', () => {
-      const { result } = renderHook(() =>
-        useTextBuffer({ viewport, isValidPath: () => false }),
-      );
+    it('should undo and redo an insert operation', async () => {
+      const { result } = await renderHook(() => useTextBuffer({ viewport }));
       act(() => result.current.insert('a'));
       expect(getBufferState(result).text).toBe('a');
 
@@ -1305,12 +1488,11 @@ describe('useTextBuffer', () => {
       expect(getBufferState(result).cursor).toEqual([0, 1]);
     });
 
-    it('should undo and redo a newline operation', () => {
-      const { result } = renderHook(() =>
+    it('should undo and redo a newline operation', async () => {
+      const { result } = await renderHook(() =>
         useTextBuffer({
           initialText: 'test',
           viewport,
-          isValidPath: () => false,
         }),
       );
       act(() => result.current.move('end'));
@@ -1328,10 +1510,8 @@ describe('useTextBuffer', () => {
   });
 
   describe('Unicode Handling', () => {
-    it('insert: should correctly handle multi-byte unicode characters', () => {
-      const { result } = renderHook(() =>
-        useTextBuffer({ viewport, isValidPath: () => false }),
-      );
+    it('insert: should correctly handle multi-byte unicode characters', async () => {
+      const { result } = await renderHook(() => useTextBuffer({ viewport }));
       act(() => result.current.insert('你好'));
       const state = getBufferState(result);
       expect(state.text).toBe('你好');
@@ -1339,12 +1519,11 @@ describe('useTextBuffer', () => {
       expect(state.visualCursor).toEqual([0, 2]);
     });
 
-    it('backspace: should correctly delete multi-byte unicode characters', () => {
-      const { result } = renderHook(() =>
+    it('backspace: should correctly delete multi-byte unicode characters', async () => {
+      const { result } = await renderHook(() =>
         useTextBuffer({
           initialText: '你好',
           viewport,
-          isValidPath: () => false,
         }),
       );
       act(() => result.current.move('end')); // cursor at [0,2]
@@ -1359,12 +1538,11 @@ describe('useTextBuffer', () => {
       expect(state.cursor).toEqual([0, 0]);
     });
 
-    it('move: left/right should treat multi-byte chars as single units for visual cursor', () => {
-      const { result } = renderHook(() =>
+    it('move: left/right should treat multi-byte chars as single units for visual cursor', async () => {
+      const { result } = await renderHook(() =>
         useTextBuffer({
           initialText: '🐶🐱',
           viewport: { width: 5, height: 1 },
-          isValidPath: () => false,
         }),
       );
       // Initial: visualCursor [0,0]
@@ -1384,12 +1562,65 @@ describe('useTextBuffer', () => {
       expect(state.visualCursor).toEqual([0, 1]);
     });
 
-    it('moveToVisualPosition: should correctly handle wide characters (Chinese)', () => {
-      const { result } = renderHook(() =>
+    it('move: up/down should work on wrapped lines (regression test)', async () => {
+      // Line that wraps into two visual lines
+      // Viewport width 10. "0123456789ABCDE" (15 chars)
+      // Visual Line 0: "0123456789"
+      // Visual Line 1: "ABCDE"
+      const { result } = await renderHook(() =>
+        useTextBuffer({
+          viewport: { width: 10, height: 5 },
+        }),
+      );
+
+      act(() => {
+        result.current.setText('0123456789ABCDE');
+      });
+
+      // Cursor should be at the end: logical [0, 15], visual [1, 5]
+      expect(getBufferState(result).cursor).toEqual([0, 15]);
+      expect(getBufferState(result).visualCursor).toEqual([1, 5]);
+
+      // Press Up arrow - should move to first visual line
+      // This currently fails because handleInput returns false if cursorRow === 0
+      let handledUp = false;
+      act(() => {
+        handledUp = result.current.handleInput({
+          name: 'up',
+          shift: false,
+          alt: false,
+          ctrl: false,
+          cmd: false,
+          insertable: false,
+          sequence: '\x1b[A',
+        });
+      });
+      expect(handledUp).toBe(true);
+      expect(getBufferState(result).visualCursor[0]).toBe(0);
+
+      // Press Down arrow - should move back to second visual line
+      // This would also fail if cursorRow is the last logical row
+      let handledDown = false;
+      act(() => {
+        handledDown = result.current.handleInput({
+          name: 'down',
+          shift: false,
+          alt: false,
+          ctrl: false,
+          cmd: false,
+          insertable: false,
+          sequence: '\x1b[B',
+        });
+      });
+      expect(handledDown).toBe(true);
+      expect(getBufferState(result).visualCursor[0]).toBe(1);
+    });
+
+    it('moveToVisualPosition: should correctly handle wide characters (Chinese)', async () => {
+      const { result } = await renderHook(() =>
         useTextBuffer({
           initialText: '你好', // 2 chars, width 4
           viewport: { width: 10, height: 1 },
-          isValidPath: () => false,
         }),
       );
 
@@ -1414,10 +1645,8 @@ describe('useTextBuffer', () => {
   });
 
   describe('handleInput', () => {
-    it('should insert printable characters', () => {
-      const { result } = renderHook(() =>
-        useTextBuffer({ viewport, isValidPath: () => false }),
-      );
+    it('should insert printable characters', async () => {
+      const { result } = await renderHook(() => useTextBuffer({ viewport }));
       act(() => {
         result.current.handleInput({
           name: 'h',
@@ -1443,13 +1672,11 @@ describe('useTextBuffer', () => {
       expect(getBufferState(result).text).toBe('hi');
     });
 
-    it('should handle "Enter" key as newline', () => {
-      const { result } = renderHook(() =>
-        useTextBuffer({ viewport, isValidPath: () => false }),
-      );
+    it('should handle "Enter" key as newline', async () => {
+      const { result } = await renderHook(() => useTextBuffer({ viewport }));
       act(() => {
         result.current.handleInput({
-          name: 'return',
+          name: 'enter',
           shift: false,
           alt: false,
           ctrl: false,
@@ -1461,10 +1688,8 @@ describe('useTextBuffer', () => {
       expect(getBufferState(result).lines).toEqual(['', '']);
     });
 
-    it('should handle Ctrl+J as newline', () => {
-      const { result } = renderHook(() =>
-        useTextBuffer({ viewport, isValidPath: () => false }),
-      );
+    it('should handle Ctrl+J as newline', async () => {
+      const { result } = await renderHook(() => useTextBuffer({ viewport }));
       act(() => {
         result.current.handleInput({
           name: 'j',
@@ -1479,10 +1704,8 @@ describe('useTextBuffer', () => {
       expect(getBufferState(result).lines).toEqual(['', '']);
     });
 
-    it('should do nothing for a tab key press', () => {
-      const { result } = renderHook(() =>
-        useTextBuffer({ viewport, isValidPath: () => false }),
-      );
+    it('should do nothing for a tab key press', async () => {
+      const { result } = await renderHook(() => useTextBuffer({ viewport }));
       act(() => {
         result.current.handleInput({
           name: 'tab',
@@ -1497,10 +1720,8 @@ describe('useTextBuffer', () => {
       expect(getBufferState(result).text).toBe('');
     });
 
-    it('should do nothing for a shift tab key press', () => {
-      const { result } = renderHook(() =>
-        useTextBuffer({ viewport, isValidPath: () => false }),
-      );
+    it('should do nothing for a shift tab key press', async () => {
+      const { result } = await renderHook(() => useTextBuffer({ viewport }));
       act(() => {
         result.current.handleInput({
           name: 'tab',
@@ -1515,12 +1736,11 @@ describe('useTextBuffer', () => {
       expect(getBufferState(result).text).toBe('');
     });
 
-    it('should handle CLEAR_INPUT (Ctrl+C)', () => {
-      const { result } = renderHook(() =>
+    it('should handle CLEAR_INPUT (Ctrl+C)', async () => {
+      const { result } = await renderHook(() =>
         useTextBuffer({
           initialText: 'hello',
           viewport,
-          isValidPath: () => false,
         }),
       );
       expect(getBufferState(result).text).toBe('hello');
@@ -1540,10 +1760,8 @@ describe('useTextBuffer', () => {
       expect(getBufferState(result).text).toBe('');
     });
 
-    it('should NOT handle CLEAR_INPUT if buffer is empty', () => {
-      const { result } = renderHook(() =>
-        useTextBuffer({ viewport, isValidPath: () => false }),
-      );
+    it('should NOT handle CLEAR_INPUT if buffer is empty', async () => {
+      const { result } = await renderHook(() => useTextBuffer({ viewport }));
       let handled = true;
       act(() => {
         handled = result.current.handleInput({
@@ -1559,12 +1777,11 @@ describe('useTextBuffer', () => {
       expect(handled).toBe(false);
     });
 
-    it('should handle "Backspace" key', () => {
-      const { result } = renderHook(() =>
+    it('should handle "Backspace" key', async () => {
+      const { result } = await renderHook(() =>
         useTextBuffer({
           initialText: 'a',
           viewport,
-          isValidPath: () => false,
         }),
       );
       act(() => result.current.move('end'));
@@ -1582,12 +1799,11 @@ describe('useTextBuffer', () => {
       expect(getBufferState(result).text).toBe('');
     });
 
-    it('should handle multiple delete characters in one input', () => {
-      const { result } = renderHook(() =>
+    it('should handle multiple delete characters in one input', async () => {
+      const { result } = await renderHook(() =>
         useTextBuffer({
           initialText: 'abcde',
           viewport,
-          isValidPath: () => false,
         }),
       );
       act(() => result.current.move('end')); // cursor at the end
@@ -1626,12 +1842,11 @@ describe('useTextBuffer', () => {
       expect(getBufferState(result).cursor).toEqual([0, 2]);
     });
 
-    it('should handle inserts that contain delete characters', () => {
-      const { result } = renderHook(() =>
+    it('should handle inserts that contain delete characters', async () => {
+      const { result } = await renderHook(() =>
         useTextBuffer({
           initialText: 'abcde',
           viewport,
-          isValidPath: () => false,
         }),
       );
       act(() => result.current.move('end')); // cursor at the end
@@ -1644,12 +1859,11 @@ describe('useTextBuffer', () => {
       expect(getBufferState(result).cursor).toEqual([0, 2]);
     });
 
-    it('should handle inserts with a mix of regular and delete characters', () => {
-      const { result } = renderHook(() =>
+    it('should handle inserts with a mix of regular and delete characters', async () => {
+      const { result } = await renderHook(() =>
         useTextBuffer({
           initialText: 'abcde',
           viewport,
-          isValidPath: () => false,
         }),
       );
       act(() => result.current.move('end')); // cursor at the end
@@ -1662,12 +1876,11 @@ describe('useTextBuffer', () => {
       expect(getBufferState(result).cursor).toEqual([0, 6]);
     });
 
-    it('should handle arrow keys for movement', () => {
-      const { result } = renderHook(() =>
+    it('should handle arrow keys for movement', async () => {
+      const { result } = await renderHook(() =>
         useTextBuffer({
           initialText: 'ab',
           viewport,
-          isValidPath: () => false,
         }),
       );
       act(() => result.current.move('end')); // cursor [0,2]
@@ -1697,10 +1910,8 @@ describe('useTextBuffer', () => {
       expect(getBufferState(result).cursor).toEqual([0, 2]);
     });
 
-    it('should strip ANSI escape codes when pasting text', () => {
-      const { result } = renderHook(() =>
-        useTextBuffer({ viewport, isValidPath: () => false }),
-      );
+    it('should strip ANSI escape codes when pasting text', async () => {
+      const { result } = await renderHook(() => useTextBuffer({ viewport }));
       const textWithAnsi = '\x1B[31mHello\x1B[0m \x1B[32mWorld\x1B[0m';
       // Simulate pasting by calling handleInput with a string longer than 1 char
       act(() => {
@@ -1717,13 +1928,11 @@ describe('useTextBuffer', () => {
       expect(getBufferState(result).text).toBe('Hello World');
     });
 
-    it('should handle VSCode terminal Shift+Enter as newline', () => {
-      const { result } = renderHook(() =>
-        useTextBuffer({ viewport, isValidPath: () => false }),
-      );
+    it('should handle VSCode terminal Shift+Enter as newline', async () => {
+      const { result } = await renderHook(() => useTextBuffer({ viewport }));
       act(() => {
         result.current.handleInput({
-          name: 'return',
+          name: 'enter',
           shift: true,
           alt: false,
           ctrl: false,
@@ -1735,7 +1944,7 @@ describe('useTextBuffer', () => {
       expect(getBufferState(result).lines).toEqual(['', '']);
     });
 
-    it('should correctly handle repeated pasting of long text', () => {
+    it('should correctly handle repeated pasting of long text', async () => {
       const longText = `not only five centuries, but also the leap into electronic typesetting, remaining essentially unchanged. It was popularised in the 1960s with the release of Letraset sheets containing Lorem Ipsum passages, and more recently with desktop publishing software like Aldus PageMaker including versions of Lorem Ipsum.
 
 Why do we use it?
@@ -1744,9 +1953,7 @@ It is a long established fact that a reader will be distracted by the readable c
 Where does it come from?
 Contrary to popular belief, Lorem Ipsum is not simply random text. It has roots in a piece of classical Latin literature from 45 BC, making it over 2000 years old. Richard McClintock, a Latin professor at Hampden-Sydney College in Virginia, looked up one of the more obscure Latin words, consectetur, from a Lore
 `;
-      const { result } = renderHook(() =>
-        useTextBuffer({ viewport, isValidPath: () => false }),
-      );
+      const { result } = await renderHook(() => useTextBuffer({ viewport }));
 
       // Simulate pasting the long text multiple times
       act(() => {
@@ -1787,12 +1994,11 @@ Contrary to popular belief, Lorem Ipsum is not simply random text. It has roots 
   // - All edge cases for visual scrolling and wrapping with different viewport sizes and text content.
 
   describe('replaceRange', () => {
-    it('should replace a single-line range with single-line text', () => {
-      const { result } = renderHook(() =>
+    it('should replace a single-line range with single-line text', async () => {
+      const { result } = await renderHook(() =>
         useTextBuffer({
           initialText: '@pac',
           viewport,
-          isValidPath: () => false,
         }),
       );
       act(() => result.current.replaceRange(0, 1, 0, 4, 'packages'));
@@ -1801,12 +2007,11 @@ Contrary to popular belief, Lorem Ipsum is not simply random text. It has roots 
       expect(state.cursor).toEqual([0, 9]); // cursor after 'typescript'
     });
 
-    it('should replace a multi-line range with single-line text', () => {
-      const { result } = renderHook(() =>
+    it('should replace a multi-line range with single-line text', async () => {
+      const { result } = await renderHook(() =>
         useTextBuffer({
           initialText: 'hello\nworld\nagain',
           viewport,
-          isValidPath: () => false,
         }),
       );
       act(() => result.current.replaceRange(0, 2, 1, 3, ' new ')); // replace 'llo\nwor' with ' new '
@@ -1815,12 +2020,11 @@ Contrary to popular belief, Lorem Ipsum is not simply random text. It has roots 
       expect(state.cursor).toEqual([0, 7]); // cursor after ' new '
     });
 
-    it('should delete a range when replacing with an empty string', () => {
-      const { result } = renderHook(() =>
+    it('should delete a range when replacing with an empty string', async () => {
+      const { result } = await renderHook(() =>
         useTextBuffer({
           initialText: 'hello world',
           viewport,
-          isValidPath: () => false,
         }),
       );
       act(() => result.current.replaceRange(0, 5, 0, 11, '')); // delete ' world'
@@ -1829,12 +2033,11 @@ Contrary to popular belief, Lorem Ipsum is not simply random text. It has roots 
       expect(state.cursor).toEqual([0, 5]);
     });
 
-    it('should handle replacing at the beginning of the text', () => {
-      const { result } = renderHook(() =>
+    it('should handle replacing at the beginning of the text', async () => {
+      const { result } = await renderHook(() =>
         useTextBuffer({
           initialText: 'world',
           viewport,
-          isValidPath: () => false,
         }),
       );
       act(() => result.current.replaceRange(0, 0, 0, 0, 'hello '));
@@ -1843,12 +2046,11 @@ Contrary to popular belief, Lorem Ipsum is not simply random text. It has roots 
       expect(state.cursor).toEqual([0, 6]);
     });
 
-    it('should handle replacing at the end of the text', () => {
-      const { result } = renderHook(() =>
+    it('should handle replacing at the end of the text', async () => {
+      const { result } = await renderHook(() =>
         useTextBuffer({
           initialText: 'hello',
           viewport,
-          isValidPath: () => false,
         }),
       );
       act(() => result.current.replaceRange(0, 5, 0, 5, ' world'));
@@ -1857,12 +2059,11 @@ Contrary to popular belief, Lorem Ipsum is not simply random text. It has roots 
       expect(state.cursor).toEqual([0, 11]);
     });
 
-    it('should handle replacing the entire buffer content', () => {
-      const { result } = renderHook(() =>
+    it('should handle replacing the entire buffer content', async () => {
+      const { result } = await renderHook(() =>
         useTextBuffer({
           initialText: 'old text',
           viewport,
-          isValidPath: () => false,
         }),
       );
       act(() => result.current.replaceRange(0, 0, 0, 8, 'new text'));
@@ -1871,12 +2072,11 @@ Contrary to popular belief, Lorem Ipsum is not simply random text. It has roots 
       expect(state.cursor).toEqual([0, 8]);
     });
 
-    it('should correctly replace with unicode characters', () => {
-      const { result } = renderHook(() =>
+    it('should correctly replace with unicode characters', async () => {
+      const { result } = await renderHook(() =>
         useTextBuffer({
           initialText: 'hello *** world',
           viewport,
-          isValidPath: () => false,
         }),
       );
       act(() => result.current.replaceRange(0, 6, 0, 9, '你好'));
@@ -1885,12 +2085,11 @@ Contrary to popular belief, Lorem Ipsum is not simply random text. It has roots 
       expect(state.cursor).toEqual([0, 8]); // after '你好'
     });
 
-    it('should handle invalid range by returning false and not changing text', () => {
-      const { result } = renderHook(() =>
+    it('should handle invalid range by returning false and not changing text', async () => {
+      const { result } = await renderHook(() =>
         useTextBuffer({
           initialText: 'test',
           viewport,
-          isValidPath: () => false,
         }),
       );
       act(() => {
@@ -1905,12 +2104,11 @@ Contrary to popular belief, Lorem Ipsum is not simply random text. It has roots 
       expect(getBufferState(result).text).toBe('test');
     });
 
-    it('replaceRange: multiple lines with a single character', () => {
-      const { result } = renderHook(() =>
+    it('replaceRange: multiple lines with a single character', async () => {
+      const { result } = await renderHook(() =>
         useTextBuffer({
           initialText: 'first\nsecond\nthird',
           viewport,
-          isValidPath: () => false,
         }),
       );
       act(() => result.current.replaceRange(0, 2, 2, 3, 'X')); // Replace 'rst\nsecond\nthi'
@@ -1919,12 +2117,11 @@ Contrary to popular belief, Lorem Ipsum is not simply random text. It has roots 
       expect(state.cursor).toEqual([0, 3]); // After 'X'
     });
 
-    it('should replace a single-line range with multi-line text', () => {
-      const { result } = renderHook(() =>
+    it('should replace a single-line range with multi-line text', async () => {
+      const { result } = await renderHook(() =>
         useTextBuffer({
           initialText: 'one two three',
           viewport,
-          isValidPath: () => false,
         }),
       );
       // Replace "two" with "new\nline"
@@ -1967,20 +2164,16 @@ Contrary to popular belief, Lorem Ipsum is not simply random text. It has roots 
         expected: 'Pasted Text',
         desc: 'pasted text with ANSI',
       },
-    ])('should strip $desc from input', ({ input, expected }) => {
-      const { result } = renderHook(() =>
-        useTextBuffer({ viewport, isValidPath: () => false }),
-      );
+    ])('should strip $desc from input', async ({ input, expected }) => {
+      const { result } = await renderHook(() => useTextBuffer({ viewport }));
       act(() => {
         result.current.handleInput(createInput(input));
       });
       expect(getBufferState(result).text).toBe(expected);
     });
 
-    it('should not strip standard characters or newlines', () => {
-      const { result } = renderHook(() =>
-        useTextBuffer({ viewport, isValidPath: () => false }),
-      );
+    it('should not strip standard characters or newlines', async () => {
+      const { result } = await renderHook(() => useTextBuffer({ viewport }));
       const validText = 'Hello World\nThis is a test.';
       act(() => {
         result.current.handleInput(createInput(validText));
@@ -1988,10 +2181,8 @@ Contrary to popular belief, Lorem Ipsum is not simply random text. It has roots 
       expect(getBufferState(result).text).toBe(validText);
     });
 
-    it('should sanitize large text (>5000 chars) and strip unsafe characters', () => {
-      const { result } = renderHook(() =>
-        useTextBuffer({ viewport, isValidPath: () => false }),
-      );
+    it('should sanitize large text (>5000 chars) and strip unsafe characters', async () => {
+      const { result } = await renderHook(() => useTextBuffer({ viewport }));
       const unsafeChars = '\x07\x08\x0B\x0C';
       const largeTextWithUnsafe =
         'safe text'.repeat(600) + unsafeChars + 'more safe text';
@@ -2019,10 +2210,8 @@ Contrary to popular belief, Lorem Ipsum is not simply random text. It has roots 
       expect(resultText).toContain('more safe text');
     });
 
-    it('should sanitize large ANSI text (>5000 chars) and strip escape codes', () => {
-      const { result } = renderHook(() =>
-        useTextBuffer({ viewport, isValidPath: () => false }),
-      );
+    it('should sanitize large ANSI text (>5000 chars) and strip escape codes', async () => {
+      const { result } = await renderHook(() => useTextBuffer({ viewport }));
       const largeTextWithAnsi =
         '\x1B[31m' +
         'red text'.repeat(800) +
@@ -2053,10 +2242,8 @@ Contrary to popular belief, Lorem Ipsum is not simply random text. It has roots 
       expect(resultText).toContain('green text');
     });
 
-    it('should not strip popular emojis', () => {
-      const { result } = renderHook(() =>
-        useTextBuffer({ viewport, isValidPath: () => false }),
-      );
+    it('should not strip popular emojis', async () => {
+      const { result } = await renderHook(() => useTextBuffer({ viewport }));
       const emojis = '🐍🐳🦀🦄';
       act(() => {
         result.current.handleInput({
@@ -2074,11 +2261,11 @@ Contrary to popular belief, Lorem Ipsum is not simply random text. It has roots 
   });
 
   describe('inputFilter', () => {
-    it('should filter input based on the provided filter function', () => {
-      const { result } = renderHook(() =>
+    it('should filter input based on the provided filter function', async () => {
+      const { result } = await renderHook(() =>
         useTextBuffer({
           viewport,
-          isValidPath: () => false,
+
           inputFilter: (text) => text.replace(/[^0-9]/g, ''),
         }),
       );
@@ -2087,11 +2274,11 @@ Contrary to popular belief, Lorem Ipsum is not simply random text. It has roots 
       expect(getBufferState(result).text).toBe('123');
     });
 
-    it('should handle empty result from filter', () => {
-      const { result } = renderHook(() =>
+    it('should handle empty result from filter', async () => {
+      const { result } = await renderHook(() =>
         useTextBuffer({
           viewport,
-          isValidPath: () => false,
+
           inputFilter: (text) => text.replace(/[^0-9]/g, ''),
         }),
       );
@@ -2100,11 +2287,11 @@ Contrary to popular belief, Lorem Ipsum is not simply random text. It has roots 
       expect(getBufferState(result).text).toBe('');
     });
 
-    it('should filter pasted text', () => {
-      const { result } = renderHook(() =>
+    it('should filter pasted text', async () => {
+      const { result } = await renderHook(() =>
         useTextBuffer({
           viewport,
-          isValidPath: () => false,
+
           inputFilter: (text) => text.toUpperCase(),
         }),
       );
@@ -2113,11 +2300,11 @@ Contrary to popular belief, Lorem Ipsum is not simply random text. It has roots 
       expect(getBufferState(result).text).toBe('HELLO');
     });
 
-    it('should not filter newlines if they are allowed by the filter', () => {
-      const { result } = renderHook(() =>
+    it('should not filter newlines if they are allowed by the filter', async () => {
+      const { result } = await renderHook(() =>
         useTextBuffer({
           viewport,
-          isValidPath: () => false,
+
           inputFilter: (text) => text, // Allow everything including newlines
         }),
       );
@@ -2128,11 +2315,11 @@ Contrary to popular belief, Lorem Ipsum is not simply random text. It has roots 
       expect(getBufferState(result).text).toBe('a\nb');
     });
 
-    it('should filter before newline check in insert', () => {
-      const { result } = renderHook(() =>
+    it('should filter before newline check in insert', async () => {
+      const { result } = await renderHook(() =>
         useTextBuffer({
           viewport,
-          isValidPath: () => false,
+
           inputFilter: (text) => text.replace(/\n/g, ''), // Filter out newlines
         }),
       );
@@ -2143,33 +2330,30 @@ Contrary to popular belief, Lorem Ipsum is not simply random text. It has roots 
   });
 
   describe('stripAnsi', () => {
-    it('should correctly strip ANSI escape codes', () => {
+    it('should correctly strip ANSI escape codes', async () => {
       const textWithAnsi = '\x1B[31mHello\x1B[0m World';
       expect(stripAnsi(textWithAnsi)).toBe('Hello World');
     });
 
-    it('should handle multiple ANSI codes', () => {
+    it('should handle multiple ANSI codes', async () => {
       const textWithMultipleAnsi = '\x1B[1m\x1B[34mBold Blue\x1B[0m Text';
       expect(stripAnsi(textWithMultipleAnsi)).toBe('Bold Blue Text');
     });
 
-    it('should not modify text without ANSI codes', () => {
+    it('should not modify text without ANSI codes', async () => {
       const plainText = 'Plain text';
       expect(stripAnsi(plainText)).toBe('Plain text');
     });
 
-    it('should handle empty string', () => {
+    it('should handle empty string', async () => {
       expect(stripAnsi('')).toBe('');
     });
   });
 
   describe('Memoization', () => {
-    it('should keep action references stable across re-renders', () => {
-      // We pass a stable `isValidPath` so that callbacks that depend on it
-      // are not recreated on every render.
-      const isValidPath = () => false;
-      const { result, rerender } = renderHook(() =>
-        useTextBuffer({ viewport, isValidPath }),
+    it('should keep action references stable across re-renders', async () => {
+      const { result, rerender } = await renderHook(() =>
+        useTextBuffer({ viewport }),
       );
 
       const initialInsert = result.current.insert;
@@ -2185,11 +2369,8 @@ Contrary to popular belief, Lorem Ipsum is not simply random text. It has roots 
       expect(result.current.handleInput).toBe(initialHandleInput);
     });
 
-    it('should have memoized actions that operate on the latest state', () => {
-      const isValidPath = () => false;
-      const { result } = renderHook(() =>
-        useTextBuffer({ viewport, isValidPath }),
-      );
+    it('should have memoized actions that operate on the latest state', async () => {
+      const { result } = await renderHook(() => useTextBuffer({ viewport }));
 
       // Store a reference to the memoized insert function.
       const memoizedInsert = result.current.insert;
@@ -2211,11 +2392,11 @@ Contrary to popular belief, Lorem Ipsum is not simply random text. It has roots 
   });
 
   describe('singleLine mode', () => {
-    it('should not insert a newline character when singleLine is true', () => {
-      const { result } = renderHook(() =>
+    it('should not insert a newline character when singleLine is true', async () => {
+      const { result } = await renderHook(() =>
         useTextBuffer({
           viewport,
-          isValidPath: () => false,
+
           singleLine: true,
         }),
       );
@@ -2225,12 +2406,12 @@ Contrary to popular belief, Lorem Ipsum is not simply random text. It has roots 
       expect(state.lines).toEqual(['']);
     });
 
-    it('should not create a new line when newline() is called and singleLine is true', () => {
-      const { result } = renderHook(() =>
+    it('should not create a new line when newline() is called and singleLine is true', async () => {
+      const { result } = await renderHook(() =>
         useTextBuffer({
           initialText: 'ab',
           viewport,
-          isValidPath: () => false,
+
           singleLine: true,
         }),
       );
@@ -2242,17 +2423,17 @@ Contrary to popular belief, Lorem Ipsum is not simply random text. It has roots 
       expect(state.cursor).toEqual([0, 2]);
     });
 
-    it('should not handle "Enter" key as newline when singleLine is true', () => {
-      const { result } = renderHook(() =>
+    it('should not handle "Enter" key as newline when singleLine is true', async () => {
+      const { result } = await renderHook(() =>
         useTextBuffer({
           viewport,
-          isValidPath: () => false,
+
           singleLine: true,
         }),
       );
       act(() => {
         result.current.handleInput({
-          name: 'return',
+          name: 'enter',
           shift: false,
           alt: false,
           ctrl: false,
@@ -2264,11 +2445,11 @@ Contrary to popular belief, Lorem Ipsum is not simply random text. It has roots 
       expect(getBufferState(result).lines).toEqual(['']);
     });
 
-    it('should not print anything for function keys when singleLine is true', () => {
-      const { result } = renderHook(() =>
+    it('should not print anything for function keys when singleLine is true', async () => {
+      const { result } = await renderHook(() =>
         useTextBuffer({
           viewport,
-          isValidPath: () => false,
+
           singleLine: true,
         }),
       );
@@ -2286,11 +2467,11 @@ Contrary to popular belief, Lorem Ipsum is not simply random text. It has roots 
       expect(getBufferState(result).lines).toEqual(['']);
     });
 
-    it('should strip newlines from pasted text when singleLine is true', () => {
-      const { result } = renderHook(() =>
+    it('should strip newlines from pasted text when singleLine is true', async () => {
+      const { result } = await renderHook(() =>
         useTextBuffer({
           viewport,
-          isValidPath: () => false,
+
           singleLine: true,
         }),
       );
@@ -2434,7 +2615,7 @@ describe('offsetToLogicalPos', () => {
     { text: '🐶🐱', offset: 0, expected: [0, 0], desc: 'emoji - start' },
     { text: '🐶🐱', offset: 1, expected: [0, 1], desc: 'emoji - middle' },
     { text: '🐶🐱', offset: 2, expected: [0, 2], desc: 'emoji - end' },
-  ])('should handle $desc', ({ text, offset, expected }) => {
+  ])('should handle $desc', async ({ text, offset, expected }) => {
     expect(offsetToLogicalPos(text, offset)).toEqual(expected);
   });
 
@@ -2462,7 +2643,7 @@ describe('offsetToLogicalPos', () => {
 });
 
 describe('logicalPosToOffset', () => {
-  it('should convert row/col position to offset correctly', () => {
+  it('should convert row/col position to offset correctly', async () => {
     const lines = ['hello', 'world', '123'];
 
     // Line 0: "hello" (5 chars)
@@ -2481,7 +2662,7 @@ describe('logicalPosToOffset', () => {
     expect(logicalPosToOffset(lines, 2, 3)).toBe(15); // End of '123'
   });
 
-  it('should handle empty lines', () => {
+  it('should handle empty lines', async () => {
     const lines = ['a', '', 'c'];
 
     expect(logicalPosToOffset(lines, 0, 0)).toBe(0); // 'a'
@@ -2491,13 +2672,13 @@ describe('logicalPosToOffset', () => {
     expect(logicalPosToOffset(lines, 2, 1)).toBe(4); // End of 'c'
   });
 
-  it('should handle single empty line', () => {
+  it('should handle single empty line', async () => {
     const lines = [''];
 
     expect(logicalPosToOffset(lines, 0, 0)).toBe(0);
   });
 
-  it('should be inverse of offsetToLogicalPos', () => {
+  it('should be inverse of offsetToLogicalPos', async () => {
     const lines = ['hello', 'world', '123'];
     const text = lines.join('\n');
 
@@ -2509,7 +2690,7 @@ describe('logicalPosToOffset', () => {
     }
   });
 
-  it('should handle out-of-bounds positions', () => {
+  it('should handle out-of-bounds positions', async () => {
     const lines = ['hello'];
 
     // Beyond end of line
@@ -2545,7 +2726,7 @@ const createTestState = (
 
 describe('textBufferReducer vim operations', () => {
   describe('vim_delete_line', () => {
-    it('should delete a single line including newline in multi-line text', () => {
+    it('should delete a single line including newline in multi-line text', async () => {
       const state = createTestState(['line1', 'line2', 'line3'], 1, 2);
 
       const action: TextBufferAction = {
@@ -2562,7 +2743,7 @@ describe('textBufferReducer vim operations', () => {
       expect(result.cursorCol).toBe(0);
     });
 
-    it('should delete multiple lines when count > 1', () => {
+    it('should delete multiple lines when count > 1', async () => {
       const state = createTestState(['line1', 'line2', 'line3', 'line4'], 1, 0);
 
       const action: TextBufferAction = {
@@ -2579,7 +2760,7 @@ describe('textBufferReducer vim operations', () => {
       expect(result.cursorCol).toBe(0);
     });
 
-    it('should clear single line content when only one line exists', () => {
+    it('should clear single line content when only one line exists', async () => {
       const state = createTestState(['only line'], 0, 5);
 
       const action: TextBufferAction = {
@@ -2596,7 +2777,7 @@ describe('textBufferReducer vim operations', () => {
       expect(result.cursorCol).toBe(0);
     });
 
-    it('should handle deleting the last line properly', () => {
+    it('should handle deleting the last line properly', async () => {
       const state = createTestState(['line1', 'line2'], 1, 0);
 
       const action: TextBufferAction = {
@@ -2613,7 +2794,7 @@ describe('textBufferReducer vim operations', () => {
       expect(result.cursorCol).toBe(0);
     });
 
-    it('should handle deleting all lines and maintain valid state for subsequent paste', () => {
+    it('should handle deleting all lines and maintain valid state for subsequent paste', async () => {
       const state = createTestState(['line1', 'line2', 'line3', 'line4'], 0, 0);
 
       // Delete all 4 lines with 4dd
@@ -2649,50 +2830,50 @@ describe('textBufferReducer vim operations', () => {
 
 describe('Unicode helper functions', () => {
   describe('findWordEndInLine with Unicode', () => {
-    it('should handle combining characters', () => {
+    it('should handle combining characters', async () => {
       // café with combining accent
       const cafeWithCombining = 'cafe\u0301';
       const result = findWordEndInLine(cafeWithCombining + ' test', 0);
       expect(result).toBe(3); // End of 'café' at base character 'e', not combining accent
     });
 
-    it('should handle precomposed characters with diacritics', () => {
+    it('should handle precomposed characters with diacritics', async () => {
       // café with precomposed é (U+00E9)
       const cafePrecomposed = 'café';
       const result = findWordEndInLine(cafePrecomposed + ' test', 0);
       expect(result).toBe(3); // End of 'café' at precomposed character 'é'
     });
 
-    it('should return null when no word end found', () => {
+    it('should return null when no word end found', async () => {
       const result = findWordEndInLine('   ', 0);
       expect(result).toBeNull(); // No word end found in whitespace-only string string
     });
   });
 
   describe('findNextWordStartInLine with Unicode', () => {
-    it('should handle right-to-left text', () => {
+    it('should handle right-to-left text', async () => {
       const result = findNextWordStartInLine('hello مرحبا world', 0);
       expect(result).toBe(6); // Start of Arabic word
     });
 
-    it('should handle Chinese characters', () => {
+    it('should handle Chinese characters', async () => {
       const result = findNextWordStartInLine('hello 你好 world', 0);
       expect(result).toBe(6); // Start of Chinese word
     });
 
-    it('should return null at end of line', () => {
+    it('should return null at end of line', async () => {
       const result = findNextWordStartInLine('hello', 10);
       expect(result).toBeNull();
     });
 
-    it('should handle combining characters', () => {
+    it('should handle combining characters', async () => {
       // café with combining accent + next word
       const textWithCombining = 'cafe\u0301 test';
       const result = findNextWordStartInLine(textWithCombining, 0);
       expect(result).toBe(6); // Start of 'test' after 'café ' (combining char makes string longer)
     });
 
-    it('should handle precomposed characters with diacritics', () => {
+    it('should handle precomposed characters with diacritics', async () => {
       // café with precomposed é + next word
       const textPrecomposed = 'café test';
       const result = findNextWordStartInLine(textPrecomposed, 0);
@@ -2701,37 +2882,37 @@ describe('Unicode helper functions', () => {
   });
 
   describe('isWordCharStrict with Unicode', () => {
-    it('should return true for ASCII word characters', () => {
+    it('should return true for ASCII word characters', async () => {
       expect(isWordCharStrict('a')).toBe(true);
       expect(isWordCharStrict('Z')).toBe(true);
       expect(isWordCharStrict('0')).toBe(true);
       expect(isWordCharStrict('_')).toBe(true);
     });
 
-    it('should return false for punctuation', () => {
+    it('should return false for punctuation', async () => {
       expect(isWordCharStrict('.')).toBe(false);
       expect(isWordCharStrict(',')).toBe(false);
       expect(isWordCharStrict('!')).toBe(false);
     });
 
-    it('should return true for non-Latin scripts', () => {
+    it('should return true for non-Latin scripts', async () => {
       expect(isWordCharStrict('你')).toBe(true); // Chinese character
       expect(isWordCharStrict('م')).toBe(true); // Arabic character
     });
 
-    it('should return false for whitespace', () => {
+    it('should return false for whitespace', async () => {
       expect(isWordCharStrict(' ')).toBe(false);
       expect(isWordCharStrict('\t')).toBe(false);
     });
   });
 
   describe('cpLen with Unicode', () => {
-    it('should handle combining characters', () => {
+    it('should handle combining characters', async () => {
       expect(cpLen('é')).toBe(1); // Precomposed
       expect(cpLen('e\u0301')).toBe(2); // e + combining acute
     });
 
-    it('should handle Chinese and Arabic text', () => {
+    it('should handle Chinese and Arabic text', async () => {
       expect(cpLen('hello 你好 world')).toBe(14); // 5 + 1 + 2 + 1 + 5 = 14
       expect(cpLen('hello مرحبا world')).toBe(17);
     });
@@ -2740,13 +2921,12 @@ describe('Unicode helper functions', () => {
   describe('useTextBuffer CJK Navigation', () => {
     const viewport = { width: 80, height: 24 };
 
-    it('should navigate by word in Chinese', () => {
-      const { result } = renderHook(() =>
+    it('should navigate by word in Chinese', async () => {
+      const { result } = await renderHook(() =>
         useTextBuffer({
           initialText: '你好世界',
           initialCursorOffset: 4, // End of string
           viewport,
-          isValidPath: () => false,
         }),
       );
 
@@ -2799,13 +2979,12 @@ describe('Unicode helper functions', () => {
       expect(result.current.cursor[1]).toBe(4);
     });
 
-    it('should navigate mixed English and Chinese', () => {
-      const { result } = renderHook(() =>
+    it('should navigate mixed English and Chinese', async () => {
+      const { result } = await renderHook(() =>
         useTextBuffer({
           initialText: 'Hello你好World',
           initialCursorOffset: 10, // End
           viewport,
-          isValidPath: () => false,
         }),
       );
 
@@ -2837,29 +3016,43 @@ describe('Unicode helper functions', () => {
   });
 });
 
+const mockPlatform = (platform: string) => {
+  vi.stubGlobal(
+    'process',
+    Object.create(process, {
+      platform: {
+        get: () => platform,
+      },
+    }),
+  );
+};
+
 describe('Transformation Utilities', () => {
   afterEach(() => {
     vi.restoreAllMocks();
+    vi.unstubAllGlobals();
   });
 
   describe('getTransformedImagePath', () => {
-    it('should transform a simple image path', () => {
+    beforeEach(() => mockPlatform('linux'));
+
+    it('should transform a simple image path', async () => {
       expect(getTransformedImagePath('@test.png')).toBe('[Image test.png]');
     });
 
-    it('should handle paths with directories', () => {
+    it('should handle paths with directories', async () => {
       expect(getTransformedImagePath('@path/to/image.jpg')).toBe(
         '[Image image.jpg]',
       );
     });
 
-    it('should truncate long filenames', () => {
+    it('should truncate long filenames', async () => {
       expect(getTransformedImagePath('@verylongfilename1234567890.png')).toBe(
         '[Image ...1234567890.png]',
       );
     });
 
-    it('should handle different image extensions', () => {
+    it('should handle different image extensions', async () => {
       expect(getTransformedImagePath('@test.jpg')).toBe('[Image test.jpg]');
       expect(getTransformedImagePath('@test.jpeg')).toBe('[Image test.jpeg]');
       expect(getTransformedImagePath('@test.gif')).toBe('[Image test.gif]');
@@ -2868,24 +3061,19 @@ describe('Transformation Utilities', () => {
       expect(getTransformedImagePath('@test.bmp')).toBe('[Image test.bmp]');
     });
 
-    it('should handle POSIX-style forward-slash paths on any platform', () => {
+    it('should handle POSIX-style forward-slash paths on any platform', async () => {
       const input = '@C:/Users/foo/screenshots/image2x.png';
       expect(getTransformedImagePath(input)).toBe('[Image image2x.png]');
     });
 
-    it('should handle Windows-style backslash paths on any platform', () => {
-      const input = '@C:\\Users\\foo\\screenshots\\image2x.png';
-      expect(getTransformedImagePath(input)).toBe('[Image image2x.png]');
-    });
-
-    it('should handle escaped spaces in paths', () => {
+    it('should handle escaped spaces in paths', async () => {
       const input = '@path/to/my\\ file.png';
       expect(getTransformedImagePath(input)).toBe('[Image my file.png]');
     });
   });
 
   describe('getTransformationsForLine', () => {
-    it('should find transformations in a line', () => {
+    it('should find transformations in a line', async () => {
       const line = 'Check out @test.png and @another.jpg';
       const result = calculateTransformationsForLine(line);
 
@@ -2900,18 +3088,18 @@ describe('Transformation Utilities', () => {
       });
     });
 
-    it('should handle no transformations', () => {
+    it('should handle no transformations', async () => {
       const line = 'Just some regular text';
       const result = calculateTransformationsForLine(line);
       expect(result).toEqual([]);
     });
 
-    it('should handle empty line', () => {
+    it('should handle empty line', async () => {
       const result = calculateTransformationsForLine('');
       expect(result).toEqual([]);
     });
 
-    it('should keep adjacent image paths as separate transformations', () => {
+    it('should keep adjacent image paths as separate transformations', async () => {
       const line = '@a.png@b.png@c.png';
       const result = calculateTransformationsForLine(line);
       expect(result).toHaveLength(3);
@@ -2920,7 +3108,7 @@ describe('Transformation Utilities', () => {
       expect(result[2].logicalText).toBe('@c.png');
     });
 
-    it('should handle multiple transformations in a row', () => {
+    it('should handle multiple transformations in a row', async () => {
       const line = '@a.png @b.png @c.png';
       const result = calculateTransformationsForLine(line);
       expect(result).toHaveLength(3);
@@ -2945,32 +3133,32 @@ describe('Transformation Utilities', () => {
       },
     ];
 
-    it('should find transformation when cursor is inside it', () => {
+    it('should find transformation when cursor is inside it', async () => {
       const result = getTransformUnderCursor(0, 7, [transformations]);
       expect(result).toEqual(transformations[0]);
     });
 
-    it('should find transformation when cursor is at start', () => {
+    it('should find transformation when cursor is at start', async () => {
       const result = getTransformUnderCursor(0, 5, [transformations]);
       expect(result).toEqual(transformations[0]);
     });
 
-    it('should NOT find transformation when cursor is at end', () => {
+    it('should NOT find transformation when cursor is at end', async () => {
       const result = getTransformUnderCursor(0, 14, [transformations]);
       expect(result).toBeNull();
     });
 
-    it('should return null when cursor is not on a transformation', () => {
+    it('should return null when cursor is not on a transformation', async () => {
       const result = getTransformUnderCursor(0, 2, [transformations]);
       expect(result).toBeNull();
     });
 
-    it('should handle empty transformations array', () => {
+    it('should handle empty transformations array', async () => {
       const result = getTransformUnderCursor(0, 5, []);
       expect(result).toBeNull();
     });
 
-    it('regression: should not find paste transformation when clicking one character after it', () => {
+    it('regression: should not find paste transformation when clicking one character after it', async () => {
       const pasteId = '[Pasted Text: 5 lines]';
       const line = pasteId + ' suffix';
       const transformations = calculateTransformationsForLine(line);
@@ -2988,7 +3176,7 @@ describe('Transformation Utilities', () => {
   });
 
   describe('calculateTransformedLine', () => {
-    it('should transform a line with one transformation', () => {
+    it('should transform a line with one transformation', async () => {
       const line = 'Check out @test.png';
       const transformations = calculateTransformationsForLine(line);
       const result = calculateTransformedLine(line, 0, [0, 0], transformations);
@@ -3001,7 +3189,7 @@ describe('Transformation Utilities', () => {
       expect(result.transformedToLogMap[9]).toBe(9); // ' ' before transformation
     });
 
-    it('should handle cursor inside transformation', () => {
+    it('should handle cursor inside transformation', async () => {
       const line = 'Check out @test.png';
       const transformations = calculateTransformationsForLine(line);
       // Cursor at '@' (position 10 in the line)
@@ -3018,7 +3206,7 @@ describe('Transformation Utilities', () => {
       expect(result.transformedToLogMap[10]).toBe(10); // '@'
     });
 
-    it('should handle line with no transformations', () => {
+    it('should handle line with no transformations', async () => {
       const line = 'Just some text';
       const result = calculateTransformedLine(line, 0, [0, 0], []);
 
@@ -3030,7 +3218,7 @@ describe('Transformation Utilities', () => {
       expect(result.transformedToLogMap[14]).toBe(14); // Trailing position
     });
 
-    it('should handle empty line', () => {
+    it('should handle empty line', async () => {
       const result = calculateTransformedLine('', 0, [0, 0], []);
       expect(result.transformedLine).toBe('');
       expect(result.transformedToLogMap).toEqual([0]); // Just the trailing position
@@ -3053,13 +3241,13 @@ describe('Transformation Utilities', () => {
       },
     ])(
       'should invalidate cache when line content changes $desc',
-      ({ actFn, expected }) => {
+      async ({ actFn, expected }) => {
         const viewport = { width: 80, height: 24 };
-        const { result } = renderHookWithProviders(() =>
+        const { result } = await renderHookWithProviders(() =>
           useTextBuffer({
             initialText: 'original line',
             viewport,
-            isValidPath: () => true,
+            escapePastedPaths: true,
           }),
         );
 
@@ -3074,15 +3262,15 @@ describe('Transformation Utilities', () => {
       },
     );
 
-    it('should invalidate cache when viewport width changes', () => {
+    it('should invalidate cache when viewport width changes', async () => {
       const viewport = { width: 80, height: 24 };
-      const { result, rerender } = renderHookWithProviders(
+      const { result, rerender } = await renderHookWithProviders(
         ({ vp }) =>
           useTextBuffer({
             initialText:
               'a very long line that will wrap when the viewport is small',
             viewport: vp,
-            isValidPath: () => true,
+            escapePastedPaths: true,
           }),
         { initialProps: { vp: viewport } },
       );
@@ -3096,14 +3284,14 @@ describe('Transformation Utilities', () => {
       expect(result.current.allVisualLines.length).toBeGreaterThan(1);
     });
 
-    it('should correctly handle cursor expansion/collapse in cached layout', () => {
+    it('should correctly handle cursor expansion/collapse in cached layout', async () => {
       const viewport = { width: 80, height: 24 };
       const text = 'Check @image.png here';
-      const { result } = renderHookWithProviders(() =>
+      const { result } = await renderHookWithProviders(() =>
         useTextBuffer({
           initialText: text,
           viewport,
-          isValidPath: () => true,
+          escapePastedPaths: true,
         }),
       );
 
@@ -3129,14 +3317,14 @@ describe('Transformation Utilities', () => {
       expect(result.current.allVisualLines[0]).toContain('[Image image.png]');
     });
 
-    it('should reuse cache for unchanged lines during editing', () => {
+    it('should reuse cache for unchanged lines during editing', async () => {
       const viewport = { width: 80, height: 24 };
       const initialText = 'line 1\nline 2\nline 3';
-      const { result } = renderHookWithProviders(() =>
+      const { result } = await renderHookWithProviders(() =>
         useTextBuffer({
           initialText,
           viewport,
-          isValidPath: () => true,
+          escapePastedPaths: true,
         }),
       );
 
@@ -3161,16 +3349,15 @@ describe('Transformation Utilities', () => {
   describe('Scroll Regressions', () => {
     const scrollViewport: Viewport = { width: 80, height: 5 };
 
-    it('should not show empty viewport when collapsing a large paste that was scrolled', () => {
+    it('should not show empty viewport when collapsing a large paste that was scrolled', async () => {
       const largeContent =
         'line1\nline2\nline3\nline4\nline5\nline6\nline7\nline8\nline9\nline10';
       const placeholder = '[Pasted Text: 10 lines]';
 
-      const { result } = renderHook(() =>
+      const { result } = await renderHook(() =>
         useTextBuffer({
           initialText: placeholder,
           viewport: scrollViewport,
-          isValidPath: () => false,
         }),
       );
 

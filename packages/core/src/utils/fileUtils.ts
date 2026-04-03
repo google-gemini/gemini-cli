@@ -8,13 +8,17 @@ import fs from 'node:fs';
 import fsPromises from 'node:fs/promises';
 import path from 'node:path';
 import type { PartUnion } from '@google/genai';
-// eslint-disable-next-line import/no-internal-modules
 import mime from 'mime/lite';
 import type { FileSystemService } from '../services/fileSystemService.js';
 import { ToolErrorType } from '../tools/tool-error.js';
 import { BINARY_EXTENSIONS } from './ignorePatterns.js';
 import { createRequire as createModuleRequire } from 'node:module';
 import { debugLogger } from './debugLogger.js';
+import {
+  DEFAULT_MAX_LINES_TEXT_FILE,
+  MAX_LINE_LENGTH_TEXT_FILE,
+  MAX_FILE_SIZE_MB,
+} from './constants.js';
 
 const requireModule = createModuleRequire(import.meta.url);
 
@@ -51,10 +55,6 @@ export async function loadWasmBinary(
     });
   }
 }
-
-// Constants for text file processing
-const DEFAULT_MAX_LINES_TEXT_FILE = 2000;
-const MAX_LINE_LENGTH_TEXT_FILE = 2000;
 
 // Default values for encoding and separator format
 export const DEFAULT_ENCODING: BufferEncoding = 'utf-8';
@@ -229,6 +229,55 @@ export function isWithinRoot(
 }
 
 /**
+ * Safely resolves a path to its real path if it exists, otherwise returns the absolute resolved path.
+ */
+export function getRealPath(filePath: string): string {
+  try {
+    return fs.realpathSync(filePath);
+  } catch {
+    return path.resolve(filePath);
+  }
+}
+
+/**
+ * Checks if a file's content is empty or contains only whitespace.
+ * Efficiently checks file size first, and only samples the beginning of the file.
+ * Honors Unicode BOM encodings.
+ */
+export async function isEmpty(filePath: string): Promise<boolean> {
+  try {
+    const stats = await fsPromises.stat(filePath);
+    if (stats.size === 0) return true;
+
+    // Sample up to 1KB to check for non-whitespace content.
+    // If a file is larger than 1KB and contains only whitespace,
+    // it's an extreme edge case we can afford to read slightly more of if needed,
+    // but for most valid plans/files, this is sufficient.
+    const fd = await fsPromises.open(filePath, 'r');
+    try {
+      const { buffer } = await fd.read({
+        buffer: Buffer.alloc(Math.min(1024, stats.size)),
+        offset: 0,
+        length: Math.min(1024, stats.size),
+        position: 0,
+      });
+
+      const bom = detectBOM(buffer);
+      const content = bom
+        ? buffer.subarray(bom.bomLength).toString('utf8')
+        : buffer.toString('utf8');
+
+      return content.trim().length === 0;
+    } finally {
+      await fd.close();
+    }
+  } catch {
+    // If file is unreadable, we treat it as empty/invalid for validation purposes
+    return true;
+  }
+}
+
+/**
  * Heuristic: determine if a file is likely binary.
  * Now BOM-aware: if a Unicode BOM is detected, we treat it as text.
  * For non-BOM files, retain the existing null-byte and non-printable ratio checks.
@@ -350,16 +399,17 @@ export interface ProcessedFileReadResult {
  * Reads and processes a single file, handling text, images, and PDFs.
  * @param filePath Absolute path to the file.
  * @param rootDirectory Absolute path to the project root for relative path display.
- * @param offset Optional offset for text files (0-based line number).
- * @param limit Optional limit for text files (number of lines to read).
+ * @param _fileSystemService Currently unused in this function; kept for signature stability.
+ * @param startLine Optional 1-based line number to start reading from.
+ * @param endLine Optional 1-based line number to end reading at (inclusive).
  * @returns ProcessedFileReadResult object.
  */
 export async function processSingleFileContent(
   filePath: string,
   rootDirectory: string,
-  fileSystemService: FileSystemService,
-  offset?: number,
-  limit?: number,
+  _fileSystemService: FileSystemService,
+  startLine?: number,
+  endLine?: number,
 ): Promise<ProcessedFileReadResult> {
   try {
     if (!fs.existsSync(filePath)) {
@@ -384,11 +434,11 @@ export async function processSingleFileContent(
     }
 
     const fileSizeInMB = stats.size / (1024 * 1024);
-    if (fileSizeInMB > 20) {
+    if (fileSizeInMB > MAX_FILE_SIZE_MB) {
       return {
-        llmContent: 'File size exceeds the 20MB limit.',
-        returnDisplay: 'File size exceeds the 20MB limit.',
-        error: `File size exceeds the 20MB limit: ${filePath} (${fileSizeInMB.toFixed(2)}MB)`,
+        llmContent: `File size exceeds the ${MAX_FILE_SIZE_MB}MB limit.`,
+        returnDisplay: `File size exceeds the ${MAX_FILE_SIZE_MB}MB limit.`,
+        error: `File size exceeds the ${MAX_FILE_SIZE_MB}MB limit: ${filePath} (${fileSizeInMB.toFixed(2)}MB)`,
         errorType: ToolErrorType.FILE_TOO_LARGE,
       };
     }
@@ -422,17 +472,27 @@ export async function processSingleFileContent(
       case 'text': {
         // Use BOM-aware reader to avoid leaving a BOM character in content and to support UTF-16/32 transparently
         const content = await readFileWithEncoding(filePath);
-        const lines = content.split('\n');
+        const lines = content.split(/\r?\n/);
         const originalLineCount = lines.length;
 
-        const startLine = offset || 0;
-        const effectiveLimit =
-          limit === undefined ? DEFAULT_MAX_LINES_TEXT_FILE : limit;
-        // Ensure endLine does not exceed originalLineCount
-        const endLine = Math.min(startLine + effectiveLimit, originalLineCount);
-        // Ensure selectedLines doesn't try to slice beyond array bounds if startLine is too high
-        const actualStartLine = Math.min(startLine, originalLineCount);
-        const selectedLines = lines.slice(actualStartLine, endLine);
+        let sliceStart = 0;
+        let sliceEnd = originalLineCount;
+
+        if (startLine !== undefined || endLine !== undefined) {
+          sliceStart = startLine ? startLine - 1 : 0;
+          sliceEnd = endLine
+            ? Math.min(endLine, originalLineCount)
+            : Math.min(
+                sliceStart + DEFAULT_MAX_LINES_TEXT_FILE,
+                originalLineCount,
+              );
+        } else {
+          sliceEnd = Math.min(DEFAULT_MAX_LINES_TEXT_FILE, originalLineCount);
+        }
+
+        // Ensure selectedLines doesn't try to slice beyond array bounds
+        const actualStart = Math.min(sliceStart, originalLineCount);
+        const selectedLines = lines.slice(actualStart, sliceEnd);
 
         let linesWereTruncatedInLength = false;
         const formattedLines = selectedLines.map((line) => {
@@ -445,17 +505,18 @@ export async function processSingleFileContent(
           return line;
         });
 
-        const contentRangeTruncated =
-          startLine > 0 || endLine < originalLineCount;
-        const isTruncated = contentRangeTruncated || linesWereTruncatedInLength;
+        const isTruncated =
+          actualStart > 0 ||
+          sliceEnd < originalLineCount ||
+          linesWereTruncatedInLength;
         const llmContent = formattedLines.join('\n');
 
         // By default, return nothing to streamline the common case of a successful read_file.
         let returnDisplay = '';
-        if (contentRangeTruncated) {
+        if (actualStart > 0 || sliceEnd < originalLineCount) {
           returnDisplay = `Read lines ${
-            actualStartLine + 1
-          }-${endLine} of ${originalLineCount} from ${relativePathForDisplay}`;
+            actualStart + 1
+          }-${sliceEnd} of ${originalLineCount} from ${relativePathForDisplay}`;
           if (linesWereTruncatedInLength) {
             returnDisplay += ' (some lines were shortened)';
           }
@@ -468,7 +529,7 @@ export async function processSingleFileContent(
           returnDisplay,
           isTruncated,
           originalLineCount,
-          linesShown: [actualStartLine + 1, endLine],
+          linesShown: [actualStart + 1, sliceEnd],
         };
       }
       case 'image':
@@ -515,80 +576,72 @@ export async function fileExists(filePath: string): Promise<boolean> {
   try {
     await fsPromises.access(filePath, fs.constants.F_OK);
     return true;
-  } catch (_: unknown) {
+  } catch {
     return false;
   }
 }
 
-const MAX_TRUNCATED_LINE_WIDTH = 1000;
-const MAX_TRUNCATED_CHARS = 4000;
+/**
+ * Sanitizes a string for use as a filename part by removing path traversal
+ * characters and other non-alphanumeric characters.
+ */
+export function sanitizeFilenamePart(part: string): string {
+  return part.replace(/[^a-zA-Z0-9_-]/g, '_');
+}
 
 /**
- * Formats a truncated message for tool output, handling multi-line and single-line (elephant) cases.
+ * Formats a truncated message for tool output.
+ * Shows the first 20% and last 80% of the allowed characters with a marker in between.
  */
 export function formatTruncatedToolOutput(
   contentStr: string,
   outputFile: string,
-  truncateLines: number = 30,
+  maxChars: number,
 ): string {
-  const physicalLines = contentStr.split('\n');
-  const totalPhysicalLines = physicalLines.length;
+  if (contentStr.length <= maxChars) return contentStr;
 
-  if (totalPhysicalLines > 1) {
-    // Multi-line case: show last N lines, but protect against "elephant" lines.
-    const lastLines = physicalLines.slice(-truncateLines);
-    let someLinesTruncatedInWidth = false;
-    const processedLines = lastLines.map((line) => {
-      if (line.length > MAX_TRUNCATED_LINE_WIDTH) {
-        someLinesTruncatedInWidth = true;
-        return (
-          line.substring(0, MAX_TRUNCATED_LINE_WIDTH) +
-          '... [LINE WIDTH TRUNCATED]'
-        );
-      }
-      return line;
-    });
+  const headChars = Math.floor(maxChars * 0.2);
+  const tailChars = maxChars - headChars;
 
-    const widthWarning = someLinesTruncatedInWidth
-      ? ' (some long lines truncated)'
-      : '';
-    return `Output too large. Showing the last ${processedLines.length} of ${totalPhysicalLines} lines${widthWarning}. For full output see: ${outputFile}
-...
-${processedLines.join('\n')}`;
-  } else {
-    // Single massive line case: use character-based truncation description.
-    const snippet = contentStr.slice(-MAX_TRUNCATED_CHARS);
-    return `Output too large. Showing the last ${MAX_TRUNCATED_CHARS.toLocaleString()} characters of the output. For full output see: ${outputFile}
-...${snippet}`;
-  }
+  const head = contentStr.slice(0, headChars);
+  const tail = contentStr.slice(-tailChars);
+  const omittedChars = contentStr.length - headChars - tailChars;
+
+  return `Output too large. Showing first ${headChars.toLocaleString()} and last ${tailChars.toLocaleString()} characters. For full output see: ${outputFile}
+${head}
+
+... [${omittedChars.toLocaleString()} characters omitted] ...
+
+${tail}`;
 }
 
 /**
  * Saves tool output to a temporary file for later retrieval.
  */
-export const TOOL_OUTPUT_DIR = 'tool_output';
+export const TOOL_OUTPUTS_DIR = 'tool-outputs';
 
 export async function saveTruncatedToolOutput(
   content: string,
   toolName: string,
   id: string | number, // Accept string (callId) or number (truncationId)
   projectTempDir: string,
-): Promise<{ outputFile: string; totalLines: number }> {
-  const safeToolName = toolName.replace(/[^a-z0-9]/gi, '_').toLowerCase();
-  const safeId = id
-    .toString()
-    .replace(/[^a-z0-9]/gi, '_')
-    .toLowerCase();
-  const fileName = `${safeToolName}_${safeId}.txt`;
-  const toolOutputDir = path.join(projectTempDir, TOOL_OUTPUT_DIR);
+  sessionId?: string,
+): Promise<{ outputFile: string }> {
+  const safeToolName = sanitizeFilenamePart(toolName).toLowerCase();
+  const safeId = sanitizeFilenamePart(id.toString()).toLowerCase();
+  const fileName = safeId.startsWith(safeToolName)
+    ? `${safeId}.txt`
+    : `${safeToolName}_${safeId}.txt`;
+
+  let toolOutputDir = path.join(projectTempDir, TOOL_OUTPUTS_DIR);
+  if (sessionId) {
+    const safeSessionId = sanitizeFilenamePart(sessionId);
+    toolOutputDir = path.join(toolOutputDir, `session-${safeSessionId}`);
+  }
   const outputFile = path.join(toolOutputDir, fileName);
 
   await fsPromises.mkdir(toolOutputDir, { recursive: true });
   await fsPromises.writeFile(outputFile, content);
 
-  const lines = content.split('\n');
-  return {
-    outputFile,
-    totalLines: lines.length,
-  };
+  return { outputFile };
 }

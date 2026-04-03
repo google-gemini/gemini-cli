@@ -1,6 +1,6 @@
 /**
  * @license
- * Copyright 2025 Google LLC
+ * Copyright 2026 Google LLC
  * SPDX-License-Identifier: Apache-2.0
  */
 
@@ -17,6 +17,7 @@ import { ToolGroupMessage } from './messages/ToolGroupMessage.js';
 import { GeminiMessageContent } from './messages/GeminiMessageContent.js';
 import { CompressionMessage } from './messages/CompressionMessage.js';
 import { WarningMessage } from './messages/WarningMessage.js';
+import { SubagentHistoryMessage } from './messages/SubagentHistoryMessage.js';
 import { Box } from 'ink';
 import { AboutBox } from './AboutBox.js';
 import { StatsDisplay } from './StatsDisplay.js';
@@ -32,19 +33,24 @@ import { SkillsList } from './views/SkillsList.js';
 import { AgentsStatus } from './views/AgentsStatus.js';
 import { McpStatus } from './views/McpStatus.js';
 import { ChatList } from './views/ChatList.js';
-import { HooksList } from './views/HooksList.js';
 import { ModelMessage } from './messages/ModelMessage.js';
+import { ThinkingMessage } from './messages/ThinkingMessage.js';
+import { HintMessage } from './messages/HintMessage.js';
+import { getInlineThinkingMode } from '../utils/inlineThinkingMode.js';
+import { useSettings } from '../contexts/SettingsContext.js';
 
 interface HistoryItemDisplayProps {
   item: HistoryItem;
   availableTerminalHeight?: number;
   terminalWidth: number;
   isPending: boolean;
-  isFocused?: boolean;
   commands?: readonly SlashCommand[];
-  activeShellPtyId?: number | null;
-  embeddedShellFocused?: boolean;
   availableTerminalHeightGemini?: number;
+  isExpandable?: boolean;
+  isFirstThinking?: boolean;
+  isFirstAfterThinking?: boolean;
+  isToolGroupBoundary?: boolean;
+  suppressNarration?: boolean;
 }
 
 export const HistoryItemDisplay: React.FC<HistoryItemDisplayProps> = ({
@@ -53,16 +59,51 @@ export const HistoryItemDisplay: React.FC<HistoryItemDisplayProps> = ({
   terminalWidth,
   isPending,
   commands,
-  isFocused = true,
-  activeShellPtyId,
-  embeddedShellFocused,
   availableTerminalHeightGemini,
+  isExpandable,
+  isFirstThinking = false,
+  isFirstAfterThinking = false,
+  isToolGroupBoundary = false,
+  suppressNarration = false,
 }) => {
+  const settings = useSettings();
+  const inlineThinkingMode = getInlineThinkingMode(settings);
   const itemForDisplay = useMemo(() => escapeAnsiCtrlCodes(item), [item]);
 
+  const needTopMargin = !!(
+    (isFirstAfterThinking && inlineThinkingMode !== 'off') ||
+    isToolGroupBoundary
+  );
+
+  // If there's a topic update in this turn, we suppress the regular narration
+  // and thoughts as they are being "replaced" by the update_topic tool.
+  if (
+    suppressNarration &&
+    (itemForDisplay.type === 'thinking' ||
+      itemForDisplay.type === 'gemini' ||
+      itemForDisplay.type === 'gemini_content')
+  ) {
+    return null;
+  }
+
   return (
-    <Box flexDirection="column" key={itemForDisplay.id} width={terminalWidth}>
+    <Box
+      flexDirection="column"
+      key={itemForDisplay.id}
+      width={terminalWidth}
+      marginTop={needTopMargin ? 1 : 0}
+    >
       {/* Render standard message types */}
+      {itemForDisplay.type === 'thinking' && inlineThinkingMode !== 'off' && (
+        <ThinkingMessage
+          thought={itemForDisplay.thought}
+          terminalWidth={terminalWidth}
+          isFirstThinking={isFirstThinking}
+        />
+      )}
+      {itemForDisplay.type === 'hint' && (
+        <HintMessage text={itemForDisplay.text} />
+      )}
       {itemForDisplay.type === 'user' && (
         <UserMessage text={itemForDisplay.text} width={terminalWidth} />
       )}
@@ -92,8 +133,10 @@ export const HistoryItemDisplay: React.FC<HistoryItemDisplayProps> = ({
       {itemForDisplay.type === 'info' && (
         <InfoMessage
           text={itemForDisplay.text}
+          secondaryText={itemForDisplay.secondaryText}
           icon={itemForDisplay.icon}
           color={itemForDisplay.color}
+          marginBottom={itemForDisplay.marginBottom}
         />
       )}
       {itemForDisplay.type === 'warning' && (
@@ -121,7 +164,6 @@ export const HistoryItemDisplay: React.FC<HistoryItemDisplayProps> = ({
       {itemForDisplay.type === 'stats' && (
         <StatsDisplay
           duration={itemForDisplay.duration}
-          quotas={itemForDisplay.quotas}
           selectedAuthType={itemForDisplay.selectedAuthType}
           userEmail={itemForDisplay.userEmail}
           tier={itemForDisplay.tier}
@@ -132,6 +174,18 @@ export const HistoryItemDisplay: React.FC<HistoryItemDisplayProps> = ({
           selectedAuthType={itemForDisplay.selectedAuthType}
           userEmail={itemForDisplay.userEmail}
           tier={itemForDisplay.tier}
+          currentModel={itemForDisplay.currentModel}
+          quotaStats={
+            itemForDisplay.pooledRemaining !== undefined ||
+            itemForDisplay.pooledLimit !== undefined ||
+            itemForDisplay.pooledResetTime !== undefined
+              ? {
+                  remaining: itemForDisplay.pooledRemaining,
+                  limit: itemForDisplay.pooledLimit,
+                  resetTime: itemForDisplay.pooledResetTime,
+                }
+              : undefined
+          }
         />
       )}
       {itemForDisplay.type === 'tool_stats' && <ToolStatsDisplay />}
@@ -143,15 +197,20 @@ export const HistoryItemDisplay: React.FC<HistoryItemDisplayProps> = ({
       )}
       {itemForDisplay.type === 'tool_group' && (
         <ToolGroupMessage
+          item={itemForDisplay}
           toolCalls={itemForDisplay.tools}
-          groupId={itemForDisplay.id}
           availableTerminalHeight={availableTerminalHeight}
           terminalWidth={terminalWidth}
-          isFocused={isFocused}
-          activeShellPtyId={activeShellPtyId}
-          embeddedShellFocused={embeddedShellFocused}
           borderTop={itemForDisplay.borderTop}
           borderBottom={itemForDisplay.borderBottom}
+          isExpandable={isExpandable}
+          isToolGroupBoundary={isToolGroupBoundary}
+        />
+      )}
+      {itemForDisplay.type === 'subagent' && (
+        <SubagentHistoryMessage
+          item={itemForDisplay}
+          terminalWidth={terminalWidth}
         />
       )}
       {itemForDisplay.type === 'compression' && (
@@ -184,9 +243,6 @@ export const HistoryItemDisplay: React.FC<HistoryItemDisplayProps> = ({
       )}
       {itemForDisplay.type === 'chat_list' && (
         <ChatList chats={itemForDisplay.chats} />
-      )}
-      {itemForDisplay.type === 'hooks_list' && (
-        <HooksList hooks={itemForDisplay.hooks} />
       )}
     </Box>
   );

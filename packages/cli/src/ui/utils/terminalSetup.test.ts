@@ -5,7 +5,12 @@
  */
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { terminalSetup, VSCODE_SHIFT_ENTER_SEQUENCE } from './terminalSetup.js';
+import {
+  terminalSetup,
+  VSCODE_SHIFT_ENTER_SEQUENCE,
+  shouldPromptForTerminalSetup,
+} from './terminalSetup.js';
+import { terminalCapabilityManager } from './terminalCapabilityManager.js';
 
 // Mock dependencies
 const mocks = vi.hoisted(() => ({
@@ -129,7 +134,7 @@ describe('terminalSetup', () => {
 
       expect(result.success).toBe(true);
       const writtenContent = JSON.parse(mocks.writeFile.mock.calls[0][1]);
-      expect(writtenContent).toHaveLength(2); // Shift+Enter and Ctrl+Enter
+      expect(writtenContent).toHaveLength(6); // Shift+Enter, Ctrl+Enter, Cmd+Z, Alt+Z, Shift+Cmd+Z, Shift+Alt+Z
     });
 
     it('should not modify if bindings already exist', async () => {
@@ -144,6 +149,26 @@ describe('terminalSetup', () => {
           key: 'ctrl+enter',
           command: 'workbench.action.terminal.sendSequence',
           args: { text: VSCODE_SHIFT_ENTER_SEQUENCE },
+        },
+        {
+          key: 'cmd+z',
+          command: 'workbench.action.terminal.sendSequence',
+          args: { text: '\u001b[122;9u' },
+        },
+        {
+          key: 'alt+z',
+          command: 'workbench.action.terminal.sendSequence',
+          args: { text: '\u001b[122;3u' },
+        },
+        {
+          key: 'shift+cmd+z',
+          command: 'workbench.action.terminal.sendSequence',
+          args: { text: '\u001b[122;10u' },
+        },
+        {
+          key: 'shift+alt+z',
+          command: 'workbench.action.terminal.sendSequence',
+          args: { text: '\u001b[122;4u' },
         },
       ];
       mocks.readFile.mockResolvedValue(JSON.stringify(existingBindings));
@@ -173,6 +198,53 @@ describe('terminalSetup', () => {
 
       expect(result.success).toBe(true);
       expect(mocks.writeFile).toHaveBeenCalled();
+    });
+  });
+
+  describe('shouldPromptForTerminalSetup', () => {
+    it('should return false when kitty protocol is already enabled', async () => {
+      vi.mocked(
+        terminalCapabilityManager.isKittyProtocolEnabled,
+      ).mockReturnValue(true);
+
+      const result = await shouldPromptForTerminalSetup();
+      expect(result).toBe(false);
+    });
+
+    it('should return false when both Shift+Enter and Ctrl+Enter bindings already exist', async () => {
+      vi.mocked(
+        terminalCapabilityManager.isKittyProtocolEnabled,
+      ).mockReturnValue(false);
+      process.env['TERM_PROGRAM'] = 'vscode';
+
+      const existingBindings = [
+        {
+          key: 'shift+enter',
+          command: 'workbench.action.terminal.sendSequence',
+          args: { text: VSCODE_SHIFT_ENTER_SEQUENCE },
+        },
+        {
+          key: 'ctrl+enter',
+          command: 'workbench.action.terminal.sendSequence',
+          args: { text: VSCODE_SHIFT_ENTER_SEQUENCE },
+        },
+      ];
+      mocks.readFile.mockResolvedValue(JSON.stringify(existingBindings));
+
+      const result = await shouldPromptForTerminalSetup();
+      expect(result).toBe(false);
+    });
+
+    it('should return true when keybindings file does not exist', async () => {
+      vi.mocked(
+        terminalCapabilityManager.isKittyProtocolEnabled,
+      ).mockReturnValue(false);
+      process.env['TERM_PROGRAM'] = 'vscode';
+
+      mocks.readFile.mockRejectedValue(new Error('ENOENT'));
+
+      const result = await shouldPromptForTerminalSetup();
+      expect(result).toBe(true);
     });
   });
 });

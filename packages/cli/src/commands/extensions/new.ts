@@ -25,7 +25,7 @@ async function pathExists(path: string) {
   try {
     await access(path);
     return true;
-  } catch (_e) {
+  } catch {
     return false;
   }
 }
@@ -98,7 +98,9 @@ export const newCommand: CommandModule = {
   },
   handler: async (args) => {
     await handleNew({
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
       path: args['path'] as string,
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
       template: args['template'] as string | undefined,
     });
     await exitCli();

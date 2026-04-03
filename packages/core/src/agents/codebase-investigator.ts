@@ -15,7 +15,7 @@ import {
   DEFAULT_THINKING_MODE,
   DEFAULT_GEMINI_MODEL,
   PREVIEW_GEMINI_FLASH_MODEL,
-  isPreviewModel,
+  supportsModernFeatures,
 } from '../config/models.js';
 import { z } from 'zod';
 import type { Config } from '../config/config.js';
@@ -51,19 +51,25 @@ const CodebaseInvestigationReportSchema = z.object({
 export const CodebaseInvestigatorAgent = (
   config: Config,
 ): LocalAgentDefinition<typeof CodebaseInvestigationReportSchema> => {
-  // Use Preview Flash model if the main model is any of the preview models.
-  // If the main model is not a preview model, use the default pro model.
-  const model = isPreviewModel(config.getModel())
+  // Use Preview Flash model if the main model supports modern features.
+  // If the main model is not a modern model, use the default pro model.
+  const model = supportsModernFeatures(config.getModel())
     ? PREVIEW_GEMINI_FLASH_MODEL
     : DEFAULT_GEMINI_MODEL;
+
+  const listCommand =
+    process.platform === 'win32'
+      ? '`dir /s` (CMD) or `Get-ChildItem -Recurse` (PowerShell)'
+      : '`ls -R`';
 
   return {
     name: 'codebase_investigator',
     kind: 'local',
     displayName: 'Codebase Investigator Agent',
-    description: `The specialized tool for codebase analysis, architectural mapping, and understanding system-wide dependencies.
-    Invoke this tool for tasks like vague requests, bug root-cause analysis, system refactoring, comprehensive feature implementation or to answer questions about the codebase that require investigation.
-    It returns a structured report with key file paths, symbols, and actionable architectural insights.`,
+    description:
+      `The specialized tool for codebase analysis, architectural mapping, and understanding system-wide dependencies. ` +
+      `Invoke this tool for tasks like vague requests, bug root-cause analysis, system refactoring, comprehensive feature implementation or to answer questions about the codebase that require investigation. ` +
+      `It returns a structured report with key file paths, symbols, and actionable architectural insights.`,
     inputConfig: {
       inputSchema: {
         type: 'object',
@@ -91,7 +97,7 @@ export const CodebaseInvestigatorAgent = (
       generateContentConfig: {
         temperature: 0.1,
         topP: 0.95,
-        thinkingConfig: isPreviewModel(model)
+        thinkingConfig: supportsModernFeatures(model)
           ? {
               includeThoughts: true,
               thinkingLevel: ThinkingLevel.HIGH,
@@ -164,7 +170,7 @@ When you are finished, you **MUST** call the \`complete_task\` tool. The \`repor
   "ExplorationTrace": [
     "Used \`grep\` to search for \`updateUser\` to locate the primary function.",
     "Read the file \`src/controllers/userController.js\` to understand the function's logic.",
-    "Used \`ls -R\` to look for related files, such as services or database models.",
+    "Used ${listCommand} to look for related files, such as services or database models.",
     "Read \`src/services/userService.js\` and \`src/models/User.js\` to understand the data flow and how state is managed."
   ],
   "RelevantLocations": [

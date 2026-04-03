@@ -7,10 +7,10 @@
 import {
   debugLogger,
   listExtensions,
+  getErrorMessage,
   type ExtensionInstallMetadata,
 } from '@google/gemini-cli-core';
 import type { ExtensionUpdateInfo } from '../../config/extension.js';
-import { getErrorMessage } from '../../utils/errors.js';
 import {
   emptyIcon,
   MessageType,
@@ -20,6 +20,7 @@ import {
 import {
   type CommandContext,
   type SlashCommand,
+  type SlashCommandActionReturn,
   CommandKind,
 } from './types.js';
 import open from 'open';
@@ -32,6 +33,11 @@ import { SettingScope } from '../../config/settings.js';
 import { McpServerEnablementManager } from '../../config/mcp/mcpServerEnablement.js';
 import { theme } from '../semantic-colors.js';
 import { stat } from 'node:fs/promises';
+import { ExtensionSettingScope } from '../../config/extensions/extensionSettings.js';
+import { type ConfigLogger } from '../../commands/extensions/utils.js';
+import { ConfigExtensionDialog } from '../components/ConfigExtensionDialog.js';
+import { ExtensionRegistryView } from '../components/views/ExtensionRegistryView.js';
+import React from 'react';
 
 function showMessageIfNoExtensions(
   context: CommandContext,
@@ -48,8 +54,8 @@ function showMessageIfNoExtensions(
 }
 
 async function listAction(context: CommandContext) {
-  const extensions = context.services.config
-    ? listExtensions(context.services.config)
+  const extensions = context.services.agentContext?.config
+    ? listExtensions(context.services.agentContext.config)
     : [];
 
   if (showMessageIfNoExtensions(context, extensions)) {
@@ -82,8 +88,8 @@ function updateAction(context: CommandContext, args: string): Promise<void> {
     (resolve) => (resolveUpdateComplete = resolve),
   );
 
-  const extensions = context.services.config
-    ? listExtensions(context.services.config)
+  const extensions = context.services.agentContext?.config
+    ? listExtensions(context.services.agentContext.config)
     : [];
 
   if (showMessageIfNoExtensions(context, extensions)) {
@@ -122,7 +128,7 @@ function updateAction(context: CommandContext, args: string): Promise<void> {
       },
     });
     if (names?.length) {
-      const extensions = listExtensions(context.services.config!);
+      const extensions = listExtensions(context.services.agentContext!.config);
       for (const name of names) {
         const extension = extensions.find(
           (extension) => extension.name === name,
@@ -150,7 +156,8 @@ async function restartAction(
   context: CommandContext,
   args: string,
 ): Promise<void> {
-  const extensionLoader = context.services.config?.getExtensionLoader();
+  const extensionLoader =
+    context.services.agentContext?.config.getExtensionLoader();
   if (!extensionLoader) {
     context.ui.addItem({
       type: MessageType.ERROR,
@@ -170,7 +177,7 @@ async function restartAction(
   if (!all && names?.length === 0) {
     context.ui.addItem({
       type: MessageType.ERROR,
-      text: 'Usage: /extensions restart <extension-names>|--all',
+      text: 'Usage: /extensions reload <extension-names>|--all',
     });
     return Promise.resolve();
   }
@@ -202,12 +209,12 @@ async function restartAction(
 
   const s = extensionsToRestart.length > 1 ? 's' : '';
 
-  const restartingMessage = {
+  const reloadingMessage = {
     type: MessageType.INFO,
-    text: `Restarting ${extensionsToRestart.length} extension${s}...`,
+    text: `Reloading ${extensionsToRestart.length} extension${s}...`,
     color: theme.text.primary,
   };
-  context.ui.addItem(restartingMessage);
+  context.ui.addItem(reloadingMessage);
 
   const results = await Promise.allSettled(
     extensionsToRestart.map(async (extension) => {
@@ -227,6 +234,18 @@ async function restartAction(
     (result): result is PromiseRejectedResult => result.status === 'rejected',
   );
 
+  if (failures.length < extensionsToRestart.length) {
+    try {
+      await context.services.agentContext?.config.reloadSkills();
+      await context.services.agentContext?.config.getAgentRegistry()?.reload();
+    } catch (error) {
+      context.ui.addItem({
+        type: MessageType.ERROR,
+        text: `Failed to reload skills or agents: ${getErrorMessage(error)}`,
+      });
+    }
+  }
+
   if (failures.length > 0) {
     const errorMessages = failures
       .map((failure, index) => {
@@ -236,12 +255,12 @@ async function restartAction(
       .join('\n  ');
     context.ui.addItem({
       type: MessageType.ERROR,
-      text: `Failed to restart some extensions:\n  ${errorMessages}`,
+      text: `Failed to reload some extensions:\n  ${errorMessages}`,
     });
   } else {
     const infoItem: HistoryItemInfo = {
       type: MessageType.INFO,
-      text: `${extensionsToRestart.length} extension${s} restarted successfully.`,
+      text: `${extensionsToRestart.length} extension${s} reloaded successfully`,
       icon: emptyIcon,
       color: theme.text.primary,
     };
@@ -249,7 +268,36 @@ async function restartAction(
   }
 }
 
-async function exploreAction(context: CommandContext) {
+async function exploreAction(
+  context: CommandContext,
+): Promise<SlashCommandActionReturn | void> {
+  const settings = context.services.settings.merged;
+  const useRegistryUI = settings.experimental?.extensionRegistry;
+
+  if (useRegistryUI) {
+    const extensionManager =
+      context.services.agentContext?.config.getExtensionLoader();
+    if (extensionManager instanceof ExtensionManager) {
+      return {
+        type: 'custom_dialog' as const,
+        component: React.createElement(ExtensionRegistryView, {
+          onSelect: async (extension, requestConsentOverride) => {
+            debugLogger.log(`Selected extension: ${extension.extensionName}`);
+            await installAction(context, extension.url, requestConsentOverride);
+            context.ui.removeComponent();
+          },
+          onLink: async (extension, requestConsentOverride) => {
+            debugLogger.log(`Linking extension: ${extension.extensionName}`);
+            await linkAction(context, extension.url, requestConsentOverride);
+            context.ui.removeComponent();
+          },
+          onClose: () => context.ui.removeComponent(),
+          extensionManager,
+        }),
+      };
+    }
+  }
+
   const extensionsUrl = 'https://geminicli.com/extensions/';
 
   // Only check for NODE_ENV for explicit test mode, not for unit test framework
@@ -273,7 +321,7 @@ async function exploreAction(context: CommandContext) {
     });
     try {
       await open(extensionsUrl);
-    } catch (_error) {
+    } catch {
       context.ui.addItem({
         type: MessageType.ERROR,
         text: `Failed to open browser. Check out the extensions gallery at ${extensionsUrl}`,
@@ -290,7 +338,8 @@ function getEnableDisableContext(
   names: string[];
   scope: SettingScope;
 } | null {
-  const extensionLoader = context.services.config?.getExtensionLoader();
+  const extensionLoader =
+    context.services.agentContext?.config.getExtensionLoader();
   if (!(extensionLoader instanceof ExtensionManager)) {
     debugLogger.error(
       `Cannot ${context.invocation?.name} extensions in this environment`,
@@ -390,7 +439,8 @@ async function enableAction(context: CommandContext, args: string) {
 
     if (extension?.mcpServers) {
       const mcpEnablementManager = McpServerEnablementManager.getInstance();
-      const mcpClientManager = context.services.config?.getMcpClientManager();
+      const mcpClientManager =
+        context.services.agentContext?.config.getMcpClientManager();
       const enabledServers = await mcpEnablementManager.autoEnableServers(
         Object.keys(extension.mcpServers ?? {}),
       );
@@ -417,8 +467,13 @@ async function enableAction(context: CommandContext, args: string) {
   }
 }
 
-async function installAction(context: CommandContext, args: string) {
-  const extensionLoader = context.services.config?.getExtensionLoader();
+async function installAction(
+  context: CommandContext,
+  args: string,
+  requestConsentOverride?: (consent: string) => Promise<boolean>,
+) {
+  const extensionLoader =
+    context.services.agentContext?.config.getExtensionLoader();
   if (!(extensionLoader instanceof ExtensionManager)) {
     debugLogger.error(
       `Cannot ${context.invocation?.name} extensions in this environment`,
@@ -464,8 +519,11 @@ async function installAction(context: CommandContext, args: string) {
 
   try {
     const installMetadata = await inferInstallMetadata(source);
-    const extension =
-      await extensionLoader.installOrUpdateExtension(installMetadata);
+    const extension = await extensionLoader.installOrUpdateExtension(
+      installMetadata,
+      undefined,
+      requestConsentOverride,
+    );
     context.ui.addItem({
       type: MessageType.INFO,
       text: `Extension "${extension.name}" installed successfully.`,
@@ -480,8 +538,13 @@ async function installAction(context: CommandContext, args: string) {
   }
 }
 
-async function linkAction(context: CommandContext, args: string) {
-  const extensionLoader = context.services.config?.getExtensionLoader();
+async function linkAction(
+  context: CommandContext,
+  args: string,
+  requestConsentOverride?: (consent: string) => Promise<boolean>,
+) {
+  const extensionLoader =
+    context.services.agentContext?.config.getExtensionLoader();
   if (!(extensionLoader instanceof ExtensionManager)) {
     debugLogger.error(
       `Cannot ${context.invocation?.name} extensions in this environment`,
@@ -528,8 +591,11 @@ async function linkAction(context: CommandContext, args: string) {
       source: sourceFilepath,
       type: 'link',
     };
-    const extension =
-      await extensionLoader.installOrUpdateExtension(installMetadata);
+    const extension = await extensionLoader.installOrUpdateExtension(
+      installMetadata,
+      undefined,
+      requestConsentOverride,
+    );
     context.ui.addItem({
       type: MessageType.INFO,
       text: `Extension "${extension.name}" linked successfully.`,
@@ -545,7 +611,8 @@ async function linkAction(context: CommandContext, args: string) {
 }
 
 async function uninstallAction(context: CommandContext, args: string) {
-  const extensionLoader = context.services.config?.getExtensionLoader();
+  const extensionLoader =
+    context.services.agentContext?.config.getExtensionLoader();
   if (!(extensionLoader instanceof ExtensionManager)) {
     debugLogger.error(
       `Cannot ${context.invocation?.name} extensions in this environment`,
@@ -553,34 +620,126 @@ async function uninstallAction(context: CommandContext, args: string) {
     return;
   }
 
-  const name = args.trim();
-  if (!name) {
+  const uninstallArgs = args.split(' ').filter((value) => value.length > 0);
+  const all = uninstallArgs.includes('--all');
+  const names = uninstallArgs.filter((a) => !a.startsWith('--'));
+
+  if (!all && names.length === 0) {
     context.ui.addItem({
       type: MessageType.ERROR,
-      text: `Usage: /extensions uninstall <extension-name>`,
+      text: `Usage: /extensions uninstall <extension-names...>|--all`,
     });
     return;
   }
 
-  context.ui.addItem({
-    type: MessageType.INFO,
-    text: `Uninstalling extension "${name}"...`,
-  });
+  let namesToUninstall: string[] = [];
+  if (all) {
+    namesToUninstall = extensionLoader.getExtensions().map((ext) => ext.name);
+  } else {
+    namesToUninstall = names;
+  }
 
-  try {
-    await extensionLoader.uninstallExtension(name, false);
+  if (namesToUninstall.length === 0) {
     context.ui.addItem({
       type: MessageType.INFO,
-      text: `Extension "${name}" uninstalled successfully.`,
+      text: all ? 'No extensions installed.' : 'No extension name provided.',
     });
-  } catch (error) {
-    context.ui.addItem({
-      type: MessageType.ERROR,
-      text: `Failed to uninstall extension "${name}": ${getErrorMessage(
-        error,
-      )}`,
-    });
+    return;
   }
+
+  for (const extensionName of namesToUninstall) {
+    context.ui.addItem({
+      type: MessageType.INFO,
+      text: `Uninstalling extension "${extensionName}"...`,
+    });
+
+    try {
+      await extensionLoader.uninstallExtension(extensionName, false);
+      context.ui.addItem({
+        type: MessageType.INFO,
+        text: `Extension "${extensionName}" uninstalled successfully.`,
+      });
+    } catch (error) {
+      context.ui.addItem({
+        type: MessageType.ERROR,
+        text: `Failed to uninstall extension "${extensionName}": ${getErrorMessage(
+          error,
+        )}`,
+      });
+    }
+  }
+}
+
+async function configAction(context: CommandContext, args: string) {
+  const parts = args.trim().split(/\s+/).filter(Boolean);
+  let scope = ExtensionSettingScope.USER;
+
+  const scopeEqIndex = parts.findIndex((p) => p.startsWith('--scope='));
+  if (scopeEqIndex > -1) {
+    const scopeVal = parts[scopeEqIndex].split('=')[1];
+    if (scopeVal === 'workspace') {
+      scope = ExtensionSettingScope.WORKSPACE;
+    } else if (scopeVal === 'user') {
+      scope = ExtensionSettingScope.USER;
+    }
+    parts.splice(scopeEqIndex, 1);
+  } else {
+    const scopeIndex = parts.indexOf('--scope');
+    if (scopeIndex > -1) {
+      const scopeVal = parts[scopeIndex + 1];
+      if (scopeVal === 'workspace' || scopeVal === 'user') {
+        scope =
+          scopeVal === 'workspace'
+            ? ExtensionSettingScope.WORKSPACE
+            : ExtensionSettingScope.USER;
+        parts.splice(scopeIndex, 2);
+      }
+    }
+  }
+
+  const otherArgs = parts;
+  const name = otherArgs[0];
+  const setting = otherArgs[1];
+
+  if (name) {
+    if (name.includes('/') || name.includes('\\') || name.includes('..')) {
+      context.ui.addItem({
+        type: MessageType.ERROR,
+        text: 'Invalid extension name. Names cannot contain path separators or "..".',
+      });
+      return;
+    }
+  }
+
+  const extensionManager =
+    context.services.agentContext?.config.getExtensionLoader();
+  if (!(extensionManager instanceof ExtensionManager)) {
+    debugLogger.error(
+      `Cannot ${context.invocation?.name} extensions in this environment`,
+    );
+    return;
+  }
+
+  const logger: ConfigLogger = {
+    log: (message: string) => {
+      context.ui.addItem({ type: MessageType.INFO, text: message.trim() });
+    },
+    error: (message: string) =>
+      context.ui.addItem({ type: MessageType.ERROR, text: message }),
+  };
+
+  return {
+    type: 'custom_dialog' as const,
+    component: React.createElement(ConfigExtensionDialog, {
+      extensionManager,
+      onClose: () => context.ui.removeComponent(),
+      extensionName: name,
+      settingKey: setting,
+      scope,
+      configureAll: !name && !setting,
+      loggerAdapter: logger,
+    }),
+  };
 }
 
 /**
@@ -590,14 +749,15 @@ export function completeExtensions(
   context: CommandContext,
   partialArg: string,
 ) {
-  let extensions = context.services.config?.getExtensions() ?? [];
+  let extensions = context.services.agentContext?.config.getExtensions() ?? [];
 
   if (context.invocation?.name === 'enable') {
     extensions = extensions.filter((ext) => !ext.isActive);
   }
   if (
     context.invocation?.name === 'disable' ||
-    context.invocation?.name === 'restart'
+    context.invocation?.name === 'restart' ||
+    context.invocation?.name === 'reload'
   ) {
     extensions = extensions.filter((ext) => ext.isActive);
   }
@@ -629,6 +789,7 @@ const listExtensionsCommand: SlashCommand = {
   description: 'List active extensions',
   kind: CommandKind.BUILT_IN,
   autoExecute: true,
+  takesArgs: false,
   action: listAction,
 };
 
@@ -689,17 +850,29 @@ const exploreExtensionsCommand: SlashCommand = {
   description: 'Open extensions page in your browser',
   kind: CommandKind.BUILT_IN,
   autoExecute: true,
+  takesArgs: false,
   action: exploreAction,
 };
 
-const restartCommand: SlashCommand = {
-  name: 'restart',
-  description: 'Restart all extensions',
+const reloadCommand: SlashCommand = {
+  name: 'reload',
+  altNames: ['restart'],
+  description: 'Reload all extensions',
   kind: CommandKind.BUILT_IN,
   autoExecute: false,
   action: restartAction,
   completion: completeExtensions,
 };
+
+const configCommand: SlashCommand = {
+  name: 'config',
+  description: 'Configure extension settings',
+  kind: CommandKind.BUILT_IN,
+  autoExecute: false,
+  action: configAction,
+};
+
+import { parseSlashCommand } from '../../utils/commands.js';
 
 export function extensionsCommand(
   enableExtensionReloading?: boolean,
@@ -711,22 +884,32 @@ export function extensionsCommand(
         installCommand,
         uninstallCommand,
         linkCommand,
+        configCommand,
       ]
     : [];
+  const subCommands = [
+    listExtensionsCommand,
+    updateExtensionsCommand,
+    exploreExtensionsCommand,
+    reloadCommand,
+    ...conditionalCommands,
+  ];
+
   return {
     name: 'extensions',
     description: 'Manage extensions',
     kind: CommandKind.BUILT_IN,
     autoExecute: false,
-    subCommands: [
-      listExtensionsCommand,
-      updateExtensionsCommand,
-      exploreExtensionsCommand,
-      restartCommand,
-      ...conditionalCommands,
-    ],
-    action: (context, args) =>
+    subCommands,
+    action: async (context, args) => {
+      if (args) {
+        const parsed = parseSlashCommand(`/${args}`, subCommands);
+        if (parsed.commandToExecute?.action) {
+          return parsed.commandToExecute.action(context, parsed.args);
+        }
+      }
       // Default to list if no subcommand is provided
-      listExtensionsCommand.action!(context, args),
+      return listExtensionsCommand.action!(context, args);
+    },
   };
 }

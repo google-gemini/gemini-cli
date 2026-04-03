@@ -9,7 +9,7 @@ import { Table } from './Table.js';
 import { Text } from 'ink';
 
 describe('Table', () => {
-  it('should render headers and data correctly', () => {
+  it('should render headers and data correctly', async () => {
     const columns = [
       { key: 'id', header: 'ID', width: 5 },
       { key: 'name', header: 'Name', flexGrow: 1 },
@@ -19,7 +19,11 @@ describe('Table', () => {
       { id: 2, name: 'Bob' },
     ];
 
-    const { lastFrame } = render(<Table columns={columns} data={data} />, 100);
+    const renderResult = await render(
+      <Table columns={columns} data={data} />,
+      100,
+    );
+    const { lastFrame } = renderResult;
     const output = lastFrame();
 
     expect(output).toContain('ID');
@@ -28,10 +32,10 @@ describe('Table', () => {
     expect(output).toContain('Alice');
     expect(output).toContain('2');
     expect(output).toContain('Bob');
-    expect(lastFrame()).toMatchSnapshot();
+    await expect(renderResult).toMatchSvgSnapshot();
   });
 
-  it('should support custom cell rendering', () => {
+  it('should support custom cell rendering', async () => {
     const columns = [
       {
         key: 'value',
@@ -44,18 +48,49 @@ describe('Table', () => {
     ];
     const data = [{ value: 10 }];
 
-    const { lastFrame } = render(<Table columns={columns} data={data} />, 100);
+    const renderResult = await render(
+      <Table columns={columns} data={data} />,
+      100,
+    );
+    const { lastFrame } = renderResult;
     const output = lastFrame();
 
     expect(output).toContain('20');
-    expect(lastFrame()).toMatchSnapshot();
+    await expect(renderResult).toMatchSvgSnapshot();
   });
 
-  it('should handle undefined values gracefully', () => {
+  it('should handle undefined values gracefully', async () => {
     const columns = [{ key: 'name', header: 'Name', flexGrow: 1 }];
     const data: Array<{ name: string | undefined }> = [{ name: undefined }];
-    const { lastFrame } = render(<Table columns={columns} data={data} />, 100);
+    const { lastFrame } = await render(
+      <Table columns={columns} data={data} />,
+      100,
+    );
     const output = lastFrame();
     expect(output).toContain('undefined');
+  });
+
+  it('should support inverse text rendering', async () => {
+    const columns = [
+      {
+        key: 'status',
+        header: 'Status',
+        flexGrow: 1,
+        renderCell: (item: { status: string }) => (
+          <Text inverse>{item.status}</Text>
+        ),
+      },
+    ];
+    const data = [{ status: 'Active' }];
+
+    const renderResult = await render(
+      <Table columns={columns} data={data} />,
+      100,
+    );
+    const { lastFrame } = renderResult;
+    const output = lastFrame();
+
+    expect(output).toContain('Active');
+    await expect(renderResult).toMatchSvgSnapshot();
   });
 });

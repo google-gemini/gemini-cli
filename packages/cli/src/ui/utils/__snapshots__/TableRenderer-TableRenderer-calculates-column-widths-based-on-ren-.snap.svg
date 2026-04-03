@@ -1,0 +1,39 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="380" height="139" viewBox="0 0 380 139">
+  <style>
+    text { font-family: Consolas, "Courier New", monospace; font-size: 14px; dominant-baseline: text-before-edge; white-space: pre; }
+  </style>
+  <rect width="380" height="139" fill="#000000" />
+  <g transform="translate(10, 10)">
+    <text x="0" y="2" fill="#333333" textLength="252" lengthAdjust="spacingAndGlyphs">┌────────┬────────┬────────┐</text>
+    <text x="0" y="19" fill="#333333" textLength="9" lengthAdjust="spacingAndGlyphs">│</text>
+    <text x="18" y="19" fill="#87afff" textLength="45" lengthAdjust="spacingAndGlyphs" font-weight="bold">Col 1</text>
+    <text x="81" y="19" fill="#333333" textLength="9" lengthAdjust="spacingAndGlyphs">│</text>
+    <text x="99" y="19" fill="#87afff" textLength="45" lengthAdjust="spacingAndGlyphs" font-weight="bold">Col 2</text>
+    <text x="162" y="19" fill="#333333" textLength="9" lengthAdjust="spacingAndGlyphs">│</text>
+    <text x="180" y="19" fill="#87afff" textLength="45" lengthAdjust="spacingAndGlyphs" font-weight="bold">Col 3</text>
+    <text x="243" y="19" fill="#333333" textLength="9" lengthAdjust="spacingAndGlyphs">│</text>
+    <text x="0" y="36" fill="#333333" textLength="252" lengthAdjust="spacingAndGlyphs">├────────┼────────┼────────┤</text>
+    <text x="0" y="53" fill="#333333" textLength="9" lengthAdjust="spacingAndGlyphs">│</text>
+    <text x="18" y="53" fill="#ffffff" textLength="54" lengthAdjust="spacingAndGlyphs" font-weight="bold">123456</text>
+    <text x="81" y="53" fill="#333333" textLength="9" lengthAdjust="spacingAndGlyphs">│</text>
+    <text x="99" y="53" fill="#ffffff" textLength="54" lengthAdjust="spacingAndGlyphs">Normal</text>
+    <text x="162" y="53" fill="#333333" textLength="9" lengthAdjust="spacingAndGlyphs">│</text>
+    <text x="180" y="53" fill="#ffffff" textLength="45" lengthAdjust="spacingAndGlyphs">Short</text>
+    <text x="243" y="53" fill="#333333" textLength="9" lengthAdjust="spacingAndGlyphs">│</text>
+    <text x="0" y="70" fill="#333333" textLength="9" lengthAdjust="spacingAndGlyphs">│</text>
+    <text x="18" y="70" fill="#ffffff" textLength="45" lengthAdjust="spacingAndGlyphs">Short</text>
+    <text x="81" y="70" fill="#333333" textLength="9" lengthAdjust="spacingAndGlyphs">│</text>
+    <text x="99" y="70" fill="#ffffff" textLength="54" lengthAdjust="spacingAndGlyphs" font-weight="bold">123456</text>
+    <text x="162" y="70" fill="#333333" textLength="9" lengthAdjust="spacingAndGlyphs">│</text>
+    <text x="180" y="70" fill="#ffffff" textLength="54" lengthAdjust="spacingAndGlyphs">Normal</text>
+    <text x="243" y="70" fill="#333333" textLength="9" lengthAdjust="spacingAndGlyphs">│</text>
+    <text x="0" y="87" fill="#333333" textLength="9" lengthAdjust="spacingAndGlyphs">│</text>
+    <text x="18" y="87" fill="#ffffff" textLength="54" lengthAdjust="spacingAndGlyphs">Normal</text>
+    <text x="81" y="87" fill="#333333" textLength="9" lengthAdjust="spacingAndGlyphs">│</text>
+    <text x="99" y="87" fill="#ffffff" textLength="45" lengthAdjust="spacingAndGlyphs">Short</text>
+    <text x="162" y="87" fill="#333333" textLength="9" lengthAdjust="spacingAndGlyphs">│</text>
+    <text x="180" y="87" fill="#ffffff" textLength="54" lengthAdjust="spacingAndGlyphs" font-weight="bold">123456</text>
+    <text x="243" y="87" fill="#333333" textLength="9" lengthAdjust="spacingAndGlyphs">│</text>
+    <text x="0" y="104" fill="#333333" textLength="252" lengthAdjust="spacingAndGlyphs">└────────┴────────┴────────┘</text>
+  </g>
+</svg>

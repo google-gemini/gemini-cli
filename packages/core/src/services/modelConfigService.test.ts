@@ -5,11 +5,11 @@
  */
 
 import { describe, it, expect } from 'vitest';
-import type {
-  ModelConfigAlias,
-  ModelConfigServiceConfig,
+import {
+  ModelConfigService,
+  type ModelConfigAlias,
+  type ModelConfigServiceConfig,
 } from './modelConfigService.js';
-import { ModelConfigService } from './modelConfigService.js';
 
 describe('ModelConfigService', () => {
   it('should resolve a basic alias to its model and settings', () => {
@@ -729,6 +729,71 @@ describe('ModelConfigService', () => {
     });
   });
 
+  describe('fallback behavior', () => {
+    it('should fallback to chat-base if the requested model is completely unknown', () => {
+      const config: ModelConfigServiceConfig = {
+        aliases: {
+          'chat-base': {
+            modelConfig: {
+              model: 'default-fallback-model',
+              generateContentConfig: {
+                temperature: 0.99,
+              },
+            },
+          },
+        },
+      };
+      const service = new ModelConfigService(config);
+      const resolved = service.getResolvedConfig({
+        model: 'my-custom-model',
+        isChatModel: true,
+      });
+
+      // It preserves the requested model name, but inherits the config from chat-base
+      expect(resolved.model).toBe('my-custom-model');
+      expect(resolved.generateContentConfig).toEqual({
+        temperature: 0.99,
+      });
+    });
+
+    it('should return empty config if requested model is unknown and chat-base is not defined', () => {
+      const config: ModelConfigServiceConfig = {
+        aliases: {},
+      };
+      const service = new ModelConfigService(config);
+      const resolved = service.getResolvedConfig({
+        model: 'my-custom-model',
+        isChatModel: true,
+      });
+
+      expect(resolved.model).toBe('my-custom-model');
+      expect(resolved.generateContentConfig).toEqual({});
+    });
+
+    it('should NOT fallback to chat-base if the requested model is completely unknown but isChatModel is false', () => {
+      const config: ModelConfigServiceConfig = {
+        aliases: {
+          'chat-base': {
+            modelConfig: {
+              model: 'default-fallback-model',
+              generateContentConfig: {
+                temperature: 0.99,
+              },
+            },
+          },
+        },
+      };
+      const service = new ModelConfigService(config);
+      const resolved = service.getResolvedConfig({
+        model: 'my-custom-model',
+        isChatModel: false,
+      });
+
+      expect(resolved.model).toBe('my-custom-model');
+      expect(resolved.generateContentConfig).toEqual({});
+    });
+  });
+
   describe('unrecognized models', () => {
     it('should apply overrides to unrecognized model names', () => {
       const unregisteredModelName = 'my-unregistered-model-v1';
@@ -951,6 +1016,43 @@ describe('ModelConfigService', () => {
         isRetry: true,
       });
       expect(retry.generateContentConfig.temperature).toBe(1.0);
+    });
+  });
+
+  describe('getAvailableModelOptions', () => {
+    it('should filter out Pro models when hasAccessToProModel is false', () => {
+      const config: ModelConfigServiceConfig = {
+        modelDefinitions: {
+          'gemini-3-pro': { isVisible: true, tier: 'pro' },
+          'gemini-3-flash': { isVisible: true, tier: 'flash' },
+        },
+      };
+      const service = new ModelConfigService(config);
+      const options = service.getAvailableModelOptions({
+        hasAccessToProModel: false,
+      });
+
+      expect(options.map((o) => o.modelId)).not.toContain('gemini-3-pro');
+      expect(options.map((o) => o.modelId)).toContain('gemini-3-flash');
+    });
+
+    it('should include Pro models when hasAccessToProModel is true or undefined', () => {
+      const config: ModelConfigServiceConfig = {
+        modelDefinitions: {
+          'gemini-3-pro': { isVisible: true, tier: 'pro' },
+        },
+      };
+      const service = new ModelConfigService(config);
+
+      const optionsWithTrue = service.getAvailableModelOptions({
+        hasAccessToProModel: true,
+      });
+      expect(optionsWithTrue.map((o) => o.modelId)).toContain('gemini-3-pro');
+
+      const optionsWithUndefined = service.getAvailableModelOptions({});
+      expect(optionsWithUndefined.map((o) => o.modelId)).toContain(
+        'gemini-3-pro',
+      );
     });
   });
 });

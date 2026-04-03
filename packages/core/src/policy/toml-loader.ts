@@ -12,17 +12,33 @@ import {
   type SafetyCheckerRule,
   InProcessCheckerType,
 } from './types.js';
-import { buildArgsPatterns } from './utils.js';
+import { buildArgsPatterns, isSafeRegExp } from './utils.js';
+import {
+  isValidToolName,
+  ALL_BUILTIN_TOOL_NAMES,
+} from '../tools/tool-names.js';
+import { getToolSuggestion } from '../utils/tool-utils.js';
+import levenshtein from 'fast-levenshtein';
 import fs from 'node:fs/promises';
 import path from 'node:path';
 import toml from '@iarna/toml';
 import { z, type ZodError } from 'zod';
+import { isNodeError } from '../utils/errors.js';
+import { MCP_TOOL_PREFIX, formatMcpToolName } from '../tools/mcp-tool.js';
+
+/**
+ * Maximum Levenshtein distance to consider a name a likely typo of a built-in tool.
+ * Names further from all built-in tools are assumed to be intentional
+ * (e.g., dynamically registered agent tools) and are not warned about.
+ */
+const MAX_TYPO_DISTANCE = 3;
 
 /**
  * Schema for a single policy rule in the TOML file (before transformation).
  */
 const PolicyRuleSchema = z.object({
-  toolName: z.union([z.string(), z.array(z.string())]).optional(),
+  toolName: z.union([z.string(), z.array(z.string())]),
+  subagent: z.string().optional(),
   mcpName: z.string().optional(),
   argsPattern: z.string().optional(),
   commandPrefix: z.union([z.string(), z.array(z.string())]).optional(),
@@ -45,21 +61,26 @@ const PolicyRuleSchema = z.object({
         'priority must be <= 999 to prevent tier overflow. Priorities >= 1000 would jump to the next tier.',
     }),
   modes: z.array(z.nativeEnum(ApprovalMode)).optional(),
-  allow_redirection: z.boolean().optional(),
-  deny_message: z.string().optional(),
+  interactive: z.boolean().optional(),
+  toolAnnotations: z.record(z.any()).optional(),
+  allowRedirection: z.boolean().optional(),
+  allow_redirection: z.boolean().optional(), // deprecated snake_case for backward compatibility
+  denyMessage: z.string().optional(),
+  deny_message: z.string().optional(), // deprecated snake_case for backward compatibility
 });
 
 /**
  * Schema for a single safety checker rule in the TOML file.
  */
 const SafetyCheckerRuleSchema = z.object({
-  toolName: z.union([z.string(), z.array(z.string())]).optional(),
+  toolName: z.union([z.string(), z.array(z.string())]),
   mcpName: z.string().optional(),
   argsPattern: z.string().optional(),
   commandPrefix: z.union([z.string(), z.array(z.string())]).optional(),
   commandRegex: z.string().optional(),
   priority: z.number().int().default(0),
   modes: z.array(z.nativeEnum(ApprovalMode)).optional(),
+  toolAnnotations: z.record(z.any()).optional(),
   checker: z.discriminatedUnion('type', [
     z.object({
       type: z.literal('in-process'),
@@ -97,7 +118,8 @@ export type PolicyFileErrorType =
   | 'toml_parse'
   | 'schema_validation'
   | 'rule_validation'
-  | 'regex_compilation';
+  | 'regex_compilation'
+  | 'tool_name_warning';
 
 /**
  * Detailed error information for policy file loading failures.
@@ -105,12 +127,13 @@ export type PolicyFileErrorType =
 export interface PolicyFileError {
   filePath: string;
   fileName: string;
-  tier: 'default' | 'user' | 'admin';
+  tier: 'default' | 'extension' | 'user' | 'workspace' | 'admin';
   ruleIndex?: number;
   errorType: PolicyFileErrorType;
   message: string;
   details?: string;
   suggestion?: string;
+  severity?: 'error' | 'warning';
 }
 
 /**
@@ -122,13 +145,62 @@ export interface PolicyLoadResult {
   errors: PolicyFileError[];
 }
 
+export interface PolicyFile {
+  path: string;
+  content: string;
+}
+
+/**
+ * Reads policy files from a directory or a single file.
+ *
+ * @param policyPath Path to a directory or a .toml file.
+ * @returns Array of PolicyFile objects.
+ */
+export async function readPolicyFiles(
+  policyPath: string,
+): Promise<PolicyFile[]> {
+  let filesToLoad: string[] = [];
+  let baseDir = '';
+
+  try {
+    const stats = await fs.stat(policyPath);
+    if (stats.isDirectory()) {
+      baseDir = policyPath;
+      const dirEntries = await fs.readdir(policyPath, { withFileTypes: true });
+      filesToLoad = dirEntries
+        .filter((entry) => entry.isFile() && entry.name.endsWith('.toml'))
+        .map((entry) => entry.name);
+    } else if (stats.isFile() && policyPath.endsWith('.toml')) {
+      baseDir = path.dirname(policyPath);
+      filesToLoad = [path.basename(policyPath)];
+    }
+  } catch (e) {
+    if (isNodeError(e) && e.code === 'ENOENT') {
+      return [];
+    }
+    throw e;
+  }
+
+  const results: PolicyFile[] = [];
+  for (const file of filesToLoad) {
+    const filePath = path.join(baseDir, file);
+    const content = await fs.readFile(filePath, 'utf-8');
+    results.push({ path: filePath, content });
+  }
+  return results;
+}
+
 /**
  * Converts a tier number to a human-readable tier name.
  */
-function getTierName(tier: number): 'default' | 'user' | 'admin' {
+function getTierName(
+  tier: number,
+): 'default' | 'extension' | 'user' | 'workspace' | 'admin' {
   if (tier === 1) return 'default';
-  if (tier === 2) return 'user';
-  if (tier === 3) return 'admin';
+  if (tier === 2) return 'extension';
+  if (tier === 3) return 'workspace';
+  if (tier === 4) return 'user';
+  if (tier === 5) return 'admin';
   return 'default';
 }
 
@@ -190,6 +262,40 @@ function validateShellCommandSyntax(
 }
 
 /**
+ * Validates that a tool name is recognized.
+ * Returns a warning message if the tool name is a likely typo of a built-in
+ * tool name, or null if valid or not close to any built-in name.
+ */
+function validateToolName(name: string, ruleIndex: number): string | null {
+  if (name.includes('__')) {
+    return `Rule #${ruleIndex + 1}: The "__" syntax for MCP tools is strictly deprecated. Please use the 'mcpName = "..."' property or the 'mcp_server_tool' format instead.`;
+  }
+
+  // A name that looks like an MCP tool (e.g., "re__ad") could be a typo of a
+  // built-in tool ("read_file"). We should let such names fall through to the
+  // Levenshtein distance check below. Non-MCP-like names that are valid can
+  // be safely skipped.
+  if (isValidToolName(name, { allowWildcards: true })) {
+    return null;
+  }
+
+  // Only warn if the name is close to a built-in name (likely typo).
+  // Names that are very different from all built-in names are likely
+  // intentional (dynamic tools, agent tools, etc.).
+  const allNames = [...ALL_BUILTIN_TOOL_NAMES];
+  const minDistance = Math.min(
+    ...allNames.map((n) => levenshtein.get(name, n)),
+  );
+
+  if (minDistance > MAX_TYPO_DISTANCE) {
+    return null;
+  }
+
+  const suggestion = getToolSuggestion(name, allNames);
+  return `Rule #${ruleIndex + 1}: Unrecognized tool name "${name}".${suggestion}`;
+}
+
+/**
  * Transforms a priority number based on the policy tier.
  * Formula: tier + priority/1000
  *
@@ -202,66 +308,56 @@ function transformPriority(priority: number, tier: number): number {
 }
 
 /**
- * Loads and parses policies from TOML files in the specified directories.
+ * Loads and parses policies from TOML files in the specified paths (directories or individual files).
  *
  * This function:
- * 1. Scans directories for .toml files
+ * 1. Scans paths for .toml files (if directory) or processes individual files
  * 2. Parses and validates each file
  * 3. Transforms rules (commandPrefix, arrays, mcpName, priorities)
  * 4. Collects detailed error information for any failures
  *
- * @param policyDirs Array of directory paths to scan for policy files
- * @param getPolicyTier Function to determine tier (1-3) for a directory
+ * @param policyPaths Array of paths (directories or files) to scan for policy files
+ * @param getPolicyTier Function to determine tier (1-4) for a path
  * @returns Object containing successfully parsed rules and any errors encountered
  */
 export async function loadPoliciesFromToml(
-  policyDirs: string[],
-  getPolicyTier: (dir: string) => number,
+  policyPaths: string[],
+  getPolicyTier: (path: string) => number,
 ): Promise<PolicyLoadResult> {
   const rules: PolicyRule[] = [];
   const checkers: SafetyCheckerRule[] = [];
   const errors: PolicyFileError[] = [];
 
-  for (const dir of policyDirs) {
-    const tier = getPolicyTier(dir);
+  for (const p of policyPaths) {
+    const tier = getPolicyTier(p);
     const tierName = getTierName(tier);
 
-    // Scan directory for all .toml files
-    let filesToLoad: string[];
+    let policyFiles: PolicyFile[] = [];
+
     try {
-      const dirEntries = await fs.readdir(dir, { withFileTypes: true });
-      filesToLoad = dirEntries
-        .filter((entry) => entry.isFile() && entry.name.endsWith('.toml'))
-        .map((entry) => entry.name);
+      policyFiles = await readPolicyFiles(p);
     } catch (e) {
-      const error = e as NodeJS.ErrnoException;
-      if (error.code === 'ENOENT') {
-        // Directory doesn't exist, skip it (not an error)
-        continue;
-      }
       errors.push({
-        filePath: dir,
-        fileName: path.basename(dir),
+        filePath: p,
+        fileName: path.basename(p),
         tier: tierName,
         errorType: 'file_read',
-        message: `Failed to read policy directory`,
-        details: error.message,
+        message: `Failed to read policy path`,
+        details: isNodeError(e) ? e.message : String(e),
       });
       continue;
     }
 
-    for (const file of filesToLoad) {
-      const filePath = path.join(dir, file);
+    for (const { path: filePath, content: fileContent } of policyFiles) {
+      const file = path.basename(filePath);
 
       try {
-        // Read file
-        const fileContent = await fs.readFile(filePath, 'utf-8');
-
         // Parse TOML
         let parsed: unknown;
         try {
           parsed = toml.parse(fileContent);
         } catch (e) {
+          // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
           const error = e as Error;
           errors.push({
             filePath,
@@ -312,6 +408,49 @@ export async function loadPoliciesFromToml(
           }
         }
 
+        // Validate tool names in rules
+        for (let i = 0; i < tomlRules.length; i++) {
+          const rule = tomlRules[i];
+
+          const toolNamesRaw: string[] = Array.isArray(rule.toolName)
+            ? rule.toolName
+            : [rule.toolName];
+
+          if (toolNamesRaw.some((name) => name === '')) {
+            errors.push({
+              filePath,
+              fileName: file,
+              tier: tierName,
+              ruleIndex: i,
+              errorType: 'rule_validation',
+              message: 'Invalid policy rule: toolName cannot be empty string',
+              details: `Rule #${i + 1} contains an empty toolName string. Use "*" to match all tools.`,
+            });
+            continue;
+          }
+
+          // We no longer skip MCP-scoped rules because we need to specifically
+          // warn users if they use deprecated "__" syntax for MCP tool names
+
+          const toolNames: string[] = toolNamesRaw;
+
+          for (const name of toolNames) {
+            const warning = validateToolName(name, i);
+            if (warning) {
+              errors.push({
+                filePath,
+                fileName: file,
+                tier: tierName,
+                ruleIndex: i,
+                errorType: 'tool_name_warning',
+                message: 'Unrecognized tool name',
+                details: warning,
+                severity: 'warning',
+              });
+            }
+          }
+        }
+
         // Transform rules
         const parsedRules: PolicyRule[] = (validationResult.data.rule ?? [])
           .flatMap((rule) => {
@@ -323,39 +462,48 @@ export async function loadPoliciesFromToml(
 
             // For each argsPattern, expand toolName arrays
             return argsPatterns.flatMap((argsPattern) => {
-              const toolNames: Array<string | undefined> = rule.toolName
-                ? Array.isArray(rule.toolName)
-                  ? rule.toolName
-                  : [rule.toolName]
-                : [undefined];
+              const toolNames: string[] = Array.isArray(rule.toolName)
+                ? rule.toolName
+                : [rule.toolName];
 
               // Create a policy rule for each tool name
               return toolNames.map((toolName) => {
-                // Transform mcpName field to composite toolName format
-                let effectiveToolName: string | undefined;
-                if (rule.mcpName && toolName) {
-                  effectiveToolName = `${rule.mcpName}__${toolName}`;
-                } else if (rule.mcpName) {
-                  effectiveToolName = `${rule.mcpName}__*`;
-                } else {
-                  effectiveToolName = toolName;
+                let effectiveToolName: string = toolName;
+                const mcpName = rule.mcpName;
+
+                if (mcpName) {
+                  // TODO(mcp): Decouple mcpName rules from FQN string parsing
+                  // to support underscores in server aliases natively. Leaving
+                  // mcpName and toolName separate here and relying on metadata
+                  // during policy evaluation will avoid underscore splitting bugs.
+                  // See: https://github.com/google-gemini/gemini-cli/issues/21727
+                  effectiveToolName = formatMcpToolName(
+                    mcpName,
+                    effectiveToolName,
+                  );
                 }
 
                 const policyRule: PolicyRule = {
                   toolName: effectiveToolName,
+                  subagent: rule.subagent,
+                  mcpName: rule.mcpName,
                   decision: rule.decision,
                   priority: transformPriority(rule.priority, tier),
                   modes: rule.modes,
-                  allowRedirection: rule.allow_redirection,
+                  interactive: rule.interactive,
+                  toolAnnotations: rule.toolAnnotations,
+                  allowRedirection:
+                    rule.allowRedirection ?? rule.allow_redirection,
                   source: `${tierName.charAt(0).toUpperCase() + tierName.slice(1)}: ${file}`,
-                  denyMessage: rule.deny_message,
+                  denyMessage: rule.denyMessage ?? rule.deny_message,
                 };
 
                 // Compile regex pattern
                 if (argsPattern) {
                   try {
-                    policyRule.argsPattern = new RegExp(argsPattern);
+                    new RegExp(argsPattern);
                   } catch (e) {
+                    // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
                     const error = e as Error;
                     errors.push({
                       filePath,
@@ -367,9 +515,24 @@ export async function loadPoliciesFromToml(
                       suggestion:
                         'Check regex syntax for errors like unmatched brackets or invalid escape sequences',
                     });
-                    // Skip this rule if regex compilation fails
                     return null;
                   }
+
+                  if (!isSafeRegExp(argsPattern)) {
+                    errors.push({
+                      filePath,
+                      fileName: file,
+                      tier: tierName,
+                      errorType: 'regex_compilation',
+                      message: 'Unsafe regex pattern (potential ReDoS)',
+                      details: `Pattern: ${argsPattern}`,
+                      suggestion:
+                        'Avoid nested quantifiers or extremely long patterns',
+                    });
+                    return null;
+                  }
+
+                  policyRule.argsPattern = new RegExp(argsPattern);
                 }
 
                 return policyRule;
@@ -379,6 +542,50 @@ export async function loadPoliciesFromToml(
           .filter((rule): rule is PolicyRule => rule !== null);
 
         rules.push(...parsedRules);
+
+        // Validate tool names in safety checker rules
+        const tomlCheckerRules = validationResult.data.safety_checker ?? [];
+        for (let i = 0; i < tomlCheckerRules.length; i++) {
+          const checker = tomlCheckerRules[i];
+
+          const checkerToolNamesRaw: string[] = Array.isArray(checker.toolName)
+            ? checker.toolName
+            : [checker.toolName];
+
+          if (checkerToolNamesRaw.some((name) => name === '')) {
+            errors.push({
+              filePath,
+              fileName: file,
+              tier: tierName,
+              ruleIndex: i,
+              errorType: 'rule_validation',
+              message:
+                'Invalid safety checker rule: toolName cannot be empty string',
+              details: `Checker #${i + 1} contains an empty toolName string. Use "*" to match all tools.`,
+            });
+            continue;
+          }
+
+          if (checker.mcpName) continue;
+
+          const checkerToolNames: string[] = checkerToolNamesRaw;
+
+          for (const name of checkerToolNames) {
+            const warning = validateToolName(name, i);
+            if (warning) {
+              errors.push({
+                filePath,
+                fileName: file,
+                tier: tierName,
+                ruleIndex: i,
+                errorType: 'tool_name_warning',
+                message: 'Unrecognized tool name in safety checker',
+                details: warning,
+                severity: 'warning',
+              });
+            }
+          }
+        }
 
         // Transform checkers
         const parsedCheckers: SafetyCheckerRule[] = (
@@ -392,33 +599,36 @@ export async function loadPoliciesFromToml(
             );
 
             return argsPatterns.flatMap((argsPattern) => {
-              const toolNames: Array<string | undefined> = checker.toolName
-                ? Array.isArray(checker.toolName)
-                  ? checker.toolName
-                  : [checker.toolName]
-                : [undefined];
+              const toolNames: string[] = Array.isArray(checker.toolName)
+                ? checker.toolName
+                : [checker.toolName];
 
               return toolNames.map((toolName) => {
-                let effectiveToolName: string | undefined;
-                if (checker.mcpName && toolName) {
-                  effectiveToolName = `${checker.mcpName}__${toolName}`;
+                let effectiveToolName: string;
+                if (checker.mcpName && toolName !== '*') {
+                  effectiveToolName = `${MCP_TOOL_PREFIX}${checker.mcpName}_${toolName}`;
                 } else if (checker.mcpName) {
-                  effectiveToolName = `${checker.mcpName}__*`;
+                  effectiveToolName = `${MCP_TOOL_PREFIX}${checker.mcpName}_*`;
                 } else {
                   effectiveToolName = toolName;
                 }
 
                 const safetyCheckerRule: SafetyCheckerRule = {
                   toolName: effectiveToolName,
-                  priority: checker.priority,
+                  mcpName: checker.mcpName,
+                  priority: transformPriority(checker.priority, tier),
+                  // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
                   checker: checker.checker as SafetyCheckerConfig,
                   modes: checker.modes,
+                  toolAnnotations: checker.toolAnnotations,
+                  source: `${tierName.charAt(0).toUpperCase() + tierName.slice(1)}: ${file}`,
                 };
 
                 if (argsPattern) {
                   try {
-                    safetyCheckerRule.argsPattern = new RegExp(argsPattern);
+                    new RegExp(argsPattern);
                   } catch (e) {
+                    // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
                     const error = e as Error;
                     errors.push({
                       filePath,
@@ -430,6 +640,21 @@ export async function loadPoliciesFromToml(
                     });
                     return null;
                   }
+
+                  if (!isSafeRegExp(argsPattern)) {
+                    errors.push({
+                      filePath,
+                      fileName: file,
+                      tier: tierName,
+                      errorType: 'regex_compilation',
+                      message:
+                        'Unsafe regex pattern in safety checker (potential ReDoS)',
+                      details: `Pattern: ${argsPattern}`,
+                    });
+                    return null;
+                  }
+
+                  safetyCheckerRule.argsPattern = new RegExp(argsPattern);
                 }
 
                 return safetyCheckerRule;
@@ -440,16 +665,15 @@ export async function loadPoliciesFromToml(
 
         checkers.push(...parsedCheckers);
       } catch (e) {
-        const error = e as NodeJS.ErrnoException;
         // Catch-all for unexpected errors
-        if (error.code !== 'ENOENT') {
+        if (!isNodeError(e) || e.code !== 'ENOENT') {
           errors.push({
             filePath,
             fileName: file,
             tier: tierName,
             errorType: 'file_read',
             message: 'Failed to read policy file',
-            details: error.message,
+            details: isNodeError(e) ? e.message : String(e),
           });
         }
       }
@@ -457,4 +681,68 @@ export async function loadPoliciesFromToml(
   }
 
   return { rules, checkers, errors };
+}
+
+/**
+ * Validates MCP tool names in policy rules against actually discovered MCP tools.
+ * Called after an MCP server connects and its tools are discovered.
+ *
+ * For each policy rule that references the given MCP server, checks if the
+ * tool name matches any discovered tool. Emits warnings for likely typos
+ * using Levenshtein distance.
+ *
+ * @param serverName The MCP server name (e.g., "google-workspace")
+ * @param discoveredToolNames The tool names discovered from this server (simple names, not fully qualified)
+ * @param policyRules The current set of policy rules to validate against
+ * @returns Array of warning messages for unrecognized MCP tool names
+ */
+export function validateMcpPolicyToolNames(
+  serverName: string,
+  discoveredToolNames: string[],
+  policyRules: ReadonlyArray<{
+    toolName: string;
+    mcpName?: string;
+    source?: string;
+  }>,
+): string[] {
+  const prefix = `${MCP_TOOL_PREFIX}${serverName}_`;
+  const warnings: string[] = [];
+
+  for (const rule of policyRules) {
+    if (!rule.toolName) continue;
+
+    let toolPart: string | undefined;
+
+    // The toolName is typically transformed into an FQN if mcpName was used.
+    if (rule.mcpName === serverName && rule.toolName.startsWith(prefix)) {
+      toolPart = rule.toolName.slice(prefix.length);
+    } else if (rule.toolName.startsWith(prefix)) {
+      toolPart = rule.toolName.slice(prefix.length);
+    } else {
+      continue;
+    }
+
+    // Skip wildcards
+    if (toolPart === '*') continue;
+
+    // Check if the tool exists
+    if (discoveredToolNames.includes(toolPart)) continue;
+
+    // Tool not found — check if it's a likely typo
+    if (discoveredToolNames.length === 0) continue;
+
+    const minDistance = Math.min(
+      ...discoveredToolNames.map((n) => levenshtein.get(toolPart, n)),
+    );
+
+    if (minDistance > MAX_TYPO_DISTANCE) continue;
+
+    const suggestion = getToolSuggestion(toolPart, discoveredToolNames);
+    const source = rule.source ? ` (from ${rule.source})` : '';
+    warnings.push(
+      `Unrecognized MCP tool "${toolPart}" for server "${serverName}"${source}.${suggestion}`,
+    );
+  }
+
+  return warnings;
 }

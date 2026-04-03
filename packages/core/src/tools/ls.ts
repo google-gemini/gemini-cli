@@ -7,14 +7,25 @@
 import type { MessageBus } from '../confirmation-bus/message-bus.js';
 import fs from 'node:fs/promises';
 import path from 'node:path';
-import type { ToolInvocation, ToolResult } from './tools.js';
-import { BaseDeclarativeTool, BaseToolInvocation, Kind } from './tools.js';
+import {
+  BaseDeclarativeTool,
+  BaseToolInvocation,
+  Kind,
+  type ToolInvocation,
+  type ToolResult,
+  type PolicyUpdateOptions,
+  type ToolConfirmationOutcome,
+} from './tools.js';
 import { makeRelative, shortenPath } from '../utils/paths.js';
 import type { Config } from '../config/config.js';
 import { DEFAULT_FILE_FILTERING_OPTIONS } from '../config/constants.js';
 import { ToolErrorType } from './tool-error.js';
-import { LS_TOOL_NAME } from './tool-names.js';
+import { LS_TOOL_NAME, LS_DISPLAY_NAME } from './tool-names.js';
+import { buildDirPathArgsPattern } from '../policy/utils.js';
 import { debugLogger } from '../utils/debugLogger.js';
+import { LS_DEFINITION } from './definitions/coreTools.js';
+import { resolveToolDeclaration } from './definitions/resolver.js';
+import { discoverJitContext, appendJitContext } from './jit-context.js';
 
 /**
  * Parameters for the LS tool
@@ -116,6 +127,14 @@ class LSToolInvocation extends BaseToolInvocation<LSToolParams, ToolResult> {
     return shortenPath(relativePath);
   }
 
+  override getPolicyUpdateOptions(
+    _outcome: ToolConfirmationOutcome,
+  ): PolicyUpdateOptions | undefined {
+    return {
+      argsPattern: buildDirPathArgsPattern(this.params.dir_path),
+    };
+  }
+
   // Helper for consistent error formatting
   private errorResult(
     llmContent: string,
@@ -124,7 +143,6 @@ class LSToolInvocation extends BaseToolInvocation<LSToolParams, ToolResult> {
   ): ToolResult {
     return {
       llmContent,
-      // Keep returnDisplay simpler in core logic
       returnDisplay: `Error: ${returnDisplay}`,
       error: {
         message: llmContent,
@@ -143,7 +161,10 @@ class LSToolInvocation extends BaseToolInvocation<LSToolParams, ToolResult> {
       this.params.dir_path,
     );
 
-    const validationError = this.config.validatePathAccess(resolvedDirPath);
+    const validationError = this.config.validatePathAccess(
+      resolvedDirPath,
+      'read',
+    );
     if (validationError) {
       return {
         llmContent: validationError,
@@ -236,12 +257,23 @@ class LSToolInvocation extends BaseToolInvocation<LSToolParams, ToolResult> {
 
       // Create formatted content for LLM
       const directoryContent = entries
-        .map((entry) => `${entry.isDirectory ? '[DIR] ' : ''}${entry.name}`)
+        .map((entry) => {
+          if (entry.isDirectory) {
+            return `[DIR] ${entry.name}`;
+          }
+          return `${entry.name} (${entry.size} bytes)`;
+        })
         .join('\n');
 
       let resultMessage = `Directory listing for ${resolvedDirPath}:\n${directoryContent}`;
       if (ignoredCount > 0) {
         resultMessage += `\n\n(${ignoredCount} ignored)`;
+      }
+
+      // Discover JIT subdirectory context for the listed directory
+      const jitContext = await discoverJitContext(this.config, resolvedDirPath);
+      if (jitContext) {
+        resultMessage = appendJitContext(resultMessage, jitContext);
       }
 
       let displayMessage = `Listed ${entries.length} item(s).`;
@@ -251,7 +283,12 @@ class LSToolInvocation extends BaseToolInvocation<LSToolParams, ToolResult> {
 
       return {
         llmContent: resultMessage,
-        returnDisplay: displayMessage,
+        returnDisplay: {
+          summary: displayMessage,
+          files: entries.map(
+            (entry) => `${entry.isDirectory ? '[DIR] ' : ''}${entry.name}`,
+          ),
+        },
       };
     } catch (error) {
       const errorMsg = `Error listing directory: ${error instanceof Error ? error.message : String(error)}`;
@@ -276,43 +313,10 @@ export class LSTool extends BaseDeclarativeTool<LSToolParams, ToolResult> {
   ) {
     super(
       LSTool.Name,
-      'ReadFolder',
-      'Lists the names of files and subdirectories directly within a specified directory path. Can optionally ignore entries matching provided glob patterns.',
+      LS_DISPLAY_NAME,
+      LS_DEFINITION.base.description!,
       Kind.Search,
-      {
-        properties: {
-          dir_path: {
-            description: 'The path to the directory to list',
-            type: 'string',
-          },
-          ignore: {
-            description: 'List of glob patterns to ignore',
-            items: {
-              type: 'string',
-            },
-            type: 'array',
-          },
-          file_filtering_options: {
-            description:
-              'Optional: Whether to respect ignore patterns from .gitignore or .geminiignore',
-            type: 'object',
-            properties: {
-              respect_git_ignore: {
-                description:
-                  'Optional: Whether to respect .gitignore patterns when listing files. Only available in git repositories. Defaults to true.',
-                type: 'boolean',
-              },
-              respect_gemini_ignore: {
-                description:
-                  'Optional: Whether to respect .geminiignore patterns when listing files. Defaults to true.',
-                type: 'boolean',
-              },
-            },
-          },
-        },
-        required: ['dir_path'],
-        type: 'object',
-      },
+      LS_DEFINITION.base.parametersJsonSchema,
       messageBus,
       true,
       false,
@@ -331,7 +335,7 @@ export class LSTool extends BaseDeclarativeTool<LSToolParams, ToolResult> {
       this.config.getTargetDir(),
       params.dir_path,
     );
-    return this.config.validatePathAccess(resolvedPath);
+    return this.config.validatePathAccess(resolvedPath, 'read');
   }
 
   protected createInvocation(
@@ -347,5 +351,9 @@ export class LSTool extends BaseDeclarativeTool<LSToolParams, ToolResult> {
       _toolName,
       _toolDisplayName,
     );
+  }
+
+  override getSchema(modelId?: string) {
+    return resolveToolDeclaration(LS_DEFINITION, modelId);
   }
 }

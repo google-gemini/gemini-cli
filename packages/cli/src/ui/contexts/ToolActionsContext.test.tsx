@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { act } from 'react';
+import { act, useState, useCallback } from 'react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { renderHook } from '../../test-utils/render.js';
 import { ToolActionsProvider, useToolActions } from './ToolActionsContext.js';
@@ -13,9 +13,10 @@ import {
   ToolConfirmationOutcome,
   MessageBusType,
   IdeClient,
-  type ToolCallConfirmationDetails,
+  CoreToolCallStatus,
+  type SerializableConfirmationDetails,
 } from '@google/gemini-cli-core';
-import { ToolCallStatus, type IndividualToolCallDisplay } from '../types.js';
+import { type IndividualToolCallDisplay } from '../types.js';
 
 // Mock IdeClient
 vi.mock('@google/gemini-cli-core', async (importOriginal) => {
@@ -45,28 +46,16 @@ describe('ToolActionsContext', () => {
       correlationId: 'corr-123',
       name: 'test-tool',
       description: 'desc',
-      status: ToolCallStatus.Confirming,
+      status: CoreToolCallStatus.AwaitingApproval,
       resultDisplay: undefined,
       confirmationDetails: { type: 'info', title: 'title', prompt: 'prompt' },
     },
     {
-      callId: 'legacy-call',
-      name: 'legacy-tool',
-      description: 'desc',
-      status: ToolCallStatus.Confirming,
-      resultDisplay: undefined,
-      confirmationDetails: {
-        type: 'info',
-        title: 'legacy',
-        prompt: 'prompt',
-        onConfirm: vi.fn(),
-      } as ToolCallConfirmationDetails,
-    },
-    {
       callId: 'edit-call',
+      correlationId: 'corr-edit',
       name: 'edit-tool',
       description: 'desc',
-      status: ToolCallStatus.Confirming,
+      status: CoreToolCallStatus.AwaitingApproval,
       resultDisplay: undefined,
       confirmationDetails: {
         type: 'edit',
@@ -76,23 +65,67 @@ describe('ToolActionsContext', () => {
         fileDiff: 'diff',
         originalContent: 'old',
         newContent: 'new',
-        onConfirm: vi.fn(),
-      } as ToolCallConfirmationDetails,
+      },
     },
   ];
 
   beforeEach(() => {
     vi.clearAllMocks();
+    // Default to a pending promise to avoid unwanted async state updates in tests
+    // that don't specifically test the IdeClient initialization.
+    vi.mocked(IdeClient.getInstance).mockReturnValue(new Promise(() => {}));
   });
 
-  const wrapper = ({ children }: { children: React.ReactNode }) => (
-    <ToolActionsProvider config={mockConfig} toolCalls={mockToolCalls}>
-      {children}
-    </ToolActionsProvider>
-  );
+  const WrapperReactComp = ({ children }: { children: React.ReactNode }) => {
+    const [expandedTools, setExpandedTools] = useState<Set<string>>(new Set());
 
-  it('publishes to MessageBus for tools with correlationId (Modern Path)', async () => {
-    const { result } = renderHook(() => useToolActions(), { wrapper });
+    const isExpanded = useCallback(
+      (callId: string) => expandedTools.has(callId),
+      [expandedTools],
+    );
+
+    const toggleExpansion = useCallback((callId: string) => {
+      setExpandedTools((prev) => {
+        const next = new Set(prev);
+        if (next.has(callId)) {
+          next.delete(callId);
+        } else {
+          next.add(callId);
+        }
+        return next;
+      });
+    }, []);
+
+    const toggleAllExpansion = useCallback((callIds: string[]) => {
+      setExpandedTools((prev) => {
+        const next = new Set(prev);
+        const anyCollapsed = callIds.some((id) => !next.has(id));
+
+        if (anyCollapsed) {
+          callIds.forEach((id) => next.add(id));
+        } else {
+          callIds.forEach((id) => next.delete(id));
+        }
+        return next;
+      });
+    }, []);
+    return (
+      <ToolActionsProvider
+        config={mockConfig}
+        toolCalls={mockToolCalls}
+        isExpanded={isExpanded}
+        toggleExpansion={toggleExpansion}
+        toggleAllExpansion={toggleAllExpansion}
+      >
+        {children}
+      </ToolActionsProvider>
+    );
+  };
+
+  it('publishes to MessageBus for tools with correlationId', async () => {
+    const { result } = await renderHook(() => useToolActions(), {
+      wrapper: WrapperReactComp,
+    });
 
     await result.current.confirm(
       'modern-call',
@@ -109,29 +142,10 @@ describe('ToolActionsContext', () => {
     });
   });
 
-  it('calls onConfirm for legacy tools (Legacy Path)', async () => {
-    const { result } = renderHook(() => useToolActions(), { wrapper });
-    const legacyDetails = mockToolCalls[1]
-      .confirmationDetails as ToolCallConfirmationDetails;
-
-    await result.current.confirm(
-      'legacy-call',
-      ToolConfirmationOutcome.ProceedOnce,
-    );
-
-    if (legacyDetails && 'onConfirm' in legacyDetails) {
-      expect(legacyDetails.onConfirm).toHaveBeenCalledWith(
-        ToolConfirmationOutcome.ProceedOnce,
-        undefined,
-      );
-    } else {
-      throw new Error('Expected onConfirm to be present');
-    }
-    expect(mockMessageBus.publish).not.toHaveBeenCalled();
-  });
-
   it('handles cancel by calling confirm with Cancel outcome', async () => {
-    const { result } = renderHook(() => useToolActions(), { wrapper });
+    const { result } = await renderHook(() => useToolActions(), {
+      wrapper: WrapperReactComp,
+    });
 
     await result.current.cancel('modern-call');
 
@@ -144,20 +158,28 @@ describe('ToolActionsContext', () => {
   });
 
   it('resolves IDE diffs for edit tools when in IDE mode', async () => {
+    let deferredIdeClient: { resolve: (c: IdeClient) => void };
     const mockIdeClient = {
       isDiffingEnabled: vi.fn().mockReturnValue(true),
       resolveDiffFromCli: vi.fn(),
+      addStatusChangeListener: vi.fn(),
+      removeStatusChangeListener: vi.fn(),
     } as unknown as IdeClient;
-    vi.mocked(IdeClient.getInstance).mockResolvedValue(mockIdeClient);
+
+    vi.mocked(IdeClient.getInstance).mockImplementation(
+      () =>
+        new Promise((resolve) => {
+          deferredIdeClient = { resolve };
+        }),
+    );
     vi.mocked(mockConfig.getIdeMode).mockReturnValue(true);
 
-    const { result } = renderHook(() => useToolActions(), { wrapper });
+    const { result } = await renderHook(() => useToolActions(), {
+      wrapper: WrapperReactComp,
+    });
 
-    // Wait for IdeClient initialization in useEffect
     await act(async () => {
-      await vi.waitFor(() => expect(IdeClient.getInstance).toHaveBeenCalled());
-      // Give React a chance to update state
-      await new Promise((resolve) => setTimeout(resolve, 0));
+      deferredIdeClient.resolve(mockIdeClient);
     });
 
     await result.current.confirm(
@@ -169,17 +191,17 @@ describe('ToolActionsContext', () => {
       '/f.txt',
       'accepted',
     );
-    const editDetails = mockToolCalls[2]
-      .confirmationDetails as ToolCallConfirmationDetails;
-    if (editDetails && 'onConfirm' in editDetails) {
-      expect(editDetails.onConfirm).toHaveBeenCalled();
-    } else {
-      throw new Error('Expected onConfirm to be present');
-    }
+    expect(mockMessageBus.publish).toHaveBeenCalledWith(
+      expect.objectContaining({
+        correlationId: 'corr-edit',
+      }),
+    );
   });
 
   it('updates isDiffingEnabled when IdeClient status changes', async () => {
     let statusListener: () => void = () => {};
+    let deferredIdeClient: { resolve: (c: IdeClient) => void };
+
     const mockIdeClient = {
       isDiffingEnabled: vi.fn().mockReturnValue(false),
       addStatusChangeListener: vi.fn().mockImplementation((listener) => {
@@ -188,15 +210,20 @@ describe('ToolActionsContext', () => {
       removeStatusChangeListener: vi.fn(),
     } as unknown as IdeClient;
 
-    vi.mocked(IdeClient.getInstance).mockResolvedValue(mockIdeClient);
+    vi.mocked(IdeClient.getInstance).mockImplementation(
+      () =>
+        new Promise((resolve) => {
+          deferredIdeClient = { resolve };
+        }),
+    );
     vi.mocked(mockConfig.getIdeMode).mockReturnValue(true);
 
-    const { result } = renderHook(() => useToolActions(), { wrapper });
+    const { result } = await renderHook(() => useToolActions(), {
+      wrapper: WrapperReactComp,
+    });
 
-    // Wait for initialization
     await act(async () => {
-      await vi.waitFor(() => expect(IdeClient.getInstance).toHaveBeenCalled());
-      await new Promise((resolve) => setTimeout(resolve, 0));
+      deferredIdeClient.resolve(mockIdeClient);
     });
 
     expect(result.current.isDiffingEnabled).toBe(false);
@@ -216,5 +243,105 @@ describe('ToolActionsContext', () => {
     });
 
     expect(result.current.isDiffingEnabled).toBe(false);
+  });
+
+  it('calls local onConfirm for tools without correlationId', async () => {
+    const mockOnConfirm = vi.fn().mockResolvedValue(undefined);
+    const legacyTool: IndividualToolCallDisplay = {
+      callId: 'legacy-call',
+      name: 'legacy-tool',
+      description: 'desc',
+      status: CoreToolCallStatus.AwaitingApproval,
+      resultDisplay: undefined,
+      confirmationDetails: {
+        type: 'exec',
+        title: 'exec',
+        command: 'ls',
+        rootCommand: 'ls',
+        rootCommands: ['ls'],
+        onConfirm: mockOnConfirm,
+      } as unknown as SerializableConfirmationDetails,
+    };
+
+    const { result } = await renderHook(() => useToolActions(), {
+      wrapper: ({ children }) => (
+        <ToolActionsProvider
+          config={mockConfig}
+          toolCalls={[legacyTool]}
+          isExpanded={vi.fn().mockReturnValue(false)}
+          toggleExpansion={vi.fn()}
+          toggleAllExpansion={vi.fn()}
+        >
+          {children}
+        </ToolActionsProvider>
+      ),
+    });
+
+    await act(async () => {
+      await result.current.confirm(
+        'legacy-call',
+        ToolConfirmationOutcome.ProceedOnce,
+      );
+    });
+
+    expect(mockOnConfirm).toHaveBeenCalledWith(
+      ToolConfirmationOutcome.ProceedOnce,
+      undefined,
+    );
+    expect(mockMessageBus.publish).not.toHaveBeenCalled();
+  });
+
+  describe('toggleAllExpansion', () => {
+    it('expands all when none are expanded', async () => {
+      const { result } = await renderHook(() => useToolActions(), {
+        wrapper: WrapperReactComp,
+      });
+
+      act(() => {
+        result.current.toggleAllExpansion(['modern-call', 'edit-call']);
+      });
+
+      expect(result.current.isExpanded('modern-call')).toBe(true);
+      expect(result.current.isExpanded('edit-call')).toBe(true);
+    });
+
+    it('expands all when some are expanded', async () => {
+      const { result } = await renderHook(() => useToolActions(), {
+        wrapper: WrapperReactComp,
+      });
+
+      act(() => {
+        result.current.toggleExpansion('modern-call');
+      });
+      expect(result.current.isExpanded('modern-call')).toBe(true);
+      expect(result.current.isExpanded('edit-call')).toBe(false);
+
+      act(() => {
+        result.current.toggleAllExpansion(['modern-call', 'edit-call']);
+      });
+
+      expect(result.current.isExpanded('modern-call')).toBe(true);
+      expect(result.current.isExpanded('edit-call')).toBe(true);
+    });
+
+    it('collapses all when all are expanded', async () => {
+      const { result } = await renderHook(() => useToolActions(), {
+        wrapper: WrapperReactComp,
+      });
+
+      act(() => {
+        result.current.toggleExpansion('modern-call');
+        result.current.toggleExpansion('edit-call');
+      });
+      expect(result.current.isExpanded('modern-call')).toBe(true);
+      expect(result.current.isExpanded('edit-call')).toBe(true);
+
+      act(() => {
+        result.current.toggleAllExpansion(['modern-call', 'edit-call']);
+      });
+
+      expect(result.current.isExpanded('modern-call')).toBe(false);
+      expect(result.current.isExpanded('edit-call')).toBe(false);
+    });
   });
 });

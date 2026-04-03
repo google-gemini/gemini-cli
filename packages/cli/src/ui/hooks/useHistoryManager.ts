@@ -42,16 +42,22 @@ export function useHistory({
   initialItems?: HistoryItem[];
 } = {}): UseHistoryManagerReturn {
   const [history, setHistory] = useState<HistoryItem[]>(initialItems);
-  const messageIdCounterRef = useRef(0);
+  const lastIdRef = useRef(
+    initialItems.reduce((max, item) => Math.max(max, item.id), 0),
+  );
 
-  // Generates a unique message ID based on a timestamp and a counter.
+  // Generates a unique message ID based on a timestamp, ensuring it is always
+  // greater than any previously assigned ID.
   const getNextMessageId = useCallback((baseTimestamp: number): number => {
-    messageIdCounterRef.current += 1;
-    return baseTimestamp + messageIdCounterRef.current;
+    const nextId = Math.max(baseTimestamp, lastIdRef.current + 1);
+    lastIdRef.current = nextId;
+    return nextId;
   }, []);
 
   const loadHistory = useCallback((newHistory: HistoryItem[]) => {
     setHistory(newHistory);
+    const maxId = newHistory.reduce((max, item) => Math.max(max, item.id), 0);
+    lastIdRef.current = Math.max(lastIdRef.current, maxId);
   }, []);
 
   // Adds a new item to the history state with a unique ID.
@@ -62,6 +68,7 @@ export function useHistory({
       isResuming: boolean = false,
     ): number => {
       const id = getNextMessageId(baseTimestamp);
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
       const newItem: HistoryItem = { ...itemData, id } as HistoryItem;
 
       setHistory((prevHistory) => {
@@ -139,6 +146,7 @@ export function useHistory({
             // Apply updates based on whether it's an object or a function
             const newUpdates =
               typeof updates === 'function' ? updates(item) : updates;
+            // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
             return { ...item, ...newUpdates } as HistoryItem;
           }
           return item;
@@ -151,7 +159,7 @@ export function useHistory({
   // Clears the entire history state and resets the ID counter.
   const clearItems = useCallback(() => {
     setHistory([]);
-    messageIdCounterRef.current = 0;
+    lastIdRef.current = 0;
   }, []);
 
   return useMemo(

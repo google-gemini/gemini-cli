@@ -1,51 +1,92 @@
 /**
  * @license
- * Copyright 2025 Google LLC
+ * Copyright 2026 Google LLC
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { useState } from 'react';
 import { Box, useIsScreenReaderEnabled } from 'ink';
-import { LoadingIndicator } from './LoadingIndicator.js';
-import { StatusDisplay } from './StatusDisplay.js';
-import { ApprovalModeIndicator } from './ApprovalModeIndicator.js';
-import { ShellModeIndicator } from './ShellModeIndicator.js';
-import { DetailedMessagesDisplay } from './DetailedMessagesDisplay.js';
-import { RawMarkdownIndicator } from './RawMarkdownIndicator.js';
-import { InputPrompt } from './InputPrompt.js';
-import { Footer } from './Footer.js';
-import { ShowMoreLines } from './ShowMoreLines.js';
-import { QueuedMessageDisplay } from './QueuedMessageDisplay.js';
-import { OverflowProvider } from '../contexts/OverflowContext.js';
-import { isNarrowWidth } from '../utils/isNarrowWidth.js';
+import { useState, useEffect } from 'react';
+import { useConfig } from '../contexts/ConfigContext.js';
+import { useSettings } from '../contexts/SettingsContext.js';
 import { useUIState } from '../contexts/UIStateContext.js';
 import { useUIActions } from '../contexts/UIActionsContext.js';
 import { useVimMode } from '../contexts/VimModeContext.js';
-import { useConfig } from '../contexts/ConfigContext.js';
-import { useSettings } from '../contexts/SettingsContext.js';
 import { useAlternateBuffer } from '../hooks/useAlternateBuffer.js';
-import { ApprovalMode } from '@google/gemini-cli-core';
-import { StreamingState } from '../types.js';
-import { ConfigInitDisplay } from '../components/ConfigInitDisplay.js';
+import { useTerminalSize } from '../hooks/useTerminalSize.js';
+import { isNarrowWidth } from '../utils/isNarrowWidth.js';
+import { ToastDisplay, shouldShowToast } from './ToastDisplay.js';
+import { DetailedMessagesDisplay } from './DetailedMessagesDisplay.js';
+import { ShortcutsHelp } from './ShortcutsHelp.js';
+import { InputPrompt } from './InputPrompt.js';
+import { Footer } from './Footer.js';
+import { StatusRow } from './StatusRow.js';
+import { ShowMoreLines } from './ShowMoreLines.js';
+import { QueuedMessageDisplay } from './QueuedMessageDisplay.js';
+import { OverflowProvider } from '../contexts/OverflowContext.js';
+import { ConfigInitDisplay } from './ConfigInitDisplay.js';
 import { TodoTray } from './messages/Todo.js';
+import { useComposerStatus } from '../hooks/useComposerStatus.js';
+import { appEvents, AppEvent } from '../../utils/events.js';
 
 export const Composer = ({ isFocused = true }: { isFocused?: boolean }) => {
-  const config = useConfig();
-  const settings = useSettings();
-  const isScreenReaderEnabled = useIsScreenReaderEnabled();
   const uiState = useUIState();
   const uiActions = useUIActions();
+  const settings = useSettings();
+  const config = useConfig();
   const { vimEnabled, vimMode } = useVimMode();
-  const terminalWidth = process.stdout.columns;
+  const isScreenReaderEnabled = useIsScreenReaderEnabled();
+  const { columns: terminalWidth } = useTerminalSize();
   const isNarrow = isNarrowWidth(terminalWidth);
   const debugConsoleMaxHeight = Math.floor(Math.max(terminalWidth * 0.2, 5));
   const [suggestionsVisible, setSuggestionsVisible] = useState(false);
 
   const isAlternateBuffer = useAlternateBuffer();
-  const { showApprovalModeIndicator } = uiState;
+  const showUiDetails = uiState.cleanUiDetailsVisible;
   const suggestionsPosition = isAlternateBuffer ? 'above' : 'below';
   const hideContextSummary =
     suggestionsVisible && suggestionsPosition === 'above';
+
+  const { hasPendingActionRequired, shouldCollapseDuringApproval } =
+    useComposerStatus();
+
+  const isPassiveShortcutsHelpState =
+    uiState.isInputActive &&
+    uiState.streamingState === 'idle' &&
+    !hasPendingActionRequired;
+
+  const { setShortcutsHelpVisible } = uiActions;
+
+  useEffect(() => {
+    if (hasPendingActionRequired) {
+      appEvents.emit(AppEvent.ScrollToBottom);
+    }
+  }, [hasPendingActionRequired]);
+
+  useEffect(() => {
+    if (uiState.shortcutsHelpVisible && !isPassiveShortcutsHelpState) {
+      setShortcutsHelpVisible(false);
+    }
+  }, [
+    uiState.shortcutsHelpVisible,
+    isPassiveShortcutsHelpState,
+    setShortcutsHelpVisible,
+  ]);
+
+  const showShortcutsHelp =
+    uiState.shortcutsHelpVisible &&
+    uiState.streamingState === 'idle' &&
+    !hasPendingActionRequired;
+
+  if (hasPendingActionRequired && shouldCollapseDuringApproval) {
+    return null;
+  }
+
+  const hasToast = shouldShowToast(uiState);
+  const hideUiDetailsForSuggestions =
+    suggestionsVisible && suggestionsPosition === 'above';
+
+  // Mini Mode VIP Flags (Pure Content Triggers)
+  const showMinimalToast = hasToast;
 
   return (
     <Box
@@ -54,62 +95,39 @@ export const Composer = ({ isFocused = true }: { isFocused?: boolean }) => {
       flexGrow={0}
       flexShrink={0}
     >
-      {(!uiState.embeddedShellFocused || uiState.isBackgroundShellVisible) && (
-        <LoadingIndicator
-          thought={
-            uiState.streamingState === StreamingState.WaitingForConfirmation ||
-            config.getAccessibility()?.enableLoadingPhrases === false
-              ? undefined
-              : uiState.thought
-          }
-          currentLoadingPhrase={
-            config.getAccessibility()?.enableLoadingPhrases === false
-              ? undefined
-              : uiState.currentLoadingPhrase
-          }
-          elapsedTime={uiState.elapsedTime}
-        />
+      {uiState.isResuming && (
+        <ConfigInitDisplay message="Resuming session..." />
       )}
 
-      {(!uiState.slashCommands ||
-        !uiState.isConfigInitialized ||
-        uiState.isResuming) && (
-        <ConfigInitDisplay
-          message={uiState.isResuming ? 'Resuming session...' : undefined}
-        />
+      {showUiDetails && (
+        <QueuedMessageDisplay messageQueue={uiState.messageQueue} />
       )}
 
-      <QueuedMessageDisplay messageQueue={uiState.messageQueue} />
+      {showUiDetails && <TodoTray />}
 
-      <TodoTray />
+      {showShortcutsHelp && <ShortcutsHelp />}
 
-      <Box
-        marginTop={1}
-        justifyContent={
-          settings.merged.ui.hideContextSummary ? 'flex-start' : 'space-between'
-        }
-        width="100%"
-        flexDirection={isNarrow ? 'column' : 'row'}
-        alignItems={isNarrow ? 'flex-start' : 'center'}
-      >
-        <Box marginRight={1}>
-          <StatusDisplay hideContextSummary={hideContextSummary} />
+      {(showUiDetails || showMinimalToast) && (
+        <Box minHeight={1} marginLeft={isNarrow ? 0 : 1}>
+          <ToastDisplay />
         </Box>
-        <Box paddingTop={isNarrow ? 1 : 0}>
-          {showApprovalModeIndicator !== ApprovalMode.DEFAULT &&
-            !uiState.shellModeActive && (
-              <ApprovalModeIndicator approvalMode={showApprovalModeIndicator} />
-            )}
-          {uiState.shellModeActive && <ShellModeIndicator />}
-          {!uiState.renderMarkdown && <RawMarkdownIndicator />}
-        </Box>
+      )}
+
+      <Box width="100%" flexDirection="column">
+        <StatusRow
+          showUiDetails={showUiDetails}
+          isNarrow={isNarrow}
+          terminalWidth={terminalWidth}
+          hideContextSummary={hideContextSummary}
+          hideUiDetailsForSuggestions={hideUiDetailsForSuggestions}
+          hasPendingActionRequired={hasPendingActionRequired}
+        />
       </Box>
 
-      {uiState.showErrorDetails && (
+      {showUiDetails && uiState.showErrorDetails && (
         <OverflowProvider>
           <Box flexDirection="column">
             <DetailedMessagesDisplay
-              messages={uiState.filteredConsoleMessages}
               maxHeight={
                 uiState.constrainHeight ? debugConsoleMaxHeight : undefined
               }
@@ -135,12 +153,13 @@ export const Composer = ({ isFocused = true }: { isFocused?: boolean }) => {
           commandContext={uiState.commandContext}
           shellModeActive={uiState.shellModeActive}
           setShellModeActive={uiActions.setShellModeActive}
-          approvalMode={showApprovalModeIndicator}
+          approvalMode={uiState.showApprovalModeIndicator}
           onEscapePromptChange={uiActions.onEscapePromptChange}
           focus={isFocused}
           vimHandleInput={uiActions.vimHandleInput}
           isEmbeddedShellFocused={uiState.embeddedShellFocused}
           popAllMessages={uiActions.popAllMessages}
+          onQueueMessage={uiActions.addMessage}
           placeholder={
             vimEnabled
               ? vimMode === 'INSERT'
@@ -154,10 +173,13 @@ export const Composer = ({ isFocused = true }: { isFocused?: boolean }) => {
           streamingState={uiState.streamingState}
           suggestionsPosition={suggestionsPosition}
           onSuggestionsVisibilityChange={setSuggestionsVisible}
+          copyModeEnabled={uiState.copyModeEnabled}
         />
       )}
 
-      {!settings.merged.ui.hideFooter && !isScreenReaderEnabled && <Footer />}
+      {showUiDetails &&
+        !settings.merged.ui.hideFooter &&
+        !isScreenReaderEnabled && <Footer />}
     </Box>
   );
 };

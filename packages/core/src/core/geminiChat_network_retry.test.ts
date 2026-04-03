@@ -5,8 +5,7 @@
  */
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import type { GenerateContentResponse } from '@google/genai';
-import { ApiError } from '@google/genai';
+import { ApiError, type GenerateContentResponse } from '@google/genai';
 import type { ContentGenerator } from '../core/contentGenerator.js';
 import { GeminiChat, StreamEventType, type StreamEvent } from './geminiChat.js';
 import type { Config } from '../config/config.js';
@@ -14,6 +13,7 @@ import { setSimulate429 } from '../utils/testUtils.js';
 import { HookSystem } from '../hooks/hookSystem.js';
 import { createMockMessageBus } from '../test-utils/mock-message-bus.js';
 import { createAvailabilityServiceMock } from '../availability/testUtils.js';
+import { LlmRole } from '../telemetry/types.js';
 
 // Mock fs module
 vi.mock('node:fs', async (importOriginal) => {
@@ -47,14 +47,20 @@ vi.mock('../utils/retry.js', async (importOriginal) => {
 });
 
 // Mock loggers
-const { mockLogContentRetry, mockLogContentRetryFailure } = vi.hoisted(() => ({
+const {
+  mockLogContentRetry,
+  mockLogContentRetryFailure,
+  mockLogNetworkRetryAttempt,
+} = vi.hoisted(() => ({
   mockLogContentRetry: vi.fn(),
   mockLogContentRetryFailure: vi.fn(),
+  mockLogNetworkRetryAttempt: vi.fn(),
 }));
 
 vi.mock('../telemetry/loggers.js', () => ({
   logContentRetry: mockLogContentRetry,
   logContentRetryFailure: mockLogContentRetryFailure,
+  logNetworkRetryAttempt: mockLogNetworkRetryAttempt,
 }));
 
 describe('GeminiChat Network Retries', () => {
@@ -73,12 +79,24 @@ describe('GeminiChat Network Retries', () => {
     // Default mock implementation: execute the function immediately
     mockRetryWithBackoff.mockImplementation(async (apiCall) => apiCall());
 
+    const mockToolRegistry = { getTool: vi.fn() };
+    const testMessageBus = { publish: vi.fn(), subscribe: vi.fn() };
+
     mockConfig = {
+      get config() {
+        return this;
+      },
+      get toolRegistry() {
+        return mockToolRegistry;
+      },
+      get messageBus() {
+        return testMessageBus;
+      },
+      promptId: 'test-session-id',
       getSessionId: () => 'test-session-id',
       getTelemetryLogPromptsEnabled: () => true,
       getUsageStatisticsEnabled: () => true,
       getDebugMode: () => false,
-      getPreviewFeatures: () => false,
       getContentGeneratorConfig: vi.fn().mockReturnValue({
         authType: 'oauth-personal',
         model: 'test-model',
@@ -94,6 +112,7 @@ describe('GeminiChat Network Retries', () => {
       getToolRegistry: vi.fn().mockReturnValue({ getTool: vi.fn() }),
       getContentGenerator: vi.fn().mockReturnValue(mockContentGenerator),
       getRetryFetchErrors: vi.fn().mockReturnValue(false), // Default false
+      getMaxAttempts: vi.fn().mockReturnValue(10),
       modelConfigService: {
         getResolvedConfig: vi.fn().mockImplementation((modelConfigKey) => ({
           model: modelConfigKey.model,
@@ -155,6 +174,7 @@ describe('GeminiChat Network Retries', () => {
       'test message',
       'prompt-id-retry-network',
       new AbortController().signal,
+      LlmRole.MAIN,
     );
 
     const events: StreamEvent[] = [];
@@ -184,10 +204,10 @@ describe('GeminiChat Network Retries', () => {
     expect(successChunk).toBeDefined();
 
     // Verify retry logging
-    expect(mockLogContentRetry).toHaveBeenCalledWith(
+    expect(mockLogNetworkRetryAttempt).toHaveBeenCalledWith(
       expect.anything(),
       expect.objectContaining({
-        error_type: 'NETWORK_ERROR',
+        error_type: 'SERVER_ERROR',
       }),
     );
   });
@@ -224,6 +244,7 @@ describe('GeminiChat Network Retries', () => {
       'test message',
       'prompt-id-retry-fetch',
       new AbortController().signal,
+      LlmRole.MAIN,
     );
 
     const events: StreamEvent[] = [];
@@ -264,6 +285,7 @@ describe('GeminiChat Network Retries', () => {
       'test message',
       'prompt-id-no-retry',
       new AbortController().signal,
+      LlmRole.MAIN,
     );
 
     await expect(async () => {
@@ -273,5 +295,227 @@ describe('GeminiChat Network Retries', () => {
     }).rejects.toThrow(error400);
 
     expect(mockLogContentRetry).not.toHaveBeenCalled();
+  });
+
+  it('should retry on SSL error during connection phase (ERR_SSL_SSLV3_ALERT_BAD_RECORD_MAC)', async () => {
+    // Create an SSL error that occurs during connection (before any yield)
+    const sslError = new Error(
+      'SSL routines:ssl3_read_bytes:sslv3 alert bad record mac',
+    );
+    (sslError as NodeJS.ErrnoException).code =
+      'ERR_SSL_SSLV3_ALERT_BAD_RECORD_MAC';
+
+    // Instead of outer loop, connection retries are handled by retryWithBackoff.
+    // Simulate retryWithBackoff attempting it twice: first throws, second succeeds.
+    mockRetryWithBackoff.mockImplementation(
+      async (apiCall) =>
+        // Execute the apiCall to trigger mockContentGenerator
+        await apiCall(),
+    );
+
+    vi.mocked(mockContentGenerator.generateContentStream)
+      // First call: throw SSL error immediately (connection phase)
+      .mockRejectedValueOnce(sslError)
+      // Second call: succeed
+      .mockImplementationOnce(async () =>
+        (async function* () {
+          yield {
+            candidates: [
+              {
+                content: { parts: [{ text: 'Success after SSL retry' }] },
+                finishReason: 'STOP',
+              },
+            ],
+          } as unknown as GenerateContentResponse;
+        })(),
+      );
+
+    // Because retryWithBackoff is mocked and we just want to test GeminiChat's integration,
+    // we need to actually execute the real retryWithBackoff logic for this test to see it work.
+    // So let's restore the real retryWithBackoff for this test.
+    const { retryWithBackoff } =
+      await vi.importActual<typeof import('../utils/retry.js')>(
+        '../utils/retry.js',
+      );
+    mockRetryWithBackoff.mockImplementation(retryWithBackoff);
+
+    const stream = await chat.sendMessageStream(
+      { model: 'test-model' },
+      'test message',
+      'prompt-id-ssl-retry',
+      new AbortController().signal,
+      LlmRole.MAIN,
+    );
+
+    const events: StreamEvent[] = [];
+    for await (const event of stream) {
+      events.push(event);
+    }
+
+    const successChunk = events.find(
+      (e) =>
+        e.type === StreamEventType.CHUNK &&
+        e.value.candidates?.[0]?.content?.parts?.[0]?.text ===
+          'Success after SSL retry',
+    );
+    expect(successChunk).toBeDefined();
+
+    // Verify the API was called twice (initial + retry)
+    expect(mockContentGenerator.generateContentStream).toHaveBeenCalledTimes(2);
+  });
+
+  it('should retry on ECONNRESET error during connection phase', async () => {
+    const connectionError = new Error('read ECONNRESET');
+    (connectionError as NodeJS.ErrnoException).code = 'ECONNRESET';
+
+    const { retryWithBackoff } =
+      await vi.importActual<typeof import('../utils/retry.js')>(
+        '../utils/retry.js',
+      );
+    mockRetryWithBackoff.mockImplementation(retryWithBackoff);
+
+    vi.mocked(mockContentGenerator.generateContentStream)
+      .mockRejectedValueOnce(connectionError)
+      .mockImplementationOnce(async () =>
+        (async function* () {
+          yield {
+            candidates: [
+              {
+                content: {
+                  parts: [{ text: 'Success after connection retry' }],
+                },
+                finishReason: 'STOP',
+              },
+            ],
+          } as unknown as GenerateContentResponse;
+        })(),
+      );
+
+    const stream = await chat.sendMessageStream(
+      { model: 'test-model' },
+      'test message',
+      'prompt-id-connection-retry',
+      new AbortController().signal,
+      LlmRole.MAIN,
+    );
+
+    const events: StreamEvent[] = [];
+    for await (const event of stream) {
+      events.push(event);
+    }
+
+    const successChunk = events.find(
+      (e) =>
+        e.type === StreamEventType.CHUNK &&
+        e.value.candidates?.[0]?.content?.parts?.[0]?.text ===
+          'Success after connection retry',
+    );
+    expect(successChunk).toBeDefined();
+    expect(mockContentGenerator.generateContentStream).toHaveBeenCalledTimes(2);
+  });
+
+  it('should NOT retry on non-retryable error during connection phase', async () => {
+    const nonRetryableError = new Error('Some non-retryable error');
+
+    vi.mocked(mockContentGenerator.generateContentStream).mockRejectedValueOnce(
+      nonRetryableError,
+    );
+
+    const stream = await chat.sendMessageStream(
+      { model: 'test-model' },
+      'test message',
+      'prompt-id-no-connection-retry',
+      new AbortController().signal,
+      LlmRole.MAIN,
+    );
+
+    await expect(async () => {
+      for await (const _ of stream) {
+        // consume
+      }
+    }).rejects.toThrow(nonRetryableError);
+
+    // Should only be called once (no retry)
+    expect(mockContentGenerator.generateContentStream).toHaveBeenCalledTimes(1);
+    expect(mockLogContentRetryFailure).not.toHaveBeenCalled();
+  });
+
+  it('should retry on SSL error during stream iteration (mid-stream failure)', async () => {
+    // This simulates the exact scenario from issue #17318 where the error
+    // occurs during a long session while streaming content
+    const sslError = new Error(
+      'request to https://cloudcode-pa.googleapis.com/v1internal:streamGenerateContent failed',
+    ) as NodeJS.ErrnoException & { type?: string };
+    sslError.type = 'system';
+    sslError.errno = 'ERR_SSL_SSLV3_ALERT_BAD_RECORD_MAC' as unknown as number;
+    sslError.code = 'ERR_SSL_SSLV3_ALERT_BAD_RECORD_MAC';
+
+    vi.mocked(mockContentGenerator.generateContentStream)
+      // First call: yield some content, then throw SSL error mid-stream
+      .mockImplementationOnce(async () =>
+        (async function* () {
+          yield {
+            candidates: [
+              { content: { parts: [{ text: 'Partial response...' }] } },
+            ],
+          } as unknown as GenerateContentResponse;
+          // SSL error occurs while waiting for more data
+          throw sslError;
+        })(),
+      )
+      // Second call: succeed
+      .mockImplementationOnce(async () =>
+        (async function* () {
+          yield {
+            candidates: [
+              {
+                content: { parts: [{ text: 'Complete response after retry' }] },
+                finishReason: 'STOP',
+              },
+            ],
+          } as unknown as GenerateContentResponse;
+        })(),
+      );
+
+    const stream = await chat.sendMessageStream(
+      { model: 'test-model' },
+      'test message',
+      'prompt-id-ssl-mid-stream',
+      new AbortController().signal,
+      LlmRole.MAIN,
+    );
+
+    const events: StreamEvent[] = [];
+    for await (const event of stream) {
+      events.push(event);
+    }
+
+    // Should have received partial content, then retry, then success
+    const partialChunk = events.find(
+      (e) =>
+        e.type === StreamEventType.CHUNK &&
+        e.value.candidates?.[0]?.content?.parts?.[0]?.text ===
+          'Partial response...',
+    );
+    expect(partialChunk).toBeDefined();
+
+    const retryEvent = events.find((e) => e.type === StreamEventType.RETRY);
+    expect(retryEvent).toBeDefined();
+
+    const successChunk = events.find(
+      (e) =>
+        e.type === StreamEventType.CHUNK &&
+        e.value.candidates?.[0]?.content?.parts?.[0]?.text ===
+          'Complete response after retry',
+    );
+    expect(successChunk).toBeDefined();
+
+    // Verify retry logging was called with network error type
+    expect(mockLogNetworkRetryAttempt).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({
+        error_type: 'ERR_SSL_SSLV3_ALERT_BAD_RECORD_MAC',
+      }),
+    );
   });
 });

@@ -4,10 +4,10 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { isNodeError } from '../utils/errors.js';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 import { debugLogger } from './debugLogger.js';
+import { resolveToRealPath } from './paths.js';
 
 export type Unsubscribe = () => void;
 
@@ -24,6 +24,7 @@ export interface AddDirectoriesResult {
 export class WorkspaceContext {
   private directories = new Set<string>();
   private initialDirectories: Set<string>;
+  private readOnlyPaths = new Set<string>();
   private onDirectoriesChangedListeners = new Set<() => void>();
 
   /**
@@ -113,6 +114,24 @@ export class WorkspaceContext {
     return result;
   }
 
+  /**
+   * Adds a path to the read-only list.
+   * These paths are allowed for reading but not for writing (unless they are also in the workspace).
+   */
+  addReadOnlyPath(pathToAdd: string): void {
+    try {
+      // Check if it exists
+      if (!fs.existsSync(pathToAdd)) {
+        return;
+      }
+      // Resolve symlinks
+      const resolved = fs.realpathSync(path.resolve(this.targetDir, pathToAdd));
+      this.readOnlyPaths.add(resolved);
+    } catch (e) {
+      debugLogger.warn(`Failed to add read-only path ${pathToAdd}:`, e);
+    }
+  }
+
   private resolveAndValidateDir(directory: string): string {
     const absolutePath = path.resolve(this.targetDir, directory);
 
@@ -169,7 +188,35 @@ export class WorkspaceContext {
         }
       }
       return false;
-    } catch (_error) {
+    } catch {
+      return false;
+    }
+  }
+
+  /**
+   * Checks if a path is allowed to be read.
+   * This includes workspace paths and explicitly added read-only paths.
+   * @param pathToCheck The path to validate
+   * @returns True if the path is readable, false otherwise
+   */
+  isPathReadable(pathToCheck: string): boolean {
+    if (this.isPathWithinWorkspace(pathToCheck)) {
+      return true;
+    }
+    try {
+      const fullyResolvedPath = this.fullyResolvedPath(pathToCheck);
+
+      for (const allowedPath of this.readOnlyPaths) {
+        // Allow exact matches or subpaths (if allowedPath is a directory)
+        if (
+          fullyResolvedPath === allowedPath ||
+          this.isPathWithinRoot(fullyResolvedPath, allowedPath)
+        ) {
+          return true;
+        }
+      }
+      return false;
+    } catch {
       return false;
     }
   }
@@ -180,22 +227,7 @@ export class WorkspaceContext {
    * if it did exist.
    */
   private fullyResolvedPath(pathToCheck: string): string {
-    try {
-      return fs.realpathSync(path.resolve(this.targetDir, pathToCheck));
-    } catch (e: unknown) {
-      if (
-        isNodeError(e) &&
-        e.code === 'ENOENT' &&
-        e.path &&
-        // realpathSync does not set e.path correctly for symlinks to
-        // non-existent files.
-        !this.isFileSymlink(e.path)
-      ) {
-        // If it doesn't exist, e.path contains the fully resolved path.
-        return e.path;
-      }
-      throw e;
-    }
+    return resolveToRealPath(path.resolve(this.targetDir, pathToCheck));
   }
 
   /**
@@ -214,16 +246,5 @@ export class WorkspaceContext {
       relative !== '..' &&
       !path.isAbsolute(relative)
     );
-  }
-
-  /**
-   * Checks if a file path is a symbolic link that points to a file.
-   */
-  private isFileSymlink(filePath: string): boolean {
-    try {
-      return !fs.readlinkSync(filePath).endsWith('/');
-    } catch (_error) {
-      return false;
-    }
   }
 }

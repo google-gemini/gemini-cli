@@ -5,11 +5,15 @@
  */
 
 import { type FunctionCall } from '@google/genai';
+import { type ApprovalMode } from '../policy/types.js';
 import type {
   ToolConfirmationOutcome,
   ToolConfirmationPayload,
+  DiffStat,
 } from '../tools/tools.js';
 import type { ToolCall } from '../scheduler/types.js';
+import type { SandboxPermissions } from '../services/sandboxManager.js';
+import type { SubagentActivityItem } from '../agents/types.js';
 
 export enum MessageBusType {
   TOOL_CONFIRMATION_REQUEST = 'tool-confirmation-request',
@@ -21,6 +25,7 @@ export enum MessageBusType {
   TOOL_CALLS_UPDATE = 'tool-calls-update',
   ASK_USER_REQUEST = 'ask-user-request',
   ASK_USER_RESPONSE = 'ask-user-response',
+  SUBAGENT_ACTIVITY = 'subagent-activity',
 }
 
 export interface ToolCallsUpdateMessage {
@@ -35,9 +40,21 @@ export interface ToolConfirmationRequest {
   correlationId: string;
   serverName?: string;
   /**
+   * Optional tool annotations (e.g., readOnlyHint, destructiveHint) from MCP.
+   */
+  toolAnnotations?: Record<string, unknown>;
+  /**
+   * Optional subagent name, if this tool call was initiated by a subagent.
+   */
+  subagent?: string;
+  /**
    * Optional rich details for the confirmation UI (diffs, counts, etc.)
    */
   details?: SerializableConfirmationDetails;
+  /**
+   * Optional decision to force for this tool call, bypassing the policy engine.
+   */
+  forcedDecision?: 'allow' | 'deny' | 'ask_user';
 }
 
 export interface ToolConfirmationResponse {
@@ -66,24 +83,36 @@ export interface ToolConfirmationResponse {
  */
 export type SerializableConfirmationDetails =
   | {
+      type: 'sandbox_expansion';
+      title: string;
+      command: string;
+      rootCommand: string;
+      additionalPermissions: SandboxPermissions;
+      systemMessage?: string;
+    }
+  | {
       type: 'info';
       title: string;
+      systemMessage?: string;
       prompt: string;
       urls?: string[];
     }
   | {
       type: 'edit';
       title: string;
+      systemMessage?: string;
       fileName: string;
       filePath: string;
       fileDiff: string;
       originalContent: string | null;
       newContent: string;
       isModifying?: boolean;
+      diffStat?: DiffStat;
     }
   | {
       type: 'exec';
       title: string;
+      systemMessage?: string;
       command: string;
       rootCommand: string;
       rootCommands: string[];
@@ -92,23 +121,37 @@ export type SerializableConfirmationDetails =
   | {
       type: 'mcp';
       title: string;
+      systemMessage?: string;
       serverName: string;
       toolName: string;
       toolDisplayName: string;
+      toolArgs?: Record<string, unknown>;
+      toolDescription?: string;
+      toolParameterSchema?: unknown;
     }
   | {
       type: 'ask_user';
       title: string;
+      systemMessage?: string;
       questions: Question[];
+    }
+  | {
+      type: 'exit_plan_mode';
+      title: string;
+      systemMessage?: string;
+      planPath: string;
     };
 
 export interface UpdatePolicy {
   type: MessageBusType.UPDATE_POLICY;
   toolName: string;
   persist?: boolean;
+  persistScope?: 'workspace' | 'user';
   argsPattern?: string;
   commandPrefix?: string | string[];
   mcpName?: string;
+  allowRedirection?: boolean;
+  modes?: ApprovalMode[];
 }
 
 export interface ToolPolicyRejection {
@@ -142,14 +185,16 @@ export enum QuestionType {
 export interface Question {
   question: string;
   header: string;
-  /** Question type: 'choice' renders selectable options, 'text' renders free-form input, 'yesno' renders a binary Yes/No choice. Defaults to 'choice'. */
-  type?: QuestionType;
-  /** Selectable choices. REQUIRED when type='choice' or omitted. IGNORED for 'text' and 'yesno'. */
+  /** Question type: 'choice' renders selectable options, 'text' renders free-form input, 'yesno' renders a Yes/No choice with an optional 'Other' feedback field. */
+  type: QuestionType;
+  /** Selectable choices. REQUIRED when type='choice'. IGNORED for 'text' and 'yesno'. */
   options?: QuestionOption[];
   /** Allow multiple selections. Only applies when type='choice'. */
   multiSelect?: boolean;
-  /** Placeholder hint text. Only applies when type='text'. */
+  /** Placeholder hint text. For type='text', shown in the input field. For type='choice' and 'yesno', shown in the 'Other' custom input. */
   placeholder?: string;
+  /** Allow the question to consume more vertical space instead of being strictly capped. */
+  unconstrainedHeight?: boolean;
 }
 
 export interface AskUserRequest {
@@ -166,6 +211,12 @@ export interface AskUserResponse {
   cancelled?: boolean;
 }
 
+export interface SubagentActivityMessage {
+  type: MessageBusType.SUBAGENT_ACTIVITY;
+  subagentName: string;
+  activity: SubagentActivityItem;
+}
+
 export type Message =
   | ToolConfirmationRequest
   | ToolConfirmationResponse
@@ -175,4 +226,5 @@ export type Message =
   | UpdatePolicy
   | AskUserRequest
   | AskUserResponse
-  | ToolCallsUpdateMessage;
+  | ToolCallsUpdateMessage
+  | SubagentActivityMessage;
