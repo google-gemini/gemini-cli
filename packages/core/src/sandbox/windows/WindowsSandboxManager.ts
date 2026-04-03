@@ -217,32 +217,10 @@ export class WindowsSandboxManager implements SandboxManager {
     // Reject override attempts in plan mode
     verifySandboxOverrides(allowOverrides, req.policy);
 
-    let command = req.command;
-    let args = req.args;
-    let targetPathEnv: string | undefined;
+    const command = req.command;
+    const args = req.args;
 
-    // Translate virtual commands for sandboxed file system access
-    if (command === '__read') {
-      // Use PowerShell for safe argument passing via env var
-      targetPathEnv = args[0] || '';
-      command = 'PowerShell.exe';
-      args = [
-        '-NoProfile',
-        '-NonInteractive',
-        '-Command',
-        '& { Get-Content -LiteralPath $env:GEMINI_TARGET_PATH -Raw }',
-      ];
-    } else if (command === '__write') {
-      // Use PowerShell for piping stdin to a file via env var
-      targetPathEnv = args[0] || '';
-      command = 'PowerShell.exe';
-      args = [
-        '-NoProfile',
-        '-NonInteractive',
-        '-Command',
-        '& { $Input | Out-File -FilePath $env:GEMINI_TARGET_PATH -Encoding utf8 }',
-      ];
-    }
+    // Native commands __read and __write are passed directly to GeminiSandbox.exe
 
     const isYolo = this.options.modeConfig?.yolo ?? false;
 
@@ -427,9 +405,6 @@ export class WindowsSandboxManager implements SandboxManager {
     ];
 
     const finalEnv = { ...sanitizedEnv };
-    if (targetPathEnv !== undefined) {
-      finalEnv['GEMINI_TARGET_PATH'] = targetPathEnv;
-    }
 
     return {
       program,
