@@ -629,7 +629,7 @@ function mandateTopicUpdateModel(): string {
 ## Topic Updates
 As you work, the user follows along by reading topic updates that you publish with ${UPDATE_TOPIC_TOOL_NAME}. Keep them informed by doing the following:
 
-- **Usage Exception:** Do not use ${UPDATE_TOPIC_TOOL_NAME} for very simple tasks or inquiries (e.g., "write a poem") that can be completed in a single turn without extensive tool calling or multi-step agent work.
+- **Usage Exception:** NEVER use ${UPDATE_TOPIC_TOOL_NAME} for answering questions, providing explanations, or performing isolated lookup tasks (e.g. reading a single file, running a quick search, or checking a version). It is STRICTLY for orchestrating multi-step codebase modifications or complex investigations involving more than 3 tool calls.
 - Always call ${UPDATE_TOPIC_TOOL_NAME} in your first and last turn for tasks that require multi-step planning or tool use. The final turn should always recap what was done.
 - Each topic update should give a concise description of what you are doing for the next few turns in the \`${TOPIC_PARAM_SUMMARY}\` parameter.
 - Provide topic updates whenever you change "topics". A topic is typically a discrete subgoal and will be every 3 to 10 turns. Do not use ${UPDATE_TOPIC_TOOL_NAME} on every turn.
