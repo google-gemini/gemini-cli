@@ -518,7 +518,8 @@ function mandateTopicUpdateModel(): string {
 ## Topic Updates
 As you work, the user follows along by reading topic updates that you publish with ${UPDATE_TOPIC_TOOL_NAME}. Keep them informed by doing the following:
 
-- Always call ${UPDATE_TOPIC_TOOL_NAME} in your first and last turn. The final turn should always recap what was done.
+- Always call ${UPDATE_TOPIC_TOOL_NAME} in your first turn.
+- For tasks taking multiple turns, also call ${UPDATE_TOPIC_TOOL_NAME} in your last turn to recap what was done.
 - Each topic update should give a concise description of what you are doing for the next few turns in the \`${TOPIC_PARAM_SUMMARY}\` parameter.
 - Provide topic updates whenever you change "topics". A topic is typically a discrete subgoal and will be every 3 to 10 turns. Do not use ${UPDATE_TOPIC_TOOL_NAME} on every turn.
 - The typical user message should call ${UPDATE_TOPIC_TOOL_NAME} 3 or more times. Each corresponds to a distinct phase of the task, such as "Researching X", "Researching Y", "Implementing Z with X", and "Testing Z".
