@@ -968,6 +968,10 @@ export class Config implements McpContext, AgentLoopContext {
           enabled: params.sandbox.enabled || params.toolSandboxing || false,
           allowedPaths: params.sandbox.allowedPaths ?? [],
           includeDirectories: [
+      ? {
+          enabled: params.sandbox.enabled || params.toolSandboxing || false,
+          allowedPaths: params.sandbox.allowedPaths ?? [],
+          includeDirectories: [
             ...(params.sandbox.includeDirectories ?? []),
             ...(params.sandbox.allowedPaths ?? []),
             Storage.getGlobalTempDir(),
