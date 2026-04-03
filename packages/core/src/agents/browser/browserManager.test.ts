@@ -46,6 +46,10 @@ vi.mock('../../utils/debugLogger.js', () => ({
   },
 }));
 
+vi.mock('../../telemetry/metrics.js', () => ({
+  recordBrowserAgentConnection: vi.fn(),
+}));
+
 // Mock browser consent to always grant consent by default
 vi.mock('../../utils/browserConsent.js', () => ({
   getBrowserConsentIfNeeded: vi.fn().mockResolvedValue(true),
@@ -78,6 +82,7 @@ vi.mock('node:fs', async (importOriginal) => {
 import * as fs from 'node:fs';
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { StdioClientTransport } from '@modelcontextprotocol/sdk/client/stdio.js';
+import { recordBrowserAgentConnection } from '../../telemetry/metrics.js';
 import { getBrowserConsentIfNeeded } from '../../utils/browserConsent.js';
 import { debugLogger } from '../../utils/debugLogger.js';
 
@@ -355,6 +360,21 @@ describe('BrowserManager', () => {
   });
 
   describe('MCP connection', () => {
+    it('should record connection success metrics', async () => {
+      const manager = new BrowserManager(mockConfig);
+      await manager.ensureConnection();
+
+      expect(recordBrowserAgentConnection).toHaveBeenCalledWith(
+        mockConfig,
+        expect.any(Number),
+        {
+          session_mode: 'persistent',
+          headless: false,
+          success: true,
+        },
+      );
+    });
+
     it('should spawn npx chrome-devtools-mcp with --experimental-vision (persistent mode by default)', async () => {
       const manager = new BrowserManager(mockConfig);
       await manager.ensureConnection();
@@ -546,6 +566,18 @@ describe('BrowserManager', () => {
       await expect(manager.ensureConnection()).rejects.toThrow(
         /Failed to connect to existing Chrome instance/,
       );
+
+      expect(recordBrowserAgentConnection).toHaveBeenCalledWith(
+        existingConfig,
+        expect.any(Number),
+        {
+          session_mode: 'existing',
+          headless: false,
+          success: false,
+          error_type: 'connection_refused',
+        },
+      );
+
       // Create a fresh manager to verify the error message includes remediation steps
       const manager2 = new BrowserManager(existingConfig);
       await expect(manager2.ensureConnection()).rejects.toThrow(
@@ -576,6 +608,18 @@ describe('BrowserManager', () => {
       await expect(manager.ensureConnection()).rejects.toThrow(
         /Close all Chrome windows using this profile/,
       );
+
+      expect(recordBrowserAgentConnection).toHaveBeenCalledWith(
+        mockConfig,
+        expect.any(Number),
+        {
+          session_mode: 'persistent',
+          headless: false,
+          success: false,
+          error_type: 'profile_locked',
+        },
+      );
+
       const manager2 = new BrowserManager(mockConfig);
       await expect(manager2.ensureConnection()).rejects.toThrow(
         /Set sessionMode to "isolated"/,
@@ -602,6 +646,17 @@ describe('BrowserManager', () => {
       await expect(manager.ensureConnection()).rejects.toThrow(
         /Chrome is not installed/,
       );
+
+      expect(recordBrowserAgentConnection).toHaveBeenCalledWith(
+        mockConfig,
+        expect.any(Number),
+        {
+          session_mode: 'persistent',
+          headless: false,
+          success: false,
+          error_type: 'timeout',
+        },
+      );
     });
 
     it('should include sessionMode in generic fallback error', async () => {
@@ -621,6 +676,61 @@ describe('BrowserManager', () => {
 
       await expect(manager.ensureConnection()).rejects.toThrow(
         /sessionMode: persistent/,
+      );
+
+      expect(recordBrowserAgentConnection).toHaveBeenCalledWith(
+        mockConfig,
+        expect.any(Number),
+        {
+          session_mode: 'persistent',
+          headless: false,
+          success: false,
+          error_type: 'unknown',
+        },
+      );
+    });
+
+    it('should classify non-connection-refused errors in existing mode as unknown', async () => {
+      vi.mocked(Client).mockImplementation(
+        () =>
+          ({
+            connect: vi
+              .fn()
+              .mockRejectedValue(new Error('Some unexpected error')),
+            close: vi.fn().mockResolvedValue(undefined),
+            listTools: vi.fn(),
+            callTool: vi.fn(),
+          }) as unknown as InstanceType<typeof Client>,
+      );
+
+      const existingConfig = makeFakeConfig({
+        agents: {
+          overrides: {
+            browser_agent: {
+              enabled: true,
+            },
+          },
+          browser: {
+            sessionMode: 'existing',
+          },
+        },
+      });
+
+      const manager = new BrowserManager(existingConfig);
+
+      await expect(manager.ensureConnection()).rejects.toThrow(
+        /Failed to connect to existing Chrome instance/,
+      );
+
+      expect(recordBrowserAgentConnection).toHaveBeenCalledWith(
+        existingConfig,
+        expect.any(Number),
+        {
+          session_mode: 'existing',
+          headless: false,
+          success: false,
+          error_type: 'unknown',
+        },
       );
     });
 
