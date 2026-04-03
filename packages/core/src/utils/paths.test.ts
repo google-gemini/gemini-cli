@@ -15,6 +15,7 @@ import {
   shortenPath,
   normalizePath,
   resolveToRealPath,
+  makeRelative,
 } from './paths.js';
 
 vi.mock('node:fs', async (importOriginal) => {
@@ -215,7 +216,7 @@ describe('isSubpath', () => {
   });
 });
 
-describe('isSubpath on Windows', () => {
+describe.skipIf(process.platform !== 'win32')('isSubpath on Windows', () => {
   afterEach(() => vi.unstubAllGlobals());
 
   beforeEach(() => mockPlatform('win32'));
@@ -268,7 +269,7 @@ describe('isSubpath on Windows', () => {
   });
 });
 
-describe('isSubpath on Darwin', () => {
+describe.skipIf(process.platform !== 'darwin')('isSubpath on Darwin', () => {
   afterEach(() => vi.unstubAllGlobals());
 
   beforeEach(() => mockPlatform('darwin'));
@@ -600,6 +601,29 @@ describe('resolveToRealPath', () => {
   });
 });
 
+describe('makeRelative', () => {
+  it('should return relative path if targetPath is already relative', () => {
+    expect(makeRelative('foo/bar', '/root')).toBe('foo/bar');
+  });
+
+  it('should return relative path from root to target', () => {
+    const root = '/Users/test/project';
+    const target = '/Users/test/project/src/file.ts';
+    expect(makeRelative(target, root)).toBe('src/file.ts');
+  });
+
+  it('should return "." if target and root are the same', () => {
+    const root = '/Users/test/project';
+    expect(makeRelative(root, root)).toBe('.');
+  });
+
+  it('should handle parent directories with ..', () => {
+    const root = '/Users/test/project/src';
+    const target = '/Users/test/project/docs/readme.md';
+    expect(makeRelative(target, root)).toBe('../docs/readme.md');
+  });
+});
+
 describe('normalizePath', () => {
   it('should resolve a relative path to an absolute path', () => {
     const result = normalizePath('some/relative/path');
@@ -629,7 +653,7 @@ describe('normalizePath', () => {
     });
   });
 
-  describe('on Darwin', () => {
+  describe.skipIf(process.platform !== 'darwin')('on Darwin', () => {
     beforeEach(() => mockPlatform('darwin'));
     afterEach(() => vi.unstubAllGlobals());
 
