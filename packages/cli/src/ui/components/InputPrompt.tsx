@@ -1066,7 +1066,6 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
                   handleSubmit(suggestion.submitValue.trim());
                   return true;
                 }
-
                 const { isArgumentCompletion, leafCommand } =
                   completion.slashCompletionRange;
 

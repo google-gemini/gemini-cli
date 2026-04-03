@@ -476,7 +476,7 @@ describe('useSlashCompletion', () => {
         expect(chatResult.current.suggestions[0]).toMatchObject({
           label: 'list',
           sectionTitle: 'auto',
-          submitValue: '/chat',
+          insertValue: 'list',
         });
       });
 
@@ -496,7 +496,7 @@ describe('useSlashCompletion', () => {
         expect(resumeResult.current.suggestions[0]).toMatchObject({
           label: 'list',
           sectionTitle: 'auto',
-          submitValue: '/resume',
+          insertValue: 'list',
         });
       });
 
@@ -511,6 +511,53 @@ describe('useSlashCompletion', () => {
 
       unmountChat();
       unmountResume();
+    });
+
+    it('should prioritize matching subcommands over the synthetic auto entry when typing /chat subcommand prefixes', async () => {
+      const slashCommands = [
+        createTestCommand({
+          name: 'chat',
+          description: 'Chat command',
+          action: vi.fn(),
+          subCommands: [
+            createTestCommand({
+              name: 'list',
+              description: 'List checkpoints',
+              suggestionGroup: 'checkpoints',
+              action: vi.fn(),
+            }),
+            createTestCommand({
+              name: 'resume',
+              description: 'Resume a saved chat',
+              action: vi.fn(),
+            }),
+          ],
+        }),
+      ];
+
+      const { result, unmount } = await renderHook(() =>
+        useTestHarnessForSlashCompletion(
+          true,
+          '/chat resu',
+          slashCommands,
+          mockCommandContext,
+        ),
+      );
+
+      await resolveMatch();
+
+      await waitFor(() => {
+        expect(result.current.suggestions).toHaveLength(1);
+        expect(result.current.suggestions[0]).toMatchObject({
+          label: 'resume',
+          value: 'resume',
+        });
+        expect(
+          result.current.suggestions.some((s) => s.sectionTitle === 'auto'),
+        ).toBe(false);
+      });
+
+      unmount();
     });
 
     it('should sort exact altName matches to the top', async () => {

@@ -336,16 +336,14 @@ function useCommandSuggestions(
                 matchesCommand(leafCommand, commandPathParts[0])))
           );
 
-          if (isTopLevelChatOrResumeContext) {
-            const canonicalParentName = leafCommand.name;
+          if (isTopLevelChatOrResumeContext && partial === '') {
             const autoSectionSuggestion: Suggestion = {
               label: 'list',
               value: 'list',
-              insertValue: canonicalParentName,
+              insertValue: 'list',
               description: 'Browse auto-saved chats',
               commandKind: CommandKind.BUILT_IN,
               sectionTitle: 'auto',
-              submitValue: `/${canonicalParentName}`,
             };
             setSuggestions([autoSectionSuggestion, ...finalSuggestions]);
             return;

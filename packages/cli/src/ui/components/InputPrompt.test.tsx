@@ -1102,6 +1102,39 @@ describe('InputPrompt', () => {
     unmount();
   });
 
+  it('should autocomplete the synthetic auto suggestion on Tab (not submit)', async () => {
+    mockedUseCommandCompletion.mockReturnValue({
+      ...mockCommandCompletion,
+      showSuggestions: true,
+      suggestions: [
+        {
+          label: 'list',
+          value: 'list',
+          insertValue: 'list',
+        },
+      ],
+      activeSuggestionIndex: 0,
+    });
+    props.buffer.setText('/chat ');
+
+    const { stdin, unmount } = await renderWithProviders(
+      <InputPrompt {...props} />,
+      {
+        uiActions,
+      },
+    );
+
+    await act(async () => {
+      stdin.write('\t');
+    });
+
+    await waitFor(() =>
+      expect(mockCommandCompletion.handleAutocomplete).toHaveBeenCalledWith(0),
+    );
+    expect(props.onSubmit).not.toHaveBeenCalled();
+    unmount();
+  });
+
   it('queues a message when Tab is pressed during generation', async () => {
     props.buffer.setText('A new prompt');
     props.streamingState = StreamingState.Responding;

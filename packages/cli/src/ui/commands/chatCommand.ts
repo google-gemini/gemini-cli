@@ -71,7 +71,7 @@ const getSavedChatTags = async (
 };
 
 const listCommand: SlashCommand = {
-  name: 'list',
+  name: 'checkpoints',
   description: 'List saved manual conversation checkpoints',
   kind: CommandKind.BUILT_IN,
   autoExecute: true,
