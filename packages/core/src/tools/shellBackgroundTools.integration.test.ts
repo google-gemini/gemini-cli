@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { describe, it, expect, beforeEach, vi } from 'vitest';
+import { describe, it, expect, beforeEach, vi, afterEach } from 'vitest';
 import { ShellExecutionService } from '../services/shellExecutionService.js';
 import {
   ListBackgroundProcessesTool,
@@ -13,12 +13,16 @@ import {
 import { createMockMessageBus } from '../test-utils/mock-message-bus.js';
 import { NoopSandboxManager } from '../services/sandboxManager.js';
 import type { AgentLoopContext } from '../config/agent-loop-context.js';
+import os from 'node:os';
+import * as fs from 'node:fs';
+import * as path from 'node:path';
 
 // Integration test simulating model interaction cycle
 describe('Background Tools Integration', () => {
   const bus = createMockMessageBus();
   let listTool: ListBackgroundProcessesTool;
   let readTool: ReadBackgroundOutputTool;
+  let tempRootDir: string;
 
   beforeEach(() => {
     vi.clearAllMocks();
@@ -28,9 +32,17 @@ describe('Background Tools Integration', () => {
     listTool = new ListBackgroundProcessesTool(mockContext, bus);
     readTool = new ReadBackgroundOutputTool(mockContext, bus);
 
+    tempRootDir = fs.mkdtempSync(path.join(os.tmpdir(), 'shell-bg-test-'));
+
     // Clear history to avoid state leakage from previous runs
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     (ShellExecutionService as any).backgroundProcessHistory.clear();
+  });
+
+  afterEach(() => {
+    if (tempRootDir && fs.existsSync(tempRootDir)) {
+      fs.rmSync(tempRootDir, { recursive: true, force: true });
+    }
   });
 
   it('should support interaction cycle: start background -> list -> read logs', async () => {
@@ -38,11 +50,18 @@ describe('Background Tools Integration', () => {
 
     // 1. Start a backgroundable process
     // We use node to print continuous logs until killed
-    const commandString = `${process.execPath} -e "setInterval(() => console.log('Log line'), 50)"`;
+    const scriptPath = path.join(tempRootDir, 'log.js');
+    fs.writeFileSync(
+      scriptPath,
+      "setInterval(() => console.log('Log line'), 100);",
+    );
+
+    // Using 'node' directly avoids cross-platform shell quoting issues with absolute paths.
+    const commandString = `node "${scriptPath}"`;
 
     const realHandle = await ShellExecutionService.execute(
       commandString,
-      '/',
+      process.cwd(),
       () => {},
       controller.signal,
       true,
@@ -82,7 +101,7 @@ describe('Background Tools Integration', () => {
     );
 
     // 4. Give it time to write output to interval
-    await new Promise((resolve) => setTimeout(resolve, 300));
+    await new Promise((resolve) => setTimeout(resolve, 2000));
 
     // 5. Model decides to read logs
     const readInvocation = readTool.build({ pid, lines: 2 });

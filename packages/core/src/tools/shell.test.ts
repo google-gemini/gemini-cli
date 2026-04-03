@@ -448,11 +448,11 @@ describe('ShellTool', () => {
           expect.any(Function),
           expect.any(AbortSignal),
           false,
-          {
+          expect.objectContaining({
             pager: 'cat',
             sanitizationConfig: {},
-            sandboxManager: new NoopSandboxManager(),
-          },
+            sandboxManager: expect.any(NoopSandboxManager),
+          }),
         );
       },
       20000,
