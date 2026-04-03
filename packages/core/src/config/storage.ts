@@ -318,10 +318,6 @@ export class Storage {
     if (customDir) {
       const resolvedPath = path.resolve(this.getProjectRoot(), customDir);
       const realProjectRoot = resolveToRealPath(this.getProjectRoot());
-
-      if (!fs.existsSync(resolvedPath)) {
-        fs.mkdirSync(resolvedPath, { recursive: true });
-      }
       const realResolvedPath = resolveToRealPath(resolvedPath);
 
       if (!isSubpath(realProjectRoot, realResolvedPath)) {

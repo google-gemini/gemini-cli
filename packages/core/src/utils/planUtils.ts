@@ -35,25 +35,8 @@ export async function validatePlanPath(
 ): Promise<string | null> {
   const safeFilename = path.basename(planPath);
   const resolvedPath = path.join(plansDir, safeFilename);
-
-  let realPath = resolvedPath;
-  let realPlansDir = plansDir;
-
-  try {
-    realPath = resolveToRealPath(resolvedPath);
-    realPlansDir = resolveToRealPath(plansDir);
-  } catch (e: unknown) {
-    if (
-      e &&
-      typeof e === 'object' &&
-      'code' in e &&
-      (e.code === 'ENOENT' || e.code === 'EISDIR')
-    ) {
-      // Fallback to unresolved paths if resolveToRealPath fails on non-existent directories.
-    } else {
-      throw e;
-    }
-  }
+  const realPath = resolveToRealPath(resolvedPath);
+  const realPlansDir = resolveToRealPath(plansDir);
 
   if (!isSubpath(realPlansDir, realPath)) {
     return PlanErrorMessages.PATH_ACCESS_DENIED(planPath, realPlansDir);
