@@ -180,6 +180,7 @@ they appear in the UI.
 | UI Label           | Setting                     | Description                                                                      | Default |
 | ------------------ | --------------------------- | -------------------------------------------------------------------------------- | ------- |
 | Enable Hooks       | `hooksConfig.enabled`       | Canonical toggle for the hooks system. When disabled, no hooks will be executed. | `true`  |
+| Show Hook Output   | `hooksConfig.showOutput`    | Display an info message when a hook returns it in its output.                    | `false` |
 | Hook Notifications | `hooksConfig.notifications` | Show visual indicators when hooks are executing.                                 | `true`  |
 
 <!-- SETTINGS-AUTOGEN:END -->

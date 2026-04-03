@@ -3006,6 +3006,13 @@
           "default": true,
           "type": "boolean"
         },
+        "showOutput": {
+          "title": "Show Hook Output",
+          "description": "Display an info message when a hook returns it in its output.",
+          "markdownDescription": "Display an info message when a hook returns it in its output.\n\n- Category: `Advanced`\n- Requires restart: `no`\n- Default: `false`",
+          "default": false,
+          "type": "boolean"
+        },
         "disabled": {
           "title": "Disabled Hooks",
           "description": "List of hook names (commands) that should be disabled. Hooks in this list will not execute even if configured.",
