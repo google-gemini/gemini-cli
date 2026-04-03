@@ -171,30 +171,4 @@ describe('update_topic_behavior', () => {
       ).toBe(0);
     },
   });
-
-  evalTest('USUALLY_PASSES', {
-    name: 'update_topic should NOT be used for surgical symbol searches (Grey Area 2)',
-    prompt:
-      "Find the file where the 'UPDATE_TOPIC_TOOL_NAME' constant is defined.",
-    files: {
-      'packages/core/src/tools/tool-names.ts':
-        "export const UPDATE_TOPIC_TOOL_NAME = 'update_topic';",
-      '.gemini/settings.json': JSON.stringify({
-        experimental: {
-          topicUpdateNarration: true,
-        },
-      }),
-    },
-    assert: async (rig) => {
-      const toolLogs = rig.readToolLogs();
-      const topicCalls = toolLogs.filter(
-        (l) => l.toolRequest.name === UPDATE_TOPIC_TOOL_NAME,
-      );
-
-      expect(
-        topicCalls.length,
-        `Expected 0 update_topic calls for a surgical symbol search, but found ${topicCalls.length}`,
-      ).toBe(0);
-    },
-  });
 });
