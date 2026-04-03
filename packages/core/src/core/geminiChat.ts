@@ -49,6 +49,7 @@ import { isFunctionResponse } from '../utils/messageInspectors.js';
 import { partListUnionToString } from './geminiRequest.js';
 import type { ModelConfigKey } from '../services/modelConfigService.js';
 import { estimateTokenCountSync } from '../utils/tokenCalculation.js';
+import { debugLogger } from '../utils/debugLogger.js';
 import {
   applyModelSelection,
   createAvailabilityContextProvider,
@@ -744,14 +745,69 @@ export class GeminiChat {
    */
   addHistory(content: Content): void {
     this.history.push(content);
+    this.pruneHistory();
   }
 
   setHistory(history: readonly Content[]): void {
     this.history = [...history];
+    this.pruneHistory();
     this.lastPromptTokenCount = estimateTokenCountSync(
       this.history.flatMap((c) => c.parts || []),
     );
     this.chatRecordingService.updateMessagesFromHistory(history);
+  }
+
+  /**
+   * Prunes the conversation history to stay within memory-safe bounds.
+   * This is a "hard" truncation that acts as a safety net against OOM
+   * when context management or compression is disabled or insufficient.
+   */
+  private pruneHistory(): void {
+    const config = this.context.config;
+    if (!config.isExperimentalAgentHistoryTruncationEnabled()) {
+      return;
+    }
+
+    const maxTokens = config.getExperimentalAgentHistoryTruncationThreshold();
+    const maxMessages = config.getExperimentalAgentHistoryRetainedMessages();
+
+    // Check if we need to prune at all
+    const totalTokens = estimateTokenCountSync(
+      this.history.flatMap((c) => c.parts || []),
+    );
+
+    if (this.history.length <= maxMessages && totalTokens <= maxTokens) {
+      return;
+    }
+
+    // Always keep at least the last 'maxMessages' messages
+    let prunedHistory =
+      this.history.length > maxMessages
+        ? this.history.slice(-maxMessages)
+        : [...this.history];
+
+    // Further prune based on token count if still over threshold
+    let currentTokens = estimateTokenCountSync(
+      prunedHistory.flatMap((c) => c.parts || []),
+    );
+
+    while (
+      prunedHistory.length > 2 && // Keep at least one exchange (user + model)
+      currentTokens > maxTokens
+    ) {
+      // Remove the oldest message from the pruned history
+      prunedHistory = prunedHistory.slice(1);
+      currentTokens = estimateTokenCountSync(
+        prunedHistory.flatMap((c) => c.parts || []),
+      );
+    }
+
+    if (prunedHistory.length !== this.history.length) {
+      debugLogger.debug(
+        `[GeminiChat] Pruning history: ${this.history.length} -> ${prunedHistory.length} messages. Tokens: ${currentTokens.toLocaleString()}`,
+      );
+      this.history = prunedHistory;
+    }
   }
 
   stripThoughtsFromHistory(): void {
@@ -994,6 +1050,7 @@ export class GeminiChat {
     }
 
     this.history.push({ role: 'model', parts: consolidatedParts });
+    this.pruneHistory();
   }
 
   getLastPromptTokenCount(): number {

@@ -166,8 +166,11 @@ too aggressively.
          ChatRecordingService and GeminiChat history).
    - [x] Implement bounded retention for ChatRecordingService (implemented
          memory-based cache eviction and leak prevention during resets).
-   - [ ] Implement bounded retention for GeminiChat (improve Tool Output Masking
-         or add hard history bounds).
+   - [x] Implement bounded retention for GeminiChat (improve Tool Output Masking
+         or add hard history bounds). - Improved `ToolOutputMaskingService` to
+         mask massive outputs (> 2x threshold) even in the latest turn. -
+         Implemented `pruneHistory` in `GeminiChat` with configurable turn and
+         token limits to provide a hard memory safety net.
    - [ ] Audit React/Ink components for event listener leaks.
 
 3. **Phase 3: Validation & CI**

@@ -1,2 +1,3 @@
 2026-04-03: Completed Phase 1. Implemented scripts/simulate-long-session.ts to reproduce memory growth. Identified ChatRecordingService and GeminiChat history as primary growth sources. Captured baseline metrics showing ~180MB growth per 200MB of tool output data.
 2026-04-03: Implemented memory-based cache eviction in ChatRecordingService (50MB threshold). Optimized initialization to prevent carrying over large session records in memory across chat resets. Verified with new unit tests.
+2026-04-03: Implemented bounded retention for GeminiChat. Improved ToolOutputMaskingService to allow masking massive outputs in the latest turn. Added hard history pruning in GeminiChat with configurable token and turn limits. Verified with new unit tests and successful build.

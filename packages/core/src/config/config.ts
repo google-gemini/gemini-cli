@@ -957,6 +957,10 @@ export class Config implements McpContext, AgentLoopContext {
   readonly injectionService: InjectionService;
   private approvedPlanPath: string | undefined;
 
+  private readonly experimentalAgentHistoryTruncation: boolean;
+  private readonly experimentalAgentHistoryTruncationThreshold: number;
+  private readonly experimentalAgentHistoryRetainedMessages: number;
+
   constructor(params: ConfigParameters) {
     this._sessionId = params.sessionId;
     this.clientName = params.clientName;
@@ -964,6 +968,12 @@ export class Config implements McpContext, AgentLoopContext {
     this.approvedPlanPath = undefined;
     this.embeddingModel =
       params.embeddingModel ?? DEFAULT_GEMINI_EMBEDDING_MODEL;
+    this.experimentalAgentHistoryTruncation =
+      params.experimentalAgentHistoryTruncation ?? false;
+    this.experimentalAgentHistoryTruncationThreshold =
+      params.experimentalAgentHistoryTruncationThreshold ?? 100000;
+    this.experimentalAgentHistoryRetainedMessages =
+      params.experimentalAgentHistoryRetainedMessages ?? 20;
     this.sandbox = params.sandbox
       ? {
           enabled: params.sandbox.enabled || params.toolSandboxing || false,
@@ -3622,6 +3632,21 @@ export class Config implements McpContext, AgentLoopContext {
    */
   getDisabledHooks(): string[] {
     return this.disabledHooks;
+  }
+
+  /**
+   * Get experimental agent history truncation settings
+   */
+  isExperimentalAgentHistoryTruncationEnabled(): boolean {
+    return this.experimentalAgentHistoryTruncation;
+  }
+
+  getExperimentalAgentHistoryTruncationThreshold(): number {
+    return this.experimentalAgentHistoryTruncationThreshold;
+  }
+
+  getExperimentalAgentHistoryRetainedMessages(): number {
+    return this.experimentalAgentHistoryRetainedMessages;
   }
 
   /**

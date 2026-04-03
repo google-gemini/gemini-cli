@@ -90,10 +90,9 @@ export class ToolOutputMaskingService {
     }> = [];
 
     // Decide where to start scanning.
-    // If PROTECT_LATEST_TURN is true, we skip the most recent message (index history.length - 1).
-    const scanStartIdx = maskingConfig.protectLatestTurn
-      ? history.length - 2
-      : history.length - 1;
+    // If PROTECT_LATEST_TURN is true, we still scan the latest turn but are more
+    // conservative about masking it.
+    const scanStartIdx = history.length - 1;
 
     // Backward scan to identify prunable tool outputs
     for (let i = scanStartIdx; i >= 0; i--) {
@@ -121,8 +120,22 @@ export class ToolOutputMaskingService {
         }
 
         const partTokens = estimateTokenCountSync([part]);
+        const isLatestTurn = i === history.length - 1;
 
         if (!protectionBoundaryReached) {
+          // If we are in the latest turn and protectLatestTurn is enabled,
+          // we only mask if the part itself is exceptionally large (> 2x threshold).
+          // This ensures that the model usually has full context for its current
+          // task while preventing massive outputs from causing OOM or context overflow.
+          if (
+            isLatestTurn &&
+            maskingConfig.protectLatestTurn &&
+            partTokens <= maskingConfig.toolProtectionThreshold * 2
+          ) {
+            cumulativeToolTokens += partTokens;
+            continue;
+          }
+
           cumulativeToolTokens += partTokens;
           if (cumulativeToolTokens > maskingConfig.toolProtectionThreshold) {
             protectionBoundaryReached = true;

@@ -1,15 +1,20 @@
 {
   "experimental": {
-    "plan": true,
     "extensionReloading": true,
     "modelSteering": true,
     "memoryManager": true,
     "topicUpdateNarration": true
   },
   "general": {
-    "devtools": true
+    "devtools": true,
+    "plan": {
+      "enabled": true
+    }
   },
   "security": {
     "toolSandboxing": true
+  },
+  "agents": {
+    "overrides": {}
   }
 }
