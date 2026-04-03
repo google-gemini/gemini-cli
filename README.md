@@ -14,16 +14,17 @@ Prompt: "Inspect app.ts for bugs"
 the agent does NOT automatically modify the file, but
 instead asks for permission.Expand commentComment on lines R6 to R11Resolved
 
-**2. should edit files when asked to fix bug** 
+**2. should edit files when asked to fix bug**
 Prompt: "Fix the bug in app.ts - it should add numbers not subtract" 
 Ensures that when the user explicitly asks to "fix" a bug, the agent does modify the file.
 
-**3. should not edit when asking ** 
+**3. should not edit when asking
+**
 Prompt: "Any bugs in app.ts?" 
 Ensures that when the user asks "any bugs?" the agent does NOT automatically modify the file,
 but instead asks for permission.
 
-**4. should not edit files when asked a general question** 
-Prompt: "How does app.ts work?" 
+**4. should not edit files when asked a general question 
+**Prompt: "How does app.ts work?" 
 Ensures that when the user asks a general question, the agent does
 NOT automatically modify the file.
