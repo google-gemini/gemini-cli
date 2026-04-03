@@ -75,7 +75,7 @@ import {
   type InitializationResult,
 } from './core/initializer.js';
 import { validateAuthMethod } from './config/auth.js';
-import { runAcpClient } from './acp/acpClient.js';
+import { runAcpClient } from './acp/acpStdioTransport.js';
 import { validateNonInteractiveAuth } from './validateNonInterActiveAuth.js';
 import { appEvents, AppEvent } from './utils/events.js';
 import { SessionError, SessionSelector } from './utils/sessionUtils.js';
