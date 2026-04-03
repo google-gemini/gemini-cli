@@ -327,8 +327,8 @@
         "compactToolOutput": {
           "title": "Compact Tool Output",
           "description": "Display tool outputs (like directory listings and file reads) in a compact, structured format.",
-          "markdownDescription": "Display tool outputs (like directory listings and file reads) in a compact, structured format.\n\n- Category: `UI`\n- Requires restart: `no`\n- Default: `false`",
-          "default": false,
+          "markdownDescription": "Display tool outputs (like directory listings and file reads) in a compact, structured format.\n\n- Category: `UI`\n- Requires restart: `no`\n- Default: `true`",
+          "default": true,
           "type": "boolean"
         },
         "hideBanner": {
