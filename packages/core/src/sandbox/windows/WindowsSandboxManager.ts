@@ -35,8 +35,7 @@ import {
 } from './commandSafety.js';
 import { verifySandboxOverrides } from '../utils/commandUtils.js';
 import { parseWindowsSandboxDenials } from './windowsSandboxDenialUtils.js';
-import { isWithinRoot } from '../../utils/fileUtils.js';
-import { resolveToRealPath } from '../../utils/paths.js';
+import { isSubpath, resolveToRealPath } from '../../utils/paths.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -320,7 +319,7 @@ export class WindowsSandboxManager implements SandboxManager {
       } catch {
         // If the file doesn't exist, it's only allowed if it resides within a granted root.
         const isInherited = writableRoots.some((root) =>
-          isWithinRoot(resolved, root),
+          isSubpath(root, resolved),
         );
 
         if (!isInherited) {

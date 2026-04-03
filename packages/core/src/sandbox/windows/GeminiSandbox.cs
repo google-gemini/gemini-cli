@@ -21,6 +21,8 @@ using System.Text;
  */
 public class GeminiSandbox {
     // P/Invoke constants and structures
+    private const int JobObjectExtendedLimitInformation = 9;
+    private const int JobObjectNetRateControlInformation = 32;
     private const uint JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE = 0x00002000;
     private const uint JOB_OBJECT_LIMIT_DIE_ON_UNHANDLED_EXCEPTION = 0x00000400;
     private const uint JOB_OBJECT_LIMIT_ACTIVE_PROCESS = 0x00000008;
@@ -73,6 +75,9 @@ public class GeminiSandbox {
 
     [DllImport("kernel32.dll", SetLastError = true)]
     static extern bool AssignProcessToJobObject(IntPtr hJob, IntPtr hProcess);
+
+    [DllImport("kernel32.dll", SetLastError = true)]
+    static extern uint ResumeThread(IntPtr hThread);
 
     [DllImport("advapi32.dll", SetLastError = true)]
     static extern bool OpenProcessToken(IntPtr ProcessHandle, uint DesiredAccess, out IntPtr TokenHandle);
@@ -240,7 +245,7 @@ public class GeminiSandbox {
             IntPtr lpJobLimits = Marshal.AllocHGlobal(Marshal.SizeOf(jobLimits));
             try {
                 Marshal.StructureToPtr(jobLimits, lpJobLimits, false);
-                if (!SetInformationJobObject(hJob, 9 /* JobObjectExtendedLimitInformation */, lpJobLimits, (uint)Marshal.SizeOf(jobLimits))) {
+                if (!SetInformationJobObject(hJob, JobObjectExtendedLimitInformation, lpJobLimits, (uint)Marshal.SizeOf(jobLimits))) {
                     Console.Error.WriteLine("Error: SetInformationJobObject(Limits) failed (" + Marshal.GetLastWin32Error() + ")");
                     return 1;
                 }
@@ -257,7 +262,7 @@ public class GeminiSandbox {
                 IntPtr lpNetLimits = Marshal.AllocHGlobal(Marshal.SizeOf(netLimits));
                 try {
                     Marshal.StructureToPtr(netLimits, lpNetLimits, false);
-                    if (!SetInformationJobObject(hJob, 32 /* JobObjectNetRateControlInformation */, lpNetLimits, (uint)Marshal.SizeOf(netLimits))) {
+                    if (!SetInformationJobObject(hJob, JobObjectNetRateControlInformation, lpNetLimits, (uint)Marshal.SizeOf(netLimits))) {
                         // Some versions of Windows might not support network rate control, but we should know if it fails.
                         Console.Error.WriteLine("Warning: SetInformationJobObject(NetRate) failed (" + Marshal.GetLastWin32Error() + "). Network might not be throttled.");
                     }
@@ -330,20 +335,22 @@ public class GeminiSandbox {
             }
 
             // Creation Flags: 0x01000000 (CREATE_BREAKAWAY_FROM_JOB) to allow job assignment if parent is in job
-            uint creationFlags = 0x01000000;
+            // 0x00000004 (CREATE_SUSPENDED) to prevent the process from executing before being placed in the job
+            uint creationFlags = 0x01000000 | 0x00000004;
             if (!CreateProcessAsUser(hRestrictedToken, null, commandLine, IntPtr.Zero, IntPtr.Zero, true, creationFlags, IntPtr.Zero, cwd, ref si, out pi)) {
-                Console.Error.WriteLine("Error: CreateProcessAsUser failed (" + Marshal.GetLastWin32Error() + ") Command: " + commandLine);        
+                Console.Error.WriteLine("Error: CreateProcessAsUser failed (" + Marshal.GetLastWin32Error() + ") Command: " + commandLine);
                 return 1;
             }
 
             if (!AssignProcessToJobObject(hJob, pi.hProcess)) {
-                Console.Error.WriteLine("Error: AssignProcessToJobObject failed (" + Marshal.GetLastWin32Error() + ")");
+                Console.Error.WriteLine("Error: AssignProcessToJobObject failed (" + Marshal.GetLastWin32Error() + ") Command: " + commandLine);
                 TerminateProcess(pi.hProcess, 1);
                 return 1;
             }
 
-            // Wait for exit
-            uint waitResult = WaitForSingleObject(pi.hProcess, 0xFFFFFFFF);
+            ResumeThread(pi.hThread);
+
+            // Wait for exit            uint waitResult = WaitForSingleObject(pi.hProcess, 0xFFFFFFFF);
             uint exitCode = 0;
             GetExitCodeProcess(pi.hProcess, out exitCode);
 

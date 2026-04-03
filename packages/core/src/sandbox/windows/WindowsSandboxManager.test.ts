@@ -566,4 +566,23 @@ describe('WindowsSandboxManager', () => {
     expect(result.args[4]).toBe('__read');
     expect(result.args[5]).toBe(filePath);
   });
+
+  it('should return a cleanup function that deletes the temporary manifest', async () => {
+    const req: SandboxRequest = {
+      command: 'test',
+      args: [],
+      cwd: testCwd,
+      env: {},
+    };
+
+    const result = await manager.prepareCommand(req);
+    const manifestPath = result.args[3];
+
+    expect(fs.existsSync(manifestPath)).toBe(true);
+    expect(result.cleanup).toBeDefined();
+
+    result.cleanup?.();
+    expect(fs.existsSync(manifestPath)).toBe(false);
+    expect(fs.existsSync(path.dirname(manifestPath))).toBe(false);
+  });
 });
