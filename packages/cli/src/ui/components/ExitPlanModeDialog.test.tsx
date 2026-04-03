@@ -139,17 +139,22 @@ Implement a comprehensive authentication system with multiple providers.
     vi.restoreAllMocks();
   });
 
-  const renderDialog = async (options?: { useAlternateBuffer?: boolean }) => {
+  const renderDialog = async (options?: {
+    useAlternateBuffer?: boolean;
+    diffContent?: string;
+    availableHeight?: number;
+  }) => {
     const useAlternateBuffer = options?.useAlternateBuffer ?? true;
     return renderWithProviders(
       <ExitPlanModeDialog
         planPath={mockPlanFullPath}
+        diffContent={options?.diffContent}
         onApprove={onApprove}
         onFeedback={onFeedback}
         onCancel={onCancel}
         getPreferredEditor={vi.fn()}
         width={80}
-        availableHeight={24}
+        availableHeight={options?.availableHeight ?? 24}
       />,
       {
         ...options,
@@ -196,6 +201,30 @@ Implement a comprehensive authentication system with multiple providers.
             mockPlansDir,
             expect.anything(),
           );
+        });
+
+        expect(lastFrame()).toMatchSnapshot();
+      });
+
+      it('renders diffContent if provided', async () => {
+        const diffContent =
+          '--- test-plan.md\n+++ test-plan.md\n@@ -1,1 +1,1 @@\n- old\n+ new';
+        const { lastFrame } = await act(async () =>
+          renderDialog({
+            useAlternateBuffer,
+            diffContent,
+            availableHeight: 100,
+          }),
+        );
+
+        await act(async () => {
+          vi.runAllTimers();
+        });
+
+        await waitFor(() => {
+          expect(lastFrame()).toContain('Changes since previous version');
+          expect(lastFrame()).toContain('old');
+          expect(lastFrame()).toContain('new');
         });
 
         expect(lastFrame()).toMatchSnapshot();

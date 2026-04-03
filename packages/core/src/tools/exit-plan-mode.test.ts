@@ -141,6 +141,25 @@ describe('ExitPlanModeTool', () => {
       expect(executeResult.llmContent).toContain('Plan approved');
     });
 
+    it('should calculate and return diffContent when a backup exists', async () => {
+      const planRelativePath = createPlanFile('test-md', '# Current Plan');
+      createPlanFile('test-md.v1', '# Old Plan');
+
+      const invocation = tool.build({ plan_filename: planRelativePath });
+      const result = await invocation.shouldConfirmExecute(
+        new AbortController().signal,
+      );
+
+      expect(result).not.toBe(false);
+      if (result === false) return;
+
+      expect(result.type).toBe('exit_plan_mode');
+      if (result.type === 'exit_plan_mode') {
+        expect(result.diffContent).toContain('Current Plan');
+        expect(result.diffContent).toContain('Old Plan');
+      }
+    });
+
     it('should throw error when policy decision is DENY', async () => {
       const planRelativePath = createPlanFile('test.md', '# Content');
       const invocation = tool.build({ plan_filename: planRelativePath });
@@ -266,6 +285,28 @@ The plan is stored at: ${expectedPath}
 Revise the plan based on the feedback.`,
         returnDisplay: 'Feedback: Please add more details.',
       });
+    });
+
+    it('should create a backup file when plan is rejected', async () => {
+      const planRelativePath = createPlanFile('test-backup.md', '# Content');
+      const invocation = tool.build({ plan_filename: planRelativePath });
+
+      const confirmDetails = await invocation.shouldConfirmExecute(
+        new AbortController().signal,
+      );
+      expect(confirmDetails).not.toBe(false);
+      if (confirmDetails === false) return;
+
+      await confirmDetails.onConfirm(ToolConfirmationOutcome.ProceedOnce, {
+        approved: false,
+        feedback: 'Please change.',
+      });
+
+      await invocation.execute(new AbortController().signal);
+
+      const expectedBackupPath = path.join(mockPlansDir, 'test-backup.md.v1');
+      expect(fs.existsSync(expectedBackupPath)).toBe(true);
+      expect(fs.readFileSync(expectedBackupPath, 'utf8')).toBe('# Content');
     });
 
     it('should handle rejection without feedback gracefully', async () => {
