@@ -67,26 +67,19 @@ interface SandboxIndicatorProps {
 const SandboxIndicator: React.FC<SandboxIndicatorProps> = ({
   isTrustedFolder,
 }) => {
+  const config = useConfig();
+  const sandboxEnabled = config.getSandboxEnabled();
   if (isTrustedFolder === false) {
     return <Text color={theme.status.warning}>untrusted</Text>;
   }
 
   const sandbox = process.env['SANDBOX'];
-  if (sandbox && sandbox !== 'sandbox-exec') {
-    return (
-      <Text color="green">{sandbox.replace(/^gemini-(?:cli-)?/, '')}</Text>
-    );
+  if (sandbox) {
+    return <Text color={theme.status.warning}>current process</Text>;
   }
 
-  if (sandbox === 'sandbox-exec') {
-    return (
-      <Text color={theme.status.warning}>
-        macOS Seatbelt{' '}
-        <Text color={theme.ui.comment}>
-          ({process.env['SEATBELT_PROFILE']})
-        </Text>
-      </Text>
-    );
+  if (sandboxEnabled) {
+    return <Text color={theme.status.warning}>all tools</Text>;
   }
 
   return <Text color={theme.status.error}>no sandbox</Text>;
@@ -311,9 +304,8 @@ export const Footer: React.FC = () => {
         let str = 'no sandbox';
         const sandbox = process.env['SANDBOX'];
         if (isTrustedFolder === false) str = 'untrusted';
-        else if (sandbox === 'sandbox-exec')
-          str = `macOS Seatbelt (${process.env['SEATBELT_PROFILE']})`;
-        else if (sandbox) str = sandbox.replace(/^gemini-(?:cli-)?/, '');
+        else if (sandbox) str = 'current process';
+        else if (config.getSandboxEnabled()) str = 'all tools';
 
         addCol(
           id,
