@@ -325,10 +325,13 @@ export function getProjectHash(projectRoot: string): string {
  * - On Windows, converts to lowercase for case-insensitivity.
  */
 export function normalizePath(p: string): string {
-  const resolved = path.resolve(p);
+  const platform = process.platform;
+  const isWindows = platform === 'win32';
+  const pathModule = isWindows ? path.win32 : path;
+
+  const resolved = pathModule.resolve(p);
   const normalized = resolved.replace(/\\/g, '/');
-  const isCaseInsensitive =
-    process.platform === 'win32' || process.platform === 'darwin';
+  const isCaseInsensitive = isWindows || platform === 'darwin';
   return isCaseInsensitive ? normalized.toLowerCase() : normalized;
 }
 
