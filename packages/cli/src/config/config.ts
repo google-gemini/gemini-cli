@@ -991,6 +991,7 @@ export async function loadCliConfig(
     experimentalJitContext: settings.experimental?.jitContext,
     experimentalMemoryManager: settings.experimental?.memoryManager,
     contextManagement,
+    experimentalBtw: settings.experimental?.btw,
     modelSteering: settings.experimental?.modelSteering,
     topicUpdateNarration: settings.experimental?.topicUpdateNarration,
     noBrowser: !!process.env['NO_BROWSER'],

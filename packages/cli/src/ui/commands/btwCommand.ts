@@ -29,7 +29,7 @@ export const btwCommand: SlashCommand = {
         type: 'message',
         messageType: 'error',
         content:
-          'Please provide a question, e.g. /btw what is this regex doing?',
+          'Please provide a question, e.g. /btw what does this function do?',
       };
     }
 

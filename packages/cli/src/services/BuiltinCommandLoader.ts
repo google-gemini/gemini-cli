@@ -121,7 +121,7 @@ export class BuiltinCommandLoader implements ICommandLoader {
       aboutCommand,
       ...(this.config?.isAgentsEnabled() ? [agentsCommand] : []),
       authCommand,
-      btwCommand,
+      ...(this.config?.isBtwEnabled() ? [btwCommand] : []),
       bugCommand,
       {
         ...chatCommand,

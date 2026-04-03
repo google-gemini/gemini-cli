@@ -54,7 +54,8 @@ describe('btwCommand', () => {
     expect(result).toEqual({
       type: 'message',
       messageType: 'error',
-      content: 'Please provide a question, e.g. /btw what is this regex doing?',
+      content:
+        'Please provide a question, e.g. /btw what does this function do?',
     });
   });
 
