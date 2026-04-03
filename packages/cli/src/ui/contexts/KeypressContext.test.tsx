@@ -658,6 +658,76 @@ describe('KeypressContext', () => {
       expect(keyHandler).not.toHaveBeenCalled();
     });
 
+    it('should preserve user keystrokes around repeated black-background OSC 11 responses', async () => {
+      const keyHandler = vi.fn();
+      const { result } = renderHook(() => useKeypressContext(), { wrapper });
+
+      act(() => result.current.subscribe(keyHandler));
+
+      act(() => stdin.write('A'));
+
+      for (let i = 0; i < 100; i += 1) {
+        act(() => stdin.write('\x1b]11;rgb:0000/'));
+        await act(async () => {
+          vi.advanceTimersByTime(ESC_TIMEOUT + 10);
+        });
+        act(() => stdin.write('0000/0000\x1b\\'));
+      }
+
+      act(() => stdin.write('B'));
+
+      await waitFor(() => {
+        expect(keyHandler).toHaveBeenCalledTimes(2);
+      });
+
+      expect(keyHandler).toHaveBeenNthCalledWith(
+        1,
+        expect.objectContaining({
+          name: 'a',
+          sequence: 'A',
+          shift: true,
+        }),
+      );
+      expect(keyHandler).toHaveBeenNthCalledWith(
+        2,
+        expect.objectContaining({
+          name: 'b',
+          sequence: 'B',
+          shift: true,
+        }),
+      );
+    });
+
+    it('should ignore bursty black-background OSC 11 responses in a single write', async () => {
+      const keyHandler = vi.fn();
+      const { result } = renderHook(() => useKeypressContext(), { wrapper });
+
+      act(() => result.current.subscribe(keyHandler));
+
+      const burst = '\x1b]11;rgb:0000/0000/0000\x1b\\'.repeat(200);
+
+      act(() => stdin.write(burst));
+      await act(async () => {
+        vi.advanceTimersByTime(0);
+      });
+
+      expect(keyHandler).not.toHaveBeenCalled();
+
+      act(() => stdin.write('C'));
+
+      await waitFor(() => {
+        expect(keyHandler).toHaveBeenCalledTimes(1);
+      });
+
+      expect(keyHandler).toHaveBeenCalledWith(
+        expect.objectContaining({
+          name: 'c',
+          sequence: 'C',
+          shift: true,
+        }),
+      );
+    });
+
     it('should ignore highly fragmented OSC 11 responses across repeated ESC timeouts', async () => {
       const keyHandler = vi.fn();
       const { result } = renderHook(() => useKeypressContext(), { wrapper });
@@ -710,6 +780,62 @@ describe('KeypressContext', () => {
         expect.objectContaining({
           name: 'x',
           sequence: 'X',
+          shift: true,
+        }),
+      );
+    });
+
+    it('should ignore highly fragmented black-background OSC 11 responses terminated by BEL', async () => {
+      const keyHandler = vi.fn();
+      const { result } = renderHook(() => useKeypressContext(), { wrapper });
+
+      act(() => result.current.subscribe(keyHandler));
+
+      const fragments = [
+        '\x1b]',
+        '1',
+        '1',
+        ';',
+        'r',
+        'g',
+        'b',
+        ':',
+        '0',
+        '0',
+        '0',
+        '0',
+        '/',
+        '0',
+        '0',
+        '0',
+        '0',
+        '/',
+        '0',
+        '0',
+        '0',
+        '0',
+        '\u0007',
+      ];
+
+      for (const fragment of fragments) {
+        act(() => stdin.write(fragment));
+        await act(async () => {
+          vi.advanceTimersByTime(ESC_TIMEOUT + 10);
+        });
+      }
+
+      expect(keyHandler).not.toHaveBeenCalled();
+
+      act(() => stdin.write('D'));
+
+      await waitFor(() => {
+        expect(keyHandler).toHaveBeenCalledTimes(1);
+      });
+
+      expect(keyHandler).toHaveBeenCalledWith(
+        expect.objectContaining({
+          name: 'd',
+          sequence: 'D',
           shift: true,
         }),
       );

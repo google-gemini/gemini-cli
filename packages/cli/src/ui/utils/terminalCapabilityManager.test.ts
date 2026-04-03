@@ -116,6 +116,17 @@ describe('TerminalCapabilityManager', () => {
     expect(manager.getTerminalBackgroundColor()).toBe('#00ff00');
   });
 
+  it('should detect Background Color terminated by BEL', async () => {
+    const manager = TerminalCapabilityManager.getInstance();
+    const promise = manager.detectCapabilities();
+
+    stdin.emit('data', Buffer.from('\x1b]11;rgb:ffff/0000/0000\x07'));
+    stdin.emit('data', Buffer.from('\x1b[?62c'));
+
+    await promise;
+    expect(manager.getTerminalBackgroundColor()).toBe('#ff0000');
+  });
+
   it('should detect Terminal Name', async () => {
     const manager = TerminalCapabilityManager.getInstance();
     const promise = manager.detectCapabilities();
@@ -182,6 +193,46 @@ describe('TerminalCapabilityManager', () => {
 
     await promise;
     expect(manager.isKittyProtocolEnabled()).toBe(true);
+  });
+
+  it('should detect highly fragmented black-background OSC 11 responses', async () => {
+    const manager = TerminalCapabilityManager.getInstance();
+    const promise = manager.detectCapabilities();
+
+    const fragments = [
+      '\x1b]',
+      '1',
+      '1',
+      ';',
+      'r',
+      'g',
+      'b',
+      ':',
+      '0',
+      '0',
+      '0',
+      '0',
+      '/',
+      '0',
+      '0',
+      '0',
+      '0',
+      '/',
+      '0',
+      '0',
+      '0',
+      '0',
+      '\x1b',
+      '\\',
+    ];
+
+    for (const fragment of fragments) {
+      stdin.emit('data', Buffer.from(fragment));
+    }
+    stdin.emit('data', Buffer.from('\x1b[?62c'));
+
+    await promise;
+    expect(manager.getTerminalBackgroundColor()).toBe('#000000');
   });
 
   describe('modifyOtherKeys detection', () => {
