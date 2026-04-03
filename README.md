@@ -24,7 +24,7 @@ Learn all about Gemini CLI in our [documentation](https://geminicli.com/docs/).
   commands, web fetching.
 - **🔌 Extensible**: MCP (Model Context Protocol) support for custom
   integrations.
-- **💻 Terminal-first**: Where developers and the command line work as one.
+- **💻 Terminal-first**: Designed for developers who live in the terminal, with a focus on speed, automation, and seamless command-line workflows.
 - **🛡️ Open source**: Apache 2.0 licensed.
 
 ## 📦 Installation
