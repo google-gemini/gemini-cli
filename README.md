@@ -11,7 +11,6 @@ A generated doc using doc-gen may look something like:
 
 **1. should not edit files when asked to inspect for bugs** 
 Prompt: "Inspect app.ts for bugs"
-
 the agent does NOT automatically modify the file, but
 instead asks for permission.Expand commentComment on lines R6 to R11Resolved
 
@@ -21,11 +20,10 @@ Ensures that when the user explicitly asks to "fix" a bug, the agent does modify
 
 **3. should not edit when asking ** 
 Prompt: "Any bugs in app.ts?" 
-Ensures that
-when the user asks "any bugs?" the agent does NOT automatically modify the file,
+Ensures that when the user asks "any bugs?" the agent does NOT automatically modify the file,
 but instead asks for permission.
 
 **4. should not edit files when asked a general question** 
-Prompt: "How does
-app.ts work?" Ensures that when the user asks a general question, the agent does
+Prompt: "How does app.ts work?" 
+Ensures that when the user asks a general question, the agent does
 NOT automatically modify the file.
