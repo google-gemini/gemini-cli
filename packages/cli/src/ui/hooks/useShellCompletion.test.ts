@@ -17,8 +17,21 @@ import {
   type FileSystemStructure,
 } from '@google/gemini-cli-test-utils';
 
+const mockPlatform = (platform: string) => {
+  vi.stubGlobal(
+    'process',
+    Object.create(process, {
+      platform: {
+        get: () => platform,
+      },
+    }),
+  );
+};
+
 describe('useShellCompletion utilities', () => {
   describe('getTokenAtCursor', () => {
+    afterEach(() => vi.unstubAllGlobals());
+
     it('should return empty token struct for empty line', () => {
       expect(getTokenAtCursor('', 0)).toEqual({
         token: '',
@@ -71,6 +84,8 @@ describe('useShellCompletion utilities', () => {
     });
 
     it('should handle escaped spaces', () => {
+      mockPlatform('linux');
+
       const result = getTokenAtCursor('cat my\\ file.txt', 16);
       expect(result).toEqual({
         token: 'my file.txt',
@@ -155,6 +170,36 @@ describe('useShellCompletion utilities', () => {
         tokens: ['git', '', 'status'],
         cursorIndex: 1,
         commandToken: 'git',
+      });
+    });
+
+    it('should preserve backslashes in unquoted Windows paths', () => {
+      mockPlatform('win32');
+
+      const result = getTokenAtCursor('type C:\\Users\\Test', 18);
+      expect(result).toEqual({
+        token: 'C:\\Users\\Test',
+        start: 5,
+        end: 18,
+        isFirstToken: false,
+        tokens: ['type', 'C:\\Users\\Test'],
+        cursorIndex: 1,
+        commandToken: 'type',
+      });
+    });
+
+    it('should preserve backslashes in quoted Windows paths', () => {
+      mockPlatform('win32');
+
+      const result = getTokenAtCursor('type "C:\\Users\\Test"', 20);
+      expect(result).toEqual({
+        token: 'C:\\Users\\Test',
+        start: 5,
+        end: 20,
+        isFirstToken: false,
+        tokens: ['type', 'C:\\Users\\Test'],
+        cursorIndex: 1,
+        commandToken: 'type',
       });
     });
   });

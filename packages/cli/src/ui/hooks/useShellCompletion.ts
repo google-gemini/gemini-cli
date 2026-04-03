@@ -60,6 +60,7 @@ export function getTokenAtCursor(
   line: string,
   cursorCol: number,
 ): TokenInfo | null {
+  const treatBackslashAsEscape = process.platform !== 'win32';
   const tokensInfo: Array<{ token: string; start: number; end: number }> = [];
   let i = 0;
 
@@ -77,7 +78,7 @@ export function getTokenAtCursor(
       const ch = line[i];
 
       // Backslash escape: consume the next char literally
-      if (ch === '\\' && i + 1 < line.length) {
+      if (treatBackslashAsEscape && ch === '\\' && i + 1 < line.length) {
         token += line[i + 1];
         i += 2;
         continue;
@@ -98,7 +99,11 @@ export function getTokenAtCursor(
       if (ch === '"') {
         i++; // skip opening quote
         while (i < line.length && line[i] !== '"') {
-          if (line[i] === '\\' && i + 1 < line.length) {
+          if (
+            treatBackslashAsEscape &&
+            line[i] === '\\' &&
+            i + 1 < line.length
+          ) {
             token += line[i + 1];
             i += 2;
           } else {
