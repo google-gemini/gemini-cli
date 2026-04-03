@@ -38,6 +38,14 @@ folder, a dialog will automatically appear, prompting you to make a choice:
 Your choice is saved in a central file (`~/.gemini/trustedFolders.json`), so you
 will only be asked once per folder.
 
+### Headless mode and automation
+
+When running in headless mode (using the `-p` or `--prompt` flag), the trust
+dialog is bypassed automatically to ensure that non-interactive workflows and
+automation scripts are not interrupted. In this mode, the CLI operates with
+restricted permissions as if the folder were untrusted, unless the folder has
+been previously trusted through an interactive session.
+
 ## Understanding folder contents: The discovery phase
 
 Before you make a choice, the Gemini CLI performs a **discovery phase** to scan

@@ -15,9 +15,13 @@ Lists the names of files and subdirectories directly within a specified path.
 - **Tool name:** `list_directory`
 - **Arguments:**
   - `dir_path` (string, required): Absolute or relative path to the directory.
-  - `ignore` (array, optional): Glob patterns to exclude.
+  - `ignore` (array, optional): Glob patterns to exclude (e.g.,
+    `["*.tmp", "build/"]`).
   - `file_filtering_options` (object, optional): Configuration for `.gitignore`
     and `.geminiignore` compliance.
+    - `respect_git_ignore` (boolean, optional): Whether to respect `.gitignore`.
+    - `respect_gemini_ignore` (boolean, optional): Whether to respect
+      `.geminiignore`.
 
 ### `read_file` (ReadFile)
 
@@ -27,8 +31,22 @@ and PDF.
 - **Tool name:** `read_file`
 - **Arguments:**
   - `file_path` (string, required): Path to the file.
-  - `offset` (number, optional): Start line for text files (0-based).
-  - `limit` (number, optional): Maximum lines to read.
+  - `start_line` (number, optional): The 1-based line number to start reading
+    from.
+  - `end_line` (number, optional): The 1-based line number to end reading at
+    (inclusive).
+
+### `read_many_files` (ReadManyFiles)
+
+Reads and concatenates content from multiple files or entire directories. This
+is the tool triggered by the `@` symbol in your prompt.
+
+- **Tool name:** `read_many_files`
+- **Arguments:**
+  - `paths` (array of strings, required): List of paths to files or directories.
+  - `ignore` (array of strings, optional): Glob patterns to exclude.
+  - `file_filtering_options` (object, optional): Configuration for `.gitignore`
+    and `.geminiignore` compliance.
 
 ### `write_file` (WriteFile)
 

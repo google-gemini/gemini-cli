@@ -138,7 +138,7 @@ like `jq`. To get pure JSON data from the model, combine the
     fi
 
     # Extract data
-    gemini --output-format json "Return a raw JSON object with keys 'version' and 'deps' from @package.json" | jq -r '.response' > data.json
+    gemini -p "Return a raw JSON object with keys 'version' and 'deps' from @package.json" --output-format json | jq -r '.response' > data.json
     ```
 
     **Windows PowerShell (`generate_json.ps1`)**
@@ -151,7 +151,7 @@ like `jq`. To get pure JSON data from the model, combine the
     }
 
     # Extract data (requires jq installed, or you can use ConvertFrom-Json)
-    $output = gemini --output-format json "Return a raw JSON object with keys 'version' and 'deps' from @package.json" | ConvertFrom-Json
+    $output = gemini -p "Return a raw JSON object with keys 'version' and 'deps' from @package.json" --output-format json | ConvertFrom-Json
     $output.response | Out-File -FilePath data.json -Encoding utf8
     ```
 

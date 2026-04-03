@@ -95,6 +95,11 @@
               }
             ]
           },
+          {
+            "label": "A2A Server",
+            "badge": "🔬",
+            "slug": "docs/core/a2a-server"
+          },
           { "label": "Agent Skills", "slug": "docs/cli/skills" },
           { "label": "Checkpointing", "slug": "docs/cli/checkpointing" },
           { "label": "Headless mode", "slug": "docs/cli/headless" },
@@ -158,8 +163,18 @@
         "items": [
           { "label": "Custom commands", "slug": "docs/cli/custom-commands" },
           {
-            "label": "Enterprise configuration",
-            "slug": "docs/cli/enterprise"
+            "label": "Enterprise administration",
+            "collapsed": true,
+            "items": [
+              {
+                "label": "Enterprise configuration",
+                "slug": "docs/cli/enterprise"
+              },
+              {
+                "label": "Enterprise Admin Controls",
+                "slug": "docs/admin/enterprise-controls"
+              }
+            ]
           },
           {
             "label": "Ignore files (.geminiignore)",
