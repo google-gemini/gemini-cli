@@ -280,13 +280,16 @@ export class WindowsSandboxManager implements SandboxManager {
     const { allowed: allowedPaths, forbidden: forbiddenPaths } =
       await resolveSandboxPaths(this.options, req);
 
-    // Grant "Low Mandatory Level" access to includeDirectories.
+    // Grant "Low Mandatory Level" access to includeDirectories only if workspaceWrite is enabled.
     const includeDirs = sanitizePaths(this.options.includeDirectories);
     for (const includeDir of includeDirs) {
-      await this.grantLowIntegrityAccess(includeDir);
+      if (workspaceWrite) {
+        await this.grantLowIntegrityAccess(includeDir);
+      }
     }
 
-    // Grant "Low Mandatory Level" read/write access to allowedPaths.
+    // Grant "Low Mandatory Level" read/write access to allowedPaths only if workspaceWrite is enabled.
+    // If not enabled, they remain at Medium integrity (default), which means a Low integrity process cannot write to them.
     for (const allowedPath of allowedPaths) {
       const resolved = await tryRealpath(allowedPath);
       try {
@@ -297,10 +300,12 @@ export class WindowsSandboxManager implements SandboxManager {
             'On Windows, granular sandbox access can only be granted to existing paths to avoid broad parent directory permissions.',
         );
       }
-      await this.grantLowIntegrityAccess(resolved);
+      if (workspaceWrite) {
+        await this.grantLowIntegrityAccess(resolved);
+      }
     }
 
-    // Grant "Low Mandatory Level" write access to additional permissions write paths.
+    // Granular permissions: Grant write access to specifically requested paths
     const additionalWritePaths = sanitizePaths(
       mergedAdditional.fileSystem?.write,
     );

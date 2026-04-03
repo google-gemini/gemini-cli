@@ -10,6 +10,7 @@ import { type SandboxManager } from './sandboxManager.js';
 import { debugLogger } from '../utils/debugLogger.js';
 import { isNodeError } from '../utils/errors.js';
 import { resolveToRealPath, isSubpath } from '../utils/paths.js';
+import type { WorkspaceContext } from '../utils/workspaceContext.js';
 
 /**
  * A FileSystemService implementation that performs operations through a sandbox.
@@ -18,27 +19,61 @@ export class SandboxedFileSystemService implements FileSystemService {
   constructor(
     private sandboxManager: SandboxManager,
     private cwd: string,
+    private workspaceContext?: WorkspaceContext,
   ) {}
 
-  private sanitizeAndValidatePath(filePath: string): string {
+  /**
+   * Updates the sandbox manager used by the service.
+   * This is called when the global approval mode changes.
+   */
+  updateSandboxManager(sandboxManager: SandboxManager): void {
+    this.sandboxManager = sandboxManager;
+  }
+
+  private sanitizeAndValidatePath(
+    filePath: string,
+    checkType: 'read' | 'write' = 'write',
+  ): string {
     const resolvedPath = resolveToRealPath(filePath);
-    if (!isSubpath(this.cwd, resolvedPath) && this.cwd !== resolvedPath) {
-      throw new Error(
-        `Access denied: Path '${filePath}' is outside the workspace.`,
-      );
+
+    if (this.workspaceContext) {
+      const isAllowed =
+        checkType === 'read'
+          ? this.workspaceContext.isPathReadable(resolvedPath)
+          : this.workspaceContext.isPathWithinWorkspace(resolvedPath);
+
+      if (!isAllowed) {
+        throw new Error(
+          `Access denied: Path '${filePath}' is not ${
+            checkType === 'read' ? 'readable' : 'writable'
+          } in the current workspace context.`,
+        );
+      }
+    } else {
+      // Fallback to legacy CWD check if workspaceContext is not provided
+      if (!isSubpath(this.cwd, resolvedPath) && this.cwd !== resolvedPath) {
+        throw new Error(
+          `Access denied: Path '${filePath}' is outside the workspace.`,
+        );
+      }
     }
+
     return resolvedPath;
   }
 
   async readTextFile(filePath: string): Promise<string> {
-    const safePath = this.sanitizeAndValidatePath(filePath);
+    const safePath = this.sanitizeAndValidatePath(filePath, 'read');
     const prepared = await this.sandboxManager.prepareCommand({
       command: '__read',
       args: [safePath],
       cwd: this.cwd,
       env: process.env,
       policy: {
-        allowedPaths: [safePath],
+        additionalPermissions: {
+          fileSystem: {
+            read: [safePath],
+          },
+        },
       },
     });
 
@@ -91,14 +126,13 @@ export class SandboxedFileSystemService implements FileSystemService {
   }
 
   async writeTextFile(filePath: string, content: string): Promise<void> {
-    const safePath = this.sanitizeAndValidatePath(filePath);
+    const safePath = this.sanitizeAndValidatePath(filePath, 'write');
     const prepared = await this.sandboxManager.prepareCommand({
       command: '__write',
       args: [safePath],
       cwd: this.cwd,
       env: process.env,
       policy: {
-        allowedPaths: [safePath],
         additionalPermissions: {
           fileSystem: {
             write: [safePath],

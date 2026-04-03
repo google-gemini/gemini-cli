@@ -94,7 +94,11 @@ describe('SandboxedFileSystemService', () => {
         command: '__read',
         args: [testFile],
         policy: {
-          allowedPaths: [testFile],
+          additionalPermissions: {
+            fileSystem: {
+              read: [testFile],
+            },
+          },
         },
       }),
     );
@@ -136,7 +140,6 @@ describe('SandboxedFileSystemService', () => {
         command: '__write',
         args: [testFile],
         policy: {
-          allowedPaths: [testFile],
           additionalPermissions: {
             fileSystem: {
               write: [testFile],

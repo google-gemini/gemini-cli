@@ -1007,6 +1007,7 @@ export class Config implements McpContext, AgentLoopContext {
       this.fileSystemService = new SandboxedFileSystemService(
         this._sandboxManager,
         params.targetDir,
+        this.workspaceContext,
       );
     } else {
       this.fileSystemService = new StandardFileSystemService();
@@ -1708,6 +1709,11 @@ export class Config implements McpContext, AgentLoopContext {
       this.getApprovalMode(),
     );
     this.shellExecutionConfig.sandboxManager = this._sandboxManager;
+
+    // Update FileSystemService if using SandboxedFileSystemService
+    if (this.fileSystemService instanceof SandboxedFileSystemService) {
+      this.fileSystemService.updateSandboxManager(this._sandboxManager);
+    }
   }
 
   get sandboxPolicyManager() {

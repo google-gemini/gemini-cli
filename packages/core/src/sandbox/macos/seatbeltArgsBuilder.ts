@@ -169,7 +169,11 @@ export function buildSeatbeltProfile(options: SeatbeltArgsOptions): string {
   const allowedPaths = options.allowedPaths;
   for (let i = 0; i < allowedPaths.length; i++) {
     const allowedPath = tryRealpath(allowedPaths[i]);
-    profile += `(allow file-read* file-write* (subpath "${escapeSchemeString(allowedPath)}"))\n`;
+    if (options.workspaceWrite) {
+      profile += `(allow file-read* file-write* (subpath "${escapeSchemeString(allowedPath)}"))\n`;
+    } else {
+      profile += `(allow file-read* (subpath "${escapeSchemeString(allowedPath)}"))\n`;
+    }
   }
 
   // Handle granular additional permissions

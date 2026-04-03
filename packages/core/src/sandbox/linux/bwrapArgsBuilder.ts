@@ -101,7 +101,7 @@ export async function buildBwrapArgs(
   for (const includeDir of includeDirs) {
     try {
       const resolved = tryRealpath(includeDir);
-      bwrapArgs.push('--ro-bind-try', resolved, resolved);
+      bwrapArgs.push(bindFlag, resolved, resolved);
     } catch {
       // Ignore
     }
@@ -127,7 +127,7 @@ export async function buildBwrapArgs(
     }
     const normalizedAllowedPath = normalize(resolved).replace(/\/$/, '');
     if (normalizedAllowedPath !== normalizedWorkspace) {
-      bwrapArgs.push('--bind-try', resolved, resolved);
+      bwrapArgs.push(bindFlag, resolved, resolved);
     }
   }
 
