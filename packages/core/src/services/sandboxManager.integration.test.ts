@@ -168,23 +168,28 @@ describe('SandboxManager Integration', () => {
         expect(result.stdout.trim()).toBe('sandbox test');
       });
 
-      it('supports interactive pseudo-terminals (node-pty)', async () => {
-        const handle = await ShellExecutionService.execute(
-          Platform.isPty(),
-          workspace,
-          () => {},
-          new AbortController().signal,
-          true,
-          {
-            sanitizationConfig: getSecureSanitizationConfig(),
-            sandboxManager: manager,
-          },
-        );
+      // The Windows sandbox wrapper (GeminiSandbox.exe) uses standard pipes
+      // for I/O interception, which breaks ConPTY pseudo-terminal inheritance.
+      it.skipIf(Platform.isWindows)(
+        'supports interactive pseudo-terminals (node-pty)',
+        async () => {
+          const handle = await ShellExecutionService.execute(
+            Platform.isPty(),
+            workspace,
+            () => {},
+            new AbortController().signal,
+            true,
+            {
+              sanitizationConfig: getSecureSanitizationConfig(),
+              sandboxManager: manager,
+            },
+          );
 
-        const result = await handle.result;
-        expect(result.exitCode).toBe(0);
-        expect(result.output).toContain('True');
-      });
+          const result = await handle.result;
+          expect(result.exitCode).toBe(0);
+          expect(result.output).toContain('True');
+        },
+      );
     });
 
     describe('File System Access', () => {
