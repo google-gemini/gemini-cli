@@ -5,6 +5,8 @@
  */
 
 import { describe, expect } from 'vitest';
+import fs from 'node:fs';
+import path from 'node:path';
 import { evalTest } from './test-helper.js';
 
 describe('update_topic_behavior', () => {
@@ -200,8 +202,6 @@ export default app;
       }),
     },
     assert: async (rig) => {
-      const fs = require('fs');
-      const path = require('path');
       const toolLogs = rig.readToolLogs();
       const topicCalls = toolLogs.filter(
         (l) => l.toolRequest.name === UPDATE_TOPIC_TOOL_NAME,
