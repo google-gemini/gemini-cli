@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { useState, useEffect, useRef, useCallback } from 'react';
+import { useState, useLayoutEffect, useRef, useCallback } from 'react';
 import { theme } from '../semantic-colors.js';
 import { interpolateColor } from '../themes/color-utils.js';
 import { debugState } from '../debug.js';
@@ -107,7 +107,7 @@ export function useAnimatedScrollbar(
   }, [cleanup]);
 
   const wasFocused = useRef(isFocused);
-  useEffect(() => {
+  useLayoutEffect(() => {
     if (isFocused && !wasFocused.current) {
       flashScrollbar();
     } else if (!isFocused && wasFocused.current) {

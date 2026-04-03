@@ -176,6 +176,8 @@ export const createMockConfig = (overrides: Partial<Config> = {}): Config =>
     getHasAccessToPreviewModel: vi.fn().mockReturnValue(false),
     validatePathAccess: vi.fn().mockReturnValue(null),
     getUseAlternateBuffer: vi.fn().mockReturnValue(false),
+    getUseTerminalBuffer: vi.fn().mockReturnValue(false),
+    getUseRenderProcess: vi.fn().mockReturnValue(false),
     ...overrides,
   }) as unknown as Config;
 

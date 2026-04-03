@@ -24,7 +24,7 @@ import type { LoadedSettings } from '../../config/settings.js';
 import { coreEvents } from '@google/gemini-cli-core';
 
 // Hoist mocks
-const mockedCwd = vi.hoisted(() => vi.fn());
+const mockedCwd = vi.hoisted(() => vi.fn().mockReturnValue('/mock/cwd'));
 const mockedLoadTrustedFolders = vi.hoisted(() => vi.fn());
 const mockedIsWorkspaceTrusted = vi.hoisted(() => vi.fn());
 const mockedUseSettings = vi.hoisted(() => vi.fn());

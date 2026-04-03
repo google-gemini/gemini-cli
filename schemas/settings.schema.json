@@ -455,6 +455,20 @@
           "default": false,
           "type": "boolean"
         },
+        "renderProcess": {
+          "title": "Render Process",
+          "description": "Enable Ink render process for the UI.",
+          "markdownDescription": "Enable Ink render process for the UI.\n\n- Category: `UI`\n- Requires restart: `yes`\n- Default: `true`",
+          "default": true,
+          "type": "boolean"
+        },
+        "terminalBuffer": {
+          "title": "Terminal Buffer",
+          "description": "Use the new terminal buffer architecture for rendering.",
+          "markdownDescription": "Use the new terminal buffer architecture for rendering.\n\n- Category: `UI`\n- Requires restart: `yes`\n- Default: `true`",
+          "default": true,
+          "type": "boolean"
+        },
         "useBackgroundColor": {
           "title": "Use Background Color",
           "description": "Whether to use background colors in the UI.",

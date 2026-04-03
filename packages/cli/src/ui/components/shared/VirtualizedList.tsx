@@ -12,17 +12,17 @@ import {
   useImperativeHandle,
   useMemo,
   useCallback,
+  memo,
 } from 'react';
 import type React from 'react';
 import { theme } from '../../semantic-colors.js';
 import { useBatchedScroll } from '../../hooks/useBatchedScroll.js';
-import { useUIState } from '../../contexts/UIStateContext.js';
 
-import { type DOMElement, Box, ResizeObserver } from 'ink';
+import { type DOMElement, Box, ResizeObserver, StaticRender } from 'ink';
 
 export const SCROLL_TO_ITEM_END = Number.MAX_SAFE_INTEGER;
 
-type VirtualizedListProps<T> = {
+export type VirtualizedListProps<T> = {
   data: T[];
   renderItem: (info: { item: T; index: number }) => React.ReactElement;
   estimatedItemHeight: (index: number) => number;
@@ -30,6 +30,15 @@ type VirtualizedListProps<T> = {
   initialScrollIndex?: number;
   initialScrollOffsetInIndex?: number;
   scrollbarThumbColor?: string;
+  renderStatic?: boolean;
+  isStatic?: boolean;
+  isStaticItem?: (item: T, index: number) => boolean;
+  width?: number | string;
+  overflowToBackbuffer?: boolean;
+  scrollbar?: boolean;
+  stableScrollback?: boolean;
+  copyModeEnabled?: boolean;
+  fixedItemHeight?: boolean;
 };
 
 export type VirtualizedListRef<T> = {
@@ -66,6 +75,43 @@ function findLastIndex<T>(
   return -1;
 }
 
+const VirtualizedListItem = memo(
+  ({
+    content,
+    shouldBeStatic,
+    width,
+    containerWidth,
+    itemKey,
+    itemRef,
+  }: {
+    content: React.ReactElement;
+    shouldBeStatic: boolean;
+    width: number | string | undefined;
+    containerWidth: number;
+    itemKey: string;
+    itemRef: (el: DOMElement | null) => void;
+  }) => (
+    <Box width="100%" flexDirection="column" flexShrink={0} ref={itemRef}>
+      {shouldBeStatic ? (
+        <StaticRender
+          width={typeof width === 'number' ? width : containerWidth}
+          key={
+            itemKey +
+            '-static-' +
+            (typeof width === 'number' ? width : containerWidth)
+          }
+        >
+          {content}
+        </StaticRender>
+      ) : (
+        content
+      )}
+    </Box>
+  ),
+);
+
+VirtualizedListItem.displayName = 'VirtualizedListItem';
+
 function VirtualizedList<T>(
   props: VirtualizedListProps<T>,
   ref: React.Ref<VirtualizedListRef<T>>,
@@ -77,8 +123,16 @@ function VirtualizedList<T>(
     keyExtractor,
     initialScrollIndex,
     initialScrollOffsetInIndex,
+    renderStatic,
+    isStatic,
+    isStaticItem,
+    width,
+    overflowToBackbuffer,
+    scrollbar = true,
+    stableScrollback,
+    copyModeEnabled = false,
+    fixedItemHeight = false,
   } = props;
-  const { copyModeEnabled } = useUIState();
   const dataRef = useRef(data);
   useLayoutEffect(() => {
     dataRef.current = data;
@@ -119,6 +173,7 @@ function VirtualizedList<T>(
 
   const containerRef = useRef<DOMElement | null>(null);
   const [containerHeight, setContainerHeight] = useState(0);
+  const [containerWidth, setContainerWidth] = useState(0);
   const itemRefs = useRef<Array<DOMElement | null>>([]);
   const [heights, setHeights] = useState<Record<string, number>>({});
   const isInitialScrollSet = useRef(false);
@@ -133,7 +188,10 @@ function VirtualizedList<T>(
       const observer = new ResizeObserver((entries) => {
         const entry = entries[0];
         if (entry) {
-          setContainerHeight(Math.round(entry.contentRect.height));
+          const newHeight = Math.round(entry.contentRect.height);
+          const newWidth = Math.round(entry.contentRect.width);
+          setContainerHeight((prev) => (prev !== newHeight ? newHeight : prev));
+          setContainerWidth((prev) => (prev !== newWidth ? newWidth : prev));
         }
       });
       observer.observe(node);
@@ -242,7 +300,9 @@ function VirtualizedList<T>(
     const wasAtBottom = contentPreviouslyFit || wasScrolledToBottomPixels;
 
     if (wasAtBottom && actualScrollTop >= prevScrollTop.current) {
-      setIsStickingToBottom(true);
+      if (!isStickingToBottom) {
+        setIsStickingToBottom(true);
+      }
     }
 
     const listGrew = data.length > prevDataLength.current;
@@ -253,10 +313,16 @@ function VirtualizedList<T>(
       (listGrew && (isStickingToBottom || wasAtBottom)) ||
       (isStickingToBottom && containerChanged)
     ) {
-      setScrollAnchor({
-        index: data.length > 0 ? data.length - 1 : 0,
-        offset: SCROLL_TO_ITEM_END,
-      });
+      const newIndex = data.length > 0 ? data.length - 1 : 0;
+      if (
+        scrollAnchor.index !== newIndex ||
+        scrollAnchor.offset !== SCROLL_TO_ITEM_END
+      ) {
+        setScrollAnchor({
+          index: newIndex,
+          offset: SCROLL_TO_ITEM_END,
+        });
+      }
       if (!isStickingToBottom) {
         setIsStickingToBottom(true);
       }
@@ -266,9 +332,17 @@ function VirtualizedList<T>(
       data.length > 0
     ) {
       const newScrollTop = Math.max(0, totalHeight - scrollableContainerHeight);
-      setScrollAnchor(getAnchorForScrollTop(newScrollTop, offsets));
+      const newAnchor = getAnchorForScrollTop(newScrollTop, offsets);
+      if (
+        scrollAnchor.index !== newAnchor.index ||
+        scrollAnchor.offset !== newAnchor.offset
+      ) {
+        setScrollAnchor(newAnchor);
+      }
     } else if (data.length === 0) {
-      setScrollAnchor({ index: 0, offset: 0 });
+      if (scrollAnchor.index !== 0 || scrollAnchor.offset !== 0) {
+        setScrollAnchor({ index: 0, offset: 0 });
+      }
     }
 
     prevDataLength.current = data.length;
@@ -281,6 +355,7 @@ function VirtualizedList<T>(
     actualScrollTop,
     scrollableContainerHeight,
     scrollAnchor.index,
+    scrollAnchor.offset,
     getAnchorForScrollTop,
     offsets,
     isStickingToBottom,
@@ -348,15 +423,22 @@ function VirtualizedList<T>(
       ? data.length - 1
       : Math.min(data.length - 1, endIndexOffset);
 
-  const topSpacerHeight = offsets[startIndex] ?? 0;
-  const bottomSpacerHeight =
-    totalHeight - (offsets[endIndex + 1] ?? totalHeight);
+  const topSpacerHeight =
+    renderStatic === true || overflowToBackbuffer === true
+      ? 0
+      : (offsets[startIndex] ?? 0);
+  const bottomSpacerHeight = renderStatic
+    ? 0
+    : totalHeight - (offsets[endIndex + 1] ?? totalHeight);
 
   // Maintain a stable set of observed nodes using useLayoutEffect
   const observedNodes = useRef<Set<DOMElement>>(new Set());
   useLayoutEffect(() => {
     const currentNodes = new Set<DOMElement>();
-    for (let i = startIndex; i <= endIndex; i++) {
+    const observeStart = renderStatic || overflowToBackbuffer ? 0 : startIndex;
+    const observeEnd = renderStatic ? data.length - 1 : endIndex;
+
+    for (let i = observeStart; i <= observeEnd; i++) {
       const node = itemRefs.current[i];
       const item = data[i];
       if (node && item) {
@@ -364,14 +446,16 @@ function VirtualizedList<T>(
         const key = keyExtractor(item, i);
         // Always update the key mapping because React can reuse nodes at different indices/keys
         nodeToKeyRef.current.set(node, key);
-        if (!observedNodes.current.has(node)) {
+        if (!isStatic && !fixedItemHeight && !observedNodes.current.has(node)) {
           itemsObserver.observe(node);
         }
       }
     }
     for (const node of observedNodes.current) {
       if (!currentNodes.has(node)) {
-        itemsObserver.unobserve(node);
+        if (!isStatic && !fixedItemHeight) {
+          itemsObserver.unobserve(node);
+        }
         nodeToKeyRef.current.delete(node);
       }
     }
@@ -379,22 +463,49 @@ function VirtualizedList<T>(
   });
 
   const renderedItems = [];
-  for (let i = startIndex; i <= endIndex; i++) {
-    const item = data[i];
-    if (item) {
-      renderedItems.push(
-        <Box
-          key={keyExtractor(item, i)}
-          width="100%"
-          flexDirection="column"
-          flexShrink={0}
-          ref={(el) => {
-            itemRefs.current[i] = el;
-          }}
-        >
-          {renderItem({ item, index: i })}
-        </Box>,
-      );
+  const renderRangeStart =
+    renderStatic || overflowToBackbuffer ? 0 : startIndex;
+  const renderRangeEnd = renderStatic ? data.length - 1 : endIndex;
+
+  // Always evaluate shouldBeStatic, width, etc. if we have a known width from the prop.
+  // If containerHeight or containerWidth is 0 we defer rendering unless a static render or defined width overrides.
+  // Wait, if it's not static and no width we need to wait for measure.
+  // BUT the initial render MUST render *something* with a width if width prop is provided to avoid layout shifts.
+  // We MUST wait for containerHeight > 0 before rendering, especially if renderStatic is true.
+  // If containerHeight is 0, we will misclassify items as isOutsideViewport and permanently print them to StaticRender!
+  const isReady =
+    containerHeight > 0 ||
+    process.env['NODE_ENV'] === 'test' ||
+    (width !== undefined && typeof width === 'number');
+
+  if (isReady) {
+    for (let i = renderRangeStart; i <= renderRangeEnd; i++) {
+      const item = data[i];
+      if (item) {
+        const isOutsideViewport = i < startIndex || i > endIndex;
+        const shouldBeStatic =
+          (renderStatic === true && isOutsideViewport) ||
+          isStaticItem?.(item, i) === true;
+
+        const content = renderItem({ item, index: i });
+        const key = keyExtractor(item, i);
+
+        renderedItems.push(
+          <VirtualizedListItem
+            key={key}
+            itemKey={key}
+            content={content}
+            shouldBeStatic={shouldBeStatic}
+            width={width}
+            containerWidth={containerWidth}
+            itemRef={(el: DOMElement | null) => {
+              if (i >= renderRangeStart && i <= renderRangeEnd) {
+                itemRefs.current[i] = el;
+              }
+            }}
+          />,
+        );
+      }
     }
   }
 
@@ -539,6 +650,9 @@ function VirtualizedList<T>(
       height="100%"
       flexDirection="column"
       paddingRight={copyModeEnabled ? 0 : 1}
+      overflowToBackbuffer={overflowToBackbuffer}
+      scrollbar={scrollbar}
+      stableScrollback={stableScrollback}
     >
       <Box
         flexShrink={0}

@@ -346,6 +346,11 @@ describe('keyMatchers', () => {
     },
     {
       command: Command.TOGGLE_COPY_MODE,
+      positive: [createKey('f9')],
+      negative: [createKey('f8'), createKey('f10')],
+    },
+    {
+      command: Command.TOGGLE_MOUSE_MODE,
       positive: [createKey('s', { ctrl: true })],
       negative: [createKey('s'), createKey('s', { alt: true })],
     },
