@@ -37,6 +37,7 @@ import {
   LegacyAgentSession,
   ToolErrorType,
   geminiPartsToContentParts,
+  debugLogger,
 } from '@google/gemini-cli-core';
 
 import type { Part } from '@google/genai';
@@ -421,9 +422,7 @@ export async function runNonInteractive(
         return errToThrow;
       };
 
-      const runTerminalExitHandler = (
-        handler: () => void | never,
-      ): void | never => {
+      const runTerminalExitHandler = (handler: () => never): never => {
         terminalProcessExitHandled = true;
         return handler();
       };
@@ -615,10 +614,13 @@ export async function runNonInteractive(
           case 'elicitation_request':
           case 'elicitation_response':
           case 'usage':
+          // TODO: We should think about converting this into the usage event.
+          // fallthrough
           case 'custom':
             // Explicitly ignore these non-interactive events
             break;
           default:
+            debugLogger.error('Unknown agent event type:', event);
             event satisfies never;
             break;
         }

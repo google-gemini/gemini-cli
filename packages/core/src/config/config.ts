@@ -2426,6 +2426,11 @@ export class Config implements McpContext, AgentLoopContext {
   getExperimentalAgentHistoryRetainedMessages(): number {
     return this.experimentalAgentHistoryRetainedMessages;
   }
+
+  isExperimentalAgentHistorySummarizationEnabled(): boolean {
+    return this.experimentalAgentHistorySummarization;
+  }
+
   getContextManagementConfig(): ContextManagementConfig {
     return this.contextManagement;
   }
