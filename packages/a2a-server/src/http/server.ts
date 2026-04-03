@@ -6,6 +6,16 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+// Suppress DEP0040 (Punycode deprecation warning) safely, as Windows limits shebang flags.
+const originalEmitWarning = process.emitWarning;
+process.emitWarning = ((...args: unknown[]) => {
+  const [warning, type, code] = args;
+  if (type === 'DEP0040' || code === 'DEP0040' || (type === 'DeprecationWarning' && String(warning).includes('punycode'))) {
+    return;
+  }
+  return Reflect.apply(originalEmitWarning, process, args);
+}) as typeof process.emitWarning;
+
 import * as url from 'node:url';
 import * as path from 'node:path';
 
