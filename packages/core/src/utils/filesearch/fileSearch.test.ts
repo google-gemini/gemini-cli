@@ -5,11 +5,13 @@
  */
 
 import { describe, it, expect, afterEach, vi } from 'vitest';
+import path from 'node:path';
 import { FileSearchFactory, AbortError, filter } from './fileSearch.js';
 import { createTmpDir, cleanupTmpDir } from '@google/gemini-cli-test-utils';
 import * as crawler from './crawler.js';
 import { GEMINI_IGNORE_FILE_NAME } from '../../config/constants.js';
 import { FileDiscoveryService } from '../../services/fileDiscoveryService.js';
+import { escapePath } from '../paths.js';
 
 describe('FileSearch', () => {
   let tmpDir: string;
@@ -789,11 +791,12 @@ describe('FileSearch', () => {
 
     // Search for the file using a pattern that contains special characters.
     // The `unescapePath` function should handle the escaped path correctly.
-    const results = await fileSearch.search(
-      'src/file with \\(special\\) chars.txt',
-    );
+    const searchPattern = escapePath('src/file with (special) chars.txt');
+    const results = await fileSearch.search(searchPattern);
 
-    expect(results).toEqual(['src/file with (special) chars.txt']);
+    expect(results.map((r) => path.normalize(r))).toEqual([
+      path.normalize('src/file with (special) chars.txt'),
+    ]);
   });
 
   describe('DirectoryFileSearch', () => {

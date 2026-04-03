@@ -15,7 +15,7 @@ import {
   DEFAULT_MEMORY_FILE_FILTERING_OPTIONS,
   type FileFilteringOptions,
 } from '../config/constants.js';
-import { GEMINI_DIR, homedir, normalizePath } from './paths.js';
+import { GEMINI_DIR, homedir, normalizePath, isSubpath } from './paths.js';
 import type { ExtensionLoader } from './extensionLoader.js';
 import { debugLogger } from './debugLogger.js';
 import type { Config } from '../config/config.js';
@@ -791,15 +791,8 @@ export async function loadJitSubdirectoryMemory(
 
   // Find the deepest trusted root that contains the target path
   for (const root of trustedRoots) {
-    const resolvedRoot = normalizePath(root);
-    const resolvedRootWithTrailing = resolvedRoot.endsWith(path.sep)
-      ? resolvedRoot
-      : resolvedRoot + path.sep;
-
-    if (
-      resolvedTarget === resolvedRoot ||
-      resolvedTarget.startsWith(resolvedRootWithTrailing)
-    ) {
+    if (isSubpath(root, targetPath)) {
+      const resolvedRoot = normalizePath(root);
       if (!bestRoot || resolvedRoot.length > bestRoot.length) {
         bestRoot = resolvedRoot;
       }

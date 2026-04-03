@@ -10,6 +10,7 @@ import {
 } from './seatbeltArgsBuilder.js';
 import * as fsUtils from '../utils/fsUtils.js';
 import fs from 'node:fs';
+import os from 'node:os';
 
 vi.mock('../utils/fsUtils.js', async () => {
   const actual = await vi.importActual('../utils/fsUtils.js');
@@ -20,7 +21,7 @@ vi.mock('../utils/fsUtils.js', async () => {
   };
 });
 
-describe('seatbeltArgsBuilder', () => {
+describe.skipIf(os.platform() === 'win32')('seatbeltArgsBuilder', () => {
   afterEach(() => {
     vi.restoreAllMocks();
   });
