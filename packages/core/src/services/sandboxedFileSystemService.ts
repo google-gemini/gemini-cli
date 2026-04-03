@@ -22,7 +22,7 @@ export class SandboxedFileSystemService implements FileSystemService {
 
   private sanitizeAndValidatePath(filePath: string): string {
     const resolvedPath = resolveToRealPath(filePath);
-    const workspace = this.sandboxManager.getWorkspace();
+    const workspace = resolveToRealPath(this.sandboxManager.getWorkspace());
 
     if (isSubpath(workspace, resolvedPath) || workspace === resolvedPath) {
       return resolvedPath;
