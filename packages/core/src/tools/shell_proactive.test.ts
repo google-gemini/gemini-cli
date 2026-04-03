@@ -23,7 +23,7 @@ import * as proactivePermissions from '../sandbox/utils/proactivePermissions.js'
 import { initializeShellParsers } from '../utils/shell-utils.js';
 
 vi.mock('node:fs', async (importOriginal) => {
-  const original = (await importOriginal());
+  const original = await importOriginal();
   return {
     ...original,
     realpathSync: vi.fn((p) => p),
