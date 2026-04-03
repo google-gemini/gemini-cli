@@ -7,6 +7,7 @@ import { describe, it, expect } from 'vitest';
 import { convertSessionToClientHistory } from './sessionUtils.js';
 import { type ConversationRecord } from '../services/chatRecordingService.js';
 import { CoreToolCallStatus } from '../scheduler/types.js';
+import { toContents } from '../code_assist/converter.js';
 
 describe('convertSessionToClientHistory', () => {
   it('should convert a simple conversation without tool calls', () => {
@@ -179,6 +180,62 @@ describe('convertSessionToClientHistory', () => {
           { text: 'Look at this image' },
           { inlineData: { mimeType: 'image/png', data: 'base64data' } },
         ],
+      },
+    ]);
+  });
+
+  it('integration: should ensure thoughts survive conversion back to API format without string mutation on session resume', () => {
+    // 1. A simulated conversation pulled from storage (like session resume)
+    const messages: ConversationRecord['messages'] = [
+      {
+        id: '1',
+        type: 'user',
+        timestamp: '2024-01-01T10:00:00Z',
+        content: 'Hello, can you help me?',
+      },
+      {
+        id: '2',
+        type: 'gemini',
+        timestamp: '2024-01-01T10:01:00Z',
+        content: 'AI Response',
+        thoughts: [
+          {
+            subject: 'Thinking',
+            description: 'I need to process this',
+            timestamp: '2024-01-01T10:00:50Z',
+          },
+        ],
+      },
+      {
+        id: '3',
+        type: 'user',
+        timestamp: '2024-01-01T10:02:00Z',
+        content: 'This is the first message after session resume.',
+      },
+    ];
+
+    // 2. convertSessionToClientHistory (what GeminiChat uses to load history internally)
+    const history = convertSessionToClientHistory(messages);
+
+    // 3. toContents (what the CodeAssist API / external AI provider uses internally to format network requests)
+    const generatedContents = toContents(history);
+
+    // 4. Assert that we don't accidentally mutate or inject '[Thought: true]' as string text.
+    expect(generatedContents).toEqual([
+      {
+        role: 'user',
+        parts: [{ text: 'Hello, can you help me?' }],
+      },
+      {
+        role: 'model',
+        parts: [
+          { text: '**Thinking** I need to process this', thought: true },
+          { text: 'AI Response' },
+        ],
+      },
+      {
+        role: 'user',
+        parts: [{ text: 'This is the first message after session resume.' }],
       },
     ]);
   });
