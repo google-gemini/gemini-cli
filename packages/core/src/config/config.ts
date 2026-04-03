@@ -225,7 +225,7 @@ export interface GemmaModelRouterSettings {
 
 export interface ADKSettings {
   agentSessionNoninteractiveEnabled?: boolean;
-  interactiveAgentSessionEnabled?: boolean;
+  agentSessionInteractiveEnabled?: boolean;
 }
 
 export interface ExtensionSetting {
@@ -893,7 +893,7 @@ export class Config implements McpContext, AgentLoopContext {
 
   private readonly gemmaModelRouter: GemmaModelRouterSettings;
   private readonly agentSessionNoninteractiveEnabled: boolean;
-  private readonly interactiveAgentSessionEnabled: boolean;
+  private readonly agentSessionInteractiveEnabled: boolean;
 
   private readonly continueOnFailedApiCall: boolean;
   private readonly retryFetchErrors: boolean;
@@ -1316,8 +1316,8 @@ export class Config implements McpContext, AgentLoopContext {
 
     this.agentSessionNoninteractiveEnabled =
       params.adk?.agentSessionNoninteractiveEnabled ?? false;
-    this.interactiveAgentSessionEnabled =
-      params.adk?.interactiveAgentSessionEnabled ?? false;
+    this.agentSessionInteractiveEnabled =
+      params.adk?.agentSessionInteractiveEnabled ?? false;
     this.retryFetchErrors = params.retryFetchErrors ?? true;
     this.maxAttempts = Math.min(
       params.maxAttempts ?? DEFAULT_MAX_ATTEMPTS,
@@ -3381,8 +3381,8 @@ export class Config implements McpContext, AgentLoopContext {
     return this.agentSessionNoninteractiveEnabled;
   }
 
-  getInteractiveAgentSessionEnabled(): boolean {
-    return this.interactiveAgentSessionEnabled;
+  getAgentSessionInteractiveEnabled(): boolean {
+    return this.agentSessionInteractiveEnabled;
   }
 
   /**

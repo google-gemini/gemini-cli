@@ -2775,6 +2775,13 @@
               "markdownDescription": "Enable non-interactive agent sessions.\n\n- Category: `Experimental`\n- Requires restart: `yes`\n- Default: `false`",
               "default": false,
               "type": "boolean"
+            },
+            "agentSessionInteractiveEnabled": {
+              "title": "Interactive Agent Session Enabled",
+              "description": "Enable the agent session implementation for the interactive CLI.",
+              "markdownDescription": "Enable the agent session implementation for the interactive CLI.\n\n- Category: `Experimental`\n- Requires restart: `yes`\n- Default: `false`",
+              "default": false,
+              "type": "boolean"
             }
           },
           "additionalProperties": false
