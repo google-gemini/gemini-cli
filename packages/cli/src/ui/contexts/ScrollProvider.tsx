@@ -46,6 +46,19 @@ const ScrollContext = createContext<ScrollContextType | null>(null);
  */
 const SCROLL_STATIC_FRICTION = 0.001;
 
+/**
+ * Calculates a scroll top value clamped between 0 and the maximum possible
+ * scroll position for the given container dimensions.
+ */
+const getClampedScrollTop = (
+  scrollTop: number,
+  scrollHeight: number,
+  innerHeight: number,
+) => {
+  const maxScroll = Math.max(0, scrollHeight - innerHeight);
+  return Math.max(0, Math.min(scrollTop, maxScroll));
+};
+
 const findScrollableCandidates = (
   mouseEvent: MouseEvent,
   scrollables: Map<string, ScrollableEntry>,
@@ -95,7 +108,8 @@ export const ScrollProvider: React.FC<{ children: React.ReactNode }> = ({
       next.delete(id);
       return next;
     });
-    pendingScrollsRef.current.delete(id);
+    trueScrollRef.current.delete(id);
+    pendingFlushRef.current.delete(id);
   }, []);
 
   const scrollablesRef = useRef(scrollables);
@@ -103,7 +117,10 @@ export const ScrollProvider: React.FC<{ children: React.ReactNode }> = ({
     scrollablesRef.current = scrollables;
   }, [scrollables]);
 
-  const pendingScrollsRef = useRef(new Map<string, number>());
+  const trueScrollRef = useRef(
+    new Map<string, { floatValue: number; expectedScrollTop: number }>(),
+  );
+  const pendingFlushRef = useRef(new Set<string>());
   const flushScheduledRef = useRef(false);
 
   const dragStateRef = useRef<{
@@ -121,24 +138,43 @@ export const ScrollProvider: React.FC<{ children: React.ReactNode }> = ({
       flushScheduledRef.current = true;
       setTimeout(() => {
         flushScheduledRef.current = false;
-        for (const [id, delta] of pendingScrollsRef.current.entries()) {
+        const ids = Array.from(pendingFlushRef.current);
+        pendingFlushRef.current.clear();
+
+        for (const id of ids) {
           const entry = scrollablesRef.current.get(id);
-          if (entry) {
-            const roundedDelta = Math.round(delta);
-            if (roundedDelta !== 0) {
-              entry.scrollBy(roundedDelta);
+          const trueScroll = trueScrollRef.current.get(id);
+
+          if (entry && trueScroll) {
+            const { scrollTop, scrollHeight, innerHeight } =
+              entry.getScrollState();
+
+            // Re-verify it hasn't become stale before flushing
+            if (trueScroll.expectedScrollTop !== scrollTop) {
+              trueScrollRef.current.set(id, {
+                floatValue: scrollTop,
+                expectedScrollTop: scrollTop,
+              });
+              continue;
             }
 
-            const remainder = delta - roundedDelta;
-            // Keep the fractional remainder for the next scroll event to ensure
-            // smooth accumulation across flushes.
-            if (Math.abs(remainder) > SCROLL_STATIC_FRICTION) {
-              pendingScrollsRef.current.set(id, remainder);
-            } else {
-              pendingScrollsRef.current.delete(id);
+            const clampedFloat = getClampedScrollTop(
+              trueScroll.floatValue,
+              scrollHeight,
+              innerHeight,
+            );
+            const roundedTarget = Math.round(clampedFloat);
+
+            const deltaToApply = roundedTarget - scrollTop;
+
+            if (deltaToApply !== 0) {
+              entry.scrollBy(deltaToApply);
+              trueScroll.expectedScrollTop = roundedTarget;
             }
+
+            trueScroll.floatValue = clampedFloat;
           } else {
-            pendingScrollsRef.current.delete(id);
+            trueScrollRef.current.delete(id);
           }
         }
       }, 0);
@@ -185,24 +221,33 @@ export const ScrollProvider: React.FC<{ children: React.ReactNode }> = ({
     for (const candidate of candidates) {
       const { scrollTop, scrollHeight, innerHeight } =
         candidate.getScrollState();
-      const pendingDelta = pendingScrollsRef.current.get(candidate.id) || 0;
-      const effectiveScrollTop = scrollTop + pendingDelta;
 
-      // Epsilon to handle floating point inaccuracies.
-      const canScrollUp = effectiveScrollTop > SCROLL_STATIC_FRICTION;
-      const canScrollDown =
-        effectiveScrollTop <
-        scrollHeight - innerHeight - SCROLL_STATIC_FRICTION;
-      const totalDelta = pendingDelta + delta;
-
-      if (direction === 'up' && canScrollUp) {
-        pendingScrollsRef.current.set(candidate.id, totalDelta);
-        scheduleFlush();
-        return true;
+      let trueScroll = trueScrollRef.current.get(candidate.id);
+      if (!trueScroll || trueScroll.expectedScrollTop !== scrollTop) {
+        trueScroll = { floatValue: scrollTop, expectedScrollTop: scrollTop };
       }
 
-      if (direction === 'down' && canScrollDown) {
-        pendingScrollsRef.current.set(candidate.id, totalDelta);
+      const maxScroll = Math.max(0, scrollHeight - innerHeight);
+      const canScrollUp = trueScroll.floatValue > SCROLL_STATIC_FRICTION;
+      const canScrollDown =
+        trueScroll.floatValue < maxScroll - SCROLL_STATIC_FRICTION;
+
+      if (
+        (direction === 'up' && canScrollUp) ||
+        (direction === 'down' && canScrollDown)
+      ) {
+        const clampedFloat = getClampedScrollTop(
+          trueScroll.floatValue + delta,
+          scrollHeight,
+          innerHeight,
+        );
+
+        trueScrollRef.current.set(candidate.id, {
+          floatValue: clampedFloat,
+          expectedScrollTop: trueScroll.expectedScrollTop,
+        });
+
+        pendingFlushRef.current.add(candidate.id);
         scheduleFlush();
         return true;
       }

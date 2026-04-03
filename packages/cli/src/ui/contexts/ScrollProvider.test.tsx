@@ -579,7 +579,7 @@ describe('ScrollProvider', () => {
         0,
       );
       expect(totalDelta).toBeGreaterThan(60);
-      expect(totalDelta).toBe(149);
+      expect(totalDelta).toBe(150);
     });
 
     it('does not accelerate for Ghostty terminals even during rapid scrolling', async () => {
