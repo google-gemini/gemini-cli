@@ -61,7 +61,7 @@ const Platform = {
   /** Returns a command that checks if the current terminal is interactive. */
   isPty() {
     return this.isWindows
-      ? 'cmd.exe /c echo True'
+      ? 'powershell.exe -NoProfile -Command "echo True"'
       : 'bash -c "if [ -t 1 ]; then echo True; else echo False; fi"';
   },
 
