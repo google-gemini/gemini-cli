@@ -478,9 +478,9 @@
         },
         "loadingPhrases": {
           "title": "Loading Phrases",
-          "description": "What to show while the model is working: tips, witty comments, both, or nothing.",
-          "markdownDescription": "What to show while the model is working: tips, witty comments, both, or nothing.\n\n- Category: `UI`\n- Requires restart: `no`\n- Default: `tips`",
-          "default": "tips",
+          "description": "What to show while the model is working: tips, witty comments, all, or off.",
+          "markdownDescription": "What to show while the model is working: tips, witty comments, all, or off.\n\n- Category: `UI`\n- Requires restart: `no`\n- Default: `off`",
+          "default": "off",
           "type": "string",
           "enum": ["tips", "witty", "all", "off"]
         },
@@ -2205,8 +2205,8 @@
             },
             "visualModel": {
               "title": "Browser Visual Model",
-              "description": "Model override for the visual agent.",
-              "markdownDescription": "Model override for the visual agent.\n\n- Category: `Advanced`\n- Requires restart: `yes`",
+              "description": "Model for the visual agent's analyze_screenshot tool. When set, enables the tool.",
+              "markdownDescription": "Model for the visual agent's analyze_screenshot tool. When set, enables the tool.\n\n- Category: `Advanced`\n- Requires restart: `yes`",
               "type": "string"
             },
             "allowedDomains": {
@@ -2712,8 +2712,8 @@
         "autoConfigureMemory": {
           "title": "Auto Configure Max Old Space Size",
           "description": "Automatically configure Node.js memory limits",
-          "markdownDescription": "Automatically configure Node.js memory limits\n\n- Category: `Advanced`\n- Requires restart: `yes`\n- Default: `false`",
-          "default": false,
+          "markdownDescription": "Automatically configure Node.js memory limits\n\n- Category: `Advanced`\n- Requires restart: `yes`\n- Default: `true`",
+          "default": true,
           "type": "boolean"
         },
         "dnsResolutionOrder": {
@@ -2908,6 +2908,13 @@
           "title": "Memory Manager Agent",
           "description": "Replace the built-in save_memory tool with a memory manager subagent that supports adding, removing, de-duplicating, and organizing memories.",
           "markdownDescription": "Replace the built-in save_memory tool with a memory manager subagent that supports adding, removing, de-duplicating, and organizing memories.\n\n- Category: `Experimental`\n- Requires restart: `yes`\n- Default: `false`",
+          "default": false,
+          "type": "boolean"
+        },
+        "generalistProfile": {
+          "title": "Use the generalist profile to manage agent contexts.",
+          "description": "Suitable for general coding and software development tasks.",
+          "markdownDescription": "Suitable for general coding and software development tasks.\n\n- Category: `Experimental`\n- Requires restart: `yes`\n- Default: `false`",
           "default": false,
           "type": "boolean"
         },

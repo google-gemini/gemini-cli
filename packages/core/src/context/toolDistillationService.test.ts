@@ -9,6 +9,10 @@ import { ToolOutputDistillationService } from './toolDistillationService.js';
 import type { Config, Part } from '../index.js';
 import type { GeminiClient } from '../core/client.js';
 
+vi.mock('../utils/fileUtils.js', () => ({
+  saveTruncatedToolOutput: vi.fn().mockResolvedValue('mocked-path'),
+}));
+
 describe('ToolOutputDistillationService', () => {
   let mockConfig: Config;
   let mockGeminiClient: GeminiClient;

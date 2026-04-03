@@ -1906,7 +1906,7 @@ describe('runNonInteractive', () => {
           input,
           prompt_id: promptId,
         });
-      } catch (_error) {
+      } catch {
         // Expected exit
       }
 

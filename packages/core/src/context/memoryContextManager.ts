@@ -19,7 +19,7 @@ import {
 import type { Config } from '../config/config.js';
 import { coreEvents, CoreEvent } from '../utils/events.js';
 
-export class ContextManager {
+export class MemoryContextManager {
   private readonly loadedPaths: Set<string> = new Set();
   private readonly loadedFileIdentities: Set<string> = new Set();
   private readonly config: Config;
