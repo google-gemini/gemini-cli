@@ -61,6 +61,10 @@ export async function internalEvalTest(evalCase: EvalCase) {
     try {
       rig.setup(evalCase.name, evalCase.params);
 
+      if (evalCase.setup) {
+        await evalCase.setup(rig);
+      }
+
       if (evalCase.files) {
         await setupTestFiles(rig, evalCase.files);
       }
@@ -371,6 +375,7 @@ export interface EvalCase {
   prompt: string;
   timeout?: number;
   files?: Record<string, string>;
+  setup?: (rig: TestRig) => Promise<void> | void;
   /** Conversation history to pre-load via --resume. Each entry is a message object with type, content, etc. */
   messages?: Record<string, unknown>[];
   /** Session ID for the resumed session. Auto-generated if not provided. */

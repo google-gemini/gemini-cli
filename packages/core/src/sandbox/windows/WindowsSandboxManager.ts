@@ -19,6 +19,7 @@ import {
   tryRealpath,
   type SandboxPermissions,
   type ParsedSandboxDenial,
+  resolveSandboxPaths,
 } from '../../services/sandboxManager.js';
 import type { ShellExecutionResult } from '../../services/shellExecutionService.js';
 import {
@@ -69,6 +70,10 @@ export class WindowsSandboxManager implements SandboxManager {
 
   parseDenials(result: ShellExecutionResult): ParsedSandboxDenial | undefined {
     return parseWindowsSandboxDenials(result);
+  }
+
+  getWorkspace(): string {
+    return this.options.workspace;
   }
 
   /**
@@ -212,8 +217,15 @@ export class WindowsSandboxManager implements SandboxManager {
     // Reject override attempts in plan mode
     verifySandboxOverrides(allowOverrides, req.policy);
 
+    const command = req.command;
+    const args = req.args;
+
+    // Native commands __read and __write are passed directly to GeminiSandbox.exe
+
+    const isYolo = this.options.modeConfig?.yolo ?? false;
+
     // Fetch persistent approvals for this command
-    const commandName = await getCommandName(req.command, req.args);
+    const commandName = await getCommandName(command, args);
     const persistentPermissions = allowOverrides
       ? this.options.policyManager?.getCommandPermissions(commandName)
       : undefined;
@@ -231,13 +243,20 @@ export class WindowsSandboxManager implements SandboxManager {
         ],
       },
       network:
+        isYolo ||
         persistentPermissions?.network ||
         req.policy?.additionalPermissions?.network ||
         false,
     };
 
+    if (req.command === '__read' && req.args[0]) {
+      mergedAdditional.fileSystem!.read!.push(req.args[0]);
+    } else if (req.command === '__write' && req.args[0]) {
+      mergedAdditional.fileSystem!.write!.push(req.args[0]);
+    }
+
     const defaultNetwork =
-      this.options.modeConfig?.network || req.policy?.networkAccess || false;
+      this.options.modeConfig?.network ?? req.policy?.networkAccess ?? false;
     const networkAccess = defaultNetwork || mergedAdditional.network;
 
     // 1. Handle filesystem permissions for Low Integrity
@@ -245,8 +264,8 @@ export class WindowsSandboxManager implements SandboxManager {
     // If not in readonly mode OR it's a strictly approved pipeline, allow workspace writes
     const isApproved = allowOverrides
       ? await isStrictlyApproved(
-          req.command,
-          req.args,
+          command,
+          args,
           this.options.modeConfig?.approvedTools,
         )
       : false;
@@ -255,24 +274,55 @@ export class WindowsSandboxManager implements SandboxManager {
       await this.grantLowIntegrityAccess(this.options.workspace);
     }
 
+    const { allowed: allowedPaths, forbidden: forbiddenPaths } =
+      await resolveSandboxPaths(this.options, req);
+
+    // Grant "Low Mandatory Level" access to includeDirectories.
+    const includeDirs = sanitizePaths(this.options.includeDirectories);
+    for (const includeDir of includeDirs) {
+      await this.grantLowIntegrityAccess(includeDir);
+    }
+
     // Grant "Low Mandatory Level" read/write access to allowedPaths.
-    const allowedPaths = sanitizePaths(req.policy?.allowedPaths) || [];
     for (const allowedPath of allowedPaths) {
-      await this.grantLowIntegrityAccess(allowedPath);
+      const resolved = await tryRealpath(allowedPath);
+      try {
+        await fs.promises.access(resolved, fs.constants.F_OK);
+      } catch {
+        throw new Error(
+          `Sandbox request rejected: Allowed path does not exist: ${resolved}. ` +
+            'On Windows, granular sandbox access can only be granted to existing paths to avoid broad parent directory permissions.',
+        );
+      }
+      await this.grantLowIntegrityAccess(resolved);
     }
 
     // Grant "Low Mandatory Level" write access to additional permissions write paths.
-    const additionalWritePaths =
-      sanitizePaths(mergedAdditional.fileSystem?.write) || [];
+    const additionalWritePaths = sanitizePaths(
+      mergedAdditional.fileSystem?.write,
+    );
     for (const writePath of additionalWritePaths) {
-      await this.grantLowIntegrityAccess(writePath);
+      const resolved = await tryRealpath(writePath);
+      try {
+        await fs.promises.access(resolved, fs.constants.F_OK);
+      } catch {
+        throw new Error(
+          `Sandbox request rejected: Additional write path does not exist: ${resolved}. ` +
+            'On Windows, granular sandbox access can only be granted to existing paths to avoid broad parent directory permissions.',
+        );
+      }
+      await this.grantLowIntegrityAccess(resolved);
     }
 
     // 2. Collect secret files and apply protective ACLs
     // On Windows, we explicitly deny access to secret files for Low Integrity
     // processes to ensure they cannot be read or written.
     const secretsToBlock: string[] = [];
-    const searchDirs = new Set([this.options.workspace, ...allowedPaths]);
+    const searchDirs = new Set([
+      this.options.workspace,
+      ...allowedPaths,
+      ...includeDirs,
+    ]);
     for (const dir of searchDirs) {
       try {
         // We use maxDepth 3 to catch common nested secrets while keeping performance high.
@@ -301,7 +351,6 @@ export class WindowsSandboxManager implements SandboxManager {
     // is restricted to avoid host corruption. External commands rely on
     // Low Integrity read/write restrictions, while internal commands
     // use the manifest for enforcement.
-    const forbiddenPaths = sanitizePaths(this.options.forbiddenPaths) || [];
     for (const forbiddenPath of forbiddenPaths) {
       try {
         await this.denyLowIntegrityAccess(forbiddenPath);
@@ -346,19 +395,21 @@ export class WindowsSandboxManager implements SandboxManager {
     // GeminiSandbox.exe <network:0|1> <cwd> --forbidden-manifest <path> <command> [args...]
     const program = this.helperPath;
 
-    const args = [
+    const finalArgs = [
       networkAccess ? '1' : '0',
       req.cwd,
       '--forbidden-manifest',
       manifestPath,
-      req.command,
-      ...req.args,
+      command,
+      ...args,
     ];
+
+    const finalEnv = { ...sanitizedEnv };
 
     return {
       program,
-      args,
-      env: sanitizedEnv,
+      args: finalArgs,
+      env: finalEnv,
       cwd: req.cwd,
     };
   }

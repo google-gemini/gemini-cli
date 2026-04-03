@@ -122,6 +122,13 @@
           "default": {},
           "type": "object",
           "properties": {
+            "enabled": {
+              "title": "Enable Plan Mode",
+              "description": "Enable Plan Mode for read-only safety during planning.",
+              "markdownDescription": "Enable Plan Mode for read-only safety during planning.\n\n- Category: `General`\n- Requires restart: `yes`\n- Default: `true`",
+              "default": true,
+              "type": "boolean"
+            },
             "directory": {
               "title": "Plan Directory",
               "description": "The directory where planning artifacts are stored. If not specified, defaults to the system temporary directory. A custom directory requires a policy to allow write access in Plan Mode.",
@@ -317,6 +324,13 @@
           "default": true,
           "type": "boolean"
         },
+        "compactToolOutput": {
+          "title": "Compact Tool Output",
+          "description": "Display tool outputs (like directory listings and file reads) in a compact, structured format.",
+          "markdownDescription": "Display tool outputs (like directory listings and file reads) in a compact, structured format.\n\n- Category: `UI`\n- Requires restart: `no`\n- Default: `false`",
+          "default": false,
+          "type": "boolean"
+        },
         "hideBanner": {
           "title": "Hide Banner",
           "description": "Hide the application banner",
@@ -441,6 +455,20 @@
           "default": false,
           "type": "boolean"
         },
+        "renderProcess": {
+          "title": "Render Process",
+          "description": "Enable Ink render process for the UI.",
+          "markdownDescription": "Enable Ink render process for the UI.\n\n- Category: `UI`\n- Requires restart: `yes`\n- Default: `true`",
+          "default": true,
+          "type": "boolean"
+        },
+        "terminalBuffer": {
+          "title": "Terminal Buffer",
+          "description": "Use the new terminal buffer architecture for rendering.",
+          "markdownDescription": "Use the new terminal buffer architecture for rendering.\n\n- Category: `UI`\n- Requires restart: `yes`\n- Default: `true`",
+          "default": true,
+          "type": "boolean"
+        },
         "useBackgroundColor": {
           "title": "Use Background Color",
           "description": "Whether to use background colors in the UI.",
@@ -464,9 +492,9 @@
         },
         "loadingPhrases": {
           "title": "Loading Phrases",
-          "description": "What to show while the model is working: tips, witty comments, both, or nothing.",
-          "markdownDescription": "What to show while the model is working: tips, witty comments, both, or nothing.\n\n- Category: `UI`\n- Requires restart: `no`\n- Default: `tips`",
-          "default": "tips",
+          "description": "What to show while the model is working: tips, witty comments, all, or off.",
+          "markdownDescription": "What to show while the model is working: tips, witty comments, all, or off.\n\n- Category: `UI`\n- Requires restart: `no`\n- Default: `off`",
+          "default": "off",
           "type": "string",
           "enum": ["tips", "witty", "all", "off"]
         },
@@ -2191,8 +2219,8 @@
             },
             "visualModel": {
               "title": "Browser Visual Model",
-              "description": "Model override for the visual agent.",
-              "markdownDescription": "Model override for the visual agent.\n\n- Category: `Advanced`\n- Requires restart: `yes`",
+              "description": "Model for the visual agent's analyze_screenshot tool. When set, enables the tool.",
+              "markdownDescription": "Model for the visual agent's analyze_screenshot tool. When set, enables the tool.\n\n- Category: `Advanced`\n- Requires restart: `yes`",
               "type": "string"
             },
             "allowedDomains": {
@@ -2698,8 +2726,8 @@
         "autoConfigureMemory": {
           "title": "Auto Configure Max Old Space Size",
           "description": "Automatically configure Node.js memory limits",
-          "markdownDescription": "Automatically configure Node.js memory limits\n\n- Category: `Advanced`\n- Requires restart: `yes`\n- Default: `false`",
-          "default": false,
+          "markdownDescription": "Automatically configure Node.js memory limits\n\n- Category: `Advanced`\n- Requires restart: `yes`\n- Default: `true`",
+          "default": true,
           "type": "boolean"
         },
         "dnsResolutionOrder": {
@@ -2734,39 +2762,18 @@
       "default": {},
       "type": "object",
       "properties": {
-        "toolOutputMasking": {
-          "title": "Tool Output Masking",
-          "description": "Advanced settings for tool output masking to manage context window efficiency.",
-          "markdownDescription": "Advanced settings for tool output masking to manage context window efficiency.\n\n- Category: `Experimental`\n- Requires restart: `yes`\n- Default: `{}`",
+        "adk": {
+          "title": "ADK",
+          "description": "Settings for the Agent Development Kit (ADK).",
+          "markdownDescription": "Settings for the Agent Development Kit (ADK).\n\n- Category: `Experimental`\n- Requires restart: `yes`\n- Default: `{}`",
           "default": {},
           "type": "object",
           "properties": {
-            "enabled": {
-              "title": "Enable Tool Output Masking",
-              "description": "Enables tool output masking to save tokens.",
-              "markdownDescription": "Enables tool output masking to save tokens.\n\n- Category: `Experimental`\n- Requires restart: `yes`\n- Default: `true`",
-              "default": true,
-              "type": "boolean"
-            },
-            "toolProtectionThreshold": {
-              "title": "Tool Protection Threshold",
-              "description": "Minimum number of tokens to protect from masking (most recent tool outputs).",
-              "markdownDescription": "Minimum number of tokens to protect from masking (most recent tool outputs).\n\n- Category: `Experimental`\n- Requires restart: `yes`\n- Default: `50000`",
-              "default": 50000,
-              "type": "number"
-            },
-            "minPrunableTokensThreshold": {
-              "title": "Min Prunable Tokens Threshold",
-              "description": "Minimum prunable tokens required to trigger a masking pass.",
-              "markdownDescription": "Minimum prunable tokens required to trigger a masking pass.\n\n- Category: `Experimental`\n- Requires restart: `yes`\n- Default: `30000`",
-              "default": 30000,
-              "type": "number"
-            },
-            "protectLatestTurn": {
-              "title": "Protect Latest Turn",
-              "description": "Ensures the absolute latest turn is never masked, regardless of token count.",
-              "markdownDescription": "Ensures the absolute latest turn is never masked, regardless of token count.\n\n- Category: `Experimental`\n- Requires restart: `yes`\n- Default: `true`",
-              "default": true,
+            "agentSessionNoninteractiveEnabled": {
+              "title": "Agent Session Non-interactive Enabled",
+              "description": "Enable non-interactive agent sessions.",
+              "markdownDescription": "Enable non-interactive agent sessions.\n\n- Category: `Experimental`\n- Requires restart: `yes`\n- Default: `false`",
+              "default": false,
               "type": "boolean"
             }
           },
@@ -2824,8 +2831,8 @@
         "jitContext": {
           "title": "JIT Context Loading",
           "description": "Enable Just-In-Time (JIT) context loading.",
-          "markdownDescription": "Enable Just-In-Time (JIT) context loading.\n\n- Category: `Experimental`\n- Requires restart: `yes`\n- Default: `true`",
-          "default": true,
+          "markdownDescription": "Enable Just-In-Time (JIT) context loading.\n\n- Category: `Experimental`\n- Requires restart: `yes`\n- Default: `false`",
+          "default": false,
           "type": "boolean"
         },
         "useOSC52Paste": {
@@ -2840,13 +2847,6 @@
           "description": "Use OSC 52 for copying. This may be more robust than the default system when using remote terminal sessions (if your terminal is configured to allow it).",
           "markdownDescription": "Use OSC 52 for copying. This may be more robust than the default system when using remote terminal sessions (if your terminal is configured to allow it).\n\n- Category: `Experimental`\n- Requires restart: `no`\n- Default: `false`",
           "default": false,
-          "type": "boolean"
-        },
-        "plan": {
-          "title": "Plan",
-          "description": "Enable Plan Mode.",
-          "markdownDescription": "Enable Plan Mode.\n\n- Category: `Experimental`\n- Requires restart: `yes`\n- Default: `true`",
-          "default": true,
           "type": "boolean"
         },
         "taskTracker": {
@@ -2925,31 +2925,17 @@
           "default": false,
           "type": "boolean"
         },
-        "agentHistoryTruncation": {
-          "title": "Agent History Truncation",
-          "description": "Enable truncation window logic for the Agent History Provider.",
-          "markdownDescription": "Enable truncation window logic for the Agent History Provider.\n\n- Category: `Experimental`\n- Requires restart: `yes`\n- Default: `false`",
+        "generalistProfile": {
+          "title": "Use the generalist profile to manage agent contexts.",
+          "description": "Suitable for general coding and software development tasks.",
+          "markdownDescription": "Suitable for general coding and software development tasks.\n\n- Category: `Experimental`\n- Requires restart: `yes`\n- Default: `false`",
           "default": false,
           "type": "boolean"
         },
-        "agentHistoryTruncationThreshold": {
-          "title": "Agent History Truncation Threshold",
-          "description": "The maximum number of messages before history is truncated.",
-          "markdownDescription": "The maximum number of messages before history is truncated.\n\n- Category: `Experimental`\n- Requires restart: `yes`\n- Default: `30`",
-          "default": 30,
-          "type": "number"
-        },
-        "agentHistoryRetainedMessages": {
-          "title": "Agent History Retained Messages",
-          "description": "The number of recent messages to retain after truncation.",
-          "markdownDescription": "The number of recent messages to retain after truncation.\n\n- Category: `Experimental`\n- Requires restart: `yes`\n- Default: `15`",
-          "default": 15,
-          "type": "number"
-        },
-        "agentHistorySummarization": {
-          "title": "Agent History Summarization",
-          "description": "Enable summarization of truncated content via a small model for the Agent History Provider.",
-          "markdownDescription": "Enable summarization of truncated content via a small model for the Agent History Provider.\n\n- Category: `Experimental`\n- Requires restart: `yes`\n- Default: `false`",
+        "contextManagement": {
+          "title": "Enable Context Management",
+          "description": "Enable logic for context management.",
+          "markdownDescription": "Enable logic for context management.\n\n- Category: `Experimental`\n- Requires restart: `yes`\n- Default: `false`",
           "default": false,
           "type": "boolean"
         },
@@ -3143,6 +3129,132 @@
         "type": "array",
         "items": {}
       }
+    },
+    "contextManagement": {
+      "title": "Context Management",
+      "description": "Settings for agent history and tool distillation context management.",
+      "markdownDescription": "Settings for agent history and tool distillation context management.\n\n- Category: `Experimental`\n- Requires restart: `yes`\n- Default: `{}`",
+      "default": {},
+      "type": "object",
+      "properties": {
+        "historyWindow": {
+          "title": "History Window Settings",
+          "markdownDescription": "Description not provided.\n\n- Category: `Context Management`\n- Requires restart: `yes`\n- Default: `{}`",
+          "default": {},
+          "type": "object",
+          "properties": {
+            "maxTokens": {
+              "title": "Max Tokens",
+              "description": "The number of tokens to allow before triggering compression.",
+              "markdownDescription": "The number of tokens to allow before triggering compression.\n\n- Category: `Context Management`\n- Requires restart: `yes`\n- Default: `150000`",
+              "default": 150000,
+              "type": "number"
+            },
+            "retainedTokens": {
+              "title": "Retained Tokens",
+              "description": "The number of tokens to always retain.",
+              "markdownDescription": "The number of tokens to always retain.\n\n- Category: `Context Management`\n- Requires restart: `yes`\n- Default: `40000`",
+              "default": 40000,
+              "type": "number"
+            }
+          },
+          "additionalProperties": false
+        },
+        "messageLimits": {
+          "title": "Message Limits",
+          "markdownDescription": "Description not provided.\n\n- Category: `Context Management`\n- Requires restart: `yes`\n- Default: `{}`",
+          "default": {},
+          "type": "object",
+          "properties": {
+            "normalMaxTokens": {
+              "title": "Normal Maximum Tokens",
+              "description": "The target number of tokens to budget for a normal conversation turn.",
+              "markdownDescription": "The target number of tokens to budget for a normal conversation turn.\n\n- Category: `Context Management`\n- Requires restart: `yes`\n- Default: `2500`",
+              "default": 2500,
+              "type": "number"
+            },
+            "retainedMaxTokens": {
+              "title": "Retained Maximum Tokens",
+              "description": "The maximum number of tokens a single conversation turn can consume before truncation.",
+              "markdownDescription": "The maximum number of tokens a single conversation turn can consume before truncation.\n\n- Category: `Context Management`\n- Requires restart: `yes`\n- Default: `12000`",
+              "default": 12000,
+              "type": "number"
+            },
+            "normalizationHeadRatio": {
+              "title": "Normalization Head Ratio",
+              "description": "The ratio of tokens to retain from the beginning of a truncated message (0.0 to 1.0).",
+              "markdownDescription": "The ratio of tokens to retain from the beginning of a truncated message (0.0 to 1.0).\n\n- Category: `Context Management`\n- Requires restart: `yes`\n- Default: `0.25`",
+              "default": 0.25,
+              "type": "number"
+            }
+          },
+          "additionalProperties": false
+        },
+        "tools": {
+          "title": "Context Management Tools",
+          "markdownDescription": "Description not provided.\n\n- Category: `Context Management`\n- Requires restart: `yes`\n- Default: `{}`",
+          "default": {},
+          "type": "object",
+          "properties": {
+            "distillation": {
+              "title": "Tool Distillation",
+              "markdownDescription": "Description not provided.\n\n- Category: `Context Management`\n- Requires restart: `yes`\n- Default: `{}`",
+              "default": {},
+              "type": "object",
+              "properties": {
+                "maxOutputTokens": {
+                  "title": "Max Output Tokens",
+                  "description": "Maximum tokens to show to the model when truncating large tool outputs.",
+                  "markdownDescription": "Maximum tokens to show to the model when truncating large tool outputs.\n\n- Category: `Context Management`\n- Requires restart: `yes`\n- Default: `10000`",
+                  "default": 10000,
+                  "type": "number"
+                },
+                "summarizationThresholdTokens": {
+                  "title": "Tool Summarization Threshold",
+                  "description": "Threshold above which truncated tool outputs will be summarized by an LLM.",
+                  "markdownDescription": "Threshold above which truncated tool outputs will be summarized by an LLM.\n\n- Category: `Context Management`\n- Requires restart: `yes`\n- Default: `20000`",
+                  "default": 20000,
+                  "type": "number"
+                }
+              },
+              "additionalProperties": false
+            },
+            "outputMasking": {
+              "title": "Tool Output Masking",
+              "description": "Advanced settings for tool output masking to manage context window efficiency.",
+              "markdownDescription": "Advanced settings for tool output masking to manage context window efficiency.\n\n- Category: `Context Management`\n- Requires restart: `yes`\n- Default: `{}`",
+              "default": {},
+              "type": "object",
+              "properties": {
+                "protectionThresholdTokens": {
+                  "title": "Tool Protection Threshold (Tokens)",
+                  "description": "Minimum number of tokens to protect from masking (most recent tool outputs).",
+                  "markdownDescription": "Minimum number of tokens to protect from masking (most recent tool outputs).\n\n- Category: `Context Management`\n- Requires restart: `yes`\n- Default: `50000`",
+                  "default": 50000,
+                  "type": "number"
+                },
+                "minPrunableThresholdTokens": {
+                  "title": "Min Prunable Tokens Threshold",
+                  "description": "Minimum prunable tokens required to trigger a masking pass.",
+                  "markdownDescription": "Minimum prunable tokens required to trigger a masking pass.\n\n- Category: `Context Management`\n- Requires restart: `yes`\n- Default: `30000`",
+                  "default": 30000,
+                  "type": "number"
+                },
+                "protectLatestTurn": {
+                  "title": "Protect Latest Turn",
+                  "description": "Ensures the absolute latest turn is never masked, regardless of token count.",
+                  "markdownDescription": "Ensures the absolute latest turn is never masked, regardless of token count.\n\n- Category: `Context Management`\n- Requires restart: `yes`\n- Default: `true`",
+                  "default": true,
+                  "type": "boolean"
+                }
+              },
+              "additionalProperties": false
+            }
+          },
+          "additionalProperties": false
+        }
+      },
+      "additionalProperties": false
     },
     "admin": {
       "title": "Admin",

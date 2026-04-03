@@ -13,6 +13,7 @@ import {
   extractStringFromParseEntry,
 } from '../utils/shell-utils.js';
 import { parse as shellParse } from 'shell-quote';
+import { isSubpath } from '../utils/paths.js';
 import {
   PolicyDecision,
   type PolicyEngineConfig,
@@ -28,6 +29,7 @@ import { debugLogger } from '../utils/debugLogger.js';
 import type { CheckerRunner } from '../safety/checker-runner.js';
 import { SafetyCheckDecision } from '../safety/protocol.js';
 import { getToolAliases } from '../tools/tool-names.js';
+import { PARAM_ADDITIONAL_PERMISSIONS } from '../tools/definitions/base-declarations.js';
 import {
   MCP_TOOL_PREFIX,
   isMcpToolAnnotation,
@@ -38,6 +40,7 @@ import {
 import {
   type SandboxManager,
   NoopSandboxManager,
+  type SandboxPermissions,
 } from '../services/sandboxManager.js';
 
 function isWildcardPattern(name: string): boolean {
@@ -644,6 +647,36 @@ export class PolicyEngine {
         matchedRule = shellResult.rule;
       } else {
         decision = this.defaultDecision;
+      }
+    }
+
+    if (decision === PolicyDecision.ALLOW) {
+      const args = toolCall.args;
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
+      const additionalPermissions = args?.[PARAM_ADDITIONAL_PERMISSIONS] as
+        | SandboxPermissions
+        | undefined;
+
+      const fsPerms = additionalPermissions?.fileSystem;
+      if (fsPerms) {
+        const workspace = this.sandboxManager.getWorkspace();
+        const readPaths = Array.isArray(fsPerms.read) ? fsPerms.read : [];
+        const writePaths = Array.isArray(fsPerms.write) ? fsPerms.write : [];
+        const allPaths = [...readPaths, ...writePaths];
+
+        for (const p of allPaths) {
+          if (
+            typeof p === 'string' &&
+            !isSubpath(workspace, p) &&
+            workspace !== p
+          ) {
+            debugLogger.debug(
+              `[PolicyEngine.check] Additional permission path '${p}' is outside workspace '${workspace}'. Downgrading to ASK_USER.`,
+            );
+            decision = PolicyDecision.ASK_USER;
+            break;
+          }
+        }
       }
     }
 

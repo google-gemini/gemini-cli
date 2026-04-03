@@ -1,0 +1,113 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`DenseToolMessage > Toggleable Diff View (Alternate Buffer) > hides diff content by default when in alternate buffer mode 1`] = `
+"  ✓  test-tool  test.ts → Accepted
+"
+`;
+
+exports[`DenseToolMessage > Toggleable Diff View (Alternate Buffer) > shows diff content by default when NOT in alternate buffer mode 1`] = `
+"  ✓  test-tool  test.ts → Accepted
+"
+`;
+
+exports[`DenseToolMessage > Visual Regression > matches SVG snapshot for a Rejected tool call 1`] = `"  -  read_file  Reading important.txt"`;
+
+exports[`DenseToolMessage > Visual Regression > matches SVG snapshot for an Accepted file edit with diff stats 1`] = `"  ✓  edit  test.ts → Accepted (+1, -1)"`;
+
+exports[`DenseToolMessage > does not render result arrow if resultDisplay is missing 1`] = `
+"  o  test-tool  Test description
+"
+`;
+
+exports[`DenseToolMessage > flattens newlines in string results 1`] = `
+"  ✓  test-tool  Test description → Line 1 Line 2
+"
+`;
+
+exports[`DenseToolMessage > renders correctly for Edit tool using confirmationDetails 1`] = `
+"  ?  Edit  styles.scss → Confirming
+"
+`;
+
+exports[`DenseToolMessage > renders correctly for Errored Edit tool 1`] = `
+"  x  Edit  styles.scss → Failed (+1, -1)
+"
+`;
+
+exports[`DenseToolMessage > renders correctly for ReadManyFiles results 1`] = `
+"  ✓  test-tool  Attempting to read files from **/*.ts → Read 3 file(s) (1 ignored)
+
+        file1.ts
+        file2.ts
+        file3.ts
+"
+`;
+
+exports[`DenseToolMessage > renders correctly for Rejected Edit tool 1`] = `
+"  -  Edit  styles.scss → Rejected (+1, -1)
+"
+`;
+
+exports[`DenseToolMessage > renders correctly for Rejected Edit tool with confirmationDetails and diffStat 1`] = `
+"  -  Edit  styles.scss → Rejected (+1, -1)
+"
+`;
+
+exports[`DenseToolMessage > renders correctly for Rejected WriteFile tool 1`] = `
+"  -  WriteFile  config.json → Rejected
+"
+`;
+
+exports[`DenseToolMessage > renders correctly for WriteFile tool 1`] = `
+"  ✓  WriteFile  config.json → Accepted (+1, -1)
+"
+`;
+
+exports[`DenseToolMessage > renders correctly for a successful string result 1`] = `
+"  ✓  test-tool  Test description → Success result
+"
+`;
+
+exports[`DenseToolMessage > renders correctly for error status with string message 1`] = `
+"  x  test-tool  Test description → Error occurred
+"
+`;
+
+exports[`DenseToolMessage > renders correctly for file diff results with stats 1`] = `
+"  ✓  test-tool  test.ts → Accepted (+15, -6)
+"
+`;
+
+exports[`DenseToolMessage > renders correctly for grep results 1`] = `
+"  ✓  test-tool  Test description → Found 2 matches
+
+        file1.ts:10: match 1
+        file2.ts:20: match 2
+"
+`;
+
+exports[`DenseToolMessage > renders correctly for ls results 1`] = `
+"  ✓  test-tool  Test description → Listed 2 files. (1 ignored)
+"
+`;
+
+exports[`DenseToolMessage > renders correctly for todo updates 1`] = `
+"  ✓  test-tool  Test description → Todos updated
+"
+`;
+
+exports[`DenseToolMessage > renders generic failure message for error status without string message 1`] = `
+"  x  test-tool  Test description → Failed
+"
+`;
+
+exports[`DenseToolMessage > renders generic output message for unknown object results 1`] = `
+"  ✓  test-tool  Test description → Returned (possible empty result)
+"
+`;
+
+exports[`DenseToolMessage > truncates long string results 1`] = `
+"  ✓  test-tool  Test description
+   → AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA…
+"
+`;
