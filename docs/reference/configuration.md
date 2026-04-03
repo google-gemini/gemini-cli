@@ -267,7 +267,7 @@ their corresponding top-level category object in your `settings.json` file.
 - **`ui.compactToolOutput`** (boolean):
   - **Description:** Display tool outputs (like directory listings and file
     reads) in a compact, structured format.
-  - **Default:** `false`
+  - **Default:** `true`
 
 - **`ui.hideBanner`** (boolean):
   - **Description:** Hide the application banner

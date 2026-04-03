@@ -576,7 +576,7 @@ const SETTINGS_SCHEMA = {
         label: 'Compact Tool Output',
         category: 'UI',
         requiresRestart: false,
-        default: false,
+        default: true,
         description:
           'Display tool outputs (like directory listings and file reads) in a compact, structured format.',
         showInDialog: true,
