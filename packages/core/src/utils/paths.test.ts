@@ -602,25 +602,50 @@ describe('resolveToRealPath', () => {
 });
 
 describe('makeRelative', () => {
-  it('should return relative path if targetPath is already relative', () => {
-    expect(makeRelative('foo/bar', '/root')).toBe('foo/bar');
+  describe.skipIf(process.platform === 'win32')('on POSIX', () => {
+    it('should return relative path if targetPath is already relative', () => {
+      expect(makeRelative('foo/bar', '/root')).toBe('foo/bar');
+    });
+
+    it('should return relative path from root to target', () => {
+      const root = '/Users/test/project';
+      const target = '/Users/test/project/src/file.ts';
+      expect(makeRelative(target, root)).toBe('src/file.ts');
+    });
+
+    it('should return "." if target and root are the same', () => {
+      const root = '/Users/test/project';
+      expect(makeRelative(root, root)).toBe('.');
+    });
+
+    it('should handle parent directories with ..', () => {
+      const root = '/Users/test/project/src';
+      const target = '/Users/test/project/docs/readme.md';
+      expect(makeRelative(target, root)).toBe('../docs/readme.md');
+    });
   });
 
-  it('should return relative path from root to target', () => {
-    const root = '/Users/test/project';
-    const target = '/Users/test/project/src/file.ts';
-    expect(makeRelative(target, root)).toBe('src/file.ts');
-  });
+  describe.skipIf(process.platform !== 'win32')('on Windows', () => {
+    it('should return relative path if targetPath is already relative', () => {
+      expect(makeRelative('foo/bar', 'C:\\root')).toBe('foo/bar');
+    });
 
-  it('should return "." if target and root are the same', () => {
-    const root = '/Users/test/project';
-    expect(makeRelative(root, root)).toBe('.');
-  });
+    it('should return relative path from root to target', () => {
+      const root = 'C:\\Users\\test\\project';
+      const target = 'C:\\Users\\test\\project\\src\\file.ts';
+      expect(makeRelative(target, root)).toBe('src\\file.ts');
+    });
 
-  it('should handle parent directories with ..', () => {
-    const root = '/Users/test/project/src';
-    const target = '/Users/test/project/docs/readme.md';
-    expect(makeRelative(target, root)).toBe('../docs/readme.md');
+    it('should return "." if target and root are the same', () => {
+      const root = 'C:\\Users\\test\\project';
+      expect(makeRelative(root, root)).toBe('.');
+    });
+
+    it('should handle parent directories with ..', () => {
+      const root = 'C:\\Users\\test\\project\\src';
+      const target = 'C:\\Users\\test\\project\\docs\\readme.md';
+      expect(makeRelative(target, root)).toBe('..\\docs\\readme.md');
+    });
   });
 });
 
