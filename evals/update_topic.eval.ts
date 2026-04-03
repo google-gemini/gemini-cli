@@ -113,4 +113,111 @@ describe('update_topic_behavior', () => {
       }
     },
   });
+
+  evalTest('USUALLY_PASSES', {
+    name: 'update_topic should NOT be used for simple tasks',
+    prompt: 'Write a short, funny poem about a cat that loves lasagna.',
+    files: {
+      '.gemini/settings.json': JSON.stringify({
+        experimental: {
+          topicUpdateNarration: true,
+        },
+      }),
+    },
+    assert: async (rig) => {
+      const toolLogs = rig.readToolLogs();
+      const topicCalls = toolLogs.filter(
+        (l) => l.toolRequest.name === UPDATE_TOPIC_TOOL_NAME,
+      );
+
+      expect(
+        topicCalls.length,
+        `Expected 0 update_topic calls for a simple task, but found ${topicCalls.length}`,
+      ).toBe(0);
+    },
+  });
+
+  evalTest('USUALLY_PASSES', {
+    name: 'update_topic should NOT be used for informational coding tasks (Obvious)',
+    prompt:
+      'Explain the difference between Map and Object in JavaScript and provide a performance-focused code snippet for each.',
+    files: {
+      '.gemini/settings.json': JSON.stringify({
+        experimental: {
+          topicUpdateNarration: true,
+        },
+      }),
+    },
+    assert: async (rig) => {
+      const toolLogs = rig.readToolLogs();
+      const topicCalls = toolLogs.filter(
+        (l) => l.toolRequest.name === UPDATE_TOPIC_TOOL_NAME,
+      );
+
+      expect(
+        topicCalls.length,
+        `Expected 0 update_topic calls for an informational task, but found ${topicCalls.length}`,
+      ).toBe(0);
+    },
+  });
+
+  evalTest('USUALLY_PASSES', {
+    name: 'update_topic should NOT be used for surgical version lookups (Grey Area)',
+    prompt:
+      'Check the root package.json and tell me what version of vitest we are currently pinned to.',
+    files: {
+      'package.json': JSON.stringify(
+        {
+          name: 'gemini-cli',
+          devDependencies: {
+            vitest: '^3.0.0',
+          },
+        },
+        null,
+        2,
+      ),
+      '.gemini/settings.json': JSON.stringify({
+        experimental: {
+          topicUpdateNarration: true,
+        },
+      }),
+    },
+    assert: async (rig) => {
+      const toolLogs = rig.readToolLogs();
+      const topicCalls = toolLogs.filter(
+        (l) => l.toolRequest.name === UPDATE_TOPIC_TOOL_NAME,
+      );
+
+      expect(
+        topicCalls.length,
+        `Expected 0 update_topic calls for a surgical lookup, but found ${topicCalls.length}`,
+      ).toBe(0);
+    },
+  });
+
+  evalTest('USUALLY_PASSES', {
+    name: 'update_topic should NOT be used for surgical symbol searches (Grey Area 2)',
+    prompt:
+      "Find the file where the 'UPDATE_TOPIC_TOOL_NAME' constant is defined.",
+    files: {
+      'packages/core/src/tools/tool-names.ts':
+        "export const UPDATE_TOPIC_TOOL_NAME = 'update_topic';",
+      '.gemini/settings.json': JSON.stringify({
+        experimental: {
+          topicUpdateNarration: true,
+        },
+      }),
+    },
+    assert: async (rig) => {
+      const toolLogs = rig.readToolLogs();
+      const topicCalls = toolLogs.filter(
+        (l) => l.toolRequest.name === UPDATE_TOPIC_TOOL_NAME,
+      );
+
+      expect(
+        topicCalls.length,
+        `Expected 0 update_topic calls for a surgical symbol search, but found ${topicCalls.length}`,
+      ).toBe(0);
+    },
+  });
 });
