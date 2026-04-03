@@ -1311,11 +1311,7 @@ Logging in with Google... Restarting Gemini CLI to continue.
       const extMatch = submittedValue.trim().match(/^\/([a-zA-Z0-9_-]+):/);
       if (extMatch && config) {
         const extName = extMatch[1];
-        if (
-          config
-            .getExtensions()
-            .some((ext) => ext.name === extName && ext.isActive)
-        ) {
+        if (config.hasExtensionPlanDir(extName)) {
           config.setActiveExtensionContext(extName);
         }
       }

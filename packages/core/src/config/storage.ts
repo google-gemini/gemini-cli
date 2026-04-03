@@ -319,12 +319,10 @@ export class Storage {
       const resolvedPath = path.resolve(this.getProjectRoot(), customDir);
       const realProjectRoot = resolveToRealPath(this.getProjectRoot());
 
-      let realResolvedPath = resolvedPath;
-      try {
-        realResolvedPath = resolveToRealPath(resolvedPath);
-      } catch (_e) {
-        // Fallback to resolvedPath if resolveToRealPath fails unexpectedly (e.g. permissions)
+      if (!fs.existsSync(resolvedPath)) {
+        fs.mkdirSync(resolvedPath, { recursive: true });
       }
+      const realResolvedPath = resolveToRealPath(resolvedPath);
 
       if (!isSubpath(realProjectRoot, realResolvedPath)) {
         throw new Error(
