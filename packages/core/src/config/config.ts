@@ -968,10 +968,6 @@ export class Config implements McpContext, AgentLoopContext {
           enabled: params.sandbox.enabled || params.toolSandboxing || false,
           allowedPaths: params.sandbox.allowedPaths ?? [],
           includeDirectories: [
-      ? {
-          enabled: params.sandbox.enabled || params.toolSandboxing || false,
-          allowedPaths: params.sandbox.allowedPaths ?? [],
-          includeDirectories: [
             ...(params.sandbox.includeDirectories ?? []),
             ...(params.sandbox.allowedPaths ?? []),
             Storage.getGlobalTempDir(),
@@ -1006,7 +1002,10 @@ export class Config implements McpContext, AgentLoopContext {
       {
         workspace: this.targetDir,
         forbiddenPaths: this.getSandboxForbiddenPaths.bind(this),
-        includeDirectories: this.pendingIncludeDirectories,
+        includeDirectories: [
+          ...this.pendingIncludeDirectories,
+          Storage.getGlobalTempDir(),
+        ],
         policyManager: this._sandboxPolicyManager,
       },
       initialApprovalMode,
@@ -1714,7 +1713,10 @@ export class Config implements McpContext, AgentLoopContext {
       {
         workspace: this.targetDir,
         forbiddenPaths: this.getSandboxForbiddenPaths.bind(this),
-        includeDirectories: this.pendingIncludeDirectories,
+        includeDirectories: [
+          ...this.pendingIncludeDirectories,
+          Storage.getGlobalTempDir(),
+        ],
         policyManager: this._sandboxPolicyManager,
       },
       this.getApprovalMode(),
