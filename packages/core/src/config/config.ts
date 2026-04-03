@@ -1397,6 +1397,7 @@ export class Config implements McpContext, AgentLoopContext {
 
     // Add plans directory to workspace context for plan file storage
     if (this.planEnabled) {
+      const resolvedPlanDirs = new Set<string>();
       const planDirSpecs = [
         undefined,
         ...Object.values(this.extensionPlanDirs),
@@ -1404,8 +1405,14 @@ export class Config implements McpContext, AgentLoopContext {
       for (const dirSpec of planDirSpecs) {
         try {
           const plansDir = this.storage.getPlansDir(dirSpec);
-          await fs.promises.mkdir(plansDir, { recursive: true });
-          this.workspaceContext.addDirectory(plansDir);
+          const realPlansDir = resolveToRealPath(plansDir);
+          if (resolvedPlanDirs.has(realPlansDir)) {
+            continue;
+          }
+          resolvedPlanDirs.add(realPlansDir);
+
+          await fs.promises.mkdir(realPlansDir, { recursive: true });
+          this.workspaceContext.addDirectory(realPlansDir);
         } catch (_e) {
           // Ignore errors during initialization
         }
