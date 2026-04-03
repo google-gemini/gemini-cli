@@ -2015,6 +2015,7 @@ describe('ShellExecutionService environment variables', () => {
       isDangerousCommand: vi.fn().mockReturnValue(false),
       parseDenials: vi.fn().mockReturnValue(undefined),
       getWorkspace: vi.fn().mockReturnValue('/workspace'),
+      getOptions: vi.fn().mockReturnValue(undefined),
     };
 
     const configWithSandbox: ShellExecutionConfig = {
