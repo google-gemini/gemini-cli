@@ -335,9 +335,9 @@ describe('DenseToolMessage', () => {
     await waitUntilReady();
     const output = lastFrame();
     expect(output).toContain('→ Found 2 matches');
-    // Matches are rendered in a secondary list for high-signal summaries
-    expect(output).toContain('file1.ts:10: match 1');
-    expect(output).toContain('file2.ts:20: match 2');
+    // Matches should no longer be rendered in dense mode to keep it compact
+    expect(output).not.toContain('file1.ts:10: match 1');
+    expect(output).not.toContain('file2.ts:20: match 2');
     expect(output).toMatchSnapshot();
   });
 
@@ -378,9 +378,10 @@ describe('DenseToolMessage', () => {
     const output = lastFrame();
     expect(output).toContain('Attempting to read files from **/*.ts');
     expect(output).toContain('→ Read 3 file(s) (1 ignored)');
-    expect(output).toContain('file1.ts');
-    expect(output).toContain('file2.ts');
-    expect(output).toContain('file3.ts');
+    // File lists should no longer be rendered in dense mode
+    expect(output).not.toContain('file1.ts');
+    expect(output).not.toContain('file2.ts');
+    expect(output).not.toContain('file3.ts');
     expect(output).toMatchSnapshot();
   });
 
