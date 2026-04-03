@@ -513,6 +513,8 @@ const baseMockUiState = {
   activePtyId: undefined,
   backgroundTasks: new Map(),
   backgroundTaskHeight: 0,
+  copyModeEnabled: false,
+  mouseMode: true,
   quota: {
     userTier: undefined,
     stats: undefined,
