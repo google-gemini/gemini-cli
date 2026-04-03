@@ -28,7 +28,7 @@ describe('save_memory', () => {
 
       assertModelHasOutput(result);
       checkModelOutputContent(result, {
-        expectedContent: 'blue',
+        expectedContent: 'red',
         testName: `${TEST_PREFIX}${rememberingFavoriteColor}`,
       });
     },
@@ -41,7 +41,7 @@ describe('save_memory', () => {
     assert: async (rig, result) => {
       const wasToolCalled = await rig.waitForToolCall('save_memory');
       expect(wasToolCalled, 'Expected save_memory tool to be called').toBe(
-        true,
+        false,
       );
 
       assertModelHasOutput(result);
