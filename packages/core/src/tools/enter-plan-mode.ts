@@ -128,6 +128,7 @@ export class EnterPlanModeInvocation extends BaseToolInvocation<
     // In sandboxed environments, the plans directory must exist on the host
     // before it can be bound/allowed in the sandbox.
     const plansDir = this.config.storage.getPlansDir();
+    this.config.getWorkspaceContext().addWritablePath(plansDir);
     if (!fs.existsSync(plansDir)) {
       try {
         fs.mkdirSync(plansDir, { recursive: true });

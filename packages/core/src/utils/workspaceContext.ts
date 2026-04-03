@@ -25,6 +25,7 @@ export class WorkspaceContext {
   private directories = new Set<string>();
   private initialDirectories: Set<string>;
   private readOnlyPaths = new Set<string>();
+  private writablePaths = new Set<string>();
   private onDirectoriesChangedListeners = new Set<() => void>();
 
   /**
@@ -132,6 +133,18 @@ export class WorkspaceContext {
     }
   }
 
+  /**
+   * Adds a path that is allowed to be written to, even if it's not within the workspace.
+   * This is useful for temporary directories or specific files that need to be
+   * writable even in restricted modes. Unlike addDirectory, this does not
+   * require the path to exist.
+   */
+  addWritablePath(pathToAdd: string): void {
+    // Resolve to absolute path, but don't use realpath as it might not exist
+    const resolved = path.resolve(this.targetDir, pathToAdd);
+    this.writablePaths.add(resolved);
+  }
+
   private resolveAndValidateDir(directory: string): string {
     const absolutePath = path.resolve(this.targetDir, directory);
 
@@ -207,6 +220,34 @@ export class WorkspaceContext {
       const fullyResolvedPath = this.fullyResolvedPath(pathToCheck);
 
       for (const allowedPath of this.readOnlyPaths) {
+        // Allow exact matches or subpaths (if allowedPath is a directory)
+        if (
+          fullyResolvedPath === allowedPath ||
+          this.isPathWithinRoot(fullyResolvedPath, allowedPath)
+        ) {
+          return true;
+        }
+      }
+      return false;
+    } catch {
+      return false;
+    }
+  }
+
+  /**
+   * Checks if a path is allowed to be written to.
+   * This includes workspace paths and explicitly added writable paths.
+   * @param pathToCheck The path to validate
+   * @returns True if the path is writable, false otherwise
+   */
+  isPathWritable(pathToCheck: string): boolean {
+    if (this.isPathWithinWorkspace(pathToCheck)) {
+      return true;
+    }
+    try {
+      const fullyResolvedPath = this.fullyResolvedPath(pathToCheck);
+
+      for (const allowedPath of this.writablePaths) {
         // Allow exact matches or subpaths (if allowedPath is a directory)
         if (
           fullyResolvedPath === allowedPath ||

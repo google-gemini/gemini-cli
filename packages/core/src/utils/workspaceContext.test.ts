@@ -162,6 +162,47 @@ describe('WorkspaceContext with real filesystem', () => {
       );
     });
 
+    it('should support granular writable paths that do not exist yet', () => {
+      const workspaceContext = new WorkspaceContext(cwd);
+      const plansDir = path.join(tempDir, 'plans');
+      const planFile = path.join(plansDir, 'my-plan.md');
+
+      // Initially rejected
+      expect(workspaceContext.isPathWritable(planFile)).toBe(false);
+
+      // Register as writable
+      workspaceContext.addWritablePath(plansDir);
+
+      // Now accepted even though plansDir does not exist on disk yet
+      expect(workspaceContext.isPathWritable(planFile)).toBe(true);
+      expect(workspaceContext.isPathWritable(plansDir)).toBe(true);
+
+      // Other paths still rejected
+      const otherFile = path.join(tempDir, 'other', 'file.txt');
+      expect(workspaceContext.isPathWritable(otherFile)).toBe(false);
+    });
+
+    it('should support workspace paths in isPathWritable', () => {
+      const workspaceContext = new WorkspaceContext(cwd);
+      const projectFile = path.join(cwd, 'src', 'index.ts');
+
+      expect(workspaceContext.isPathWritable(projectFile)).toBe(true);
+    });
+
+    it('should support read-only paths in isPathReadable', () => {
+      const workspaceContext = new WorkspaceContext(cwd);
+      const readOnlyDir = path.join(tempDir, 'readonly');
+      const readOnlyFile = path.join(readOnlyDir, 'data.json');
+
+      fs.mkdirSync(readOnlyDir);
+      fs.writeFileSync(readOnlyFile, '{}');
+
+      workspaceContext.addReadOnlyPath(readOnlyDir);
+
+      expect(workspaceContext.isPathReadable(readOnlyFile)).toBe(true);
+      expect(workspaceContext.isPathWritable(readOnlyFile)).toBe(false);
+    });
+
     describe.skipIf(os.platform() === 'win32')('with symbolic link', () => {
       describe('in the workspace', () => {
         let realDir: string;

@@ -40,7 +40,7 @@ export class SandboxedFileSystemService implements FileSystemService {
       const isAllowed =
         checkType === 'read'
           ? this.workspaceContext.isPathReadable(resolvedPath)
-          : this.workspaceContext.isPathWithinWorkspace(resolvedPath);
+          : this.workspaceContext.isPathWritable(resolvedPath);
 
       if (!isAllowed) {
         throw new Error(

@@ -1398,14 +1398,13 @@ export class Config implements McpContext, AgentLoopContext {
     // Add plans directory to workspace context for plan file storage
     if (this.planEnabled) {
       const plansDir = this.storage.getPlansDir();
+      this.workspaceContext.addWritablePath(plansDir);
       try {
         await fs.promises.access(plansDir);
         this.workspaceContext.addDirectory(plansDir);
       } catch {
-        // Directory does not exist yet, so we don't add it to the workspace context.
-        // It will be created when the first plan is written. Since custom plan
-        // directories must be within the project root, they are automatically
-        // covered by the project-wide file discovery once created.
+        // Directory does not exist yet, so we only add it as a writable path
+        // for validation, but not as a workspace directory for discovery.
       }
     }
 
