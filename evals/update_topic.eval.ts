@@ -215,4 +215,44 @@ export default app;
       expect(fs.existsSync(path.join(rig.testDir, 'src/routes.ts'))).toBe(true);
     },
   });
+
+  /**
+   * Regression test for a bug where update_topic was called multiple times in a
+   * row.
+   */
+  evalTest('USUALLY_PASSES', {
+    name: 'update_topic should be called just once',
+    prompt:
+      'What is 2+2. Post your answer with update_topic tool. Do not talk.',
+    files: {
+      '.gemini/settings.json': JSON.stringify({
+        experimental: {
+          topicUpdateNarration: true,
+        },
+      }),
+    },
+    assert: async (rig, result) => {
+      const toolLogs = rig.readToolLogs();
+      const topicCalls = toolLogs.filter(
+        (l) => l.toolRequest.name === UPDATE_TOPIC_TOOL_NAME,
+      );
+
+      expect(
+        topicCalls.length,
+        'Expected at least one update_topic call',
+      ).toStrictEqual(1);
+
+      expect(
+        topicCalls.some((l) => {
+          const params = JSON.parse(l.toolRequest.args);
+          return (
+            params.title?.includes('4') ||
+            params.summary?.includes('4') ||
+            params.strategic_intent?.includes('4')
+          );
+        }),
+        'Expected update_topic to contain the answer "4"',
+      ).toBe(true);
+    },
+  });
 });
