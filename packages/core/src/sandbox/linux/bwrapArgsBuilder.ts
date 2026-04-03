@@ -33,6 +33,7 @@ export interface BwrapArgsOptions {
   includeDirectories: string[];
   maskFilePath: string;
   isWriteCommand: boolean;
+  geminiTmpPath?: string;
 }
 
 /**
@@ -62,6 +63,15 @@ export async function buildBwrapArgs(
     '--tmpfs', // Provides an isolated, writable /tmp directory
     '/tmp',
   );
+
+  // Allow read/write access to the Gemini temporary directory if provided
+  if (options.geminiTmpPath) {
+    const geminiTmp = tryRealpath(options.geminiTmpPath);
+    bwrapArgs.push('--bind-try', options.geminiTmpPath, options.geminiTmpPath);
+    if (geminiTmp !== options.geminiTmpPath) {
+      bwrapArgs.push('--bind-try', geminiTmp, geminiTmp);
+    }
+  }
 
   const workspacePath = tryRealpath(options.workspace);
 

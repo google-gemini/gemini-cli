@@ -144,6 +144,7 @@ export class MacOsSandboxManager implements SandboxManager {
       networkAccess: mergedAdditional.network,
       workspaceWrite,
       additionalPermissions: mergedAdditional,
+      geminiTmpPath: path.join(os.homedir(), '.gemini', 'tmp'),
     });
 
     const tempFile = this.writeProfileToTempFile(sandboxArgs);

@@ -256,6 +256,7 @@ export class LinuxSandboxManager implements SandboxManager {
       includeDirectories: this.options.includeDirectories || [],
       maskFilePath: this.getMaskFilePath(),
       isWriteCommand: req.command === '__write',
+      geminiTmpPath: join(os.homedir(), '.gemini', 'tmp'),
     });
 
     const bpfPath = getSeccompBpfPath();

@@ -34,6 +34,8 @@ export interface SeatbeltArgsOptions {
   additionalPermissions?: SandboxPermissions;
   /** Whether to allow write access to the workspace. */
   workspaceWrite?: boolean;
+  /** The path to the Gemini temporary directory (~/.gemini/tmp). */
+  geminiTmpPath?: string;
 }
 
 /**
@@ -60,6 +62,15 @@ export function buildSeatbeltProfile(options: SeatbeltArgsOptions): string {
 
   const tmpPath = tryRealpath(os.tmpdir());
   profile += `(allow file-read* file-write* (subpath "${escapeSchemeString(tmpPath)}"))\n`;
+
+  // Allow read/write access to the Gemini temporary directory if provided
+  if (options.geminiTmpPath) {
+    const geminiTmp = tryRealpath(options.geminiTmpPath);
+    profile += `(allow file-read* file-write* (subpath "${escapeSchemeString(options.geminiTmpPath)}"))\n`;
+    if (geminiTmp !== options.geminiTmpPath) {
+      profile += `(allow file-read* file-write* (subpath "${escapeSchemeString(geminiTmp)}"))\n`;
+    }
+  }
 
   // Add explicit deny rules for governance files in the workspace.
   // These are added after the workspace allow rule to ensure they take precedence

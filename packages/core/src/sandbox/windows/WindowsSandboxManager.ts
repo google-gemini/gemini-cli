@@ -222,7 +222,25 @@ export class WindowsSandboxManager implements SandboxManager {
 
     // Native commands __read and __write are passed directly to GeminiSandbox.exe
 
+    const isApproved = allowOverrides
+      ? await isStrictlyApproved(
+          command,
+          args,
+          this.options.modeConfig?.approvedTools,
+        )
+      : false;
+
     const isYolo = this.options.modeConfig?.yolo ?? false;
+    const workspaceWrite = !isReadonlyMode || isApproved || isYolo;
+
+    if (workspaceWrite) {
+      await this.grantLowIntegrityAccess(this.options.workspace);
+    }
+
+    // Grant write access to the Gemini temporary directory
+    await this.grantLowIntegrityAccess(
+      path.join(os.homedir(), '.gemini', 'tmp'),
+    );
 
     // Fetch persistent approvals for this command
     const commandName = await getCommandName(command, args);
@@ -258,21 +276,6 @@ export class WindowsSandboxManager implements SandboxManager {
     const defaultNetwork =
       this.options.modeConfig?.network ?? req.policy?.networkAccess ?? false;
     const networkAccess = defaultNetwork || mergedAdditional.network;
-
-    // 1. Handle filesystem permissions for Low Integrity
-    // Grant "Low Mandatory Level" write access to the workspace.
-    // If not in readonly mode OR it's a strictly approved pipeline, allow workspace writes
-    const isApproved = allowOverrides
-      ? await isStrictlyApproved(
-          command,
-          args,
-          this.options.modeConfig?.approvedTools,
-        )
-      : false;
-
-    if (!isReadonlyMode || isApproved) {
-      await this.grantLowIntegrityAccess(this.options.workspace);
-    }
 
     const { allowed: allowedPaths, forbidden: forbiddenPaths } =
       await resolveSandboxPaths(this.options, req);
