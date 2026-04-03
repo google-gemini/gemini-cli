@@ -1,5 +1,9 @@
 # Gemini CLI releases
 
+<!-- prettier-ignore -->
+> [!IMPORTANT]
+> **Coordinate with the Release Manager:** The release manager is responsible for coordinating patches and releases. Please update them before performing any of the release actions described in this document.
+
 ## `dev` vs `prod` environment
 
 Our release flows support both `dev` and `prod` environments.
