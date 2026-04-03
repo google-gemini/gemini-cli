@@ -122,6 +122,13 @@ code.
   # From the root of the repository
   npm run start
   ```
+- **Production mode (React optimizations):** This method runs the CLI with React
+  production mode enabled, which is useful for testing performance without
+  development overhead.
+  ```bash
+  # From the root of the repository
+  npm run start:prod
+  ```
 - **Production-like mode (linked package):** This method simulates a global
   installation by linking your local package. It's useful for testing a local
   build in a production workflow.
