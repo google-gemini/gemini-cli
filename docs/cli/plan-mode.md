@@ -181,9 +181,16 @@ As described in the
 rule that does not explicitly specify `modes` is considered "always active" and
 will apply to Plan Mode as well.
 
-If you want a rule to apply to other modes but _not_ to Plan Mode, you must
-explicitly specify the target modes. For example, to allow `npm test` in default
-and Auto-Edit modes but not in Plan Mode:
+To maintain the integrity of Plan Mode as a safe research environment,
+persistent tool approvals are context-aware. Approvals granted in modes like
+Default or Auto-Edit do not apply to Plan Mode, ensuring that tools trusted for
+implementation don't automatically execute while you're researching. However,
+approvals granted while in Plan Mode are treated as intentional choices for
+global trust and apply to all modes.
+
+If you want to manually restrict a rule to other modes but _not_ to Plan Mode,
+you must explicitly specify the target modes. For example, to allow `npm test`
+in default and Auto-Edit modes but not in Plan Mode:
 
 ```toml
 [[rule]]
