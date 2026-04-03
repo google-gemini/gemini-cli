@@ -42,6 +42,7 @@ import {
   stripShellWrapper,
   parseCommandDetails,
   hasRedirection,
+  detectCommandSubstitution,
 } from '../utils/shell-utils.js';
 import { SHELL_TOOL_NAME } from './tool-names.js';
 import { PARAM_ADDITIONAL_PERMISSIONS } from './definitions/base-declarations.js';
@@ -405,6 +406,17 @@ export class ShellToolInvocation extends BaseToolInvocation<
   ): Promise<ToolResult> {
     const { shellExecutionConfig, setExecutionIdCallback } = options ?? {};
     const strippedCommand = stripShellWrapper(this.params.command);
+
+    if (detectCommandSubstitution(strippedCommand)) {
+      return {
+        llmContent:
+          'Command injection detected: command substitution syntax ' +
+          '($(), backticks, <() or >()) found in command arguments. ' +
+          'This is a security risk and the command was blocked.',
+        returnDisplay:
+          'Blocked: command substitution detected in shell command.',
+      };
+    }
 
     if (signal.aborted) {
       return {
