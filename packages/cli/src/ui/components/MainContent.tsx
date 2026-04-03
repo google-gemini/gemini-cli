@@ -432,6 +432,9 @@ export const MainContent = () => {
         {(item) => item}
       </Static>
       {pendingItems}
+      {/* In alternate buffer mode, the btwDisplayNode is rendered within the ScrollableList
+          (via virtualizedData) to ensure proper scrolling. In standard mode, it is rendered
+          here at the bottom of the layout. */}
       {btwDisplayNode}
     </>
   );

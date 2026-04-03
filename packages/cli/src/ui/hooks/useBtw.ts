@@ -148,7 +148,10 @@ export const useBtw = (
               break;
             }
             case GeminiEventType.Error: {
-              if (flushTimerRef.current) clearTimeout(flushTimerRef.current);
+              if (flushTimerRef.current) {
+                clearTimeout(flushTimerRef.current);
+                flushTimerRef.current = null;
+              }
               flushResponse();
 
               const value = event.value;
@@ -177,7 +180,10 @@ export const useBtw = (
             }
             case GeminiEventType.Finished:
             case GeminiEventType.UserCancelled:
-              if (flushTimerRef.current) clearTimeout(flushTimerRef.current);
+              if (flushTimerRef.current) {
+                clearTimeout(flushTimerRef.current);
+                flushTimerRef.current = null;
+              }
               flushResponse();
               dispatch({ type: 'FINISHED' });
               break;
@@ -186,7 +192,10 @@ export const useBtw = (
           }
         }
       } catch (err) {
-        if (flushTimerRef.current) clearTimeout(flushTimerRef.current);
+        if (flushTimerRef.current) {
+          clearTimeout(flushTimerRef.current);
+          flushTimerRef.current = null;
+        }
         flushResponse();
 
         if (err instanceof Error && err.name === 'AbortError') {
@@ -198,7 +207,10 @@ export const useBtw = (
           });
         }
       } finally {
-        if (flushTimerRef.current) clearTimeout(flushTimerRef.current);
+        if (flushTimerRef.current) {
+          clearTimeout(flushTimerRef.current);
+          flushTimerRef.current = null;
+        }
         flushResponse();
 
         if (requestIdRef.current === requestId) {
@@ -217,6 +229,7 @@ export const useBtw = (
       }
       if (flushTimerRef.current) {
         clearTimeout(flushTimerRef.current);
+        flushTimerRef.current = null;
       }
     },
     [],
