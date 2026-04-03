@@ -42,8 +42,17 @@ export async function validatePlanPath(
   try {
     realPath = resolveToRealPath(resolvedPath);
     realPlansDir = resolveToRealPath(plansDir);
-  } catch (_e) {
-    // Fallback to unresolved paths if resolveToRealPath fails unexpectedly on non-existent directories.
+  } catch (e: unknown) {
+    if (
+      e &&
+      typeof e === 'object' &&
+      'code' in e &&
+      (e.code === 'ENOENT' || e.code === 'EISDIR')
+    ) {
+      // Fallback to unresolved paths if resolveToRealPath fails on non-existent directories.
+    } else {
+      throw e;
+    }
   }
 
   if (!isSubpath(realPlansDir, realPath)) {
