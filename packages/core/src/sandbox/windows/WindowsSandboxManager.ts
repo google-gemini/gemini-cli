@@ -400,15 +400,6 @@ export class WindowsSandboxManager implements SandboxManager {
     const manifestPath = path.join(tempDir, 'manifest.txt');
     fs.writeFileSync(manifestPath, allForbidden.join('\n'));
 
-    // Cleanup on exit
-    process.on('exit', () => {
-      try {
-        fs.rmSync(tempDir, { recursive: true, force: true });
-      } catch {
-        // Ignore errors
-      }
-    });
-
     // 5. Construct the helper command
     // GeminiSandbox.exe <network:0|1> <cwd> --forbidden-manifest <path> <command> [args...]
     const program = this.helperPath;
@@ -429,6 +420,13 @@ export class WindowsSandboxManager implements SandboxManager {
       args: finalArgs,
       env: finalEnv,
       cwd: req.cwd,
+      cleanup: () => {
+        try {
+          fs.rmSync(tempDir, { recursive: true, force: true });
+        } catch {
+          // Ignore errors
+        }
+      },
     };
   }
 

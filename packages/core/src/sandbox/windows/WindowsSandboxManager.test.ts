@@ -535,9 +535,7 @@ describe('WindowsSandboxManager', () => {
   });
 
   it('should safely handle special characters in __write path using environment variables', async () => {
-    // Note: Windows does not allow " in filenames, but it does allow spaces and other symbols.
     const maliciousPath = path.join(testCwd, 'foo & echo bar; ! .txt');
-
     fs.writeFileSync(maliciousPath, '');
     const req: SandboxRequest = {
       command: '__write',

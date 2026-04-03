@@ -29,13 +29,8 @@ const Platform = {
   touch(filePath: string) {
     return this.isWindows
       ? {
-          command: 'powershell.exe',
-          args: [
-            '-NoProfile',
-            '-NonInteractive',
-            '-Command',
-            `New-Item -Path "${filePath}" -ItemType File -Force`,
-          ],
+          command: 'cmd.exe',
+          args: ['/c', `echo. > ${filePath} || exit 1`],
         }
       : { command: 'touch', args: [filePath] };
   },
@@ -93,6 +88,8 @@ async function runCommand(command: SandboxedCommand) {
       stdout: err.stdout ?? '',
       stderr: err.stderr ?? '',
     };
+  } finally {
+    command.cleanup?.();
   }
 }
 
@@ -165,7 +162,10 @@ describe('SandboxManager Integration', () => {
         });
 
         const result = await runCommand(sandboxed);
-        expect(result.status).toBe(0);
+        expect(
+          result.status,
+          `Expected command to succeed but it failed. Output: ${result.stdout}, Stderr: ${result.stderr}`,
+        ).toBe(0);
         expect(result.stdout.trim()).toBe('sandbox test');
       });
 
@@ -183,7 +183,10 @@ describe('SandboxManager Integration', () => {
         );
 
         const result = await handle.result;
-        expect(result.exitCode).toBe(0);
+        expect(
+          result.exitCode,
+          `PTY command failed with exit code ${result.exitCode}. Output: ${result.output}`,
+        ).toBe(0);
         expect(result.output).toContain('True');
       });
     });
@@ -201,7 +204,10 @@ describe('SandboxManager Integration', () => {
         });
 
         const result = await runCommand(sandboxed);
-        expect(result.status).not.toBe(0);
+        expect(
+          result.status,
+          `Expected command to fail but it succeeded. Output: ${result.stdout}`,
+        ).not.toBe(0);
       });
 
       it('allows dynamic expansion of permissions after a failure', async () => {
@@ -233,7 +239,10 @@ describe('SandboxManager Integration', () => {
             policy: { allowedPaths: [tempDir] },
           });
           const result2 = await runCommand(sandboxed2);
-          expect(result2.status).toBe(0);
+          expect(
+            result2.status,
+            `Second attempt failed. Stderr: ${result2.stderr}`,
+          ).toBe(0);
           expect(fs.existsSync(testFile)).toBe(true);
         } finally {
           if (fs.existsSync(testFile)) fs.unlinkSync(testFile);
@@ -258,7 +267,10 @@ describe('SandboxManager Integration', () => {
           });
 
           const result = await runCommand(sandboxed);
-          expect(result.status).toBe(0);
+          expect(
+            result.status,
+            `Grants access failed. Stderr: ${result.stderr}`,
+          ).toBe(0);
           expect(fs.existsSync(testFile)).toBe(true);
         } finally {
           if (fs.existsSync(testFile)) fs.unlinkSync(testFile);
@@ -292,7 +304,10 @@ describe('SandboxManager Integration', () => {
           });
 
           const result = await runCommand(sandboxed);
-          expect(result.status).not.toBe(0);
+          expect(
+            result.status,
+            `Expected command to fail but it succeeded. Output: ${result.stdout}, Stderr: ${result.stderr}`,
+          ).not.toBe(0);
         } finally {
           fs.rmSync(tempWorkspace, { recursive: true, force: true });
         }
@@ -327,7 +342,10 @@ describe('SandboxManager Integration', () => {
           });
 
           const result = await runCommand(sandboxed);
-          expect(result.status).not.toBe(0);
+          expect(
+            result.status,
+            `Expected command to fail but it succeeded. Output: ${result.stdout}, Stderr: ${result.stderr}`,
+          ).not.toBe(0);
         } finally {
           fs.rmSync(tempWorkspace, { recursive: true, force: true });
         }
@@ -362,7 +380,10 @@ describe('SandboxManager Integration', () => {
           });
 
           const result = await runCommand(sandboxed);
-          expect(result.status).not.toBe(0);
+          expect(
+            result.status,
+            `Expected command to fail but it succeeded. Output: ${result.stdout}, Stderr: ${result.stderr}`,
+          ).not.toBe(0);
         } finally {
           fs.rmSync(tempWorkspace, { recursive: true, force: true });
         }
@@ -393,7 +414,10 @@ describe('SandboxManager Integration', () => {
             },
           });
           const result = await runCommand(sandboxed);
-          expect(result.status).toBe(0);
+          expect(
+            result.status,
+            `Expected command to succeed but it failed. Output: ${result.stdout}, Stderr: ${result.stderr}`,
+          ).toBe(0);
           expect(result.stdout.trim()).toBe('survived');
         } finally {
           fs.rmSync(tempWorkspace, { recursive: true, force: true });
@@ -432,7 +456,10 @@ describe('SandboxManager Integration', () => {
           // Execute the command, we expect it to fail (permission denied or read-only file system)
           const result = await runCommand(sandboxedCmd);
 
-          expect(result.status).not.toBe(0);
+          expect(
+            result.status,
+            `Expected command to fail but it succeeded. Output: ${result.stdout}, Stderr: ${result.stderr}`,
+          ).not.toBe(0);
           expect(fs.existsSync(nonExistentFile)).toBe(false);
         } finally {
           fs.rmSync(tempWorkspace, { recursive: true, force: true });
@@ -470,7 +497,10 @@ describe('SandboxManager Integration', () => {
             env: process.env,
           });
           const resultTarget = await runCommand(commandTarget);
-          expect(resultTarget.status).not.toBe(0);
+          expect(
+            resultTarget.status,
+            `Expected command to fail but it succeeded. Output: ${resultTarget.stdout}, Stderr: ${resultTarget.stderr}`,
+          ).not.toBe(0);
 
           // Attempt to read via the symlink
           const { command: cmdLink, args: argsLink } =
@@ -482,7 +512,10 @@ describe('SandboxManager Integration', () => {
             env: process.env,
           });
           const resultLink = await runCommand(commandLink);
-          expect(resultLink.status).not.toBe(0);
+          expect(
+            resultLink.status,
+            `Expected command to fail but it succeeded. Output: ${resultLink.stdout}, Stderr: ${resultLink.stderr}`,
+          ).not.toBe(0);
         } finally {
           fs.rmSync(tempWorkspace, { recursive: true, force: true });
         }
@@ -528,7 +561,10 @@ describe('SandboxManager Integration', () => {
         });
 
         const result = await runCommand(sandboxed);
-        expect(result.status).not.toBe(0);
+        expect(
+          result.status,
+          `Expected network access to be blocked, but it succeeded. Output: ${result.stdout}, Stderr: ${result.stderr}`,
+        ).not.toBe(0);
       }, 30000);
 
       it('grants network access when explicitly allowed', async () => {
@@ -542,7 +578,10 @@ describe('SandboxManager Integration', () => {
         });
 
         const result = await runCommand(sandboxed);
-        expect(result.status).toBe(0);
+        expect(
+          result.status,
+          `Expected network access to succeed but it failed. Output: ${result.stdout}, Stderr: ${result.stderr}`,
+        ).toBe(0);
         if (!Platform.isWindows) {
           expect(result.stdout.trim()).toBe('ok');
         }

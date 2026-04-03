@@ -229,13 +229,24 @@ public class GeminiSandbox {
 
             // 3. Setup Job Object for cleanup
             hJob = CreateJobObject(IntPtr.Zero, null);
+            if (hJob == IntPtr.Zero) {
+                Console.Error.WriteLine("Error: CreateJobObject failed (" + Marshal.GetLastWin32Error() + ")");
+                return 1;
+            }
+
             JOBOBJECT_EXTENDED_LIMIT_INFORMATION jobLimits = new JOBOBJECT_EXTENDED_LIMIT_INFORMATION();
             jobLimits.BasicLimitInformation.LimitFlags = JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE | JOB_OBJECT_LIMIT_DIE_ON_UNHANDLED_EXCEPTION;
 
             IntPtr lpJobLimits = Marshal.AllocHGlobal(Marshal.SizeOf(jobLimits));
-            Marshal.StructureToPtr(jobLimits, lpJobLimits, false);
-            SetInformationJobObject(hJob, 9 /* JobObjectExtendedLimitInformation */, lpJobLimits, (uint)Marshal.SizeOf(jobLimits));
-            Marshal.FreeHGlobal(lpJobLimits);
+            try {
+                Marshal.StructureToPtr(jobLimits, lpJobLimits, false);
+                if (!SetInformationJobObject(hJob, 9 /* JobObjectExtendedLimitInformation */, lpJobLimits, (uint)Marshal.SizeOf(jobLimits))) {
+                    Console.Error.WriteLine("Error: SetInformationJobObject(Limits) failed (" + Marshal.GetLastWin32Error() + ")");
+                    return 1;
+                }
+            } finally {
+                Marshal.FreeHGlobal(lpJobLimits);
+            }
 
             if (!networkAccess) {
                 JOBOBJECT_NET_RATE_CONTROL_INFORMATION netLimits = new JOBOBJECT_NET_RATE_CONTROL_INFORMATION();
@@ -244,9 +255,15 @@ public class GeminiSandbox {
                 netLimits.DscpTag = 0;
 
                 IntPtr lpNetLimits = Marshal.AllocHGlobal(Marshal.SizeOf(netLimits));
-                Marshal.StructureToPtr(netLimits, lpNetLimits, false);
-                SetInformationJobObject(hJob, 32 /* JobObjectNetRateControlInformation */, lpNetLimits, (uint)Marshal.SizeOf(netLimits));
-                Marshal.FreeHGlobal(lpNetLimits);
+                try {
+                    Marshal.StructureToPtr(netLimits, lpNetLimits, false);
+                    if (!SetInformationJobObject(hJob, 32 /* JobObjectNetRateControlInformation */, lpNetLimits, (uint)Marshal.SizeOf(netLimits))) {
+                        // Some versions of Windows might not support network rate control, but we should know if it fails.
+                        Console.Error.WriteLine("Warning: SetInformationJobObject(NetRate) failed (" + Marshal.GetLastWin32Error() + "). Network might not be throttled.");
+                    }
+                } finally {
+                    Marshal.FreeHGlobal(lpNetLimits);
+                }
             }
 
             // 4. Handle Internal Commands or External Process
