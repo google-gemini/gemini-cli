@@ -1,0 +1,87 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="920" height="666" viewBox="0 0 920 666">
+  <style>
+    text { font-family: Consolas, "Courier New", monospace; font-size: 14px; dominant-baseline: text-before-edge; white-space: pre; }
+  </style>
+  <rect width="920" height="666" fill="#000000" />
+  <g transform="translate(10, 10)">
+    <text x="0" y="2" fill="#afafaf" textLength="414" lengthAdjust="spacingAndGlyphs">... first 18 lines hidden (Ctrl+O to show) ...</text>
+    <text x="0" y="19" fill="#00cdcd" textLength="36" lengthAdjust="spacingAndGlyphs">echo</text>
+    <text x="45" y="19" fill="#cdcd00" textLength="81" lengthAdjust="spacingAndGlyphs">&quot;Line 19&quot;</text>
+    <text x="0" y="36" fill="#00cdcd" textLength="36" lengthAdjust="spacingAndGlyphs">echo</text>
+    <text x="45" y="36" fill="#cdcd00" textLength="81" lengthAdjust="spacingAndGlyphs">&quot;Line 20&quot;</text>
+    <text x="0" y="53" fill="#00cdcd" textLength="36" lengthAdjust="spacingAndGlyphs">echo</text>
+    <text x="45" y="53" fill="#cdcd00" textLength="81" lengthAdjust="spacingAndGlyphs">&quot;Line 21&quot;</text>
+    <text x="0" y="70" fill="#00cdcd" textLength="36" lengthAdjust="spacingAndGlyphs">echo</text>
+    <text x="45" y="70" fill="#cdcd00" textLength="81" lengthAdjust="spacingAndGlyphs">&quot;Line 22&quot;</text>
+    <text x="0" y="87" fill="#00cdcd" textLength="36" lengthAdjust="spacingAndGlyphs">echo</text>
+    <text x="45" y="87" fill="#cdcd00" textLength="81" lengthAdjust="spacingAndGlyphs">&quot;Line 23&quot;</text>
+    <text x="0" y="104" fill="#00cdcd" textLength="36" lengthAdjust="spacingAndGlyphs">echo</text>
+    <text x="45" y="104" fill="#cdcd00" textLength="81" lengthAdjust="spacingAndGlyphs">&quot;Line 24&quot;</text>
+    <text x="0" y="121" fill="#00cdcd" textLength="36" lengthAdjust="spacingAndGlyphs">echo</text>
+    <text x="45" y="121" fill="#cdcd00" textLength="81" lengthAdjust="spacingAndGlyphs">&quot;Line 25&quot;</text>
+    <text x="0" y="138" fill="#00cdcd" textLength="36" lengthAdjust="spacingAndGlyphs">echo</text>
+    <text x="45" y="138" fill="#cdcd00" textLength="81" lengthAdjust="spacingAndGlyphs">&quot;Line 26&quot;</text>
+    <text x="0" y="155" fill="#00cdcd" textLength="36" lengthAdjust="spacingAndGlyphs">echo</text>
+    <text x="45" y="155" fill="#cdcd00" textLength="81" lengthAdjust="spacingAndGlyphs">&quot;Line 27&quot;</text>
+    <text x="0" y="172" fill="#00cdcd" textLength="36" lengthAdjust="spacingAndGlyphs">echo</text>
+    <text x="45" y="172" fill="#cdcd00" textLength="81" lengthAdjust="spacingAndGlyphs">&quot;Line 28&quot;</text>
+    <text x="0" y="189" fill="#00cdcd" textLength="36" lengthAdjust="spacingAndGlyphs">echo</text>
+    <text x="45" y="189" fill="#cdcd00" textLength="81" lengthAdjust="spacingAndGlyphs">&quot;Line 29&quot;</text>
+    <text x="0" y="206" fill="#00cdcd" textLength="36" lengthAdjust="spacingAndGlyphs">echo</text>
+    <text x="45" y="206" fill="#cdcd00" textLength="81" lengthAdjust="spacingAndGlyphs">&quot;Line 30&quot;</text>
+    <text x="0" y="223" fill="#00cdcd" textLength="36" lengthAdjust="spacingAndGlyphs">echo</text>
+    <text x="45" y="223" fill="#cdcd00" textLength="81" lengthAdjust="spacingAndGlyphs">&quot;Line 31&quot;</text>
+    <text x="0" y="240" fill="#00cdcd" textLength="36" lengthAdjust="spacingAndGlyphs">echo</text>
+    <text x="45" y="240" fill="#cdcd00" textLength="81" lengthAdjust="spacingAndGlyphs">&quot;Line 32&quot;</text>
+    <text x="0" y="257" fill="#00cdcd" textLength="36" lengthAdjust="spacingAndGlyphs">echo</text>
+    <text x="45" y="257" fill="#cdcd00" textLength="81" lengthAdjust="spacingAndGlyphs">&quot;Line 33&quot;</text>
+    <text x="0" y="274" fill="#00cdcd" textLength="36" lengthAdjust="spacingAndGlyphs">echo</text>
+    <text x="45" y="274" fill="#cdcd00" textLength="81" lengthAdjust="spacingAndGlyphs">&quot;Line 34&quot;</text>
+    <text x="0" y="291" fill="#00cdcd" textLength="36" lengthAdjust="spacingAndGlyphs">echo</text>
+    <text x="45" y="291" fill="#cdcd00" textLength="81" lengthAdjust="spacingAndGlyphs">&quot;Line 35&quot;</text>
+    <text x="0" y="308" fill="#00cdcd" textLength="36" lengthAdjust="spacingAndGlyphs">echo</text>
+    <text x="45" y="308" fill="#cdcd00" textLength="81" lengthAdjust="spacingAndGlyphs">&quot;Line 36&quot;</text>
+    <text x="0" y="325" fill="#00cdcd" textLength="36" lengthAdjust="spacingAndGlyphs">echo</text>
+    <text x="45" y="325" fill="#cdcd00" textLength="81" lengthAdjust="spacingAndGlyphs">&quot;Line 37&quot;</text>
+    <text x="0" y="342" fill="#00cdcd" textLength="36" lengthAdjust="spacingAndGlyphs">echo</text>
+    <text x="45" y="342" fill="#cdcd00" textLength="81" lengthAdjust="spacingAndGlyphs">&quot;Line 38&quot;</text>
+    <text x="0" y="359" fill="#00cdcd" textLength="36" lengthAdjust="spacingAndGlyphs">echo</text>
+    <text x="45" y="359" fill="#cdcd00" textLength="81" lengthAdjust="spacingAndGlyphs">&quot;Line 39&quot;</text>
+    <text x="0" y="376" fill="#00cdcd" textLength="36" lengthAdjust="spacingAndGlyphs">echo</text>
+    <text x="45" y="376" fill="#cdcd00" textLength="81" lengthAdjust="spacingAndGlyphs">&quot;Line 40&quot;</text>
+    <text x="0" y="393" fill="#00cdcd" textLength="36" lengthAdjust="spacingAndGlyphs">echo</text>
+    <text x="45" y="393" fill="#cdcd00" textLength="81" lengthAdjust="spacingAndGlyphs">&quot;Line 41&quot;</text>
+    <text x="0" y="410" fill="#00cdcd" textLength="36" lengthAdjust="spacingAndGlyphs">echo</text>
+    <text x="45" y="410" fill="#cdcd00" textLength="81" lengthAdjust="spacingAndGlyphs">&quot;Line 42&quot;</text>
+    <text x="0" y="427" fill="#00cdcd" textLength="36" lengthAdjust="spacingAndGlyphs">echo</text>
+    <text x="45" y="427" fill="#cdcd00" textLength="81" lengthAdjust="spacingAndGlyphs">&quot;Line 43&quot;</text>
+    <text x="0" y="444" fill="#00cdcd" textLength="36" lengthAdjust="spacingAndGlyphs">echo</text>
+    <text x="45" y="444" fill="#cdcd00" textLength="81" lengthAdjust="spacingAndGlyphs">&quot;Line 44&quot;</text>
+    <text x="0" y="461" fill="#00cdcd" textLength="36" lengthAdjust="spacingAndGlyphs">echo</text>
+    <text x="45" y="461" fill="#cdcd00" textLength="81" lengthAdjust="spacingAndGlyphs">&quot;Line 45&quot;</text>
+    <text x="0" y="478" fill="#00cdcd" textLength="36" lengthAdjust="spacingAndGlyphs">echo</text>
+    <text x="45" y="478" fill="#cdcd00" textLength="81" lengthAdjust="spacingAndGlyphs">&quot;Line 46&quot;</text>
+    <text x="0" y="495" fill="#00cdcd" textLength="36" lengthAdjust="spacingAndGlyphs">echo</text>
+    <text x="45" y="495" fill="#cdcd00" textLength="81" lengthAdjust="spacingAndGlyphs">&quot;Line 47&quot;</text>
+    <text x="0" y="512" fill="#00cdcd" textLength="36" lengthAdjust="spacingAndGlyphs">echo</text>
+    <text x="45" y="512" fill="#cdcd00" textLength="81" lengthAdjust="spacingAndGlyphs">&quot;Line 48&quot;</text>
+    <text x="0" y="529" fill="#00cdcd" textLength="36" lengthAdjust="spacingAndGlyphs">echo</text>
+    <text x="45" y="529" fill="#cdcd00" textLength="81" lengthAdjust="spacingAndGlyphs">&quot;Line 49&quot;</text>
+    <text x="0" y="546" fill="#00cdcd" textLength="36" lengthAdjust="spacingAndGlyphs">echo</text>
+    <text x="45" y="546" fill="#cdcd00" textLength="81" lengthAdjust="spacingAndGlyphs">&quot;Line 50&quot;</text>
+    <text x="0" y="563" fill="#ffffff" textLength="243" lengthAdjust="spacingAndGlyphs">Allow execution of: &apos;echo&apos;?</text>
+    <rect x="0" y="595" width="9" height="17" fill="#001a00" />
+    <text x="0" y="597" fill="#00cd00" textLength="9" lengthAdjust="spacingAndGlyphs">●</text>
+    <rect x="9" y="595" width="9" height="17" fill="#001a00" />
+    <rect x="18" y="595" width="18" height="17" fill="#001a00" />
+    <text x="18" y="597" fill="#00cd00" textLength="18" lengthAdjust="spacingAndGlyphs">1.</text>
+    <rect x="36" y="595" width="9" height="17" fill="#001a00" />
+    <rect x="45" y="595" width="90" height="17" fill="#001a00" />
+    <text x="45" y="597" fill="#00cd00" textLength="90" lengthAdjust="spacingAndGlyphs">Allow once</text>
+    <rect x="135" y="595" width="135" height="17" fill="#001a00" />
+    <text x="18" y="614" fill="#ffffff" textLength="18" lengthAdjust="spacingAndGlyphs">2.</text>
+    <text x="45" y="614" fill="#ffffff" textLength="198" lengthAdjust="spacingAndGlyphs">Allow for this session</text>
+    <text x="18" y="631" fill="#ffffff" textLength="18" lengthAdjust="spacingAndGlyphs">3.</text>
+    <text x="45" y="631" fill="#ffffff" textLength="225" lengthAdjust="spacingAndGlyphs">No, suggest changes (esc)</text>
+  </g>
+</svg>

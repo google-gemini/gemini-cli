@@ -16,11 +16,116 @@ export const BASE_SEATBELT_PROFILE = `(version 1)
 
 (import "system.sb")
 
+
 ; Core execution requirements
 (allow process-exec)
 (allow process-fork)
 (allow signal (target same-sandbox))
-(allow process-info* (target same-sandbox))
+(allow process-info*)
+
+; Map system frameworks + dylibs for loader.
+(allow file-map-executable
+  (subpath "/System/Library/Frameworks")
+  (subpath "/System/Library/PrivateFrameworks")
+  (subpath "/usr/lib")
+  (subpath "/bin")
+  (subpath "/usr/bin")
+)
+
+(allow file-write-data
+  (require-all
+    (path "/dev/null")
+    (vnode-type CHARACTER-DEVICE)))
+
+; sysctls permitted.
+(allow sysctl-read
+  (sysctl-name "hw.activecpu")
+  (sysctl-name "hw.busfrequency_compat")
+  (sysctl-name "hw.byteorder")
+  (sysctl-name "hw.cacheconfig")
+  (sysctl-name "hw.cachelinesize_compat")
+  (sysctl-name "hw.cpufamily")
+  (sysctl-name "hw.cpufrequency_compat")
+  (sysctl-name "hw.cputype")
+  (sysctl-name "hw.l1dcachesize_compat")
+  (sysctl-name "hw.l1icachesize_compat")
+  (sysctl-name "hw.l2cachesize_compat")
+  (sysctl-name "hw.l3cachesize_compat")
+  (sysctl-name "hw.logicalcpu_max")
+  (sysctl-name "hw.machine")
+  (sysctl-name "hw.model")
+  (sysctl-name "hw.memsize")
+  (sysctl-name "hw.ncpu")
+  (sysctl-name "hw.nperflevels")
+  (sysctl-name-prefix "hw.optional.arm.")
+  (sysctl-name-prefix "hw.optional.armv8_")
+  (sysctl-name "hw.packages")
+  (sysctl-name "hw.pagesize_compat")
+  (sysctl-name "hw.pagesize")
+  (sysctl-name "hw.physicalcpu")
+  (sysctl-name "hw.physicalcpu_max")
+  (sysctl-name "hw.logicalcpu")
+  (sysctl-name "hw.cpufrequency")
+  (sysctl-name "hw.tbfrequency_compat")
+  (sysctl-name "hw.vectorunit")
+  (sysctl-name "machdep.cpu.brand_string")
+  (sysctl-name "kern.argmax")
+  (sysctl-name "kern.hostname")
+  (sysctl-name "kern.maxfilesperproc")
+  (sysctl-name "kern.maxproc")
+  (sysctl-name "kern.osproductversion")
+  (sysctl-name "kern.osrelease")
+  (sysctl-name "kern.ostype")
+  (sysctl-name "kern.osvariant_status")
+  (sysctl-name "kern.osversion")
+  (sysctl-name "kern.secure_kernel")
+  (sysctl-name "kern.usrstack64")
+  (sysctl-name "kern.version")
+  (sysctl-name "sysctl.proc_cputype")
+  (sysctl-name "vm.loadavg")
+  (sysctl-name-prefix "hw.perflevel")
+  (sysctl-name-prefix "kern.proc.pgrp.")
+  (sysctl-name-prefix "kern.proc.pid.")
+  (sysctl-name-prefix "net.routetable.")
+)
+
+(allow sysctl-write
+  (sysctl-name "kern.grade_cputype"))
+
+
+(allow mach-lookup
+  (global-name "com.apple.sysmond")
+  (global-name "com.apple.system.opendirectoryd.libinfo")
+  (global-name "com.apple.system.opendirectoryd.membership")
+  (global-name "com.apple.system.logger")
+  (global-name "com.apple.system.notification_center")
+  (global-name "com.apple.logd")
+  (global-name "com.apple.secinitd")
+  (global-name "com.apple.trustd.agent")
+  (global-name "com.apple.trustd")
+  (global-name "com.apple.analyticsd")
+  (global-name "com.apple.analyticsd.messagetracer")
+)
+\n; IOKit
+(allow iokit-open
+  (iokit-registry-entry-class "RootDomainUserClient")
+)
+
+; Needed for python multiprocessing on MacOS for the SemLock
+(allow ipc-posix-sem)
+
+(allow mach-lookup
+  (global-name "com.apple.PowerManagement.control")
+)
+
+; PTY and Terminal support
+(allow pseudo-tty)
+(allow file-read* file-write* file-ioctl (literal "/dev/ptmx"))
+(allow file-read* file-write*
+  (require-all
+    (regex #"^/dev/ttys[0-9]+")
+    (extension "com.apple.sandbox.pty")))
+(allow file-ioctl (regex #"^/dev/ttys[0-9]+"))
 
 ; Allow basic read access to system frameworks and libraries required to run
 (allow file-read*
@@ -38,24 +143,23 @@ export const BASE_SEATBELT_PROFILE = `(version 1)
   (subpath "/private/etc")
 )
 
-; PTY and Terminal support
-(allow pseudo-tty)
-(allow file-read* file-write* file-ioctl (literal "/dev/ptmx"))
-(allow file-read* file-write* file-ioctl (regex #"^/dev/ttys[0-9]+"))
-
 ; Allow read/write access to temporary directories and common device nodes
 (allow file-read* file-write*
   (literal "/dev/null")
   (literal "/dev/zero")
+  (literal "/dev/tty")
+  (subpath "/dev/fd")
   (subpath "/tmp")
   (subpath "/private/tmp")
-  (subpath (param "TMPDIR"))
 )
 
-; Workspace access using parameterized paths
-(allow file-read* file-write*
-  (subpath (param "WORKSPACE"))
+(allow file-read-metadata
+  (literal "/")
+  (subpath "/var")
+  (subpath "/private/var")
+  (subpath "/dev")
 )
+
 `;
 
 /**
@@ -66,7 +170,9 @@ export const BASE_SEATBELT_PROFILE = `(version 1)
  */
 export const NETWORK_SEATBELT_PROFILE = `
 ; Network Access
-(allow network*)
+(allow network-outbound)
+(allow network-inbound)
+(allow network-bind)
 
 (allow system-socket
   (require-all

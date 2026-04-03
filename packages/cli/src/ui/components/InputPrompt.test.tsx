@@ -61,7 +61,7 @@ import type { UIState } from '../contexts/UIStateContext.js';
 import { isLowColorDepth } from '../utils/terminalUtils.js';
 import { cpLen } from '../utils/textUtils.js';
 import { defaultKeyMatchers, Command } from '../key/keyMatchers.js';
-import type { Key } from '../hooks/useKeypress.js';
+import { useKeypress, type Key } from '../hooks/useKeypress.js';
 import {
   appEvents,
   AppEvent,
@@ -163,6 +163,18 @@ describe('InputPrompt', () => {
   let mockBuffer: TextBuffer;
   let mockCommandContext: CommandContext;
 
+  const GlobalEscapeHandler = ({ onEscape }: { onEscape: () => void }) => {
+    useKeypress(
+      (key) => {
+        if (key.name !== 'escape') return false;
+        onEscape();
+        return true;
+      },
+      { isActive: true, priority: false },
+    );
+    return null;
+  };
+
   const mockedUseShellHistory = vi.mocked(useShellHistory);
   const mockedUseCommandCompletion = vi.mocked(useCommandCompletion);
   const mockedUseInputHistory = vi.mocked(useInputHistory);
@@ -179,6 +191,7 @@ describe('InputPrompt', () => {
     setCleanUiDetailsVisible: mockSetCleanUiDetailsVisible,
     toggleCleanUiDetailsVisible: mockToggleCleanUiDetailsVisible,
     revealCleanUiDetailsTemporarily: mockRevealCleanUiDetailsTemporarily,
+    addMessage: vi.fn(),
   };
 
   beforeEach(() => {
@@ -340,6 +353,8 @@ describe('InputPrompt', () => {
     vi.mocked(clipboardy.read).mockResolvedValue('');
 
     props = {
+      onQueueMessage: vi.fn(),
+
       buffer: mockBuffer,
       onSubmit: vi.fn(),
       userMessages: [],
@@ -1087,6 +1102,76 @@ describe('InputPrompt', () => {
     unmount();
   });
 
+  it('queues a message when Tab is pressed during generation', async () => {
+    props.buffer.setText('A new prompt');
+    props.streamingState = StreamingState.Responding;
+
+    const { stdin, unmount } = await renderWithProviders(
+      <InputPrompt {...props} />,
+      {
+        uiActions,
+      },
+    );
+
+    await act(async () => {
+      stdin.write('\t');
+    });
+
+    await waitFor(() => {
+      expect(props.onQueueMessage).toHaveBeenCalledWith('A new prompt');
+      expect(props.buffer.text).toBe('');
+    });
+    unmount();
+  });
+
+  it('shows an error when attempting to queue a slash command', async () => {
+    props.buffer.setText('/clear');
+    props.streamingState = StreamingState.Responding;
+
+    const { stdin, unmount } = await renderWithProviders(
+      <InputPrompt {...props} />,
+      {
+        uiActions,
+      },
+    );
+
+    await act(async () => {
+      stdin.write('\t');
+    });
+
+    await waitFor(() => {
+      expect(props.setQueueErrorMessage).toHaveBeenCalledWith(
+        'Slash commands cannot be queued',
+      );
+      expect(props.onQueueMessage).not.toHaveBeenCalled();
+    });
+    unmount();
+  });
+
+  it('shows an error when attempting to queue a shell command', async () => {
+    props.shellModeActive = true;
+    props.buffer.setText('ls');
+    props.streamingState = StreamingState.Responding;
+
+    const { stdin, unmount } = await renderWithProviders(
+      <InputPrompt {...props} />,
+      {
+        uiActions,
+      },
+    );
+
+    await act(async () => {
+      stdin.write('\t');
+    });
+
+    await waitFor(() => {
+      expect(props.setQueueErrorMessage).toHaveBeenCalledWith(
+        'Shell commands cannot be queued',
+      );
+      expect(props.onQueueMessage).not.toHaveBeenCalled();
+    });
+    unmount();
+  });
   it('should not submit on Enter when the buffer is empty or only contains whitespace', async () => {
     props.buffer.setText('   '); // Set buffer to whitespace
 
@@ -2137,85 +2222,67 @@ describe('InputPrompt', () => {
           name: 'mid-word',
           text: 'hello world',
           visualCursor: [0, 3],
-          expected: `hel${chalk.inverse('l')}o world`,
         },
         {
           name: 'at the beginning of the line',
           text: 'hello',
           visualCursor: [0, 0],
-          expected: `${chalk.inverse('h')}ello`,
         },
         {
           name: 'at the end of the line',
           text: 'hello',
           visualCursor: [0, 5],
-          expected: `hello${chalk.inverse(' ')}`,
         },
         {
           name: 'on a highlighted token',
           text: 'run @path/to/file',
           visualCursor: [0, 9],
-          expected: `@path/${chalk.inverse('t')}o/file`,
         },
         {
           name: 'for multi-byte unicode characters',
           text: 'hello 👍 world',
           visualCursor: [0, 6],
-          expected: `hello ${chalk.inverse('👍')} world`,
         },
         {
           name: 'after multi-byte unicode characters',
           text: '👍A',
           visualCursor: [0, 1],
-          expected: `👍${chalk.inverse('A')}`,
         },
         {
           name: 'at the end of a line with unicode characters',
           text: 'hello 👍',
           visualCursor: [0, 8],
-          expected: `hello 👍`, // skip checking inverse ansi due to ink truncation bug
         },
         {
           name: 'at the end of a short line with unicode characters',
           text: '👍',
           visualCursor: [0, 1],
-          expected: `👍${chalk.inverse(' ')}`,
         },
         {
           name: 'on an empty line',
           text: '',
           visualCursor: [0, 0],
-          expected: chalk.inverse(' '),
         },
         {
           name: 'on a space between words',
           text: 'hello world',
           visualCursor: [0, 5],
-          expected: `hello${chalk.inverse(' ')}world`,
         },
       ])(
         'should display cursor correctly $name',
-        async ({ name, text, visualCursor, expected }) => {
+        async ({ text, visualCursor }) => {
           mockBuffer.text = text;
           mockBuffer.lines = [text];
           mockBuffer.viewportVisualLines = [text];
           mockBuffer.visualCursor = visualCursor as [number, number];
           props.config.getUseBackgroundColor = () => false;
 
-          const { stdout, unmount } = await renderWithProviders(
+          const renderResult = await renderWithProviders(
             <InputPrompt {...props} />,
           );
-          await waitFor(() => {
-            const frame = stdout.lastFrameRaw();
-            expect(stripAnsi(frame)).toContain(stripAnsi(expected));
-            if (
-              name !== 'at the end of a line with unicode characters' &&
-              name !== 'on a highlighted token'
-            ) {
-              expect(frame).toContain('\u001b[7m');
-            }
-          });
-          unmount();
+          await renderResult.waitUntilReady();
+          await expect(renderResult).toMatchSvgSnapshot();
+          renderResult.unmount();
         },
       );
     });
@@ -2231,7 +2298,6 @@ describe('InputPrompt', () => {
             [1, 0],
             [2, 0],
           ],
-          expected: `sec${chalk.inverse('o')}nd line`,
         },
         {
           name: 'at the beginning of a line',
@@ -2241,7 +2307,6 @@ describe('InputPrompt', () => {
             [0, 0],
             [1, 0],
           ],
-          expected: `${chalk.inverse('s')}econd line`,
         },
         {
           name: 'at the end of a line',
@@ -2251,11 +2316,10 @@ describe('InputPrompt', () => {
             [0, 0],
             [1, 0],
           ],
-          expected: `first line${chalk.inverse(' ')}`,
         },
       ])(
         'should display cursor correctly $name in a multiline block',
-        async ({ name, text, visualCursor, expected, visualToLogicalMap }) => {
+        async ({ text, visualCursor, visualToLogicalMap }) => {
           mockBuffer.text = text;
           mockBuffer.lines = text.split('\n');
           mockBuffer.viewportVisualLines = text.split('\n');
@@ -2265,20 +2329,12 @@ describe('InputPrompt', () => {
           >;
           props.config.getUseBackgroundColor = () => false;
 
-          const { stdout, unmount } = await renderWithProviders(
+          const renderResult = await renderWithProviders(
             <InputPrompt {...props} />,
           );
-          await waitFor(() => {
-            const frame = stdout.lastFrameRaw();
-            expect(stripAnsi(frame)).toContain(stripAnsi(expected));
-            if (
-              name !== 'at the end of a line with unicode characters' &&
-              name !== 'on a highlighted token'
-            ) {
-              expect(frame).toContain('\u001b[7m');
-            }
-          });
-          unmount();
+          await renderResult.waitUntilReady();
+          await expect(renderResult).toMatchSvgSnapshot();
+          renderResult.unmount();
         },
       );
 
@@ -2295,18 +2351,12 @@ describe('InputPrompt', () => {
         ];
         props.config.getUseBackgroundColor = () => false;
 
-        const { stdout, unmount } = await renderWithProviders(
+        const renderResult = await renderWithProviders(
           <InputPrompt {...props} />,
         );
-        await waitFor(() => {
-          const frame = stdout.lastFrameRaw();
-          const lines = frame.split('\n');
-          // The line with the cursor should just be an inverted space inside the box border
-          expect(
-            lines.find((l) => l.includes(chalk.inverse(' '))),
-          ).not.toBeUndefined();
-        });
-        unmount();
+        await renderResult.waitUntilReady();
+        await expect(renderResult).toMatchSvgSnapshot();
+        renderResult.unmount();
       });
     });
   });
@@ -2327,22 +2377,14 @@ describe('InputPrompt', () => {
       ];
       props.config.getUseBackgroundColor = () => false;
 
-      const { stdout, unmount } = await renderWithProviders(
+      const renderResult = await renderWithProviders(
         <InputPrompt {...props} />,
       );
-      await waitFor(() => {
-        const frame = stdout.lastFrameRaw();
-        // Check that all lines, including the empty one, are rendered.
-        // This implicitly tests that the Box wrapper provides height for the empty line.
-        expect(frame).toContain('hello');
-        expect(frame).toContain('world');
-        expect(frame).toContain(chalk.inverse(' '));
 
-        const outputLines = frame.trim().split('\n');
-        // The number of lines should be 2 for the border plus 3 for the content.
-        expect(outputLines.length).toBe(5);
-      });
-      unmount();
+      await renderResult.waitUntilReady();
+      await expect(renderResult).toMatchSvgSnapshot();
+
+      renderResult.unmount();
     });
   });
 
@@ -2767,6 +2809,54 @@ describe('InputPrompt', () => {
 
         expect(props.setShellModeActive).toHaveBeenCalledWith(false);
       });
+      unmount();
+    });
+
+    it('should not propagate ESC to global cancellation handler when shell mode is active (responding)', async () => {
+      props.shellModeActive = true;
+      props.streamingState = StreamingState.Responding;
+      const onGlobalEscape = vi.fn();
+
+      const { stdin, unmount } = await renderWithProviders(
+        <>
+          <GlobalEscapeHandler onEscape={onGlobalEscape} />
+          <InputPrompt {...props} />
+        </>,
+      );
+
+      await act(async () => {
+        stdin.write('\x1B');
+        vi.advanceTimersByTime(100);
+      });
+
+      await waitFor(() => {
+        expect(props.setShellModeActive).toHaveBeenCalledWith(false);
+      });
+      expect(onGlobalEscape).not.toHaveBeenCalled();
+      unmount();
+    });
+
+    it('should allow ESC to reach global cancellation handler when responding and no overlay is active', async () => {
+      props.shellModeActive = false;
+      props.streamingState = StreamingState.Responding;
+      const onGlobalEscape = vi.fn();
+
+      const { stdin, unmount } = await renderWithProviders(
+        <>
+          <GlobalEscapeHandler onEscape={onGlobalEscape} />
+          <InputPrompt {...props} />
+        </>,
+      );
+
+      await act(async () => {
+        stdin.write('\x1B');
+        vi.advanceTimersByTime(100);
+      });
+
+      await waitFor(() => {
+        expect(onGlobalEscape).toHaveBeenCalledTimes(1);
+      });
+      expect(props.setShellModeActive).not.toHaveBeenCalled();
       unmount();
     });
 
@@ -3955,14 +4045,12 @@ describe('InputPrompt', () => {
     it('should not show inverted cursor when shell is focused', async () => {
       props.isEmbeddedShellFocused = true;
       props.focus = false;
-      const { stdout, unmount } = await renderWithProviders(
+      const renderResult = await renderWithProviders(
         <InputPrompt {...props} />,
       );
-      await waitFor(() => {
-        expect(stdout.lastFrame()).not.toContain(`{chalk.inverse(' ')}`);
-      });
-      expect(stdout.lastFrame()).toMatchSnapshot();
-      unmount();
+      await renderResult.waitUntilReady();
+      await expect(renderResult).toMatchSvgSnapshot();
+      renderResult.unmount();
     });
   });
 
