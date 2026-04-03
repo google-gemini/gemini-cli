@@ -46,12 +46,6 @@ jobs:
           node-version-file: '.nvmrc'
           cache: 'npm'
 
-      - name: 'Install dependencies'
-        run: 'npm ci'
-
-      - name: 'Build project'
-        run: 'npm run build'
-
       - name: 'Detect Steering Changes'
         id: 'detect'
         run: |
@@ -59,6 +53,14 @@ jobs:
           STEERING_DETECTED=$(node scripts/changed_prompt.js --steering-only)
           echo "SHOULD_RUN=$SHOULD_RUN" >> "$GITHUB_OUTPUT"
           echo "STEERING_DETECTED=$STEERING_DETECTED" >> "$GITHUB_OUTPUT"
+
+      - name: 'Install dependencies'
+        if: "steps.detect.outputs.SHOULD_RUN == 'true'"
+        run: 'npm ci'
+
+      - name: 'Build project'
+        if: "steps.detect.outputs.SHOULD_RUN == 'true'"
+        run: 'npm run build'
 
       - name: 'Analyze PR Content (Guidance)'
         if: "steps.detect.outputs.STEERING_DETECTED == 'true'"
@@ -94,7 +96,7 @@ jobs:
           fi
 
       - name: 'Post or Update PR Comment'
-        if: "always() && steps.detect.outputs.STEERING_DETECTED == 'true'"
+        if: "always() && (steps.detect.outputs.STEERING_DETECTED == 'true' || env.REPORT_FILE != '')"
         env:
           GH_TOKEN: '${{ secrets.GITHUB_TOKEN }}'
         run: |
@@ -104,17 +106,20 @@ jobs:
               cat eval_regression_report.md
               echo ""
             fi
-            echo "### 🧠 Model Steering Guidance"
-            echo ""
-            echo "This PR modifies files that affect the model's behavior (prompts, tools, or instructions)."
-            echo ""
 
-            if [[ "${{ steps.analysis.outputs.MISSING_EVALS }}" == "true" ]]; then
-              echo "- ⚠️ **Consider adding Evals:** No behavioral evaluations (\`evals/*.eval.ts\`) were added or updated in this PR. Consider [adding a test case](https://github.com/google-gemini/gemini-cli/blob/main/evals/README.md#creating-an-evaluation) to verify the new behavior and prevent regressions."
-            fi
+            if [[ "${{ steps.detect.outputs.STEERING_DETECTED }}" == "true" ]]; then
+              echo "### 🧠 Model Steering Guidance"
+              echo ""
+              echo "This PR modifies files that affect the model's behavior (prompts, tools, or instructions)."
+              echo ""
 
-            if [[ "${{ steps.analysis.outputs.IS_MAINTAINER }}" == "true" ]]; then
-              echo "- 🚀 **Maintainer Reminder:** Please ensure that these changes do not regress results on benchmark evals before merging."
+              if [[ "${{ steps.analysis.outputs.MISSING_EVALS }}" == "true" ]]; then
+                echo "- ⚠️ **Consider adding Evals:** No behavioral evaluations (\`evals/*.eval.ts\`) were added or updated in this PR. Consider [adding a test case](https://github.com/google-gemini/gemini-cli/blob/main/evals/README.md#creating-an-evaluation) to verify the new behavior and prevent regressions."
+              fi
+
+              if [[ "${{ steps.analysis.outputs.IS_MAINTAINER }}" == "true" ]]; then
+                echo "- 🚀 **Maintainer Reminder:** Please ensure that these changes do not regress results on benchmark evals before merging."
+              fi
             fi
 
             echo ""
