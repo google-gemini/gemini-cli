@@ -26,6 +26,7 @@ import { SessionBrowser } from './SessionBrowser.js';
 import { PermissionsModifyTrustDialog } from './PermissionsModifyTrustDialog.js';
 import { ModelDialog } from './ModelDialog.js';
 import { TeamSelectionDialog } from './TeamSelectionDialog.js';
+import { TeamCreatorWizard } from './TeamCreatorWizard.js';
 import { theme } from '../semantic-colors.js';
 import { useUIState } from '../contexts/UIStateContext.js';
 import { useUIActions } from '../contexts/UIActionsContext.js';
@@ -66,6 +67,14 @@ export const DialogManager = ({
       <TeamSelectionDialog
         teams={config.getTeamRegistry().getAllTeams()}
         onSelect={uiActions.handleTeamSelect}
+      />
+    );
+  }
+  if (uiState.isTeamCreatorActive) {
+    return (
+      <TeamCreatorWizard
+        onComplete={() => uiActions.setIsTeamCreatorActive(false)}
+        onCancel={() => uiActions.setIsTeamCreatorActive(false)}
       />
     );
   }

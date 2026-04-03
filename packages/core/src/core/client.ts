@@ -120,6 +120,7 @@ export class GeminiClient {
 
     coreEvents.on(CoreEvent.ModelChanged, this.handleModelChanged);
     coreEvents.on(CoreEvent.MemoryChanged, this.handleMemoryChanged);
+    coreEvents.on(CoreEvent.ActiveTeamChanged, this.handleActiveTeamChanged);
   }
 
   private get config(): Config {
@@ -131,6 +132,10 @@ export class GeminiClient {
   };
 
   private handleMemoryChanged = () => {
+    this.updateSystemInstruction();
+  };
+
+  private handleActiveTeamChanged = () => {
     this.updateSystemInstruction();
   };
 
@@ -318,6 +323,7 @@ export class GeminiClient {
   dispose() {
     coreEvents.off(CoreEvent.ModelChanged, this.handleModelChanged);
     coreEvents.off(CoreEvent.MemoryChanged, this.handleMemoryChanged);
+    coreEvents.off(CoreEvent.ActiveTeamChanged, this.handleActiveTeamChanged);
   }
 
   async resumeChat(

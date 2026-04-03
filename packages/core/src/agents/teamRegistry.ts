@@ -121,10 +121,15 @@ export class TeamRegistry {
 
   /**
    * Sets the current active team.
-   * @param name The slug (name) of the team to activate.
-   * @throws Error if the team is not found.
+   * @param name The slug (name) of the team to activate, or undefined to clear.
+   * @throws Error if the team is not found and name is provided.
    */
-  setActiveTeam(name: string): void {
+  setActiveTeam(name: string | undefined): void {
+    if (name === undefined) {
+      this.activeTeamName = undefined;
+      return;
+    }
+
     if (this.teams.has(name)) {
       this.activeTeamName = name;
     } else {

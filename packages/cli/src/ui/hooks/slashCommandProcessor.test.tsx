@@ -216,6 +216,8 @@ describe('useSlashCommandProcessor', () => {
             toggleBackgroundTasks: vi.fn(),
             toggleShortcutsHelp: vi.fn(),
             setText: vi.fn(),
+            setIsTeamSelectionActive: vi.fn(),
+            setIsTeamCreatorActive: vi.fn(),
           },
           new Map(), // extensionsUpdateState
           true, // isConfigInitialized

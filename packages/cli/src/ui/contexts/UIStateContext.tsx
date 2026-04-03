@@ -222,6 +222,7 @@ export interface UIState {
   adminSettingsChanged: boolean;
   newAgents: AgentDefinition[] | null;
   isTeamSelectionActive: boolean;
+  isTeamCreatorActive: boolean;
   showIsExpandableHint: boolean;
   hintMode: boolean;
   hintBuffer: string;

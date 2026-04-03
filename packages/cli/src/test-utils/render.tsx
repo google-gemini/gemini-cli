@@ -526,6 +526,11 @@ const baseMockUiState = {
   pendingHistoryItems: [],
   mainControlsRef: () => {},
   rootUiRef: { current: null },
+  adminSettingsChanged: false,
+  newAgents: null,
+  isTeamSelectionActive: false,
+  isTeamCreatorActive: false,
+  showIsExpandableHint: false,
 };
 
 export const mockAppState: AppState = {
@@ -533,7 +538,7 @@ export const mockAppState: AppState = {
   startupWarnings: [],
 };
 
-const mockUIActions: UIActions = {
+export const mockUIActions: UIActions = {
   handleThemeSelect: vi.fn(),
   closeThemeDialog: vi.fn(),
   handleThemeHighlight: vi.fn(),
@@ -590,6 +595,7 @@ const mockUIActions: UIActions = {
   handleRestart: vi.fn(),
   handleNewAgentsSelect: vi.fn(),
   handleTeamSelect: vi.fn(),
+  setIsTeamCreatorActive: vi.fn(),
   getPreferredEditor: vi.fn(),
   clearAccountSuspension: vi.fn(),
 };

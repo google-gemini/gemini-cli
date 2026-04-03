@@ -736,6 +736,7 @@ export interface ConfigParameters {
     agents?: AgentSettings;
   }>;
   enableConseca?: boolean;
+  activeTeam?: string;
   billing?: {
     overageStrategy?: OverageStrategy;
   };
@@ -894,6 +895,7 @@ export class Config implements McpContext, AgentLoopContext {
   private initPromise: Promise<void> | undefined;
   private mcpInitializationPromise: Promise<void> | null = null;
   readonly storage: Storage;
+  private readonly _params: ConfigParameters;
   private readonly fileExclusions: FileExclusions;
   private readonly eventEmitter?: EventEmitter;
   private readonly useWriteTodos: boolean;
@@ -970,6 +972,7 @@ export class Config implements McpContext, AgentLoopContext {
   private approvedPlanPath: string | undefined;
 
   constructor(params: ConfigParameters) {
+    this._params = params;
     this._sessionId = params.sessionId;
     this.clientName = params.clientName;
     this.clientVersion = params.clientVersion ?? 'unknown';
@@ -1432,6 +1435,14 @@ export class Config implements McpContext, AgentLoopContext {
 
     await this.agentRegistry.initialize();
     await this.teamRegistry.initialize();
+
+    if (this._params.activeTeam) {
+      try {
+        this.teamRegistry.setActiveTeam(this._params.activeTeam);
+      } catch (_e) {
+        // Ignore if team not found (might have been deleted or is project-specific)
+      }
+    }
 
     coreEvents.on(CoreEvent.AgentsRefreshed, this.onAgentsRefreshed);
 
@@ -2037,13 +2048,8 @@ export class Config implements McpContext, AgentLoopContext {
   }
 
   setActiveTeam(name: string | undefined): void {
-    if (name) {
-      this.teamRegistry.setActiveTeam(name);
-    } else {
-      // Logic for clearing active team could be added here if needed,
-      // but for now TeamRegistry.setActiveTeam expects a string.
-      // We'll leave it as is to match TeamRegistry signature or update TeamRegistry if null is allowed.
-    }
+    this.teamRegistry.setActiveTeam(name);
+    coreEvents.emitActiveTeamChanged(name);
   }
 
   getAcknowledgedAgentsService(): AcknowledgedAgentsService {

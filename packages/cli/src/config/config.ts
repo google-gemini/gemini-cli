@@ -894,6 +894,7 @@ export async function loadCliConfig(
     targetDir: cwd,
     includeDirectoryTree,
     includeDirectories,
+    activeTeam: settings.general?.activeTeam,
     loadMemoryFromIncludeDirectories:
       settings.context?.loadMemoryFromIncludeDirectories || false,
     discoveryMaxDirs: settings.context?.discoveryMaxDirs,

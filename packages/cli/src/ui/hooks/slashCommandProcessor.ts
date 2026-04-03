@@ -87,6 +87,8 @@ interface SlashCommandProcessorActions {
   toggleBackgroundTasks: () => void;
   toggleShortcutsHelp: () => void;
   setText: (text: string) => void;
+  setIsTeamSelectionActive: (active: boolean) => void;
+  setIsTeamCreatorActive: (active: boolean) => void;
 }
 
 /**
@@ -499,6 +501,12 @@ export const useSlashCommandProcessor = (
                       return { type: 'handled' };
                     case 'model':
                       actions.openModelDialog();
+                      return { type: 'handled' };
+                    case 'teamSelection':
+                      actions.setIsTeamSelectionActive(true);
+                      return { type: 'handled' };
+                    case 'teamCreator':
+                      actions.setIsTeamCreatorActive(true);
                       return { type: 'handled' };
                     case 'agentConfig': {
                       // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion

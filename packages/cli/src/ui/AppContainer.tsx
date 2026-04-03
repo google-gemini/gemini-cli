@@ -416,6 +416,7 @@ export const AppContainer = (props: AppContainerProps) => {
 
   const [isConfigInitialized, setConfigInitialized] = useState(false);
   const [isTeamSelectionActive, setIsTeamSelectionActive] = useState(false);
+  const [isTeamCreatorActive, setIsTeamCreatorActive] = useState(false);
 
   const logger = useLogger(config.storage);
   const { inputHistory, addInput, initializeFromLogger } =
@@ -958,6 +959,8 @@ Logging in with Google... Restarting Gemini CLI to continue.
       },
       toggleShortcutsHelp: () => setShortcutsHelpVisible((visible) => !visible),
       setText: stableSetText,
+      setIsTeamSelectionActive,
+      setIsTeamCreatorActive,
     }),
     [
       setAuthState,
@@ -977,6 +980,8 @@ Logging in with Google... Restarting Gemini CLI to continue.
       toggleDebugProfiler,
       setShortcutsHelpVisible,
       stableSetText,
+      setIsTeamSelectionActive,
+      setIsTeamCreatorActive,
     ],
   );
 
@@ -1421,12 +1426,12 @@ Logging in with Google... Restarting Gemini CLI to continue.
   const handleTeamSelect = useCallback(
     (teamName: string | undefined) => {
       config.setActiveTeam(teamName);
+      settings.setValue(SettingScope.Workspace, 'general.activeTeam', teamName);
       setIsTeamSelectionActive(false);
       refreshStatic();
     },
-    [config, refreshStatic],
+    [config, refreshStatic, settings],
   );
-
   /**
    * Determines if the input prompt should be active and accept user input.
    * Input is disabled during:
@@ -2067,6 +2072,7 @@ Logging in with Google... Restarting Gemini CLI to continue.
 
   const dialogsVisible =
     isTeamSelectionActive ||
+    isTeamCreatorActive ||
     shouldShowIdePrompt ||
     shouldShowIdePrompt ||
     isFolderTrustDialogOpen ||
@@ -2399,6 +2405,7 @@ Logging in with Google... Restarting Gemini CLI to continue.
       adminSettingsChanged,
       newAgents,
       isTeamSelectionActive,
+      isTeamCreatorActive,
       showIsExpandableHint,
       hintMode:
         config.isModelSteeringEnabled() && isToolExecuting(pendingHistoryItems),
@@ -2527,6 +2534,7 @@ Logging in with Google... Restarting Gemini CLI to continue.
       newAgents,
       showIsExpandableHint,
       isTeamSelectionActive,
+      isTeamCreatorActive,
     ],
   );
 
@@ -2624,6 +2632,7 @@ Logging in with Google... Restarting Gemini CLI to continue.
         setNewAgents(null);
       },
       handleTeamSelect,
+      setIsTeamCreatorActive,
       getPreferredEditor,
       clearAccountSuspension: () => {
         setAccountSuspensionInfo(null);
@@ -2686,6 +2695,7 @@ Logging in with Google... Restarting Gemini CLI to continue.
       historyManager,
       getPreferredEditor,
       handleTeamSelect,
+      setIsTeamCreatorActive,
     ],
   );
 

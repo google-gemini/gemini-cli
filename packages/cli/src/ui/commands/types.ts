@@ -126,6 +126,8 @@ export interface OpenDialogActionReturn {
     | 'sessionBrowser'
     | 'model'
     | 'agentConfig'
+    | 'teamSelection'
+    | 'teamCreator'
     | 'permissions';
 }
 

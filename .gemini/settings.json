@@ -6,6 +6,7 @@
     "topicUpdateNarration": true
   },
   "general": {
-    "devtools": true
+    "devtools": true,
+    "activeTeam": "test-team"
   }
 }

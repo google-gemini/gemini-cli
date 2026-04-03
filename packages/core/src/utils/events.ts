@@ -193,6 +193,7 @@ export enum CoreEvent {
   EditorSelected = 'editor-selected',
   SlashCommandConflicts = 'slash-command-conflicts',
   QuotaChanged = 'quota-changed',
+  ActiveTeamChanged = 'active-team-changed',
   TelemetryKeychainAvailability = 'telemetry-keychain-availability',
   TelemetryTokenStorageType = 'telemetry-token-storage-type',
 }
@@ -226,6 +227,7 @@ export interface CoreEvents extends ExtensionEvents {
   [CoreEvent.RequestEditorSelection]: never[];
   [CoreEvent.EditorSelected]: [EditorSelectedPayload];
   [CoreEvent.SlashCommandConflicts]: [SlashCommandConflictsPayload];
+  [CoreEvent.ActiveTeamChanged]: [string | undefined];
   [CoreEvent.TelemetryKeychainAvailability]: [KeychainAvailabilityEvent];
   [CoreEvent.TelemetryTokenStorageType]: [TokenStorageInitializationEvent];
 }
@@ -401,6 +403,13 @@ export class CoreEventEmitter extends EventEmitter<CoreEvents> {
   ): void {
     const payload: QuotaChangedPayload = { remaining, limit, resetTime };
     this.emit(CoreEvent.QuotaChanged, payload);
+  }
+
+  /**
+   * Notifies subscribers that the active team has changed.
+   */
+  emitActiveTeamChanged(teamName: string | undefined): void {
+    this.emit(CoreEvent.ActiveTeamChanged, teamName);
   }
 
   /**

@@ -184,6 +184,7 @@ export * from './agents/types.js';
 export * from './agents/agentLoader.js';
 export * from './agents/local-executor.js';
 export * from './agents/agent-scheduler.js';
+export * from './agents/teamScaffolder.js';
 
 // Export browser session management
 export { resetBrowserSession } from './agents/browser/browserAgentFactory.js';

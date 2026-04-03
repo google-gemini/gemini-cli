@@ -92,6 +92,7 @@ export interface UIActions {
   handleRestart: () => void;
   handleNewAgentsSelect: (choice: NewAgentsChoice) => Promise<void>;
   handleTeamSelect: (teamName: string | undefined) => void;
+  setIsTeamCreatorActive: (active: boolean) => void;
   getPreferredEditor: () => EditorType;
 
   clearAccountSuspension: () => void;

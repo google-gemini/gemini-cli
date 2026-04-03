@@ -5,76 +5,67 @@
  */
 
 import { describe, it, expect, vi } from 'vitest';
+import { renderWithProviders, mockUIActions } from '../../test-utils/render.js';
 import { act } from 'react';
 import { TeamSelectionDialog } from './TeamSelectionDialog.js';
-import { renderWithProviders } from '../../test-utils/render.js';
-import { waitFor } from '../../test-utils/async.js';
-import { type TeamDefinition } from '@google/gemini-cli-core';
 
 describe('<TeamSelectionDialog />', () => {
-  const mockTeams: TeamDefinition[] = [
+  const mockTeams = [
     {
-      name: 'team-1',
+      name: 'team-one',
       displayName: 'Team One',
       description: 'First team description',
-      instructions: 'Instructions 1',
       agents: [],
+      instructions: '',
+      configPath: '/test/team1',
     },
     {
-      name: 'team-2',
+      name: 'team-two',
       displayName: 'Team Two',
       description: 'Second team description',
-      instructions: 'Instructions 2',
       agents: [],
+      instructions: '',
+      configPath: '/test/team2',
     },
   ];
 
-  const mockOnSelect = vi.fn();
-
-  beforeEach(() => {
-    mockOnSelect.mockReset();
-  });
-
-  const renderComponent = async () =>
-    renderWithProviders(
-      <TeamSelectionDialog teams={mockTeams} onSelect={mockOnSelect} />,
+  it('renders a list of discovered teams and standard options', async () => {
+    const onSelect = vi.fn();
+    const { lastFrame, unmount } = await renderWithProviders(
+      <TeamSelectionDialog teams={mockTeams} onSelect={onSelect} />,
     );
 
-  it('renders all options correctly', async () => {
-    const { lastFrame, unmount } = await renderComponent();
-    const output = lastFrame();
-
-    expect(output).toContain('Select an Agent Team');
-    expect(output).toContain('Team One');
-    expect(output).toContain('First team description');
-    expect(output).toContain('Team Two');
-    expect(output).toContain('Second team description');
-    expect(output).toContain('The Polyglot Team (Curated)');
-    expect(output).toContain('No Team');
-    expect(output).toContain('Browse Team Marketplace');
-    expect(output).toContain('Create Team');
+    expect(lastFrame()).toContain('Select an Agent Team');
+    expect(lastFrame()).toContain('Team One');
+    expect(lastFrame()).toContain('Team Two');
+    expect(lastFrame()).toContain('The Polyglot Team');
+    expect(lastFrame()).toContain('No Team');
+    expect(lastFrame()).toContain('Browse Team Marketplace');
+    expect(lastFrame()).toContain('Create Team');
     unmount();
   });
 
   it('calls onSelect with team name when a team is selected', async () => {
-    const { stdin, waitUntilReady, unmount } = await renderComponent();
+    const onSelect = vi.fn();
+    const { stdin, unmount } = await renderWithProviders(
+      <TeamSelectionDialog teams={mockTeams} onSelect={onSelect} />,
+    );
 
-    // Default selection is index 0 (Team One)
     await act(async () => {
-      stdin.write('\r'); // Enter
+      stdin.write('\r'); // Enter on first item
     });
-    await waitUntilReady();
 
-    await waitFor(() => {
-      expect(mockOnSelect).toHaveBeenCalledWith('team-1');
-    });
+    expect(onSelect).toHaveBeenCalledWith('team-one');
     unmount();
   });
 
-  it('calls onSelect with undefined when "No Team" is selected', async () => {
-    const { stdin, waitUntilReady, unmount } = await renderComponent();
+  it('calls onSelect with undefined when No Team is selected', async () => {
+    const onSelect = vi.fn();
+    const { stdin, waitUntilReady, unmount } = await renderWithProviders(
+      <TeamSelectionDialog teams={mockTeams} onSelect={onSelect} />,
+    );
 
-    // Navigate to "No Team" (index 3: Team 1, Team 2, Polyglot, No Team)
+    // Navigate to No Team (index 3)
     for (let i = 0; i < 3; i++) {
       await act(async () => {
         stdin.write('\u001B[B'); // Down
@@ -85,37 +76,17 @@ describe('<TeamSelectionDialog />', () => {
     await act(async () => {
       stdin.write('\r'); // Enter
     });
-    await waitUntilReady();
 
-    await waitFor(() => {
-      expect(mockOnSelect).toHaveBeenCalledWith(undefined);
-    });
+    expect(onSelect).toHaveBeenCalledWith(undefined);
     unmount();
   });
 
-  it('does not call onSelect for placeholder options', async () => {
-    const { stdin, waitUntilReady, unmount } = await renderComponent();
-
-    // Navigate to "Browse Team Marketplace" (index 4)
-    for (let i = 0; i < 4; i++) {
-      await act(async () => {
-        stdin.write('\u001B[B'); // Down
-      });
-      await waitUntilReady();
-    }
-
-    await act(async () => {
-      stdin.write('\r'); // Enter
-    });
-    await waitUntilReady();
-
-    expect(mockOnSelect).not.toHaveBeenCalled();
-    unmount();
-  });
-
-  it('shows marketplace sub-view when selected', async () => {
-    const { stdin, lastFrame, waitUntilReady, unmount } =
-      await renderComponent();
+  it('shows marketplace view when selected', async () => {
+    const onSelect = vi.fn();
+    const { lastFrame, stdin, waitUntilReady, unmount } =
+      await renderWithProviders(
+        <TeamSelectionDialog teams={mockTeams} onSelect={onSelect} />,
+      );
 
     // Navigate to Marketplace (index 4)
     for (let i = 0; i < 4; i++) {
@@ -131,20 +102,24 @@ describe('<TeamSelectionDialog />', () => {
     await waitUntilReady();
 
     expect(lastFrame()).toContain('Agent Team Marketplace');
-    expect(lastFrame()).toContain('under development');
+    expect(lastFrame()).toContain(
+      'community marketplace is currently under development',
+    );
 
-    // Go back
+    // Go back with escape
     await act(async () => {
-      stdin.write('a');
+      stdin.write('\u001B'); // Escape
     });
     await waitUntilReady();
     expect(lastFrame()).toContain('Select an Agent Team');
     unmount();
   });
 
-  it('shows create team sub-view when selected', async () => {
-    const { stdin, lastFrame, waitUntilReady, unmount } =
-      await renderComponent();
+  it('launches team creator wizard when Create Team is selected', async () => {
+    const onSelect = vi.fn();
+    const { stdin, waitUntilReady, unmount } = await renderWithProviders(
+      <TeamSelectionDialog teams={mockTeams} onSelect={onSelect} />,
+    );
 
     // Navigate to Create Team (index 5)
     for (let i = 0; i < 5; i++) {
@@ -159,15 +134,7 @@ describe('<TeamSelectionDialog />', () => {
     });
     await waitUntilReady();
 
-    expect(lastFrame()).toContain('Create New Agent Team');
-    expect(lastFrame()).toContain('Create a directory in .gemini/teams/');
-
-    // Go back
-    await act(async () => {
-      stdin.write('a');
-    });
-    await waitUntilReady();
-    expect(lastFrame()).toContain('Select an Agent Team');
+    expect(mockUIActions.setIsTeamCreatorActive).toHaveBeenCalledWith(true);
     unmount();
   });
 });

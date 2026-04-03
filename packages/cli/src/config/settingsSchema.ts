@@ -199,6 +199,15 @@ const SETTINGS_SCHEMA = {
         description: 'The preferred editor to open files in.',
         showInDialog: false,
       },
+      activeTeam: {
+        type: 'string',
+        label: 'Active Team',
+        category: 'General',
+        requiresRestart: false,
+        default: undefined as string | undefined,
+        description: 'The currently active agent team slug.',
+        showInDialog: false,
+      },
       vimMode: {
         type: 'boolean',
         label: 'Vim Mode',

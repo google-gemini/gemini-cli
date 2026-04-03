@@ -159,7 +159,10 @@ const PROVIDER_COLORS: Record<string, string> = {
  */
 const ActiveTeamIndicator: React.FC = () => {
   const config = useConfig();
-  const activeTeam = config?.getActiveTeam();
+  const activeTeam =
+    typeof config?.getActiveTeam === 'function'
+      ? config.getActiveTeam()
+      : undefined;
 
   if (!activeTeam) return null;
 

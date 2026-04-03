@@ -14,6 +14,7 @@ import {
 import { theme } from '../semantic-colors.js';
 import { DescriptiveRadioButtonSelect } from './shared/DescriptiveRadioButtonSelect.js';
 import { useKeypress } from '../hooks/useKeypress.js';
+import { useUIActions } from '../contexts/UIActionsContext.js';
 
 interface TeamSelectionDialogProps {
   teams: TeamDefinition[];
@@ -87,9 +88,8 @@ export function TeamSelectionDialog({
   teams: discoveredTeams,
   onSelect,
 }: TeamSelectionDialogProps): React.JSX.Element {
-  const [view, setView] = useState<'select' | 'marketplace' | 'create'>(
-    'select',
-  );
+  const uiActions = useUIActions();
+  const [view, setView] = useState<'select' | 'marketplace'>('select');
 
   useKeypress(
     () => {
@@ -184,12 +184,13 @@ export function TeamSelectionDialog({
       } else if (value === 'marketplace') {
         setView('marketplace');
       } else if (value === 'create') {
-        setView('create');
+        uiActions.setIsTeamCreatorActive(true);
+        onSelect(undefined);
       } else {
         onSelect(value);
       }
     },
-    [onSelect],
+    [onSelect, uiActions],
   );
 
   if (view === 'marketplace') {
@@ -219,54 +220,6 @@ export function TeamSelectionDialog({
               will be able to browse hundreds of specialized teams.
             </Text>
           </Box>
-          <Box marginTop={1}>
-            <Text color={theme.text.accent}>
-              Press any key to go back to selection...
-            </Text>
-          </Box>
-        </Box>
-      </Box>
-    );
-  }
-
-  if (view === 'create') {
-    return (
-      <Box
-        borderStyle="round"
-        borderColor={theme.border.default}
-        flexDirection="column"
-        padding={1}
-        width="100%"
-      >
-        <Text bold color={theme.text.primary}>
-          Create New Agent Team
-        </Text>
-        <Box marginTop={1} flexDirection="column">
-          <Text color={theme.text.secondary}>
-            To create a new team, follow these simple steps:
-          </Text>
-          <Text color={theme.text.primary}>
-            1. Create a directory in .gemini/teams/ (e.g.,
-            .gemini/teams/my-team/)
-          </Text>
-          <Text color={theme.text.primary}>
-            2. Create a TEAM.md file with name, display_name, and description.
-          </Text>
-          <Text color={theme.text.primary}>
-            3. (Optional) Add specialized agents to an agents/ sub-directory.
-          </Text>
-
-          <Box
-            marginTop={1}
-            padding={1}
-            borderStyle="single"
-            borderColor={theme.ui.focus}
-          >
-            <Text color={theme.ui.focus}>
-              Tip: You can now specify external agents directly in TEAM.md!
-            </Text>
-          </Box>
-
           <Box marginTop={1}>
             <Text color={theme.text.accent}>
               Press any key to go back to selection...
