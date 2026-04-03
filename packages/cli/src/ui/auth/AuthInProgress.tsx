@@ -10,6 +10,7 @@ import { Box, Text } from 'ink';
 import { CliSpinner } from '../components/CliSpinner.js';
 import { theme } from '../semantic-colors.js';
 import { useKeypress } from '../hooks/useKeypress.js';
+import { KeypressPriority } from '../contexts/KeypressContext.js';
 
 interface AuthInProgressProps {
   onTimeout: () => void;
@@ -24,9 +25,11 @@ export function AuthInProgress({
     (key) => {
       if (key.name === 'escape' || (key.ctrl && key.name === 'c')) {
         onTimeout();
+        return true;
       }
+      return false;
     },
-    { isActive: true },
+    { isActive: true, priority: KeypressPriority.Critical },
   );
 
   useEffect(() => {

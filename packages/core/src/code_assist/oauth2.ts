@@ -348,19 +348,24 @@ async function initOauthClient(
     // Listen for SIGINT to stop waiting for auth so the terminal doesn't hang
     // if the user chooses not to auth.
     let sigIntHandler: (() => void) | undefined;
-    let stdinHandler: ((data: Buffer) => void) | undefined;
+    let stdinHandler: ((data: Buffer | string) => void) | undefined;
+    let cancelEventHandler: (() => void) | undefined;
     const cancellationPromise = new Promise<never>((_, reject) => {
-      sigIntHandler = () =>
+      const onCancel = () =>
         reject(new FatalCancellationError('Authentication cancelled by user.'));
+
+      sigIntHandler = onCancel;
       process.on('SIGINT', sigIntHandler);
+
+      cancelEventHandler = onCancel;
+      coreEvents.on(CoreEvent.OauthCancelRequest, cancelEventHandler);
 
       // Note that SIGINT might not get raised on Ctrl+C in raw mode
       // so we also need to look for Ctrl+C directly in stdin.
-      stdinHandler = (data: Buffer) => {
-        if (data.includes(0x03)) {
-          reject(
-            new FatalCancellationError('Authentication cancelled by user.'),
-          );
+      stdinHandler = (data: Buffer | string) => {
+        const buf = typeof data === 'string' ? Buffer.from(data) : data;
+        if (buf.includes(0x03)) {
+          onCancel();
         }
       };
       process.stdin.on('data', stdinHandler);
@@ -381,6 +386,9 @@ async function initOauthClient(
       }
       if (stdinHandler) {
         process.stdin.removeListener('data', stdinHandler);
+      }
+      if (cancelEventHandler) {
+        coreEvents.off(CoreEvent.OauthCancelRequest, cancelEventHandler);
       }
     }
 
