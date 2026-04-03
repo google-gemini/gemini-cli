@@ -443,10 +443,16 @@ export function useCommandCompletion({
         const command =
           slashCompletionRange.getCommandFromSuggestion(suggestion);
         // Don't add a space if the command has an action (can be executed)
-        // and doesn't have a completion function (doesn't REQUIRE more arguments)
+        // and doesn't have a completion function or subcommands
         const isExecutableCommand = !!(command && command.action);
         const requiresArguments = !!(command && command.completion);
-        shouldAddSpace = !isExecutableCommand || requiresArguments;
+        const hasSubCommands = !!(
+          command &&
+          command.subCommands &&
+          command.subCommands.length > 0
+        );
+        shouldAddSpace =
+          !isExecutableCommand || requiresArguments || hasSubCommands;
       }
 
       if (

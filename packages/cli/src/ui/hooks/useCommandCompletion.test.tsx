@@ -481,7 +481,34 @@ describe('useCommandCompletion', () => {
   });
 
   describe('handleAutocomplete', () => {
-    it('should complete a partial command and NOT add a space if it has an action', async () => {
+    it('should complete a partial command and ADD a space if it has subcommands even if it has an action', async () => {
+      setupMocks({
+        slashSuggestions: [{ label: 'mcp', value: 'mcp' }],
+        slashCompletionRange: {
+          completionStart: 1,
+          completionEnd: 4,
+          getCommandFromSuggestion: () =>
+            ({
+              action: vi.fn(),
+              subCommands: [{ name: 'list' }],
+            }) as unknown as SlashCommand,
+        },
+      });
+
+      const { result } = await renderCommandCompletionHook('/mcp');
+
+      await waitFor(() => {
+        expect(result.current.suggestions.length).toBe(1);
+      });
+
+      act(() => {
+        result.current.handleAutocomplete(0);
+      });
+
+      expect(result.current.textBuffer.text).toBe('/mcp ');
+    });
+
+    it('should complete a partial command and NOT add a space if it has an action and NO subcommands', async () => {
       setupMocks({
         slashSuggestions: [{ label: 'memory', value: 'memory' }],
         slashCompletionRange: {

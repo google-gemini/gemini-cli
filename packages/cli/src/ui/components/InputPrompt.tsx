@@ -1086,12 +1086,19 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
                   const command =
                     completion.getCommandFromSuggestion(suggestion);
 
+                  const hasSubCommands = !!(
+                    command &&
+                    command.subCommands &&
+                    command.subCommands.length > 0
+                  );
+
                   // Only auto-execute if the command has no completion function
-                  // (i.e., it doesn't require an argument to be selected)
+                  // and no subcommands (so we don't skip showing subcommands)
                   if (
                     command &&
                     isAutoExecutableCommand(command) &&
-                    !command.completion
+                    !command.completion &&
+                    !hasSubCommands
                   ) {
                     const completedText =
                       completion.getCompletedText(suggestion);

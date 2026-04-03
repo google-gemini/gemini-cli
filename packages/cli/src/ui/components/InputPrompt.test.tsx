@@ -1409,6 +1409,57 @@ describe('InputPrompt', () => {
     unmount();
   });
 
+  it('should NOT auto-execute commands with subcommands even if autoExecute: true on Enter', async () => {
+    const chatCommand: SlashCommand = {
+      name: 'chat',
+      kind: CommandKind.BUILT_IN,
+      description: 'Chat command',
+      action: vi.fn(),
+      autoExecute: true,
+      subCommands: [
+        { name: 'list', description: 'List', kind: CommandKind.BUILT_IN },
+      ],
+    };
+
+    const suggestion = { label: 'chat', value: 'chat' };
+
+    mockedUseCommandCompletion.mockReturnValue({
+      ...mockCommandCompletion,
+      showSuggestions: true,
+      suggestions: [suggestion],
+      activeSuggestionIndex: 0,
+      getCommandFromSuggestion: vi.fn().mockReturnValue(chatCommand),
+      getCompletedText: vi.fn().mockReturnValue('/chat '), // Added space due to subcommands
+      slashCompletionRange: {
+        completionStart: 1,
+        completionEnd: 3, // "/ch" -> start at 1, end at 3
+        getCommandFromSuggestion: vi.fn(),
+        isArgumentCompletion: false,
+        leafCommand: null,
+      },
+    });
+
+    // User typed partial command
+    props.buffer.setText('/ch');
+    props.buffer.lines = ['/ch'];
+    props.buffer.cursor = [0, 3];
+
+    const { stdin, unmount } = await renderWithProviders(
+      <InputPrompt {...props} />,
+      {
+        uiActions,
+      },
+    );
+
+    await act(async () => {
+      stdin.write('\r'); // Enter
+    });
+
+    // Should NOT auto-execute, should just autocomplete (which InputPrompt handles by replacing buffer)
+    expect(props.onSubmit).not.toHaveBeenCalled();
+    unmount();
+  });
+
   it('should autocomplete commands with autoExecute: false on Enter', async () => {
     const shareCommand: SlashCommand = {
       name: 'share',
