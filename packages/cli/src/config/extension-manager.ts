@@ -1145,6 +1145,9 @@ Would you like to attempt to install via "git clone" instead?`,
 
     const status = workspaceEnabled ? chalk.green('✓') : chalk.red('✗');
     let output = `${status} ${extension.name} (${extension.version})`;
+    if (extension.manifestType) {
+      output += ` [${extension.manifestType === 'open-plugin' ? 'Open Plugin' : 'Gemini Extension'}]`;
+    }
     output += `\n ID: ${extension.id}`;
     output += `\n name: ${hashValue(extension.name)}`;
 

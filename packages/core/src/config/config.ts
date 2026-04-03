@@ -386,6 +386,9 @@ export interface GeminiCLIExtension {
   description?: string;
   author?: string | { name: string; email?: string; url?: string };
   license?: string;
+  keywords?: string[];
+  homepage?: string;
+  repository?: string;
   mcpServers?: Record<string, MCPServerConfig>;
   contextFiles: string[];
   excludeTools?: string[];

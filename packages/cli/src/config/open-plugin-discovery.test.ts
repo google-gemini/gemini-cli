@@ -71,7 +71,7 @@ describe('ExtensionManager - Open Plugin Support', () => {
     }
   });
 
-  it('should discover a plugin with plugin.json', async () => {
+  it('should NOT discover a plugin with plugin.json at root', async () => {
     const pluginDir = path.join(userExtensionsDir, 'test-plugin');
     fs.mkdirSync(pluginDir, { recursive: true });
     fs.writeFileSync(
@@ -79,19 +79,13 @@ describe('ExtensionManager - Open Plugin Support', () => {
       JSON.stringify({
         name: 'hello-world',
         version: '1.0.0',
-        description: 'An Open Plugin test',
-        author: { name: 'Taylor' },
-        license: 'Apache-2.0',
       }),
     );
 
     const extensions = await extensionManager.loadExtensions();
     const plugin = extensions.find((ext) => ext.name === 'hello-world');
 
-    expect(plugin).toBeDefined();
-    expect(plugin?.version).toBe('1.0.0');
-    expect(plugin?.description).toBe('An Open Plugin test');
-    expect(plugin?.manifestType).toBe('open-plugin');
+    expect(plugin).toBeUndefined();
   });
 
   it('should discover a plugin with .plugin/plugin.json', async () => {
@@ -116,10 +110,11 @@ describe('ExtensionManager - Open Plugin Support', () => {
 
   it('should support PLUGIN_ROOT variable alias in metadata', async () => {
     const pluginDir = path.join(userExtensionsDir, 'var-plugin');
-    fs.mkdirSync(pluginDir, { recursive: true });
+    const hiddenDir = path.join(pluginDir, '.plugin');
+    fs.mkdirSync(hiddenDir, { recursive: true });
 
     fs.writeFileSync(
-      path.join(pluginDir, 'plugin.json'),
+      path.join(hiddenDir, 'plugin.json'),
       JSON.stringify({
         name: 'var-plugin',
         version: '1.0.0',
@@ -136,12 +131,13 @@ describe('ExtensionManager - Open Plugin Support', () => {
 
   it('should NOT load skills or context files for Open Plugins in v1', async () => {
     const pluginDir = path.join(userExtensionsDir, 'feature-plugin');
-    fs.mkdirSync(pluginDir, { recursive: true });
+    const hiddenDir = path.join(pluginDir, '.plugin');
+    fs.mkdirSync(hiddenDir, { recursive: true });
     const skillsDir = path.join(pluginDir, 'skills', 'test');
     fs.mkdirSync(skillsDir, { recursive: true });
 
     fs.writeFileSync(
-      path.join(pluginDir, 'plugin.json'),
+      path.join(hiddenDir, 'plugin.json'),
       JSON.stringify({
         name: 'feature-plugin',
         version: '1.0.0',
@@ -169,7 +165,8 @@ describe('ExtensionManager - Open Plugin Support', () => {
 
   it('should prioritize gemini-extension.json over plugin.json', async () => {
     const pluginDir = path.join(userExtensionsDir, 'dual-manifest-plugin');
-    fs.mkdirSync(pluginDir, { recursive: true });
+    const hiddenDir = path.join(pluginDir, '.plugin');
+    fs.mkdirSync(hiddenDir, { recursive: true });
     fs.writeFileSync(
       path.join(pluginDir, 'gemini-extension.json'),
       JSON.stringify({
@@ -178,7 +175,7 @@ describe('ExtensionManager - Open Plugin Support', () => {
       }),
     );
     fs.writeFileSync(
-      path.join(pluginDir, 'plugin.json'),
+      path.join(hiddenDir, 'plugin.json'),
       JSON.stringify({
         name: 'open-plugin',
         version: '2.2.2',
@@ -194,5 +191,70 @@ describe('ExtensionManager - Open Plugin Support', () => {
 
     const openPlugin = extensions.find((ext) => ext.name === 'open-plugin');
     expect(openPlugin).toBeUndefined();
+  });
+
+  it('should support new metadata and discovery fields with path validation', async () => {
+    const pluginDir = path.join(userExtensionsDir, 'new-spec-plugin');
+    const hiddenDir = path.join(pluginDir, '.plugin');
+    fs.mkdirSync(hiddenDir, { recursive: true });
+
+    fs.writeFileSync(
+      path.join(hiddenDir, 'plugin.json'),
+      JSON.stringify({
+        name: 'new-spec-plugin',
+        version: '1.0.0',
+        keywords: ['test', 'plugin'],
+        homepage: 'https://example.com',
+        repository: 'https://github.com/example/plugin',
+        skills: './skills',
+      }),
+    );
+
+    const extensions = await extensionManager.loadExtensions();
+    const plugin = extensions.find((ext) => ext.name === 'new-spec-plugin');
+
+    expect(plugin).toBeDefined();
+    expect(plugin?.keywords).toEqual(['test', 'plugin']);
+    expect(plugin?.homepage).toBe('https://example.com');
+    expect(plugin?.repository).toBe('https://github.com/example/plugin');
+    expect(plugin?.manifestType).toBe('open-plugin');
+  });
+
+  it('should fail validation if discovery path does not start with ./', async () => {
+    const pluginDir = path.join(userExtensionsDir, 'invalid-path-plugin');
+    const hiddenDir = path.join(pluginDir, '.plugin');
+    fs.mkdirSync(hiddenDir, { recursive: true });
+
+    fs.writeFileSync(
+      path.join(hiddenDir, 'plugin.json'),
+      JSON.stringify({
+        name: 'invalid-path-plugin',
+        version: '1.0.0',
+        skills: 'skills', // Missing ./
+      }),
+    );
+
+    await expect(
+      extensionManager.loadExtensionConfig(pluginDir),
+    ).rejects.toThrow('Invalid plugin.json');
+  });
+
+  it('should fail validation if discovery path contains ../', async () => {
+    const pluginDir = path.join(userExtensionsDir, 'traversal-plugin');
+    const hiddenDir = path.join(pluginDir, '.plugin');
+    fs.mkdirSync(hiddenDir, { recursive: true });
+
+    fs.writeFileSync(
+      path.join(hiddenDir, 'plugin.json'),
+      JSON.stringify({
+        name: 'traversal-plugin',
+        version: '1.0.0',
+        skills: './../outside', // Contains ../
+      }),
+    );
+
+    await expect(
+      extensionManager.loadExtensionConfig(pluginDir),
+    ).rejects.toThrow('Invalid plugin.json');
   });
 });

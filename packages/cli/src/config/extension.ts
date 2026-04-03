@@ -30,40 +30,9 @@ import {
  * outside of the loading process that data needs to be stored on the
  * GeminiCLIExtension class defined in Core.
  */
-export interface ExtensionConfig {
-  name: string;
-  version: string;
-  manifestType?: 'gemini' | 'open-plugin';
-  description?: string;
-  author?: string | { name: string; email?: string; url?: string };
-  license?: string;
-  mcpServers?: Record<string, MCPServerConfig>;
-  contextFileName?: string | string[];
-  excludeTools?: string[];
-  settings?: ExtensionSetting[];
-  /**
-   * Custom themes contributed by this extension.
-   * These themes will be registered when the extension is activated.
-   */
-  themes?: CustomTheme[];
-  /**
-   * Planning features configuration contributed by this extension.
-   */
-  plan?: {
-    /**
-     * The directory where planning artifacts are stored.
-     */
-    directory?: string;
-  };
-  /**
-   * Used to migrate an extension to a new repository source.
-   */
-  migratedTo?: string;
-}
-
 export const geminiExtensionSchema = z.object({
-  name: z.string().min(1),
-  version: z.string().min(1),
+  name: z.string().trim().min(1),
+  version: z.string().trim().min(1),
   description: z.string().optional(),
   author: z
     .union([
@@ -76,18 +45,38 @@ export const geminiExtensionSchema = z.object({
     ])
     .optional(),
   license: z.string().optional(),
-  mcpServers: z.record(z.any()).optional(),
+  mcpServers: z.record(z.custom<MCPServerConfig>()).optional(),
   contextFileName: z.union([z.string(), z.array(z.string())]).optional(),
   excludeTools: z.array(z.string()).optional(),
-  settings: z.array(z.any()).optional(),
-  themes: z.array(z.any()).optional(),
+  settings: z.array(z.custom<ExtensionSetting>()).optional(),
+  /**
+   * Custom themes contributed by this extension.
+   * These themes will be registered when the extension is activated.
+   */
+  themes: z.array(z.custom<CustomTheme>()).optional(),
+  /**
+   * Planning features configuration contributed by this extension.
+   */
   plan: z
     .object({
       directory: z.string().optional(),
     })
     .optional(),
+  /**
+   * Used to migrate an extension to a new repository source.
+   */
   migratedTo: z.string().optional(),
 });
+
+/**
+ *  Internal representation of an extension configuration after being loaded and validated.
+ */
+export type ExtensionConfig = z.infer<typeof geminiExtensionSchema> & {
+  manifestType?: 'gemini' | 'open-plugin';
+  keywords?: string[];
+  homepage?: string;
+  repository?: string;
+};
 
 export interface ExtensionUpdateInfo {
   name: string;

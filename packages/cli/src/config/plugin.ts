@@ -13,8 +13,7 @@ import type {
 } from '@google/gemini-cli-core';
 import {
   EXTENSIONS_CONFIG_FILENAME,
-  HIDDEN_OPEN_PLUGIN_CONFIG_FILENAME,
-  OPEN_PLUGIN_CONFIG_FILENAME,
+  STANDARD_OPEN_PLUGIN_CONFIG_FILENAME,
   recursivelyHydrateStrings,
   type JsonObject,
 } from './extensions/variables.js';
@@ -30,18 +29,45 @@ export interface OpenPluginConfig {
   description?: string;
   author?: string | { name: string; email?: string; url?: string };
   license?: string;
+  keywords?: string[];
+  homepage?: string;
+  repository?: string;
   // Component fields (parsed but currently ignored during execution per v1 plan)
-  skills?: string[] | Record<string, unknown>;
-  agents?: string[] | Record<string, unknown>;
-  hooks?: string[] | Record<string, unknown>;
-  mcpServers?: string[] | Record<string, unknown>;
+  skills?: OpenPluginDiscoveryField;
+  mcpServers?: OpenPluginDiscoveryField | Record<string, unknown>;
 }
 
-export const OPEN_PLUGIN_NAME_REGEX = /^[a-z0-9]([a-z0-9.-]*[a-z0-9])?$/;
+export type OpenPluginDiscoveryField = string | string[] | { paths: string[] };
+
+export const OPEN_PLUGIN_NAME_REGEX = /^[a-z0-9.-]{1,64}$/;
+
+/**
+ * Validates that a discovery path starts with ./ and does not contain ../
+ */
+const isValidDiscoveryPath = (p: string) =>
+  p.startsWith('./') && !p.includes('../');
+
+const discoveryFieldSchema = z.union([
+  z.string().refine(isValidDiscoveryPath, {
+    message: 'Path must start with "./" and cannot contain "../"',
+  }),
+  z.array(
+    z.string().refine(isValidDiscoveryPath, {
+      message: 'Path must start with "./" and cannot contain "../"',
+    }),
+  ),
+  z.object({
+    paths: z.array(
+      z.string().refine(isValidDiscoveryPath, {
+        message: 'Path must start with "./" and cannot contain "../"',
+      }),
+    ),
+  }),
+]);
 
 export const openPluginSchema = z.object({
-  name: z.string().min(1).max(64).regex(OPEN_PLUGIN_NAME_REGEX),
-  version: z.string().optional(),
+  name: z.string().trim().min(1).max(64).regex(OPEN_PLUGIN_NAME_REGEX),
+  version: z.string().trim().optional(),
   description: z.string().optional(),
   author: z
     .union([
@@ -54,10 +80,11 @@ export const openPluginSchema = z.object({
     ])
     .optional(),
   license: z.string().optional(),
-  skills: z.union([z.array(z.string()), z.record(z.any())]).optional(),
-  agents: z.union([z.array(z.string()), z.record(z.any())]).optional(),
-  hooks: z.union([z.array(z.string()), z.record(z.any())]).optional(),
-  mcpServers: z.union([z.array(z.string()), z.record(z.any())]).optional(),
+  keywords: z.array(z.string()).optional(),
+  homepage: z.string().url().optional(),
+  repository: z.string().url().optional(),
+  skills: discoveryFieldSchema.optional(),
+  mcpServers: z.union([discoveryFieldSchema, z.record(z.any())]).optional(),
 });
 
 export interface ManifestInfo {
@@ -71,17 +98,12 @@ export function findManifest(extensionDir: string): ManifestInfo | undefined {
     return { type: 'gemini', path: geminiPath };
   }
 
-  const openPluginPath = path.join(extensionDir, OPEN_PLUGIN_CONFIG_FILENAME);
-  if (fs.existsSync(openPluginPath)) {
-    return { type: 'open-plugin', path: openPluginPath };
-  }
-
-  const hiddenOpenPluginPath = path.join(
+  const standardOpenPluginPath = path.join(
     extensionDir,
-    HIDDEN_OPEN_PLUGIN_CONFIG_FILENAME,
+    STANDARD_OPEN_PLUGIN_CONFIG_FILENAME,
   );
-  if (fs.existsSync(hiddenOpenPluginPath)) {
-    return { type: 'open-plugin', path: hiddenOpenPluginPath };
+  if (fs.existsSync(standardOpenPluginPath)) {
+    return { type: 'open-plugin', path: standardOpenPluginPath };
   }
 
   return undefined;
@@ -125,6 +147,9 @@ export async function loadOpenPluginConfig(
     description: hydratedConfig.description,
     author: hydratedConfig.author,
     license: hydratedConfig.license,
+    keywords: hydratedConfig.keywords,
+    homepage: hydratedConfig.homepage,
+    repository: hydratedConfig.repository,
     // Features are explicitly NOT mapped here for v1 plugins
   };
 }
@@ -159,6 +184,9 @@ export async function createOpenPlugin(
     description: config.description,
     author: config.author,
     license: config.license,
+    keywords: config.keywords,
+    homepage: config.homepage,
+    repository: config.repository,
     // v1: Features disabled
     contextFiles: [],
     mcpServers: undefined,
