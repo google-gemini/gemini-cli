@@ -4,6 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+import { randomUUID } from 'node:crypto';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 import * as os from 'node:os';
@@ -84,7 +85,8 @@ export class ProjectRegistry {
 
     try {
       const content = JSON.stringify(data, null, 2);
-      const tmpPath = `${this.registryPath}.tmp`;
+      // Use a randomized tmp path to avoid ENOENT crashes when save() is called concurrently
+      const tmpPath = this.registryPath + '.' + randomUUID() + '.tmp';
       await fs.promises.writeFile(tmpPath, content, 'utf8');
       await fs.promises.rename(tmpPath, this.registryPath);
     } catch (error) {
