@@ -1527,7 +1527,7 @@ const SETTINGS_SCHEMA = {
             label: 'Show Color',
             category: 'Tools',
             requiresRestart: false,
-            default: false,
+            default: true,
             description: 'Show color in shell output.',
             showInDialog: true,
           },
