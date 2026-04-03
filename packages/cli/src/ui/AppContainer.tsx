@@ -11,6 +11,7 @@ import {
   useEffect,
   useRef,
   useLayoutEffect,
+  useContext,
 } from 'react';
 import {
   type DOMElement,
@@ -19,6 +20,7 @@ import {
   useStdout,
   useStdin,
   type AppProps,
+  AppContext as InkAppContext,
 } from 'ink';
 import { App } from './App.js';
 import { AppContext } from './contexts/AppContext.js';
@@ -38,6 +40,8 @@ import {
 import { checkPermissions } from './hooks/atCommandProcessor.js';
 import { MessageType, StreamingState } from './types.js';
 import { ToolActionsProvider } from './contexts/ToolActionsContext.js';
+import { MouseProvider } from './contexts/MouseContext.js';
+import { ScrollProvider } from './contexts/ScrollProvider.js';
 import {
   type StartupWarning,
   type EditorType,
@@ -83,6 +87,7 @@ import {
   logBillingEvent,
   ApiKeyUpdatedEvent,
   type InjectionSource,
+  startMemoryService,
 } from '@google/gemini-cli-core';
 import { validateAuthMethod } from '../config/auth.js';
 import process from 'node:process';
@@ -209,12 +214,30 @@ export const AppContainer = (props: AppContainerProps) => {
   const { reset } = useOverflowActions()!;
   const notificationsEnabled = isNotificationsEnabled(settings);
 
+  const { setOptions, dumpCurrentFrame, startRecording, stopRecording } =
+    useContext(InkAppContext);
+  const recordingFilenameRef = useRef<string | null>(null);
   const historyManager = useHistory({
     chatRecordingService: config.getGeminiClient()?.getChatRecordingService(),
   });
 
   useMemoryMonitor(historyManager);
   const isAlternateBuffer = config.getUseAlternateBuffer();
+  const [mouseMode, setMouseMode] = useState(() =>
+    config.getUseAlternateBuffer(),
+  );
+
+  useEffect(() => {
+    setOptions({
+      stickyHeadersInBackbuffer: mouseMode,
+    });
+    if (mouseMode) {
+      enableMouseEvents();
+    } else {
+      disableMouseEvents();
+    }
+  }, [mouseMode, setOptions]);
+
   const [corgiMode, setCorgiMode] = useState(false);
   const [forceRerenderKey, setForceRerenderKey] = useState(0);
   const [debugMessage, setDebugMessage] = useState<string>('');
@@ -447,6 +470,13 @@ export const AppContainer = (props: AppContainerProps) => {
       setConfigInitialized(true);
       startupProfiler.flush(config);
 
+      // Fire-and-forget memory service (skill extraction from past sessions)
+      if (config.isMemoryManagerEnabled()) {
+        startMemoryService(config).catch((e) => {
+          debugLogger.error('Failed to start memory service:', e);
+        });
+      }
+
       const sessionStartSource = resumedSessionData
         ? SessionStartSource.Resume
         : SessionStartSource.Startup;
@@ -613,11 +643,11 @@ export const AppContainer = (props: AppContainerProps) => {
   });
 
   const refreshStatic = useCallback(() => {
-    if (!isAlternateBuffer) {
+    if (!isAlternateBuffer && !config.getUseTerminalBuffer()) {
       stdout.write(ansiEscapes.clearTerminal);
+      setHistoryRemountKey((prev) => prev + 1);
     }
-    setHistoryRemountKey((prev) => prev + 1);
-  }, [setHistoryRemountKey, isAlternateBuffer, stdout]);
+  }, [setHistoryRemountKey, isAlternateBuffer, stdout, config]);
 
   const shouldUseAlternateScreen = shouldEnterAlternateScreen(
     isAlternateBuffer,
@@ -1026,7 +1056,7 @@ Logging in with Google... Restarting Gemini CLI to continue.
       let fileCount: number;
 
       if (config.isJitContextEnabled()) {
-        await config.getContextManager()?.refresh();
+        await config.getMemoryContextManager()?.refresh();
         config.updateSystemInstructionIfInitialized();
         flattenedMemory = flattenMemory(config.getUserMemory());
         fileCount = config.getGeminiMdFileCount();
@@ -1422,10 +1452,17 @@ Logging in with Google... Restarting Gemini CLI to continue.
     (streamingState === StreamingState.Idle ||
       streamingState === StreamingState.Responding ||
       streamingState === StreamingState.WaitingForConfirmation) &&
-    !proQuotaRequest &&
-    !copyModeEnabled;
+    !proQuotaRequest;
 
   const observerRef = useRef<ResizeObserver | null>(null);
+
+  useEffect(
+    () => () => {
+      observerRef.current?.disconnect();
+    },
+    [],
+  );
+
   const [controlsHeight, setControlsHeight] = useState(0);
   const [lastNonCopyControlsHeight, setLastNonCopyControlsHeight] = useState(0);
 
@@ -1724,6 +1761,14 @@ Logging in with Google... Restarting Gemini CLI to continue.
         setShortcutsHelpVisible(false);
       }
 
+      if (keyMatchers[Command.TOGGLE_MOUSE_MODE](key)) {
+        setMouseMode((prev) => !prev);
+        if (mouseMode && !isAlternateBuffer) {
+          appEvents.emit(AppEvent.ScrollToBottom);
+        }
+        return true;
+      }
+
       if (isAlternateBuffer && keyMatchers[Command.TOGGLE_COPY_MODE](key)) {
         setCopyModeEnabled(true);
         disableMouseEvents();
@@ -1746,6 +1791,32 @@ Logging in with Google... Restarting Gemini CLI to continue.
         return true;
       } else if (keyMatchers[Command.SUSPEND_APP](key)) {
         handleSuspend();
+      } else if (keyMatchers[Command.DUMP_FRAME](key)) {
+        const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
+        const filename = `snapshot-${timestamp}.json`;
+        if (dumpCurrentFrame) {
+          dumpCurrentFrame(filename);
+          debugLogger.log(`Dumped frame to: ${filename}`);
+        }
+        return true;
+      } else if (keyMatchers[Command.START_RECORDING](key)) {
+        const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
+        const filename = `recording-${timestamp}.json`;
+        if (startRecording) {
+          startRecording(filename);
+          recordingFilenameRef.current = filename;
+          debugLogger.log(`Started recording to: ${filename}`);
+        }
+        return true;
+      } else if (keyMatchers[Command.STOP_RECORDING](key)) {
+        if (stopRecording) {
+          stopRecording();
+          debugLogger.log(
+            `Stopped recording, saved to: ${recordingFilenameRef.current ?? 'unknown'}`,
+          );
+          recordingFilenameRef.current = null;
+        }
+        return true;
       } else if (
         keyMatchers[Command.TOGGLE_COPY_MODE](key) &&
         !isAlternateBuffer
@@ -1932,6 +2003,10 @@ Logging in with Google... Restarting Gemini CLI to continue.
       historyManager.history,
       pendingHistoryItems,
       toggleAllExpansion,
+      dumpCurrentFrame,
+      startRecording,
+      stopRecording,
+      mouseMode,
     ],
   );
 
@@ -1951,7 +2026,9 @@ Logging in with Google... Restarting Gemini CLI to continue.
       }
 
       setCopyModeEnabled(false);
-      enableMouseEvents();
+      if (mouseMode) {
+        enableMouseEvents();
+      }
       return true;
     },
     {
@@ -2268,6 +2345,7 @@ Logging in with Google... Restarting Gemini CLI to continue.
       editorError,
       isEditorDialogOpen,
       showPrivacyNotice,
+      mouseMode,
       corgiMode,
       debugMessage,
       quittingMessages,
@@ -2394,6 +2472,7 @@ Logging in with Google... Restarting Gemini CLI to continue.
       editorError,
       isEditorDialogOpen,
       showPrivacyNotice,
+      mouseMode,
       corgiMode,
       debugMessage,
       quittingMessages,
@@ -2694,7 +2773,11 @@ Logging in with Google... Restarting Gemini CLI to continue.
               toggleAllExpansion={toggleAllExpansion}
             >
               <ShellFocusContext.Provider value={isFocused}>
-                <App key={`app-${forceRerenderKey}`} />
+                <MouseProvider mouseEventsEnabled={mouseMode}>
+                  <ScrollProvider>
+                    <App key={`app-${forceRerenderKey}`} />
+                  </ScrollProvider>
+                </MouseProvider>
               </ShellFocusContext.Provider>
             </ToolActionsProvider>
           </AppContext.Provider>
