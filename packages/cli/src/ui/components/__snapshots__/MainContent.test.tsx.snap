@@ -3,8 +3,9 @@
 exports[`MainContent > MainContent Tool Output Height Logic > 'ASB mode - Focused shell should expand' 1`] = `
 "ScrollableList
 AppHeader(full)
+
 ╭──────────────────────────────────────────────────────────────────────────────────────────────╮
-│ ⊶  Shell Command Running a long command...                                                   │
+│ ⠋  Shell Command Running a long command...                                                   │
 │                                                                                              │
 │ Line 11                                                                                      │
 │ Line 12                                                                                      │
@@ -23,8 +24,9 @@ AppHeader(full)
 exports[`MainContent > MainContent Tool Output Height Logic > 'ASB mode - Unfocused shell' 1`] = `
 "ScrollableList
 AppHeader(full)
+
 ╭──────────────────────────────────────────────────────────────────────────────────────────────╮
-│ ⊶  Shell Command Running a long command...                                                   │
+│ ⠋  Shell Command Running a long command...                                                   │
 │                                                                                              │
 │ Line 11                                                                                      │
 │ Line 12                                                                                      │
@@ -42,8 +44,9 @@ AppHeader(full)
 
 exports[`MainContent > MainContent Tool Output Height Logic > 'Normal mode - Constrained height' 1`] = `
 "AppHeader(full)
+
 ╭──────────────────────────────────────────────────────────────────────────────────────────────╮
-│ ⊶  Shell Command Running a long command...                                                   │
+│ ⠋  Shell Command Running a long command...                                                   │
 │                                                                                              │
 │ ... first 11 lines hidden (Ctrl+O to show) ...                                               │
 │ Line 12                                                                                      │
@@ -61,8 +64,9 @@ exports[`MainContent > MainContent Tool Output Height Logic > 'Normal mode - Con
 
 exports[`MainContent > MainContent Tool Output Height Logic > 'Normal mode - Unconstrained height' 1`] = `
 "AppHeader(full)
+
 ╭──────────────────────────────────────────────────────────────────────────────────────────────╮
-│ ⊶  Shell Command Running a long command...                                                   │
+│ ⠋  Shell Command Running a long command...                                                   │
 │                                                                                              │
 │ Line 1                                                                                       │
 │ Line 2                                                                                       │
@@ -93,6 +97,7 @@ exports[`MainContent > renders a ToolConfirmationQueue without an extra line whe
 ▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀
  > Apply plan                                                                   
 ▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄
+
 ╭──────────────────────────────────────────────────────────────────────────────╮
 │ Ready to start implementation?                                               │
 │                                                                              │
@@ -103,6 +108,7 @@ exports[`MainContent > renders a ToolConfirmationQueue without an extra line whe
 
 exports[`MainContent > renders a split tool group without a gap between static and pending areas 1`] = `
 "AppHeader(full)
+
 ╭──────────────────────────────────────────────────────────────────────────╮
 │ ✓  test-tool A tool for testing                                          │
 │                                                                          │
@@ -128,6 +134,7 @@ exports[`MainContent > renders a subagent with a complete box including bottom b
 ▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀
  > Investigate                                                                  
 ▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄
+
 ╭──────────────────────────────────────────────────────────────────────────╮
 │ ≡ Running Agent... (ctrl+o to collapse)                                  │
 │                                                                          │

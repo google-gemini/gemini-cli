@@ -172,6 +172,7 @@ Implement a comprehensive authentication system with multiple providers.
             writeTextFile: vi.fn(),
           }),
           getUseAlternateBuffer: () => useAlternateBuffer,
+          getUseTerminalBuffer: () => false,
         } as unknown as import('@google/gemini-cli-core').Config,
         settings: createMockSettings({ ui: { useAlternateBuffer } }),
       },
@@ -472,6 +473,7 @@ Implement a comprehensive authentication system with multiple providers.
                   writeTextFile: vi.fn(),
                 }),
                 getUseAlternateBuffer: () => useAlternateBuffer ?? true,
+                getUseTerminalBuffer: () => false,
               } as unknown as import('@google/gemini-cli-core').Config,
               settings: createMockSettings({
                 ui: { useAlternateBuffer: useAlternateBuffer ?? true },

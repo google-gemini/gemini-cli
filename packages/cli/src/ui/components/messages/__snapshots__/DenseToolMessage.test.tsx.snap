@@ -7,21 +7,12 @@ exports[`DenseToolMessage > Toggleable Diff View (Alternate Buffer) > hides diff
 
 exports[`DenseToolMessage > Toggleable Diff View (Alternate Buffer) > shows diff content by default when NOT in alternate buffer mode 1`] = `
 "  ✓  test-tool  test.ts → Accepted
-
-      1 - old line
-      1 + new line
 "
 `;
 
 exports[`DenseToolMessage > Visual Regression > matches SVG snapshot for a Rejected tool call 1`] = `"  -  read_file  Reading important.txt"`;
 
-exports[`DenseToolMessage > Visual Regression > matches SVG snapshot for an Accepted file edit with diff stats 1`] = `
-"  ✓  edit  test.ts → Accepted (+1, -1)
-
-      1 - old
-      1 + new
-"
-`;
+exports[`DenseToolMessage > Visual Regression > matches SVG snapshot for an Accepted file edit with diff stats 1`] = `"  ✓  edit  test.ts → Accepted (+1, -1)"`;
 
 exports[`DenseToolMessage > does not render result arrow if resultDisplay is missing 1`] = `
 "  o  test-tool  Test description
@@ -35,17 +26,11 @@ exports[`DenseToolMessage > flattens newlines in string results 1`] = `
 
 exports[`DenseToolMessage > renders correctly for Edit tool using confirmationDetails 1`] = `
 "  ?  Edit  styles.scss → Confirming
-
-      1 - body { color: blue; }
-      1 + body { color: red; }
 "
 `;
 
 exports[`DenseToolMessage > renders correctly for Errored Edit tool 1`] = `
 "  x  Edit  styles.scss → Failed (+1, -1)
-
-      1 - old line
-      1 + new line
 "
 `;
 
@@ -60,33 +45,21 @@ exports[`DenseToolMessage > renders correctly for ReadManyFiles results 1`] = `
 
 exports[`DenseToolMessage > renders correctly for Rejected Edit tool 1`] = `
 "  -  Edit  styles.scss → Rejected (+1, -1)
-
-      1 - old line
-      1 + new line
 "
 `;
 
 exports[`DenseToolMessage > renders correctly for Rejected Edit tool with confirmationDetails and diffStat 1`] = `
 "  -  Edit  styles.scss → Rejected (+1, -1)
-
-      1 - body { color: blue; }
-      1 + body { color: red; }
 "
 `;
 
 exports[`DenseToolMessage > renders correctly for Rejected WriteFile tool 1`] = `
 "  -  WriteFile  config.json → Rejected
-
-      1 - old content
-      1 + new content
 "
 `;
 
 exports[`DenseToolMessage > renders correctly for WriteFile tool 1`] = `
 "  ✓  WriteFile  config.json → Accepted (+1, -1)
-
-      1 - old content
-      1 + new content
 "
 `;
 
@@ -102,9 +75,6 @@ exports[`DenseToolMessage > renders correctly for error status with string messa
 
 exports[`DenseToolMessage > renders correctly for file diff results with stats 1`] = `
 "  ✓  test-tool  test.ts → Accepted (+15, -6)
-
-      1 - old line
-      1 + diff content
 "
 `;
 

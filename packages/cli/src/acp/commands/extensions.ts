@@ -284,7 +284,7 @@ export class LinkExtensionCommand implements Command {
 
     try {
       await stat(sourceFilepath);
-    } catch (_error) {
+    } catch {
       return { name: this.name, data: `Invalid source: ${sourceFilepath}` };
     }
 
