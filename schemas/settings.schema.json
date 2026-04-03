@@ -2440,8 +2440,8 @@
             "showColor": {
               "title": "Show Color",
               "description": "Show color in shell output.",
-              "markdownDescription": "Show color in shell output.\n\n- Category: `Tools`\n- Requires restart: `no`\n- Default: `false`",
-              "default": false,
+              "markdownDescription": "Show color in shell output.\n\n- Category: `Tools`\n- Requires restart: `no`\n- Default: `true`",
+              "default": true,
               "type": "boolean"
             },
             "inactivityTimeout": {
