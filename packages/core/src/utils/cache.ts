@@ -28,6 +28,14 @@ export interface CacheOptions {
    * Use 'map' if you need to use strings as keys or need the clear() method.
    */
   storage?: 'map' | 'weakmap';
+
+  /**
+   * Maximum number of entries in the cache (LRU eviction strategy).
+   * Only applicable when storage is 'map'. When the cache exceeds this
+   * limit, the least recently used entries will be evicted.
+   * Set to Infinity to disable LRU eviction (default).
+   */
+  maxCapacity?: number;
 }
 
 /**
@@ -39,6 +47,8 @@ export class CacheService<K extends object | string | undefined, V> {
     | WeakMap<WeakKey, CacheEntry<V>>;
   private readonly defaultTtl?: number;
   private readonly deleteOnPromiseFailure: boolean;
+  private readonly maxCapacity: number;
+  private readonly accessOrder: K[];
 
   constructor(options: CacheOptions = {}) {
     // Default to map for safety unless weakmap is explicitly requested.
@@ -48,6 +58,9 @@ export class CacheService<K extends object | string | undefined, V> {
         : new Map<K, CacheEntry<V>>();
     this.defaultTtl = options.defaultTtl;
     this.deleteOnPromiseFailure = options.deleteOnPromiseFailure ?? true;
+    this.maxCapacity =
+      options.maxCapacity !== undefined ? options.maxCapacity : Infinity;
+    this.accessOrder = [];
   }
 
   /**
@@ -69,6 +82,15 @@ export class CacheService<K extends object | string | undefined, V> {
       return undefined;
     }
 
+    // Update access order for LRU tracking
+    if (this.storage instanceof Map && this.maxCapacity !== Infinity) {
+      const idx = this.accessOrder.indexOf(key);
+      if (idx !== -1) {
+        this.accessOrder.splice(idx, 1);
+      }
+      this.accessOrder.push(key);
+    }
+
     return entry.value;
   }
 
@@ -76,6 +98,19 @@ export class CacheService<K extends object | string | undefined, V> {
    * Stores a value in the cache.
    */
   set(key: K, value: V, ttl?: number): void {
+    // Evict LRU entry if at capacity, only for Map storage
+    if (
+      this.storage instanceof Map &&
+      this.maxCapacity !== Infinity &&
+      this.accessOrder.length >= this.maxCapacity &&
+      !this.accessOrder.includes(key)
+    ) {
+      const lruKey = this.accessOrder.shift();
+      if (lruKey !== undefined) {
+        (this.storage as Map<K, CacheEntry<V>>).delete(lruKey);
+      }
+    }
+
     const entry: CacheEntry<V> = {
       value,
       timestamp: Date.now(),
@@ -84,6 +119,15 @@ export class CacheService<K extends object | string | undefined, V> {
 
     // eslint-disable-next-line @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-type-assertion
     (this.storage as any).set(key, entry);
+
+    // Track access order for LRU
+    if (
+      this.storage instanceof Map &&
+      this.maxCapacity !== Infinity &&
+      !this.accessOrder.includes(key)
+    ) {
+      this.accessOrder.push(key);
+    }
 
     if (this.deleteOnPromiseFailure && value instanceof Promise) {
       value.catch(() => {
@@ -114,6 +158,10 @@ export class CacheService<K extends object | string | undefined, V> {
   delete(key: K): void {
     if (this.storage instanceof Map) {
       this.storage.delete(key);
+      const idx = this.accessOrder.indexOf(key);
+      if (idx !== -1) {
+        this.accessOrder.splice(idx, 1);
+      }
     } else {
       // WeakMap.delete returns a boolean, we can ignore it.
       // Cast to any to bypass the WeakKey constraint since we've already
@@ -129,6 +177,7 @@ export class CacheService<K extends object | string | undefined, V> {
   clear(): void {
     if (this.storage instanceof Map) {
       this.storage.clear();
+      this.accessOrder.length = 0;
     } else {
       throw new Error('clear() is not supported on WeakMap storage');
     }
