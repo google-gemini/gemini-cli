@@ -33,10 +33,25 @@ import { injectAutomationOverlay } from './automationOverlay.js';
 import { injectInputBlocker } from './inputBlocker.js';
 import { debugLogger } from '../../utils/debugLogger.js';
 import {
+  recordBrowserAgentToolDiscovery,
+  recordBrowserAgentVisionStatus,
+  recordBrowserAgentCleanup,
+} from '../../telemetry/metrics.js';
+import {
   PolicyDecision,
   PRIORITY_SUBAGENT_TOOL,
   type PolicyRule,
 } from '../../policy/types.js';
+
+/**
+ * Structured return type for vision disabled reasons.
+ * Separates the condition code from the human-readable message.
+ */
+type VisionDisabledReason =
+  | { code: 'no_visual_model'; message: string }
+  | { code: 'missing_visual_tools'; message: string }
+  | { code: 'blocked_auth_type'; message: string }
+  | undefined;
 
 /**
  * Creates a browser agent definition with MCP tools configured.
@@ -57,6 +72,8 @@ export async function createBrowserAgentDefinition(
 ): Promise<{
   definition: LocalAgentDefinition<typeof BrowserTaskResultSchema>;
   browserManager: BrowserManager;
+  visionEnabled: boolean;
+  sessionMode: 'persistent' | 'isolated' | 'existing';
 }> {
   debugLogger.log(
     'Creating browser agent definition with isolated MCP tools...',
@@ -169,6 +186,20 @@ export async function createBrowserAgentDefinition(
   const missingSemanticTools = requiredSemanticTools.filter(
     (t) => !availableToolNames.includes(t),
   );
+
+  const rawSessionMode = browserConfig?.customConfig?.sessionMode;
+  const sessionMode =
+    rawSessionMode === 'isolated' || rawSessionMode === 'existing'
+      ? rawSessionMode
+      : 'persistent';
+
+  recordBrowserAgentToolDiscovery(
+    config,
+    mcpTools.length,
+    missingSemanticTools,
+    sessionMode,
+  );
+
   if (missingSemanticTools.length > 0) {
     debugLogger.warn(
       `Semantic tools missing (${missingSemanticTools.join(', ')}). ` +
@@ -182,17 +213,22 @@ export async function createBrowserAgentDefinition(
     (t) => !availableToolNames.includes(t),
   );
 
-  // Check whether vision can be enabled; returns undefined if all gates pass.
-  function getVisionDisabledReason(): string | undefined {
+  // Check whether vision can be enabled; returns structured type with code and message.
+  function getVisionDisabledReason(): VisionDisabledReason {
     const browserConfig = config.getBrowserAgentConfig();
     if (!browserConfig.customConfig.visualModel) {
-      return 'No visualModel configured.';
+      return {
+        code: 'no_visual_model',
+        message: 'No visualModel configured.',
+      };
     }
     if (missingVisualTools.length > 0) {
-      return (
-        `Visual tools missing (${missingVisualTools.join(', ')}). ` +
-        `The installed chrome-devtools-mcp version may be too old.`
-      );
+      return {
+        code: 'missing_visual_tools',
+        message:
+          `Visual tools missing (${missingVisualTools.join(', ')}). ` +
+          `The installed chrome-devtools-mcp version may be too old.`,
+      };
     }
     const authType = config.getContentGeneratorConfig()?.authType;
     const blockedAuthTypes = new Set([
@@ -201,7 +237,10 @@ export async function createBrowserAgentDefinition(
       AuthType.COMPUTE_ADC,
     ]);
     if (authType && blockedAuthTypes.has(authType)) {
-      return 'Visual agent model not available for current auth type.';
+      return {
+        code: 'blocked_auth_type',
+        message: 'Visual agent model not available for current auth type.',
+      };
     }
     return undefined;
   }
@@ -209,8 +248,13 @@ export async function createBrowserAgentDefinition(
   const allTools: AnyDeclarativeTool[] = [...mcpTools];
   const visionDisabledReason = getVisionDisabledReason();
 
+  recordBrowserAgentVisionStatus(config, {
+    enabled: !visionDisabledReason,
+    disabled_reason: visionDisabledReason?.code,
+  });
+
   if (visionDisabledReason) {
-    debugLogger.log(`Vision disabled: ${visionDisabledReason}`);
+    debugLogger.log(`Vision disabled: ${visionDisabledReason.message}`);
   } else {
     allTools.push(
       createAnalyzeScreenshotTool(browserManager, config, messageBus),
@@ -232,12 +276,46 @@ export async function createBrowserAgentDefinition(
     },
   };
 
-  return { definition, browserManager };
+  return {
+    definition,
+    browserManager,
+    visionEnabled: !visionDisabledReason,
+    sessionMode,
+  };
 }
 
 /**
  * Closes all persistent browser sessions and cleans up resources.
  *
+ * @param browserManager The browser manager to clean up
+ * @param config Runtime configuration
+ * @param sessionMode The browser session mode
+ */
+export async function cleanupBrowserAgent(
+  browserManager: BrowserManager,
+  config: Config,
+  sessionMode: 'persistent' | 'isolated' | 'existing',
+): Promise<void> {
+  const startMs = Date.now();
+  try {
+    await browserManager.close();
+    recordBrowserAgentCleanup(config, Date.now() - startMs, {
+      session_mode: sessionMode,
+      success: true,
+    });
+    debugLogger.log('Browser agent cleanup complete');
+  } catch (error) {
+    recordBrowserAgentCleanup(config, Date.now() - startMs, {
+      session_mode: sessionMode,
+      success: false,
+    });
+    debugLogger.error(
+      `Error during browser cleanup: ${error instanceof Error ? error.message : String(error)}`,
+    );
+  }
+}
+
+/**
  * Call this on /clear commands and CLI exit to reset browser state.
  */
 export async function resetBrowserSession(): Promise<void> {
