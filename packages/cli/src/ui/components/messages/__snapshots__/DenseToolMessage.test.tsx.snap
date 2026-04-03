@@ -24,6 +24,11 @@ exports[`DenseToolMessage > flattens newlines in string results 1`] = `
 "
 `;
 
+exports[`DenseToolMessage > flattens newlines in string results 2`] = `
+"  ✓  test-tool  Test description → Line 1 Line 2
+"
+`;
+
 exports[`DenseToolMessage > renders correctly for Edit tool using confirmationDetails 1`] = `
 "  ?  Edit  styles.scss → Confirming
 "
