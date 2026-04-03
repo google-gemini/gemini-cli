@@ -5,7 +5,7 @@
  */
 
 import type React from 'react';
-import { useCallback, useRef, useState } from 'react';
+import { useCallback, useRef, useState, useEffect } from 'react';
 import { Box, Text, ResizeObserver, type DOMElement } from 'ink';
 import {
   isUserVisibleHook,
@@ -76,6 +76,13 @@ export const StatusNode: React.FC<{
   onResize,
 }) => {
   const observerRef = useRef<ResizeObserver | null>(null);
+
+  useEffect(
+    () => () => {
+      observerRef.current?.disconnect();
+    },
+    [],
+  );
 
   const onRefChange = useCallback(
     (node: DOMElement | null) => {
@@ -169,6 +176,13 @@ export const StatusRow: React.FC<StatusRowProps> = ({
   const [tipWidth, setTipWidth] = useState(0);
   const tipObserverRef = useRef<ResizeObserver | null>(null);
 
+  useEffect(
+    () => () => {
+      tipObserverRef.current?.disconnect();
+    },
+    [],
+  );
+
   const onTipRefChange = useCallback((node: DOMElement | null) => {
     if (tipObserverRef.current) {
       tipObserverRef.current.disconnect();
@@ -179,7 +193,13 @@ export const StatusRow: React.FC<StatusRowProps> = ({
       const observer = new ResizeObserver((entries) => {
         const entry = entries[0];
         if (entry) {
-          setTipWidth(Math.round(entry.contentRect.width));
+          const width = Math.round(entry.contentRect.width);
+          // Only update if width > 0 to prevent layout feedback loops
+          // when the tip is hidden. This ensures we always use the
+          // intrinsic width for collision detection.
+          if (width > 0) {
+            setTipWidth(width);
+          }
         }
       });
       observer.observe(node);
@@ -230,6 +250,10 @@ export const StatusRow: React.FC<StatusRowProps> = ({
   const showRow1 = showUiDetails || showRow1Minimal;
   const showRow2 = showUiDetails || showRow2Minimal;
 
+  const onStatusResize = useCallback((width: number) => {
+    if (width > 0) setStatusWidth(width);
+  }, []);
+
   const statusNode = (
     <StatusNode
       showTips={showTips}
@@ -242,7 +266,7 @@ export const StatusRow: React.FC<StatusRowProps> = ({
       errorVerbosity={
         settings.merged.ui.errorVerbosity as 'low' | 'full' | undefined
       }
-      onResize={setStatusWidth}
+      onResize={onStatusResize}
     />
   );
 
@@ -322,20 +346,23 @@ export const StatusRow: React.FC<StatusRowProps> = ({
 
           <Box
             flexShrink={0}
-            marginLeft={LAYOUT.TIP_LEFT_MARGIN}
+            marginLeft={showTipLine ? LAYOUT.TIP_LEFT_MARGIN : 0}
             marginRight={
-              isNarrow
-                ? LAYOUT.TIP_RIGHT_MARGIN_NARROW
-                : LAYOUT.TIP_RIGHT_MARGIN_WIDE
+              showTipLine
+                ? isNarrow
+                  ? LAYOUT.TIP_RIGHT_MARGIN_NARROW
+                  : LAYOUT.TIP_RIGHT_MARGIN_WIDE
+                : 0
             }
+            position={showTipLine ? 'relative' : 'absolute'}
+            {...(showTipLine ? {} : { top: -100, left: -100 })}
           >
             {/* 
-                We always render the tip node so it can be measured by ResizeObserver,
-                but we control its visibility based on the collision detection.
+                We always render the tip node so it can be measured by ResizeObserver.
+                When hidden, we use absolute positioning so it can still be measured 
+                but doesn't affect the layout of Row 1. This prevents layout loops.
             */}
-            <Box display={showTipLine ? 'flex' : 'none'}>
-              {!isNarrow && tipContentStr && renderTipNode()}
-            </Box>
+            {!isNarrow && tipContentStr && renderTipNode()}
           </Box>
         </Box>
       )}

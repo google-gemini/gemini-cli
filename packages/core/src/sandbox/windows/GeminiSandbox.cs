@@ -58,6 +58,13 @@ public class GeminiSandbox {
         public ulong OtherTransferCount;
     }
 
+    [StructLayout(LayoutKind.Sequential)]
+    struct JOBOBJECT_NET_RATE_CONTROL_INFORMATION {
+        public ulong MaxBandwidth;
+        public uint ControlFlags;
+        public byte DscpTag;
+    }
+
     [DllImport("kernel32.dll", SetLastError = true)]
     static extern IntPtr CreateJobObject(IntPtr lpJobAttributes, string lpName);
 
@@ -69,6 +76,9 @@ public class GeminiSandbox {
 
     [DllImport("advapi32.dll", SetLastError = true)]
     static extern bool OpenProcessToken(IntPtr ProcessHandle, uint DesiredAccess, out IntPtr TokenHandle);
+
+    [DllImport("advapi32.dll", SetLastError = true)]
+    static extern bool DuplicateTokenEx(IntPtr hExistingToken, uint dwDesiredAccess, IntPtr lpTokenAttributes, uint ImpersonationLevel, uint TokenType, out IntPtr phNewToken);
 
     [DllImport("advapi32.dll", SetLastError = true)]
     static extern bool CreateRestrictedToken(IntPtr ExistingTokenHandle, uint Flags, uint DisableSidCount, IntPtr SidsToDisable, uint DeletePrivilegeCount, IntPtr PrivilegesToDelete, uint RestrictedSidCount, IntPtr SidsToRestrict, out IntPtr NewTokenHandle);
@@ -143,11 +153,13 @@ public class GeminiSandbox {
 
     private const int TokenIntegrityLevel = 25;
     private const uint SE_GROUP_INTEGRITY = 0x00000020;
+    private const uint TOKEN_ALL_ACCESS = 0xF01FF;
+    private const uint DISABLE_MAX_PRIVILEGE = 0x1;
 
     static int Main(string[] args) {
         if (args.Length < 3) {
-            Console.WriteLine("Usage: GeminiSandbox.exe <network:0|1> <cwd> [--forbidden-manifest <path>] <command> [args...]");
-            Console.WriteLine("Internal commands: __read <path>, __write <path>");
+            Console.Error.WriteLine("Usage: GeminiSandbox.exe <network:0|1> <cwd> [--forbidden-manifest <path>] <command> [args...]");
+            Console.Error.WriteLine("Internal commands: __read <path>, __write <path>");
             return 1;
         }
 
@@ -171,7 +183,7 @@ public class GeminiSandbox {
         }
 
         if (argIndex >= args.Length) {
-            Console.WriteLine("Error: Missing command");
+            Console.Error.WriteLine("Error: Missing command");
             return 1;
         }
 
@@ -182,15 +194,15 @@ public class GeminiSandbox {
         IntPtr lowIntegritySid = IntPtr.Zero;
 
         try {
-            // 1. Create Restricted Token
-            if (!OpenProcessToken(GetCurrentProcess(), 0x0002 /* TOKEN_DUPLICATE */ | 0x0008 /* TOKEN_QUERY */ | 0x0080 /* TOKEN_ADJUST_DEFAULT */, out hToken)) {
-                Console.WriteLine("Error: OpenProcessToken failed (" + Marshal.GetLastWin32Error() + ")");
+            // 1. Duplicate Primary Token
+            if (!OpenProcessToken(GetCurrentProcess(), TOKEN_ALL_ACCESS, out hToken)) {
+                Console.Error.WriteLine("Error: OpenProcessToken failed (" + Marshal.GetLastWin32Error() + ")");
                 return 1;
             }
 
-            // Flags: 0x1 (DISABLE_MAX_PRIVILEGE)
-            if (!CreateRestrictedToken(hToken, 1, 0, IntPtr.Zero, 0, IntPtr.Zero, 0, IntPtr.Zero, out hRestrictedToken)) {
-                Console.WriteLine("Error: CreateRestrictedToken failed (" + Marshal.GetLastWin32Error() + ")");
+            // Create a restricted token to strip administrative privileges
+            if (!CreateRestrictedToken(hToken, DISABLE_MAX_PRIVILEGE, 0, IntPtr.Zero, 0, IntPtr.Zero, 0, IntPtr.Zero, out hRestrictedToken)) {
+                Console.Error.WriteLine("Error: CreateRestrictedToken failed (" + Marshal.GetLastWin32Error() + ")");
                 return 1;
             }
 
@@ -205,7 +217,7 @@ public class GeminiSandbox {
                 try {
                     Marshal.StructureToPtr(tml, pTml, false);
                     if (!SetTokenInformation(hRestrictedToken, TokenIntegrityLevel, pTml, (uint)tmlSize)) {
-                        Console.WriteLine("Error: SetTokenInformation failed (" + Marshal.GetLastWin32Error() + ")");
+                        Console.Error.WriteLine("Error: SetTokenInformation failed (" + Marshal.GetLastWin32Error() + ")");
                         return 1;
                     }
                 } finally {
@@ -223,10 +235,22 @@ public class GeminiSandbox {
             SetInformationJobObject(hJob, 9 /* JobObjectExtendedLimitInformation */, lpJobLimits, (uint)Marshal.SizeOf(jobLimits));
             Marshal.FreeHGlobal(lpJobLimits);
 
+            if (!networkAccess) {
+                JOBOBJECT_NET_RATE_CONTROL_INFORMATION netLimits = new JOBOBJECT_NET_RATE_CONTROL_INFORMATION();
+                netLimits.MaxBandwidth = 1;
+                netLimits.ControlFlags = 0x1 | 0x2; // ENABLE | MAX_BANDWIDTH
+                netLimits.DscpTag = 0;
+                
+                IntPtr lpNetLimits = Marshal.AllocHGlobal(Marshal.SizeOf(netLimits));
+                Marshal.StructureToPtr(netLimits, lpNetLimits, false);
+                SetInformationJobObject(hJob, 32 /* JobObjectNetRateControlInformation */, lpNetLimits, (uint)Marshal.SizeOf(netLimits));
+                Marshal.FreeHGlobal(lpNetLimits);
+            }
+
             // 4. Handle Internal Commands or External Process
             if (command == "__read") {
                 if (argIndex + 1 >= args.Length) {
-                    Console.WriteLine("Error: Missing path for __read");
+                    Console.Error.WriteLine("Error: Missing path for __read");
                     return 1;
                 }
                 string path = args[argIndex + 1];
@@ -245,24 +269,31 @@ public class GeminiSandbox {
                 });
             } else if (command == "__write") {
                 if (argIndex + 1 >= args.Length) {
-                    Console.WriteLine("Error: Missing path for __write");
+                    Console.Error.WriteLine("Error: Missing path for __write");
                     return 1;
                 }
                 string path = args[argIndex + 1];
                 CheckForbidden(path, forbiddenPaths);
-                return RunInImpersonation(hRestrictedToken, () => {
-                    try {
-                        using (StreamReader reader = new StreamReader(Console.OpenStandardInput(), System.Text.Encoding.UTF8))
-                        using (FileStream fs = new FileStream(path, FileMode.Create, FileAccess.Write, FileShare.None))
-                        using (StreamWriter writer = new StreamWriter(fs, System.Text.Encoding.UTF8)) {
-                            writer.Write(reader.ReadToEnd());
+
+                try {
+                    using (MemoryStream ms = new MemoryStream()) {
+                        // Buffer stdin before impersonation (as restricted token can't read the inherited pipe).
+                        using (Stream stdin = Console.OpenStandardInput()) {
+                            stdin.CopyTo(ms);
                         }
-                        return 0;
-                    } catch (Exception e) {
-                        Console.Error.WriteLine("Error writing file: " + e.Message);
-                        return 1;
+
+                        return RunInImpersonation(hRestrictedToken, () => {
+                            using (FileStream fs = new FileStream(path, FileMode.Create, FileAccess.Write, FileShare.None)) {
+                                ms.Position = 0;
+                                ms.CopyTo(fs);
+                            }
+                            return 0;
+                        });
                     }
-                });
+                } catch (Exception e) {
+                    Console.Error.WriteLine("Error during __write: " + e.Message);
+                    return 1;
+                }
             }
 
             // External Process
@@ -313,7 +344,7 @@ public class GeminiSandbox {
 
     private static int RunInImpersonation(IntPtr hToken, Func<int> action) {
         if (!ImpersonateLoggedOnUser(hToken)) {
-            Console.WriteLine("Error: ImpersonateLoggedOnUser failed (" + Marshal.GetLastWin32Error() + ")");
+            Console.Error.WriteLine("Error: ImpersonateLoggedOnUser failed (" + Marshal.GetLastWin32Error() + ")");
             return 1;
         }
         try {

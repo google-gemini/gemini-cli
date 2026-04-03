@@ -26,6 +26,7 @@ import {
   type ScheduledToolCall,
 } from './types.js';
 import { ToolErrorType } from '../tools/tool-error.js';
+import { UPDATE_TOPIC_TOOL_NAME } from '../tools/tool-names.js';
 import { PolicyDecision, type ApprovalMode } from '../policy/types.js';
 import {
   ToolConfirmationOutcome,
@@ -302,9 +303,16 @@ export class Scheduler {
     this.state.clearBatch();
     const currentApprovalMode = this.config.getApprovalMode();
 
+    // Sort requests to ensure Topic changes happen before actions in the same batch.
+    const sortedRequests = [...requests].sort((a, b) => {
+      if (a.name === UPDATE_TOPIC_TOOL_NAME) return -1;
+      if (b.name === UPDATE_TOPIC_TOOL_NAME) return 1;
+      return 0;
+    });
+
     try {
       const toolRegistry = this.context.toolRegistry;
-      const newCalls: ToolCall[] = requests.map((request) => {
+      const newCalls: ToolCall[] = sortedRequests.map((request) => {
         const enrichedRequest: ToolCallRequestInfo = {
           ...request,
           schedulerId: this.schedulerId,
@@ -893,7 +901,7 @@ export class Scheduler {
           } as ScheduledToolCall,
           signal,
         );
-      } catch (_e) {
+      } catch {
         // Fallback to normal error handling if parsing/looping fails
       }
     }

@@ -513,7 +513,11 @@ describe('HookRunner', () => {
             const args = vi.mocked(spawn).mock.calls[
               executionOrder.length
             ][1] as string[];
-            const command = args[args.length - 1];
+            let command = args[args.length - 1];
+            // On Windows, the command is wrapped in PowerShell syntax
+            if (command.includes('; if ($LASTEXITCODE -ne 0)')) {
+              command = command.split(';')[0];
+            }
             executionOrder.push(command);
             setImmediate(() => callback(0));
           }

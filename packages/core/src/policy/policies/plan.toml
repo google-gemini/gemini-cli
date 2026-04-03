@@ -113,15 +113,22 @@ decision = "allow"
 priority = 70
 modes = ["plan"]
 
+# Topic grouping tool is innocuous and used for UI organization.
 [[rule]]
-toolName = ["ask_user", "save_memory"]
+toolName = "update_topic"
+decision = "allow"
+priority = 70
+modes = ["plan"]
+
+[[rule]]
+toolName = ["ask_user", "save_memory", "web_fetch"]
 decision = "ask_user"
 priority = 70
 modes = ["plan"]
 interactive = true
 
 [[rule]]
-toolName = ["ask_user", "save_memory"]
+toolName = ["ask_user", "save_memory", "web_fetch"]
 decision = "deny"
 priority = 70
 modes = ["plan"]

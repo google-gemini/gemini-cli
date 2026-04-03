@@ -46,7 +46,12 @@ export * from './core/geminiRequest.js';
 export * from './scheduler/scheduler.js';
 export * from './scheduler/types.js';
 export * from './scheduler/tool-executor.js';
+export * from './scheduler/policy.js';
 export * from './core/recordingContentGenerator.js';
+
+// Export Routing
+export * from './routing/routingStrategy.js';
+export * from './routing/modelRouterService.js';
 
 export * from './fallback/types.js';
 export * from './fallback/handler.js';
@@ -83,6 +88,7 @@ export * from './utils/authConsent.js';
 export * from './utils/googleQuotaErrors.js';
 export * from './utils/googleErrors.js';
 export * from './utils/fileUtils.js';
+export * from './utils/sessionOperations.js';
 export * from './utils/planUtils.js';
 export * from './utils/approvalModeUtils.js';
 export * from './utils/fileDiffUtils.js';
@@ -130,9 +136,11 @@ export * from './services/FolderTrustDiscoveryService.js';
 export * from './services/chatRecordingService.js';
 export * from './services/fileSystemService.js';
 export * from './services/sandboxedFileSystemService.js';
+export * from './services/modelConfigService.js';
 export * from './sandbox/windows/WindowsSandboxManager.js';
 export * from './services/sessionSummaryUtils.js';
-export * from './services/contextManager.js';
+export { startMemoryService } from './services/memoryService.js';
+export * from './context/memoryContextManager.js';
 export * from './services/trackerService.js';
 export * from './services/trackerTypes.js';
 export * from './services/keychainService.js';
@@ -155,12 +163,6 @@ export * from './ide/types.js';
 // Export Shell Execution Service
 export * from './services/shellExecutionService.js';
 export * from './services/sandboxManager.js';
-
-// Export Execution Lifecycle Service
-export * from './services/executionLifecycleService.js';
-
-// Export Injection Service
-export * from './config/injectionService.js';
 
 // Export Execution Lifecycle Service
 export * from './services/executionLifecycleService.js';
@@ -274,3 +276,7 @@ export * from './voice/responseFormatter.js';
 
 // Export types from @google/genai
 export type { Content, Part, FunctionCall } from '@google/genai';
+
+// Export context types and profiles
+export * from './context/types.js';
+export * from './context/profiles.js';

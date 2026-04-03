@@ -42,6 +42,7 @@ import {
   type OverflowState,
 } from '../ui/contexts/OverflowContext.js';
 
+import { makeFakeConfig } from '@google/gemini-cli-core';
 import { type Config } from '@google/gemini-cli-core';
 import { FakePersistentState } from './persistentStateFake.js';
 import { AppContext, type AppState } from '../ui/contexts/AppContext.js';
@@ -51,7 +52,6 @@ import { themeManager, DEFAULT_THEME } from '../ui/themes/theme-manager.js';
 import { DefaultLight } from '../ui/themes/builtin/light/default-light.js';
 import { pickDefaultThemeName } from '../ui/themes/theme.js';
 import { generateSvgForTerminal } from './svg.js';
-import { loadCliConfig, type CliArgs } from '../config/config.js';
 
 export const persistentStateMock = new FakePersistentState();
 
@@ -223,7 +223,7 @@ class XtermStdout extends EventEmitter {
             this.once('render', resolve),
           );
           const timeoutPromise = new Promise((resolve) =>
-            setTimeout(resolve, 50),
+            setTimeout(resolve, 1000),
           );
           await Promise.race([renderPromise, timeoutPromise]);
         }
@@ -254,7 +254,12 @@ class XtermStdout extends EventEmitter {
 
       const isMatch = () => {
         if (expectedFrame === '...') {
-          return currentFrame !== '';
+          // '...' is our fallback when output isn't in metrics, meaning Ink rendered *something*
+          // but we don't know what it is. If terminal has content, we consider it a match.
+          // However, if the component rendered null, both would be empty, but our fallback
+          // made expectedFrame '...'. In that case, we can't easily know if it's ready,
+          // but we can assume if there are no pending writes, it's ready.
+          return currentFrame !== '' || this.pendingWrites === 0;
         }
 
         // If Ink expects nothing (no new static content and no dynamic output),
@@ -506,8 +511,8 @@ const baseMockUiState = {
   cleanUiDetailsVisible: false,
   allowPlanMode: true,
   activePtyId: undefined,
-  backgroundShells: new Map(),
-  backgroundShellHeight: 0,
+  backgroundTasks: new Map(),
+  backgroundTaskHeight: 0,
   quota: {
     userTier: undefined,
     stats: undefined,
@@ -568,6 +573,7 @@ const mockUIActions: UIActions = {
   handleOverageMenuChoice: vi.fn(),
   handleEmptyWalletChoice: vi.fn(),
   setQueueErrorMessage: vi.fn(),
+  addMessage: vi.fn(),
   popAllMessages: vi.fn(),
   handleApiKeySubmit: vi.fn(),
   handleApiKeyCancel: vi.fn(),
@@ -578,9 +584,9 @@ const mockUIActions: UIActions = {
   revealCleanUiDetailsTemporarily: vi.fn(),
   handleWarning: vi.fn(),
   setEmbeddedShellFocused: vi.fn(),
-  dismissBackgroundShell: vi.fn(),
-  setActiveBackgroundShellPid: vi.fn(),
-  setIsBackgroundShellListOpen: vi.fn(),
+  dismissBackgroundTask: vi.fn(),
+  setActiveBackgroundTaskPid: vi.fn(),
+  setIsBackgroundTaskListOpen: vi.fn(),
   setAuthContext: vi.fn(),
   onHintInput: vi.fn(),
   onHintBackspace: vi.fn(),
@@ -612,6 +618,7 @@ export const renderWithProviders = async (
     mouseEventsEnabled = false,
     config,
     uiActions,
+    toolActions,
     persistentState,
     appState = mockAppState,
   }: {
@@ -622,6 +629,11 @@ export const renderWithProviders = async (
     mouseEventsEnabled?: boolean;
     config?: Config;
     uiActions?: Partial<UIActions>;
+    toolActions?: Partial<{
+      isExpanded: (callId: string) => boolean;
+      toggleExpansion: (callId: string) => void;
+      toggleAllExpansion: (callIds: string[]) => void;
+    }>;
     persistentState?: {
       get?: typeof persistentStateMock.get;
       set?: typeof persistentStateMock.set;
@@ -659,12 +671,11 @@ export const renderWithProviders = async (
   const terminalWidth = width ?? baseState.terminalWidth;
 
   if (!config) {
-    config = await loadCliConfig(
-      settings.merged,
-      'random-session-id',
-      {} as unknown as CliArgs,
-      { cwd: '/' },
-    );
+    config = makeFakeConfig({
+      useAlternateBuffer: settings.merged.ui?.useAlternateBuffer,
+      showMemoryUsage: settings.merged.ui?.showMemoryUsage,
+      accessibility: settings.merged.ui?.accessibility,
+    });
   }
 
   const mainAreaWidth = providedUiState?.mainAreaWidth ?? terminalWidth;
@@ -709,6 +720,16 @@ export const renderWithProviders = async (
                         <ToolActionsProvider
                           config={config}
                           toolCalls={allToolCalls}
+                          isExpanded={
+                            toolActions?.isExpanded ??
+                            vi.fn().mockReturnValue(false)
+                          }
+                          toggleExpansion={
+                            toolActions?.toggleExpansion ?? vi.fn()
+                          }
+                          toggleAllExpansion={
+                            toolActions?.toggleAllExpansion ?? vi.fn()
+                          }
                         >
                           <AskUserActionsProvider
                             request={null}
