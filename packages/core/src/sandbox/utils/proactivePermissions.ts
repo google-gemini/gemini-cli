@@ -8,6 +8,7 @@ import os from 'node:os';
 import path from 'node:path';
 import fs from 'node:fs';
 import { type SandboxPermissions } from '../../services/sandboxManager.js';
+import { normalizeCommand } from '../../utils/shell-utils.js';
 
 const NETWORK_RELIANT_TOOLS = new Set([
   'npm',
@@ -45,7 +46,7 @@ export function isNetworkReliantCommand(
   commandName: string,
   subCommand?: string,
 ): boolean {
-  const normalizedCommand = commandName.toLowerCase().replace(/\.exe$/, '');
+  const normalizedCommand = normalizeCommand(commandName);
   if (!NETWORK_RELIANT_TOOLS.has(normalizedCommand)) {
     return false;
   }
@@ -82,7 +83,7 @@ export function isNetworkReliantCommand(
 export async function getProactiveToolSuggestions(
   commandName: string,
 ): Promise<SandboxPermissions | undefined> {
-  const normalizedCommand = commandName.toLowerCase().replace(/\.exe$/, '');
+  const normalizedCommand = normalizeCommand(commandName);
   if (!NETWORK_RELIANT_TOOLS.has(normalizedCommand)) {
     return undefined;
   }
