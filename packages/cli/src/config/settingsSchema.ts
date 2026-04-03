@@ -2106,6 +2106,67 @@ const SETTINGS_SCHEMA = {
           'Enable dynamic model configuration (definitions, resolutions, and chains) via settings.',
         showInDialog: false,
       },
+      ollamaGemma: {
+        type: 'object',
+        label: 'Ollama Gemma',
+        category: 'Experimental',
+        requiresRestart: true,
+        default: {},
+        description:
+          'Experimental local Gemma 4 support via Ollama with a bundled Gemini-compatible bridge.',
+        showInDialog: false,
+        properties: {
+          enabled: {
+            type: 'boolean',
+            label: 'Enable Ollama Gemma',
+            category: 'Experimental',
+            requiresRestart: true,
+            default: undefined as boolean | undefined,
+            description:
+              'Enable local Gemma 4 discovery from installed Ollama manifests.',
+            showInDialog: false,
+          },
+          ollamaBaseUrl: {
+            type: 'string',
+            label: 'Ollama Base URL',
+            category: 'Experimental',
+            requiresRestart: true,
+            default: 'http://127.0.0.1:11434',
+            description: 'The Ollama server base URL.',
+            showInDialog: false,
+          },
+          bridgeHost: {
+            type: 'string',
+            label: 'Bridge Host',
+            category: 'Experimental',
+            requiresRestart: true,
+            default: '127.0.0.1',
+            description:
+              'The host interface for the bundled Gemini-compatible local bridge.',
+            showInDialog: false,
+          },
+          bridgePort: {
+            type: 'number',
+            label: 'Bridge Port',
+            category: 'Experimental',
+            requiresRestart: true,
+            default: 0,
+            description:
+              'The port for the bundled Gemini-compatible local bridge. Use 0 for an auto-assigned port.',
+            showInDialog: false,
+          },
+          simpleContextMode: {
+            type: 'boolean',
+            label: 'Simple Context Mode',
+            category: 'Experimental',
+            requiresRestart: true,
+            default: true,
+            description:
+              'When using local Gemma models, minimize prompt injections and expose a smaller built-in tool set.',
+            showInDialog: false,
+          },
+        },
+      },
       gemmaModelRouter: {
         type: 'object',
         label: 'Gemma Model Router',

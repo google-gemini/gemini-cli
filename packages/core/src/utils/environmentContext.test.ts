@@ -199,6 +199,31 @@ describe('getEnvironmentContext', () => {
     expect(context).toContain('Mock Environment Memory');
   });
 
+  it('should return a minimal session context in simple context mode', async () => {
+    (mockConfig as Record<string, unknown>)['isSimpleContextModeEnabled'] = vi
+      .fn()
+      .mockReturnValue(true);
+
+    const parts = await getEnvironmentContext(mockConfig as Config);
+
+    expect(parts.length).toBe(1);
+    const context = parts[0].text;
+
+    expect(context).toContain('<session_context>');
+    expect(context).toContain('This is the Gemini CLI.');
+    expect(context).toContain('- **Workspace Directories:**');
+    expect(context).toContain('  - /test/dir');
+    expect(context).not.toContain(
+      'We are setting up the context for our chat.',
+    );
+    expect(context).not.toContain('Directory Structure:');
+    expect(context).not.toContain('Mock Folder Structure');
+    expect(context).not.toContain('Mock Environment Memory');
+    expect(context).toContain('</session_context>');
+    expect(getFolderStructure).not.toHaveBeenCalled();
+    expect(mockConfig.getEnvironmentMemory).not.toHaveBeenCalled();
+  });
+
   it('should handle read_many_files returning no content', async () => {
     const mockReadManyFilesTool = {
       build: vi.fn().mockReturnValue({

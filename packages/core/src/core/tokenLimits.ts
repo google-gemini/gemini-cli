@@ -16,8 +16,21 @@ type Model = string;
 type TokenCount = number;
 
 export const DEFAULT_TOKEN_LIMIT = 1_048_576;
+const runtimeTokenLimits = new Map<Model, TokenCount>();
+
+export function registerRuntimeTokenLimit(
+  model: Model,
+  limit: TokenCount,
+): void {
+  runtimeTokenLimits.set(model, limit);
+}
 
 export function tokenLimit(model: Model): TokenCount {
+  const runtimeLimit = runtimeTokenLimits.get(model);
+  if (runtimeLimit !== undefined) {
+    return runtimeLimit;
+  }
+
   // Add other models as they become relevant or if specified by config
   // Pulled from https://ai.google.dev/gemini-api/docs/models
   switch (model) {

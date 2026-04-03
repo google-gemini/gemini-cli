@@ -35,6 +35,7 @@ import {
   getAdminErrorMessage,
   isHeadlessMode,
   Config,
+  discoverLocalGemmaModels,
   resolveToRealPath,
   applyAdminAllowlist,
   applyRequiredServers,
@@ -797,6 +798,10 @@ export async function loadCliConfig(
     interactive,
   );
 
+  const localGemmaModels =
+    settings.experimental?.ollamaGemma?.enabled === false
+      ? []
+      : await discoverLocalGemmaModels();
   const defaultModel = PREVIEW_GEMINI_MODEL_AUTO;
   const specifiedModel =
     argv.model || process.env['GEMINI_MODEL'] || settings.model?.name;
@@ -1019,6 +1024,8 @@ export async function loadCliConfig(
       format: (argv.outputFormat ?? settings.output?.format) as OutputFormat,
     },
     gemmaModelRouter: settings.experimental?.gemmaModelRouter,
+    ollamaGemma: settings.experimental?.ollamaGemma,
+    localGemmaModels,
     adk: settings.experimental?.adk,
     fakeResponses: argv.fakeResponses,
     recordResponses: argv.recordResponses,
@@ -1029,7 +1036,9 @@ export async function loadCliConfig(
     disableLLMCorrection: settings.tools?.disableLLMCorrection,
     rawOutput: argv.rawOutput,
     acceptRawOutputRisk: argv.acceptRawOutputRisk,
-    dynamicModelConfiguration: settings.experimental?.dynamicModelConfiguration,
+    dynamicModelConfiguration:
+      settings.experimental?.dynamicModelConfiguration ||
+      localGemmaModels.length > 0,
     modelConfigServiceConfig: settings.modelConfigs,
     // TODO: loading of hooks based on workspace trust
     enableHooks: settings.hooksConfig.enabled,

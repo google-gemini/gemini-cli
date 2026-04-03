@@ -217,6 +217,7 @@ export function ModelDialog({ onClose }: ModelDialogProps): React.JSX.Element {
         .map((o) => ({
           value: o.modelId,
           title: o.name,
+          description: o.description,
           key: o.modelId,
         }));
     }
@@ -305,7 +306,7 @@ export function ModelDialog({ onClose }: ModelDialogProps): React.JSX.Element {
 
   // Handle selection internally (Autonomous Dialog).
   const handleSelect = useCallback(
-    (model: string) => {
+    async (model: string) => {
       if (model === 'Manual') {
         setView('manual');
         return;
@@ -313,6 +314,7 @@ export function ModelDialog({ onClose }: ModelDialogProps): React.JSX.Element {
 
       if (config) {
         config.setModel(model, persistMode ? false : true);
+        await config.waitForPendingModelSessionReconfiguration?.();
         const event = new ModelSlashCommandEvent(model);
         logModelSlashCommand(config, event);
       }

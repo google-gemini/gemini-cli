@@ -279,17 +279,22 @@ export class GeminiAgent {
     let isAuthenticated = false;
     let authErrorMessage = '';
     try {
-      await config.refreshAuth(
-        authType,
-        this.apiKey,
-        this.baseUrl,
-        this.customHeaders,
-      );
+      if (config.canUseCurrentModelWithoutAuth()) {
+        await config.refreshAuth(undefined);
+      } else {
+        await config.refreshAuth(
+          authType,
+          this.apiKey,
+          this.baseUrl,
+          this.customHeaders,
+        );
+      }
       isAuthenticated = true;
 
       // Extra validation for Gemini API key
       const contentGeneratorConfig = config.getContentGeneratorConfig();
       if (
+        !config.canUseCurrentModelWithoutAuth() &&
         authType === AuthType.USE_GEMINI &&
         (!contentGeneratorConfig || !contentGeneratorConfig.apiKey)
       ) {
@@ -427,23 +432,26 @@ export class GeminiAgent {
     mcpServers: acp.McpServer[],
   ): Promise<Config> {
     const selectedAuthType = this.settings.merged.security.auth.selectedType;
-    if (!selectedAuthType) {
-      throw acp.RequestError.authRequired();
-    }
-
     // 1. Create config WITHOUT initializing it (no MCP servers started yet)
     const config = await this.newSessionConfig(sessionId, cwd, mcpServers);
+    if (!selectedAuthType && !config.canUseCurrentModelWithoutAuth()) {
+      throw acp.RequestError.authRequired();
+    }
 
     // 2. Authenticate BEFORE initializing configuration or starting MCP servers.
     // This satisfies the security requirement to verify the user before executing
     // potentially unsafe server definitions.
     try {
-      await config.refreshAuth(
-        selectedAuthType,
-        this.apiKey,
-        this.baseUrl,
-        this.customHeaders,
-      );
+      if (config.canUseCurrentModelWithoutAuth()) {
+        await config.refreshAuth(undefined);
+      } else {
+        await config.refreshAuth(
+          selectedAuthType,
+          this.apiKey,
+          this.baseUrl,
+          this.customHeaders,
+        );
+      }
     } catch (e) {
       debugLogger.error(`Authentication failed: ${e}`);
       throw acp.RequestError.authRequired();

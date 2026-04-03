@@ -36,6 +36,7 @@ const setModelCommand: SlashCommand = {
 
     if (context.services.agentContext?.config) {
       context.services.agentContext.config.setModel(modelName, !persist);
+      await context.services.agentContext.config.waitForPendingModelSessionReconfiguration?.();
       const event = new ModelSlashCommandEvent(modelName);
       logModelSlashCommand(context.services.agentContext.config, event);
 

@@ -30,6 +30,7 @@ export const StatusDisplay: React.FC<StatusDisplayProps> = ({
   if (!settings.merged.ui.hideContextSummary && !hideContextSummary) {
     return (
       <ContextSummaryDisplay
+        simpleContextMode={config.isSimpleContextModeEnabled?.() ?? false}
         ideContext={uiState.ideContextState}
         geminiMdFileCount={uiState.geminiMdFileCount}
         contextFileNames={uiState.contextFileNames}

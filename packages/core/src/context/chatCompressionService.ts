@@ -49,7 +49,7 @@ const COMPRESSION_PRESERVE_THRESHOLD = 0.3;
 /**
  * The budget for function response tokens in the preserved history.
  */
-const COMPRESSION_FUNCTION_RESPONSE_TOKEN_BUDGET = 50_000;
+const DEFAULT_COMPRESSION_FUNCTION_RESPONSE_TOKEN_BUDGET = 50_000;
 
 /**
  * Returns the index of the oldest item to keep when compressing. May return
@@ -100,6 +100,10 @@ export function findCompressSplitPoint(
 }
 
 export function modelStringToModelConfigAlias(model: string): string {
+  if (model.startsWith('gemma4:')) {
+    return model;
+  }
+
   switch (model) {
     case PREVIEW_GEMINI_MODEL:
     case PREVIEW_GEMINI_3_1_MODEL:
@@ -135,7 +139,11 @@ export function modelStringToModelConfigAlias(model: string): string {
 async function truncateHistoryToBudget(
   history: readonly Content[],
   config: Config,
+  model: string,
 ): Promise<Content[]> {
+  const functionResponseBudget =
+    config.getCompressionToolResponseBudget(model) ??
+    DEFAULT_COMPRESSION_FUNCTION_RESPONSE_TOKEN_BUDGET;
   let functionResponseTokenCounter = 0;
   const truncatedHistory: Content[] = [];
 
@@ -178,10 +186,7 @@ async function truncateHistoryToBudget(
 
           const tokens = estimateTokenCountSync([{ text: contentStr }]);
 
-          if (
-            functionResponseTokenCounter + tokens >
-            COMPRESSION_FUNCTION_RESPONSE_TOKEN_BUDGET
-          ) {
+          if (functionResponseTokenCounter + tokens > functionResponseBudget) {
             try {
               // Budget exceeded: Truncate this response.
               const { outputFile } = await saveTruncatedToolOutput(
@@ -268,7 +273,7 @@ export class ChatCompressionService {
     // Don't compress if not forced and we are under the limit.
     if (!force) {
       const threshold =
-        (await config.getCompressionThreshold()) ??
+        (await config.getCompressionThreshold(model)) ??
         DEFAULT_COMPRESSION_TOKEN_THRESHOLD;
       if (originalTokenCount < threshold * tokenLimit(model)) {
         return {
@@ -287,6 +292,7 @@ export class ChatCompressionService {
     const truncatedHistory = await truncateHistoryToBudget(
       curatedHistory,
       config,
+      model,
     );
 
     // If summarization previously failed (and not forced), we only rely on truncation.

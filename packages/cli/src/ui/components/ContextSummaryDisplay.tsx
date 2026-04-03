@@ -10,6 +10,7 @@ import { theme } from '../semantic-colors.js';
 import { type IdeContext, type MCPServerConfig } from '@google/gemini-cli-core';
 
 interface ContextSummaryDisplayProps {
+  simpleContextMode?: boolean;
   geminiMdFileCount: number;
   contextFileNames: string[];
   mcpServers?: Record<string, MCPServerConfig>;
@@ -20,6 +21,7 @@ interface ContextSummaryDisplayProps {
 }
 
 export const ContextSummaryDisplay: React.FC<ContextSummaryDisplayProps> = ({
+  simpleContextMode = false,
   geminiMdFileCount,
   contextFileNames,
   mcpServers,
@@ -33,6 +35,7 @@ export const ContextSummaryDisplay: React.FC<ContextSummaryDisplayProps> = ({
   const openFileCount = ideContext?.workspaceState?.openFiles?.length ?? 0;
 
   if (
+    !simpleContextMode &&
     geminiMdFileCount === 0 &&
     mcpServerCount === 0 &&
     blockedMcpServerCount === 0 &&
@@ -102,10 +105,10 @@ export const ContextSummaryDisplay: React.FC<ContextSummaryDisplayProps> = ({
   })();
 
   const summaryParts = [
-    openFilesText,
-    geminiMdText,
-    mcpText,
-    skillText,
+    simpleContextMode ? 'simple context mode' : openFilesText,
+    simpleContextMode ? '' : geminiMdText,
+    simpleContextMode ? '' : mcpText,
+    simpleContextMode ? '' : skillText,
     backgroundText,
   ].filter(Boolean);
 

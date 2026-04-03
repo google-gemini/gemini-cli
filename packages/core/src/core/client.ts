@@ -16,6 +16,7 @@ import { partListUnionToString } from './geminiRequest.js';
 import {
   getDirectoryContextString,
   getInitialChatHistory,
+  INITIAL_HISTORY_LENGTH,
 } from '../utils/environmentContext.js';
 import {
   CompressionStatus,
@@ -307,6 +308,30 @@ export class GeminiClient {
     this.getChat().setTools(tools);
   }
 
+  async reconfigureForModelChange(): Promise<void> {
+    if (!this.chat) {
+      return;
+    }
+
+    this.currentSequenceModel = null;
+    this.lastUsedModelId = undefined;
+    this.forceFullIdeContext = true;
+
+    const history = this.getChat().getHistory();
+    const shouldResetPristineSession =
+      history.length <= INITIAL_HISTORY_LENGTH ||
+      history.every((content) => content.role === 'user');
+
+    if (shouldResetPristineSession) {
+      await this.resetChat();
+      return;
+    }
+
+    await this.setTools(this.config.getActiveModel());
+    this.updateSystemInstruction();
+    this.updateTelemetryTokenCount();
+  }
+
   async resetChat(): Promise<void> {
     this.chat = await this.startChat();
     this.updateTelemetryTokenCount();
@@ -407,6 +432,10 @@ export class GeminiClient {
     contextParts: string[];
     newIdeContext: IdeContext | undefined;
   } {
+    if (this.config.isSimpleContextModeEnabled?.()) {
+      return { contextParts: [], newIdeContext: undefined };
+    }
+
     const currentIdeContext = ideContextStore.get();
     if (!currentIdeContext) {
       return { contextParts: [], newIdeContext: undefined };
@@ -738,6 +767,8 @@ export class GeminiClient {
       yield { type: GeminiEventType.ModelInfo, value: modelToUse };
     }
     this.currentSequenceModel = modelToUse;
+    const isLocalModel =
+      this.config.canUseModelWithoutAuth?.(modelToUse) ?? false;
 
     // Update tools with the final modelId to ensure model-dependent descriptions are used.
     await this.setTools(modelToUse);
@@ -816,7 +847,7 @@ export class GeminiClient {
     }
 
     if (isInvalidStream) {
-      if (this.config.getContinueOnFailedApiCall()) {
+      if (this.config.getContinueOnFailedApiCall() && !isLocalModel) {
         if (isInvalidStreamRetry) {
           logContentRetryFailure(
             this.config,
@@ -842,7 +873,12 @@ export class GeminiClient {
       }
     }
 
-    if (!turn.pendingToolCalls.length && signal && !signal.aborted) {
+    if (
+      !isLocalModel &&
+      !turn.pendingToolCalls.length &&
+      signal &&
+      !signal.aborted
+    ) {
       if (
         !this.config.getQuotaErrorOccurred() &&
         !this.config.getSkipNextSpeakerCheck()
@@ -1043,7 +1079,7 @@ export class GeminiClient {
     role: LlmRole,
   ): Promise<GenerateContentResponse> {
     const desiredModelConfig =
-      this.config.modelConfigService.getResolvedConfig(modelConfigKey);
+      this.config.getResolvedModelConfig(modelConfigKey);
     let {
       model: currentAttemptModel,
       generateContentConfig: currentAttemptGenerateContentConfig,
@@ -1078,7 +1114,7 @@ export class GeminiClient {
           initialActiveModel = active;
           // Re-resolve config if model changed
           const { model: resolvedModel, generateContentConfig } =
-            this.config.modelConfigService.getResolvedConfig({
+            this.config.getResolvedModelConfig({
               ...modelConfigKey,
               model: active,
             });

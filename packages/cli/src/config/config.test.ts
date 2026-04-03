@@ -1868,6 +1868,7 @@ describe('loadCliConfig with admin.mcp.config', () => {
 describe('loadCliConfig model selection', () => {
   beforeEach(() => {
     vi.spyOn(ExtensionManager.prototype, 'getExtensions').mockReturnValue([]);
+    vi.spyOn(ServerConfig, 'discoverLocalGemmaModels').mockResolvedValue([]);
   });
 
   afterEach(() => {
@@ -1902,6 +1903,76 @@ describe('loadCliConfig model selection', () => {
     );
 
     expect(config.getModel()).toBe('auto-gemini-3');
+  });
+
+  it('keeps the default Gemini auto model even when local Gemma is installed', async () => {
+    vi.mocked(ServerConfig.discoverLocalGemmaModels).mockResolvedValue([
+      {
+        modelId: 'gemma4:e4b',
+        variant: 'e4b',
+        displayName: 'Gemma 4 E4B',
+        dialogDescription: 'Local via Ollama. 128k context. tools.',
+        contextLength: 131072,
+        capabilities: {
+          completion: true,
+          tools: true,
+          thinking: true,
+          vision: false,
+          audio: false,
+        },
+      },
+      {
+        modelId: 'gemma4:31b',
+        variant: '31b',
+        displayName: 'Gemma 4 31B',
+        dialogDescription: 'Local via Ollama. 256k context. tools.',
+        contextLength: 262144,
+        capabilities: {
+          completion: true,
+          tools: true,
+          thinking: true,
+          vision: true,
+          audio: false,
+        },
+      },
+    ]);
+    process.argv = ['node', 'script.js'];
+    const argv = await parseArguments(createTestMergedSettings());
+    const config = await loadCliConfig(
+      createTestMergedSettings(),
+      'test-session',
+      argv,
+    );
+
+    expect(config.getModel()).toBe('auto-gemini-3');
+  });
+
+  it('still allows explicit selection of a local Gemma model from argv', async () => {
+    vi.mocked(ServerConfig.discoverLocalGemmaModels).mockResolvedValue([
+      {
+        modelId: 'gemma4:31b',
+        variant: '31b',
+        displayName: 'Gemma 4 31B',
+        dialogDescription: 'Local via Ollama. 256k context. tools.',
+        contextLength: 262144,
+        capabilities: {
+          completion: true,
+          tools: true,
+          thinking: true,
+          vision: true,
+          audio: false,
+        },
+      },
+    ]);
+    process.argv = ['node', 'script.js', '--model', 'gemma4:31b'];
+    const argv = await parseArguments(createTestMergedSettings());
+    const config = await loadCliConfig(
+      createTestMergedSettings(),
+      'test-session',
+      argv,
+    );
+
+    expect(config.getModel()).toBe('gemma4:31b');
   });
 
   it('always prefers model from argv', async () => {

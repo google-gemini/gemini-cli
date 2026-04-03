@@ -84,6 +84,8 @@ describe('PromptProvider', () => {
       isTrackerEnabled: vi.fn().mockReturnValue(false),
       getHasAccessToPreviewModel: vi.fn().mockReturnValue(true),
       getGemini31LaunchedSync: vi.fn().mockReturnValue(true),
+      isSimpleContextModeEnabled: vi.fn().mockReturnValue(false),
+      isLocalGemmaModel: vi.fn().mockReturnValue(false),
     } as unknown as Config;
   });
 
@@ -153,6 +155,29 @@ describe('PromptProvider', () => {
     expect(prompt).toContain(
       `# Contextual Instructions (${DEFAULT_CONTEXT_FILENAME}, CUSTOM.md)`,
     );
+  });
+
+  it('should use the compact local gemma prompt in simple context mode', () => {
+    vi.mocked(mockConfig.getActiveModel).mockReturnValue('gemma4:31b');
+    vi.mocked(mockConfig.isSimpleContextModeEnabled).mockReturnValue(true);
+    vi.mocked(mockConfig.isLocalGemmaModel).mockReturnValue(true);
+
+    const provider = new PromptProvider();
+    const prompt = provider.getCoreSystemPrompt(mockConfig);
+
+    expect(prompt).toContain('local Gemma mode');
+    expect(prompt).toContain(
+      'Once you know the next step, call the tool immediately.',
+    );
+    expect(prompt).toContain('Do not keep repeating the plan.');
+    expect(prompt).toContain(
+      'Do not use shell redirection, heredocs, or chmod as a substitute for `write_file`.',
+    );
+    expect(prompt).toContain(
+      'Do not stall in planning or stop after only creating a directory.',
+    );
+    expect(prompt).not.toContain('# Available Agent Skills');
+    expect(prompt).not.toContain('# Core Mandates');
   });
 
   describe('plan mode prompt', () => {
@@ -273,6 +298,21 @@ describe('PromptProvider', () => {
       const prompt = provider.getCompressionPrompt(mockConfig);
 
       expect(prompt).not.toContain('### APPROVED PLAN PRESERVATION');
+    });
+
+    it('should use the compact compression prompt for local gemma simple context mode', () => {
+      vi.mocked(mockConfig.getActiveModel).mockReturnValue('gemma4:31b');
+      vi.mocked(mockConfig.isSimpleContextModeEnabled).mockReturnValue(true);
+      vi.mocked(mockConfig.isLocalGemmaModel).mockReturnValue(true);
+
+      const provider = new PromptProvider();
+      const prompt = provider.getCompressionPrompt(mockConfig);
+
+      expect(prompt).toContain(
+        'You are compressing chat history into a durable XML state snapshot.',
+      );
+      expect(prompt).toContain('<state_snapshot>');
+      expect(prompt).not.toContain('CRITICAL SECURITY RULE');
     });
   });
 

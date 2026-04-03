@@ -520,7 +520,7 @@ Respond ONLY with a JSON object where each key is the filepath and the value is:
       const text = getResponseText(response) ?? '';
       return text.trim();
     } catch (e) {
-      return `[Summary generation failed for ${filepath} (cloud error): ${e}]`;
+      return `[Summary generation failed for ${filepath} (model error): ${e}]`;
     }
   }
 }

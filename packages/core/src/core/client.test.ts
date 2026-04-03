@@ -218,6 +218,7 @@ describe('Gemini Client (client.ts)', () => {
       getEnvironmentMemory: vi.fn().mockReturnValue(''),
       getSystemInstructionMemory: vi.fn().mockReturnValue(''),
       getSessionMemory: vi.fn().mockReturnValue(''),
+      isSimpleContextModeEnabled: vi.fn().mockReturnValue(false),
       isJitContextEnabled: vi.fn().mockReturnValue(false),
       getMemoryContextManager: vi.fn().mockReturnValue(undefined),
       getDisableLoopDetection: vi.fn().mockReturnValue(false),
@@ -278,11 +279,18 @@ describe('Gemini Client (client.ts)', () => {
           };
         },
       },
+      getResolvedModelConfig: vi
+        .fn()
+        .mockImplementation((modelConfigKey) =>
+          mockConfig.modelConfigService.getResolvedConfig(modelConfigKey),
+        ),
+      getCompressionToolResponseBudget: vi.fn().mockReturnValue(undefined),
       isInteractive: vi.fn().mockReturnValue(false),
       getExperiments: () => {},
       getActiveModel: vi.fn().mockReturnValue('test-model'),
       setActiveModel: vi.fn(),
       resetTurn: vi.fn(),
+      canUseModelWithoutAuth: vi.fn().mockReturnValue(false),
 
       isAutoDistillationEnabled: vi.fn().mockReturnValue(false),
       getContextManagementConfig: vi.fn().mockReturnValue({ enabled: false }),
@@ -400,6 +408,58 @@ describe('Gemini Client (client.ts)', () => {
       vi.mocked(mockConfig.getMemoryContextManager).mockReturnValue(undefined);
 
       await expect(client.resetChat()).resolves.not.toThrow();
+    });
+  });
+
+  describe('reconfigureForModelChange', () => {
+    it('should rebuild the initial history for a pristine session', async () => {
+      const initialChat = client.getChat();
+      const initialContext = partToString(client.getHistory()[0].parts ?? []);
+      expect(initialContext).toContain('Directory Structure');
+
+      vi.mocked(mockConfig.getActiveModel).mockReturnValue('gemma4:31b');
+      vi.mocked(mockConfig.isSimpleContextModeEnabled).mockReturnValue(true);
+
+      await client.reconfigureForModelChange();
+
+      const refreshedChat = client.getChat();
+      const refreshedContext = partToString(client.getHistory()[0].parts ?? []);
+
+      expect(refreshedChat).not.toBe(initialChat);
+      expect(refreshedContext).toContain('This is the Gemini CLI.');
+      expect(refreshedContext).not.toContain('Directory Structure');
+    });
+
+    it('should preserve non-pristine history while updating the live chat state', async () => {
+      const chat = client.getChat();
+      const resetSpy = vi.spyOn(client, 'resetChat');
+      const setToolsSpy = vi.spyOn(client, 'setTools');
+      const setSystemInstructionSpy = vi.spyOn(chat, 'setSystemInstruction');
+
+      await client.addHistory({
+        role: 'user',
+        parts: [{ text: 'Real user request' }],
+      });
+      await client.addHistory({
+        role: 'model',
+        parts: [{ text: 'Real model reply' }],
+      });
+
+      vi.mocked(mockConfig.getActiveModel).mockReturnValue('gemma4:31b');
+      vi.mocked(mockConfig.isSimpleContextModeEnabled).mockReturnValue(true);
+
+      await client.reconfigureForModelChange();
+
+      expect(resetSpy).not.toHaveBeenCalled();
+      expect(client.getChat()).toBe(chat);
+      expect(setToolsSpy).toHaveBeenCalledWith('gemma4:31b');
+      expect(setSystemInstructionSpy).toHaveBeenCalled();
+      expect(partToString(client.getHistory().at(-2)?.parts ?? [])).toContain(
+        'Real user request',
+      );
+      expect(partToString(client.getHistory().at(-1)?.parts ?? [])).toContain(
+        'Real model reply',
+      );
     });
   });
 
@@ -2161,6 +2221,46 @@ ${JSON.stringify(
       expect(mockTurnRunFn).toHaveBeenCalledTimes(1);
     });
 
+    it('should not recursively call sendMessageStream with "Please continue." for local Gemma invalid streams', async () => {
+      vi.spyOn(client['config'], 'getContinueOnFailedApiCall').mockReturnValue(
+        true,
+      );
+      vi.spyOn(client['config'], 'canUseModelWithoutAuth').mockReturnValue(
+        true,
+      );
+      mockRouterService.route.mockResolvedValue({
+        model: 'gemma4:31b',
+        reason: 'test',
+      });
+
+      const mockStream1 = (async function* () {
+        yield { type: GeminiEventType.InvalidStream };
+      })();
+
+      mockTurnRunFn.mockReturnValueOnce(mockStream1);
+
+      const mockChat: Partial<GeminiChat> = {
+        addHistory: vi.fn(),
+        setTools: vi.fn(),
+        getHistory: vi.fn().mockReturnValue([]),
+        getLastPromptTokenCount: vi.fn(),
+      };
+      client['chat'] = mockChat as GeminiChat;
+
+      const initialRequest = [{ text: 'Hi' }];
+      const promptId = 'prompt-id-invalid-stream-local';
+      const signal = new AbortController().signal;
+
+      const stream = client.sendMessageStream(initialRequest, signal, promptId);
+      const events = await fromAsync(stream);
+
+      expect(events).toEqual([
+        { type: GeminiEventType.ModelInfo, value: 'gemma4:31b' },
+        { type: GeminiEventType.InvalidStream },
+      ]);
+      expect(mockTurnRunFn).toHaveBeenCalledTimes(1);
+    });
+
     it('should stop recursing after one retry when InvalidStream events are repeatedly received', async () => {
       vi.spyOn(client['config'], 'getContinueOnFailedApiCall').mockReturnValue(
         true,
@@ -2204,6 +2304,52 @@ ${JSON.stringify(
 
       // Verify that turn.run was called twice
       expect(mockTurnRunFn).toHaveBeenCalledTimes(2);
+    });
+
+    it('should skip next-speaker self-continuation for local Gemma', async () => {
+      const { checkNextSpeaker } = await import(
+        '../utils/nextSpeakerChecker.js'
+      );
+      vi.mocked(checkNextSpeaker).mockResolvedValue({
+        next_speaker: 'model',
+        reasoning: 'more',
+      });
+
+      vi.spyOn(client['config'], 'canUseModelWithoutAuth').mockReturnValue(
+        true,
+      );
+      mockRouterService.route.mockResolvedValue({
+        model: 'gemma4:31b',
+        reason: 'test',
+      });
+
+      const mockStream1 = (async function* () {
+        yield { type: GeminiEventType.Content, value: 'I will create it.' };
+      })();
+
+      mockTurnRunFn.mockReturnValueOnce(mockStream1);
+
+      const mockChat: Partial<GeminiChat> = {
+        addHistory: vi.fn(),
+        setTools: vi.fn(),
+        getHistory: vi.fn().mockReturnValue([]),
+        getLastPromptTokenCount: vi.fn(),
+      };
+      client['chat'] = mockChat as GeminiChat;
+
+      const stream = client.sendMessageStream(
+        [{ text: 'Create the file' }],
+        new AbortController().signal,
+        'prompt-id-local-next-speaker',
+      );
+      const events = await fromAsync(stream);
+
+      expect(events).toEqual([
+        { type: GeminiEventType.ModelInfo, value: 'gemma4:31b' },
+        { type: GeminiEventType.Content, value: 'I will create it.' },
+      ]);
+      expect(mockTurnRunFn).toHaveBeenCalledTimes(1);
+      expect(checkNextSpeaker).not.toHaveBeenCalled();
     });
 
     describe('Editor context delta', () => {

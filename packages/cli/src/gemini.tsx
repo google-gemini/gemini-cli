@@ -336,7 +336,14 @@ export async function main() {
   // the sandbox because the sandbox will interfere with the Oauth2 web
   // redirect.
   let initialAuthFailed = false;
-  if (!settings.merged.security.auth.useExternal && !argv.isCommand) {
+  if (partialConfig.canUseCurrentModelWithoutAuth()) {
+    try {
+      await partialConfig.refreshAuth(undefined);
+    } catch (err) {
+      debugLogger.error('Error initializing local Gemma transport:', err);
+      initialAuthFailed = true;
+    }
+  } else if (!settings.merged.security.auth.useExternal && !argv.isCommand) {
     try {
       if (
         partialConfig.isInteractive() &&

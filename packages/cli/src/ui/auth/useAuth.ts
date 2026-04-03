@@ -91,6 +91,19 @@ export const useAuthCommand = (
         return;
       }
 
+      if (config.canUseCurrentModelWithoutAuth()) {
+        try {
+          await config.refreshAuth(undefined);
+          setAuthError(null);
+          setAuthState(AuthState.Authenticated);
+        } catch (e) {
+          onAuthError(
+            `Failed to initialize local Gemma session. Message: ${getErrorMessage(e)}`,
+          );
+        }
+        return;
+      }
+
       const authType = settings.merged.security.auth.selectedType;
       if (!authType) {
         if (process.env['GEMINI_API_KEY']) {

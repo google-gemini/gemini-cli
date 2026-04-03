@@ -249,6 +249,7 @@ vi.mock('../core/baseLlmClient.js');
 vi.mock('../core/localLiteRtLmClient.js');
 vi.mock('../core/tokenLimits.js', () => ({
   tokenLimit: vi.fn(),
+  registerRuntimeTokenLimit: vi.fn(),
 }));
 vi.mock('../code_assist/codeAssist.js');
 vi.mock('../code_assist/experiments/experiments.js');
@@ -2216,6 +2217,92 @@ describe('Generation Config Merging (HACK)', () => {
 
     // Assert that the full default config is used
     expect(serviceConfig).toEqual(DEFAULT_MODEL_CONFIGS);
+  });
+});
+
+describe('Local Gemma Utility Model Resolution', () => {
+  const baseParams: ConfigParameters = {
+    cwd: '/tmp',
+    targetDir: '/path/to/target',
+    debugMode: false,
+    sessionId: 'test-session-id',
+    model: 'gemma4:31b',
+    userMemory: 'Project memory that should be ignored in simple mode.',
+    usageStatisticsEnabled: false,
+    localGemmaModels: [
+      {
+        modelId: 'gemma4:e4b',
+        variant: 'e4b',
+        displayName: 'Gemma 4 E4B',
+        dialogDescription: 'Local via Ollama.',
+        contextLength: 131072,
+        capabilities: {
+          completion: true,
+          tools: true,
+          thinking: true,
+          vision: false,
+          audio: false,
+        },
+      },
+      {
+        modelId: 'gemma4:31b',
+        variant: '31b',
+        displayName: 'Gemma 4 31B',
+        dialogDescription: 'Local via Ollama.',
+        contextLength: 262144,
+        capabilities: {
+          completion: true,
+          tools: true,
+          thinking: true,
+          vision: true,
+          audio: false,
+        },
+      },
+    ],
+  };
+
+  it('routes utility aliases to the preferred smaller local Gemma model', () => {
+    const config = new Config(baseParams);
+
+    const resolved = config.getResolvedModelConfig({
+      model: 'summarizer-default',
+    });
+
+    expect(resolved.model).toBe('gemma4:e4b');
+    expect(resolved.generateContentConfig.maxOutputTokens).toBe(2000);
+  });
+
+  it('does not override requests that already target a local Gemma model', () => {
+    const config = new Config(baseParams);
+
+    const resolved = config.getResolvedModelConfig({
+      model: 'gemma4:31b',
+    });
+
+    expect(resolved.model).toBe('gemma4:31b');
+  });
+
+  it('suppresses injected memory and hooks in simple context mode', () => {
+    const config = new Config(baseParams);
+
+    expect(config.isSimpleContextModeEnabled()).toBe(true);
+    expect(config.getSystemInstructionMemory()).toBe('');
+    expect(config.getSessionMemory()).toBe('');
+    expect(config.getEnableHooks()).toBe(false);
+  });
+
+  it('can disable simple context mode explicitly', () => {
+    const config = new Config({
+      ...baseParams,
+      ollamaGemma: {
+        simpleContextMode: false,
+      },
+    });
+
+    expect(config.isSimpleContextModeEnabled()).toBe(false);
+    expect(config.getSystemInstructionMemory()).toBe(
+      'Project memory that should be ignored in simple mode.',
+    );
   });
 });
 

@@ -33,9 +33,24 @@ import {
   UPDATE_TOPIC_TOOL_NAME,
   ENTER_PLAN_MODE_TOOL_NAME,
   EXIT_PLAN_MODE_TOOL_NAME,
+  GLOB_TOOL_NAME,
+  GREP_TOOL_NAME,
+  LS_TOOL_NAME,
+  READ_FILE_TOOL_NAME,
+  SHELL_TOOL_NAME,
 } from './tool-names.js';
 
 type ToolParams = Record<string, unknown>;
+
+const SIMPLE_CONTEXT_TOOL_ALLOWLIST = new Set([
+  LS_TOOL_NAME,
+  READ_FILE_TOOL_NAME,
+  GREP_TOOL_NAME,
+  GLOB_TOOL_NAME,
+  EDIT_TOOL_NAME,
+  WRITE_FILE_TOOL_NAME,
+  SHELL_TOOL_NAME,
+]);
 
 class DiscoveredToolInvocation extends BaseToolInvocation<
   ToolParams,
@@ -618,6 +633,8 @@ export class ToolRegistry {
   getFunctionDeclarations(modelId?: string): FunctionDeclaration[] {
     const isPlanMode = this.config.getApprovalMode() === ApprovalMode.PLAN;
     const plansDir = this.config.storage.getPlansDir();
+    const useSimpleContextToolSet =
+      this.config.isSimpleContextModeEnabled?.(modelId) ?? false;
 
     const declarations: FunctionDeclaration[] = [];
     const seenNames = new Set<string>();
@@ -641,6 +658,13 @@ export class ToolRegistry {
         !mainAgentTools.includes(toolName) &&
         !mainAgentTools.includes(tool.constructor.name) &&
         !mainAgentTools.some((t) => t.startsWith(`${tool.constructor.name}(`))
+      ) {
+        return;
+      }
+
+      if (
+        useSimpleContextToolSet &&
+        !SIMPLE_CONTEXT_TOOL_ALLOWLIST.has(tool.name)
       ) {
         return;
       }

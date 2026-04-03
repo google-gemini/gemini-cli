@@ -594,10 +594,9 @@ export class LoopDetectionService {
         ? flashResult['unproductive_state_analysis']
         : '';
 
-    const doubleCheckModelName =
-      this.context.config.modelConfigService.getResolvedConfig({
-        model: DOUBLE_CHECK_MODEL_ALIAS,
-      }).model;
+    const doubleCheckModelName = this.context.config.getResolvedModelConfig({
+      model: DOUBLE_CHECK_MODEL_ALIAS,
+    }).model;
 
     if (flashConfidence < LLM_CONFIDENCE_THRESHOLD) {
       logLlmLoopCheck(
@@ -616,10 +615,9 @@ export class LoopDetectionService {
     const availability = this.context.config.getModelAvailabilityService();
 
     if (!availability.snapshot(doubleCheckModelName).available) {
-      const flashModelName =
-        this.context.config.modelConfigService.getResolvedConfig({
-          model: 'loop-detection',
-        }).model;
+      const flashModelName = this.context.config.getResolvedModelConfig({
+        model: 'loop-detection',
+      }).model;
       return {
         isLoop: true,
         analysis: flashAnalysis,

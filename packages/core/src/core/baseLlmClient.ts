@@ -135,8 +135,7 @@ export class BaseLlmClient {
       maxAttempts,
     } = options;
 
-    const { model } =
-      this.config.modelConfigService.getResolvedConfig(modelConfigKey);
+    const { model } = this.config.getResolvedModelConfig(modelConfigKey);
 
     const shouldRetryOnContent = (response: GenerateContentResponse) => {
       const text = getResponseText(response)?.trim();
@@ -300,7 +299,7 @@ export class BaseLlmClient {
           initialActiveModel = activeModel;
           // Re-resolve config if model changed during retry
           const { model: resolvedModel, generateContentConfig } =
-            this.config.modelConfigService.getResolvedConfig({
+            this.config.getResolvedModelConfig({
               ...modelConfigKey,
               model: activeModel,
             });

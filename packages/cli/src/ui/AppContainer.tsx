@@ -766,6 +766,7 @@ export const AppContainer = (props: AppContainerProps) => {
   // TODO: Consider handling other auth types that should also skip the blocking screen
   const isAuthenticating =
     authState === AuthState.Unauthenticated &&
+    !config.canUseCurrentModelWithoutAuth() &&
     settings.merged.security.auth.selectedType !== AuthType.USE_GEMINI;
 
   // Session browser and resume functionality

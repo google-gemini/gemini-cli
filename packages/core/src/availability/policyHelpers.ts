@@ -256,7 +256,7 @@ export function applyModelSelection(
   modelConfigKey: ModelConfigKey,
   options: { consumeAttempt?: boolean } = {},
 ): { model: string; config: GenerateContentConfig; maxAttempts?: number } {
-  const resolved = config.modelConfigService.getResolvedConfig(modelConfigKey);
+  const resolved = config.getResolvedModelConfig(modelConfigKey);
   const model = resolved.model;
   const selection = selectModelForAvailability(config, model);
 
@@ -268,7 +268,7 @@ export function applyModelSelection(
   let generateContentConfig = resolved.generateContentConfig;
 
   if (finalModel !== model) {
-    const fallbackResolved = config.modelConfigService.getResolvedConfig({
+    const fallbackResolved = config.getResolvedModelConfig({
       ...modelConfigKey,
       model: finalModel,
     });

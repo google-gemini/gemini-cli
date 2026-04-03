@@ -10,7 +10,9 @@
 import {
   createUserContent,
   FinishReason,
-  type GenerateContentResponse,
+  FunctionCallingConfigMode,
+  GenerateContentResponse,
+  ThinkingLevel,
   type Content,
   type Part,
   type Tool,
@@ -55,6 +57,8 @@ import {
 } from '../availability/policyHelpers.js';
 import { coreEvents } from '../utils/events.js';
 import type { AgentLoopContext } from '../config/agent-loop-context.js';
+import { getResponseText } from '../utils/partUtils.js';
+import { debugLogger } from '../utils/debugLogger.js';
 
 export enum StreamEventType {
   /** A regular content chunk from the API. */
@@ -93,6 +97,272 @@ const MID_STREAM_RETRY_OPTIONS: MidStreamRetryOptions = {
 };
 
 export const SYNTHETIC_THOUGHT_SIGNATURE = 'skip_thought_signature_validator';
+const LOCAL_GEMMA_VISIBLE_RESPONSE_RETRY_INSTRUCTION =
+  'Retry rule: respond with visible text or a tool call in this turn. Do not emit thoughts only.';
+function getLocalGemmaSuggestedFilePathRetryInstruction(
+  suggestedFilePath: string,
+): string {
+  return `Retry rule: call write_file now using \`${suggestedFilePath}\` as file_path. Do not emit thoughts only. Do not answer with text only.`;
+}
+const LOCAL_GEMMA_TOOL_FOLLOW_UP_INSTRUCTION =
+  'Tool follow-up rule: after a tool result, either call the next tool immediately or give the final answer. Do not restate the plan.';
+const LOCAL_GEMMA_DIRECT_REPLY_INSTRUCTION =
+  'Reply directly to the current user message. Do not announce session initialization, readiness, or your role.';
+const LOCAL_GEMMA_FILE_CREATION_INSTRUCTION =
+  'File-creation rule: if the user asked you to create a new file or script, call write_file now with the full contents and target path. If only a directory is given, choose a short sensible filename yourself. write_file can create parent directories for the target path.';
+const LOCAL_GEMMA_STRUCTURED_TOOL_ARGS_INSTRUCTION =
+  'Tool fallback rule: do not answer in prose and do not emit thoughts. Return only a JSON object containing the arguments for the required tool.';
+
+type LocalGemmaStructuredToolRetry = {
+  functionName: string;
+  schema: Record<string, unknown>;
+  suggestedFilePath?: string;
+};
+
+function isJsonRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null && !Array.isArray(value);
+}
+
+function getRecordStringValue(
+  record: Record<string, unknown>,
+  key: string,
+): string | undefined {
+  const value = record[key];
+  return typeof value === 'string' ? value : undefined;
+}
+
+function getFirstRecordStringValue(
+  record: Record<string, unknown>,
+  keys: string[],
+): string | undefined {
+  for (const key of keys) {
+    const value = getRecordStringValue(record, key);
+    if (value !== undefined) {
+      return value;
+    }
+  }
+  return undefined;
+}
+
+function getSingleRequiredFunctionName(
+  request: GenerateContentParameters,
+): string | undefined {
+  const allowedFunctionNames =
+    request.config?.toolConfig?.functionCallingConfig?.allowedFunctionNames;
+
+  if (allowedFunctionNames?.length !== 1) {
+    return undefined;
+  }
+
+  return allowedFunctionNames[0];
+}
+
+function findToolSchema(
+  tools: Tool[] | undefined,
+  functionName: string,
+): Record<string, unknown> | undefined {
+  for (const tool of tools ?? []) {
+    for (const declaration of tool.functionDeclarations ?? []) {
+      if (declaration?.name !== functionName) {
+        continue;
+      }
+
+      const schema = declaration.parametersJsonSchema ?? declaration.parameters;
+      if (isJsonRecord(schema)) {
+        return schema;
+      }
+    }
+  }
+
+  return undefined;
+}
+
+function getLocalGemmaStructuredToolRetry(
+  tools: Tool[] | undefined,
+  contents: readonly Content[],
+): LocalGemmaStructuredToolRetry | undefined {
+  const isToolFollowUpTurn =
+    contents.length > 0 && isFunctionResponse(contents[contents.length - 1]);
+  const preferredFunctionNames = getLocalGemmaPreferredFunctionNames(
+    contents,
+    isToolFollowUpTurn,
+  );
+
+  if (!preferredFunctionNames || preferredFunctionNames.length !== 1) {
+    return undefined;
+  }
+
+  const functionName = preferredFunctionNames[0];
+  const schema = findToolSchema(tools, functionName);
+  if (!schema) {
+    return undefined;
+  }
+
+  return {
+    functionName,
+    schema,
+    suggestedFilePath: getSuggestedLocalGemmaFilePath(contents),
+  };
+}
+
+function extractJsonObjectCandidate(text: string): string {
+  const trimmed = text.trim();
+  if (!trimmed) {
+    return trimmed;
+  }
+
+  let normalized = trimmed;
+  if (normalized.startsWith('```')) {
+    normalized = normalized.replace(/^```[a-zA-Z0-9_-]*\s*/, '');
+    normalized = normalized.replace(/\s*```$/, '');
+  }
+
+  const firstBrace = normalized.indexOf('{');
+  const lastBrace = normalized.lastIndexOf('}');
+  if (firstBrace !== -1 && lastBrace > firstBrace) {
+    return normalized.slice(firstBrace, lastBrace + 1);
+  }
+
+  return normalized;
+}
+
+function parseStructuredToolArgsText(text: string): Record<string, unknown> {
+  const jsonCandidate = extractJsonObjectCandidate(text);
+  const parsed = JSON.parse(jsonCandidate) as unknown;
+
+  if (!isJsonRecord(parsed)) {
+    throw new Error('Structured tool retry must return a JSON object.');
+  }
+
+  return parsed;
+}
+
+function unwrapStructuredToolArgsRecord(
+  parsedArgs: Record<string, unknown>,
+): Record<string, unknown> {
+  const nestedArgumentKeys = [
+    'arguments',
+    'args',
+    'parameters',
+    'params',
+    'input',
+  ];
+
+  for (const key of nestedArgumentKeys) {
+    const nestedValue = parsedArgs[key];
+    if (isJsonRecord(nestedValue)) {
+      return unwrapStructuredToolArgsRecord(nestedValue);
+    }
+  }
+
+  return parsedArgs;
+}
+
+function getJsonSchemaPropertyNames(
+  schema: Record<string, unknown>,
+): Set<string> | undefined {
+  const properties = schema['properties'];
+  if (!isJsonRecord(properties)) {
+    return undefined;
+  }
+
+  return new Set(Object.keys(properties));
+}
+
+function createSyntheticToolCallResponse(
+  response: GenerateContentResponse,
+  functionName: string,
+  args: Record<string, unknown>,
+): GenerateContentResponse {
+  const syntheticResponse = new GenerateContentResponse();
+  syntheticResponse.candidates = [
+    {
+      content: {
+        role: 'model',
+        parts: [
+          {
+            functionCall: {
+              name: functionName,
+              args,
+            },
+          },
+        ],
+      },
+      finishReason: FinishReason.STOP,
+    },
+  ];
+  syntheticResponse.usageMetadata = response.usageMetadata;
+  syntheticResponse.modelVersion = response.modelVersion;
+  return syntheticResponse;
+}
+
+function normalizeStructuredToolArgs(
+  retry: LocalGemmaStructuredToolRetry,
+  parsedArgs: Record<string, unknown>,
+): Record<string, unknown> {
+  const unwrappedArgs = unwrapStructuredToolArgsRecord(parsedArgs);
+
+  if (retry.functionName !== 'write_file') {
+    return unwrappedArgs;
+  }
+
+  const normalizedArgs = { ...unwrappedArgs };
+  const normalizedFilePath = getFirstRecordStringValue(unwrappedArgs, [
+    'file_path',
+    'filepath',
+    'path',
+    'file',
+    'filename',
+    'fileName',
+    'output_path',
+    'script_path',
+  ]);
+  const normalizedContent = getFirstRecordStringValue(unwrappedArgs, [
+    'content',
+    'contents',
+    'file_content',
+    'fileContents',
+    'script_content',
+    'script',
+    'body',
+    'text',
+    'code',
+  ]);
+
+  if (normalizedFilePath !== undefined) {
+    normalizedArgs['file_path'] = normalizedFilePath;
+  }
+  if (normalizedContent !== undefined) {
+    normalizedArgs['content'] = normalizedContent;
+  }
+  if (
+    retry.suggestedFilePath &&
+    getRecordStringValue(normalizedArgs, 'file_path') === undefined
+  ) {
+    normalizedArgs['file_path'] = retry.suggestedFilePath;
+  }
+
+  const allowedPropertyNames = getJsonSchemaPropertyNames(retry.schema);
+  if (!allowedPropertyNames) {
+    return normalizedArgs;
+  }
+
+  return Object.fromEntries(
+    Object.entries(normalizedArgs).filter(([key]) =>
+      allowedPropertyNames.has(key),
+    ),
+  );
+}
+
+function getStructuredToolRetryInstruction(
+  retry: LocalGemmaStructuredToolRetry,
+): string {
+  const pathHint = retry.suggestedFilePath
+    ? ` Use this exact file_path: \`${retry.suggestedFilePath}\`.`
+    : '';
+
+  return `${LOCAL_GEMMA_STRUCTURED_TOOL_ARGS_INSTRUCTION} Return only JSON arguments for \`${retry.functionName}\`.${pathHint}`;
+}
 
 /**
  * Returns true if the response is valid, false otherwise.
@@ -119,6 +389,227 @@ export function isValidNonThoughtTextPart(part: Part): boolean {
     !part.inlineData &&
     !part.fileData
   );
+}
+
+function getLatestPlainUserText(
+  contents: readonly Content[],
+): string | undefined {
+  for (let index = contents.length - 1; index >= 0; index -= 1) {
+    const content = contents[index];
+    if (!content || isFunctionResponse(content) || content.role !== 'user') {
+      continue;
+    }
+    const text = (content.parts ?? [])
+      .filter((part) => typeof part.text === 'string' && !part.thought)
+      .map((part) => part.text)
+      .join(' ')
+      .trim();
+    if (text) {
+      return text;
+    }
+  }
+
+  return undefined;
+}
+
+function shouldUseLowThinkingForLocalGemmaUserTurn(
+  contents: readonly Content[],
+): boolean {
+  const latestUserText = getLatestPlainUserText(contents);
+  if (!latestUserText) {
+    return false;
+  }
+
+  const normalized = latestUserText.toLowerCase();
+  if (estimateTokenCountSync([{ text: latestUserText }]) > 48) {
+    return false;
+  }
+
+  const codingSignals =
+    /\b(file|script|code|edit|write|read|run|build|test|fix|implement|debug|grep|search|folder|directory|command|terminal|shell|tool|function|class|npm|node|python|bash|zsh|git|json|yaml|ts|tsx|js|jsx)\b|[./\\]|`/;
+
+  return !codingSignals.test(normalized);
+}
+
+function isSimpleLocalGemmaFileCreationRequest(
+  contents: readonly Content[],
+): boolean {
+  const latestUserText = getLatestPlainUserText(contents);
+  if (!latestUserText) {
+    return false;
+  }
+
+  const normalized = latestUserText.toLowerCase();
+  const createVerb = /\b(create|make|write|add|put|save|generate|build)\b/.test(
+    normalized,
+  );
+  const fileNoun =
+    /\b(file|script|module|component|config|json|yaml|yml|toml|ts|tsx|js|jsx|py|sh|bash|zsh)\b/.test(
+      normalized,
+    );
+
+  return createVerb && fileNoun;
+}
+
+function getMostRecentFunctionCall(
+  contents: readonly Content[],
+): Part['functionCall'] | undefined {
+  for (let index = contents.length - 1; index >= 0; index -= 1) {
+    const content = contents[index];
+    if (!content || content.role !== 'model') {
+      continue;
+    }
+
+    for (
+      let partIndex = (content.parts?.length ?? 0) - 1;
+      partIndex >= 0;
+      partIndex -= 1
+    ) {
+      const part = content.parts?.[partIndex];
+      if (part?.functionCall) {
+        return part.functionCall;
+      }
+    }
+  }
+
+  return undefined;
+}
+
+function getLocalGemmaPreferredFunctionNames(
+  contents: readonly Content[],
+  isToolFollowUpTurn: boolean,
+): string[] | undefined {
+  if (!isSimpleLocalGemmaFileCreationRequest(contents)) {
+    return undefined;
+  }
+
+  if (isToolFollowUpTurn) {
+    const lastFunctionCall = getMostRecentFunctionCall(contents);
+    if (lastFunctionCall?.name === 'run_shell_command') {
+      return ['write_file'];
+    }
+  }
+
+  if (getMostRecentFunctionCall(contents)?.name === 'write_file') {
+    return ['write_file'];
+  }
+
+  return ['write_file'];
+}
+
+function getSuggestedLocalGemmaFilePath(
+  contents: readonly Content[],
+): string | undefined {
+  const latestUserText = getLatestPlainUserText(contents);
+  if (!latestUserText || !isSimpleLocalGemmaFileCreationRequest(contents)) {
+    return undefined;
+  }
+
+  const normalized = latestUserText.toLowerCase();
+  const directoryMatch =
+    normalized.match(
+      /\b(?:in|into|under|inside|at)\s+(?:a\s+)?([./\w-]+)\s+(?:folder|directory)\b/,
+    ) ?? normalized.match(/\b(\.\w[\w./-]*)\b/);
+  const directory = directoryMatch?.[1]?.replace(/\/+$/, '');
+
+  const extension = /\bpython|\.py\b/.test(normalized)
+    ? '.py'
+    : /\btypescript|tsx\b|\.ts\b/.test(normalized)
+      ? '.ts'
+      : /\bjavascript|node\b|\.js\b/.test(normalized)
+        ? '.js'
+        : /\bjson\b/.test(normalized)
+          ? '.json'
+          : /\byaml|yml\b/.test(normalized)
+            ? '.yml'
+            : '.sh';
+
+  let baseName = 'new_file';
+  if (
+    /\bmachine info|system info\b/.test(normalized) ||
+    (/\bmachine\b/.test(normalized) && /\binfo\b/.test(normalized))
+  ) {
+    baseName = 'machine_info';
+  } else {
+    const words = normalized
+      .replace(/[^a-z0-9./_\-\s]/g, ' ')
+      .split(/\s+/)
+      .filter(Boolean)
+      .filter(
+        (word) =>
+          !new Set([
+            'a',
+            'all',
+            'and',
+            'can',
+            'create',
+            'current',
+            'directory',
+            'exactly',
+            'file',
+            'folder',
+            'for',
+            'info',
+            'into',
+            'it',
+            'just',
+            'make',
+            'me',
+            'now',
+            'of',
+            'please',
+            'print',
+            'prints',
+            'put',
+            'returns',
+            'script',
+            'small',
+            'text',
+            'that',
+            'the',
+            'this',
+            'use',
+            'with',
+            'write',
+            'you',
+          ]).has(word) &&
+          !word.startsWith('.') &&
+          !word.includes('/'),
+      )
+      .slice(0, 3);
+
+    if (words.length > 0) {
+      baseName = words.join('_');
+    }
+  }
+
+  if (!directory) {
+    return `${baseName}${extension}`;
+  }
+
+  return `${directory}/${baseName}${extension}`;
+}
+
+function appendTextToLatestUserContent(
+  contents: readonly Content[],
+  extraText: string,
+): Content[] {
+  const updatedContents = [...contents];
+
+  for (let index = updatedContents.length - 1; index >= 0; index -= 1) {
+    const content = updatedContents[index];
+    if (!content || content.role !== 'user' || isFunctionResponse(content)) {
+      continue;
+    }
+
+    updatedContents[index] = {
+      ...content,
+      parts: [...(content.parts ?? []), { text: extraText }],
+    };
+    return updatedContents;
+  }
+
+  return updatedContents;
 }
 
 function isValidContent(content: Content): boolean {
@@ -348,6 +839,16 @@ export class GeminiChat {
     const streamWithRetries = async function* (
       this: GeminiChat,
     ): AsyncGenerator<StreamEvent, void, void> {
+      let retryLocalGemmaWithoutThinking = false;
+      let retryLocalGemmaWithSuggestedFilePath: string | undefined;
+      let retryLocalGemmaStructuredToolCall:
+        | LocalGemmaStructuredToolRetry
+        | undefined;
+      let lastAttemptUsedVisibleResponseRetry = false;
+      let lastAttemptUsedSuggestedFilePathRetry = false;
+      let lastAttemptUsedStructuredToolRetry = false;
+      let lastAttemptWasLocalGemma = false;
+
       try {
         const maxAttempts = this.context.config.getMaxAttempts();
 
@@ -363,6 +864,12 @@ export class GeminiChat {
               attempt > 0
                 ? { ...modelConfigKey, isRetry: true }
                 : modelConfigKey;
+            lastAttemptUsedVisibleResponseRetry =
+              retryLocalGemmaWithoutThinking;
+            lastAttemptUsedSuggestedFilePathRetry =
+              retryLocalGemmaWithSuggestedFilePath !== undefined;
+            lastAttemptUsedStructuredToolRetry =
+              retryLocalGemmaStructuredToolCall !== undefined;
 
             isConnectionPhase = true;
             const stream = await this.makeApiCallAndProcessStream(
@@ -371,6 +878,16 @@ export class GeminiChat {
               prompt_id,
               signal,
               role,
+              {
+                forceVisibleResponseRetry: lastAttemptUsedVisibleResponseRetry,
+                forceSuggestedFilePathRetry:
+                  retryLocalGemmaWithSuggestedFilePath,
+                forceStructuredToolArgsRetry: retryLocalGemmaStructuredToolCall,
+                onResolvedModel: (resolvedModel) => {
+                  lastAttemptWasLocalGemma =
+                    this.context.config.canUseModelWithoutAuth(resolvedModel);
+                },
+              },
             );
             isConnectionPhase = false;
             for await (const chunk of stream) {
@@ -418,6 +935,51 @@ export class GeminiChat {
             const errorType = isContentError
               ? error.type
               : getRetryErrorType(error);
+            const shouldRetryLocalGemmaWithoutThinking =
+              isContentError &&
+              error.type === 'NO_RESPONSE_TEXT' &&
+              lastAttemptWasLocalGemma;
+            const suggestedLocalGemmaFilePath =
+              getSuggestedLocalGemmaFilePath(requestContents);
+            const structuredToolRetry = getLocalGemmaStructuredToolRetry(
+              this.tools,
+              requestContents,
+            );
+
+            if (shouldRetryLocalGemmaWithoutThinking) {
+              if (structuredToolRetry && !lastAttemptUsedStructuredToolRetry) {
+                retryLocalGemmaStructuredToolCall = structuredToolRetry;
+                retryLocalGemmaWithoutThinking = false;
+                retryLocalGemmaWithSuggestedFilePath = undefined;
+              } else if (lastAttemptUsedVisibleResponseRetry) {
+                if (
+                  lastAttemptUsedSuggestedFilePathRetry ||
+                  !suggestedLocalGemmaFilePath
+                ) {
+                  throw error;
+                }
+                retryLocalGemmaStructuredToolCall = undefined;
+                retryLocalGemmaWithSuggestedFilePath =
+                  suggestedLocalGemmaFilePath;
+              } else {
+                retryLocalGemmaStructuredToolCall = undefined;
+                retryLocalGemmaWithoutThinking = true;
+                retryLocalGemmaWithSuggestedFilePath = undefined;
+              }
+            } else {
+              retryLocalGemmaStructuredToolCall = undefined;
+              retryLocalGemmaWithSuggestedFilePath = undefined;
+            }
+
+            if (shouldRetryLocalGemmaWithoutThinking) {
+              if (
+                lastAttemptUsedStructuredToolRetry ||
+                (lastAttemptUsedVisibleResponseRetry &&
+                  lastAttemptUsedSuggestedFilePathRetry)
+              ) {
+                throw error;
+              }
+            }
 
             if (isContentError || (isRetryable && !signal.aborted)) {
               // The issue requests exactly 3 retries (4 attempts) for API errors during stream iteration.
@@ -490,6 +1052,12 @@ export class GeminiChat {
     prompt_id: string,
     abortSignal: AbortSignal,
     role: LlmRole,
+    retryBehavior?: {
+      forceVisibleResponseRetry?: boolean;
+      forceSuggestedFilePathRetry?: string;
+      forceStructuredToolArgsRetry?: LocalGemmaStructuredToolRetry;
+      onResolvedModel?: (modelId: string) => void;
+    },
   ): Promise<AsyncGenerator<GenerateContentResponse>> {
     const contentsForPreviewModel =
       this.ensureActiveLoopHasThoughtSignatures(requestContents);
@@ -555,6 +1123,7 @@ export class GeminiChat {
       }
 
       lastModelToUse = modelToUse;
+      retryBehavior?.onResolvedModel?.(modelToUse);
       const config: GenerateContentConfig = {
         ...currentGenerateContentConfig,
         // TODO(12622): Ensure we don't overrwrite these when they are
@@ -564,9 +1133,115 @@ export class GeminiChat {
         abortSignal,
       };
 
+      if (
+        retryBehavior?.forceVisibleResponseRetry &&
+        this.context.config.canUseModelWithoutAuth(modelToUse)
+      ) {
+        config.thinkingConfig = {
+          ...config.thinkingConfig,
+          includeThoughts: false,
+          thinkingBudget: 0,
+        };
+        config.systemInstruction = config.systemInstruction
+          ? `${config.systemInstruction}\n\n${LOCAL_GEMMA_VISIBLE_RESPONSE_RETRY_INSTRUCTION}`
+          : LOCAL_GEMMA_VISIBLE_RESPONSE_RETRY_INSTRUCTION;
+      }
+
+      if (
+        retryBehavior?.forceSuggestedFilePathRetry &&
+        this.context.config.canUseModelWithoutAuth(modelToUse)
+      ) {
+        config.thinkingConfig = {
+          ...config.thinkingConfig,
+          includeThoughts: false,
+          thinkingBudget: 0,
+        };
+        const retryInstruction = getLocalGemmaSuggestedFilePathRetryInstruction(
+          retryBehavior.forceSuggestedFilePathRetry,
+        );
+        config.systemInstruction = config.systemInstruction
+          ? `${config.systemInstruction}\n\n${retryInstruction}`
+          : retryInstruction;
+      }
+
       let contentsToUse: Content[] = supportsModernFeatures(modelToUse)
         ? [...contentsForPreviewModel]
         : [...requestContents];
+      const isToolFollowUpTurn =
+        contentsToUse.length > 0 &&
+        isFunctionResponse(contentsToUse[contentsToUse.length - 1]);
+      const preferredLocalGemmaFunctionNames =
+        this.context.config.canUseModelWithoutAuth(modelToUse)
+          ? getLocalGemmaPreferredFunctionNames(
+              contentsToUse,
+              isToolFollowUpTurn,
+            )
+          : undefined;
+      const suggestedLocalGemmaFilePath = preferredLocalGemmaFunctionNames
+        ? getSuggestedLocalGemmaFilePath(contentsToUse)
+        : undefined;
+
+      if (
+        preferredLocalGemmaFunctionNames &&
+        suggestedLocalGemmaFilePath &&
+        !isToolFollowUpTurn
+      ) {
+        contentsToUse = appendTextToLatestUserContent(
+          contentsToUse,
+          `Use this exact file path: ${suggestedLocalGemmaFilePath}. Call write_file in this turn.`,
+        );
+      }
+
+      if (preferredLocalGemmaFunctionNames) {
+        config.toolConfig = {
+          functionCallingConfig: {
+            mode: FunctionCallingConfigMode.ANY,
+            allowedFunctionNames: preferredLocalGemmaFunctionNames,
+          },
+        };
+        config.thinkingConfig = {
+          ...config.thinkingConfig,
+          includeThoughts: true,
+          thinkingLevel: ThinkingLevel.LOW,
+        };
+        config.systemInstruction = config.systemInstruction
+          ? `${config.systemInstruction}\n\n${LOCAL_GEMMA_FILE_CREATION_INSTRUCTION}${
+              suggestedLocalGemmaFilePath
+                ? ` If you need a filename here, use \`${suggestedLocalGemmaFilePath}\`.`
+                : ''
+            }`
+          : `${LOCAL_GEMMA_FILE_CREATION_INSTRUCTION}${
+              suggestedLocalGemmaFilePath
+                ? ` If you need a filename here, use \`${suggestedLocalGemmaFilePath}\`.`
+                : ''
+            }`;
+      }
+
+      if (
+        this.context.config.canUseModelWithoutAuth(modelToUse) &&
+        isToolFollowUpTurn
+      ) {
+        config.thinkingConfig = {
+          ...config.thinkingConfig,
+          includeThoughts: true,
+          thinkingLevel: ThinkingLevel.LOW,
+        };
+        config.systemInstruction = config.systemInstruction
+          ? `${config.systemInstruction}\n\n${LOCAL_GEMMA_TOOL_FOLLOW_UP_INSTRUCTION}`
+          : LOCAL_GEMMA_TOOL_FOLLOW_UP_INSTRUCTION;
+      } else if (
+        this.context.config.canUseModelWithoutAuth(modelToUse) &&
+        shouldUseLowThinkingForLocalGemmaUserTurn(contentsToUse)
+      ) {
+        config.thinkingConfig = {
+          ...config.thinkingConfig,
+          includeThoughts: true,
+          thinkingLevel: ThinkingLevel.LOW,
+        };
+        config.systemInstruction = config.systemInstruction
+          ? `${config.systemInstruction}\n\n${LOCAL_GEMMA_DIRECT_REPLY_INSTRUCTION}`
+          : LOCAL_GEMMA_DIRECT_REPLY_INSTRUCTION;
+      }
 
       const hookSystem = this.context.config.getHookSystem();
       if (hookSystem) {
@@ -636,6 +1311,20 @@ export class GeminiChat {
       lastConfig = config;
       lastContentsToUse = contentsToUse;
 
+      if (
+        retryBehavior?.forceStructuredToolArgsRetry &&
+        this.context.config.canUseModelWithoutAuth(modelToUse)
+      ) {
+        return this.createStructuredToolRetryStream(
+          modelToUse,
+          contentsToUse,
+          config,
+          retryBehavior.forceStructuredToolArgsRetry,
+          prompt_id,
+          role,
+        );
+      }
+
       return this.context.config.getContentGenerator().generateContentStream(
         {
           model: modelToUse,
@@ -700,6 +1389,79 @@ export class GeminiChat {
       streamResponse,
       originalRequest,
     );
+  }
+
+  private async createStructuredToolRetryStream(
+    model: string,
+    contents: Content[],
+    config: GenerateContentConfig,
+    retry: LocalGemmaStructuredToolRetry,
+    promptId: string,
+    role: LlmRole,
+  ): Promise<AsyncGenerator<GenerateContentResponse>> {
+    const instruction = getStructuredToolRetryInstruction(retry);
+    const retryContents = appendTextToLatestUserContent(contents, instruction);
+    const retryConfig: GenerateContentConfig = {
+      ...config,
+      tools: undefined,
+      toolConfig: undefined,
+      responseMimeType: 'application/json',
+      responseJsonSchema: retry.schema,
+      thinkingConfig: {
+        ...config.thinkingConfig,
+        includeThoughts: false,
+        thinkingBudget: 0,
+      },
+      systemInstruction: config.systemInstruction
+        ? `${config.systemInstruction}\n\n${instruction}`
+        : instruction,
+    };
+
+    const response = await this.context.config
+      .getContentGenerator()
+      .generateContent(
+        {
+          model,
+          contents: retryContents,
+          config: retryConfig,
+        },
+        promptId,
+        role,
+      );
+
+    const responseText = getResponseText(response)?.trim();
+    if (!responseText) {
+      throw new InvalidStreamError(
+        `Local Gemma did not return JSON arguments for required tool "${retry.functionName}".`,
+        'NO_RESPONSE_TEXT',
+      );
+    }
+
+    let parsedArgs: Record<string, unknown>;
+    try {
+      parsedArgs = parseStructuredToolArgsText(responseText);
+    } catch (error) {
+      throw new InvalidStreamError(
+        `Local Gemma returned invalid JSON arguments for required tool "${retry.functionName}": ${
+          error instanceof Error ? error.message : String(error)
+        }`,
+        'NO_RESPONSE_TEXT',
+      );
+    }
+    parsedArgs = normalizeStructuredToolArgs(retry, parsedArgs);
+    debugLogger.debug(
+      `[local-gemma] structured-tool-retry function=${retry.functionName} raw_preview=${JSON.stringify(
+        responseText.slice(0, 240),
+      )} normalized_keys=${Object.keys(parsedArgs).join(',') || 'none'}`,
+    );
+
+    return (async function* () {
+      yield createSyntheticToolCallResponse(
+        response,
+        retry.functionName,
+        parsedArgs,
+      );
+    })();
   }
 
   /**
@@ -946,6 +1708,11 @@ export class GeminiChat {
       .map((part) => part.text)
       .join('')
       .trim();
+    const requiredLocalToolCall = this.context.config.canUseModelWithoutAuth(
+      model,
+    )
+      ? getSingleRequiredFunctionName(originalRequest)
+      : undefined;
 
     // Record model response text from the collected parts.
     // Also flush when there are thoughts or a tool call (even with no text)
@@ -983,6 +1750,12 @@ export class GeminiChat {
         throw new InvalidStreamError(
           'Model stream ended with unexpected tool call.',
           'UNEXPECTED_TOOL_CALL',
+        );
+      }
+      if (requiredLocalToolCall) {
+        throw new InvalidStreamError(
+          `Model stream ended without required tool call "${requiredLocalToolCall}".`,
+          'NO_RESPONSE_TEXT',
         );
       }
       if (!responseText) {

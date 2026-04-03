@@ -94,4 +94,26 @@ describe('<ContextSummaryDisplay />', () => {
     expect(lastFrame()).toMatchSnapshot();
     unmount();
   });
+
+  it('shows simple context mode and hides injected-context counts', async () => {
+    const props = {
+      ...baseProps,
+      simpleContextMode: true,
+      geminiMdFileCount: 8,
+      contextFileNames: ['GEMINI.md'],
+      mcpServers: { 'test-server': { command: 'test' } },
+      ideContext: {
+        workspaceState: {
+          openFiles: [{ path: '/a/b/c', timestamp: Date.now() }],
+        },
+      },
+      skillCount: 11,
+    };
+    const { lastFrame, unmount } = await renderWithWidth(120, props);
+    expect(lastFrame()).toContain('simple context mode');
+    expect(lastFrame()).not.toContain('GEMINI.md');
+    expect(lastFrame()).not.toContain('skill');
+    expect(lastFrame()).not.toContain('MCP');
+    unmount();
+  });
 });

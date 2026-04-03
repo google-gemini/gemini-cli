@@ -69,7 +69,7 @@ import {
   type TelemetryTarget,
 } from '../telemetry/index.js';
 import { coreEvents, CoreEvent } from '../utils/events.js';
-import { tokenLimit } from '../core/tokenLimits.js';
+import { registerRuntimeTokenLimit, tokenLimit } from '../core/tokenLimits.js';
 import {
   DEFAULT_GEMINI_EMBEDDING_MODEL,
   DEFAULT_GEMINI_FLASH_MODEL,
@@ -121,9 +121,23 @@ import { OutputFormat } from '../output/types.js';
 import {
   ModelConfigService,
   type ModelConfig,
+  type ModelConfigKey,
   type ModelConfigServiceConfig,
+  type ResolvedModelConfig,
 } from '../services/modelConfigService.js';
 import { DEFAULT_MODEL_CONFIGS } from './defaultModelConfigs.js';
+import {
+  createLocalGemmaModelAlias,
+  createLocalGemmaModelDefinition,
+  DEFAULT_OLLAMA_BASE_URL,
+  DEFAULT_OLLAMA_BRIDGE_HOST,
+  DEFAULT_OLLAMA_BRIDGE_PORT,
+  getLocalGemmaCompressionThreshold,
+  getPreferredLocalGemmaUtilityModel as selectPreferredLocalGemmaUtilityModel,
+  getLocalGemmaToolResponseBudget,
+  type LocalGemmaModelInfo,
+  type OllamaGemmaSettings,
+} from '../local-models/ollamaGemma.js';
 import { MemoryContextManager } from '../context/memoryContextManager.js';
 import { TrackerService } from '../services/trackerService.js';
 import type { GenerateContentParameters } from '@google/genai';
@@ -666,6 +680,8 @@ export interface ConfigParameters {
   policyUpdateConfirmationRequest?: PolicyUpdateConfirmationRequest;
   output?: OutputSettings;
   gemmaModelRouter?: GemmaModelRouterSettings;
+  ollamaGemma?: OllamaGemmaSettings;
+  localGemmaModels?: LocalGemmaModelInfo[];
   adk?: ADKSettings;
   disableModelRouterForAuth?: AuthType[];
   continueOnFailedApiCall?: boolean;
@@ -819,6 +835,7 @@ export class Config implements McpContext, AgentLoopContext {
   fallbackModelHandler?: FallbackModelHandler;
   validationHandler?: ValidationHandler;
   private quotaErrorOccurred: boolean = false;
+  private pendingModelSessionReconfiguration?: Promise<void>;
   private creditsNotificationShown: boolean = false;
   private modelQuotas: Map<
     string,
@@ -891,6 +908,8 @@ export class Config implements McpContext, AgentLoopContext {
   private readonly outputSettings: OutputSettings;
 
   private readonly gemmaModelRouter: GemmaModelRouterSettings;
+  private readonly ollamaGemma: Required<OllamaGemmaSettings>;
+  private readonly localGemmaModels: Map<string, LocalGemmaModelInfo>;
   private readonly agentSessionNoninteractiveEnabled: boolean;
 
   private readonly continueOnFailedApiCall: boolean;
@@ -1138,6 +1157,20 @@ export class Config implements McpContext, AgentLoopContext {
       modelConfigServiceConfig ?? DEFAULT_MODEL_CONFIGS,
     );
 
+    this.localGemmaModels = new Map();
+    for (const model of params.localGemmaModels ?? []) {
+      this.localGemmaModels.set(model.modelId, model);
+      this.modelConfigService.registerRuntimeModelDefinition(
+        model.modelId,
+        createLocalGemmaModelDefinition(model),
+      );
+      this.modelConfigService.registerRuntimeModelConfig(
+        model.modelId,
+        createLocalGemmaModelAlias(model),
+      );
+      registerRuntimeTokenLimit(model.modelId, model.contextLength);
+    }
+
     this.experimentalJitContext = params.experimentalJitContext ?? false;
     this.experimentalMemoryManager = params.experimentalMemoryManager ?? false;
     this.memoryBoundaryMarkers = params.memoryBoundaryMarkers ?? ['.git'];
@@ -1310,6 +1343,16 @@ export class Config implements McpContext, AgentLoopContext {
         model:
           params.gemmaModelRouter?.classifier?.model ?? 'gemma3-1b-gpu-custom',
       },
+    };
+    this.ollamaGemma = {
+      enabled:
+        params.ollamaGemma?.enabled ??
+        (params.localGemmaModels?.length ?? 0) > 0,
+      bridgeHost: params.ollamaGemma?.bridgeHost ?? DEFAULT_OLLAMA_BRIDGE_HOST,
+      bridgePort: params.ollamaGemma?.bridgePort ?? DEFAULT_OLLAMA_BRIDGE_PORT,
+      ollamaBaseUrl:
+        params.ollamaGemma?.ollamaBaseUrl ?? DEFAULT_OLLAMA_BASE_URL,
+      simpleContextMode: params.ollamaGemma?.simpleContextMode ?? true,
     };
 
     this.agentSessionNoninteractiveEnabled =
@@ -1491,7 +1534,7 @@ export class Config implements McpContext, AgentLoopContext {
   }
 
   async refreshAuth(
-    authMethod: AuthType,
+    authMethod: AuthType | undefined,
     apiKey?: string,
     baseUrl?: string,
     customHeaders?: Record<string, string>,
@@ -1787,7 +1830,8 @@ export class Config implements McpContext, AgentLoopContext {
   }
 
   setModel(newModel: string, isTemporary: boolean = true): void {
-    if (this.model !== newModel || this._activeModel !== newModel) {
+    const didChange = this.model !== newModel || this._activeModel !== newModel;
+    if (didChange) {
       this.model = newModel;
       // When the user explicitly sets a model, that becomes the active model.
       this._activeModel = newModel;
@@ -1797,6 +1841,27 @@ export class Config implements McpContext, AgentLoopContext {
       this.onModelChange(newModel);
     }
     this.modelAvailabilityService.reset();
+
+    if (didChange && this._geminiClient?.isInitialized()) {
+      const reconfigurationPromise =
+        this._geminiClient.reconfigureForModelChange();
+      reconfigurationPromise.catch((err) => {
+        debugLogger.error(
+          'Failed to reconfigure the active chat after a model change.',
+          err,
+        );
+      });
+      const wrappedPromise = reconfigurationPromise.finally(() => {
+        if (this.pendingModelSessionReconfiguration === wrappedPromise) {
+          this.pendingModelSessionReconfiguration = undefined;
+        }
+      });
+      this.pendingModelSessionReconfiguration = wrappedPromise;
+    }
+  }
+
+  async waitForPendingModelSessionReconfiguration(): Promise<void> {
+    await this.pendingModelSessionReconfiguration;
   }
 
   activateFallbackMode(model: string): void {
@@ -2330,6 +2395,10 @@ export class Config implements McpContext, AgentLoopContext {
    * via system instruction updates.
    */
   getSystemInstructionMemory(): string | HierarchicalMemory {
+    if (this.isSimpleContextModeEnabled()) {
+      return '';
+    }
+
     if (this.experimentalJitContext && this.memoryContextManager) {
       const global = this.memoryContextManager.getGlobalMemory();
       const userProjectMemory =
@@ -2348,6 +2417,10 @@ export class Config implements McpContext, AgentLoopContext {
    * disabled (Tier 2 memory is already in the system instruction).
    */
   getSessionMemory(): string {
+    if (this.isSimpleContextModeEnabled()) {
+      return '';
+    }
+
     if (!this.experimentalJitContext || !this.memoryContextManager) {
       return '';
     }
@@ -2597,7 +2670,99 @@ export class Config implements McpContext, AgentLoopContext {
   }
 
   getExperimentalDynamicModelConfiguration(): boolean {
-    return this.dynamicModelConfiguration;
+    return (
+      this.dynamicModelConfiguration ||
+      this.modelConfigService.hasRuntimeModelDefinitions()
+    );
+  }
+
+  getLocalGemmaModels(): LocalGemmaModelInfo[] {
+    return Array.from(this.localGemmaModels.values());
+  }
+
+  getLocalGemmaModel(modelId: string): LocalGemmaModelInfo | undefined {
+    return this.localGemmaModels.get(modelId);
+  }
+
+  hasLocalGemmaModels(): boolean {
+    return this.localGemmaModels.size > 0;
+  }
+
+  isLocalGemmaModel(modelId: string): boolean {
+    return this.localGemmaModels.has(modelId);
+  }
+
+  isSimpleContextModeEnabled(modelId?: string): boolean {
+    if (!this.ollamaGemma.simpleContextMode) {
+      return false;
+    }
+
+    return this.canUseModelWithoutAuth(modelId ?? this.getActiveModel());
+  }
+
+  getPreferredLocalGemmaUtilityModel(): LocalGemmaModelInfo | undefined {
+    return selectPreferredLocalGemmaUtilityModel(this.getLocalGemmaModels());
+  }
+
+  getResolvedModelConfig(modelConfigKey: ModelConfigKey): ResolvedModelConfig {
+    const resolved = this.modelConfigService.getResolvedConfig(modelConfigKey);
+
+    if (modelConfigKey.isChatModel) {
+      return resolved;
+    }
+
+    if (!this.canUseCurrentModelWithoutAuth()) {
+      return resolved;
+    }
+
+    if (this.canUseModelWithoutAuth(resolved.model)) {
+      return resolved;
+    }
+
+    if (!resolved.model.startsWith('gemini-')) {
+      return resolved;
+    }
+
+    const localUtilityModel = this.getPreferredLocalGemmaUtilityModel();
+    if (!localUtilityModel) {
+      return resolved;
+    }
+
+    const localUtilityConfig = this.modelConfigService.getResolvedConfig({
+      model: localUtilityModel.modelId,
+    });
+
+    debugLogger.debug(
+      `[local-gemma] utility model override ${resolved.model} -> ${localUtilityModel.modelId} (request=${modelConfigKey.model})`,
+    );
+
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
+    return {
+      model: localUtilityModel.modelId,
+      generateContentConfig: {
+        ...localUtilityConfig.generateContentConfig,
+        ...resolved.generateContentConfig,
+      },
+    } as ResolvedModelConfig;
+  }
+
+  private resolveModelForCapabilities(modelId: string): string {
+    return resolveModel(
+      modelId,
+      this.getGemini31LaunchedSync?.() ?? false,
+      this.getGemini31FlashLiteLaunchedSync?.() ?? false,
+      false,
+      this.getHasAccessToPreviewModel?.() ?? true,
+      this,
+    );
+  }
+
+  canUseModelWithoutAuth(modelId: string): boolean {
+    return this.isLocalGemmaModel(this.resolveModelForCapabilities(modelId));
+  }
+
+  canUseCurrentModelWithoutAuth(): boolean {
+    return this.canUseModelWithoutAuth(this.getActiveModel());
   }
 
   getPendingIncludeDirectories(): string[] {
@@ -2961,9 +3126,16 @@ export class Config implements McpContext, AgentLoopContext {
     this.fileSystemService = fileSystemService;
   }
 
-  async getCompressionThreshold(): Promise<number | undefined> {
-    if (this.compressionThreshold) {
+  async getCompressionThreshold(modelId?: string): Promise<number | undefined> {
+    if (this.compressionThreshold !== undefined) {
       return this.compressionThreshold;
+    }
+
+    const localModel = this.getLocalGemmaModel(
+      this.resolveModelForCapabilities(modelId ?? this.getActiveModel()),
+    );
+    if (localModel) {
+      return getLocalGemmaCompressionThreshold(localModel.contextLength);
     }
 
     await this.ensureExperimentsLoaded();
@@ -2975,6 +3147,16 @@ export class Config implements McpContext, AgentLoopContext {
       return undefined;
     }
     return remoteThreshold;
+  }
+
+  getCompressionToolResponseBudget(modelId?: string): number {
+    const localModel = this.getLocalGemmaModel(
+      this.resolveModelForCapabilities(modelId ?? this.getActiveModel()),
+    );
+    if (localModel) {
+      return getLocalGemmaToolResponseBudget(localModel.contextLength);
+    }
+    return 50_000;
   }
 
   async getUserCaching(): Promise<boolean | undefined> {
@@ -3305,10 +3487,12 @@ export class Config implements McpContext, AgentLoopContext {
   }
 
   getTruncateToolOutputThreshold(): number {
+    const activeModel = this.resolveModelForCapabilities(this.getActiveModel());
     return Math.min(
       // Estimate remaining context window in characters (1 token ~= 4 chars).
       4 *
-        (tokenLimit(this.model) - uiTelemetryService.getLastPromptTokenCount()),
+        (tokenLimit(activeModel) -
+          uiTelemetryService.getLastPromptTokenCount()),
       this.truncateToolOutputThreshold,
     );
   }
@@ -3358,7 +3542,7 @@ export class Config implements McpContext, AgentLoopContext {
   }
 
   getEnableHooks(): boolean {
-    return this.enableHooks;
+    return this.enableHooks && !this.isSimpleContextModeEnabled();
   }
 
   getEnableHooksUI(): boolean {
@@ -3371,6 +3555,10 @@ export class Config implements McpContext, AgentLoopContext {
 
   getGemmaModelRouterSettings(): GemmaModelRouterSettings {
     return this.gemmaModelRouter;
+  }
+
+  getOllamaGemmaSettings(): Required<OllamaGemmaSettings> {
+    return this.ollamaGemma;
   }
 
   getAgentSessionNoninteractiveEnabled(): boolean {
@@ -3628,6 +3816,9 @@ export class Config implements McpContext, AgentLoopContext {
    * Get the hook system instance
    */
   getHookSystem(): HookSystem | undefined {
+    if (this.isSimpleContextModeEnabled()) {
+      return undefined;
+    }
     return this.hookSystem;
   }
 

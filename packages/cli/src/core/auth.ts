@@ -30,6 +30,18 @@ export async function performInitialAuth(
   config: Config,
   authType: AuthType | undefined,
 ): Promise<InitialAuthResult> {
+  if (config.canUseCurrentModelWithoutAuth()) {
+    try {
+      await config.refreshAuth(undefined);
+      return { authError: null, accountSuspensionInfo: null };
+    } catch (e) {
+      return {
+        authError: `Failed to initialize local Gemma session. Message: ${getErrorMessage(e)}`,
+        accountSuspensionInfo: null,
+      };
+    }
+  }
+
   if (!authType) {
     return { authError: null, accountSuspensionInfo: null };
   }

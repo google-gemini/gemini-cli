@@ -11,6 +11,7 @@ import type { HierarchicalMemory } from '../config/memory.js';
 import { GEMINI_DIR } from '../utils/paths.js';
 import { ApprovalMode } from '../policy/types.js';
 import * as snippets from './snippets.js';
+import * as localGemmaSnippets from './snippets.local-gemma.js';
 import * as legacySnippets from './snippets.legacy.js';
 import {
   resolvePathFromEnv,
@@ -54,12 +55,6 @@ export class PromptProvider {
       context.config.getApprovalMode?.() ?? ApprovalMode.DEFAULT;
     const isPlanMode = approvalMode === ApprovalMode.PLAN;
     const isYoloMode = approvalMode === ApprovalMode.YOLO;
-    const skills = context.config.getSkillManager().getSkills();
-    const toolNames = context.toolRegistry.getAllToolNames();
-    const enabledToolNames = new Set(toolNames);
-
-    const approvedPlanPath = context.config.getApprovedPlanPath();
-
     const desiredModel = resolveModel(
       context.config.getActiveModel(),
       context.config.getGemini31LaunchedSync?.() ?? false,
@@ -68,9 +63,21 @@ export class PromptProvider {
       context.config.getHasAccessToPreviewModel?.() ?? true,
       context.config,
     );
+    const simpleContextMode =
+      context.config.isSimpleContextModeEnabled?.(desiredModel) ?? false;
+    const isLocalGemmaSimpleContextMode =
+      simpleContextMode &&
+      (context.config.isLocalGemmaModel?.(desiredModel) ?? false);
+    const skills = simpleContextMode
+      ? []
+      : context.config.getSkillManager().getSkills();
+    const toolNames = context.toolRegistry.getAllToolNames();
+    const enabledToolNames = new Set(toolNames);
+
+    const approvedPlanPath = context.config.getApprovedPlanPath();
     const isModernModel = supportsModernFeatures(desiredModel);
     const activeSnippets = isModernModel ? snippets : legacySnippets;
-    const contextFilenames = getAllGeminiMdFilenames();
+    const contextFilenames = simpleContextMode ? [] : getAllGeminiMdFilenames();
 
     let trackerDir = context.config.isTrackerEnabled()
       ? context.config.storage.getProjectTempTrackerDir()
@@ -120,6 +127,15 @@ export class PromptProvider {
         skillsPrompt,
         isModernModel,
       );
+    } else if (isLocalGemmaSimpleContextMode) {
+      basePrompt = localGemmaSnippets.getCoreSystemPrompt({
+        interactive: interactiveMode,
+        isPlanMode,
+        plansDir: context.config.storage.getPlansDir(),
+        sandboxMode: getSandboxMode(),
+        toolSandboxingEnabled: context.config.getSandboxEnabled(),
+        isGitRepository: isGitRepository(process.cwd()),
+      });
     } else {
       // --- Standard Composition ---
       const hasHierarchicalMemory =
@@ -160,7 +176,10 @@ export class PromptProvider {
           skills.length > 0,
         ),
         taskTracker: trackerDir,
-        hookContext: isSectionEnabled('hookContext') || undefined,
+        hookContext:
+          !simpleContextMode && isSectionEnabled('hookContext')
+            ? true
+            : undefined,
         primaryWorkflows: this.withSection(
           'primaryWorkflows',
           () => ({
@@ -234,11 +253,13 @@ export class PromptProvider {
     }
 
     // --- Finalization (Shell) ---
-    const finalPrompt = activeSnippets.renderFinalShell(
-      basePrompt,
-      userMemory,
-      contextFilenames,
-    );
+    const finalPrompt = isLocalGemmaSimpleContextMode
+      ? basePrompt
+      : activeSnippets.renderFinalShell(
+          basePrompt,
+          userMemory,
+          contextFilenames,
+        );
 
     // Sanitize erratic newlines from composition
     let sanitizedPrompt = finalPrompt.replace(/\n{3,}/g, '\n\n');
@@ -273,8 +294,16 @@ export class PromptProvider {
       context.config.getHasAccessToPreviewModel?.() ?? true,
       context.config,
     );
+    const isLocalGemmaSimpleContextMode =
+      (context.config.isSimpleContextModeEnabled?.(desiredModel) ?? false) &&
+      (context.config.isLocalGemmaModel?.(desiredModel) ?? false);
     const isModernModel = supportsModernFeatures(desiredModel);
     const activeSnippets = isModernModel ? snippets : legacySnippets;
+    if (isLocalGemmaSimpleContextMode) {
+      return localGemmaSnippets.getCompressionPrompt(
+        context.config.getApprovedPlanPath(),
+      );
+    }
     return activeSnippets.getCompressionPrompt(
       context.config.getApprovedPlanPath(),
     );

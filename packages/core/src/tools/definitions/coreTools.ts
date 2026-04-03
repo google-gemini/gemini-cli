@@ -13,6 +13,7 @@ import type { ToolDefinition, CoreToolSet } from './types.js';
 import { getToolFamily } from './modelFamilyService.js';
 import { DEFAULT_LEGACY_SET } from './model-family-sets/default-legacy.js';
 import { GEMINI_3_SET } from './model-family-sets/gemini-3.js';
+import { LOCAL_GEMMA_SET } from './model-family-sets/local-gemma.js';
 import {
   getShellDeclaration,
   getExitPlanModeDeclaration,
@@ -104,6 +105,7 @@ export {
 // Re-export sets for compatibility
 export { DEFAULT_LEGACY_SET } from './model-family-sets/default-legacy.js';
 export { GEMINI_3_SET } from './model-family-sets/gemini-3.js';
+export { LOCAL_GEMMA_SET } from './model-family-sets/local-gemma.js';
 
 /**
  * Resolves the appropriate tool set for a given model ID.
@@ -114,6 +116,8 @@ export function getToolSet(modelId?: string): CoreToolSet {
   switch (family) {
     case 'gemini-3':
       return GEMINI_3_SET;
+    case 'local-gemma':
+      return LOCAL_GEMMA_SET;
     case 'default-legacy':
     default:
       return DEFAULT_LEGACY_SET;

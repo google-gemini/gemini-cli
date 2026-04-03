@@ -48,6 +48,7 @@ export * from './scheduler/types.js';
 export * from './scheduler/tool-executor.js';
 export * from './scheduler/policy.js';
 export * from './core/recordingContentGenerator.js';
+export * from './local-models/ollamaGemma.js';
 
 // Export Routing
 export * from './routing/routingStrategy.js';

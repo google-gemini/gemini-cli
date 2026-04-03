@@ -23,6 +23,10 @@ export function getToolFamily(modelId?: string): ToolFamily {
     return 'default-legacy';
   }
 
+  if (modelId.startsWith('gemma4:')) {
+    return 'local-gemma';
+  }
+
   // Explicit mapping for Gemini 3 family
   if (isGemini3Model(modelId)) {
     return 'gemini-3';

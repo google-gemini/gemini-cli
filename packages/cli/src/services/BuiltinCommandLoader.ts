@@ -78,131 +78,68 @@ export class BuiltinCommandLoader implements ICommandLoader {
    */
   async loadCommands(_signal: AbortSignal): Promise<SlashCommand[]> {
     const handle = startupProfiler.start('load_builtin_commands');
-
-    const isNightlyBuild = await isNightly(process.cwd());
-    const addDebugToChatResumeSubCommands = (
-      subCommands: SlashCommand[] | undefined,
-    ): SlashCommand[] | undefined => {
-      if (!subCommands) {
-        return subCommands;
-      }
-
-      const withNestedCompatibility = subCommands.map((subCommand) => {
-        if (subCommand.name !== 'checkpoints') {
-          return subCommand;
+    try {
+      const isNightlyBuild = await isNightly(process.cwd());
+      const addDebugToChatResumeSubCommands = (
+        subCommands: SlashCommand[] | undefined,
+      ): SlashCommand[] | undefined => {
+        if (!subCommands) {
+          return subCommands;
         }
 
-        return {
-          ...subCommand,
-          subCommands: addDebugToChatResumeSubCommands(subCommand.subCommands),
-        };
-      });
+        const withNestedCompatibility = subCommands.map((subCommand) => {
+          if (subCommand.name !== 'checkpoints') {
+            return subCommand;
+          }
 
-      if (!isNightlyBuild) {
-        return withNestedCompatibility;
-      }
+          return {
+            ...subCommand,
+            subCommands: addDebugToChatResumeSubCommands(
+              subCommand.subCommands,
+            ),
+          };
+        });
 
-      return withNestedCompatibility.some(
-        (cmd) => cmd.name === debugCommand.name,
-      )
-        ? withNestedCompatibility
-        : [
-            ...withNestedCompatibility,
-            { ...debugCommand, suggestionGroup: 'checkpoints' },
-          ];
-    };
+        if (!isNightlyBuild) {
+          return withNestedCompatibility;
+        }
 
-    const chatResumeSubCommands = addDebugToChatResumeSubCommands(
-      chatCommand.subCommands,
-    );
+        return withNestedCompatibility.some(
+          (cmd) => cmd.name === debugCommand.name,
+        )
+          ? withNestedCompatibility
+          : [
+              ...withNestedCompatibility,
+              { ...debugCommand, suggestionGroup: 'checkpoints' },
+            ];
+      };
 
-    const allDefinitions: Array<SlashCommand | null> = [
-      aboutCommand,
-      ...(this.config?.isAgentsEnabled() ? [agentsCommand] : []),
-      authCommand,
-      bugCommand,
-      {
-        ...chatCommand,
-        subCommands: chatResumeSubCommands,
-      },
-      clearCommand,
-      commandsCommand,
-      compressCommand,
-      copyCommand,
-      corgiCommand,
-      docsCommand,
-      directoryCommand,
-      editorCommand,
-      ...(this.config?.getExtensionsEnabled() === false
-        ? [
-            {
-              name: 'extensions',
-              description: 'Manage extensions',
-              kind: CommandKind.BUILT_IN,
-              autoExecute: false,
-              subCommands: [],
-              action: async (
-                _context: CommandContext,
-              ): Promise<MessageActionReturn> => ({
-                type: 'message',
-                messageType: 'error',
-                content: getAdminErrorMessage(
-                  'Extensions',
-                  this.config ?? undefined,
-                ),
-              }),
-            },
-          ]
-        : [extensionsCommand(this.config?.getEnableExtensionReloading())]),
-      helpCommand,
-      footerCommand,
-      shortcutsCommand,
-      ...(this.config?.getEnableHooksUI() ? [hooksCommand] : []),
-      rewindCommand,
-      await ideCommand(),
-      initCommand,
-      ...(isNightlyBuild ? [oncallCommand] : []),
-      ...(this.config?.getMcpEnabled() === false
-        ? [
-            {
-              name: 'mcp',
-              description:
-                'Manage configured Model Context Protocol (MCP) servers',
-              kind: CommandKind.BUILT_IN,
-              autoExecute: false,
-              subCommands: [],
-              action: async (
-                _context: CommandContext,
-              ): Promise<MessageActionReturn> => ({
-                type: 'message',
-                messageType: 'error',
-                content: getAdminErrorMessage('MCP', this.config ?? undefined),
-              }),
-            },
-          ]
-        : [mcpCommand]),
-      memoryCommand,
-      modelCommand,
-      ...(this.config?.getFolderTrust() ? [permissionsCommand] : []),
-      ...(this.config?.isPlanEnabled() ? [planCommand] : []),
-      policiesCommand,
-      privacyCommand,
-      ...(isDevelopment ? [profileCommand] : []),
-      quitCommand,
-      restoreCommand(this.config),
-      {
-        ...resumeCommand,
-        subCommands: addDebugToChatResumeSubCommands(resumeCommand.subCommands),
-      },
-      statsCommand,
-      themeCommand,
-      toolsCommand,
-      ...(this.config?.isSkillsSupportEnabled()
-        ? this.config?.getSkillManager()?.isAdminEnabled() === false
+      const chatResumeSubCommands = addDebugToChatResumeSubCommands(
+        chatCommand.subCommands,
+      );
+
+      const allDefinitions: Array<SlashCommand | null> = [
+        aboutCommand,
+        ...(this.config?.isAgentsEnabled() ? [agentsCommand] : []),
+        authCommand,
+        bugCommand,
+        {
+          ...chatCommand,
+          subCommands: chatResumeSubCommands,
+        },
+        clearCommand,
+        commandsCommand,
+        compressCommand,
+        copyCommand,
+        corgiCommand,
+        docsCommand,
+        directoryCommand,
+        editorCommand,
+        ...(this.config?.getExtensionsEnabled() === false
           ? [
               {
-                name: 'skills',
-                description: 'Manage agent skills',
+                name: 'extensions',
+                description: 'Manage extensions',
                 kind: CommandKind.BUILT_IN,
                 autoExecute: false,
                 subCommands: [],
@@ -212,25 +149,97 @@ export class BuiltinCommandLoader implements ICommandLoader {
                   type: 'message',
                   messageType: 'error',
                   content: getAdminErrorMessage(
-                    'Agent skills',
+                    'Extensions',
                     this.config ?? undefined,
                   ),
                 }),
               },
             ]
-          : [skillsCommand]
-        : []),
-      settingsCommand,
-      tasksCommand,
-      vimCommand,
-      setupGithubCommand,
-      terminalSetupCommand,
-      ...(this.config?.getContentGeneratorConfig()?.authType ===
-      AuthType.LOGIN_WITH_GOOGLE
-        ? [upgradeCommand]
-        : []),
-    ];
-    handle?.end();
-    return allDefinitions.filter((cmd): cmd is SlashCommand => cmd !== null);
+          : [extensionsCommand(this.config?.getEnableExtensionReloading())]),
+        helpCommand,
+        footerCommand,
+        shortcutsCommand,
+        ...(this.config?.getEnableHooksUI() ? [hooksCommand] : []),
+        rewindCommand,
+        await ideCommand(),
+        initCommand,
+        ...(isNightlyBuild ? [oncallCommand] : []),
+        ...(this.config?.getMcpEnabled() === false
+          ? [
+              {
+                name: 'mcp',
+                description:
+                  'Manage configured Model Context Protocol (MCP) servers',
+                kind: CommandKind.BUILT_IN,
+                autoExecute: false,
+                subCommands: [],
+                action: async (
+                  _context: CommandContext,
+                ): Promise<MessageActionReturn> => ({
+                  type: 'message',
+                  messageType: 'error',
+                  content: getAdminErrorMessage(
+                    'MCP',
+                    this.config ?? undefined,
+                  ),
+                }),
+              },
+            ]
+          : [mcpCommand]),
+        memoryCommand,
+        modelCommand,
+        ...(this.config?.getFolderTrust() ? [permissionsCommand] : []),
+        ...(this.config?.isPlanEnabled() ? [planCommand] : []),
+        policiesCommand,
+        privacyCommand,
+        ...(isDevelopment ? [profileCommand] : []),
+        quitCommand,
+        restoreCommand(this.config),
+        {
+          ...resumeCommand,
+          subCommands: addDebugToChatResumeSubCommands(
+            resumeCommand.subCommands,
+          ),
+        },
+        statsCommand,
+        themeCommand,
+        toolsCommand,
+        ...(this.config?.isSkillsSupportEnabled()
+          ? this.config?.getSkillManager()?.isAdminEnabled() === false
+            ? [
+                {
+                  name: 'skills',
+                  description: 'Manage agent skills',
+                  kind: CommandKind.BUILT_IN,
+                  autoExecute: false,
+                  subCommands: [],
+                  action: async (
+                    _context: CommandContext,
+                  ): Promise<MessageActionReturn> => ({
+                    type: 'message',
+                    messageType: 'error',
+                    content: getAdminErrorMessage(
+                      'Agent skills',
+                      this.config ?? undefined,
+                    ),
+                  }),
+                },
+              ]
+            : [skillsCommand]
+          : []),
+        settingsCommand,
+        tasksCommand,
+        vimCommand,
+        setupGithubCommand,
+        terminalSetupCommand,
+        ...(this.config?.getContentGeneratorConfig()?.authType ===
+        AuthType.LOGIN_WITH_GOOGLE
+          ? [upgradeCommand]
+          : []),
+      ];
+      return allDefinitions.filter((cmd): cmd is SlashCommand => cmd !== null);
+    } finally {
+      handle?.end();
+    }
   }
 }

@@ -28,6 +28,8 @@ import { determineSurface } from '../utils/surface.js';
 import { RecordingContentGenerator } from './recordingContentGenerator.js';
 import { getVersion, resolveModel } from '../../index.js';
 import type { LlmRole } from '../telemetry/llmRole.js';
+import { RoutingContentGenerator } from '../local-models/routingContentGenerator.js';
+import { OllamaGemmaBridgeManager } from '../local-models/ollamaGemmaBridge.js';
 
 /**
  * Interface abstracting the core functionalities for generating content and counting tokens.
@@ -167,13 +169,9 @@ export async function createContentGenerator(
   gcConfig: Config,
   sessionId?: string,
 ): Promise<ContentGenerator> {
-  const generator = await (async () => {
-    if (gcConfig.fakeResponses) {
-      const fakeGenerator = await FakeContentGenerator.fromFile(
-        gcConfig.fakeResponses,
-      );
-      return new LoggingContentGenerator(fakeGenerator, gcConfig);
-    }
+  const createRemoteGenerator = async (): Promise<
+    ContentGenerator | undefined
+  > => {
     const version = await getVersion();
     const model = resolveModel(
       gcConfig.getModel(),
@@ -290,6 +288,35 @@ export async function createContentGenerator(
       });
       return new LoggingContentGenerator(googleGenAI.models, gcConfig);
     }
+    return undefined;
+  };
+
+  const generator = await (async () => {
+    if (gcConfig.fakeResponses) {
+      const fakeGenerator = await FakeContentGenerator.fromFile(
+        gcConfig.fakeResponses,
+      );
+      return new LoggingContentGenerator(fakeGenerator, gcConfig);
+    }
+
+    const remoteGenerator = await createRemoteGenerator();
+    if (gcConfig.hasLocalGemmaModels()) {
+      const bridgeManager = new OllamaGemmaBridgeManager(gcConfig);
+      if (!remoteGenerator && gcConfig.canUseCurrentModelWithoutAuth()) {
+        await bridgeManager.assertOllamaAvailable();
+        await bridgeManager.ensureStarted();
+      }
+      return new RoutingContentGenerator(
+        gcConfig,
+        remoteGenerator,
+        bridgeManager,
+      );
+    }
+
+    if (remoteGenerator) {
+      return remoteGenerator;
+    }
+
     throw new Error(
       `Error creating contentGenerator: Unsupported authType: ${config.authType}`,
     );

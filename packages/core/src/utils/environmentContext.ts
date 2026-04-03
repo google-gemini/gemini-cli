@@ -53,10 +53,27 @@ export async function getEnvironmentContext(config: Config): Promise<Part[]> {
     day: 'numeric',
   });
   const platform = process.platform;
-  const directoryContext = config.getIncludeDirectoryTree()
-    ? await getDirectoryContextString(config)
-    : '';
+  const workspaceDirectories = config.getWorkspaceContext().getDirectories();
+  const workspaceDirectoryList = workspaceDirectories
+    .map((dir) => `  - ${dir}`)
+    .join('\n');
+  const simpleContextMode = config.isSimpleContextModeEnabled?.() ?? false;
   const tempDir = config.storage.getProjectTempDir();
+
+  if (simpleContextMode) {
+    const context = `
+<session_context>
+This is the Gemini CLI.
+Today's date is ${today} (formatted according to the user's locale).
+My operating system is: ${platform}
+The project's temporary directory is: ${tempDir}
+- **Workspace Directories:**
+${workspaceDirectoryList}
+</session_context>`.trim();
+
+    return [{ text: context }];
+  }
+
   // Tiered context model (see issue #11488):
   // - Tier 1 (global): system instruction only
   // - Tier 2 (extension + project): first user message (here)
@@ -67,6 +84,10 @@ export async function getEnvironmentContext(config: Config): Promise<Part[]> {
   const environmentMemory = config.isJitContextEnabled?.()
     ? config.getSessionMemory()
     : config.getEnvironmentMemory();
+
+  const directoryContext = config.getIncludeDirectoryTree()
+    ? await getDirectoryContextString(config)
+    : '';
 
   const context = `
 <session_context>

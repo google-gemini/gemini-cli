@@ -196,16 +196,29 @@ describe('GeminiChat', () => {
           };
         }),
       },
+      getResolvedModelConfig: vi
+        .fn()
+        .mockImplementation((modelConfigKey) =>
+          mockConfig.modelConfigService.getResolvedConfig(modelConfigKey),
+        ),
       isInteractive: vi.fn().mockReturnValue(false),
       getEnableHooks: vi.fn().mockReturnValue(false),
       getActiveModel: vi.fn().mockImplementation(() => currentActiveModel),
       setActiveModel: vi
         .fn()
         .mockImplementation((m: string) => (currentActiveModel = m)),
+      canUseModelWithoutAuth: vi
+        .fn()
+        .mockImplementation((modelId: string) => modelId.startsWith('gemma4:')),
       getModelAvailabilityService: vi
         .fn()
         .mockReturnValue(createAvailabilityServiceMock()),
     } as unknown as Config;
+
+    vi.mocked(mockConfig.getToolRegistry).mockReturnValue({
+      getTool: vi.fn(),
+      getFunctionDeclarations: vi.fn(),
+    } as unknown as ReturnType<Config['getToolRegistry']>);
 
     // Use proper MessageBus mocking for Phase 3 preparation
     const mockMessageBus = createMockMessageBus();
@@ -772,6 +785,663 @@ describe('GeminiChat', () => {
           }
         })(),
       ).rejects.toThrow(InvalidStreamError);
+    });
+
+    it('should retry local Gemma thought-only responses with thinking disabled', async () => {
+      vi.mocked(
+        mockConfig.modelConfigService.getResolvedConfig,
+      ).mockImplementation(
+        (modelConfigKey) =>
+          ({
+            model: modelConfigKey.model ?? 'gemma4:31b',
+            generateContentConfig: {
+              temperature: modelConfigKey.isRetry ? 1 : 0,
+              thinkingConfig: {
+                includeThoughts: true,
+                thinkingLevel: ThinkingLevel.HIGH,
+              },
+            },
+          }) as ReturnType<
+            typeof mockConfig.modelConfigService.getResolvedConfig
+          >,
+      );
+
+      const emptyStreamResponse = (async function* () {
+        yield {
+          candidates: [
+            {
+              content: {
+                role: 'model',
+                parts: [{ text: 'thinking...', thought: true }],
+              },
+              finishReason: 'STOP',
+            },
+          ],
+        } as unknown as GenerateContentResponse;
+      })();
+
+      const validStreamResponse = (async function* () {
+        yield {
+          candidates: [
+            {
+              content: {
+                role: 'model',
+                parts: [
+                  {
+                    functionCall: {
+                      name: 'write_file',
+                      args: {
+                        file_path: '.tmp/machine_info.sh',
+                        content: '#!/bin/bash\necho hi\n',
+                      },
+                    },
+                  },
+                ],
+              },
+              finishReason: 'STOP',
+            },
+          ],
+        } as unknown as GenerateContentResponse;
+      })();
+
+      vi.mocked(mockContentGenerator.generateContentStream)
+        .mockResolvedValueOnce(emptyStreamResponse)
+        .mockResolvedValueOnce(validStreamResponse);
+
+      const stream = await chat.sendMessageStream(
+        { model: 'gemma4:31b' },
+        'test message',
+        'prompt-id-1',
+        new AbortController().signal,
+        LlmRole.MAIN,
+      );
+
+      await expect(
+        (async () => {
+          for await (const _ of stream) {
+            // consume stream
+          }
+        })(),
+      ).resolves.not.toThrow();
+
+      expect(mockContentGenerator.generateContentStream).toHaveBeenCalledTimes(
+        2,
+      );
+      expect(
+        vi.mocked(mockContentGenerator.generateContentStream).mock.calls[0]?.[0]
+          .config?.thinkingConfig,
+      ).toEqual({
+        includeThoughts: true,
+        thinkingLevel: ThinkingLevel.HIGH,
+      });
+      expect(
+        vi.mocked(mockContentGenerator.generateContentStream).mock.calls[1]?.[0]
+          .config?.thinkingConfig,
+      ).toEqual({
+        includeThoughts: false,
+        thinkingLevel: ThinkingLevel.HIGH,
+        thinkingBudget: 0,
+      });
+      expect(
+        vi.mocked(mockContentGenerator.generateContentStream).mock.calls[1]?.[0]
+          .config?.systemInstruction,
+      ).toContain(
+        'Retry rule: respond with visible text or a tool call in this turn.',
+      );
+    });
+
+    it('should synthesize a write_file tool call from structured JSON after a local Gemma thought-only file-creation response', async () => {
+      vi.mocked(
+        mockConfig.modelConfigService.getResolvedConfig,
+      ).mockImplementation(
+        (modelConfigKey) =>
+          ({
+            model: modelConfigKey.model ?? 'gemma4:31b',
+            generateContentConfig: {
+              temperature: 0,
+              thinkingConfig: {
+                includeThoughts: true,
+                thinkingLevel: ThinkingLevel.HIGH,
+              },
+            },
+          }) as ReturnType<
+            typeof mockConfig.modelConfigService.getResolvedConfig
+          >,
+      );
+      chat.setTools([
+        {
+          functionDeclarations: [
+            {
+              name: 'write_file',
+              description:
+                'Create a new file or fully rewrite an existing file.',
+              parametersJsonSchema: {
+                type: 'object',
+                properties: {
+                  file_path: { type: 'string' },
+                  content: { type: 'string' },
+                },
+                required: ['file_path', 'content'],
+              },
+            },
+          ],
+        },
+      ]);
+
+      const thoughtOnlyStream = (async function* () {
+        yield {
+          candidates: [
+            {
+              content: {
+                role: 'model',
+                parts: [{ text: 'thinking...', thought: true }],
+              },
+              finishReason: 'STOP',
+            },
+          ],
+        } as unknown as GenerateContentResponse;
+      })();
+
+      vi.mocked(
+        mockContentGenerator.generateContentStream,
+      ).mockResolvedValueOnce(thoughtOnlyStream);
+      vi.mocked(mockContentGenerator.generateContent).mockResolvedValueOnce({
+        candidates: [
+          {
+            content: {
+              role: 'model',
+              parts: [
+                {
+                  text: '```json\n{"tool":"write_file","arguments":{"file_path":".tmp/machine_info.sh","content":"#!/bin/bash\\necho hi\\n"}}\n```',
+                },
+              ],
+            },
+            finishReason: 'STOP',
+          },
+        ],
+        usageMetadata: {
+          promptTokenCount: 12,
+          candidatesTokenCount: 8,
+          totalTokenCount: 20,
+        },
+        modelVersion: 'gemma4:31b',
+      } as unknown as GenerateContentResponse);
+
+      const stream = await chat.sendMessageStream(
+        { model: 'gemma4:31b' },
+        'make me a small script in a .tmp folder that prints machine info',
+        'prompt-id-structured-tool-retry',
+        new AbortController().signal,
+        LlmRole.MAIN,
+      );
+
+      const chunks: GenerateContentResponse[] = [];
+      await expect(
+        (async () => {
+          for await (const event of stream) {
+            if (event.type === StreamEventType.CHUNK) {
+              chunks.push(event.value);
+            }
+          }
+        })(),
+      ).resolves.not.toThrow();
+
+      expect(mockContentGenerator.generateContentStream).toHaveBeenCalledTimes(
+        1,
+      );
+      expect(mockContentGenerator.generateContent).toHaveBeenCalledTimes(1);
+      expect(
+        vi.mocked(mockContentGenerator.generateContent).mock.calls[0]?.[0]
+          .config?.responseMimeType,
+      ).toBe('application/json');
+      expect(
+        vi.mocked(mockContentGenerator.generateContent).mock.calls[0]?.[0]
+          .config?.responseJsonSchema,
+      ).toEqual(
+        expect.objectContaining({
+          type: 'object',
+        }),
+      );
+      expect(
+        vi.mocked(mockContentGenerator.generateContent).mock.calls[0]?.[0]
+          .config?.tools,
+      ).toBeUndefined();
+      expect(
+        vi.mocked(mockContentGenerator.generateContent).mock.calls[0]?.[0]
+          .config?.systemInstruction,
+      ).toContain('Tool fallback rule: do not answer in prose');
+      expect(
+        chunks.at(-1)?.candidates?.[0]?.content?.parts?.[0]?.functionCall,
+      ).toEqual({
+        name: 'write_file',
+        args: {
+          file_path: '.tmp/machine_info.sh',
+          content: '#!/bin/bash\necho hi\n',
+        },
+      });
+    });
+
+    it('should stop retrying local Gemma thought-only responses after the no-thinking retry', async () => {
+      vi.mocked(
+        mockConfig.modelConfigService.getResolvedConfig,
+      ).mockImplementation(
+        (modelConfigKey) =>
+          ({
+            model: modelConfigKey.model ?? 'gemma4:31b',
+            generateContentConfig: {
+              temperature: modelConfigKey.isRetry ? 1 : 0,
+              thinkingConfig: {
+                includeThoughts: true,
+                thinkingLevel: ThinkingLevel.HIGH,
+              },
+            },
+          }) as ReturnType<
+            typeof mockConfig.modelConfigService.getResolvedConfig
+          >,
+      );
+
+      const emptyStreamResponse = () =>
+        (async function* () {
+          yield {
+            candidates: [
+              {
+                content: {
+                  role: 'model',
+                  parts: [{ text: 'thinking...', thought: true }],
+                },
+                finishReason: 'STOP',
+              },
+            ],
+          } as unknown as GenerateContentResponse;
+        })();
+
+      vi.mocked(mockContentGenerator.generateContentStream)
+        .mockResolvedValueOnce(emptyStreamResponse())
+        .mockResolvedValueOnce(emptyStreamResponse());
+
+      const stream = await chat.sendMessageStream(
+        { model: 'gemma4:31b' },
+        'test message',
+        'prompt-id-1',
+        new AbortController().signal,
+        LlmRole.MAIN,
+      );
+
+      await expect(
+        (async () => {
+          for await (const _ of stream) {
+            // consume stream
+          }
+        })(),
+      ).rejects.toThrow(InvalidStreamError);
+
+      expect(mockContentGenerator.generateContentStream).toHaveBeenCalledTimes(
+        2,
+      );
+    });
+
+    it('should downshift local Gemma tool-follow-up turns to low thinking', async () => {
+      vi.mocked(
+        mockConfig.modelConfigService.getResolvedConfig,
+      ).mockImplementation(
+        (modelConfigKey) =>
+          ({
+            model: modelConfigKey.model ?? 'gemma4:31b',
+            generateContentConfig: {
+              temperature: 0,
+              thinkingConfig: {
+                includeThoughts: true,
+                thinkingLevel: ThinkingLevel.HIGH,
+              },
+            },
+          }) as ReturnType<
+            typeof mockConfig.modelConfigService.getResolvedConfig
+          >,
+      );
+
+      const initialHistory: Content[] = [
+        {
+          role: 'user',
+          parts: [{ text: 'Create a script.' }],
+        },
+        {
+          role: 'model',
+          parts: [
+            {
+              functionCall: {
+                name: 'run_shell_command',
+                args: { command: 'mkdir -p .tmp' },
+              },
+            },
+          ],
+        },
+      ];
+      chat.setHistory(initialHistory);
+
+      const validStreamResponse = (async function* () {
+        yield {
+          candidates: [
+            {
+              content: {
+                role: 'model',
+                parts: [
+                  {
+                    functionCall: {
+                      name: 'write_file',
+                      args: {
+                        file_path: '.tmp/machine_info.sh',
+                        content: '#!/bin/bash\necho hi\n',
+                      },
+                    },
+                  },
+                ],
+              },
+              finishReason: 'STOP',
+            },
+          ],
+        } as unknown as GenerateContentResponse;
+      })();
+
+      vi.mocked(mockContentGenerator.generateContentStream).mockResolvedValue(
+        validStreamResponse,
+      );
+
+      const stream = await chat.sendMessageStream(
+        { model: 'gemma4:31b' },
+        {
+          functionResponse: {
+            name: 'run_shell_command',
+            response: { output: 'ok' },
+          },
+        },
+        'prompt-id-follow-up',
+        new AbortController().signal,
+        LlmRole.MAIN,
+      );
+
+      await expect(
+        (async () => {
+          for await (const _ of stream) {
+            // consume stream
+          }
+        })(),
+      ).resolves.not.toThrow();
+
+      expect(
+        vi.mocked(mockContentGenerator.generateContentStream).mock.calls[0]?.[0]
+          .config?.thinkingConfig,
+      ).toEqual({
+        includeThoughts: true,
+        thinkingLevel: ThinkingLevel.LOW,
+      });
+      expect(
+        vi.mocked(mockContentGenerator.generateContentStream).mock.calls[0]?.[0]
+          .config?.systemInstruction,
+      ).toContain('Tool follow-up rule: after a tool result');
+    });
+
+    it('should downshift short non-coding local Gemma prompts to low thinking', async () => {
+      vi.mocked(
+        mockConfig.modelConfigService.getResolvedConfig,
+      ).mockImplementation(
+        (modelConfigKey) =>
+          ({
+            model: modelConfigKey.model ?? 'gemma4:31b',
+            generateContentConfig: {
+              temperature: 0,
+              thinkingConfig: {
+                includeThoughts: true,
+                thinkingLevel: ThinkingLevel.HIGH,
+              },
+            },
+          }) as ReturnType<
+            typeof mockConfig.modelConfigService.getResolvedConfig
+          >,
+      );
+
+      const validStreamResponse = (async function* () {
+        yield {
+          candidates: [
+            {
+              content: {
+                role: 'model',
+                parts: [{ text: 'hello' }],
+              },
+              finishReason: 'STOP',
+            },
+          ],
+        } as unknown as GenerateContentResponse;
+      })();
+
+      vi.mocked(mockContentGenerator.generateContentStream).mockResolvedValue(
+        validStreamResponse,
+      );
+
+      const stream = await chat.sendMessageStream(
+        { model: 'gemma4:31b' },
+        'hello?',
+        'prompt-id-short-local',
+        new AbortController().signal,
+        LlmRole.MAIN,
+      );
+
+      await expect(
+        (async () => {
+          for await (const _ of stream) {
+            // consume stream
+          }
+        })(),
+      ).resolves.not.toThrow();
+
+      expect(
+        vi.mocked(mockContentGenerator.generateContentStream).mock.calls[0]?.[0]
+          .config?.thinkingConfig,
+      ).toEqual({
+        includeThoughts: true,
+        thinkingLevel: ThinkingLevel.LOW,
+      });
+      expect(
+        vi.mocked(mockContentGenerator.generateContentStream).mock.calls[0]?.[0]
+          .config?.systemInstruction,
+      ).toContain('Do not announce session initialization');
+    });
+
+    it('should narrow local Gemma tools for simple file creation requests', async () => {
+      vi.mocked(
+        mockConfig.modelConfigService.getResolvedConfig,
+      ).mockImplementation(
+        (modelConfigKey) =>
+          ({
+            model: modelConfigKey.model ?? 'gemma4:31b',
+            generateContentConfig: {
+              temperature: 0,
+              thinkingConfig: {
+                includeThoughts: true,
+                thinkingLevel: ThinkingLevel.HIGH,
+              },
+            },
+          }) as ReturnType<
+            typeof mockConfig.modelConfigService.getResolvedConfig
+          >,
+      );
+
+      const validStreamResponse = (async function* () {
+        yield {
+          candidates: [
+            {
+              content: {
+                role: 'model',
+                parts: [
+                  {
+                    functionCall: {
+                      name: 'write_file',
+                      args: {
+                        file_path: '.tmp/machine_info.sh',
+                        content: '#!/bin/bash\necho hi\n',
+                      },
+                    },
+                  },
+                ],
+              },
+              finishReason: 'STOP',
+            },
+          ],
+        } as unknown as GenerateContentResponse;
+      })();
+
+      vi.mocked(mockContentGenerator.generateContentStream).mockResolvedValue(
+        validStreamResponse,
+      );
+
+      const stream = await chat.sendMessageStream(
+        { model: 'gemma4:31b' },
+        'make me a small script in a .tmp folder that prints machine info',
+        'prompt-id-file-create',
+        new AbortController().signal,
+        LlmRole.MAIN,
+      );
+
+      await expect(
+        (async () => {
+          for await (const _ of stream) {
+            // consume stream
+          }
+        })(),
+      ).resolves.not.toThrow();
+
+      expect(
+        vi.mocked(mockContentGenerator.generateContentStream).mock.calls[0]?.[0]
+          .config?.toolConfig,
+      ).toEqual({
+        functionCallingConfig: {
+          mode: 'ANY',
+          allowedFunctionNames: ['write_file'],
+        },
+      });
+      expect(
+        vi.mocked(mockContentGenerator.generateContentStream).mock.calls[0]?.[0]
+          .config?.thinkingConfig,
+      ).toEqual({
+        includeThoughts: true,
+        thinkingLevel: ThinkingLevel.LOW,
+      });
+      expect(
+        vi.mocked(mockContentGenerator.generateContentStream).mock.calls[0]?.[0]
+          .config?.systemInstruction,
+      ).toContain(
+        'File-creation rule: if the user asked you to create a new file or script',
+      );
+      expect(
+        vi.mocked(mockContentGenerator.generateContentStream).mock.calls[0]?.[0]
+          .config?.systemInstruction,
+      ).toContain('If you need a filename here, use `.tmp/machine_info.sh`.');
+    });
+
+    it('should prefer write_file after a local Gemma mkdir follow-up', async () => {
+      vi.mocked(
+        mockConfig.modelConfigService.getResolvedConfig,
+      ).mockImplementation(
+        (modelConfigKey) =>
+          ({
+            model: modelConfigKey.model ?? 'gemma4:31b',
+            generateContentConfig: {
+              temperature: 0,
+              thinkingConfig: {
+                includeThoughts: true,
+                thinkingLevel: ThinkingLevel.HIGH,
+              },
+            },
+          }) as ReturnType<
+            typeof mockConfig.modelConfigService.getResolvedConfig
+          >,
+      );
+
+      chat.setHistory([
+        {
+          role: 'user',
+          parts: [
+            {
+              text: 'make me a small script in .tmp that prints machine info',
+            },
+          ],
+        },
+        {
+          role: 'model',
+          parts: [
+            {
+              functionCall: {
+                name: 'run_shell_command',
+                args: {
+                  command: 'mkdir -p .tmp',
+                  description: 'Create the .tmp directory.',
+                },
+              },
+            },
+          ],
+        },
+      ]);
+
+      const validStreamResponse = (async function* () {
+        yield {
+          candidates: [
+            {
+              content: {
+                role: 'model',
+                parts: [
+                  {
+                    functionCall: {
+                      name: 'write_file',
+                      args: {
+                        file_path: '.tmp/machine_info.sh',
+                        content: '#!/bin/bash\necho hi\n',
+                      },
+                    },
+                  },
+                ],
+              },
+              finishReason: 'STOP',
+            },
+          ],
+        } as unknown as GenerateContentResponse;
+      })();
+
+      vi.mocked(mockContentGenerator.generateContentStream).mockResolvedValue(
+        validStreamResponse,
+      );
+
+      const stream = await chat.sendMessageStream(
+        { model: 'gemma4:31b' },
+        {
+          functionResponse: {
+            name: 'run_shell_command',
+            response: {
+              output:
+                'run_shell_command completed successfully with no output.',
+            },
+          },
+        },
+        'prompt-id-file-create-follow-up',
+        new AbortController().signal,
+        LlmRole.MAIN,
+      );
+
+      await expect(
+        (async () => {
+          for await (const _ of stream) {
+            // consume stream
+          }
+        })(),
+      ).resolves.not.toThrow();
+
+      expect(
+        vi.mocked(mockContentGenerator.generateContentStream).mock.calls[0]?.[0]
+          .config?.toolConfig,
+      ).toEqual({
+        functionCallingConfig: {
+          mode: 'ANY',
+          allowedFunctionNames: ['write_file'],
+        },
+      });
     });
 
     it('should succeed when there is finish reason and response text', async () => {

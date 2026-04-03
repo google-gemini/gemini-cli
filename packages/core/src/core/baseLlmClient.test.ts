@@ -123,6 +123,9 @@ describe('BaseLlmClient', () => {
       getModel: vi.fn().mockReturnValue('test-model'),
       getActiveModel: vi.fn().mockReturnValue('test-model'),
     } as unknown as Mocked<Config>;
+    mockConfig.getResolvedModelConfig = vi.fn((modelConfigKey) =>
+      mockConfig.modelConfigService.getResolvedConfig(modelConfigKey),
+    ) as unknown as Mocked<Config>['getResolvedModelConfig'];
 
     client = new BaseLlmClient(mockContentGenerator, mockConfig);
     abortController = new AbortController();

@@ -138,6 +138,8 @@ export interface _ResolvedModelConfig {
 export class ModelConfigService {
   private readonly runtimeAliases: Record<string, ModelConfigAlias> = {};
   private readonly runtimeOverrides: ModelConfigOverride[] = [];
+  private readonly runtimeModelDefinitions: Record<string, ModelDefinition> =
+    {};
 
   // TODO(12597): Process config to build a typed alias hierarchy.
   constructor(private readonly config: ModelConfigServiceConfig) {}
@@ -152,7 +154,7 @@ export class ModelConfigService {
     description: string;
     tier: string;
   }> {
-    const definitions = this.config.modelDefinitions ?? {};
+    const definitions = this.getModelDefinitions();
     const shouldShowPreviewModels = context.hasAccessToPreview ?? false;
     const useGemini31 = context.useGemini3_1 ?? false;
     const useGemini31FlashLite = context.useGemini3_1FlashLite ?? false;
@@ -215,9 +217,14 @@ export class ModelConfigService {
   }
 
   getModelDefinition(modelId: string): ModelDefinition | undefined {
-    const definition = this.config.modelDefinitions?.[modelId];
+    const definition = this.runtimeModelDefinitions[modelId];
     if (definition) {
       return definition;
+    }
+
+    const configuredDefinition = this.config.modelDefinitions?.[modelId];
+    if (configuredDefinition) {
+      return configuredDefinition;
     }
 
     // For unknown models, return an implicit custom definition to match legacy behavior.
@@ -233,7 +240,21 @@ export class ModelConfigService {
   }
 
   getModelDefinitions(): Record<string, ModelDefinition> {
-    return this.config.modelDefinitions ?? {};
+    return {
+      ...(this.config.modelDefinitions ?? {}),
+      ...this.runtimeModelDefinitions,
+    };
+  }
+
+  hasRuntimeModelDefinitions(): boolean {
+    return Object.keys(this.runtimeModelDefinitions).length > 0;
+  }
+
+  registerRuntimeModelDefinition(
+    modelId: string,
+    definition: ModelDefinition,
+  ): void {
+    this.runtimeModelDefinitions[modelId] = definition;
   }
 
   private matches(
