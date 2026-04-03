@@ -411,7 +411,10 @@ function* emitKeys(
           debugLogger.log('Discarded oversized OSC sequence');
           while (true) {
             const next = yield;
-            if (next === '' || next === '\u0007') {
+            if (next === '') {
+              continue;
+            }
+            if (next === '\u0007') {
               break;
             }
             if (sawEsc) {

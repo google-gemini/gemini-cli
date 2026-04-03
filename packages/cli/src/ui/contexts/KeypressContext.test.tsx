@@ -841,7 +841,7 @@ describe('KeypressContext', () => {
       );
     });
 
-    it('should recover after discarding oversized OSC sequences', async () => {
+    it('should recover after discarding oversized OSC sequences terminated by BEL after a timeout', async () => {
       const keyHandler = vi.fn();
       const logSpy = vi.spyOn(debugLogger, 'log').mockImplementation(() => {});
       const { result } = renderHook(() => useKeypressContext(), { wrapper });
@@ -853,6 +853,7 @@ describe('KeypressContext', () => {
         await act(async () => {
           vi.advanceTimersByTime(ESC_TIMEOUT + 10);
         });
+        act(() => stdin.write('\u0007'));
         act(() => stdin.write('Z'));
 
         await waitFor(() => {
@@ -864,6 +865,42 @@ describe('KeypressContext', () => {
           expect.objectContaining({
             name: 'z',
             sequence: 'Z',
+            shift: true,
+          }),
+        );
+      } finally {
+        logSpy.mockRestore();
+      }
+    });
+
+    it('should keep discarding oversized OSC sequences across timeouts until terminated', async () => {
+      const keyHandler = vi.fn();
+      const logSpy = vi.spyOn(debugLogger, 'log').mockImplementation(() => {});
+      const { result } = renderHook(() => useKeypressContext(), { wrapper });
+
+      try {
+        act(() => result.current.subscribe(keyHandler));
+
+        act(() => stdin.write(`\x1b]11;${'a'.repeat(5000)}`));
+        await act(async () => {
+          vi.advanceTimersByTime(ESC_TIMEOUT + 10);
+        });
+        act(() => stdin.write('still-discarding-after-timeout'));
+        await act(async () => {
+          vi.advanceTimersByTime(ESC_TIMEOUT + 10);
+        });
+        act(() => stdin.write('\u0007'));
+        act(() => stdin.write('V'));
+
+        await waitFor(() => {
+          expect(keyHandler).toHaveBeenCalledTimes(1);
+        });
+
+        expect(logSpy).toHaveBeenCalledWith('Discarded oversized OSC sequence');
+        expect(keyHandler).toHaveBeenCalledWith(
+          expect.objectContaining({
+            name: 'v',
+            sequence: 'V',
             shift: true,
           }),
         );
