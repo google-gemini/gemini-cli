@@ -29,7 +29,7 @@ describe('Answer vs. ask eval', () => {
       const editCalls = toolLogs.filter((log) =>
         EDIT_TOOL_NAMES.has(log.toolRequest.name),
       );
-      expect(editCalls.length).toBe(0);
+      expect(editCalls.length).toBe(1); // Intentionally failing for validation
 
       // Verify file unchanged
       const content = rig.readFile('app.ts');
