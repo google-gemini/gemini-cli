@@ -439,7 +439,7 @@ export const ToolConfirmationMessage: React.FC<
 
     // Calculate the vertical space (in lines) consumed by UI elements
     // surrounding the main body content.
-    const PADDING_OUTER_Y = 1;
+    const PADDING_OUTER_Y = 0;
     const HEIGHT_QUESTION = 1;
     const MARGIN_QUESTION_TOP = 0;
     const MARGIN_QUESTION_BOTTOM = 1;
@@ -485,7 +485,7 @@ export const ToolConfirmationMessage: React.FC<
       securityWarningsHeight +
       extraInfoLines;
 
-    return Math.max(availableTerminalHeight - surroundingElementsHeight, 4);
+    return Math.max(availableTerminalHeight - surroundingElementsHeight, 2);
   }, [
     availableTerminalHeight,
     handlesOwnUI,
@@ -597,7 +597,7 @@ export const ToolConfirmationMessage: React.FC<
         if (!confirmationDetails.isModifying) {
           question = `Apply this change?`;
           bodyContent = (
-            <Box flexDirection="column">
+            <>
               <Box
                 borderStyle="round"
                 borderColor={theme.border.default}
@@ -618,7 +618,7 @@ export const ToolConfirmationMessage: React.FC<
                   terminalWidth={Math.max(terminalWidth, 1) - 4}
                 />
               </Box>
-            </Box>
+            </>
           );
         }
       } else if (confirmationDetails.type === 'sandbox_expansion') {
@@ -634,17 +634,16 @@ export const ToolConfirmationMessage: React.FC<
           .map((c) => c.trim().split(/\s+/)[0])
           .filter((c) => c && !c.startsWith('redirection'));
         const commandNames = Array.from(new Set(rootCmds)).join(', ');
-
-        question = `To run [${sanitizeForDisplay(commandNames)}], allow access to the following?`;
+        question = '';
 
         bodyContent = (
-          <Box flexDirection="column">
+          <>
             <Box
               borderStyle="round"
               borderColor={theme.border.default}
               paddingX={1}
               paddingY={0}
-              marginBottom={1}
+              marginBottom={0}
             >
               {colorizeCode({
                 code: command.trim(),
@@ -653,42 +652,49 @@ export const ToolConfirmationMessage: React.FC<
                 settings,
                 theme: activeTheme,
                 hideLineNumbers: true,
+                availableHeight:
+                  bodyHeight !== undefined
+                    ? Math.max(bodyHeight - 2, 2)
+                    : undefined,
               })}
             </Box>
-            {network && (
-              <Box height={1}>
+            <Box flexDirection="column">
+              <Text>
+                To run{' '}
+                <Text
+                  color={isShell ? theme.status.warning : undefined}
+                  bold={isShell}
+                >
+                  [{sanitizeForDisplay(commandNames)}]
+                </Text>
+                , allow access to the following?
+              </Text>
+              {network && (
                 <Text>
                   <Text color={isShell ? theme.status.warning : undefined} bold>
-                    {' '}
-                    • Network
+                    • Network:
                   </Text>{' '}
                   All Urls
                 </Text>
-              </Box>
-            )}
-            {writePaths.map((p, i) => (
-              <Box key={`write-${i}`} flexDirection="row" height={1}>
-                <Text color={isShell ? theme.status.warning : undefined} bold>
-                  {' '}
-                  • Write{' '}
+              )}
+              {writePaths.length > 0 && (
+                <Text>
+                  <Text color={isShell ? theme.status.warning : undefined} bold>
+                    • Write:
+                  </Text>{' '}
+                  {writePaths.map((p) => sanitizeForDisplay(p)).join(', ')}
                 </Text>
-                <Box flexShrink={1}>
-                  <Text wrap="truncate-middle">{sanitizeForDisplay(p)}</Text>
-                </Box>
-              </Box>
-            ))}
-            {readPaths.map((p, i) => (
-              <Box key={`read-${i}`} flexDirection="row" height={1}>
-                <Text color={isShell ? theme.status.warning : undefined} bold>
-                  {' '}
-                  • Read{' '}
+              )}
+              {readPaths.length > 0 && (
+                <Text>
+                  <Text color={isShell ? theme.status.warning : undefined} bold>
+                    • Read:
+                  </Text>{' '}
+                  {readPaths.map((p) => sanitizeForDisplay(p)).join(', ')}
                 </Text>
-                <Box flexShrink={1}>
-                  <Text wrap="truncate-middle">{sanitizeForDisplay(p)}</Text>
-                </Box>
-              </Box>
-            ))}
-          </Box>
+              )}
+            </Box>
+          </>
         );
       } else if (confirmationDetails.type === 'exec') {
         const executionProps = confirmationDetails;
@@ -746,7 +752,7 @@ export const ToolConfirmationMessage: React.FC<
         );
 
         bodyContent = (
-          <Box flexDirection="column">
+          <>
             <Box
               borderStyle="round"
               borderColor={theme.border.default}
@@ -786,7 +792,7 @@ export const ToolConfirmationMessage: React.FC<
                 </Box>
               </MaxSizedBox>
             </Box>
-          </Box>
+          </>
         );
       } else if (confirmationDetails.type === 'info') {
         question = `Do you want to proceed?`;
@@ -947,7 +953,7 @@ export const ToolConfirmationMessage: React.FC<
 
   return (
     <Box flexDirection="column" paddingTop={0} paddingBottom={0}>
-      {confirmationDetails.systemMessage && (
+      {!!confirmationDetails.systemMessage && (
         <Box marginBottom={1}>
           <Text color={theme.status.warning}>
             {confirmationDetails.systemMessage}
@@ -959,7 +965,11 @@ export const ToolConfirmationMessage: React.FC<
         bodyContent
       ) : (
         <>
-          <Box flexShrink={1} overflow="hidden">
+          <Box
+            flexShrink={1}
+            overflow="hidden"
+            marginBottom={!question && !securityWarnings ? 1 : 0}
+          >
             <MaxSizedBox
               maxHeight={availableBodyContentHeight()}
               maxWidth={terminalWidth}
@@ -979,13 +989,15 @@ export const ToolConfirmationMessage: React.FC<
             </Box>
           )}
 
-          <Box marginBottom={1} flexShrink={0}>
-            {typeof question === 'string' ? (
-              <Text color={theme.text.primary}>{question}</Text>
-            ) : (
-              question
-            )}
-          </Box>
+          {!!question && (
+            <Box marginBottom={1} flexShrink={0}>
+              {typeof question === 'string' ? (
+                <Text color={theme.text.primary}>{question}</Text>
+              ) : (
+                question
+              )}
+            </Box>
+          )}
 
           <Box flexShrink={0}>
             <RadioButtonSelect

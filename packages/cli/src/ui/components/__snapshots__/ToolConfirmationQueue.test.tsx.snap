@@ -1,22 +1,5 @@
 // Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
 
-exports[`ToolConfirmationQueue > calculates availableContentHeight based on availableTerminalHeight from UI state 1`] = `
-"╭──────────────────────────────────────────────────────────────────────────────╮
-│ ? replace                                                                    │
-│ ╭──────────────────────────────────────────────────────────────────────────╮ │
-│ │ ... 49 hidden (Ctrl+O) ...                                               │ │
-│ │ 50 line                                                                  │ │
-│ ╰──────────────────────────────────────────────────────────────────────────╯ │
-│ Apply this change?                                                           │
-│                                                                              │
-│ ● 1. Allow once                                                              │
-│   2. Allow for this session                                                  │
-│   3. Modify with external editor                                             │
-│   4. No, suggest changes (esc)                                               │
-╰──────────────────────────────────────────────────────────────────────────────╯
-"
-`;
-
 exports[`ToolConfirmationQueue > does not render expansion hint when constrainHeight is false 1`] = `
 "╭──────────────────────────────────────────────────────────────────────────────╮
 │ ? replace                                                                    │
@@ -39,6 +22,7 @@ exports[`ToolConfirmationQueue > height allocation and layout > should handle se
 "╭──────────────────────────────────────────────────────────────────────────────╮
 │ ? Shell  Executes a bash command with a deceptive URL                 3 of 3 │
 │ ... 6 hidden (Ctrl+O) ...                                                    │
+│ │ echo "Line 44"                                                           │ │
 │ │ echo "Line 45"                                                           │ │
 │ │ echo "Line 46"                                                           │ │
 │ │ echo "Line 47"                                                           │ │
@@ -66,7 +50,8 @@ exports[`ToolConfirmationQueue > height allocation and layout > should render th
 "╭──────────────────────────────────────────────────────────────────────────────╮
 │ ? replace                                                                    │
 │ ╭──────────────────────────────────────────────────────────────────────────╮ │
-│ │ ... 14 hidden (Ctrl+O) ...                                               │ │
+│ │ ... 13 hidden (Ctrl+O) ...                                               │ │
+│ │  7 + const newLine7 = true;                                              │ │
 │ │  8 - const oldLine8 = true;                                              │ │
 │ │  8 + const newLine8 = true;                                              │ │
 │ │  9 - const oldLine9 = true;                                              │ │
@@ -108,7 +93,8 @@ exports[`ToolConfirmationQueue > height allocation and layout > should render th
 "╭──────────────────────────────────────────────────────────────────────────────╮
 │ ? Shell  Executes a bash command                                      2 of 3 │
 │ ╭──────────────────────────────────────────────────────────────────────────╮ │
-│ │ ... 23 hidden (Ctrl+O) ...                                               │ │
+│ │ ... 22 hidden (Ctrl+O) ...                                               │ │
+│ │ echo "Line 23"                                                           │ │
 │ │ echo "Line 24"                                                           │ │
 │ │ echo "Line 25"                                                           │ │
 │ │ echo "Line 26"                                                           │ │
