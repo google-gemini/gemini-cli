@@ -14,6 +14,7 @@ import {
   type SandboxPermissions,
   type GlobalSandboxOptions,
   type ParsedSandboxDenial,
+  resolveSandboxPaths,
 } from '../../services/sandboxManager.js';
 import type { ShellExecutionResult } from '../../services/shellExecutionService.js';
 import {
@@ -54,6 +55,10 @@ export class MacOsSandboxManager implements SandboxManager {
     return parsePosixSandboxDenials(result);
   }
 
+  getWorkspace(): string {
+    return this.options.workspace;
+  }
+
   async prepareCommand(req: SandboxRequest): Promise<SandboxedCommand> {
     await initializeShellParsers();
     const sanitizationConfig = getSecureSanitizationConfig(
@@ -89,9 +94,14 @@ export class MacOsSandboxManager implements SandboxManager {
         )
       : false;
 
-    const workspaceWrite = !isReadonlyMode || isApproved;
+    const isYolo = this.options.modeConfig?.yolo ?? false;
+    const workspaceWrite = !isReadonlyMode || isApproved || isYolo;
+
     const defaultNetwork =
-      this.options.modeConfig?.network || req.policy?.networkAccess || false;
+      this.options.modeConfig?.network || req.policy?.networkAccess || isYolo;
+
+    const { allowed: allowedPaths, forbidden: forbiddenPaths } =
+      await resolveSandboxPaths(this.options, req);
 
     // Fetch persistent approvals for this command
     const commandName = await getFullCommandName(currentReq);
@@ -99,7 +109,6 @@ export class MacOsSandboxManager implements SandboxManager {
       ? this.options.policyManager?.getCommandPermissions(commandName)
       : undefined;
 
-    // Merge all permissions
     const mergedAdditional: SandboxPermissions = {
       fileSystem: {
         read: [
@@ -128,10 +137,10 @@ export class MacOsSandboxManager implements SandboxManager {
     const sandboxArgs = buildSeatbeltProfile({
       workspace: this.options.workspace,
       allowedPaths: [
-        ...(req.policy?.allowedPaths || []),
+        ...allowedPaths,
         ...(this.options.includeDirectories || []),
       ],
-      forbiddenPaths: this.options.forbiddenPaths,
+      forbiddenPaths,
       networkAccess: mergedAdditional.network,
       workspaceWrite,
       additionalPermissions: mergedAdditional,

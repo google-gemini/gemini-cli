@@ -77,7 +77,12 @@ describe.skipIf(!chromeAvailable)('browser-agent', () => {
       ),
       settings: {
         agents: {
-          browser_agent: {
+          overrides: {
+            browser_agent: {
+              enabled: true,
+            },
+          },
+          browser: {
             headless: true,
             sessionMode: 'isolated',
           },
@@ -106,7 +111,12 @@ describe.skipIf(!chromeAvailable)('browser-agent', () => {
       fakeResponsesPath: join(__dirname, 'browser-agent.screenshot.responses'),
       settings: {
         agents: {
-          browser_agent: {
+          overrides: {
+            browser_agent: {
+              enabled: true,
+            },
+          },
+          browser: {
             headless: true,
             sessionMode: 'isolated',
           },
@@ -132,7 +142,12 @@ describe.skipIf(!chromeAvailable)('browser-agent', () => {
       fakeResponsesPath: join(__dirname, 'browser-agent.interaction.responses'),
       settings: {
         agents: {
-          browser_agent: {
+          overrides: {
+            browser_agent: {
+              enabled: true,
+            },
+          },
+          browser: {
             headless: true,
             sessionMode: 'isolated',
           },
@@ -161,7 +176,12 @@ describe.skipIf(!chromeAvailable)('browser-agent', () => {
       fakeResponsesPath: join(__dirname, 'browser-agent.cleanup.responses'),
       settings: {
         agents: {
-          browser_agent: {
+          overrides: {
+            browser_agent: {
+              enabled: true,
+            },
+          },
+          browser: {
             headless: true,
             sessionMode: 'isolated',
           },
@@ -182,7 +202,12 @@ describe.skipIf(!chromeAvailable)('browser-agent', () => {
       fakeResponsesPath: join(__dirname, 'browser-agent.sequential.responses'),
       settings: {
         agents: {
-          browser_agent: {
+          overrides: {
+            browser_agent: {
+              enabled: true,
+            },
+          },
+          browser: {
             headless: true,
             sessionMode: 'isolated',
           },
@@ -212,7 +237,12 @@ describe.skipIf(!chromeAvailable)('browser-agent', () => {
       ),
       settings: {
         agents: {
-          browser_agent: {
+          overrides: {
+            browser_agent: {
+              enabled: true,
+            },
+          },
+          browser: {
             headless: true,
             sessionMode: 'isolated',
           },
