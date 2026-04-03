@@ -135,7 +135,7 @@ export async function getDirectorySuggestions(
       .sort()
       .slice(0, MAX_SUGGESTIONS)
       .map((name) => resultPrefix + name + userSep);
-  } catch (_) {
+  } catch {
     return [];
   }
 }

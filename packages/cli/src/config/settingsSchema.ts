@@ -576,7 +576,7 @@ const SETTINGS_SCHEMA = {
         label: 'Compact Tool Output',
         category: 'UI',
         requiresRestart: false,
-        default: false,
+        default: true,
         description:
           'Display tool outputs (like directory listings and file reads) in a compact, structured format.',
         showInDialog: true,
@@ -743,6 +743,24 @@ const SETTINGS_SCHEMA = {
           'Use an alternate screen buffer for the UI, preserving shell history.',
         showInDialog: true,
       },
+      renderProcess: {
+        type: 'boolean',
+        label: 'Render Process',
+        category: 'UI',
+        requiresRestart: true,
+        default: true,
+        description: 'Enable Ink render process for the UI.',
+        showInDialog: true,
+      },
+      terminalBuffer: {
+        type: 'boolean',
+        label: 'Terminal Buffer',
+        category: 'UI',
+        requiresRestart: true,
+        default: true,
+        description: 'Use the new terminal buffer architecture for rendering.',
+        showInDialog: true,
+      },
       useBackgroundColor: {
         type: 'boolean',
         label: 'Use Background Color',
@@ -776,9 +794,9 @@ const SETTINGS_SCHEMA = {
         label: 'Loading Phrases',
         category: 'UI',
         requiresRestart: false,
-        default: 'tips',
+        default: 'off',
         description:
-          'What to show while the model is working: tips, witty comments, both, or nothing.',
+          'What to show while the model is working: tips, witty comments, all, or off.',
         showInDialog: true,
         options: [
           { value: 'tips', label: 'Tips' },
@@ -1202,7 +1220,8 @@ const SETTINGS_SCHEMA = {
             category: 'Advanced',
             requiresRestart: true,
             default: undefined as string | undefined,
-            description: 'Model override for the visual agent.',
+            description:
+              "Model for the visual agent's analyze_screenshot tool. When set, enables the tool.",
             showInDialog: false,
           },
           allowedDomains: {
@@ -1508,7 +1527,7 @@ const SETTINGS_SCHEMA = {
             label: 'Show Color',
             category: 'Tools',
             requiresRestart: false,
-            default: false,
+            default: true,
             description: 'Show color in shell output.',
             showInDialog: true,
           },
@@ -1887,7 +1906,7 @@ const SETTINGS_SCHEMA = {
         label: 'Auto Configure Max Old Space Size',
         category: 'Advanced',
         requiresRestart: true,
-        default: false,
+        default: true,
         description: 'Automatically configure Node.js memory limits',
         showInDialog: true,
       },
@@ -1933,6 +1952,26 @@ const SETTINGS_SCHEMA = {
     description: 'Setting to enable experimental features',
     showInDialog: false,
     properties: {
+      adk: {
+        type: 'object',
+        label: 'ADK',
+        category: 'Experimental',
+        requiresRestart: true,
+        default: {},
+        description: 'Settings for the Agent Development Kit (ADK).',
+        showInDialog: false,
+        properties: {
+          agentSessionNoninteractiveEnabled: {
+            type: 'boolean',
+            label: 'Agent Session Non-interactive Enabled',
+            category: 'Experimental',
+            requiresRestart: true,
+            default: false,
+            description: 'Enable non-interactive agent sessions.',
+            showInDialog: false,
+          },
+        },
+      },
       enableAgents: {
         type: 'boolean',
         label: 'Enable Agents',
@@ -2126,6 +2165,16 @@ const SETTINGS_SCHEMA = {
         default: false,
         description:
           'Replace the built-in save_memory tool with a memory manager subagent that supports adding, removing, de-duplicating, and organizing memories.',
+        showInDialog: true,
+      },
+      generalistProfile: {
+        type: 'boolean',
+        label: 'Use the generalist profile to manage agent contexts.',
+        category: 'Experimental',
+        requiresRestart: true,
+        default: false,
+        description:
+          'Suitable for general coding and software development tasks.',
         showInDialog: true,
       },
       contextManagement: {

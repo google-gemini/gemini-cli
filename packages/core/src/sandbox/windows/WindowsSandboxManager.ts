@@ -72,6 +72,10 @@ export class WindowsSandboxManager implements SandboxManager {
     return parseWindowsSandboxDenials(result);
   }
 
+  getWorkspace(): string {
+    return this.options.workspace;
+  }
+
   /**
    * Ensures a file or directory exists.
    */
@@ -213,32 +217,12 @@ export class WindowsSandboxManager implements SandboxManager {
     // Reject override attempts in plan mode
     verifySandboxOverrides(allowOverrides, req.policy);
 
-    let command = req.command;
-    let args = req.args;
-    let targetPathEnv: string | undefined;
+    const command = req.command;
+    const args = req.args;
 
-    // Translate virtual commands for sandboxed file system access
-    if (command === '__read') {
-      // Use PowerShell for safe argument passing via env var
-      targetPathEnv = args[0] || '';
-      command = 'PowerShell.exe';
-      args = [
-        '-NoProfile',
-        '-NonInteractive',
-        '-Command',
-        '& { Get-Content -LiteralPath $env:GEMINI_TARGET_PATH -Raw }',
-      ];
-    } else if (command === '__write') {
-      // Use PowerShell for piping stdin to a file via env var
-      targetPathEnv = args[0] || '';
-      command = 'PowerShell.exe';
-      args = [
-        '-NoProfile',
-        '-NonInteractive',
-        '-Command',
-        '& { $Input | Out-File -FilePath $env:GEMINI_TARGET_PATH -Encoding utf8 }',
-      ];
-    }
+    // Native commands __read and __write are passed directly to GeminiSandbox.exe
+
+    const isYolo = this.options.modeConfig?.yolo ?? false;
 
     // Fetch persistent approvals for this command
     const commandName = await getCommandName(command, args);
@@ -259,6 +243,7 @@ export class WindowsSandboxManager implements SandboxManager {
         ],
       },
       network:
+        isYolo ||
         persistentPermissions?.network ||
         req.policy?.additionalPermissions?.network ||
         false,
@@ -301,7 +286,9 @@ export class WindowsSandboxManager implements SandboxManager {
     // Grant "Low Mandatory Level" read/write access to allowedPaths.
     for (const allowedPath of allowedPaths) {
       const resolved = await tryRealpath(allowedPath);
-      if (!fs.existsSync(resolved)) {
+      try {
+        await fs.promises.access(resolved, fs.constants.F_OK);
+      } catch {
         throw new Error(
           `Sandbox request rejected: Allowed path does not exist: ${resolved}. ` +
             'On Windows, granular sandbox access can only be granted to existing paths to avoid broad parent directory permissions.',
@@ -316,7 +303,9 @@ export class WindowsSandboxManager implements SandboxManager {
     );
     for (const writePath of additionalWritePaths) {
       const resolved = await tryRealpath(writePath);
-      if (!fs.existsSync(resolved)) {
+      try {
+        await fs.promises.access(resolved, fs.constants.F_OK);
+      } catch {
         throw new Error(
           `Sandbox request rejected: Additional write path does not exist: ${resolved}. ` +
             'On Windows, granular sandbox access can only be granted to existing paths to avoid broad parent directory permissions.',
@@ -416,9 +405,6 @@ export class WindowsSandboxManager implements SandboxManager {
     ];
 
     const finalEnv = { ...sanitizedEnv };
-    if (targetPathEnv !== undefined) {
-      finalEnv['GEMINI_TARGET_PATH'] = targetPathEnv;
-    }
 
     return {
       program,
