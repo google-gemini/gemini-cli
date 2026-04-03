@@ -5,15 +5,6 @@ session. They are designed to handle specific, complex tasks—like deep codebas
 analysis, documentation lookup, or domain-specific reasoning—without cluttering
 the main agent's context or toolset.
 
-Subagents are enabled by default. To disable them, set `enableAgents` to `false`
-in your `settings.json`:
-
-```json
-{
-  "experimental": { "enableAgents": false }
-}
-```
-
 ## What are subagents?
 
 Subagents are "specialists" that the main Gemini agent can hire for a specific
@@ -568,3 +559,14 @@ configuration, authentication, and usage instructions.
 Extensions can bundle and distribute subagents. See the
 [Extensions documentation](../extensions/index.md#subagents) for details on how
 to package agents within an extension.
+
+## Disabling subagents
+
+Subagents are enabled by default. To disable them, set `enableAgents` to `false`
+in your `settings.json`:
+
+```json
+{
+  "experimental": { "enableAgents": false }
+}
+```

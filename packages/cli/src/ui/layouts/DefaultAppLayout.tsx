@@ -34,7 +34,6 @@ export const DefaultAppLayout: React.FC = () => {
       paddingBottom={isAlternateBuffer ? 1 : undefined}
       flexShrink={0}
       flexGrow={0}
-      overflow="hidden"
       ref={uiState.rootUiRef}
     >
       <MainContent />
