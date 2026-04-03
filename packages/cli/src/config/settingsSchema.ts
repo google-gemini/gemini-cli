@@ -1428,6 +1428,18 @@ const SETTINGS_SCHEMA = {
             items: { type: 'string' },
             mergeStrategy: MergeStrategy.UNION,
           },
+          customExcludePatterns: {
+            type: 'array',
+            label: 'Custom Exclude Patterns',
+            category: 'Context',
+            requiresRestart: true,
+            default: [] as string[],
+            description:
+              'Additional glob patterns to exclude from file searches (e.g. "**/*.test.ts", "**/dist/**").',
+            showInDialog: true,
+            items: { type: 'string' },
+            mergeStrategy: MergeStrategy.UNION,
+          },
         },
       },
     },

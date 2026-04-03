@@ -123,6 +123,7 @@ they appear in the UI.
 | Enable Recursive File Search         | `context.fileFiltering.enableRecursiveFileSearch` | Enable recursive file search functionality when completing @ references in the prompt.                                                                                                                                                      | `true`  |
 | Enable Fuzzy Search                  | `context.fileFiltering.enableFuzzySearch`         | Enable fuzzy search when searching for files.                                                                                                                                                                                               | `true`  |
 | Custom Ignore File Paths             | `context.fileFiltering.customIgnoreFilePaths`     | Additional ignore file paths to respect. These files take precedence over .geminiignore and .gitignore. Files earlier in the array take precedence over files later in the array, e.g. the first file takes precedence over the second one. | `[]`    |
+| Custom Exclude Patterns              | `context.fileFiltering.customExcludePatterns`     | Additional glob patterns to exclude from file searches (e.g. "**/\*.test.ts", "**/dist/\*\*").                                                                                                                                              | `[]`    |
 
 ### Tools
 

@@ -2371,6 +2371,16 @@
               "items": {
                 "type": "string"
               }
+            },
+            "customExcludePatterns": {
+              "title": "Custom Exclude Patterns",
+              "description": "Additional glob patterns to exclude from file searches (e.g. \"**/*.test.ts\", \"**/dist/**\").",
+              "markdownDescription": "Additional glob patterns to exclude from file searches (e.g. \"**/*.test.ts\", \"**/dist/**\").\n\n- Category: `Context`\n- Requires restart: `yes`\n- Default: `[]`",
+              "default": [],
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
             }
           },
           "additionalProperties": false
