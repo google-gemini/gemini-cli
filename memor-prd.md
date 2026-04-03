@@ -162,10 +162,14 @@ too aggressively.
   - [x] Capture baseline memory metrics and initial heap snapshots.
 
 2. **Phase 2: Analysis & Implementation**
-   - Identify the top 3 memory retainers using Chrome DevTools.
-   - Implement bounded retention (e.g., capping array sizes in memory,
-     offloading heavy execution logs to the `.gemini/history` temp files).
-   - Audit React/Ink components for event listener leaks.
+   - [x] Identify the top 3 memory retainers using Chrome DevTools (Identified
+         ChatRecordingService and GeminiChat history).
+   - [x] Implement bounded retention for ChatRecordingService (implemented
+         memory-based cache eviction and leak prevention during resets).
+   - [ ] Implement bounded retention for GeminiChat (improve Tool Output Masking
+         or add hard history bounds).
+   - [ ] Audit React/Ink components for event listener leaks.
+
 3. **Phase 3: Validation & CI**
    - Run E2E tests to ensure behavioral parity.
    - Run `npm run preflight`.

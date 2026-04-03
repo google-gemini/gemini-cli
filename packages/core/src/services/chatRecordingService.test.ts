@@ -1117,4 +1117,74 @@ describe('ChatRecordingService', () => {
       writeFileSyncSpy.mockRestore();
     });
   });
+
+  describe('Memory management (cache eviction)', () => {
+    beforeEach(() => {
+      chatRecordingService.initialize();
+    });
+
+    it('should clear in-memory cache when conversation exceeds 50MB', () => {
+      // 1. Create a large message (> 50MB)
+      const largeContent = 'A'.repeat(50 * 1024 * 1024 + 1024);
+      chatRecordingService.recordMessage({
+        type: 'user',
+        content: largeContent,
+        model: 'gemini-pro',
+      });
+
+      // 2. Check private cache properties
+      // @ts-expect-error private property
+      expect(chatRecordingService.cachedConversation).toBeNull();
+      // @ts-expect-error private property
+      expect(chatRecordingService.cachedLastConvData).toBeNull();
+
+      // 3. Subsequent read should reload from disk
+      const readFileSyncSpy = vi.spyOn(fs, 'readFileSync');
+      const conversation = chatRecordingService.getConversation();
+      expect(conversation).not.toBeNull();
+      expect(conversation!.messages).toHaveLength(1);
+      expect(readFileSyncSpy).toHaveBeenCalled();
+      readFileSyncSpy.mockRestore();
+    });
+
+    it('should keep in-memory cache when conversation is small', () => {
+      // 1. Create a small message
+      chatRecordingService.recordMessage({
+        type: 'user',
+        content: 'Small message',
+        model: 'gemini-pro',
+      });
+
+      // 2. Check private cache properties
+      // @ts-expect-error private property
+      expect(chatRecordingService.cachedConversation).not.toBeNull();
+      // @ts-expect-error private property
+      expect(chatRecordingService.cachedLastConvData).not.toBeNull();
+
+      // 3. Subsequent read should NOT reload from disk
+      const readFileSyncSpy = vi.spyOn(fs, 'readFileSync');
+      const conversation = chatRecordingService.getConversation();
+      expect(conversation).not.toBeNull();
+      expect(readFileSyncSpy).not.toHaveBeenCalled();
+      readFileSyncSpy.mockRestore();
+    });
+
+    it('should verify writeConversation stringification calls', () => {
+      const stringifySpy = vi.spyOn(JSON, 'stringify');
+      // Clear calls from initialize
+      stringifySpy.mockClear();
+
+      chatRecordingService.recordMessage({
+        type: 'user',
+        content: 'ping',
+        model: 'm',
+      });
+
+      // It is called twice: once for comparison with cachedLastConvData,
+      // and once for writing to disk with the updated lastUpdated timestamp.
+      expect(stringifySpy).toHaveBeenCalledTimes(2);
+
+      stringifySpy.mockRestore();
+    });
+  });
 });

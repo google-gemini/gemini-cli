@@ -28,6 +28,13 @@ import type { AgentLoopContext } from '../config/agent-loop-context.js';
 export const SESSION_FILE_PREFIX = 'session-';
 
 /**
+ * Maximum size of the in-memory chat history cache (50MB).
+ * When the conversation record exceeds this size, it will be cleared from memory
+ * after being written to disk to bound the memory footprint.
+ */
+const MAX_CACHE_SIZE_BYTES = 50 * 1024 * 1024;
+
+/**
  * Warning message shown when recording is disabled due to disk full.
  */
 const ENOSPC_WARNING_MESSAGE =
@@ -128,6 +135,10 @@ export interface ResumedSessionData {
  * - Assistant thoughts and reasoning
  *
  * Sessions are stored as JSON files in ~/.gemini/tmp/<project_hash>/chats/
+ *
+ * Memory Optimization: To prevent unbounded memory growth in long-running
+ * sessions, this service implements a memory-based eviction policy for its
+ * in-memory JSON cache.
  */
 export class ChatRecordingService {
   private conversationFile: string | null = null;
@@ -165,12 +176,15 @@ export class ChatRecordingService {
         this.sessionId = resumedSessionData.conversation.sessionId;
         this.kind = resumedSessionData.conversation.kind;
 
-        // Update the session ID in the existing file
+        // Use the conversation data for a one-time setup if needed.
+        // We don't cache it permanently here to save memory; it will be reloaded
+        // if/when needed by readConversation().
         this.updateConversation((conversation) => {
           conversation.sessionId = this.sessionId;
         });
 
-        // Clear any cached data to force fresh reads
+        // Memory Management: Clear the cache after the initial update
+        // since it might be huge and we want to allow it to be GC'ed.
         this.cachedLastConvData = null;
         this.cachedConversation = null;
       } else {
@@ -527,13 +541,31 @@ export class ChatRecordingService {
       // Compare before updating lastUpdated so the timestamp doesn't
       // cause a false diff.
       if (this.cachedLastConvData === newContent) return;
+
       this.cachedConversation = conversation;
       conversation.lastUpdated = new Date().toISOString();
       const contentToWrite = JSON.stringify(conversation, null, 2);
-      this.cachedLastConvData = contentToWrite;
+
       // Ensure directory exists before writing (handles cases where temp dir was cleaned)
       fs.mkdirSync(path.dirname(this.conversationFile), { recursive: true });
       fs.writeFileSync(this.conversationFile, contentToWrite);
+
+      // Memory Management: If the conversation is large, clear the in-memory cache
+      // to bound the heap usage. Subsequent reads will reload from disk.
+      if (contentToWrite.length > MAX_CACHE_SIZE_BYTES) {
+        debugLogger.debug(
+          `[ChatRecordingService] Conversation too large (${(
+            contentToWrite.length /
+            1024 /
+            1024
+          ).toFixed(2)}MB). Evicting from memory cache.`,
+        );
+        this.cachedConversation = null;
+        this.cachedLastConvData = null;
+      } else {
+        this.cachedConversation = conversation;
+        this.cachedLastConvData = contentToWrite;
+      }
     } catch (error) {
       // Handle disk full (ENOSPC) gracefully - disable recording but allow conversation to continue
       if (
@@ -544,6 +576,7 @@ export class ChatRecordingService {
       ) {
         this.conversationFile = null;
         this.cachedConversation = null;
+        this.cachedLastConvData = null;
         debugLogger.warn(ENOSPC_WARNING_MESSAGE);
         return; // Don't throw - allow the conversation to continue
       }
