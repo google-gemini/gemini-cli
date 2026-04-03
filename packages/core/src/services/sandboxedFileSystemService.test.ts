@@ -14,6 +14,7 @@ import {
   type Mock,
 } from 'vitest';
 import { SandboxedFileSystemService } from './sandboxedFileSystemService.js';
+import { WorkspaceContext } from '../utils/workspaceContext.js';
 import type {
   SandboxManager,
   SandboxRequest,
@@ -25,6 +26,16 @@ import type { Writable } from 'node:stream';
 
 vi.mock('node:child_process', () => ({
   spawn: vi.fn(),
+}));
+
+// Mock resolveAndValidateDir to avoid filesystem checks in tests
+vi.spyOn(WorkspaceContext.prototype as any, 'resolveAndValidateDir').mockImplementation((dir: unknown) => dir as string);
+// Mock fs.existsSync and realpathSync for addDirectory called in constructor
+vi.mock('node:fs', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('node:fs')>()),
+  existsSync: vi.fn(() => true),
+  realpathSync: vi.fn((p) => p),
+  statSync: vi.fn(() => ({ isDirectory: () => true })),
 }));
 
 class MockSandboxManager implements SandboxManager {
@@ -56,11 +67,13 @@ class MockSandboxManager implements SandboxManager {
 describe('SandboxedFileSystemService', () => {
   let sandboxManager: MockSandboxManager;
   let service: SandboxedFileSystemService;
+  let workspaceContext: WorkspaceContext;
   const cwd = '/test/cwd';
 
   beforeEach(() => {
     sandboxManager = new MockSandboxManager();
-    service = new SandboxedFileSystemService(sandboxManager, cwd);
+    workspaceContext = new WorkspaceContext(cwd);
+    service = new SandboxedFileSystemService(sandboxManager, workspaceContext);
     vi.clearAllMocks();
   });
 

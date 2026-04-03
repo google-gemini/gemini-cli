@@ -112,6 +112,72 @@ describe('Plan Mode', () => {
     ).toBe(true);
   });
 
+  it('should allow write_file to the default plans directory in plan mode with sandboxing enabled', async () => {
+    const testName =
+      'should allow write_file to the default plans directory in plan mode with sandboxing enabled';
+
+    await rig.setup(testName, {
+      settings: {
+        security: { toolSandboxing: true },
+        tools: {
+          core: [
+            'write_file',
+            'read_file',
+            'list_directory',
+            'exit_plan_mode',
+          ],
+        },
+        general: {
+          plan: { enabled: true },
+          defaultApprovalMode: 'plan',
+        },
+      },
+    });
+
+    await rig.run({
+      approvalMode: 'plan',
+      args: `Create a file called default-plan.md in the plans directory with some content, don't ask me about the content. After that, exit plan mode with exit_plan_mode.`,
+    });
+
+    const toolLogs = rig.readToolLogs();
+    const planWrite = toolLogs.find(
+      (l) =>
+        l.toolRequest.name === 'write_file' &&
+        l.toolRequest.args.includes('default-plan.md'),
+    );
+    const exitPlanMode = toolLogs.find(
+      (l) => l.toolRequest.name === 'exit_plan_mode',
+    );
+
+    if (!planWrite || !exitPlanMode) {
+      console.error(
+        'All tool calls found:',
+        toolLogs.map((l) => ({
+          name: l.toolRequest.name,
+          args: l.toolRequest.args,
+        })),
+      );
+    }
+
+    expect(
+      planWrite,
+      'Expected write_file to be called for default-plan.md',
+    ).toBeDefined();
+    expect(
+      planWrite?.toolRequest.success,
+      `Expected write_file to succeed, but it failed with error: ${planWrite?.toolRequest.error}`,
+    ).toBe(true);
+
+    expect(
+      exitPlanMode,
+      'Expected exit_plan_mode to be called',
+    ).toBeDefined();
+    expect(
+      exitPlanMode?.toolRequest.success,
+      `Expected exit_plan_mode to succeed, but it failed with error: ${exitPlanMode?.toolRequest.error}`,
+    ).toBe(true);
+  });
+
   it('should deny write_file to non-plans directory in plan mode', async () => {
     const plansDir = '.gemini/tmp/foo/123/plans';
     const testName =

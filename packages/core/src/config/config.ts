@@ -1006,7 +1006,7 @@ export class Config implements McpContext, AgentLoopContext {
     ) {
       this.fileSystemService = new SandboxedFileSystemService(
         this._sandboxManager,
-        params.targetDir,
+        this.workspaceContext,
       );
     } else {
       this.fileSystemService = new StandardFileSystemService();
@@ -1401,10 +1401,17 @@ export class Config implements McpContext, AgentLoopContext {
         await fs.promises.access(plansDir);
         this.workspaceContext.addDirectory(plansDir);
       } catch {
-        // Directory does not exist yet, so we don't add it to the workspace context.
-        // It will be created when the first plan is written. Since custom plan
-        // directories must be within the project root, they are automatically
-        // covered by the project-wide file discovery once created.
+        // Directory does not exist yet.
+        // If sandboxing is enabled, we must create it now so it can be added to the workspace context,
+        // otherwise SandboxedFileSystemService will reject writes to it.
+        if (this.sandbox?.enabled) {
+          try {
+            await fs.promises.mkdir(plansDir, { recursive: true });
+            this.workspaceContext.addDirectory(plansDir);
+          } catch (e) {
+            debugLogger.warn(`Failed to create plans directory for sandboxing: ${e}`);
+          }
+        }
       }
     }
 

@@ -9,7 +9,8 @@ import { type FileSystemService } from './fileSystemService.js';
 import { type SandboxManager } from './sandboxManager.js';
 import { debugLogger } from '../utils/debugLogger.js';
 import { isNodeError } from '../utils/errors.js';
-import { resolveToRealPath, isSubpath } from '../utils/paths.js';
+import { resolveToRealPath } from '../utils/paths.js';
+import { type WorkspaceContext } from '../utils/workspaceContext.js';
 
 /**
  * A FileSystemService implementation that performs operations through a sandbox.
@@ -17,12 +18,20 @@ import { resolveToRealPath, isSubpath } from '../utils/paths.js';
 export class SandboxedFileSystemService implements FileSystemService {
   constructor(
     private sandboxManager: SandboxManager,
-    private cwd: string,
+    private workspaceContext: WorkspaceContext,
   ) {}
 
-  private sanitizeAndValidatePath(filePath: string): string {
+  private sanitizeAndValidatePath(
+    filePath: string,
+    operation: 'read' | 'write',
+  ): string {
     const resolvedPath = resolveToRealPath(filePath);
-    if (!isSubpath(this.cwd, resolvedPath) && this.cwd !== resolvedPath) {
+    const isAllowed =
+      operation === 'read'
+        ? this.workspaceContext.isPathReadable(resolvedPath)
+        : this.workspaceContext.isPathWithinWorkspace(resolvedPath);
+
+    if (!isAllowed) {
       throw new Error(
         `Access denied: Path '${filePath}' is outside the workspace.`,
       );
@@ -31,11 +40,11 @@ export class SandboxedFileSystemService implements FileSystemService {
   }
 
   async readTextFile(filePath: string): Promise<string> {
-    const safePath = this.sanitizeAndValidatePath(filePath);
+    const safePath = this.sanitizeAndValidatePath(filePath, 'read');
     const prepared = await this.sandboxManager.prepareCommand({
       command: '__read',
       args: [safePath],
-      cwd: this.cwd,
+      cwd: this.workspaceContext.targetDir,
       env: process.env,
       policy: {
         allowedPaths: [safePath],
@@ -46,7 +55,7 @@ export class SandboxedFileSystemService implements FileSystemService {
       // Direct spawn is necessary here for streaming large file contents.
 
       const child = spawn(prepared.program, prepared.args, {
-        cwd: this.cwd,
+        cwd: this.workspaceContext.targetDir,
         env: prepared.env,
       });
 
@@ -91,11 +100,11 @@ export class SandboxedFileSystemService implements FileSystemService {
   }
 
   async writeTextFile(filePath: string, content: string): Promise<void> {
-    const safePath = this.sanitizeAndValidatePath(filePath);
+    const safePath = this.sanitizeAndValidatePath(filePath, 'write');
     const prepared = await this.sandboxManager.prepareCommand({
       command: '__write',
       args: [safePath],
-      cwd: this.cwd,
+      cwd: this.workspaceContext.targetDir,
       env: process.env,
       policy: {
         allowedPaths: [safePath],
@@ -111,7 +120,7 @@ export class SandboxedFileSystemService implements FileSystemService {
       // Direct spawn is necessary here for streaming large file contents.
 
       const child = spawn(prepared.program, prepared.args, {
-        cwd: this.cwd,
+        cwd: this.workspaceContext.targetDir,
         env: prepared.env,
       });
 
@@ -155,5 +164,8 @@ export class SandboxedFileSystemService implements FileSystemService {
         );
       });
     });
+  }
+}
+);
   }
 }
