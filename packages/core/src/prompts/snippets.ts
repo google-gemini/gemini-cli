@@ -4,6 +4,8 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+// Steering signature: ToolDefinition
+
 import {
   ACTIVATE_SKILL_TOOL_NAME,
   ASK_USER_TOOL_NAME,
