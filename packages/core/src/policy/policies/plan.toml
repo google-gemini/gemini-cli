@@ -86,6 +86,16 @@ toolAnnotations = { readOnlyHint = true }
 decision = "ask_user"
 priority = 70
 modes = ["plan"]
+interactive = true
+
+[[rule]]
+toolName = "*"
+mcpName = "*"
+toolAnnotations = { readOnlyHint = true }
+decision = "deny"
+priority = 70
+modes = ["plan"]
+interactive = false
 
 [[rule]]
 toolName = [
@@ -103,19 +113,44 @@ decision = "allow"
 priority = 70
 modes = ["plan"]
 
+# Topic grouping tool is innocuous and used for UI organization.
 [[rule]]
-toolName = ["ask_user", "save_memory"]
-decision = "ask_user"
+toolName = "update_topic"
+decision = "allow"
 priority = 70
 modes = ["plan"]
 
+[[rule]]
+toolName = ["ask_user", "save_memory", "web_fetch"]
+decision = "ask_user"
+priority = 70
+modes = ["plan"]
+interactive = true
+
+[[rule]]
+toolName = ["ask_user", "save_memory", "web_fetch"]
+decision = "deny"
+priority = 70
+modes = ["plan"]
+interactive = false
+
 # Allow write_file and replace for .md files in the plans directory (cross-platform)
+# We split this into two rules to avoid ReDoS checker issues with nested optional segments.
+# This rule handles the case where there is a session ID in the plan file path
 [[rule]]
 toolName = ["write_file", "replace"]
 decision = "allow"
 priority = 70
 modes = ["plan"]
 argsPattern = "\\x00\"file_path\":\"[^\"]+[\\\\/]+\\.gemini[\\\\/]+tmp[\\\\/]+[\\w-]+[\\\\/]+[\\w-]+[\\\\/]+plans[\\\\/]+[\\w-]+\\.md\"\\x00"
+
+# This rule handles the case where there isn't a session ID in the plan file path
+[[rule]]
+toolName = ["write_file", "replace"]
+decision = "allow"
+priority = 70
+modes = ["plan"]
+argsPattern = "\\x00\"file_path\":\"[^\"]+[\\\\/]+\\.gemini[\\\\/]+tmp[\\\\/]+[\\w-]+[\\\\/]+plans[\\\\/]+[\\w-]+\\.md\"\\x00"
 
 # Explicitly Deny other write operations in Plan mode with a clear message.
 [[rule]]

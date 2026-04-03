@@ -11,6 +11,7 @@ import {
   shutdownTelemetry,
   isTelemetrySdkInitialized,
   ExitCodes,
+  resetBrowserSession,
 } from '@google/gemini-cli-core';
 import type { Config } from '@google/gemini-cli-core';
 
@@ -42,7 +43,7 @@ export function runSyncCleanup() {
   for (const fn of syncCleanupFunctions) {
     try {
       fn();
-    } catch (_) {
+    } catch {
       // Ignore errors during cleanup.
     }
   }
@@ -66,16 +67,23 @@ export async function runExitCleanup() {
   for (const fn of cleanupFunctions) {
     try {
       await fn();
-    } catch (_) {
+    } catch {
       // Ignore errors during cleanup.
     }
   }
   cleanupFunctions.length = 0; // Clear the array
 
+  // Close persistent browser sessions before disposing config
+  try {
+    await resetBrowserSession();
+  } catch {
+    // Ignore errors during browser cleanup
+  }
+
   if (configForTelemetry) {
     try {
       await configForTelemetry.dispose();
-    } catch (_) {
+    } catch {
       // Ignore errors during disposal
     }
   }
@@ -85,7 +93,7 @@ export async function runExitCleanup() {
   if (configForTelemetry && isTelemetrySdkInitialized()) {
     try {
       await shutdownTelemetry(configForTelemetry);
-    } catch (_) {
+    } catch {
       // Ignore errors during telemetry shutdown
     }
   }
