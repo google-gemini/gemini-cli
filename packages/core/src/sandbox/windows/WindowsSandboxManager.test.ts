@@ -25,8 +25,7 @@ vi.mock('../../utils/shell-utils.js', async (importOriginal) => {
   };
 });
 
-// TODO: reenable once test is fixed
-describe.skipIf(os.platform() === 'win32')('WindowsSandboxManager', () => {
+describe('WindowsSandboxManager', () => {
   let manager: WindowsSandboxManager;
   let testCwd: string;
 
@@ -535,7 +534,7 @@ describe.skipIf(os.platform() === 'win32')('WindowsSandboxManager', () => {
     expect(result.args[5]).toBe(filePath);
   });
 
-it('should safely handle special characters in __write path using environment variables', async () => {
+  it('should safely handle special characters in __write path using environment variables', async () => {
     // Note: Windows does not allow " in filenames, but it does allow spaces and other symbols.
     const maliciousPath = path.join(testCwd, 'foo & echo bar; ! .txt');
 

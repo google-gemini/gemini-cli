@@ -294,7 +294,7 @@ export class WindowsSandboxManager implements SandboxManager {
 
     // 3. Explicitly allowed paths from the request policy
     for (const allowedPath of allowedPaths) {
-      const resolved = await tryRealpath(allowedPath);
+      const resolved = resolveToRealPath(allowedPath);
       try {
         await fs.promises.access(resolved, fs.constants.F_OK);
       } catch {
@@ -312,7 +312,7 @@ export class WindowsSandboxManager implements SandboxManager {
       mergedAdditional.fileSystem?.write,
     );
     for (const writePath of additionalWritePaths) {
-      const resolved = await tryRealpath(writePath);
+      const resolved = resolveToRealPath(writePath);
       try {
         await fs.promises.access(resolved, fs.constants.F_OK);
         await this.grantLowIntegrityAccess(resolved);
