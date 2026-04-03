@@ -12,6 +12,7 @@ export interface AnsiToken {
   underline: boolean;
   dim: boolean;
   inverse: boolean;
+  isUninitialized: boolean;
   fg: string;
   bg: string;
 }
@@ -126,6 +127,12 @@ class Cell {
     return this.cell?.getChars() || ' ';
   }
 
+  isUninitialized(): boolean {
+    return this.cell
+      ? this.cell.getCode() === 0 && this.cell.isAttributeDefault()
+      : true;
+  }
+
   isAttribute(attribute: Attribute): boolean {
     return (this.attributes & attribute) !== 0;
   }
@@ -137,7 +144,8 @@ class Cell {
       this.bg === other.bg &&
       this.fgColorMode === other.fgColorMode &&
       this.bgColorMode === other.bgColorMode &&
-      this.isCursor() === other.isCursor()
+      this.isCursor() === other.isCursor() &&
+      this.isUninitialized() === other.isUninitialized()
     );
   }
 }
@@ -190,6 +198,7 @@ export function serializeTerminalToObject(
             dim: lastCell.isAttribute(Attribute.dim),
             inverse:
               lastCell.isAttribute(Attribute.inverse) || lastCell.isCursor(),
+            isUninitialized: lastCell.isUninitialized(),
             fg: convertColorToHex(lastCell.fg, lastCell.fgColorMode, defaultFg),
             bg: convertColorToHex(lastCell.bg, lastCell.bgColorMode, defaultBg),
           };
@@ -211,6 +220,7 @@ export function serializeTerminalToObject(
         underline: lastCell.isAttribute(Attribute.underline),
         dim: lastCell.isAttribute(Attribute.dim),
         inverse: lastCell.isAttribute(Attribute.inverse) || lastCell.isCursor(),
+        isUninitialized: lastCell.isUninitialized(),
         fg: convertColorToHex(lastCell.fg, lastCell.fgColorMode, defaultFg),
         bg: convertColorToHex(lastCell.bg, lastCell.bgColorMode, defaultBg),
       };
@@ -218,6 +228,23 @@ export function serializeTerminalToObject(
     }
 
     result.push(currentLine);
+  }
+
+  // Remove trailing empty lines
+  while (result.length > 0) {
+    const lastLine = result[result.length - 1];
+    const lineY = effectiveStart + result.length - 1;
+
+    // A line is empty if all its tokens are marked as uninitialized and it has no cursor
+    const isEmpty =
+      lastLine.every((token) => token.isUninitialized && !token.inverse) &&
+      lineY !== cursorY;
+
+    if (isEmpty) {
+      result.pop();
+    } else {
+      break;
+    }
   }
 
   return result;
