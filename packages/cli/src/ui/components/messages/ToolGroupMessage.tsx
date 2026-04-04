@@ -20,7 +20,7 @@ import { SubagentGroupDisplay } from './SubagentGroupDisplay.js';
 import { DenseToolMessage } from './DenseToolMessage.js';
 import { theme } from '../../semantic-colors.js';
 import { useConfig } from '../../contexts/ConfigContext.js';
-import { isShellTool } from './ToolShared.js';
+import { isShellTool, isThisShellFocused } from './ToolShared.js';
 import {
   shouldHideToolCall,
   CoreToolCallStatus,
@@ -38,7 +38,13 @@ import {
   isGrepResult,
   isListResult,
 } from '@google/gemini-cli-core';
+import { ShowMoreLines } from '../ShowMoreLines.js';
 import { useUIState } from '../../contexts/UIStateContext.js';
+import { useAlternateBuffer } from '../../hooks/useAlternateBuffer.js';
+import {
+  calculateShellMaxLines,
+  calculateToolContentMaxLines,
+} from '../../utils/toolLayoutUtils.js';
 import { getToolGroupBorderAppearance } from '../../utils/borderStyles.js';
 import { useSettings } from '../../contexts/SettingsContext.js';
 import {
@@ -132,7 +138,6 @@ export const ToolGroupMessage: React.FC<ToolGroupMessageProps> = ({
   const settings = useSettings();
   const isLowErrorVerbosity = settings.merged.ui?.errorVerbosity !== 'full';
   const isCompactModeEnabled = settings.merged.ui?.compactToolOutput === true;
-
   // Filter out tool calls that should be hidden (e.g. in-progress Ask User, or Plan Mode operations).
   const visibleToolCalls = useMemo(
     () =>
@@ -174,11 +179,13 @@ export const ToolGroupMessage: React.FC<ToolGroupMessageProps> = ({
   );
 
   const {
+    constrainHeight,
     activePtyId,
     embeddedShellFocused,
     backgroundTasks,
     pendingHistoryItems,
   } = useUIState();
+  const isAlternateBuffer = useAlternateBuffer();
 
   const config = useConfig();
 
@@ -274,34 +281,17 @@ export const ToolGroupMessage: React.FC<ToolGroupMessageProps> = ({
         (nextIsCompact || nextIsTopicToolCall || isLast);
 
       if (isAgentGroup) {
-        // Agent Group Spacing Breakdown:
-        // 1. Top Boundary (0 or 1): Only present via borderTop if isFirstProp is true.
-        // 2. Header Content (1): The "≡ Running Agent..." status text.
-        // 3. Agent List (group.length lines): One line per agent in the group.
-        // 4. Closing Border (1): Added if transition logic (showClosingBorder) requires it.
         height +=
           (isFirstProp ? 1 : 0) +
           1 +
           group.length +
           (showClosingBorder ? 1 : 0);
       } else if (isTopicToolCall) {
-        // Topic Message Spacing Breakdown:
-        // 1. Top Margin (1): Present unless it's the very first item following a boundary.
-        // 2. Topic Content (1).
-        // 3. Bottom Margin (1): Always present around TopicMessage for breathing room.
         const hasTopMargin = !(isFirst && isToolGroupBoundary);
         height += (hasTopMargin ? 1 : 0) + 1 + 1;
       } else if (isCompact) {
-        // Compact Tool: Always renders as a single dense line.
         height += 1;
       } else {
-        // Standard Tool (ToolMessage / ShellToolMessage) Spacing Breakdown:
-        // 1. TOOL_RESULT_STANDARD_RESERVED_LINE_COUNT (4) accounts for the top boundary,
-        // internal separator, header padding, and the group closing border.
-        // (Subtract 1 to isolate the group-level closing border.)
-        // 2. Header Content (1): TOOL_RESULT_STATIC_HEIGHT (the tool name/status).
-        // 3. Output File Message (1): (conditional) if outputFile is present.
-        // 4. Group Closing Border (1): (conditional) if transition logic (showClosingBorder) requires it.
         height +=
           TOOL_RESULT_STANDARD_RESERVED_LINE_COUNT -
           1 +
@@ -333,7 +323,6 @@ export const ToolGroupMessage: React.FC<ToolGroupMessageProps> = ({
       }
     }
   }
-
   const availableTerminalHeightPerToolMessage = availableTerminalHeight
     ? Math.max(
         Math.floor(
@@ -346,11 +335,63 @@ export const ToolGroupMessage: React.FC<ToolGroupMessageProps> = ({
 
   const contentWidth = terminalWidth - TOOL_MESSAGE_HORIZONTAL_MARGIN;
 
-  // If all tools are filtered out (e.g., in-progress AskUser tools, low-verbosity
-  // internal errors, plan-mode hidden write/edit), we should not emit standalone
-  // border fragments. The only case where an empty group should render is the
-  // explicit "closing slice" (tools: []) used to bridge static/pending sections,
-  // and only if it's actually continuing an open box from above.
+  const hasOverflow = useMemo(() => {
+    if (!availableTerminalHeightPerToolMessage) return false;
+    return visibleToolCalls.some((tool) => {
+      const isShellToolCall = isShellTool(tool.name);
+      const isFocused = isThisShellFocused(
+        tool.name,
+        tool.status,
+        tool.ptyId,
+        activePtyId,
+        embeddedShellFocused,
+      );
+
+      let maxLines: number | undefined;
+
+      if (isShellToolCall) {
+        maxLines = calculateShellMaxLines({
+          status: tool.status,
+          isAlternateBuffer,
+          isThisShellFocused: isFocused,
+          availableTerminalHeight: availableTerminalHeightPerToolMessage,
+          constrainHeight,
+          isExpandable,
+        });
+      }
+
+      // Standard tools and Shell tools both eventually use ToolResultDisplay's logic.
+      // ToolResultDisplay uses calculateToolContentMaxLines to find the final line budget.
+      const contentMaxLines = calculateToolContentMaxLines({
+        availableTerminalHeight: availableTerminalHeightPerToolMessage,
+        isAlternateBuffer,
+        maxLinesLimit: maxLines,
+      });
+
+      if (!contentMaxLines) return false;
+
+      if (typeof tool.resultDisplay === 'string') {
+        const text = tool.resultDisplay;
+        const hasTrailingNewline = text.endsWith('\n');
+        const contentText = hasTrailingNewline ? text.slice(0, -1) : text;
+        const lineCount = contentText.split('\n').length;
+        return lineCount > contentMaxLines;
+      }
+      if (Array.isArray(tool.resultDisplay)) {
+        return tool.resultDisplay.length > contentMaxLines;
+      }
+      return false;
+    });
+  }, [
+    visibleToolCalls,
+    availableTerminalHeightPerToolMessage,
+    activePtyId,
+    embeddedShellFocused,
+    isAlternateBuffer,
+    constrainHeight,
+    isExpandable,
+  ]);
+
   const isExplicitClosingSlice = allToolCalls.length === 0;
   const shouldShowGroup =
     visibleToolCalls.length > 0 ||
@@ -378,13 +419,13 @@ export const ToolGroupMessage: React.FC<ToolGroupMessageProps> = ({
         borderBottomOverride === true && (
           <Box
             width={contentWidth}
-            borderLeft={true}
-            borderRight={true}
+            borderLeft={!isAlternateBuffer}
+            borderRight={!isAlternateBuffer}
             borderTop={false}
-            borderBottom={true}
+            borderBottom={!isAlternateBuffer}
             borderColor={borderColor}
             borderDimColor={borderDimColor}
-            borderStyle="round"
+            borderStyle={isAlternateBuffer ? undefined : 'round'}
           />
         )}
       {groupedTools.map((group, index) => {
@@ -424,7 +465,7 @@ export const ToolGroupMessage: React.FC<ToolGroupMessageProps> = ({
         const isTopicToolCall = !isAgentGroup && isTopicTool(group.name);
 
         const isFirstProp = !!(isFirst
-          ? (borderTopOverride ?? true)
+          ? borderTopOverride ?? true
           : prevIsCompact);
 
         const showClosingBorder =
@@ -451,13 +492,17 @@ export const ToolGroupMessage: React.FC<ToolGroupMessageProps> = ({
               {showClosingBorder && (
                 <Box
                   width={contentWidth}
-                  borderLeft={true}
-                  borderRight={true}
+                  borderLeft={!isAlternateBuffer}
+                  borderRight={!isAlternateBuffer}
                   borderTop={false}
-                  borderBottom={isLast ? (borderBottomOverride ?? true) : true}
+                  borderBottom={
+                    isLast
+                      ? !isAlternateBuffer && (borderBottomOverride ?? true)
+                      : !isAlternateBuffer
+                  }
                   borderColor={borderColor}
                   borderDimColor={borderDimColor}
-                  borderStyle="round"
+                  borderStyle={isAlternateBuffer ? undefined : 'round'}
                 />
               )}
             </Box>
@@ -497,14 +542,14 @@ export const ToolGroupMessage: React.FC<ToolGroupMessageProps> = ({
               )}
               {!isCompact && tool.outputFile && (
                 <Box
-                  borderLeft={true}
-                  borderRight={true}
+                  borderLeft={!isAlternateBuffer}
+                  borderRight={!isAlternateBuffer}
                   borderTop={false}
                   borderBottom={false}
                   borderColor={borderColor}
                   borderDimColor={borderDimColor}
                   flexDirection="column"
-                  borderStyle="round"
+                  borderStyle={isAlternateBuffer ? undefined : 'round'}
                   paddingLeft={1}
                   paddingRight={1}
                 >
@@ -519,18 +564,28 @@ export const ToolGroupMessage: React.FC<ToolGroupMessageProps> = ({
             {showClosingBorder && (
               <Box
                 width={contentWidth}
-                borderLeft={true}
-                borderRight={true}
+                borderLeft={!isAlternateBuffer}
+                borderRight={!isAlternateBuffer}
                 borderTop={false}
-                borderBottom={isLast ? (borderBottomOverride ?? true) : true}
+                borderBottom={
+                  isLast
+                    ? !isAlternateBuffer && (borderBottomOverride ?? true)
+                    : !isAlternateBuffer
+                }
                 borderColor={borderColor}
                 borderDimColor={borderDimColor}
-                borderStyle="round"
+                borderStyle={isAlternateBuffer ? undefined : 'round'}
               />
             )}
           </Fragment>
         );
       })}
+      {(borderBottomOverride ?? true) && visibleToolCalls.length > 0 && (
+        <ShowMoreLines
+          constrainHeight={constrainHeight && !!isExpandable}
+          isOverflowing={hasOverflow}
+        />
+      )}
     </Box>
   );
 
