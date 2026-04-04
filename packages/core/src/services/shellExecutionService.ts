@@ -581,12 +581,12 @@ export class ShellExecutionService {
             formatInjection: (output, error) =>
               ShellExecutionService.formatShellBackgroundCompletion(
                 child.pid!,
-                shellExecutionConfig.backgroundCompletionBehavior || 'silent',
+                shellExecutionConfig.backgroundCompletionBehavior ?? 'inject',
                 output,
                 error ?? undefined,
               ),
             completionBehavior:
-              shellExecutionConfig.backgroundCompletionBehavior || 'silent',
+              shellExecutionConfig.backgroundCompletionBehavior ?? 'inject',
           })
         : undefined;
 
@@ -935,12 +935,12 @@ export class ShellExecutionService {
         formatInjection: (output, error) =>
           ShellExecutionService.formatShellBackgroundCompletion(
             ptyPid,
-            shellExecutionConfig.backgroundCompletionBehavior || 'silent',
+            shellExecutionConfig.backgroundCompletionBehavior ?? 'inject',
             output,
             error ?? undefined,
           ),
         completionBehavior:
-          shellExecutionConfig.backgroundCompletionBehavior || 'silent',
+          shellExecutionConfig.backgroundCompletionBehavior ?? 'inject',
       }).result;
 
       let processingChain = Promise.resolve();

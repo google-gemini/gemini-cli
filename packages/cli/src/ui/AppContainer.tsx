@@ -84,6 +84,7 @@ import {
   ChangeAuthRequestedError,
   ProjectIdRequiredError,
   buildUserSteeringHintPrompt,
+  formatBackgroundCompletionForModel,
   logBillingEvent,
   ApiKeyUpdatedEvent,
   type InjectionSource,
@@ -1129,30 +1130,49 @@ Logging in with Google... Restarting Gemini CLI to continue.
     }
   }, [pendingRestorePrompt, inputHistory, historyManager.history]);
 
-  const pendingHintsRef = useRef<string[]>([]);
-  const [pendingHintCount, setPendingHintCount] = useState(0);
+  const pendingInjectionsRef = useRef<
+    Array<{ text: string; source: InjectionSource }>
+  >([]);
+  const [pendingInjectionCount, setPendingInjectionCount] = useState(0);
 
-  const consumePendingHints = useCallback(() => {
-    if (pendingHintsRef.current.length === 0) {
-      return null;
-    }
-    const hint = pendingHintsRef.current.join('\n');
-    pendingHintsRef.current = [];
-    setPendingHintCount(0);
-    return hint;
-  }, []);
+  const consumePendingInjections = useCallback(
+    (source?: InjectionSource) => {
+      if (pendingInjectionsRef.current.length === 0) {
+        return [];
+      }
+
+      if (!source) {
+        const injections = [...pendingInjectionsRef.current];
+        pendingInjectionsRef.current = [];
+        setPendingInjectionCount(0);
+        return injections;
+      }
+
+      const matching = pendingInjectionsRef.current.filter(
+        (inj) => inj.source === source,
+      );
+      pendingInjectionsRef.current = pendingInjectionsRef.current.filter(
+        (inj) => inj.source !== source,
+      );
+      setPendingInjectionCount(pendingInjectionsRef.current.length);
+      return matching;
+    },
+    [pendingInjectionsRef],
+  );
+
+  const consumeUserHints = useCallback(() => {
+    const hints = consumePendingInjections('user_steering');
+    return hints.length > 0 ? hints.map((h) => h.text).join('\n') : null;
+  }, [consumePendingInjections]);
 
   useEffect(() => {
-    const hintListener = (text: string, source: InjectionSource) => {
-      if (source !== 'user_steering' && source !== 'background_completion') {
-        return;
-      }
-      pendingHintsRef.current.push(text);
-      setPendingHintCount((prev) => prev + 1);
+    const injectionListener = (text: string, source: InjectionSource) => {
+      pendingInjectionsRef.current.push({ text, source });
+      setPendingInjectionCount((prev) => prev + 1);
     };
-    config.injectionService.onInjection(hintListener);
+    config.injectionService.onInjection(injectionListener);
     return () => {
-      config.injectionService.offInjection(hintListener);
+      config.injectionService.offInjection(injectionListener);
     };
   }, [config]);
 
@@ -1194,7 +1214,7 @@ Logging in with Google... Restarting Gemini CLI to continue.
     terminalWidth,
     terminalHeight,
     embeddedShellFocused,
-    consumePendingHints,
+    consumeUserHints,
   );
 
   const pendingHistoryItems = useMemo(
@@ -2261,30 +2281,35 @@ Logging in with Google... Restarting Gemini CLI to continue.
   useEffect(() => {
     if (
       !isConfigInitialized ||
-      !config.isModelSteeringEnabled() ||
       streamingState !== StreamingState.Idle ||
       !isMcpReady ||
+      pendingInjectionCount === 0 ||
       isToolAwaitingConfirmation(pendingHistoryItems)
     ) {
       return;
     }
 
-    const pendingHint = consumePendingHints();
-    if (!pendingHint) {
+    const pendingInjections = consumePendingInjections();
+    if (pendingInjections.length === 0) {
       return;
     }
 
-    void submitQuery([{ text: buildUserSteeringHintPrompt(pendingHint) }]);
+    const prompts = pendingInjections.map((inj) => {
+      if (inj.source === 'user_steering') {
+        return { text: buildUserSteeringHintPrompt(inj.text) };
+      }
+      return { text: formatBackgroundCompletionForModel(inj.text) };
+    });
+
+    void submitQuery(prompts);
   }, [
-    config,
-    historyManager,
     isConfigInitialized,
     isMcpReady,
     streamingState,
     submitQuery,
-    consumePendingHints,
+    pendingInjectionCount,
     pendingHistoryItems,
-    pendingHintCount,
+    consumePendingInjections,
   ]);
 
   const allToolCalls = useMemo(
