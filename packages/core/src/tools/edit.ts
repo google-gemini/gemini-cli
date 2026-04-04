@@ -845,159 +845,161 @@ class EditToolInvocation
       };
     }
 
-    let editData: CalculatedEdit;
-    try {
-      editData = await this.calculateEdit(this.params, signal);
-    } catch (error) {
-      if (signal.aborted) {
-        throw error;
-      }
-      const errorMsg = error instanceof Error ? error.message : String(error);
-      return {
-        llmContent: `Error preparing edit: ${errorMsg}`,
-        returnDisplay: `Error preparing edit: ${errorMsg}`,
-        error: {
-          message: errorMsg,
-          type: ToolErrorType.EDIT_PREPARATION_FAILURE,
-        },
-      };
-    }
-
-    if (editData.error) {
-      return {
-        llmContent: editData.error.raw,
-        returnDisplay: `Error: ${editData.error.display}`,
-        error: {
-          message: editData.error.raw,
-          type: editData.error.type,
-        },
-      };
-    }
-
-    try {
-      await this.ensureParentDirectoriesExistAsync(this.resolvedPath);
-      let finalContent = editData.newContent;
-
-      // Restore original line endings if they were CRLF, or use OS default for new files
-      const useCRLF =
-        (!editData.isNewFile && editData.originalLineEnding === '\r\n') ||
-        (editData.isNewFile && os.EOL === '\r\n');
-
-      if (useCRLF) {
-        finalContent = finalContent.replace(/\r?\n/g, '\r\n');
-      }
-      await this.config
-        .getFileSystemService()
-        .writeTextFile(this.resolvedPath, finalContent);
-
-      let displayResult: ToolResultDisplay;
-      if (editData.isNewFile) {
-        displayResult = `Created ${shortenPath(makeRelative(this.resolvedPath, this.config.getTargetDir()))}`;
-      } else {
-        // Generate diff for display, even though core logic doesn't technically need it
-        // The CLI wrapper will use this part of the ToolResult
-        const fileName = path.basename(this.resolvedPath);
-        const fileDiff = Diff.createPatch(
-          fileName,
-          editData.currentContent ?? '', // Should not be null here if not isNewFile
-          editData.newContent,
-          'Current',
-          'Proposed',
-          DEFAULT_DIFF_OPTIONS,
-        );
-
-        // Determine the full content as originally proposed by the AI to ensure accurate diff stats.
-        let fullAiProposedContent = editData.newContent;
-        if (
-          this.params.modified_by_user &&
-          this.params.ai_proposed_content !== undefined
-        ) {
-          try {
-            const aiReplacement = await calculateReplacement(this.config, {
-              params: {
-                ...this.params,
-                new_string: this.params.ai_proposed_content,
-              },
-              currentContent: editData.currentContent ?? '',
-              abortSignal: signal,
-            });
-            fullAiProposedContent = aiReplacement.newContent;
-          } catch (error) {
-            const errorMsg =
-              error instanceof Error ? error.message : String(error);
-            debugLogger.log(`AI replacement fallback: ${errorMsg}`);
-            // Fallback to newContent if speculative calculation fails
-            fullAiProposedContent = editData.newContent;
-          }
+    return withFileLock(this.resolvedPath, async () => {
+      let editData: CalculatedEdit;
+      try {
+        editData = await this.calculateEdit(this.params, signal);
+      } catch (error) {
+        if (signal.aborted) {
+          throw error;
         }
-
-        const diffStat = getDiffStat(
-          fileName,
-          editData.currentContent ?? '',
-          fullAiProposedContent,
-          editData.newContent,
-        );
-        displayResult = {
-          fileDiff,
-          fileName,
-          filePath: this.resolvedPath,
-          originalContent: editData.currentContent,
-          newContent: editData.newContent,
-          diffStat,
-          isNewFile: editData.isNewFile,
+        const errorMsg = error instanceof Error ? error.message : String(error);
+        return {
+          llmContent: `Error preparing edit: ${errorMsg}`,
+          returnDisplay: `Error preparing edit: ${errorMsg}`,
+          error: {
+            message: errorMsg,
+            type: ToolErrorType.EDIT_PREPARATION_FAILURE,
+          },
         };
       }
 
-      const llmSuccessMessageParts = [
-        editData.isNewFile
-          ? `Created new file: ${this.resolvedPath} with provided content.`
-          : `Successfully modified file: ${this.resolvedPath} (${editData.occurrences} replacements).`,
-      ];
-
-      // Return a diff of the file before and after the write so that the agent
-      // can avoid the need to spend a turn doing a verification read.
-      const snippet = getDiffContextSnippet(
-        editData.currentContent ?? '',
-        finalContent,
-        5,
-      );
-      llmSuccessMessageParts.push(`Here is the updated code:
-${snippet}`);
-      const fuzzyFeedback = getFuzzyMatchFeedback(editData);
-      if (fuzzyFeedback) {
-        llmSuccessMessageParts.push(fuzzyFeedback);
+      if (editData.error) {
+        return {
+          llmContent: editData.error.raw,
+          returnDisplay: `Error: ${editData.error.display}`,
+          error: {
+            message: editData.error.raw,
+            type: editData.error.type,
+          },
+        };
       }
-      if (this.params.modified_by_user) {
-        llmSuccessMessageParts.push(
-          `User modified the \`new_string\` content to be: ${this.params.new_string}.`,
+
+      try {
+        await this.ensureParentDirectoriesExistAsync(this.resolvedPath);
+        let finalContent = editData.newContent;
+
+        // Restore original line endings if they were CRLF, or use OS default for new files
+        const useCRLF =
+          (!editData.isNewFile && editData.originalLineEnding === '\r\n') ||
+          (editData.isNewFile && os.EOL === '\r\n');
+
+        if (useCRLF) {
+          finalContent = finalContent.replace(/\r?\n/g, '\r\n');
+        }
+        await this.config
+          .getFileSystemService()
+          .writeTextFile(this.resolvedPath, finalContent);
+
+        let displayResult: ToolResultDisplay;
+        if (editData.isNewFile) {
+          displayResult = `Created ${shortenPath(makeRelative(this.resolvedPath, this.config.getTargetDir()))}`;
+        } else {
+          // Generate diff for display, even though core logic doesn't technically need it
+          // The CLI wrapper will use this part of the ToolResult
+          const fileName = path.basename(this.resolvedPath);
+          const fileDiff = Diff.createPatch(
+            fileName,
+            editData.currentContent ?? '', // Should not be null here if not isNewFile
+            editData.newContent,
+            'Current',
+            'Proposed',
+            DEFAULT_DIFF_OPTIONS,
+          );
+
+          // Determine the full content as originally proposed by the AI to ensure accurate diff stats.
+          let fullAiProposedContent = editData.newContent;
+          if (
+            this.params.modified_by_user &&
+            this.params.ai_proposed_content !== undefined
+          ) {
+            try {
+              const aiReplacement = await calculateReplacement(this.config, {
+                params: {
+                  ...this.params,
+                  new_string: this.params.ai_proposed_content,
+                },
+                currentContent: editData.currentContent ?? '',
+                abortSignal: signal,
+              });
+              fullAiProposedContent = aiReplacement.newContent;
+            } catch (error) {
+              const errorMsg =
+                error instanceof Error ? error.message : String(error);
+              debugLogger.log(`AI replacement fallback: ${errorMsg}`);
+              // Fallback to newContent if speculative calculation fails
+              fullAiProposedContent = editData.newContent;
+            }
+          }
+
+          const diffStat = getDiffStat(
+            fileName,
+            editData.currentContent ?? '',
+            fullAiProposedContent,
+            editData.newContent,
+          );
+          displayResult = {
+            fileDiff,
+            fileName,
+            filePath: this.resolvedPath,
+            originalContent: editData.currentContent,
+            newContent: editData.newContent,
+            diffStat,
+            isNewFile: editData.isNewFile,
+          };
+        }
+
+        const llmSuccessMessageParts = [
+          editData.isNewFile
+            ? `Created new file: ${this.resolvedPath} with provided content.`
+            : `Successfully modified file: ${this.resolvedPath} (${editData.occurrences} replacements).`,
+        ];
+
+        // Return a diff of the file before and after the write so that the agent
+        // can avoid the need to spend a turn doing a verification read.
+        const snippet = getDiffContextSnippet(
+          editData.currentContent ?? '',
+          finalContent,
+          5,
         );
-      }
+        llmSuccessMessageParts.push(`Here is the updated code:
+${snippet}`);
+        const fuzzyFeedback = getFuzzyMatchFeedback(editData);
+        if (fuzzyFeedback) {
+          llmSuccessMessageParts.push(fuzzyFeedback);
+        }
+        if (this.params.modified_by_user) {
+          llmSuccessMessageParts.push(
+            `User modified the \`new_string\` content to be: ${this.params.new_string}.`,
+          );
+        }
 
-      // Discover JIT subdirectory context for the edited file path
-      const jitContext = await discoverJitContext(
-        this.config,
-        this.resolvedPath,
-      );
-      let llmContent = llmSuccessMessageParts.join(' ');
-      if (jitContext) {
-        llmContent = appendJitContext(llmContent, jitContext);
-      }
+        // Discover JIT subdirectory context for the edited file path
+        const jitContext = await discoverJitContext(
+          this.config,
+          this.resolvedPath,
+        );
+        let llmContent = llmSuccessMessageParts.join(' ');
+        if (jitContext) {
+          llmContent = appendJitContext(llmContent, jitContext);
+        }
 
-      return {
-        llmContent,
-        returnDisplay: displayResult,
-      };
-    } catch (error) {
-      const errorMsg = error instanceof Error ? error.message : String(error);
-      return {
-        llmContent: `Error executing edit: ${errorMsg}`,
-        returnDisplay: `Error writing file: ${errorMsg}`,
-        error: {
-          message: errorMsg,
-          type: ToolErrorType.FILE_WRITE_FAILURE,
-        },
-      };
-    }
+        return {
+          llmContent,
+          returnDisplay: displayResult,
+        };
+      } catch (error) {
+        const errorMsg = error instanceof Error ? error.message : String(error);
+        return {
+          llmContent: `Error executing edit: ${errorMsg}`,
+          returnDisplay: `Error writing file: ${errorMsg}`,
+          error: {
+            message: errorMsg,
+            type: ToolErrorType.FILE_WRITE_FAILURE,
+          },
+        };
+      }
+    });
   }
 
   /**
@@ -1011,6 +1013,34 @@ ${snippet}`);
       await fsPromises.access(dirName);
     } catch {
       await fsPromises.mkdir(dirName, { recursive: true });
+    }
+  }
+}
+
+const fileLocks = new Map<string, Promise<void>>();
+
+async function withFileLock<T>(
+  filePath: string,
+  action: () => Promise<T>,
+): Promise<T> {
+  const currentLock = fileLocks.get(filePath) || Promise.resolve();
+  let releaseLock!: () => void;
+  const newLock = new Promise<void>((resolve) => {
+    releaseLock = resolve;
+  });
+
+  fileLocks.set(
+    filePath,
+    currentLock.then(() => newLock),
+  );
+
+  try {
+    await currentLock;
+    return await action();
+  } finally {
+    releaseLock();
+    if (fileLocks.get(filePath) === newLock) {
+      fileLocks.delete(filePath);
     }
   }
 }
