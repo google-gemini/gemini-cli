@@ -393,6 +393,39 @@ fileDiff Index: Dockerfile
         await waitFor(() => expect(lastFrame()).toContain('RUN npm run build'));
         expect(lastFrame()).toMatchSnapshot();
       });
+
+      it('should render a safe summary for very large diffs', async () => {
+        const largeContextBlock = Array.from(
+          { length: 21000 },
+          (_, i) => ` line ${i + 1}`,
+        ).join('\n');
+        const largeDiff = `
+diff --git a/huge.js b/huge.js
+index 1111111..2222222 100644
+--- a/huge.js
++++ b/huge.js
+@@ -1,21000 +1,21000 @@
+${largeContextBlock}
+`;
+
+        const { lastFrame } = await renderWithProviders(
+          <OverflowProvider>
+            <DiffRenderer
+              diffContent={largeDiff}
+              filename="huge.js"
+              terminalWidth={80}
+            />
+          </OverflowProvider>,
+          {
+            settings: createMockSettings({ ui: { useAlternateBuffer } }),
+          },
+        );
+
+        await waitFor(() =>
+          expect(lastFrame()).toContain('Diff is too large to render safely.'),
+        );
+        expect(lastFrame()).toContain('Showing summary only (21000 lines).');
+      });
     },
   );
 });
