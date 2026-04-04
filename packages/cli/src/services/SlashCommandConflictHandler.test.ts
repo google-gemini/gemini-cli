@@ -173,6 +173,30 @@ describe('SlashCommandConflictHandler', () => {
     expect(coreEvents.emitFeedback).not.toHaveBeenCalled();
   });
 
+  it('should notify again when a conflict is resolved and later reappears', () => {
+    const conflict = {
+      name: 'deploy',
+      renamedTo: 'firebase.deploy',
+      loserExtensionName: 'firebase',
+      loserKind: CommandKind.EXTENSION_FILE,
+      winnerKind: CommandKind.BUILT_IN,
+    };
+
+    simulateEvent([conflict]);
+    vi.advanceTimersByTime(600);
+    expect(coreEvents.emitFeedback).toHaveBeenCalledTimes(1);
+
+    vi.mocked(coreEvents.emitFeedback).mockClear();
+
+    simulateEvent([]);
+    vi.advanceTimersByTime(600);
+    expect(coreEvents.emitFeedback).not.toHaveBeenCalled();
+
+    simulateEvent([conflict]);
+    vi.advanceTimersByTime(600);
+    expect(coreEvents.emitFeedback).toHaveBeenCalledTimes(1);
+  });
+
   it('should display a descriptive message for a skill conflict', () => {
     simulateEvent([
       {
