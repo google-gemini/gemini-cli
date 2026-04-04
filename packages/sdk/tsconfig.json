@@ -6,7 +6,13 @@
     "lib": ["DOM", "DOM.Iterable", "ES2023"],
     "types": ["node", "vitest/globals"]
   },
-  "include": ["index.ts", "src/**/*.ts", "package.json"],
+  "include": [
+    "index.ts",
+    "src/**/*.ts",
+    "test-utils/**/*.ts",
+    "test-setup.ts",
+    "package.json"
+  ],
   "exclude": ["node_modules", "dist"],
   "references": [{ "path": "../core" }]
 }

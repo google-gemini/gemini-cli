@@ -8,6 +8,39 @@
 import * as fs from 'node:fs';
 import * as util from 'node:util';
 
+export type DebugLoggerLevel = 'log' | 'warn' | 'error' | 'debug';
+export type DebugLoggerCaptureHook = (
+  level: DebugLoggerLevel,
+  args: unknown[],
+) => void;
+
+const DEBUG_LOGGER_CAPTURE_HOOK = Symbol.for('gemini.debugLogger.captureHook');
+
+function getCaptureHook(): DebugLoggerCaptureHook | undefined {
+  return (
+    globalThis as typeof globalThis & {
+      [DEBUG_LOGGER_CAPTURE_HOOK]?: DebugLoggerCaptureHook;
+    }
+  )[DEBUG_LOGGER_CAPTURE_HOOK];
+}
+
+export function setDebugLoggerCaptureHook(hook?: DebugLoggerCaptureHook): void {
+  const scopedGlobal = globalThis as typeof globalThis & {
+    [DEBUG_LOGGER_CAPTURE_HOOK]?: DebugLoggerCaptureHook;
+  };
+
+  if (hook) {
+    scopedGlobal[DEBUG_LOGGER_CAPTURE_HOOK] = hook;
+    return;
+  }
+
+  delete scopedGlobal[DEBUG_LOGGER_CAPTURE_HOOK];
+}
+
+function shouldSuppressConsoleOutput(): boolean {
+  return process.env['GEMINI_SUPPRESS_DEBUG_LOGGER_CONSOLE'] === 'true';
+}
+
 /**
  * A simple, centralized logger for developer-facing debug messages.
  *
@@ -47,21 +80,41 @@ class DebugLogger {
 
   log(...args: unknown[]): void {
     this.writeToFile('LOG', args);
+    const captureHook = getCaptureHook();
+    captureHook?.('log', args);
+    if (captureHook || shouldSuppressConsoleOutput()) {
+      return;
+    }
     console.log(...args);
   }
 
   warn(...args: unknown[]): void {
     this.writeToFile('WARN', args);
+    const captureHook = getCaptureHook();
+    captureHook?.('warn', args);
+    if (captureHook || shouldSuppressConsoleOutput()) {
+      return;
+    }
     console.warn(...args);
   }
 
   error(...args: unknown[]): void {
     this.writeToFile('ERROR', args);
+    const captureHook = getCaptureHook();
+    captureHook?.('error', args);
+    if (captureHook || shouldSuppressConsoleOutput()) {
+      return;
+    }
     console.error(...args);
   }
 
   debug(...args: unknown[]): void {
     this.writeToFile('DEBUG', args);
+    const captureHook = getCaptureHook();
+    captureHook?.('debug', args);
+    if (captureHook || shouldSuppressConsoleOutput()) {
+      return;
+    }
     console.debug(...args);
   }
 }
