@@ -283,6 +283,32 @@ describe('fileUtils', () => {
       }
       expect(await isBinaryFile(filePathForBinaryTest)).toBe(false);
     });
+
+    it('should return false for a file containing literal U+FFFD (replacement character)', async () => {
+      // U+FFFD is a valid Unicode codepoint that can appear in source files
+      // (e.g., Rust code using '\u{FFFD}'). Its UTF-8 encoding is EF BF BD.
+      // The binary detector must not treat this as a binary indicator.
+      const content =
+        "// Rust source\nlet replacement = '\\u{FFFD}';\nlet c: char = '\uFFFD';\n";
+      actualNodeFs.writeFileSync(filePathForBinaryTest, content, 'utf8');
+      expect(await isBinaryFile(filePathForBinaryTest)).toBe(false);
+    });
+
+    it('should return false for a file with many valid UTF-8 multibyte characters', async () => {
+      // A file full of CJK characters, emojis, and U+FFFD should not be binary
+      const content = '\uFFFD\uFFFD\uFFFD hello \u4e16\u754c \uD83D\uDE00\n';
+      actualNodeFs.writeFileSync(filePathForBinaryTest, content, 'utf8');
+      expect(await isBinaryFile(filePathForBinaryTest)).toBe(false);
+    });
+
+    it('should return true for a file with invalid UTF-8 byte sequences', async () => {
+      // Raw high bytes that do NOT form valid UTF-8 sequences → likely binary
+      const binaryContent = Buffer.from([
+        0x80, 0x81, 0x82, 0x83, 0x84, 0x85, 0x86, 0x87, 0x88, 0x89,
+      ]);
+      actualNodeFs.writeFileSync(filePathForBinaryTest, binaryContent);
+      expect(await isBinaryFile(filePathForBinaryTest)).toBe(true);
+    });
   });
 
   describe('BOM detection and encoding', () => {
