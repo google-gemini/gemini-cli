@@ -43,26 +43,26 @@ describe('getFsErrorMessage', () => {
         message: 'EACCES: permission denied',
         path: '/etc/gemini-cli/settings.json',
         expected:
-          "Permission denied: cannot access '/etc/gemini-cli/settings.json'. Check file permissions or run with elevated privileges.",
+          "Permission denied: cannot access '/etc/gemini-cli/settings.json'. Check file permissions or run with elevated privileges.\nSuggestions: Verify file ownership, check for sufficient read/write permissions, or try running with elevated privileges (e.g., sudo).",
       },
       {
         code: 'EACCES',
         message: 'EACCES: permission denied',
         expected:
-          'Permission denied. Check file permissions or run with elevated privileges.',
+          'Permission denied. Check file permissions or run with elevated privileges.\nSuggestions: Verify file ownership, check for sufficient read/write permissions, or try running with elevated privileges (e.g., sudo).',
       },
       {
         code: 'ENOENT',
         message: 'ENOENT: no such file or directory',
         path: '/nonexistent/file.txt',
         expected:
-          "File or directory not found: '/nonexistent/file.txt'. Check if the path exists and is spelled correctly.",
+          "File or directory not found: '/nonexistent/file.txt'. Check if the path exists and is spelled correctly.\nSuggestions: Double-check the path for typos, ensure the file or directory exists in the specified location, and verify that any environment variables are correctly resolved.",
       },
       {
         code: 'ENOENT',
         message: 'ENOENT: no such file or directory',
         expected:
-          'File or directory not found. Check if the path exists and is spelled correctly.',
+          'File or directory not found. Check if the path exists and is spelled correctly.\nSuggestions: Double-check the path for typos, ensure the file or directory exists in the specified location, and verify that any environment variables are correctly resolved.',
       },
       {
         code: 'ENOSPC',
@@ -156,13 +156,15 @@ describe('getFsErrorMessage', () => {
       {
         code: 'EUNKNOWN',
         message: 'Some unknown error occurred',
-        expected: 'Some unknown error occurred (EUNKNOWN)',
+        expected:
+          'Some unknown error occurred (EUNKNOWN). This error code is not recognized. Please check system logs or documentation.',
       },
       {
         code: 'toString',
         message: 'Unexpected error',
         path: '/some/path',
-        expected: 'Unexpected error (toString)',
+        expected:
+          'Unexpected error (toString). This error code is not recognized. Please check system logs or documentation.',
       },
     ];
 
