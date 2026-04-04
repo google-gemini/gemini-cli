@@ -55,6 +55,7 @@ import type { McpAuthProvider } from '../mcp/auth-provider.js';
 import { MCPOAuthProvider } from '../mcp/oauth-provider.js';
 import { MCPOAuthTokenStorage } from '../mcp/oauth-token-storage.js';
 import { OAuthUtils } from '../mcp/oauth-utils.js';
+import { StoredOAuthMcpProvider } from '../mcp/stored-oauth-provider.js';
 import type { PromptRegistry } from '../prompts/prompt-registry.js';
 import {
   getErrorMessage,
@@ -80,6 +81,7 @@ import {
   type EnvironmentSanitizationConfig,
 } from '../services/environmentSanitization.js';
 import { expandEnvVars } from '../utils/envExpansion.js';
+import { isRecord } from '../utils/markdownUtils.js';
 import {
   GEMINI_CLI_IDENTIFICATION_ENV_VAR,
   GEMINI_CLI_IDENTIFICATION_ENV_VAR_VALUE,
@@ -146,6 +148,7 @@ export class McpClient implements McpProgressReporter {
   private client: Client | undefined;
   private transport: Transport | undefined;
   private status: MCPServerStatus = MCPServerStatus.DISCONNECTED;
+  private authRecoveryInProgress = false;
   private isRefreshingTools: boolean = false;
   private pendingToolRefresh: boolean = false;
   private isRefreshingResources: boolean = false;
@@ -175,6 +178,147 @@ export class McpClient implements McpProgressReporter {
     return this.serverName;
   }
 
+  private isRecoverableTransportError(error: unknown): boolean {
+    const message = getErrorMessage(error);
+
+    if (isAuthenticationError(error)) {
+      return true;
+    }
+
+    return (
+      message.includes('401') ||
+      message.includes('Unauthorized') ||
+      message.includes('No auth provider') ||
+      message.includes('after successful authentication')
+    );
+  }
+
+  private isTransientStreamableHttpBackgroundError(error: unknown): boolean {
+    if (!usesHttpTransport(this.serverConfig)) {
+      return false;
+    }
+
+    const message = getErrorMessage(error);
+    return (
+      message.includes('SSE stream disconnected') ||
+      message.includes('Failed to reconnect SSE stream') ||
+      message.includes('Failed to open SSE stream')
+    );
+  }
+
+  private wireClientErrorHandling(client: Client): void {
+    const originalOnError = client.onerror;
+    client.onerror = (error) => {
+      if (this.status !== MCPServerStatus.CONNECTED) {
+        return;
+      }
+
+      if (
+        this.authRecoveryInProgress &&
+        this.isRecoverableTransportError(error)
+      ) {
+        debugLogger.log(
+          `Ignoring MCP transport error during auth recovery for '${this.serverName}': ${getErrorMessage(error)}`,
+        );
+        return;
+      }
+
+      if (this.isTransientStreamableHttpBackgroundError(error)) {
+        debugLogger.log(
+          `Ignoring transient Streamable HTTP background transport error for '${this.serverName}': ${getErrorMessage(error)}`,
+        );
+        return;
+      }
+
+      if (originalOnError) originalOnError(error);
+      this.cliConfig.emitMcpDiagnostic(
+        'error',
+        `MCP ERROR (${this.serverName})`,
+        error,
+        this.serverName,
+      );
+      this.updateStatus(MCPServerStatus.DISCONNECTED);
+    };
+  }
+
+  private async establishConnection(): Promise<void> {
+    this.client = await connectToMcpServer(
+      this.clientVersion,
+      this.serverName,
+      this.serverConfig,
+      this.debugMode,
+      this.workspaceContext,
+      this.cliConfig,
+    );
+
+    this.registerNotificationHandlers();
+    this.wireClientErrorHandling(this.client);
+    this.updateStatus(MCPServerStatus.CONNECTED);
+  }
+
+  private async reconnect(): Promise<void> {
+    if (this.client) {
+      try {
+        await this.client.close();
+      } catch (error) {
+        debugLogger.debug(
+          `Ignoring MCP client close error during reconnect for '${this.serverName}': ${getErrorMessage(error)}`,
+        );
+      }
+    }
+
+    this.client = undefined;
+    this.updateStatus(MCPServerStatus.CONNECTING);
+    await this.establishConnection();
+  }
+
+  private async runWithAuthRecovery<T>(
+    operation: () => Promise<T>,
+  ): Promise<T> {
+    this.authRecoveryInProgress = true;
+    try {
+      return await operation();
+    } finally {
+      this.authRecoveryInProgress = false;
+    }
+  }
+
+  private async callToolWithReconnect(
+    call: FunctionCall,
+    progressToken: string,
+  ): Promise<unknown> {
+    this.assertConnected();
+
+    const request = {
+      name: call.name!,
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
+      arguments: call.args as Record<string, unknown>,
+      _meta: { progressToken },
+    };
+
+    try {
+      return await this.client!.callTool(request, undefined, {
+        timeout: this.serverConfig.timeout ?? MCP_DEFAULT_TIMEOUT_MSEC,
+      });
+    } catch (error) {
+      if (!this.isRecoverableTransportError(error)) {
+        throw error;
+      }
+
+      debugLogger.log(
+        `Recoverable MCP tool call error for '${this.serverName}', reconnecting and retrying once: ${getErrorMessage(error)}`,
+      );
+
+      return this.runWithAuthRecovery(async () => {
+        await this.reconnect();
+
+        return this.client!.callTool(request, undefined, {
+          timeout: this.serverConfig.timeout ?? MCP_DEFAULT_TIMEOUT_MSEC,
+        });
+      });
+    }
+  }
+
   /**
    * Connects to the MCP server.
    */
@@ -186,32 +330,7 @@ export class McpClient implements McpProgressReporter {
     }
     this.updateStatus(MCPServerStatus.CONNECTING);
     try {
-      this.client = await connectToMcpServer(
-        this.clientVersion,
-        this.serverName,
-        this.serverConfig,
-        this.debugMode,
-        this.workspaceContext,
-        this.cliConfig,
-      );
-
-      this.registerNotificationHandlers();
-
-      const originalOnError = this.client.onerror;
-      this.client.onerror = (error) => {
-        if (this.status !== MCPServerStatus.CONNECTED) {
-          return;
-        }
-        if (originalOnError) originalOnError(error);
-        this.cliConfig.emitMcpDiagnostic(
-          'error',
-          `MCP ERROR (${this.serverName})`,
-          error,
-          this.serverName,
-        );
-        this.updateStatus(MCPServerStatus.DISCONNECTED);
-      };
-      this.updateStatus(MCPServerStatus.CONNECTED);
+      await this.establishConnection();
     } catch (error) {
       this.updateStatus(MCPServerStatus.DISCONNECTED);
       throw error;
@@ -335,6 +454,8 @@ export class McpClient implements McpProgressReporter {
           timeout: this.serverConfig.timeout ?? MCP_DEFAULT_TIMEOUT_MSEC,
         }),
         progressReporter: this,
+        toolCallRunner: (call, progressToken) =>
+          this.callToolWithReconnect(call, progressToken),
       },
     );
   }
@@ -1027,6 +1148,39 @@ function createAuthProvider(
   return undefined;
 }
 
+function usesHttpTransport(mcpServerConfig: MCPServerConfig): boolean {
+  if (mcpServerConfig.httpUrl) {
+    return true;
+  }
+
+  if (mcpServerConfig.type === 'sse') {
+    return false;
+  }
+
+  return !!mcpServerConfig.url;
+}
+
+async function createStoredOAuthAuthProvider(
+  mcpServerName: string,
+  mcpServerConfig: MCPServerConfig,
+): Promise<McpAuthProvider | undefined> {
+  if (!usesHttpTransport(mcpServerConfig)) {
+    return undefined;
+  }
+
+  const tokenStorage = new MCPOAuthTokenStorage();
+  const credentials = await tokenStorage.getCredentials(mcpServerName);
+  if (!credentials) {
+    return undefined;
+  }
+
+  return new StoredOAuthMcpProvider(
+    mcpServerName,
+    mcpServerConfig.oauth ?? {},
+    tokenStorage,
+  );
+}
+
 /**
  * Create a transport with OAuth token for the given server configuration.
  *
@@ -1276,6 +1430,10 @@ export async function discoverTools(
     timeout?: number;
     signal?: AbortSignal;
     progressReporter?: McpProgressReporter;
+    toolCallRunner?: (
+      call: FunctionCall,
+      progressToken: string,
+    ) => Promise<unknown>;
   },
 ): Promise<DiscoveredMCPTool[]> {
   try {
@@ -1295,6 +1453,7 @@ export async function discoverTools(
           toolDef,
           mcpServerConfig.timeout ?? MCP_DEFAULT_TIMEOUT_MSEC,
           options?.progressReporter,
+          options?.toolCallRunner,
         );
 
         // Extract annotations from the tool definition
@@ -1355,6 +1514,10 @@ class McpCallableTool implements CallableTool {
     private readonly toolDef: McpTool,
     private readonly timeout: number,
     private readonly progressReporter?: McpProgressReporter,
+    private readonly toolCallRunner?: (
+      call: FunctionCall,
+      progressToken: string,
+    ) => Promise<unknown>,
   ) {}
 
   async tool(): Promise<Tool> {
@@ -1386,22 +1549,29 @@ class McpCallableTool implements CallableTool {
     }
 
     try {
-      const result = await this.client.callTool(
-        {
-          name: call.name!,
-          // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
-          arguments: call.args as Record<string, unknown>,
-          _meta: { progressToken },
-        },
-        undefined,
-        { timeout: this.timeout },
-      );
+      const result = this.toolCallRunner
+        ? await this.toolCallRunner(call, progressToken)
+        : await this.client.callTool(
+            {
+              name: call.name!,
+              // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
+              arguments: call.args as Record<string, unknown>,
+              _meta: { progressToken },
+            },
+            undefined,
+            { timeout: this.timeout },
+          );
 
       return [
         {
           functionResponse: {
             name: call.name,
-            response: result,
+            response:
+              result === undefined
+                ? undefined
+                : isRecord(result)
+                  ? result
+                  : { result },
           },
         },
       ];
@@ -2190,7 +2360,11 @@ export async function createTransport(
     }
   }
   if (mcpServerConfig.httpUrl || mcpServerConfig.url) {
-    const authProvider = createAuthProvider(mcpServerConfig);
+    let authProvider = createAuthProvider(mcpServerConfig);
+    authProvider ??= await createStoredOAuthAuthProvider(
+      mcpServerName,
+      mcpServerConfig,
+    );
     const headers: Record<string, string> =
       (await authProvider?.getRequestHeaders?.()) ?? {};
 
