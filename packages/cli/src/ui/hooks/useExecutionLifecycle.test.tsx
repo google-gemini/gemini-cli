@@ -541,6 +541,7 @@ describe('useExecutionLifecycle', () => {
           italic: false,
           underline: false,
           inverse: false,
+          isUninitialized: false,
         },
       ],
     ];
