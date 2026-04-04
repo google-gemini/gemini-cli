@@ -302,10 +302,18 @@ export class ActivityLogger extends EventEmitter {
         return originalFetch(input, init);
 
       const id = Math.random().toString(36).substring(7);
-      const method = (init?.method || 'GET').toUpperCase();
+      const inputMethod =
+        typeof input === 'object' && 'method' in input
+          ? input.method
+          : undefined;
+      const method = (init?.method || inputMethod || 'GET').toUpperCase();
 
       const newInit = { ...init };
-      const headers = new Headers(init?.headers || {});
+      const inputHeaders =
+        typeof input === 'object' && 'headers' in input
+          ? input.headers
+          : undefined;
+      const headers = new Headers(init?.headers || inputHeaders || {});
       headers.set(ACTIVITY_ID_HEADER, id);
       newInit.headers = headers;
 
