@@ -22,12 +22,29 @@ export class SandboxedFileSystemService implements FileSystemService {
 
   private sanitizeAndValidatePath(filePath: string): string {
     const resolvedPath = resolveToRealPath(filePath);
-    if (!isSubpath(this.cwd, resolvedPath) && this.cwd !== resolvedPath) {
-      throw new Error(
-        `Access denied: Path '${filePath}' is outside the workspace.`,
-      );
+    const workspace = resolveToRealPath(this.sandboxManager.getWorkspace());
+
+    if (isSubpath(workspace, resolvedPath) || workspace === resolvedPath) {
+      return resolvedPath;
     }
-    return resolvedPath;
+
+    // Check if the path is explicitly allowed by the sandbox manager
+    const options = this.sandboxManager.getOptions();
+    const allowedPaths = options?.includeDirectories ?? [];
+
+    for (const allowed of allowedPaths) {
+      const resolvedAllowed = resolveToRealPath(allowed);
+      if (
+        isSubpath(resolvedAllowed, resolvedPath) ||
+        resolvedAllowed === resolvedPath
+      ) {
+        return resolvedPath;
+      }
+    }
+
+    throw new Error(
+      `Access denied: Path '${filePath}' is outside the workspace and not in allowed paths.`,
+    );
   }
 
   async readTextFile(filePath: string): Promise<string> {
