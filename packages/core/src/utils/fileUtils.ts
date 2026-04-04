@@ -278,9 +278,43 @@ export async function isEmpty(filePath: string): Promise<boolean> {
 }
 
 /**
+ * Check whether a buffer region starting at `offset` is a valid UTF-8 multibyte
+ * sequence. Returns the byte length of the sequence (2-4) if valid, or 0 if invalid.
+ */
+function validUtf8SequenceLength(
+  buf: Buffer,
+  offset: number,
+  bytesRead: number,
+): number {
+  const b = buf[offset];
+  let expectedLen: number;
+  if (b >= 0xc2 && b <= 0xdf) {
+    expectedLen = 2;
+  } else if (b >= 0xe0 && b <= 0xef) {
+    expectedLen = 3;
+  } else if (b >= 0xf0 && b <= 0xf4) {
+    expectedLen = 4;
+  } else {
+    return 0; // Not a valid leading byte
+  }
+
+  if (offset + expectedLen > bytesRead) return 0; // Truncated sequence
+
+  for (let j = 1; j < expectedLen; j++) {
+    if ((buf[offset + j] & 0xc0) !== 0x80) return 0; // Bad continuation byte
+  }
+  return expectedLen;
+}
+
+/**
  * Heuristic: determine if a file is likely binary.
- * Now BOM-aware: if a Unicode BOM is detected, we treat it as text.
- * For non-BOM files, retain the existing null-byte and non-printable ratio checks.
+ * BOM-aware: if a Unicode BOM is detected, we treat it as text.
+ * For non-BOM files we use null-byte detection and an invalid-byte ratio check.
+ *
+ * Importantly, valid UTF-8 multibyte sequences (including U+FFFD = EF BF BD)
+ * are NOT counted as non-printable. This prevents false positives for text files
+ * that legitimately contain the Unicode replacement character or other high-byte
+ * codepoints.
  */
 export async function isBinaryFile(filePath: string): Promise<boolean> {
   let fh: fs.promises.FileHandle | null = null;
@@ -303,7 +337,22 @@ export async function isBinaryFile(filePath: string): Promise<boolean> {
     let nonPrintableCount = 0;
     for (let i = 0; i < bytesRead; i++) {
       if (buf[i] === 0) return true; // strong indicator of binary when no BOM
-      if (buf[i] < 9 || (buf[i] > 13 && buf[i] < 32)) {
+
+      // For high bytes (>= 0x80), check if they form a valid UTF-8 multibyte
+      // sequence. Valid sequences (like U+FFFD encoded as EF BF BD) are normal
+      // text and should be skipped. Invalid sequences count toward the
+      // non-printable tally.
+      if (buf[i] >= 0x80) {
+        const seqLen = validUtf8SequenceLength(buf, i, bytesRead);
+        if (seqLen > 0) {
+          i += seqLen - 1; // skip the valid continuation bytes
+        } else {
+          nonPrintableCount++;
+        }
+        continue;
+      }
+
+      if (buf[i] < 9 || (buf[i] > 13 && buf[i] < 32) || buf[i] === 127) {
         nonPrintableCount++;
       }
     }
