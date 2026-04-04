@@ -1711,10 +1711,10 @@ const SETTINGS_SCHEMA = {
         type: 'boolean',
         label: 'Tool Sandboxing',
         category: 'Security',
-        requiresRestart: false,
+        requiresRestart: true,
         default: false,
         description:
-          'Experimental tool-level sandboxing (implementation in progress).',
+          'Tool-level sandboxing. Isolates individual tools instead of the entire CLI process.',
         showInDialog: true,
       },
       disableYoloMode: {
