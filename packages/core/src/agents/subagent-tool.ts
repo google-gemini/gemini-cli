@@ -28,6 +28,45 @@ import {
   GEN_AI_AGENT_NAME,
 } from '../telemetry/constants.js';
 
+/**
+ * Extracts missing required fields from a schema validation error.
+ */
+function extractMissingFieldsFromError(error: string): string[] {
+  const matches = error.match(/'([^']+)'\s*(?:is required|must be defined)/gi);
+  return matches ? matches.map((m) => m.replace(/['"]/g, '').trim()) : [];
+}
+
+/**
+ * Creates a helpful example input based on schema.
+ */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function createExampleInput(schema: any): Record<string, unknown> {
+  const example: Record<string, unknown> = {};
+  if (schema?.properties && typeof schema.properties === 'object') {
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
+    const requiredFields = (schema.required ?? []) as string[];
+    for (const [key, prop] of Object.entries(schema.properties)) {
+      if (requiredFields.includes(key)) {
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion, @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-assignment
+        const propConfig = prop as any;
+
+        if (propConfig.type === 'string') {
+          example[key] = `[Example value for ${key}]`;
+        } else if (propConfig.type === 'object') {
+          example[key] = {
+            /* nested */
+          };
+        } else if (propConfig.type === 'array') {
+          example[key] = [];
+        } else {
+          example[key] = null;
+        }
+      }
+    }
+  }
+  return example;
+}
+
 export class SubagentTool extends BaseDeclarativeTool<AgentInputs, ToolResult> {
   constructor(
     private readonly definition: AgentDefinition,
@@ -168,9 +207,26 @@ class SubAgentInvocation extends BaseToolInvocation<AgentInputs, ToolResult> {
     );
 
     if (validationError) {
-      throw new Error(
-        `Invalid arguments for agent '${this.definition.name}': ${validationError}. Input schema: ${JSON.stringify(this.definition.inputConfig.inputSchema)}.`,
-      );
+      const schema = this.definition.inputConfig.inputSchema;
+      const missingFields = extractMissingFieldsFromError(validationError);
+      const example = createExampleInput(schema);
+
+      const message = [
+        `Invalid arguments for agent '${this.definition.name}': ${validationError}`,
+        '',
+        'MISSING FIELDS: ' +
+          (missingFields.length > 0
+            ? missingFields.join(', ')
+            : '(unknown - see schema below)'),
+        '',
+        'EXPECTED SCHEMA:',
+        JSON.stringify(schema, null, 2),
+        '',
+        'VALID EXAMPLE:',
+        JSON.stringify(example, null, 2),
+      ].join('\n');
+
+      throw new Error(message);
     }
 
     const invocation = this.buildSubInvocation(

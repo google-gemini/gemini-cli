@@ -57,6 +57,7 @@ import {
   type SubagentActivityEvent,
 } from './types.js';
 import { getErrorMessage } from '../utils/errors.js';
+import { SchemaValidator } from '../utils/schemaValidator.js';
 import { templateString } from './utils.js';
 import { DEFAULT_GEMINI_MODEL, isAutoModel } from '../config/models.js';
 import type { RoutingContext } from '../routing/routingStrategy.js';
@@ -87,6 +88,48 @@ import {
 export type ActivityCallback = (activity: SubagentActivityEvent) => void;
 
 const GRACE_PERIOD_MS = 60 * 1000; // 1 min
+const MAX_VALIDATION_RETRIES_PER_TURN = 3;
+
+/**
+ * Extracts missing required fields from a schema validation error.
+ */
+function extractMissingFieldsFromError(error: string): string[] {
+  // AJV error messages for missing properties are typically in the format:
+  // "data must have required property 'fieldName'"
+  const regex = /must have required property '([^']+)'/g;
+  const matches = error.matchAll(regex);
+  return Array.from(matches, (match) => match[1]);
+}
+
+/**
+ * Creates a helpful example input based on schema properties and required fields.
+ */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function createExampleInput(schema: any): Record<string, unknown> {
+  const example: Record<string, unknown> = {};
+  if (schema?.properties && typeof schema.properties === 'object') {
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
+    const requiredFields = (schema.required ?? []) as string[];
+    for (const [key, prop] of Object.entries(schema.properties)) {
+      if (requiredFields.includes(key)) {
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion, @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-assignment
+        const propConfig = prop as any;
+        // Provide type-appropriate example
+
+        if (propConfig.type === 'string') {
+          example[key] = `[Example value for ${key}]`;
+        } else if (propConfig.type === 'object') {
+          example[key] = { '...': 'nested object' };
+        } else if (propConfig.type === 'array') {
+          example[key] = [];
+        } else {
+          example[key] = null;
+        }
+      }
+    }
+  }
+  return example;
+}
 
 /** The possible outcomes of a single agent turn. */
 type AgentTurnResult =
@@ -362,6 +405,64 @@ export class LocalAgentExecutor<TOutput extends z.ZodTypeAny> {
       return {
         status: 'stop',
         terminateReason: AgentTerminateMode.ERROR_NO_COMPLETE_TASK_CALL,
+        finalResult: null,
+      };
+    }
+
+    // NEW: Pre-validate function call arguments to catch schema errors early
+    // and prevent infinite retry loops
+    let validationFailureCount = 0;
+    for (const call of functionCalls) {
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
+      const toolName = call.name as string;
+      const tool = this.toolRegistry.getTool(toolName);
+
+      // Only validate if it's a real tool with input schema requirements
+      if (tool && toolName !== TASK_COMPLETE_TOOL_NAME) {
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-type-assertion, @typescript-eslint/no-explicit-any
+        const toolSchema = tool.parameterSchema;
+        if (toolSchema && typeof toolSchema === 'object') {
+          const args = call.args ?? {};
+          const validationError = SchemaValidator.validate(toolSchema, args);
+
+          if (validationError) {
+            validationFailureCount++;
+            const missingFields =
+              extractMissingFieldsFromError(validationError);
+            const example = createExampleInput(toolSchema);
+
+            const errorMsg =
+              missingFields.length > 0
+                ? `Missing required fields: ${missingFields.join(', ')}`
+                : validationError;
+
+            this.emitActivity('ERROR', {
+              error: `Tool '${toolName}' received invalid arguments: ${errorMsg}`,
+              context: 'schema_validation',
+              toolName,
+              missingFields,
+            });
+
+            debugLogger.warn(
+              `[LocalAgentExecutor] Schema validation failed for tool '${toolName}'.\n` +
+                `Error: ${validationError}\n` +
+                `Expected schema: ${JSON.stringify(toolSchema, null, 2)}\n` +
+                `Example: ${JSON.stringify(example, null, 2)}`,
+            );
+          }
+        }
+      }
+    }
+
+    // If too many validation failures in this turn, abort to prevent quota drain
+    if (validationFailureCount > MAX_VALIDATION_RETRIES_PER_TURN) {
+      this.emitActivity('ERROR', {
+        error: `Agent generated invalid arguments for multiple tool calls (${validationFailureCount} failures). Aborting to prevent infinite retry loop.`,
+        context: 'validation_failure_abort',
+      });
+      return {
+        status: 'stop',
+        terminateReason: AgentTerminateMode.ERROR,
         finalResult: null,
       };
     }
