@@ -1438,13 +1438,14 @@ export class Config implements McpContext, AgentLoopContext {
 
     if (this._params.activeTeam) {
       try {
-        this.teamRegistry.setActiveTeam(this._params.activeTeam);
+        await this.teamRegistry.setActiveTeam(this._params.activeTeam);
       } catch (_e) {
         // Ignore if team not found (might have been deleted or is project-specific)
       }
     }
 
     coreEvents.on(CoreEvent.AgentsRefreshed, this.onAgentsRefreshed);
+    coreEvents.on(CoreEvent.ActiveTeamChanged, this.onActiveTeamChanged);
 
     this._toolRegistry = await this.createToolRegistry();
     discoverToolsHandle?.end();
@@ -2047,10 +2048,16 @@ export class Config implements McpContext, AgentLoopContext {
     return this.teamRegistry.getActiveTeam();
   }
 
-  setActiveTeam(name: string | undefined): void {
-    this.teamRegistry.setActiveTeam(name);
+  async setActiveTeam(name: string | undefined): Promise<void> {
+    await this.teamRegistry.setActiveTeam(name);
     coreEvents.emitActiveTeamChanged(name);
   }
+
+  private onActiveTeamChanged = () => {
+    if (this._toolRegistry) {
+      this.registerSubAgentTools(this._toolRegistry);
+    }
+  };
 
   getAcknowledgedAgentsService(): AcknowledgedAgentsService {
     return this.acknowledgedAgentsService;
@@ -3603,36 +3610,30 @@ export class Config implements McpContext, AgentLoopContext {
    */
   private registerSubAgentTools(registry: ToolRegistry): void {
     const agentsOverrides = this.getAgentsSettings().overrides ?? {};
-    const discoveredDefinitions =
-      this.agentRegistry.getAllDiscoveredAgentNames();
 
-    // First, unregister any agents that are now disabled
-    for (const agentName of discoveredDefinitions) {
-      if (
-        !this.isAgentsEnabled() ||
-        agentsOverrides[agentName]?.enabled === false
-      ) {
-        const tool = registry.getTool(agentName);
-        if (tool instanceof SubagentTool) {
-          registry.unregisterTool(agentName);
-        }
+    // First, unregister ALL current SubagentTools to ensure a clean state
+    const allTools = registry.getAllTools();
+    for (const tool of allTools) {
+      if (tool instanceof SubagentTool) {
+        registry.unregisterTool(tool.name);
       }
     }
 
-    const discoveredNames = this.agentRegistry.getAllDiscoveredAgentNames();
+    if (!this.isAgentsEnabled()) {
+      return;
+    }
+
+    const activeAgentNames = this.agentRegistry.getAllAgentNames();
     const activeTeam = this.teamRegistry.getActiveTeam();
     const teamAgentNames = new Set(activeTeam?.agents.map((a) => a.name) ?? []);
 
-    for (const agentName of discoveredNames) {
-      const definition = this.agentRegistry.getDiscoveredDefinition(agentName);
+    for (const agentName of activeAgentNames) {
+      const definition = this.agentRegistry.getDefinition(agentName);
       if (!definition) {
         continue;
       }
       try {
-        if (
-          !this.isAgentsEnabled() ||
-          agentsOverrides[definition.name]?.enabled === false
-        ) {
+        if (agentsOverrides[definition.name]?.enabled === false) {
           continue;
         }
 

@@ -6,7 +6,7 @@
 
 import type React from 'react';
 import { useState, useMemo, useCallback } from 'react';
-import { Box, Text , useStdin } from 'ink';
+import { Box, Text, useStdin } from 'ink';
 import {
   type ScaffoldTeamAgent,
   scaffoldTeam,
@@ -104,7 +104,7 @@ export function TeamCreatorWizard({
     () =>
       config
         ?.getAgentRegistry()
-        .getAllDefinitions()
+        .getAllDiscoveredDefinitions()
         .filter((a) => a.kind === 'local') || [],
     [config],
   );
@@ -295,7 +295,7 @@ export function TeamCreatorWizard({
     (key: Key) => {
       if (step === 'success') {
         if (key.sequence?.toLowerCase() === 'y') {
-          handleTeamSelect(teamName);
+          void handleTeamSelect(teamName);
         }
         onComplete();
         return true;

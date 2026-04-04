@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { type TeamDefinition } from './types.js';
+import { type TeamDefinition, type AgentDefinition } from './types.js';
 import { type Config } from '../config/config.js';
 import { Storage } from '../config/storage.js';
 import { type AgentRegistry } from './registry.js';
@@ -79,37 +79,14 @@ export class TeamRegistry {
       coreEvents.emitFeedback('error', `Team loading error: ${error.message}`);
     }
 
-    const registrationPromises: Array<Promise<void>> = [];
-
     for (const team of result.teams) {
       this.teams.set(team.name, team);
 
-      // Register team agents in the global AgentRegistry so they are available as SubagentTools
+      // Record team agents for discovery (e.g. in the Team Creator)
       for (const agent of team.agents) {
-        const descriptionOverride = `MANDATORY for ${agent.displayName} tasks: ${agent.description} (Team Agent: ${team.displayName}). You MUST delegate all ${agent.displayName} tasks to this agent.`;
-
-        // We wrap the agent definition to provide the description override
-        const wrappedAgent = {
-          ...agent,
-          description: descriptionOverride,
-        };
-
-        registrationPromises.push(
-          this.agentRegistry.registerAgent(wrappedAgent).catch((e) => {
-            debugLogger.warn(
-              `[TeamRegistry] Error registering agent "${agent.name}" from team "${team.name}":`,
-              e,
-            );
-            coreEvents.emitFeedback(
-              'error',
-              `Error registering agent "${agent.name}" from team "${team.name}": ${e instanceof Error ? e.message : String(e)}`,
-            );
-          }),
-        );
+        this.agentRegistry.registerDiscoveredAgent(agent);
       }
     }
-
-    await Promise.allSettled(registrationPromises);
   }
 
   /**
@@ -124,16 +101,67 @@ export class TeamRegistry {
    * @param name The slug (name) of the team to activate, or undefined to clear.
    * @throws Error if the team is not found and name is provided.
    */
-  setActiveTeam(name: string | undefined): void {
+  async setActiveTeam(name: string | undefined): Promise<void> {
+    const previousTeam = this.getActiveTeam();
+
     if (name === undefined) {
       this.activeTeamName = undefined;
+      if (previousTeam) {
+        this.unregisterTeamAgents(previousTeam);
+      }
       return;
     }
 
     if (this.teams.has(name)) {
+      if (previousTeam) {
+        this.unregisterTeamAgents(previousTeam);
+      }
       this.activeTeamName = name;
+      const newTeam = this.getActiveTeam();
+      if (newTeam) {
+        await this.registerTeamAgents(newTeam);
+      }
     } else {
       throw new Error(`Team not found: ${name}`);
+    }
+  }
+
+  private async registerTeamAgents(team: TeamDefinition): Promise<void> {
+    const registrationPromises: Array<Promise<void>> = [];
+
+    for (const agent of team.agents) {
+      const descriptionOverride = `MANDATORY for ${agent.displayName} tasks: ${agent.description} (Team Agent: ${team.displayName}). You MUST delegate all ${agent.displayName} tasks to this agent.`;
+
+      // We wrap the agent definition to provide the description override
+      const wrappedAgent: AgentDefinition = {
+        ...agent,
+        description: descriptionOverride,
+        metadata: {
+          ...agent.metadata,
+          isTeamAgent: true,
+        },
+      };
+
+      registrationPromises.push(
+        this.agentRegistry.registerAgent(wrappedAgent).catch((e) => {
+          debugLogger.warn(
+            `[TeamRegistry] Error registering agent "${agent.name}" from team "${team.name}":`,
+            e,
+          );
+          coreEvents.emitFeedback(
+            'error',
+            `Error registering agent "${agent.name}" from team "${team.name}": ${e instanceof Error ? e.message : String(e)}`,
+          );
+        }),
+      );
+    }
+
+    await Promise.allSettled(registrationPromises);
+  }
+
+  private unregisterTeamAgents(team: TeamDefinition): void {
+    for (const agent of team.agents) {
+      this.agentRegistry.unregisterAgent(agent.name);
     }
   }
 

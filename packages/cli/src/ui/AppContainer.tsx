@@ -1424,8 +1424,8 @@ Logging in with Google... Restarting Gemini CLI to continue.
   const { handleInput: vimHandleInput } = useVim(buffer, handleFinalSubmit);
 
   const handleTeamSelect = useCallback(
-    (teamName: string | undefined) => {
-      config.setActiveTeam(teamName);
+    async (teamName: string | undefined) => {
+      await config.setActiveTeam(teamName);
       settings.setValue(SettingScope.Workspace, 'general.activeTeam', teamName);
       setIsTeamSelectionActive(false);
       refreshStatic();

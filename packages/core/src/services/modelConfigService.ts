@@ -333,8 +333,20 @@ export class ModelConfigService {
     this.runtimeAliases[aliasName] = alias;
   }
 
+  unregisterRuntimeModelConfig(aliasName: string): void {
+    delete this.runtimeAliases[aliasName];
+  }
+
   registerRuntimeModelOverride(override: ModelConfigOverride): void {
     this.runtimeOverrides.push(override);
+  }
+
+  unregisterRuntimeModelOverridesByScope(scope: string): void {
+    for (let i = this.runtimeOverrides.length - 1; i >= 0; i--) {
+      if (this.runtimeOverrides[i].match.overrideScope === scope) {
+        this.runtimeOverrides.splice(i, 1);
+      }
+    }
   }
 
   /**

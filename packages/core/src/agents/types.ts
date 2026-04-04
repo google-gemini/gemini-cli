@@ -199,6 +199,7 @@ export interface BaseAgentDefinition<
   metadata?: {
     hash?: string;
     filePath?: string;
+    isTeamAgent?: boolean;
   };
 }
 

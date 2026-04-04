@@ -313,6 +313,33 @@ export class AgentRegistry {
   }
 
   /**
+   * Unregisters an agent definition from the active agents list.
+   * It remains in the discovered definitions list.
+   */
+  unregisterAgent(name: string): void {
+    this.agents.delete(name);
+
+    // Unregister model configs
+    this.config.modelConfigService.unregisterRuntimeModelConfig(
+      `${name}-config`,
+    );
+    this.config.modelConfigService.unregisterRuntimeModelOverridesByScope(name);
+
+    // Remove policies
+    const policyEngine = this.config.getPolicyEngine();
+    if (policyEngine) {
+      policyEngine.removeRulesForTool(name, 'AgentRegistry (Dynamic)');
+    }
+  }
+
+  /**
+   * Registers an agent definition for discovery only.
+   */
+  registerDiscoveredAgent(definition: AgentDefinition): void {
+    this.allDefinitions.set(definition.name, definition);
+  }
+
+  /**
    * Registers an agent definition. If an agent with the same name exists,
    * it will be overwritten, respecting the precedence established by the
    * initialization order.
@@ -362,6 +389,16 @@ export class AgentRegistry {
     }
 
     this.agents.set(definition.name, definition);
+
+    // Register default model config for external agents
+    this.registerModelConfigs({
+      ...definition,
+      kind: 'local',
+      modelConfig: { model: 'inherit' },
+      runConfig: {},
+      promptConfig: {},
+    });
+
     this.addAgentPolicy(definition);
   }
 
@@ -432,7 +469,7 @@ export class AgentRegistry {
     policyEngine.addRule({
       toolName: definition.name,
       decision:
-        definition.kind === 'local'
+        definition.kind === 'local' || definition.metadata?.isTeamAgent
           ? PolicyDecision.ALLOW
           : PolicyDecision.ASK_USER,
       priority: PRIORITY_SUBAGENT_TOOL,
@@ -728,6 +765,13 @@ export class AgentRegistry {
    */
   getAllDefinitions(): AgentDefinition[] {
     return Array.from(this.agents.values());
+  }
+
+  /**
+   * Returns all discovered agent definitions.
+   */
+  getAllDiscoveredDefinitions(): AgentDefinition[] {
+    return Array.from(this.allDefinitions.values());
   }
 
   /**
