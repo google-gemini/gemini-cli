@@ -37,7 +37,7 @@ export interface SystemPromptOptions {
   hookContext?: boolean;
   primaryWorkflows?: PrimaryWorkflowsOptions;
   planningWorkflow?: PlanningWorkflowOptions;
-  taskTracker?: boolean;
+  taskTracker?: string;
   operationalGuidelines?: OperationalGuidelinesOptions;
   sandbox?: SandboxOptions;
   interactiveYoloMode?: boolean;
@@ -63,7 +63,7 @@ export interface PrimaryWorkflowsOptions {
   enableWriteTodosTool: boolean;
   enableEnterPlanModeTool: boolean;
   approvedPlan?: { path: string };
-  taskTracker?: boolean;
+  taskTracker?: string;
   topicUpdateNarration?: boolean;
 }
 
@@ -95,7 +95,6 @@ export interface PlanningWorkflowOptions {
   planModeToolsList: string;
   plansDir: string;
   approvedPlanPath?: string;
-  taskTracker?: boolean;
 }
 
 export interface AgentSkillOptions {
@@ -132,7 +131,7 @@ ${
     : renderPrimaryWorkflows(options.primaryWorkflows)
 }
 
-${options.taskTracker ? renderTaskTracker() : ''}
+${options.taskTracker ? renderTaskTracker(options.taskTracker) : ''}
 
 ${renderOperationalGuidelines(options.operationalGuidelines)}
 
@@ -491,10 +490,10 @@ An approved plan is available for this task.
 `;
 }
 
-export function renderTaskTracker(): string {
+export function renderTaskTracker(trackerDir: string): string {
   return `
 # TASK MANAGEMENT PROTOCOL
-You are operating with a persistent file-based task tracking system located at \`.tracker/tasks/\`. You must adhere to the following rules:
+You are operating with a persistent file-based task tracking system located at \`${trackerDir}\`. You must adhere to the following rules:
 
 1.  **NO IN-MEMORY LISTS**: Do not maintain a mental list of tasks or write markdown checkboxes in the chat. Use the provided tools (\`${TRACKER_CREATE_TASK_TOOL_NAME}\`, \`${TRACKER_LIST_TASKS_TOOL_NAME}\`, \`${TRACKER_UPDATE_TASK_TOOL_NAME}\`) for all state management.
 2.  **IMMEDIATE DECOMPOSITION**: Upon receiving a task, evaluate its functional complexity and scope. If the request involves more than a single atomic modification, or necessitates research before execution, you MUST immediately decompose it into discrete entries using \`${TRACKER_CREATE_TASK_TOOL_NAME}\`.
@@ -519,10 +518,10 @@ function mandateTopicUpdateModel(): string {
 ## Topic Updates
 As you work, the user follows along by reading topic updates that you publish with ${UPDATE_TOPIC_TOOL_NAME}. Keep them informed by doing the following:
 
-- Always call ${UPDATE_TOPIC_TOOL_NAME} in your first and last turn. The final turn should always recap what was done.
+- Usage Exception: NEVER use ${UPDATE_TOPIC_TOOL_NAME} for answering questions, providing explanations, or performing isolated lookup tasks (e.g. reading a single file, running a quick search, or checking a version). It is STRICTLY for orchestrating multi-step codebase modifications or complex investigations involving 3 or more tool calls.\n- Always call ${UPDATE_TOPIC_TOOL_NAME} in your first and last turn for tasks that require 3 or more tool calls. The final turn should always recap what was done.
 - Each topic update should give a concise description of what you are doing for the next few turns in the \`${TOPIC_PARAM_SUMMARY}\` parameter.
 - Provide topic updates whenever you change "topics". A topic is typically a discrete subgoal and will be every 3 to 10 turns. Do not use ${UPDATE_TOPIC_TOOL_NAME} on every turn.
-- The typical user message should call ${UPDATE_TOPIC_TOOL_NAME} 3 or more times. Each corresponds to a distinct phase of the task, such as "Researching X", "Researching Y", "Implementing Z with X", and "Testing Z".
+- The typical complex user message should call ${UPDATE_TOPIC_TOOL_NAME} 3 or more times. Each corresponds to a distinct phase of the task, such as "Researching X", "Researching Y", "Implementing Z with X", and "Testing Z".
 - Remember to call ${UPDATE_TOPIC_TOOL_NAME} when you experience an unexpected event (e.g., a test failure, compilation error, environment issue, or unexpected learning) that requires a strategic detour.
 - **Examples:**
   - ${UPDATE_TOPIC_TOOL_NAME}(${TOPIC_PARAM_TITLE}="Researching Parser", ${TOPIC_PARAM_SUMMARY}="I am starting an investigation into the parser timeout bug. My goal is to first understand the current test coverage and then attempt to reproduce the failure. This phase will focus on identifying the bottleneck in the main loop before we move to implementation.")

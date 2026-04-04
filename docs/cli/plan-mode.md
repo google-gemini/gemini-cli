@@ -123,6 +123,7 @@ These are the only allowed tools:
   [`glob`](../tools/file-system.md#4-glob-findfiles)
 - **Search:** [`grep_search`](../tools/file-system.md#5-grep_search-searchtext),
   [`google_web_search`](../tools/web-search.md),
+  [`web_fetch`](../tools/web-fetch.md) (requires explicit confirmation),
   [`get_internal_docs`](../tools/internal-docs.md)
 - **Research Subagents:**
   [`codebase_investigator`](../core/subagents.md#codebase-investigator),
@@ -180,9 +181,16 @@ As described in the
 rule that does not explicitly specify `modes` is considered "always active" and
 will apply to Plan Mode as well.
 
-If you want a rule to apply to other modes but _not_ to Plan Mode, you must
-explicitly specify the target modes. For example, to allow `npm test` in default
-and Auto-Edit modes but not in Plan Mode:
+To maintain the integrity of Plan Mode as a safe research environment,
+persistent tool approvals are context-aware. Approvals granted in modes like
+Default or Auto-Edit do not apply to Plan Mode, ensuring that tools trusted for
+implementation don't automatically execute while you're researching. However,
+approvals granted while in Plan Mode are treated as intentional choices for
+global trust and apply to all modes.
+
+If you want to manually restrict a rule to other modes but _not_ to Plan Mode,
+you must explicitly specify the target modes. For example, to allow `npm test`
+in default and Auto-Edit modes but not in Plan Mode:
 
 ```toml
 [[rule]]

@@ -51,7 +51,7 @@ export async function refreshMemory(
   let fileCount = 0;
 
   if (config.isJitContextEnabled()) {
-    await config.getContextManager()?.refresh();
+    await config.getMemoryContextManager()?.refresh();
     memoryContent = flattenMemory(config.getUserMemory());
     fileCount = config.getGeminiMdFileCount();
   } else {

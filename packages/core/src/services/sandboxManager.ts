@@ -57,6 +57,7 @@ export interface SandboxModeConfig {
   network?: boolean;
   approvedTools?: string[];
   allowOverrides?: boolean;
+  yolo?: boolean;
 }
 
 /**
@@ -140,6 +141,16 @@ export interface SandboxManager {
    * Parses the output of a command to detect sandbox denials.
    */
   parseDenials(result: ShellExecutionResult): ParsedSandboxDenial | undefined;
+
+  /**
+   * Returns the primary workspace directory for this sandbox.
+   */
+  getWorkspace(): string;
+
+  /**
+   * Returns the global sandbox options for this sandbox.
+   */
+  getOptions(): GlobalSandboxOptions | undefined;
 }
 
 /**
@@ -238,6 +249,8 @@ export async function findSecretFiles(
  * through while applying environment sanitization.
  */
 export class NoopSandboxManager implements SandboxManager {
+  constructor(private options?: GlobalSandboxOptions) {}
+
   /**
    * Prepares a command by sanitizing the environment and passing through
    * the original program and arguments.
@@ -271,12 +284,22 @@ export class NoopSandboxManager implements SandboxManager {
   parseDenials(): undefined {
     return undefined;
   }
+
+  getWorkspace(): string {
+    return this.options?.workspace ?? process.cwd();
+  }
+
+  getOptions(): GlobalSandboxOptions | undefined {
+    return this.options;
+  }
 }
 
 /**
  * A SandboxManager implementation that just runs locally (no sandboxing yet).
  */
 export class LocalSandboxManager implements SandboxManager {
+  constructor(private options?: GlobalSandboxOptions) {}
+
   async prepareCommand(_req: SandboxRequest): Promise<SandboxedCommand> {
     throw new Error('Tool sandboxing is not yet implemented.');
   }
@@ -291,6 +314,14 @@ export class LocalSandboxManager implements SandboxManager {
 
   parseDenials(): undefined {
     return undefined;
+  }
+
+  getWorkspace(): string {
+    return this.options?.workspace ?? process.cwd();
+  }
+
+  getOptions(): GlobalSandboxOptions | undefined {
+    return this.options;
   }
 }
 

@@ -285,6 +285,8 @@ async function reloadAction(
       context.ui.setPendingItem(null);
     }
 
+    context.ui.reloadCommands();
+
     const afterSkills = skillManager.getSkills();
     const afterNames = new Set(afterSkills.map((s) => s.name));
 
