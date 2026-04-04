@@ -99,7 +99,7 @@ exports[`InputPrompt > History Navigation and Completion Suppression > should no
 
 exports[`InputPrompt > command search (Ctrl+R when not in shell) > expands and collapses long suggestion via Right/Left arrows > command-search-render-collapsed-match 1`] = `
 "▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀
- (r:)    Type your message or @path/to/file                                                         
+ (r:)   Type your message or @path/to/file                                                          
 ▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄
  lllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllll → 
  lllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllll   
@@ -109,7 +109,7 @@ exports[`InputPrompt > command search (Ctrl+R when not in shell) > expands and c
 
 exports[`InputPrompt > command search (Ctrl+R when not in shell) > expands and collapses long suggestion via Right/Left arrows > command-search-render-expanded-match 1`] = `
 "▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀
- (r:)    Type your message or @path/to/file                                                         
+ (r:)   Type your message or @path/to/file                                                          
 ▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄
  lllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllll ← 
  lllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllll   

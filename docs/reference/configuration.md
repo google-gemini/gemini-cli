@@ -393,6 +393,30 @@ their corresponding top-level category object in your `settings.json` file.
   - **Default:** `false`
   - **Requires restart:** Yes
 
+#### `voice`
+
+- **`voice.enabled`** (boolean):
+  - **Description:** Enable voice input support. Note: Voice input is not
+    natively supported in WSL2 (Windows Subsystem for Linux).
+  - **Default:** `false`
+
+- **`voice.provider`** (enum):
+  - **Description:** Transcription backend: "gemini" (default, zero-install) or
+    "whisper" (local).
+  - **Default:** `"gemini"`
+  - **Values:** `"gemini"`, `"whisper"`
+
+- **`voice.whisperPath`** (string):
+  - **Description:** Path to the whisper executable. Only used when provider is
+    "whisper".
+  - **Default:** `undefined`
+
+- **`voice.silenceThreshold`** (number):
+  - **Description:** RMS energy threshold (0–1000) below which audio is
+    discarded as silence. Lower values allow quieter speech such as whispering.
+    0 disables silence detection.
+  - **Default:** `80`
+
 #### `ide`
 
 - **`ide.enabled`** (boolean):

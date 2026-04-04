@@ -255,6 +255,31 @@ Slash commands provide meta-level control over the CLI itself.
     - **Description:** List configured MCP servers and tools with descriptions
       and schemas.
 
+### `/voice`
+
+- **Description:** Manage voice input configuration and inspect current voice
+  settings.
+- **Shortcuts:** Press **Space Space** on an empty prompt to start or stop
+  recording. Press **Esc** while recording to cancel.
+- **Sub-commands:**
+  - **`enable`**:
+    - **Description:** Enable voice input.
+  - **`disable`**:
+    - **Description:** Disable voice input.
+  - **`provider [gemini|whisper]`**:
+    - **Description:** Set the transcription backend.
+  - **`sensitivity <0-1000>`**:
+    - **Description:** Set the silence detection threshold. `0` disables silence
+      filtering.
+  - **`set-path <path>`**:
+    - **Description:** Set the path to the Whisper binary when using the local
+      Whisper backend.
+  - **`help`**:
+    - **Description:** Show voice command help.
+  - **Default behavior:**
+    - **Description:** Running `/voice` with no sub-command shows the current
+      voice settings.
+
 ### `/memory`
 
 - **Description:** Manage the AI's instructional context (hierarchical memory
