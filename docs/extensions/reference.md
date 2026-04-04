@@ -41,27 +41,41 @@ To uninstall one or more extensions, use the `uninstall` command:
 gemini extensions uninstall <name...>
 ```
 
-### Disable an extension
+### Disable extensions
 
-Extensions are enabled globally by default. You can disable an extension
-entirely or for a specific workspace.
+Extensions are enabled globally by default. You can disable one or more
+extensions entirely or for a specific workspace.
 
 ```bash
-gemini extensions disable <name> [--scope <scope>]
+gemini extensions disable <names..> [--scope <scope>]
 ```
 
-- `<name>`: The name of the extension to disable.
+To disable every installed extension at once, use `--all`:
+
+```bash
+gemini extensions disable --all
+```
+
+- `<names..>`: One or more extension names to disable.
+- `--all`: Disable every installed extension.
 - `--scope`: The scope to disable the extension in (`user` or `workspace`).
 
-### Enable an extension
+### Enable extensions
 
-Re-enable a disabled extension using the `enable` command:
+Re-enable one or more disabled extensions using the `enable` command:
 
 ```bash
-gemini extensions enable <name> [--scope <scope>]
+gemini extensions enable <names..> [--scope <scope>]
 ```
 
-- `<name>`: The name of the extension to enable.
+To enable every installed extension at once, use `--all`:
+
+```bash
+gemini extensions enable --all
+```
+
+- `<names..>`: One or more extension names to enable.
+- `--all`: Enable every installed extension.
 - `--scope`: The scope to enable the extension in (`user` or `workspace`).
 
 ### Update an extension
