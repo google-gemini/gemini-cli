@@ -1766,6 +1766,44 @@ describe('Session', () => {
     );
   });
 
+  it('should forward video prompt blocks as inlineData', async () => {
+    const stream = createMockStream([
+      {
+        type: StreamEventType.CHUNK,
+        value: { candidates: [] },
+      },
+    ]);
+    mockChat.sendMessageStream.mockResolvedValue(stream);
+
+    await session.prompt({
+      sessionId: 'session-1',
+      prompt: [
+        { type: 'text', text: 'Describe this clip' },
+        {
+          type: 'video',
+          mimeType: 'video/mp4',
+          data: 'base64-video-data',
+        } as unknown as acp.ContentBlock,
+      ],
+    });
+
+    expect(mockChat.sendMessageStream).toHaveBeenCalledWith(
+      expect.anything(),
+      [
+        { text: 'Describe this clip' },
+        {
+          inlineData: {
+            mimeType: 'video/mp4',
+            data: 'base64-video-data',
+          },
+        },
+      ],
+      expect.anything(),
+      expect.any(AbortSignal),
+      LlmRole.MAIN,
+    );
+  });
+
   it('should handle @path resolution error', async () => {
     (path.resolve as unknown as Mock).mockReturnValue('/tmp/error.txt');
     (fs.stat as unknown as Mock).mockResolvedValue({

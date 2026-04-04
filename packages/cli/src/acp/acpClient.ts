@@ -89,6 +89,16 @@ const RequestPermissionResponseSchema = z.object({
   ]),
 });
 
+type VideoContentBlock = {
+  type: 'video';
+  mimeType: string;
+  data: string;
+};
+
+type SupportedInlineMediaBlock =
+  | Extract<acp.ContentBlock, { type: 'image' | 'audio' }>
+  | VideoContentBlock;
+
 export async function runAcpClient(
   config: Config,
   settings: LoadedSettings,
@@ -1250,36 +1260,41 @@ export class Session {
     const embeddedContext: acp.EmbeddedResourceResource[] = [];
 
     const parts = message.map((part) => {
-      switch (part.type) {
+      const contentBlock = part as acp.ContentBlock | VideoContentBlock;
+
+      switch (contentBlock.type) {
         case 'text':
-          return { text: part.text };
+          return { text: contentBlock.text };
         case 'image':
         case 'audio':
+        case 'video': {
+          const mediaPart = contentBlock as SupportedInlineMediaBlock;
           return {
             inlineData: {
-              mimeType: part.mimeType,
-              data: part.data,
+              mimeType: mediaPart.mimeType,
+              data: mediaPart.data,
             },
           };
+        }
         case 'resource_link': {
-          if (part.uri.startsWith(FILE_URI_SCHEME)) {
+          if (contentBlock.uri.startsWith(FILE_URI_SCHEME)) {
             return {
               fileData: {
-                mimeData: part.mimeType,
-                name: part.name,
-                fileUri: part.uri.slice(FILE_URI_SCHEME.length),
+                mimeData: contentBlock.mimeType,
+                name: contentBlock.name,
+                fileUri: contentBlock.uri.slice(FILE_URI_SCHEME.length),
               },
             };
           } else {
-            return { text: `@${part.uri}` };
+            return { text: `@${contentBlock.uri}` };
           }
         }
         case 'resource': {
-          embeddedContext.push(part.resource);
-          return { text: `@${part.resource.uri}` };
+          embeddedContext.push(contentBlock.resource);
+          return { text: `@${contentBlock.resource.uri}` };
         }
         default: {
-          const unreachable: never = part;
+          const unreachable: never = contentBlock;
           throw new Error(`Unexpected chunk type: '${unreachable}'`);
         }
       }
