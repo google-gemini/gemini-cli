@@ -2574,8 +2574,8 @@
       "properties": {
         "toolSandboxing": {
           "title": "Tool Sandboxing",
-          "description": "Experimental tool-level sandboxing (implementation in progress).",
-          "markdownDescription": "Experimental tool-level sandboxing (implementation in progress).\n\n- Category: `Security`\n- Requires restart: `no`\n- Default: `false`",
+          "description": "Tool-level sandboxing. Isolates individual tools instead of the entire CLI process.",
+          "markdownDescription": "Tool-level sandboxing. Isolates individual tools instead of the entire CLI process.\n\n- Category: `Security`\n- Requires restart: `yes`\n- Default: `false`",
           "default": false,
           "type": "boolean"
         },
