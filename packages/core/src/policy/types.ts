@@ -143,6 +143,12 @@ export interface PolicyRule {
   argsPattern?: RegExp;
 
   /**
+   * A human-readable display string representing the constraint (e.g., 'git diff*').
+   * Used for UI presentation to avoid reverse-engineering the compiled `argsPattern` regex.
+   */
+  constraintDisplay?: string;
+
+  /**
    * Metadata annotations provided by the tool (e.g. readOnlyHint).
    * All keys and values in this record must match the tool's annotations.
    */
@@ -209,6 +215,11 @@ export interface SafetyCheckerRule {
    * Can be used for more fine-grained control.
    */
   argsPattern?: RegExp;
+
+  /**
+   * A human-readable display string representing the constraint.
+   */
+  constraintDisplay?: string;
 
   /**
    * Metadata annotations provided by the tool (e.g. readOnlyHint).

@@ -87,7 +87,7 @@ describe('Shell Safety Policy', () => {
     const argsPatterns = buildArgsPatterns(undefined, prefix, undefined);
     // Since buildArgsPatterns returns array of patterns (strings), we pick the first one
     // and compile it.
-    const argsPattern = new RegExp(argsPatterns[0]!);
+    const argsPattern = new RegExp(argsPatterns[0].pattern!);
 
     return new PolicyEngine({
       rules: [
@@ -201,13 +201,13 @@ describe('Shell Safety Policy', () => {
       rules: [
         {
           toolName: 'run_shell_command',
-          argsPattern: new RegExp(argsPatternsEcho[0]!),
+          argsPattern: new RegExp(argsPatternsEcho[0].pattern!),
           decision: PolicyDecision.ALLOW,
           priority: 2,
         },
         {
           toolName: 'run_shell_command',
-          argsPattern: new RegExp(argsPatternsGit[0]!),
+          argsPattern: new RegExp(argsPatternsGit[0].pattern!),
           decision: PolicyDecision.ALLOW,
           priority: 2,
         },
@@ -287,14 +287,14 @@ describe('Shell Safety Policy', () => {
       rules: [
         {
           toolName: 'run_shell_command',
-          argsPattern: new RegExp(argsPatternsEcho[0]!),
+          argsPattern: new RegExp(argsPatternsEcho[0].pattern!),
           decision: PolicyDecision.ALLOW,
           priority: 2,
         },
         {
           toolName: 'run_shell_command',
           // Matches "git" at start of *subcommand*
-          argsPattern: new RegExp(argsPatternsGit[0]!),
+          argsPattern: new RegExp(argsPatternsGit[0].pattern!),
           decision: PolicyDecision.ALLOW,
           priority: 2,
         },
@@ -332,7 +332,7 @@ describe('Shell Safety Policy', () => {
       rules: [
         {
           toolName: 'run_shell_command',
-          argsPattern: new RegExp(argsPatternsGitLog[0]!),
+          argsPattern: new RegExp(argsPatternsGitLog[0].pattern!),
           decision: PolicyDecision.ALLOW,
           priority: 2,
           allowRedirection: true,
@@ -375,7 +375,7 @@ describe('Shell Safety Policy', () => {
       rules: [
         {
           toolName: 'run_shell_command',
-          argsPattern: new RegExp(argsPatternsPush[0]!),
+          argsPattern: new RegExp(argsPatternsPush[0].pattern!),
           decision: PolicyDecision.DENY,
           priority: 2,
         },
@@ -406,7 +406,7 @@ describe('Shell Safety Policy', () => {
       rules: [
         {
           toolName: 'run_shell_command',
-          argsPattern: new RegExp(argsPatternsGitStatus[0]!),
+          argsPattern: new RegExp(argsPatternsGitStatus[0].pattern!),
           decision: PolicyDecision.ALLOW,
           priority: 2,
           name: 'allow_git_status_rule', // Give a name to easily identify
@@ -443,7 +443,7 @@ describe('Shell Safety Policy', () => {
       rules: [
         {
           toolName: 'run_shell_command',
-          argsPattern: new RegExp(argsPatternsAnotherUnknown[0]!),
+          argsPattern: new RegExp(argsPatternsAnotherUnknown[0].pattern!),
           decision: PolicyDecision.ASK_USER,
           priority: 2,
           name: 'ask_another_unknown_command_rule',
@@ -486,14 +486,14 @@ describe('Shell Safety Policy', () => {
       rules: [
         {
           toolName: 'run_shell_command',
-          argsPattern: new RegExp(argsPatternsAsk1[0]!),
+          argsPattern: new RegExp(argsPatternsAsk1[0].pattern!),
           decision: PolicyDecision.ASK_USER,
           priority: 2,
           name: 'ask_rule_1',
         },
         {
           toolName: 'run_shell_command',
-          argsPattern: new RegExp(argsPatternsAsk2[0]!),
+          argsPattern: new RegExp(argsPatternsAsk2[0].pattern!),
           decision: PolicyDecision.ASK_USER,
           priority: 2,
           name: 'ask_rule_2',

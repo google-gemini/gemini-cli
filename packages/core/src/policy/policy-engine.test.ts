@@ -786,7 +786,7 @@ describe('PolicyEngine', () => {
       const rules: PolicyRule[] = [
         {
           toolName: 'run_shell_command',
-          argsPattern: new RegExp(patterns[0]!),
+          argsPattern: new RegExp(patterns[0].pattern!),
           decision: PolicyDecision.ALLOW,
         },
       ];
