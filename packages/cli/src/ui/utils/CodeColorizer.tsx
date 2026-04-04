@@ -136,6 +136,7 @@ export interface ColorizeCodeOptions {
   hideLineNumbers?: boolean;
   disableColor?: boolean;
   returnLines?: boolean;
+  paddingX?: number;
 }
 
 /**
@@ -160,6 +161,7 @@ export function colorizeCode({
   hideLineNumbers = false,
   disableColor = false,
   returnLines = false,
+  paddingX = 0,
 }: ColorizeCodeOptions): React.ReactNode | React.ReactNode[] {
   const codeToHighlight = code.replace(/\n$/, '');
   const activeTheme = theme || themeManager.getActiveTheme();
@@ -167,26 +169,29 @@ export function colorizeCode({
     ? false
     : settings.merged.ui.showLineNumbers;
 
-  const useMaxSizedBox = !settings.merged.ui.useAlternateBuffer && !returnLines;
+  // We force MaxSizedBox if availableHeight is provided, even if alternate buffer is enabled,
+  // because this might be rendered in a constrained UI box (like tool confirmation).
+  const useMaxSizedBox =
+    (!settings.merged.ui.useAlternateBuffer || availableHeight !== undefined) &&
+    !returnLines;
+
+  let hiddenLinesCount = 0;
+  let finalLines = codeToHighlight.split(/\r?\n/);
+
   try {
-    // Render the HAST tree using the adapted theme
-    // Apply the theme's default foreground color to the top-level Text element
-    let lines = codeToHighlight.split(/\r?\n/);
-    const padWidth = String(lines.length).length; // Calculate padding width based on number of lines
-
-    let hiddenLinesCount = 0;
-
     // Optimization to avoid highlighting lines that cannot possibly be displayed.
     if (availableHeight !== undefined && useMaxSizedBox) {
       availableHeight = Math.max(availableHeight, MINIMUM_MAX_HEIGHT);
-      if (lines.length > availableHeight) {
-        const sliceIndex = lines.length - availableHeight;
+      if (finalLines.length > availableHeight) {
+        const sliceIndex = finalLines.length - availableHeight;
         hiddenLinesCount = sliceIndex;
-        lines = lines.slice(sliceIndex);
+        finalLines = finalLines.slice(sliceIndex);
       }
     }
 
-    const renderedLines = lines.map((line, index) => {
+    const padWidth = String(finalLines.length + hiddenLinesCount).length;
+
+    const renderedLines = finalLines.map((line, index) => {
       const contentToRender = disableColor
         ? line
         : highlightAndRenderLine(line, language, activeTheme);
@@ -223,6 +228,7 @@ export function colorizeCode({
     if (useMaxSizedBox) {
       return (
         <MaxSizedBox
+          paddingX={paddingX}
           maxHeight={availableHeight}
           maxWidth={maxWidth}
           additionalHiddenLinesCount={hiddenLinesCount}
@@ -244,10 +250,8 @@ export function colorizeCode({
       error,
     );
     // Fall back to plain text with default color on error
-    // Also display line numbers in fallback
-    const lines = codeToHighlight.split(/\r?\n/);
-    const padWidth = String(lines.length).length; // Calculate padding width based on number of lines
-    const fallbackLines = lines.map((line, index) => (
+    const padWidth = String(finalLines.length + hiddenLinesCount).length;
+    const fallbackLines = finalLines.map((line, index) => (
       <Box key={index} minHeight={1}>
         {showLineNumbers && (
           <Box
@@ -258,7 +262,7 @@ export function colorizeCode({
             justifyContent="flex-end"
           >
             <Text color={disableColor ? undefined : activeTheme.defaultColor}>
-              {`${index + 1}`}
+              {`${index + 1 + hiddenLinesCount}`}
             </Text>
           </Box>
         )}
@@ -275,8 +279,10 @@ export function colorizeCode({
     if (useMaxSizedBox) {
       return (
         <MaxSizedBox
+          paddingX={paddingX}
           maxHeight={availableHeight}
           maxWidth={maxWidth}
+          additionalHiddenLinesCount={hiddenLinesCount}
           overflowDirection="top"
         >
           {fallbackLines}
