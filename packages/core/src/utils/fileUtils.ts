@@ -288,11 +288,11 @@ function validUtf8SequenceLength(
 ): number {
   const b = buf[offset];
   let expectedLen: number;
-  if ((b & 0xe0) === 0xc0) {
+  if (b >= 0xc2 && b <= 0xdf) {
     expectedLen = 2;
-  } else if ((b & 0xf0) === 0xe0) {
+  } else if (b >= 0xe0 && b <= 0xef) {
     expectedLen = 3;
-  } else if ((b & 0xf8) === 0xf0) {
+  } else if (b >= 0xf0 && b <= 0xf4) {
     expectedLen = 4;
   } else {
     return 0; // Not a valid leading byte
@@ -352,7 +352,7 @@ export async function isBinaryFile(filePath: string): Promise<boolean> {
         continue;
       }
 
-      if (buf[i] < 9 || (buf[i] > 13 && buf[i] < 32)) {
+      if (buf[i] < 9 || (buf[i] > 13 && buf[i] < 32) || buf[i] === 127) {
         nonPrintableCount++;
       }
     }
