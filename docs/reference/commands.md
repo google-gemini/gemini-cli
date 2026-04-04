@@ -17,8 +17,6 @@ Slash commands provide meta-level control over the CLI itself.
 ### `/agents`
 
 - **Description:** Manage local and remote subagents.
-- **Note:** This command is experimental and requires
-  `experimental.enableAgents: true` in your `settings.json`.
 - **Sub-commands:**
   - **`list`**:
     - **Description:** Lists all discovered agents, including built-in, local,
@@ -250,8 +248,8 @@ Slash commands provide meta-level control over the CLI itself.
   - **`list`** or **`ls`**:
     - **Description:** List configured MCP servers and tools. This is the
       default action if no subcommand is specified.
-  - **`refresh`**:
-    - **Description:** Restarts all MCP servers and re-discovers their available
+  - **`reload`**:
+    - **Description:** Reloads all MCP servers and re-discovers their available
       tools.
   - **`schema`**:
     - **Description:** List configured MCP servers and tools with descriptions
@@ -305,7 +303,7 @@ Slash commands provide meta-level control over the CLI itself.
 - **Description:** Switch to Plan Mode (read-only) and view the current plan if
   one has been generated.
   - **Note:** This feature is enabled by default. It can be disabled via the
-    `experimental.plan` setting in your configuration.
+    `general.plan.enabled` setting in your configuration.
 - **Sub-commands:**
   - **`copy`**:
     - **Description:** Copy the currently approved plan to your clipboard.

@@ -18,7 +18,7 @@ describe('renderOperationalGuidelines - memoryManagerEnabled', () => {
   it('should include standard memory tool guidance when memoryManagerEnabled is false', () => {
     const result = renderOperationalGuidelines(baseOptions);
     expect(result).toContain('save_memory');
-    expect(result).toContain('persistent user-related information');
+    expect(result).toContain('persist facts across sessions');
     expect(result).not.toContain('subagent');
   });
 
