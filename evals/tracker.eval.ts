@@ -60,7 +60,8 @@ describe('tracker_mode', () => {
         'Expected tracker_update_task tool to be called',
       ).toBe(true);
 
-      const updateCall = toolLogs.find(
+      const updatedToolLogs = rig.readToolLogs();
+      const updateCall = updatedToolLogs.find(
         (log) => log.toolRequest.name === TRACKER_UPDATE_TASK_TOOL_NAME,
       );
       expect(updateCall).toBeDefined();
