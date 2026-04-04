@@ -349,7 +349,7 @@ export function symlinkNodeModules(testDir: string) {
     fs.existsSync(rootNodeModules) &&
     !fs.existsSync(testNodeModules)
   ) {
-    fs.symlinkSync(rootNodeModules, testNodeModules, 'dir');
+    fs.symlinkSync(rootNodeModules, testNodeModules, 'junction');
   }
 }
 
