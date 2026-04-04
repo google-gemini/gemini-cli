@@ -285,6 +285,39 @@ export async function main() {
     });
   }
 
+  // Check for daemon client/server commands — these need raw stdio (not
+  // patched) because they write directly to stdout/stderr and must not be
+  // intercepted by the interactive UI renderer.
+  if (
+    argv.daemonStatus ||
+    argv.daemonStop ||
+    argv.client ||
+    argv.close ||
+    argv.daemon
+  ) {
+    cleanupStdio();
+
+    if (argv.daemon) {
+      const { startDaemon } = await import('./daemon/daemonServer.js');
+      await startDaemon(settings, argv);
+      return;
+    }
+
+    let input = argv.promptInteractive || argv.prompt || argv.query || '';
+    if (argv.client && !process.stdin.isTTY) {
+      const { readStdin } = await import('./utils/readStdin.js');
+      const stdinData = await readStdin();
+      if (stdinData) {
+        input = input ? `${stdinData}\n\n${input}` : stdinData;
+      }
+    }
+    const { runDaemonClientCommands } = await import(
+      './daemon/daemonClient.js'
+    );
+    await runDaemonClientCommands(argv, input);
+    return;
+  }
+
   // Check for invalid input combinations early to prevent crashes
   if (argv.promptInteractive && !process.stdin.isTTY) {
     writeToStderr(
