@@ -28,7 +28,7 @@
   },
   "devDependencies": {
     "typescript": "^5.3.3",
-    "vitest": "^3.1.1"
+    "vitest": "^4.1.1"
   },
   "engines": {
     "node": ">=20"

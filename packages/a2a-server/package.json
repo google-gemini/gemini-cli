@@ -25,26 +25,26 @@
     "dist"
   ],
   "dependencies": {
-    "@a2a-js/sdk": "0.3.11",
+    "@a2a-js/sdk": "0.3.13",
     "@google-cloud/storage": "^7.16.0",
     "@google/gemini-cli-core": "file:../core",
     "express": "^5.1.0",
-    "fs-extra": "^11.3.0",
-    "strip-json-comments": "^3.1.1",
-    "tar": "^7.5.8",
+    "fs-extra": "^11.3.4",
+    "strip-json-comments": "^5.0.3",
+    "tar": "^7.5.13",
     "uuid": "^13.0.0",
-    "winston": "^3.17.0"
+    "winston": "^3.19.0"
   },
   "devDependencies": {
-    "@google/genai": "1.30.0",
-    "@types/express": "^5.0.3",
+    "@google/genai": "1.46.0",
+    "@types/express": "^5.0.6",
     "@types/fs-extra": "^11.0.4",
-    "@types/supertest": "^6.0.3",
-    "@types/tar": "^6.1.13",
-    "dotenv": "^16.4.5",
-    "supertest": "^7.1.4",
+    "@types/supertest": "^7.2.0",
+    "@types/tar": "^7.0.87",
+    "dotenv": "^17.3.1",
+    "supertest": "^7.2.2",
     "typescript": "^5.3.3",
-    "vitest": "^3.1.1"
+    "vitest": "^4.1.1"
   },
   "engines": {
     "node": ">=20"
