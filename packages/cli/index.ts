@@ -56,17 +56,36 @@ async function run() {
       ].includes(scriptArgs[0]);
 
     if (!isCommand) {
-      // Very rudimentary check for memory args without parsing full settings.
-      // If we need more memory, we just provide it.
-      const totalMemoryMB = os.totalmem() / (1024 * 1024);
-      const heapStats = v8.getHeapStatistics();
-      const currentMaxOldSpaceSizeMb = Math.floor(
-        heapStats.heap_size_limit / 1024 / 1024,
-      );
-      const targetMaxOldSpaceSizeInMB = Math.floor(totalMemoryMB * 0.5);
+      let autoConfigureMemory = true;
+      try {
+        const { readFileSync } = await import('node:fs');
+        const { join } = await import('node:path');
+        const homedir = os.homedir();
+        const settingsPath = join(homedir, '.gemini', 'settings.json');
+        const rawSettings = readFileSync(settingsPath, 'utf8');
+        const settings = JSON.parse(rawSettings);
+        if (settings?.advanced?.autoConfigureMemory === false) {
+          autoConfigureMemory = false;
+        }
+      } catch {
+        // ignore
+      }
 
-      if (targetMaxOldSpaceSizeInMB > currentMaxOldSpaceSizeMb) {
-        nodeArgs.push(`--max-old-space-size=${targetMaxOldSpaceSizeInMB}`);
+      if (autoConfigureMemory) {
+        // We allocate 50% of system memory because parsing large codebases, handling
+        // huge contexts (like massive prompts or full repo context), and maintaining
+        // terminal UI states in Ink requires significantly more memory than the V8 default
+        // (which is ~2GB-4GB). Without this, the app easily crashes with Out of Memory errors.
+        const totalMemoryMB = os.totalmem() / (1024 * 1024);
+        const heapStats = v8.getHeapStatistics();
+        const currentMaxOldSpaceSizeMb = Math.floor(
+          heapStats.heap_size_limit / 1024 / 1024,
+        );
+        const targetMaxOldSpaceSizeInMB = Math.floor(totalMemoryMB * 0.5);
+
+        if (targetMaxOldSpaceSizeInMB > currentMaxOldSpaceSizeMb) {
+          nodeArgs.push(`--max-old-space-size=${targetMaxOldSpaceSizeInMB}`);
+        }
       }
     }
 
