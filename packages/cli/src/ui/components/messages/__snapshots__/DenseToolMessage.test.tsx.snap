@@ -129,6 +129,12 @@ exports[`DenseToolMessage > renders generic output message for unknown object re
 "
 `;
 
+exports[`DenseToolMessage > truncates long description but preserves tool name (< 25 chars) 1`] = `
+"  ✓  tool-name-is-24-chars-!!  This is a very long description that should definitely be truncated …
+   → Success result
+"
+`;
+
 exports[`DenseToolMessage > truncates long string results 1`] = `
 "  ✓  test-tool  Test description
    → AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA…

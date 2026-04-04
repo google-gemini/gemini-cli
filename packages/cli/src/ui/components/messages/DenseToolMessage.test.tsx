@@ -475,6 +475,28 @@ describe('DenseToolMessage', () => {
     expect(output).toMatchSnapshot();
   });
 
+  it('truncates long description but preserves tool name (< 25 chars)', async () => {
+    const longDescription =
+      'This is a very long description that should definitely be truncated because it exceeds the available terminal width and we want to see how it behaves.';
+    const toolName = 'tool-name-is-24-chars-!!'; // Exactly 24 chars
+    const { lastFrame, waitUntilReady } = await renderWithProviders(
+      <DenseToolMessage
+        {...defaultProps}
+        name={toolName}
+        description={longDescription}
+        terminalWidth={50} // Narrow width to force truncation
+      />,
+    );
+    await waitUntilReady();
+    const output = lastFrame();
+
+    // Tool name should be fully present (it plus one space is exactly 25, fitting the maxWidth)
+    expect(output).toContain(toolName);
+    // Description should be present but truncated
+    expect(output).toContain('This is a');
+    expect(output).toMatchSnapshot();
+  });
+
   describe('Toggleable Diff View (Alternate Buffer)', () => {
     const diffResult: FileDiff = {
       fileDiff: '@@ -1,1 +1,1 @@\n-old line\n+new line',

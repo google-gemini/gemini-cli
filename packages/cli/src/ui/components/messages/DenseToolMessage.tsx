@@ -450,15 +450,18 @@ export const DenseToolMessage: React.FC<DenseToolMessageProps> = (props) => {
   return (
     <Box flexDirection="column">
       <Box marginLeft={2} flexDirection="row" flexWrap="wrap">
-        <ToolStatusIndicator status={status} name={name} />
-        <Box maxWidth={25} flexShrink={1} flexGrow={0}>
-          <Text color={theme.text.primary} bold wrap="truncate-end">
-            {name}{' '}
-          </Text>
+        <Box flexDirection="row" flexShrink={1}>
+          <ToolStatusIndicator status={status} name={name} />
+          <Box maxWidth={25} flexShrink={0} flexGrow={0}>
+            <Text color={theme.text.primary} bold wrap="truncate-end">
+              {name}{' '}
+            </Text>
+          </Box>
+          <Box marginLeft={1} flexShrink={1} flexGrow={0}>
+            {description}
+          </Box>
         </Box>
-        <Box marginLeft={1} flexShrink={1} flexGrow={0}>
-          {description}
-        </Box>
+
         {summary && (
           <Box
             key="tool-summary"
