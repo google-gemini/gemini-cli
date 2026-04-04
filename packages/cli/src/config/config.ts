@@ -46,6 +46,7 @@ import {
   type HookEventName,
   type OutputFormat,
   detectIdeFromEnv,
+  generalistProfile,
 } from '@google/gemini-cli-core';
 import {
   type Settings,
@@ -163,12 +164,104 @@ export async function parseArguments(
     .usage(
       'Usage: gemini [options] [command]\n\nGemini CLI - Defaults to interactive mode. Use -p/--prompt for non-interactive (headless) mode.',
     )
+    .option('isCommand', {
+      type: 'boolean',
+      hidden: true,
+      description: 'Internal flag to indicate if a subcommand is being run',
+    })
     .option('debug', {
       alias: 'd',
       type: 'boolean',
       description: 'Run in debug mode (open debug console with F12)',
       default: false,
     })
+    .middleware((argv) => {
+      const commandModules = [
+        mcpCommand,
+        extensionsCommand,
+        skillsCommand,
+        hooksCommand,
+      ];
+
+      const subcommands = commandModules.flatMap((mod) => {
+        const names: string[] = [];
+
+        const cmd = mod.command;
+        if (cmd) {
+          if (Array.isArray(cmd)) {
+            for (const c of cmd) {
+              names.push(String(c).split(' ')[0]);
+            }
+          } else {
+            names.push(String(cmd).split(' ')[0]);
+          }
+        }
+
+        const aliases = mod.aliases;
+        if (aliases) {
+          if (Array.isArray(aliases)) {
+            for (const a of aliases) {
+              names.push(String(a).split(' ')[0]);
+            }
+          } else {
+            names.push(String(aliases).split(' ')[0]);
+          }
+        }
+
+        return names;
+      });
+
+      const firstArg = argv._[0];
+      if (typeof firstArg === 'string' && subcommands.includes(firstArg)) {
+        argv['isCommand'] = true;
+      }
+    }, true)
+    // Ensure validation flows through .fail() for clean UX
+    .fail((msg, err) => {
+      if (err) throw err;
+      throw new Error(msg);
+    })
+    .check((argv) => {
+      // The 'query' positional can be a string (for one arg) or string[] (for multiple).
+      // This guard safely checks if any positional argument was provided.
+      const queryArg = argv['query'];
+      const query =
+        typeof queryArg === 'string' || Array.isArray(queryArg)
+          ? queryArg
+          : undefined;
+      const hasPositionalQuery = Array.isArray(query)
+        ? query.length > 0
+        : !!query;
+
+      if (argv['prompt'] && hasPositionalQuery) {
+        return 'Cannot use both a positional prompt and the --prompt (-p) flag together';
+      }
+      if (argv['prompt'] && argv['promptInteractive']) {
+        return 'Cannot use both --prompt (-p) and --prompt-interactive (-i) together';
+      }
+      if (argv['yolo'] && argv['approvalMode']) {
+        return 'Cannot use both --yolo (-y) and --approval-mode together. Use --approval-mode=yolo instead.';
+      }
+
+      const outputFormat = argv['outputFormat'];
+      if (
+        typeof outputFormat === 'string' &&
+        !['text', 'json', 'stream-json'].includes(outputFormat)
+      ) {
+        return `Invalid values:\n  Argument: output-format, Given: "${outputFormat}", Choices: "text", "json", "stream-json"`;
+      }
+      if (argv['worktree'] && !settings.experimental?.worktrees) {
+        return 'The --worktree flag is only available when experimental.worktrees is enabled in your settings.';
+      }
+      return true;
+    });
+
+  yargsInstance.command(mcpCommand);
+  yargsInstance.command(extensionsCommand);
+  yargsInstance.command(skillsCommand);
+  yargsInstance.command(hooksCommand);
+
+  yargsInstance
     .command('$0 [query..]', 'Launch Gemini CLI', (yargsInstance) =>
       yargsInstance
         .positional('query', {
@@ -352,59 +445,6 @@ export async function parseArguments(
           description: 'Suppress the security warning when using --raw-output.',
         }),
     )
-    // Register MCP subcommands
-    .command(mcpCommand)
-    // Ensure validation flows through .fail() for clean UX
-    .fail((msg, err) => {
-      if (err) throw err;
-      throw new Error(msg);
-    })
-    .check((argv) => {
-      // The 'query' positional can be a string (for one arg) or string[] (for multiple).
-      // This guard safely checks if any positional argument was provided.
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
-      const query = argv['query'] as string | string[] | undefined;
-      const hasPositionalQuery = Array.isArray(query)
-        ? query.length > 0
-        : !!query;
-
-      if (argv['prompt'] && hasPositionalQuery) {
-        return 'Cannot use both a positional prompt and the --prompt (-p) flag together';
-      }
-      if (argv['prompt'] && argv['promptInteractive']) {
-        return 'Cannot use both --prompt (-p) and --prompt-interactive (-i) together';
-      }
-      if (argv['yolo'] && argv['approvalMode']) {
-        return 'Cannot use both --yolo (-y) and --approval-mode together. Use --approval-mode=yolo instead.';
-      }
-      if (
-        argv['outputFormat'] &&
-        !['text', 'json', 'stream-json'].includes(
-          // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
-          argv['outputFormat'] as string,
-        )
-      ) {
-        return `Invalid values:\n  Argument: output-format, Given: "${argv['outputFormat']}", Choices: "text", "json", "stream-json"`;
-      }
-      if (argv['worktree'] && !settings.experimental?.worktrees) {
-        return 'The --worktree flag is only available when experimental.worktrees is enabled in your settings.';
-      }
-      return true;
-    });
-
-  if (settings.experimental?.extensionManagement) {
-    yargsInstance.command(extensionsCommand);
-  }
-
-  if (settings.skills?.enabled ?? true) {
-    yargsInstance.command(skillsCommand);
-  }
-  // Register hooks command if hooks are enabled
-  if (settings.hooksConfig.enabled) {
-    yargsInstance.command(hooksCommand);
-  }
-
-  yargsInstance
     .version(await getVersion()) // This will enable the --version flag based on package.json
     .alias('v', 'version')
     .help()
@@ -603,6 +643,7 @@ export async function loadCliConfig(
       memoryImportFormat,
       memoryFileFiltering,
       settings.context?.discoveryMaxDirs,
+      settings.context?.memoryBoundaryMarkers,
     );
     memoryContent = result.memoryContent;
     fileCount = result.fileCount;
@@ -629,9 +670,9 @@ export async function loadCliConfig(
         approvalMode = ApprovalMode.AUTO_EDIT;
         break;
       case 'plan':
-        if (!(settings.experimental?.plan ?? false)) {
+        if (!(settings.general?.plan?.enabled ?? true)) {
           debugLogger.warn(
-            'Approval mode "plan" is only available when experimental.plan is enabled. Falling back to "default".',
+            'Approval mode "plan" is disabled in your settings. Falling back to "default".',
           );
           approvalMode = ApprovalMode.DEFAULT;
         } else {
@@ -753,8 +794,8 @@ export async function loadCliConfig(
     effectiveSettings,
     approvalMode,
     workspacePoliciesDir,
+    interactive,
   );
-  policyEngineConfig.nonInteractive = !interactive;
 
   const defaultModel = PREVIEW_GEMINI_MODEL_AUTO;
   const specifiedModel =
@@ -843,6 +884,16 @@ export async function loadCliConfig(
     }
   }
 
+  const useGeneralistProfile =
+    settings.experimental?.generalistProfile ?? false;
+  const useContextManagement =
+    settings.experimental?.contextManagement ?? false;
+  const contextManagement = {
+    ...(useGeneralistProfile ? generalistProfile : {}),
+    ...(useContextManagement ? settings?.contextManagement : {}),
+    enabled: useContextManagement || useGeneralistProfile,
+  };
+
   return new Config({
     acpMode: isAcpMode,
     clientName,
@@ -857,6 +908,7 @@ export async function loadCliConfig(
     loadMemoryFromIncludeDirectories:
       settings.context?.loadMemoryFromIncludeDirectories || false,
     discoveryMaxDirs: settings.context?.discoveryMaxDirs,
+    memoryBoundaryMarkers: settings.context?.memoryBoundaryMarkers,
     importFormat: settings.context?.importFormat,
     debugMode,
     question,
@@ -925,7 +977,7 @@ export async function loadCliConfig(
     extensionRegistryURI,
     enableExtensionReloading: settings.experimental?.extensionReloading,
     enableAgents: settings.experimental?.enableAgents,
-    plan: settings.experimental?.plan,
+    plan: settings.general?.plan?.enabled ?? true,
     tracker: settings.experimental?.taskTracker,
     directWebFetch: settings.experimental?.directWebFetch,
     planSettings: settings.general?.plan?.directory
@@ -936,9 +988,9 @@ export async function loadCliConfig(
     disabledSkills: settings.skills?.disabled,
     experimentalJitContext: settings.experimental?.jitContext,
     experimentalMemoryManager: settings.experimental?.memoryManager,
+    contextManagement,
     modelSteering: settings.experimental?.modelSteering,
     topicUpdateNarration: settings.experimental?.topicUpdateNarration,
-    toolOutputMasking: settings.experimental?.toolOutputMasking,
     noBrowser: !!process.env['NO_BROWSER'],
     summarizeToolOutput: settings.model?.summarizeToolOutput,
     ideMode,
@@ -949,8 +1001,12 @@ export async function loadCliConfig(
     trustedFolder,
     useBackgroundColor: settings.ui?.useBackgroundColor,
     useAlternateBuffer: settings.ui?.useAlternateBuffer,
+    useTerminalBuffer: settings.ui?.terminalBuffer,
+    useRenderProcess: settings.ui?.renderProcess,
     useRipgrep: settings.tools?.useRipgrep,
     enableInteractiveShell: settings.tools?.shell?.enableInteractiveShell,
+    shellBackgroundCompletionBehavior: settings.tools?.shell
+      ?.backgroundCompletionBehavior as string | undefined,
     shellToolInactivityTimeout: settings.tools?.shell?.inactivityTimeout,
     enableShellOutputEfficiency:
       settings.tools?.shell?.enableShellOutputEfficiency ?? true,
@@ -963,6 +1019,7 @@ export async function loadCliConfig(
       format: (argv.outputFormat ?? settings.output?.format) as OutputFormat,
     },
     gemmaModelRouter: settings.experimental?.gemmaModelRouter,
+    adk: settings.experimental?.adk,
     fakeResponses: argv.fakeResponses,
     recordResponses: argv.recordResponses,
     retryFetchErrors: settings.general?.retryFetchErrors,
@@ -1017,7 +1074,7 @@ async function resolveWorktreeSettings(
     if (isGeminiWorktree(toplevel, projectRoot)) {
       worktreePath = toplevel;
     }
-  } catch (_e) {
+  } catch {
     return undefined;
   }
 

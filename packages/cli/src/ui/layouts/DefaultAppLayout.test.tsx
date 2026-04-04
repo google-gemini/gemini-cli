@@ -10,7 +10,7 @@ import { DefaultAppLayout } from './DefaultAppLayout.js';
 import { StreamingState } from '../types.js';
 import { Text } from 'ink';
 import type { UIState } from '../contexts/UIStateContext.js';
-import type { BackgroundShell } from '../hooks/shellCommandProcessor.js';
+import type { BackgroundTask } from '../hooks/useExecutionLifecycle.js';
 
 // Mock dependencies
 const mockUIState = {
@@ -18,14 +18,14 @@ const mockUIState = {
   terminalHeight: 24,
   terminalWidth: 80,
   mainAreaWidth: 80,
-  backgroundShells: new Map<number, BackgroundShell>(),
-  activeBackgroundShellPid: null as number | null,
-  backgroundShellHeight: 10,
+  backgroundTasks: new Map<number, BackgroundTask>(),
+  activeBackgroundTaskPid: null as number | null,
+  backgroundTaskHeight: 10,
   embeddedShellFocused: false,
   dialogsVisible: false,
   streamingState: StreamingState.Idle,
-  isBackgroundShellListOpen: false,
-  mainControlsRef: { current: null },
+  isBackgroundTaskListOpen: false,
+  mainControlsRef: vi.fn(),
   customDialog: null,
   historyManager: { addItem: vi.fn() },
   history: [],
@@ -34,7 +34,7 @@ const mockUIState = {
   constrainHeight: false,
   availableTerminalHeight: 20,
   activePtyId: null,
-  isBackgroundShellVisible: true,
+  isBackgroundTaskVisible: true,
 } as unknown as UIState;
 
 vi.mock('../contexts/UIStateContext.js', () => ({
@@ -79,11 +79,11 @@ vi.mock('../components/ExitWarning.js', () => ({
 vi.mock('../components/CopyModeWarning.js', () => ({
   CopyModeWarning: () => <Text>CopyModeWarning</Text>,
 }));
-vi.mock('../components/BackgroundShellDisplay.js', () => ({
-  BackgroundShellDisplay: () => <Text>BackgroundShellDisplay</Text>,
+vi.mock('../components/BackgroundTaskDisplay.js', () => ({
+  BackgroundTaskDisplay: () => <Text>BackgroundTaskDisplay</Text>,
 }));
 
-const createMockShell = (pid: number): BackgroundShell => ({
+const createMockShell = (pid: number): BackgroundTask => ({
   pid,
   command: 'test command',
   output: 'test output',
@@ -96,25 +96,25 @@ describe('<DefaultAppLayout />', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     // Reset mock state defaults
-    mockUIState.backgroundShells = new Map();
-    mockUIState.activeBackgroundShellPid = null;
+    mockUIState.backgroundTasks = new Map();
+    mockUIState.activeBackgroundTaskPid = null;
     mockUIState.streamingState = StreamingState.Idle;
   });
 
-  it('renders BackgroundShellDisplay when shells exist and active', async () => {
-    mockUIState.backgroundShells.set(123, createMockShell(123));
-    mockUIState.activeBackgroundShellPid = 123;
-    mockUIState.backgroundShellHeight = 5;
+  it('renders BackgroundTaskDisplay when shells exist and active', async () => {
+    mockUIState.backgroundTasks.set(123, createMockShell(123));
+    mockUIState.activeBackgroundTaskPid = 123;
+    mockUIState.backgroundTaskHeight = 5;
 
     const { lastFrame, unmount } = await render(<DefaultAppLayout />);
     expect(lastFrame()).toMatchSnapshot();
     unmount();
   });
 
-  it('hides BackgroundShellDisplay when StreamingState is WaitingForConfirmation', async () => {
-    mockUIState.backgroundShells.set(123, createMockShell(123));
-    mockUIState.activeBackgroundShellPid = 123;
-    mockUIState.backgroundShellHeight = 5;
+  it('hides BackgroundTaskDisplay when StreamingState is WaitingForConfirmation', async () => {
+    mockUIState.backgroundTasks.set(123, createMockShell(123));
+    mockUIState.activeBackgroundTaskPid = 123;
+    mockUIState.backgroundTaskHeight = 5;
     mockUIState.streamingState = StreamingState.WaitingForConfirmation;
 
     const { lastFrame, unmount } = await render(<DefaultAppLayout />);
@@ -122,10 +122,10 @@ describe('<DefaultAppLayout />', () => {
     unmount();
   });
 
-  it('shows BackgroundShellDisplay when StreamingState is NOT WaitingForConfirmation', async () => {
-    mockUIState.backgroundShells.set(123, createMockShell(123));
-    mockUIState.activeBackgroundShellPid = 123;
-    mockUIState.backgroundShellHeight = 5;
+  it('shows BackgroundTaskDisplay when StreamingState is NOT WaitingForConfirmation', async () => {
+    mockUIState.backgroundTasks.set(123, createMockShell(123));
+    mockUIState.activeBackgroundTaskPid = 123;
+    mockUIState.backgroundTaskHeight = 5;
     mockUIState.streamingState = StreamingState.Responding;
 
     const { lastFrame, unmount } = await render(<DefaultAppLayout />);
