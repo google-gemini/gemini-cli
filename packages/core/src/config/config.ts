@@ -200,6 +200,13 @@ export interface PlanSettings {
   modelRouting?: boolean;
 }
 
+export interface PerformanceMonitoringOptions {
+  enabled?: boolean;
+  traceSamplingRate?: number;
+  memoryProfiling?: boolean;
+  disableExporter?: boolean;
+}
+
 export interface TelemetrySettings {
   enabled?: boolean;
   target?: TelemetryTarget;
@@ -209,6 +216,7 @@ export interface TelemetrySettings {
   outfile?: string;
   useCollector?: boolean;
   useCliAuth?: boolean;
+  performanceMonitoring?: PerformanceMonitoringOptions;
 }
 
 export interface OutputSettings {
@@ -1058,6 +1066,7 @@ export class Config implements McpContext, AgentLoopContext {
       outfile: params.telemetry?.outfile,
       useCollector: params.telemetry?.useCollector,
       useCliAuth: params.telemetry?.useCliAuth,
+      performanceMonitoring: params.telemetry?.performanceMonitoring,
     };
     this.usageStatisticsEnabled = params.usageStatisticsEnabled ?? true;
 
@@ -2678,6 +2687,12 @@ export class Config implements McpContext, AgentLoopContext {
 
   getTelemetryUseCliAuth(): boolean {
     return this.telemetrySettings.useCliAuth ?? false;
+  }
+
+  getTelemetryPerformanceMonitoringSettings():
+    | PerformanceMonitoringOptions
+    | undefined {
+    return this.telemetrySettings.performanceMonitoring;
   }
 
   /** @deprecated Use geminiClient getter */

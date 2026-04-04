@@ -3335,6 +3335,42 @@ describe('Plans Directory Initialization', () => {
       recursive: true,
     });
   });
+
+  describe('telemetry configuration', () => {
+    it('should read performanceMonitoring settings when provided', () => {
+      const config = new Config({
+        ...baseParams,
+        telemetry: {
+          enabled: true,
+          performanceMonitoring: {
+            enabled: true,
+            traceSamplingRate: 0.5,
+            memoryProfiling: true,
+            disableExporter: false,
+          },
+        },
+      });
+
+      const perfSettings = config.getTelemetryPerformanceMonitoringSettings();
+      expect(perfSettings).toBeDefined();
+      expect(perfSettings?.enabled).toBe(true);
+      expect(perfSettings?.traceSamplingRate).toBe(0.5);
+      expect(perfSettings?.memoryProfiling).toBe(true);
+      expect(perfSettings?.disableExporter).toBe(false);
+    });
+
+    it('should return undefined for performanceMonitoring when not provided', () => {
+      const config = new Config({
+        ...baseParams,
+        telemetry: {
+          enabled: true,
+        },
+      });
+
+      const perfSettings = config.getTelemetryPerformanceMonitoringSettings();
+      expect(perfSettings).toBeUndefined();
+    });
+  });
 });
 
 describe('Model Persistence Bug Fix (#19864)', () => {
