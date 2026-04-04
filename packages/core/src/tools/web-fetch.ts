@@ -18,7 +18,7 @@ import type { MessageBus } from '../confirmation-bus/message-bus.js';
 import { ToolErrorType } from './tool-error.js';
 import { getErrorMessage } from '../utils/errors.js';
 import { getResponseText } from '../utils/partUtils.js';
-import { fetchWithTimeout, isPrivateIp } from '../utils/fetch.js';
+import { fetchWithTimeout, isPrivateIpAsync, resolveUrlForSafeFetch } from '../utils/fetch.js';
 import { truncateString } from '../utils/textUtils.js';
 import { convert } from 'html-to-text';
 import {
@@ -218,6 +218,16 @@ interface ErrorWithStatus extends Error {
   status?: number;
 }
 
+class RedirectError extends Error {
+  constructor(
+    public resolvedUrl: string,
+    public hostHeader: string,
+  ) {
+    super('Redirect to DNS-pinned URL');
+    this.name = 'RedirectError';
+  }
+}
+
 class WebFetchToolInvocation extends BaseToolInvocation<
   WebFetchToolParams,
   ToolResult
@@ -266,15 +276,12 @@ class WebFetchToolInvocation extends BaseToolInvocation<
     );
   }
 
-  private isBlockedHost(urlStr: string): boolean {
+  private async isBlockedHost(urlStr: string): Promise<boolean> {
     try {
-      const url = new URL(urlStr);
-      const hostname = url.hostname.toLowerCase();
-      if (hostname === 'localhost' || hostname === '127.0.0.1') {
-        return true;
-      }
-      return isPrivateIp(urlStr);
+      // isPrivateIpAsync handles loopback checks, DNS resolution, and malformed URLs safely
+      return await isPrivateIpAsync(urlStr);
     } catch {
+      // Block if DNS lookup fails, treating it as a potential security risk (fail-closed)
       return true;
     }
   }
@@ -284,7 +291,15 @@ class WebFetchToolInvocation extends BaseToolInvocation<
     signal: AbortSignal,
   ): Promise<string> {
     const url = convertGithubUrlToRaw(urlStr);
-    if (this.isBlockedHost(url)) {
+
+    // DNS pinning: resolve once and use resolved IP with Host header to prevent rebinding
+    let resolvedUrl: string;
+    let hostHeader: string;
+    try {
+      const resolution = await resolveUrlForSafeFetch(url);
+      resolvedUrl = resolution.resolvedUrl;
+      hostHeader = resolution.hostHeader;
+    } catch (error) {
       debugLogger.warn(`[WebFetchTool] Blocked access to host: ${url}`);
       throw new Error(
         `Access to blocked or private host ${url} is not allowed.`,
@@ -293,12 +308,34 @@ class WebFetchToolInvocation extends BaseToolInvocation<
 
     const response = await retryWithBackoff(
       async () => {
-        const res = await fetchWithTimeout(url, URL_FETCH_TIMEOUT_MS, {
+        const res = await fetchWithTimeout(resolvedUrl, URL_FETCH_TIMEOUT_MS, {
           signal,
+          redirect: 'manual',
           headers: {
             'User-Agent': USER_AGENT,
+            'Host': hostHeader,
           },
         });
+        // Validate redirect location if present (prevent SSRF via redirects)
+        if (res.status >= 300 && res.status < 400) {
+          const location = res.headers.get('location');
+          if (location) {
+            const redirectUrl = new URL(location, url).href;
+            // Re-validate redirect through DNS pinning
+            try {
+              const redirectResolution = await resolveUrlForSafeFetch(redirectUrl);
+              // Return a synthetic response that triggers a retry with the redirect
+              throw new RedirectError(redirectResolution.resolvedUrl, redirectResolution.hostHeader);
+            } catch {
+              throw new Error(
+                `Redirect to blocked or private host ${redirectUrl} is not allowed.`,
+              );
+            }
+          }
+          throw new Error(
+            `Request failed with status code ${res.status} ${res.statusText}`,
+          );
+        }
         if (!res.ok) {
           const error = new Error(
             `Request failed with status code ${res.status} ${res.statusText}`,
@@ -310,8 +347,14 @@ class WebFetchToolInvocation extends BaseToolInvocation<
       },
       {
         retryFetchErrors: this.context.config.getRetryFetchErrors(),
-        onRetry: (attempt, error, delayMs) =>
-          this.handleRetry(attempt, error, delayMs),
+        onRetry: (attempt, error, delayMs) => {
+          // Handle redirect retries with DNS-pinned URLs
+          if (error instanceof RedirectError) {
+            resolvedUrl = error.resolvedUrl;
+            hostHeader = error.hostHeader;
+          }
+          this.handleRetry(attempt, error, delayMs);
+        },
         signal,
       },
     );
@@ -349,16 +392,16 @@ class WebFetchToolInvocation extends BaseToolInvocation<
     return textContent;
   }
 
-  private filterAndValidateUrls(urls: string[]): {
+  private async filterAndValidateUrls(urls: string[]): Promise<{
     toFetch: string[];
     skipped: string[];
-  } {
+  }> {
     const uniqueUrls = [...new Set(urls.map(normalizeUrl))];
     const toFetch: string[] = [];
     const skipped: string[] = [];
 
     for (const url of uniqueUrls) {
-      if (this.isBlockedHost(url)) {
+      if (await this.isBlockedHost(url)) {
         debugLogger.warn(
           `[WebFetchTool] Skipped private or local host: ${url}`,
         );
@@ -614,7 +657,14 @@ ${aggregatedContent}
     // Convert GitHub blob URL to raw URL
     url = convertGithubUrlToRaw(url);
 
-    if (this.isBlockedHost(url)) {
+    // DNS pinning: resolve once and use resolved IP with Host header to prevent rebinding
+    let resolvedUrl: string;
+    let hostHeader: string;
+    try {
+      const resolution = await resolveUrlForSafeFetch(url);
+      resolvedUrl = resolution.resolvedUrl;
+      hostHeader = resolution.hostHeader;
+    } catch (error) {
       const errorMessage = `Access to blocked or private host ${url} is not allowed.`;
       debugLogger.warn(
         `[WebFetchTool] Blocked experimental fetch to host: ${url}`,
@@ -632,20 +682,50 @@ ${aggregatedContent}
     try {
       const response = await retryWithBackoff(
         async () => {
-          const res = await fetchWithTimeout(url, URL_FETCH_TIMEOUT_MS, {
+          const res = await fetchWithTimeout(resolvedUrl, URL_FETCH_TIMEOUT_MS, {
             signal,
+            redirect: 'manual',
             headers: {
               Accept:
                 'text/markdown, text/plain;q=0.9, application/json;q=0.9, text/html;q=0.8, application/pdf;q=0.7, video/*;q=0.7, */*;q=0.5',
               'User-Agent': USER_AGENT,
+              'Host': hostHeader,
             },
           });
+          // Validate redirect location if present (prevent SSRF via redirects)
+          if (res.status >= 300 && res.status < 400) {
+            const location = res.headers.get('location');
+            if (location) {
+              const redirectUrl = new URL(location, url).href;
+              // Re-validate redirect through DNS pinning
+              try {
+                const redirectResolution = await resolveUrlForSafeFetch(redirectUrl);
+                // Update for retry with DNS-pinned redirect
+                resolvedUrl = redirectResolution.resolvedUrl;
+                hostHeader = redirectResolution.hostHeader;
+                throw new RedirectError(resolvedUrl, hostHeader);
+              } catch {
+                throw new Error(
+                  `Redirect to blocked or private host ${redirectUrl} is not allowed.`,
+                );
+              }
+            }
+            throw new Error(
+              `Request failed with status code ${res.status} ${res.statusText}`,
+            );
+          }
           return res;
         },
         {
           retryFetchErrors: this.context.config.getRetryFetchErrors(),
-          onRetry: (attempt, error, delayMs) =>
-            this.handleRetry(attempt, error, delayMs),
+          onRetry: (attempt, error, delayMs) => {
+            // Handle redirect retries with DNS-pinned URLs
+            if (error instanceof RedirectError) {
+              resolvedUrl = error.resolvedUrl;
+              hostHeader = error.hostHeader;
+            }
+            this.handleRetry(attempt, error, delayMs);
+          },
           signal,
         },
       );
@@ -768,7 +848,7 @@ Response: ${rawResponseText}`;
     const userPrompt = this.params.prompt!;
     const { validUrls } = parsePrompt(userPrompt);
 
-    const { toFetch, skipped } = this.filterAndValidateUrls(validUrls);
+    const { toFetch, skipped } = await this.filterAndValidateUrls(validUrls);
 
     // If everything was skipped, fail early
     if (toFetch.length === 0 && skipped.length > 0) {
