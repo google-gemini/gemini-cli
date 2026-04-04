@@ -136,7 +136,7 @@ export class ShellToolInvocation extends BaseToolInvocation<
   }
 
   getDescription(): string {
-    return `${this.params.command} ${this.getContextualDetails()}`;
+    return this.params.description || '';
   }
 
   private simplifyPaths(paths: Set<string>): string[] {

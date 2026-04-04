@@ -9,7 +9,11 @@ import { Box, Text } from 'ink';
 import { theme } from '../semantic-colors.js';
 import { useConfig } from '../contexts/ConfigContext.js';
 import { ToolConfirmationMessage } from './messages/ToolConfirmationMessage.js';
-import { ToolStatusIndicator, ToolInfo } from './messages/ToolShared.js';
+import {
+  isShellTool,
+  ToolStatusIndicator,
+  ToolInfo,
+} from './messages/ToolShared.js';
 import { useUIState } from '../contexts/UIStateContext.js';
 import type { ConfirmingToolState } from '../hooks/useConfirmingTool.js';
 import { StickyHeader } from './StickyHeader.js';
@@ -29,6 +33,16 @@ function getConfirmationHeader(
     return 'Action Required';
   }
   return headers[details.type] ?? 'Action Required';
+}
+
+function getConfirmationLabel(
+  toolName: string,
+  details: SerializableConfirmationDetails | undefined,
+): string {
+  if (details?.type === 'ask_user') return 'Questions';
+  if (details?.type === 'exit_plan_mode') return 'Implementation';
+  if (isShellTool(toolName)) return 'Shell';
+  return toolName;
 }
 
 interface ToolConfirmationQueueProps {
@@ -58,22 +72,78 @@ export const ToolConfirmationQueue: React.FC<ToolConfirmationQueueProps> = ({
       ? Math.max(uiAvailableHeight, 4)
       : Math.floor(terminalHeight * 0.5);
 
+  const isShell = isShellTool(tool.name);
+  const isEdit = tool.confirmationDetails?.type === 'edit';
+
+  if (isShell || isEdit) {
+    // Use the new simplified layout for Shell and Edit tools
+    const borderColor = theme.border.default;
+    const availableContentHeight = constrainHeight
+      ? Math.max(maxHeight - 3, 4)
+      : undefined;
+
+    const toolLabel = getConfirmationLabel(tool.name, tool.confirmationDetails);
+
+    return (
+      <Box
+        flexDirection="column"
+        width={mainAreaWidth}
+        flexShrink={0}
+        borderStyle="round"
+        borderColor={borderColor}
+        paddingX={1}
+      >
+        {/* Header Line */}
+        <Box justifyContent="space-between" marginBottom={0}>
+          <Box flexDirection="row" flexShrink={1} overflow="hidden">
+            <Text color={theme.status.warning} bold>
+              ? {toolLabel}
+              {!isEdit && !!tool.description && '  '}
+            </Text>
+            {!isEdit && !!tool.description && (
+              <Box flexShrink={1} overflow="hidden">
+                <Text color={theme.text.primary} wrap="truncate-end">
+                  {tool.description}
+                </Text>
+              </Box>
+            )}
+          </Box>
+          {total > 1 && (
+            <Text color={theme.text.secondary}>
+              {index} of {total}
+            </Text>
+          )}
+        </Box>
+
+        {/* Interactive Area */}
+        <Box flexDirection="column">
+          <ToolConfirmationMessage
+            callId={tool.callId}
+            confirmationDetails={tool.confirmationDetails}
+            config={config}
+            getPreferredEditor={getPreferredEditor}
+            terminalWidth={mainAreaWidth - 4} // Adjust for parent border/padding
+            availableTerminalHeight={availableContentHeight}
+            toolName={tool.name}
+            isFocused={true}
+          />
+        </Box>
+      </Box>
+    );
+  }
+
+  // Restore original logic for other tools
   const isRoutine =
     tool.confirmationDetails?.type === 'ask_user' ||
     tool.confirmationDetails?.type === 'exit_plan_mode';
   const borderColor = isRoutine ? theme.status.success : theme.status.warning;
   const hideToolIdentity = isRoutine;
 
-  // ToolConfirmationMessage needs to know the height available for its OWN content.
-  // We subtract the lines used by the Queue wrapper:
-  // - 2 lines for the rounded border
-  // - 2 lines for the Header (text + margin)
-  // - 2 lines for Tool Identity (text + margin)
   const availableContentHeight = constrainHeight
     ? Math.max(maxHeight - (hideToolIdentity ? 4 : 6), 4)
     : undefined;
 
-  const content = (
+  return (
     <Box flexDirection="column" width={mainAreaWidth} flexShrink={0}>
       <StickyHeader
         width={mainAreaWidth}
@@ -122,11 +192,6 @@ export const ToolConfirmationQueue: React.FC<ToolConfirmationQueueProps> = ({
         paddingX={1}
         flexDirection="column"
       >
-        {/* Interactive Area */}
-        {/*
-          Note: We force isFocused={true} because if this component is rendered,
-          it effectively acts as a modal over the shell/composer.
-        */}
         <ToolConfirmationMessage
           callId={tool.callId}
           confirmationDetails={tool.confirmationDetails}
@@ -134,6 +199,7 @@ export const ToolConfirmationQueue: React.FC<ToolConfirmationQueueProps> = ({
           getPreferredEditor={getPreferredEditor}
           terminalWidth={mainAreaWidth - 4} // Adjust for parent border/padding
           availableTerminalHeight={availableContentHeight}
+          toolName={tool.name}
           isFocused={true}
         />
       </Box>
@@ -149,6 +215,4 @@ export const ToolConfirmationQueue: React.FC<ToolConfirmationQueueProps> = ({
       />
     </Box>
   );
-
-  return content;
 };
