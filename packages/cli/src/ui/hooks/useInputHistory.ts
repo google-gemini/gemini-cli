@@ -20,6 +20,7 @@ export interface UseInputHistoryReturn {
   handleSubmit: (value: string) => void;
   navigateUp: () => boolean;
   navigateDown: () => boolean;
+  saveDraft: (text: string, offset: number) => void;
 }
 
 export function useInputHistory({
@@ -42,10 +43,13 @@ export function useInputHistory({
     Record<number, { text: string; offset: number }>
   >({});
 
+  const draftRef = useRef<{ text: string; offset: number } | null>(null);
+
   const resetHistoryNav = useCallback(() => {
     setHistoryIndex(-1);
     previousHistoryIndexRef.current = undefined;
     historyCacheRef.current = {};
+    draftRef.current = null;
   }, []);
 
   const handleSubmit = useCallback(
@@ -107,8 +111,30 @@ export function useInputHistory({
     [historyIndex, currentQuery, currentCursorOffset, userMessages, onChange],
   );
 
+  const saveDraft = useCallback((text: string, offset: number) => {
+    if (text.trim()) {
+      draftRef.current = { text, offset };
+    }
+  }, []);
+
   const navigateUp = useCallback(() => {
     if (!isActive) return false;
+
+    const shouldRestoreDraft =
+      historyIndex === -1 &&
+      draftRef.current &&
+      (!currentQuery.trim() || currentQuery === draftRef.current.text);
+
+    if (shouldRestoreDraft) {
+      const draft = draftRef.current;
+      if (!draft) {
+        return false;
+      }
+      draftRef.current = null;
+      onChange(draft.text, draft.offset);
+      return true;
+    }
+
     if (userMessages.length === 0) return false;
 
     if (historyIndex < userMessages.length - 1) {
@@ -116,7 +142,14 @@ export function useInputHistory({
       return true;
     }
     return false;
-  }, [historyIndex, userMessages, isActive, navigateTo]);
+  }, [
+    historyIndex,
+    userMessages,
+    isActive,
+    navigateTo,
+    currentQuery,
+    onChange,
+  ]);
 
   const navigateDown = useCallback(() => {
     if (!isActive) return false;
@@ -130,5 +163,6 @@ export function useInputHistory({
     handleSubmit,
     navigateUp,
     navigateDown,
+    saveDraft,
   };
 }
