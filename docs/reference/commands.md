@@ -102,9 +102,11 @@ Slash commands provide meta-level control over the CLI itself.
 ### `/clear`
 
 - **Description:** Clear the terminal screen, including the visible session
-  history and scrollback within the CLI. The underlying session data (for
-  history recall) might be preserved depending on the exact implementation, but
-  the visual display is cleared.
+  history and scrollback within the CLI. This also resets the active
+  conversation context so you can start a fresh thread without prior context
+  affecting future responses. Underlying session data used for history recall
+  might still be preserved depending on the exact implementation, even though
+  the visible display is cleared.
 - **Keyboard shortcut:** Press **Ctrl+L** at any time to perform a clear action.
 
 ### `/commands`
