@@ -43,7 +43,7 @@ describe('terminal notifications', () => {
     });
   });
 
-  it('returns false without writing on non-macOS platforms', async () => {
+  it('emits notification on non-macOS platforms', async () => {
     Object.defineProperty(process, 'platform', {
       value: 'linux',
       configurable: true,
@@ -54,8 +54,8 @@ describe('terminal notifications', () => {
       body: 'b',
     });
 
-    expect(shown).toBe(false);
-    expect(writeToStdout).not.toHaveBeenCalled();
+    expect(shown).toBe(true);
+    expect(writeToStdout).toHaveBeenCalled();
   });
 
   it('returns false without writing when disabled', async () => {
@@ -69,6 +69,7 @@ describe('terminal notifications', () => {
   });
 
   it('emits OSC 9 notification when supported terminal is detected', async () => {
+    vi.stubEnv('WT_SESSION', '');
     vi.stubEnv('TERM_PROGRAM', 'iTerm.app');
 
     const shown = await notifyViaTerminal(true, {
@@ -126,6 +127,7 @@ describe('terminal notifications', () => {
   });
 
   it('strips terminal control sequences and newlines from payload text', async () => {
+    vi.stubEnv('WT_SESSION', '');
     vi.stubEnv('TERM_PROGRAM', 'iTerm.app');
 
     const shown = await notifyViaTerminal(true, {

@@ -511,8 +511,9 @@ const ChoiceQuestionView: React.FC<ChoiceQuestionViewProps> = ({
 }) => {
   const keyMatchers = useKeyMatchers();
   const isAlternateBuffer = useAlternateBuffer();
-  const numOptions =
-    (question.options?.length ?? 0) + (question.type !== 'yesno' ? 1 : 0);
+  const hasAll = question.multiSelect && (question.options?.length ?? 0) > 1;
+  // Calculate total options including 'All' and 'Other' to ensure consistent numbering column width
+  const numOptions = (question.options?.length ?? 0) + (hasAll ? 1 : 0) + 1;
   const numLen = String(numOptions).length;
   const radioWidth = 2; // "● "
   const numberWidth = numLen + 2; // e.g., "1. "
@@ -735,17 +736,15 @@ const ChoiceQuestionView: React.FC<ChoiceQuestionViewProps> = ({
       list.push({ key: 'all', value: allItem });
     }
 
-    // Only add custom option for choice type, not yesno
-    if (question.type !== 'yesno') {
-      const otherItem: OptionItem = {
-        key: 'other',
-        label: customOptionText || '',
-        description: '',
-        type: 'other',
-        index: list.length,
-      };
-      list.push({ key: 'other', value: otherItem });
-    }
+    // Add custom option for choice and yesno types
+    const otherItem: OptionItem = {
+      key: 'other',
+      label: customOptionText || '',
+      description: '',
+      type: 'other',
+      index: list.length,
+    };
+    list.push({ key: 'other', value: otherItem });
 
     if (question.multiSelect) {
       const doneItem: OptionItem = {
@@ -759,7 +758,7 @@ const ChoiceQuestionView: React.FC<ChoiceQuestionViewProps> = ({
     }
 
     return list;
-  }, [questionOptions, question.multiSelect, question.type, customOptionText]);
+  }, [questionOptions, question.multiSelect, customOptionText]);
 
   const handleHighlight = useCallback(
     (itemValue: OptionItem) => {
@@ -849,16 +848,24 @@ const ChoiceQuestionView: React.FC<ChoiceQuestionViewProps> = ({
     ? Math.max(1, availableHeight - overhead)
     : undefined;
 
+  // Reserve space for at least 3 items if more selectionItems available.
+  const reservedListHeight = Math.min(selectionItems.length * 2, 6);
   const questionHeightLimit =
     listHeight && !isAlternateBuffer
       ? question.unconstrainedHeight
         ? Math.max(1, listHeight - selectionItems.length * 2)
-        : Math.min(15, Math.max(1, listHeight - DIALOG_PADDING))
+        : Math.max(1, listHeight - Math.max(DIALOG_PADDING, reservedListHeight))
       : undefined;
 
   const maxItemsToShow =
-    listHeight && questionHeightLimit
-      ? Math.max(1, Math.floor((listHeight - questionHeightLimit) / 2))
+    listHeight && (!isAlternateBuffer || availableHeight !== undefined)
+      ? Math.min(
+          selectionItems.length,
+          Math.max(
+            1,
+            Math.floor((listHeight - (questionHeightLimit ?? 0)) / 2),
+          ),
+        )
       : selectionItems.length;
 
   return (
