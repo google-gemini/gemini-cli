@@ -40,6 +40,7 @@ import { loadCliConfig, type CliArgs } from '../config/config.js';
 import * as fs from 'node:fs/promises';
 import * as path from 'node:path';
 import { ApprovalMode } from '@google/gemini-cli-core/src/policy/types.js';
+import { SHELL_TOOL_NAME } from '@google/gemini-cli-core';
 
 vi.mock('../config/config.js', () => ({
   loadCliConfig: vi.fn(),
@@ -668,8 +669,32 @@ describe('Session', () => {
         execute: vi.fn().mockResolvedValue({ llmContent: 'Tool Result' }),
       }),
     };
+    const mockShellTool = {
+      name: SHELL_TOOL_NAME,
+      kind: 'execute',
+      build: vi.fn().mockReturnValue({
+        getDescription: () => 'Execute shell command',
+        toolLocations: () => [],
+        shouldConfirmExecute: vi.fn().mockResolvedValue(null),
+        execute: vi.fn().mockImplementation(async (abortSignal, onOutput) => {
+          if (onOutput) {
+            onOutput([[{ text: 'chunk 1' }]]);
+            onOutput([[{ text: 'chunk 2' }]]);
+          }
+          return {
+            llmContent: 'Command finished',
+            data: { exitCode: 0 },
+          };
+        }),
+      }),
+    };
     mockToolRegistry = {
-      getTool: vi.fn().mockReturnValue(mockTool),
+      getTool: vi.fn().mockImplementation((name) => {
+        if (name === SHELL_TOOL_NAME || name === 'shell') {
+          return mockShellTool;
+        }
+        return mockTool;
+      }),
     };
     mockMessageBus = {
       publish: vi.fn(),
@@ -1057,6 +1082,101 @@ describe('Session', () => {
         }),
       }),
     );
+    expect(result).toMatchObject({ stopReason: 'end_turn' });
+  });
+
+  it('should emit terminal lifecycle events for ShellTool', async () => {
+    const stream1 = createMockStream([
+      {
+        type: StreamEventType.CHUNK,
+        value: {
+          functionCalls: [{ name: SHELL_TOOL_NAME, args: { command: 'ls' } }],
+        },
+      },
+    ]);
+    const stream2 = createMockStream([
+      {
+        type: StreamEventType.CHUNK,
+        value: {
+          candidates: [{ content: { parts: [{ text: 'Result' }] } }],
+        },
+      },
+    ]);
+
+    mockChat.sendMessageStream
+      .mockResolvedValueOnce(stream1)
+      .mockResolvedValueOnce(stream2);
+
+    const result = await session.prompt({
+      sessionId: 'session-1',
+      prompt: [{ type: 'text', text: 'Run ls' }],
+    });
+
+    expect(mockToolRegistry.getTool).toHaveBeenCalledWith(SHELL_TOOL_NAME);
+
+    // Verify terminal_info
+    expect(mockConnection.sessionUpdate).toHaveBeenCalledWith(
+      expect.objectContaining({
+        update: expect.objectContaining({
+          sessionUpdate: 'tool_call',
+          status: 'in_progress',
+          _meta: expect.objectContaining({
+            terminal_info: expect.objectContaining({
+              cwd: '/tmp',
+              terminal_id: expect.any(String),
+            }),
+          }),
+        }),
+      }),
+    );
+
+    // Verify terminal_output (2 chunks)
+    expect(mockConnection.sessionUpdate).toHaveBeenCalledWith(
+      expect.objectContaining({
+        update: expect.objectContaining({
+          sessionUpdate: 'tool_call_update',
+          status: 'in_progress',
+          _meta: expect.objectContaining({
+            terminal_output: expect.objectContaining({
+              data: 'chunk 1',
+              terminal_id: expect.any(String),
+            }),
+          }),
+        }),
+      }),
+    );
+    expect(mockConnection.sessionUpdate).toHaveBeenCalledWith(
+      expect.objectContaining({
+        update: expect.objectContaining({
+          sessionUpdate: 'tool_call_update',
+          status: 'in_progress',
+          _meta: expect.objectContaining({
+            terminal_output: expect.objectContaining({
+              data: 'chunk 2',
+              terminal_id: expect.any(String),
+            }),
+          }),
+        }),
+      }),
+    );
+
+    // Verify terminal_exit
+    expect(mockConnection.sessionUpdate).toHaveBeenCalledWith(
+      expect.objectContaining({
+        update: expect.objectContaining({
+          sessionUpdate: 'tool_call_update',
+          status: 'completed',
+          _meta: expect.objectContaining({
+            terminal_exit: expect.objectContaining({
+              exit_code: 0,
+              signal: null,
+              terminal_id: expect.any(String),
+            }),
+          }),
+        }),
+      }),
+    );
+
     expect(result).toMatchObject({ stopReason: 'end_turn' });
   });
 
