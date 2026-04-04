@@ -226,7 +226,7 @@ function logReliabilityEvent(
   const reliabilityLog = {
     timestamp: new Date().toISOString(),
     testName,
-    model: process.env.GEMINI_MODEL || 'unknown',
+    model: process.env['GEMINI_MODEL'] || 'unknown',
     attempt,
     status,
     errorCode,
