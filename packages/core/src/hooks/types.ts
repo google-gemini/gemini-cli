@@ -297,6 +297,13 @@ export class DefaultHookOutput implements HookOutput {
   }
 
   /**
+   * Returns a prompt for the next turn if provided by the hook
+   */
+  getFollowUpPrompt(): string {
+    return '';
+  }
+
+  /**
    * Optional request to execute another tool immediately after this one.
    * The result of this tail call will replace the original tool's response.
    */
@@ -466,6 +473,21 @@ export class AfterAgentHookOutput extends DefaultHookOutput {
     }
     return false;
   }
+
+  /**
+   * Returns a prompt for the next turn if provided by the hook
+   */
+  override getFollowUpPrompt(): string {
+    if (
+      this.hookSpecificOutput &&
+      'followUpPrompt' in this.hookSpecificOutput &&
+      // eslint-disable-next-line no-restricted-syntax
+      typeof this.hookSpecificOutput['followUpPrompt'] === 'string'
+    ) {
+      return this.hookSpecificOutput['followUpPrompt'];
+    }
+    return '';
+  }
 }
 
 /**
@@ -598,6 +620,7 @@ export interface AfterAgentOutput extends HookOutput {
   hookSpecificOutput?: {
     hookEventName: 'AfterAgent';
     clearContext?: boolean;
+    followUpPrompt?: string;
   };
 }
 
