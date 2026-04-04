@@ -22,6 +22,7 @@ import { DEFAULT_FILE_FILTERING_OPTIONS } from '../config/constants.js';
 import { ToolErrorType } from './tool-error.js';
 import { LS_TOOL_NAME, LS_DISPLAY_NAME } from './tool-names.js';
 import { buildDirPathArgsPattern } from '../policy/utils.js';
+import { debugLogger } from '../utils/debugLogger.js';
 import { LS_DEFINITION } from './definitions/coreTools.js';
 import { resolveToolDeclaration } from './definitions/resolver.js';
 import { discoverJitContext, appendJitContext } from './jit-context.js';
@@ -262,7 +263,11 @@ class LSToolInvocation extends BaseToolInvocation<LSToolParams, ToolResult> {
           if (result.status === 'fulfilled') {
             entries.push(result.value);
           }
-          // Files that disappeared between listing and stat are silently dropped
+          if (result.status === 'rejected') {
+            debugLogger.debug(
+              `Stat failed (file may have been deleted): ${result.reason}`,
+            );
+          }
         }
       }
 

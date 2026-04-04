@@ -82,6 +82,12 @@ export interface ReadManyFilesParams {
   useDefaultExcludes?: boolean;
 
   /**
+   * Whether the search should be case-sensitive (optional, defaults to false
+   * on macOS/Windows, true on Linux for performance)
+   */
+  case_sensitive?: boolean;
+
+  /**
    * Whether to respect .gitignore and .geminiignore patterns (optional, defaults to true)
    */
   file_filtering_options?: {
@@ -221,7 +227,10 @@ ${finalExclusionPatternsForDescription
           // On Linux, nocase forces readdir at every directory level to
           // simulate case-insensitive matching on a case-sensitive FS.
           // Default to false there to avoid expensive readdir storms.
-          nocase: process.platform !== 'linux',
+          nocase:
+            this.params.case_sensitive === undefined
+              ? process.platform !== 'linux'
+              : !this.params.case_sensitive,
           signal,
         });
         for (const entry of entriesInDir) {

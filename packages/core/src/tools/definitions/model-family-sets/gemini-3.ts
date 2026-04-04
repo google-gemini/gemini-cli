@@ -282,7 +282,7 @@ export const GEMINI_3_SET: CoreToolSet = {
         },
         [PARAM_CASE_SENSITIVE]: {
           description:
-            'Optional: Whether the search should be case-sensitive. Defaults to false.',
+            'Optional: Whether the search should be case-sensitive. Defaults to false on macOS/Windows, true on Linux.',
           type: 'boolean',
         },
         [PARAM_RESPECT_GIT_IGNORE]: {
@@ -471,6 +471,11 @@ Use this tool when the user's query implies needing the content of several files
           description:
             'Optional. Whether to apply a list of default exclusion patterns (e.g., node_modules, .git, binary files). Defaults to true.',
           default: true,
+        },
+        [PARAM_CASE_SENSITIVE]: {
+          description:
+            'Optional: Whether the search should be case-sensitive. Defaults to false on macOS/Windows, true on Linux.',
+          type: 'boolean',
         },
         [PARAM_FILE_FILTERING_OPTIONS]: {
           description:

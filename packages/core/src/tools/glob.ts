@@ -80,7 +80,8 @@ export interface GlobToolParams {
   dir_path?: string;
 
   /**
-   * Whether the search should be case-sensitive (optional, defaults to false)
+   * Whether the search should be case-sensitive (optional, defaults to false
+   * on macOS/Windows, true on Linux for performance)
    */
   case_sensitive?: boolean;
 
@@ -238,7 +239,11 @@ class GlobToolInvocation extends BaseToolInvocation<
           if (result.status === 'fulfilled') {
             statResults.push(result.value);
           }
-          // Files deleted between glob and stat are silently dropped
+          if (result.status === 'rejected') {
+            debugLogger.debug(
+              `Stat failed (file may have been deleted): ${result.reason}`,
+            );
+          }
         }
       }
 

@@ -280,6 +280,35 @@ describe('GlobTool', () => {
       const result = await invocation.execute(abortSignal);
       expect(result.error?.type).toBe(ToolErrorType.GLOB_EXECUTION_ERROR);
     }, 30000);
+
+    it('should gracefully handle files deleted between glob and stat', async () => {
+      // Create files that glob will find
+      await fs.writeFile(path.join(tempRootDir, 'keep.dat'), 'keep');
+      await fs.writeFile(path.join(tempRootDir, 'vanish.dat'), 'vanish');
+
+      const params: GlobToolParams = { pattern: '*.dat' };
+      const invocation = globTool.build(params);
+
+      // Spy on fsPromises.stat to simulate a file disappearing after glob
+      const fsPromisesMod = await import('node:fs/promises');
+      const originalStat = fsPromisesMod.default.stat;
+      const statSpy = vi
+        .spyOn(fsPromisesMod.default, 'stat')
+        .mockImplementation(async (filePath, ...args) => {
+          if (String(filePath).includes('vanish.dat')) {
+            throw new Error('ENOENT: no such file or directory');
+          }
+          return originalStat(filePath, ...args);
+        });
+
+      const result = await invocation.execute(abortSignal);
+
+      expect(result.llmContent).toContain('keep.dat');
+      expect(result.llmContent).not.toContain('vanish.dat');
+      expect(result.llmContent).toContain('Found 1 file(s)');
+
+      statSpy.mockRestore();
+    }, 30000);
   });
 
   describe('validateToolParams', () => {
