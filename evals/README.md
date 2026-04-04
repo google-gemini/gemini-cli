@@ -111,12 +111,20 @@ policy.** A subset that prove to be highly stable over time may be promoted to
 
 - `name`: The name of the evaluation case.
 - `prompt`: The prompt to send to the model.
+- `files`: An optional object mapping relative file paths to their contents
+  (e.g., `{ 'src/app.ts': 'const x = 1;' }`). When provided, the test helper
+  creates these files in a temporary directory and initializes a git repository
+  with an initial commit.
 - `params`: An optional object with parameters to pass to the test rig (e.g.,
-  settings).
+  settings). Note: restricting core tools via `tools.core` is forbidden and
+  enforced at compile time.
+- `timeout`: An optional timeout in milliseconds. Overrides the default 5-minute
+  timeout from the vitest config.
+- `approvalMode`: An optional string controlling how tool calls are approved
+  during the eval. One of `'default'`, `'auto_edit'`, `'yolo'`, or `'plan'`.
+  Defaults to `'yolo'` (all tools auto-approved).
 - `assert`: An async function that takes the test rig and the result of the run
   and asserts that the result is correct.
-- `log`: An optional boolean that, if set to `true`, will log the tool calls to
-  a file in the `evals/logs` directory.
 
 ### Example
 
@@ -135,6 +143,34 @@ describe('my_feature', () => {
   });
 });
 ```
+
+### `appEvalTest`
+
+For evals that need to test UI interactions or use breakpoints, use
+`appEvalTest` from `evals/app-test-helper.ts`. It runs the CLI in-process using
+`AppRig` instead of as a subprocess, which allows pausing execution at specific
+tool calls.
+
+|             | `evalTest`               | `appEvalTest`                                  |
+| ----------- | ------------------------ | ---------------------------------------------- |
+| Rig         | `TestRig` (subprocess)   | `AppRig` (in-process)                          |
+| Import      | `./test-helper.js`       | `./app-test-helper.js`                         |
+| Breakpoints | No                       | Yes (`rig.setBreakpoint()`)                    |
+| Setup hook  | No                       | Yes (`setup: async (rig) => {}`)               |
+| Use when    | Standard workspace tests | UI/interaction tests, tool confirmation checks |
+
+#### `AppEvalCase` Properties
+
+- `name`: The name of the evaluation case.
+- `prompt`: The prompt to send to the model.
+- `files`: Same as `EvalCase` — optional file map for workspace setup.
+- `configOverrides`: An optional object for configuration overrides. Restricting
+  tools (`excludeTools`, `coreTools`, `allowedTools`) is forbidden.
+- `timeout`: An optional timeout in milliseconds. Defaults to 60 seconds.
+- `setup`: An optional async function that runs after file creation but before
+  the prompt is sent. Use this to set breakpoints.
+- `assert`: An async function that takes the rig and output string and asserts
+  correctness.
 
 ## Running Evaluations
 
