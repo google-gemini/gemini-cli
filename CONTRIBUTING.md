@@ -207,6 +207,12 @@ development setup of this project.
       tool like [nvm](https://github.com/nvm-sh/nvm) to manage Node.js versions.
     - **Production:** For running the CLI in a production environment, any
       version of Node.js `>=20` is acceptable.
+
+      > **Note:** To install a specific Node.js version, use
+      > `nvm install 20.19.0 && nvm use 20.19.0`. Windows users: `nvm` is not
+      > available by default. Please use
+      > [nvm-windows](https://github.com/coreybutler/nvm-windows) instead.
+
 2.  **Git**
 
 ### Build process
@@ -358,8 +364,8 @@ npm run lint
 
 #### VS Code
 
-0.  Run the CLI to interactively debug in VS Code with `F5`
-1.  Start the CLI in debug mode from the root directory:
+1.  Run the CLI to interactively debug in VS Code with `F5`
+2.  Start the CLI in debug mode from the root directory:
     ```bash
     npm run debug
     ```
@@ -367,7 +373,7 @@ npm run lint
     `packages/cli` directory, pausing execution until a debugger attaches. You
     can then open `chrome://inspect` in your Chrome browser to connect to the
     debugger.
-2.  In VS Code, use the "Attach" launch configuration (found in
+3.  In VS Code, use the "Attach" launch configuration (found in
     `.vscode/launch.json`).
 
 Alternatively, you can use the "Launch Program" configuration in VS Code if you
