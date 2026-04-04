@@ -120,6 +120,13 @@ There are three possible decisions a rule can enforce:
 
 ### Priority system and tiers
 
+<!-- prettier-ignore -->
+> [!WARNING]
+> The **Workspace** tier (project-level policies) is currently non-functional.
+> Defining policies in a workspace's `.gemini/policies` directory will not
+> have any effect. See [issue #18186](https://github.com/google-gemini/gemini-cli/issues/18186).
+> Use User or Admin policies instead.
+
 The policy engine uses a sophisticated priority system to resolve conflicts when
 multiple rules match a single tool call. The core principle is simple: **the
 rule with the highest priority wins**.
@@ -131,7 +138,7 @@ has a designated number that forms the base of the final priority calculation.
 | :-------- | :--- | :------------------------------------------------------------------------- |
 | Default   | 1    | Built-in policies that ship with the Gemini CLI.                           |
 | Extension | 2    | Policies defined in extensions.                                            |
-| Workspace | 3    | Policies defined in the current workspace's configuration directory.       |
+| Workspace | 3    | **(Currently non-functional)** Policies defined in the current workspace.   |
 | User      | 4    | Custom policies defined by the user.                                       |
 | Admin     | 5    | Policies managed by an administrator (e.g., in an enterprise environment). |
 
@@ -214,11 +221,11 @@ User, and (if configured) Admin directories.
 
 ### Policy locations
 
-| Tier          | Type   | Location                                  |
-| :------------ | :----- | :---------------------------------------- |
-| **User**      | Custom | `~/.gemini/policies/*.toml`               |
-| **Workspace** | Custom | `$WORKSPACE_ROOT/.gemini/policies/*.toml` |
-| **Admin**     | System | _See below (OS specific)_                 |
+| Tier          | Type   | Location                                              |
+| :------------ | :----- | :---------------------------------------------------- |
+| **User**      | Custom | `~/.gemini/policies/*.toml`                           |
+| **Workspace** | Custom | **(Non-functional)** `$WORKSPACE_ROOT/.gemini/policies/*.toml` |
+| **Admin**     | System | _See below (OS specific)_                             |
 
 #### System-wide policies (Admin)
 
