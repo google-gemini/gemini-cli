@@ -33,6 +33,7 @@ export interface StartupPhaseHandle {
  */
 export class StartupProfiler {
   private phases: Map<string, StartupPhase> = new Map();
+  private lastFlushResults: StartupPhaseStats[] | null = null;
   private static instance: StartupProfiler;
 
   private constructor() {}
@@ -42,6 +43,12 @@ export class StartupProfiler {
       StartupProfiler.instance = new StartupProfiler();
     }
     return StartupProfiler.instance;
+  }
+
+  /** Returns the startup phase timings from the most recent flush, or null if
+   *  flush() has not been called yet. */
+  getLastFlushResults(): StartupPhaseStats[] | null {
+    return this.lastFlushResults;
   }
 
   /**
@@ -232,6 +239,8 @@ export class StartupProfiler {
         ),
       );
     }
+
+    this.lastFlushResults = startupPhases.length > 0 ? startupPhases : null;
 
     // Clear performance marks and measures for all tracked phases.
     for (const phaseName of this.phases.keys()) {
