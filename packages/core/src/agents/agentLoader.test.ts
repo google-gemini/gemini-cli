@@ -610,6 +610,95 @@ Hidden`,
       expect(result.errors).toHaveLength(0);
     });
 
+    it('should load agents from symlinked .md files', async () => {
+      const realFile = path.join(tempDir, 'real-agent.md');
+      await fs.writeFile(
+        realFile,
+        `---
+name: symlinked-agent
+description: Agent via symlink
+---
+Prompt`,
+      );
+
+      const linkPath = path.join(tempDir, 'linked-agent.md');
+      await fs.symlink(realFile, linkPath);
+
+      const result = await loadAgentsFromDirectory(tempDir);
+      // Should load only once (deduplication by resolved path)
+      expect(result.agents).toHaveLength(1);
+      expect(result.agents[0].name).toBe('symlinked-agent');
+      expect(result.errors).toHaveLength(0);
+    });
+
+    it('should reject symlinks pointing outside agents directory', async () => {
+      // Create a file outside the agents directory
+      const outsideDir = await fs.mkdtemp(
+        path.join(os.tmpdir(), 'agent-outside-'),
+      );
+      const outsideFile = path.join(outsideDir, 'evil.md');
+      await fs.writeFile(
+        outsideFile,
+        `---
+name: evil-agent
+description: Should not load
+---
+Evil prompt`,
+      );
+
+      const linkPath = path.join(tempDir, 'evil-link.md');
+      await fs.symlink(outsideFile, linkPath);
+
+      const result = await loadAgentsFromDirectory(tempDir);
+      expect(result.agents).toHaveLength(0);
+      expect(result.errors).toHaveLength(1);
+      expect(result.errors[0].message).toContain(
+        'Symlink points outside agents directory',
+      );
+
+      await fs.rm(outsideDir, { recursive: true, force: true });
+    });
+
+    it('should reject symlinks to dirs sharing a prefix with agents dir', async () => {
+      // Create a sibling directory whose name shares a prefix with tempDir
+      // e.g. tempDir = '/tmp/agents-abc' → evilDir = '/tmp/agents-abc-evil'
+      const evilDir = tempDir + '-evil';
+      await fs.mkdir(evilDir, { recursive: true });
+      const evilFile = path.join(evilDir, 'steal.md');
+      await fs.writeFile(
+        evilFile,
+        `---
+name: steal-agent
+description: Should not load
+---
+Malicious prompt`,
+      );
+
+      const linkPath = path.join(tempDir, 'steal-link.md');
+      await fs.symlink(evilFile, linkPath);
+
+      const result = await loadAgentsFromDirectory(tempDir);
+      expect(result.agents).toHaveLength(0);
+      expect(result.errors).toHaveLength(1);
+      expect(result.errors[0].message).toContain(
+        'Symlink points outside agents directory',
+      );
+
+      await fs.rm(evilDir, { recursive: true, force: true });
+    });
+
+    it('should report error for broken symlinks', async () => {
+      const linkPath = path.join(tempDir, 'broken-link.md');
+      await fs.symlink('/nonexistent/file.md', linkPath);
+
+      const result = await loadAgentsFromDirectory(tempDir);
+      expect(result.agents).toHaveLength(0);
+      expect(result.errors).toHaveLength(1);
+      expect(result.errors[0].message).toContain(
+        'Symlink target does not exist',
+      );
+    });
+
     it('should capture errors for malformed individual files', async () => {
       // Create a malformed Markdown file
       await writeAgentMarkdown('invalid markdown', 'malformed.md');
