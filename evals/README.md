@@ -111,12 +111,18 @@ policy.** A subset that prove to be highly stable over time may be promoted to
 
 - `name`: The name of the evaluation case.
 - `prompt`: The prompt to send to the model.
+- `files`: An optional map of file paths to contents. Files are written to the
+  test workspace before the agent runs, letting you provide source files,
+  configs, or other context the agent should operate on.
 - `params`: An optional object with parameters to pass to the test rig (e.g.,
   settings).
+- `approvalMode`: An optional approval mode for the agent during this eval.
+  Accepted values: `'default'`, `'auto_edit'`, `'yolo'`, `'plan'`. Defaults to
+  `'auto_edit'` when not set.
+- `timeout`: An optional timeout in milliseconds for the eval case. Overrides
+  the default test timeout.
 - `assert`: An async function that takes the test rig and the result of the run
   and asserts that the result is correct.
-- `log`: An optional boolean that, if set to `true`, will log the tool calls to
-  a file in the `evals/logs` directory.
 
 ### Example
 
@@ -128,9 +134,13 @@ describe('my_feature', () => {
   // New tests MUST start as USUALLY_PASSES and be promoted based on consistency metrics
   evalTest('USUALLY_PASSES', {
     name: 'should do something',
-    prompt: 'do it',
+    prompt: 'Add a hello() function to greet.ts',
+    files: {
+      'greet.ts': 'export {};\n',
+    },
     assert: async (rig, result) => {
-      // assertions
+      const content = await rig.readFile('greet.ts');
+      expect(content).toContain('hello');
     },
   });
 });
