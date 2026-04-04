@@ -162,6 +162,28 @@ describe('unescapePath', () => {
       ['unquoted path', 'C:\\path\\to\\file.txt', 'C:\\path\\to\\file.txt'],
       ['partially quoted', '"C:\\path', '"C:\\path'],
       ['empty string', '', ''],
+      ['backslash-escaped parentheses', 'file\\(1\\).txt', 'file(1).txt'],
+      [
+        'backslash-escaped square brackets',
+        'file\\[backup\\].txt',
+        'file[backup].txt',
+      ],
+      [
+        'backslash-escaped curly braces',
+        'file\\{temp\\}.txt',
+        'file{temp}.txt',
+      ],
+      ['backslash-escaped glob wildcards', 'file\\*.txt', 'file*.txt'],
+      [
+        'mixed escaped glob metacharacters',
+        'src/file with \\(special\\) chars.txt',
+        'src/file with (special) chars.txt',
+      ],
+      [
+        'Windows path separators preserved',
+        'C:\\Users\\test\\file.txt',
+        'C:\\Users\\test\\file.txt',
+      ],
     ])('should unescape %s', (_, input, expected) => {
       expect(unescapePath(input)).toBe(expected);
     });

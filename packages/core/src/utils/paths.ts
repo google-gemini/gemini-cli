@@ -291,7 +291,9 @@ export function escapePath(filePath: string): string {
 /**
  * Unescapes paths for at-commands.
  *
- *  - Windows: double quoted if they contain special chars, otherwise bare
+ *  - Windows: double quoted if they contain special chars, otherwise bare.
+ *    Also handles backslash-escaped glob metacharacters (e.g. from
+ *    LLM-generated patterns) without breaking Windows path separators.
  *  - POSIX: backslash-escaped
  */
 export function unescapePath(filePath: string): string {
@@ -303,7 +305,11 @@ export function unescapePath(filePath: string): string {
     ) {
       return filePath.slice(1, -1);
     }
-    return filePath;
+    // Handle backslash-escaped glob metacharacters that may arrive from
+    // POSIX-style escaping or LLM-generated patterns. Only unescape
+    // specific characters to avoid breaking Windows paths where backslash
+    // is a path separator.
+    return filePath.replace(/\\([()[\]{}*?!])/g, '$1');
   } else {
     return filePath.replace(/\\(.)/g, '$1');
   }
