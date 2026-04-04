@@ -18,7 +18,10 @@ export const Tips: React.FC<TipsProps> = ({ config }) => {
 
   return (
     <Box flexDirection="column" marginTop={1}>
-      <Text color={theme.text.primary}>Tips for getting started:</Text>
+      <Text>
+        <Text color={theme.text.secondary}>[INFO] </Text>
+        <Text color={theme.text.primary}>Tips for getting started:</Text>
+      </Text>
       {geminiMdFileCount === 0 && (
         <Text color={theme.text.primary}>
           1. Create <Text bold>GEMINI.md</Text> files to customize your
