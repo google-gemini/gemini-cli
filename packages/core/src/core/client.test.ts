@@ -1262,6 +1262,7 @@ ${JSON.stringify(
 
       // Assert
       expect(events).toContainEqual({ type: GeminiEventType.LoopDetected });
+      await new Promise((resolve) => setTimeout(resolve, 0));
       expect(abortSpy).toHaveBeenCalled();
       expect(finalResult).toBeInstanceOf(Turn);
     });
@@ -3121,6 +3122,7 @@ ${JSON.stringify(
         );
 
         // Act
+        const abortSpy = vi.spyOn(AbortController.prototype, 'abort');
         const stream = client.sendMessageStream(
           [{ text: 'Hi' }],
           new AbortController().signal,
@@ -3135,6 +3137,8 @@ ${JSON.stringify(
         // Assert
         expect(events).toContainEqual({ type: GeminiEventType.LoopDetected });
         expect(sendMessageStreamSpy).toHaveBeenCalledTimes(2); // One original, one recovery
+        await new Promise((resolve) => setTimeout(resolve, 0));
+        expect(abortSpy).toHaveBeenCalled();
       });
 
       it('should respect boundedTurns during recovery', async () => {
