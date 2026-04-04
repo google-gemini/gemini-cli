@@ -1469,6 +1469,7 @@ export class Config implements McpContext, AgentLoopContext {
           this.storage,
           this.getExtensions(),
           this.isTrustedFolder(),
+          [...this.workspaceContext.getDirectories()],
         );
         this.getSkillManager().setDisabledSkills(this.disabledSkills);
 
@@ -3211,6 +3212,7 @@ export class Config implements McpContext, AgentLoopContext {
         this.storage,
         this.getExtensions(),
         this.isTrustedFolder(),
+        [...this.workspaceContext.getDirectories()],
       );
       this.getSkillManager().setDisabledSkills(this.disabledSkills);
 

@@ -260,10 +260,21 @@ export class GeminiAgent {
     );
   }
 
-  async newSession({
-    cwd,
-    mcpServers,
-  }: acp.NewSessionRequest): Promise<acp.NewSessionResponse> {
+  async newSession(
+    req: acp.NewSessionRequest,
+  ): Promise<acp.NewSessionResponse> {
+    const { cwd, mcpServers } = req;
+    const meta = hasMeta(req) ? req._meta : undefined;
+    const additionalRootsRaw = meta?.['additionalRoots'];
+    const additionalRoots: string[] = [];
+    if (Array.isArray(additionalRootsRaw)) {
+      for (const root of additionalRootsRaw) {
+        if (typeof root === 'string') {
+          additionalRoots.push(root);
+        }
+      }
+    }
+
     const sessionId = randomUUID();
     const loadedSettings = loadSettings(cwd);
     const config = await this.newSessionConfig(
@@ -271,6 +282,7 @@ export class GeminiAgent {
       cwd,
       mcpServers,
       loadedSettings,
+      additionalRoots,
     );
 
     const authType =
@@ -474,6 +486,7 @@ export class GeminiAgent {
     cwd: string,
     mcpServers: acp.McpServer[],
     loadedSettings?: LoadedSettings,
+    additionalRoots: string[] = [],
   ): Promise<Config> {
     const currentSettings = loadedSettings || this.settings;
     const mergedMcpServers = { ...currentSettings.merged.mcpServers };
@@ -514,6 +527,13 @@ export class GeminiAgent {
     const settings = {
       ...currentSettings.merged,
       mcpServers: mergedMcpServers,
+      context: {
+        ...currentSettings.merged.context,
+        includeDirectories: [
+          ...(currentSettings.merged.context?.includeDirectories || []),
+          ...additionalRoots,
+        ],
+      },
     };
 
     const config = await loadCliConfig(settings, sessionId, this.argv, { cwd });
@@ -693,6 +713,29 @@ export class Session {
     this.pendingPrompt?.abort();
     const pendingSend = new AbortController();
     this.pendingPrompt = pendingSend;
+
+    const meta = hasMeta(params) ? params._meta : undefined;
+    const additionalRootsRaw = meta?.['additionalRoots'];
+    const additionalRoots: string[] = [];
+    if (Array.isArray(additionalRootsRaw)) {
+      for (const root of additionalRootsRaw) {
+        if (typeof root === 'string') {
+          additionalRoots.push(root);
+        }
+      }
+    }
+
+    if (additionalRoots.length > 0) {
+      this.context.config.getWorkspaceContext().addDirectories(additionalRoots);
+      await this.context.config
+        .getSkillManager()
+        .discoverSkills(
+          this.context.config.storage,
+          this.context.config.getExtensions(),
+          this.context.config.isTrustedFolder(),
+          [...this.context.config.getWorkspaceContext().getDirectories()],
+        );
+    }
 
     await this.context.config.waitForMcpInit();
 
