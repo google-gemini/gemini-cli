@@ -10,6 +10,7 @@ import {
   initializeTelemetry,
   shutdownTelemetry,
   bufferTelemetryEvent,
+  resolveGcpProjectId,
 } from './sdk.js';
 import { OTLPTraceExporter } from '@opentelemetry/exporter-trace-otlp-grpc';
 import { OTLPLogExporter } from '@opentelemetry/exporter-logs-otlp-grpc';
@@ -29,6 +30,7 @@ import { TelemetryTarget } from './index.js';
 
 import * as os from 'node:os';
 import * as path from 'node:path';
+import * as childProcess from 'node:child_process';
 
 import { authEvents } from '../code_assist/oauth2.js';
 import { debugLogger } from '../utils/debugLogger.js';
@@ -42,6 +44,7 @@ vi.mock('@opentelemetry/exporter-metrics-otlp-http');
 vi.mock('@opentelemetry/sdk-trace-node');
 vi.mock('@opentelemetry/sdk-node');
 vi.mock('./gcp-exporters.js');
+vi.mock('node:child_process');
 vi.mock('google-auth-library');
 vi.mock('../utils/debugLogger.js', () => ({
   debugLogger: {
@@ -201,6 +204,10 @@ describe('Telemetry SDK', () => {
     );
     vi.spyOn(mockConfig, 'getTelemetryUseCollector').mockReturnValue(false);
     vi.spyOn(mockConfig, 'getTelemetryOtlpEndpoint').mockReturnValue('');
+    // Simulate gcloud not available
+    vi.mocked(childProcess.execSync).mockImplementation(() => {
+      throw new Error('gcloud not found');
+    });
 
     const originalOtlpEnv = process.env['OTLP_GOOGLE_CLOUD_PROJECT'];
     const originalGoogleEnv = process.env['GOOGLE_CLOUD_PROJECT'];
@@ -213,6 +220,49 @@ describe('Telemetry SDK', () => {
       expect(GcpTraceExporter).toHaveBeenCalledWith(undefined, undefined);
       expect(GcpLogExporter).toHaveBeenCalledWith(undefined, undefined);
       expect(GcpMetricExporter).toHaveBeenCalledWith(undefined, undefined);
+      expect(NodeSDK.prototype.start).toHaveBeenCalled();
+    } finally {
+      if (originalOtlpEnv) {
+        process.env['OTLP_GOOGLE_CLOUD_PROJECT'] = originalOtlpEnv;
+      }
+      if (originalGoogleEnv) {
+        process.env['GOOGLE_CLOUD_PROJECT'] = originalGoogleEnv;
+      }
+    }
+  });
+
+  it('should resolve GCP project ID from gcloud when env vars are not set', async () => {
+    mockGetApplicationDefault.mockResolvedValue(undefined);
+    vi.spyOn(mockConfig, 'getTelemetryTarget').mockReturnValue(
+      TelemetryTarget.GCP,
+    );
+    vi.spyOn(mockConfig, 'getTelemetryUseCollector').mockReturnValue(false);
+    vi.spyOn(mockConfig, 'getTelemetryOtlpEndpoint').mockReturnValue('');
+    // Simulate gcloud returning a project ID
+    vi.mocked(childProcess.execSync).mockReturnValue(
+      'gcloud-resolved-project\n',
+    );
+
+    const originalOtlpEnv = process.env['OTLP_GOOGLE_CLOUD_PROJECT'];
+    const originalGoogleEnv = process.env['GOOGLE_CLOUD_PROJECT'];
+    delete process.env['OTLP_GOOGLE_CLOUD_PROJECT'];
+    delete process.env['GOOGLE_CLOUD_PROJECT'];
+
+    try {
+      await initializeTelemetry(mockConfig);
+
+      expect(GcpTraceExporter).toHaveBeenCalledWith(
+        'gcloud-resolved-project',
+        undefined,
+      );
+      expect(GcpLogExporter).toHaveBeenCalledWith(
+        'gcloud-resolved-project',
+        undefined,
+      );
+      expect(GcpMetricExporter).toHaveBeenCalledWith(
+        'gcloud-resolved-project',
+        undefined,
+      );
       expect(NodeSDK.prototype.start).toHaveBeenCalled();
     } finally {
       if (originalOtlpEnv) {
@@ -405,5 +455,54 @@ describe('Telemetry SDK', () => {
     expect(debugLogger.error).not.toHaveBeenCalledWith(
       expect.stringContaining('Telemetry credentials have changed'),
     );
+  });
+});
+
+describe('resolveGcpProjectId', () => {
+  afterEach(() => {
+    vi.unstubAllEnvs();
+    vi.restoreAllMocks();
+  });
+
+  it('should return OTLP_GOOGLE_CLOUD_PROJECT if set', async () => {
+    vi.stubEnv('OTLP_GOOGLE_CLOUD_PROJECT', 'otlp-project');
+    vi.stubEnv('GOOGLE_CLOUD_PROJECT', 'google-project');
+    const result = await resolveGcpProjectId();
+    expect(result).toBe('otlp-project');
+  });
+
+  it('should return GOOGLE_CLOUD_PROJECT if OTLP var is not set', async () => {
+    vi.stubEnv('OTLP_GOOGLE_CLOUD_PROJECT', '');
+    vi.stubEnv('GOOGLE_CLOUD_PROJECT', 'google-project');
+    const result = await resolveGcpProjectId();
+    expect(result).toBe('google-project');
+  });
+
+  it('should fall back to gcloud config when env vars are not set', async () => {
+    vi.stubEnv('OTLP_GOOGLE_CLOUD_PROJECT', '');
+    vi.stubEnv('GOOGLE_CLOUD_PROJECT', '');
+    vi.mocked(childProcess.execSync).mockReturnValue(
+      'gcloud-project\n',
+    );
+    const result = await resolveGcpProjectId();
+    expect(result).toBe('gcloud-project');
+  });
+
+  it('should return undefined when gcloud returns (unset)', async () => {
+    vi.stubEnv('OTLP_GOOGLE_CLOUD_PROJECT', '');
+    vi.stubEnv('GOOGLE_CLOUD_PROJECT', '');
+    vi.mocked(childProcess.execSync).mockReturnValue('(unset)\n');
+    const result = await resolveGcpProjectId();
+    expect(result).toBeUndefined();
+  });
+
+  it('should return undefined when gcloud is not available', async () => {
+    vi.stubEnv('OTLP_GOOGLE_CLOUD_PROJECT', '');
+    vi.stubEnv('GOOGLE_CLOUD_PROJECT', '');
+    vi.mocked(childProcess.execSync).mockImplementation(() => {
+      throw new Error('gcloud not found');
+    });
+    const result = await resolveGcpProjectId();
+    expect(result).toBeUndefined();
   });
 });
