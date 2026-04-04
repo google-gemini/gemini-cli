@@ -3689,6 +3689,8 @@ export class Config implements McpContext, AgentLoopContext {
   }
 
   private onAgentsRefreshed = async () => {
+    await this.agentRegistry.initialize();
+
     // Propagate updates to the active chat session
     const client = this.geminiClient;
     if (client?.isInitialized()) {

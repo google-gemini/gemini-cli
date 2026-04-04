@@ -230,7 +230,7 @@ class DelegateInvocation extends BaseToolInvocation<
     const properties = schemaObj['properties'];
     if (isRecord(properties)) {
       const keys = Object.keys(properties);
-      const primaryKey = keys.length === 1 ? keys[0] : 'query';
+      const primaryKey = keys.length === 1 ? keys[0] : 'prompt';
 
       const value = agentArgs[primaryKey];
       if (typeof value !== 'string' || value.trim().length === 0) {

@@ -47,15 +47,23 @@ export class AgentRegistry {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   private readonly allDefinitions = new Map<string, AgentDefinition<any>>();
 
+  private initialized = false;
+
   constructor(private readonly config: Config) {}
 
   /**
    * Discovers and loads agents.
    */
   async initialize(): Promise<void> {
+    if (this.initialized) {
+      await this.loadAgents();
+      return;
+    }
+
     coreEvents.on(CoreEvent.ModelChanged, this.onModelChanged);
 
     await this.loadAgents();
+    this.initialized = true;
   }
 
   private onModelChanged = () => {
