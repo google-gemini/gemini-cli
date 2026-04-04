@@ -46,6 +46,7 @@ import {
   handleMaxTurnsExceededError,
 } from './utils/errors.js';
 import { TextOutput } from './ui/utils/textOutput.js';
+import { runNonInteractive as runNonInteractiveAgentSession } from './nonInteractiveCliAgentSession.js';
 
 interface RunNonInteractiveParams {
   config: Config;
@@ -55,16 +56,20 @@ interface RunNonInteractiveParams {
   resumedSessionData?: ResumedSessionData;
 }
 
-export async function runNonInteractive({
-  config,
-  settings,
-  input,
-  prompt_id,
-  resumedSessionData,
-}: RunNonInteractiveParams): Promise<void> {
+export async function runNonInteractive(
+  params: RunNonInteractiveParams,
+): Promise<void> {
+  const useAgentSession = params.config.getAgentSessionNoninteractiveEnabled();
+  if (useAgentSession) {
+    return runNonInteractiveAgentSession(params);
+  }
+
+  const { config, settings, input, prompt_id, resumedSessionData } = params;
+
   return promptIdContext.run(prompt_id, async () => {
     const consolePatcher = new ConsolePatcher({
       stderr: true,
+      interactive: false,
       debugMode: config.getDebugMode(),
       onNewMessage: (msg) => {
         coreEvents.emitConsoleLog(msg.type, msg.content);
@@ -211,7 +216,7 @@ export async function runNonInteractive({
 
       const geminiClient = config.getGeminiClient();
       const scheduler = new Scheduler({
-        config,
+        context: config,
         messageBus: config.getMessageBus(),
         getPreferredEditor: () => undefined,
         schedulerId: ROOT_SCHEDULER_ID,
@@ -263,8 +268,8 @@ export async function runNonInteractive({
           onDebugMessage: () => {},
           messageId: Date.now(),
           signal: abortController.signal,
+          escapePastedAtSymbols: false,
         });
-
         if (error || !processedQuery) {
           // An error occurred during @include processing (e.g., file not found).
           // The error message is already logged by handleAtCommand.

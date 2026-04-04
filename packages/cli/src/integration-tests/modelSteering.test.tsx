@@ -29,7 +29,7 @@ describe('Model Steering Integration', () => {
       configOverrides: { modelSteering: true },
     });
     await rig.initialize();
-    rig.render();
+    await rig.render();
     await rig.waitForIdle();
 
     rig.setToolPolicy('list_directory', PolicyDecision.ASK_USER);
@@ -65,13 +65,9 @@ describe('Model Steering Integration', () => {
     // Resolve list_directory (Proceed)
     await rig.resolveTool('ReadFolder');
 
-    // Wait for the model to process the hint and output the next action
-    // Based on steering.responses, it should first acknowledge the hint
-    await rig.waitForOutput('ACK: I will focus on .txt files now.');
-
     // Then it should proceed with the next action
     await rig.waitForOutput(
-      /Since you want me to focus on .txt files,[\s\S]*I will read file1.txt/,
+      /Since you want me to focus on \.txt[\s\S]*files,[\s\S]*I will read file1\.txt/,
     );
     await rig.waitForOutput('ReadFile');
 

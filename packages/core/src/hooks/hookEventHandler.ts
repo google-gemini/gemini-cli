@@ -4,31 +4,31 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import type { Config } from '../config/config.js';
 import type { HookPlanner, HookEventContext } from './hookPlanner.js';
 import type { HookRunner } from './hookRunner.js';
 import type { HookAggregator, AggregatedHookResult } from './hookAggregator.js';
-import { HookEventName, HookType } from './types.js';
-import type {
-  HookConfig,
-  HookInput,
-  BeforeToolInput,
-  AfterToolInput,
-  BeforeAgentInput,
-  NotificationInput,
-  AfterAgentInput,
-  SessionStartInput,
-  SessionEndInput,
-  PreCompressInput,
-  BeforeModelInput,
-  AfterModelInput,
-  BeforeToolSelectionInput,
-  NotificationType,
-  SessionStartSource,
-  SessionEndReason,
-  PreCompressTrigger,
-  HookExecutionResult,
-  McpToolContext,
+import {
+  HookEventName,
+  HookType,
+  type HookConfig,
+  type HookInput,
+  type BeforeToolInput,
+  type AfterToolInput,
+  type BeforeAgentInput,
+  type NotificationInput,
+  type AfterAgentInput,
+  type SessionStartInput,
+  type SessionEndInput,
+  type PreCompressInput,
+  type BeforeModelInput,
+  type AfterModelInput,
+  type BeforeToolSelectionInput,
+  type NotificationType,
+  type SessionStartSource,
+  type SessionEndReason,
+  type PreCompressTrigger,
+  type HookExecutionResult,
+  type McpToolContext,
 } from './types.js';
 import { defaultHookTranslator } from './hookTranslator.js';
 import type {
@@ -39,12 +39,13 @@ import { logHookCall } from '../telemetry/loggers.js';
 import { HookCallEvent } from '../telemetry/types.js';
 import { debugLogger } from '../utils/debugLogger.js';
 import { coreEvents } from '../utils/events.js';
+import type { AgentLoopContext } from '../config/agent-loop-context.js';
 
 /**
  * Hook event bus that coordinates hook execution across the system
  */
 export class HookEventHandler {
-  private readonly config: Config;
+  private readonly context: AgentLoopContext;
   private readonly hookPlanner: HookPlanner;
   private readonly hookRunner: HookRunner;
   private readonly hookAggregator: HookAggregator;
@@ -57,12 +58,12 @@ export class HookEventHandler {
   private readonly reportedFailures = new WeakMap<object, Set<string>>();
 
   constructor(
-    config: Config,
+    context: AgentLoopContext,
     hookPlanner: HookPlanner,
     hookRunner: HookRunner,
     hookAggregator: HookAggregator,
   ) {
-    this.config = config;
+    this.context = context;
     this.hookPlanner = hookPlanner;
     this.hookRunner = hookRunner;
     this.hookAggregator = hookAggregator;
@@ -302,6 +303,7 @@ export class HookEventHandler {
         coreEvents.emitHookStart({
           hookName: this.getHookName(config),
           eventName,
+          source: config.source,
           hookIndex: index + 1,
           totalHooks: plan.hookConfigs.length,
         });
@@ -369,15 +371,14 @@ export class HookEventHandler {
   private createBaseInput(eventName: HookEventName): HookInput {
     // Get the transcript path from the ChatRecordingService if available
     const transcriptPath =
-      this.config
-        .getGeminiClient()
+      this.context.geminiClient
         ?.getChatRecordingService()
         ?.getConversationFilePath() ?? '';
 
     return {
-      session_id: this.config.getSessionId(),
+      session_id: this.context.config.getSessionId(),
       transcript_path: transcriptPath,
-      cwd: this.config.getWorkingDir(),
+      cwd: this.context.config.getWorkingDir(),
       hook_event_name: eventName,
       timestamp: new Date().toISOString(),
     };
@@ -456,7 +457,7 @@ export class HookEventHandler {
         result.error?.message,
       );
 
-      logHookCall(this.config, hookCallEvent);
+      logHookCall(this.context.config, hookCallEvent);
     }
 
     // Log individual errors

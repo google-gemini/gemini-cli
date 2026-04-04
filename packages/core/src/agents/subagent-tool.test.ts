@@ -7,7 +7,13 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { SubagentTool } from './subagent-tool.js';
 import { SubagentToolWrapper } from './subagent-tool-wrapper.js';
-import { Kind } from '../tools/tools.js';
+import {
+  Kind,
+  type DeclarativeTool,
+  type ToolCallConfirmationDetails,
+  type ToolInvocation,
+  type ToolResult,
+} from '../tools/tools.js';
 import type {
   LocalAgentDefinition,
   RemoteAgentDefinition,
@@ -17,12 +23,6 @@ import { makeFakeConfig } from '../test-utils/config.js';
 import { createMockMessageBus } from '../test-utils/mock-message-bus.js';
 import type { Config } from '../config/config.js';
 import type { MessageBus } from '../confirmation-bus/message-bus.js';
-import type {
-  DeclarativeTool,
-  ToolCallConfirmationDetails,
-  ToolInvocation,
-  ToolResult,
-} from '../tools/tools.js';
 import {
   GeminiCliOperation,
   GEN_AI_AGENT_DESCRIPTION,
@@ -38,7 +38,6 @@ const runInDevTraceSpan = vi.hoisted(() =>
     const metadata = { attributes: opts.attributes || {} };
     return fn({
       metadata,
-      endSpan: vi.fn(),
     });
   }),
 );
@@ -77,6 +76,11 @@ describe('SubAgentInvocation', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mockConfig = makeFakeConfig();
+    // .config is already set correctly by the getter on the instance.
+    Object.defineProperty(mockConfig, 'promptId', {
+      get: () => 'test-prompt-id',
+      configurable: true,
+    });
     mockMessageBus = createMockMessageBus();
     mockInnerInvocation = {
       shouldConfirmExecute: vi.fn(),
@@ -117,6 +121,16 @@ describe('SubAgentInvocation', () => {
       testDefinition,
       mockConfig,
       mockMessageBus,
+    );
+  });
+
+  it('should return the correct description', () => {
+    const tool = new SubagentTool(testDefinition, mockConfig, mockMessageBus);
+    const params = {};
+    // @ts-expect-error - accessing protected method for testing
+    const invocation = tool.createInvocation(params, mockMessageBus);
+    expect(invocation.getDescription()).toBe(
+      "Delegating to agent 'LocalAgent'",
     );
   });
 
@@ -190,7 +204,7 @@ describe('SubAgentInvocation', () => {
     // Verify metadata was set on the span
     const spanCallback = vi.mocked(runInDevTraceSpan).mock.calls[0][1];
     const mockMetadata = { input: undefined, output: undefined };
-    const mockSpan = { metadata: mockMetadata, endSpan: vi.fn() };
+    const mockSpan = { metadata: mockMetadata };
     await spanCallback(mockSpan as Parameters<typeof spanCallback>[0]);
     expect(mockMetadata.input).toBe(params);
     expect(mockMetadata.output).toBe(mockResult);
@@ -199,7 +213,7 @@ describe('SubAgentInvocation', () => {
   describe('withUserHints', () => {
     it('should NOT modify query for local agents', async () => {
       mockConfig = makeFakeConfig({ modelSteering: true });
-      mockConfig.userHintService.addUserHint('Test Hint');
+      mockConfig.injectionService.addInjection('Test Hint', 'user_steering');
 
       const tool = new SubagentTool(testDefinition, mockConfig, mockMessageBus);
       const params = { query: 'original query' };
@@ -214,7 +228,7 @@ describe('SubAgentInvocation', () => {
 
     it('should NOT modify query for remote agents if model steering is disabled', async () => {
       mockConfig = makeFakeConfig({ modelSteering: false });
-      mockConfig.userHintService.addUserHint('Test Hint');
+      mockConfig.injectionService.addInjection('Test Hint', 'user_steering');
 
       const tool = new SubagentTool(
         testRemoteDefinition,
@@ -261,8 +275,8 @@ describe('SubAgentInvocation', () => {
       // @ts-expect-error - accessing private method for testing
       const invocation = tool.createInvocation(params, mockMessageBus);
 
-      mockConfig.userHintService.addUserHint('Hint 1');
-      mockConfig.userHintService.addUserHint('Hint 2');
+      mockConfig.injectionService.addInjection('Hint 1', 'user_steering');
+      mockConfig.injectionService.addInjection('Hint 2', 'user_steering');
 
       // @ts-expect-error - accessing private method for testing
       const hintedParams = invocation.withUserHints(params);
@@ -274,7 +288,7 @@ describe('SubAgentInvocation', () => {
 
     it('should NOT include legacy hints added before the invocation was created', async () => {
       mockConfig = makeFakeConfig({ modelSteering: true });
-      mockConfig.userHintService.addUserHint('Legacy Hint');
+      mockConfig.injectionService.addInjection('Legacy Hint', 'user_steering');
 
       const tool = new SubagentTool(
         testRemoteDefinition,
@@ -293,7 +307,7 @@ describe('SubAgentInvocation', () => {
       expect(hintedParams.query).toBe('original query');
 
       // Add a new hint after creation
-      mockConfig.userHintService.addUserHint('New Hint');
+      mockConfig.injectionService.addInjection('New Hint', 'user_steering');
       // @ts-expect-error - accessing private method for testing
       hintedParams = invocation.withUserHints(params);
 
@@ -303,7 +317,7 @@ describe('SubAgentInvocation', () => {
 
     it('should NOT modify query if query is missing or not a string', async () => {
       mockConfig = makeFakeConfig({ modelSteering: true });
-      mockConfig.userHintService.addUserHint('Hint');
+      mockConfig.injectionService.addInjection('Hint', 'user_steering');
 
       const tool = new SubagentTool(
         testRemoteDefinition,
@@ -329,6 +343,11 @@ describe('SubagentTool Read-Only logic', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mockConfig = makeFakeConfig();
+    // .config is already set correctly by the getter on the instance.
+    Object.defineProperty(mockConfig, 'promptId', {
+      get: () => 'test-prompt-id',
+      configurable: true,
+    });
     mockMessageBus = createMockMessageBus();
   });
 
@@ -349,7 +368,7 @@ describe('SubagentTool Read-Only logic', () => {
     const registry = {
       getTool: (name: string) => (name === 'read' ? readOnlyTool : undefined),
     };
-    vi.spyOn(mockConfig, 'getToolRegistry').mockReturnValue(
+    vi.spyOn(mockConfig, 'toolRegistry', 'get').mockReturnValue(
       registry as unknown as ToolRegistry,
     );
 
@@ -377,7 +396,7 @@ describe('SubagentTool Read-Only logic', () => {
         return undefined;
       },
     };
-    vi.spyOn(mockConfig, 'getToolRegistry').mockReturnValue(
+    vi.spyOn(mockConfig, 'toolRegistry', 'get').mockReturnValue(
       registry as unknown as ToolRegistry,
     );
 
@@ -391,7 +410,7 @@ describe('SubagentTool Read-Only logic', () => {
 
   it('should be true for local agent with no tools', () => {
     const registry = { getTool: () => undefined };
-    vi.spyOn(mockConfig, 'getToolRegistry').mockReturnValue(
+    vi.spyOn(mockConfig, 'toolRegistry', 'get').mockReturnValue(
       registry as unknown as ToolRegistry,
     );
 

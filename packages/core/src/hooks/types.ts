@@ -10,12 +10,12 @@ import type {
   ToolConfig as GenAIToolConfig,
   ToolListUnion,
 } from '@google/genai';
-import type {
-  LLMRequest,
-  LLMResponse,
-  HookToolConfig,
+import {
+  defaultHookTranslator,
+  type LLMRequest,
+  type LLMResponse,
+  type HookToolConfig,
 } from './hookTranslator.js';
-import { defaultHookTranslator } from './hookTranslator.js';
 
 /**
  * Configuration source levels in precedence order (highest to lowest)
@@ -26,6 +26,15 @@ export enum ConfigSource {
   User = 'user',
   System = 'system',
   Extensions = 'extensions',
+}
+
+/**
+ * Returns true if a hook source implies it is a user-visible hook.
+ * Only System hooks are hidden by default to reduce noise.
+ */
+export function isUserVisibleHook(source?: string | ConfigSource): boolean {
+  if (!source) return true; // Treat unknown/legacy hooks as user-visible
+  return source !== ConfigSource.System;
 }
 
 /**
@@ -197,10 +206,17 @@ export class DefaultHookOutput implements HookOutput {
   }
 
   /**
-   * Check if this output represents a blocking decision
+   * Check if this output represents a blocking decision (block or deny)
    */
   isBlockingDecision(): boolean {
     return this.decision === 'block' || this.decision === 'deny';
+  }
+
+  /**
+   * Check if this output represents an 'ask' decision
+   */
+  isAskDecision(): boolean {
+    return this.decision === 'ask';
   }
 
   /**

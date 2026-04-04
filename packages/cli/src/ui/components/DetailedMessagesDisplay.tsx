@@ -4,8 +4,8 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { useRef, useCallback } from 'react';
 import type React from 'react';
+import { useRef, useCallback, useMemo } from 'react';
 import { Box, Text } from 'ink';
 import { theme } from '../semantic-colors.js';
 import type { ConsoleMessageItem } from '../types.js';
@@ -13,11 +13,10 @@ import {
   ScrollableList,
   type ScrollableListRef,
 } from './shared/ScrollableList.js';
+import { useConsoleMessages } from '../hooks/useConsoleMessages.js';
 import { useConfig } from '../contexts/ConfigContext.js';
-import { useSettings } from '../contexts/SettingsContext.js';
 
 interface DetailedMessagesDisplayProps {
-  messages: ConsoleMessageItem[];
   maxHeight: number | undefined;
   width: number;
   hasFocus: boolean;
@@ -27,12 +26,18 @@ const iconBoxWidth = 3;
 
 export const DetailedMessagesDisplay: React.FC<
   DetailedMessagesDisplayProps
-> = ({ messages, maxHeight, width, hasFocus }) => {
+> = ({ maxHeight, width, hasFocus }) => {
   const scrollableListRef = useRef<ScrollableListRef<ConsoleMessageItem>>(null);
+
+  const consoleMessages = useConsoleMessages();
   const config = useConfig();
-  const settings = useSettings();
-  const showHotkeyHint =
-    settings.merged.ui.errorVerbosity === 'full' || config.getDebugMode();
+
+  const messages = useMemo(() => {
+    if (config.getDebugMode()) {
+      return consoleMessages;
+    }
+    return consoleMessages.filter((msg) => msg.type !== 'debug');
+  }, [consoleMessages, config]);
 
   const borderAndPadding = 3;
 
@@ -71,10 +76,7 @@ export const DetailedMessagesDisplay: React.FC<
     >
       <Box marginBottom={1}>
         <Text bold color={theme.text.primary}>
-          Debug Console{' '}
-          {showHotkeyHint && (
-            <Text color={theme.text.secondary}>(F12 to close)</Text>
-          )}
+          Debug Console <Text color={theme.text.secondary}>(F12 to close)</Text>
         </Text>
       </Box>
       <Box height={maxHeight} width={width - borderAndPadding}>

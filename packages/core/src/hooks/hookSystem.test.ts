@@ -8,11 +8,10 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { HookSystem } from './hookSystem.js';
 import { Config } from '../config/config.js';
 import { HookType } from './types.js';
-import { spawn } from 'node:child_process';
+import { spawn, type ChildProcessWithoutNullStreams } from 'node:child_process';
 import * as fs from 'node:fs';
 import * as os from 'node:os';
 import * as path from 'node:path';
-import type { ChildProcessWithoutNullStreams } from 'node:child_process';
 import type { Readable, Writable } from 'node:stream';
 
 // Mock type for the child_process spawn

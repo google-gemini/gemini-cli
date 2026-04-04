@@ -14,39 +14,27 @@
  * - Focus section switching between settings and scope selector
  * - Scope selection and settings persistence across scopes
  * - Restart-required vs immediate settings behavior
- * - VimModeContext integration
  * - Complex user interaction workflows
  * - Error handling and edge cases
  * - Display values for inherited and overridden settings
  *
  */
 
-import { render } from '../../test-utils/render.js';
+import { renderWithProviders } from '../../test-utils/render.js';
 import { waitFor } from '../../test-utils/async.js';
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { SettingsDialog } from './SettingsDialog.js';
-import { LoadedSettings, SettingScope } from '../../config/settings.js';
+import { SettingScope } from '../../config/settings.js';
 import { createMockSettings } from '../../test-utils/settings.js';
-import { VimModeProvider } from '../contexts/VimModeContext.js';
-import { KeypressProvider } from '../contexts/KeypressContext.js';
+import { makeFakeConfig } from '@google/gemini-cli-core';
 import { act } from 'react';
-import { saveModifiedSettings, TEST_ONLY } from '../../utils/settingsUtils.js';
+import { TEST_ONLY } from '../../utils/settingsUtils.js';
 import {
   getSettingsSchema,
   type SettingDefinition,
   type SettingsSchemaType,
 } from '../../config/settingsSchema.js';
 import { terminalCapabilityManager } from '../utils/terminalCapabilityManager.js';
-
-// Mock the VimModeContext
-const mockToggleVimEnabled = vi.fn().mockResolvedValue(undefined);
-const mockSetVimMode = vi.fn();
-
-vi.mock('../contexts/UIStateContext.js', () => ({
-  useUIState: () => ({
-    terminalWidth: 100, // Fixed width for consistent snapshots
-  }),
-}));
 
 enum TerminalKeys {
   ENTER = '\u000D',
@@ -57,6 +45,8 @@ enum TerminalKeys {
   RIGHT_ARROW = '\u001B[C',
   ESCAPE = '\u001B',
   BACKSPACE = '\u0008',
+  CTRL_P = '\u0010',
+  CTRL_N = '\u000E',
 }
 
 vi.mock('../../config/settingsSchema.js', async (importOriginal) => {
@@ -65,27 +55,6 @@ vi.mock('../../config/settingsSchema.js', async (importOriginal) => {
   return {
     ...original,
     getSettingsSchema: vi.fn(original.getSettingsSchema),
-  };
-});
-
-vi.mock('../contexts/VimModeContext.js', async () => {
-  const actual = await vi.importActual('../contexts/VimModeContext.js');
-  return {
-    ...actual,
-    useVimMode: () => ({
-      vimEnabled: false,
-      vimMode: 'INSERT' as const,
-      toggleVimEnabled: mockToggleVimEnabled,
-      setVimMode: mockSetVimMode,
-    }),
-  };
-});
-
-vi.mock('../../utils/settingsUtils.js', async () => {
-  const actual = await vi.importActual('../../utils/settingsUtils.js');
-  return {
-    ...actual,
-    saveModifiedSettings: vi.fn(),
   };
 });
 
@@ -120,7 +89,25 @@ const ENUM_SETTING: SettingDefinition = {
   showInDialog: true,
 };
 
+// Minimal general schema for KeypressProvider
+const MINIMAL_GENERAL_SCHEMA = {
+  general: {
+    showInDialog: false,
+    properties: {
+      debugKeystrokeLogging: {
+        type: 'boolean',
+        label: 'Debug Keystroke Logging',
+        category: 'General',
+        requiresRestart: false,
+        default: false,
+        showInDialog: false,
+      },
+    },
+  },
+};
+
 const ENUM_FAKE_SCHEMA: SettingsSchemaType = {
+  ...MINIMAL_GENERAL_SCHEMA,
   ui: {
     showInDialog: false,
     properties: {
@@ -131,7 +118,65 @@ const ENUM_FAKE_SCHEMA: SettingsSchemaType = {
   },
 } as unknown as SettingsSchemaType;
 
+const ARRAY_FAKE_SCHEMA: SettingsSchemaType = {
+  ...MINIMAL_GENERAL_SCHEMA,
+  context: {
+    type: 'object',
+    label: 'Context',
+    category: 'Context',
+    requiresRestart: false,
+    default: {},
+    description: 'Context settings.',
+    showInDialog: false,
+    properties: {
+      fileFiltering: {
+        type: 'object',
+        label: 'File Filtering',
+        category: 'Context',
+        requiresRestart: false,
+        default: {},
+        description: 'File filtering settings.',
+        showInDialog: false,
+        properties: {
+          customIgnoreFilePaths: {
+            type: 'array',
+            label: 'Custom Ignore File Paths',
+            category: 'Context',
+            requiresRestart: false,
+            default: [] as string[],
+            description: 'Additional ignore file paths.',
+            showInDialog: true,
+            items: { type: 'string' },
+          },
+        },
+      },
+    },
+  },
+  security: {
+    type: 'object',
+    label: 'Security',
+    category: 'Security',
+    requiresRestart: false,
+    default: {},
+    description: 'Security settings.',
+    showInDialog: false,
+    properties: {
+      allowedExtensions: {
+        type: 'array',
+        label: 'Extension Source Regex Allowlist',
+        category: 'Security',
+        requiresRestart: false,
+        default: [] as string[],
+        description: 'Allowed extension source regex patterns.',
+        showInDialog: true,
+        items: { type: 'string' },
+      },
+    },
+  },
+} as unknown as SettingsSchemaType;
+
 const TOOLS_SHELL_FAKE_SCHEMA: SettingsSchemaType = {
+  ...MINIMAL_GENERAL_SCHEMA,
   tools: {
     type: 'object',
     label: 'Tools',
@@ -184,23 +229,25 @@ const TOOLS_SHELL_FAKE_SCHEMA: SettingsSchemaType = {
 } as unknown as SettingsSchemaType;
 
 // Helper function to render SettingsDialog with standard wrapper
-const renderDialog = (
-  settings: LoadedSettings,
+const renderDialog = async (
+  settings: ReturnType<typeof createMockSettings>,
   onSelect: ReturnType<typeof vi.fn>,
   options?: {
     onRestartRequest?: ReturnType<typeof vi.fn>;
     availableTerminalHeight?: number;
   },
 ) =>
-  render(
-    <KeypressProvider>
-      <SettingsDialog
-        settings={settings}
-        onSelect={onSelect}
-        onRestartRequest={options?.onRestartRequest}
-        availableTerminalHeight={options?.availableTerminalHeight}
-      />
-    </KeypressProvider>,
+  renderWithProviders(
+    <SettingsDialog
+      onSelect={onSelect}
+      onRestartRequest={options?.onRestartRequest}
+      availableTerminalHeight={options?.availableTerminalHeight}
+    />,
+    {
+      settings,
+      config: makeFakeConfig(),
+      uiState: { terminalBackgroundColor: undefined },
+    },
   );
 
 describe('SettingsDialog', () => {
@@ -210,7 +257,6 @@ describe('SettingsDialog', () => {
       terminalCapabilityManager,
       'isKittyProtocolEnabled',
     ).mockReturnValue(true);
-    mockToggleVimEnabled.mockRejectedValue(undefined);
   });
 
   afterEach(() => {
@@ -224,11 +270,7 @@ describe('SettingsDialog', () => {
       const settings = createMockSettings();
       const onSelect = vi.fn();
 
-      const { lastFrame, waitUntilReady, unmount } = renderDialog(
-        settings,
-        onSelect,
-      );
-      await waitUntilReady();
+      const { lastFrame, unmount } = await renderDialog(settings, onSelect);
 
       const output = lastFrame();
       expect(output).toContain('Settings');
@@ -242,14 +284,9 @@ describe('SettingsDialog', () => {
       const settings = createMockSettings();
       const onSelect = vi.fn();
 
-      const { lastFrame, waitUntilReady, unmount } = renderDialog(
-        settings,
-        onSelect,
-        {
-          availableTerminalHeight: 20,
-        },
-      );
-      await waitUntilReady();
+      const { lastFrame, unmount } = await renderDialog(settings, onSelect, {
+        availableTerminalHeight: 20,
+      });
 
       const output = lastFrame();
       // Should still render properly with the height prop
@@ -263,8 +300,7 @@ describe('SettingsDialog', () => {
       const settings = createMockSettings();
       const onSelect = vi.fn();
 
-      const renderResult = renderDialog(settings, onSelect);
-      await renderResult.waitUntilReady();
+      const renderResult = await renderDialog(settings, onSelect);
 
       await expect(renderResult).toMatchSvgSnapshot();
       renderResult.unmount();
@@ -275,14 +311,9 @@ describe('SettingsDialog', () => {
       const onSelect = vi.fn();
 
       // Render with a fixed height of 25 rows
-      const { lastFrame, waitUntilReady, unmount } = renderDialog(
-        settings,
-        onSelect,
-        {
-          availableTerminalHeight: 25,
-        },
-      );
-      await waitUntilReady();
+      const { lastFrame, unmount } = await renderDialog(settings, onSelect, {
+        availableTerminalHeight: 25,
+      });
 
       // Wait for the dialog to render
       await waitFor(() => {
@@ -302,11 +333,7 @@ describe('SettingsDialog', () => {
       const settings = createMockSettings();
       const onSelect = vi.fn();
 
-      const { lastFrame, waitUntilReady, unmount } = renderDialog(
-        settings,
-        onSelect,
-      );
-      await waitUntilReady();
+      const { lastFrame, unmount } = await renderDialog(settings, onSelect);
 
       const output = lastFrame();
       // 'general.vimMode' has description 'Enable Vim keybindings' in settingsSchema.ts
@@ -327,19 +354,18 @@ describe('SettingsDialog', () => {
         up: TerminalKeys.UP_ARROW,
       },
       {
-        name: 'vim keys (j/k)',
-        down: 'j',
-        up: 'k',
+        name: 'emacs keys (Ctrl+P/N)',
+        down: TerminalKeys.CTRL_N,
+        up: TerminalKeys.CTRL_P,
       },
     ])('should navigate with $name', async ({ down, up }) => {
       const settings = createMockSettings();
       const onSelect = vi.fn();
 
-      const { stdin, unmount, lastFrame, waitUntilReady } = renderDialog(
+      const { stdin, unmount, lastFrame, waitUntilReady } = await renderDialog(
         settings,
         onSelect,
       );
-      await waitUntilReady();
 
       const initialFrame = lastFrame();
       expect(initialFrame).toContain('Vim Mode');
@@ -367,15 +393,38 @@ describe('SettingsDialog', () => {
       unmount();
     });
 
+    it('should allow j and k characters to be typed in search without triggering navigation', async () => {
+      const settings = createMockSettings();
+      const onSelect = vi.fn();
+      const { lastFrame, stdin, waitUntilReady, unmount } = await renderDialog(
+        settings,
+        onSelect,
+      );
+
+      // Enter 'j' and 'k' in search
+      await act(async () => stdin.write('j'));
+      await waitUntilReady();
+      await act(async () => stdin.write('k'));
+      await waitUntilReady();
+
+      await waitFor(() => {
+        const frame = lastFrame();
+        // The search box should contain 'jk'
+        expect(frame).toContain('jk');
+        // Since 'jk' doesn't match any setting labels, it should say "No matches found."
+        expect(frame).toContain('No matches found.');
+      });
+      unmount();
+    });
+
     it('wraps around when at the top of the list', async () => {
       const settings = createMockSettings();
       const onSelect = vi.fn();
 
-      const { stdin, unmount, lastFrame, waitUntilReady } = renderDialog(
+      const { stdin, unmount, lastFrame, waitUntilReady } = await renderDialog(
         settings,
         onSelect,
       );
-      await waitUntilReady();
 
       // Try to go up from first item
       await act(async () => {
@@ -394,16 +443,14 @@ describe('SettingsDialog', () => {
 
   describe('Settings Toggling', () => {
     it('should toggle setting with Enter key', async () => {
-      vi.mocked(saveModifiedSettings).mockClear();
-
       const settings = createMockSettings();
+      const setValueSpy = vi.spyOn(settings, 'setValue');
       const onSelect = vi.fn();
 
-      const { stdin, unmount, lastFrame, waitUntilReady } = renderDialog(
+      const { stdin, unmount, lastFrame } = await renderDialog(
         settings,
         onSelect,
       );
-      await waitUntilReady();
 
       // Wait for initial render and verify we're on Vim Mode (first setting)
       await waitFor(() => {
@@ -414,29 +461,16 @@ describe('SettingsDialog', () => {
       await act(async () => {
         stdin.write(TerminalKeys.ENTER as string);
       });
-      await waitUntilReady();
 
-      // Wait for the setting change to be processed
+      // Wait for setValue to be called
       await waitFor(() => {
-        expect(
-          vi.mocked(saveModifiedSettings).mock.calls.length,
-        ).toBeGreaterThan(0);
+        expect(setValueSpy).toHaveBeenCalled();
       });
 
-      // Wait for the mock to be called
-      await waitFor(() => {
-        expect(vi.mocked(saveModifiedSettings)).toHaveBeenCalled();
-      });
-
-      expect(vi.mocked(saveModifiedSettings)).toHaveBeenCalledWith(
-        new Set<string>(['general.vimMode']),
-        expect.objectContaining({
-          general: expect.objectContaining({
-            vimMode: true,
-          }),
-        }),
-        expect.any(LoadedSettings),
+      expect(setValueSpy).toHaveBeenCalledWith(
         SettingScope.User,
+        'general.vimMode',
+        true,
       );
 
       unmount();
@@ -455,21 +489,20 @@ describe('SettingsDialog', () => {
           expectedValue: StringEnum.FOO,
         },
       ])('$name', async ({ initialValue, expectedValue }) => {
-        vi.mocked(saveModifiedSettings).mockClear();
         vi.mocked(getSettingsSchema).mockReturnValue(ENUM_FAKE_SCHEMA);
 
         const settings = createMockSettings();
         if (initialValue !== undefined) {
           settings.setValue(SettingScope.User, 'ui.theme', initialValue);
         }
+        const setValueSpy = vi.spyOn(settings, 'setValue');
 
         const onSelect = vi.fn();
 
-        const { stdin, unmount, waitUntilReady } = renderDialog(
+        const { stdin, unmount, waitUntilReady } = await renderDialog(
           settings,
           onSelect,
         );
-        await waitUntilReady();
 
         await act(async () => {
           stdin.write(TerminalKeys.DOWN_ARROW as string);
@@ -482,19 +515,12 @@ describe('SettingsDialog', () => {
         await waitUntilReady();
 
         await waitFor(() => {
-          expect(vi.mocked(saveModifiedSettings)).toHaveBeenCalled();
+          expect(setValueSpy).toHaveBeenCalledWith(
+            SettingScope.User,
+            'ui.theme',
+            expectedValue,
+          );
         });
-
-        expect(vi.mocked(saveModifiedSettings)).toHaveBeenCalledWith(
-          new Set<string>(['ui.theme']),
-          expect.objectContaining({
-            ui: expect.objectContaining({
-              theme: expectedValue,
-            }),
-          }),
-          expect.any(LoadedSettings),
-          SettingScope.User,
-        );
 
         unmount();
       });
@@ -504,11 +530,10 @@ describe('SettingsDialog', () => {
       const settings = createMockSettings();
       const onSelect = vi.fn();
 
-      const { stdin, unmount, waitUntilReady } = renderDialog(
+      const { stdin, unmount, waitUntilReady } = await renderDialog(
         settings,
         onSelect,
       );
-      await waitUntilReady();
 
       // Navigate to vim mode setting and toggle it
       // This would require knowing the exact position, so we'll just test that the mock is called
@@ -527,11 +552,10 @@ describe('SettingsDialog', () => {
       const settings = createMockSettings();
       const onSelect = vi.fn();
 
-      const { stdin, unmount, waitUntilReady } = renderDialog(
+      const { stdin, unmount, waitUntilReady } = await renderDialog(
         settings,
         onSelect,
       );
-      await waitUntilReady();
 
       // Switch to scope focus
       await act(async () => {
@@ -548,11 +572,7 @@ describe('SettingsDialog', () => {
       const settings = createMockSettings();
       const onSelect = vi.fn();
 
-      const { lastFrame, unmount, waitUntilReady } = renderDialog(
-        settings,
-        onSelect,
-      );
-      await waitUntilReady();
+      const { lastFrame, unmount } = await renderDialog(settings, onSelect);
 
       // Wait for initial render
       await waitFor(() => {
@@ -575,10 +595,9 @@ describe('SettingsDialog', () => {
       const settings = createMockSettings();
       const onRestartRequest = vi.fn();
 
-      const { unmount, waitUntilReady } = renderDialog(settings, vi.fn(), {
+      const { unmount } = await renderDialog(settings, vi.fn(), {
         onRestartRequest,
       });
-      await waitUntilReady();
 
       // This test would need to trigger a restart-required setting change
       // The exact steps depend on which settings require restart
@@ -590,14 +609,13 @@ describe('SettingsDialog', () => {
       const settings = createMockSettings();
       const onRestartRequest = vi.fn();
 
-      const { stdin, unmount, waitUntilReady } = renderDialog(
+      const { stdin, unmount, waitUntilReady } = await renderDialog(
         settings,
         vi.fn(),
         {
           onRestartRequest,
         },
       );
-      await waitUntilReady();
 
       // Press 'r' key (this would only work if restart prompt is showing)
       await act(async () => {
@@ -615,11 +633,7 @@ describe('SettingsDialog', () => {
       const settings = createMockSettings();
       const onSelect = vi.fn();
 
-      const { lastFrame, unmount, waitUntilReady } = renderDialog(
-        settings,
-        onSelect,
-      );
-      await waitUntilReady();
+      const { lastFrame, unmount } = await renderDialog(settings, onSelect);
 
       // Wait for initial render
       await waitFor(() => {
@@ -642,11 +656,10 @@ describe('SettingsDialog', () => {
       const settings = createMockSettings({ vimMode: true });
       const onSelect = vi.fn();
 
-      const { stdin, unmount, waitUntilReady } = renderDialog(
+      const { stdin, unmount, waitUntilReady } = await renderDialog(
         settings,
         onSelect,
       );
-      await waitUntilReady();
 
       // Switch to scope selector and change scope
       await act(async () => {
@@ -679,39 +692,11 @@ describe('SettingsDialog', () => {
       });
       const onSelect = vi.fn();
 
-      const { lastFrame, waitUntilReady, unmount } = renderDialog(
-        settings,
-        onSelect,
-      );
-      await waitUntilReady();
+      const { lastFrame, unmount } = await renderDialog(settings, onSelect);
 
       // Should show user scope values initially
       const output = lastFrame();
       expect(output).toContain('Settings');
-      unmount();
-    });
-  });
-
-  describe('Error Handling', () => {
-    it('should handle vim mode toggle errors gracefully', async () => {
-      mockToggleVimEnabled.mockRejectedValue(new Error('Toggle failed'));
-
-      const settings = createMockSettings();
-      const onSelect = vi.fn();
-
-      const { stdin, unmount, waitUntilReady } = renderDialog(
-        settings,
-        onSelect,
-      );
-      await waitUntilReady();
-
-      // Try to toggle a setting (this might trigger vim mode toggle)
-      await act(async () => {
-        stdin.write(TerminalKeys.ENTER as string); // Enter
-      });
-      await waitUntilReady();
-
-      // Should not crash
       unmount();
     });
   });
@@ -721,11 +706,10 @@ describe('SettingsDialog', () => {
       const settings = createMockSettings();
       const onSelect = vi.fn();
 
-      const { stdin, unmount, waitUntilReady } = renderDialog(
+      const { stdin, unmount, waitUntilReady } = await renderDialog(
         settings,
         onSelect,
       );
-      await waitUntilReady();
 
       // Toggle a setting, then toggle another setting
       await act(async () => {
@@ -749,42 +733,16 @@ describe('SettingsDialog', () => {
       const settings = createMockSettings();
       const onSelect = vi.fn();
 
-      const { stdin, unmount, waitUntilReady } = renderDialog(
+      const { stdin, unmount, waitUntilReady } = await renderDialog(
         settings,
         onSelect,
       );
-      await waitUntilReady();
 
       // Navigate down many times to test scrolling
       await act(async () => {
         for (let i = 0; i < 10; i++) {
           stdin.write(TerminalKeys.DOWN_ARROW as string); // Down arrow
         }
-      });
-      await waitUntilReady();
-
-      unmount();
-    });
-  });
-
-  describe('VimMode Integration', () => {
-    it('should sync with VimModeContext when vim mode is toggled', async () => {
-      const settings = createMockSettings();
-      const onSelect = vi.fn();
-
-      const { stdin, unmount, waitUntilReady } = render(
-        <VimModeProvider settings={settings}>
-          <KeypressProvider>
-            <SettingsDialog settings={settings} onSelect={onSelect} />
-          </KeypressProvider>
-        </VimModeProvider>,
-      );
-      await waitUntilReady();
-
-      // Navigate to and toggle vim mode setting
-      // This would require knowing the exact position of vim mode setting
-      await act(async () => {
-        stdin.write(TerminalKeys.ENTER as string); // Enter
       });
       await waitUntilReady();
 
@@ -813,11 +771,7 @@ describe('SettingsDialog', () => {
       });
       const onSelect = vi.fn();
 
-      const { lastFrame, waitUntilReady, unmount } = renderDialog(
-        settings,
-        onSelect,
-      );
-      await waitUntilReady();
+      const { lastFrame, unmount } = await renderDialog(settings, onSelect);
 
       const output = lastFrame();
       // Should contain settings labels
@@ -829,11 +783,10 @@ describe('SettingsDialog', () => {
       const settings = createMockSettings();
       const onSelect = vi.fn();
 
-      const { stdin, unmount, waitUntilReady } = renderDialog(
+      const { stdin, unmount, waitUntilReady } = await renderDialog(
         settings,
         onSelect,
       );
-      await waitUntilReady();
 
       // Toggle a non-restart-required setting (like hideTips)
       await act(async () => {
@@ -849,11 +802,7 @@ describe('SettingsDialog', () => {
       const settings = createMockSettings();
       const onSelect = vi.fn();
 
-      const { lastFrame, unmount, waitUntilReady } = renderDialog(
-        settings,
-        onSelect,
-      );
-      await waitUntilReady();
+      const { lastFrame, unmount } = await renderDialog(settings, onSelect);
 
       // This test would need to navigate to a specific restart-required setting
       // Since we can't easily target specific settings, we test the general behavior
@@ -861,7 +810,7 @@ describe('SettingsDialog', () => {
       // Should not show restart prompt initially
       await waitFor(() => {
         expect(lastFrame()).not.toContain(
-          'To see changes, Gemini CLI must be restarted',
+          'Changes that require a restart have been modified',
         );
       });
 
@@ -872,8 +821,7 @@ describe('SettingsDialog', () => {
       const settings = createMockSettings();
       const onSelect = vi.fn();
 
-      const { unmount, waitUntilReady } = renderDialog(settings, onSelect);
-      await waitUntilReady();
+      const { unmount } = await renderDialog(settings, onSelect);
 
       // Restart prompt should be cleared when switching scopes
       unmount();
@@ -891,11 +839,7 @@ describe('SettingsDialog', () => {
       });
       const onSelect = vi.fn();
 
-      const { lastFrame, waitUntilReady, unmount } = renderDialog(
-        settings,
-        onSelect,
-      );
-      await waitUntilReady();
+      const { lastFrame, unmount } = await renderDialog(settings, onSelect);
 
       const output = lastFrame();
       // Settings should show inherited values
@@ -918,11 +862,7 @@ describe('SettingsDialog', () => {
       });
       const onSelect = vi.fn();
 
-      const { lastFrame, waitUntilReady, unmount } = renderDialog(
-        settings,
-        onSelect,
-      );
-      await waitUntilReady();
+      const { lastFrame, unmount } = await renderDialog(settings, onSelect);
 
       const output = lastFrame();
       // Should show settings with override indicators
@@ -957,63 +897,41 @@ describe('SettingsDialog', () => {
           pager: 'less',
         },
       },
-    ])(
-      'should $name',
-      async ({ toggleCount, shellSettings, expectedSiblings }) => {
-        vi.mocked(saveModifiedSettings).mockClear();
+    ])('should $name', async ({ toggleCount, shellSettings }) => {
+      vi.mocked(getSettingsSchema).mockReturnValue(TOOLS_SHELL_FAKE_SCHEMA);
 
-        vi.mocked(getSettingsSchema).mockReturnValue(TOOLS_SHELL_FAKE_SCHEMA);
+      const settings = createMockSettings({
+        tools: {
+          shell: shellSettings,
+        },
+      });
+      const setValueSpy = vi.spyOn(settings, 'setValue');
 
-        const settings = createMockSettings({
-          tools: {
-            shell: shellSettings,
-          },
+      const onSelect = vi.fn();
+
+      const { stdin, unmount } = await renderDialog(settings, onSelect);
+
+      for (let i = 0; i < toggleCount; i++) {
+        act(() => {
+          stdin.write(TerminalKeys.ENTER as string);
         });
+      }
 
-        const onSelect = vi.fn();
+      await waitFor(() => {
+        expect(setValueSpy).toHaveBeenCalled();
+      });
 
-        const { stdin, unmount, waitUntilReady } = renderDialog(
-          settings,
-          onSelect,
-        );
-        await waitUntilReady();
+      // With the store pattern, setValue is called atomically per key.
+      // Sibling preservation is handled by LoadedSettings internally.
+      const calls = setValueSpy.mock.calls;
+      expect(calls.length).toBeGreaterThan(0);
+      calls.forEach((call) => {
+        // Each call should target only 'tools.shell.showColor'
+        expect(call[1]).toBe('tools.shell.showColor');
+      });
 
-        for (let i = 0; i < toggleCount; i++) {
-          await act(async () => {
-            stdin.write(TerminalKeys.ENTER as string);
-          });
-          await waitUntilReady();
-        }
-
-        await waitFor(() => {
-          expect(
-            vi.mocked(saveModifiedSettings).mock.calls.length,
-          ).toBeGreaterThan(0);
-        });
-
-        const calls = vi.mocked(saveModifiedSettings).mock.calls;
-        calls.forEach((call) => {
-          const [modifiedKeys, pendingSettings] = call;
-
-          if (modifiedKeys.has('tools.shell.showColor')) {
-            const shellSettings = pendingSettings.tools?.shell as
-              | Record<string, unknown>
-              | undefined;
-
-            Object.entries(expectedSiblings).forEach(([key, value]) => {
-              expect(shellSettings?.[key]).toBe(value);
-              expect(modifiedKeys.has(`tools.shell.${key}`)).toBe(false);
-            });
-
-            expect(modifiedKeys.size).toBe(1);
-          }
-        });
-
-        expect(calls.length).toBeGreaterThan(0);
-
-        unmount();
-      },
-    );
+      unmount();
+    });
   });
 
   describe('Keyboard Shortcuts Edge Cases', () => {
@@ -1021,11 +939,10 @@ describe('SettingsDialog', () => {
       const settings = createMockSettings();
       const onSelect = vi.fn();
 
-      const { stdin, unmount, waitUntilReady } = renderDialog(
+      const { stdin, unmount, waitUntilReady } = await renderDialog(
         settings,
         onSelect,
       );
-      await waitUntilReady();
 
       // Rapid navigation
       await act(async () => {
@@ -1049,11 +966,10 @@ describe('SettingsDialog', () => {
         const settings = createMockSettings({ vimMode: true });
         const onSelect = vi.fn();
 
-        const { stdin, unmount, waitUntilReady } = renderDialog(
+        const { stdin, unmount, waitUntilReady } = await renderDialog(
           settings,
           onSelect,
         );
-        await waitUntilReady();
 
         await act(async () => {
           stdin.write(code);
@@ -1069,11 +985,10 @@ describe('SettingsDialog', () => {
       const settings = createMockSettings();
       const onSelect = vi.fn();
 
-      const { stdin, unmount, waitUntilReady } = renderDialog(
+      const { stdin, unmount, waitUntilReady } = await renderDialog(
         settings,
         onSelect,
       );
-      await waitUntilReady();
 
       // Try to navigate when potentially at bounds
       await act(async () => {
@@ -1092,11 +1007,7 @@ describe('SettingsDialog', () => {
       const settings = createMockSettings();
       const onSelect = vi.fn();
 
-      const { lastFrame, unmount, waitUntilReady } = renderDialog(
-        settings,
-        onSelect,
-      );
-      await waitUntilReady();
+      const { lastFrame, unmount } = await renderDialog(settings, onSelect);
 
       // Wait for initial render
       await waitFor(() => {
@@ -1126,11 +1037,7 @@ describe('SettingsDialog', () => {
       });
       const onSelect = vi.fn();
 
-      const { lastFrame, waitUntilReady, unmount } = renderDialog(
-        settings,
-        onSelect,
-      );
-      await waitUntilReady();
+      const { lastFrame, unmount } = await renderDialog(settings, onSelect);
 
       // Should still render without crashing
       expect(lastFrame()).toContain('Settings');
@@ -1142,11 +1049,7 @@ describe('SettingsDialog', () => {
       const onSelect = vi.fn();
 
       // Should not crash even if some settings are missing definitions
-      const { lastFrame, waitUntilReady, unmount } = renderDialog(
-        settings,
-        onSelect,
-      );
-      await waitUntilReady();
+      const { lastFrame, unmount } = await renderDialog(settings, onSelect);
 
       expect(lastFrame()).toContain('Settings');
       unmount();
@@ -1158,11 +1061,7 @@ describe('SettingsDialog', () => {
       const settings = createMockSettings();
       const onSelect = vi.fn();
 
-      const { lastFrame, unmount, waitUntilReady } = renderDialog(
-        settings,
-        onSelect,
-      );
-      await waitUntilReady();
+      const { lastFrame, unmount } = await renderDialog(settings, onSelect);
 
       // Wait for initial render
       await waitFor(() => {
@@ -1187,11 +1086,10 @@ describe('SettingsDialog', () => {
       const settings = createMockSettings();
       const onSelect = vi.fn();
 
-      const { stdin, unmount, waitUntilReady } = renderDialog(
+      const { stdin, unmount, waitUntilReady } = await renderDialog(
         settings,
         onSelect,
       );
-      await waitUntilReady();
 
       // Toggle multiple settings
       await act(async () => {
@@ -1224,11 +1122,10 @@ describe('SettingsDialog', () => {
       const settings = createMockSettings({ vimMode: true });
       const onSelect = vi.fn();
 
-      const { stdin, unmount, waitUntilReady } = renderDialog(
+      const { stdin, unmount, waitUntilReady } = await renderDialog(
         settings,
         onSelect,
       );
-      await waitUntilReady();
 
       // Multiple scope changes
       await act(async () => {
@@ -1260,14 +1157,13 @@ describe('SettingsDialog', () => {
       const settings = createMockSettings();
       const onRestartRequest = vi.fn();
 
-      const { stdin, unmount, waitUntilReady } = renderDialog(
+      const { stdin, unmount, waitUntilReady } = await renderDialog(
         settings,
         vi.fn(),
         {
           onRestartRequest,
         },
       );
-      await waitUntilReady();
 
       // This would test the restart workflow if we could trigger it
       await act(async () => {
@@ -1288,14 +1184,13 @@ describe('SettingsDialog', () => {
       const settings = createMockSettings();
       const onRestartRequest = vi.fn();
 
-      const { stdin, lastFrame, unmount, waitUntilReady } = renderDialog(
+      const { stdin, lastFrame, unmount, waitUntilReady } = await renderDialog(
         settings,
         vi.fn(),
         {
           onRestartRequest,
         },
       );
-      await waitUntilReady();
 
       // Wait for initial render
       await waitFor(() => expect(lastFrame()).toContain('Show Color'));
@@ -1319,7 +1214,7 @@ describe('SettingsDialog', () => {
 
       await waitFor(() => {
         expect(lastFrame()).toContain(
-          'To see changes, Gemini CLI must be restarted',
+          'Changes that require a restart have been modified',
         );
       });
 
@@ -1340,11 +1235,10 @@ describe('SettingsDialog', () => {
       vi.mocked(getSettingsSchema).mockReturnValue(TOOLS_SHELL_FAKE_SCHEMA);
       const settings = createMockSettings();
 
-      const { stdin, lastFrame, unmount, waitUntilReady } = renderDialog(
+      const { stdin, lastFrame, unmount, waitUntilReady } = await renderDialog(
         settings,
         vi.fn(),
       );
-      await waitUntilReady();
 
       // Search box should be visible initially (searchPlaceholder)
       expect(lastFrame()).toContain('Search to filter');
@@ -1366,7 +1260,7 @@ describe('SettingsDialog', () => {
 
       await waitFor(() => {
         expect(lastFrame()).toContain(
-          'To see changes, Gemini CLI must be restarted',
+          'Changes that require a restart have been modified',
         );
       });
 
@@ -1379,17 +1273,15 @@ describe('SettingsDialog', () => {
 
   describe('String Settings Editing', () => {
     it('should allow editing and committing a string setting', async () => {
-      let settings = createMockSettings({
+      const settings = createMockSettings({
         'general.sessionCleanup.maxAge': 'initial',
       });
       const onSelect = vi.fn();
 
-      const { stdin, unmount, rerender, waitUntilReady } = render(
-        <KeypressProvider>
-          <SettingsDialog settings={settings} onSelect={onSelect} />
-        </KeypressProvider>,
+      const { stdin, unmount, waitUntilReady } = await renderWithProviders(
+        <SettingsDialog onSelect={onSelect} />,
+        { settings, config: makeFakeConfig() },
       );
-      await waitUntilReady();
 
       // Search for 'chat history' to filter the list
       await act(async () => {
@@ -1417,18 +1309,12 @@ describe('SettingsDialog', () => {
       });
       await waitUntilReady();
 
-      settings = createMockSettings({
-        user: {
-          settings: { 'general.sessionCleanup.maxAge': 'new value' },
-          originalSettings: { 'general.sessionCleanup.maxAge': 'new value' },
-          path: '',
-        },
-      });
+      // Simulate the settings file being updated on disk
       await act(async () => {
-        rerender(
-          <KeypressProvider>
-            <SettingsDialog settings={settings} onSelect={onSelect} />
-          </KeypressProvider>,
+        settings.setValue(
+          SettingScope.User,
+          'general.sessionCleanup.maxAge',
+          'new value',
         );
       });
       await waitUntilReady();
@@ -1447,16 +1333,83 @@ describe('SettingsDialog', () => {
     });
   });
 
+  describe('Array Settings Editing', () => {
+    const typeInput = async (
+      stdin: { write: (data: string) => void },
+      input: string,
+    ) => {
+      for (const ch of input) {
+        await act(async () => {
+          stdin.write(ch);
+        });
+      }
+    };
+
+    it('should parse comma-separated input as string arrays', async () => {
+      vi.mocked(getSettingsSchema).mockReturnValue(ARRAY_FAKE_SCHEMA);
+      const settings = createMockSettings();
+      const setValueSpy = vi.spyOn(settings, 'setValue');
+
+      const { stdin, unmount } = await renderDialog(settings, vi.fn());
+
+      await act(async () => {
+        stdin.write(TerminalKeys.ENTER as string); // Start editing first array setting
+      });
+      await typeInput(stdin, 'first/path, second/path,third/path');
+      await act(async () => {
+        stdin.write(TerminalKeys.ENTER as string); // Commit
+      });
+
+      await waitFor(() => {
+        expect(setValueSpy).toHaveBeenCalledWith(
+          SettingScope.User,
+          'context.fileFiltering.customIgnoreFilePaths',
+          ['first/path', 'second/path', 'third/path'],
+        );
+      });
+
+      unmount();
+    });
+
+    it('should parse JSON array input for allowedExtensions', async () => {
+      vi.mocked(getSettingsSchema).mockReturnValue(ARRAY_FAKE_SCHEMA);
+      const settings = createMockSettings();
+      const setValueSpy = vi.spyOn(settings, 'setValue');
+
+      const { stdin, unmount } = await renderDialog(settings, vi.fn());
+
+      await act(async () => {
+        stdin.write(TerminalKeys.DOWN_ARROW as string); // Move to second array setting
+      });
+      await act(async () => {
+        stdin.write(TerminalKeys.ENTER as string); // Start editing
+      });
+      await typeInput(stdin, '["^github\\\\.com/.*$", "^gitlab\\\\.com/.*$"]');
+      await act(async () => {
+        stdin.write(TerminalKeys.ENTER as string); // Commit
+      });
+
+      await waitFor(() => {
+        expect(setValueSpy).toHaveBeenCalledWith(
+          SettingScope.User,
+          'security.allowedExtensions',
+          ['^github\\.com/.*$', '^gitlab\\.com/.*$'],
+        );
+      });
+
+      unmount();
+    });
+  });
+
   describe('Search Functionality', () => {
     it('should display text entered in search', async () => {
       const settings = createMockSettings();
       const onSelect = vi.fn();
 
-      const { lastFrame, stdin, unmount, waitUntilReady } = renderDialog(
+      const { lastFrame, stdin, unmount, waitUntilReady } = await renderDialog(
         settings,
         onSelect,
       );
-      await waitUntilReady();
 
       // Wait for initial render and verify that search is not active
       await waitFor(() => {
@@ -1482,11 +1435,10 @@ describe('SettingsDialog', () => {
       const settings = createMockSettings();
       const onSelect = vi.fn();
 
-      const { lastFrame, stdin, unmount, waitUntilReady } = renderDialog(
+      const { lastFrame, stdin, unmount, waitUntilReady } = await renderDialog(
         settings,
         onSelect,
       );
-      await waitUntilReady();
 
       await act(async () => {
         stdin.write('yolo');
@@ -1505,11 +1457,10 @@ describe('SettingsDialog', () => {
       const settings = createMockSettings();
       const onSelect = vi.fn();
 
-      const { lastFrame, stdin, unmount, waitUntilReady } = renderDialog(
+      const { lastFrame, stdin, unmount, waitUntilReady } = await renderDialog(
         settings,
         onSelect,
       );
-      await waitUntilReady();
 
       await act(async () => {
         stdin.write('vim');
@@ -1538,11 +1489,10 @@ describe('SettingsDialog', () => {
       const settings = createMockSettings();
       const onSelect = vi.fn();
 
-      const { lastFrame, stdin, unmount, waitUntilReady } = renderDialog(
+      const { lastFrame, stdin, unmount, waitUntilReady } = await renderDialog(
         settings,
         onSelect,
       );
-      await waitUntilReady();
 
       await act(async () => {
         stdin.write('vimm');
@@ -1571,11 +1521,10 @@ describe('SettingsDialog', () => {
       const settings = createMockSettings();
       const onSelect = vi.fn();
 
-      const { lastFrame, stdin, unmount, waitUntilReady } = renderDialog(
+      const { lastFrame, stdin, unmount, waitUntilReady } = await renderDialog(
         settings,
         onSelect,
       );
-      await waitUntilReady();
 
       // Type a search query that won't match any settings
       await act(async () => {
@@ -1825,7 +1774,7 @@ describe('SettingsDialog', () => {
         });
         const onSelect = vi.fn();
 
-        const renderResult = renderDialog(settings, onSelect);
+        const renderResult = await renderDialog(settings, onSelect);
         await renderResult.waitUntilReady();
 
         if (stdinActions) {

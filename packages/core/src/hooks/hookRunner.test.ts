@@ -7,8 +7,13 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { spawn, type ChildProcessWithoutNullStreams } from 'node:child_process';
 import { HookRunner } from './hookRunner.js';
-import { HookEventName, HookType, ConfigSource } from './types.js';
-import type { HookConfig, HookInput } from './types.js';
+import {
+  HookEventName,
+  HookType,
+  ConfigSource,
+  type HookConfig,
+  type HookInput,
+} from './types.js';
 import type { Readable, Writable } from 'node:stream';
 import type { Config } from '../config/config.js';
 
@@ -508,7 +513,11 @@ describe('HookRunner', () => {
             const args = vi.mocked(spawn).mock.calls[
               executionOrder.length
             ][1] as string[];
-            const command = args[args.length - 1];
+            let command = args[args.length - 1];
+            // On Windows, the command is wrapped in PowerShell syntax
+            if (command.includes('; if ($LASTEXITCODE -ne 0)')) {
+              command = command.split(';')[0];
+            }
             executionOrder.push(command);
             setImmediate(() => callback(0));
           }

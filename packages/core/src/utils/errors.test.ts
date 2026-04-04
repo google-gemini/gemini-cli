@@ -7,6 +7,7 @@
 import { describe, it, expect } from 'vitest';
 import {
   isAuthenticationError,
+  isAbortError,
   UnauthorizedError,
   toFriendlyError,
   BadRequestError,
@@ -45,6 +46,29 @@ describe('getErrorMessage', () => {
       },
     };
     expect(getErrorMessage(error)).toBe('Bad Request Message');
+  });
+});
+
+describe('isAbortError', () => {
+  it('should return true for AbortError', () => {
+    const error = new Error('Aborted');
+    error.name = 'AbortError';
+    expect(isAbortError(error)).toBe(true);
+  });
+
+  it('should return true for DOMException AbortError', () => {
+    const error = new DOMException('Aborted', 'AbortError');
+    expect(isAbortError(error)).toBe(true);
+  });
+
+  it('should return false for other errors', () => {
+    expect(isAbortError(new Error('Other error'))).toBe(false);
+  });
+
+  it('should return false for non-error objects', () => {
+    expect(isAbortError({ name: 'AbortError' })).toBe(false);
+    expect(isAbortError(null)).toBe(false);
+    expect(isAbortError('AbortError')).toBe(false);
   });
 });
 
@@ -329,5 +353,31 @@ describe('getErrorType', () => {
     expect(getErrorType({})).toBe('unknown');
     expect(getErrorType(null)).toBe('unknown');
     expect(getErrorType(undefined)).toBe('unknown');
+  });
+
+  it('should use explicitly set error names', () => {
+    class _GaxiosError extends Error {
+      constructor(message: string) {
+        super(message);
+        this.name = 'GaxiosError';
+      }
+    }
+    expect(getErrorType(new _GaxiosError('test'))).toBe('GaxiosError');
+
+    class BadRequestError3 extends Error {
+      constructor(message: string) {
+        super(message);
+        this.name = 'BadRequestError';
+      }
+    }
+    expect(getErrorType(new BadRequestError3('test'))).toBe('BadRequestError');
+
+    class _AbortError2 extends Error {
+      constructor(message: string) {
+        super(message);
+        this.name = 'AbortError';
+      }
+    }
+    expect(getErrorType(new _AbortError2('test'))).toBe('AbortError');
   });
 });

@@ -14,15 +14,18 @@ import {
   HookEventName,
   HookType,
   BeforeToolHookOutput,
+  type HookDecision,
 } from './types.js';
-import { defaultHookTranslator } from './hookTranslator.js';
+import {
+  defaultHookTranslator,
+  type LLMRequest,
+  type LLMResponse,
+} from './hookTranslator.js';
 import type {
   GenerateContentParameters,
   GenerateContentResponse,
   ToolConfig,
 } from '@google/genai';
-import type { LLMRequest, LLMResponse } from './hookTranslator.js';
-import type { HookDecision } from './types.js';
 
 vi.mock('./hookTranslator.js', () => ({
   defaultHookTranslator: {
