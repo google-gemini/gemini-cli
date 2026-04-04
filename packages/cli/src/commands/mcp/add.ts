@@ -7,7 +7,14 @@
 // File for 'gemini mcp add' command
 import type { CommandModule } from 'yargs';
 import { loadSettings, SettingScope } from '../../config/settings.js';
-import { debugLogger, type MCPServerConfig } from '@google/gemini-cli-core';
+import {
+  debugLogger,
+  type MCPServerConfig,
+  type McpContext,
+  createTransport,
+  createSandboxManager,
+} from '@google/gemini-cli-core';
+import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { exitCli } from '../utils.js';
 
 async function addMcpServer(
@@ -134,6 +141,63 @@ async function addMcpServer(
     debugLogger.log(
       `MCP server "${name}" added to ${scope} settings. (${transport})`,
     );
+  }
+
+  const isSandboxEnabled =
+    typeof settings.merged.tools?.sandbox === 'object'
+      ? settings.merged.tools.sandbox.enabled
+      : !!settings.merged.tools?.sandbox;
+
+  if (isSandboxEnabled) {
+    const mcpContext: McpContext = {
+      sanitizationConfig: {
+        enableEnvironmentVariableRedaction: true,
+        allowedEnvironmentVariables: [],
+        blockedEnvironmentVariables:
+          settings.merged.advanced?.excludedEnvVars ?? [],
+      },
+      emitMcpDiagnostic: () => {},
+      isTrustedFolder: () => true,
+      isSandboxEnabled: () => true,
+      sandboxManager: createSandboxManager(
+        { enabled: true },
+        { workspace: process.cwd(), modeConfig: { readonly: true } },
+      ),
+    };
+
+    try {
+      const serverTransport = await createTransport(
+        name,
+        newServer as MCPServerConfig,
+        false,
+        mcpContext,
+      );
+      const client = new Client(
+        { name: 'gemini-cli-discovery', version: '1.0.0' },
+        { capabilities: {} },
+      );
+      await client.connect(serverTransport);
+      const result = await client.listTools();
+      const readOnlyTools = result.tools
+        .filter(
+          (t: { name: string; annotations?: { readOnlyHint?: boolean } }) =>
+            t.annotations?.readOnlyHint === true,
+        )
+        .map((t) => t.name);
+
+      if (readOnlyTools.length > 0) {
+        debugLogger.warn(
+          `Warning: With sandboxing enabled, the following tools are marked as read-only and will AUTO-EXECUTE without confirmation:\n${readOnlyTools
+            .map((t) => `  * ${t}`)
+            .join('\n')}`,
+        );
+      }
+      await client.close();
+    } catch {
+      debugLogger.warn(
+        'Warning: With sandboxing enabled, any read-only tools provided by this server will AUTO-EXECUTE without confirmation.',
+      );
+    }
   }
 }
 

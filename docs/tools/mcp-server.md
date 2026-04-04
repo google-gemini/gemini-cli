@@ -651,6 +651,14 @@ When confirmation is required, users can choose:
 - **Always allow this server:** Add to server-level allow-list
 - **Cancel:** Abort execution
 
+#### Read-only bypass
+
+If an MCP tool provides a `readOnlyHint` in its metadata (annotations) AND tool
+sandboxing is enabled, the Gemini CLI will automatically execute it without
+prompting for confirmation, regardless of the configured approval mode. This
+ensures a seamless experience for safe, data-fetching operations while
+maintaining system security.
+
 ### 3. Execution
 
 Upon confirmation (or trust bypass):

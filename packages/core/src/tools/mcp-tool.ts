@@ -168,6 +168,7 @@ export class DiscoveredMCPToolInvocation extends BaseToolInvocation<
     private readonly toolDescription?: string,
     private readonly toolParameterSchema?: unknown,
     toolAnnotationsData?: Record<string, unknown>,
+    readonly isReadOnly: boolean = false,
   ) {
     // Use composite format for policy checks: serverName__toolName
     // This enables server wildcards (e.g., "google-workspace__*")
@@ -203,6 +204,10 @@ export class DiscoveredMCPToolInvocation extends BaseToolInvocation<
 
     if (this.cliConfig?.isTrustedFolder() && this.trust) {
       return false; // server is trusted, no confirmation needed
+    }
+
+    if (this.isReadOnly && this.cliConfig?.isSandboxEnabled()) {
+      return false; // read-only tools do not require confirmation if sandboxing is enabled
     }
 
     if (
@@ -442,6 +447,7 @@ export class DiscoveredMCPTool extends BaseDeclarativeTool<
       this.description,
       this.parameterSchema,
       this._toolAnnotations,
+      this.isReadOnly,
     );
   }
 }

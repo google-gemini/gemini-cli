@@ -2912,6 +2912,10 @@ export class Config implements McpContext, AgentLoopContext {
     return this.folderTrust ? (this.trustedFolder ?? false) : true;
   }
 
+  isSandboxEnabled(): boolean {
+    return this.sandbox?.enabled ?? false;
+  }
+
   setIdeMode(value: boolean): void {
     this.ideMode = value;
   }

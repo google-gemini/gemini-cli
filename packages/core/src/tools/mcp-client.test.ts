@@ -28,6 +28,7 @@ import {
 import type { DiscoveredMCPTool } from './mcp-tool.js';
 
 import { WorkspaceContext } from '../utils/workspaceContext.js';
+import { NoopSandboxManager } from '../services/sandboxManager.js';
 import {
   connectToMcpServer,
   createTransport,
@@ -63,6 +64,8 @@ const MOCK_CONTEXT_DEFAULT = {
   emitMcpDiagnostic: vi.fn(),
   setUserInteractedWithMcp: vi.fn(),
   isTrustedFolder: vi.fn().mockReturnValue(true),
+  isSandboxEnabled: vi.fn().mockReturnValue(false),
+  sandboxManager: new NoopSandboxManager(),
 };
 
 let MOCK_CONTEXT: McpContext = MOCK_CONTEXT_DEFAULT;
@@ -93,6 +96,8 @@ describe('mcp-client', () => {
       emitMcpDiagnostic: vi.fn(),
       setUserInteractedWithMcp: vi.fn(),
       isTrustedFolder: vi.fn().mockReturnValue(true),
+      isSandboxEnabled: vi.fn().mockReturnValue(false),
+      sandboxManager: new NoopSandboxManager(),
     };
     // create a tmp dir for this test
     // Create a unique temporary directory for the workspace to avoid conflicts
