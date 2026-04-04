@@ -1,5 +1,20 @@
 // Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
 
+exports[`ToolConfirmationQueue > calculates availableContentHeight based on availableTerminalHeight from UI state 1`] = `
+"╭──────────────────────────────────────────────────────────────────────────────╮
+│ ? replace                                                                    │
+│ ╭──────────────────────────────────────────────────────────────────────────╮ │
+│ ╰─... 48 hidden (Ctrl+O) ...───────────────────────────────────────────────╯ │
+│ Apply this change?                                                           │
+│                                                                              │
+│ ● 1. Allow once                                                              │
+│   2. Allow for this session                                                  │
+│   3. Modify with external editor                                             │
+│   4. No, suggest changes (esc)                                               │
+╰──────────────────────────────────────────────────────────────────────────────╯
+"
+`;
+
 exports[`ToolConfirmationQueue > does not render expansion hint when constrainHeight is false 1`] = `
 "╭──────────────────────────────────────────────────────────────────────────────╮
 │ ? replace                                                                    │

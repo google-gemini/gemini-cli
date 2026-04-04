@@ -696,8 +696,8 @@ describe('ToolConfirmationMessage', () => {
       await waitUntilReady();
 
       const outputLines = lastFrame().split('\n');
-      // Should use the entire terminal height minus 1 line for the "Press Ctrl+O to show more lines" hint
-      expect(outputLines.length).toBe(39);
+      // Should use the entire terminal height
+      expect(outputLines.length).toBe(40);
 
       await expect({ lastFrame, generateSvg }).toMatchSvgSnapshot();
       unmount();
@@ -737,8 +737,8 @@ describe('ToolConfirmationMessage', () => {
       await waitUntilReady();
 
       const outputLines = lastFrame().split('\n');
-      // Should use the entire terminal height minus 1 line for the "Press Ctrl+O to show more lines" hint
-      expect(outputLines.length).toBe(39);
+      // Should use the entire terminal height
+      expect(outputLines.length).toBe(40);
 
       await expect({ lastFrame, generateSvg }).toMatchSvgSnapshot();
       unmount();
