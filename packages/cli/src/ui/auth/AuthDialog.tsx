@@ -119,7 +119,12 @@ export function AuthDialog({
         return;
       }
       if (authType) {
-        if (authType === AuthType.LOGIN_WITH_GOOGLE) {
+        const needsRestart =
+          authType === AuthType.LOGIN_WITH_GOOGLE ||
+          (authType === AuthType.USE_VERTEX_AI &&
+            process.env['CLOUD_SHELL'] === 'true');
+
+        if (needsRestart) {
           setAuthContext({ requiresRestart: true });
         } else {
           setAuthContext({});

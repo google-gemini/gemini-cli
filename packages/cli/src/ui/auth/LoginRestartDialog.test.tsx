@@ -1,12 +1,12 @@
 /**
  * @license
- * Copyright 2025 Google LLC
+ * Copyright 2026 Google LLC
  * SPDX-License-Identifier: Apache-2.0
  */
 
 import { render } from '../../test-utils/render.js';
 import { describe, it, expect, vi, beforeEach, type Mock } from 'vitest';
-import { LoginWithGoogleRestartDialog } from './LoginWithGoogleRestartDialog.js';
+import { LoginRestartDialog } from './LoginRestartDialog.js';
 import { useKeypress } from '../hooks/useKeypress.js';
 import { runExitCleanup } from '../../utils/cleanup.js';
 import {
@@ -27,7 +27,7 @@ vi.mock('../../utils/cleanup.js', () => ({
 const mockedUseKeypress = useKeypress as Mock;
 const mockedRunExitCleanup = runExitCleanup as Mock;
 
-describe('LoginWithGoogleRestartDialog', () => {
+describe('LoginRestartDialog', () => {
   const onDismiss = vi.fn();
   const exitSpy = vi
     .spyOn(process, 'exit')
@@ -44,11 +44,20 @@ describe('LoginWithGoogleRestartDialog', () => {
     _resetRelaunchStateForTesting();
   });
 
-  it('renders correctly', async () => {
+  it('renders correctly with default message', async () => {
     const { lastFrame, unmount } = await render(
-      <LoginWithGoogleRestartDialog
+      <LoginRestartDialog onDismiss={onDismiss} config={mockConfig} />,
+    );
+    expect(lastFrame()).toMatchSnapshot();
+    unmount();
+  });
+
+  it('renders correctly with custom message', async () => {
+    const { lastFrame, unmount } = await render(
+      <LoginRestartDialog
         onDismiss={onDismiss}
         config={mockConfig}
+        message="Authenticating to Vertex AI in Cloud Shell requires a restart to apply project settings."
       />,
     );
     expect(lastFrame()).toMatchSnapshot();
@@ -57,10 +66,7 @@ describe('LoginWithGoogleRestartDialog', () => {
 
   it('calls onDismiss when escape is pressed', async () => {
     const { unmount } = await render(
-      <LoginWithGoogleRestartDialog
-        onDismiss={onDismiss}
-        config={mockConfig}
-      />,
+      <LoginRestartDialog onDismiss={onDismiss} config={mockConfig} />,
     );
     const keypressHandler = mockedUseKeypress.mock.calls[0][0];
 
@@ -82,10 +88,7 @@ describe('LoginWithGoogleRestartDialog', () => {
       vi.useFakeTimers();
 
       const { unmount } = await render(
-        <LoginWithGoogleRestartDialog
-          onDismiss={onDismiss}
-          config={mockConfig}
-        />,
+        <LoginRestartDialog onDismiss={onDismiss} config={mockConfig} />,
       );
       const keypressHandler = mockedUseKeypress.mock.calls[0][0];
 

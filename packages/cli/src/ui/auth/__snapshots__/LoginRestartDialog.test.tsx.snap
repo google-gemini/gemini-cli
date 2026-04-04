@@ -1,0 +1,17 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`LoginRestartDialog > renders correctly with custom message 1`] = `
+"╭──────────────────────────────────────────────────────────────────────────────────────────────────╮
+│ Authenticating to Vertex AI in Cloud Shell requires a restart to apply project settings.         │
+│ Press R to restart, or Esc to choose a different authentication method.                          │
+╰──────────────────────────────────────────────────────────────────────────────────────────────────╯
+"
+`;
+
+exports[`LoginRestartDialog > renders correctly with default message 1`] = `
+"╭──────────────────────────────────────────────────────────────────────────────────────────────────╮
+│ You've successfully signed in with Google. Gemini CLI needs to be restarted.                     │
+│ Press R to restart, or Esc to choose a different authentication method.                          │
+╰──────────────────────────────────────────────────────────────────────────────────────────────────╯
+"
+`;
