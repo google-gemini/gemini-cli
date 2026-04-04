@@ -116,6 +116,7 @@ export function SettingsDialog({
   const [filteredKeys, setFilteredKeys] = useState<string[]>(() =>
     getDialogSettingKeys(),
   );
+
   const { fzfInstance, searchMap } = useMemo(() => {
     const keys = getDialogSettingKeys();
     const map = new Map<string, string>();
@@ -133,12 +134,14 @@ export function SettingsDialog({
       fuzzy: 'v2',
       casing: 'case-insensitive',
     });
+
     return { fzfInstance: fzf, searchMap: map };
   }, []);
 
   // Perform search
   useEffect(() => {
     let active = true;
+
     if (!searchQuery.trim() || !fzfInstance) {
       setFilteredKeys(getDialogSettingKeys());
       return;
@@ -148,13 +151,18 @@ export function SettingsDialog({
       // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
       const results = await fzfInstance.find(searchQuery);
 
-      if (!active) return;
+      if (!active) {
+        return;
+      }
 
       const matchedKeys = new Set<string>();
       results.forEach((res: FzfResult) => {
         const key = searchMap.get(res.item.toLowerCase());
-        if (key) matchedKeys.add(key);
+        if (key) {
+          matchedKeys.add(key);
+        }
       });
+
       setFilteredKeys(Array.from(matchedKeys));
     };
 
@@ -184,12 +192,14 @@ export function SettingsDialog({
           ? getEffectiveValue(key, scopeSettings)
           : undefined;
         const initialJson = initialScopeMap.get(scopeName);
+
         if (JSON.stringify(currentValue) !== initialJson) {
           changed.add(key);
           break; // one scope changed is enough
         }
       }
     }
+
     return changed;
   }, [settings, activeRestartRequiredSettings]);
 
@@ -199,9 +209,12 @@ export function SettingsDialog({
   const maxLabelOrDescriptionWidth = useMemo(() => {
     const allKeys = getDialogSettingKeys();
     let max = 0;
+
     for (const key of allKeys) {
       const def = getSettingDefinition(key);
-      if (!def) continue;
+      if (!def) {
+        continue;
+      }
 
       const scopeMessage = getScopeMessageForSetting(
         key,
@@ -217,6 +230,7 @@ export function SettingsDialog({
 
       max = Math.max(max, lWidth, dWidth);
     }
+
     return max;
   }, [selectedScope, settings]);
 
@@ -228,6 +242,7 @@ export function SettingsDialog({
 
   // Generate items for BaseSettingsDialog
   const settingKeys = searchQuery ? filteredKeys : getDialogSettingKeys();
+
   const items: SettingsDialogItem[] = useMemo(() => {
     const scopeSettings = settings.forScope(selectedScope).settings;
     const mergedSettings = settings.merged;
@@ -276,6 +291,7 @@ export function SettingsDialog({
   const handleItemToggle = useCallback(
     (key: string, _item: SettingsDialogItem) => {
       const definition = getSettingDefinition(key);
+
       if (!TOGGLE_TYPES.has(definition?.type)) {
         return;
       }
@@ -291,12 +307,15 @@ export function SettingsDialog({
         newValue = !currentValue;
       } else if (definition?.type === 'enum' && definition.options) {
         const options = definition.options;
+
         if (options.length === 0) {
           return;
         }
-        const currentIndex = options?.findIndex(
+
+        const currentIndex = options.findIndex(
           (opt) => opt.value === currentValue,
         );
+
         if (currentIndex !== -1 && currentIndex < options.length - 1) {
           newValue = options[currentIndex + 1].value;
         } else {
@@ -310,6 +329,7 @@ export function SettingsDialog({
         `[DEBUG SettingsDialog] Saving ${key} immediately with value:`,
         newValue,
       );
+
       setSetting(selectedScope, key, newValue);
     },
     [settings, selectedScope, setSetting],
@@ -344,6 +364,7 @@ export function SettingsDialog({
   }, [onSelect, selectedScope]);
 
   const globalKeyMatchers = useKeyMatchers();
+
   const settingsKeyMatchers = useMemo(
     () => ({
       ...globalKeyMatchers,
@@ -360,9 +381,12 @@ export function SettingsDialog({
     (key: Key, _currentItem: SettingsDialogItem | undefined): boolean => {
       // 'r' key for restart
       if (showRestartPrompt && key.sequence === 'r') {
-        if (onRestartRequest) onRestartRequest();
+        if (onRestartRequest) {
+          onRestartRequest();
+        }
         return true;
       }
+
       return false;
     },
     [showRestartPrompt, onRestartRequest],
