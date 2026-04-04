@@ -6,6 +6,7 @@
 
 import { type Config } from '@google/gemini-cli-core';
 import { Box, Text } from 'ink';
+import { useState } from 'react';
 import { theme } from '../semantic-colors.js';
 import { useKeypress } from '../hooks/useKeypress.js';
 import { relaunchApp } from '../../utils/processUtils.js';
@@ -19,12 +20,18 @@ export const LoginWithGoogleRestartDialog = ({
   onDismiss,
   config,
 }: LoginWithGoogleRestartDialogProps) => {
+  const [isRestarting, setIsRestarting] = useState(false);
+
   useKeypress(
     (key) => {
+      if (isRestarting) {
+        return false;
+      }
       if (key.name === 'escape') {
         onDismiss();
         return true;
       } else if (key.name === 'r' || key.name === 'R') {
+        setIsRestarting(true);
         setTimeout(async () => {
           if (process.send) {
             const remoteSettings = config.getRemoteAdminSettings();
@@ -43,6 +50,10 @@ export const LoginWithGoogleRestartDialog = ({
     },
     { isActive: true },
   );
+
+  if (isRestarting) {
+    return null;
+  }
 
   const message =
     "You've successfully signed in with Google. Gemini CLI needs to be restarted.";

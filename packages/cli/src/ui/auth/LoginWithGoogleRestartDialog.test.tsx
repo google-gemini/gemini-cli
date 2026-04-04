@@ -6,6 +6,7 @@
 
 import { render } from '../../test-utils/render.js';
 import { describe, it, expect, vi, beforeEach, type Mock } from 'vitest';
+import { act } from 'react';
 import { LoginWithGoogleRestartDialog } from './LoginWithGoogleRestartDialog.js';
 import { useKeypress } from '../hooks/useKeypress.js';
 import { runExitCleanup } from '../../utils/cleanup.js';
@@ -64,12 +65,14 @@ describe('LoginWithGoogleRestartDialog', () => {
     );
     const keypressHandler = mockedUseKeypress.mock.calls[0][0];
 
-    keypressHandler({
-      name: 'escape',
-      shift: false,
-      ctrl: false,
-      cmd: false,
-      sequence: '\u001b',
+    act(() => {
+      keypressHandler({
+        name: 'escape',
+        shift: false,
+        ctrl: false,
+        cmd: false,
+        sequence: '\u001b',
+      });
     });
 
     expect(onDismiss).toHaveBeenCalledTimes(1);
@@ -89,12 +92,14 @@ describe('LoginWithGoogleRestartDialog', () => {
       );
       const keypressHandler = mockedUseKeypress.mock.calls[0][0];
 
-      keypressHandler({
-        name: keyName,
-        shift: false,
-        ctrl: false,
-        cmd: false,
-        sequence: keyName,
+      act(() => {
+        keypressHandler({
+          name: keyName,
+          shift: false,
+          ctrl: false,
+          cmd: false,
+          sequence: keyName,
+        });
       });
 
       // Advance timers to trigger the setTimeout callback
