@@ -858,6 +858,7 @@ export class ShellExecutionService {
         true,
       );
 
+      const isWindowsPlatform = os.platform() === 'win32';
       // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
       const ptyProcess = ptyInfo.module.spawn(finalExecutable, finalArgs, {
         cwd: finalCwd,
@@ -865,7 +866,16 @@ export class ShellExecutionService {
         cols,
         rows,
         env: finalEnv,
-        handleFlowControl: true,
+        // handleFlowControl intercepts XON/XOFF (Ctrl+S/Q) and prevents them
+        // from reaching the child.  On Windows, the flag can interfere with
+        // ConPTY's internal input routing and cause interactive TUI tools to
+        // miss key events, so we disable it there.
+        handleFlowControl: !isWindowsPlatform,
+        // On Windows, explicitly request ConPTY (introduced in Windows 10 1809).
+        // Without this, @lydell/node-pty may silently fall back to WinPTY, which
+        // has known incompatibilities with interactive Node.js TUI applications
+        // that rely on VT-sequence-based arrow-key navigation.
+        ...(isWindowsPlatform ? { useConpty: true } : {}),
       });
 
       // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
@@ -912,6 +922,13 @@ export class ShellExecutionService {
           this.activePtys.delete(ptyPid);
         },
         isActive: () => {
+          // On Windows, process.kill(pid, 0) can return false negatives
+          // for ConPTY-managed shell wrappers (powershell.exe), causing
+          // writeToPty to silently discard input (including arrow keys).
+          // Check the internal activePtys map first for reliable status.
+          if (ShellExecutionService.activePtys.has(ptyPid)) {
+            return true;
+          }
           try {
             return process.kill(ptyPid, 0);
           } catch {
