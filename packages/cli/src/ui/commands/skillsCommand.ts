@@ -30,9 +30,8 @@ import {
 
 async function listAction(
   context: CommandContext,
-  args: string,
 ): Promise<void | SlashCommandActionReturn> {
-  const subArgs = args.trim().split(/\s+/);
+  const subArgs = context.invocation!.args.trim().split(/\s+/);
 
   // Default to SHOWING descriptions. The user can hide them with 'nodesc'.
   let useShowDescriptions = true;
@@ -77,9 +76,8 @@ async function listAction(
 
 async function linkAction(
   context: CommandContext,
-  args: string,
 ): Promise<void | SlashCommandActionReturn> {
-  const parts = args.trim().split(/\s+/);
+  const parts = context.invocation!.args.trim().split(/\s+/);
   const sourcePath = parts[0];
 
   if (!sourcePath) {
@@ -140,9 +138,8 @@ async function linkAction(
 
 async function disableAction(
   context: CommandContext,
-  args: string,
 ): Promise<void | SlashCommandActionReturn> {
-  const skillName = args.trim();
+  const skillName = context.invocation!.args.trim();
   if (!skillName) {
     context.ui.addItem({
       type: MessageType.ERROR,
@@ -200,9 +197,8 @@ async function disableAction(
 
 async function enableAction(
   context: CommandContext,
-  args: string,
 ): Promise<void | SlashCommandActionReturn> {
-  const skillName = args.trim();
+  const skillName = context.invocation!.args.trim();
   if (!skillName) {
     context.ui.addItem({
       type: MessageType.ERROR,
@@ -406,13 +402,14 @@ export const skillsCommand: SlashCommand = {
       action: reloadAction,
     },
   ],
-  action: async (context, args) => {
+  action: async (context: CommandContext) => {
+    const args = context.invocation?.args;
     if (args) {
       const parsed = parseSlashCommand(`/${args}`, skillsCommand.subCommands!);
       if (parsed.commandToExecute?.action) {
-        return parsed.commandToExecute.action(context, parsed.args);
+        return parsed.commandToExecute.action(context);
       }
     }
-    return listAction(context, args);
+    return listAction(context);
   },
 };

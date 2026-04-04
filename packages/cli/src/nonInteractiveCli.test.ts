@@ -1271,7 +1271,13 @@ describe('runNonInteractive', () => {
       prompt_id: 'prompt-id-args',
     });
 
-    expect(mockAction).toHaveBeenCalledWith(expect.any(Object), 'arg1 arg2');
+    expect(mockAction).toHaveBeenCalledWith(
+      expect.objectContaining({
+        invocation: expect.objectContaining({
+          args: 'arg1 arg2',
+        }),
+      }),
+    );
 
     expect(getWrittenOutput()).toBe('Acknowledged\n');
   });

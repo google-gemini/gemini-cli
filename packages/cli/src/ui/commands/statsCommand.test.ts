@@ -54,7 +54,8 @@ describe('statsCommand', () => {
       },
     } as unknown as Config;
 
-    await statsCommand.action(mockContext, '');
+    mockContext.invocation!.args = '';
+    await statsCommand.action(mockContext);
 
     const expectedDuration = formatDuration(
       endTime.getTime() - startTime.getTime(),
@@ -97,7 +98,8 @@ describe('statsCommand', () => {
       },
     } as unknown as Config;
 
-    await statsCommand.action(mockContext, '');
+    mockContext.invocation!.args = '';
+    await statsCommand.action(mockContext);
 
     expect(mockRefreshUserQuota).toHaveBeenCalled();
     expect(mockContext.ui.addItem).toHaveBeenCalledWith(
@@ -118,8 +120,9 @@ describe('statsCommand', () => {
     );
     if (!modelSubCommand?.action) throw new Error('Subcommand has no action');
 
+    mockContext.invocation!.args = '';
     // eslint-disable-next-line @typescript-eslint/no-floating-promises
-    modelSubCommand.action(mockContext, '');
+    modelSubCommand.action(mockContext);
 
     expect(mockContext.ui.addItem).toHaveBeenCalledWith({
       type: MessageType.MODEL_STATS,
@@ -138,8 +141,9 @@ describe('statsCommand', () => {
     );
     if (!toolsSubCommand?.action) throw new Error('Subcommand has no action');
 
+    mockContext.invocation!.args = '';
     // eslint-disable-next-line @typescript-eslint/no-floating-promises
-    toolsSubCommand.action(mockContext, '');
+    toolsSubCommand.action(mockContext);
 
     expect(mockContext.ui.addItem).toHaveBeenCalledWith({
       type: MessageType.TOOL_STATS,

@@ -23,7 +23,8 @@ describe('modelCommand', () => {
       throw new Error('The model command must have an action.');
     }
 
-    const result = await modelCommand.action(mockContext, '');
+    mockContext.invocation!.args = '';
+    const result = await modelCommand.action(mockContext);
 
     expect(result).toEqual({
       type: 'dialog',
@@ -44,7 +45,8 @@ describe('modelCommand', () => {
       },
     } as unknown as Config;
 
-    await modelCommand.action(mockContext, '');
+    mockContext.invocation!.args = '';
+    await modelCommand.action(mockContext);
 
     expect(mockRefreshUserQuota).toHaveBeenCalled();
   });
@@ -56,7 +58,8 @@ describe('modelCommand', () => {
       );
       expect(manageCommand).toBeDefined();
 
-      const result = await manageCommand!.action!(mockContext, '');
+      mockContext.invocation!.args = '';
+      const result = await manageCommand!.action!(mockContext);
 
       expect(result).toEqual({
         type: 'dialog',
@@ -76,7 +79,8 @@ describe('modelCommand', () => {
         },
       } as unknown as Config;
 
-      await manageCommand!.action!(mockContext, '');
+      mockContext.invocation!.args = '';
+      await manageCommand!.action!(mockContext);
 
       expect(mockRefreshUserQuota).toHaveBeenCalled();
     });
@@ -109,7 +113,8 @@ describe('modelCommand', () => {
         },
       } as unknown as Config;
 
-      await setCommand!.action!(mockContext, 'gemini-pro');
+      mockContext.invocation!.args = 'gemini-pro';
+      await setCommand!.action!(mockContext);
 
       expect(mockSetModel).toHaveBeenCalledWith('gemini-pro', true);
       expect(mockContext.ui.addItem).toHaveBeenCalledWith(
@@ -144,7 +149,8 @@ describe('modelCommand', () => {
         },
       } as unknown as Config;
 
-      await setCommand!.action!(mockContext, 'gemini-pro --persist');
+      mockContext.invocation!.args = 'gemini-pro --persist';
+      await setCommand!.action!(mockContext);
 
       expect(mockSetModel).toHaveBeenCalledWith('gemini-pro', false);
       expect(mockContext.ui.addItem).toHaveBeenCalledWith(
@@ -159,7 +165,8 @@ describe('modelCommand', () => {
       const setCommand = modelCommand.subCommands?.find(
         (c) => c.name === 'set',
       );
-      await setCommand!.action!(mockContext, '');
+      mockContext.invocation!.args = '';
+      await setCommand!.action!(mockContext);
 
       expect(mockContext.ui.addItem).toHaveBeenCalledWith(
         expect.objectContaining({

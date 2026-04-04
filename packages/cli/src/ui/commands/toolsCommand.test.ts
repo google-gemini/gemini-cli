@@ -37,7 +37,8 @@ describe('toolsCommand', () => {
     });
 
     if (!toolsCommand.action) throw new Error('Action not defined');
-    await toolsCommand.action(mockContext, '');
+    mockContext.invocation!.args = '';
+    await toolsCommand.action(mockContext);
 
     expect(mockContext.ui.addItem).toHaveBeenCalledWith({
       type: MessageType.ERROR,
@@ -57,7 +58,8 @@ describe('toolsCommand', () => {
     });
 
     if (!toolsCommand.action) throw new Error('Action not defined');
-    await toolsCommand.action(mockContext, '');
+    mockContext.invocation!.args = '';
+    await toolsCommand.action(mockContext);
 
     expect(mockContext.ui.addItem).toHaveBeenCalledWith({
       type: MessageType.TOOLS_LIST,
@@ -76,7 +78,8 @@ describe('toolsCommand', () => {
     });
 
     if (!toolsCommand.action) throw new Error('Action not defined');
-    await toolsCommand.action(mockContext, '');
+    mockContext.invocation!.args = '';
+    await toolsCommand.action(mockContext);
 
     const [message] = (mockContext.ui.addItem as ReturnType<typeof vi.fn>).mock
       .calls[0];
@@ -97,7 +100,8 @@ describe('toolsCommand', () => {
     });
 
     if (!toolsCommand.action) throw new Error('Action not defined');
-    await toolsCommand.action(mockContext, 'list');
+    mockContext.invocation!.args = 'list';
+    await toolsCommand.action(mockContext);
 
     const [message] = (mockContext.ui.addItem as ReturnType<typeof vi.fn>).mock
       .calls[0];
@@ -118,7 +122,8 @@ describe('toolsCommand', () => {
     });
 
     if (!toolsCommand.action) throw new Error('Action not defined');
-    await toolsCommand.action(mockContext, 'desc');
+    mockContext.invocation!.args = 'desc';
+    await toolsCommand.action(mockContext);
 
     const [message] = (mockContext.ui.addItem as ReturnType<typeof vi.fn>).mock
       .calls[0];
@@ -152,7 +157,8 @@ describe('toolsCommand', () => {
 
     const listCmd = toolsCommand.subCommands?.find((s) => s.name === 'list');
     if (!listCmd?.action) throw new Error('Action not defined');
-    await listCmd.action(mockContext, '');
+    mockContext.invocation!.args = '';
+    await listCmd.action(mockContext);
 
     const [message] = (mockContext.ui.addItem as ReturnType<typeof vi.fn>).mock
       .calls[0];
@@ -173,7 +179,8 @@ describe('toolsCommand', () => {
 
     const descCmd = toolsCommand.subCommands?.find((s) => s.name === 'desc');
     if (!descCmd?.action) throw new Error('Action not defined');
-    await descCmd.action(mockContext, '');
+    mockContext.invocation!.args = '';
+    await descCmd.action(mockContext);
 
     const [message] = (mockContext.ui.addItem as ReturnType<typeof vi.fn>).mock
       .calls[0];
@@ -203,7 +210,8 @@ describe('toolsCommand', () => {
     });
 
     if (!descSubCommand?.action) throw new Error('Action not defined');
-    await descSubCommand.action(mockContext, '');
+    mockContext.invocation!.args = '';
+    await descSubCommand.action(mockContext);
 
     const [message] = (mockContext.ui.addItem as ReturnType<typeof vi.fn>).mock
       .calls[0];

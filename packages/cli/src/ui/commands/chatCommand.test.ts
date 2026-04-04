@@ -129,7 +129,8 @@ describe('chatCommand', () => {
         return { mtime: date2 } as Stats;
       });
 
-      await listCommand?.action?.(mockContext, '');
+      mockContext.invocation!.args = '';
+      await listCommand?.action?.(mockContext);
 
       expect(mockContext.ui.addItem).toHaveBeenCalledWith({
         type: 'chat_list',
@@ -158,7 +159,8 @@ describe('chatCommand', () => {
     });
 
     it('should return an error if tag is missing', async () => {
-      const result = await saveCommand?.action?.(mockContext, '  ');
+      mockContext.invocation!.args = '  ';
+      const result = await saveCommand?.action?.(mockContext);
       expect(result).toEqual({
         type: 'message',
         messageType: 'error',
@@ -168,7 +170,8 @@ describe('chatCommand', () => {
 
     it('should inform if conversation history is empty or only contains system context', async () => {
       mockGetHistory.mockReturnValue([]);
-      let result = await saveCommand?.action?.(mockContext, tag);
+      mockContext.invocation!.args = tag;
+      let result = await saveCommand?.action?.(mockContext);
       expect(result).toEqual({
         type: 'message',
         messageType: 'info',
@@ -178,7 +181,8 @@ describe('chatCommand', () => {
       mockGetHistory.mockReturnValue([
         { role: 'user', parts: [{ text: 'context for our chat' }] },
       ]);
-      result = await saveCommand?.action?.(mockContext, tag);
+      mockContext.invocation!.args = tag;
+      result = await saveCommand?.action?.(mockContext);
       expect(result).toEqual({
         type: 'message',
         messageType: 'info',
@@ -190,7 +194,8 @@ describe('chatCommand', () => {
         { role: 'model', parts: [{ text: 'Got it. Thanks for the context!' }] },
         { role: 'user', parts: [{ text: 'Hello, how are you?' }] },
       ]);
-      result = await saveCommand?.action?.(mockContext, tag);
+      mockContext.invocation!.args = tag;
+      result = await saveCommand?.action?.(mockContext);
       expect(result).toEqual({
         type: 'message',
         messageType: 'info',
@@ -206,7 +211,8 @@ describe('chatCommand', () => {
         args: tag,
       };
 
-      const result = await saveCommand?.action?.(mockContext, tag);
+      mockContext.invocation.args = tag;
+      const result = await saveCommand?.action?.(mockContext);
 
       expect(mockCheckpointExists).toHaveBeenCalledWith(tag);
       expect(mockSaveCheckpoint).not.toHaveBeenCalled();
@@ -226,7 +232,8 @@ describe('chatCommand', () => {
       mockGetHistory.mockReturnValue(history);
       mockContext.overwriteConfirmed = true;
 
-      const result = await saveCommand?.action?.(mockContext, tag);
+      mockContext.invocation!.args = tag;
+      const result = await saveCommand?.action?.(mockContext);
 
       expect(mockCheckpointExists).not.toHaveBeenCalled(); // Should skip existence check
       expect(mockSaveCheckpoint).toHaveBeenCalledWith(
@@ -251,7 +258,8 @@ describe('chatCommand', () => {
     });
 
     it('should return an error if tag is missing', async () => {
-      const result = await resumeCommand?.action?.(mockContext, '');
+      mockContext.invocation!.args = '';
+      const result = await resumeCommand?.action?.(mockContext);
 
       expect(result).toEqual({
         type: 'message',
@@ -263,7 +271,8 @@ describe('chatCommand', () => {
     it('should inform if checkpoint is not found', async () => {
       mockLoadCheckpoint.mockResolvedValue({ history: [] });
 
-      const result = await resumeCommand?.action?.(mockContext, badTag);
+      mockContext.invocation!.args = badTag;
+      const result = await resumeCommand?.action?.(mockContext);
 
       expect(result).toEqual({
         type: 'message',
@@ -283,7 +292,8 @@ describe('chatCommand', () => {
         authType: AuthType.LOGIN_WITH_GOOGLE,
       });
 
-      const result = await resumeCommand?.action?.(mockContext, goodTag);
+      mockContext.invocation!.args = goodTag;
+      const result = await resumeCommand?.action?.(mockContext);
 
       expect(result).toEqual({
         type: 'load_history',
@@ -306,7 +316,8 @@ describe('chatCommand', () => {
         authType: AuthType.USE_GEMINI,
       });
 
-      const result = await resumeCommand?.action?.(mockContext, goodTag);
+      mockContext.invocation!.args = goodTag;
+      const result = await resumeCommand?.action?.(mockContext);
 
       expect(result).toEqual({
         type: 'message',
@@ -323,7 +334,8 @@ describe('chatCommand', () => {
       ];
       mockLoadCheckpoint.mockResolvedValue({ history: conversation });
 
-      const result = await resumeCommand?.action?.(mockContext, goodTag);
+      mockContext.invocation!.args = goodTag;
+      const result = await resumeCommand?.action?.(mockContext);
 
       expect(result).toEqual({
         type: 'load_history',
@@ -386,7 +398,8 @@ describe('chatCommand', () => {
     });
 
     it('should return an error if tag is missing', async () => {
-      const result = await deleteCommand?.action?.(mockContext, '  ');
+      mockContext.invocation!.args = '  ';
+      const result = await deleteCommand?.action?.(mockContext);
       expect(result).toEqual({
         type: 'message',
         messageType: 'error',
@@ -396,7 +409,8 @@ describe('chatCommand', () => {
 
     it('should return an error if checkpoint is not found', async () => {
       mockDeleteCheckpoint.mockResolvedValue(false);
-      const result = await deleteCommand?.action?.(mockContext, tag);
+      mockContext.invocation!.args = tag;
+      const result = await deleteCommand?.action?.(mockContext);
       expect(result).toEqual({
         type: 'message',
         messageType: 'error',
@@ -405,7 +419,8 @@ describe('chatCommand', () => {
     });
 
     it('should delete the conversation', async () => {
-      const result = await deleteCommand?.action?.(mockContext, tag);
+      mockContext.invocation!.args = tag;
+      const result = await deleteCommand?.action?.(mockContext);
 
       expect(mockDeleteCheckpoint).toHaveBeenCalledWith(tag);
       expect(result).toEqual({
@@ -457,7 +472,8 @@ describe('chatCommand', () => {
     });
 
     it('should default to a json file if no path is provided', async () => {
-      const result = await shareCommand?.action?.(mockContext, '');
+      mockContext.invocation!.args = '';
+      const result = await shareCommand?.action?.(mockContext);
       const expectedPath = path.join(
         process.cwd(),
         'gemini-conversation-1234567890.json',
@@ -475,7 +491,8 @@ describe('chatCommand', () => {
 
     it('should share the conversation to a JSON file', async () => {
       const filePath = 'my-chat.json';
-      const result = await shareCommand?.action?.(mockContext, filePath);
+      mockContext.invocation!.args = filePath;
+      const result = await shareCommand?.action?.(mockContext);
       const expectedPath = path.join(process.cwd(), 'my-chat.json');
       expect(mockExport).toHaveBeenCalledWith({
         history: mockHistory,
@@ -490,7 +507,8 @@ describe('chatCommand', () => {
 
     it('should share the conversation to a Markdown file', async () => {
       const filePath = 'my-chat.md';
-      const result = await shareCommand?.action?.(mockContext, filePath);
+      mockContext.invocation!.args = filePath;
+      const result = await shareCommand?.action?.(mockContext);
       const expectedPath = path.join(process.cwd(), 'my-chat.md');
       expect(mockExport).toHaveBeenCalledWith({
         history: mockHistory,
@@ -505,7 +523,8 @@ describe('chatCommand', () => {
 
     it('should return an error for unsupported file extensions', async () => {
       const filePath = 'my-chat.txt';
-      const result = await shareCommand?.action?.(mockContext, filePath);
+      mockContext.invocation!.args = filePath;
+      const result = await shareCommand?.action?.(mockContext);
       expect(mockExport).not.toHaveBeenCalled();
       expect(result).toEqual({
         type: 'message',
@@ -518,7 +537,8 @@ describe('chatCommand', () => {
       mockGetHistory.mockReturnValue([
         { role: 'user', parts: [{ text: 'context' }] },
       ]);
-      const result = await shareCommand?.action?.(mockContext, 'my-chat.json');
+      mockContext.invocation!.args = 'my-chat.json';
+      const result = await shareCommand?.action?.(mockContext);
       expect(mockExport).not.toHaveBeenCalled();
       expect(result).toEqual({
         type: 'message',
@@ -530,7 +550,8 @@ describe('chatCommand', () => {
     it('should handle errors during file writing', async () => {
       const error = new Error('Permission denied');
       mockExport.mockRejectedValue(error);
-      const result = await shareCommand?.action?.(mockContext, 'my-chat.json');
+      mockContext.invocation!.args = 'my-chat.json';
+      const result = await shareCommand?.action?.(mockContext);
       expect(result).toEqual({
         type: 'message',
         messageType: 'error',
@@ -540,7 +561,8 @@ describe('chatCommand', () => {
 
     it('should output valid JSON schema', async () => {
       const filePath = 'my-chat.json';
-      await shareCommand?.action?.(mockContext, filePath);
+      mockContext.invocation!.args = filePath;
+      await shareCommand?.action?.(mockContext);
       const expectedPath = path.join(process.cwd(), 'my-chat.json');
       expect(mockExport).toHaveBeenCalledWith({
         history: mockHistory,
@@ -550,7 +572,8 @@ describe('chatCommand', () => {
 
     it('should output correct markdown format', async () => {
       const filePath = 'my-chat.md';
-      await shareCommand?.action?.(mockContext, filePath);
+      mockContext.invocation!.args = filePath;
+      await shareCommand?.action?.(mockContext);
       const expectedPath = path.join(process.cwd(), 'my-chat.md');
       expect(mockExport).toHaveBeenCalledWith({
         history: mockHistory,
@@ -713,7 +736,8 @@ Hi there!`;
       it('should return an error if no API request is found', async () => {
         mockGetLatestApiRequest.mockReturnValue(undefined);
 
-        const result = await debugCommand.action?.(mockContext, '');
+        mockContext.invocation!.args = '';
+        const result = await debugCommand.action?.(mockContext);
 
         expect(result).toEqual({
           type: 'message',
@@ -729,7 +753,8 @@ Hi there!`;
         };
         mockGetLatestApiRequest.mockReturnValue(mockRequest);
 
-        const result = await debugCommand.action?.(mockContext, '');
+        mockContext.invocation!.args = '';
+        const result = await debugCommand.action?.(mockContext);
 
         const expectedFilename = 'gcli-request-1234567890.json';
         const expectedPath = path.join('/project/root', expectedFilename);
@@ -750,7 +775,8 @@ Hi there!`;
         mockGetLatestApiRequest.mockReturnValue(mockRequest);
         mockFs.writeFile.mockRejectedValue(new Error('Write failed'));
 
-        const result = await debugCommand.action?.(mockContext, '');
+        mockContext.invocation!.args = '';
+        const result = await debugCommand.action?.(mockContext);
 
         expect(result).toEqual({
           type: 'message',

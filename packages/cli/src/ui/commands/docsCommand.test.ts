@@ -37,7 +37,8 @@ describe('docsCommand', () => {
 
     const docsUrl = 'https://goo.gle/gemini-cli-docs';
 
-    await docsCommand.action(mockContext, '');
+    mockContext.invocation!.args = '';
+    await docsCommand.action(mockContext);
 
     expect(mockContext.ui.addItem).toHaveBeenCalledWith(
       {
@@ -59,7 +60,8 @@ describe('docsCommand', () => {
     vi.stubEnv('SANDBOX', 'gemini-sandbox');
     const docsUrl = 'https://goo.gle/gemini-cli-docs';
 
-    await docsCommand.action(mockContext, '');
+    mockContext.invocation!.args = '';
+    await docsCommand.action(mockContext);
 
     expect(mockContext.ui.addItem).toHaveBeenCalledWith(
       {
@@ -82,7 +84,8 @@ describe('docsCommand', () => {
     vi.stubEnv('SANDBOX', 'sandbox-exec');
     const docsUrl = 'https://goo.gle/gemini-cli-docs';
 
-    await docsCommand.action(mockContext, '');
+    mockContext.invocation!.args = '';
+    await docsCommand.action(mockContext);
 
     // The logic should fall through to the 'else' block
     expect(mockContext.ui.addItem).toHaveBeenCalledWith(

@@ -81,9 +81,10 @@ describe('setupGithubCommand', async () => {
       'fakeOpenCommand',
     );
 
+    const mockContext = {} as CommandContext;
+    mockContext.invocation = { raw: '', name: 'setup-github', args: '' };
     const result = (await setupGithubCommand.action?.(
-      {} as CommandContext,
-      '',
+      mockContext,
     )) as ToolActionReturn;
 
     const { command } = result.toolArgs;
@@ -151,9 +152,10 @@ describe('setupGithubCommand', async () => {
       'fakeOpenCommand',
     );
 
+    const mockContext = {} as CommandContext;
+    mockContext.invocation = { raw: '', name: 'setup-github', args: '' };
     const result = (await setupGithubCommand.action?.(
-      {} as CommandContext,
-      '',
+      mockContext,
     )) as ToolActionReturn;
 
     const { command } = result.toolArgs;
@@ -212,9 +214,16 @@ describe('setupGithubCommand', async () => {
       repo: 'repo',
     });
 
-    await expect(
-      setupGithubCommand.action?.({} as CommandContext, ''),
-    ).rejects.toThrow(/Invalid response code downloading.*404 - Not Found/);
+    // Assuming createMockCommandContext is a helper function available in the test environment
+    // and it correctly sets up the CommandContext with an invocation object.
+    // The instruction implies removing 'command' from an object passed to it.
+    // Since it's not defined here, we'll assume a direct replacement for the mockContext setup.
+    const mockContext = {
+      invocation: { raw: '', name: 'setup-github', args: '' },
+    } as unknown as CommandContext;
+    await expect(setupGithubCommand.action?.(mockContext)).rejects.toThrow(
+      /Invalid response code downloading.*404 - Not Found/,
+    );
   });
 });
 

@@ -139,7 +139,8 @@ describe('mcpCommand', () => {
         },
       });
 
-      const result = await mcpCommand.action!(contextWithoutConfig, '');
+      contextWithoutConfig.invocation!.args = '';
+      const result = await mcpCommand.action!(contextWithoutConfig);
 
       expect(result).toEqual({
         type: 'message',
@@ -152,7 +153,8 @@ describe('mcpCommand', () => {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       (mockContext.services.agentContext as any).toolRegistry = undefined;
 
-      const result = await mcpCommand.action!(mockContext, '');
+      mockContext.invocation!.args = '';
+      const result = await mcpCommand.action!(mockContext);
 
       expect(result).toEqual({
         type: 'message',
@@ -232,7 +234,8 @@ describe('mcpCommand', () => {
         ),
       });
 
-      await mcpCommand.action!(mockContext, '');
+      mockContext.invocation!.args = '';
+      await mcpCommand.action!(mockContext);
 
       expect(mockContext.ui.addItem).toHaveBeenCalledWith(
         expect.objectContaining({
@@ -257,7 +260,8 @@ describe('mcpCommand', () => {
       const descSubCommand = mcpCommand.subCommands!.find(
         (c) => c.name === 'desc',
       );
-      await descSubCommand!.action!(mockContext, '');
+      mockContext.invocation!.args = '';
+      await descSubCommand!.action!(mockContext);
 
       expect(mockContext.ui.addItem).toHaveBeenCalledWith(
         expect.objectContaining({
@@ -271,7 +275,8 @@ describe('mcpCommand', () => {
       const listSubCommand = mcpCommand.subCommands!.find(
         (c) => c.name === 'list',
       );
-      await listSubCommand!.action!(mockContext, '');
+      mockContext.invocation!.args = '';
+      await listSubCommand!.action!(mockContext);
 
       expect(mockContext.ui.addItem).toHaveBeenCalledWith(
         expect.objectContaining({
@@ -282,7 +287,14 @@ describe('mcpCommand', () => {
     });
 
     it('should filter servers by name when an argument is provided to list', async () => {
-      await mcpCommand.action!(mockContext, 'list server1');
+      await mcpCommand.action!({
+        ...mockContext,
+        invocation: {
+          raw: '/mcp list server1',
+          name: 'mcp',
+          args: 'list server1',
+        },
+      });
 
       expect(mockContext.ui.addItem).toHaveBeenCalledWith(
         expect.objectContaining({
@@ -300,7 +312,14 @@ describe('mcpCommand', () => {
     });
 
     it('should filter servers by name and show descriptions when an argument is provided to desc', async () => {
-      await mcpCommand.action!(mockContext, 'desc server2');
+      await mcpCommand.action!({
+        ...mockContext,
+        invocation: {
+          raw: '/mcp desc server2',
+          name: 'mcp',
+          args: 'desc server2',
+        },
+      });
 
       expect(mockContext.ui.addItem).toHaveBeenCalledWith(
         expect.objectContaining({

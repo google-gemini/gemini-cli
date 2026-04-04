@@ -119,9 +119,10 @@ describe('ideCommand', () => {
         status: core.IDEConnectionStatus.Connected,
       });
       const command = await ideCommand();
+      mockContext.invocation!.args = '';
       const result = await command.subCommands!.find(
         (c) => c.name === 'status',
-      )!.action!(mockContext, '');
+      )!.action!(mockContext);
       expect(vi.mocked(mockIdeClient.getConnectionStatus)).toHaveBeenCalled();
       expect(result).toEqual({
         type: 'message',
@@ -135,9 +136,10 @@ describe('ideCommand', () => {
         status: core.IDEConnectionStatus.Connecting,
       });
       const command = await ideCommand();
+      mockContext.invocation!.args = '';
       const result = await command.subCommands!.find(
         (c) => c.name === 'status',
-      )!.action!(mockContext, '');
+      )!.action!(mockContext);
       expect(vi.mocked(mockIdeClient.getConnectionStatus)).toHaveBeenCalled();
       expect(result).toEqual({
         type: 'message',
@@ -150,9 +152,10 @@ describe('ideCommand', () => {
         status: core.IDEConnectionStatus.Disconnected,
       });
       const command = await ideCommand();
+      mockContext.invocation!.args = '';
       const result = await command.subCommands!.find(
         (c) => c.name === 'status',
-      )!.action!(mockContext, '');
+      )!.action!(mockContext);
       expect(vi.mocked(mockIdeClient.getConnectionStatus)).toHaveBeenCalled();
       expect(result).toEqual({
         type: 'message',
@@ -168,9 +171,10 @@ describe('ideCommand', () => {
         details,
       });
       const command = await ideCommand();
+      mockContext.invocation!.args = '';
       const result = await command.subCommands!.find(
         (c) => c.name === 'status',
-      )!.action!(mockContext, '');
+      )!.action!(mockContext);
       expect(vi.mocked(mockIdeClient.getConnectionStatus)).toHaveBeenCalled();
       expect(result).toEqual({
         type: 'message',
@@ -209,9 +213,10 @@ describe('ideCommand', () => {
         status: core.IDEConnectionStatus.Connected,
       });
 
+      mockContext.invocation!.args = '';
       const actionPromise = command.subCommands!.find(
         (c) => c.name === 'install',
-      )!.action!(mockContext, '');
+      )!.action!(mockContext);
       await vi.runAllTimersAsync();
       await actionPromise;
 
@@ -248,9 +253,9 @@ describe('ideCommand', () => {
       });
 
       const command = await ideCommand();
+      mockContext.invocation!.args = '';
       await command.subCommands!.find((c) => c.name === 'install')!.action!(
         mockContext,
-        '',
       );
 
       expect(core.getIdeInstaller).toHaveBeenCalledWith(IDE_DEFINITIONS.vscode);

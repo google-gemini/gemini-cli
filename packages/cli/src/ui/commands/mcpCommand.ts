@@ -38,10 +38,8 @@ const authCommand: SlashCommand = {
   description: 'Authenticate with an OAuth-enabled MCP server',
   kind: CommandKind.BUILT_IN,
   autoExecute: true,
-  action: async (
-    context: CommandContext,
-    args: string,
-  ): Promise<MessageActionReturn> => {
+  action: async (context: CommandContext): Promise<MessageActionReturn> => {
+    const args = context.invocation?.args || '';
     const serverName = args.trim();
     const agentContext = context.services.agentContext;
     const config = agentContext?.config;
@@ -322,7 +320,8 @@ const listCommand: SlashCommand = {
   description: 'List configured MCP servers and tools',
   kind: CommandKind.BUILT_IN,
   autoExecute: true,
-  action: (context, args) => listAction(context, false, false, args),
+  action: (context: CommandContext) =>
+    listAction(context, false, false, context.invocation?.args),
 };
 
 const descCommand: SlashCommand = {
@@ -331,7 +330,8 @@ const descCommand: SlashCommand = {
   description: 'List configured MCP servers and tools with descriptions',
   kind: CommandKind.BUILT_IN,
   autoExecute: true,
-  action: (context, args) => listAction(context, true, false, args),
+  action: (context: CommandContext) =>
+    listAction(context, true, false, context.invocation?.args),
 };
 
 const schemaCommand: SlashCommand = {
@@ -340,7 +340,8 @@ const schemaCommand: SlashCommand = {
     'List configured MCP servers and tools with descriptions and schemas',
   kind: CommandKind.BUILT_IN,
   autoExecute: true,
-  action: (context, args) => listAction(context, true, true, args),
+  action: (context: CommandContext) =>
+    listAction(context, true, true, context.invocation?.args),
 };
 
 const reloadCommand: SlashCommand = {
@@ -388,15 +389,15 @@ const reloadCommand: SlashCommand = {
     // Reload the slash commands to reflect the changes.
     context.ui.reloadCommands();
 
-    return listCommand.action!(context, '');
+    return listCommand.action!(context);
   },
 };
 
 async function handleEnableDisable(
   context: CommandContext,
-  args: string,
   enable: boolean,
 ): Promise<MessageActionReturn> {
+  const args = context.invocation?.args || '';
   const agentContext = context.services.agentContext;
   const config = agentContext?.config;
   if (!config) {
@@ -520,7 +521,7 @@ const enableCommand: SlashCommand = {
   description: 'Enable a disabled MCP server',
   kind: CommandKind.BUILT_IN,
   autoExecute: true,
-  action: (ctx, args) => handleEnableDisable(ctx, args, true),
+  action: (ctx) => handleEnableDisable(ctx, true),
   completion: (ctx, arg) => getEnablementCompletion(ctx, arg, false),
 };
 
@@ -529,7 +530,7 @@ const disableCommand: SlashCommand = {
   description: 'Disable an MCP server',
   kind: CommandKind.BUILT_IN,
   autoExecute: true,
-  action: (ctx, args) => handleEnableDisable(ctx, args, false),
+  action: (ctx) => handleEnableDisable(ctx, false),
   completion: (ctx, arg) => getEnablementCompletion(ctx, arg, true),
 };
 
@@ -549,12 +550,12 @@ export const mcpCommand: SlashCommand = {
   ],
   action: async (
     context: CommandContext,
-    args: string,
   ): Promise<void | SlashCommandActionReturn> => {
+    const args = context.invocation?.args;
     if (args) {
       const parsed = parseSlashCommand(`/${args}`, mcpCommand.subCommands!);
       if (parsed.commandToExecute?.action) {
-        return parsed.commandToExecute.action(context, parsed.args);
+        return parsed.commandToExecute.action(context);
       }
       // If no subcommand matches, treat the whole args as a filter for list
       return listAction(context, false, false, args);

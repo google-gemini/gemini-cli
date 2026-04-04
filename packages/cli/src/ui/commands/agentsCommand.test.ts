@@ -61,7 +61,7 @@ describe('agentsCommand', () => {
       },
     });
 
-    const result = await agentsCommand.action!(contextWithoutConfig, '');
+    const result = await agentsCommand.action!(contextWithoutConfig);
 
     expect(result).toEqual({
       type: 'message',
@@ -73,7 +73,7 @@ describe('agentsCommand', () => {
   it('should show an error if agent registry is not available', async () => {
     mockConfig.getAgentRegistry = vi.fn().mockReturnValue(undefined);
 
-    const result = await agentsCommand.action!(mockContext, '');
+    const result = await agentsCommand.action!(mockContext);
 
     expect(result).toEqual({
       type: 'message',
@@ -99,7 +99,7 @@ describe('agentsCommand', () => {
     ];
     mockConfig.getAgentRegistry().getAllDefinitions.mockReturnValue(mockAgents);
 
-    await agentsCommand.action!(mockContext, '');
+    await agentsCommand.action!(mockContext);
 
     expect(mockContext.ui.addItem).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -120,7 +120,7 @@ describe('agentsCommand', () => {
     );
     expect(reloadCommand).toBeDefined();
 
-    const result = await reloadCommand!.action!(mockContext, '');
+    const result = await reloadCommand!.action!(mockContext);
 
     expect(reloadSpy).toHaveBeenCalled();
     expect(mockContext.ui.addItem).toHaveBeenCalledWith(
@@ -142,7 +142,7 @@ describe('agentsCommand', () => {
     const reloadCommand = agentsCommand.subCommands?.find(
       (cmd) => cmd.name === 'reload',
     );
-    const result = await reloadCommand!.action!(mockContext, '');
+    const result = await reloadCommand!.action!(mockContext);
 
     expect(result).toEqual({
       type: 'message',
@@ -176,7 +176,7 @@ describe('agentsCommand', () => {
     );
     expect(enableCommand).toBeDefined();
 
-    const result = await enableCommand!.action!(mockContext, 'test-agent');
+    const result = await enableCommand!.action!(mockContext);
 
     expect(enableAgent).toHaveBeenCalledWith(
       mockContext.services.settings,
@@ -204,7 +204,7 @@ describe('agentsCommand', () => {
     const enableCommand = agentsCommand.subCommands?.find(
       (cmd) => cmd.name === 'enable',
     );
-    const result = await enableCommand!.action!(mockContext, 'test-agent');
+    const result = await enableCommand!.action!(mockContext);
 
     expect(enableAgent).not.toHaveBeenCalled();
     expect(mockContext.ui.addItem).not.toHaveBeenCalled();
@@ -219,7 +219,7 @@ describe('agentsCommand', () => {
     const enableCommand = agentsCommand.subCommands?.find(
       (cmd) => cmd.name === 'enable',
     );
-    const result = await enableCommand!.action!(mockContext, '   ');
+    const result = await enableCommand!.action!(mockContext);
 
     expect(result).toEqual({
       type: 'message',
@@ -235,7 +235,7 @@ describe('agentsCommand', () => {
     const enableCommand = agentsCommand.subCommands?.find(
       (cmd) => cmd.name === 'enable',
     );
-    const result = await enableCommand!.action!(contextWithoutConfig, 'test');
+    const result = await enableCommand!.action!(contextWithoutConfig);
     expect(result).toEqual({
       type: 'message',
       messageType: 'error',
@@ -265,7 +265,7 @@ describe('agentsCommand', () => {
     );
     expect(disableCommand).toBeDefined();
 
-    const result = await disableCommand!.action!(mockContext, 'test-agent');
+    const result = await disableCommand!.action!(mockContext);
 
     expect(disableAgent).toHaveBeenCalledWith(
       mockContext.services.settings,
@@ -295,7 +295,7 @@ describe('agentsCommand', () => {
     const disableCommand = agentsCommand.subCommands?.find(
       (cmd) => cmd.name === 'disable',
     );
-    const result = await disableCommand!.action!(mockContext, 'test-agent');
+    const result = await disableCommand!.action!(mockContext);
 
     expect(disableAgent).not.toHaveBeenCalled();
     expect(result).toEqual({
@@ -311,7 +311,7 @@ describe('agentsCommand', () => {
     const disableCommand = agentsCommand.subCommands?.find(
       (cmd) => cmd.name === 'disable',
     );
-    const result = await disableCommand!.action!(mockContext, 'test-agent');
+    const result = await disableCommand!.action!(mockContext);
 
     expect(disableAgent).not.toHaveBeenCalled();
     expect(result).toEqual({
@@ -325,7 +325,7 @@ describe('agentsCommand', () => {
     const disableCommand = agentsCommand.subCommands?.find(
       (cmd) => cmd.name === 'disable',
     );
-    const result = await disableCommand!.action!(mockContext, '');
+    const result = await disableCommand!.action!(mockContext);
 
     expect(result).toEqual({
       type: 'message',
@@ -341,7 +341,7 @@ describe('agentsCommand', () => {
     const disableCommand = agentsCommand.subCommands?.find(
       (cmd) => cmd.name === 'disable',
     );
-    const result = await disableCommand!.action!(contextWithoutConfig, 'test');
+    const result = await disableCommand!.action!(contextWithoutConfig);
     expect(result).toEqual({
       type: 'message',
       messageType: 'error',
@@ -366,7 +366,7 @@ describe('agentsCommand', () => {
       );
       expect(configCommand).toBeDefined();
 
-      const result = await configCommand!.action!(mockContext, 'test-agent');
+      const result = await configCommand!.action!(mockContext);
 
       expect(result).toEqual({
         type: 'dialog',
@@ -392,7 +392,7 @@ describe('agentsCommand', () => {
       const configCommand = agentsCommand.subCommands?.find(
         (cmd) => cmd.name === 'config',
       );
-      const result = await configCommand!.action!(mockContext, 'test-agent');
+      const result = await configCommand!.action!(mockContext);
 
       expect(result).toEqual({
         type: 'dialog',
@@ -413,7 +413,7 @@ describe('agentsCommand', () => {
       const configCommand = agentsCommand.subCommands?.find(
         (cmd) => cmd.name === 'config',
       );
-      const result = await configCommand!.action!(mockContext, 'non-existent');
+      const result = await configCommand!.action!(mockContext);
 
       expect(result).toEqual({
         type: 'message',
@@ -426,7 +426,7 @@ describe('agentsCommand', () => {
       const configCommand = agentsCommand.subCommands?.find(
         (cmd) => cmd.name === 'config',
       );
-      const result = await configCommand!.action!(mockContext, '  ');
+      const result = await configCommand!.action!(mockContext);
 
       expect(result).toEqual({
         type: 'message',
@@ -442,7 +442,7 @@ describe('agentsCommand', () => {
       const configCommand = agentsCommand.subCommands?.find(
         (cmd) => cmd.name === 'config',
       );
-      const result = await configCommand!.action!(contextWithoutConfig, 'test');
+      const result = await configCommand!.action!(contextWithoutConfig);
       expect(result).toEqual({
         type: 'message',
         messageType: 'error',

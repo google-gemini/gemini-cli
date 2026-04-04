@@ -18,7 +18,7 @@ describe('tasksCommand', () => {
     } as unknown as CommandContext;
 
     if (tasksCommand.action) {
-      await tasksCommand.action(context, '');
+      await tasksCommand.action(context);
     }
 
     expect(toggleBackgroundTasks).toHaveBeenCalled();

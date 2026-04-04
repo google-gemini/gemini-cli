@@ -10,7 +10,9 @@ import type { CommandContext } from './types.js';
 
 describe('resumeCommand', () => {
   it('should open the session browser for bare /resume', async () => {
-    const result = await resumeCommand.action?.({} as CommandContext, '');
+    const mockContext = {} as CommandContext;
+    mockContext.invocation = { raw: '', name: 'resume', args: '' };
+    const result = await resumeCommand.action?.(mockContext);
     expect(result).toEqual({
       type: 'dialog',
       dialog: 'sessionBrowser',

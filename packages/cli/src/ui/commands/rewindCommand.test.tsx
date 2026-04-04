@@ -121,16 +121,13 @@ describe('rewindCommand', () => {
   });
 
   it('should initialize successfully', async () => {
-    const result = await rewindCommand.action!(mockContext, '');
+    const result = await rewindCommand.action!(mockContext);
     expect(result).toHaveProperty('type', 'custom_dialog');
   });
 
   it('should handle RewindOnly correctly', async () => {
     // 1. Run the command to get the component
-    const result = (await rewindCommand.action!(
-      mockContext,
-      '',
-    )) as OpenCustomDialogActionReturn;
+    const result = (await rewindCommand.action!(mockContext)) as OpenCustomDialogActionReturn;
     const component = result.component as ReactElement<RewindViewerProps>;
 
     // Access onRewind from props
@@ -159,10 +156,7 @@ describe('rewindCommand', () => {
   });
 
   it('should handle RewindAndRevert correctly', async () => {
-    const result = (await rewindCommand.action!(
-      mockContext,
-      '',
-    )) as OpenCustomDialogActionReturn;
+    const result = (await rewindCommand.action!(mockContext)) as OpenCustomDialogActionReturn;
     const component = result.component as ReactElement<RewindViewerProps>;
     const onRewind = component.props.onRewind;
 
@@ -183,10 +177,7 @@ describe('rewindCommand', () => {
   });
 
   it('should handle RevertOnly correctly', async () => {
-    const result = (await rewindCommand.action!(
-      mockContext,
-      '',
-    )) as OpenCustomDialogActionReturn;
+    const result = (await rewindCommand.action!(mockContext)) as OpenCustomDialogActionReturn;
     const component = result.component as ReactElement<RewindViewerProps>;
     const onRewind = component.props.onRewind;
 
@@ -208,10 +199,7 @@ describe('rewindCommand', () => {
   });
 
   it('should handle Cancel correctly', async () => {
-    const result = (await rewindCommand.action!(
-      mockContext,
-      '',
-    )) as OpenCustomDialogActionReturn;
+    const result = (await rewindCommand.action!(mockContext)) as OpenCustomDialogActionReturn;
     const component = result.component as ReactElement<RewindViewerProps>;
     const onRewind = component.props.onRewind;
 
@@ -226,10 +214,7 @@ describe('rewindCommand', () => {
   });
 
   it('should handle onExit correctly', async () => {
-    const result = (await rewindCommand.action!(
-      mockContext,
-      '',
-    )) as OpenCustomDialogActionReturn;
+    const result = (await rewindCommand.action!(mockContext)) as OpenCustomDialogActionReturn;
     const component = result.component as ReactElement<RewindViewerProps>;
     const onExit = component.props.onExit;
 
@@ -239,10 +224,7 @@ describe('rewindCommand', () => {
   });
 
   it('should handle rewind error correctly', async () => {
-    const result = (await rewindCommand.action!(
-      mockContext,
-      '',
-    )) as OpenCustomDialogActionReturn;
+    const result = (await rewindCommand.action!(mockContext)) as OpenCustomDialogActionReturn;
     const component = result.component as ReactElement<RewindViewerProps>;
     const onRewind = component.props.onRewind;
 
@@ -261,10 +243,7 @@ describe('rewindCommand', () => {
   });
 
   it('should handle null conversation from rewindTo', async () => {
-    const result = (await rewindCommand.action!(
-      mockContext,
-      '',
-    )) as OpenCustomDialogActionReturn;
+    const result = (await rewindCommand.action!(mockContext)) as OpenCustomDialogActionReturn;
     const component = result.component as ReactElement<RewindViewerProps>;
     const onRewind = component.props.onRewind;
 
@@ -284,7 +263,7 @@ describe('rewindCommand', () => {
   it('should fail if config is missing', () => {
     const context = { services: {} } as CommandContext;
 
-    const result = rewindCommand.action!(context, '');
+    const result = rewindCommand.action!(context);
 
     expect(result).toEqual({
       type: 'message',
@@ -305,7 +284,7 @@ describe('rewindCommand', () => {
       },
     }) as unknown as CommandContext;
 
-    const result = rewindCommand.action!(context, '');
+    const result = rewindCommand.action!(context);
 
     expect(result).toEqual({
       type: 'message',
@@ -326,7 +305,7 @@ describe('rewindCommand', () => {
       },
     }) as unknown as CommandContext;
 
-    const result = rewindCommand.action!(context, '');
+    const result = rewindCommand.action!(context);
 
     expect(result).toEqual({
       type: 'message',
@@ -338,7 +317,7 @@ describe('rewindCommand', () => {
   it('should return info if no conversation found', () => {
     mockGetConversation.mockReturnValue(null);
 
-    const result = rewindCommand.action!(mockContext, '');
+    const result = rewindCommand.action!(mockContext);
 
     expect(result).toEqual({
       type: 'message',
@@ -353,7 +332,7 @@ describe('rewindCommand', () => {
       sessionId: 'test-session',
     });
 
-    const result = rewindCommand.action!(mockContext, '');
+    const result = rewindCommand.action!(mockContext);
 
     expect(result).toEqual({
       type: 'message',

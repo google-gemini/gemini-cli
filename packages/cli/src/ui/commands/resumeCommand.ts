@@ -19,7 +19,6 @@ export const resumeCommand: SlashCommand = {
   autoExecute: true,
   action: async (
     _context: CommandContext,
-    _args: string,
   ): Promise<OpenDialogActionReturn> => ({
     type: 'dialog',
     dialog: 'sessionBrowser',

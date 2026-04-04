@@ -22,7 +22,8 @@ describe('privacyCommand', () => {
       throw new Error('The privacy command must have an action.');
     }
 
-    const result = privacyCommand.action(mockContext, '');
+    mockContext.invocation!.args = '';
+    const result = privacyCommand.action(mockContext);
 
     // Assert that the action returns the correct object to trigger the privacy dialog.
     expect(result).toEqual({

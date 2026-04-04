@@ -164,7 +164,7 @@ describe.skipIf(skipFlaky)(
         );
         expect(blockHook).toBeDefined();
         expect(
-          blockHook?.hookCall.stdout + blockHook?.hookCall.stderr,
+          blockHook!.hookCall.stdout + blockHook!.hookCall.stderr,
         ).toContain(blockMsg);
       });
 

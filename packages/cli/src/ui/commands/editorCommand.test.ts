@@ -15,7 +15,7 @@ describe('editorCommand', () => {
       throw new Error('The editor command must have an action.');
     }
     const mockContext = createMockCommandContext();
-    const result = editorCommand.action(mockContext, '');
+    const result = editorCommand.action(mockContext);
 
     expect(result).toEqual({
       type: 'dialog',

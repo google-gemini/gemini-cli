@@ -8,7 +8,7 @@ import React, { useMemo } from 'react';
 import {
   Text,
   Box,
-  StyledLine,
+  type StyledChar,
   toStyledCharacters,
   wordBreakStyledChars,
   wrapStyledChars,
@@ -38,15 +38,15 @@ const TABLE_MARGIN = 2;
 const parseMarkdownToStyledLine = (
   text: string,
   defaultColor?: string,
-): StyledLine => {
+): StyledChar[] => {
   const ansi = parseMarkdownToANSI(text, defaultColor);
   return toStyledCharacters(ansi);
 };
 
-const calculateWidths = (styledLine: StyledLine) => {
+const calculateWidths = (styledLine: StyledChar[]) => {
   const contentWidth = styledCharsWidth(styledLine);
 
-  const words: StyledLine[] = wordBreakStyledChars(styledLine);
+  const words: StyledChar[][] = wordBreakStyledChars(styledLine);
   const maxWordWidth = widestLineFromStyledChars(words);
 
   return { contentWidth, maxWordWidth };
@@ -67,7 +67,7 @@ export const TableRenderer: React.FC<TableRendererProps> = ({
   rows,
   terminalWidth,
 }) => {
-  const styledHeaders = useMemo<StyledLine[]>(
+  const styledHeaders = useMemo<StyledChar[][]>(
     () =>
       headers.map((header) =>
         parseMarkdownToStyledLine(
@@ -78,7 +78,7 @@ export const TableRenderer: React.FC<TableRendererProps> = ({
     [headers],
   );
 
-  const styledRows = useMemo<StyledLine[][]>(
+  const styledRows = useMemo<StyledChar[][][]>(
     () =>
       rows.map((row) =>
         row.map((cell) =>
@@ -100,12 +100,12 @@ export const TableRenderer: React.FC<TableRendererProps> = ({
     // --- Define Constraints per Column ---
     const constraints = Array.from({ length: numColumns }).map(
       (_, colIndex) => {
-        const headerStyledLine = styledHeaders[colIndex] || StyledLine.empty(0);
+        const headerStyledLine = styledHeaders[colIndex] || [];
         let { contentWidth: maxContentWidth, maxWordWidth } =
           calculateWidths(headerStyledLine);
 
         styledRows.forEach((row) => {
-          const cellStyledLine = row[colIndex] || StyledLine.empty(0);
+          const cellStyledLine = row[colIndex] || [];
           const { contentWidth: cellWidth, maxWordWidth: cellWordWidth } =
             calculateWidths(cellStyledLine);
 
@@ -176,11 +176,11 @@ export const TableRenderer: React.FC<TableRendererProps> = ({
     // --- Pre-wrap and Optimize Widths ---
     const actualColumnWidths = new Array(numColumns).fill(0);
 
-    const wrapAndProcessRow = (row: StyledLine[]) => {
+    const wrapAndProcessRow = (row: StyledChar[][]) => {
       const rowResult: ProcessedLine[][] = [];
       // Ensure we iterate up to numColumns, filling with empty cells if needed
       for (let colIndex = 0; colIndex < numColumns; colIndex++) {
-        const cellStyledLine = row[colIndex] || StyledLine.empty(0);
+        const cellStyledLine = row[colIndex] || [];
         const allocatedWidth = finalContentWidths[colIndex];
         const contentWidth = Math.max(1, allocatedWidth);
 

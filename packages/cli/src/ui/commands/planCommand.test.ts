@@ -93,7 +93,8 @@ describe('planCommand', () => {
     ).mockReturnValue(undefined);
 
     if (!planCommand.action) throw new Error('Action missing');
-    await planCommand.action(mockContext, '');
+    mockContext.invocation!.args = '';
+    await planCommand.action(mockContext);
 
     expect(
       mockContext.services.agentContext!.config.setApprovalMode,
@@ -115,7 +116,7 @@ describe('planCommand', () => {
     };
 
     if (!planCommand.action) throw new Error('Action missing');
-    const result = await planCommand.action(mockContext, '');
+    const result = await planCommand.action(mockContext);
 
     expect(result).toBeUndefined();
     expect(
@@ -134,7 +135,7 @@ describe('planCommand', () => {
     };
 
     if (!planCommand.action) throw new Error('Action missing');
-    const result = await planCommand.action(mockContext, 'implement auth');
+    const result = await planCommand.action(mockContext);
 
     expect(result).toEqual({
       type: 'submit_prompt',
@@ -159,7 +160,8 @@ describe('planCommand', () => {
     } as ProcessedFileReadResult);
 
     if (!planCommand.action) throw new Error('Action missing');
-    await planCommand.action(mockContext, '');
+    mockContext.invocation!.args = '';
+    await planCommand.action(mockContext);
 
     expect(coreEvents.emitFeedback).toHaveBeenCalledWith(
       'info',
@@ -184,7 +186,8 @@ describe('planCommand', () => {
       );
       if (!copySubCommand?.action) throw new Error('Copy action missing');
 
-      await copySubCommand.action(mockContext, '');
+      mockContext.invocation!.args = '';
+      await copySubCommand.action(mockContext);
 
       expect(readFileWithEncoding).toHaveBeenCalledWith(mockPlanPath);
       expect(copyToClipboard).toHaveBeenCalledWith('# Plan Content');
@@ -204,7 +207,8 @@ describe('planCommand', () => {
       );
       if (!copySubCommand?.action) throw new Error('Copy action missing');
 
-      await copySubCommand.action(mockContext, '');
+      mockContext.invocation!.args = '';
+      await copySubCommand.action(mockContext);
 
       expect(coreEvents.emitFeedback).toHaveBeenCalledWith(
         'warning',

@@ -135,7 +135,6 @@ describe('FileCommandLoader', () => {
           args: '',
         },
       }),
-      '',
     );
     if (result?.type === 'submit_prompt') {
       expect(result.content).toEqual([{ text: 'This is a test prompt' }]);
@@ -291,7 +290,6 @@ describe('FileCommandLoader', () => {
           args: '',
         },
       }),
-      '',
     );
     if (userResult?.type === 'submit_prompt') {
       expect(userResult.content).toEqual([{ text: 'User prompt' }]);
@@ -306,7 +304,6 @@ describe('FileCommandLoader', () => {
           args: '',
         },
       }),
-      '',
     );
     if (projectResult?.type === 'submit_prompt') {
       expect(projectResult.content).toEqual([{ text: 'Project prompt' }]);
@@ -643,8 +640,7 @@ describe('FileCommandLoader', () => {
             args: '',
           },
         }),
-        '',
-      );
+    );
       expect(result0?.type).toBe('submit_prompt');
       if (result0?.type === 'submit_prompt') {
         expect(result0.content).toEqual([{ text: 'User deploy command' }]);
@@ -660,8 +656,7 @@ describe('FileCommandLoader', () => {
             args: '',
           },
         }),
-        '',
-      );
+    );
       expect(result1?.type).toBe('submit_prompt');
       if (result1?.type === 'submit_prompt') {
         expect(result1.content).toEqual([{ text: 'Project deploy command' }]);
@@ -678,8 +673,7 @@ describe('FileCommandLoader', () => {
             args: '',
           },
         }),
-        '',
-      );
+    );
       expect(result2?.type).toBe('submit_prompt');
       if (result2?.type === 'submit_prompt') {
         expect(result2.content).toEqual([{ text: 'Extension deploy command' }]);
@@ -839,8 +833,7 @@ describe('FileCommandLoader', () => {
             args: '',
           },
         }),
-        '',
-      );
+    );
       if (result?.type === 'submit_prompt') {
         expect(result.content).toEqual([
           { text: 'Nested command from extension a' },
@@ -920,7 +913,6 @@ describe('FileCommandLoader', () => {
             args: 'do something cool',
           },
         }),
-        'do something cool',
       );
       expect(result?.type).toBe('submit_prompt');
       if (result?.type === 'submit_prompt') {
@@ -954,7 +946,6 @@ describe('FileCommandLoader', () => {
             args: '1.2.0 added "a feature"',
           },
         }),
-        '1.2.0 added "a feature"',
       );
       expect(result?.type).toBe('submit_prompt');
       if (result?.type === 'submit_prompt') {
@@ -1025,8 +1016,7 @@ describe('FileCommandLoader', () => {
         createMockCommandContext({
           invocation: { raw: '/shell', name: 'shell', args: '' },
         }),
-        '',
-      );
+    );
 
       expect(result?.type).toBe('submit_prompt');
       if (result?.type === 'submit_prompt') {
@@ -1058,7 +1048,6 @@ describe('FileCommandLoader', () => {
         createMockCommandContext({
           invocation: { raw: rawInvocation, name: 'shell', args: 'rm -rf /' },
         }),
-        'rm -rf /',
       );
 
       expect(result?.type).toBe('confirm_shell_commands');
@@ -1089,7 +1078,6 @@ describe('FileCommandLoader', () => {
           createMockCommandContext({
             invocation: { raw: '/shell', name: 'shell', args: '' },
           }),
-          '',
         ),
       ).rejects.toThrow('Something else went wrong');
     });
@@ -1145,7 +1133,6 @@ describe('FileCommandLoader', () => {
             args: 'baz',
           },
         }),
-        'baz',
       );
 
       expect(mockAtFileProcess.mock.invocationCallOrder[0]).toBeLessThan(
@@ -1241,8 +1228,7 @@ describe('FileCommandLoader', () => {
             args: '',
           },
         }),
-        '',
-      );
+    );
       expect(result?.type).toBe('submit_prompt');
       if (result?.type === 'submit_prompt') {
         expect(result.content).toEqual([

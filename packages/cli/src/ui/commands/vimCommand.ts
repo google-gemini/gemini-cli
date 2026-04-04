@@ -12,7 +12,7 @@ export const vimCommand: SlashCommand = {
   kind: CommandKind.BUILT_IN,
   autoExecute: true,
   isSafeConcurrent: true,
-  action: async (context, _args) => {
+  action: async (context) => {
     const newVimState = await context.ui.toggleVimEnabled();
 
     const message = newVimState

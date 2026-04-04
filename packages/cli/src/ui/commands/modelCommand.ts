@@ -21,7 +21,8 @@ const setModelCommand: SlashCommand = {
     'Set the model to use. Usage: /model set <model-name> [--persist]',
   kind: CommandKind.BUILT_IN,
   autoExecute: false,
-  action: async (context: CommandContext, args: string) => {
+  action: async (context: CommandContext) => {
+    const args = context.invocation?.args || '';
     const parts = args.trim().split(/\s+/).filter(Boolean);
     if (parts.length === 0) {
       context.ui.addItem({
@@ -69,6 +70,6 @@ export const modelCommand: SlashCommand = {
   kind: CommandKind.BUILT_IN,
   autoExecute: false,
   subCommands: [manageModelCommand, setModelCommand],
-  action: async (context: CommandContext, args: string) =>
-    manageModelCommand.action!(context, args),
+  action: async (context: CommandContext) =>
+    manageModelCommand.action!(context),
 };

@@ -70,7 +70,8 @@ async function listAction(context: CommandContext) {
   context.ui.addItem(historyItem);
 }
 
-function updateAction(context: CommandContext, args: string): Promise<void> {
+function updateAction(context: CommandContext): Promise<void> {
+  const args = context.invocation?.args || '';
   const updateArgs = args.split(' ').filter((value) => value.length > 0);
   const all = updateArgs.length === 1 && updateArgs[0] === '--all';
   const names = all ? null : updateArgs;
@@ -152,10 +153,8 @@ function updateAction(context: CommandContext, args: string): Promise<void> {
   return updateComplete.then((_) => {});
 }
 
-async function restartAction(
-  context: CommandContext,
-  args: string,
-): Promise<void> {
+async function restartAction(context: CommandContext): Promise<void> {
+  const args = context.invocation?.args || '';
   const extensionLoader =
     context.services.agentContext?.config.getExtensionLoader();
   if (!extensionLoader) {
@@ -406,7 +405,8 @@ function getEnableDisableContext(
   };
 }
 
-async function disableAction(context: CommandContext, args: string) {
+async function disableAction(context: CommandContext) {
+  const args = context.invocation?.args || '';
   const enableContext = getEnableDisableContext(context, args);
   if (!enableContext) return;
 
@@ -420,7 +420,8 @@ async function disableAction(context: CommandContext, args: string) {
   }
 }
 
-async function enableAction(context: CommandContext, args: string) {
+async function enableAction(context: CommandContext) {
+  const args = context.invocation?.args || '';
   const enableContext = getEnableDisableContext(context, args);
   if (!enableContext) return;
 
@@ -469,7 +470,7 @@ async function enableAction(context: CommandContext, args: string) {
 
 async function installAction(
   context: CommandContext,
-  args: string,
+  sourceOverride?: string,
   requestConsentOverride?: (consent: string) => Promise<boolean>,
 ) {
   const extensionLoader =
@@ -481,7 +482,7 @@ async function installAction(
     return;
   }
 
-  const source = args.trim();
+  const source = (sourceOverride ?? context.invocation?.args ?? '').trim();
   if (!source) {
     context.ui.addItem({
       type: MessageType.ERROR,
@@ -540,7 +541,7 @@ async function installAction(
 
 async function linkAction(
   context: CommandContext,
-  args: string,
+  sourceOverride?: string,
   requestConsentOverride?: (consent: string) => Promise<boolean>,
 ) {
   const extensionLoader =
@@ -552,7 +553,11 @@ async function linkAction(
     return;
   }
 
-  const sourceFilepath = args.trim();
+  const sourceFilepath = (
+    sourceOverride ??
+    context.invocation?.args ??
+    ''
+  ).trim();
   if (!sourceFilepath) {
     context.ui.addItem({
       type: MessageType.ERROR,
@@ -610,7 +615,8 @@ async function linkAction(
   }
 }
 
-async function uninstallAction(context: CommandContext, args: string) {
+async function uninstallAction(context: CommandContext) {
+  const args = context.invocation?.args || '';
   const extensionLoader =
     context.services.agentContext?.config.getExtensionLoader();
   if (!(extensionLoader instanceof ExtensionManager)) {
@@ -670,7 +676,8 @@ async function uninstallAction(context: CommandContext, args: string) {
   }
 }
 
-async function configAction(context: CommandContext, args: string) {
+async function configAction(context: CommandContext) {
+  const args = context.invocation?.args || '';
   const parts = args.trim().split(/\s+/).filter(Boolean);
   let scope = ExtensionSettingScope.USER;
 
@@ -901,15 +908,16 @@ export function extensionsCommand(
     kind: CommandKind.BUILT_IN,
     autoExecute: false,
     subCommands,
-    action: async (context, args) => {
+    action: async (context: CommandContext) => {
+      const args = context.invocation?.args;
       if (args) {
         const parsed = parseSlashCommand(`/${args}`, subCommands);
         if (parsed.commandToExecute?.action) {
-          return parsed.commandToExecute.action(context, parsed.args);
+          return parsed.commandToExecute.action(context);
         }
       }
       // Default to list if no subcommand is provided
-      return listExtensionsCommand.action!(context, args);
+      return listExtensionsCommand.action!(context);
     },
   };
 }

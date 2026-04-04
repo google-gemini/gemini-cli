@@ -20,7 +20,7 @@ describe('settingsCommand', () => {
     if (!settingsCommand.action) {
       throw new Error('The settings command must have an action.');
     }
-    const result = settingsCommand.action(mockContext, '');
+    const result = settingsCommand.action(mockContext);
     expect(result).toEqual({
       type: 'dialog',
       dialog: 'settings',

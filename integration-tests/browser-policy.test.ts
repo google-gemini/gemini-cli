@@ -152,7 +152,6 @@ priority = 200
         1000,
       );
       await run.sendKeys('1\r');
-      await new Promise((r) => setTimeout(r, 2000));
 
       // Handle privacy notice
       await poll(
@@ -161,7 +160,6 @@ priority = 200
         100,
       );
       await run.sendKeys('1\r');
-      await new Promise((r) => setTimeout(r, 5000));
 
       // new_page (MCP tool, should have 4 options, use option 3: Allow all server tools)
       await poll(

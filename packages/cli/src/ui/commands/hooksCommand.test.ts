@@ -130,7 +130,8 @@ describe('hooksCommand', () => {
         createMockHook('test-hook', HookEventName.BeforeTool, true),
       ]);
 
-      const result = await hooksCommand.action(mockContext, '');
+      mockContext.invocation!.args = '';
+      const result = await hooksCommand.action(mockContext);
 
       expect(result).toHaveProperty('type', 'custom_dialog');
       expect(result).toHaveProperty('component');
@@ -152,7 +153,8 @@ describe('hooksCommand', () => {
         throw new Error('panel command must have an action');
       }
 
-      const result = await panelCmd.action(contextWithoutConfig, '');
+      contextWithoutConfig.invocation!.args = '';
+      const result = await panelCmd.action(contextWithoutConfig);
 
       expect(result).toEqual({
         type: 'message',
@@ -171,7 +173,8 @@ describe('hooksCommand', () => {
         throw new Error('panel command must have an action');
       }
 
-      const result = await panelCmd.action(mockContext, '');
+      mockContext.invocation!.args = '';
+      const result = await panelCmd.action(mockContext);
 
       expect(result).toHaveProperty('type', 'custom_dialog');
       expect(result).toHaveProperty('component');
@@ -190,7 +193,8 @@ describe('hooksCommand', () => {
         throw new Error('panel command must have an action');
       }
 
-      const result = await panelCmd.action(mockContext, '');
+      mockContext.invocation!.args = '';
+      const result = await panelCmd.action(mockContext);
 
       expect(result).toHaveProperty('type', 'custom_dialog');
       expect(result).toHaveProperty('component');
@@ -214,7 +218,8 @@ describe('hooksCommand', () => {
         throw new Error('panel command must have an action');
       }
 
-      const result = await panelCmd.action(mockContext, '');
+      mockContext.invocation!.args = '';
+      const result = await panelCmd.action(mockContext);
 
       expect(result).toHaveProperty('type', 'custom_dialog');
       expect(result).toHaveProperty('component');
@@ -236,7 +241,8 @@ describe('hooksCommand', () => {
         throw new Error('enable command must have an action');
       }
 
-      const result = await enableCmd.action(contextWithoutConfig, 'test-hook');
+      contextWithoutConfig.invocation!.args = 'test-hook';
+      const result = await enableCmd.action(contextWithoutConfig);
 
       expect(result).toEqual({
         type: 'message',
@@ -255,7 +261,8 @@ describe('hooksCommand', () => {
         throw new Error('enable command must have an action');
       }
 
-      const result = await enableCmd.action(mockContext, 'test-hook');
+      mockContext.invocation!.args = 'test-hook';
+      const result = await enableCmd.action(mockContext);
 
       expect(result).toEqual({
         type: 'message',
@@ -272,7 +279,8 @@ describe('hooksCommand', () => {
         throw new Error('enable command must have an action');
       }
 
-      const result = await enableCmd.action(mockContext, '');
+      mockContext.invocation!.args = '';
+      const result = await enableCmd.action(mockContext);
 
       expect(result).toEqual({
         type: 'message',
@@ -296,7 +304,8 @@ describe('hooksCommand', () => {
         throw new Error('enable command must have an action');
       }
 
-      const result = await enableCmd.action(mockContext, 'test-hook');
+      mockContext.invocation!.args = 'test-hook';
+      const result = await enableCmd.action(mockContext);
 
       expect(mockContext.services.settings.setValue).toHaveBeenCalledWith(
         SettingScope.User,
@@ -349,7 +358,8 @@ describe('hooksCommand', () => {
         throw new Error('disable command must have an action');
       }
 
-      const result = await disableCmd.action(contextWithoutConfig, 'test-hook');
+      contextWithoutConfig.invocation!.args = 'test-hook';
+      const result = await disableCmd.action(contextWithoutConfig);
 
       expect(result).toEqual({
         type: 'message',
@@ -368,7 +378,8 @@ describe('hooksCommand', () => {
         throw new Error('disable command must have an action');
       }
 
-      const result = await disableCmd.action(mockContext, 'test-hook');
+      mockContext.invocation!.args = 'test-hook';
+      const result = await disableCmd.action(mockContext);
 
       expect(result).toEqual({
         type: 'message',
@@ -385,7 +396,8 @@ describe('hooksCommand', () => {
         throw new Error('disable command must have an action');
       }
 
-      const result = await disableCmd.action(mockContext, '');
+      mockContext.invocation!.args = '';
+      const result = await disableCmd.action(mockContext);
 
       expect(result).toEqual({
         type: 'message',
@@ -406,7 +418,8 @@ describe('hooksCommand', () => {
         throw new Error('disable command must have an action');
       }
 
-      const result = await disableCmd.action(mockContext, 'test-hook');
+      mockContext.invocation!.args = 'test-hook';
+      const result = await disableCmd.action(mockContext);
 
       // Should default to workspace if present
       expect(mockContext.services.settings.setValue).toHaveBeenCalledWith(
@@ -437,7 +450,8 @@ describe('hooksCommand', () => {
         throw new Error('disable command must have an action');
       }
 
-      const result = await disableCmd.action(mockContext, 'test-hook');
+      mockContext.invocation!.args = 'test-hook';
+      const result = await disableCmd.action(mockContext);
 
       expect(mockContext.services.settings.setValue).not.toHaveBeenCalled();
       expect(result).toEqual({
@@ -578,7 +592,8 @@ describe('hooksCommand', () => {
         throw new Error('enable-all command must have an action');
       }
 
-      const result = await enableAllCmd.action(contextWithoutConfig, '');
+      contextWithoutConfig.invocation!.args = '';
+      const result = await enableAllCmd.action(contextWithoutConfig);
 
       expect(result).toEqual({
         type: 'message',
@@ -597,7 +612,8 @@ describe('hooksCommand', () => {
         throw new Error('enable-all command must have an action');
       }
 
-      const result = await enableAllCmd.action(mockContext, '');
+      mockContext.invocation!.args = '';
+      const result = await enableAllCmd.action(mockContext);
 
       expect(result).toEqual({
         type: 'message',
@@ -621,7 +637,8 @@ describe('hooksCommand', () => {
         throw new Error('enable-all command must have an action');
       }
 
-      const result = await enableAllCmd.action(mockContext, '');
+      mockContext.invocation!.args = '';
+      const result = await enableAllCmd.action(mockContext);
 
       expect(mockContext.services.settings.setValue).toHaveBeenCalledWith(
         expect.any(String), // enableAll uses legacy logic so it might return 'Workspace' or 'User' depending on ternary
@@ -653,7 +670,8 @@ describe('hooksCommand', () => {
         throw new Error('enable-all command must have an action');
       }
 
-      const result = await enableAllCmd.action(mockContext, '');
+      mockContext.invocation!.args = '';
+      const result = await enableAllCmd.action(mockContext);
 
       expect(result).toEqual({
         type: 'message',
@@ -676,7 +694,8 @@ describe('hooksCommand', () => {
         throw new Error('enable-all command must have an action');
       }
 
-      const result = await enableAllCmd.action(mockContext, '');
+      mockContext.invocation!.args = '';
+      const result = await enableAllCmd.action(mockContext);
 
       expect(mockContext.services.settings.setValue).not.toHaveBeenCalled();
       expect(result).toEqual({
@@ -702,7 +721,8 @@ describe('hooksCommand', () => {
         throw new Error('disable-all command must have an action');
       }
 
-      const result = await disableAllCmd.action(contextWithoutConfig, '');
+      contextWithoutConfig.invocation!.args = '';
+      const result = await disableAllCmd.action(contextWithoutConfig);
 
       expect(result).toEqual({
         type: 'message',
@@ -721,7 +741,8 @@ describe('hooksCommand', () => {
         throw new Error('disable-all command must have an action');
       }
 
-      const result = await disableAllCmd.action(mockContext, '');
+      mockContext.invocation!.args = '';
+      const result = await disableAllCmd.action(mockContext);
 
       expect(result).toEqual({
         type: 'message',
@@ -745,7 +766,8 @@ describe('hooksCommand', () => {
         throw new Error('disable-all command must have an action');
       }
 
-      const result = await disableAllCmd.action(mockContext, '');
+      mockContext.invocation!.args = '';
+      const result = await disableAllCmd.action(mockContext);
 
       expect(mockContext.services.settings.setValue).toHaveBeenCalledWith(
         expect.any(String),
@@ -777,7 +799,8 @@ describe('hooksCommand', () => {
         throw new Error('disable-all command must have an action');
       }
 
-      const result = await disableAllCmd.action(mockContext, '');
+      mockContext.invocation!.args = '';
+      const result = await disableAllCmd.action(mockContext);
 
       expect(result).toEqual({
         type: 'message',
@@ -800,7 +823,8 @@ describe('hooksCommand', () => {
         throw new Error('disable-all command must have an action');
       }
 
-      const result = await disableAllCmd.action(mockContext, '');
+      mockContext.invocation!.args = '';
+      const result = await disableAllCmd.action(mockContext);
 
       expect(mockContext.services.settings.setValue).not.toHaveBeenCalled();
       expect(result).toEqual({

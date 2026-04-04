@@ -21,7 +21,6 @@ export const initCommand: SlashCommand = {
   autoExecute: true,
   action: async (
     context: CommandContext,
-    _args: string,
   ): Promise<SlashCommandActionReturn> => {
     if (!context.services.agentContext?.config) {
       return {

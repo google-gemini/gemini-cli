@@ -32,7 +32,7 @@ describe('helpCommand', () => {
       throw new Error('Help command has no action');
     }
 
-    await helpCommand.action(mockContext, '');
+    await helpCommand.action(mockContext);
 
     expect(mockContext.ui.addItem).toHaveBeenCalledWith(
       expect.objectContaining({

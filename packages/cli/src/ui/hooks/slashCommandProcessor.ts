@@ -435,10 +435,7 @@ export const useSlashCommandProcessor = (
                 ]),
               };
             }
-            const result = await commandToExecute.action(
-              fullCommandContext,
-              args,
-            );
+            const result = await commandToExecute.action(fullCommandContext);
 
             if (result) {
               switch (result.type) {

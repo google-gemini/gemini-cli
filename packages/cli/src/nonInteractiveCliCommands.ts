@@ -84,7 +84,7 @@ export const handleSlashCommand = async (
         },
       };
 
-      const result = await commandToExecute.action(commandContext, args);
+      const result = await commandToExecute.action(commandContext);
 
       if (result) {
         switch (result.type) {

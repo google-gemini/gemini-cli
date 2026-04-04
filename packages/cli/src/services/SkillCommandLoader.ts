@@ -5,7 +5,11 @@
  */
 
 import { type Config, ACTIVATE_SKILL_TOOL_NAME } from '@google/gemini-cli-core';
-import { CommandKind, type SlashCommand } from '../ui/commands/types.js';
+import {
+  CommandKind,
+  type SlashCommand,
+  type CommandContext,
+} from '../ui/commands/types.js';
 import { type ICommandLoader } from './types.js';
 
 /**
@@ -42,12 +46,16 @@ export class SkillCommandLoader implements ICommandLoader {
         kind: CommandKind.SKILL,
         autoExecute: true,
         extensionName: skill.extensionName,
-        action: async (_context, args) => ({
-          type: 'tool',
-          toolName: ACTIVATE_SKILL_TOOL_NAME,
-          toolArgs: { name: skill.name },
-          postSubmitPrompt: args.trim().length > 0 ? args.trim() : undefined,
-        }),
+        action: async (context: CommandContext) => {
+          const argsStr = context.invocation?.args.trim();
+          return {
+            type: 'tool',
+            toolName: ACTIVATE_SKILL_TOOL_NAME,
+            toolArgs: { name: skill.name },
+            postSubmitPrompt:
+              argsStr && argsStr.length > 0 ? argsStr : undefined,
+          };
+        },
       };
     });
   }

@@ -47,7 +47,7 @@ describe('copyCommand', () => {
 
     mockGetChat.mockReturnValue(undefined);
 
-    const result = await copyCommand.action(mockContext, '');
+    const result = await copyCommand.action(mockContext);
 
     expect(result).toEqual({
       type: 'message',
@@ -63,7 +63,7 @@ describe('copyCommand', () => {
 
     mockGetHistory.mockReturnValue([]);
 
-    const result = await copyCommand.action(mockContext, '');
+    const result = await copyCommand.action(mockContext);
 
     expect(result).toEqual({
       type: 'message',
@@ -86,7 +86,7 @@ describe('copyCommand', () => {
 
     mockGetHistory.mockReturnValue(historyWithUserOnly);
 
-    const result = await copyCommand.action(mockContext, '');
+    const result = await copyCommand.action(mockContext);
 
     expect(result).toEqual({
       type: 'message',
@@ -114,7 +114,7 @@ describe('copyCommand', () => {
     mockGetHistory.mockReturnValue(historyWithAiMessage);
     mockCopyToClipboard.mockResolvedValue(undefined);
 
-    const result = await copyCommand.action(mockContext, '');
+    const result = await copyCommand.action(mockContext);
 
     expect(result).toEqual({
       type: 'message',
@@ -141,7 +141,7 @@ describe('copyCommand', () => {
     mockGetHistory.mockReturnValue(historyWithMultipleParts);
     mockCopyToClipboard.mockResolvedValue(undefined);
 
-    const result = await copyCommand.action(mockContext, '');
+    const result = await copyCommand.action(mockContext);
 
     expect(mockCopyToClipboard).toHaveBeenCalledWith(
       'Part 1: Part 2: Part 3',
@@ -171,7 +171,7 @@ describe('copyCommand', () => {
     mockGetHistory.mockReturnValue(historyWithMixedParts);
     mockCopyToClipboard.mockResolvedValue(undefined);
 
-    const result = await copyCommand.action(mockContext, '');
+    const result = await copyCommand.action(mockContext);
 
     expect(mockCopyToClipboard).toHaveBeenCalledWith(
       'Text part more text',
@@ -205,7 +205,7 @@ describe('copyCommand', () => {
     mockGetHistory.mockReturnValue(historyWithMultipleAiMessages);
     mockCopyToClipboard.mockResolvedValue(undefined);
 
-    const result = await copyCommand.action(mockContext, '');
+    const result = await copyCommand.action(mockContext);
 
     expect(mockCopyToClipboard).toHaveBeenCalledWith(
       'Second AI response',
@@ -232,7 +232,7 @@ describe('copyCommand', () => {
     const clipboardError = new Error('Clipboard access denied');
     mockCopyToClipboard.mockRejectedValue(clipboardError);
 
-    const result = await copyCommand.action(mockContext, '');
+    const result = await copyCommand.action(mockContext);
 
     expect(result).toEqual({
       type: 'message',
@@ -260,7 +260,7 @@ describe('copyCommand', () => {
     const rejectedValue = 'String error';
     mockCopyToClipboard.mockRejectedValue(rejectedValue);
 
-    const result = await copyCommand.action(mockContext, '');
+    const result = await copyCommand.action(mockContext);
 
     expect(result).toEqual({
       type: 'message',
@@ -286,7 +286,7 @@ describe('copyCommand', () => {
 
     mockGetHistory.mockReturnValue(historyWithEmptyParts);
 
-    const result = await copyCommand.action(mockContext, '');
+    const result = await copyCommand.action(mockContext);
 
     expect(result).toEqual({
       type: 'message',
@@ -304,7 +304,7 @@ describe('copyCommand', () => {
       services: { agentContext: null },
     });
 
-    const result = await copyCommand.action(nullConfigContext, '');
+    const result = await copyCommand.action(nullConfigContext);
 
     expect(result).toEqual({
       type: 'message',

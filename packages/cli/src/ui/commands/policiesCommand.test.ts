@@ -35,7 +35,8 @@ describe('policiesCommand', () => {
       mockContext.services.agentContext = null;
       const listCommand = policiesCommand.subCommands![0];
 
-      await listCommand.action!(mockContext, '');
+      mockContext.invocation!.args = '';
+      await listCommand.action!(mockContext);
 
       expect(mockContext.ui.addItem).toHaveBeenCalledWith(
         expect.objectContaining({
@@ -58,7 +59,8 @@ describe('policiesCommand', () => {
       } as unknown as Config;
 
       const listCommand = policiesCommand.subCommands![0];
-      await listCommand.action!(mockContext, '');
+      mockContext.invocation!.args = '';
+      await listCommand.action!(mockContext);
 
       expect(mockContext.ui.addItem).toHaveBeenCalledWith(
         expect.objectContaining({
@@ -96,7 +98,8 @@ describe('policiesCommand', () => {
       } as unknown as Config;
 
       const listCommand = policiesCommand.subCommands![0];
-      await listCommand.action!(mockContext, '');
+      mockContext.invocation!.args = '';
+      await listCommand.action!(mockContext);
 
       expect(mockContext.ui.addItem).toHaveBeenCalledWith(
         expect.objectContaining({
@@ -158,7 +161,8 @@ describe('policiesCommand', () => {
       } as unknown as Config;
 
       const listCommand = policiesCommand.subCommands![0];
-      await listCommand.action!(mockContext, '');
+      mockContext.invocation!.args = '';
+      await listCommand.action!(mockContext);
 
       const call = vi.mocked(mockContext.ui.addItem).mock.calls[0];
       const content = (call[0] as { text: string }).text;
