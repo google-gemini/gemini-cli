@@ -628,4 +628,34 @@ export class ExecutionLifecycleService {
       execution.writeInput?.(input);
     }
   }
+
+  static cleanupAll(): void {
+    for (const executionId of this.activeExecutions.keys()) {
+      try {
+        this.kill(executionId);
+      } catch {
+        // Ignore errors during global cleanup
+      }
+    }
+  }
 }
+
+// --- Global Cleanup Hooks ---
+// Ensures that if the gemini-cli process exits or is killed,
+// any spawned subprocesses (like node-pty shells) are terminated.
+let hasCleanedUp = false;
+const handleProcessExit = () => {
+  if (hasCleanedUp) return;
+  hasCleanedUp = true;
+  ExecutionLifecycleService.cleanupAll();
+};
+
+process.on('exit', handleProcessExit);
+process.on('SIGINT', () => {
+  handleProcessExit();
+  process.exit(130);
+});
+process.on('SIGTERM', () => {
+  handleProcessExit();
+  process.exit(143);
+});
