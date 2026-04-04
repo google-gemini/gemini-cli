@@ -12,7 +12,10 @@
 
 import { debugLogger } from '../utils/debugLogger.js';
 
-export type InjectionSource = 'user_steering' | 'background_completion';
+export type InjectionSource =
+  | 'user_steering'
+  | 'background_completion'
+  | 'channel_message';
 
 /**
  * Typed listener that receives both the injection text and its source.
@@ -43,6 +46,8 @@ export class InjectionService {
    * Other sources (e.g. `background_completion`) are always accepted.
    */
   addInjection(text: string, source: InjectionSource): void {
+    // Only user_steering is gated on model steering being enabled.
+    // Other sources (background_completion, channel_message) are always accepted.
     if (source === 'user_steering' && !this.isEnabled()) {
       return;
     }

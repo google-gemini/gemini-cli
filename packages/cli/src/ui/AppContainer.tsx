@@ -1271,6 +1271,30 @@ Logging in with Google... Restarting Gemini CLI to continue.
     isMcpReady,
   });
 
+  // Listen for channel messages from MCP servers (e.g. Telegram)
+  // and feed them into the message queue for processing.
+  useEffect(() => {
+    const handleChannelMessage = (payload: {
+      content: string;
+      serverName: string;
+      meta?: Record<string, string>;
+    }) => {
+      debugLogger.log(`📨 Channel message received from ${payload.serverName}`);
+      // Add to message queue — it will be submitted when Gemini is idle
+      addMessage(payload.content);
+      // Show in chat history
+      historyManager.addItem({
+        type: 'hint',
+        text: `[${payload.serverName}] ${payload.content}`,
+      });
+    };
+
+    coreEvents.on(CoreEvent.ChannelMessage, handleChannelMessage);
+    return () => {
+      coreEvents.off(CoreEvent.ChannelMessage, handleChannelMessage);
+    };
+  }, [addMessage, historyManager]);
+
   cancelHandlerRef.current = useCallback(
     (shouldRestorePrompt: boolean = true) => {
       if (isToolAwaitingConfirmation(pendingHistoryItems)) {
