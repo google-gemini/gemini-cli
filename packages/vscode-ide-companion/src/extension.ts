@@ -34,7 +34,9 @@ let logger: vscode.OutputChannel;
 let log: (message: string) => void = () => {};
 
 const VscodePackageJsonSchema = z.object({
-  version: z.string(),
+  version: z.string().refine((v) => semver.valid(v) !== null, {
+    message: 'version must be a valid semver string',
+  }),
 });
 
 const MarketplaceResponseSchema = z.object({
