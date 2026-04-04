@@ -10,6 +10,7 @@ import { MemoryCommand } from './commands/memory.js';
 import { ExtensionsCommand } from './commands/extensions.js';
 import { InitCommand } from './commands/init.js';
 import { RestoreCommand } from './commands/restore.js';
+import { AboutCommand } from './commands/about.js';
 
 export class CommandHandler {
   private registry: CommandRegistry;
@@ -24,6 +25,7 @@ export class CommandHandler {
     registry.register(new ExtensionsCommand());
     registry.register(new InitCommand());
     registry.register(new RestoreCommand());
+    registry.register(new AboutCommand());
     return registry;
   }
 
