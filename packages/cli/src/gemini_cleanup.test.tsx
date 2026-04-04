@@ -177,15 +177,16 @@ vi.mock('./utils/sessionCleanup.js', async (importOriginal) => {
 describe('gemini.tsx main function cleanup', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    process.env['GEMINI_CLI_NO_RELAUNCH'] = 'true';
+    vi.stubEnv('GEMINI_CLI_NO_RELAUNCH', 'true');
+    vi.spyOn(process, 'exit').mockImplementation(() => undefined as never);
   });
 
   afterEach(() => {
-    delete process.env['GEMINI_CLI_NO_RELAUNCH'];
+    vi.unstubAllEnvs();
     vi.restoreAllMocks();
   });
 
-  it.skip('should log error when cleanupExpiredSessions fails', async () => {
+  it('should log error when cleanupExpiredSessions fails', async () => {
     const { loadCliConfig, parseArguments } = await import(
       './config/config.js'
     );
@@ -222,8 +223,9 @@ describe('gemini.tsx main function cleanup', () => {
       getMcpServers: () => ({}),
       getMcpClientManager: vi.fn(),
       getIdeMode: vi.fn(() => false),
-      getAcpMode: vi.fn(() => true),
+      getAcpMode: vi.fn(() => false),
       getScreenReader: vi.fn(() => false),
+      getUseAlternateBuffer: vi.fn(() => false),
       getGeminiMdFileCount: vi.fn(() => 0),
       getProjectRoot: vi.fn(() => '/'),
       getListExtensions: vi.fn(() => false),
