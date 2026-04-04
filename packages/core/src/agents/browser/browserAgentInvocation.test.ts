@@ -26,6 +26,7 @@ vi.mock('../../utils/debugLogger.js', () => ({
 
 vi.mock('./browserAgentFactory.js', () => ({
   createBrowserAgentDefinition: vi.fn(),
+  cleanupBrowserAgent: vi.fn(),
 }));
 
 vi.mock('./inputBlocker.js', () => ({
@@ -36,16 +37,24 @@ vi.mock('./automationOverlay.js', () => ({
   removeAutomationOverlay: vi.fn(),
 }));
 
+vi.mock('../../telemetry/metrics.js', () => ({
+  recordBrowserAgentTaskOutcome: vi.fn(),
+}));
+
 vi.mock('../local-executor.js', () => ({
   LocalAgentExecutor: {
     create: vi.fn(),
   },
 }));
 
-import { createBrowserAgentDefinition } from './browserAgentFactory.js';
+import {
+  createBrowserAgentDefinition,
+  cleanupBrowserAgent,
+} from './browserAgentFactory.js';
 import { removeInputBlocker } from './inputBlocker.js';
 import { removeAutomationOverlay } from './automationOverlay.js';
 import { LocalAgentExecutor } from '../local-executor.js';
+import { recordBrowserAgentTaskOutcome } from '../../telemetry/metrics.js';
 import type { ToolLiveOutput } from '../../tools/tools.js';
 
 describe('BrowserAgentInvocation', () => {
@@ -184,6 +193,8 @@ describe('BrowserAgentInvocation', () => {
           toolConfig: { tools: ['analyze_screenshot', 'click'] },
         },
         browserManager: {} as never,
+        visionEnabled: true,
+        sessionMode: 'persistent',
       });
 
       mockExecutor = {
@@ -669,17 +680,81 @@ describe('BrowserAgentInvocation', () => {
         .map((c) => c[0] as SubagentProgress)
         .filter((p) => p.isSubagentProgress);
 
-      const allItems = progressCalls.flatMap((p) => p.recentActivity);
-      const toolA = allItems.find(
+      const finalActivity =
+        progressCalls[progressCalls.length - 1].recentActivity;
+      const toolA = finalActivity.find(
         (a) => a.type === 'tool_call' && a.content === 'tool_a',
       );
-      const toolB = allItems.find(
+      const toolB = finalActivity.find(
         (a) => a.type === 'tool_call' && a.content === 'tool_b',
       );
 
       // Both should be error since no callId was specified
       expect(toolA?.status).toBe('error');
       expect(toolB?.status).toBe('error');
+    });
+
+    it('should record successful task outcome metrics', async () => {
+      const invocation = new BrowserAgentInvocation(
+        mockConfig,
+        mockParams,
+        mockMessageBus,
+      );
+      await invocation.execute(new AbortController().signal, vi.fn());
+
+      expect(recordBrowserAgentTaskOutcome).toHaveBeenCalledWith(
+        mockConfig,
+        expect.objectContaining({
+          success: true,
+          session_mode: 'persistent',
+          vision_enabled: true,
+          headless: false,
+          duration_ms: expect.any(Number),
+        }),
+      );
+    });
+
+    it('should record failed task outcome metrics', async () => {
+      vi.mocked(LocalAgentExecutor.create).mockResolvedValue({
+        run: vi.fn().mockResolvedValue({
+          result: JSON.stringify({ success: false, foo: 'bar' }),
+        }),
+      } as never);
+
+      const updateOutput = vi.fn();
+      const invocation = new BrowserAgentInvocation(
+        mockConfig,
+        mockParams,
+        mockMessageBus,
+      );
+
+      await invocation.execute(new AbortController().signal, updateOutput);
+
+      expect(recordBrowserAgentTaskOutcome).toHaveBeenCalledWith(
+        mockConfig,
+        expect.objectContaining({
+          success: false,
+          session_mode: 'persistent',
+          vision_enabled: true,
+          headless: false,
+          duration_ms: expect.any(Number),
+        }),
+      );
+    });
+
+    it('should call cleanupBrowserAgent with correct params', async () => {
+      const invocation = new BrowserAgentInvocation(
+        mockConfig,
+        mockParams,
+        mockMessageBus,
+      );
+      await invocation.execute(new AbortController().signal, vi.fn());
+
+      expect(cleanupBrowserAgent).toHaveBeenCalledWith(
+        expect.anything(),
+        mockConfig,
+        'persistent',
+      );
     });
   });
 
@@ -711,6 +786,8 @@ describe('BrowserAgentInvocation', () => {
           toolConfig: { tools: [] },
         },
         browserManager: mockBrowserManager as never,
+        visionEnabled: true,
+        sessionMode: 'persistent',
       });
 
       const mockExecutor = {

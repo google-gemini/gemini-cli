@@ -5,16 +5,16 @@
  */
 
 import React, { useMemo } from 'react';
-import { styledCharsToString } from '@alcalzone/ansi-tokenize';
 import {
   Text,
   Box,
-  type StyledChar,
   toStyledCharacters,
   styledCharsWidth,
   wordBreakStyledChars,
   wrapStyledChars,
   widestLineFromStyledChars,
+  styledLineToString,
+  type StyledLine,
 } from 'ink';
 import { theme } from '../semantic-colors.js';
 import { parseMarkdownToANSI } from './markdownParsingUtils.js';
@@ -38,15 +38,15 @@ const TABLE_MARGIN = 2;
 const parseMarkdownToStyledChars = (
   text: string,
   defaultColor?: string,
-): StyledChar[] => {
+): StyledLine => {
   const ansi = parseMarkdownToANSI(text, defaultColor);
   return toStyledCharacters(ansi);
 };
 
-const calculateWidths = (styledChars: StyledChar[]) => {
+const calculateWidths = (styledChars: StyledLine) => {
   const contentWidth = styledCharsWidth(styledChars);
 
-  const words: StyledChar[][] = wordBreakStyledChars(styledChars);
+  const words: StyledLine[] = wordBreakStyledChars(styledChars);
   const maxWordWidth = widestLineFromStyledChars(words);
 
   return { contentWidth, maxWordWidth };
@@ -100,12 +100,13 @@ export const TableRenderer: React.FC<TableRendererProps> = ({
     // --- Define Constraints per Column ---
     const constraints = Array.from({ length: numColumns }).map(
       (_, colIndex) => {
-        const headerStyledChars = styledHeaders[colIndex] || [];
+        const headerStyledChars =
+          styledHeaders[colIndex] || toStyledCharacters('');
         let { contentWidth: maxContentWidth, maxWordWidth } =
           calculateWidths(headerStyledChars);
 
         styledRows.forEach((row) => {
-          const cellStyledChars = row[colIndex] || [];
+          const cellStyledChars = row[colIndex] || toStyledCharacters('');
           const { contentWidth: cellWidth, maxWordWidth: cellWordWidth } =
             calculateWidths(cellStyledChars);
 
@@ -176,11 +177,11 @@ export const TableRenderer: React.FC<TableRendererProps> = ({
     // --- Pre-wrap and Optimize Widths ---
     const actualColumnWidths = new Array(numColumns).fill(0);
 
-    const wrapAndProcessRow = (row: StyledChar[][]) => {
+    const wrapAndProcessRow = (row: StyledLine[]) => {
       const rowResult: ProcessedLine[][] = [];
       // Ensure we iterate up to numColumns, filling with empty cells if needed
       for (let colIndex = 0; colIndex < numColumns; colIndex++) {
-        const cellStyledChars = row[colIndex] || [];
+        const cellStyledChars = row[colIndex] || toStyledCharacters('');
         const allocatedWidth = finalContentWidths[colIndex];
         const contentWidth = Math.max(1, allocatedWidth);
 
@@ -196,7 +197,7 @@ export const TableRenderer: React.FC<TableRendererProps> = ({
         );
 
         const lines = wrappedStyledLines.map((line) => ({
-          text: styledCharsToString(line),
+          text: styledLineToString(line),
           width: styledCharsWidth(line),
         }));
         rowResult.push(lines);

@@ -148,6 +148,10 @@ export class LinuxSandboxManager implements SandboxManager {
     return this.options.workspace;
   }
 
+  getOptions(): GlobalSandboxOptions {
+    return this.options;
+  }
+
   private getMaskFilePath(): string {
     if (
       LinuxSandboxManager.maskFilePath &&
