@@ -33,10 +33,23 @@ import { PassThrough, Readable } from 'node:stream';
 import EventEmitter from 'node:events';
 import { downloadRipGrep } from '@joshua.litt/get-ripgrep';
 import { createMockMessageBus } from '../test-utils/mock-message-bus.js';
+import { execPromise } from '../utils/shell-utils.js';
+
 // Mock dependencies for canUseRipgrep
 vi.mock('@joshua.litt/get-ripgrep', () => ({
   downloadRipGrep: vi.fn(),
 }));
+
+// Mock shell-utils
+vi.mock('../utils/shell-utils.js', async () => {
+  const actual = await vi.importActual<
+    typeof import('../utils/shell-utils.js')
+  >('../utils/shell-utils.js');
+  return {
+    ...actual,
+    execPromise: vi.fn(),
+  };
+});
 
 // Mock child_process for ripgrep calls
 vi.mock('child_process', () => ({
@@ -45,6 +58,7 @@ vi.mock('child_process', () => ({
 
 const mockSpawn = vi.mocked(spawn);
 const downloadRipGrepMock = vi.mocked(downloadRipGrep);
+const execPromiseMock = vi.mocked(execPromise);
 const originalGetGlobalBinDir = Storage.getGlobalBinDir.bind(Storage);
 const storageSpy = vi.spyOn(Storage, 'getGlobalBinDir');
 
@@ -199,6 +213,87 @@ describe('ensureRgPath', () => {
       await expect(fs.access(expectedRgExePath)).resolves.toBeUndefined();
     },
   );
+
+  describe('Android and Fallback Resolution', () => {
+    it('should prioritize system ripgrep on Android', async () => {
+      vi.stubEnv('PROCESS_PLATFORM', 'android');
+      const originalPlatform = process.platform;
+      Object.defineProperty(process, 'platform', {
+        value: 'android',
+        configurable: true,
+      });
+
+      const systemRgPath = '/system/bin/rg';
+      execPromiseMock.mockResolvedValue({ stdout: systemRgPath, stderr: '' });
+
+      const rgPath = await ensureRgPath();
+      expect(rgPath).toBe(systemRgPath);
+      expect(execPromiseMock).toHaveBeenCalledWith('command -v rg');
+
+      // Cleanup
+      Object.defineProperty(process, 'platform', {
+        value: originalPlatform,
+        configurable: true,
+      });
+      vi.unstubAllEnvs();
+    });
+
+    it('should fallback to managed binary on Android if system ripgrep is missing', async () => {
+      vi.stubEnv('PROCESS_PLATFORM', 'android');
+      const originalPlatform = process.platform;
+      Object.defineProperty(process, 'platform', {
+        value: 'android',
+        configurable: true,
+      });
+
+      execPromiseMock.mockRejectedValue(new Error('command not found'));
+      const managedRgPath = path.join(binDir, 'rg');
+      await fs.writeFile(managedRgPath, '');
+
+      const rgPath = await ensureRgPath();
+      expect(rgPath).toBe(managedRgPath);
+
+      // Cleanup
+      Object.defineProperty(process, 'platform', {
+        value: originalPlatform,
+        configurable: true,
+      });
+      vi.unstubAllEnvs();
+    });
+
+    it('should fallback to system ripgrep on non-Android if managed binary is missing', async () => {
+      // Ensure we are not on Android for this test
+      if (process.platform === 'android') {
+        return; // Skip if already on Android
+      }
+
+      // Ensure managed binary does not exist
+      const managedRgPath = path.join(binDir, 'rg');
+      const managedRgExePath = path.join(binDir, 'rg.exe');
+      await fs.rm(managedRgPath, { force: true });
+      await fs.rm(managedRgExePath, { force: true });
+
+      const systemRgPath = '/usr/local/bin/rg';
+      execPromiseMock.mockResolvedValue({ stdout: systemRgPath, stderr: '' });
+
+      const rgPath = await ensureRgPath();
+      expect(rgPath).toBe(systemRgPath);
+      expect(execPromiseMock).toHaveBeenCalledWith('command -v rg');
+    });
+
+    it('should download ripgrep if both system and managed binaries are missing', async () => {
+      execPromiseMock.mockRejectedValue(new Error('command not found'));
+      const expectedPath = path.join(binDir, getRipgrepBinaryName());
+
+      downloadRipGrepMock.mockImplementation(async () => {
+        await fs.writeFile(expectedPath, '');
+      });
+
+      const rgPath = await ensureRgPath();
+      expect(rgPath).toBe(expectedPath);
+      expect(downloadRipGrepMock).toHaveBeenCalled();
+    });
+  });
 });
 
 // Helper function to create mock spawn implementations
