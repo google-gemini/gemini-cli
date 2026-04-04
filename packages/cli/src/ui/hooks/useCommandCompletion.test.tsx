@@ -481,7 +481,7 @@ describe('useCommandCompletion', () => {
   });
 
   describe('handleAutocomplete', () => {
-    it('should complete a partial command and NOT add a space if it has an action', async () => {
+    it('should complete a partial command and ALWAYS add a space if it is a slash command', async () => {
       setupMocks({
         slashSuggestions: [{ label: 'memory', value: 'memory' }],
         slashCompletionRange: {
@@ -502,7 +502,31 @@ describe('useCommandCompletion', () => {
         result.current.handleAutocomplete(0);
       });
 
-      expect(result.current.textBuffer.text).toBe('/memory');
+      expect(result.current.textBuffer.text).toBe('/memory ');
+    });
+
+    it('should ADD a space even even if it is ALREADY complete', async () => {
+      setupMocks({
+        slashSuggestions: [{ label: 'stats', value: 'stats' }],
+        slashCompletionRange: {
+          completionStart: 1,
+          completionEnd: 6, // "/stats"
+          getCommandFromSuggestion: () =>
+            ({ action: vi.fn() }) as unknown as SlashCommand,
+        },
+      });
+
+      const { result } = await renderCommandCompletionHook('/stats');
+
+      await waitFor(() => {
+        expect(result.current.suggestions.length).toBe(1);
+      });
+
+      act(() => {
+        result.current.handleAutocomplete(0);
+      });
+
+      expect(result.current.textBuffer.text).toBe('/stats ');
     });
 
     it('should complete a partial command and ADD a space if it has NO action (e.g. just a parent)', async () => {

@@ -1446,9 +1446,101 @@ describe('InputPrompt', () => {
     });
 
     await waitFor(() => {
-      // Should autocomplete to allow adding file argument
+      // Should submit the full command constructed from buffer + suggestion
+      // even if autoExecute is false, because the user explicitly hit Enter on the suggestion.
+      expect(props.onSubmit).toHaveBeenCalledWith('/share');
+      expect(mockCommandCompletion.handleAutocomplete).not.toHaveBeenCalled();
+    });
+    unmount();
+  });
+
+  it('should add a space on Tab when command is already complete in the buffer', async () => {
+    const executableCommand: SlashCommand = {
+      name: 'about',
+      kind: CommandKind.BUILT_IN,
+      description: 'About info',
+      action: vi.fn(),
+      autoExecute: true,
+    };
+
+    const suggestion = { label: 'about', value: 'about' };
+
+    mockedUseCommandCompletion.mockReturnValue({
+      ...mockCommandCompletion,
+      showSuggestions: true,
+      suggestions: [suggestion],
+      activeSuggestionIndex: 0,
+      getCommandFromSuggestion: vi.fn().mockReturnValue(executableCommand),
+      getCompletedText: vi.fn().mockReturnValue('/about'),
+    });
+
+    // Buffer is already complete
+    props.buffer.setText('/about');
+    props.buffer.lines = ['/about'];
+    props.buffer.cursor = [0, 6];
+
+    const { stdin, unmount } = await renderWithProviders(
+      <InputPrompt {...props} />,
+      {
+        uiActions,
+      },
+    );
+
+    await act(async () => {
+      stdin.write('\t'); // Tab
+    });
+
+    await waitFor(() => {
+      // Should call handleAutocomplete which will add the space
       expect(mockCommandCompletion.handleAutocomplete).toHaveBeenCalledWith(0);
-      expect(props.onSubmit).not.toHaveBeenCalled();
+    });
+    unmount();
+  });
+
+  it('should submit the base command when Enter is pressed on its suggestion even with a trailing space', async () => {
+    const statsCommand: SlashCommand = {
+      name: 'stats',
+      kind: CommandKind.BUILT_IN,
+      description: 'Stats info',
+      action: vi.fn(),
+      autoExecute: false,
+    };
+
+    const suggestion = {
+      label: 'stats',
+      value: 'stats',
+      sectionTitle: 'command',
+      insertValue: 'stats',
+    };
+
+    mockedUseCommandCompletion.mockReturnValue({
+      ...mockCommandCompletion,
+      showSuggestions: true,
+      suggestions: [suggestion],
+      activeSuggestionIndex: 0,
+      getCommandFromSuggestion: vi.fn().mockReturnValue(statsCommand),
+      getCompletedText: vi.fn().mockReturnValue('/stats'),
+    });
+
+    // Buffer has trailing space: "/stats "
+    props.buffer.setText('/stats ');
+    props.buffer.lines = ['/stats '];
+    props.buffer.cursor = [0, 7];
+
+    const { stdin, unmount } = await renderWithProviders(
+      <InputPrompt {...props} />,
+      {
+        uiActions,
+      },
+    );
+
+    await act(async () => {
+      stdin.write('\r'); // Enter
+    });
+
+    await waitFor(() => {
+      // Should submit "/stats"
+      expect(props.onSubmit).toHaveBeenCalledWith('/stats');
     });
     unmount();
   });
@@ -1565,9 +1657,9 @@ describe('InputPrompt', () => {
     });
 
     await waitFor(() => {
-      // Should autocomplete (not execute) since autoExecute is undefined
-      expect(mockCommandCompletion.handleAutocomplete).toHaveBeenCalledWith(0);
-      expect(props.onSubmit).not.toHaveBeenCalled();
+      // Should submit the command
+      expect(props.onSubmit).toHaveBeenCalledWith('/find-capital');
+      expect(mockCommandCompletion.handleAutocomplete).not.toHaveBeenCalled();
     });
     unmount();
   });
