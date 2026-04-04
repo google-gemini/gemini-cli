@@ -136,6 +136,58 @@ gemini -p "build the snap"
   absolute path — the path must be writable inside the container.
 - Used with tools like Snapcraft or Rockcraft that require a full system.
 
+## Tool sandboxing
+
+Tool-level sandboxing provides granular isolation for individual tool executions
+(like `shell_exec` and `write_file`) instead of sandboxing the entire Gemini CLI
+process.
+
+This approach offers better integration with your local environment for non-tool
+tasks (like UI rendering and configuration loading) while still providing
+security for tool-driven operations.
+
+### How to turn off tool sandboxing
+
+If you experience issues with tool sandboxing or prefer full-process isolation,
+you can disable it by setting `security.toolSandboxing` to `false` in your
+`settings.json` file.
+
+```json
+{
+  "security": {
+    "toolSandboxing": false
+  }
+}
+```
+
+<!-- prettier-ignore -->
+> [!NOTE]
+> Changing the `security.toolSandboxing` setting requires a restart of Gemini
+> CLI to take effect.
+
+## Sandbox expansion
+
+Sandbox expansion is a dynamic permission system that lets Gemini CLI request
+additional permissions for a command when needed.
+
+When a sandboxed command fails due to permission restrictions (like restricted
+file paths or network access), or when a command is proactively identified as
+requiring extra permissions (like `npm install`), Gemini CLI will present you
+with a "Sandbox Expansion Request."
+
+### How sandbox expansion works
+
+1.  **Detection**: Gemini CLI detects a sandbox denial or proactively identifies
+    a command that requires extra permissions.
+2.  **Request**: A modal dialog is shown, explaining which additional
+    permissions (e.g., specific directories or network access) are required.
+3.  **Approval**: If you approve the expansion, the command is executed with the
+    extended permissions for that specific run.
+
+This mechanism ensures you don't have to manually re-run commands with more
+permissive sandbox settings, while still maintaining control over what the AI
+can access.
+
 ## Quickstart
 
 ```bash
