@@ -188,7 +188,7 @@ export class WorkspaceContext {
         }
       }
       return false;
-    } catch (_error) {
+    } catch {
       return false;
     }
   }
@@ -216,7 +216,7 @@ export class WorkspaceContext {
         }
       }
       return false;
-    } catch (_error) {
+    } catch {
       return false;
     }
   }

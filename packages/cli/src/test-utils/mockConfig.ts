@@ -38,6 +38,7 @@ export const createMockConfig = (overrides: Partial<Config> = {}): Config =>
       fireSessionEndEvent: vi.fn().mockResolvedValue(undefined),
       fireSessionStartEvent: vi.fn().mockResolvedValue(undefined),
     })),
+    isMemoryManagerEnabled: vi.fn(() => false),
     getListExtensions: vi.fn(() => false),
     getExtensions: vi.fn(() => []),
     getListSessions: vi.fn(() => false),
@@ -175,6 +176,8 @@ export const createMockConfig = (overrides: Partial<Config> = {}): Config =>
     getHasAccessToPreviewModel: vi.fn().mockReturnValue(false),
     validatePathAccess: vi.fn().mockReturnValue(null),
     getUseAlternateBuffer: vi.fn().mockReturnValue(false),
+    getUseTerminalBuffer: vi.fn().mockReturnValue(false),
+    getUseRenderProcess: vi.fn().mockReturnValue(false),
     ...overrides,
   }) as unknown as Config;
 
@@ -194,6 +197,17 @@ export function createMockSettings(
     user: { settings: {} },
     workspace: { settings: {} },
     errors: [],
+    subscribe: vi.fn().mockReturnValue(() => {}),
+    getSnapshot: vi.fn().mockReturnValue({
+      system: { settings: {} },
+      systemDefaults: { settings: {} },
+      user: { settings: {} },
+      workspace: { settings: {} },
+      isTrusted: true,
+      errors: [],
+      merged,
+    }),
+    setValue: vi.fn(),
     ...overrides,
     merged,
   } as unknown as LoadedSettings;

@@ -3,52 +3,53 @@
 exports[`ToolConfirmationMessage > enablePermanentToolApproval setting > should show "Allow for all future sessions" when trusted 1`] = `
 "╭──────────────────────────────────────────────────────────────────────────────╮
 │                                                                              │
-│ No changes detected.                                                         │
+│  No changes detected.                                                        │
 │                                                                              │
 ╰──────────────────────────────────────────────────────────────────────────────╯
 Apply this change?
 
-● 1. Allow once                                
+● 1. Allow once                                                                   
   2. Allow for this session
-  3. Allow for this file in all future sessions
+  3. Allow for this file in all future sessions ~/.gemini/policies/auto-saved.toml
   4. Modify with external editor
   5. No, suggest changes (esc)
 "
 `;
 
 exports[`ToolConfirmationMessage > height allocation and layout > should expand to available height for large edit diffs 1`] = `
-"... first 9 lines hidden (Ctrl+O to show) ...
- 5 + const newLine5 = true;
- 6 - const oldLine6 = true;
- 6 + const newLine6 = true;
- 7 - const oldLine7 = true;
- 7 + const newLine7 = true;
- 8 - const oldLine8 = true;
- 8 + const newLine8 = true;
- 9 - const oldLine9 = true;
- 9 + const newLine9 = true;
-10 - const oldLine10 = true;
-10 + const newLine10 = true;
-11 - const oldLine11 = true;
-11 + const newLine11 = true;
-12 - const oldLine12 = true;
-12 + const newLine12 = true;
-13 - const oldLine13 = true;
-13 + const newLine13 = true;
-14 - const oldLine14 = true;
-14 + const newLine14 = true;
-15 - const oldLine15 = true;
-15 + const newLine15 = true;
-16 - const oldLine16 = true;
-16 + const newLine16 = true;
-17 - const oldLine17 = true;
-17 + const newLine17 = true;
-18 - const oldLine18 = true;
-18 + const newLine18 = true;
-19 - const oldLine19 = true;
-19 + const newLine19 = true;
-20 - const oldLine20 = true;
-20 + const newLine20 = true;
+"╭──────────────────────────────────────────────────────────────────────────────╮
+│ ... 10 hidden (Ctrl+O) ...                                                   │
+│  6 - const oldLine6 = true;                                                  │
+│  6 + const newLine6 = true;                                                  │
+│  7 - const oldLine7 = true;                                                  │
+│  7 + const newLine7 = true;                                                  │
+│  8 - const oldLine8 = true;                                                  │
+│  8 + const newLine8 = true;                                                  │
+│  9 - const oldLine9 = true;                                                  │
+│  9 + const newLine9 = true;                                                  │
+│ 10 - const oldLine10 = true;                                                 │
+│ 10 + const newLine10 = true;                                                 │
+│ 11 - const oldLine11 = true;                                                 │
+│ 11 + const newLine11 = true;                                                 │
+│ 12 - const oldLine12 = true;                                                 │
+│ 12 + const newLine12 = true;                                                 │
+│ 13 - const oldLine13 = true;                                                 │
+│ 13 + const newLine13 = true;                                                 │
+│ 14 - const oldLine14 = true;                                                 │
+│ 14 + const newLine14 = true;                                                 │
+│ 15 - const oldLine15 = true;                                                 │
+│ 15 + const newLine15 = true;                                                 │
+│ 16 - const oldLine16 = true;                                                 │
+│ 16 + const newLine16 = true;                                                 │
+│ 17 - const oldLine17 = true;                                                 │
+│ 17 + const newLine17 = true;                                                 │
+│ 18 - const oldLine18 = true;                                                 │
+│ 18 + const newLine18 = true;                                                 │
+│ 19 - const oldLine19 = true;                                                 │
+│ 19 + const newLine19 = true;                                                 │
+│ 20 - const oldLine20 = true;                                                 │
+│ 20 + const newLine20 = true;                                                 │
+╰──────────────────────────────────────────────────────────────────────────────╯
 Apply this change?
 
 ● 1. Allow once                 
@@ -59,40 +60,41 @@ Apply this change?
 `;
 
 exports[`ToolConfirmationMessage > height allocation and layout > should expand to available height for large exec commands 1`] = `
-"... first 18 lines hidden (Ctrl+O to show) ...
-echo "Line 19"
-echo "Line 20"
-echo "Line 21"
-echo "Line 22"
-echo "Line 23"
-echo "Line 24"
-echo "Line 25"
-echo "Line 26"
-echo "Line 27"
-echo "Line 28"
-echo "Line 29"
-echo "Line 30"
-echo "Line 31"
-echo "Line 32"
-echo "Line 33"
-echo "Line 34"
-echo "Line 35"
-echo "Line 36"
-echo "Line 37"
-echo "Line 38"
-echo "Line 39"
-echo "Line 40"
-echo "Line 41"
-echo "Line 42"
-echo "Line 43"
-echo "Line 44"
-echo "Line 45"
-echo "Line 46"
-echo "Line 47"
-echo "Line 48"
-echo "Line 49"
-echo "Line 50"
-Allow execution of: 'echo'?
+"╭──────────────────────────────────────────────────────────────────────────────╮
+│ ... 19 hidden (Ctrl+O) ...                                                   │
+│ echo "Line 20"                                                               │
+│ echo "Line 21"                                                               │
+│ echo "Line 22"                                                               │
+│ echo "Line 23"                                                               │
+│ echo "Line 24"                                                               │
+│ echo "Line 25"                                                               │
+│ echo "Line 26"                                                               │
+│ echo "Line 27"                                                               │
+│ echo "Line 28"                                                               │
+│ echo "Line 29"                                                               │
+│ echo "Line 30"                                                               │
+│ echo "Line 31"                                                               │
+│ echo "Line 32"                                                               │
+│ echo "Line 33"                                                               │
+│ echo "Line 34"                                                               │
+│ echo "Line 35"                                                               │
+│ echo "Line 36"                                                               │
+│ echo "Line 37"                                                               │
+│ echo "Line 38"                                                               │
+│ echo "Line 39"                                                               │
+│ echo "Line 40"                                                               │
+│ echo "Line 41"                                                               │
+│ echo "Line 42"                                                               │
+│ echo "Line 43"                                                               │
+│ echo "Line 44"                                                               │
+│ echo "Line 45"                                                               │
+│ echo "Line 46"                                                               │
+│ echo "Line 47"                                                               │
+│ echo "Line 48"                                                               │
+│ echo "Line 49"                                                               │
+│ echo "Line 50"                                                               │
+╰──────────────────────────────────────────────────────────────────────────────╯
+Allow execution of [echo]?
 
 ● 1. Allow once               
   2. Allow for this session
@@ -101,12 +103,14 @@ Allow execution of: 'echo'?
 `;
 
 exports[`ToolConfirmationMessage > should display multiple commands for exec type when provided 1`] = `
-"echo "hello"
-
-ls -la
-
-whoami
-Allow execution of 3 commands?
+"╭──────────────────────────────────────────────────────────────────────────────╮
+│ echo "hello"                                                                 │
+│                                                                              │
+│ ls -la                                                                       │
+│                                                                              │
+│ whoami                                                                       │
+╰──────────────────────────────────────────────────────────────────────────────╯
+Allow execution of [echo, ls, whoami]?
 
 ● 1. Allow once               
   2. Allow for this session
@@ -138,16 +142,17 @@ Do you want to proceed?
 `;
 
 exports[`ToolConfirmationMessage > should render multiline shell scripts with correct newlines and syntax highlighting 1`] = `
-"echo "hello"
-for i in 1 2 3; do
-  echo $i
-done
-Allow execution of: 'echo'?
+"╭──────────────────────────────────────────────────────────────────────────────╮
+│ echo "hello"                                                                 │
+│ for i in 1 2 3; do                                                           │
+│   echo $i                                                                    │
+│ done                                                                         │
+╰──────────────────────────────────────────────────────────────────────────────╯
+Allow execution of [echo]?
 
 ● 1. Allow once               
   2. Allow for this session
-  3. No, suggest changes (esc)
-"
+  3. No, suggest changes (esc)"
 `;
 
 exports[`ToolConfirmationMessage > should strip BiDi characters from MCP tool and server names 1`] = `
@@ -165,7 +170,7 @@ Allow execution of MCP tool "testtool" from server "testserver"?
 exports[`ToolConfirmationMessage > with folder trust > 'for edit confirmations' > should NOT show "allow always" when folder is untrusted 1`] = `
 "╭──────────────────────────────────────────────────────────────────────────────╮
 │                                                                              │
-│ No changes detected.                                                         │
+│  No changes detected.                                                        │
 │                                                                              │
 ╰──────────────────────────────────────────────────────────────────────────────╯
 Apply this change?
@@ -179,7 +184,7 @@ Apply this change?
 exports[`ToolConfirmationMessage > with folder trust > 'for edit confirmations' > should show "allow always" when folder is trusted 1`] = `
 "╭──────────────────────────────────────────────────────────────────────────────╮
 │                                                                              │
-│ No changes detected.                                                         │
+│  No changes detected.                                                        │
 │                                                                              │
 ╰──────────────────────────────────────────────────────────────────────────────╯
 Apply this change?
@@ -192,8 +197,10 @@ Apply this change?
 `;
 
 exports[`ToolConfirmationMessage > with folder trust > 'for exec confirmations' > should NOT show "allow always" when folder is untrusted 1`] = `
-"echo "hello"
-Allow execution of: 'echo'?
+"╭──────────────────────────────────────────────────────────────────────────────╮
+│ echo "hello"                                                                 │
+╰──────────────────────────────────────────────────────────────────────────────╯
+Allow execution of [echo]?
 
 ● 1. Allow once               
   2. No, suggest changes (esc)
@@ -201,8 +208,10 @@ Allow execution of: 'echo'?
 `;
 
 exports[`ToolConfirmationMessage > with folder trust > 'for exec confirmations' > should show "allow always" when folder is trusted 1`] = `
-"echo "hello"
-Allow execution of: 'echo'?
+"╭──────────────────────────────────────────────────────────────────────────────╮
+│ echo "hello"                                                                 │
+╰──────────────────────────────────────────────────────────────────────────────╯
+Allow execution of [echo]?
 
 ● 1. Allow once               
   2. Allow for this session

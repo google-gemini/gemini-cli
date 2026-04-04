@@ -1,0 +1,142 @@
+name: 'Evals: PR Evaluation & Regression'
+
+on:
+  pull_request:
+    types: ['opened', 'synchronize', 'reopened', 'ready_for_review']
+    paths:
+      - 'packages/core/src/prompts/**'
+      - 'packages/core/src/tools/**'
+      - 'packages/core/src/agents/**'
+      - 'evals/**'
+      - '!**/*.test.ts'
+      - '!**/*.test.tsx'
+  workflow_dispatch:
+
+# Prevents multiple runs for the same PR simultaneously (saves tokens)
+concurrency:
+  group: '${{ github.workflow }}-${{ github.head_ref || github.ref }}'
+  cancel-in-progress: true
+
+permissions:
+  pull-requests: 'write'
+  contents: 'read'
+  actions: 'read'
+
+jobs:
+  pr-evaluation:
+    name: 'Evaluate Steering & Regressions'
+    runs-on: 'gemini-cli-ubuntu-16-core'
+    if: "github.repository == 'google-gemini/gemini-cli' && (github.event_name != 'pull_request' || (github.event.pull_request.draft == false && github.event.pull_request.head.repo.full_name == github.repository))"
+    # External contributors' PRs will wait for approval in this environment
+    environment: |-
+      ${{ (github.event.pull_request.head.repo.full_name == github.repository) && 'internal' || 'external-evals' }}
+    env:
+      # CENTRALIZED MODEL LIST
+      MODEL_LIST: 'gemini-3-flash-preview'
+
+    steps:
+      - name: 'Checkout'
+        uses: 'actions/checkout@08eba0b27e820071cde6df949e0beb9ba4906955' # ratchet:actions/checkout@v5
+        with:
+          fetch-depth: 0
+
+      - name: 'Set up Node.js'
+        uses: 'actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020' # ratchet:actions/setup-node@v4.4.0
+        with:
+          node-version-file: '.nvmrc'
+          cache: 'npm'
+
+      - name: 'Detect Steering Changes'
+        id: 'detect'
+        run: |
+          SHOULD_RUN=$(node scripts/changed_prompt.js)
+          STEERING_DETECTED=$(node scripts/changed_prompt.js --steering-only)
+          echo "SHOULD_RUN=$SHOULD_RUN" >> "$GITHUB_OUTPUT"
+          echo "STEERING_DETECTED=$STEERING_DETECTED" >> "$GITHUB_OUTPUT"
+
+      - name: 'Install dependencies'
+        if: "steps.detect.outputs.SHOULD_RUN == 'true'"
+        run: 'npm ci'
+
+      - name: 'Build project'
+        if: "steps.detect.outputs.SHOULD_RUN == 'true'"
+        run: 'npm run build'
+
+      - name: 'Analyze PR Content (Guidance)'
+        if: "steps.detect.outputs.STEERING_DETECTED == 'true'"
+        id: 'analysis'
+        env:
+          GH_TOKEN: '${{ secrets.GITHUB_TOKEN }}'
+        run: |
+          # Check for behavioral eval changes
+          EVAL_CHANGES=$(git diff --name-only origin/${{ github.base_ref }}...HEAD | grep "^evals/" || true)
+          if [ -z "$EVAL_CHANGES" ]; then
+            echo "MISSING_EVALS=true" >> "$GITHUB_OUTPUT"
+          fi
+
+          # Check if user is a maintainer
+          USER_PERMISSION=$(gh api repos/${{ github.repository }}/collaborators/${{ github.actor }}/permission --jq '.permission')
+          if [[ "$USER_PERMISSION" == "admin" || "$USER_PERMISSION" == "write" ]]; then
+            echo "IS_MAINTAINER=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: 'Execute Regression Check'
+        if: "steps.detect.outputs.SHOULD_RUN == 'true'"
+        env:
+          GEMINI_API_KEY: '${{ secrets.GEMINI_API_KEY }}'
+          GH_TOKEN: '${{ secrets.GITHUB_TOKEN }}'
+          MODEL_LIST: '${{ env.MODEL_LIST }}'
+        run: |
+          # Run the regression check loop. The script saves the report to a file.
+          node scripts/run_eval_regression.js
+
+          # Use the generated report file if it exists
+          if [[ -f eval_regression_report.md ]]; then
+            echo "REPORT_FILE=eval_regression_report.md" >> "$GITHUB_ENV"
+          fi
+
+      - name: 'Post or Update PR Comment'
+        if: "always() && (steps.detect.outputs.STEERING_DETECTED == 'true' || env.REPORT_FILE != '')"
+        env:
+          GH_TOKEN: '${{ secrets.GITHUB_TOKEN }}'
+        run: |
+          # 1. Build the full comment body
+          {
+            if [[ -f eval_regression_report.md ]]; then
+              cat eval_regression_report.md
+              echo ""
+            fi
+
+            if [[ "${{ steps.detect.outputs.STEERING_DETECTED }}" == "true" ]]; then
+              echo "### 🧠 Model Steering Guidance"
+              echo ""
+              echo "This PR modifies files that affect the model's behavior (prompts, tools, or instructions)."
+              echo ""
+
+              if [[ "${{ steps.analysis.outputs.MISSING_EVALS }}" == "true" ]]; then
+                echo "- ⚠️ **Consider adding Evals:** No behavioral evaluations (\`evals/*.eval.ts\`) were added or updated in this PR. Consider [adding a test case](https://github.com/google-gemini/gemini-cli/blob/main/evals/README.md#creating-an-evaluation) to verify the new behavior and prevent regressions."
+              fi
+
+              if [[ "${{ steps.analysis.outputs.IS_MAINTAINER }}" == "true" ]]; then
+                echo "- 🚀 **Maintainer Reminder:** Please ensure that these changes do not regress results on benchmark evals before merging."
+              fi
+            fi
+
+            echo ""
+            echo "---"
+            echo "*This is an automated guidance message triggered by steering logic signatures.*"
+            echo "<!-- eval-pr-report -->"
+          } > full_comment.md
+
+          # 2. Find if a comment with our unique tag already exists
+          # We extract the numeric ID from the URL to ensure compatibility with the REST API
+          COMMENT_ID=$(gh pr view ${{ github.event.pull_request.number }} --json comments --jq '.comments[] | select(.body | contains("<!-- eval-pr-report -->")) | .url' | grep -oE "[0-9]+$" | head -n 1)
+
+          # 3. Update or Create the comment
+          if [ -n "$COMMENT_ID" ]; then
+            echo "Updating existing comment $COMMENT_ID via API..."
+            gh api -X PATCH "repos/${{ github.repository }}/issues/comments/$COMMENT_ID" -F body=@full_comment.md
+          else
+            echo "Creating new PR comment..."
+            gh pr comment ${{ github.event.pull_request.number }} --body-file full_comment.md
+          fi

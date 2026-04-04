@@ -679,6 +679,7 @@ describe('mapError', () => {
     expect(result.status).toBe('RESOURCE_EXHAUSTED');
     expect(result.message).toBe('Rate limit');
     expect(result.fatal).toBe(true);
+    expect(result._meta?.['status']).toBe(429);
     expect(result._meta?.['rawError']).toEqual({
       message: 'Rate limit',
       status: 429,

@@ -5,7 +5,7 @@
  */
 
 import type React from 'react';
-import { useCallback, useRef, useState } from 'react';
+import { useCallback, useRef, useState, useEffect } from 'react';
 import { Box, Text, ResizeObserver, type DOMElement } from 'ink';
 import {
   isUserVisibleHook,
@@ -76,6 +76,13 @@ export const StatusNode: React.FC<{
   onResize,
 }) => {
   const observerRef = useRef<ResizeObserver | null>(null);
+
+  useEffect(
+    () => () => {
+      observerRef.current?.disconnect();
+    },
+    [],
+  );
 
   const onRefChange = useCallback(
     (node: DOMElement | null) => {
@@ -168,6 +175,13 @@ export const StatusRow: React.FC<StatusRowProps> = ({
   const [statusWidth, setStatusWidth] = useState(0);
   const [tipWidth, setTipWidth] = useState(0);
   const tipObserverRef = useRef<ResizeObserver | null>(null);
+
+  useEffect(
+    () => () => {
+      tipObserverRef.current?.disconnect();
+    },
+    [],
+  );
 
   const onTipRefChange = useCallback((node: DOMElement | null) => {
     if (tipObserverRef.current) {
