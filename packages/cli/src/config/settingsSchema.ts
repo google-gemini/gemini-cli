@@ -2196,6 +2196,16 @@ const SETTINGS_SCHEMA = {
           'Enable the experimental Topic & Update communication model for reduced chattiness and structured progress reporting.',
         showInDialog: true,
       },
+      btw: {
+        type: 'boolean',
+        label: 'Enable /btw Side Inquiries',
+        category: 'Experimental',
+        requiresRestart: false,
+        default: false,
+        description:
+          'Enable the experimental /btw side inquiry command for ephemeral, non-persisted chat turns.',
+        showInDialog: true,
+      },
     },
   },
   extensions: {

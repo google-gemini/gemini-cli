@@ -1719,6 +1719,11 @@ their corresponding top-level category object in your `settings.json` file.
     for reduced chattiness and structured progress reporting.
   - **Default:** `false`
 
+- **`experimental.btw`** (boolean):
+  - **Description:** Enable the experimental /btw side inquiry command for
+    ephemeral, non-persisted chat turns.
+  - **Default:** `false`
+
 #### `skills`
 
 - **`skills.enabled`** (boolean):

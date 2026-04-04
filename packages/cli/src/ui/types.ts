@@ -499,6 +499,11 @@ export interface SubmitPromptResult {
   content: PartListUnion;
 }
 
+export interface BtwActionReturn {
+  type: 'btw';
+  query: string;
+}
+
 /**
  * Defines the result of the slash command processor for its consumer (useGeminiStream).
  */
@@ -512,7 +517,8 @@ export type SlashCommandProcessorResult =
   | {
       type: 'handled'; // Indicates the command was processed and no further action is needed.
     }
-  | SubmitPromptResult;
+  | SubmitPromptResult
+  | BtwActionReturn;
 
 export interface ConfirmationRequest {
   prompt: ReactNode;
