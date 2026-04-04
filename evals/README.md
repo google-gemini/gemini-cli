@@ -111,12 +111,34 @@ policy.** A subset that prove to be highly stable over time may be promoted to
 
 - `name`: The name of the evaluation case.
 - `prompt`: The prompt to send to the model.
-- `params`: An optional object with parameters to pass to the test rig (e.g.,
-  settings).
+- `params`: An optional object with parameters to pass to the test rig. The
+  `settings` field is passed directly to the CLI and accepts any valid settings
+  key. **Restricting tools via `settings.tools.core` is forbidden** — evals must
+  test against the full, default tool set. Common `settings.experimental` flags
+  used in evals include `plan`, `memoryManager`, `enableAgents`, and
+  `agents.overrides`.
+- `timeout`: An optional timeout in milliseconds for the test. Passed directly
+  to Vitest's `it()`.
+- `files`: An optional map of relative file paths to their string contents. When
+  provided, these files are written into the temp test directory before the
+  agent runs, and the directory is initialised as a git repo with an initial
+  commit. File paths must be relative and must not escape the test directory.
+- `messages`: An optional array of prior conversation message objects. When
+  provided, a session file is written to the test's home directory and the CLI
+  is launched with `--resume <sessionId>`, so the agent can access the previous
+  conversation history. Useful for testing behaviors that depend on context from
+  earlier in a session.
+- `sessionId`: An optional custom session ID used with `messages`. If omitted, a
+  random ID is generated.
+- `approvalMode`: An optional approval mode for the agent run
+  (`'default' | 'auto_edit' | 'yolo' | 'plan'`). Defaults to `'yolo'`.
 - `assert`: An async function that takes the test rig and the result of the run
   and asserts that the result is correct.
-- `log`: An optional boolean that, if set to `true`, will log the tool calls to
-  a file in the `evals/logs` directory.
+
+> **Logging is automatic.** For every run, `evals/logs/<name>.log` (tool call
+> JSON) and `evals/logs/<name>.jsonl` (activity log) are written. The `.jsonl`
+> file is deleted on success to reduce noise. If the run produces stderr output,
+> it is saved to `evals/logs/<name>.stderr.log`.
 
 ### Example
 
@@ -134,6 +156,120 @@ describe('my_feature', () => {
     },
   });
 });
+```
+
+### `appEvalTest` (in-process variant)
+
+`appEvalTest` in `evals/app-test-helper.ts` is an alternative to `evalTest` that
+runs the agent in-process using `AppRig` instead of spawning a CLI subprocess.
+It is faster and supports interactive steering via the `setup` hook, making it
+useful for tests that need to inspect or manipulate the running app before the
+prompt is sent (e.g. placing breakpoints in the UI).
+
+`appEvalTest` takes the same two arguments as `evalTest` — `policy` and an
+`AppEvalCase` object — and shares the same `EvalPolicy` values.
+
+#### `AppEvalCase` Properties
+
+- `name`, `prompt`, `timeout`, `files`: Same semantics as `EvalCase`.
+- `configOverrides`: An optional object merged into the CLI config for this run.
+  Restricting tools via `excludeTools`, `coreTools`, `allowedTools`, or
+  `mainAgentTools` is **forbidden**.
+- `setup`: An optional `async (rig: AppRig) => Promise<void>` hook called after
+  files are written and the rig is initialised but **before** the app is
+  rendered. Use this to configure breakpoints or other pre-render state.
+- `assert`: `async (rig: AppRig, output: string) => Promise<void>`. `output` is
+  the static terminal output captured via `rig.getStaticOutput()`.
+
+The default timeout for `appEvalTest` is 70 000 ms (60 s eval + 10 s buffer).
+
+#### When to use `appEvalTest` vs `evalTest`
+
+|                                  | `evalTest`     | `appEvalTest`                |
+| -------------------------------- | -------------- | ---------------------------- |
+| Execution model                  | Subprocess CLI | In-process `AppRig`          |
+| Supports `messages` / `--resume` | Yes            | No                           |
+| Supports `setup` hook            | No             | Yes                          |
+| Startup overhead                 | Higher         | Lower                        |
+| Good for                         | Most evals     | Interactive / UI-layer tests |
+
+```typescript
+import { appEvalTest } from './app-test-helper.js';
+
+describe('my_feature', () => {
+  appEvalTest('USUALLY_PASSES', {
+    name: 'should do something in-process',
+    prompt: 'do it',
+    assert: async (rig, output) => {
+      // assertions
+    },
+  });
+});
+```
+
+### Assertion Helpers
+
+The `TestRig` (used by `evalTest`) and `AppRig` (used by `appEvalTest`) expose
+several assertion helpers commonly used in evals.
+
+#### `rig.waitForToolCall(toolName, timeout?, filterFn?)`
+
+Waits for a tool call with the given name to appear in the activity log. Returns
+`true` if found, `false` if the timeout expires.
+
+The optional third argument `filterFn` is `(args: string) => boolean`. Use it to
+assert that the tool was called with specific argument content:
+
+```typescript
+const called = await rig.waitForToolCall('save_memory', undefined, (args) =>
+  /vitest/i.test(args),
+);
+expect(called).toBe(true);
+```
+
+#### `rig.readToolLogs()`
+
+Returns the array of tool call log entries recorded during the run. Use this for
+negative assertions (checking a tool was _not_ called) or to inspect tool
+arguments and outcomes directly.
+
+<details>
+<summary>Entry shape</summary>
+
+```typescript
+{
+  timestamp: number;
+  toolRequest: {
+    name: string;       // tool name, e.g. 'save_memory'
+    args: string;       // JSON-encoded arguments string
+    success: boolean;   // whether the tool call succeeded
+    duration_ms: number;
+    prompt_id?: string;
+  };
+}
+```
+
+</details>
+
+> **Important:** Call `await rig.waitForTelemetryReady()` before using
+> `rig.readToolLogs()` synchronously. Without it, the activity log may not yet
+> be flushed and some entries could be missing.
+
+```typescript
+await rig.waitForTelemetryReady();
+const logs = rig.readToolLogs();
+const called = logs.some((l) => l.toolRequest.name === 'save_memory');
+expect(called).toBe(false);
+```
+
+#### `rig.expectToolCallSuccess(toolNames)`
+
+Asserts that at least one of the tools in the provided array was called and
+completed successfully. Useful for subagent evals where you want to confirm
+delegation occurred:
+
+```typescript
+await rig.expectToolCallSuccess([TEST_AGENTS.DOCS_AGENT.name]);
 ```
 
 ## Running Evaluations
