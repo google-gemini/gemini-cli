@@ -20,9 +20,13 @@ process.on('uncaughtException', (error) => {
     error instanceof Error &&
     error.message === 'Cannot resize a pty that has already exited'
   ) {
+    // This error happens on Windows with node-pty when resizing a pty that has just exited.
+    // It is a race condition in node-pty that we cannot prevent, so we silence it.
     return;
   }
 
+  // For other errors, we rely on the default behavior, but since we attached a listener,
+  // we must manually replicate it.
   if (error instanceof Error) {
     process.stderr.write(error.stack + '\n');
   } else {
