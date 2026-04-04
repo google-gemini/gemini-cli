@@ -2097,21 +2097,6 @@ describe('AppContainer State Management', () => {
         unmount();
       });
 
-      it('should quit on second press', async () => {
-        await setupKeypressTest();
-
-        pressKey('\x03', 2); // Ctrl+C
-
-        expect(mockCancelOngoingRequest).toHaveBeenCalledTimes(2);
-        expect(mockHandleSlashCommand).toHaveBeenCalledWith(
-          '/quit',
-          undefined,
-          undefined,
-          false,
-        );
-        unmount();
-      });
-
       it('should reset press count after a timeout', async () => {
         await setupKeypressTest();
 
@@ -2125,6 +2110,38 @@ describe('AppContainer State Management', () => {
 
         pressKey('\x03'); // Ctrl+C
         expect(mockHandleSlashCommand).not.toHaveBeenCalled();
+        unmount();
+      });
+      it('should not call quit if second press < 400ms', async () => {
+        await setupKeypressTest();
+
+        pressKey('\x03'); // Ctrl+C
+        act(() => {
+          vi.advanceTimersByTime(300);
+        });
+        pressKey('\x03'); // Ctrl+C
+        expect(mockHandleSlashCommand).not.toHaveBeenCalledWith(
+          '/quit',
+          undefined,
+          undefined,
+          false,
+        );
+        unmount();
+      });
+      it('should call quit if second press > 400ms', async () => {
+        await setupKeypressTest();
+
+        pressKey('\x03'); // Ctrl+C
+        act(() => {
+          vi.advanceTimersByTime(500);
+        });
+        pressKey('\x03'); // Ctrl+C
+        expect(mockHandleSlashCommand).toHaveBeenCalledWith(
+          '/quit',
+          undefined,
+          undefined,
+          false,
+        );
         unmount();
       });
     });
