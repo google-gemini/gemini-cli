@@ -25,21 +25,23 @@ export class UserAccountManager {
    * @returns A valid UserAccounts object.
    */
   private parseAndValidateAccounts(content: string): UserAccounts {
-    const defaultState = { active: null, old: [] };
+    const defaultState: UserAccounts = { active: null, old: [] };
     if (!content.trim()) {
       return defaultState;
     }
 
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
-    const parsed = JSON.parse(content);
+    const parsed: unknown = JSON.parse(content);
 
-    // Inlined validation logic
+    // Validate top-level structure
     if (typeof parsed !== 'object' || parsed === null) {
       debugLogger.log('Invalid accounts file schema, starting fresh.');
       return defaultState;
     }
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
-    const { active, old } = parsed as Partial<UserAccounts>;
+
+    // Use `in` operator for safe property narrowing instead of unsafe cast
+    const active: unknown = 'active' in parsed ? parsed.active : undefined;
+    const old: unknown = 'old' in parsed ? parsed.old : undefined;
+
     const isValid =
       (active === undefined || active === null || typeof active === 'string') &&
       (old === undefined ||
@@ -51,10 +53,8 @@ export class UserAccountManager {
     }
 
     return {
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
-      active: parsed.active ?? null,
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
-      old: parsed.old ?? [],
+      active: typeof active === 'string' ? active : null,
+      old: Array.isArray(old) ? old : [],
     };
   }
 
