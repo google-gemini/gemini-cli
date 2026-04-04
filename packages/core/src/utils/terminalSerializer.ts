@@ -157,15 +157,15 @@ export function serializeTerminalToObject(
 ): AnsiOutput {
   const buffer = terminal.buffer.active;
   const cursorX = buffer.cursorX;
-  const cursorY = buffer.cursorY;
+  const absoluteCursorY = buffer.baseY + buffer.cursorY;
   const defaultFg = '';
   const defaultBg = '';
 
   const result: AnsiOutput = [];
 
   // Reuse cell instances
-  const lastCell = new Cell(null, -1, -1, cursorX, cursorY);
-  const currentCell = new Cell(null, -1, -1, cursorX, cursorY);
+  const lastCell = new Cell(null, -1, -1, cursorX, absoluteCursorY);
+  const currentCell = new Cell(null, -1, -1, cursorX, absoluteCursorY);
 
   const effectiveStart = startLine ?? buffer.viewportY;
   const effectiveEnd = endLine ?? buffer.viewportY + terminal.rows;
@@ -181,12 +181,12 @@ export function serializeTerminalToObject(
     }
 
     // Reset lastCell for new line
-    lastCell.update(null, -1, -1, cursorX, cursorY);
+    lastCell.update(null, -1, -1, cursorX, absoluteCursorY);
     let currentText = '';
 
     for (let x = 0; x < terminal.cols; x++) {
       const cellData = line.getCell(x, cellBuffer);
-      currentCell.update(cellData || null, x, y, cursorX, cursorY);
+      currentCell.update(cellData || null, x, y, cursorX, absoluteCursorY);
 
       if (x > 0 && !currentCell.equals(lastCell)) {
         if (currentText) {
@@ -209,7 +209,7 @@ export function serializeTerminalToObject(
       currentText += currentCell.getChars();
       // Copy state from currentCell to lastCell. Since we can't easily deep copy
       // without allocating, we just update lastCell with the same data.
-      lastCell.update(cellData || null, x, y, cursorX, cursorY);
+      lastCell.update(cellData || null, x, y, cursorX, absoluteCursorY);
     }
 
     if (currentText) {
@@ -238,7 +238,7 @@ export function serializeTerminalToObject(
     // A line is empty if all its tokens are marked as uninitialized and it has no cursor
     const isEmpty =
       lastLine.every((token) => token.isUninitialized && !token.inverse) &&
-      lineY !== cursorY;
+      lineY !== absoluteCursorY;
 
     if (isEmpty) {
       result.pop();
