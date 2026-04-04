@@ -136,6 +136,20 @@ describe('my_feature', () => {
 });
 ```
 
+### Understanding app-level evals at a high level
+
+Some behavioral evals use app-level helpers such as `appEvalTest`, where the
+execution flow is not always obvious from the eval case fields alone.
+
+In general, app-level evals prepare the test workspace first, run any optional
+setup logic, render the app/session environment, wait for the initial ready
+state, inject the prompt, and then validate behavior through assertions.
+
+For contributors who want to understand this flow in more detail, it may be
+helpful to start with a concrete eval such as `model_steering.eval.ts`, then
+follow the helper implementation path in `app-test-helper.ts` and
+`test-helper.ts`.
+
 ## Running Evaluations
 
 First, build the bundled Gemini CLI. You must do this after every code change.
