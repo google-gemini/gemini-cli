@@ -153,9 +153,20 @@ jobs:
         uses: 'actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020' # ratchet:actions-node@v4
         with:
           node-version: '${{ matrix.node-version }}'
+          cache: 'npm'
 
       - name: 'Install dependencies'
         run: 'npm ci'
+
+      - name: 'Cache TypeScript build'
+        uses: 'actions/cache@v4'
+        with:
+          path: |
+            packages/*/dist
+            packages/*/*.tsbuildinfo
+          key: "${{ runner.os }}-${{ runner.arch }}-tsbuild-e2e-${{ hashFiles('packages/*/tsconfig.json', 'tsconfig.json') }}"
+          restore-keys: |
+            ${{ runner.os }}-${{ runner.arch }}-tsbuild-e2e-
 
       - name: 'Build project'
         run: 'npm run build'
@@ -197,17 +208,24 @@ jobs:
         uses: 'actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020' # ratchet:actions-node@v4
         with:
           node-version: '20.x'
+          cache: 'npm'
 
       - name: 'Install dependencies'
         run: 'npm ci'
 
+      - name: 'Cache TypeScript build'
+        uses: 'actions/cache@v4'
+        with:
+          path: |
+            packages/*/dist
+            packages/*/*.tsbuildinfo
+          key: "${{ runner.os }}-${{ runner.arch }}-tsbuild-e2e-${{ hashFiles('packages/*/tsconfig.json', 'tsconfig.json') }}"
+          restore-keys: |
+            ${{ runner.os }}-${{ runner.arch }}-tsbuild-e2e-
+
       - name: 'Build project'
         run: 'npm run build'
 
-      - name: 'Fix rollup optional dependencies on macOS'
-        if: "${{runner.os == 'macOS'}}"
-        run: |
-          npm cache clean --force
       - name: 'Run E2E tests (non-Windows)'
         if: "${{runner.os != 'Windows'}}"
         env:
@@ -317,9 +335,20 @@ jobs:
         uses: 'actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020' # ratchet:actions-node@v4
         with:
           node-version: '20.x'
+          cache: 'npm'
 
       - name: 'Install dependencies'
         run: 'npm ci'
+
+      - name: 'Cache TypeScript build'
+        uses: 'actions/cache@v4'
+        with:
+          path: |
+            packages/*/dist
+            packages/*/*.tsbuildinfo
+          key: "${{ runner.os }}-${{ runner.arch }}-tsbuild-e2e-${{ hashFiles('packages/*/tsconfig.json', 'tsconfig.json') }}"
+          restore-keys: |
+            ${{ runner.os }}-${{ runner.arch }}-tsbuild-e2e-
 
       - name: 'Build project'
         run: 'npm run build'
