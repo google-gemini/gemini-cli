@@ -279,6 +279,29 @@ export SANDBOX_FLAGS="--flag1 --flag2=value"
 $env:SANDBOX_FLAGS="--flag1 --flag2=value"
 ```
 
+### Route custom environment variables
+
+Use the `SANDBOX_ENV` environment variable to explicitly route custom
+environment variables into the sandbox. This is a comma-separated list of
+`KEY=VALUE` pairs.
+
+**macOS/Linux**
+
+```bash
+export SANDBOX_ENV="MY_VAR=hello,ANOTHER_VAR=world"
+gemini -p "echo \$MY_VAR \$ANOTHER_VAR"
+```
+
+**Windows (PowerShell)**
+
+```powershell
+$env:SANDBOX_ENV="MY_VAR=hello,ANOTHER_VAR=world"
+gemini -p "echo %MY_VAR% %ANOTHER_VAR%"
+```
+
+Environment variables listed in `SANDBOX_ENV` are also available to tools run by
+the agent.
+
 ## Linux UID/GID handling
 
 The sandbox automatically handles user permissions on Linux. Override these

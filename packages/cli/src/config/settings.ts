@@ -85,14 +85,15 @@ const AUTH_ENV_VAR_WHITELIST = [
   'GOOGLE_API_KEY',
   'GOOGLE_CLOUD_PROJECT',
   'GOOGLE_CLOUD_LOCATION',
+  'SANDBOX_ENV',
 ];
 
 /**
  * Sanitizes an environment variable value to prevent shell injection.
- * Restricts values to a safe character set: alphanumeric, -, _, ., /
+ * Restricts values to a safe character set: alphanumeric, -, _, ., /, =, ,
  */
 export function sanitizeEnvVar(value: string): string {
-  return value.replace(/[^a-zA-Z0-9\-_./]/g, '');
+  return value.replace(/[^a-zA-Z0-9\-_./=,]/g, '');
 }
 
 export function getSystemSettingsPath(): string {

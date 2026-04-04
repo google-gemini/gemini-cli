@@ -22,6 +22,7 @@ import {
 import { isBinary, truncateString } from '../utils/textUtils.js';
 import pkg from '@xterm/headless';
 import { debugLogger } from '../utils/debugLogger.js';
+import { parseSandboxEnv } from '../utils/envUtils.js';
 import { Storage } from '../config/storage.js';
 import {
   serializeTerminalToObject,
@@ -447,6 +448,12 @@ export class ShellExecutionService {
       PAGER: shellExecutionConfig.pager ?? 'cat',
       GIT_PAGER: shellExecutionConfig.pager ?? 'cat',
     };
+
+    // Forward SANDBOX_ENV key=value pairs
+    const sandboxEnv = parseSandboxEnv(process.env['SANDBOX_ENV']);
+    for (const [key, value] of Object.entries(sandboxEnv)) {
+      baseEnv[key] = value;
+    }
 
     if (!isInteractive) {
       // Ensure all GIT_CONFIG_* variables are preserved even if they were redacted

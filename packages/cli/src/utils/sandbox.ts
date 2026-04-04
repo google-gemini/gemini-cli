@@ -25,6 +25,7 @@ import {
   FatalSandboxError,
   GEMINI_DIR,
   homedir,
+  parseSandboxEnv,
 } from '@google/gemini-cli-core';
 import { ConsolePatcher } from '../ui/utils/ConsolePatcher.js';
 import { randomBytes } from 'node:crypto';
@@ -140,19 +141,21 @@ export async function start_sandbox(
         args.push('-D', `INCLUDE_DIR_${i}=${dirPath}`);
       }
 
-      const finalArgv = cliArgs;
+      const shCommandParts = [
+        'SANDBOX=sandbox-exec',
+        `NODE_OPTIONS=${quote([nodeOptions])}`,
+      ];
 
-      args.push(
-        '-f',
-        profileFile,
-        'sh',
-        '-c',
-        [
-          `SANDBOX=sandbox-exec`,
-          `NODE_OPTIONS="${nodeOptions}"`,
-          ...finalArgv.map((arg) => quote([arg])),
-        ].join(' '),
-      );
+      // copy additional environment variables from SANDBOX_ENV
+      const parsedSandboxEnv = parseSandboxEnv(process.env['SANDBOX_ENV']);
+      for (const [key, value] of Object.entries(parsedSandboxEnv)) {
+        debugLogger.log(`SANDBOX_ENV: ${key}=${value}`);
+        shCommandParts.push(`${key}=${quote([value])}`);
+      }
+
+      shCommandParts.push(...cliArgs.map((arg) => quote([arg])));
+
+      args.push('-f', profileFile, 'sh', '-c', shCommandParts.join(' '));
       // start and set up proxy if GEMINI_SANDBOX_PROXY_COMMAND is set
       const proxyCommand = process.env['GEMINI_SANDBOX_PROXY_COMMAND'];
       let proxyProcess: ChildProcess | undefined = undefined;
@@ -615,19 +618,10 @@ export async function start_sandbox(
     }
 
     // copy additional environment variables from SANDBOX_ENV
-    if (process.env['SANDBOX_ENV']) {
-      for (let env of process.env['SANDBOX_ENV'].split(',')) {
-        if ((env = env.trim())) {
-          if (env.includes('=')) {
-            debugLogger.log(`SANDBOX_ENV: ${env}`);
-            args.push('--env', env);
-          } else {
-            throw new FatalSandboxError(
-              'SANDBOX_ENV must be a comma-separated list of key=value pairs',
-            );
-          }
-        }
-      }
+    const parsedSandboxEnv = parseSandboxEnv(process.env['SANDBOX_ENV']);
+    for (const [key, value] of Object.entries(parsedSandboxEnv)) {
+      debugLogger.log(`SANDBOX_ENV: ${key}=${value}`);
+      args.push('--env', `${key}=${value}`);
     }
 
     // copy NODE_OPTIONS
@@ -978,20 +972,11 @@ async function start_lxc_sandbox(
     }
 
     // Forward SANDBOX_ENV key=value pairs
-    if (process.env['SANDBOX_ENV']) {
-      for (let env of process.env['SANDBOX_ENV'].split(',')) {
-        if ((env = env.trim())) {
-          if (env.includes('=')) {
-            envArgs.push('--env', env);
-          } else {
-            throw new FatalSandboxError(
-              'SANDBOX_ENV must be a comma-separated list of key=value pairs',
-            );
-          }
-        }
-      }
+    const parsedSandboxEnv = parseSandboxEnv(process.env['SANDBOX_ENV']);
+    for (const [key, value] of Object.entries(parsedSandboxEnv)) {
+      debugLogger.log(`SANDBOX_ENV: ${key}=${value}`);
+      envArgs.push('--env', `${key}=${value}`);
     }
-
     // Forward NODE_OPTIONS (e.g. from --inspect flags)
     const existingNodeOptions = process.env['NODE_OPTIONS'] || '';
     const allNodeOptions = [
