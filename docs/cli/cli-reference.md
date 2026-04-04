@@ -94,8 +94,10 @@ These are convenient shortcuts that map to specific models:
 | `gemini extensions list`                           | List all installed extensions                | `gemini extensions list`                                                       |
 | `gemini extensions update <name>`                  | Update a specific extension                  | `gemini extensions update my-extension`                                        |
 | `gemini extensions update --all`                   | Update all extensions                        | `gemini extensions update --all`                                               |
-| `gemini extensions enable <name>`                  | Enable an extension                          | `gemini extensions enable my-extension`                                        |
-| `gemini extensions disable <name>`                 | Disable an extension                         | `gemini extensions disable my-extension`                                       |
+| `gemini extensions enable <names..>`               | Enable one or more extensions                | `gemini extensions enable ext-a ext-b`                                         |
+| `gemini extensions enable --all`                   | Enable all installed extensions              | `gemini extensions enable --all`                                               |
+| `gemini extensions disable <names..>`              | Disable one or more extensions               | `gemini extensions disable ext-a ext-b`                                        |
+| `gemini extensions disable --all`                  | Disable all installed extensions             | `gemini extensions disable --all`                                              |
 | `gemini extensions link <path>`                    | Link local extension for development         | `gemini extensions link /path/to/extension`                                    |
 | `gemini extensions new <path>`                     | Create new extension from template           | `gemini extensions new ./my-extension`                                         |
 | `gemini extensions validate <path>`                | Validate extension structure                 | `gemini extensions validate ./my-extension`                                    |

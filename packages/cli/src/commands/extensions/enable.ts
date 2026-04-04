@@ -8,17 +8,14 @@ import { type CommandModule } from 'yargs';
 import { loadSettings, SettingScope } from '../../config/settings.js';
 import { requestConsentNonInteractive } from '../../config/extensions/consent.js';
 import { ExtensionManager } from '../../config/extension-manager.js';
-import {
-  debugLogger,
-  FatalConfigError,
-  getErrorMessage,
-} from '@google/gemini-cli-core';
+import { debugLogger, getErrorMessage } from '@google/gemini-cli-core';
 import { promptForSetting } from '../../config/extensions/extensionSettings.js';
 import { exitCli } from '../utils.js';
 import { McpServerEnablementManager } from '../../config/mcp/mcpServerEnablement.js';
 
 interface EnableArgs {
-  name: string;
+  names?: string[];
+  all?: boolean;
   scope?: string;
 }
 
@@ -32,54 +29,86 @@ export async function handleEnable(args: EnableArgs) {
   });
   await extensionManager.loadExtensions();
 
-  try {
-    if (args.scope?.toLowerCase() === 'workspace') {
-      await extensionManager.enableExtension(args.name, SettingScope.Workspace);
-    } else {
-      await extensionManager.enableExtension(args.name, SettingScope.User);
+  const scope =
+    args.scope?.toLowerCase() === 'workspace'
+      ? SettingScope.Workspace
+      : SettingScope.User;
+
+  let namesToEnable: string[] = [];
+  if (args.all) {
+    namesToEnable = extensionManager.getExtensions().map((ext) => ext.name);
+  } else if (args.names) {
+    namesToEnable = [...new Set(args.names)];
+  }
+
+  if (namesToEnable.length === 0) {
+    if (args.all) {
+      debugLogger.log('No extensions currently installed.');
     }
+    return;
+  }
 
-    // Auto-enable any disabled MCP servers for this extension
-    const extension = extensionManager
-      .getExtensions()
-      .find((e) => e.name === args.name);
+  const errors: Array<{ name: string; error: string }> = [];
+  const mcpServersToEnable: string[] = [];
 
-    if (extension?.mcpServers) {
-      const mcpEnablementManager = McpServerEnablementManager.getInstance();
-      const enabledServers = await mcpEnablementManager.autoEnableServers(
-        Object.keys(extension.mcpServers ?? {}),
-      );
+  for (const name of namesToEnable) {
+    try {
+      await extensionManager.enableExtension(name, scope);
 
-      for (const serverName of enabledServers) {
+      const extension = extensionManager
+        .getExtensions()
+        .find((e) => e.name === name);
+      if (extension?.mcpServers) {
+        mcpServersToEnable.push(...Object.keys(extension.mcpServers));
+      }
+
+      if (args.scope) {
         debugLogger.log(
-          `MCP server '${serverName}' was disabled - now enabled.`,
+          `Extension "${name}" successfully enabled for scope "${args.scope}".`,
+        );
+      } else {
+        debugLogger.log(
+          `Extension "${name}" successfully enabled in all scopes.`,
         );
       }
-      // Note: No restartServer() - CLI exits immediately, servers load on next session
+    } catch (error) {
+      errors.push({ name, error: getErrorMessage(error) });
     }
+  }
 
-    if (args.scope) {
-      debugLogger.log(
-        `Extension "${args.name}" successfully enabled for scope "${args.scope}".`,
-      );
-    } else {
-      debugLogger.log(
-        `Extension "${args.name}" successfully enabled in all scopes.`,
-      );
+  // Auto-enable any disabled MCP servers for newly enabled extensions.
+  if (mcpServersToEnable.length > 0) {
+    const mcpEnablementManager = McpServerEnablementManager.getInstance();
+    const enabledServers =
+      await mcpEnablementManager.autoEnableServers(mcpServersToEnable);
+    for (const serverName of enabledServers) {
+      debugLogger.log(`MCP server '${serverName}' was disabled - now enabled.`);
     }
-  } catch (error) {
-    throw new FatalConfigError(getErrorMessage(error));
+    // Note: No restartServer() - CLI exits immediately, servers load on next session
+  }
+
+  if (errors.length > 0) {
+    for (const { name, error } of errors) {
+      debugLogger.error(`Failed to enable "${name}": ${error}`);
+    }
+    await exitCli(1);
   }
 }
 
 export const enableCommand: CommandModule = {
-  command: 'enable [--scope] <name>',
-  describe: 'Enables an extension.',
+  command: 'enable [names..]',
+  describe: 'Enables one or more extensions.',
   builder: (yargs) =>
     yargs
-      .positional('name', {
-        describe: 'The name of the extension to enable.',
+      .positional('names', {
+        describe: 'The name(s) of the extension(s) to enable.',
         type: 'string',
+        array: true,
+      })
+      .option('all', {
+        type: 'boolean',
+        describe: 'Enable all installed extensions.',
+        default: false,
       })
       .option('scope', {
         describe:
@@ -87,6 +116,11 @@ export const enableCommand: CommandModule = {
         type: 'string',
       })
       .check((argv) => {
+        if (!argv.all && (!argv.names || argv.names.length === 0)) {
+          throw new Error(
+            'Please include at least one extension name to enable as a positional argument, or use the --all flag.',
+          );
+        }
         if (
           argv.scope &&
           !Object.values(SettingScope)
@@ -104,9 +138,18 @@ export const enableCommand: CommandModule = {
         return true;
       }),
   handler: async (argv) => {
+    const rawNames = argv['names'];
+    const names =
+      rawNames === undefined
+        ? undefined
+        : Array.isArray(rawNames)
+          ? // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
+            (rawNames as string[])
+          : [String(rawNames)];
     await handleEnable({
+      names,
       // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
-      name: argv['name'] as string,
+      all: argv['all'] as boolean,
       // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
       scope: argv['scope'] as string,
     });
