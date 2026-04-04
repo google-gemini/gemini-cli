@@ -152,10 +152,11 @@ export function mapExitPlanModeAnswers(answers: Record<string, string>): {
     };
   }
 
-  if (answer) {
+  const trimmedAnswer = answer?.trim();
+  if (trimmedAnswer) {
     return {
       approved: false,
-      feedback: answer,
+      feedback: trimmedAnswer,
     };
   }
 
