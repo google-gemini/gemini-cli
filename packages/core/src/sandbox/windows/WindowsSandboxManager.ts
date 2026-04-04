@@ -80,6 +80,10 @@ export class WindowsSandboxManager implements SandboxManager {
     return this.options.workspace;
   }
 
+  getOptions(): GlobalSandboxOptions {
+    return this.options;
+  }
+
   /**
    * Ensures a file or directory exists.
    */
