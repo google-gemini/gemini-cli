@@ -273,6 +273,15 @@ cd gemini-cli
 gemini
 > Give me a summary of all of the changes that went in yesterday
 ```
+## Troubleshooting: Common Setup Issues
+
+### Authentication or Login Errors
+
+If you encounter login or authentication issues, ensure the following environment variable is set correctly:
+
+```bash
+export GOOGLE_CLOUD_PROJECT="YOUR_PROJECT_ID"
+```
 
 ## 📚 Documentation
 
