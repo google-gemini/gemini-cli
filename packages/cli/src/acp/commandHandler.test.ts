@@ -26,5 +26,8 @@ describe('CommandHandler', () => {
 
     const init = parse('/init');
     expect(init.commandToExecute?.name).toBe('init');
+
+    const about = parse('/about');
+    expect(about.commandToExecute?.name).toBe('about');
   });
 });
