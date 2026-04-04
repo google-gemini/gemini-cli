@@ -67,4 +67,56 @@ describe('stableStringify', () => {
     expect(stableStringify({})).toBe('{}');
     expect(stableStringify([])).toBe('[]');
   });
+
+  it('handles toJSON() method returning primitives or undefined', () => {
+    expect(stableStringify({ toJSON: () => 'stringified' })).toBe(
+      '"stringified"',
+    );
+    expect(stableStringify({ toJSON: () => 123 })).toBe('123');
+    expect(stableStringify({ toJSON: () => null })).toBe('null');
+    // toJSON returns undefined -> not caught by the null check -> recursed into
+    // stringify where undefined becomes 'null'
+    expect(stableStringify({ toJSON: () => undefined })).toBe('null');
+  });
+
+  it('handles circular references introduced by toJSON()', () => {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const obj: any = { a: 1 };
+    obj.b = { toJSON: () => obj };
+    expect(stableStringify(obj)).toBe('{\0"a":1\0,\0"b":"[Circular]"\0}');
+  });
+
+  it('handles repeated non-circular object references correctly', () => {
+    const shared = { x: 1 };
+    const obj = { a: shared, b: shared };
+    expect(stableStringify(obj)).toBe('{\0"a":{"x":1}\0,\0"b":{"x":1}\0}');
+  });
+
+  it('escapes null bytes within string values', () => {
+    const obj = { key: 'value\0with\0null' };
+    // The literal \0 should be escaped to \\u0000 by JSON.stringify, which is what our function uses internally for strings.
+    expect(stableStringify(obj)).toBe(
+      '{\0"key":"value\\u0000with\\u0000null"\0}',
+    );
+  });
+
+  it('sorts keys at all nesting levels', () => {
+    const obj = { z: { y: { b: 2, a: 1 }, x: 3 }, m: 4 };
+    expect(stableStringify(obj)).toBe(
+      '{\0"m":4\0,\0"z":{"x":3,"y":{"a":1,"b":2}}\0}',
+    );
+  });
+
+  it('handles undefined at top-level', () => {
+    expect(stableStringify(undefined)).toBe('null');
+  });
+
+  it('handles function at top-level', () => {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    expect(stableStringify((() => {}) as any)).toBe('null');
+  });
+
+  it('sorts keys within objects nested inside arrays', () => {
+    expect(stableStringify([{ b: 2, a: 1 }])).toBe('[{"a":1,"b":2}]');
+  });
 });
