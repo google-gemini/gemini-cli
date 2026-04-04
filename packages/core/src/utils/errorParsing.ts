@@ -9,6 +9,8 @@ import { DEFAULT_GEMINI_FLASH_MODEL } from '../config/models.js';
 import type { UserTierId } from '../code_assist/types.js';
 import { AuthType } from '../core/contentGenerator.js';
 
+const INVALID_API_KEY_ERROR_MESSAGE =
+  '\nPlease check your API key and try again. Run /auth to switch authentication methods or update your API key.';
 const RATE_LIMIT_ERROR_MESSAGE_USE_GEMINI =
   '\nPlease wait and try again later. To increase your limits, request a quota increase through AI Studio, or switch to another /auth method';
 const RATE_LIMIT_ERROR_MESSAGE_VERTEX =
@@ -40,6 +42,9 @@ export function parseAndFormatApiError(
   fallbackModel?: string,
 ): string {
   if (isStructuredError(error)) {
+    if (error.reason === 'API_KEY_INVALID') {
+      return `[API Error: Invalid API key.]${INVALID_API_KEY_ERROR_MESSAGE}`;
+    }
     let text = `[API Error: ${error.message}]`;
     if (error.status === 429) {
       text += getRateLimitMessage(authType, fallbackModel);
