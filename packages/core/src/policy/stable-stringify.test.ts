@@ -51,7 +51,8 @@ describe('stableStringify', () => {
         throw new Error('Test Error');
       },
     };
-    // It should fall back to standard matching. The toJSON function itself will be omitted.
+    // Falls back to serializing own properties (toJSON is omitted as a function).
+    // This graceful fallback is the implementation's documented behavior.
     expect(stableStringify(obj)).toBe('{\0"a":1\0}');
   });
 
@@ -74,8 +75,8 @@ describe('stableStringify', () => {
     );
     expect(stableStringify({ toJSON: () => 123 })).toBe('123');
     expect(stableStringify({ toJSON: () => null })).toBe('null');
-    // toJSON returns undefined -> not caught by the null check -> recursed into
-    // stringify where undefined becomes 'null'
+    // toJSON returning undefined bypasses the null check, so stringify treats
+    // it as a top-level undefined → 'null'. Differs from JSON.stringify.
     expect(stableStringify({ toJSON: () => undefined })).toBe('null');
   });
 
@@ -117,6 +118,8 @@ describe('stableStringify', () => {
   });
 
   it('sorts keys within objects nested inside arrays', () => {
+    // Top-level arrays don't get \0 markers — only top-level object pairs do.
+    // This is intentional in the current implementation.
     expect(stableStringify([{ b: 2, a: 1 }])).toBe('[{"a":1,"b":2}]');
   });
 });
