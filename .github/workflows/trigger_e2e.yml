@@ -13,6 +13,9 @@ on:
         type: 'string'
   pull_request:
 
+permissions:
+  contents: read
+
 jobs:
   save_repo_name:
     if: "github.repository == 'google-gemini/gemini-cli'"
