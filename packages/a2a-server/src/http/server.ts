@@ -6,7 +6,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import './suppress-warnings.js';
+import '../suppress-warnings.js';
 import * as url from 'node:url';
 import * as path from 'node:path';
 
