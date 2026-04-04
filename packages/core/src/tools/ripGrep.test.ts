@@ -31,10 +31,10 @@ import { createMockWorkspaceContext } from '../test-utils/mockWorkspaceContext.j
 import { spawn, type ChildProcess } from 'node:child_process';
 import { PassThrough, Readable } from 'node:stream';
 import EventEmitter from 'node:events';
-import { downloadRipGrep } from '@joshua.litt/get-ripgrep';
+import { downloadRipGrep } from './downloadRipGrep.js';
 import { createMockMessageBus } from '../test-utils/mock-message-bus.js';
 // Mock dependencies for canUseRipgrep
-vi.mock('@joshua.litt/get-ripgrep', () => ({
+vi.mock('./downloadRipGrep.js', () => ({
   downloadRipGrep: vi.fn(),
 }));
 
