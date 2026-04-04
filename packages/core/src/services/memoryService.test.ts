@@ -13,6 +13,7 @@ import {
   type ConversationRecord,
 } from './chatRecordingService.js';
 import type { ExtractionState, ExtractionRun } from './memoryService.js';
+import { coreEvents } from '../utils/events.js';
 
 // Mock external modules used by startMemoryService
 vi.mock('../agents/local-executor.js', () => ({
@@ -29,6 +30,7 @@ vi.mock('../agents/skill-extraction-agent.js', () => ({
     promptConfig: { systemPrompt: 'test' },
     tools: [],
     outputSchema: {},
+    modelConfig: { model: 'test-model' },
   }),
 }));
 
@@ -51,11 +53,44 @@ vi.mock('../resources/resource-registry.js', () => ({
   ResourceRegistry: vi.fn(),
 }));
 
+vi.mock('../policy/policy-engine.js', () => ({
+  PolicyEngine: vi.fn(),
+}));
+
+vi.mock('../policy/types.js', () => ({
+  PolicyDecision: { ALLOW: 'ALLOW' },
+}));
+
+vi.mock('../confirmation-bus/message-bus.js', () => ({
+  MessageBus: vi.fn(),
+}));
+
+vi.mock('../agents/registry.js', () => ({
+  getModelConfigAlias: vi.fn().mockReturnValue('skill-extraction-config'),
+}));
+
+vi.mock('../config/storage.js', () => ({
+  Storage: {
+    getUserSkillsDir: vi.fn().mockReturnValue('/tmp/fake-user-skills'),
+  },
+}));
+
+vi.mock('../skills/skillLoader.js', () => ({
+  FRONTMATTER_REGEX: /^---\n([\s\S]*?)\n---/,
+  parseFrontmatter: vi.fn().mockReturnValue(null),
+}));
+
 vi.mock('../utils/debugLogger.js', () => ({
   debugLogger: {
     debug: vi.fn(),
     log: vi.fn(),
     warn: vi.fn(),
+  },
+}));
+
+vi.mock('../utils/events.js', () => ({
+  coreEvents: {
+    emitFeedback: vi.fn(),
   },
 }));
 
@@ -425,6 +460,77 @@ describe('memoryService', () => {
         expect.objectContaining({
           error: expect.any(Error),
         }),
+      );
+    });
+
+    it('emits feedback when new skills are created during extraction', async () => {
+      const { startMemoryService } = await import('./memoryService.js');
+      const { LocalAgentExecutor } = await import(
+        '../agents/local-executor.js'
+      );
+
+      // Reset mocks that may carry state from prior tests
+      vi.mocked(coreEvents.emitFeedback).mockClear();
+      vi.mocked(LocalAgentExecutor.create).mockReset();
+
+      const memoryDir = path.join(tmpDir, 'memory4');
+      const skillsDir = path.join(tmpDir, 'skills4');
+      const projectTempDir = path.join(tmpDir, 'temp4');
+      const chatsDir = path.join(projectTempDir, 'chats');
+      await fs.mkdir(memoryDir, { recursive: true });
+      await fs.mkdir(skillsDir, { recursive: true });
+      await fs.mkdir(chatsDir, { recursive: true });
+
+      // Write a valid session with enough messages to pass the filter
+      const conversation = createConversation({
+        sessionId: 'skill-session',
+        messageCount: 20,
+      });
+      await fs.writeFile(
+        path.join(chatsDir, 'session-2025-01-01T00-00-skill001.json'),
+        JSON.stringify(conversation),
+      );
+
+      // Override LocalAgentExecutor.create to return an executor whose run
+      // creates a new skill directory with a SKILL.md in the skillsDir
+      vi.mocked(LocalAgentExecutor.create).mockResolvedValueOnce({
+        run: vi.fn().mockImplementation(async () => {
+          const newSkillDir = path.join(skillsDir, 'my-new-skill');
+          await fs.mkdir(newSkillDir, { recursive: true });
+          await fs.writeFile(
+            path.join(newSkillDir, 'SKILL.md'),
+            '# My New Skill',
+          );
+          return undefined;
+        }),
+      } as never);
+
+      const mockConfig = {
+        storage: {
+          getProjectMemoryDir: vi.fn().mockReturnValue(memoryDir),
+          getProjectMemoryTempDir: vi.fn().mockReturnValue(memoryDir),
+          getProjectSkillsMemoryDir: vi.fn().mockReturnValue(skillsDir),
+          getProjectTempDir: vi.fn().mockReturnValue(projectTempDir),
+        },
+        getToolRegistry: vi.fn(),
+        getMessageBus: vi.fn(),
+        getGeminiClient: vi.fn(),
+        getSkillManager: vi.fn().mockReturnValue({ getSkills: () => [] }),
+        modelConfigService: {
+          registerRuntimeModelConfig: vi.fn(),
+        },
+        sandboxManager: undefined,
+      } as unknown as Parameters<typeof startMemoryService>[0];
+
+      await startMemoryService(mockConfig);
+
+      expect(coreEvents.emitFeedback).toHaveBeenCalledWith(
+        'info',
+        expect.stringContaining('my-new-skill'),
+      );
+      expect(coreEvents.emitFeedback).toHaveBeenCalledWith(
+        'info',
+        expect.stringContaining('/memory inbox'),
       );
     });
   });
