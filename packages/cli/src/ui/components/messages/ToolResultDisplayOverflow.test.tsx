@@ -74,6 +74,7 @@ describe('ToolResultDisplay Overflow', () => {
         underline: false,
         dim: false,
         inverse: false,
+        isUninitialized: false,
       },
     ]);
     const { lastFrame, waitUntilReady, unmount } = await renderWithProviders(

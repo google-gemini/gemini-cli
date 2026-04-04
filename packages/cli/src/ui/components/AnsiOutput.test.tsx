@@ -16,6 +16,7 @@ const createAnsiToken = (overrides: Partial<AnsiToken>): AnsiToken => ({
   underline: false,
   dim: false,
   inverse: false,
+  isUninitialized: false,
   fg: '#ffffff',
   bg: '#000000',
   ...overrides,
