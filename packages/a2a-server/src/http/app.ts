@@ -322,7 +322,7 @@ export async function createApp() {
     expressApp.get('/tasks/metadata', async (req, res) => {
       // This endpoint is only meaningful if the task store is in-memory.
       if (!(taskStoreForExecutor instanceof InMemoryTaskStore)) {
-        res.status(501).send({
+        return res.status(501).send({
           error:
             'Listing all task metadata is only supported when using InMemoryTaskStore.',
         });
@@ -333,9 +333,9 @@ export async function createApp() {
           const tasksMetadata = await Promise.all(
             wrappers.map((wrapper) => wrapper.task.getMetadata()),
           );
-          res.status(200).json(tasksMetadata);
+          return res.status(200).json(tasksMetadata);
         } else {
-          res.status(204).send();
+          return res.status(204).send();
         }
       } catch (error) {
         logger.error('[CoreAgent] Error getting all task metadata:', error);
@@ -343,7 +343,7 @@ export async function createApp() {
           error instanceof Error
             ? error.message
             : 'Unknown error getting task metadata';
-        res.status(500).send({ error: errorMessage });
+        return res.status(500).send({ error: errorMessage });
       }
     });
 
