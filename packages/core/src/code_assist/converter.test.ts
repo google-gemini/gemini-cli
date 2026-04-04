@@ -393,7 +393,30 @@ describe('converter', () => {
       ]);
     });
 
-    it('should convert thought parts to text parts for API compatibility', () => {
+    it('should convert thought parts to text parts for API compatibility when isCountToken is true', () => {
+      const contentWithThought: ContentListUnion = {
+        role: 'model',
+        parts: [
+          { text: 'regular text' },
+          { thought: 'thinking about the problem' } as Part & {
+            thought: string;
+          },
+          { text: 'more text' },
+        ],
+      };
+      expect(toContents(contentWithThought, { isCountToken: true })).toEqual([
+        {
+          role: 'model',
+          parts: [
+            { text: 'regular text' },
+            { text: '[Thought: thinking about the problem]' },
+            { text: 'more text' },
+          ],
+        },
+      ]);
+    });
+
+    it('should preserve thought parts by default', () => {
       const contentWithThought: ContentListUnion = {
         role: 'model',
         parts: [
@@ -409,14 +432,14 @@ describe('converter', () => {
           role: 'model',
           parts: [
             { text: 'regular text' },
-            { text: '[Thought: thinking about the problem]' },
+            { thought: 'thinking about the problem' },
             { text: 'more text' },
           ],
         },
       ]);
     });
 
-    it('should combine text and thought for text parts with thoughts', () => {
+    it('should combine text and thought for text parts with thoughts when isCountToken is true', () => {
       const contentWithTextAndThought: ContentListUnion = {
         role: 'model',
         parts: [
@@ -426,7 +449,9 @@ describe('converter', () => {
           } as Part & { thought: string },
         ],
       };
-      expect(toContents(contentWithTextAndThought)).toEqual([
+      expect(
+        toContents(contentWithTextAndThought, { isCountToken: true }),
+      ).toEqual([
         {
           role: 'model',
           parts: [
@@ -438,7 +463,7 @@ describe('converter', () => {
       ]);
     });
 
-    it('should preserve non-thought properties while removing thought', () => {
+    it('should preserve non-thought properties while removing thought when isCountToken is true', () => {
       const contentWithComplexPart: ContentListUnion = {
         role: 'model',
         parts: [
@@ -448,7 +473,9 @@ describe('converter', () => {
           } as Part & { thought: string },
         ],
       };
-      expect(toContents(contentWithComplexPart)).toEqual([
+      expect(
+        toContents(contentWithComplexPart, { isCountToken: true }),
+      ).toEqual([
         {
           role: 'model',
           parts: [
@@ -460,7 +487,7 @@ describe('converter', () => {
       ]);
     });
 
-    it('should convert invalid text content to valid text part with thought', () => {
+    it('should convert invalid text content to valid text part with thought when isCountToken is true', () => {
       const contentWithInvalidText: ContentListUnion = {
         role: 'model',
         parts: [
@@ -470,7 +497,9 @@ describe('converter', () => {
           } as Part & { thought: string; text: number },
         ],
       };
-      expect(toContents(contentWithInvalidText)).toEqual([
+      expect(
+        toContents(contentWithInvalidText, { isCountToken: true }),
+      ).toEqual([
         {
           role: 'model',
           parts: [
