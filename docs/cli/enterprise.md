@@ -225,6 +225,11 @@ use the `GEMINI_CLI_HOME` environment variable to point to a unique directory
 for a specific user or job. The CLI will create a `.gemini` folder inside the
 specified path.
 
+> **Note:** If you use custom settings (e.g. `customAliases` in
+> `settings.json`), you must place the file at
+> `$GEMINI_CLI_HOME/.gemini/settings.json` — not at the root of
+> `$GEMINI_CLI_HOME`.
+
 **macOS/Linux**
 
 ```bash

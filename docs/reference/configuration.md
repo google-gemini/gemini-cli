@@ -2094,7 +2094,12 @@ the `advanced.excludedEnvVars` setting in your `settings.json` file.
     storage.
   - By default, this is the user's system home directory. The CLI will create a
     `.gemini` folder inside this directory.
-  - Useful for shared compute environments or keeping CLI state isolated.
+  - All configuration files, including `settings.json` (with `customAliases`),
+    must be placed inside the `.gemini` subdirectory — for example,
+    `$GEMINI_CLI_HOME/.gemini/settings.json`, not
+    `$GEMINI_CLI_HOME/settings.json`.
+  - Useful for shared compute environments, keeping CLI state isolated, or
+    running multiple accounts on the same machine.
   - Example: `export GEMINI_CLI_HOME="/path/to/user/config"` (Windows
     PowerShell: `$env:GEMINI_CLI_HOME="C:\path\to\user\config"`)
 - **`GEMINI_CLI_SURFACE`**:
