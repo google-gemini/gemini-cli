@@ -81,12 +81,19 @@ export async function openFileInEditor(
     args.unshift('-i', 'NONE');
   }
 
+  // Prevent command injection on Windows by quoting arguments and stripping any double
+  // quotes to ensure the quotes act as strict boundaries.
+  const safeArgs =
+    process.platform === 'win32'
+      ? [...initialArgs, ...args].map((arg) => `"${arg.replace(/"/g, '')}"`)
+      : [...initialArgs, ...args];
+
   const wasRaw = stdin?.isRaw ?? false;
   setRawMode?.(false);
 
   try {
     if (isTerminal) {
-      const result = spawnSync(executable, [...initialArgs, ...args], {
+      const result = spawnSync(executable, safeArgs, {
         stdio: 'inherit',
         shell: process.platform === 'win32',
       });
@@ -111,7 +118,7 @@ export async function openFileInEditor(
       }
     } else {
       await new Promise<void>((resolve, reject) => {
-        const child = spawn(executable, [...initialArgs, ...args], {
+        const child = spawn(executable, safeArgs, {
           stdio: 'inherit',
           shell: process.platform === 'win32',
         });

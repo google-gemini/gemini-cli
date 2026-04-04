@@ -5,6 +5,8 @@
  */
 
 import type React from 'react';
+import * as crypto from 'node:crypto';
+import * as fs from 'node:fs/promises';
 import { useEffect, useState, useCallback } from 'react';
 import { Box, Text, useStdin } from 'ink';
 import {
@@ -156,12 +158,32 @@ export const ExitPlanModeDialog: React.FC<ExitPlanModeDialogProps> = ({
 
   const handleOpenEditor = useCallback(async () => {
     try {
+      const getHash = async () => {
+        try {
+          const content = await fs.readFile(planPath);
+          return crypto.createHash('sha256').update(content).digest('hex');
+        } catch (err) {
+          // If the file doesn't exist, it's not an error, just means there's no hash.
+          if (err instanceof Error && 'code' in err && err.code === 'ENOENT') {
+            return null;
+          }
+          // For other errors (e.g., permissions), re-throw to be caught by the outer handler.
+          throw err;
+        }
+      };
+
+      const hashBefore = await getHash();
+
       await openFileInEditor(planPath, stdin, setRawMode, getPreferredEditor());
 
-      onFeedback(
-        'I have edited the plan or annotated it with feedback. Review the edited plan, update if necessary, and present it again for approval.',
-      );
-      refresh();
+      const hashAfter = await getHash();
+
+      if (hashBefore !== hashAfter) {
+        onFeedback(
+          'I have edited the plan or annotated it with feedback. Review the edited plan, update if necessary, and present it again for approval.',
+        );
+        refresh();
+      }
     } catch (err) {
       debugLogger.error('Failed to open plan in editor:', err);
     }

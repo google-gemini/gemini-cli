@@ -19,10 +19,16 @@ import {
   type FileSystemService,
 } from '@google/gemini-cli-core';
 import * as fs from 'node:fs';
+import * as fsPromises from 'node:fs/promises';
 import { useKeyMatchers } from '../hooks/useKeyMatchers.js';
+import { openFileInEditor } from '../utils/editorUtils.js';
 
 vi.mock('../utils/editorUtils.js', () => ({
   openFileInEditor: vi.fn(),
+}));
+
+vi.mock('node:fs/promises', () => ({
+  readFile: vi.fn(async () => Buffer.from('mock initial content')),
 }));
 
 vi.mock('@google/gemini-cli-core', async (importOriginal) => {
@@ -577,7 +583,17 @@ Implement a comprehensive authentication system with multiple providers.
         expect(onFeedback).not.toHaveBeenCalled();
       });
 
-      it('automatically submits feedback when Ctrl+X is used to edit the plan', async () => {
+      it('automatically submits feedback when Ctrl+X is used to edit the plan and changes are made', async () => {
+        vi.mocked(fsPromises.readFile).mockResolvedValueOnce(
+          Buffer.from('initial content'),
+        );
+
+        vi.mocked(openFileInEditor).mockImplementationOnce(async () => {
+          vi.mocked(fsPromises.readFile).mockResolvedValueOnce(
+            Buffer.from('modified content'),
+          );
+        });
+
         const { stdin, lastFrame } = await act(async () =>
           renderDialog({ useAlternateBuffer }),
         );
@@ -600,6 +616,42 @@ Implement a comprehensive authentication system with multiple providers.
             'I have edited the plan or annotated it with feedback. Review the edited plan, update if necessary, and present it again for approval.',
           );
         });
+      });
+
+      it('does not submit feedback when Ctrl+X is used but no changes are made', async () => {
+        vi.mocked(fsPromises.readFile).mockResolvedValueOnce(
+          Buffer.from('initial content'),
+        );
+
+        vi.mocked(openFileInEditor).mockImplementationOnce(async () => {
+          vi.mocked(fsPromises.readFile).mockResolvedValueOnce(
+            Buffer.from('initial content'),
+          );
+        });
+
+        const { stdin, lastFrame } = await act(async () =>
+          renderDialog({ useAlternateBuffer }),
+        );
+
+        await act(async () => {
+          vi.runAllTimers();
+        });
+
+        await waitFor(() => {
+          expect(lastFrame()).toContain('Add user authentication');
+        });
+
+        // Press Ctrl+X
+        await act(async () => {
+          writeKey(stdin, '\x18'); // Ctrl+X
+        });
+
+        // Wait a bit to ensure no callback was triggered
+        await act(async () => {
+          vi.advanceTimersByTime(500);
+        });
+
+        expect(onFeedback).not.toHaveBeenCalled();
       });
     },
   );
