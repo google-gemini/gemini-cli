@@ -368,6 +368,8 @@ export interface BrowserAgentCustomConfig {
   confirmSensitiveActions?: boolean;
   /** Whether to block file uploads. */
   blockFileUploads?: boolean;
+  /** Show visual cursor animations for clicks and scrolls. Default: true in non-headless mode */
+  showCursorAnimations?: boolean;
 }
 
 /**

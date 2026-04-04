@@ -98,6 +98,11 @@ export async function createBrowserAgentDefinition(
     }
   }
 
+  // Determine if cursor animations should be shown (default: true in non-headless)
+  const showCursorAnimations =
+    browserConfig?.customConfig?.showCursorAnimations ??
+    !browserConfig?.customConfig?.headless;
+
   // Create declarative tools from dynamically discovered MCP tools
   // These tools dispatch to browserManager's isolated client
   const mcpTools = await createMcpDeclarativeTools(
@@ -105,6 +110,7 @@ export async function createBrowserAgentDefinition(
     messageBus,
     shouldDisableInput,
     browserConfig.customConfig.blockFileUploads,
+    showCursorAnimations,
   );
   const availableToolNames = mcpTools.map((t) => t.name);
 
