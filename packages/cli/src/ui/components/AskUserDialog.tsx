@@ -6,6 +6,7 @@
 
 import type React from 'react';
 import {
+  useState,
   useCallback,
   useMemo,
   useRef,
@@ -13,7 +14,7 @@ import {
   useReducer,
   useContext,
 } from 'react';
-import { Box, Text } from 'ink';
+import { Box, Text, useIsScreenReaderEnabled } from 'ink';
 import { theme } from '../semantic-colors.js';
 import { checkExhaustive, type Question } from '@google/gemini-cli-core';
 import { BaseSelectionList } from './shared/BaseSelectionList.js';
@@ -1010,6 +1011,9 @@ export const AskUserDialog: React.FC<AskUserDialogProps> = ({
   extraParts,
 }) => {
   const keyMatchers = useKeyMatchers();
+  const isScreenReaderEnabled = useIsScreenReaderEnabled();
+  const [srInput, setSrInput] = useState('');
+  const [srInputError, setSrInputError] = useState('');
   const uiState = useContext(UIStateContext);
   const availableHeight =
     availableHeightProp ??
@@ -1063,7 +1067,7 @@ export const AskUserDialog: React.FC<AskUserDialogProps> = ({
   );
 
   useKeypress(handleCancel, {
-    isActive: !submitted,
+    isActive: !submitted && !isScreenReaderEnabled,
   });
 
   const isOnReviewTab = currentQuestionIndex === reviewTabIndex;
@@ -1195,6 +1199,135 @@ export const AskUserDialog: React.FC<AskUserDialogProps> = ({
         completedIndices={answeredIndices}
       />
     ) : null;
+
+  const handleSrKeypress = useCallback(
+    (key: Key) => {
+      if (keyMatchers[Command.ESCAPE](key)) {
+        onCancel();
+        return true;
+      }
+      if (keyMatchers[Command.RETURN](key)) {
+        // Use effectiveQuestion not currentQuestion - YES/NO type is transformed
+        // to a CHOICE question with Yes/No options at this point, but we want to keep the original type for handling answers
+        if (!effectiveQuestion) return false;
+        if (effectiveQuestion.type === 'text') {
+          handleAnswer(srInput.trim());
+          setSrInput('');
+        } else {
+          setSrInputError('');
+
+          const raw = srInput.trim()
+            ? srInput.trim().split(/\s+/).map(Number)
+            : [];
+
+          const maxOption = effectiveQuestion.options?.length ?? 0;
+          const valid = raw.filter(
+            (n) => !isNaN(n) && n >= 1 && n <= maxOption,
+          );
+          const invalid = raw.filter((n) => isNaN(n) || n < 1 || n > maxOption);
+
+          if (invalid.length > 0) {
+            setSrInputError(
+              `Invalid input: ${invalid.join(', ')}. Please enter numbers between 1 and ${maxOption}, separated by spaces.`,
+            );
+            setSrInput('');
+          } else if (valid.length > 0) {
+            if (!effectiveQuestion.multiSelect && valid.length > 1) {
+              setSrInputError(
+                `This question only accepts one answer. Please enter a single number between 1 and ${maxOption}.`,
+              );
+              setSrInput('');
+            } else {
+              const selected = valid
+                .map((n) => effectiveQuestion.options![n - 1].label)
+                .join(', ');
+              handleAnswer(selected);
+              setSrInput('');
+              setSrInputError('');
+            }
+          }
+        }
+        return true;
+      }
+      // Backspace(ASCII - \x7f): allow user to correct input without cancelling the dialog
+      if (key.sequence === '\x7f') {
+        setSrInput((prev) => prev.slice(0, -1));
+        return true;
+      }
+      if (
+        key.sequence &&
+        !key.ctrl &&
+        !key.alt &&
+        !key.cmd &&
+        key.sequence.charCodeAt(0) >= 32
+      ) {
+        setSrInput((prev) => prev + key.sequence);
+        return true;
+      }
+      return false;
+    },
+    [
+      keyMatchers,
+      onCancel,
+      effectiveQuestion,
+      srInput,
+      handleAnswer,
+      setSrInputError,
+    ],
+  );
+
+  useKeypress(handleSrKeypress, {
+    isActive: isScreenReaderEnabled && !submitted,
+  });
+
+  // Screen reader mode: render plain accessible text UI instead of cursor-driven Ink components
+  if (isScreenReaderEnabled) {
+    const srQuestion = effectiveQuestion ?? questions[0];
+    const questionNumber = `Question ${currentQuestionIndex + 1} of ${questions.length}`;
+    return (
+      <Box flexDirection="column" width={width}>
+        <Text>{questionNumber}</Text>
+        <Text>
+          <RenderInline text={srQuestion?.header || ''} />
+        </Text>
+        <Text>
+          <RenderInline text={srQuestion?.question || ''} />
+        </Text>
+        {srQuestion?.type !== 'text' && srQuestion?.options && (
+          <Box flexDirection="column" marginTop={1}>
+            <Text>Options:</Text>
+            {srQuestion.options.map((opt, i) => (
+              <Text key={i}>
+                {'  '}
+                {i + 1}. <RenderInline text={opt.label} />
+                {opt.description ? ' - ' : ''}
+                {opt.description && <RenderInline text={opt.description} />}
+              </Text>
+            ))}
+          </Box>
+        )}
+
+        <Box marginTop={1}>
+          {srQuestion?.type === 'text' ? (
+            <Text>
+              Type your answer and press Enter. Press Escape to cancel.
+            </Text>
+          ) : srQuestion?.multiSelect ? (
+            <Text>
+              Type numbers separated by spaces (e.g. 1 2) and press Enter. Press
+              Escape to cancel.
+            </Text>
+          ) : (
+            <Text>Type a number and press Enter. Press Escape to cancel.</Text>
+          )}
+        </Box>
+        {srInput.length > 0 && <Text>Input: {srInput}</Text>}
+        {srInputError.length > 0 && (
+          <Text color={theme.status.error}>{srInputError}</Text>
+        )}
+      </Box>
+    );
+  }
 
   if (isOnReviewTab) {
     return (
