@@ -89,9 +89,8 @@ initiatives that interest you.
 ## How to Contribute
 
 Gemini CLI is an open-source project, and we welcome contributions from the
-community! Whether you're a developer, a designer, or just an enthusiastic user
-you can find our
-[Community Guidelines here](https://github.com/google-gemini/gemini-cli/blob/main/CONTRIBUTING.md)
+community! Whether you're a developer, a designer, or just an enthusiastic user,
+you can find our [Community Guidelines](CONTRIBUTING.md)
 to learn how to get started. There are many ways to get involved:
 
 - **Roadmap:** Please review and find areas in our
