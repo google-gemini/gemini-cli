@@ -1,4 +1,4 @@
-#!/usr/bin/env -S node --no-warnings=DEP0040
+#!/usr/bin/env node
 
 /**
  * @license
@@ -6,6 +6,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+import './src/suppress-warnings.js';
 import { main } from './src/gemini.js';
 import { FatalError, writeToStderr } from '@google/gemini-cli-core';
 import { runExitCleanup } from './src/utils/cleanup.js';

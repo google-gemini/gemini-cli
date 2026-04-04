@@ -1,4 +1,4 @@
-#!/usr/bin/env -S node --no-warnings=DEP0040
+#!/usr/bin/env node
 
 /**
  * @license
@@ -6,6 +6,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+import '../suppress-warnings.js';
 import * as url from 'node:url';
 import * as path from 'node:path';
 
