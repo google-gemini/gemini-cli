@@ -96,7 +96,7 @@ export const LoadingIndicator: React.FC<LoadingIndicatorProps> = ({
             nonRespondingDisplay={
               spinnerIcon ??
               (streamingState === StreamingState.WaitingForConfirmation
-                ? '⠏'
+                ? '⢎⡱'
                 : '')
             }
             isHookActive={isHookActive}
@@ -140,7 +140,7 @@ export const LoadingIndicator: React.FC<LoadingIndicatorProps> = ({
               nonRespondingDisplay={
                 spinnerIcon ??
                 (streamingState === StreamingState.WaitingForConfirmation
-                  ? '⠏'
+                  ? '⢎⡱'
                   : '')
               }
               isHookActive={isHookActive}

@@ -6,7 +6,6 @@
 
 import type React from 'react';
 import { Text, useIsScreenReaderEnabled } from 'ink';
-import type { SpinnerName } from 'cli-spinners';
 import { useStreamingContext } from '../contexts/StreamingContext.js';
 import { StreamingState } from '../types.js';
 import {
@@ -15,6 +14,7 @@ import {
 } from '../textConstants.js';
 import { theme } from '../semantic-colors.js';
 import { GeminiSpinner } from './GeminiSpinner.js';
+import { type CircularSpinnerVariant } from './CircularSpinner.js';
 
 interface GeminiRespondingSpinnerProps {
   /**
@@ -22,7 +22,7 @@ interface GeminiRespondingSpinnerProps {
    * If not provided and not Responding, renders null.
    */
   nonRespondingDisplay?: string;
-  spinnerType?: SpinnerName;
+  variant?: CircularSpinnerVariant;
   /**
    * If true, we prioritize showing the nonRespondingDisplay (hook icon)
    * even if the state is Responding.
@@ -35,7 +35,7 @@ export const GeminiRespondingSpinner: React.FC<
   GeminiRespondingSpinnerProps
 > = ({
   nonRespondingDisplay,
-  spinnerType = 'dots',
+  variant = 'Composite',
   isHookActive = false,
   color,
 }) => {
@@ -46,10 +46,7 @@ export const GeminiRespondingSpinner: React.FC<
   // to be consistent, instead of the rainbow spinner which means "Gemini is talking".
   if (streamingState === StreamingState.Responding && !isHookActive) {
     return (
-      <GeminiSpinner
-        spinnerType={spinnerType}
-        altText={SCREEN_READER_RESPONDING}
-      />
+      <GeminiSpinner variant={variant} altText={SCREEN_READER_RESPONDING} />
     );
   }
 
