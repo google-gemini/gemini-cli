@@ -6,9 +6,9 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { main } from './src/gemini.js';
-import { FatalError, writeToStderr } from '@google/gemini-cli-core';
-import { runExitCleanup } from './src/utils/cleanup.js';
+import { spawn } from 'node:child_process';
+import os from 'node:os';
+import v8 from 'node:v8';
 
 // --- Global Entry Point ---
 
@@ -20,52 +20,145 @@ process.on('uncaughtException', (error) => {
     error instanceof Error &&
     error.message === 'Cannot resize a pty that has already exited'
   ) {
-    // This error happens on Windows with node-pty when resizing a pty that has just exited.
-    // It is a race condition in node-pty that we cannot prevent, so we silence it.
     return;
   }
 
-  // For other errors, we rely on the default behavior, but since we attached a listener,
-  // we must manually replicate it.
   if (error instanceof Error) {
-    writeToStderr(error.stack + '\n');
+    process.stderr.write(error.stack + '\n');
   } else {
-    writeToStderr(String(error) + '\n');
+    process.stderr.write(String(error) + '\n');
   }
   process.exit(1);
 });
 
-main().catch(async (error) => {
-  // Set a timeout to force exit if cleanup hangs
-  const cleanupTimeout = setTimeout(() => {
-    writeToStderr('Cleanup timed out, forcing exit...\n');
-    process.exit(1);
-  }, 5000);
+async function run() {
+  if (!process.env['GEMINI_CLI_NO_RELAUNCH'] && !process.env['SANDBOX']) {
+    // --- Lightweight Parent Process / Daemon ---
+    // We avoid importing heavy dependencies here to save ~1.5s of startup time.
 
-  try {
-    await runExitCleanup();
-  } catch (cleanupError) {
-    writeToStderr(
-      `Error during final cleanup: ${cleanupError instanceof Error ? cleanupError.message : String(cleanupError)}\n`,
-    );
-  } finally {
-    clearTimeout(cleanupTimeout);
-  }
+    // Check memory arguments (lightweight version)
+    const nodeArgs: string[] = [...process.execArgv];
+    const scriptArgs = process.argv.slice(2);
+    const isCommand =
+      scriptArgs.length > 0 &&
+      [
+        'mcp',
+        'extensions',
+        'extension',
+        'skills',
+        'skill',
+        'hooks',
+        'hook',
+      ].includes(scriptArgs[0]);
 
-  if (error instanceof FatalError) {
-    let errorMessage = error.message;
-    if (!process.env['NO_COLOR']) {
-      errorMessage = `\x1b[31m${errorMessage}\x1b[0m`;
+    if (!isCommand) {
+      // Very rudimentary check for memory args without parsing full settings.
+      // If we need more memory, we just provide it.
+      const totalMemoryMB = os.totalmem() / (1024 * 1024);
+      const heapStats = v8.getHeapStatistics();
+      const currentMaxOldSpaceSizeMb = Math.floor(
+        heapStats.heap_size_limit / 1024 / 1024,
+      );
+      const targetMaxOldSpaceSizeInMB = Math.floor(totalMemoryMB * 0.5);
+
+      if (targetMaxOldSpaceSizeInMB > currentMaxOldSpaceSizeMb) {
+        nodeArgs.push(`--max-old-space-size=${targetMaxOldSpaceSizeInMB}`);
+      }
     }
-    writeToStderr(errorMessage + '\n');
-    process.exit(error.exitCode);
-  }
 
-  writeToStderr('An unexpected critical error occurred:');
-  if (error instanceof Error) {
-    writeToStderr(error.stack + '\n');
+    const script = process.argv[1];
+    nodeArgs.push(script);
+    nodeArgs.push(...scriptArgs);
+
+    const newEnv = { ...process.env, GEMINI_CLI_NO_RELAUNCH: 'true' };
+    const RELAUNCH_EXIT_CODE = 199;
+    let latestAdminSettings: unknown = undefined;
+
+    const runner = () => {
+      process.stdin.pause();
+
+      const child = spawn(process.execPath, nodeArgs, {
+        stdio: ['inherit', 'inherit', 'inherit', 'ipc'],
+        env: newEnv,
+      });
+
+      if (latestAdminSettings) {
+        child.send({ type: 'admin-settings', settings: latestAdminSettings });
+      }
+
+      child.on('message', (msg: { type?: string; settings?: unknown }) => {
+        if (msg.type === 'admin-settings-update' && msg.settings) {
+          latestAdminSettings = msg.settings;
+        }
+      });
+
+      return new Promise<number>((resolve) => {
+        child.on('error', () => resolve(1));
+        child.on('close', (code) => {
+          process.stdin.resume();
+          resolve(code ?? 1);
+        });
+      });
+    };
+
+    while (true) {
+      try {
+        const exitCode = await runner();
+        if (exitCode !== RELAUNCH_EXIT_CODE) {
+          process.exit(exitCode);
+        }
+      } catch (error: unknown) {
+        process.stdin.resume();
+        process.stderr.write(
+          `Fatal error: Failed to relaunch the CLI process.\n${error instanceof Error ? (error.stack ?? error.message) : String(error)}\n`,
+        );
+        process.exit(1);
+      }
+    }
   } else {
-    writeToStderr(String(error) + '\n');
+    // --- Heavy Child Process ---
+    // Now we can safely import everything.
+    const { main } = await import('./src/gemini.js');
+    const { FatalError, writeToStderr } = await import(
+      '@google/gemini-cli-core'
+    );
+    const { runExitCleanup } = await import('./src/utils/cleanup.js');
+
+    main().catch(async (error: unknown) => {
+      // Set a timeout to force exit if cleanup hangs
+      const cleanupTimeout = setTimeout(() => {
+        writeToStderr('Cleanup timed out, forcing exit...\n');
+        process.exit(1);
+      }, 5000);
+
+      try {
+        await runExitCleanup();
+      } catch (cleanupError: unknown) {
+        writeToStderr(
+          `Error during final cleanup: ${cleanupError instanceof Error ? cleanupError.message : String(cleanupError)}\n`,
+        );
+      } finally {
+        clearTimeout(cleanupTimeout);
+      }
+
+      if (error instanceof FatalError) {
+        let errorMessage = error.message;
+        if (!process.env['NO_COLOR']) {
+          errorMessage = `\x1b[31m${errorMessage}\x1b[0m`;
+        }
+        writeToStderr(errorMessage + '\n');
+        process.exit(error.exitCode);
+      }
+
+      writeToStderr('An unexpected critical error occurred:');
+      if (error instanceof Error) {
+        writeToStderr(error.stack + '\n');
+      } else {
+        writeToStderr(String(error) + '\n');
+      }
+      process.exit(1);
+    });
   }
-  process.exit(1);
-});
+}
+
+run();
