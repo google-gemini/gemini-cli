@@ -163,9 +163,8 @@ describe.skipIf(skipFlaky)(
               log.hookCall.stderr.includes('"decision":"deny"')),
         );
         expect(blockHook).toBeDefined();
-        expect(
-          blockHook?.hookCall.stdout + blockHook?.hookCall.stderr,
-        ).toContain(blockMsg);
+        const output = blockHook!.hookCall.stdout + blockHook!.hookCall.stderr;
+        expect(output).toContain(blockMsg);
       });
 
       it('should allow tool execution when hook returns allow decision', async () => {
