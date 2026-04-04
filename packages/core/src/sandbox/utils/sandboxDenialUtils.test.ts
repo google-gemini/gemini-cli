@@ -4,11 +4,18 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { describe, it, expect } from 'vitest';
-import { parsePosixSandboxDenials } from './sandboxDenialUtils.js';
+import { describe, it, expect, beforeEach } from 'vitest';
+import {
+  parsePosixSandboxDenials,
+  clearErrorCache,
+} from './sandboxDenialUtils.js';
 import type { ShellExecutionResult } from '../../services/shellExecutionService.js';
 
 describe('parsePosixSandboxDenials', () => {
+  beforeEach(() => {
+    clearErrorCache();
+  });
+
   it('should detect file system denial and extract paths', () => {
     const parsed = parsePosixSandboxDenials({
       output: 'ls: /root: Operation not permitted',
@@ -115,5 +122,49 @@ EACCES: permission denied, mkdir '/Users/galzahavi/.pnpm-store/v3'
     } as unknown as ShellExecutionResult);
     expect(parsed).toBeDefined();
     expect(parsed?.filePaths).toContain('/Users/galzahavi/.pnpm-store/v3');
+  });
+
+  it('should detect Python PermissionError and extract path accurately', () => {
+    const output = `Caught exception: [Errno 13] Permission denied: '/etc/test_sandbox_denial'
+Traceback (most recent call last):
+  File "/usr/local/google/home/davidapierce/gemini-cli/repro_sandbox.py", line 9, in <module>
+    raise e
+  File "/usr/local/google/home/davidapierce/gemini-cli/repro_sandbox.py", line 5, in <module>
+    with open('/etc/test_sandbox_denial', 'w') as f:
+         ~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+PermissionError: [Errno 13] Permission denied: '/etc/test_sandbox_denial'`;
+
+    const parsed = parsePosixSandboxDenials({
+      output,
+      exitCode: 1,
+      error: null,
+    } as unknown as ShellExecutionResult);
+
+    expect(parsed?.filePaths).toEqual(['/etc/test_sandbox_denial']);
+  });
+
+  it('should detect new keywords like "access denied" and "forbidden"', () => {
+    const parsed1 = parsePosixSandboxDenials({
+      output: 'Access denied to /var/log/syslog',
+      exitCode: 1,
+      error: null,
+    } as unknown as ShellExecutionResult);
+    expect(parsed1?.filePaths).toContain('/var/log/syslog');
+
+    const parsed2 = parsePosixSandboxDenials({
+      output: 'Forbidden: access to /root/secret is not allowed',
+      exitCode: 1,
+      error: null,
+    } as unknown as ShellExecutionResult);
+    expect(parsed2?.filePaths).toContain('/root/secret');
+  });
+
+  it('should detect read-only file system error', () => {
+    const parsed = parsePosixSandboxDenials({
+      output: 'rm: cannot remove /mnt/usb/test: Read-only file system',
+      exitCode: 1,
+      error: null,
+    } as unknown as ShellExecutionResult);
+    expect(parsed?.filePaths).toContain('/mnt/usb/test');
   });
 });

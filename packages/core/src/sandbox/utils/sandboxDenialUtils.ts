@@ -7,6 +7,16 @@
 import { type ParsedSandboxDenial } from '../../services/sandboxManager.js';
 import type { ShellExecutionResult } from '../../services/shellExecutionService.js';
 
+const MAX_CACHE_SIZE = 5;
+const errorCache: string[] = [];
+
+/**
+ * Clears the error cache. Only used for testing.
+ */
+export function clearErrorCache(): void {
+  errorCache.length = 0;
+}
+
 /**
  * Common POSIX-style sandbox denial detection.
  * Used by macOS and Linux sandbox managers.
@@ -18,6 +28,11 @@ export function parsePosixSandboxDenials(
   const errorOutput = result.error?.message;
   const combined = (output + ' ' + (errorOutput || '')).toLowerCase();
 
+  const combinedTrimmed = combined.trim();
+  if (combinedTrimmed && errorCache.includes(combinedTrimmed)) {
+    return undefined;
+  }
+
   const isFileDenial = [
     'operation not permitted',
     'permission denied',
@@ -27,6 +42,12 @@ export function parsePosixSandboxDenials(
     'should be read/write',
     'sandbox_apply',
     'sandbox: ',
+    'access denied',
+    'read-only file system',
+    'permissionerror',
+    'fs.permissiondenied',
+    'forbidden',
+    'system.unauthorizedaccessexception',
   ].some((keyword) => combined.includes(keyword));
 
   const isNetworkDenial = [
@@ -46,6 +67,8 @@ export function parsePosixSandboxDenials(
     'err_pnpm_fetch',
     'err_pnpm_no_matching_version',
     "syscall: 'listen'",
+    'socketexception',
+    'networkaccessdenied',
   ].some((keyword) => combined.includes(keyword));
 
   if (!isFileDenial && !isNetworkDenial) {
@@ -57,15 +80,21 @@ export function parsePosixSandboxDenials(
   // Extract denied paths (POSIX absolute paths or home-relative paths starting with ~)
   const regexes = [
     // format: /path: operation not permitted
-    /(?:^|\s)['"]?((?:\/|~)[\w.\-/:~]+)['"]?:\s*[Oo]peration not permitted/gi,
+    /(?:^|\s)['"]?((?:\/|~)[\w.\-/:~]*[\w.\-/~])['"]?[^\w/]*operation not permitted/gi,
     // format: operation not permitted, open '/path'
-    /[Oo]peration not permitted,\s*open\s*['"]?((?:\/|~)[\w.\-/:~]+)['"]?/gi,
+    /operation not permitted[^\w/]*open[^\w/]*['"]?((?:\/|~)[\w.\-/:~]*[\w.\-/~])['"]?/gi,
     // format: permission denied, open '/path'
-    /[Pp]ermission denied,\s*open\s*['"]?((?:\/|~)[\w.\-/:~]+)['"]?/gi,
+    /permission denied[^\w/]*open[^\w/]*['"]?((?:\/|~)[\w.\-/:~]*[\w.\-/~])['"]?/gi,
     // format: npm error path /path or npm ERR! path /path
-    /npm\s+(?:error|ERR!)\s+path\s+((?:\/|~)[\w.\-/:~]+)/gi,
+    /npm[\s!]*[A-Za-z]*err[A-Za-z!]*[\s!]+path[\s!]*((?:\/|~)[\w.\-/:~]*[\w.\-/~])/gi,
     // format: EACCES: permission denied, mkdir '/path'
-    /EACCES:\s*permission denied,\s*\w+\s*['"]?((?:\/|~)[\w.\-/:~]+)['"]?/gi,
+    /eacces[^\w/]*permission denied[^\w/]*\w+[^\w/]*['"]?((?:\/|~)[\w.\-/:~]*[\w.\-/~])['"]?/gi,
+    // format: PermissionError: [Errno 13] Permission denied: '/path'
+    /permissionerror[^\w/]*(?:[^'"]*)['"]((?:\/|~)[\w.\-/:~]*[\w.\-/~])['"]/gi,
+    // format: FileNotFoundError: [Errno 2] No such file or directory: '/path' (sometimes returned in sandbox denials if directory is hidden)
+    /filenotfounderror[^\w/]*(?:[^'"]*)['"]((?:\/|~)[\w.\-/:~]*[\w.\-/~])['"]/gi,
+    // format: Error: EACCES: permission denied, open '/path'
+    /error[^\w/]*eacces[^\w/]*permission denied[^\w/]*(?:[^'"]*)['"]((?:\/|~)[\w.\-/:~]*[\w.\-/~])['"]/gi,
   ];
 
   for (const regex of regexes) {
@@ -99,6 +128,13 @@ export function parsePosixSandboxDenials(
           filePaths.add(p);
         }
       }
+    }
+  }
+
+  if (combinedTrimmed) {
+    errorCache.push(combinedTrimmed);
+    if (errorCache.length > MAX_CACHE_SIZE) {
+      errorCache.shift();
     }
   }
 
