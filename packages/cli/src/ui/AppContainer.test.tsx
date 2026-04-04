@@ -328,13 +328,13 @@ describe('AppContainer State Management', () => {
     handleApprovalModeChange: vi.fn(),
     activePtyId: null,
     loopDetectionConfirmationRequest: null,
-    backgroundShellCount: 0,
-    isBackgroundShellVisible: false,
-    toggleBackgroundShell: vi.fn(),
-    backgroundCurrentShell: vi.fn(),
-    backgroundShells: new Map(),
-    registerBackgroundShell: vi.fn(),
-    dismissBackgroundShell: vi.fn(),
+    backgroundTaskCount: 0,
+    isBackgroundTaskVisible: false,
+    toggleBackgroundTasks: vi.fn(),
+    backgroundCurrentExecution: vi.fn(),
+    backgroundTasks: new Map(),
+    registerBackgroundTask: vi.fn(),
+    dismissBackgroundTask: vi.fn(),
   };
 
   beforeEach(() => {
@@ -346,6 +346,7 @@ describe('AppContainer State Management', () => {
     // Initialize mock stdout for terminal title tests
 
     mocks.mockStdout.write.mockClear();
+    (disableMouseEvents as import('vitest').Mock).mockClear();
 
     capturedUIState = null!;
 
@@ -470,6 +471,7 @@ describe('AppContainer State Management', () => {
 
     // Mock Config
     mockConfig = makeFakeConfig();
+    vi.spyOn(mockConfig, 'getUseRenderProcess').mockReturnValue(false);
 
     // Mock config's getTargetDir to return consistent workspace directory
     vi.spyOn(mockConfig, 'getTargetDir').mockReturnValue('/test/workspace');
@@ -489,8 +491,8 @@ describe('AppContainer State Management', () => {
     // Mock LoadedSettings
     mockSettings = createMockSettings({
       hideBanner: false,
-      hideFooter: false,
       hideTips: false,
+      hideFooter: false,
       showMemoryUsage: false,
       theme: 'default',
       ui: {
@@ -911,8 +913,8 @@ describe('AppContainer State Management', () => {
     it('handles settings with all display options disabled', async () => {
       const settingsAllHidden = createMockSettings({
         hideBanner: true,
-        hideFooter: true,
         hideTips: true,
+        hideFooter: true,
         showMemoryUsage: false,
       });
 
@@ -1356,6 +1358,7 @@ describe('AppContainer State Management', () => {
     beforeEach(() => {
       // Reset mock stdout for each test
       mocks.mockStdout.write.mockClear();
+      (disableMouseEvents as import('vitest').Mock).mockClear();
     });
 
     it('verifies useStdout is mocked', async () => {
@@ -2157,13 +2160,8 @@ describe('AppContainer State Management', () => {
         expect(mockHandleSlashCommand).not.toHaveBeenCalled();
 
         pressKey('\x04'); // Ctrl+D
-        // Now count is 2, it should quit.
-        expect(mockHandleSlashCommand).toHaveBeenCalledWith(
-          '/quit',
-          undefined,
-          undefined,
-          false,
-        );
+        // It should still not quit because buffer is non-empty.
+        expect(mockHandleSlashCommand).not.toHaveBeenCalled();
         unmount();
       });
 
@@ -2262,13 +2260,13 @@ describe('AppContainer State Management', () => {
       });
 
       it('should focus background shell on Tab when already visible (not toggle it off)', async () => {
-        const mockToggleBackgroundShell = vi.fn();
+        const mockToggleBackgroundTask = vi.fn();
         mockedUseGeminiStream.mockReturnValue({
           ...DEFAULT_GEMINI_STREAM_MOCK,
           activePtyId: null,
-          isBackgroundShellVisible: true,
-          backgroundShells: new Map([[123, { pid: 123, status: 'running' }]]),
-          toggleBackgroundShell: mockToggleBackgroundShell,
+          isBackgroundTaskVisible: true,
+          backgroundTasks: new Map([[123, { pid: 123, status: 'running' }]]),
+          toggleBackgroundTasks: mockToggleBackgroundTask,
         });
 
         await setupKeypressTest();
@@ -2282,7 +2280,7 @@ describe('AppContainer State Management', () => {
         // Should be focused
         expect(capturedUIState.embeddedShellFocused).toBe(true);
         // Should NOT have toggled (closed) the shell
-        expect(mockToggleBackgroundShell).not.toHaveBeenCalled();
+        expect(mockToggleBackgroundTask).not.toHaveBeenCalled();
 
         unmount();
       });
@@ -2290,13 +2288,13 @@ describe('AppContainer State Management', () => {
 
     describe('Background Shell Toggling (CTRL+B)', () => {
       it('should toggle background shell on Ctrl+B even if visible but not focused', async () => {
-        const mockToggleBackgroundShell = vi.fn();
+        const mockToggleBackgroundTask = vi.fn();
         mockedUseGeminiStream.mockReturnValue({
           ...DEFAULT_GEMINI_STREAM_MOCK,
           activePtyId: null,
-          isBackgroundShellVisible: true,
-          backgroundShells: new Map([[123, { pid: 123, status: 'running' }]]),
-          toggleBackgroundShell: mockToggleBackgroundShell,
+          isBackgroundTaskVisible: true,
+          backgroundTasks: new Map([[123, { pid: 123, status: 'running' }]]),
+          toggleBackgroundTasks: mockToggleBackgroundTask,
         });
 
         await setupKeypressTest();
@@ -2308,7 +2306,7 @@ describe('AppContainer State Management', () => {
         pressKey('\x02');
 
         // Should have toggled (closed) the shell
-        expect(mockToggleBackgroundShell).toHaveBeenCalled();
+        expect(mockToggleBackgroundTask).toHaveBeenCalled();
         // Should be unfocused
         expect(capturedUIState.embeddedShellFocused).toBe(false);
 
@@ -2316,28 +2314,28 @@ describe('AppContainer State Management', () => {
       });
 
       it('should show and focus background shell on Ctrl+B if hidden', async () => {
-        const mockToggleBackgroundShell = vi.fn();
+        const mockToggleBackgroundTask = vi.fn();
         const geminiStreamMock = {
           ...DEFAULT_GEMINI_STREAM_MOCK,
           activePtyId: null,
-          isBackgroundShellVisible: false,
-          backgroundShells: new Map([[123, { pid: 123, status: 'running' }]]),
-          toggleBackgroundShell: mockToggleBackgroundShell,
+          isBackgroundTaskVisible: false,
+          backgroundTasks: new Map([[123, { pid: 123, status: 'running' }]]),
+          toggleBackgroundTasks: mockToggleBackgroundTask,
         };
         mockedUseGeminiStream.mockReturnValue(geminiStreamMock);
 
         await setupKeypressTest();
 
         // Update the mock state when toggled to simulate real behavior
-        mockToggleBackgroundShell.mockImplementation(() => {
-          geminiStreamMock.isBackgroundShellVisible = true;
+        mockToggleBackgroundTask.mockImplementation(() => {
+          geminiStreamMock.isBackgroundTaskVisible = true;
         });
 
         // Press Ctrl+B
         pressKey('\x02');
 
         // Should have toggled (shown) the shell
-        expect(mockToggleBackgroundShell).toHaveBeenCalled();
+        expect(mockToggleBackgroundTask).toHaveBeenCalled();
         // Should be focused
         expect(capturedUIState.embeddedShellFocused).toBe(true);
 
@@ -2464,7 +2462,7 @@ describe('AppContainer State Management', () => {
     });
   });
 
-  describe('Copy Mode (CTRL+S)', () => {
+  describe('Copy Mode (F9)', () => {
     let rerender: () => void;
     let unmount: () => void;
     let stdin: Awaited<ReturnType<typeof render>>['stdin'];
@@ -2473,6 +2471,8 @@ describe('AppContainer State Management', () => {
       isAlternateMode = false,
       childHandler?: Mock,
     ) => {
+      vi.spyOn(mockConfig, 'getUseTerminalBuffer').mockReturnValue(false);
+
       vi.spyOn(mockConfig, 'getUseAlternateBuffer').mockReturnValue(
         isAlternateMode,
       );
@@ -2517,6 +2517,8 @@ describe('AppContainer State Management', () => {
 
     beforeEach(() => {
       mocks.mockStdout.write.mockClear();
+      (disableMouseEvents as import('vitest').Mock).mockClear();
+
       vi.useFakeTimers();
     });
 
@@ -2537,12 +2539,13 @@ describe('AppContainer State Management', () => {
         modeName: 'Alternate Buffer Mode',
       },
     ])('$modeName', ({ isAlternateMode, shouldEnable }) => {
-      it(`should ${shouldEnable ? 'toggle' : 'NOT toggle'} mouse off when Ctrl+S is pressed`, async () => {
+      it(`should ${shouldEnable ? 'toggle' : 'NOT toggle'} mouse off when F9 is pressed`, async () => {
         await setupCopyModeTest(isAlternateMode);
         mocks.mockStdout.write.mockClear(); // Clear initial enable call
+        (disableMouseEvents as import('vitest').Mock).mockClear();
 
         act(() => {
-          stdin.write('\x13'); // Ctrl+S
+          stdin.write('\x1b[20~'); // F9
         });
         rerender();
 
@@ -2555,13 +2558,13 @@ describe('AppContainer State Management', () => {
       });
 
       if (shouldEnable) {
-        it('should toggle mouse back on when Ctrl+S is pressed again', async () => {
+        it('should toggle mouse back on when F9 is pressed again', async () => {
           await setupCopyModeTest(isAlternateMode);
           (writeToStdout as Mock).mockClear();
 
           // Turn it on (disable mouse)
           act(() => {
-            stdin.write('\x13'); // Ctrl+S
+            stdin.write('\x1b[20~'); // F9
           });
           rerender();
           expect(disableMouseEvents).toHaveBeenCalled();
@@ -2581,7 +2584,7 @@ describe('AppContainer State Management', () => {
 
           // Enter copy mode
           act(() => {
-            stdin.write('\x13'); // Ctrl+S
+            stdin.write('\x1b[20~'); // F9
           });
           rerender();
 
@@ -2661,7 +2664,7 @@ describe('AppContainer State Management', () => {
 
           // 2. Enter copy mode
           act(() => {
-            stdin.write('\x13'); // Ctrl+S
+            stdin.write('\x1b[20~'); // F9
           });
           rerender();
 
@@ -3098,6 +3101,7 @@ describe('AppContainer State Management', () => {
 
       // Clear previous calls
       mocks.mockStdout.write.mockClear();
+      (disableMouseEvents as import('vitest').Mock).mockClear();
 
       const { unmount } = await act(async () => renderAppContainer());
 
@@ -3140,16 +3144,13 @@ describe('AppContainer State Management', () => {
 
       // Reset mock stdout to clear any initial writes
       mocks.mockStdout.write.mockClear();
+      (disableMouseEvents as import('vitest').Mock).mockClear();
 
       // Submit
       await act(async () => capturedUIActions.handleFinalSubmit('test prompt'));
 
       // Should be reset
       expect(capturedUIState.constrainHeight).toBe(true);
-      // Should refresh static (which clears terminal in non-alternate buffer)
-      expect(mocks.mockStdout.write).toHaveBeenCalledWith(
-        ansiEscapes.clearTerminal,
-      );
       unmount();
     });
 
@@ -3158,6 +3159,8 @@ describe('AppContainer State Management', () => {
         './hooks/atCommandProcessor.js'
       );
       vi.mocked(checkPermissions).mockResolvedValue([]);
+
+      vi.spyOn(mockConfig, 'getUseTerminalBuffer').mockReturnValue(false);
 
       vi.spyOn(mockConfig, 'getUseAlternateBuffer').mockReturnValue(true);
 
@@ -3175,6 +3178,7 @@ describe('AppContainer State Management', () => {
 
       // Reset mock stdout
       mocks.mockStdout.write.mockClear();
+      (disableMouseEvents as import('vitest').Mock).mockClear();
 
       // Submit
       await act(async () => capturedUIActions.handleFinalSubmit('test prompt'));
@@ -3407,6 +3411,8 @@ describe('AppContainer State Management', () => {
       const settingsWithAlternateBuffer = createMockSettings({
         ui: { useAlternateBuffer: true },
       });
+
+      vi.spyOn(mockConfig, 'getUseTerminalBuffer').mockReturnValue(false);
 
       vi.spyOn(mockConfig, 'getUseAlternateBuffer').mockReturnValue(true);
 

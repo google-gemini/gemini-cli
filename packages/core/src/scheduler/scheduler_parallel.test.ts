@@ -25,7 +25,6 @@ const runInDevTraceSpan = vi.hoisted(() =>
     const metadata = { name: '', attributes: opts.attributes || {} };
     return fn({
       metadata,
-      endSpan: vi.fn(),
     });
   }),
 );
@@ -218,6 +217,7 @@ describe('Scheduler Parallel Execution', () => {
       getEnableHooks: vi.fn().mockReturnValue(true),
       setApprovalMode: vi.fn(),
       getApprovalMode: vi.fn().mockReturnValue(ApprovalMode.DEFAULT),
+      getTelemetryLogPromptsEnabled: vi.fn().mockReturnValue(false),
     } as unknown as Mocked<Config>;
 
     (mockConfig as unknown as { config: Config }).config = mockConfig as Config;
@@ -378,7 +378,7 @@ describe('Scheduler Parallel Execution', () => {
     const spanArgs = vi.mocked(runInDevTraceSpan).mock.calls[0];
     const fn = spanArgs[1];
     const metadata = { name: '', attributes: {} };
-    await fn({ metadata, endSpan: vi.fn() });
+    await fn({ metadata });
     expect(metadata).toMatchObject({
       input: [req1, req2, req3],
     });

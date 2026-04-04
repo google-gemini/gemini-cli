@@ -89,9 +89,13 @@ describe('Core System Prompt (prompts.ts)', () => {
     mockConfig = {
       getToolRegistry: vi.fn().mockReturnValue(mockRegistry),
       getEnableShellOutputEfficiency: vi.fn().mockReturnValue(true),
+      getSandboxEnabled: vi.fn().mockReturnValue(false),
       storage: {
         getProjectTempDir: vi.fn().mockReturnValue('/tmp/project-temp'),
         getPlansDir: vi.fn().mockReturnValue('/tmp/project-temp/plans'),
+        getProjectTempTrackerDir: vi
+          .fn()
+          .mockReturnValue('/mock/.gemini/tmp/session/tracker'),
       },
       isInteractive: vi.fn().mockReturnValue(true),
       isInteractiveShellEnabled: vi.fn().mockReturnValue(true),
@@ -418,6 +422,7 @@ describe('Core System Prompt (prompts.ts)', () => {
       const testConfig = {
         getToolRegistry: vi.fn().mockReturnValue(mockToolRegistry),
         getEnableShellOutputEfficiency: vi.fn().mockReturnValue(true),
+        getSandboxEnabled: vi.fn().mockReturnValue(false),
         storage: {
           getProjectTempDir: vi.fn().mockReturnValue('/tmp/project-temp'),
         },

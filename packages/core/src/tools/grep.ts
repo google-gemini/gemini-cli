@@ -30,7 +30,7 @@ import { isGitRepository } from '../utils/gitUtils.js';
 import type { Config } from '../config/config.js';
 import type { FileExclusions } from '../utils/ignorePatterns.js';
 import { ToolErrorType } from './tool-error.js';
-import { GREP_TOOL_NAME } from './tool-names.js';
+import { GREP_TOOL_NAME, GREP_DISPLAY_NAME } from './tool-names.js';
 import { buildPatternArgsPattern } from '../policy/utils.js';
 import { debugLogger } from '../utils/debugLogger.js';
 import { GREP_DEFINITION } from './definitions/coreTools.js';
@@ -215,9 +215,17 @@ class GrepToolInvocation extends BaseToolInvocation<
 
       // Create a timeout controller to prevent indefinitely hanging searches
       const timeoutController = new AbortController();
+      const configTimeout = this.config.getFileFilteringOptions().searchTimeout;
+      // If configTimeout is less than standard default, it might be too short for grep.
+      // We check if it's greater or if we should use DEFAULT_SEARCH_TIMEOUT_MS as a fallback.
+      // Let's assume the user can set it higher if they want. Using it directly if it exists, otherwise fallback.
+      const timeoutMs =
+        configTimeout && configTimeout > DEFAULT_SEARCH_TIMEOUT_MS
+          ? configTimeout
+          : DEFAULT_SEARCH_TIMEOUT_MS;
       const timeoutId = setTimeout(() => {
         timeoutController.abort();
-      }, DEFAULT_SEARCH_TIMEOUT_MS);
+      }, timeoutMs);
 
       // Link the passed signal to our timeout controller
       const onAbort = () => timeoutController.abort();
@@ -252,6 +260,13 @@ class GrepToolInvocation extends BaseToolInvocation<
 
           allMatches = allMatches.concat(matches);
         }
+      } catch (error) {
+        if (timeoutController.signal.aborted) {
+          throw new Error(
+            `Operation timed out after ${timeoutMs}ms. In large repositories, consider narrowing your search scope by specifying a 'dir_path' or an 'include_pattern'.`,
+          );
+        }
+        throw error;
       } finally {
         clearTimeout(timeoutId);
         signal.removeEventListener('abort', onAbort);
@@ -638,7 +653,7 @@ export class GrepTool extends BaseDeclarativeTool<GrepToolParams, ToolResult> {
   ) {
     super(
       GrepTool.Name,
-      'SearchText',
+      GREP_DISPLAY_NAME,
       GREP_DEFINITION.base.description!,
       Kind.Search,
       GREP_DEFINITION.base.parametersJsonSchema,

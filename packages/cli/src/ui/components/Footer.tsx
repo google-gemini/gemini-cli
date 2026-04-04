@@ -5,6 +5,7 @@
  */
 
 import type React from 'react';
+import { useState, useEffect } from 'react';
 import { Box, Text } from 'ink';
 import { theme } from '../semantic-colors.js';
 import {
@@ -12,6 +13,8 @@ import {
   tildeifyPath,
   getDisplayString,
   checkExhaustive,
+  AuthType,
+  UserAccountManager,
 } from '@google/gemini-cli-core';
 import { ConsoleSummaryDisplay } from './ConsoleSummaryDisplay.js';
 import process from 'node:process';
@@ -64,26 +67,19 @@ interface SandboxIndicatorProps {
 const SandboxIndicator: React.FC<SandboxIndicatorProps> = ({
   isTrustedFolder,
 }) => {
+  const config = useConfig();
+  const sandboxEnabled = config.getSandboxEnabled();
   if (isTrustedFolder === false) {
     return <Text color={theme.status.warning}>untrusted</Text>;
   }
 
   const sandbox = process.env['SANDBOX'];
-  if (sandbox && sandbox !== 'sandbox-exec') {
-    return (
-      <Text color="green">{sandbox.replace(/^gemini-(?:cli-)?/, '')}</Text>
-    );
+  if (sandbox) {
+    return <Text color={theme.status.warning}>current process</Text>;
   }
 
-  if (sandbox === 'sandbox-exec') {
-    return (
-      <Text color={theme.status.warning}>
-        macOS Seatbelt{' '}
-        <Text color={theme.ui.comment}>
-          ({process.env['SEATBELT_PROFILE']})
-        </Text>
-      </Text>
-    );
+  if (sandboxEnabled) {
+    return <Text color={theme.status.warning}>all tools</Text>;
   }
 
   return <Text color={theme.status.error}>no sandbox</Text>;
@@ -181,6 +177,18 @@ export const Footer: React.FC = () => {
   const settings = useSettings();
   const { vimEnabled, vimMode } = useVimMode();
 
+  const authType = config.getContentGeneratorConfig()?.authType;
+  const [email, setEmail] = useState<string | undefined>();
+
+  useEffect(() => {
+    if (authType) {
+      const userAccountManager = new UserAccountManager();
+      setEmail(userAccountManager.getCachedGoogleAccount() ?? undefined);
+    } else {
+      setEmail(undefined);
+    }
+  }, [authType]);
+
   const {
     model,
     targetDir,
@@ -215,6 +223,7 @@ export const Footer: React.FC = () => {
     errorCount > 0 &&
     (isFullErrorVerbosity || debugMode || isDevelopment);
   const displayVimMode = vimEnabled ? vimMode : undefined;
+
   const items =
     settings.merged.ui.footer.items ??
     deriveItemsFromLegacySettings(settings.merged);
@@ -295,9 +304,8 @@ export const Footer: React.FC = () => {
         let str = 'no sandbox';
         const sandbox = process.env['SANDBOX'];
         if (isTrustedFolder === false) str = 'untrusted';
-        else if (sandbox === 'sandbox-exec')
-          str = `macOS Seatbelt (${process.env['SEATBELT_PROFILE']})`;
-        else if (sandbox) str = sandbox.replace(/^gemini-(?:cli-)?/, '');
+        else if (sandbox) str = 'current process';
+        else if (config.getSandboxEnabled()) str = 'all tools';
 
         addCol(
           id,
@@ -353,7 +361,17 @@ export const Footer: React.FC = () => {
         break;
       }
       case 'memory-usage': {
-        addCol(id, header, () => <MemoryUsageDisplay color={itemColor} />, 10);
+        addCol(
+          id,
+          header,
+          () => (
+            <MemoryUsageDisplay
+              color={itemColor}
+              isActive={!uiState.copyModeEnabled}
+            />
+          ),
+          10,
+        );
         break;
       }
       case 'session-id': {
@@ -366,6 +384,25 @@ export const Footer: React.FC = () => {
             </Text>
           ),
           8,
+        );
+        break;
+      }
+      case 'auth': {
+        if (!settings.merged.ui.showUserIdentity) break;
+        if (!authType) break;
+        const displayStr =
+          authType === AuthType.LOGIN_WITH_GOOGLE
+            ? (email ?? 'google')
+            : authType;
+        addCol(
+          id,
+          header,
+          () => (
+            <Text color={itemColor} wrap="truncate-end">
+              {displayStr}
+            </Text>
+          ),
+          displayStr.length,
         );
         break;
       }
