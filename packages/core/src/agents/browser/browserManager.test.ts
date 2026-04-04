@@ -462,6 +462,94 @@ describe('BrowserManager', () => {
       );
     });
 
+    describe('Linux display fallback', () => {
+      let originalPlatform: NodeJS.Platform;
+
+      beforeEach(() => {
+        originalPlatform = process.platform;
+        Object.defineProperty(process, 'platform', { value: 'linux' });
+      });
+
+      afterEach(() => {
+        Object.defineProperty(process, 'platform', { value: originalPlatform });
+        vi.unstubAllEnvs();
+      });
+
+      it('should fallback to headless when explicit config is missing and no display is available', async () => {
+        vi.stubEnv('WAYLAND_DISPLAY', '');
+        vi.stubEnv('DISPLAY', '');
+
+        const noDisplayConfig = makeFakeConfig({
+          agents: {
+            overrides: { browser_agent: { enabled: true } },
+            browser: {},
+          },
+        });
+
+        const manager = new BrowserManager(noDisplayConfig);
+        await manager.ensureConnection();
+
+        expect(StdioClientTransport).toHaveBeenCalledWith(
+          expect.objectContaining({
+            command: 'node',
+            args: expect.arrayContaining(['--headless']),
+          }),
+        );
+      });
+
+      it('should NOT fallback to headless when DISPLAY is available', async () => {
+        vi.stubEnv('WAYLAND_DISPLAY', '');
+        vi.stubEnv('DISPLAY', ':0');
+
+        const displayConfig = makeFakeConfig({
+          agents: {
+            overrides: { browser_agent: { enabled: true } },
+            browser: {},
+          },
+        });
+
+        const manager = new BrowserManager(displayConfig);
+        await manager.ensureConnection();
+
+        const args = vi.mocked(StdioClientTransport).mock.calls[0]?.[0]
+          ?.args as string[];
+        expect(args).not.toContain('--headless');
+        expect(args).not.toContain('--chrome-arg=--ozone-platform-hint=auto');
+      });
+
+      it('should NOT fallback to headless but pass ozone flag when WAYLAND_DISPLAY is available', async () => {
+        vi.stubEnv('WAYLAND_DISPLAY', 'wayland-0');
+        vi.stubEnv('DISPLAY', '');
+
+        const waylandConfig = makeFakeConfig({
+          agents: {
+            overrides: { browser_agent: { enabled: true } },
+            browser: {},
+          },
+        });
+
+        const manager = new BrowserManager(waylandConfig);
+        await manager.ensureConnection();
+
+        const args = vi.mocked(StdioClientTransport).mock.calls[0]?.[0]
+          ?.args as string[];
+        expect(args).not.toContain('--headless');
+        expect(args).toContain('--chrome-arg=--ozone-platform-hint=auto');
+      });
+
+      it('should NOT fallback to headless if explicitly forced to false, even without display', async () => {
+        vi.stubEnv('WAYLAND_DISPLAY', '');
+        vi.stubEnv('DISPLAY', '');
+
+        const manager = new BrowserManager(mockConfig); // mockConfig has headless: false
+        await manager.ensureConnection();
+
+        const args = vi.mocked(StdioClientTransport).mock.calls[0]?.[0]
+          ?.args as string[];
+        expect(args).not.toContain('--headless');
+      });
+    });
+
     it('should pass profilePath as --userDataDir when configured', async () => {
       const profileConfig = makeFakeConfig({
         agents: {

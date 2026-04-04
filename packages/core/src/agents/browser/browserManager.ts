@@ -560,11 +560,34 @@ export class BrowserManager {
       }
     }
 
-    // Add optional settings from config.
+    // Add optional settings from config
+    const explicitHeadless = this.config.getAgentsSettings()?.browser?.headless;
+    let useHeadless = explicitHeadless ?? browserConfig.customConfig.headless;
+
+    const isLinux = process.platform === 'linux';
+    const hasWayland = !!process.env['WAYLAND_DISPLAY'];
+    const hasX11 = !!process.env['DISPLAY'];
+
+    // Auto-fallback to headless on Linux if no display server is found and
+    // headless is not explicitly forced to false.
+    if (isLinux && !hasWayland && !hasX11 && explicitHeadless !== false) {
+      useHeadless = true;
+    }
+
     // Force headless in seatbelt sandbox since Chrome profile/display access
     // may be restricted, and the user is running in a sandboxed environment.
-    if (browserConfig.customConfig.headless || isSeatbeltSandbox) {
+    if (isSeatbeltSandbox && explicitHeadless !== false) {
+      useHeadless = true;
+    }
+    
+    if (useHeadless) {
       mcpArgs.push('--headless');
+    }
+
+    // Pass ozone platform hint for native Wayland support so Chrome doesn't
+    // crash looking for an X server when XWayland is unavailable or disabled.
+    if (isLinux && hasWayland && !useHeadless) {
+      mcpArgs.push('--chrome-arg=--ozone-platform-hint=auto');
     }
     if (browserConfig.customConfig.profilePath) {
       mcpArgs.push('--userDataDir', browserConfig.customConfig.profilePath);
