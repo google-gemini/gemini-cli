@@ -54,7 +54,7 @@ export interface HostInputRequest {
   toolCall?: {
     toolCallId: string;
     title: string;
-    locations?: unknown[];
+    locations?: acp.ToolCallLocation[];
     kind: acp.ToolKind;
   };
   _meta?: Record<string, unknown>;

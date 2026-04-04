@@ -35,6 +35,7 @@ import {
   partListUnionToString,
   LlmRole,
   ApprovalMode,
+  checkExhaustive,
   getVersion,
   convertSessionToClientHistory,
   DEFAULT_GEMINI_MODEL,
@@ -1080,7 +1081,7 @@ export class Session {
 
     await confirmationDetails.onConfirm(
       ToolConfirmationOutcome.ProceedOnce,
-      mapExitPlanModeAnswers(output.answers ?? {}),
+      mapExitPlanModeAnswers(output.answers),
     );
     return ToolConfirmationOutcome.ProceedOnce;
   }
@@ -2066,11 +2067,11 @@ function toPermissionOptions(
         break;
       case 'ask_user':
       case 'exit_plan_mode':
+      case 'sandbox_expansion':
         // askuser and exit_plan_mode don't need "always allow" options
         break;
       default:
-        // No "always allow" options for other types.
-        break;
+        return checkExhaustive(confirmation);
     }
   }
 
@@ -2087,16 +2088,10 @@ function toPermissionOptions(
     case 'sandbox_expansion':
       break;
     default:
-      return assertUnreachableConfirmation(confirmation);
+      return checkExhaustive(confirmation);
   }
 
   return options;
-}
-
-function assertUnreachableConfirmation(value: never): never {
-  throw new Error(
-    `Unhandled tool confirmation details: ${JSON.stringify(value)}`,
-  );
 }
 
 /**
