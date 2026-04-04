@@ -149,7 +149,7 @@ export function isBackgroundExecutionData(
  */
 export interface PolicyUpdateOptions {
   argsPattern?: string;
-  commandPrefix?: string | string[];
+  commandPrefix?: string | string[] | string[][];
   mcpName?: string;
   toolName?: string;
   allowRedirection?: boolean;

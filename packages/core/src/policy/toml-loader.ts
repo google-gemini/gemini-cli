@@ -41,7 +41,9 @@ const PolicyRuleSchema = z.object({
   subagent: z.string().optional(),
   mcpName: z.string().optional(),
   argsPattern: z.string().optional(),
-  commandPrefix: z.union([z.string(), z.array(z.string())]).optional(),
+  commandPrefix: z
+    .union([z.string(), z.array(z.union([z.string(), z.array(z.string())]))])
+    .optional(),
   commandRegex: z.string().optional(),
   decision: z.nativeEnum(PolicyDecision),
   // Priority must be in range [0, 999] to prevent tier overflow.
@@ -76,7 +78,9 @@ const SafetyCheckerRuleSchema = z.object({
   toolName: z.union([z.string(), z.array(z.string())]),
   mcpName: z.string().optional(),
   argsPattern: z.string().optional(),
-  commandPrefix: z.union([z.string(), z.array(z.string())]).optional(),
+  commandPrefix: z
+    .union([z.string(), z.array(z.union([z.string(), z.array(z.string())]))])
+    .optional(),
   commandRegex: z.string().optional(),
   priority: z.number().int().default(0),
   modes: z.array(z.nativeEnum(ApprovalMode)).optional(),
@@ -458,6 +462,7 @@ export async function loadPoliciesFromToml(
               rule.argsPattern,
               rule.commandPrefix,
               rule.commandRegex,
+              rule.allowRedirection ?? rule.allow_redirection,
             );
 
             // For each argsPattern, expand toolName arrays

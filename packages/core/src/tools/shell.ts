@@ -41,12 +41,15 @@ import { formatBytes } from '../utils/formatters.js';
 import type { AnsiOutput } from '../utils/terminalSerializer.js';
 import {
   getCommandRoots,
+  getCommandSegments,
   initializeShellParsers,
   stripShellWrapper,
   parseCommandDetails,
   hasRedirection,
+  isNakedSensitiveCommand,
   normalizeCommand,
 } from '../utils/shell-utils.js';
+import { buildParamArgsPattern } from '../policy/utils.js';
 import { SHELL_TOOL_NAME } from './tool-names.js';
 import { PARAM_ADDITIONAL_PERMISSIONS } from './definitions/base-declarations.js';
 import type { MessageBus } from '../confirmation-bus/message-bus.js';
@@ -232,13 +235,23 @@ export class ShellToolInvocation extends BaseToolInvocation<
       outcome === ToolConfirmationOutcome.ProceedAlways
     ) {
       const command = stripShellWrapper(this.params.command);
-      const rootCommands = [...new Set(getCommandRoots(command))];
+      const segments = getCommandSegments(command);
       const allowRedirection = hasRedirection(command) ? true : undefined;
 
-      if (rootCommands.length > 0) {
-        return { commandPrefix: rootCommands, allowRedirection };
+      // Filter out "naked" sensitive commands to prevent over-broad matching
+      const safeSegments = segments.filter(
+        (seg) => !isNakedSensitiveCommand(seg),
+      );
+
+      if (safeSegments.length > 0) {
+        return { commandPrefix: safeSegments, allowRedirection };
       }
-      return { commandPrefix: this.params.command, allowRedirection };
+      // If the command is naked and sensitive, we fall back to the raw command as an exact argsPattern
+      // instead of a broad prefix rule.
+      return {
+        argsPattern: buildParamArgsPattern('command', this.params.command),
+        allowRedirection,
+      };
     }
     return undefined;
   }
