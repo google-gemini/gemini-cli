@@ -347,8 +347,11 @@ function useCommandSuggestions(
               sectionTitle: 'auto',
               submitValue: `/${canonicalParentName}`,
             };
-            setSuggestions([autoSectionSuggestion, ...finalSuggestions]);
-            return;
+
+            if (!partial || 'list'.startsWith(partial.toLowerCase())) {
+              setSuggestions([autoSectionSuggestion, ...finalSuggestions]);
+              return;
+            }
           }
 
           setSuggestions(finalSuggestions);
