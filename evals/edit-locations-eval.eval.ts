@@ -95,14 +95,17 @@ test('capitalize capitalizes the first letter', () => {
         }
       });
 
-      console.log('DEBUG: targetFiles', targetFiles);
+      // Ignore unparsable tool args and empty strings so assertions only measure valid edit targets.
+      const editedPaths = targetFiles
+        .filter((f): f is string => typeof f === 'string' && f.trim() !== '')
+        .map((f) => f.trim());
 
       expect(
-        new Set(targetFiles).size,
-        'Expected only two files changed',
+        new Set(editedPaths).size,
+        'Expected at least two distinct files to be changed',
       ).greaterThanOrEqual(2);
-      expect(targetFiles.some((f) => f?.endsWith('src/math.ts'))).toBe(true);
-      expect(targetFiles.some((f) => f?.endsWith('src/math.test.ts'))).toBe(
+      expect(editedPaths.some((f) => f.endsWith('src/math.ts'))).toBe(true);
+      expect(editedPaths.some((f) => f.endsWith('src/math.test.ts'))).toBe(
         true,
       );
     },
