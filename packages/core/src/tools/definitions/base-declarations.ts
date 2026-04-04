@@ -92,6 +92,7 @@ export const READ_MANY_PARAM_USE_DEFAULT_EXCLUDES = 'useDefaultExcludes';
 // -- save_memory --
 export const MEMORY_TOOL_NAME = 'save_memory';
 export const MEMORY_PARAM_FACT = 'fact';
+export const MEMORY_PARAM_SCOPE = 'scope';
 
 // -- get_internal_docs --
 export const GET_INTERNAL_DOCS_TOOL_NAME = 'get_internal_docs';
@@ -117,8 +118,22 @@ export const ASK_USER_OPTION_PARAM_DESCRIPTION = 'description';
 
 // -- exit_plan_mode --
 export const EXIT_PLAN_MODE_TOOL_NAME = 'exit_plan_mode';
-export const EXIT_PLAN_PARAM_PLAN_PATH = 'plan_path';
+export const EXIT_PLAN_PARAM_PLAN_FILENAME = 'plan_filename';
 
 // -- enter_plan_mode --
 export const ENTER_PLAN_MODE_TOOL_NAME = 'enter_plan_mode';
 export const PLAN_MODE_PARAM_REASON = 'reason';
+
+// -- sandbox --
+export const PARAM_ADDITIONAL_PERMISSIONS = 'additional_permissions';
+
+// -- update_topic --
+export const UPDATE_TOPIC_TOOL_NAME = 'update_topic';
+export const UPDATE_TOPIC_DISPLAY_NAME = 'Update Topic Context';
+export const TOPIC_PARAM_TITLE = 'title';
+export const TOPIC_PARAM_SUMMARY = 'summary';
+export const TOPIC_PARAM_STRATEGIC_INTENT = 'strategic_intent';
+
+// -- complete_task --
+export const COMPLETE_TASK_TOOL_NAME = 'complete_task';
+export const COMPLETE_TASK_DISPLAY_NAME = 'Complete Task';

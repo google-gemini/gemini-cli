@@ -9,6 +9,7 @@ import { type FileSystemService } from './fileSystemService.js';
 import { type SandboxManager } from './sandboxManager.js';
 import { debugLogger } from '../utils/debugLogger.js';
 import { isNodeError } from '../utils/errors.js';
+import { resolveToRealPath, isSubpath } from '../utils/paths.js';
 
 /**
  * A FileSystemService implementation that performs operations through a sandbox.
@@ -19,12 +20,43 @@ export class SandboxedFileSystemService implements FileSystemService {
     private cwd: string,
   ) {}
 
+  private sanitizeAndValidatePath(filePath: string): string {
+    const resolvedPath = resolveToRealPath(filePath);
+    const workspace = resolveToRealPath(this.sandboxManager.getWorkspace());
+
+    if (isSubpath(workspace, resolvedPath) || workspace === resolvedPath) {
+      return resolvedPath;
+    }
+
+    // Check if the path is explicitly allowed by the sandbox manager
+    const options = this.sandboxManager.getOptions();
+    const allowedPaths = options?.includeDirectories ?? [];
+
+    for (const allowed of allowedPaths) {
+      const resolvedAllowed = resolveToRealPath(allowed);
+      if (
+        isSubpath(resolvedAllowed, resolvedPath) ||
+        resolvedAllowed === resolvedPath
+      ) {
+        return resolvedPath;
+      }
+    }
+
+    throw new Error(
+      `Access denied: Path '${filePath}' is outside the workspace and not in allowed paths.`,
+    );
+  }
+
   async readTextFile(filePath: string): Promise<string> {
+    const safePath = this.sanitizeAndValidatePath(filePath);
     const prepared = await this.sandboxManager.prepareCommand({
       command: '__read',
-      args: [filePath],
+      args: [safePath],
       cwd: this.cwd,
       env: process.env,
+      policy: {
+        allowedPaths: [safePath],
+      },
     });
 
     return new Promise((resolve, reject) => {
@@ -50,11 +82,18 @@ export class SandboxedFileSystemService implements FileSystemService {
         if (code === 0) {
           resolve(output);
         } else {
-          reject(
-            new Error(
-              `Sandbox Error: read_file failed for '${filePath}'. Exit code ${code}. ${error ? 'Details: ' + error : ''}`,
-            ),
+          const isEnoent =
+            error.toLowerCase().includes('no such file or directory') ||
+            error.toLowerCase().includes('enoent') ||
+            error.toLowerCase().includes('could not find file') ||
+            error.toLowerCase().includes('could not find a part of the path');
+          const err = new Error(
+            `Sandbox Error: read_file failed for '${filePath}'. Exit code ${code}. ${error ? 'Details: ' + error : ''}`,
           );
+          if (isEnoent) {
+            Object.assign(err, { code: 'ENOENT' });
+          }
+          reject(err);
         }
       });
 
@@ -69,11 +108,20 @@ export class SandboxedFileSystemService implements FileSystemService {
   }
 
   async writeTextFile(filePath: string, content: string): Promise<void> {
+    const safePath = this.sanitizeAndValidatePath(filePath);
     const prepared = await this.sandboxManager.prepareCommand({
       command: '__write',
-      args: [filePath],
+      args: [safePath],
       cwd: this.cwd,
       env: process.env,
+      policy: {
+        allowedPaths: [safePath],
+        additionalPermissions: {
+          fileSystem: {
+            write: [safePath],
+          },
+        },
+      },
     });
 
     return new Promise((resolve, reject) => {

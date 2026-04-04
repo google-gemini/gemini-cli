@@ -5,6 +5,7 @@
  */
 
 import type { SafetyCheckInput } from '../safety/protocol.js';
+import type { SandboxManager } from '../services/sandboxManager.js';
 
 export enum PolicyDecision {
   ALLOW = 'allow',
@@ -50,6 +51,18 @@ export enum ApprovalMode {
   YOLO = 'yolo',
   PLAN = 'plan',
 }
+
+/**
+ * The order of permissiveness for approval modes.
+ * Tools allowed in a less permissive mode should also be allowed
+ * in more permissive modes.
+ */
+export const MODES_BY_PERMISSIVENESS = [
+  ApprovalMode.PLAN,
+  ApprovalMode.DEFAULT,
+  ApprovalMode.AUTO_EDIT,
+  ApprovalMode.YOLO,
+];
 
 /**
  * Configuration for the built-in allowed-path checker.
@@ -106,9 +119,9 @@ export interface PolicyRule {
 
   /**
    * The name of the tool this rule applies to.
-   * If undefined, the rule applies to all tools.
+   * Use '*' to match all tools.
    */
-  toolName?: string;
+  toolName: string;
 
   /**
    * The name of the subagent this rule applies to.
@@ -182,9 +195,9 @@ export interface PolicyRule {
 export interface SafetyCheckerRule {
   /**
    * The name of the tool this rule applies to.
-   * If undefined, the rule applies to all tools.
+   * Use '*' to match all tools.
    */
-  toolName?: string;
+  toolName: string;
 
   /**
    * Identifies the MCP server this rule applies to.
@@ -309,6 +322,11 @@ export interface PolicyEngineConfig {
    * Used to filter rules that have specific 'modes' defined.
    */
   approvalMode?: ApprovalMode;
+
+  /**
+   * The sandbox manager instance.
+   */
+  sandboxManager?: SandboxManager;
 }
 
 export interface PolicySettings {
