@@ -34,8 +34,15 @@ import {
   ENTER_PLAN_MODE_TOOL_NAME,
   EXIT_PLAN_MODE_TOOL_NAME,
 } from './tool-names.js';
+import { z } from 'zod';
 
 type ToolParams = Record<string, unknown>;
+const jsonRecordSchema = z.record(z.string(), z.unknown());
+const discoveredFunctionSchema = z.object({
+  name: z.string(),
+  description: z.string().optional(),
+  parametersJsonSchema: z.record(z.string(), z.unknown()).optional(),
+});
 
 class DiscoveredToolInvocation extends BaseToolInvocation<
   ToolParams,
@@ -305,10 +312,10 @@ export class ToolRegistry {
         }
 
         if (priorityA === 2) {
-          // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
-          const serverA = (toolA as DiscoveredMCPTool).serverName;
-          // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
-          const serverB = (toolB as DiscoveredMCPTool).serverName;
+          const serverA =
+            toolA instanceof DiscoveredMCPTool ? toolA.serverName : '';
+          const serverB =
+            toolB instanceof DiscoveredMCPTool ? toolB.serverName : '';
           return serverA.localeCompare(serverB);
         }
 
@@ -361,7 +368,6 @@ export class ToolRegistry {
           'Tool discovery command is empty or contains only whitespace.',
         );
       }
-
       const firstPart = cmdParts[0];
       if (typeof firstPart !== 'string') {
         throw new Error(
@@ -370,9 +376,14 @@ export class ToolRegistry {
       }
 
       let finalCommand: string = firstPart;
-      let finalArgs: string[] = cmdParts
-        .slice(1)
-        .filter((p): p is string => typeof p === 'string');
+      let finalArgs: string[] = cmdParts.slice(1).map((part) => {
+        if (typeof part !== 'string') {
+          throw new Error(
+            'Tool discovery command arguments must be plain string tokens.',
+          );
+        }
+        return part;
+      });
       let finalEnv = process.env;
 
       const sandboxManager = this.config.sandboxManager;
@@ -470,8 +481,18 @@ export class ToolRegistry {
           } else if (Array.isArray(tool['functionDeclarations'])) {
             functions.push(...tool['functionDeclarations']);
           } else if (tool['name']) {
-            // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
-            functions.push(tool as FunctionDeclaration);
+            const parsedTool = discoveredFunctionSchema.safeParse(tool);
+            if (parsedTool.success) {
+              const { name, description, parametersJsonSchema } =
+                parsedTool.data;
+              functions.push({
+                name,
+                description,
+                ...(parametersJsonSchema
+                  ? { parametersJsonSchema }
+                  : undefined),
+              });
+            }
           }
         }
       }
@@ -481,20 +502,19 @@ export class ToolRegistry {
           debugLogger.warn('Discovered a tool with no name. Skipping.');
           continue;
         }
-        const parameters =
-          func.parametersJsonSchema &&
-          typeof func.parametersJsonSchema === 'object' &&
-          !Array.isArray(func.parametersJsonSchema)
-            ? func.parametersJsonSchema
-            : {};
+        const parsedParameters = jsonRecordSchema.safeParse(
+          func.parametersJsonSchema,
+        );
+        const parameters = parsedParameters.success
+          ? parsedParameters.data
+          : {};
         this.registerTool(
           new DiscoveredTool(
             this.config,
             func.name,
             DISCOVERED_TOOL_PREFIX + func.name,
             func.description ?? '',
-            // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
-            parameters as Record<string, unknown>,
+            parameters,
             this.messageBus,
           ),
         );
@@ -746,8 +766,7 @@ export class ToolRegistry {
   getToolsByServer(serverName: string): AnyDeclarativeTool[] {
     const serverTools: AnyDeclarativeTool[] = [];
     for (const tool of this.getActiveTools()) {
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
-      if ((tool as DiscoveredMCPTool)?.serverName === serverName) {
+      if (tool instanceof DiscoveredMCPTool && tool.serverName === serverName) {
         serverTools.push(tool);
       }
     }
