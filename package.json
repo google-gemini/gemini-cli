@@ -68,6 +68,11 @@
     "clean": "node scripts/clean.js",
     "pre-commit": "node scripts/pre-commit.js"
   },
+  "vitest": {
+    "setupFiles": [
+      "./vitest.setup.ts"
+    ]
+  },
   "overrides": {
     "ink": "npm:@jrichman/ink@6.6.7",
     "wrap-ansi": "9.0.2",
