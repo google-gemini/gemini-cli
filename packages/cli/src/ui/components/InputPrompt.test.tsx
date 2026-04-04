@@ -220,6 +220,7 @@ describe('InputPrompt', () => {
             col = newText.length;
           }
           mockBuffer.cursor = [0, col];
+          mockBuffer.allVisualLines = [newText];
           mockBuffer.viewportVisualLines = [newText];
           mockBuffer.allVisualLines = [newText];
           mockBuffer.visualToLogicalMap = [[0, 0]];
@@ -2273,6 +2274,7 @@ describe('InputPrompt', () => {
         async ({ text, visualCursor }) => {
           mockBuffer.text = text;
           mockBuffer.lines = [text];
+          mockBuffer.allVisualLines = [text];
           mockBuffer.viewportVisualLines = [text];
           mockBuffer.visualCursor = visualCursor as [number, number];
           props.config.getUseBackgroundColor = () => false;
@@ -2322,6 +2324,7 @@ describe('InputPrompt', () => {
         async ({ text, visualCursor, visualToLogicalMap }) => {
           mockBuffer.text = text;
           mockBuffer.lines = text.split('\n');
+          mockBuffer.allVisualLines = text.split('\n');
           mockBuffer.viewportVisualLines = text.split('\n');
           mockBuffer.visualCursor = visualCursor as [number, number];
           mockBuffer.visualToLogicalMap = visualToLogicalMap as Array<
@@ -2342,6 +2345,7 @@ describe('InputPrompt', () => {
         const text = 'first line\n\nthird line';
         mockBuffer.text = text;
         mockBuffer.lines = text.split('\n');
+        mockBuffer.allVisualLines = text.split('\n');
         mockBuffer.viewportVisualLines = text.split('\n');
         mockBuffer.visualCursor = [1, 0]; // cursor on the blank line
         mockBuffer.visualToLogicalMap = [
@@ -2361,11 +2365,98 @@ describe('InputPrompt', () => {
     });
   });
 
+  describe('scrolling large inputs', () => {
+    it('should correctly render scrolling down and up for large inputs', async () => {
+      const lines = Array.from({ length: 50 }).map((_, i) => `testline ${i}`);
+
+      // Since we need to test how the React component tree responds to TextBuffer state changes,
+      // we must provide a fake TextBuffer implementation that triggers re-renders like the real one.
+
+      const TestWrapper = () => {
+        const [bufferState, setBufferState] = useState({
+          text: lines.join('\n'),
+          lines,
+          allVisualLines: lines,
+          viewportVisualLines: lines.slice(0, 10),
+          visualToLogicalMap: lines.map((_, i) => [i, 0]),
+          visualCursor: [0, 0] as [number, number],
+          visualScrollRow: 0,
+          viewportHeight: 10,
+        });
+
+        const fakeBuffer = {
+          ...mockBuffer,
+          ...bufferState,
+          handleInput: vi.fn().mockImplementation((key) => {
+            let newRow = bufferState.visualCursor[0];
+            let newScroll = bufferState.visualScrollRow;
+            if (key.name === 'down') {
+              newRow = Math.min(49, newRow + 1);
+              if (newRow >= newScroll + 10) newScroll++;
+            } else if (key.name === 'up') {
+              newRow = Math.max(0, newRow - 1);
+              if (newRow < newScroll) newScroll--;
+            }
+            setBufferState({
+              ...bufferState,
+              visualCursor: [newRow, 0],
+              visualScrollRow: newScroll,
+              viewportVisualLines: lines.slice(newScroll, newScroll + 10),
+            });
+            return true;
+          }),
+        } as unknown as TextBuffer;
+
+        return <InputPrompt {...props} buffer={fakeBuffer} />;
+      };
+
+      const { stdout, unmount, stdin } = await renderWithProviders(
+        <TestWrapper />,
+        {
+          uiActions,
+        },
+      );
+
+      // Verify initial render
+      await waitFor(() => {
+        expect(stdout.lastFrame()).toContain('testline 0');
+        expect(stdout.lastFrame()).not.toContain('testline 49');
+      });
+
+      // Move cursor to bottom
+      for (let i = 0; i < 49; i++) {
+        act(() => {
+          stdin.write('\x1b[B'); // Arrow Down
+        });
+      }
+
+      await waitFor(() => {
+        expect(stdout.lastFrame()).toContain('testline 49');
+        expect(stdout.lastFrame()).not.toContain('testline 0');
+      });
+
+      // Move cursor back to top
+      for (let i = 0; i < 49; i++) {
+        act(() => {
+          stdin.write('\x1b[A'); // Arrow Up
+        });
+      }
+
+      await waitFor(() => {
+        expect(stdout.lastFrame()).toContain('testline 0');
+        expect(stdout.lastFrame()).not.toContain('testline 49');
+      });
+
+      unmount();
+    });
+  });
+
   describe('multiline rendering', () => {
     it('should correctly render multiline input including blank lines', async () => {
       const text = 'hello\n\nworld';
       mockBuffer.text = text;
       mockBuffer.lines = text.split('\n');
+      mockBuffer.allVisualLines = text.split('\n');
       mockBuffer.viewportVisualLines = text.split('\n');
       mockBuffer.allVisualLines = text.split('\n');
       mockBuffer.visualCursor = [2, 5]; // cursor at the end of "world"
@@ -3592,7 +3683,9 @@ describe('InputPrompt', () => {
       async ({ relX, relY, mouseCol, mouseRow }) => {
         props.buffer.text = 'hello world\nsecond line';
         props.buffer.lines = ['hello world', 'second line'];
+        props.buffer.allVisualLines = ['hello world', 'second line'];
         props.buffer.viewportVisualLines = ['hello world', 'second line'];
+        props.buffer.viewportHeight = 10;
         props.buffer.visualToLogicalMap = [
           [0, 0],
           [1, 0],
@@ -3630,6 +3723,7 @@ describe('InputPrompt', () => {
     it('should unfocus embedded shell on click', async () => {
       props.buffer.text = 'hello';
       props.buffer.lines = ['hello'];
+      props.buffer.allVisualLines = ['hello'];
       props.buffer.viewportVisualLines = ['hello'];
       props.buffer.visualToLogicalMap = [[0, 0]];
       props.isEmbeddedShellFocused = true;
@@ -3671,6 +3765,7 @@ describe('InputPrompt', () => {
           lines: currentLines,
           viewportVisualLines: currentLines,
           allVisualLines: currentLines,
+          viewportHeight: 10,
           pastedContent: { [id]: largeText },
           transformationsByLine: isExpanded
             ? currentLines.map(() => [])
@@ -3759,6 +3854,7 @@ describe('InputPrompt', () => {
           lines: currentLines,
           viewportVisualLines: currentLines,
           allVisualLines: currentLines,
+          viewportHeight: 10,
           pastedContent: { [id]: largeText },
           transformationsByLine: isExpanded
             ? currentLines.map(() => [])
@@ -3830,7 +3926,9 @@ describe('InputPrompt', () => {
       props.config.getUseBackgroundColor = () => false;
       props.buffer.text = 'hello world';
       props.buffer.lines = ['hello world'];
+      props.buffer.allVisualLines = ['hello world'];
       props.buffer.viewportVisualLines = ['hello world'];
+      props.buffer.viewportHeight = 10;
       props.buffer.visualToLogicalMap = [[0, 0]];
       props.buffer.visualCursor = [0, 11];
       props.buffer.visualScrollRow = 0;
@@ -4137,6 +4235,7 @@ describe('InputPrompt', () => {
       const text = 'hello';
       mockBuffer.text = text;
       mockBuffer.lines = [text];
+      mockBuffer.allVisualLines = [text];
       mockBuffer.viewportVisualLines = [text];
       mockBuffer.visualToLogicalMap = [[0, 0]];
       mockBuffer.visualCursor = [0, 3]; // Cursor after 'hel'
@@ -4167,6 +4266,7 @@ describe('InputPrompt', () => {
       const text = '👍hello';
       mockBuffer.text = text;
       mockBuffer.lines = [text];
+      mockBuffer.allVisualLines = [text];
       mockBuffer.viewportVisualLines = [text];
       mockBuffer.visualToLogicalMap = [[0, 0]];
       mockBuffer.visualCursor = [0, 2]; // Cursor after '👍h' (Note: '👍' is one code point but width 2)
@@ -4196,6 +4296,7 @@ describe('InputPrompt', () => {
       const text = '😀😀😀';
       mockBuffer.text = text;
       mockBuffer.lines = [text];
+      mockBuffer.allVisualLines = [text];
       mockBuffer.viewportVisualLines = [text];
       mockBuffer.visualToLogicalMap = [[0, 0]];
       mockBuffer.visualCursor = [0, 2]; // Cursor after 2 emojis (each 1 code point, width 2)
@@ -4225,7 +4326,9 @@ describe('InputPrompt', () => {
       const lines = ['😀😀', 'hello 😀', 'world'];
       mockBuffer.text = lines.join('\n');
       mockBuffer.lines = lines;
+      mockBuffer.allVisualLines = lines;
       mockBuffer.viewportVisualLines = lines;
+      mockBuffer.viewportHeight = 10;
       mockBuffer.visualToLogicalMap = [
         [0, 0],
         [1, 0],
@@ -4262,7 +4365,9 @@ describe('InputPrompt', () => {
       const lines = ['first line', 'second line', 'third line'];
       mockBuffer.text = lines.join('\n');
       mockBuffer.lines = lines;
+      mockBuffer.allVisualLines = lines;
       mockBuffer.viewportVisualLines = lines;
+      mockBuffer.viewportHeight = 10;
       mockBuffer.visualToLogicalMap = [
         [0, 0],
         [1, 0],
@@ -4303,6 +4408,7 @@ describe('InputPrompt', () => {
     it('should report cursor position 0 when input is empty and placeholder is shown', async () => {
       mockBuffer.text = '';
       mockBuffer.lines = [''];
+      mockBuffer.allVisualLines = [''];
       mockBuffer.viewportVisualLines = [''];
       mockBuffer.visualToLogicalMap = [[0, 0]];
       mockBuffer.visualCursor = [0, 0];
@@ -4335,6 +4441,7 @@ describe('InputPrompt', () => {
     const applyVisualState = (visualLine: string, cursorCol: number): void => {
       mockBuffer.text = logicalLine;
       mockBuffer.lines = [logicalLine];
+      mockBuffer.allVisualLines = [visualLine];
       mockBuffer.viewportVisualLines = [visualLine];
       mockBuffer.allVisualLines = [visualLine];
       mockBuffer.visualToLogicalMap = [[0, 0]];

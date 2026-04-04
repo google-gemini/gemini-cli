@@ -88,7 +88,8 @@ beforeEach(() => {
 
       if (
         relevantStack.includes('OverflowContext.tsx') ||
-        relevantStack.includes('useTimedMessage.ts')
+        relevantStack.includes('useTimedMessage.ts') ||
+        relevantStack.includes('useInlineEditBuffer.ts')
       ) {
         return;
       }

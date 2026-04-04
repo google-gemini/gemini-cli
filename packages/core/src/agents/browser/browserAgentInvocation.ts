@@ -15,6 +15,7 @@
  */
 
 import { randomUUID } from 'node:crypto';
+import { debugLogger } from '../../utils/debugLogger.js';
 import type { Config } from '../../config/config.js';
 import { type AgentLoopContext } from '../../config/agent-loop-context.js';
 import { LocalAgentExecutor } from '../local-executor.js';
@@ -33,8 +34,12 @@ import {
   isToolActivityError,
 } from '../types.js';
 import type { MessageBus } from '../../confirmation-bus/message-bus.js';
-import { createBrowserAgentDefinition } from './browserAgentFactory.js';
+import {
+  createBrowserAgentDefinition,
+  cleanupBrowserAgent,
+} from './browserAgentFactory.js';
 import { removeInputBlocker } from './inputBlocker.js';
+import { recordBrowserAgentTaskOutcome } from '../../telemetry/metrics.js';
 import {
   sanitizeThoughtContent,
   sanitizeToolArgs,
@@ -109,8 +114,12 @@ export class BrowserAgentInvocation extends BaseToolInvocation<
     signal: AbortSignal,
     updateOutput?: (output: ToolLiveOutput) => void,
   ): Promise<ToolResult> {
+    const invocationStartMs = Date.now();
     let browserManager;
     let recentActivity: SubagentActivityItem[] = [];
+    let sessionMode: 'persistent' | 'isolated' | 'existing' = 'persistent';
+    let visionEnabled = false;
+    let taskSuccess = false;
 
     try {
       if (updateOutput) {
@@ -154,6 +163,8 @@ export class BrowserAgentInvocation extends BaseToolInvocation<
       );
       const { definition } = result;
       browserManager = result.browserManager;
+      visionEnabled = result.visionEnabled;
+      sessionMode = result.sessionMode;
 
       // Create activity callback for streaming output
       const onActivity = (activity: SubagentActivityEvent): void => {
@@ -302,6 +313,19 @@ export class BrowserAgentInvocation extends BaseToolInvocation<
 
       const output = await executor.run(this.params, signal);
 
+      try {
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
+        const parsed = JSON.parse(output.result);
+
+        taskSuccess = parsed?.success === true;
+      } catch (parseError) {
+        // non-JSON result -> treat as unknown, default false
+        debugLogger.log(
+          'Failed to parse browser agent output as JSON:',
+          parseError,
+        );
+      }
+
       const resultContent = `Browser agent finished.
 Termination Reason: ${output.terminate_reason}
 Result:
@@ -376,6 +400,14 @@ ${output.result}`;
         },
       };
     } finally {
+      recordBrowserAgentTaskOutcome(this.config, {
+        success: taskSuccess,
+        session_mode: sessionMode,
+        vision_enabled: visionEnabled,
+        headless: !!this.config.getBrowserAgentConfig().customConfig.headless,
+        duration_ms: Date.now() - invocationStartMs,
+      });
+
       // Clean up input blocker, but keep browserManager alive for persistent sessions
       if (browserManager) {
         await removeInputBlocker(browserManager, signal);
@@ -404,14 +436,15 @@ ${output.result}`;
                 );
                 await removeInputBlocker(browserManager, signal);
                 await removeAutomationOverlay(browserManager, signal);
-              } catch (_err) {
+              } catch {
                 // Ignore errors for individual pages
               }
             }
           }
-        } catch (_) {
+        } catch {
           // Ignore errors for removing the overlays.
         }
+        await cleanupBrowserAgent(browserManager, this.config, sessionMode);
       }
     }
   }

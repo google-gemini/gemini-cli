@@ -30,7 +30,7 @@ import { CompressionStatus } from '../core/turn.js';
 import { type ToolCallRequestInfo } from '../scheduler/types.js';
 import { ChatCompressionService } from '../context/chatCompressionService.js';
 import { getDirectoryContextString } from '../utils/environmentContext.js';
-import { renderUserMemory } from '../prompts/snippets.js';
+import { renderUserMemory, renderAgentSkills } from '../prompts/snippets.js';
 import { promptIdContext } from '../utils/promptIdContext.js';
 import {
   logAgentStart,
@@ -73,8 +73,15 @@ import {
   formatBackgroundCompletionForModel,
 } from '../utils/fastAckHelper.js';
 import type { InjectionSource } from '../config/injectionService.js';
+import {
+  createScopedWorkspaceContext,
+  runWithScopedWorkspaceContext,
+} from '../config/scoped-config.js';
 import { CompleteTaskTool } from '../tools/complete-task.js';
-import { COMPLETE_TASK_TOOL_NAME } from '../tools/definitions/base-declarations.js';
+import {
+  COMPLETE_TASK_TOOL_NAME,
+  ACTIVATE_SKILL_TOOL_NAME,
+} from '../tools/definitions/base-declarations.js';
 
 /** A callback function to report on agent activity. */
 export type ActivityCallback = (activity: SubagentActivityEvent) => void;
@@ -521,6 +528,27 @@ export class LocalAgentExecutor<TOutput extends z.ZodTypeAny> {
    * @returns A promise that resolves to the agent's final output.
    */
   async run(inputs: AgentInputs, signal: AbortSignal): Promise<OutputObject> {
+    // If the agent definition declares additional workspace directories,
+    // wrap execution in a scoped workspace context. All calls to
+    // Config.getWorkspaceContext() within this scope will see the extended
+    // directories, without mutating the shared Config.
+    const dirs = this.definition.workspaceDirectories;
+    if (dirs && dirs.length > 0) {
+      const scopedCtx = createScopedWorkspaceContext(
+        this.context.config.getWorkspaceContext(),
+        dirs,
+      );
+      return runWithScopedWorkspaceContext(scopedCtx, () =>
+        this.runInternal(inputs, signal),
+      );
+    }
+    return this.runInternal(inputs, signal);
+  }
+
+  private async runInternal(
+    inputs: AgentInputs,
+    signal: AbortSignal,
+  ): Promise<OutputObject> {
     const startTime = Date.now();
     let turnCounter = 0;
     let terminateReason: AgentTerminateMode = AgentTerminateMode.ERROR;
@@ -1293,6 +1321,21 @@ export class LocalAgentExecutor<TOutput extends z.ZodTypeAny> {
     // Inject user inputs into the prompt template.
     let finalPrompt = templateString(promptConfig.systemPrompt, inputs);
 
+    // Inject skill SI if ACTIVATE_SKILL_TOOL_NAME is available to this agent.
+    if (this.toolRegistry.getTool(ACTIVATE_SKILL_TOOL_NAME) !== undefined) {
+      const skills = this.context.config.getSkillManager().getSkills();
+      if (skills.length > 0) {
+        const skillsPrompt = renderAgentSkills(
+          skills.map((s) => ({
+            name: s.name,
+            description: s.description,
+            location: s.location,
+          })),
+        );
+        finalPrompt += `\n\n${skillsPrompt}`;
+      }
+    }
+
     // Append memory context if available.
     const systemMemory = this.context.config.getSystemInstructionMemory();
     if (systemMemory) {
@@ -1408,7 +1451,7 @@ Important Rules:
           Object.assign(args, parsed);
         }
         return { args };
-      } catch (_) {
+      } catch {
         return {
           args: {},
           error: `Failed to parse JSON arguments for tool "${functionCall.name}": ${functionCall.args}. Ensure you provide a valid JSON object.`,

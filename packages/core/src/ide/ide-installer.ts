@@ -186,7 +186,7 @@ class VsCodeInstaller implements IdeInstaller {
         success: true,
         message: `${this.ideInfo.displayName} companion extension was installed successfully.`,
       };
-    } catch (_error) {
+    } catch {
       return {
         success: false,
         message: `Failed to install ${this.ideInfo.displayName} companion extension. Please try installing '${GEMINI_CLI_COMPANION_EXTENSION_NAME}' manually from the ${this.ideInfo.displayName} extension marketplace.`,
@@ -236,7 +236,7 @@ class PositronInstaller implements IdeInstaller {
         success: true,
         message: `${this.ideInfo.displayName} companion extension was installed successfully.`,
       };
-    } catch (_error) {
+    } catch {
       return {
         success: false,
         message: `Failed to install ${this.ideInfo.displayName} companion extension. Please try installing '${GEMINI_CLI_COMPANION_EXTENSION_NAME}' manually from the ${this.ideInfo.displayName} extension marketplace.`,
@@ -306,7 +306,7 @@ class AntigravityInstaller implements IdeInstaller {
         success: true,
         message: `${this.ideInfo.displayName} companion extension was installed successfully.`,
       };
-    } catch (_error) {
+    } catch {
       return {
         success: false,
         message: `Failed to install ${this.ideInfo.displayName} companion extension. Please try installing '${GEMINI_CLI_COMPANION_EXTENSION_NAME}' manually from the ${this.ideInfo.displayName} extension marketplace.`,
