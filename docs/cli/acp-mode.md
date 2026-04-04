@@ -52,6 +52,58 @@ and Gemini CLI (the server).
 The core of the ACP implementation can be found in
 `packages/cli/src/acp/acpClient.ts`.
 
+## Host input extensions
+
+ACP covers prompts, cancellations, permissions, and session control. Gemini CLI
+also exposes a Gemini-specific ACP extension for structured host input so an ACP
+client can surface questions in its own UI instead of handing control back to
+the terminal.
+
+During `initialize`, Gemini CLI advertises the extension in
+`agentCapabilities._meta.geminiCli.hostInput`:
+
+```json
+{
+  "version": 1,
+  "requestUserInput": true,
+  "method": "gemini/requestUserInput",
+  "supportedKinds": ["ask_user", "exit_plan_mode"]
+}
+```
+
+To enable host input, the ACP client must advertise
+`clientCapabilities._meta.geminiCli.hostInput` with `requestUserInput: true`.
+The client can also narrow support by setting `supportedKinds`.
+
+- Include `ask_user` to let Gemini CLI surface `ask_user` tool requests over
+  ACP.
+- Include `exit_plan_mode` to let Gemini CLI surface plan-approval questions
+  over ACP.
+- Omit `ask_user` if you want to keep `ask_user` disabled in ACP mode while
+  still supporting other host-input request kinds.
+
+If the client doesn't opt in, Gemini CLI keeps `ask_user` excluded in ACP mode.
+This preserves the default ACP behavior and avoids opening host-driven dialogs
+unless the client has explicitly implemented them.
+
+When Gemini CLI needs host input, it calls `gemini/requestUserInput` as an ACP
+extension request. The request includes:
+
+- `sessionId` for the active ACP session
+- `requestId` for the host-input interaction
+- `kind`, such as `ask_user` or `exit_plan_mode`
+- `title` and `questions`
+- optional `extraParts`
+- optional `toolCall` metadata
+
+The client responds with either:
+
+- `{"outcome":"submitted","answers":{"0":"..."}}`
+- `{"outcome":"cancelled"}`
+
+This extension is separate from MCP. Use it when you want Gemini CLI to keep
+owning the tool flow while your ACP host owns the user-facing input surface.
+
 ### Extending with MCP
 
 ACP can be used with the Model Context Protocol (MCP). This lets an ACP client
@@ -78,7 +130,7 @@ control Gemini CLI.
 ### Core methods
 
 - `initialize`: Establishes the initial connection and lets the client to
-  register its MCP server.
+  register its MCP server and negotiate Gemini-specific ACP extensions.
 - `authenticate`: Authenticates the user.
 - `newSession`: Starts a new chat session.
 - `loadSession`: Loads a previous session.

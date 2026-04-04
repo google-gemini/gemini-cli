@@ -511,6 +511,7 @@ export function isDebugMode(argv: CliArgs): boolean {
 
 export interface LoadCliConfigOptions {
   cwd?: string;
+  acpAskUserEnabled?: boolean;
   projectHooks?: { [K in HookEventName]?: HookDefinition[] } & {
     disabled?: string[];
   };
@@ -523,7 +524,11 @@ export async function loadCliConfig(
   argv: CliArgs,
   options: LoadCliConfigOptions = {},
 ): Promise<Config> {
-  const { cwd = process.cwd(), projectHooks } = options;
+  const {
+    cwd = process.cwd(),
+    projectHooks,
+    acpAskUserEnabled = false,
+  } = options;
   const debugMode = isDebugMode(argv);
 
   const worktreeSettings =
@@ -752,12 +757,13 @@ export async function loadCliConfig(
 
   // In non-interactive mode, exclude tools that require a prompt.
   const extraExcludes: string[] = [];
-  if (!interactive || isAcpMode) {
+  if (!interactive || (isAcpMode && !acpAskUserEnabled)) {
     // The Policy Engine natively handles headless safety by translating ASK_USER
     // decisions to DENY. However, we explicitly block ask_user here to guarantee
-    // it can never be allowed via a high-priority policy rule when no human is present.
-    // We also exclude it in ACP mode as IDEs intercept tool calls and ask for permission,
-    // breaking conversational flows.
+    // it can never be allowed via a high-priority policy rule when no human is
+    // present. In ACP mode, ask_user stays excluded by default and is only
+    // enabled when the client explicitly opts into Gemini CLI host-input
+    // requests.
     extraExcludes.push(ASK_USER_TOOL_NAME);
   }
 

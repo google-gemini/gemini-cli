@@ -40,6 +40,11 @@ import { loadCliConfig, type CliArgs } from '../config/config.js';
 import * as fs from 'node:fs/promises';
 import * as path from 'node:path';
 import { ApprovalMode } from '@google/gemini-cli-core/src/policy/types.js';
+import {
+  ACP_HOST_INPUT_CAPABILITY_KEY,
+  ACP_HOST_INPUT_REQUEST_METHOD,
+  PLAN_APPROVAL_AUTO_OPTION,
+} from './hostInput.js';
 
 vi.mock('../config/config.js', () => ({
   loadCliConfig: vi.fn(),
@@ -247,6 +252,14 @@ describe('GeminiAgent', () => {
       },
     });
     expect(response.agentCapabilities?.loadSession).toBe(true);
+    expect(response.agentCapabilities?._meta).toEqual(
+      expect.objectContaining({
+        [ACP_HOST_INPUT_CAPABILITY_KEY]: expect.objectContaining({
+          requestUserInput: true,
+          method: ACP_HOST_INPUT_REQUEST_METHOD,
+        }),
+      }),
+    );
   });
 
   it('should authenticate correctly', async () => {
@@ -517,7 +530,68 @@ describe('GeminiAgent', () => {
       }),
       'test-session-id',
       mockArgv,
-      { cwd: '/tmp' },
+      { cwd: '/tmp', acpAskUserEnabled: false },
+    );
+  });
+
+  it('should enable ACP host input in config when the client advertises support', async () => {
+    agent = new GeminiAgent(mockConfig, mockSettings, mockArgv, mockConnection);
+    await agent.initialize({
+      clientCapabilities: {
+        _meta: {
+          [ACP_HOST_INPUT_CAPABILITY_KEY]: {
+            requestUserInput: true,
+            version: 1,
+          },
+        },
+      },
+      protocolVersion: 1,
+    });
+
+    await agent.newSession({
+      cwd: '/tmp',
+      mcpServers: [],
+    });
+
+    expect(loadCliConfig).toHaveBeenCalledWith(
+      expect.anything(),
+      'test-session-id',
+      mockArgv,
+      expect.objectContaining({
+        cwd: '/tmp',
+        acpAskUserEnabled: true,
+      }),
+    );
+  });
+
+  it('should keep ask_user disabled in config when host input excludes ask_user', async () => {
+    agent = new GeminiAgent(mockConfig, mockSettings, mockArgv, mockConnection);
+    await agent.initialize({
+      clientCapabilities: {
+        _meta: {
+          [ACP_HOST_INPUT_CAPABILITY_KEY]: {
+            requestUserInput: true,
+            supportedKinds: ['exit_plan_mode'],
+            version: 1,
+          },
+        },
+      },
+      protocolVersion: 1,
+    });
+
+    await agent.newSession({
+      cwd: '/tmp',
+      mcpServers: [],
+    });
+
+    expect(loadCliConfig).toHaveBeenCalledWith(
+      expect.anything(),
+      'test-session-id',
+      mockArgv,
+      expect.objectContaining({
+        cwd: '/tmp',
+        acpAskUserEnabled: false,
+      }),
     );
   });
 
@@ -714,6 +788,7 @@ describe('Session', () => {
     mockConnection = {
       sessionUpdate: vi.fn(),
       requestPermission: vi.fn(),
+      extMethod: vi.fn(),
       sendNotification: vi.fn(),
     } as unknown as Mocked<acp.AgentSideConnection>;
 
@@ -1106,6 +1181,496 @@ describe('Session', () => {
     expect(mockConnection.requestPermission).toHaveBeenCalled();
     expect(confirmationDetails.onConfirm).toHaveBeenCalledWith(
       ToolConfirmationOutcome.ProceedOnce,
+    );
+  });
+
+  it('should request host input for ask_user confirmations when enabled', async () => {
+    const confirmationDetails = {
+      type: 'ask_user' as const,
+      title: 'Ask User',
+      questions: [
+        {
+          header: 'Mode',
+          question: 'Which mode should we use?',
+          type: 'choice',
+          options: [
+            {
+              label: 'Auto Edit',
+              description: 'Automatically approve edit tools',
+            },
+            {
+              label: 'Default',
+              description: 'Require approval for edits',
+            },
+          ],
+        },
+      ],
+      onConfirm: vi.fn(),
+    };
+    const hostInputSession = new Session(
+      'session-1',
+      mockChat,
+      mockConfig,
+      mockConnection,
+      {
+        system: { settings: {} },
+        systemDefaults: { settings: {} },
+        user: { settings: {} },
+        workspace: { settings: {} },
+        merged: {
+          security: { enablePermanentToolApproval: true },
+          mcpServers: {},
+        },
+        errors: [],
+      } as unknown as LoadedSettings,
+      { askUser: true, exitPlanMode: true },
+    );
+
+    mockTool.build.mockReturnValue({
+      getDescription: () => 'Ask User',
+      toolLocations: () => [],
+      shouldConfirmExecute: vi.fn().mockResolvedValue(confirmationDetails),
+      execute: vi.fn().mockResolvedValue({ llmContent: 'Tool Result' }),
+    });
+
+    mockConnection.extMethod.mockResolvedValue({
+      outcome: 'submitted',
+      answers: { '0': 'Auto Edit' },
+    });
+
+    const stream1 = createMockStream([
+      {
+        type: StreamEventType.CHUNK,
+        value: {
+          functionCalls: [{ name: 'test_tool', args: {} }],
+        },
+      },
+    ]);
+    const stream2 = createMockStream([
+      {
+        type: StreamEventType.CHUNK,
+        value: { candidates: [] },
+      },
+    ]);
+
+    mockChat.sendMessageStream
+      .mockResolvedValueOnce(stream1)
+      .mockResolvedValueOnce(stream2);
+
+    await hostInputSession.prompt({
+      sessionId: 'session-1',
+      prompt: [{ type: 'text', text: 'Ask the user something' }],
+    });
+
+    expect(mockConnection.extMethod).toHaveBeenCalledWith(
+      ACP_HOST_INPUT_REQUEST_METHOD,
+      expect.objectContaining({
+        sessionId: 'session-1',
+        kind: 'ask_user',
+        questions: confirmationDetails.questions,
+      }),
+    );
+    expect(mockConnection.requestPermission).not.toHaveBeenCalled();
+    expect(confirmationDetails.onConfirm).toHaveBeenCalledWith(
+      ToolConfirmationOutcome.ProceedOnce,
+      { answers: { '0': 'Auto Edit' } },
+    );
+  });
+
+  it('should cancel ask_user confirmations when host input is cancelled', async () => {
+    const confirmationDetails = {
+      type: 'ask_user' as const,
+      title: 'Ask User',
+      questions: [
+        {
+          header: 'Mode',
+          question: 'Which mode should we use?',
+          type: 'choice',
+          options: [
+            {
+              label: 'Auto Edit',
+              description: 'Automatically approve edit tools',
+            },
+            {
+              label: 'Default',
+              description: 'Require approval for edits',
+            },
+          ],
+        },
+      ],
+      onConfirm: vi.fn(),
+    };
+    const hostInputSession = new Session(
+      'session-1',
+      mockChat,
+      mockConfig,
+      mockConnection,
+      {
+        system: { settings: {} },
+        systemDefaults: { settings: {} },
+        user: { settings: {} },
+        workspace: { settings: {} },
+        merged: {
+          security: { enablePermanentToolApproval: true },
+          mcpServers: {},
+        },
+        errors: [],
+      } as unknown as LoadedSettings,
+      { askUser: true, exitPlanMode: true },
+    );
+
+    mockTool.build.mockReturnValue({
+      getDescription: () => 'Ask User',
+      toolLocations: () => [],
+      shouldConfirmExecute: vi.fn().mockResolvedValue(confirmationDetails),
+      execute: vi.fn().mockResolvedValue({ llmContent: 'Tool Result' }),
+    });
+
+    mockConnection.extMethod.mockResolvedValue({
+      outcome: 'cancelled',
+    });
+
+    const stream1 = createMockStream([
+      {
+        type: StreamEventType.CHUNK,
+        value: {
+          functionCalls: [{ name: 'test_tool', args: {} }],
+        },
+      },
+    ]);
+    const stream2 = createMockStream([
+      {
+        type: StreamEventType.CHUNK,
+        value: { candidates: [] },
+      },
+    ]);
+
+    mockChat.sendMessageStream
+      .mockResolvedValueOnce(stream1)
+      .mockResolvedValueOnce(stream2);
+
+    await hostInputSession.prompt({
+      sessionId: 'session-1',
+      prompt: [{ type: 'text', text: 'Ask the user something' }],
+    });
+
+    expect(mockConnection.extMethod).toHaveBeenCalledWith(
+      ACP_HOST_INPUT_REQUEST_METHOD,
+      expect.objectContaining({
+        sessionId: 'session-1',
+        kind: 'ask_user',
+      }),
+    );
+    expect(mockConnection.requestPermission).not.toHaveBeenCalled();
+    expect(confirmationDetails.onConfirm).toHaveBeenCalledWith(
+      ToolConfirmationOutcome.Cancel,
+    );
+  });
+
+  it('should cancel ask_user confirmations when host input support is disabled', async () => {
+    const confirmationDetails = {
+      type: 'ask_user' as const,
+      title: 'Ask User',
+      questions: [
+        {
+          header: 'Mode',
+          question: 'Which mode should we use?',
+          type: 'choice',
+          options: [
+            {
+              label: 'Auto Edit',
+              description: 'Automatically approve edit tools',
+            },
+            {
+              label: 'Default',
+              description: 'Require approval for edits',
+            },
+          ],
+        },
+      ],
+      onConfirm: vi.fn(),
+    };
+    const hostInputSession = new Session(
+      'session-1',
+      mockChat,
+      mockConfig,
+      mockConnection,
+      {
+        system: { settings: {} },
+        systemDefaults: { settings: {} },
+        user: { settings: {} },
+        workspace: { settings: {} },
+        merged: {
+          security: { enablePermanentToolApproval: true },
+          mcpServers: {},
+        },
+        errors: [],
+      } as unknown as LoadedSettings,
+      { askUser: false, exitPlanMode: true },
+    );
+
+    mockTool.build.mockReturnValue({
+      getDescription: () => 'Ask User',
+      toolLocations: () => [],
+      shouldConfirmExecute: vi.fn().mockResolvedValue(confirmationDetails),
+      execute: vi.fn().mockResolvedValue({ llmContent: 'Tool Result' }),
+    });
+
+    const stream1 = createMockStream([
+      {
+        type: StreamEventType.CHUNK,
+        value: {
+          functionCalls: [{ name: 'test_tool', args: {} }],
+        },
+      },
+    ]);
+    const stream2 = createMockStream([
+      {
+        type: StreamEventType.CHUNK,
+        value: { candidates: [] },
+      },
+    ]);
+
+    mockChat.sendMessageStream
+      .mockResolvedValueOnce(stream1)
+      .mockResolvedValueOnce(stream2);
+
+    await hostInputSession.prompt({
+      sessionId: 'session-1',
+      prompt: [{ type: 'text', text: 'Ask the user something' }],
+    });
+
+    expect(mockConnection.extMethod).not.toHaveBeenCalled();
+    expect(mockConnection.requestPermission).not.toHaveBeenCalled();
+    expect(confirmationDetails.onConfirm).toHaveBeenCalledWith(
+      ToolConfirmationOutcome.Cancel,
+    );
+  });
+
+  it('should request host input for exit_plan_mode when enabled', async () => {
+    const planPath = '/tmp/approved-plan.md';
+    const confirmationDetails = {
+      type: 'exit_plan_mode' as const,
+      title: 'Plan Approval',
+      planPath,
+      onConfirm: vi.fn(),
+    };
+    const hostInputSession = new Session(
+      'session-1',
+      mockChat,
+      mockConfig,
+      mockConnection,
+      {
+        system: { settings: {} },
+        systemDefaults: { settings: {} },
+        user: { settings: {} },
+        workspace: { settings: {} },
+        merged: {
+          security: { enablePermanentToolApproval: true },
+          mcpServers: {},
+        },
+        errors: [],
+      } as unknown as LoadedSettings,
+      { askUser: true, exitPlanMode: true },
+    );
+
+    (fs.readFile as unknown as Mock).mockResolvedValue('# Approved plan');
+    mockTool.build.mockReturnValue({
+      getDescription: () => 'Exit plan mode',
+      toolLocations: () => [],
+      shouldConfirmExecute: vi.fn().mockResolvedValue(confirmationDetails),
+      execute: vi.fn().mockResolvedValue({ llmContent: 'Tool Result' }),
+    });
+
+    mockConnection.extMethod.mockResolvedValue({
+      outcome: 'submitted',
+      answers: { '0': PLAN_APPROVAL_AUTO_OPTION },
+    });
+
+    const stream1 = createMockStream([
+      {
+        type: StreamEventType.CHUNK,
+        value: {
+          functionCalls: [{ name: 'test_tool', args: {} }],
+        },
+      },
+    ]);
+    const stream2 = createMockStream([
+      {
+        type: StreamEventType.CHUNK,
+        value: { candidates: [] },
+      },
+    ]);
+
+    mockChat.sendMessageStream
+      .mockResolvedValueOnce(stream1)
+      .mockResolvedValueOnce(stream2);
+
+    await hostInputSession.prompt({
+      sessionId: 'session-1',
+      prompt: [{ type: 'text', text: 'Approve the plan' }],
+    });
+
+    expect(mockConnection.extMethod).toHaveBeenCalledWith(
+      ACP_HOST_INPUT_REQUEST_METHOD,
+      expect.objectContaining({
+        sessionId: 'session-1',
+        kind: 'exit_plan_mode',
+        extraParts: [`Plan file: ${planPath}`],
+      }),
+    );
+    expect(confirmationDetails.onConfirm).toHaveBeenCalledWith(
+      ToolConfirmationOutcome.ProceedOnce,
+      {
+        approved: true,
+        approvalMode: ApprovalMode.AUTO_EDIT,
+      },
+    );
+  });
+
+  it('should fall back to requestPermission for exit_plan_mode when host input is disabled', async () => {
+    const planPath = '/tmp/approved-plan.md';
+    const confirmationDetails = {
+      type: 'exit_plan_mode' as const,
+      title: 'Plan Approval',
+      planPath,
+      onConfirm: vi.fn(),
+    };
+    const hostInputSession = new Session(
+      'session-1',
+      mockChat,
+      mockConfig,
+      mockConnection,
+      {
+        system: { settings: {} },
+        systemDefaults: { settings: {} },
+        user: { settings: {} },
+        workspace: { settings: {} },
+        merged: {
+          security: { enablePermanentToolApproval: true },
+          mcpServers: {},
+        },
+        errors: [],
+      } as unknown as LoadedSettings,
+      { askUser: true, exitPlanMode: false },
+    );
+
+    mockTool.build.mockReturnValue({
+      getDescription: () => 'Exit plan mode',
+      toolLocations: () => [],
+      shouldConfirmExecute: vi.fn().mockResolvedValue(confirmationDetails),
+      execute: vi.fn().mockResolvedValue({ llmContent: 'Tool Result' }),
+    });
+
+    mockConnection.requestPermission.mockResolvedValue({
+      outcome: {
+        outcome: 'selected',
+        optionId: ToolConfirmationOutcome.ProceedOnce,
+      },
+    });
+
+    const stream1 = createMockStream([
+      {
+        type: StreamEventType.CHUNK,
+        value: {
+          functionCalls: [{ name: 'test_tool', args: {} }],
+        },
+      },
+    ]);
+    const stream2 = createMockStream([
+      {
+        type: StreamEventType.CHUNK,
+        value: { candidates: [] },
+      },
+    ]);
+
+    mockChat.sendMessageStream
+      .mockResolvedValueOnce(stream1)
+      .mockResolvedValueOnce(stream2);
+
+    await hostInputSession.prompt({
+      sessionId: 'session-1',
+      prompt: [{ type: 'text', text: 'Approve the plan' }],
+    });
+
+    expect(mockConnection.extMethod).not.toHaveBeenCalled();
+    expect(mockConnection.requestPermission).toHaveBeenCalledWith(
+      expect.objectContaining({
+        sessionId: 'session-1',
+        toolCall: expect.objectContaining({
+          title: 'Exit plan mode',
+        }),
+      }),
+    );
+    expect(confirmationDetails.onConfirm).toHaveBeenCalledWith(
+      ToolConfirmationOutcome.ProceedOnce,
+    );
+  });
+
+  it('should cancel exit_plan_mode when the plan file is missing', async () => {
+    const planPath = '/tmp/missing-plan.md';
+    const confirmationDetails = {
+      type: 'exit_plan_mode' as const,
+      title: 'Plan Approval',
+      planPath,
+      onConfirm: vi.fn(),
+    };
+    const hostInputSession = new Session(
+      'session-1',
+      mockChat,
+      mockConfig,
+      mockConnection,
+      {
+        system: { settings: {} },
+        systemDefaults: { settings: {} },
+        user: { settings: {} },
+        workspace: { settings: {} },
+        merged: {
+          security: { enablePermanentToolApproval: true },
+          mcpServers: {},
+        },
+        errors: [],
+      } as unknown as LoadedSettings,
+      { askUser: true, exitPlanMode: true },
+    );
+
+    (fs.readFile as unknown as Mock).mockRejectedValue(
+      Object.assign(new Error('ENOENT'), { code: 'ENOENT' }),
+    );
+    mockTool.build.mockReturnValue({
+      getDescription: () => 'Exit plan mode',
+      toolLocations: () => [],
+      shouldConfirmExecute: vi.fn().mockResolvedValue(confirmationDetails),
+      execute: vi.fn().mockResolvedValue({ llmContent: 'Tool Result' }),
+    });
+
+    const stream1 = createMockStream([
+      {
+        type: StreamEventType.CHUNK,
+        value: {
+          functionCalls: [{ name: 'test_tool', args: {} }],
+        },
+      },
+    ]);
+    const stream2 = createMockStream([
+      {
+        type: StreamEventType.CHUNK,
+        value: { candidates: [] },
+      },
+    ]);
+
+    mockChat.sendMessageStream
+      .mockResolvedValueOnce(stream1)
+      .mockResolvedValueOnce(stream2);
+
+    await hostInputSession.prompt({
+      sessionId: 'session-1',
+      prompt: [{ type: 'text', text: 'Approve the plan' }],
+    });
+
+    expect(mockConnection.extMethod).not.toHaveBeenCalled();
+    expect(confirmationDetails.onConfirm).toHaveBeenCalledWith(
+      ToolConfirmationOutcome.Cancel,
     );
   });
 

@@ -35,6 +35,7 @@ import {
   partListUnionToString,
   LlmRole,
   ApprovalMode,
+  checkExhaustive,
   getVersion,
   convertSessionToClientHistory,
   DEFAULT_GEMINI_MODEL,
@@ -78,6 +79,14 @@ import { runExitCleanup } from '../utils/cleanup.js';
 import { SessionSelector } from '../utils/sessionUtils.js';
 
 import { CommandHandler } from './commandHandler.js';
+import {
+  ACP_HOST_INPUT_CAPABILITY_KEY,
+  buildExitPlanModeQuestions,
+  buildHostInputAgentCapability,
+  mapExitPlanModeAnswers,
+  requestHostInput,
+  resolveHostInputSupport,
+} from './hostInput.js';
 
 const RequestPermissionResponseSchema = z.object({
   outcome: z.discriminatedUnion('outcome', [
@@ -183,6 +192,9 @@ export class GeminiAgent {
         version,
       },
       agentCapabilities: {
+        _meta: {
+          [ACP_HOST_INPUT_CAPABILITY_KEY]: buildHostInputAgentCapability(),
+        },
         loadSession: true,
         promptCapabilities: {
           image: true,
@@ -327,6 +339,7 @@ export class GeminiAgent {
 
     const geminiClient = config.getGeminiClient();
     const chat = await geminiClient.startChat();
+    const hostInputSupport = resolveHostInputSupport(this.clientCapabilities);
 
     const session = new Session(
       sessionId,
@@ -334,6 +347,7 @@ export class GeminiAgent {
       config,
       this.connection,
       this.settings,
+      hostInputSupport,
     );
     this.sessions.set(sessionId, session);
 
@@ -391,6 +405,7 @@ export class GeminiAgent {
       config,
       this.connection,
       this.settings,
+      resolveHostInputSupport(this.clientCapabilities),
     );
     this.sessions.set(sessionId, session);
 
@@ -516,7 +531,11 @@ export class GeminiAgent {
       mcpServers: mergedMcpServers,
     };
 
-    const config = await loadCliConfig(settings, sessionId, this.argv, { cwd });
+    const config = await loadCliConfig(settings, sessionId, this.argv, {
+      cwd,
+      acpAskUserEnabled: resolveHostInputSupport(this.clientCapabilities)
+        .askUser,
+    });
 
     createPolicyUpdater(
       config.getPolicyEngine(),
@@ -574,6 +593,10 @@ export class Session {
     private readonly context: AgentLoopContext,
     private readonly connection: acp.AgentSideConnection,
     private readonly settings: LoadedSettings,
+    private readonly hostInputSupport = {
+      askUser: false,
+      exitPlanMode: false,
+    },
   ) {}
 
   async cancelPendingPrompt(): Promise<void> {
@@ -964,6 +987,105 @@ export class Session {
     await this.connection.sessionUpdate(params);
   }
 
+  private async requestAskUserInput(
+    callId: string,
+    displayTitle: string,
+    toolKind: acp.ToolKind,
+    locations: acp.ToolCallLocation[] | undefined,
+    confirmationDetails: Extract<
+      ToolCallConfirmationDetails,
+      { type: 'ask_user' }
+    >,
+  ): Promise<ToolConfirmationOutcome> {
+    if (!this.hostInputSupport.askUser) {
+      this.debug(
+        'ask_user confirmation reached without ACP host input support; canceling the tool call.',
+      );
+      await confirmationDetails.onConfirm(ToolConfirmationOutcome.Cancel);
+      return ToolConfirmationOutcome.Cancel;
+    }
+
+    const output = await requestHostInput(this.connection, {
+      sessionId: this.id,
+      requestId: callId,
+      kind: 'ask_user',
+      title: confirmationDetails.title,
+      questions: confirmationDetails.questions,
+      toolCall: {
+        toolCallId: callId,
+        title: displayTitle,
+        locations,
+        kind: toolKind,
+      },
+    });
+
+    if (output.outcome === 'cancelled') {
+      await confirmationDetails.onConfirm(ToolConfirmationOutcome.Cancel);
+      return ToolConfirmationOutcome.Cancel;
+    }
+
+    await confirmationDetails.onConfirm(ToolConfirmationOutcome.ProceedOnce, {
+      answers: output.answers,
+    });
+    return ToolConfirmationOutcome.ProceedOnce;
+  }
+
+  private async requestExitPlanModeInput(
+    callId: string,
+    displayTitle: string,
+    toolKind: acp.ToolKind,
+    locations: acp.ToolCallLocation[] | undefined,
+    confirmationDetails: Extract<
+      ToolCallConfirmationDetails,
+      { type: 'exit_plan_mode' }
+    >,
+  ): Promise<ToolConfirmationOutcome> {
+    let planContent: string;
+    try {
+      planContent = (
+        await fs.readFile(confirmationDetails.planPath, 'utf8')
+      ).trim();
+    } catch (error) {
+      if (isNodeError(error) && error.code === 'ENOENT') {
+        this.debug(
+          `Plan file ${confirmationDetails.planPath} was removed before ACP host input could be requested.`,
+        );
+        await confirmationDetails.onConfirm(ToolConfirmationOutcome.Cancel);
+        return ToolConfirmationOutcome.Cancel;
+      }
+      throw error;
+    }
+
+    const output = await requestHostInput(this.connection, {
+      sessionId: this.id,
+      requestId: callId,
+      kind: 'exit_plan_mode',
+      title: confirmationDetails.title,
+      questions: buildExitPlanModeQuestions(planContent),
+      extraParts: [`Plan file: ${confirmationDetails.planPath}`],
+      toolCall: {
+        toolCallId: callId,
+        title: displayTitle,
+        locations,
+        kind: toolKind,
+      },
+      _meta: {
+        planPath: confirmationDetails.planPath,
+      },
+    });
+
+    if (output.outcome === 'cancelled') {
+      await confirmationDetails.onConfirm(ToolConfirmationOutcome.Cancel);
+      return ToolConfirmationOutcome.Cancel;
+    }
+
+    await confirmationDetails.onConfirm(
+      ToolConfirmationOutcome.ProceedOnce,
+      mapExitPlanModeAnswers(output.answers),
+    );
+    return ToolConfirmationOutcome.ProceedOnce;
+  }
+
   private async runTool(
     abortSignal: AbortSignal,
     promptId: string,
@@ -1038,6 +1160,8 @@ export class Session {
 
       const confirmationDetails =
         await invocation.shouldConfirmExecute(abortSignal);
+      const toolKind = toAcpToolKind(tool.kind);
+      const locations = invocation.toolLocations();
 
       if (confirmationDetails) {
         const content: acp.ToolCallContent[] = [];
@@ -1058,45 +1182,67 @@ export class Session {
           });
         }
 
-        const params: acp.RequestPermissionRequest = {
-          sessionId: this.id,
-          options: toPermissionOptions(
+        let outcome: ToolConfirmationOutcome;
+        if (confirmationDetails.type === 'ask_user') {
+          outcome = await this.requestAskUserInput(
+            callId,
+            displayTitle,
+            toolKind,
+            locations,
             confirmationDetails,
-            this.context.config,
-            this.settings.merged.security.enablePermanentToolApproval,
-          ),
-          toolCall: {
-            toolCallId: callId,
-            status: 'pending',
-            title: displayTitle,
-            content,
-            locations: invocation.toolLocations(),
-            kind: toAcpToolKind(tool.kind),
-          },
-        };
+          );
+        } else if (
+          confirmationDetails.type === 'exit_plan_mode' &&
+          this.hostInputSupport.exitPlanMode
+        ) {
+          outcome = await this.requestExitPlanModeInput(
+            callId,
+            displayTitle,
+            toolKind,
+            locations,
+            confirmationDetails,
+          );
+        } else {
+          const params: acp.RequestPermissionRequest = {
+            sessionId: this.id,
+            options: toPermissionOptions(
+              confirmationDetails,
+              this.context.config,
+              this.settings.merged.security.enablePermanentToolApproval,
+            ),
+            toolCall: {
+              toolCallId: callId,
+              status: 'pending',
+              title: displayTitle,
+              content,
+              locations,
+              kind: toolKind,
+            },
+          };
 
-        const output = RequestPermissionResponseSchema.parse(
-          await this.connection.requestPermission(params),
-        );
+          const output = RequestPermissionResponseSchema.parse(
+            await this.connection.requestPermission(params),
+          );
 
-        const outcome =
-          output.outcome.outcome === 'cancelled'
-            ? ToolConfirmationOutcome.Cancel
-            : z
-                .nativeEnum(ToolConfirmationOutcome)
-                .parse(output.outcome.optionId);
+          outcome =
+            output.outcome.outcome === 'cancelled'
+              ? ToolConfirmationOutcome.Cancel
+              : z
+                  .nativeEnum(ToolConfirmationOutcome)
+                  .parse(output.outcome.optionId);
 
-        await confirmationDetails.onConfirm(outcome);
+          await confirmationDetails.onConfirm(outcome);
 
-        // Update policy to enable Always Allow persistence
-        await updatePolicy(
-          tool,
-          outcome,
-          confirmationDetails,
-          this.context,
-          this.context.messageBus,
-          invocation,
-        );
+          // Update policy to enable Always Allow persistence
+          await updatePolicy(
+            tool,
+            outcome,
+            confirmationDetails,
+            this.context,
+            this.context.messageBus,
+            invocation,
+          );
+        }
 
         switch (outcome) {
           case ToolConfirmationOutcome.Cancel:
@@ -1111,8 +1257,10 @@ export class Session {
           case ToolConfirmationOutcome.ModifyWithEditor:
             break;
           default: {
-            const resultOutcome: never = outcome;
-            throw new Error(`Unexpected: ${resultOutcome}`);
+            const exhaustiveCheck: never = outcome;
+            throw new Error(
+              `Unhandled tool confirmation outcome: ${exhaustiveCheck}`,
+            );
           }
         }
       } else {
@@ -1124,8 +1272,8 @@ export class Session {
           status: 'in_progress',
           title: displayTitle,
           content,
-          locations: invocation.toolLocations(),
-          kind: toAcpToolKind(tool.kind),
+          locations,
+          kind: toolKind,
         });
       }
 
@@ -1140,8 +1288,8 @@ export class Session {
         status: 'completed',
         title: displayTitle,
         content: updateContent,
-        locations: invocation.toolLocations(),
-        kind: toAcpToolKind(tool.kind),
+        locations,
+        kind: toolKind,
       });
 
       const durationMs = Date.now() - startTime;
@@ -1919,11 +2067,11 @@ function toPermissionOptions(
         break;
       case 'ask_user':
       case 'exit_plan_mode':
+      case 'sandbox_expansion':
         // askuser and exit_plan_mode don't need "always allow" options
         break;
       default:
-        // No "always allow" options for other types
-        break;
+        return checkExhaustive(confirmation);
     }
   }
 
@@ -1939,10 +2087,8 @@ function toPermissionOptions(
     case 'exit_plan_mode':
     case 'sandbox_expansion':
       break;
-    default: {
-      const unreachable: never = confirmation;
-      throw new Error(`Unexpected: ${unreachable}`);
-    }
+    default:
+      return checkExhaustive(confirmation);
   }
 
   return options;
