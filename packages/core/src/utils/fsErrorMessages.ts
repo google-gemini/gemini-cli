@@ -15,12 +15,16 @@ const errorMessageGenerators: Record<string, (path?: string) => string> = {
     (path
       ? `Permission denied: cannot access '${path}'. `
       : 'Permission denied. ') +
-    'Check file permissions or run with elevated privileges.',
+    'Check file permissions or run with elevated privileges.' +
+    (path ? `\nAction: Run 'ls -l ${path}' to check permissions.` : ''),
   ENOENT: (path) =>
     (path
       ? `File or directory not found: '${path}'. `
       : 'File or directory not found. ') +
-    'Check if the path exists and is spelled correctly.',
+    'Check if the path exists and is spelled correctly.' +
+    (path
+      ? `\nAction: Run 'ls' in the parent directory to see available files.`
+      : ''),
   ENOSPC: () =>
     'No space left on device. Free up some disk space and try again.',
   EISDIR: (path) =>
