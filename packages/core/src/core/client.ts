@@ -922,10 +922,7 @@ export class GeminiClient {
           const additionalContext = hookResult.additionalContext;
           if (additionalContext) {
             const requestArray = Array.isArray(request) ? request : [request];
-            request = [
-              ...requestArray,
-              { text: `<hook_context>${additionalContext}</hook_context>` },
-            ];
+            request = [...requestArray, { text: `\n\n${additionalContext}` }];
           }
         }
       }

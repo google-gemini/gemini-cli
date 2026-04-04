@@ -15,7 +15,6 @@ import {
   type HookInput,
   type HookOutput,
   type HookExecutionResult,
-  type BeforeAgentInput,
   type BeforeModelInput,
   type BeforeModelOutput,
   type BeforeToolInput,
@@ -180,22 +179,6 @@ export class HookRunner {
     // Apply modifications based on hook output and event type
     if (hookOutput.hookSpecificOutput) {
       switch (eventName) {
-        case HookEventName.BeforeAgent:
-          if ('additionalContext' in hookOutput.hookSpecificOutput) {
-            // For BeforeAgent, we could modify the prompt with additional context
-            const additionalContext =
-              hookOutput.hookSpecificOutput['additionalContext'];
-            if (
-              typeof additionalContext === 'string' &&
-              'prompt' in modifiedInput
-            ) {
-              // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
-              (modifiedInput as BeforeAgentInput).prompt +=
-                '\n\n' + additionalContext;
-            }
-          }
-          break;
-
         case HookEventName.BeforeModel:
           if ('llm_request' in hookOutput.hookSpecificOutput) {
             // For BeforeModel, we update the LLM request
