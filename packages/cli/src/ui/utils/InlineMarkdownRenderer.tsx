@@ -5,7 +5,6 @@
  */
 
 import React from 'react';
-import { Text } from 'ink';
 import { parseMarkdownToANSI } from './markdownParsingUtils.js';
 import { stripUnsafeCharacters } from './textUtils.js';
 
@@ -21,7 +20,15 @@ const RenderInlineInternal: React.FC<RenderInlineProps> = ({
   const text = stripUnsafeCharacters(rawText);
   const ansiText = parseMarkdownToANSI(text, defaultColor);
 
-  return <Text>{ansiText}</Text>;
+  return <>{ansiText}</>;
 };
 
+/**
+ * Renders inline markdown as ANSI-formatted text.
+ *
+ * NOTE: This component returns a React fragment and does NOT include its own
+ * Ink <Text> wrapper. Callers MUST wrap this component in a <Text> block to
+ * ensure Ink's layout engine can correctly calculate wrap points and prevent
+ * character dropping.
+ */
 export const RenderInline = React.memo(RenderInlineInternal);
