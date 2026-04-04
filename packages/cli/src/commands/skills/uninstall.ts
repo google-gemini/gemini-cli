@@ -9,11 +9,17 @@ import { debugLogger, getErrorMessage } from '@google/gemini-cli-core';
 import { exitCli } from '../utils.js';
 import { uninstallSkill } from '../../utils/skillUtils.js';
 import chalk from 'chalk';
+import { z } from 'zod';
 
 interface UninstallArgs {
   name: string;
   scope?: 'user' | 'workspace';
 }
+
+const uninstallArgsSchema = z.object({
+  name: z.string(),
+  scope: z.enum(['user', 'workspace']).optional(),
+});
 
 export async function handleUninstall(args: UninstallArgs) {
   try {
@@ -62,11 +68,10 @@ export const uninstallCommand: CommandModule = {
         return true;
       }),
   handler: async (argv) => {
+    const parsedArgs = uninstallArgsSchema.parse(argv);
     await handleUninstall({
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
-      name: argv['name'] as string,
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
-      scope: argv['scope'] as 'user' | 'workspace',
+      name: parsedArgs.name,
+      scope: parsedArgs.scope,
     });
     await exitCli();
   },

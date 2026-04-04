@@ -5,17 +5,18 @@
  */
 
 import { useCallback, useSyncExternalStore } from 'react';
-import type { ConsoleMessageItem } from '../types.js';
 import {
   coreEvents,
   CoreEvent,
   type ConsoleLogPayload,
 } from '@google/gemini-cli-core';
+import type { ConsoleMessageItem } from '../types.js';
 
 export interface UseErrorCountReturn {
   errorCount: number;
   clearErrorCount: () => void;
 }
+
 
 // --- Global Console Store ---
 
@@ -76,7 +77,7 @@ function processQueue() {
     ) {
       newMessages[newMessages.length - 1] = {
         ...prev,
-        count: prev.count + 1,
+        count: (prev.count || 1) + 1,
       };
     } else {
       newMessages.push({ ...queuedMessage, count: 1 });

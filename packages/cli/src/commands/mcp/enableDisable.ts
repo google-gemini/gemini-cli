@@ -14,6 +14,7 @@ import {
 import { loadSettings } from '../../config/settings.js';
 import { exitCli } from '../utils.js';
 import { getMcpServersFromConfig } from './list.js';
+import { z } from 'zod';
 
 const GREEN = '\x1b[32m';
 const YELLOW = '\x1b[33m';
@@ -96,7 +97,12 @@ async function handleDisable(args: Args): Promise<void> {
   }
 }
 
-export const enableCommand: CommandModule<object, Args> = {
+const enableDisableArgsSchema = z.object({
+  name: z.string(),
+  session: z.boolean().optional().default(false),
+});
+
+export const enableCommand: CommandModule = {
   command: 'enable <name>',
   describe: 'Enable an MCP server',
   builder: (yargs) =>
@@ -112,12 +118,13 @@ export const enableCommand: CommandModule<object, Args> = {
         default: false,
       }),
   handler: async (argv) => {
-    await handleEnable(argv as Args);
+    const parsedArgs = enableDisableArgsSchema.parse(argv);
+    await handleEnable(parsedArgs);
     await exitCli();
   },
 };
 
-export const disableCommand: CommandModule<object, Args> = {
+export const disableCommand: CommandModule = {
   command: 'disable <name>',
   describe: 'Disable an MCP server',
   builder: (yargs) =>
@@ -133,7 +140,8 @@ export const disableCommand: CommandModule<object, Args> = {
         default: false,
       }),
   handler: async (argv) => {
-    await handleDisable(argv as Args);
+    const parsedArgs = enableDisableArgsSchema.parse(argv);
+    await handleDisable(parsedArgs);
     await exitCli();
   },
 };
