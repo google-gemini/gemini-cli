@@ -155,7 +155,7 @@ class LSToolInvocation extends BaseToolInvocation<LSToolParams, ToolResult> {
    * Executes the LS operation with the given parameters
    * @returns Result of the LS operation
    */
-  async execute(_signal: AbortSignal): Promise<ToolResult> {
+  async execute(signal: AbortSignal): Promise<ToolResult> {
     const resolvedDirPath = path.resolve(
       this.config.getTargetDir(),
       this.params.dir_path,
@@ -224,27 +224,50 @@ class LSToolInvocation extends BaseToolInvocation<LSToolParams, ToolResult> {
             DEFAULT_FILE_FILTERING_OPTIONS.respectGeminiIgnore,
         });
 
-      const entries = [];
-      for (const relativePath of filteredPaths) {
-        const fullPath = path.resolve(this.config.getTargetDir(), relativePath);
+      const pathsToStat = filteredPaths.filter(
+        (relativePath) =>
+          !this.shouldIgnore(path.basename(relativePath), this.params.ignore),
+      );
 
-        if (this.shouldIgnore(path.basename(fullPath), this.params.ignore)) {
-          continue;
-        }
-
-        try {
-          const stats = await fs.stat(fullPath);
-          const isDir = stats.isDirectory();
-          entries.push({
-            name: path.basename(fullPath),
-            path: fullPath,
-            isDirectory: isDir,
-            size: isDir ? 0 : stats.size,
-            modifiedTime: stats.mtime,
-          });
-        } catch (error) {
-          // Log error internally but don't fail the whole listing
-          debugLogger.debug(`Error accessing ${fullPath}: ${error}`);
+      // Batch stat calls to avoid opening too many file descriptors at once
+      const CONCURRENT_LIMIT = 20;
+      type LSEntry = {
+        name: string;
+        path: string;
+        isDirectory: boolean;
+        size: number;
+        modifiedTime: Date;
+      };
+      const entries: LSEntry[] = [];
+      for (let i = 0; i < pathsToStat.length; i += CONCURRENT_LIMIT) {
+        if (signal.aborted) throw signal.reason;
+        const batch = pathsToStat.slice(i, i + CONCURRENT_LIMIT);
+        const batchResults = await Promise.allSettled(
+          batch.map(async (relativePath) => {
+            const fullPath = path.resolve(
+              this.config.getTargetDir(),
+              relativePath,
+            );
+            const stats = await fs.stat(fullPath);
+            const isDir = stats.isDirectory();
+            return {
+              name: path.basename(fullPath),
+              path: fullPath,
+              isDirectory: isDir,
+              size: isDir ? 0 : stats.size,
+              modifiedTime: stats.mtime,
+            };
+          }),
+        );
+        for (const result of batchResults) {
+          if (result.status === 'fulfilled') {
+            entries.push(result.value);
+          }
+          if (result.status === 'rejected') {
+            debugLogger.debug(
+              `Stat failed (file may have been deleted): ${result.reason}`,
+            );
+          }
         }
       }
 

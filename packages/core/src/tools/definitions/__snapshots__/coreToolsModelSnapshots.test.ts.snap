@@ -205,7 +205,7 @@ exports[`coreTools snapshots for specific models > Model: gemini-2.5-pro > snaps
   "parametersJsonSchema": {
     "properties": {
       "case_sensitive": {
-        "description": "Optional: Whether the search should be case-sensitive. Defaults to false.",
+        "description": "Optional: Whether the search should be case-sensitive. Defaults to false on macOS/Windows, true on Linux.",
         "type": "boolean",
       },
       "dir_path": {
@@ -450,6 +450,10 @@ Use this tool when the user's query implies needing the content of several files
   "name": "read_many_files",
   "parametersJsonSchema": {
     "properties": {
+      "case_sensitive": {
+        "description": "Optional: Whether the search should be case-sensitive. Defaults to false on macOS/Windows, true on Linux.",
+        "type": "boolean",
+      },
       "exclude": {
         "default": [],
         "description": "Optional. Glob patterns for files/directories to exclude. Added to default excludes if useDefaultExcludes is true. Example: "**/*.log", "temp/"",
@@ -1035,7 +1039,7 @@ exports[`coreTools snapshots for specific models > Model: gemini-3-pro-preview >
   "parametersJsonSchema": {
     "properties": {
       "case_sensitive": {
-        "description": "Optional: Whether the search should be case-sensitive. Defaults to false.",
+        "description": "Optional: Whether the search should be case-sensitive. Defaults to false on macOS/Windows, true on Linux.",
         "type": "boolean",
       },
       "dir_path": {
@@ -1280,6 +1284,10 @@ Use this tool when the user's query implies needing the content of several files
   "name": "read_many_files",
   "parametersJsonSchema": {
     "properties": {
+      "case_sensitive": {
+        "description": "Optional: Whether the search should be case-sensitive. Defaults to false on macOS/Windows, true on Linux.",
+        "type": "boolean",
+      },
       "exclude": {
         "default": [],
         "description": "Optional. Glob patterns for files/directories to exclude. Added to default excludes if useDefaultExcludes is true. Example: "**/*.log", "temp/"",

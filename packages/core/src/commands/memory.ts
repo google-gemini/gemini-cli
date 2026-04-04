@@ -60,7 +60,6 @@ export async function refreshMemory(
     fileCount = result.fileCount;
   }
 
-  config.updateSystemInstructionIfInitialized();
   let content: string;
 
   if (memoryContent.length > 0) {
