@@ -43,6 +43,12 @@ import {
 const execAsync = promisify(exec);
 const execFileAsync = promisify(execFile);
 
+// Module-scope references to the previous proxy cleanup handlers.
+// Persists across start_sandbox calls so process.off() can match
+// and remove the correct listener from earlier launches.
+let previousStopProxy: (() => void) | undefined;
+let previousContainerStopProxy: (() => void) | undefined;
+
 export async function start_sandbox(
   config: SandboxConfig,
   nodeArgs: string[] = [],
@@ -179,18 +185,22 @@ export async function start_sandbox(
           shell: true,
           detached: true,
         });
-        // install handlers to stop proxy on exit/signal
+        // Stop the previous proxy and remove its handlers before registering new ones
+        if (previousStopProxy) {
+          previousStopProxy();
+          process.off('exit', previousStopProxy);
+          process.off('SIGINT', previousStopProxy);
+          process.off('SIGTERM', previousStopProxy);
+        }
         const stopProxy = () => {
           debugLogger.log('stopping proxy ...');
           if (proxyProcess?.pid) {
             process.kill(-proxyProcess.pid, 'SIGTERM');
           }
         };
-        process.off('exit', stopProxy);
+        previousStopProxy = stopProxy;
         process.on('exit', stopProxy);
-        process.off('SIGINT', stopProxy);
         process.on('SIGINT', stopProxy);
-        process.off('SIGTERM', stopProxy);
         process.on('SIGTERM', stopProxy);
 
         // commented out as it disrupts ink rendering
@@ -737,16 +747,20 @@ export async function start_sandbox(
         shell: false, // <-- no shell; args are passed directly
         detached: true,
       });
-      // install handlers to stop proxy on exit/signal
+      // Stop the previous proxy container and remove its handlers before registering new ones
+      if (previousContainerStopProxy) {
+        previousContainerStopProxy();
+        process.off('exit', previousContainerStopProxy);
+        process.off('SIGINT', previousContainerStopProxy);
+        process.off('SIGTERM', previousContainerStopProxy);
+      }
       const stopProxy = () => {
         debugLogger.log('stopping proxy container ...');
         execSync(`${command} rm -f ${SANDBOX_PROXY_NAME}`);
       };
-      process.off('exit', stopProxy);
+      previousContainerStopProxy = stopProxy;
       process.on('exit', stopProxy);
-      process.off('SIGINT', stopProxy);
       process.on('SIGINT', stopProxy);
-      process.off('SIGTERM', stopProxy);
       process.on('SIGTERM', stopProxy);
 
       // commented out as it disrupts ink rendering
