@@ -1133,7 +1133,7 @@ export class GeminiClient {
         onPersistent429: onPersistent429Callback,
         onValidationRequired: onValidationRequiredCallback,
         authType: this.config.getContentGeneratorConfig()?.authType,
-        maxAttempts: availabilityMaxAttempts,
+        maxAttempts: availabilityMaxAttempts ?? this.config.getMaxAttempts(),
         retryFetchErrors: this.config.getRetryFetchErrors(),
         getAvailabilityContext,
         onRetry: (attempt, error, delayMs) => {

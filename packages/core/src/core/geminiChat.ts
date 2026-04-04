@@ -78,8 +78,6 @@ export type StreamEvent =
  * Options for retrying mid-stream errors (e.g. invalid content or API disconnects).
  */
 interface MidStreamRetryOptions {
-  /** Total number of attempts to make (1 initial + N retries). */
-  maxAttempts: number;
   /** The base delay in milliseconds for backoff. */
   initialDelayMs: number;
   /** Whether to use exponential backoff instead of linear. */
@@ -87,7 +85,6 @@ interface MidStreamRetryOptions {
 }
 
 const MID_STREAM_RETRY_OPTIONS: MidStreamRetryOptions = {
-  maxAttempts: 4, // 1 initial call + 3 retries mid-stream
   initialDelayMs: 1000,
   useExponentialBackoff: true,
 };
@@ -420,10 +417,8 @@ export class GeminiChat {
               : getRetryErrorType(error);
 
             if (isContentError || (isRetryable && !signal.aborted)) {
-              // The issue requests exactly 3 retries (4 attempts) for API errors during stream iteration.
-              // Regardless of the global maxAttempts (e.g. 10), we only want to retry these mid-stream API errors
-              // up to 3 times before finally throwing the error to the user.
-              const maxMidStreamAttempts = MID_STREAM_RETRY_OPTIONS.maxAttempts;
+              // We retry mid-stream API errors up to maxAttempts times before finally throwing the error to the user.
+              const maxMidStreamAttempts = this.context.config.getMaxAttempts();
 
               if (
                 attempt < maxAttempts - 1 &&

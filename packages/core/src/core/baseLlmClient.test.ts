@@ -102,6 +102,7 @@ describe('BaseLlmClient', () => {
     );
 
     mockConfig = {
+      getRequestTimeoutMs: vi.fn().mockReturnValue(undefined),
       getSessionId: vi.fn().mockReturnValue('test-session-id'),
       getContentGeneratorConfig: vi
         .fn()
@@ -251,7 +252,7 @@ describe('BaseLlmClient', () => {
       expect(retryWithBackoff).toHaveBeenCalledWith(
         expect.any(Function),
         expect.objectContaining({
-          maxAttempts: 5,
+          maxAttempts: 3,
         }),
       );
     });
