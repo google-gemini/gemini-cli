@@ -16,7 +16,7 @@ import {
 } from 'vitest';
 import { render, cleanup, persistentStateMock } from '../test-utils/render.js';
 import { waitFor } from '../test-utils/async.js';
-import { act, useContext } from 'react';
+import { act, useContext, useEffect } from 'react';
 import { AppContainer } from './AppContainer.js';
 import { SettingsContext } from './contexts/SettingsContext.js';
 import { type TrackedToolCall } from './hooks/useToolScheduler.js';
@@ -419,6 +419,7 @@ describe('AppContainer State Management', () => {
       addMessage: vi.fn(),
       clearQueue: vi.fn(),
       getQueuedMessagesText: vi.fn().mockReturnValue(''),
+      popAllMessages: vi.fn(),
     });
     mockedUseApprovalModeIndicator.mockReturnValue(false);
     mockedUseGitBranchName.mockReturnValue('main');
@@ -3189,6 +3190,123 @@ describe('AppContainer State Management', () => {
       expect(mocks.mockStdout.write).not.toHaveBeenCalledWith(
         ansiEscapes.clearTerminal,
       );
+      unmount();
+    });
+  });
+
+  describe('Compression Queueing', () => {
+    const pendingCompressionItem = {
+      type: 'compression' as const,
+      compression: {
+        isPending: true,
+        originalTokenCount: null,
+        newTokenCount: null,
+        compressionStatus: null,
+      },
+    };
+
+    it('keeps input active while compression is pending', async () => {
+      mockedUseSlashCommandProcessor.mockImplementation((...args) => {
+        const setIsProcessing = args[7] as (isProcessing: boolean) => void;
+
+        useEffect(() => {
+          setIsProcessing(true);
+        }, [setIsProcessing]);
+
+        return {
+          handleSlashCommand: vi.fn(),
+          slashCommands: [],
+          pendingHistoryItems: [pendingCompressionItem],
+          commandContext: {},
+          confirmationRequest: null,
+        };
+      });
+
+      const { unmount } = await act(async () => renderAppContainer());
+
+      await waitFor(() => {
+        expect(capturedUIState.isInputActive).toBe(true);
+      });
+      expect(mockedUseMessageQueue.mock.lastCall?.[0]).toMatchObject({
+        canSubmitMessages: false,
+      });
+
+      unmount();
+    });
+
+    it('queues plain messages while compression is pending', async () => {
+      const addMessage = vi.fn();
+      const addInput = vi.fn();
+      const submitQuery = vi.fn();
+
+      mockedUseSlashCommandProcessor.mockReturnValue({
+        handleSlashCommand: vi.fn(),
+        slashCommands: [],
+        pendingHistoryItems: [pendingCompressionItem],
+        commandContext: {},
+        confirmationRequest: null,
+      });
+      mockedUseMessageQueue.mockReturnValue({
+        messageQueue: [],
+        addMessage,
+        clearQueue: vi.fn(),
+        getQueuedMessagesText: vi.fn().mockReturnValue(''),
+        popAllMessages: vi.fn(),
+      });
+      mockedUseInputHistoryStore.mockReturnValue({
+        inputHistory: [],
+        addInput,
+        initializeFromLogger: vi.fn(),
+      });
+      mockedUseGeminiStream.mockReturnValue({
+        ...DEFAULT_GEMINI_STREAM_MOCK,
+        submitQuery,
+      });
+
+      const { unmount } = await act(async () => renderAppContainer());
+
+      await act(async () => {
+        await capturedUIActions.handleFinalSubmit('queued prompt');
+      });
+
+      expect(addMessage).toHaveBeenCalledWith('queued prompt');
+      expect(addInput).toHaveBeenCalledWith('queued prompt');
+      expect(submitQuery).not.toHaveBeenCalled();
+
+      unmount();
+    });
+
+    it('blocks slash commands while compression is pending', async () => {
+      const addMessage = vi.fn();
+      const handleSlashCommand = vi.fn();
+
+      mockedUseSlashCommandProcessor.mockReturnValue({
+        handleSlashCommand,
+        slashCommands: [],
+        pendingHistoryItems: [pendingCompressionItem],
+        commandContext: {},
+        confirmationRequest: null,
+      });
+      mockedUseMessageQueue.mockReturnValue({
+        messageQueue: [],
+        addMessage,
+        clearQueue: vi.fn(),
+        getQueuedMessagesText: vi.fn().mockReturnValue(''),
+        popAllMessages: vi.fn(),
+      });
+
+      const { unmount } = await act(async () => renderAppContainer());
+
+      await act(async () => {
+        await capturedUIActions.handleFinalSubmit('/help');
+      });
+
+      expect(addMessage).not.toHaveBeenCalled();
+      expect(handleSlashCommand).not.toHaveBeenCalled();
+      expect(capturedUIState.queueErrorMessage).toBe(
+        'Slash commands cannot be queued',
+      );
+
       unmount();
     });
   });
