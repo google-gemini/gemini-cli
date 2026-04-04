@@ -161,7 +161,7 @@ describe('fetch utils', () => {
   });
 
   describe('fetchWithTimeout', () => {
-    it('should handle timeouts', async () => {
+    it('should throw FetchError with ETIMEDOUT on an internal timeout', async () => {
       vi.mocked(global.fetch).mockImplementation(
         (_input, init) =>
           new Promise((_resolve, reject) => {
@@ -181,6 +181,35 @@ describe('fetch utils', () => {
       await expect(fetchWithTimeout('http://example.com', 50)).rejects.toThrow(
         'Request timed out after 50ms',
       );
+    });
+
+    it('should throw an AbortError (not ETIMEDOUT) when the caller signal is aborted', async () => {
+      vi.mocked(global.fetch).mockImplementation(
+        (_input, init) =>
+          new Promise((_resolve, reject) => {
+            if (init?.signal) {
+              init.signal.addEventListener('abort', () => {
+                const error = new Error('The operation was aborted');
+                error.name = 'AbortError';
+                // @ts-expect-error - for mocking purposes
+                error.code = 'ABORT_ERR';
+                reject(error);
+              });
+            }
+          }),
+      );
+
+      const controller = new AbortController();
+      // Abort the external signal before the request even starts
+      controller.abort();
+
+      const rejection = fetchWithTimeout('http://example.com', 10_000, {
+        signal: controller.signal,
+      });
+
+      await expect(rejection).rejects.toMatchObject({ name: 'AbortError' });
+      // Must NOT be classified as a timeout
+      await expect(rejection).rejects.not.toThrow('timed out');
     });
   });
 });
