@@ -2416,6 +2416,19 @@ describe('loadCliConfig tool exclusions', () => {
     expect(config.getExcludeTools()).toContain('ask_user');
   });
 
+  it('should keep ask_user enabled in ACP mode when host input support is enabled', async () => {
+    process.stdin.isTTY = true;
+    process.argv = ['node', 'script.js', '--acp'];
+    const argv = await parseArguments(createTestMergedSettings());
+    const config = await loadCliConfig(
+      createTestMergedSettings(),
+      'test-session',
+      argv,
+      { acpAskUserEnabled: true },
+    );
+    expect(config.getExcludeTools()).not.toContain('ask_user');
+  });
+
   it('should not exclude shell tool in non-interactive mode when --allowed-tools="ShellTool" is set', async () => {
     process.stdin.isTTY = false;
     process.argv = [

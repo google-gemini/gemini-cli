@@ -33,12 +33,80 @@ confirmation.
   - Presents an interactive dialog to the user with the specified questions.
   - Pauses execution until the user provides answers or dismisses the dialog.
   - Returns the user's answers to the model.
+  - In ACP mode, Gemini CLI keeps `ask_user` disabled unless the ACP client
+    explicitly opts in to Gemini CLI host-input requests.
 
 - **Output (`llmContent`):** A JSON string containing the user's answers,
   indexed by question position (e.g.,
   `{"answers":{"0": "Option A", "1": "Some text"}}`).
 
 - **Confirmation:** Yes. The tool inherently involves user interaction.
+
+## ACP mode
+
+In ACP mode, Gemini CLI doesn't assume that the host client can handle
+interactive user questions. To preserve existing ACP behavior, Gemini CLI
+excludes `ask_user` unless the host explicitly advertises support.
+
+To enable `ask_user` over ACP, the host client must do all of the following:
+
+1. Set `clientCapabilities._meta.geminiCli.hostInput.requestUserInput` to
+   `true`.
+2. Include `ask_user` in
+   `clientCapabilities._meta.geminiCli.hostInput.supportedKinds`, or omit
+   `supportedKinds` entirely.
+3. Handle the `gemini/requestUserInput` ACP extension request and return either
+   submitted answers or cancellation.
+
+If the host omits `ask_user` from `supportedKinds`, Gemini CLI keeps the tool
+disabled in ACP mode. This lets a client support other host-input request kinds
+without taking on `ask_user`.
+
+When enabled, Gemini CLI sends the same question payload that the terminal UI
+uses. The ACP extension request looks like this:
+
+```json
+{
+  "sessionId": "session-123",
+  "requestId": "ask_user-456",
+  "kind": "ask_user",
+  "title": "Ask User",
+  "questions": [
+    {
+      "header": "Database",
+      "question": "Which database would you like to use?",
+      "type": "choice",
+      "options": [
+        {
+          "label": "PostgreSQL",
+          "description": "Powerful, open source object-relational database system."
+        },
+        {
+          "label": "SQLite",
+          "description": "C-library that implements a SQL database engine."
+        }
+      ]
+    }
+  ]
+}
+```
+
+The ACP client responds with one of these payloads:
+
+```json
+{
+  "outcome": "submitted",
+  "answers": {
+    "0": "PostgreSQL"
+  }
+}
+```
+
+```json
+{
+  "outcome": "cancelled"
+}
+```
 
 ## Usage Examples
 
