@@ -99,6 +99,10 @@ These are convenient shortcuts that map to specific models:
 | `gemini extensions link <path>`                    | Link local extension for development         | `gemini extensions link /path/to/extension`                                    |
 | `gemini extensions new <path>`                     | Create new extension from template           | `gemini extensions new ./my-extension`                                         |
 | `gemini extensions validate <path>`                | Validate extension structure                 | `gemini extensions validate ./my-extension`                                    |
+| `gemini extensions select`                         | Interactively select extensions to enable    | `gemini extensions select`                                                     |
+| `gemini extensions select <names..>`               | Enable only the named extensions             | `gemini extensions select ext-a ext-b`                                         |
+| `gemini extensions select --all`                   | Enable all extensions                        | `gemini extensions select --all`                                               |
+| `gemini extensions select --none`                  | Disable all extensions                       | `gemini extensions select --none`                                              |
 
 See [Extensions Documentation](../extensions/index.md) for more details.
 

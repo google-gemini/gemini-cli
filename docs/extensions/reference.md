@@ -79,6 +79,34 @@ To update all installed extensions at once:
 gemini extensions update --all
 ```
 
+### Select extensions to enable or disable
+
+Interactively select which extensions to enable or disable using a pick list.
+Extensions not selected will be disabled.
+
+```bash
+gemini extensions select
+```
+
+You can also provide extension names directly to skip the interactive picker:
+
+```bash
+gemini extensions select <names..> [--scope <scope>]
+```
+
+Use `--all` to enable all extensions or `--none` to disable all extensions:
+
+```bash
+gemini extensions select --all
+gemini extensions select --none
+```
+
+- `<names..>`: Extension names to enable. All others will be disabled.
+- `--all`: Enable all installed extensions.
+- `--none`: Disable all installed extensions.
+- `--scope`: The scope to apply changes in (`user` or `workspace`). Defaults to
+  `user`.
+
 ### Create an extension from a template
 
 Create a new extension directory using a built-in template.

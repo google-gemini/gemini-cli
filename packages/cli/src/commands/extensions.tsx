@@ -15,6 +15,7 @@ import { linkCommand } from './extensions/link.js';
 import { newCommand } from './extensions/new.js';
 import { validateCommand } from './extensions/validate.js';
 import { configureCommand } from './extensions/configure.js';
+import { selectCommand } from './extensions/select.js';
 import { initializeOutputListenersAndFlush } from '../gemini.js';
 import { defer } from '../deferred.js';
 
@@ -38,6 +39,7 @@ export const extensionsCommand: CommandModule = {
       .command(defer(newCommand, 'extensions'))
       .command(defer(validateCommand, 'extensions'))
       .command(defer(configureCommand, 'extensions'))
+      .command(defer(selectCommand, 'extensions'))
       .demandCommand(1, 'You need at least one command before continuing.')
       .version(false),
   handler: () => {
