@@ -3416,20 +3416,23 @@ export class Config implements McpContext, AgentLoopContext {
   } {
     const override = this.getAgentOverride('browser_agent');
     const customConfig = this.getAgentsSettings()?.browser ?? {};
+
+    const resolvedConfig: BrowserAgentCustomConfig = {
+      sessionMode: customConfig.sessionMode ?? 'persistent',
+      headless: customConfig.headless ?? false,
+      profilePath: customConfig.profilePath,
+      visualModel: customConfig.visualModel,
+      allowedDomains: customConfig.allowedDomains,
+      disableUserInput: customConfig.disableUserInput,
+      maxActionsPerTask: customConfig.maxActionsPerTask ?? 100,
+      confirmSensitiveActions: customConfig.confirmSensitiveActions,
+      blockFileUploads: customConfig.blockFileUploads,
+    };
+
     return {
       enabled: override?.enabled ?? false,
       model: override?.modelConfig?.model,
-      customConfig: {
-        sessionMode: customConfig.sessionMode ?? 'persistent',
-        headless: customConfig.headless ?? false,
-        profilePath: customConfig.profilePath,
-        visualModel: customConfig.visualModel,
-        allowedDomains: customConfig.allowedDomains,
-        disableUserInput: customConfig.disableUserInput,
-        maxActionsPerTask: customConfig.maxActionsPerTask ?? 100,
-        confirmSensitiveActions: customConfig.confirmSensitiveActions,
-        blockFileUploads: customConfig.blockFileUploads,
-      },
+      customConfig: resolvedConfig,
     };
   }
 
