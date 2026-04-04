@@ -31,10 +31,10 @@ export class HighWaterMarkTracker {
     // Track last seen time for cleanup regardless of whether we record
     this.lastUpdateTimes.set(metricType, now);
     // Get current high-water mark
-    const currentWaterMark = this.waterMarks.get(metricType) || 0;
+    const currentWaterMark = this.waterMarks.get(metricType);
 
     // For first measurement, always record
-    if (currentWaterMark === 0) {
+    if (currentWaterMark === undefined) {
       this.waterMarks.set(metricType, currentValue);
       this.lastUpdateTimes.set(metricType, now);
       return true;
@@ -58,7 +58,7 @@ export class HighWaterMarkTracker {
    * Get current high-water mark for a metric type
    */
   getHighWaterMark(metricType: string): number {
-    return this.waterMarks.get(metricType) || 0;
+    return this.waterMarks.get(metricType) ?? 0;
   }
 
   /**
