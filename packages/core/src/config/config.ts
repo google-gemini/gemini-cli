@@ -87,6 +87,7 @@ import { shouldAttemptBrowserLaunch } from '../utils/browser.js';
 import type { MCPOAuthConfig } from '../mcp/oauth-provider.js';
 import { ideContextStore } from '../ide/ideContext.js';
 import { WriteTodosTool } from '../tools/write-todos.js';
+import { InvestigationTool } from '../tools/investigation-tool.js';
 import {
   StandardFileSystemService,
   type FileSystemService,
@@ -3589,6 +3590,10 @@ export class Config implements McpContext, AgentLoopContext {
         registry.registerTool(new TrackerVisualizeTool(this, this.messageBus)),
       );
     }
+
+    maybeRegister(InvestigationTool, () =>
+      registry.registerTool(new InvestigationTool(this.messageBus)),
+    );
 
     // Register Subagents as Tools
     this.registerSubAgentTools(registry);
