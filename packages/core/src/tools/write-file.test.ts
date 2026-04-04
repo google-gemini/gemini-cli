@@ -643,6 +643,37 @@ describe('WriteFileTool', () => {
         await diffPromise;
         expect(diffPromiseResolved).toBe(true);
       });
+
+      it('should populate cancelResult field in confirmation details', async () => {
+        const filePath = path.join(rootDir, 'cancel_result_file.txt');
+        const originalContent = 'Original content';
+        const proposedContent = 'Proposed new content';
+        const correctedContent = 'Corrected new content';
+        fs.writeFileSync(filePath, originalContent, 'utf8');
+
+        mockEnsureCorrectFileContent.mockResolvedValue(correctedContent);
+
+        const params = { file_path: filePath, content: proposedContent };
+        const invocation = tool.build(params);
+        const confirmation = (await invocation.shouldConfirmExecute(
+          abortSignal,
+        )) as ToolEditConfirmationDetails;
+
+        // Verify that cancelResult exists and contains the expected fields
+        expect(confirmation.cancelResult).toBeDefined();
+        expect(confirmation.cancelResult).toEqual(
+          expect.objectContaining({
+            fileDiff: expect.any(String),
+            fileName: 'cancel_result_file.txt',
+            filePath,
+            originalContent,
+            newContent: correctedContent,
+          }),
+        );
+        // Verify the diff is properly generated
+        expect(confirmation.cancelResult.fileDiff).toContain(originalContent);
+        expect(confirmation.cancelResult.fileDiff).toContain(correctedContent);
+      });
     });
   });
 
