@@ -30,7 +30,7 @@ import * as path from 'node:path';
 import * as fs from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { injectAutomationOverlay } from './automationOverlay.js';
-import { recordBrowserAgentConnection } from '../../telemetry/metrics.js';
+import { logBrowserAgentConnection } from '../../telemetry/loggers.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -667,15 +667,11 @@ export class BrowserManager {
           // clear the action counter for each connection
           this.actionCounter = 0;
 
-          recordBrowserAgentConnection(
-            this.config,
-            Date.now() - connectStartMs,
-            {
-              session_mode: sessionMode,
-              headless: !!browserConfig.customConfig.headless,
-              success: true,
-            },
-          );
+          logBrowserAgentConnection(this.config, Date.now() - connectStartMs, {
+            session_mode: sessionMode,
+            headless: !!browserConfig.customConfig.headless,
+            success: true,
+          });
         })(),
         new Promise<never>((_, reject) => {
           timeoutId = setTimeout(
@@ -696,7 +692,7 @@ export class BrowserManager {
         error instanceof Error ? error.message : String(error);
       const errorType = BrowserManager.classifyConnectionError(rawErrorMessage);
 
-      recordBrowserAgentConnection(this.config, Date.now() - connectStartMs, {
+      logBrowserAgentConnection(this.config, Date.now() - connectStartMs, {
         session_mode: sessionMode,
         headless: !!browserConfig.customConfig.headless,
         success: false,
