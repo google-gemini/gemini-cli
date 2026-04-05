@@ -140,7 +140,9 @@ describe('ContextManager Golden Tests', () => {
 
   it('should process history and match golden snapshot', async () => {
     const history = createLargeHistory();
-    (contextManager as any).pristineEpisodes = (await import('./ir/mapper.js')).IrMapper.toIr(history);
+    (contextManager as any).pristineEpisodes = (
+      await import('./ir/mapper.js')
+    ).IrMapper.toIr(history);
     const result = await contextManager.projectCompressedHistory();
     expect(result).toMatchSnapshot();
   });
@@ -177,7 +179,9 @@ describe('ContextManager Golden Tests', () => {
       },
     });
     const history = createLargeHistory();
-    (contextManager as any).pristineEpisodes = (await import('./ir/mapper.js')).IrMapper.toIr(history);
+    (contextManager as any).pristineEpisodes = (
+      await import('./ir/mapper.js')
+    ).IrMapper.toIr(history);
     // In Golden Tests, we just want to ensure the logic doesn't throw or alter unprotected history in weird ways.
     // Since we're skipping processors due to being under budget, it should equal history.
     const result = await contextManager.projectCompressedHistory();

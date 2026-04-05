@@ -62,7 +62,11 @@ export class AgentChatHistory {
   }
 
   flatMap<U>(
-    callback: (value: Content, index: number, array: Content[]) => U | readonly U[]
+    callback: (
+      value: Content,
+      index: number,
+      array: Content[],
+    ) => U | readonly U[],
   ): U[] {
     return this.history.flatMap(callback);
   }

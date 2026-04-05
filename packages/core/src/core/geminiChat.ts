@@ -347,10 +347,10 @@ export class GeminiChat {
 
     // Add user content to pristine history ONCE before any attempts.
     this.agentHistory.push(userContent as Content);
-    
+
     // We use the injected activeHistory (which contains the projected, compressed context),
     // but we MUST append the newly created userContent to it for the immediate network request.
-    const requestContents = activeHistory 
+    const requestContents = activeHistory
       ? [...activeHistory, userContent]
       : this.getHistory(true);
 

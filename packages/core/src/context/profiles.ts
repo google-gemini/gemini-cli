@@ -30,7 +30,7 @@ export const GENERALIST_PROFILE: ContextManagementConfig = {
 export const POWER_USER_PROFILE: ContextManagementConfig = {
   enabled: true,
   budget: {
-    incrementalGc: true, 
+    incrementalGc: true,
     maxTokens: 150_000, // The absolute ceiling
     retainedTokens: 65_000, // The "bloom filter" backbuffer floor
     protectedEpisodes: 1,

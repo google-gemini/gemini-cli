@@ -118,7 +118,7 @@ export class GeminiClient {
     this.compressionService = new ChatCompressionService();
 
     this.contextManager = new ContextManager(this.config, this);
-        // Order matters: Fast, lossless masking -> Intelligent degradation -> Brutal truncation fallback
+    // Order matters: Fast, lossless masking -> Intelligent degradation -> Brutal truncation fallback
     this.contextManager.setProcessors([
       new ToolMaskingProcessor(this.config),
       new BlobDegradationProcessor(this.config),
@@ -651,7 +651,7 @@ export class GeminiClient {
       request,
       this.getContentGeneratorOrFail(),
       modelForLimitCheck,
-      activeHistory // Added a new parameter to calculate tokens against the projected history!
+      activeHistory, // Added a new parameter to calculate tokens against the projected history!
     );
     if (estimatedRequestTokenCount > remainingTokenCount) {
       yield {

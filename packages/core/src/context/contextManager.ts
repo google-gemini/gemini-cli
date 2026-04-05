@@ -17,7 +17,7 @@ import { ContextEventBus } from './eventBus.js';
 export class ContextManager {
   private config: Config;
   private processors: ContextProcessor[] = [];
-  
+
   // The stateful, pristine Episodic Intermediate Representation graph.
   // This allows the agent to remember and summarize continuously without losing data across turns.
   private pristineEpisodes: Episode[] = [];
@@ -30,13 +30,17 @@ export class ContextManager {
 
     this.eventBus.onVariantReady((event) => {
       // Find the target episode in the pristine graph
-      const targetEp = this.pristineEpisodes.find(ep => ep.id === event.targetId);
+      const targetEp = this.pristineEpisodes.find(
+        (ep) => ep.id === event.targetId,
+      );
       if (targetEp) {
         if (!targetEp.variants) {
           targetEp.variants = {};
         }
         targetEp.variants[event.variantId] = event.variant;
-        debugLogger.log(`ContextManager: Received async variant [${event.variantId}] for Episode ${event.targetId}.`);
+        debugLogger.log(
+          `ContextManager: Received async variant [${event.variantId}] for Episode ${event.targetId}.`,
+        );
       }
     });
   }
@@ -53,11 +57,11 @@ export class ContextManager {
     if (this.unsubscribeHistory) {
       this.unsubscribeHistory();
     }
-    
+
     this.unsubscribeHistory = chatHistory.subscribe((event) => {
       // Rebuild the pristine IR graph from the full source history on every change.
-      // We must map the FULL array at once because IrMapper groups adjacent 
-      // function calls and responses into unified Episodes. Pushing messages 
+      // We must map the FULL array at once because IrMapper groups adjacent
+      // function calls and responses into unified Episodes. Pushing messages
       // individually would shatter these episodic boundaries.
       this.pristineEpisodes = IrMapper.toIr(chatHistory.get());
       this.checkTriggers(); // Eager Compute & Ship of Theseus Triggers
@@ -69,7 +73,7 @@ export class ContextManager {
 
     const mngConfig = this.config.getContextManagementConfig();
     const currentTokens = this.calculateIrTokens(this.pristineEpisodes);
-    
+
     // 1. Eager Compute Trigger (Continuous Streaming)
     // Broadcast the full graph to the async workers so they can proactively summarize partial massive files.
     this.eventBus.emitChunkReceived({ episodes: this.pristineEpisodes });
@@ -97,7 +101,7 @@ export class ContextManager {
     const mngConfig = this.config.getContextManagementConfig();
     const maxTokens = mngConfig.budget.maxTokens;
     const retainedTokens = mngConfig.budget.retainedTokens;
-    
+
     // Default block GC: target the 65k floor instantly.
     let targetTokens = retainedTokens;
 
@@ -105,23 +109,50 @@ export class ContextManager {
     // The processors only modify `presentation` and `metadata.transformations`.
     // 1. Opportunistic Swap (The Ship of Theseus)
     // We build the projection array by sweeping through pristine history.
-    // If we are over the retained threshold, we look for pre-computed, 'ready' variants 
+    // If we are over the retained threshold, we look for pre-computed, 'ready' variants
     // and seamlessly inject them instead of the raw text.
     let currentEpisodes: Episode[] = [];
     let rollingTokens = 0;
-    
+
     // We walk backwards (newest to oldest) to easily know when we cross the retained threshold.
     for (let i = this.pristineEpisodes.length - 1; i >= 0; i--) {
       const ep = this.pristineEpisodes[i];
       let projectedEp = {
         ...ep,
-        trigger: { ...ep.trigger, metadata: { ...ep.trigger.metadata, transformations: [...ep.trigger.metadata.transformations] }, semanticParts: ep.trigger.type === 'USER_PROMPT' ? [...ep.trigger.semanticParts.map(sp => ({...sp}))] : undefined } as any,
-        steps: ep.steps.map((step) => ({ ...step, metadata: { ...step.metadata, transformations: [...step.metadata.transformations] } } as any)),
-        yield: ep.yield ? { ...ep.yield, metadata: { ...ep.yield.metadata, transformations: [...ep.yield.metadata.transformations] } } : undefined,
+        trigger: {
+          ...ep.trigger,
+          metadata: {
+            ...ep.trigger.metadata,
+            transformations: [...ep.trigger.metadata.transformations],
+          },
+          semanticParts:
+            ep.trigger.type === 'USER_PROMPT'
+              ? [...ep.trigger.semanticParts.map((sp) => ({ ...sp }))]
+              : undefined,
+        } as any,
+        steps: ep.steps.map(
+          (step) =>
+            ({
+              ...step,
+              metadata: {
+                ...step.metadata,
+                transformations: [...step.metadata.transformations],
+              },
+            }) as any,
+        ),
+        yield: ep.yield
+          ? {
+              ...ep.yield,
+              metadata: {
+                ...ep.yield.metadata,
+                transformations: [...ep.yield.metadata.transformations],
+              },
+            }
+          : undefined,
       };
 
       const epTokens = this.calculateIrTokens([projectedEp]);
-      
+
       // If this episode falls entirely outside the retained threshold AND has a ready variant, swap it!
       if (rollingTokens > retainedTokens && ep.variants) {
         // Look for the best available variant
@@ -129,35 +160,71 @@ export class ContextManager {
         const summary = ep.variants['summary'];
         const masked = ep.variants['masked'];
 
-        if (snapshot && snapshot.status === 'ready' && snapshot.type === 'snapshot') {
+        if (
+          snapshot &&
+          snapshot.status === 'ready' &&
+          snapshot.type === 'snapshot'
+        ) {
           // A snapshot replaces this node ENTIRELY (and potentially others, but for now we just swap this node)
           // To be perfectly accurate, a snapshot variant usually replaces multiple episodes.
           // But as a simplistic projection, we just use the snapshot's episode structure.
           projectedEp = snapshot.episode as any;
-          debugLogger.log(`Opportunistically swapped Episode ${ep.id} for pre-computed Snapshot variant.`);
-        } else if (summary && summary.status === 'ready' && summary.type === 'summary') {
+          debugLogger.log(
+            `Opportunistically swapped Episode ${ep.id} for pre-computed Snapshot variant.`,
+          );
+        } else if (
+          summary &&
+          summary.status === 'ready' &&
+          summary.type === 'summary'
+        ) {
           // A summary replaces all the steps with a single thought containing the summary text.
-          projectedEp.steps = [{
-            id: ep.id + '-summary',
-            type: 'AGENT_THOUGHT',
-            text: summary.text,
-            metadata: { originalTokens: epTokens, currentTokens: summary.recoveredTokens || 50, transformations: [{ processorName: 'AsyncSemanticCompressor', action: 'SUMMARIZED', timestamp: Date.now() }] }
-          }] as any;
+          projectedEp.steps = [
+            {
+              id: ep.id + '-summary',
+              type: 'AGENT_THOUGHT',
+              text: summary.text,
+              metadata: {
+                originalTokens: epTokens,
+                currentTokens: summary.recoveredTokens || 50,
+                transformations: [
+                  {
+                    processorName: 'AsyncSemanticCompressor',
+                    action: 'SUMMARIZED',
+                    timestamp: Date.now(),
+                  },
+                ],
+              },
+            },
+          ] as any;
           projectedEp.yield = undefined; // Drop the yield, the summary covers it
-          debugLogger.log(`Opportunistically swapped Episode ${ep.id} for pre-computed Summary variant.`);
-        } else if (masked && masked.status === 'ready' && masked.type === 'masked') {
-           // We just replace the raw text with the masked text variant
-           if (projectedEp.trigger.type === 'USER_PROMPT' && projectedEp.trigger.semanticParts.length > 0) {
-             projectedEp.trigger.semanticParts[0].presentation = { text: masked.text, tokens: masked.recoveredTokens || 10 };
-           }
-           debugLogger.log(`Opportunistically swapped Episode ${ep.id} for pre-computed Masked variant.`);
+          debugLogger.log(
+            `Opportunistically swapped Episode ${ep.id} for pre-computed Summary variant.`,
+          );
+        } else if (
+          masked &&
+          masked.status === 'ready' &&
+          masked.type === 'masked'
+        ) {
+          // We just replace the raw text with the masked text variant
+          if (
+            projectedEp.trigger.type === 'USER_PROMPT' &&
+            projectedEp.trigger.semanticParts.length > 0
+          ) {
+            projectedEp.trigger.semanticParts[0].presentation = {
+              text: masked.text,
+              tokens: masked.recoveredTokens || 10,
+            };
+          }
+          debugLogger.log(
+            `Opportunistically swapped Episode ${ep.id} for pre-computed Masked variant.`,
+          );
         }
       }
 
       currentEpisodes.unshift(projectedEp); // Put it back in oldest-to-newest order
       rollingTokens += this.calculateIrTokens([projectedEp]);
     }
-    
+
     let currentTokens = this.calculateIrTokens(currentEpisodes);
 
     if (currentTokens <= maxTokens) {
