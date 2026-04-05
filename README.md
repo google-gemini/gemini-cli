@@ -128,6 +128,9 @@ npm install -g @google/gemini-cli@nightly
   information
 - Conversation checkpointing to save and resume complex sessions
 - Custom context files (GEMINI.md) to tailor behavior for your projects
+- **Web GUI**: Browser-based chat interface with Material You design, model
+  picker, file attachments, and session management
+  ([guide](./docs/cli/web-gui.md))
 
 ### GitHub Integration
 
@@ -273,6 +276,17 @@ cd gemini-cli
 gemini
 > Give me a summary of all of the changes that went in yesterday
 ```
+
+#### Use the web GUI
+
+```bash
+gemini
+> /web
+```
+
+Launches a browser-based chat interface at `http://localhost:11267` with
+Material You design, model picker, file attachments, session management, and 4
+built-in themes. See the [Web GUI guide](./docs/cli/web-gui.md) for details.
 
 ## 📚 Documentation
 

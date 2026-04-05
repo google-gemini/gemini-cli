@@ -18,8 +18,14 @@ on GitHub.
 | [Preview](preview.md) | Experimental features ready for early feedback. |
 | [Stable](latest.md)   | Stable, recommended for general use.            |
 
-## Announcements: v0.36.0 - 2026-04-01
+## Announcements: v0.36.0 - 2026-04-06
 
+- **Web GUI:** Introduced a browser-based chat interface accessible via the
+  `/web` command, featuring Material You design, SSE-streamed responses, model
+  picker, @-mention file attachments, file creation with approval flow, session
+  management, and 4 built-in themes
+  ([#24369](https://github.com/google-gemini/gemini-cli/pull/24369) by
+  @TIPC1110).
 - **Multi-Registry Architecture and Sandboxing:** Introduced a multi-registry
   architecture and implemented native macOS Seatbelt and Windows sandboxing for
   enhanced subagent security
