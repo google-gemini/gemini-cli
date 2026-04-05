@@ -16,15 +16,20 @@ import {
 import {
   type DOMElement,
   ResizeObserver,
-  useApp,
   useStdout,
   useStdin,
+  useApp,
   type AppProps,
   AppContext as InkAppContext,
 } from 'ink';
+import path, { basename } from 'node:path';
 import { App } from './App.js';
 import { AppContext } from './contexts/AppContext.js';
-import { UIStateContext, type UIState } from './contexts/UIStateContext.js';
+import {
+  UIStateContext,
+  type UIState,
+  type SessionResumePromptRequest,
+} from './contexts/UIStateContext.js';
 import {
   UIActionsContext,
   type UIActions,
@@ -110,7 +115,6 @@ import { useTerminalSize } from './hooks/useTerminalSize.js';
 import { calculatePromptWidths } from './components/InputPrompt.js';
 import { calculateMainAreaWidth } from './utils/ui-sizing.js';
 import ansiEscapes from 'ansi-escapes';
-import { basename } from 'node:path';
 import { computeTerminalTitle } from '../utils/windowTitle.js';
 import { useTextBuffer } from './components/shared/text-buffer.js';
 import { useLogger } from './hooks/useLogger.js';
@@ -133,7 +137,7 @@ import { type UpdateObject } from './utils/updateCheck.js';
 import { setUpdateHandler } from '../utils/handleAutoUpdate.js';
 import { registerCleanup, runExitCleanup } from '../utils/cleanup.js';
 import { relaunchApp } from '../utils/processUtils.js';
-import type { SessionInfo } from '../utils/sessionUtils.js';
+import { type SessionInfo, getSessionFiles } from '../utils/sessionUtils.js';
 import { useMessageQueue } from './hooks/useMessageQueue.js';
 import { useMcpStatus } from './hooks/useMcpStatus.js';
 import { useApprovalModeIndicator } from './hooks/useApprovalModeIndicator.js';
@@ -438,6 +442,8 @@ export const AppContainer = (props: AppContainerProps) => {
   );
 
   const [isConfigInitialized, setConfigInitialized] = useState(false);
+  const [sessionResumePromptRequest, setSessionResumePromptRequest] =
+    useState<SessionResumePromptRequest | null>(null);
 
   const logger = useLogger(config.storage);
   const { inputHistory, addInput, initializeFromLogger } =
@@ -1327,7 +1333,7 @@ Logging in with Google... Restarting Gemini CLI to continue.
   );
 
   const handleFinalSubmit = useCallback(
-    async (submittedValue: string) => {
+    async (submittedValue: string, bypassSessionCheck = false) => {
       reset();
       // Explicitly hide the expansion hint and clear its x-second timer when a new turn begins.
       triggerExpandHint(null);
@@ -1338,7 +1344,41 @@ Logging in with Google... Restarting Gemini CLI to continue.
         }
       }
 
-      const isSlash = isSlashCommand(submittedValue.trim());
+      const trimmed = submittedValue.trim();
+
+      // Intercept the very first prompt to check for session resume matches
+      if (!bypassSessionCheck && trimmed) {
+        const userMessagesCount = historyManager.history.filter(
+          (h) => h.type === 'user',
+        ).length;
+
+        if (userMessagesCount === 0) {
+          try {
+            const chatsDir = path.join(
+              config.storage.getProjectTempDir(),
+              'chats',
+            );
+            const sessions = await getSessionFiles(
+              chatsDir,
+              config.getSessionId(),
+            );
+            const matchingSession = sessions.find(
+              (s) => s.firstUserMessage === trimmed && !s.isCurrentSession,
+            );
+            if (matchingSession) {
+              setSessionResumePromptRequest({
+                matchedSession: matchingSession,
+                submittedValue,
+              });
+              return;
+            }
+          } catch (e) {
+            debugLogger.error('Failed to check for matching sessions:', e);
+          }
+        }
+      }
+
+      const isSlash = isSlashCommand(trimmed);
       const isIdle = streamingState === StreamingState.Idle;
       const isAgentRunning =
         streamingState === StreamingState.Responding ||
@@ -1417,7 +1457,25 @@ Logging in with Google... Restarting Gemini CLI to continue.
       handleHintSubmit,
       isConfigInitialized,
       triggerExpandHint,
+      historyManager,
     ],
+  );
+
+  const handleSessionResumePromptChoice = useCallback(
+    (resume: boolean) => {
+      const request = sessionResumePromptRequest;
+      setSessionResumePromptRequest(null);
+      if (!request) {
+        return;
+      }
+
+      if (resume) {
+        void handleResumeSession(request.matchedSession);
+      } else {
+        void handleFinalSubmit(request.submittedValue, true);
+      }
+    },
+    [handleFinalSubmit, handleResumeSession, sessionResumePromptRequest],
   );
 
   const handleClearScreen = useCallback(() => {
@@ -2149,6 +2207,7 @@ Logging in with Google... Restarting Gemini CLI to continue.
     !!overageMenuRequest ||
     !!emptyWalletRequest ||
     isSessionBrowserOpen ||
+    !!sessionResumePromptRequest ||
     authState === AuthState.AwaitingApiKeyInput ||
     !!newAgents;
 
@@ -2456,6 +2515,7 @@ Logging in with Google... Restarting Gemini CLI to continue.
       adminSettingsChanged,
       newAgents,
       showIsExpandableHint,
+      sessionResumePromptRequest,
       hintMode:
         config.isModelSteeringEnabled() && isToolExecuting(pendingHistoryItems),
       hintBuffer: '',
@@ -2583,6 +2643,7 @@ Logging in with Google... Restarting Gemini CLI to continue.
       adminSettingsChanged,
       newAgents,
       showIsExpandableHint,
+      sessionResumePromptRequest,
     ],
   );
 
@@ -2623,6 +2684,7 @@ Logging in with Google... Restarting Gemini CLI to continue.
       // G1 AI Credits handlers
       handleOverageMenuChoice,
       handleEmptyWalletChoice,
+      handleSessionResumePromptChoice,
       openSessionBrowser,
       closeSessionBrowser,
       handleResumeSession,
@@ -2715,6 +2777,7 @@ Logging in with Google... Restarting Gemini CLI to continue.
       handleValidationChoice,
       handleOverageMenuChoice,
       handleEmptyWalletChoice,
+      handleSessionResumePromptChoice,
       openSessionBrowser,
       closeSessionBrowser,
       handleResumeSession,

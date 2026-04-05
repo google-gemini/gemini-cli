@@ -35,6 +35,7 @@ import type { DOMElement } from 'ink';
 import type { SessionStatsState } from '../contexts/SessionContext.js';
 import type { ExtensionUpdateState } from '../state/extensions.js';
 import type { UpdateObject } from '../utils/updateCheck.js';
+import type { SessionInfo } from '../../utils/sessionUtils.js';
 
 export interface ProQuotaDialogRequest {
   failedModel: string;
@@ -79,6 +80,12 @@ export interface EmptyWalletDialogRequest {
   userEmail?: string;
   onGetCredits: () => void;
   resolve: (intent: EmptyWalletIntent) => void;
+}
+
+/** Request for session resume confirmation dialog */
+export interface SessionResumePromptRequest {
+  matchedSession: SessionInfo;
+  submittedValue: string;
 }
 
 import { type UseHistoryManagerReturn } from '../hooks/useHistoryManager.js';
@@ -225,6 +232,7 @@ export interface UIState {
   showIsExpandableHint: boolean;
   hintMode: boolean;
   hintBuffer: string;
+  sessionResumePromptRequest: SessionResumePromptRequest | null;
   transientMessage: {
     text: string;
     type: TransientMessageType;

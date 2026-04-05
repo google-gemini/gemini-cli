@@ -37,6 +37,7 @@ import { IdeTrustChangeDialog } from './IdeTrustChangeDialog.js';
 import { NewAgentsNotification } from './NewAgentsNotification.js';
 import { AgentConfigDialog } from './AgentConfigDialog.js';
 import { PolicyUpdateDialog } from './PolicyUpdateDialog.js';
+import { SessionResumePromptDialog } from './SessionResumePromptDialog.js';
 
 interface DialogManagerProps {
   addItem: UseHistoryManagerReturn['addItem'];
@@ -349,6 +350,15 @@ export const DialogManager = ({
         onResumeSession={uiActions.handleResumeSession}
         onDeleteSession={uiActions.handleDeleteSession}
         onExit={uiActions.closeSessionBrowser}
+      />
+    );
+  }
+
+  if (uiState.sessionResumePromptRequest) {
+    return (
+      <SessionResumePromptDialog
+        request={uiState.sessionResumePromptRequest}
+        onSelect={uiActions.handleSessionResumePromptChoice}
       />
     );
   }

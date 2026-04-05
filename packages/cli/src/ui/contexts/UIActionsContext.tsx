@@ -65,6 +65,7 @@ export interface UIActions {
   handleValidationChoice: (choice: 'verify' | 'change_auth' | 'cancel') => void;
   handleOverageMenuChoice: (choice: OverageMenuIntent) => void;
   handleEmptyWalletChoice: (choice: EmptyWalletIntent) => void;
+  handleSessionResumePromptChoice: (resume: boolean) => void;
   openSessionBrowser: () => void;
   closeSessionBrowser: () => void;
   handleResumeSession: (session: SessionInfo) => Promise<void>;

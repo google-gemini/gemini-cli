@@ -572,6 +572,7 @@ const mockUIActions: UIActions = {
   handleValidationChoice: vi.fn(),
   handleOverageMenuChoice: vi.fn(),
   handleEmptyWalletChoice: vi.fn(),
+  handleSessionResumePromptChoice: vi.fn(),
   setQueueErrorMessage: vi.fn(),
   addMessage: vi.fn(),
   popAllMessages: vi.fn(),
