@@ -26,10 +26,13 @@ import {
   Scheduler,
   ROOT_SCHEDULER_ID,
   writeToStderr,
+  type ToolCallRequestInfo,
+  type CompletedToolCall,
 } from '@google/gemini-cli-core';
 import type { Part, Content } from '@google/genai';
 import { loadCliConfig, type CliArgs } from '../config/config.js';
 import type { LoadedSettings } from '../config/settings.js';
+import { isRecord } from '../utils/settingsUtils.js';
 import { runExitCleanup } from '../utils/cleanup.js';
 import { validateNonInteractiveAuth } from '../validateNonInterActiveAuth.js';
 
@@ -273,39 +276,28 @@ function safeWrite(socket: net.Socket, response: DaemonResponse): void {
 }
 
 function isValidDaemonPayload(value: unknown): value is DaemonPayload {
-  if (value === null || typeof value !== 'object') return false;
-  const obj = value as Record<string, unknown>;
+  if (!isRecord(value)) return false;
+  const obj = value;
 
   const action = obj['action'];
   if (typeof action !== 'string') return false;
   if (!['prompt', 'close_session', 'stop'].includes(action)) return false;
 
-  if (
-    'token' in obj &&
-    obj['token'] !== undefined &&
-    typeof obj['token'] !== 'string'
-  )
-    return false;
-  if (
-    'session' in obj &&
-    obj['session'] !== undefined &&
-    typeof obj['session'] !== 'string'
-  )
-    return false;
-  if ('cwd' in obj && obj['cwd'] !== undefined && typeof obj['cwd'] !== 'string')
-    return false;
-  if (
-    'input' in obj &&
-    obj['input'] !== undefined &&
-    typeof obj['input'] !== 'string'
-  )
-    return false;
-  if (
-    'verbose' in obj &&
-    obj['verbose'] !== undefined &&
-    typeof obj['verbose'] !== 'boolean'
-  )
-    return false;
+  const token = obj['token'];
+  if (token !== undefined && typeof token !== 'string') return false;
+
+  const session = obj['session'];
+  if (session !== undefined && typeof session !== 'string') return false;
+
+  const cwd = obj['cwd'];
+  if (cwd !== undefined && typeof cwd !== 'string') return false;
+
+  const input = obj['input'];
+  if (input !== undefined && typeof input !== 'string') return false;
+
+  const verbose = obj['verbose'];
+  if (verbose !== undefined && typeof verbose !== 'boolean') return false;
+
   return true;
 }
 
@@ -314,8 +306,7 @@ async function withSessionLock<T>(
   fn: () => Promise<T>,
 ): Promise<T> {
   const previous = sessionLocks.get(sessionName) ?? Promise.resolve();
-  let next: Promise<T>;
-  next = previous.then(fn, fn);
+  const next = previous.then(fn, fn);
 
   const completion = next.then(
     () => undefined,
@@ -564,7 +555,7 @@ async function runDaemonTurn(
     try {
       const geminiClient = config.getGeminiClient();
       const scheduler = new Scheduler({
-        config,
+        context: config,
         messageBus: config.getMessageBus(),
         getPreferredEditor: () => undefined,
         schedulerId: ROOT_SCHEDULER_ID,
@@ -596,10 +587,7 @@ async function runDaemonTurn(
           turnCount === 1 ? input : undefined,
         );
 
-        // Scheduler types are intentionally permissive here because the daemon
-        // IPC path is headless and should fail safely rather than crash on
-        // unexpected shapes.
-        const toolCallRequests: any[] = [];
+        const toolCallRequests: ToolCallRequestInfo[] = [];
 
         for await (const event of responseStream) {
           if (abortController.signal.aborted) {
@@ -655,7 +643,8 @@ async function runDaemonTurn(
           }
 
           const stopExecutionTool = completedToolCalls.find(
-            (tc: any) => tc.response.errorType === ToolErrorType.STOP_EXECUTION,
+            (tc: CompletedToolCall) =>
+              tc.response.errorType === ToolErrorType.STOP_EXECUTION,
           );
           if (stopExecutionTool) {
             return;

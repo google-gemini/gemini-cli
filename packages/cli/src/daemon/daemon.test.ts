@@ -11,6 +11,11 @@ import os from 'node:os';
 import { getDaemonSocketPath, checkDaemonStatus } from './daemonClient.js';
 
 import { loadCliConfig } from '../config/config.js';
+import type { CliArgs } from '../config/config.js';
+import {
+  createTestMergedSettings,
+  type LoadedSettings,
+} from '../config/settings.js';
 
 vi.mock('../config/config.js', () => ({
   loadCliConfig: vi.fn(),
@@ -24,8 +29,9 @@ vi.mock('../validateNonInterActiveAuth.js', () => ({
   validateNonInteractiveAuth: vi.fn(),
 }));
 
-vi.mock('@google/gemini-cli-core', async (importOriginal: any) => {
-  const actual = await importOriginal();
+vi.mock('@google/gemini-cli-core', async (importOriginal) => {
+  type CoreModule = typeof import('@google/gemini-cli-core');
+  const actual = await importOriginal<CoreModule>();
   return {
     ...actual,
     debugLogger: {
@@ -50,7 +56,7 @@ describe('Daemon Mode', () => {
     vi.spyOn(process, 'exit').mockImplementation(
       (() => {}) as unknown as typeof process.exit,
     );
-    if (typeof (process as any).umask === 'function') {
+    if (typeof process.umask === 'function') {
       vi.spyOn(process, 'umask').mockImplementation(() => 0o22);
     }
 
@@ -92,11 +98,18 @@ describe('Daemon Mode', () => {
     });
 
     it('should return false if daemon is not running', async () => {
+      if (process.platform === 'win32') {
+        // checkDaemonStatus uses Unix sockets; unsupported on Windows.
+        return;
+      }
       const isRunning = await checkDaemonStatus();
       expect(isRunning).toBe(false);
     });
 
     it('should return true if daemon is running', async () => {
+      if (process.platform === 'win32') {
+        return;
+      }
       mockServer = net.createServer().listen(socketPath);
       await new Promise((resolve) => setTimeout(resolve, 100)); // wait for listen
 
@@ -108,6 +121,18 @@ describe('Daemon Mode', () => {
   });
 
   describe('daemonServer', () => {
+    function daemonTestSettings(): LoadedSettings {
+      return {
+        merged: createTestMergedSettings({
+          security: {
+            auth: { selectedType: undefined, useExternal: false },
+          },
+        }),
+      } as LoadedSettings;
+    }
+
+    const baseArgv = {} as CliArgs;
+
     it('rejects unauthenticated prompt requests', async () => {
       if (process.platform === 'win32') {
         // Daemon mode is not supported on Windows.
@@ -115,13 +140,7 @@ describe('Daemon Mode', () => {
       }
 
       const { startDaemon } = await import('./daemonServer.js');
-      const settings = {
-        merged: {
-          security: { auth: { selectedType: undefined, useExternal: false } },
-        },
-      } as any;
-
-      const baseArgv = {} as any;
+      const settings = daemonTestSettings();
 
       await startDaemon(settings, baseArgv);
       // Wait for daemon to be reachable.
@@ -168,7 +187,8 @@ describe('Daemon Mode', () => {
 
       expect(
         messages.some(
-          (m) => m.type === 'error' && m.content === 'Unauthorized daemon request.',
+          (m) =>
+            m.type === 'error' && m.content === 'Unauthorized daemon request.',
         ),
       ).toBe(true);
       expect(messages.some((m) => m.type === 'end')).toBe(true);
@@ -178,9 +198,7 @@ describe('Daemon Mode', () => {
       await new Promise((resolve) => {
         const stopClient = net.createConnection(socketPath);
         stopClient.on('connect', () => {
-          stopClient.write(
-            JSON.stringify({ action: 'stop', token }) + '\n',
-          );
+          stopClient.write(JSON.stringify({ action: 'stop', token }) + '\n');
         });
         stopClient.on('data', () => {});
         stopClient.on('end', () => resolve(undefined));
@@ -194,12 +212,7 @@ describe('Daemon Mode', () => {
       }
 
       const { startDaemon } = await import('./daemonServer.js');
-      const settings = {
-        merged: {
-          security: { auth: { selectedType: undefined, useExternal: false } },
-        },
-      } as any;
-      const baseArgv = {} as any;
+      const settings = daemonTestSettings();
 
       await startDaemon(settings, baseArgv);
       await new Promise<void>((resolve, reject) => {
@@ -255,9 +268,7 @@ describe('Daemon Mode', () => {
       await new Promise((resolve) => {
         const stopClient = net.createConnection(socketPath);
         stopClient.on('connect', () => {
-          stopClient.write(
-            JSON.stringify({ action: 'stop', token }) + '\n',
-          );
+          stopClient.write(JSON.stringify({ action: 'stop', token }) + '\n');
         });
         stopClient.on('data', () => {});
         stopClient.on('end', () => resolve(undefined));

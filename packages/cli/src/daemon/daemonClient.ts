@@ -14,6 +14,7 @@ import {
   writeToStdout,
 } from '@google/gemini-cli-core';
 import type { CliArgs } from '../config/config.js';
+import { isRecord } from '../utils/settingsUtils.js';
 
 interface DaemonMessage {
   type: string;
@@ -21,12 +22,9 @@ interface DaemonMessage {
 }
 
 function isDaemonMessage(value: unknown): value is DaemonMessage {
-  return (
-    value !== null &&
-    typeof value === 'object' &&
-    'type' in value &&
-    typeof (value as Record<string, unknown>)['type'] === 'string'
-  );
+  if (!isRecord(value)) return false;
+  const messageType = value['type'];
+  return typeof messageType === 'string';
 }
 
 export function getDaemonSocketPath(): string {
@@ -117,7 +115,9 @@ export async function runDaemonClientCommands(
         process.exit(1);
       }
       const client = await connectToDaemon(socketPath);
-      client.write(JSON.stringify({ action: 'stop', token: daemonToken }) + '\n');
+      client.write(
+        JSON.stringify({ action: 'stop', token: daemonToken }) + '\n',
+      );
       client.end();
       writeToStdout('Daemon stop signal sent.\n');
       process.exit(ExitCodes.SUCCESS);

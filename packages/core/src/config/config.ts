@@ -1469,7 +1469,6 @@ export class Config implements McpContext, AgentLoopContext {
     });
 
     if (
-      this.experimentalZedIntegration ||
       this.acpMode ||
       (!this.interactive && !this.mcpInitializationInBackground)
     ) {
