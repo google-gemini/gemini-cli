@@ -34,7 +34,7 @@ export class SemanticCompressionProcessor implements ContextProcessor {
       this.config.getContextManagementConfig().strategies.semanticCompression;
     // We estimate 4 chars per token for truncation logic
     const thresholdChars = semanticConfig.nodeThresholdTokens * 4;
-    this.modelToUse = semanticConfig.compressionModel;
+    this.modelToUse = 'gemini-2.5-flash';
 
     let currentDeficit = state.deficitTokens;
     const newEpisodes = [...episodes];

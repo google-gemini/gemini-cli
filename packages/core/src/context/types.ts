@@ -23,7 +23,9 @@ export interface ContextManagementConfig {
      * - 'truncate': Drop oldest episodes until under limit (Instant, data loss)
      * - 'compress': Block request, perform N-to-1 Snapshot generation, then proceed (Slow, no data loss)
      */
-    maxPressureStrategy: 'truncate' | 'compress';
+    maxPressureStrategy: 'truncate' | 'compress' | 'rollingSummarizer';
+    gcTarget: 'incremental' | 'freeNTokens' | 'max';
+    freeTokensTarget?: number;
   };
 
   /** Specific hyperparameters for degrading the context when over budget */

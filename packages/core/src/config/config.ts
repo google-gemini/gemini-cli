@@ -1133,10 +1133,8 @@ export class Config implements McpContext, AgentLoopContext {
         maxTokens: params.contextManagement?.budget?.maxTokens ?? 150000,
         retainedTokens:
           params.contextManagement?.budget?.retainedTokens ?? 40000,
-        protectedEpisodes:
-          params.contextManagement?.budget?.protectedEpisodes ?? 1,
-        protectSystemEpisode:
-          params.contextManagement?.budget?.protectSystemEpisode ?? true,
+        gcTarget: params.contextManagement?.budget?.gcTarget ?? 'incremental',
+        freeTokensTarget: params.contextManagement?.budget?.freeTokensTarget ?? undefined,
         maxPressureStrategy: params.contextManagement?.budget?.maxPressureStrategy ?? 'truncate',
       },
       strategies: {
@@ -1154,9 +1152,7 @@ export class Config implements McpContext, AgentLoopContext {
           nodeThresholdTokens:
             params.contextManagement?.strategies?.semanticCompression
               ?.nodeThresholdTokens ?? 5000,
-          compressionModel:
-            params.contextManagement?.strategies?.semanticCompression
-              ?.compressionModel ?? 'chat-compression-2.5-flash-lite',
+          
         },
       },
     };
