@@ -109,7 +109,7 @@ export function createMockConfig(
         enableEnvironmentVariableRedaction: false,
       },
     }),
-    isAutoDistillationEnabled: vi.fn().mockReturnValue(false),
+    isContextManagementEnabled: vi.fn().mockReturnValue(false),
     getContextManagementConfig: vi.fn().mockReturnValue({ enabled: false }),
     ...overrides,
   } as unknown as Config;

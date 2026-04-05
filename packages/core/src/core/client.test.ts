@@ -39,7 +39,7 @@ import { tokenLimit } from './tokenLimits.js';
 import { ideContextStore } from '../ide/ideContext.js';
 import type { ModelRouterService } from '../routing/modelRouterService.js';
 import { uiTelemetryService } from '../telemetry/uiTelemetry.js';
-import { ChatCompressionService } from '../services/chatCompressionService.js';
+import { ChatCompressionService } from '../context/chatCompressionService.js';
 import type { ChatRecordingService } from '../services/chatRecordingService.js';
 import { createAvailabilityServiceMock } from '../availability/testUtils.js';
 import type { ModelAvailabilityService } from '../availability/modelAvailabilityService.js';
@@ -219,9 +219,13 @@ describe('Gemini Client (client.ts)', () => {
       getSystemInstructionMemory: vi.fn().mockReturnValue(''),
       getSessionMemory: vi.fn().mockReturnValue(''),
       isJitContextEnabled: vi.fn().mockReturnValue(false),
-      getContextManager: vi.fn().mockReturnValue(undefined),
-      getToolOutputMaskingEnabled: vi.fn().mockReturnValue(false),
+      getMemoryContextManager: vi.fn().mockReturnValue(undefined),
       getDisableLoopDetection: vi.fn().mockReturnValue(false),
+      getToolOutputMaskingConfig: vi.fn().mockReturnValue({
+        protectionThresholdTokens: 50000,
+        minPrunableThresholdTokens: 30000,
+        protectLatestTurn: true,
+      }),
 
       getSessionId: vi.fn().mockReturnValue('test-session-id'),
       getProxy: vi.fn().mockReturnValue(undefined),
@@ -381,19 +385,19 @@ describe('Gemini Client (client.ts)', () => {
       expect(JSON.stringify(newHistory)).not.toContain('some old message');
     });
 
-    it('should refresh ContextManager to reset JIT loaded paths', async () => {
+    it('should refresh MemoryContextManager to reset JIT loaded paths', async () => {
       const mockRefresh = vi.fn().mockResolvedValue(undefined);
-      vi.mocked(mockConfig.getContextManager).mockReturnValue({
+      vi.mocked(mockConfig.getMemoryContextManager).mockReturnValue({
         refresh: mockRefresh,
-      } as unknown as ReturnType<typeof mockConfig.getContextManager>);
+      } as unknown as ReturnType<typeof mockConfig.getMemoryContextManager>);
 
       await client.resetChat();
 
       expect(mockRefresh).toHaveBeenCalledTimes(1);
     });
 
-    it('should not fail when ContextManager is undefined', async () => {
-      vi.mocked(mockConfig.getContextManager).mockReturnValue(undefined);
+    it('should not fail when MemoryContextManager is undefined', async () => {
+      vi.mocked(mockConfig.getMemoryContextManager).mockReturnValue(undefined);
 
       await expect(client.resetChat()).resolves.not.toThrow();
     });
@@ -1483,7 +1487,7 @@ ${JSON.stringify(
             break;
           }
         }
-      } catch (_) {
+      } catch {
         // If the test framework times out, that also demonstrates the infinite loop
       }
 

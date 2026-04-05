@@ -1,4 +1,4 @@
-# Remote Subagents (experimental)
+# Remote Subagents
 
 Gemini CLI supports connecting to remote subagents using the Agent-to-Agent
 (A2A) protocol. This allows Gemini CLI to interact with other agents, expanding
@@ -9,23 +9,6 @@ agents in the following repositories:
 
 - [ADK Samples (Python)](https://github.com/google/adk-samples/tree/main/python)
 - [ADK Python Contributing Samples](https://github.com/google/adk-python/tree/main/contributing/samples)
-
-<!-- prettier-ignore -->
-> [!NOTE]
-> Remote subagents are currently an experimental feature.
-
-## Configuration
-
-To use remote subagents, you must explicitly enable them in your
-`settings.json`:
-
-```json
-{
-  "experimental": {
-    "enableAgents": true
-  }
-}
-```
 
 ## Proxy support
 
@@ -459,3 +442,16 @@ Users can manage subagents using the following commands within the Gemini CLI:
 > [!TIP]
 > You can use the `@cli_help` agent within Gemini CLI for assistance
 > with configuring subagents.
+
+## Disabling remote agents
+
+Remote subagents are enabled by default. To disable them, set `enableAgents` to
+`false` in your `settings.json`:
+
+```json
+{
+  "experimental": {
+    "enableAgents": false
+  }
+}
+```
