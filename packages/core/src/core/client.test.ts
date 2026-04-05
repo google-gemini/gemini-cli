@@ -284,7 +284,7 @@ describe('Gemini Client (client.ts)', () => {
       setActiveModel: vi.fn(),
       resetTurn: vi.fn(),
 
-      isAutoDistillationEnabled: vi.fn().mockReturnValue(false),
+      isContextManagementEnabled: vi.fn().mockReturnValue(false),
       getContextManagementConfig: vi.fn().mockReturnValue({ enabled: false }),
       getModelAvailabilityService: vi
         .fn()
@@ -2130,6 +2130,8 @@ ${JSON.stringify(
         initialRequest,
         expect.any(AbortSignal),
         undefined,
+        'main',
+        []
       );
 
       // Second call with "Please continue."
@@ -2139,6 +2141,8 @@ ${JSON.stringify(
         [{ text: 'System: Please continue.' }],
         expect.any(AbortSignal),
         undefined,
+        'main',
+        []
       );
     });
 

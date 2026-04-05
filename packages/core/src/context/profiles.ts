@@ -45,3 +45,23 @@ export const POWER_USER_PROFILE: ContextManagementConfig = {
     },
   },
 };
+
+
+export const STRESS_TEST_PROFILE: ContextManagementConfig = {
+  enabled: true,
+  budget: {
+    maxPressureStrategy: 'truncate',
+    maxTokens: 12_000,
+    retainedTokens: 6_000,
+    protectedEpisodes: 1,
+    protectSystemEpisode: true,
+  },
+  strategies: {
+    historySquashing: { maxTokensPerNode: 2000 },
+    toolMasking: { stringLengthThresholdTokens: 2000 },
+    semanticCompression: {
+      nodeThresholdTokens: 1000,
+      compressionModel: 'gemini-2.5-flash',
+    },
+  },
+};

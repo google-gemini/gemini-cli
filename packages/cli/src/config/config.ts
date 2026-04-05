@@ -48,6 +48,7 @@ import {
   detectIdeFromEnv,
   GENERALIST_PROFILE,
   POWER_USER_PROFILE,
+  STRESS_TEST_PROFILE,
 } from '@google/gemini-cli-core';
 import {
   type Settings,
@@ -887,15 +888,17 @@ export async function loadCliConfig(
 
   const useGeneralistProfile =
     settings.experimental?.generalistProfile ?? false;
+  const useStressTestProfile = settings.experimental?.stressTestProfile ?? false;
   const usePowerUserProfile = settings.experimental?.powerUserProfile ?? false;
   const useContextManagement =
     settings.experimental?.contextManagement ?? false;
   const contextManagement = {
     ...(useGeneralistProfile ? GENERALIST_PROFILE : {}),
     ...(usePowerUserProfile ? POWER_USER_PROFILE : {}),
+    ...(useStressTestProfile ? STRESS_TEST_PROFILE : {}),
     ...(useContextManagement ? settings?.contextManagement : {}),
     enabled:
-      useContextManagement || useGeneralistProfile || usePowerUserProfile,
+      useContextManagement || useGeneralistProfile || usePowerUserProfile || useStressTestProfile,
   };
 
   return new Config({

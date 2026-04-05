@@ -16,16 +16,19 @@ import { debugLogger } from '../../utils/debugLogger.js';
 import { estimateTokenCountSync } from '../../utils/tokenCalculation.js';
 import { IrMapper } from '../ir/mapper.js';
 import { LlmRole } from '../../telemetry/llmRole.js';
+import type { ContextTracer } from '../tracer.js';
 
 export class StateSnapshotWorker implements AsyncContextWorker {
   name = 'StateSnapshotWorker';
   private bus?: ContextEventBus;
+  private tracer?: ContextTracer;
   private isSynthesizing = false;
 
   constructor(private readonly _config: Config) {}
 
-  start(bus: ContextEventBus): void {
+  start(bus: ContextEventBus, tracer?: ContextTracer): void {
     this.bus = bus;
+    this.tracer = tracer;
     this.bus.onConsolidationNeeded(this.handleConsolidation.bind(this));
   }
 
@@ -74,9 +77,12 @@ export class StateSnapshotWorker implements AsyncContextWorker {
       debugLogger.log(
         `StateSnapshotWorker: Asynchronously synthesizing ${episodesToSynthesize.length} episodes to recover ~${tokensToSynthesize} tokens.`,
       );
+      this.tracer?.logEvent('StateSnapshotWorker', `Consolidation requested. Synthesizing ${episodesToSynthesize.length} episodes for ~${tokensToSynthesize} tokens.`);
 
       const client = this._config.getBaseLlmClient();
       const rawContents = IrMapper.fromIr(episodesToSynthesize);
+      const rawAssetId = this.tracer?.saveAsset('StateSnapshotWorker', 'episodes_to_synthesize', rawContents);
+      this.tracer?.logEvent('StateSnapshotWorker', 'Dispatching LLM request for snapshot generation', { rawAssetId });
 
       const promptText = `
 You are a background memory consolidation worker for an AI assistant.
@@ -98,10 +104,16 @@ Output the snapshot as a dense, structured summary.`;
       });
 
       // Extract text safely from the GenAI response
-      const snapshotText = response.text || '[Failed to generate snapshot]';
+      const snapshotText = response.text;
+      const responseAssetId = this.tracer?.saveAsset('StateSnapshotWorker', 'snapshot_response', snapshotText || '');
+      this.tracer?.logEvent('StateSnapshotWorker', 'Received LLM response', { responseAssetId });
+      if (!snapshotText) {
+          debugLogger.warn('StateSnapshotWorker: LLM returned empty response for snapshot generation.');
+      }
+      
       const mockSnapshotText = `
 <world_state_snapshot>
-${snapshotText}
+${snapshotText || '[Failed to generate snapshot]'}
 </world_state_snapshot>`;
 
       const snapshotTokens = estimateTokenCountSync([
@@ -160,12 +172,17 @@ ${snapshotText}
       const targetId = replacedEpisodeIds[replacedEpisodeIds.length - 1];
 
       if (this.bus) {
+        this.tracer?.logEvent('StateSnapshotWorker', `Emitting VARIANT_READY for targetId [${targetId}]`);
         this.bus.emitVariantReady({
           targetId,
           variantId: 'snapshot',
           variant,
         });
+      } else {
+        debugLogger.warn('StateSnapshotWorker: Event bus disconnected before variant could be emitted.');
       }
+    } catch (error) {
+      debugLogger.error(`StateSnapshotWorker: Critical failure during snapshot synthesis: ${error instanceof Error ? error.message : String(error)}`);
     } finally {
       this.isSynthesizing = false;
     }

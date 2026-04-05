@@ -17,9 +17,6 @@ import { ContextManager } from './contextManager.js';
 import type { Config } from '../config/config.js';
 import type { GeminiClient } from '../core/client.js';
 import type { Content } from '@google/genai';
-import { ToolMaskingProcessor } from './processors/toolMaskingProcessor.js';
-import { HistorySquashingProcessor } from './processors/historySquashingProcessor.js';
-import { SemanticCompressionProcessor } from './processors/semanticCompressionProcessor.js';
 
 expect.addSnapshotSerializer({
   test: (val) =>
@@ -46,6 +43,8 @@ describe('ContextManager Golden Tests', () => {
   beforeEach(() => {
     mockConfig = {
       isContextManagementEnabled: vi.fn().mockReturnValue(true),
+      getTargetDir: vi.fn().mockReturnValue('/tmp'),
+      getSessionId: vi.fn().mockReturnValue('test-session'),
       getToolOutputMaskingConfig: vi.fn().mockResolvedValue({
         enabled: true,
         minPrunableThresholdTokens: 50,
@@ -83,7 +82,6 @@ describe('ContextManager Golden Tests', () => {
         },
       }),
       storage: { getProjectTempDir: vi.fn().mockReturnValue('/tmp') },
-      getSessionId: vi.fn().mockReturnValue('mock-session'),
       getUsageStatisticsEnabled: vi.fn().mockReturnValue(false),
       getBaseLlmClient: vi.fn().mockReturnValue({
         generateJson: vi.fn().mockResolvedValue({
@@ -101,11 +99,7 @@ describe('ContextManager Golden Tests', () => {
       mockConfig as Config,
       {} as unknown as GeminiClient,
     );
-    contextManager.setProcessors([
-      new ToolMaskingProcessor(mockConfig as unknown as Config),
-      new HistorySquashingProcessor(mockConfig as unknown as Config),
-      new SemanticCompressionProcessor(mockConfig as unknown as Config),
-    ]);
+    
   });
 
   const createLargeHistory = (): Content[] => [

@@ -2221,7 +2221,7 @@ describe('loadCliConfig context management', () => {
     const argv = await parseArguments(createTestMergedSettings());
     const contextManagementConfig: Partial<ContextManagementConfig> = {
       budget: {
-        incrementalGc: false,
+        maxPressureStrategy: 'truncate',
         maxTokens: 100_000,
         retainedTokens: 50_000,
         protectedEpisodes: 1,

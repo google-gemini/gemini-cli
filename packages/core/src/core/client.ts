@@ -45,10 +45,6 @@ import type { ContentGenerator } from './contentGenerator.js';
 import { LoopDetectionService } from '../services/loopDetectionService.js';
 import { ChatCompressionService } from '../context/chatCompressionService.js';
 import { ContextManager } from '../context/contextManager.js';
-import { ToolMaskingProcessor } from '../context/processors/toolMaskingProcessor.js';
-import { HistorySquashingProcessor } from '../context/processors/historySquashingProcessor.js';
-import { BlobDegradationProcessor } from '../context/processors/blobDegradationProcessor.js';
-import { SemanticCompressionProcessor } from '../context/processors/semanticCompressionProcessor.js';
 import { ideContextStore } from '../ide/ideContext.js';
 import {
   logContentRetryFailure,
@@ -118,13 +114,6 @@ export class GeminiClient {
     this.compressionService = new ChatCompressionService();
 
     this.contextManager = new ContextManager(this.config, this);
-    // Order matters: Fast, lossless masking -> Intelligent degradation -> Brutal truncation fallback
-    this.contextManager.setProcessors([
-      new ToolMaskingProcessor(this.config),
-      new BlobDegradationProcessor(this.config),
-      new SemanticCompressionProcessor(this.config),
-      new HistorySquashingProcessor(this.config),
-    ]);
     this.toolOutputMaskingService = new ToolOutputMaskingService();
     this.lastPromptId = this.config.getSessionId();
 
@@ -329,6 +318,7 @@ export class GeminiClient {
   dispose() {
     coreEvents.off(CoreEvent.ModelChanged, this.handleModelChanged);
     coreEvents.off(CoreEvent.MemoryChanged, this.handleMemoryChanged);
+    this.contextManager.shutdown();
   }
 
   async resumeChat(

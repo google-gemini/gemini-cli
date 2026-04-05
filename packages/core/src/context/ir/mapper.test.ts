@@ -127,4 +127,35 @@ describe('IrMapper', () => {
     // The exact structural equivalence isn't mathematically perfect because Gemini allows mixing text and calls
     // in one Content block, but the flat representation is semantically identical.
   });
+
+  it('should guarantee WeakMap ID stability across continuous mapping', () => {
+    // 1. Initial history
+    const history: Content[] = [
+      { role: 'user', parts: [{ text: 'Hello' }] },
+      { role: 'model', parts: [{ text: 'Hi there' }] }
+    ];
+
+    const initialIr = IrMapper.toIr(history);
+    expect(initialIr).toHaveLength(1);
+    
+    // Save the uniquely generated deterministic ID for the first episode
+    const episodeId = initialIr[0].id;
+    const triggerId = initialIr[0].trigger.id;
+
+    // 2. Push new history (simulating a continuing conversation)
+    history.push({ role: 'user', parts: [{ text: 'How are you?' }] });
+    history.push({ role: 'model', parts: [{ text: 'I am an AI.' }] });
+
+    const updatedIr = IrMapper.toIr(history);
+    expect(updatedIr).toHaveLength(2);
+
+    // 3. Verify ID Stability
+    // The exact same ID must be generated for the first episode because the underlying Content object reference hasn't changed.
+    // This proves the WeakMap successfully pinned the reference!
+    expect(updatedIr[0].id).toBe(episodeId);
+    expect(updatedIr[0].trigger.id).toBe(triggerId);
+    
+    // Ensure the new episode has a different ID
+    expect(updatedIr[1].id).not.toBe(episodeId);
+  });
 });
