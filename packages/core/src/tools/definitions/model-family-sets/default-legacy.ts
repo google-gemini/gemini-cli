@@ -109,7 +109,9 @@ export const DEFAULT_LEGACY_SET: CoreToolSet = {
 
   write_file: {
     name: WRITE_FILE_TOOL_NAME,
-    description: `Writes content to a specified file in the local filesystem.
+    description: `Writes content to a specified file in the local filesystem. Overwrites existing files.
+
+      Prefer the '${EDIT_TOOL_NAME}' tool for modifying existing files — it produces cleaner diffs, is less error-prone, and uses fewer tokens. Only use write_file to create new files or for complete rewrites where most of the content is changing.
 
       The user has the ability to modify \`content\`. If modified, this will be stated in the response.`,
     parametersJsonSchema: {
