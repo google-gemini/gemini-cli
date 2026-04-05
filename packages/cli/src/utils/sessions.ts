@@ -9,6 +9,7 @@ import {
   generateSummary,
   writeToStderr,
   writeToStdout,
+  OutputFormat,
   type Config,
 } from '@google/gemini-cli-core';
 import {
@@ -18,37 +19,43 @@ import {
 } from './sessionUtils.js';
 
 export async function listSessions(config: Config): Promise<void> {
-  // Generate summary for most recent session if needed
-  await generateSummary(config);
+  // Only generate summaries for interactive display to keep JSON output clean
+  if (config.getOutputFormat() !== OutputFormat.JSON) {
+    await generateSummary(config);
+  }
 
   const sessionSelector = new SessionSelector(config);
   const sessions = await sessionSelector.listSessions();
 
-  if (sessions.length === 0) {
+  const sortedSessions = sessions.sort(
+    (a, b) => new Date(a.startTime).getTime() - new Date(b.startTime).getTime(),
+  );
+
+  if (config.getOutputFormat() === OutputFormat.JSON) {
+    writeToStdout(JSON.stringify(sortedSessions, null, 2) + '\n');
+    return;
+  }
+
+  if (sortedSessions.length === 0) {
     writeToStdout('No previous sessions found for this project.');
     return;
   }
 
   writeToStdout(
-    `\nAvailable sessions for this project (${sessions.length}):\n`,
+    `\nAvailable sessions for this project (${sortedSessions.length}):\n`,
   );
 
-  sessions
-    .sort(
-      (a, b) =>
-        new Date(a.startTime).getTime() - new Date(b.startTime).getTime(),
-    )
-    .forEach((session, index) => {
-      const current = session.isCurrentSession ? ', current' : '';
-      const time = formatRelativeTime(session.lastUpdated);
-      const title =
-        session.displayName.length > 100
-          ? session.displayName.slice(0, 97) + '...'
-          : session.displayName;
-      writeToStdout(
-        `  ${index + 1}. ${title} (${time}${current}) [${session.id}]\n`,
-      );
-    });
+  sortedSessions.forEach((session, index) => {
+    const current = session.isCurrentSession ? ', current' : '';
+    const time = formatRelativeTime(session.lastUpdated);
+    const title =
+      session.displayName.length > 100
+        ? session.displayName.slice(0, 97) + '...'
+        : session.displayName;
+    writeToStdout(
+      `  ${index + 1}. ${title} (${time}${current}) [${session.id}]\n`,
+    );
+  });
 }
 
 export async function deleteSession(
