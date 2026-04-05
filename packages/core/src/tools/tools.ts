@@ -367,7 +367,7 @@ export abstract class BaseToolInvocation<
 
       try {
         void this.messageBus.publish(request);
-      } catch (_error) {
+      } catch {
         cleanup();
         resolve('allow');
       }
@@ -379,6 +379,12 @@ export abstract class BaseToolInvocation<
     updateOutput?: (output: ToolLiveOutput) => void,
     options?: ExecuteOptions,
   ): Promise<TResult>;
+
+  toJSON() {
+    return {
+      params: this.params,
+    };
+  }
 }
 
 /**
@@ -496,6 +502,16 @@ export abstract class DeclarativeTool<
       });
     }
     return cloned;
+  }
+
+  toJSON() {
+    return {
+      name: this.name,
+      displayName: this.displayName,
+      description: this.description,
+      kind: this.kind,
+      parameterSchema: this.parameterSchema,
+    };
   }
 
   get isReadOnly(): boolean {
@@ -905,12 +921,18 @@ export const isListResult = (
 ): res is ListDirectoryResult | ReadManyFilesResult =>
   isStructuredToolResult(res) && 'files' in res && Array.isArray(res.files);
 
+export const isReadManyFilesResult = (
+  res: unknown,
+): res is ReadManyFilesResult => isListResult(res) && 'include' in res;
 export type ToolResultDisplay =
   | string
   | FileDiff
   | AnsiOutput
   | TodoList
-  | SubagentProgress;
+  | SubagentProgress
+  | GrepResult
+  | ListDirectoryResult
+  | ReadManyFilesResult;
 
 export type TodoStatus =
   | 'pending'

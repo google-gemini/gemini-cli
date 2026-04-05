@@ -403,7 +403,7 @@ export function mapError(
   }
 
   if (isStructuredError(error)) {
-    const structuredMeta = { ...meta, rawError: error };
+    const structuredMeta = { ...meta, rawError: error, status: error.status };
     return {
       status: mapHttpToGrpcStatus(error.status),
       message: error.message,
