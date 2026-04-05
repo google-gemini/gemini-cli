@@ -44,8 +44,9 @@ if (!existsSync(generatedCoreDir)) {
 try {
   // Check for GIT_COMMIT env var first (e.g. when building inside Docker
   // without a .git directory available)
-  if (process.env.GIT_COMMIT) {
-    gitCommitInfo = process.env.GIT_COMMIT;
+  const envCommit = process.env.GIT_COMMIT;
+  if (envCommit && /^[0-9a-f]+$/i.test(envCommit)) {
+    gitCommitInfo = envCommit;
   } else {
     const gitHash = execSync('git rev-parse --short HEAD', {
       encoding: 'utf-8',
