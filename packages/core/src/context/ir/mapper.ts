@@ -17,6 +17,18 @@ import type {
 } from './types.js';
 import { estimateTokenCountSync } from '../../utils/tokenCalculation.js';
 
+// WeakMap to provide stable, deterministic identity across parses for the exact same Content/Part references
+const nodeIdentityMap = new WeakMap<object, string>();
+
+function getStableId(obj: object): string {
+  let id = nodeIdentityMap.get(obj);
+  if (!id) {
+    id = randomUUID();
+    nodeIdentityMap.set(obj, id);
+  }
+  return id;
+}
+
 export class IrMapper {
   /**
    * Translates a flat Gemini Content[] array into our rich Episodic Intermediate Representation.
@@ -55,10 +67,10 @@ export class IrMapper {
         if (hasToolResponses) {
           if (!currentEpisode) {
             currentEpisode = {
-              id: randomUUID(),
+              id: getStableId(msg),
               timestamp: Date.now(),
               trigger: {
-                id: randomUUID(),
+                id: getStableId(msg.parts[0] || msg),
                 type: 'SYSTEM_EVENT',
                 name: 'history_resume',
                 payload: {},
@@ -79,7 +91,7 @@ export class IrMapper {
               const obsTokens = estimateTokenCountSync([part]);
 
               const step: ToolExecution = {
-                id: randomUUID(),
+                id: getStableId(part),
                 type: 'TOOL_EXECUTION',
                 toolName: part.functionResponse.name || 'unknown',
                 intent:
@@ -134,7 +146,7 @@ export class IrMapper {
           }
 
           const trigger: UserPrompt = {
-            id: randomUUID(),
+            id: getStableId(msg.parts[0] || msg),
             type: 'USER_PROMPT',
             semanticParts,
             metadata: createMetadata(
@@ -143,7 +155,7 @@ export class IrMapper {
           };
 
           currentEpisode = {
-            id: randomUUID(),
+            id: getStableId(msg),
             timestamp: Date.now(),
             trigger,
             steps: [],
@@ -152,10 +164,10 @@ export class IrMapper {
       } else if (msg.role === 'model') {
         if (!currentEpisode) {
           currentEpisode = {
-            id: randomUUID(),
+            id: getStableId(msg),
             timestamp: Date.now(),
             trigger: {
-              id: randomUUID(),
+              id: getStableId(msg.parts[0] || msg),
               type: 'SYSTEM_EVENT',
               name: 'model_init',
               payload: {},
@@ -171,7 +183,7 @@ export class IrMapper {
             if (callId) pendingCallParts.set(callId, part);
           } else if (part.text) {
             const thought: AgentThought = {
-              id: randomUUID(),
+              id: getStableId(part),
               type: 'AGENT_THOUGHT',
               text: part.text,
               metadata: createMetadata([part]),

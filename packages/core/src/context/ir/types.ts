@@ -38,10 +38,38 @@ export type IrNodeType =
   | 'AGENT_YIELD';
 
 /** Base interface for all nodes in the Episodic IR */
+export type VariantStatus = 'computing' | 'ready' | 'failed';
+
+export interface BaseVariant {
+  status: VariantStatus;
+  recoveredTokens?: number;
+  error?: string;
+}
+
+export interface SummaryVariant extends BaseVariant {
+  type: 'summary';
+  text: string;
+}
+
+export interface MaskedVariant extends BaseVariant {
+  type: 'masked';
+  text: string;
+}
+
+export interface SnapshotVariant extends BaseVariant {
+  type: 'snapshot';
+  episode: Episode;
+  replacedEpisodeIds: string[];
+}
+
+export type Variant = SummaryVariant | MaskedVariant | SnapshotVariant;
+
+/** Base interface for all nodes in the Episodic IR */
 export interface IrNode {
   readonly id: string;
   readonly type: IrNodeType;
   metadata: IrMetadata;
+  variants?: Record<string, Variant>;
 }
 
 /**
@@ -161,6 +189,7 @@ export interface Episode {
   readonly id: string;
   /** When the episode began */
   readonly timestamp: number;
+  variants?: Record<string, Variant>;
 
   /** The event that initiated this run */
   trigger: EpisodeTrigger;
