@@ -309,7 +309,12 @@ export const TableRenderer: React.FC<TableRendererProps> = ({
   };
 
   return (
-    <Box flexDirection="column" marginY={1}>
+    <Box
+      flexDirection="column"
+      marginY={1}
+      width={terminalWidth}
+      flexShrink={0}
+    >
       {/* Top border */}
       {renderBorder('top')}
 
