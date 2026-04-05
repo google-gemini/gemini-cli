@@ -289,48 +289,42 @@ export class ContextManager {
       `Context Manager Synchronous Barrier triggered: View at ${currentTokens} tokens (limit: ${maxTokens}). Strategy: ${mngConfig.budget.maxPressureStrategy}`,
     );
 
-    const protectedEpisodeIds = new Set<string>();
-    if (mngConfig.budget.protectSystemEpisode && currentEpisodes.length > 0) {
-      protectedEpisodeIds.add(currentEpisodes[0].id);
-    }
-    if (currentEpisodes.length > 1) {
-      protectedEpisodeIds.add(currentEpisodes[currentEpisodes.length - 1].id);
+    // Calculate target based on gcTarget
+    let targetTokens = maxTokens;
+    if (mngConfig.budget.gcTarget === 'max') {
+        targetTokens = mngConfig.budget.retainedTokens;
+    } else if (mngConfig.budget.gcTarget === 'freeNTokens') {
+        targetTokens = maxTokens - (mngConfig.budget.freeTokensTarget ?? 10000);
     }
 
-    if (mngConfig.budget.maxPressureStrategy === 'truncate') {
-      // Simplest, fastest fallback. Drop oldest unprotected episodes until under maxTokens.
-      const truncated: Episode[] = [];
-      let remainingTokens = currentTokens;
-      for (const ep of currentEpisodes) {
-        const epTokens = this.calculateIrTokens([ep]);
-        if (remainingTokens > maxTokens && !protectedEpisodeIds.has(ep.id)) {
-           remainingTokens -= epTokens;
-           this.tracer.logEvent('Barrier', `Truncating episode [${ep.id}].`);
-           debugLogger.log(`Barrier (truncate): Dropped Episode ${ep.id}`);
-        } else {
-           truncated.push(ep);
-        }
+    // Structural invariant: We ALWAYS protect the architectural initialization turn (Turn 0)
+    // We do NOT arbitrarily protect recent episodes (like currentEpisodes.length - 1)
+    // because an episode can be unboundedly large, and protecting it would crash the LLM.
+    const protectedEpisodeId = currentEpisodes.length > 0 ? currentEpisodes[0].id : null;
+
+    let remainingTokens = currentTokens;
+    const truncated: Episode[] = [];
+    const strategy = mngConfig.budget.maxPressureStrategy;
+
+    for (const ep of currentEpisodes) {
+      const epTokens = this.calculateIrTokens([ep]);
+      if (remainingTokens > targetTokens && ep.id !== protectedEpisodeId) {
+         remainingTokens -= epTokens;
+         if (strategy === 'truncate') {
+             this.tracer.logEvent('Barrier', `Truncating episode [${ep.id}].`);
+             debugLogger.log(`Barrier (truncate): Dropped Episode ${ep.id}`);
+         } else if (strategy === 'compress') {
+             this.tracer.logEvent('Barrier', `Compress fallback to truncate for [${ep.id}].`);
+             debugLogger.warn(`Synchronous compress barrier not fully implemented, truncating Episode ${ep.id}.`);
+         } else if (strategy === 'rollingSummarizer') {
+             this.tracer.logEvent('Barrier', `RollingSummarizer fallback to truncate for [${ep.id}].`);
+             debugLogger.warn(`Synchronous rollingSummarizer barrier not fully implemented, truncating Episode ${ep.id}.`);
+         }
+      } else {
+         truncated.push(ep);
       }
-      currentEpisodes = truncated;
-    } else if (mngConfig.budget.maxPressureStrategy === 'compress') {
-      // TODO: Synchronously invoke the StateSnapshotWorker, wait for it to finish, 
-      // merge the variants, and regenerate the View.
-      // For now, if compress fails/isn't wired synchronously, we fallback to truncate.
-      debugLogger.warn('Synchronous compress barrier not fully implemented, falling back to truncate.');
-      this.tracer.logEvent('Barrier', `Falling back to truncate.`);
-      
-      const truncated: Episode[] = [];
-      let remainingTokens = currentTokens;
-      for (const ep of currentEpisodes) {
-        const epTokens = this.calculateIrTokens([ep]);
-        if (remainingTokens > maxTokens && !protectedEpisodeIds.has(ep.id)) {
-           remainingTokens -= epTokens;
-        } else {
-           truncated.push(ep);
-        }
-      }
-      currentEpisodes = truncated;
     }
+    currentEpisodes = truncated;
 
     const finalTokens = this.calculateIrTokens(currentEpisodes);
     this.tracer.logEvent('ContextManager', `Finished projection. Final token count: ${finalTokens}.`);
