@@ -375,6 +375,186 @@ describe('policy.ts', () => {
       );
     });
 
+    it('should use policySuggestion.commandPrefix over heuristic for shell commands', async () => {
+      const mockConfig = {
+        setApprovalMode: vi.fn(),
+        getApprovalMode: vi.fn().mockReturnValue(ApprovalMode.DEFAULT),
+      } as unknown as Mocked<Config>;
+
+      (mockConfig as unknown as { config: Config }).config =
+        mockConfig as Config;
+      const mockMessageBus = {
+        publish: vi.fn(),
+      } as unknown as Mocked<MessageBus>;
+      (mockConfig as unknown as { messageBus: MessageBus }).messageBus =
+        mockMessageBus;
+      const tool = { name: 'run_shell_command' } as AnyDeclarativeTool;
+      const details: ToolExecuteConfirmationDetails = {
+        type: 'exec',
+        command: 'git diff src/main.ts',
+        rootCommand: 'git',
+        rootCommands: ['git'],
+        title: 'Shell',
+        onConfirm: vi.fn(),
+      };
+
+      await updatePolicy(
+        tool,
+        ToolConfirmationOutcome.ProceedAlways,
+        details,
+        mockConfig,
+        mockMessageBus,
+        undefined,
+        {
+          description: 'Allow read-only git commands',
+          commandPrefix: ['git diff', 'git log', 'git status', 'git show'],
+        },
+      );
+
+      expect(mockMessageBus.publish).toHaveBeenCalledWith(
+        expect.objectContaining({
+          type: MessageBusType.UPDATE_POLICY,
+          toolName: 'run_shell_command',
+          commandPrefix: ['git diff', 'git log', 'git status', 'git show'],
+        }),
+      );
+    });
+
+    it('should use policySuggestion.argsPattern when commandPrefix is absent', async () => {
+      const mockConfig = {
+        setApprovalMode: vi.fn(),
+        getApprovalMode: vi.fn().mockReturnValue(ApprovalMode.DEFAULT),
+      } as unknown as Mocked<Config>;
+
+      (mockConfig as unknown as { config: Config }).config =
+        mockConfig as Config;
+      const mockMessageBus = {
+        publish: vi.fn(),
+      } as unknown as Mocked<MessageBus>;
+      (mockConfig as unknown as { messageBus: MessageBus }).messageBus =
+        mockMessageBus;
+      const tool = { name: 'run_shell_command' } as AnyDeclarativeTool;
+      const details: ToolExecuteConfirmationDetails = {
+        type: 'exec',
+        command: 'npm test -- src/utils',
+        rootCommand: 'npm',
+        rootCommands: ['npm'],
+        title: 'Shell',
+        onConfirm: vi.fn(),
+      };
+
+      await updatePolicy(
+        tool,
+        ToolConfirmationOutcome.ProceedAlways,
+        details,
+        mockConfig,
+        mockMessageBus,
+        undefined,
+        {
+          description: 'Allow npm test commands',
+          argsPattern: '^npm\\s+test',
+        },
+      );
+
+      expect(mockMessageBus.publish).toHaveBeenCalledWith(
+        expect.objectContaining({
+          type: MessageBusType.UPDATE_POLICY,
+          toolName: 'run_shell_command',
+          argsPattern: '^npm\\s+test',
+        }),
+      );
+    });
+
+    it('should use policySuggestion.toolName for MCP tool scoping', async () => {
+      const mockConfig = {
+        setApprovalMode: vi.fn(),
+        getApprovalMode: vi.fn().mockReturnValue(ApprovalMode.DEFAULT),
+      } as unknown as Mocked<Config>;
+
+      (mockConfig as unknown as { config: Config }).config =
+        mockConfig as Config;
+      const mockMessageBus = {
+        publish: vi.fn(),
+      } as unknown as Mocked<MessageBus>;
+      (mockConfig as unknown as { messageBus: MessageBus }).messageBus =
+        mockMessageBus;
+      const tool = { name: 'mcp-tool' } as AnyDeclarativeTool;
+      const details: ToolMcpConfirmationDetails = {
+        type: 'mcp',
+        serverName: 'my-server',
+        toolName: 'mcp-tool',
+        toolDisplayName: 'My Tool',
+        title: 'MCP',
+        onConfirm: vi.fn(),
+      };
+
+      await updatePolicy(
+        tool,
+        ToolConfirmationOutcome.ProceedAlwaysTool,
+        details,
+        mockConfig,
+        mockMessageBus,
+        undefined,
+        {
+          description: 'Allow read-only MCP tools',
+          toolName: 'mcp_my-server_read-*',
+        },
+      );
+
+      expect(mockMessageBus.publish).toHaveBeenCalledWith(
+        expect.objectContaining({
+          type: MessageBusType.UPDATE_POLICY,
+          toolName: 'mcp_my-server_read-*',
+          mcpName: 'my-server',
+        }),
+      );
+    });
+
+    it('should ignore policySuggestion.toolName for MCP server-wide scope', async () => {
+      const mockConfig = {
+        setApprovalMode: vi.fn(),
+        getApprovalMode: vi.fn().mockReturnValue(ApprovalMode.DEFAULT),
+      } as unknown as Mocked<Config>;
+
+      (mockConfig as unknown as { config: Config }).config =
+        mockConfig as Config;
+      const mockMessageBus = {
+        publish: vi.fn(),
+      } as unknown as Mocked<MessageBus>;
+      (mockConfig as unknown as { messageBus: MessageBus }).messageBus =
+        mockMessageBus;
+      const tool = { name: 'mcp-tool' } as AnyDeclarativeTool;
+      const details: ToolMcpConfirmationDetails = {
+        type: 'mcp',
+        serverName: 'my-server',
+        toolName: 'mcp-tool',
+        toolDisplayName: 'My Tool',
+        title: 'MCP',
+        onConfirm: vi.fn(),
+      };
+
+      await updatePolicy(
+        tool,
+        ToolConfirmationOutcome.ProceedAlwaysServer,
+        details,
+        mockConfig,
+        mockMessageBus,
+        undefined,
+        {
+          description: 'Allow read-only MCP tools',
+          toolName: 'mcp_my-server_read-*',
+        },
+      );
+
+      expect(mockMessageBus.publish).toHaveBeenCalledWith(
+        expect.objectContaining({
+          type: MessageBusType.UPDATE_POLICY,
+          toolName: 'mcp_my-server_*',
+          mcpName: 'my-server',
+        }),
+      );
+    });
+
     it('should handle MCP policy updates (server scope)', async () => {
       const mockConfig = {
         getApprovalMode: vi.fn().mockReturnValue(ApprovalMode.DEFAULT),

@@ -1575,6 +1575,15 @@ their corresponding top-level category object in your `settings.json` file.
   - **Default:** `false`
   - **Requires restart:** Yes
 
+- **`security.enableSmartPolicyScoping`** (boolean):
+  - **Description:** Let Gemini suggest better-scoped policy rules when you
+    approve tools. When you select **Allow for this session** or **Allow for all
+    future sessions**, Gemini analyzes the tool invocation and suggests a
+    meaningful scope (for example, "read-only git commands") instead of the
+    default heuristic. The suggested scope appears in the approval question.
+  - **Default:** `false`
+  - **Requires restart:** No
+
 #### `advanced`
 
 - **`advanced.autoConfigureMemory`** (boolean):

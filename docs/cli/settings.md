@@ -150,6 +150,7 @@ they appear in the UI.
 | Folder Trust                          | `security.folderTrust.enabled`                  | Setting to track whether Folder trust is enabled.                                                                                                                                                                                    | `true`  |
 | Enable Environment Variable Redaction | `security.environmentVariableRedaction.enabled` | Enable redaction of environment variables that may contain secrets.                                                                                                                                                                  | `false` |
 | Enable Context-Aware Security         | `security.enableConseca`                        | Enable the context-aware security checker. This feature uses an LLM to dynamically generate and enforce security policies for tool use based on your prompt, providing an additional layer of protection against unintended actions. | `false` |
+| Smart Policy Scoping                  | `security.enableSmartPolicyScoping`             | Let Gemini suggest better-scoped policy rules when you approve tools. Displays the suggested scope in the approval question.                                                                                                         | `false` |
 
 ### Advanced
 

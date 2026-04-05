@@ -2712,6 +2712,13 @@
           "markdownDescription": "Enable the context-aware security checker. This feature uses an LLM to dynamically generate and enforce security policies for tool use based on your prompt, providing an additional layer of protection against unintended actions.\n\n- Category: `Security`\n- Requires restart: `yes`\n- Default: `false`",
           "default": false,
           "type": "boolean"
+        },
+        "enableSmartPolicyScoping": {
+          "title": "Smart Policy Scoping",
+          "description": "Use AI to suggest better-scoped policy rules when approving tools. Shows a suggested scope description on approval options.",
+          "markdownDescription": "Use AI to suggest better-scoped policy rules when approving tools. Shows a suggested scope description on approval options.\n\n- Category: `Security`\n- Requires restart: `no`\n- Default: `false`",
+          "default": false,
+          "type": "boolean"
         }
       },
       "additionalProperties": false
