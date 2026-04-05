@@ -109,6 +109,7 @@ describe('Turn', () => {
         expect.any(AbortSignal),
         LlmRole.MAIN,
         undefined,
+        undefined
       );
 
       expect(events).toEqual([

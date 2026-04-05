@@ -44,7 +44,7 @@ import type {
 import type { ContentGenerator } from './contentGenerator.js';
 import { LoopDetectionService } from '../services/loopDetectionService.js';
 import { ChatCompressionService } from '../context/chatCompressionService.js';
-import { AgentHistoryProvider } from '../context/agentHistoryProvider.js';
+import { ContextManager } from '../context/contextManager.js';
 import { ideContextStore } from '../ide/ideContext.js';
 import {
   logContentRetryFailure,
@@ -57,7 +57,7 @@ import type {
 import {
   ContentRetryFailureEvent,
   NextSpeakerCheckEvent,
-  type LlmRole,
+  LlmRole,
 } from '../telemetry/types.js';
 import { uiTelemetryService } from '../telemetry/uiTelemetry.js';
 import type { IdeContext, File } from '../ide/types.js';
@@ -65,7 +65,6 @@ import { handleFallback } from '../fallback/handler.js';
 import type { RoutingContext } from '../routing/routingStrategy.js';
 import { debugLogger } from '../utils/debugLogger.js';
 import type { ModelConfigKey } from '../services/modelConfigService.js';
-import { ToolOutputMaskingService } from '../context/toolOutputMaskingService.js';
 import { calculateRequestTokenCount } from '../utils/tokenCalculation.js';
 import {
   applyModelSelection,
@@ -74,6 +73,7 @@ import {
 import { getDisplayString, resolveModel } from '../config/models.js';
 import { partToString } from '../utils/partUtils.js';
 import { coreEvents, CoreEvent } from '../utils/events.js';
+import { ToolOutputMaskingService } from '../context/toolOutputMaskingService.js';
 
 const MAX_TURNS = 100;
 
@@ -95,7 +95,8 @@ export class GeminiClient {
 
   private readonly loopDetector: LoopDetectionService;
   private readonly compressionService: ChatCompressionService;
-  private readonly agentHistoryProvider: AgentHistoryProvider;
+
+  private readonly contextManager: ContextManager;
   private readonly toolOutputMaskingService: ToolOutputMaskingService;
   private lastPromptId: string;
   private currentSequenceModel: string | null = null;
@@ -111,10 +112,8 @@ export class GeminiClient {
   constructor(private readonly context: AgentLoopContext) {
     this.loopDetector = new LoopDetectionService(this.config);
     this.compressionService = new ChatCompressionService();
-    this.agentHistoryProvider = new AgentHistoryProvider(
-      this.config.agentHistoryProviderConfig,
-      this.config,
-    );
+
+    this.contextManager = new ContextManager(this.config, this);
     this.toolOutputMaskingService = new ToolOutputMaskingService();
     this.lastPromptId = this.config.getSessionId();
 
@@ -250,6 +249,7 @@ export class GeminiClient {
 
   async initialize() {
     this.chat = await this.startChat();
+    this.contextManager.subscribeToHistory((this.chat as any).agentHistory);
     this.updateTelemetryTokenCount();
   }
 
@@ -318,6 +318,7 @@ export class GeminiClient {
   dispose() {
     coreEvents.off(CoreEvent.ModelChanged, this.handleModelChanged);
     coreEvents.off(CoreEvent.MemoryChanged, this.handleMemoryChanged);
+    this.contextManager.shutdown();
   }
 
   async resumeChat(
@@ -615,14 +616,10 @@ export class GeminiClient {
     // Check for context window overflow
     const modelForLimitCheck = this._getActiveModelForCurrentTurn();
 
+    let activeHistory = this.getHistory();
+
     if (this.config.getContextManagementConfig().enabled) {
-      const newHistory = await this.agentHistoryProvider.manageHistory(
-        this.getHistory(),
-        signal,
-      );
-      if (newHistory.length !== this.getHistory().length) {
-        this.getChat().setHistory(newHistory);
-      }
+      activeHistory = await this.contextManager.projectCompressedHistory();
     } else {
       const compressed = await this.tryCompressChat(prompt_id, false, signal);
 
@@ -634,7 +631,9 @@ export class GeminiClient {
     const remainingTokenCount =
       tokenLimit(modelForLimitCheck) - this.getChat().getLastPromptTokenCount();
 
-    await this.tryMaskToolOutputs(this.getHistory());
+    if (!this.config.getContextManagementConfig().enabled) {
+      await this.tryMaskToolOutputs(activeHistory);
+    }
 
     // Estimate tokens. For text-only requests, we estimate based on character length.
     // For requests with non-text parts (like images, tools), we use the countTokens API.
@@ -642,8 +641,8 @@ export class GeminiClient {
       request,
       this.getContentGeneratorOrFail(),
       modelForLimitCheck,
+      activeHistory, // Added a new parameter to calculate tokens against the projected history!
     );
-
     if (estimatedRequestTokenCount > remainingTokenCount) {
       yield {
         type: GeminiEventType.ContextWindowWillOverflow,
@@ -747,6 +746,8 @@ export class GeminiClient {
       request,
       linkedSignal,
       displayContent,
+      LlmRole.MAIN,
+      activeHistory, // Feed it the projected history
     );
     let isError = false;
     let isInvalidStream = false;
