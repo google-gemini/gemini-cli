@@ -33,6 +33,7 @@ export class GcliAgentModel extends BaseLlm {
       router: RouterService;
       compactor: CompactorService;
       quota: QuotaService;
+      masker: MaskerService;
     }
   ) {
     super({ model: 'gcli-consolidated' });
@@ -210,7 +211,7 @@ Ensuring availability by retrying or switching models when rate limits (429s) or
 
 ```typescript
 // Inside GcliAgentModel.generateContentAsync
-await this.services.quota.checkAvailabilityOrPrompt(request.model);
+await this.services.quota.checkAvailabilityOrPrompt(request);
 ```
 
 
