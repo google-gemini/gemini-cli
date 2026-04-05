@@ -9,16 +9,21 @@ export interface ContextManagementConfig {
 
   /** The global orchestration budget */
   budget: {
-    /** The absolute maximum tokens before the context manager triggers */
+    /** The absolute maximum tokens before the context manager triggers the Synchronous Pressure Barrier */
     maxTokens: number;
-    /** The target token count to reduce to when triggered */
+    /** The target token count to aggressively drop to using asynchronous "Ship of Theseus" background GC */
     retainedTokens: number;
     /** The number of recent Episodes to always protect from degradation (default: 1) */
     protectedEpisodes: number;
     /** Should we protect Episode 0 (the System Prompt/Architectural Initialization)? */
     protectSystemEpisode: boolean;
-    /** If true, the system only evicts exactly enough tokens to stay under maxTokens, ignoring retainedTokens. (default: false) */
-    incrementalGc?: boolean;
+    
+    /** 
+     * The strategy to use when maxTokens is exceeded.
+     * - 'truncate': Drop oldest episodes until under limit (Instant, data loss)
+     * - 'compress': Block request, perform N-to-1 Snapshot generation, then proceed (Slow, no data loss)
+     */
+    maxPressureStrategy: 'truncate' | 'compress';
   };
 
   /** Specific hyperparameters for degrading the context when over budget */

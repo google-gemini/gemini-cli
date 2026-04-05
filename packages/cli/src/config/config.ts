@@ -887,15 +887,15 @@ export async function loadCliConfig(
 
   const useGeneralistProfile =
     settings.experimental?.generalistProfile ?? false;
-  const usePowerUserProfile =
-    settings.experimental?.powerUserProfile ?? false;
+  const usePowerUserProfile = settings.experimental?.powerUserProfile ?? false;
   const useContextManagement =
     settings.experimental?.contextManagement ?? false;
   const contextManagement = {
     ...(useGeneralistProfile ? GENERALIST_PROFILE : {}),
     ...(usePowerUserProfile ? POWER_USER_PROFILE : {}),
     ...(useContextManagement ? settings?.contextManagement : {}),
-    enabled: useContextManagement || useGeneralistProfile || usePowerUserProfile,
+    enabled:
+      useContextManagement || useGeneralistProfile || usePowerUserProfile,
   };
 
   return new Config({

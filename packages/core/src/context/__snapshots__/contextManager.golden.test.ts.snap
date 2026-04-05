@@ -15,11 +15,6 @@ exports[`ContextManager Golden Tests > should process history and match golden s
       {
         "text": "in a galaxy far far away...",
       },
-    ],
-    "role": "model",
-  },
-  {
-    "parts": [
       {
         "functionCall": {
           "args": {},

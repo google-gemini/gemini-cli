@@ -8,7 +8,7 @@ import type { ContextManagementConfig } from './types.js';
 export const GENERALIST_PROFILE: ContextManagementConfig = {
   enabled: true,
   budget: {
-    incrementalGc: false,
+    maxPressureStrategy: 'truncate',
     maxTokens: 150_000,
     retainedTokens: 65_000,
     protectedEpisodes: 1,
@@ -30,7 +30,7 @@ export const GENERALIST_PROFILE: ContextManagementConfig = {
 export const POWER_USER_PROFILE: ContextManagementConfig = {
   enabled: true,
   budget: {
-    incrementalGc: true, 
+    maxPressureStrategy: 'truncate',
     maxTokens: 150_000, // The absolute ceiling
     retainedTokens: 65_000, // The "bloom filter" backbuffer floor
     protectedEpisodes: 1,

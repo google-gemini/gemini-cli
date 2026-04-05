@@ -1137,7 +1137,7 @@ export class Config implements McpContext, AgentLoopContext {
           params.contextManagement?.budget?.protectedEpisodes ?? 1,
         protectSystemEpisode:
           params.contextManagement?.budget?.protectSystemEpisode ?? true,
-        incrementalGc: params.contextManagement?.budget?.incrementalGc ?? false,
+        maxPressureStrategy: params.contextManagement?.budget?.maxPressureStrategy ?? 'truncate',
       },
       strategies: {
         historySquashing: {

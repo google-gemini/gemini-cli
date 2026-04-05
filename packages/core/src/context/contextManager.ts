@@ -6,7 +6,7 @@
 import type { Content } from '@google/genai';
 import type { Config } from '../config/config.js';
 import type { GeminiClient } from '../core/client.js';
-import type { ContextAccountingState, ContextProcessor } from './pipeline.js';
+import type { ContextProcessor } from './pipeline.js';
 import type { AgentChatHistory } from '../core/agentChatHistory.js';
 import { debugLogger } from '../utils/debugLogger.js';
 import { IrMapper } from './ir/mapper.js';
@@ -16,7 +16,6 @@ import { ContextEventBus } from './eventBus.js';
 
 export class ContextManager {
   private config: Config;
-  private processors: ContextProcessor[] = [];
   
   // The stateful, pristine Episodic Intermediate Representation graph.
   // This allows the agent to remember and summarize continuously without losing data across turns.
@@ -30,20 +29,23 @@ export class ContextManager {
 
     this.eventBus.onVariantReady((event) => {
       // Find the target episode in the pristine graph
-      const targetEp = this.pristineEpisodes.find(ep => ep.id === event.targetId);
+      const targetEp = this.pristineEpisodes.find(
+        (ep) => ep.id === event.targetId,
+      );
       if (targetEp) {
         if (!targetEp.variants) {
           targetEp.variants = {};
         }
         targetEp.variants[event.variantId] = event.variant;
-        debugLogger.log(`ContextManager: Received async variant [${event.variantId}] for Episode ${event.targetId}.`);
+        debugLogger.log(
+          `ContextManager: Received async variant [${event.variantId}] for Episode ${event.targetId}.`,
+        );
       }
     });
   }
 
   setProcessors(processors: ContextProcessor[]) {
-    this.processors = processors;
-  }
+      }
 
   /**
    * Subscribes to the core AgentChatHistory to natively track all message events,
@@ -53,11 +55,11 @@ export class ContextManager {
     if (this.unsubscribeHistory) {
       this.unsubscribeHistory();
     }
-    
+
     this.unsubscribeHistory = chatHistory.subscribe((event) => {
       // Rebuild the pristine IR graph from the full source history on every change.
-      // We must map the FULL array at once because IrMapper groups adjacent 
-      // function calls and responses into unified Episodes. Pushing messages 
+      // We must map the FULL array at once because IrMapper groups adjacent
+      // function calls and responses into unified Episodes. Pushing messages
       // individually would shatter these episodic boundaries.
       this.pristineEpisodes = IrMapper.toIr(chatHistory.get());
       this.checkTriggers(); // Eager Compute & Ship of Theseus Triggers
@@ -68,10 +70,14 @@ export class ContextManager {
     if (!this.config.isContextManagementEnabled()) return;
 
     const mngConfig = this.config.getContextManagementConfig();
-    const currentTokens = this.calculateIrTokens(this.pristineEpisodes);
     
+    // Calculate tokens based on the *Working Buffer View*, not the raw pristine log.
+    // This solves Bug 2: The View shrinks when variants are applied, preventing infinite GC loops.
+    const workingBuffer = this.getWorkingBufferView();
+    const currentTokens = this.calculateIrTokens(workingBuffer);
+
     // 1. Eager Compute Trigger (Continuous Streaming)
-    // Broadcast the full graph to the async workers so they can proactively summarize partial massive files.
+    // Broadcast the full pristine log to the async workers so they can proactively summarize partial massive files.
     this.eventBus.emitChunkReceived({ episodes: this.pristineEpisodes });
 
     // 2. The Ship of Theseus Trigger (retainedTokens crossed)
@@ -79,10 +85,140 @@ export class ContextManager {
     if (currentTokens > mngConfig.budget.retainedTokens) {
       const deficit = currentTokens - mngConfig.budget.retainedTokens;
       this.eventBus.emitConsolidationNeeded({
-        episodes: this.pristineEpisodes,
+        episodes: workingBuffer, // Pass the working buffer so they know what still needs compression
         targetDeficit: deficit,
       });
     }
+  }
+
+  /**
+   * Generates a computed view of the pristine log.
+   * Sweeps backwards (newest to oldest), tracking rolling tokens.
+   * When rollingTokens > retainedTokens, it injects the "best" available ready variant 
+   * (snapshot > summary > masked) instead of the raw text.
+   * Handles N-to-1 variant skipping automatically.
+   */
+  public getWorkingBufferView(): Episode[] {
+    const mngConfig = this.config.getContextManagementConfig();
+    const retainedTokens = mngConfig.budget.retainedTokens;
+    
+    let currentEpisodes: Episode[] = [];
+    let rollingTokens = 0;
+    const skippedIds = new Set<string>();
+
+    for (let i = this.pristineEpisodes.length - 1; i >= 0; i--) {
+      const ep = this.pristineEpisodes[i];
+      
+      // If this episode was already replaced by an N-to-1 Snapshot injected earlier in the sweep, skip it entirely!
+      // This solves Bug 1 (Duplicate Projection).
+      if (skippedIds.has(ep.id)) continue;
+
+      let projectedEp = {
+        ...ep,
+        trigger: {
+          ...ep.trigger,
+          metadata: {
+            ...ep.trigger.metadata,
+            transformations: [...ep.trigger.metadata.transformations],
+          },
+          semanticParts:
+            ep.trigger.type === 'USER_PROMPT'
+              ? [...ep.trigger.semanticParts.map((sp) => ({ ...sp }))]
+              : undefined,
+        } as any,
+        steps: ep.steps.map(
+          (step) =>
+            ({
+              ...step,
+              metadata: {
+                ...step.metadata,
+                transformations: [...step.metadata.transformations],
+              },
+            }) as any,
+        ),
+        yield: ep.yield
+          ? {
+              ...ep.yield,
+              metadata: {
+                ...ep.yield.metadata,
+                transformations: [...ep.yield.metadata.transformations],
+              },
+            }
+          : undefined,
+      };
+
+      const epTokens = this.calculateIrTokens([projectedEp]);
+
+      if (rollingTokens > retainedTokens && ep.variants) {
+        const snapshot = ep.variants['snapshot'];
+        const summary = ep.variants['summary'];
+        const masked = ep.variants['masked'];
+
+        if (
+          snapshot &&
+          snapshot.status === 'ready' &&
+          snapshot.type === 'snapshot'
+        ) {
+          projectedEp = snapshot.episode as any;
+          // Mark all the episodes this snapshot covers to be skipped by the backwards sweep.
+          for (const id of snapshot.replacedEpisodeIds) {
+            skippedIds.add(id);
+          }
+          debugLogger.log(
+            `Opportunistically swapped Episodes [${snapshot.replacedEpisodeIds.join(', ')}] for pre-computed Snapshot variant.`,
+          );
+        } else if (
+          summary &&
+          summary.status === 'ready' &&
+          summary.type === 'summary'
+        ) {
+          projectedEp.steps = [
+            {
+              id: ep.id + '-summary',
+              type: 'AGENT_THOUGHT',
+              text: summary.text,
+              metadata: {
+                originalTokens: epTokens,
+                currentTokens: summary.recoveredTokens || 50,
+                transformations: [
+                  {
+                    processorName: 'AsyncSemanticCompressor',
+                    action: 'SUMMARIZED',
+                    timestamp: Date.now(),
+                  },
+                ],
+              },
+            },
+          ] as any;
+          projectedEp.yield = undefined;
+          debugLogger.log(
+            `Opportunistically swapped Episode ${ep.id} for pre-computed Summary variant.`,
+          );
+        } else if (
+          masked &&
+          masked.status === 'ready' &&
+          masked.type === 'masked'
+        ) {
+          if (
+            projectedEp.trigger.type === 'USER_PROMPT' &&
+            projectedEp.trigger.semanticParts.length > 0
+          ) {
+            projectedEp.trigger.semanticParts[0].presentation = {
+              text: masked.text,
+              tokens: masked.recoveredTokens || 10,
+            };
+          }
+          debugLogger.log(
+            `Opportunistically swapped Episode ${ep.id} for pre-computed Masked variant.`,
+          );
+        }
+      }
+
+      currentEpisodes.unshift(projectedEp);
+      rollingTokens += this.calculateIrTokens([projectedEp]);
+    }
+
+    return currentEpisodes;
   }
 
   /**
@@ -96,126 +232,63 @@ export class ContextManager {
 
     const mngConfig = this.config.getContextManagementConfig();
     const maxTokens = mngConfig.budget.maxTokens;
-    const retainedTokens = mngConfig.budget.retainedTokens;
-    
-    // Default block GC: target the 65k floor instantly.
-    let targetTokens = retainedTokens;
 
-    // Deep-ish clone the IR graph so processors only mutate the projected copy.
-    // The processors only modify `presentation` and `metadata.transformations`.
-    // 1. Opportunistic Swap (The Ship of Theseus)
-    // We build the projection array by sweeping through pristine history.
-    // If we are over the retained threshold, we look for pre-computed, 'ready' variants 
-    // and seamlessly inject them instead of the raw text.
-    let currentEpisodes: Episode[] = [];
-    let rollingTokens = 0;
-    
-    // We walk backwards (newest to oldest) to easily know when we cross the retained threshold.
-    for (let i = this.pristineEpisodes.length - 1; i >= 0; i--) {
-      const ep = this.pristineEpisodes[i];
-      let projectedEp = {
-        ...ep,
-        trigger: { ...ep.trigger, metadata: { ...ep.trigger.metadata, transformations: [...ep.trigger.metadata.transformations] }, semanticParts: ep.trigger.type === 'USER_PROMPT' ? [...ep.trigger.semanticParts.map(sp => ({...sp}))] : undefined } as any,
-        steps: ep.steps.map((step) => ({ ...step, metadata: { ...step.metadata, transformations: [...step.metadata.transformations] } } as any)),
-        yield: ep.yield ? { ...ep.yield, metadata: { ...ep.yield.metadata, transformations: [...ep.yield.metadata.transformations] } } : undefined,
-      };
-
-      const epTokens = this.calculateIrTokens([projectedEp]);
-      
-      // If this episode falls entirely outside the retained threshold AND has a ready variant, swap it!
-      if (rollingTokens > retainedTokens && ep.variants) {
-        // Look for the best available variant
-        const snapshot = ep.variants['snapshot'];
-        const summary = ep.variants['summary'];
-        const masked = ep.variants['masked'];
-
-        if (snapshot && snapshot.status === 'ready' && snapshot.type === 'snapshot') {
-          // A snapshot replaces this node ENTIRELY (and potentially others, but for now we just swap this node)
-          // To be perfectly accurate, a snapshot variant usually replaces multiple episodes.
-          // But as a simplistic projection, we just use the snapshot's episode structure.
-          projectedEp = snapshot.episode as any;
-          debugLogger.log(`Opportunistically swapped Episode ${ep.id} for pre-computed Snapshot variant.`);
-        } else if (summary && summary.status === 'ready' && summary.type === 'summary') {
-          // A summary replaces all the steps with a single thought containing the summary text.
-          projectedEp.steps = [{
-            id: ep.id + '-summary',
-            type: 'AGENT_THOUGHT',
-            text: summary.text,
-            metadata: { originalTokens: epTokens, currentTokens: summary.recoveredTokens || 50, transformations: [{ processorName: 'AsyncSemanticCompressor', action: 'SUMMARIZED', timestamp: Date.now() }] }
-          }] as any;
-          projectedEp.yield = undefined; // Drop the yield, the summary covers it
-          debugLogger.log(`Opportunistically swapped Episode ${ep.id} for pre-computed Summary variant.`);
-        } else if (masked && masked.status === 'ready' && masked.type === 'masked') {
-           // We just replace the raw text with the masked text variant
-           if (projectedEp.trigger.type === 'USER_PROMPT' && projectedEp.trigger.semanticParts.length > 0) {
-             projectedEp.trigger.semanticParts[0].presentation = { text: masked.text, tokens: masked.recoveredTokens || 10 };
-           }
-           debugLogger.log(`Opportunistically swapped Episode ${ep.id} for pre-computed Masked variant.`);
-        }
-      }
-
-      currentEpisodes.unshift(projectedEp); // Put it back in oldest-to-newest order
-      rollingTokens += this.calculateIrTokens([projectedEp]);
-    }
-    
+    // Get the dynamically computed Working Buffer View
+    let currentEpisodes = this.getWorkingBufferView();
     let currentTokens = this.calculateIrTokens(currentEpisodes);
 
     if (currentTokens <= maxTokens) {
       return IrMapper.fromIr(currentEpisodes);
     }
 
-    // incrementalGc: instead of instantly dropping from 150k to 65k (block GC),
-    // we only prune exactly enough tokens to survive the incoming turn.
-    // However, the processors are STILL instructed to squash/compress down to the
-    // 65k floor (the "bloom filter" backbuffer). They just stop early once
-    // the immediate maxTokens deficit is cleared.
-    if (mngConfig.budget.incrementalGc) {
-      const immediateDeficit = currentTokens - maxTokens;
-      // We set the target just beneath the current ceiling to clear the immediate deficit.
-      // This forces the oldest nodes to heavily compress (since they are furthest from the 65k floor),
-      // but stops the pipeline as soon as we drop back under 150k.
-      targetTokens = currentTokens - immediateDeficit;
-    }
-
+    // --- The Synchronous Pressure Barrier ---
+    // The background eager workers couldn't keep up, or a massive file was pasted.
+    // The Working Buffer View is still over the absolute hard limit (maxTokens).
+    // We MUST reduce tokens before returning, or the API request will 400.
+    
     debugLogger.log(
-      `Context Manager triggered: Context window at ${currentTokens} tokens (limit: ${maxTokens}, target: ${targetTokens}).`,
+      `Context Manager Synchronous Barrier triggered: View at ${currentTokens} tokens (limit: ${maxTokens}). Strategy: ${mngConfig.budget.maxPressureStrategy}`,
     );
 
     const protectedEpisodeIds = new Set<string>();
-    // Protect the very first episode (often contains the initial architectural ask/system prompt)
     if (mngConfig.budget.protectSystemEpisode && currentEpisodes.length > 0) {
       protectedEpisodeIds.add(currentEpisodes[0].id);
     }
-    // Protect the most recent episode (current working context)
     if (currentEpisodes.length > 1) {
       protectedEpisodeIds.add(currentEpisodes[currentEpisodes.length - 1].id);
     }
 
-    for (const processor of this.processors) {
-      const state: ContextAccountingState = {
-        currentTokens,
-        maxTokens,
-        retainedTokens: targetTokens,
-        deficitTokens: Math.max(0, currentTokens - targetTokens),
-        protectedEpisodeIds,
-        isBudgetSatisfied: currentTokens <= targetTokens,
-      };
-
-      if (state.isBudgetSatisfied) {
-        debugLogger.log('Context Manager satisfied budget. Stopping early.');
-        break;
+    if (mngConfig.budget.maxPressureStrategy === 'truncate') {
+      // Simplest, fastest fallback. Drop oldest unprotected episodes until under maxTokens.
+      const truncated: Episode[] = [];
+      let remainingTokens = currentTokens;
+      for (const ep of currentEpisodes) {
+        const epTokens = this.calculateIrTokens([ep]);
+        if (remainingTokens > maxTokens && !protectedEpisodeIds.has(ep.id)) {
+           remainingTokens -= epTokens;
+           debugLogger.log(`Barrier (truncate): Dropped Episode ${ep.id}`);
+        } else {
+           truncated.push(ep);
+        }
       }
-
-      debugLogger.log(`Running ContextProcessor: ${processor.name}`);
-      currentEpisodes = await processor.process(currentEpisodes, state);
-      const newTokens = this.calculateIrTokens(currentEpisodes);
-
-      if (newTokens < currentTokens) {
-        debugLogger.log(
-          `Processor [${processor.name}] saved approx ${currentTokens - newTokens} tokens. New estimate: ${newTokens}.`,
-        );
-        currentTokens = newTokens;
+      currentEpisodes = truncated;
+    } else if (mngConfig.budget.maxPressureStrategy === 'compress') {
+      // TODO: Synchronously invoke the StateSnapshotWorker, wait for it to finish, 
+      // merge the variants, and regenerate the View.
+      // For now, if compress fails/isn't wired synchronously, we fallback to truncate.
+      debugLogger.warn('Synchronous compress barrier not fully implemented, falling back to truncate.');
+      
+      const truncated: Episode[] = [];
+      let remainingTokens = currentTokens;
+      for (const ep of currentEpisodes) {
+        const epTokens = this.calculateIrTokens([ep]);
+        if (remainingTokens > maxTokens && !protectedEpisodeIds.has(ep.id)) {
+           remainingTokens -= epTokens;
+        } else {
+           truncated.push(ep);
+        }
       }
+      currentEpisodes = truncated;
     }
 
     const finalTokens = this.calculateIrTokens(currentEpisodes);

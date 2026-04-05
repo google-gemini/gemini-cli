@@ -102,7 +102,7 @@ export class SemanticCompressionProcessor implements ContextProcessor {
         // 3. Compress Tool Observations
         if (step.type === 'TOOL_EXECUTION') {
           const rawObs = step.presentation?.observation ?? step.observation;
-          
+
           let stringifiedObs = '';
           if (typeof rawObs === 'string') {
             stringifiedObs = rawObs;

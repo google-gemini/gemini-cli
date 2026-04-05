@@ -2155,7 +2155,8 @@ const SETTINGS_SCHEMA = {
         category: 'Experimental',
         requiresRestart: true,
         default: false,
-        description: 'Enables continuous minimal GC near the max tokens limit instead of a blocked backbuffer.',
+        description:
+          'Enables continuous minimal GC near the max tokens limit instead of a blocked backbuffer.',
         showInDialog: true,
       },
       generalistProfile: {

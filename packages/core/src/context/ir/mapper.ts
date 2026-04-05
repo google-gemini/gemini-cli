@@ -262,11 +262,8 @@ export class IrMapper {
 
       for (const step of ep.steps) {
         if (step.type === 'AGENT_THOUGHT') {
-          flushPending();
-          history.push({
-            role: 'model',
-            parts: [{ text: step.presentation?.text ?? step.text }],
-          });
+          if (pendingUserParts.length > 0) flushPending();
+          pendingModelParts.push({ text: step.presentation?.text ?? step.text });
         } else if (step.type === 'TOOL_EXECUTION') {
           pendingModelParts.push({
             functionCall: {

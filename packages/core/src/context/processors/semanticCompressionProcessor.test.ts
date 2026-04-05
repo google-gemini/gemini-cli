@@ -142,7 +142,9 @@ describe('SemanticCompressionProcessor', () => {
     expect(thoughtPart.presentation!.text).toContain('Mocked Summary!');
 
     expect(toolPart.presentation).toBeDefined();
-    expect((toolPart.presentation!.observation as Record<string, string>)['summary']).toContain('Mocked Summary!');
+    expect(
+      (toolPart.presentation!.observation as Record<string, string>)['summary'],
+    ).toContain('Mocked Summary!');
   });
 
   it('stops calling LLM when deficit hits zero', async () => {

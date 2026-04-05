@@ -9,7 +9,7 @@ import type { ContextEventBus } from '../eventBus.js';
 export interface AsyncContextWorker {
   /** The unique name of the worker (e.g., 'StateSnapshotWorker') */
   readonly name: string;
-  
+
   /** Starts listening to the ContextEventBus for background tasks */
   start(bus: ContextEventBus): void;
 
