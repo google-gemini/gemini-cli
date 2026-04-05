@@ -18,6 +18,31 @@ on GitHub.
 | [Preview](preview.md) | Experimental features ready for early feedback. |
 | [Stable](latest.md)   | Stable, recommended for general use.            |
 
+## Announcements: v0.36.0 - 2026-04-01
+
+- **Multi-Registry Architecture and Sandboxing:** Introduced a multi-registry
+  architecture and implemented native macOS Seatbelt and Windows sandboxing for
+  enhanced subagent security
+  ([#22712](https://github.com/google-gemini/gemini-cli/pull/22712),
+  [#22718](https://github.com/google-gemini/gemini-cli/pull/22718) by @akh64bit,
+  [#22832](https://github.com/google-gemini/gemini-cli/pull/22832) by @ehedlund,
+  [#21807](https://github.com/google-gemini/gemini-cli/pull/21807) by
+  @mattKorwel).
+- **Refreshed Composer UX:** Implemented a refreshed user experience for the
+  Composer layout and improved terminal interaction robustness
+  ([#21212](https://github.com/google-gemini/gemini-cli/pull/21212),
+  [#23286](https://github.com/google-gemini/gemini-cli/pull/23286) by
+  @jwhelangoog).
+- **Git Worktree Support:** Added native support for Git worktrees, allowing for
+  isolated parallel sessions
+  ([#22973](https://github.com/google-gemini/gemini-cli/pull/22973),
+  [#23265](https://github.com/google-gemini/gemini-cli/pull/23265) by @jerop).
+- **Subagent Context and Feedback:** Enhanced subagents with JIT context
+  injection and resilient tool rejection with contextual feedback
+  ([#23032](https://github.com/google-gemini/gemini-cli/pull/23032),
+  [#22951](https://github.com/google-gemini/gemini-cli/pull/22951) by
+  @abhipatel12).
+
 ## Announcements: v0.35.0 - 2026-03-24
 
 - **Customizable Keyboard Shortcuts:** Users can now customize their keyboard

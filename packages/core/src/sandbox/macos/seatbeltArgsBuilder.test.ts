@@ -10,6 +10,7 @@ import {
 } from './seatbeltArgsBuilder.js';
 import * as fsUtils from '../utils/fsUtils.js';
 import fs from 'node:fs';
+import os from 'node:os';
 
 vi.mock('../utils/fsUtils.js', async () => {
   const actual = await vi.importActual('../utils/fsUtils.js');
@@ -20,7 +21,7 @@ vi.mock('../utils/fsUtils.js', async () => {
   };
 });
 
-describe('seatbeltArgsBuilder', () => {
+describe.skipIf(os.platform() === 'win32')('seatbeltArgsBuilder', () => {
   afterEach(() => {
     vi.restoreAllMocks();
   });
@@ -38,6 +39,8 @@ describe('seatbeltArgsBuilder', () => {
 
       const profile = buildSeatbeltProfile({
         workspace: '/Users/test/workspace',
+        allowedPaths: [],
+        forbiddenPaths: [],
       });
 
       expect(profile).toContain('(version 1)');
@@ -51,6 +54,8 @@ describe('seatbeltArgsBuilder', () => {
       vi.mocked(fsUtils.tryRealpath).mockImplementation((p) => p);
       const profile = buildSeatbeltProfile({
         workspace: '/test',
+        allowedPaths: [],
+        forbiddenPaths: [],
         networkAccess: true,
       });
       expect(profile).toContain('(allow network-outbound)');
@@ -70,6 +75,8 @@ describe('seatbeltArgsBuilder', () => {
 
         const profile = buildSeatbeltProfile({
           workspace: '/test/workspace',
+          allowedPaths: [],
+          forbiddenPaths: [],
         });
 
         expect(profile).toContain(
@@ -96,7 +103,11 @@ describe('seatbeltArgsBuilder', () => {
             }) as unknown as fs.Stats,
         );
 
-        const profile = buildSeatbeltProfile({ workspace: '/test/workspace' });
+        const profile = buildSeatbeltProfile({
+          workspace: '/test/workspace',
+          allowedPaths: [],
+          forbiddenPaths: [],
+        });
 
         expect(profile).toContain(
           `(deny file-write* (literal "/test/workspace/.gitignore"))`,
@@ -117,6 +128,7 @@ describe('seatbeltArgsBuilder', () => {
         const profile = buildSeatbeltProfile({
           workspace: '/test',
           allowedPaths: ['/custom/path1', '/test/symlink'],
+          forbiddenPaths: [],
         });
 
         expect(profile).toContain(`(subpath "/custom/path1")`);
@@ -130,6 +142,7 @@ describe('seatbeltArgsBuilder', () => {
 
         const profile = buildSeatbeltProfile({
           workspace: '/test',
+          allowedPaths: [],
           forbiddenPaths: ['/secret/path'],
         });
 
@@ -148,6 +161,7 @@ describe('seatbeltArgsBuilder', () => {
 
         const profile = buildSeatbeltProfile({
           workspace: '/test',
+          allowedPaths: [],
           forbiddenPaths: ['/test/symlink'],
         });
 
@@ -161,6 +175,7 @@ describe('seatbeltArgsBuilder', () => {
 
         const profile = buildSeatbeltProfile({
           workspace: '/test',
+          allowedPaths: [],
           forbiddenPaths: ['/test/missing-dir/missing-file.txt'],
         });
 

@@ -85,6 +85,7 @@ export enum Command {
   SHOW_IDE_CONTEXT_DETAIL = 'app.showIdeContextDetail',
   TOGGLE_MARKDOWN = 'app.toggleMarkdown',
   TOGGLE_COPY_MODE = 'app.toggleCopyMode',
+  TOGGLE_MOUSE_MODE = 'app.toggleMouseMode',
   TOGGLE_YOLO = 'app.toggleYolo',
   CYCLE_APPROVAL_MODE = 'app.cycleApprovalMode',
   SHOW_MORE_LINES = 'app.showMoreLines',
@@ -109,6 +110,10 @@ export enum Command {
   // Extension Controls
   UPDATE_EXTENSION = 'extension.update',
   LINK_EXTENSION = 'extension.link',
+
+  DUMP_FRAME = 'app.dumpFrame',
+  START_RECORDING = 'app.startRecording',
+  STOP_RECORDING = 'app.stopRecording',
 }
 
 /**
@@ -385,7 +390,8 @@ export const defaultKeyBindingConfig: KeyBindingConfig = new Map([
   [Command.SHOW_FULL_TODOS, [new KeyBinding('ctrl+t')]],
   [Command.SHOW_IDE_CONTEXT_DETAIL, [new KeyBinding('ctrl+g')]],
   [Command.TOGGLE_MARKDOWN, [new KeyBinding('alt+m')]],
-  [Command.TOGGLE_COPY_MODE, [new KeyBinding('ctrl+s')]],
+  [Command.TOGGLE_COPY_MODE, [new KeyBinding('f9')]],
+  [Command.TOGGLE_MOUSE_MODE, [new KeyBinding('ctrl+s')]],
   [Command.TOGGLE_YOLO, [new KeyBinding('ctrl+y')]],
   [Command.CYCLE_APPROVAL_MODE, [new KeyBinding('shift+tab')]],
   [Command.SHOW_MORE_LINES, [new KeyBinding('ctrl+o')]],
@@ -396,6 +402,9 @@ export const defaultKeyBindingConfig: KeyBindingConfig = new Map([
   [Command.RESTART_APP, [new KeyBinding('r'), new KeyBinding('shift+r')]],
   [Command.SUSPEND_APP, [new KeyBinding('ctrl+z')]],
   [Command.SHOW_SHELL_INPUT_UNFOCUS_WARNING, [new KeyBinding('tab')]],
+  [Command.DUMP_FRAME, [new KeyBinding('f8')]],
+  [Command.START_RECORDING, [new KeyBinding('f6')]],
+  [Command.STOP_RECORDING, [new KeyBinding('f7')]],
 
   // Background Shell Controls
   [Command.BACKGROUND_SHELL_ESCAPE, [new KeyBinding('escape')]],
@@ -512,6 +521,7 @@ export const commandCategories: readonly CommandCategory[] = [
       Command.SHOW_IDE_CONTEXT_DETAIL,
       Command.TOGGLE_MARKDOWN,
       Command.TOGGLE_COPY_MODE,
+      Command.TOGGLE_MOUSE_MODE,
       Command.TOGGLE_YOLO,
       Command.CYCLE_APPROVAL_MODE,
       Command.SHOW_MORE_LINES,
@@ -535,6 +545,9 @@ export const commandCategories: readonly CommandCategory[] = [
       Command.UNFOCUS_BACKGROUND_SHELL,
       Command.UNFOCUS_BACKGROUND_SHELL_LIST,
       Command.SHOW_BACKGROUND_SHELL_UNFOCUS_WARNING,
+      Command.DUMP_FRAME,
+      Command.START_RECORDING,
+      Command.STOP_RECORDING,
     ],
   },
   {
@@ -621,6 +634,7 @@ export const commandDescriptions: Readonly<Record<Command, string>> = {
   [Command.SHOW_IDE_CONTEXT_DETAIL]: 'Show IDE context details.',
   [Command.TOGGLE_MARKDOWN]: 'Toggle Markdown rendering.',
   [Command.TOGGLE_COPY_MODE]: 'Toggle copy mode when in alternate buffer mode.',
+  [Command.TOGGLE_MOUSE_MODE]: 'Toggle mouse mode (scrolling and clicking).',
   [Command.TOGGLE_YOLO]: 'Toggle YOLO (auto-approval) mode for tool calls.',
   [Command.CYCLE_APPROVAL_MODE]:
     'Cycle through approval modes: default (prompt), auto_edit (auto-approve edits), and plan (read-only). Plan mode is skipped when the agent is busy.',
@@ -654,6 +668,10 @@ export const commandDescriptions: Readonly<Record<Command, string>> = {
   // Extension Controls
   [Command.UPDATE_EXTENSION]: 'Update the current extension if available.',
   [Command.LINK_EXTENSION]: 'Link the current extension to a local path.',
+
+  [Command.DUMP_FRAME]: 'Dump the current frame as a snapshot.',
+  [Command.START_RECORDING]: 'Start recording the session.',
+  [Command.STOP_RECORDING]: 'Stop recording the session.',
 };
 
 const keybindingsSchema = z.array(

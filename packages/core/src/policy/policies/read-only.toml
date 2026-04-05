@@ -62,3 +62,9 @@ priority = 50
 toolName = "update_topic"
 decision = "allow"
 priority = 50
+
+# Core agent lifecycle tool
+[[rule]]
+toolName = "complete_task"
+decision = "allow"
+priority = 50
