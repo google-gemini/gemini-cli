@@ -40,19 +40,28 @@ export class GcliAgentModel extends BaseLlm {
 
   async *generateContentAsync(request: LlmRequest, stream = false): AsyncGenerator<LlmResponse, void> {
     
-    // 1. Route Abstract Alias to Concrete Machine ID (Section 3.7)
+    // 1. Quota Management (Section 3.8)
+    // Checks if the alias is available; if not, prompts for fallback (mutates request.model)
+    await this.services.quota.checkAvailabilityOrPrompt(request);
+
+    // 2. Route Abstract Alias to Concrete Machine ID (Section 3.7)
     request.model = this.services.router.resolve(request.model);
 
-    // 2. Token Compaction (Alters request.contents in-place if too big) (Section 3.3)
+    // 3. Token Compaction (Alters request.contents in-place if too big) (Section 3.3)
+    // Note: Compactor is stateful and executes its own sub-model calls for summarization.
     const threshold = this.services.compactor.getThresholdFor(request.model);
     if (estimateTokens(request.contents) > threshold) {
        request.contents = await this.services.compactor.compact(request.contents);
     }
 
-    // 3. Quota Management (Section 3.8)
-    await this.services.quota.checkAvailabilityOrPrompt(request.model);
+    // 4. Tool Output Masking (Alters request.contents in-place) (Section 3.10)
+    // Note: Offloads large raw tool outputs to files on EVERY turn, leaving a preview snippet.
+    if (this.services.masker.shouldMask(request.model)) {
+      const result = await this.services.masker.mask(request.contents);
+      request.contents = result.newHistory;
+    }
 
-    // 4. Auth Injection (Section 3.1)
+    // 5. Auth Injection (Section 3.1)
     request.headers = { ...request.headers, ...this.services.auth.getAuthHeaders() };
 
     // 5. Final Dispatch
@@ -70,6 +79,7 @@ The CLI resolves distinct authentication flows (OAuth, ADC, Compute metadata) us
     *   Compute Metadata Server (`COMPUTE_ADC`): Resolves via `fetchCachedCredentials` (`L204-L226`).
 *   **Proposed ADK Mapping (Constraint):** Standard `Gemini` params in `adk-js/core/src/models/google_llm.ts` strictly validate for `apiKey` or `project` (`L94-L98`). They do not bridge standard `google-auth-library` `AuthClient`s or OAuth2 bearer tokens natively.
 *   **Proposed ADK Mapping (Solution):** Instead of a separate isolated decorator, this logic is executed as the final step in the `GcliAgentModel.generateContentAsync` pipeline. It resolves the CLI's OAuth2 refreshed tokens and injects them into the `request.headers` right before dispatching to the base model. This keeps standard ADK key checks bypassed without fracturing the execution graph.
+*   **Validation**: This approach was verified via code analysis. By providing a dummy string (e.g., `'dummy-key'`) to the standard `Gemini` constructor, we satisfy its runtime check, and then override the `Authorization` header in the linear pipeline right before dispatch.
 
 ```typescript
 // Inside GcliAgentModel.generateContentAsync
@@ -91,16 +101,12 @@ User interjections (hints) course-correct the loop mid-turn.
 ## 3.3 State Management and Token Compaction
 The CLI truncates large tool responses and summarizes older history to protect token budgets.
 
-*   **Current State:** `ChatCompressionService` in `packages/core/src/services/chatCompressionService.ts` implements a "Reverse Token Budget" for tool outputs and a two-step self-correction verification loop for `<state_snapshot>` generation.
-*   **Proposed ADK Mapping:** This logic executes as a linear step inside the `GcliAgentModel.generateContentAsync` pipeline. If the `llmRequest.contents` exceed thresholds, the compactor service is safely invoked to mutate the history *before* dispatching to the base model. This keeps standard ADK history trackers clean while enforcing exact parity with legacy CLI compression.
-
-```typescript
-// Inside GcliAgentModel.generateContentAsync
-const threshold = this.services.compactor.getThresholdFor(request.model);
-if (estimateTokens(request.contents) > threshold) {
-   request.contents = await this.services.compactor.compact(request.contents);
-}
-```
+*   **Current State:** `ChatCompressionService` in `packages/core/src/context/chatCompressionService.ts` implements a "Reverse Token Budget" and a Two-Phase Verification self-correction loop.
+    *   **Reverse Token Budgeting**: Iterates backwards (newest to oldest). Preserves recent tool outputs, but once a $50,000$ token budget for function responses is exceeded, older large outputs are truncated to 30 lines and saved to files.
+    *   **Two-Phase Verification**: 
+        -   **Phase 1**: Yields a `<state_snapshot>` summary of the older $70\%$ of history using a family-mapped Flash alias (e.g., `chat-compression-2.5-flash`).
+        -   **Phase 2**: Calls the model again with the summary and original history to evaluate if anything was missed ("Self-Correction").
+*   **Proposed ADK Mapping:** This logic executes as a linear step inside the `GcliAgentModel.generateContentAsync` pipeline. The `CompactorService` holds its own reference to a `BaseLlm` (or the base model) to make these sub-calls. These sub-calls are also subjected to standard Quota/Availability checks to ensure the utility model is healthy.
 
 ## 3.4 Model Configuration and Hierarchical Overrides
 Dynamic aliasing (e.g., Temperature scoped to specific sub-commands).
@@ -137,6 +143,9 @@ export class GcliPolicyEngineAdapter implements BasePolicyEngine {
     return { outcome: PolicyOutcome.DENY, reason: 'Unknown policy decision.' };
   }
 }
+
+> [!TIP]
+> **Tool Suspension Validation**: Tool execution in `adk-js` (specifically `handleFunctionCallList` in `functions.ts`) uses standard natural `await` chains. If a tool returns an unresolved Promise (e.g. while waiting for UI interaction), the execution loop will block naturally without timing out. This means we do not need custom polling shims for asynchronous tool confirmation!
 ```
 
 
@@ -183,7 +192,7 @@ Banning a model mid-turn, auto-routing via classifiers (e.g. Gemma, Numerical), 
 
 *   **Current State:** Managed by `ModelRouterService` and a chain of `RoutingStrategy` implementations which require the full `RoutingContext` (`history`, `request`, `AbortSignal`).
 *   **Proposed ADK Mapping (Router Interception):** Yes, it is **100% possible to model the current routing feature today**. Because `LlmRequest` exposes the full `contents` array right at execution time, we can synthesize a strict `RoutingContext` (`history = contents.slice(0,-1)`, `request = contents.pop()`).
-*   **Proposed ADK Mapping (Solution):** This logic is executed as the first step in the `GcliAgentModel.generateContentAsync` pipeline. It resolves the abstract alias to a concrete model ID *before* any other steps run, ensuring that downstream steps (Compaction, Quota, Auth) use the correct target model constraints.
+*   **Proposed ADK Mapping (Solution):** This logic is executed as the second step (after the Quota/Availability prompt) in the `GcliAgentModel.generateContentAsync` pipeline. It resolves the abstract alias to a concrete model ID *after* the availability check, ensuring that any chosen fallback model is also correctly resolved.
 
 ```typescript
 // Inside GcliAgentModel.generateContentAsync
@@ -196,7 +205,8 @@ request.model = this.services.router.resolve(request.model);
 Ensuring availability by retrying or switching models when rate limits (429s) or terminal faults occur.
 
 *   **Current State:** Managed by `ModelAvailabilityService` and `ModelPool` which track healthy vs terminal models.
-*   **Proposed ADK Mapping (Solution):** This logic is executed as a middle step in the `GcliAgentModel.generateContentAsync` pipeline. It checks if the model is currently overloaded or de-prioritized and prompts the user for a fallback before any network traffic is sent.
+*   **Proposed ADK Mapping (Solution):** This logic is executed as the first step in the `GcliAgentModel.generateContentAsync` pipeline. It checks if the model alias is currently overloaded or de-prioritized and prompts the user for a fallback *before* standard routing and network traffic begin.
+*   **Global Application**: Availability checks apply not just to the primary model, but to **Utility Calls** (e.g., classifiers for routing, summarizers for compaction). The `QuotaService` must be accessible by these sub-services to ensure fallback prompts trigger for utility models too.
 
 ```typescript
 // Inside GcliAgentModel.generateContentAsync
@@ -241,6 +251,15 @@ export class GcliModeAwareToolset extends BaseToolset {
   async close() {}
 }
 ```
+
+## 3.10 Tool Output Masking
+Managing context window efficiency by offloading bulky tool outputs (e.g., shell logs, large file reads) to files.
+
+*   **Current State:** `ToolOutputMaskingService` in `packages/core/src/context/toolOutputMaskingService.ts`.
+    -   **Algorithm**: "Hybrid Backward Scanned FIFO".
+    -   **Trigger**: Scans backwards. Protects recent $50,000$ tool tokens. Masks older ones once a $30,000$ batch threshold is reached.
+    -   **Behavior**: Writes full output to `tool-outputs/` file and yield a preview snippet containing a Head+Tail summary and a file path link.
+*   **Proposed ADK Mapping:** This logic is executed on **every conversation turn** as a linear step in the `GcliAgentModel.generateContentAsync` pipeline (executed *after* Compaction so the Compactor sees raw data, but *before* Auth/Dispatch). This ensures the context window stays lean cheaply without LLM overhead.
 
 # 4. The SDK Facade (Stateful Orchestration)
 
@@ -289,7 +308,8 @@ This section highlights existing gaps in standard ADK that prevent a seamless cu
 While Next-Step steering is possible today using `beforeModelCallback`, true real-time interruption (injecting a hint while a tool or model is actively running without aborting the RPC altogether) requires **Input Streams** (feeding an `AsyncGenerator` to `runAsync`). Un-merged ADK PR #214 addresses this, but it is not yet standard.
 
 ## 5.2 Conversation Rewind and State Reversal
-Translating manual trajectory drops to ADK runtime state is cumbersome. While Python ADK supports rollback, typescript ADK does not yet support it natively. Reconstructing history today requires manual MikroORM DB record purges in `adk-js/core/src/sessions/database_session_service.ts`.
+Translating manual trajectory drops to ADK runtime state is cumbersome. While Python ADK supports rollback, typescript ADK does not yet support it natively.
+*   **Resolution Strategy**: Since we are implementing a custom `GcliFileSessionService` (Section 4.2) for workspace parity, we can **implement Rewind directly in our custom service** (by truncating the JSON file history) without requiring upstream ADK changes to the SQL-based `DatabaseSessionService`.
 
 ## 5.3 Concurrent runAsync Sessions and DB Locking
 Running parallel `runAsync` loops on the exact same Session ID causes database serialization conflicts (`PESSIMISTIC_WRITE`) or state clobbering inside standard repository storage layers.
