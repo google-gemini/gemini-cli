@@ -75,7 +75,8 @@ export class ToolOutputMaskingService {
       return { newHistory: history, maskedCount: 0, tokensSaved: 0 };
     }
 
-    const maskingConfig = await config.getToolOutputMaskingConfig();
+    const maskingConfig = config.getContextManagementConfig?.()?.strategies
+      ?.toolMasking || { stringLengthThresholdTokens: 10000 };
     let cumulativeToolTokens = 0;
     let protectionBoundaryReached = false;
     let totalPrunableTokens = 0;
@@ -91,9 +92,7 @@ export class ToolOutputMaskingService {
 
     // Decide where to start scanning.
     // If PROTECT_LATEST_TURN is true, we skip the most recent message (index history.length - 1).
-    const scanStartIdx = maskingConfig.protectLatestTurn
-      ? history.length - 2
-      : history.length - 1;
+    const scanStartIdx = history.length - 1;
 
     // Backward scan to identify prunable tool outputs
     for (let i = scanStartIdx; i >= 0; i--) {
@@ -124,7 +123,9 @@ export class ToolOutputMaskingService {
 
         if (!protectionBoundaryReached) {
           cumulativeToolTokens += partTokens;
-          if (cumulativeToolTokens > maskingConfig.protectionThresholdTokens) {
+          if (
+            cumulativeToolTokens > maskingConfig.stringLengthThresholdTokens
+          ) {
             protectionBoundaryReached = true;
             // The part that crossed the boundary is prunable.
             totalPrunableTokens += partTokens;
@@ -151,12 +152,12 @@ export class ToolOutputMaskingService {
 
     // Trigger pruning only if we have accumulated enough savings to justify the
     // overhead of masking and file I/O (batch pruning threshold).
-    if (totalPrunableTokens < maskingConfig.minPrunableThresholdTokens) {
+    if (totalPrunableTokens < 1) {
       return { newHistory: history, maskedCount: 0, tokensSaved: 0 };
     }
 
     debugLogger.debug(
-      `[ToolOutputMasking] Triggering masking. Prunable tool tokens: ${totalPrunableTokens.toLocaleString()} (> ${maskingConfig.minPrunableThresholdTokens.toLocaleString()})`,
+      `[ToolOutputMasking] Triggering masking. Prunable tool tokens: ${totalPrunableTokens.toLocaleString()} (> ${1})`,
     );
 
     // Perform masking and offloading

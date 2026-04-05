@@ -11,11 +11,7 @@ import { inspect } from 'node:util';
 import process from 'node:process';
 import { z } from 'zod';
 import type { ConversationRecord } from '../services/chatRecordingService.js';
-import type {
-  AgentHistoryProviderConfig,
-  ContextManagementConfig,
-  ToolOutputMaskingConfig,
-} from '../context/types.js';
+import type { ContextManagementConfig } from '../context/types.js';
 export type { ConversationRecord };
 import {
   AuthType,
@@ -436,12 +432,6 @@ import {
   DEFAULT_MEMORY_FILE_FILTERING_OPTIONS,
   type FileFilteringOptions,
 } from './constants.js';
-import {
-  DEFAULT_TOOL_PROTECTION_THRESHOLD,
-  DEFAULT_MIN_PRUNABLE_TOKENS_THRESHOLD,
-  DEFAULT_PROTECT_LATEST_TURN,
-} from '../context/toolOutputMaskingService.js';
-
 import {
   type ExtensionLoader,
   SimpleExtensionLoader,
@@ -1154,40 +1144,34 @@ export class Config implements McpContext, AgentLoopContext {
     this.memoryBoundaryMarkers = params.memoryBoundaryMarkers ?? ['.git'];
     this.contextManagement = {
       enabled: params.contextManagement?.enabled ?? false,
-      historyWindow: {
-        maxTokens: params.contextManagement?.historyWindow?.maxTokens ?? 150000,
+      budget: {
+        maxTokens: params.contextManagement?.budget?.maxTokens ?? 150000,
         retainedTokens:
-          params.contextManagement?.historyWindow?.retainedTokens ?? 40000,
+          params.contextManagement?.budget?.retainedTokens ?? 40000,
+        protectedEpisodes:
+          params.contextManagement?.budget?.protectedEpisodes ?? 1,
+        protectSystemEpisode:
+          params.contextManagement?.budget?.protectSystemEpisode ?? true,
+        incrementalGc: params.contextManagement?.budget?.incrementalGc ?? false,
       },
-      messageLimits: {
-        normalMaxTokens:
-          params.contextManagement?.messageLimits?.normalMaxTokens ?? 2500,
-        retainedMaxTokens:
-          params.contextManagement?.messageLimits?.retainedMaxTokens ?? 12000,
-        normalizationHeadRatio:
-          params.contextManagement?.messageLimits?.normalizationHeadRatio ??
-          0.25,
-      },
-      tools: {
-        distillation: {
-          maxOutputTokens:
-            params.contextManagement?.tools?.distillation?.maxOutputTokens ??
-            10000,
-          summarizationThresholdTokens:
-            params.contextManagement?.tools?.distillation
-              ?.summarizationThresholdTokens ?? 20000,
+      strategies: {
+        historySquashing: {
+          maxTokensPerNode:
+            params.contextManagement?.strategies?.historySquashing
+              ?.maxTokensPerNode ?? 3000,
         },
-        outputMasking: {
-          protectionThresholdTokens:
-            params.contextManagement?.tools?.outputMasking
-              ?.protectionThresholdTokens ?? DEFAULT_TOOL_PROTECTION_THRESHOLD,
-          minPrunableThresholdTokens:
-            params.contextManagement?.tools?.outputMasking
-              ?.minPrunableThresholdTokens ??
-            DEFAULT_MIN_PRUNABLE_TOKENS_THRESHOLD,
-          protectLatestTurn:
-            params.contextManagement?.tools?.outputMasking?.protectLatestTurn ??
-            DEFAULT_PROTECT_LATEST_TURN,
+        toolMasking: {
+          stringLengthThresholdTokens:
+            params.contextManagement?.strategies?.toolMasking
+              ?.stringLengthThresholdTokens ?? 10000,
+        },
+        semanticCompression: {
+          nodeThresholdTokens:
+            params.contextManagement?.strategies?.semanticCompression
+              ?.nodeThresholdTokens ?? 5000,
+          compressionModel:
+            params.contextManagement?.strategies?.semanticCompression
+              ?.compressionModel ?? 'chat-compression-2.5-flash-lite',
         },
       },
     };
@@ -2417,61 +2401,12 @@ export class Config implements McpContext, AgentLoopContext {
     return this.contextManagement;
   }
 
-  get agentHistoryProviderConfig(): AgentHistoryProviderConfig {
-    return {
-      maxTokens: this.contextManagement.historyWindow.maxTokens,
-      retainedTokens: this.contextManagement.historyWindow.retainedTokens,
-      normalMessageTokens: this.contextManagement.messageLimits.normalMaxTokens,
-      maximumMessageTokens:
-        this.contextManagement.messageLimits.retainedMaxTokens,
-      normalizationHeadRatio:
-        this.contextManagement.messageLimits.normalizationHeadRatio,
-    };
-  }
-
   isTopicUpdateNarrationEnabled(): boolean {
     return this.topicUpdateNarration;
   }
 
   isModelSteeringEnabled(): boolean {
     return this.modelSteering;
-  }
-
-  async getToolOutputMaskingConfig(): Promise<ToolOutputMaskingConfig> {
-    await this.ensureExperimentsLoaded();
-
-    const remoteProtection =
-      this.experiments?.flags[ExperimentFlags.MASKING_PROTECTION_THRESHOLD]
-        ?.intValue;
-    const remotePrunable =
-      this.experiments?.flags[ExperimentFlags.MASKING_PRUNABLE_THRESHOLD]
-        ?.intValue;
-    const remoteProtectLatest =
-      this.experiments?.flags[ExperimentFlags.MASKING_PROTECT_LATEST_TURN]
-        ?.boolValue;
-
-    const parsedProtection = remoteProtection
-      ? parseInt(remoteProtection, 10)
-      : undefined;
-    const parsedPrunable = remotePrunable
-      ? parseInt(remotePrunable, 10)
-      : undefined;
-
-    return {
-      protectionThresholdTokens:
-        parsedProtection !== undefined && !isNaN(parsedProtection)
-          ? parsedProtection
-          : this.contextManagement.tools.outputMasking
-              .protectionThresholdTokens,
-      minPrunableThresholdTokens:
-        parsedPrunable !== undefined && !isNaN(parsedPrunable)
-          ? parsedPrunable
-          : this.contextManagement.tools.outputMasking
-              .minPrunableThresholdTokens,
-      protectLatestTurn:
-        remoteProtectLatest ??
-        this.contextManagement.tools.outputMasking.protectLatestTurn,
-    };
   }
 
   getGeminiMdFileCount(): number {
@@ -3330,15 +3265,6 @@ export class Config implements McpContext, AgentLoopContext {
         (tokenLimit(this.model) - uiTelemetryService.getLastPromptTokenCount()),
       this.truncateToolOutputThreshold,
     );
-  }
-
-  getToolMaxOutputTokens(): number {
-    return this.contextManagement.tools.distillation.maxOutputTokens;
-  }
-
-  getToolSummarizationThresholdTokens(): number {
-    return this.contextManagement.tools.distillation
-      .summarizationThresholdTokens;
   }
 
   getNextCompressionTruncationId(): number {

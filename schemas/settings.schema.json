@@ -2925,6 +2925,13 @@
           "default": false,
           "type": "boolean"
         },
+        "powerUserProfile": {
+          "title": "Use the power user profile for massive contexts.",
+          "description": "Enables continuous minimal GC near the max tokens limit instead of a blocked backbuffer.",
+          "markdownDescription": "Enables continuous minimal GC near the max tokens limit instead of a blocked backbuffer.\n\n- Category: `Experimental`\n- Requires restart: `yes`\n- Default: `false`",
+          "default": false,
+          "type": "boolean"
+        },
         "generalistProfile": {
           "title": "Use the generalist profile to manage agent contexts.",
           "description": "Suitable for general coding and software development tasks.",

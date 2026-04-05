@@ -19,7 +19,6 @@ import {
 import { isAbortError } from '../utils/errors.js';
 import { SHELL_TOOL_NAME } from '../tools/tool-names.js';
 import { DiscoveredMCPTool } from '../tools/mcp-tool.js';
-import { ToolOutputDistillationService } from '../context/toolDistillationService.js';
 import { executeToolWithHooks } from '../core/coreToolHookTriggers.js';
 import {
   saveTruncatedToolOutput,
@@ -198,12 +197,7 @@ export class ToolExecutor {
     content: PartListUnion,
   ): Promise<{ truncatedContent: PartListUnion; outputFile?: string }> {
     if (this.config.isContextManagementEnabled()) {
-      const distiller = new ToolOutputDistillationService(
-        this.config,
-        this.context.geminiClient,
-        this.context.promptId,
-      );
-      return distiller.distill(call.request.name, call.request.callId, content);
+      return { truncatedContent: content };
     }
 
     const toolName = call.request.name;

@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import type { PartListUnion, Part } from '@google/genai';
+import type { PartListUnion, Part, Content } from '@google/genai';
 import type { ContentGenerator } from '../core/contentGenerator.js';
 import { debugLogger } from './debugLogger.js';
 
@@ -139,6 +139,7 @@ export async function calculateRequestTokenCount(
   request: PartListUnion,
   contentGenerator: ContentGenerator,
   model: string,
+  history?: readonly Content[],
 ): Promise<number> {
   const parts: Part[] = Array.isArray(request)
     ? request.map((p) => (typeof p === 'string' ? { text: p } : p))

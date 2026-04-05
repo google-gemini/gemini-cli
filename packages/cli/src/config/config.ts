@@ -46,7 +46,8 @@ import {
   type HookEventName,
   type OutputFormat,
   detectIdeFromEnv,
-  generalistProfile,
+  GENERALIST_PROFILE,
+  POWER_USER_PROFILE,
 } from '@google/gemini-cli-core';
 import {
   type Settings,
@@ -886,12 +887,15 @@ export async function loadCliConfig(
 
   const useGeneralistProfile =
     settings.experimental?.generalistProfile ?? false;
+  const usePowerUserProfile = settings.experimental?.powerUserProfile ?? false;
   const useContextManagement =
     settings.experimental?.contextManagement ?? false;
   const contextManagement = {
-    ...(useGeneralistProfile ? generalistProfile : {}),
+    ...(useGeneralistProfile ? GENERALIST_PROFILE : {}),
+    ...(usePowerUserProfile ? POWER_USER_PROFILE : {}),
     ...(useContextManagement ? settings?.contextManagement : {}),
-    enabled: useContextManagement || useGeneralistProfile,
+    enabled:
+      useContextManagement || useGeneralistProfile || usePowerUserProfile,
   };
 
   return new Config({
