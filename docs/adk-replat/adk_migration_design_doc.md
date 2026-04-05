@@ -280,6 +280,14 @@ export interface AgentServiceConfig {
   policyEngine: BasePolicyEngine;
 }
 
+### 4.3 Concept: Decomposing the "God Config" (Legacy AgentLoopContext)
+
+To prevent dragging legacy debt into the pure ADK architecture, the existing `AgentLoopContext` will be treated strictly as a **Legacy Bridge Artifact**. In the new `AdkAgentService`, we decompose it into granular, single-responsibility injections:
+
+-   **Pipeline Config**: Only Quota, Routing, Compactor, Masker, and Auth are passed to `GcliAgentModel`. NO tool registries or sandboxes.
+-   **Tool Config**: Environmental dependencies (like `SandboxManager`) are injected directly into the tool constructors (e.g., `ExecuteShellTool`), not passed globally.
+-   **UI Yields**: Responsibilities for terminal UI rendering listen to standard ADK runner event output streams, rather than agents reaching out to a global `messageBus`.
+
 export class AdkAgentService {
   constructor(private config: AgentServiceConfig) {}
 
