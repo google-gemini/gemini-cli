@@ -27,31 +27,30 @@ export async function listSessions(config: Config): Promise<void> {
   const sessionSelector = new SessionSelector(config);
   const sessions = await sessionSelector.listSessions();
 
-  const sortedSessions = sessions.sort(
-    (a, b) => new Date(a.startTime).getTime() - new Date(b.startTime).getTime(),
-  );
-
   if (config.getOutputFormat() === OutputFormat.JSON) {
-    writeToStdout(JSON.stringify(sortedSessions, null, 2) + '\n');
+    writeToStdout(JSON.stringify(sessions, null, 2) + '\n');
     return;
   }
 
-  if (sortedSessions.length === 0) {
+  if (sessions.length === 0) {
     writeToStdout('No previous sessions found for this project.');
     return;
   }
 
   writeToStdout(
-    `\nAvailable sessions for this project (${sortedSessions.length}):\n`,
+    `\nAvailable sessions for this project (${sessions.length}):\n`,
   );
 
-  sortedSessions.forEach((session, index) => {
+  sessions.forEach((session, index) => {
     const current = session.isCurrentSession ? ', current' : '';
     const time = formatRelativeTime(session.lastUpdated);
+
+    const titleChars = Array.from(session.displayName);
     const title =
-      session.displayName.length > 100
-        ? session.displayName.slice(0, 97) + '...'
+      titleChars.length > 100
+        ? titleChars.slice(0, 97).join('') + '...'
         : session.displayName;
+
     writeToStdout(
       `  ${index + 1}. ${title} (${time}${current}) [${session.id}]\n`,
     );
@@ -70,17 +69,10 @@ export async function deleteSession(
     return;
   }
 
-  // Sort sessions by start time to match list-sessions ordering
-  const sortedSessions = sessions.sort(
-    (a, b) => new Date(a.startTime).getTime() - new Date(b.startTime).getTime(),
-  );
-
   let sessionToDelete: SessionInfo;
 
   // Try to find by UUID first
-  const sessionByUuid = sortedSessions.find(
-    (session) => session.id === sessionIndex,
-  );
+  const sessionByUuid = sessions.find((session) => session.id === sessionIndex);
   if (sessionByUuid) {
     sessionToDelete = sessionByUuid;
   } else {
@@ -92,7 +84,7 @@ export async function deleteSession(
       );
       return;
     }
-    sessionToDelete = sortedSessions[index - 1];
+    sessionToDelete = sessions[index - 1];
   }
 
   // Prevent deleting the current session
