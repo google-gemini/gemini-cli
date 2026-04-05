@@ -510,5 +510,36 @@ describe('LocalSubagentInvocation', () => {
         'Operation cancelled by user',
       );
     });
+
+    it('should publish SUBAGENT_ACTIVITY events to the MessageBus', async () => {
+      const { MessageBusType } = await import('../confirmation-bus/types.js');
+
+      mockExecutorInstance.run.mockImplementation(async () => {
+        const onActivity = MockLocalAgentExecutor.create.mock.calls[0][2];
+
+        if (onActivity) {
+          onActivity({
+            isSubagentActivityEvent: true,
+            agentName: 'MockAgent',
+            type: 'THOUGHT_CHUNK',
+            data: { text: 'Thinking...' },
+          } as SubagentActivityEvent);
+        }
+        return { result: 'Done', terminate_reason: AgentTerminateMode.GOAL };
+      });
+
+      await invocation.execute(signal, updateOutput);
+
+      expect(mockMessageBus.publish).toHaveBeenCalledWith(
+        expect.objectContaining({
+          type: MessageBusType.SUBAGENT_ACTIVITY,
+          subagentName: 'Mock Agent',
+          activity: expect.objectContaining({
+            type: 'thought',
+            content: 'Thinking...',
+          }),
+        }),
+      );
+    });
   });
 });

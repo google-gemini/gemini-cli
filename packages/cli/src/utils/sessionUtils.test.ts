@@ -11,11 +11,13 @@ import {
   formatRelativeTime,
   hasUserOrAssistantMessage,
   SessionError,
+  convertSessionToHistoryFormats,
 } from './sessionUtils.js';
 import {
   SESSION_FILE_PREFIX,
   type Config,
   type MessageRecord,
+  CoreToolCallStatus,
 } from '@google/gemini-cli-core';
 import * as fs from 'node:fs/promises';
 import path from 'node:path';
@@ -43,7 +45,7 @@ describe('SessionSelector', () => {
     // Clean up test files
     try {
       await fs.rm(tmpDir, { recursive: true, force: true });
-    } catch (_error) {
+    } catch {
       // Ignore cleanup errors
     }
   });
@@ -804,5 +806,190 @@ describe('formatRelativeTime', () => {
     // Just now (within 60 seconds)
     const thirtySecondsAgo = new Date(now.getTime() - 30 * 1000);
     expect(formatRelativeTime(thirtySecondsAgo.toISOString())).toBe('Just now');
+  });
+});
+
+describe('convertSessionToHistoryFormats', () => {
+  it('should preserve tool call arguments', () => {
+    const messages: MessageRecord[] = [
+      {
+        id: '1',
+        timestamp: new Date().toISOString(),
+        type: 'gemini',
+        content: '',
+        toolCalls: [
+          {
+            id: 'call_1',
+            name: 'update_topic',
+            args: {
+              title: 'Researching bug',
+              summary: 'I am looking into the issue.',
+            },
+            status: CoreToolCallStatus.Success,
+            timestamp: new Date().toISOString(),
+            displayName: 'Update Topic Context',
+            description: 'Updating the topic',
+            renderOutputAsMarkdown: true,
+            resultDisplay: 'Topic updated',
+          },
+        ],
+      },
+    ];
+
+    const result = convertSessionToHistoryFormats(messages);
+
+    expect(result.uiHistory).toHaveLength(1);
+    const toolGroup = result.uiHistory[0];
+    if (toolGroup.type === 'tool_group') {
+      expect(toolGroup.tools).toHaveLength(1);
+      const tool = toolGroup.tools[0];
+      expect(tool.callId).toBe('call_1');
+      expect(tool.name).toBe('Update Topic Context');
+      expect(tool.description).toBe('Updating the topic');
+      expect(tool.renderOutputAsMarkdown).toBe(true);
+      expect(tool.status).toBe(CoreToolCallStatus.Success);
+      expect(tool.resultDisplay).toBe('Topic updated');
+      expect(tool.args).toEqual({
+        title: 'Researching bug',
+        summary: 'I am looking into the issue.',
+      });
+    } else {
+      throw new Error('Expected tool_group history item');
+    }
+  });
+
+  it('should map tool call status correctly when not success', () => {
+    const messages: MessageRecord[] = [
+      {
+        id: '1',
+        timestamp: new Date().toISOString(),
+        type: 'gemini',
+        content: '',
+        toolCalls: [
+          {
+            id: 'call_1',
+            name: 'test_tool',
+            status: CoreToolCallStatus.Error,
+            timestamp: new Date().toISOString(),
+            args: {},
+          },
+          {
+            id: 'call_2',
+            name: 'test_tool_2',
+            status: CoreToolCallStatus.Cancelled,
+            timestamp: new Date().toISOString(),
+            args: {},
+          },
+        ],
+      },
+    ];
+
+    const result = convertSessionToHistoryFormats(messages);
+    expect(result.uiHistory).toHaveLength(1);
+
+    const toolGroup = result.uiHistory[0];
+    if (toolGroup.type === 'tool_group') {
+      expect(toolGroup.tools).toHaveLength(2);
+      expect(toolGroup.tools[0].status).toBe(CoreToolCallStatus.Error);
+      expect(toolGroup.tools[1].status).toBe(CoreToolCallStatus.Error); // Cancelled maps to error in this older format projection
+    } else {
+      throw new Error('Expected tool_group history item');
+    }
+  });
+
+  it('should convert various message types', () => {
+    const messages: MessageRecord[] = [
+      {
+        id: '1',
+        timestamp: new Date().toISOString(),
+        type: 'user',
+        content: 'Hello user',
+      },
+      {
+        id: '2',
+        timestamp: new Date().toISOString(),
+        type: 'info',
+        content: 'System info',
+      },
+      {
+        id: '3',
+        timestamp: new Date().toISOString(),
+        type: 'error',
+        content: 'System error',
+      },
+      {
+        id: '4',
+        timestamp: new Date().toISOString(),
+        type: 'warning',
+        content: 'System warning',
+      },
+      {
+        id: '5',
+        timestamp: new Date().toISOString(),
+        type: 'gemini',
+        content: 'Hello gemini',
+        thoughts: [
+          {
+            subject: 'Thinking',
+            description: 'about things',
+            timestamp: new Date().toISOString(),
+          },
+        ],
+      },
+    ];
+
+    const result = convertSessionToHistoryFormats(messages);
+
+    // thoughts become a separate item
+    expect(result.uiHistory).toHaveLength(6);
+    expect(result.uiHistory[0]).toEqual({ type: 'user', text: 'Hello user' });
+    expect(result.uiHistory[1]).toEqual({ type: 'info', text: 'System info' });
+    expect(result.uiHistory[2]).toEqual({
+      type: 'error',
+      text: 'System error',
+    });
+    expect(result.uiHistory[3]).toEqual({
+      type: 'warning',
+      text: 'System warning',
+    });
+    expect(result.uiHistory[4]).toEqual({
+      type: 'thinking',
+      thought: { subject: 'Thinking', description: 'about things' },
+    });
+    expect(result.uiHistory[5]).toEqual({
+      type: 'gemini',
+      text: 'Hello gemini',
+    });
+  });
+
+  it('should handle missing tool descriptions and displayNames', () => {
+    const messages: MessageRecord[] = [
+      {
+        id: '1',
+        timestamp: new Date().toISOString(),
+        type: 'gemini',
+        content: '',
+        toolCalls: [
+          {
+            id: 'call_1',
+            name: 'test_tool',
+            status: CoreToolCallStatus.Success,
+            timestamp: new Date().toISOString(),
+            args: {},
+          },
+        ],
+      },
+    ];
+
+    const result = convertSessionToHistoryFormats(messages);
+    expect(result.uiHistory).toHaveLength(1);
+
+    const toolGroup = result.uiHistory[0];
+    if (toolGroup.type === 'tool_group') {
+      expect(toolGroup.tools[0].name).toBe('test_tool'); // Fallback to name
+      expect(toolGroup.tools[0].description).toBe(''); // Fallback to empty string
+    } else {
+      throw new Error('Expected tool_group history item');
+    }
   });
 });

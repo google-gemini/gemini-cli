@@ -5,6 +5,7 @@
  */
 
 import type { SafetyCheckInput } from '../safety/protocol.js';
+import type { SandboxManager } from '../services/sandboxManager.js';
 
 export enum PolicyDecision {
   ALLOW = 'allow',
@@ -50,6 +51,18 @@ export enum ApprovalMode {
   YOLO = 'yolo',
   PLAN = 'plan',
 }
+
+/**
+ * The order of permissiveness for approval modes.
+ * Tools allowed in a less permissive mode should also be allowed
+ * in more permissive modes.
+ */
+export const MODES_BY_PERMISSIVENESS = [
+  ApprovalMode.PLAN,
+  ApprovalMode.DEFAULT,
+  ApprovalMode.AUTO_EDIT,
+  ApprovalMode.YOLO,
+];
 
 /**
  * Configuration for the built-in allowed-path checker.
@@ -311,13 +324,9 @@ export interface PolicyEngineConfig {
   approvalMode?: ApprovalMode;
 
   /**
-   * Whether tool sandboxing is enabled.
+   * The sandbox manager instance.
    */
-  toolSandboxEnabled?: boolean;
-  /**
-   * List of tools approved by the sandbox policy for the current mode.
-   */
-  sandboxApprovedTools?: string[];
+  sandboxManager?: SandboxManager;
 }
 
 export interface PolicySettings {

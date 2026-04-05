@@ -1,9 +1,9 @@
 {
   "experimental": {
-    "plan": true,
     "extensionReloading": true,
     "modelSteering": true,
-    "memoryManager": true
+    "memoryManager": false,
+    "topicUpdateNarration": true
   },
   "general": {
     "devtools": true

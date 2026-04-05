@@ -13,20 +13,35 @@ import {
   type SandboxRequest,
   type SandboxedCommand,
   GOVERNANCE_FILES,
+  findSecretFiles,
   type GlobalSandboxOptions,
   sanitizePaths,
-  tryRealpath,
+  type SandboxPermissions,
+  type ParsedSandboxDenial,
+  resolveSandboxPaths,
 } from '../../services/sandboxManager.js';
+import type { ShellExecutionResult } from '../../services/shellExecutionService.js';
 import {
   sanitizeEnvironment,
   getSecureSanitizationConfig,
 } from '../../services/environmentSanitization.js';
 import { debugLogger } from '../../utils/debugLogger.js';
-import { spawnAsync } from '../../utils/shell-utils.js';
+import { spawnAsync, getCommandName } from '../../utils/shell-utils.js';
 import { isNodeError } from '../../utils/errors.js';
+import {
+  isKnownSafeCommand,
+  isDangerousCommand,
+  isStrictlyApproved,
+} from './commandSafety.js';
+import { verifySandboxOverrides } from '../utils/commandUtils.js';
+import { parseWindowsSandboxDenials } from './windowsSandboxDenialUtils.js';
+import { isSubpath, resolveToRealPath } from '../../utils/paths.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
+
+// S-1-16-4096 is the SID for "Low Mandatory Level" (Low Integrity)
+const LOW_INTEGRITY_SID = '*S-1-16-4096';
 
 /**
  * A SandboxManager implementation for Windows that uses Restricted Tokens,
@@ -34,13 +49,39 @@ const __dirname = path.dirname(__filename);
  * Uses a native C# helper to bypass PowerShell restrictions.
  */
 export class WindowsSandboxManager implements SandboxManager {
+  static readonly HELPER_EXE = 'GeminiSandbox.exe';
   private readonly helperPath: string;
   private initialized = false;
   private readonly allowedCache = new Set<string>();
   private readonly deniedCache = new Set<string>();
 
   constructor(private readonly options: GlobalSandboxOptions) {
-    this.helperPath = path.resolve(__dirname, 'GeminiSandbox.exe');
+    this.helperPath = path.resolve(__dirname, WindowsSandboxManager.HELPER_EXE);
+  }
+
+  isKnownSafeCommand(args: string[]): boolean {
+    const toolName = args[0]?.toLowerCase();
+    const approvedTools = this.options.modeConfig?.approvedTools ?? [];
+    if (toolName && approvedTools.some((t) => t.toLowerCase() === toolName)) {
+      return true;
+    }
+    return isKnownSafeCommand(args);
+  }
+
+  isDangerousCommand(args: string[]): boolean {
+    return isDangerousCommand(args);
+  }
+
+  parseDenials(result: ShellExecutionResult): ParsedSandboxDenial | undefined {
+    return parseWindowsSandboxDenials(result);
+  }
+
+  getWorkspace(): string {
+    return this.options.workspace;
+  }
+
+  getOptions(): GlobalSandboxOptions {
+    return this.options;
   }
 
   /**
@@ -178,60 +219,217 @@ export class WindowsSandboxManager implements SandboxManager {
 
     const sanitizedEnv = sanitizeEnvironment(req.env, sanitizationConfig);
 
-    // 1. Handle filesystem permissions for Low Integrity
-    // Grant "Low Mandatory Level" write access to the workspace.
-    await this.grantLowIntegrityAccess(this.options.workspace);
+    const isReadonlyMode = this.options.modeConfig?.readonly ?? true;
+    const allowOverrides = this.options.modeConfig?.allowOverrides ?? true;
 
-    // Grant "Low Mandatory Level" read access to allowedPaths.
-    const allowedPaths = sanitizePaths(req.policy?.allowedPaths) || [];
+    // Reject override attempts in plan mode
+    verifySandboxOverrides(allowOverrides, req.policy);
+
+    const command = req.command;
+    const args = req.args;
+
+    // Native commands __read and __write are passed directly to GeminiSandbox.exe
+
+    const isYolo = this.options.modeConfig?.yolo ?? false;
+
+    // Fetch persistent approvals for this command
+    const commandName = await getCommandName(command, args);
+    const persistentPermissions = allowOverrides
+      ? this.options.policyManager?.getCommandPermissions(commandName)
+      : undefined;
+
+    // Merge all permissions
+    const mergedAdditional: SandboxPermissions = {
+      fileSystem: {
+        read: [
+          ...(persistentPermissions?.fileSystem?.read ?? []),
+          ...(req.policy?.additionalPermissions?.fileSystem?.read ?? []),
+        ],
+        write: [
+          ...(persistentPermissions?.fileSystem?.write ?? []),
+          ...(req.policy?.additionalPermissions?.fileSystem?.write ?? []),
+        ],
+      },
+      network:
+        isYolo ||
+        persistentPermissions?.network ||
+        req.policy?.additionalPermissions?.network ||
+        false,
+    };
+
+    if (req.command === '__read' && req.args[0]) {
+      mergedAdditional.fileSystem!.read!.push(req.args[0]);
+    } else if (req.command === '__write' && req.args[0]) {
+      mergedAdditional.fileSystem!.write!.push(req.args[0]);
+    }
+
+    const defaultNetwork =
+      this.options.modeConfig?.network ?? req.policy?.networkAccess ?? false;
+    const networkAccess = defaultNetwork || mergedAdditional.network;
+
+    const { allowed: allowedPaths, forbidden: forbiddenPaths } =
+      await resolveSandboxPaths(this.options, req);
+
+    // Track all roots where Low Integrity write access has been granted.
+    // New files created within these roots will inherit the Low label.
+    const writableRoots: string[] = [];
+
+    // 1. Workspace access
+    const isApproved = allowOverrides
+      ? await isStrictlyApproved(
+          command,
+          args,
+          this.options.modeConfig?.approvedTools,
+        )
+      : false;
+
+    if (!isReadonlyMode || isApproved) {
+      await this.grantLowIntegrityAccess(this.options.workspace);
+      writableRoots.push(this.options.workspace);
+    }
+
+    // 2. Globally included directories
+    const includeDirs = sanitizePaths(this.options.includeDirectories);
+    for (const includeDir of includeDirs) {
+      await this.grantLowIntegrityAccess(includeDir);
+      writableRoots.push(includeDir);
+    }
+
+    // 3. Explicitly allowed paths from the request policy
     for (const allowedPath of allowedPaths) {
-      await this.grantLowIntegrityAccess(allowedPath);
+      const resolved = resolveToRealPath(allowedPath);
+      try {
+        await fs.promises.access(resolved, fs.constants.F_OK);
+      } catch {
+        throw new Error(
+          `Sandbox request rejected: Allowed path does not exist: ${resolved}. ` +
+            'On Windows, granular sandbox access can only be granted to existing paths to avoid broad parent directory permissions.',
+        );
+      }
+      await this.grantLowIntegrityAccess(resolved);
+      writableRoots.push(resolved);
+    }
+
+    // 4. Additional write paths (e.g. from internal __write command)
+    const additionalWritePaths = sanitizePaths(
+      mergedAdditional.fileSystem?.write,
+    );
+    for (const writePath of additionalWritePaths) {
+      const resolved = resolveToRealPath(writePath);
+      try {
+        await fs.promises.access(resolved, fs.constants.F_OK);
+        await this.grantLowIntegrityAccess(resolved);
+        continue;
+      } catch {
+        // If the file doesn't exist, it's only allowed if it resides within a granted root.
+        const isInherited = writableRoots.some((root) =>
+          isSubpath(root, resolved),
+        );
+
+        if (!isInherited) {
+          throw new Error(
+            `Sandbox request rejected: Additional write path does not exist and its parent directory is not allowed: ${resolved}. ` +
+              'On Windows, granular sandbox access can only be granted to existing paths to avoid broad parent directory permissions.',
+          );
+        }
+      }
+    }
+
+    // 2. Collect secret files and apply protective ACLs
+    // On Windows, we explicitly deny access to secret files for Low Integrity
+    // processes to ensure they cannot be read or written.
+    const secretsToBlock: string[] = [];
+    const searchDirs = new Set([
+      this.options.workspace,
+      ...allowedPaths,
+      ...includeDirs,
+    ]);
+    for (const dir of searchDirs) {
+      try {
+        // We use maxDepth 3 to catch common nested secrets while keeping performance high.
+        const secretFiles = await findSecretFiles(dir, 3);
+        for (const secretFile of secretFiles) {
+          try {
+            secretsToBlock.push(secretFile);
+            await this.denyLowIntegrityAccess(secretFile);
+          } catch (e) {
+            debugLogger.log(
+              `WindowsSandboxManager: Failed to secure secret file ${secretFile}`,
+              e,
+            );
+          }
+        }
+      } catch (e) {
+        debugLogger.log(
+          `WindowsSandboxManager: Failed to find secret files in ${dir}`,
+          e,
+        );
+      }
     }
 
     // Denies access to forbiddenPaths for Low Integrity processes.
-    const forbiddenPaths = sanitizePaths(req.policy?.forbiddenPaths) || [];
+    // Note: Denying access to arbitrary paths (like system files) via icacls
+    // is restricted to avoid host corruption. External commands rely on
+    // Low Integrity read/write restrictions, while internal commands
+    // use the manifest for enforcement.
     for (const forbiddenPath of forbiddenPaths) {
-      await this.denyLowIntegrityAccess(forbiddenPath);
+      try {
+        await this.denyLowIntegrityAccess(forbiddenPath);
+      } catch (e) {
+        debugLogger.log(
+          `WindowsSandboxManager: Failed to secure forbidden path ${forbiddenPath}`,
+          e,
+        );
+      }
     }
 
-    // 2. Protected governance files
+    // 3. Protected governance files
     // These must exist on the host before running the sandbox to prevent
     // the sandboxed process from creating them with Low integrity.
     // By being created as Medium integrity, they are write-protected from Low processes.
     for (const file of GOVERNANCE_FILES) {
       const filePath = path.join(this.options.workspace, file.path);
       this.touch(filePath, file.isDirectory);
-
-      // We resolve real paths to ensure protection for both the symlink and its target.
-      try {
-        const realPath = fs.realpathSync(filePath);
-        if (realPath !== filePath) {
-          // If it's a symlink, the target is already implicitly protected
-          // if it's outside the Low integrity workspace (likely Medium).
-          // If it's inside, we ensure it's not accidentally Low.
-        }
-      } catch {
-        // Ignore realpath errors
-      }
     }
 
-    // 3. Construct the helper command
-    // GeminiSandbox.exe <network:0|1> <cwd> <command> [args...]
+    // 4. Forbidden paths manifest
+    // We use a manifest file to avoid command-line length limits.
+    const allForbidden = Array.from(
+      new Set([...secretsToBlock, ...forbiddenPaths]),
+    );
+    const tempDir = fs.mkdtempSync(
+      path.join(os.tmpdir(), 'gemini-cli-forbidden-'),
+    );
+    const manifestPath = path.join(tempDir, 'manifest.txt');
+    fs.writeFileSync(manifestPath, allForbidden.join('\n'));
+
+    // 5. Construct the helper command
+    // GeminiSandbox.exe <network:0|1> <cwd> --forbidden-manifest <path> <command> [args...]
     const program = this.helperPath;
 
-    // If the command starts with __, it's an internal command for the sandbox helper itself.
-    const args = [
-      req.policy?.networkAccess ? '1' : '0',
+    const finalArgs = [
+      networkAccess ? '1' : '0',
       req.cwd,
-      req.command,
-      ...req.args,
+      '--forbidden-manifest',
+      manifestPath,
+      command,
+      ...args,
     ];
+
+    const finalEnv = { ...sanitizedEnv };
 
     return {
       program,
-      args,
-      env: sanitizedEnv,
+      args: finalArgs,
+      env: finalEnv,
       cwd: req.cwd,
+      cleanup: () => {
+        try {
+          fs.rmSync(tempDir, { recursive: true, force: true });
+        } catch {
+          // Ignore errors
+        }
+      },
     };
   }
 
@@ -243,27 +441,39 @@ export class WindowsSandboxManager implements SandboxManager {
       return;
     }
 
-    const resolvedPath = await tryRealpath(targetPath);
+    const resolvedPath = resolveToRealPath(targetPath);
     if (this.allowedCache.has(resolvedPath)) {
       return;
     }
 
-    // Never modify integrity levels for system directories
-    const systemRoot = process.env['SystemRoot'] || 'C:\\Windows';
-    const programFiles = process.env['ProgramFiles'] || 'C:\\Program Files';
-    const programFilesX86 =
-      process.env['ProgramFiles(x86)'] || 'C:\\Program Files (x86)';
-
+    // Explicitly reject UNC paths to prevent credential theft/SSRF,
+    // but allow local extended-length and device paths.
     if (
-      resolvedPath.toLowerCase().startsWith(systemRoot.toLowerCase()) ||
-      resolvedPath.toLowerCase().startsWith(programFiles.toLowerCase()) ||
-      resolvedPath.toLowerCase().startsWith(programFilesX86.toLowerCase())
+      resolvedPath.startsWith('\\\\') &&
+      !resolvedPath.startsWith('\\\\?\\') &&
+      !resolvedPath.startsWith('\\\\.\\')
     ) {
+      debugLogger.log(
+        'WindowsSandboxManager: Rejecting UNC path for Low Integrity grant:',
+        resolvedPath,
+      );
+      return;
+    }
+
+    if (this.isSystemDirectory(resolvedPath)) {
       return;
     }
 
     try {
-      await spawnAsync('icacls', [resolvedPath, '/setintegritylevel', 'Low']);
+      // 1. Grant explicit Modify access to the Low Integrity SID
+      // 2. Set the Mandatory Label to Low to allow "Write Up" from Low processes
+      await spawnAsync('icacls', [
+        resolvedPath,
+        '/grant',
+        `${LOW_INTEGRITY_SID}:(OI)(CI)(M)`,
+        '/setintegritylevel',
+        '(OI)(CI)Low',
+      ]);
       this.allowedCache.add(resolvedPath);
     } catch (e) {
       debugLogger.log(
@@ -282,13 +492,15 @@ export class WindowsSandboxManager implements SandboxManager {
       return;
     }
 
-    const resolvedPath = await tryRealpath(targetPath);
+    const resolvedPath = resolveToRealPath(targetPath);
     if (this.deniedCache.has(resolvedPath)) {
       return;
     }
 
-    // S-1-16-4096 is the SID for "Low Mandatory Level" (Low Integrity)
-    const LOW_INTEGRITY_SID = '*S-1-16-4096';
+    // Never modify ACEs for system directories
+    if (this.isSystemDirectory(resolvedPath)) {
+      return;
+    }
 
     // icacls flags: (OI) Object Inherit, (CI) Container Inherit, (F) Full Access Deny.
     // Omit /T (recursive) for performance; (OI)(CI) ensures inheritance for new items.
@@ -322,5 +534,18 @@ export class WindowsSandboxManager implements SandboxManager {
         }`,
       );
     }
+  }
+
+  private isSystemDirectory(resolvedPath: string): boolean {
+    const systemRoot = process.env['SystemRoot'] || 'C:\\Windows';
+    const programFiles = process.env['ProgramFiles'] || 'C:\\Program Files';
+    const programFilesX86 =
+      process.env['ProgramFiles(x86)'] || 'C:\\Program Files (x86)';
+
+    return (
+      resolvedPath.toLowerCase().startsWith(systemRoot.toLowerCase()) ||
+      resolvedPath.toLowerCase().startsWith(programFiles.toLowerCase()) ||
+      resolvedPath.toLowerCase().startsWith(programFilesX86.toLowerCase())
+    );
   }
 }

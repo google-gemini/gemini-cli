@@ -24,10 +24,14 @@ import {
   type ToolResult,
   type ToolInvocation,
 } from '../../tools/tools.js';
+import { Environment } from '@google/genai';
 import type { MessageBus } from '../../confirmation-bus/message-bus.js';
 import type { BrowserManager } from './browserManager.js';
 import type { Config } from '../../config/config.js';
-import { getVisualAgentModel } from './modelAvailability.js';
+import {
+  getVisualAgentModel,
+  isComputerUseModel,
+} from './modelAvailability.js';
 import { debugLogger } from '../../utils/debugLogger.js';
 import { LlmRole } from '../../telemetry/llmRole.js';
 
@@ -116,6 +120,27 @@ class AnalyzeScreenshotInvocation extends BaseToolInvocation<
       const visualModel = getVisualAgentModel(this.config);
       const contentGenerator = this.config.getContentGenerator();
 
+      // Computer-use models require the computerUse tool declaration in every
+      // request. We exclude all predefined action functions so the model
+      // provides text analysis rather than issuing actions.
+      // Non-computer-use models (e.g., gemini-2.0-flash) do plain text
+      // analysis natively and don't need this declaration.
+      const tools = isComputerUseModel(visualModel)
+        ? [
+            {
+              computerUse: {
+                environment: Environment.ENVIRONMENT_BROWSER,
+                excludedPredefinedFunctions: [
+                  'open_web_browser',
+                  'click_at',
+                  'key_combination',
+                  'drag_and_drop',
+                ],
+              },
+            },
+          ]
+        : undefined;
+
       const response = await contentGenerator.generateContent(
         {
           model: visualModel,
@@ -124,6 +149,7 @@ class AnalyzeScreenshotInvocation extends BaseToolInvocation<
             topP: 0.95,
             systemInstruction: VISUAL_SYSTEM_PROMPT,
             abortSignal: signal,
+            ...(tools ? { tools } : {}),
           },
           contents: [
             {
@@ -146,12 +172,22 @@ class AnalyzeScreenshotInvocation extends BaseToolInvocation<
         LlmRole.UTILITY_TOOL,
       );
 
-      // Extract text from response
-      const responseText =
-        response.candidates?.[0]?.content?.parts
-          ?.filter((p) => p.text)
-          .map((p) => p.text)
-          .join('\n') ?? '';
+      // Extract response content. Computer-use models may still return
+      // functionCall parts even with exclusions, so we handle both text
+      // and functionCall parts defensively.
+      const parts = response.candidates?.[0]?.content?.parts ?? [];
+
+      const textParts = parts.filter((p) => p.text).map((p) => p.text!);
+
+      const functionCallParts = parts
+        .filter((p) => p.functionCall)
+        .map((p) => {
+          const fc = p.functionCall!;
+          const argsStr = fc.args ? JSON.stringify(fc.args) : '';
+          return `Action: ${fc.name}${argsStr ? ` with args ${argsStr}` : ''}`;
+        });
+
+      const responseText = [...textParts, ...functionCallParts].join('\n');
 
       if (!responseText) {
         return {

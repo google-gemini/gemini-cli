@@ -198,7 +198,7 @@ const createMockUIState = (overrides: Partial<UIState> = {}): UIState =>
     nightly: false,
     isTrustedFolder: true,
     activeHooks: [],
-    isBackgroundShellVisible: false,
+    isBackgroundTaskVisible: false,
     embeddedShellFocused: false,
     showIsExpandableHint: false,
     quota: {
@@ -464,7 +464,7 @@ describe('Composer', () => {
       const uiState = createMockUIState({
         streamingState: StreamingState.Responding,
         embeddedShellFocused: true,
-        isBackgroundShellVisible: true,
+        isBackgroundTaskVisible: true,
       });
 
       const { lastFrame } = await renderComposer(uiState);
@@ -494,7 +494,7 @@ describe('Composer', () => {
       const uiState = createMockUIState({
         streamingState: StreamingState.Responding,
         embeddedShellFocused: true,
-        isBackgroundShellVisible: false,
+        isBackgroundTaskVisible: false,
       });
 
       const { lastFrame } = await renderComposer(uiState);
