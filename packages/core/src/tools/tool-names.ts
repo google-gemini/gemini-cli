@@ -73,8 +73,15 @@ import {
   ASK_USER_OPTION_PARAM_LABEL,
   ASK_USER_OPTION_PARAM_DESCRIPTION,
   PLAN_MODE_PARAM_REASON,
-  EXIT_PLAN_PARAM_PLAN_PATH,
+  EXIT_PLAN_PARAM_PLAN_FILENAME,
   SKILL_PARAM_NAME,
+  UPDATE_TOPIC_TOOL_NAME,
+  UPDATE_TOPIC_DISPLAY_NAME,
+  COMPLETE_TASK_TOOL_NAME,
+  COMPLETE_TASK_DISPLAY_NAME,
+  TOPIC_PARAM_TITLE,
+  TOPIC_PARAM_SUMMARY,
+  TOPIC_PARAM_STRATEGIC_INTENT,
 } from './definitions/coreTools.js';
 
 export {
@@ -95,6 +102,10 @@ export {
   ASK_USER_TOOL_NAME,
   EXIT_PLAN_MODE_TOOL_NAME,
   ENTER_PLAN_MODE_TOOL_NAME,
+  UPDATE_TOPIC_TOOL_NAME,
+  UPDATE_TOPIC_DISPLAY_NAME,
+  COMPLETE_TASK_TOOL_NAME,
+  COMPLETE_TASK_DISPLAY_NAME,
   // Shared parameter names
   PARAM_FILE_PATH,
   PARAM_DIR_PATH,
@@ -146,13 +157,36 @@ export {
   ASK_USER_OPTION_PARAM_LABEL,
   ASK_USER_OPTION_PARAM_DESCRIPTION,
   PLAN_MODE_PARAM_REASON,
-  EXIT_PLAN_PARAM_PLAN_PATH,
+  EXIT_PLAN_PARAM_PLAN_FILENAME,
   SKILL_PARAM_NAME,
+  TOPIC_PARAM_TITLE,
+  TOPIC_PARAM_SUMMARY,
+  TOPIC_PARAM_STRATEGIC_INTENT,
 };
 
-export const LS_TOOL_NAME_LEGACY = 'list_directory'; // Just to be safe if anything used the old exported name directly
-
 export const EDIT_TOOL_NAMES = new Set([EDIT_TOOL_NAME, WRITE_FILE_TOOL_NAME]);
+
+/**
+ * Tools that require mandatory argument narrowing (e.g., file paths, command prefixes)
+ * when granting persistent or session-wide approval.
+ */
+export const TOOLS_REQUIRING_NARROWING = new Set([
+  GLOB_TOOL_NAME,
+  GREP_TOOL_NAME,
+  READ_MANY_FILES_TOOL_NAME,
+  READ_FILE_TOOL_NAME,
+  LS_TOOL_NAME,
+  WRITE_FILE_TOOL_NAME,
+  EDIT_TOOL_NAME,
+  SHELL_TOOL_NAME,
+]);
+
+export const TRACKER_CREATE_TASK_TOOL_NAME = 'tracker_create_task';
+export const TRACKER_UPDATE_TASK_TOOL_NAME = 'tracker_update_task';
+export const TRACKER_GET_TASK_TOOL_NAME = 'tracker_get_task';
+export const TRACKER_LIST_TASKS_TOOL_NAME = 'tracker_list_tasks';
+export const TRACKER_ADD_DEPENDENCY_TOOL_NAME = 'tracker_add_dependency';
+export const TRACKER_VISUALIZE_TOOL_NAME = 'tracker_visualize';
 
 // Tool Display Names
 export const WRITE_FILE_DISPLAY_NAME = 'WriteFile';
@@ -160,12 +194,11 @@ export const EDIT_DISPLAY_NAME = 'Edit';
 export const ASK_USER_DISPLAY_NAME = 'Ask User';
 export const READ_FILE_DISPLAY_NAME = 'ReadFile';
 export const GLOB_DISPLAY_NAME = 'FindFiles';
-export const TRACKER_CREATE_TASK_TOOL_NAME = 'tracker_create_task';
-export const TRACKER_UPDATE_TASK_TOOL_NAME = 'tracker_update_task';
-export const TRACKER_GET_TASK_TOOL_NAME = 'tracker_get_task';
-export const TRACKER_LIST_TASKS_TOOL_NAME = 'tracker_list_tasks';
-export const TRACKER_ADD_DEPENDENCY_TOOL_NAME = 'tracker_add_dependency';
-export const TRACKER_VISUALIZE_TOOL_NAME = 'tracker_visualize';
+export const LS_DISPLAY_NAME = 'ReadFolder';
+export const GREP_DISPLAY_NAME = 'SearchText';
+export const WEB_SEARCH_DISPLAY_NAME = 'GoogleSearch';
+export const WEB_FETCH_DISPLAY_NAME = 'WebFetch';
+export const READ_MANY_FILES_DISPLAY_NAME = 'ReadManyFiles';
 
 /**
  * Mapping of legacy tool names to their current names.
@@ -204,6 +237,12 @@ export const DISCOVERED_TOOL_PREFIX = 'discovered_tool_';
 /**
  * List of all built-in tool names.
  */
+import {
+  isMcpToolName,
+  parseMcpToolName,
+  MCP_TOOL_PREFIX,
+} from './mcp-tool.js';
+
 export const ALL_BUILTIN_TOOL_NAMES = [
   GLOB_TOOL_NAME,
   WRITE_TODOS_TOOL_NAME,
@@ -228,6 +267,8 @@ export const ALL_BUILTIN_TOOL_NAMES = [
   GET_INTERNAL_DOCS_TOOL_NAME,
   ENTER_PLAN_MODE_TOOL_NAME,
   EXIT_PLAN_MODE_TOOL_NAME,
+  UPDATE_TOPIC_TOOL_NAME,
+  COMPLETE_TASK_TOOL_NAME,
 ] as const;
 
 /**
@@ -243,6 +284,10 @@ export const PLAN_MODE_TOOLS = [
   WEB_SEARCH_TOOL_NAME,
   ASK_USER_TOOL_NAME,
   ACTIVATE_SKILL_TOOL_NAME,
+  GET_INTERNAL_DOCS_TOOL_NAME,
+  UPDATE_TOPIC_TOOL_NAME,
+  'codebase_investigator',
+  'cli_help',
 ] as const;
 
 /**
@@ -273,25 +318,44 @@ export function isValidToolName(
     return true;
   }
 
-  // MCP tools (format: server__tool)
-  if (name.includes('__')) {
-    const parts = name.split('__');
-    if (parts.length !== 2 || parts[0].length === 0 || parts[1].length === 0) {
+  // Handle standard MCP FQNs (mcp_server_tool or wildcards mcp_*, mcp_server_*)
+  if (isMcpToolName(name)) {
+    // Global wildcard: mcp_*
+    if (name === `${MCP_TOOL_PREFIX}*` && options.allowWildcards) {
+      return true;
+    }
+
+    // Explicitly reject names with empty server component (e.g. mcp__tool)
+    if (name.startsWith(`${MCP_TOOL_PREFIX}_`)) {
       return false;
     }
 
-    const server = parts[0];
-    const tool = parts[1];
+    const parsed = parseMcpToolName(name);
+    // Ensure that both components are populated. parseMcpToolName splits at the second _,
+    // so `mcp__tool` has serverName="", toolName="tool"
+    if (parsed.serverName && parsed.toolName) {
+      // Basic slug validation for server and tool names.
+      // We allow dots (.) and colons (:) as they are valid in function names and
+      // used for truncation markers.
+      const slugRegex = /^[a-z0-9_.:-]+$/i;
 
-    if (tool === '*') {
-      return !!options.allowWildcards;
+      if (!slugRegex.test(parsed.serverName)) {
+        return false;
+      }
+
+      if (parsed.toolName === '*') {
+        return options.allowWildcards === true;
+      }
+
+      // A tool name consisting only of underscores is invalid.
+      if (/^_*$/.test(parsed.toolName)) {
+        return false;
+      }
+
+      return slugRegex.test(parsed.toolName);
     }
 
-    // Basic slug validation for server and tool names.
-    // We allow dots (.) and colons (:) as they are valid in function names and
-    // used for truncation markers.
-    const slugRegex = /^[a-z0-9_.:-]+$/i;
-    return slugRegex.test(server) && slugRegex.test(tool);
+    return false;
   }
 
   return false;

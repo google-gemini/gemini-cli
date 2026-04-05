@@ -25,7 +25,8 @@ vi.mock('./tool-names.js', async (importOriginal) => {
     ...actual,
     TOOL_LEGACY_ALIASES: mockedAliases,
     isValidToolName: vi.fn().mockImplementation((name: string, options) => {
-      if (mockedAliases[name]) return true;
+      if (Object.prototype.hasOwnProperty.call(mockedAliases, name))
+        return true;
       return actual.isValidToolName(name, options);
     }),
     getToolAliases: vi.fn().mockImplementation((name: string) => {
@@ -55,11 +56,9 @@ describe('tool-names', () => {
       expect(isValidToolName(`${DISCOVERED_TOOL_PREFIX}my_tool`)).toBe(true);
     });
 
-    it('should validate MCP tool names (server__tool)', () => {
-      expect(isValidToolName('server__tool')).toBe(true);
-      expect(isValidToolName('my-server__my-tool')).toBe(true);
-      expect(isValidToolName('my.server__my:tool')).toBe(true);
-      expect(isValidToolName('my-server...truncated__tool')).toBe(true);
+    it('should validate modern MCP FQNs (mcp_server_tool)', () => {
+      expect(isValidToolName('mcp_server_tool')).toBe(true);
+      expect(isValidToolName('mcp_my-server_my-tool')).toBe(true);
     });
 
     it('should validate legacy tool aliases', async () => {
@@ -69,28 +68,33 @@ describe('tool-names', () => {
       }
     });
 
-    it('should reject invalid tool names', () => {
-      expect(isValidToolName('')).toBe(false);
-      expect(isValidToolName('invalid-name')).toBe(false);
-      expect(isValidToolName('server__')).toBe(false);
-      expect(isValidToolName('__tool')).toBe(false);
-      expect(isValidToolName('server__tool__extra')).toBe(false);
+    it('should return false for invalid tool names', () => {
+      expect(isValidToolName('invalid-tool-name')).toBe(false);
+      expect(isValidToolName('mcp_server')).toBe(false);
+      expect(isValidToolName('mcp__tool')).toBe(false);
+      expect(isValidToolName('mcp_invalid server_tool')).toBe(false);
+      expect(isValidToolName('mcp_server_invalid tool')).toBe(false);
+      expect(isValidToolName('mcp_server_')).toBe(false);
     });
 
     it('should handle wildcards when allowed', () => {
       // Default: not allowed
       expect(isValidToolName('*')).toBe(false);
-      expect(isValidToolName('server__*')).toBe(false);
+      expect(isValidToolName('mcp_*')).toBe(false);
+      expect(isValidToolName('mcp_server_*')).toBe(false);
 
       // Explicitly allowed
       expect(isValidToolName('*', { allowWildcards: true })).toBe(true);
-      expect(isValidToolName('server__*', { allowWildcards: true })).toBe(true);
+      expect(isValidToolName('mcp_*', { allowWildcards: true })).toBe(true);
+      expect(isValidToolName('mcp_server_*', { allowWildcards: true })).toBe(
+        true,
+      );
 
       // Invalid wildcards
-      expect(isValidToolName('__*', { allowWildcards: true })).toBe(false);
-      expect(isValidToolName('server__tool*', { allowWildcards: true })).toBe(
-        false,
-      );
+      expect(isValidToolName('mcp__*', { allowWildcards: true })).toBe(false);
+      expect(
+        isValidToolName('mcp_server_tool*', { allowWildcards: true }),
+      ).toBe(false);
     });
   });
 

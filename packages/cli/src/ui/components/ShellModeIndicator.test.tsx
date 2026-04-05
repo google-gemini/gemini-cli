@@ -10,10 +10,7 @@ import { describe, it, expect } from 'vitest';
 
 describe('ShellModeIndicator', () => {
   it('renders correctly', async () => {
-    const { lastFrame, waitUntilReady, unmount } = render(
-      <ShellModeIndicator />,
-    );
-    await waitUntilReady();
+    const { lastFrame, unmount } = await render(<ShellModeIndicator />);
     expect(lastFrame()).toContain('shell mode enabled');
     expect(lastFrame()).toContain('esc to disable');
     unmount();

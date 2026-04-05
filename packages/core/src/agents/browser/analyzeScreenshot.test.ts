@@ -9,6 +9,7 @@ import { createAnalyzeScreenshotTool } from './analyzeScreenshot.js';
 import type { BrowserManager, McpToolCallResult } from './browserManager.js';
 import type { Config } from '../../config/config.js';
 import type { MessageBus } from '../../confirmation-bus/message-bus.js';
+import { Environment } from '@google/genai';
 
 const mockMessageBus = {
   waitForConfirmation: vi.fn().mockResolvedValue({ approved: true }),
@@ -36,6 +37,7 @@ function createMockBrowserManager(
 function createMockConfig(
   generateContentResult?: unknown,
   generateContentError?: Error,
+  modelName: string = 'gemini-2.5-computer-use-preview-10-2025',
 ): Config {
   const generateContent = generateContentError
     ? vi.fn().mockRejectedValue(generateContentError)
@@ -57,7 +59,7 @@ function createMockConfig(
 
   return {
     getBrowserAgentConfig: vi.fn().mockReturnValue({
-      customConfig: { visualModel: 'test-visual-model' },
+      customConfig: { visualModel: modelName },
     }),
     getContentGenerator: vi.fn().mockReturnValue({
       generateContent,
@@ -109,7 +111,22 @@ describe('analyzeScreenshot', () => {
       const contentGenerator = config.getContentGenerator();
       expect(contentGenerator.generateContent).toHaveBeenCalledWith(
         expect.objectContaining({
-          model: 'test-visual-model',
+          model: 'gemini-2.5-computer-use-preview-10-2025',
+          config: expect.objectContaining({
+            tools: [
+              {
+                computerUse: {
+                  environment: Environment.ENVIRONMENT_BROWSER,
+                  excludedPredefinedFunctions: [
+                    'open_web_browser',
+                    'click_at',
+                    'key_combination',
+                    'drag_and_drop',
+                  ],
+                },
+              },
+            ],
+          }),
           contents: expect.arrayContaining([
             expect.objectContaining({
               role: 'user',
@@ -134,6 +151,33 @@ describe('analyzeScreenshot', () => {
         'The blue submit button is at coordinates (250, 400).',
       );
       expect(result.error).toBeUndefined();
+    });
+
+    it('omits computerUse tools for non-computer-use models', async () => {
+      const browserManager = createMockBrowserManager();
+      const config = createMockConfig(undefined, undefined, 'gemini-2.0-flash');
+      const tool = createAnalyzeScreenshotTool(
+        browserManager,
+        config,
+        mockMessageBus,
+      );
+
+      const invocation = tool.build({
+        instruction: 'Find the search bar',
+      });
+      await invocation.execute(new AbortController().signal);
+
+      const contentGenerator = config.getContentGenerator();
+      expect(contentGenerator.generateContent).toHaveBeenCalledWith(
+        expect.objectContaining({
+          model: 'gemini-2.0-flash',
+          config: expect.not.objectContaining({
+            tools: expect.anything(),
+          }),
+        }),
+        'visual-analysis',
+        'utility_tool',
+      );
     });
 
     it('returns an error when screenshot capture fails (no image)', async () => {

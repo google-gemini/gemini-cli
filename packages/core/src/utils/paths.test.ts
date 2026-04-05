@@ -15,6 +15,7 @@ import {
   shortenPath,
   normalizePath,
   resolveToRealPath,
+  makeRelative,
 } from './paths.js';
 
 vi.mock('node:fs', async (importOriginal) => {
@@ -215,7 +216,7 @@ describe('isSubpath', () => {
   });
 });
 
-describe('isSubpath on Windows', () => {
+describe.skipIf(process.platform !== 'win32')('isSubpath on Windows', () => {
   afterEach(() => vi.unstubAllGlobals());
 
   beforeEach(() => mockPlatform('win32'));
@@ -265,6 +266,20 @@ describe('isSubpath on Windows', () => {
   it('should handle relative paths correctly on Windows', () => {
     expect(isSubpath('Users\\Test', 'Users\\Test\\file.txt')).toBe(true);
     expect(isSubpath('Users\\Test\\file.txt', 'Users\\Test')).toBe(false);
+  });
+});
+
+describe.skipIf(process.platform !== 'darwin')('isSubpath on Darwin', () => {
+  afterEach(() => vi.unstubAllGlobals());
+
+  beforeEach(() => mockPlatform('darwin'));
+
+  it('should be case-insensitive for path components on Darwin', () => {
+    expect(isSubpath('/PROJECT', '/project/src')).toBe(true);
+  });
+
+  it('should return true for a direct subpath on Darwin', () => {
+    expect(isSubpath('/Users/Test', '/Users/Test/file.txt')).toBe(true);
   });
 });
 
@@ -484,6 +499,10 @@ describe('shortenPath', () => {
 });
 
 describe('resolveToRealPath', () => {
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
   it.each([
     {
       description:
@@ -510,9 +529,11 @@ describe('resolveToRealPath', () => {
     expect(resolveToRealPath(input)).toBe(expected);
   });
 
-  it('should return decoded path even if fs.realpathSync fails', () => {
+  it('should return decoded path even if fs.realpathSync fails with ENOENT', () => {
     vi.spyOn(fs, 'realpathSync').mockImplementationOnce(() => {
-      throw new Error('File not found');
+      const err = new Error('File not found') as NodeJS.ErrnoException;
+      err.code = 'ENOENT';
+      throw err;
     });
 
     const p = path.resolve('path', 'to', 'New Project');
@@ -520,6 +541,111 @@ describe('resolveToRealPath', () => {
     const expected = p;
 
     expect(resolveToRealPath(input)).toBe(expected);
+  });
+
+  it('should return decoded path even if fs.realpathSync fails with EISDIR', () => {
+    vi.spyOn(fs, 'realpathSync').mockImplementationOnce(() => {
+      const err = new Error(
+        'Illegal operation on a directory',
+      ) as NodeJS.ErrnoException;
+      err.code = 'EISDIR';
+      throw err;
+    });
+
+    const p = path.resolve('path', 'to', 'New Project');
+    const input = pathToFileURL(p).toString();
+    const expected = p;
+
+    expect(resolveToRealPath(input)).toBe(expected);
+  });
+
+  it('should recursively resolve symlinks for non-existent child paths', () => {
+    const parentPath = path.resolve('/some/parent/path');
+    const resolvedParentPath = path.resolve('/resolved/parent/path');
+    const childPath = path.resolve(parentPath, 'child', 'file.txt');
+    const expectedPath = path.resolve(resolvedParentPath, 'child', 'file.txt');
+
+    vi.spyOn(fs, 'realpathSync').mockImplementation((p) => {
+      const pStr = p.toString();
+      if (pStr === parentPath) {
+        return resolvedParentPath;
+      }
+      const err = new Error('ENOENT') as NodeJS.ErrnoException;
+      err.code = 'ENOENT';
+      throw err;
+    });
+
+    expect(resolveToRealPath(childPath)).toBe(expectedPath);
+  });
+
+  it('should prevent infinite recursion on malicious symlink structures', () => {
+    const maliciousPath = path.resolve('malicious', 'symlink');
+
+    vi.spyOn(fs, 'realpathSync').mockImplementation(() => {
+      const err = new Error('ENOENT') as NodeJS.ErrnoException;
+      err.code = 'ENOENT';
+      throw err;
+    });
+
+    vi.spyOn(fs, 'lstatSync').mockImplementation(
+      () => ({ isSymbolicLink: () => true }) as fs.Stats,
+    );
+
+    vi.spyOn(fs, 'readlinkSync').mockImplementation(() =>
+      ['..', 'malicious', 'symlink'].join(path.sep),
+    );
+
+    expect(() => resolveToRealPath(maliciousPath)).toThrow(
+      /Infinite recursion detected/,
+    );
+  });
+});
+
+describe('makeRelative', () => {
+  describe.skipIf(process.platform === 'win32')('on POSIX', () => {
+    it('should return relative path if targetPath is already relative', () => {
+      expect(makeRelative('foo/bar', '/root')).toBe('foo/bar');
+    });
+
+    it('should return relative path from root to target', () => {
+      const root = '/Users/test/project';
+      const target = '/Users/test/project/src/file.ts';
+      expect(makeRelative(target, root)).toBe('src/file.ts');
+    });
+
+    it('should return "." if target and root are the same', () => {
+      const root = '/Users/test/project';
+      expect(makeRelative(root, root)).toBe('.');
+    });
+
+    it('should handle parent directories with ..', () => {
+      const root = '/Users/test/project/src';
+      const target = '/Users/test/project/docs/readme.md';
+      expect(makeRelative(target, root)).toBe('../docs/readme.md');
+    });
+  });
+
+  describe.skipIf(process.platform !== 'win32')('on Windows', () => {
+    it('should return relative path if targetPath is already relative', () => {
+      expect(makeRelative('foo/bar', 'C:\\root')).toBe('foo/bar');
+    });
+
+    it('should return relative path from root to target', () => {
+      const root = 'C:\\Users\\test\\project';
+      const target = 'C:\\Users\\test\\project\\src\\file.ts';
+      expect(makeRelative(target, root)).toBe('src\\file.ts');
+    });
+
+    it('should return "." if target and root are the same', () => {
+      const root = 'C:\\Users\\test\\project';
+      expect(makeRelative(root, root)).toBe('.');
+    });
+
+    it('should handle parent directories with ..', () => {
+      const root = 'C:\\Users\\test\\project\\src';
+      const target = 'C:\\Users\\test\\project\\docs\\readme.md';
+      expect(makeRelative(target, root)).toBe('..\\docs\\readme.md');
+    });
   });
 });
 
@@ -552,7 +678,19 @@ describe('normalizePath', () => {
     });
   });
 
-  describe.skipIf(process.platform === 'win32')('on POSIX', () => {
+  describe.skipIf(process.platform !== 'darwin')('on Darwin', () => {
+    beforeEach(() => mockPlatform('darwin'));
+    afterEach(() => vi.unstubAllGlobals());
+
+    it('should lowercase the entire path', () => {
+      const result = normalizePath('/Users/TEST');
+      expect(result).toBe('/users/test');
+    });
+  });
+
+  describe.skipIf(
+    process.platform === 'win32' || process.platform === 'darwin',
+  )('on Linux', () => {
     it('should preserve case', () => {
       const result = normalizePath('/usr/Local/Bin');
       expect(result).toContain('Local');

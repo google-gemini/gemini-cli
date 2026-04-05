@@ -5,12 +5,13 @@
  */
 
 import type React from 'react';
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import { Text, Box } from 'ink';
 import { theme } from '../../semantic-colors.js';
-import { useSelectionList } from '../../hooks/useSelectionList.js';
-
-import type { SelectionListItem } from '../../hooks/useSelectionList.js';
+import {
+  useSelectionList,
+  type SelectionListItem,
+} from '../../hooks/useSelectionList.js';
 
 export interface RenderItemContext {
   isSelected: boolean;
@@ -33,6 +34,7 @@ export interface BaseSelectionListProps<
   wrapAround?: boolean;
   focusKey?: string;
   priority?: boolean;
+  selectedIndicator?: string;
   renderItem: (item: TItem, context: RenderItemContext) => React.ReactNode;
 }
 
@@ -65,6 +67,7 @@ export function BaseSelectionList<
   wrapAround = true,
   focusKey,
   priority,
+  selectedIndicator = '●',
   renderItem,
 }: BaseSelectionListProps<T, TItem>): React.JSX.Element {
   const { activeIndex } = useSelectionList({
@@ -81,20 +84,27 @@ export function BaseSelectionList<
 
   const [scrollOffset, setScrollOffset] = useState(0);
 
-  // Handle scrolling for long lists
-  useEffect(() => {
-    const newScrollOffset = Math.max(
+  // Derive the effective scroll offset during render to avoid "no-selection" flicker.
+  // This ensures that the visibleItems calculation uses an offset that includes activeIndex.
+  let effectiveScrollOffset = scrollOffset;
+  if (activeIndex < effectiveScrollOffset) {
+    effectiveScrollOffset = activeIndex;
+  } else if (activeIndex >= effectiveScrollOffset + maxItemsToShow) {
+    effectiveScrollOffset = Math.max(
       0,
       Math.min(activeIndex - maxItemsToShow + 1, items.length - maxItemsToShow),
     );
-    if (activeIndex < scrollOffset) {
-      setScrollOffset(activeIndex);
-    } else if (activeIndex >= scrollOffset + maxItemsToShow) {
-      setScrollOffset(newScrollOffset);
-    }
-  }, [activeIndex, items.length, scrollOffset, maxItemsToShow]);
+  }
 
-  const visibleItems = items.slice(scrollOffset, scrollOffset + maxItemsToShow);
+  // Synchronize state if it changed during derivation
+  if (effectiveScrollOffset !== scrollOffset) {
+    setScrollOffset(effectiveScrollOffset);
+  }
+
+  const visibleItems = items.slice(
+    effectiveScrollOffset,
+    effectiveScrollOffset + maxItemsToShow,
+  );
   const numberColumnWidth = String(items.length).length;
 
   return (
@@ -102,14 +112,18 @@ export function BaseSelectionList<
       {/* Use conditional coloring instead of conditional rendering */}
       {showScrollArrows && items.length > maxItemsToShow && (
         <Text
-          color={scrollOffset > 0 ? theme.text.primary : theme.text.secondary}
+          color={
+            effectiveScrollOffset > 0
+              ? theme.text.primary
+              : theme.text.secondary
+          }
         >
           ▲
         </Text>
       )}
 
       {visibleItems.map((item, index) => {
-        const itemIndex = scrollOffset + index;
+        const itemIndex = effectiveScrollOffset + index;
         const isSelected = activeIndex === itemIndex;
 
         // Determine colors based on selection and disabled state
@@ -148,7 +162,7 @@ export function BaseSelectionList<
                 color={isSelected ? theme.ui.focus : theme.text.primary}
                 aria-hidden
               >
-                {isSelected ? '●' : ' '}
+                {isSelected ? selectedIndicator : ' '}
               </Text>
             </Box>
 
@@ -179,7 +193,7 @@ export function BaseSelectionList<
       {showScrollArrows && items.length > maxItemsToShow && (
         <Text
           color={
-            scrollOffset + maxItemsToShow < items.length
+            effectiveScrollOffset + maxItemsToShow < items.length
               ? theme.text.primary
               : theme.text.secondary
           }
