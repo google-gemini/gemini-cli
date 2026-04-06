@@ -4,16 +4,14 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { createMockEnvironment } from '../testing/contextTestUtils.js';
+import { createMockEnvironment, createDummyState, createDummyEpisode } from '../testing/contextTestUtils.js';
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { SemanticCompressionProcessor } from './semanticCompressionProcessor.js';
 import type {
-  Episode,
   UserPrompt,
   ToolExecution,
   AgentThought,
 } from '../ir/types.js';
-import type { ContextAccountingState } from '../pipeline.js';
 import { randomUUID } from 'node:crypto';
 import type { BaseLlmClient } from 'src/core/baseLlmClient.js';
 
@@ -27,51 +25,32 @@ describe('SemanticCompressionProcessor', () => {
     });
 
     const env = createMockEnvironment();
+    // Re-mock llmClient properly
     vi.spyOn(env, 'llmClient', 'get').mockReturnValue({ generateContent: generateContentMock } as unknown as BaseLlmClient);
+    
     processor = new SemanticCompressionProcessor(env, {
       nodeThresholdTokens: 2000,
     });
   });
 
-  const getDummyState = (
-    isSatisfied = false,
-    deficit = 0,
-    protectedIds = new Set<string>(),
-  ): ContextAccountingState => ({
-    currentTokens: 5000,
-    maxTokens: 10000,
-    retainedTokens: 4000,
-    deficitTokens: deficit,
-    protectedEpisodeIds: protectedIds,
-    isBudgetSatisfied: isSatisfied,
-  });
-
-  const createDummyEpisode = (
+  const createEpisodeWithThoughtsAndTools = (
     id: string,
     userText: string,
     thoughtText: string,
     toolObs: string,
-  ): Episode => ({
-    id,
-    timestamp: Date.now(),
-    trigger: {
-      id: randomUUID(),
-      type: 'USER_PROMPT',
-      semanticParts: [{ type: 'text', text: userText }],
-      metadata: {
-        originalTokens: 3800,
-        currentTokens: 3800,
-        transformations: [],
-      },
-    },
-    steps: [
+  ) => {
+    const ep = createDummyEpisode(id, 'USER_PROMPT', [{ type: 'text', text: userText }]);
+    // We override metadata for threshold triggering
+    ep.trigger.metadata.currentTokens = 3800;
+    
+    ep.steps = [
       {
         id: randomUUID(),
         type: 'AGENT_THOUGHT',
         text: thoughtText,
         metadata: {
-          originalTokens: 100,
-          currentTokens: 100,
+          originalTokens: 3800,
+          currentTokens: 3800,
           transformations: [],
         },
       },
@@ -88,23 +67,24 @@ describe('SemanticCompressionProcessor', () => {
           transformations: [],
         },
       },
-    ],
-  });
+    ];
+    return ep;
+  };
 
   it('bypasses processing if budget is satisfied', async () => {
-    const episodes = [createDummyEpisode('1', 'short', 'short', 'short')];
-    const state = getDummyState(true);
+    const episodes = [createEpisodeWithThoughtsAndTools('1', 'short', 'short', 'short')];
+    const state = createDummyState(true);
 
     await processor.process(episodes, state);
     expect(generateContentMock).not.toHaveBeenCalled();
   });
 
   it('skips protected episodes even if over budget', async () => {
-    const massiveStr = 'M'.repeat(15000); // Exceeds threshold (10 * 4 = 40)
+    const massiveStr = 'M'.repeat(15000); 
     const episodes = [
-      createDummyEpisode('ep-1', massiveStr, massiveStr, massiveStr),
+      createEpisodeWithThoughtsAndTools('ep-1', massiveStr, massiveStr, massiveStr),
     ];
-    const state = getDummyState(false, 1000, new Set(['ep-1']));
+    const state = createDummyState(false, 1000, new Set(['ep-1']));
 
     await processor.process(episodes, state);
     expect(generateContentMock).not.toHaveBeenCalled();
@@ -113,9 +93,9 @@ describe('SemanticCompressionProcessor', () => {
   it('summarizes unprotected UserPrompts, Thoughts, and Tool observations until deficit is met', async () => {
     const massiveStr = 'M'.repeat(15000);
     const episodes = [
-      createDummyEpisode('ep-1', massiveStr, massiveStr, massiveStr),
+      createEpisodeWithThoughtsAndTools('ep-1', massiveStr, massiveStr, massiveStr),
     ];
-    const state = getDummyState(false, 50000, new Set()); // Massive deficit, forces all 3 to summarize
+    const state = createDummyState(false, 50000); // Massive deficit, forces all 3 to summarize
 
     const result = await processor.process(episodes, state);
     expect(generateContentMock).toHaveBeenCalledTimes(3);
@@ -140,11 +120,11 @@ describe('SemanticCompressionProcessor', () => {
   it('stops calling LLM when deficit hits zero', async () => {
     const massiveStr = 'M'.repeat(15000);
     const episodes = [
-      createDummyEpisode('ep-1', massiveStr, massiveStr, massiveStr),
+      createEpisodeWithThoughtsAndTools('ep-1', massiveStr, massiveStr, massiveStr),
     ];
 
     // Set deficit low enough that ONE summary solves the problem
-    const state = getDummyState(false, 5, new Set());
+    const state = createDummyState(false, 5);
 
     await processor.process(episodes, state);
     // It should only compress the UserPrompt and then stop

@@ -13,6 +13,57 @@ import { ContextManager } from '../contextManager.js';
 
 import { InMemoryFileSystem } from '../system/InMemoryFileSystem.js';
 import { DeterministicIdGenerator } from '../system/DeterministicIdGenerator.js';
+import type { Episode } from '../ir/types.js';
+import type { ContextAccountingState } from '../pipeline.js';
+import { randomUUID } from 'node:crypto';
+
+export function createDummyState(
+  isSatisfied = false,
+  deficit = 0,
+  protectedIds = new Set<string>(),
+  currentTokens = 5000,
+  maxTokens = 10000,
+  retainedTokens = 4000,
+): ContextAccountingState {
+  return {
+    currentTokens,
+    maxTokens,
+    retainedTokens,
+    deficitTokens: deficit,
+    protectedEpisodeIds: protectedIds,
+    isBudgetSatisfied: isSatisfied,
+  };
+}
+
+export function createDummyEpisode(
+  id: string,
+  type: 'USER_PROMPT' | 'SYSTEM_EVENT',
+  parts: unknown[] = [],
+  toolSteps: { intent: Record<string, unknown>; observation: Record<string, unknown>; toolName?: string; tokens?: { intent: number; observation: number } }[] = []
+): Episode {
+  return {
+    id,
+    timestamp: Date.now(),
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
+    trigger: {
+      id: randomUUID(),
+      type,
+      name: type === 'SYSTEM_EVENT' ? 'dummy_event' : undefined,
+      payload: type === 'SYSTEM_EVENT' ? {} : undefined,
+      semanticParts: type === 'USER_PROMPT' ? parts as any : undefined,
+      metadata: { originalTokens: 100, currentTokens: 100, transformations: [] },
+    } as any,
+    steps: toolSteps.map(step => ({
+      id: randomUUID(),
+      type: 'TOOL_EXECUTION',
+      toolName: step.toolName || 'test_tool',
+      intent: step.intent,
+      observation: step.observation,
+      tokens: step.tokens || { intent: 50, observation: 50 },
+      metadata: { originalTokens: 100, currentTokens: 100, transformations: [] },
+    })),
+  };
+}
 
 export function createMockEnvironment(): ContextEnvironment {
   return {

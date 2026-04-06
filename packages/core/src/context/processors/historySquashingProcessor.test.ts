@@ -3,16 +3,14 @@
  * Copyright 2026 Google LLC
  * SPDX-License-Identifier: Apache-2.0
  */
-import { createMockEnvironment } from '../testing/contextTestUtils.js';
+import { createMockEnvironment, createDummyState, createDummyEpisode } from '../testing/contextTestUtils.js';
 import { describe, it, expect, beforeEach } from 'vitest';
 import { HistorySquashingProcessor } from './historySquashingProcessor.js';
 import type {
-  Episode,
   UserPrompt,
   AgentThought,
   AgentYield,
 } from '../ir/types.js';
-import type { ContextAccountingState } from '../pipeline.js';
 import { randomUUID } from 'node:crypto';
 
 describe('HistorySquashingProcessor', () => {
@@ -24,37 +22,10 @@ describe('HistorySquashingProcessor', () => {
     });
   });
 
-  const getDummyState = (
-    isSatisfied = false,
-    deficit = 0,
-    protectedIds = new Set<string>(),
-  ): ContextAccountingState => ({
-    currentTokens: 5000,
-    maxTokens: 10000,
-    retainedTokens: 4000,
-    deficitTokens: deficit,
-    protectedEpisodeIds: protectedIds,
-    isBudgetSatisfied: isSatisfied,
-  });
-
-  const createDummyEpisode = (
-    id: string,
-    userText: string,
-    modelThought: string,
-  ): Episode => ({
-    id,
-    timestamp: Date.now(),
-    trigger: {
-      id: randomUUID(),
-      type: 'USER_PROMPT',
-      semanticParts: [{ type: 'text', text: userText }],
-      metadata: {
-        originalTokens: 1000,
-        currentTokens: 1000,
-        transformations: [],
-      },
-    },
-    steps: [
+  const createThoughtEpisode = (id: string, userText: string, modelThought: string) => {
+    const ep = createDummyEpisode(id, 'USER_PROMPT', [{ type: 'text', text: userText }]);
+    // Replace the tool steps with a thought step for this test
+    ep.steps = [
       {
         id: randomUUID(),
         type: 'AGENT_THOUGHT',
@@ -65,12 +36,13 @@ describe('HistorySquashingProcessor', () => {
           transformations: [],
         },
       },
-    ],
-  });
+    ];
+    return ep;
+  };
 
   it('bypasses processing if budget is satisfied', async () => {
-    const episodes = [createDummyEpisode('1', 'short text', 'short thought')];
-    const state = getDummyState(true);
+    const episodes = [createThoughtEpisode('1', 'short text', 'short thought')];
+    const state = createDummyState(true);
 
     const result = await processor.process(episodes, state);
 
@@ -83,8 +55,8 @@ describe('HistorySquashingProcessor', () => {
   it('skips protected episodes', async () => {
     // 500 chars = ~125 tokens. Limit is 100 tokens, so it WOULD truncate if not protected.
     const longText = 'A'.repeat(500);
-    const episodes = [createDummyEpisode('ep-1', longText, 'short thought')];
-    const state = getDummyState(false, 100, new Set(['ep-1']));
+    const episodes = [createThoughtEpisode('ep-1', longText, 'short thought')];
+    const state = createDummyState(false, 100, new Set(['ep-1']));
 
     const result = await processor.process(episodes, state);
 
@@ -96,8 +68,8 @@ describe('HistorySquashingProcessor', () => {
   it('truncates both UserPrompts and AgentThoughts', async () => {
     const longUser = 'U'.repeat(1000); // ~250 tokens
     const longModel = 'M'.repeat(1000); // ~250 tokens
-    const episodes = [createDummyEpisode('ep-2', longUser, longModel)];
-    const state = getDummyState(false, 500, new Set()); // High deficit, force truncation
+    const episodes = [createThoughtEpisode('ep-2', longUser, longModel)];
+    const state = createDummyState(false, 500); // High deficit, force truncation
 
     const result = await processor.process(episodes, state);
 
@@ -123,13 +95,13 @@ describe('HistorySquashingProcessor', () => {
     const longUser1 = 'A'.repeat(1000);
     const longUser2 = 'B'.repeat(1000);
     const episodes = [
-      createDummyEpisode('ep-3', longUser1, 'short'),
-      createDummyEpisode('ep-4', longUser2, 'short'),
+      createThoughtEpisode('ep-3', longUser1, 'short'),
+      createThoughtEpisode('ep-4', longUser2, 'short'),
     ];
 
     // Set deficit to exactly what ONE truncation will save
     // Original = ~250 tokens. Limit = 100. Truncation saves ~150 tokens.
-    const state = getDummyState(false, 150, new Set());
+    const state = createDummyState(false, 150);
 
     const result = await processor.process(episodes, state);
 
@@ -144,7 +116,7 @@ describe('HistorySquashingProcessor', () => {
 
   it('truncates IrNodes', async () => {
     const longYield = 'Y'.repeat(1000); // ~250 tokens
-    const ep = createDummyEpisode('ep-5', 'short', 'short');
+    const ep = createThoughtEpisode('ep-5', 'short', 'short');
     ep.yield = {
       id: randomUUID(),
       type: 'AGENT_YIELD',
@@ -156,7 +128,7 @@ describe('HistorySquashingProcessor', () => {
       },
     };
 
-    const state = getDummyState(false, 500, new Set());
+    const state = createDummyState(false, 500);
     const result = await processor.process([ep], state);
 
     const yieldPart = result[0].yield as AgentYield;
