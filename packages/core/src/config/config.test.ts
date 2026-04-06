@@ -3380,6 +3380,38 @@ describe('Plans Directory Initialization', () => {
     );
   });
 
+  it('should deduplicate and cache when multiple extensions (or default) use the same directory', async () => {
+    vi.spyOn(fs, 'mkdirSync').mockReturnValue(undefined);
+    const config = new Config({
+      ...baseParams,
+      plan: true,
+    });
+
+    await config.initialize();
+
+    // 1. Call for Default Plan Dir
+    const defaultDir = config.getPlansDir();
+    expect(fs.mkdirSync).toHaveBeenCalledTimes(1);
+
+    // 2. Mock an extension that happens to use the SAME directory string
+    vi.spyOn(
+      config as unknown as {
+        getActiveExtensionPlanDir: () => string | undefined;
+      },
+      'getActiveExtensionPlanDir',
+    ).mockReturnValue(
+      'plans', // This will resolve to the same path as the default in our mock setup
+    );
+
+    const extDir = config.getPlansDir();
+
+    // It should be the same path
+    expect(extDir).toBe(defaultDir);
+
+    // It should NOT have called mkdirSync a second time
+    expect(fs.mkdirSync).toHaveBeenCalledTimes(1);
+  });
+
   it('should NOT create plans directory or add it to workspace context when plan is disabled', async () => {
     vi.spyOn(fs, 'mkdirSync').mockReturnValue(undefined);
     const config = new Config({
