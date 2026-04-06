@@ -41,6 +41,8 @@ export class AgentTool extends BaseDeclarativeTool<
   { agent_name: string; prompt: string },
   ToolResult
 > {
+  static readonly Name = AGENT_TOOL_NAME;
+
   constructor(
     private readonly context: AgentLoopContext,
     messageBus: MessageBus,

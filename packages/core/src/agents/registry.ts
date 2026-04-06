@@ -16,6 +16,7 @@ import { CliHelpAgent } from './cli-help-agent.js';
 import { GeneralistAgent } from './generalist-agent.js';
 import { BrowserAgentDefinition } from './browser/browserAgentDefinition.js';
 import { MemoryManagerAgent } from './memory-manager-agent.js';
+import { AgentTool } from './agent-tool.js';
 import { A2AAuthProviderFactory } from './auth-provider/factory.js';
 import type { AuthenticationHandler } from '@a2a-js/sdk/client';
 import { type z } from 'zod';
@@ -59,11 +60,11 @@ export class AgentRegistry {
       await this.loadAgents();
       return;
     }
+    this.initialized = true;
 
     coreEvents.on(CoreEvent.ModelChanged, this.onModelChanged);
 
     await this.loadAgents();
-    this.initialized = true;
   }
 
   private onModelChanged = () => {
@@ -115,6 +116,11 @@ export class AgentRegistry {
     this.agents.clear();
     this.allDefinitions.clear();
     this.loadBuiltInAgents();
+
+    // Clear old dynamic rules before reloading
+    this.config
+      .getPolicyEngine()
+      ?.removeRulesBySource('AgentRegistry (Dynamic)');
 
     if (!this.config.isAgentsEnabled()) {
       return;
@@ -385,19 +391,16 @@ export class AgentRegistry {
       return;
     }
 
-    // Clean up any old dynamic policy for this tool (e.g. if we are overwriting an agent)
-    policyEngine.removeRulesForTool(definition.name, 'AgentRegistry (Dynamic)');
-
-    // Add the new dynamic policy
-    policyEngine.addRule({
-      toolName: definition.name,
-      decision:
-        definition.kind === 'local'
-          ? PolicyDecision.ALLOW
-          : PolicyDecision.ASK_USER,
-      priority: PRIORITY_SUBAGENT_TOOL,
-      source: 'AgentRegistry (Dynamic)',
-    });
+    // Only add override for remote agents. Local agents are handled by blanket allow.
+    if (definition.kind === 'remote') {
+      policyEngine.addRule({
+        toolName: AgentTool.Name,
+        argsPattern: new RegExp(`"agent_name":\\s*"${definition.name}"`),
+        decision: PolicyDecision.ASK_USER,
+        priority: PRIORITY_SUBAGENT_TOOL + 0.1, // Higher priority to override blanket allow
+        source: 'AgentRegistry (Dynamic)',
+      });
+    }
   }
 
   private isAgentEnabled<TOutput extends z.ZodTypeAny>(
