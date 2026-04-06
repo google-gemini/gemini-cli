@@ -8,15 +8,30 @@ import type { BaseLlmClient } from '../../core/baseLlmClient.js';
 import type { ContextTracer } from '../tracer.js';
 import type { ContextEnvironment } from './environment.js';
 
+import type { ContextEventBus } from '../eventBus.js';
+
 export class ContextEnvironmentImpl implements ContextEnvironment {
+  private eventBus?: ContextEventBus;
+
   constructor(
     private llmClient: BaseLlmClient,
     private sessionId: string,
+    private promptId: string,
     private traceDir: string,
     private tempDir: string,
     private tracer: ContextTracer,
     private charsPerToken: number,
   ) {}
+
+  // TODO(joshualitt): Idiomatic getters and setters
+  setEventBus(bus: ContextEventBus) {
+    this.eventBus = bus;
+  }
+
+  getEventBus(): ContextEventBus {
+    if (!this.eventBus) throw new Error('EventBus not bound');
+    return this.eventBus;
+  }
 
   getLlmClient(): BaseLlmClient {
     return this.llmClient;
@@ -40,5 +55,9 @@ export class ContextEnvironmentImpl implements ContextEnvironment {
 
   getCharsPerToken(): number {
     return this.charsPerToken;
+  }
+
+  getPromptId(): string {
+    return this.promptId;
   }
 }

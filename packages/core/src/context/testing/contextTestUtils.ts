@@ -8,7 +8,6 @@ import { vi } from 'vitest';
 import type { Config } from '../../config/config.js';
 
 import type { ContextEnvironment } from '../sidecar/environment.js';
-
 export function createMockEnvironment(): ContextEnvironment {
   return {
     getLlmClient: vi.fn().mockReturnValue({
@@ -18,15 +17,12 @@ export function createMockEnvironment(): ContextEnvironment {
     }) as any,
     getSessionId: vi.fn().mockReturnValue('mock-session'),
     getTraceDir: vi.fn().mockReturnValue('/tmp/.gemini/trace'),
-    getProjectTempDir: vi.fn().mockReturnValue('/tmp'),
-    getTracer: vi.fn().mockReturnValue({
-      logEvent: vi.fn(),
-      saveAsset: vi.fn().mockReturnValue('mock-asset-id'),
-    }) as any,
+    getProjectTempDir: vi.fn().mockReturnValue('/tmp/.gemini/tool-outputs'),
+    getEventBus: vi.fn(),
+    getTracer: vi.fn(),
     getCharsPerToken: vi.fn().mockReturnValue(1),
   };
 }
-
 import type { Content } from '@google/genai';
 import { AgentChatHistory } from '../../core/agentChatHistory.js';
 import { ContextManager } from '../contextManager.js';

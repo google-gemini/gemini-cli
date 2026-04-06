@@ -15,6 +15,18 @@ export interface ProcessorConfig {
   options: Record<string, unknown>;
 }
 
+export type PipelineTrigger =
+  | 'on_turn'
+  | 'post_turn'
+  | 'budget_exceeded'
+  | { type: 'timer'; intervalMs: number };
+
+export interface PipelineDef {
+  name: string;
+  triggers: PipelineTrigger[];
+  processors: ProcessorConfig[];
+}
+
 /**
  * The Data-Driven Schema for the Context Manager.
  */
@@ -33,23 +45,5 @@ export interface SidecarConfig {
   };
 
   /** The execution graphs for context manipulation */
-  pipelines: {
-    /**
-     * Eagerly executes in the background when the 'retainedTokens' boundary is crossed.
-     * Contains AsyncContextWorkers (e.g. StateSnapshotWorker).
-     */
-    eagerBackground: ProcessorConfig[];
-
-    /**
-     * Executes sequentially to protect the pristine outliers within the retained window.
-     * Contains ContextProcessors (e.g. HistorySquashingProcessor).
-     */
-    retainedProcessingGraph: ProcessorConfig[];
-
-    /**
-     * Executes sequentially to opportunistically degrade messages older than the retained window.
-     * Contains ContextProcessors (e.g. ToolMaskingProcessor, SemanticCompressionProcessor).
-     */
-    normalProcessingGraph: ProcessorConfig[];
-  };
+  pipelines: PipelineDef[];
 }
