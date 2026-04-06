@@ -10,17 +10,20 @@ import { ToolMaskingProcessor } from './toolMaskingProcessor.js';
 import type { Episode, ToolExecution } from '../ir/types.js';
 import type { ContextAccountingState } from '../pipeline.js';
 import { randomUUID } from 'node:crypto';
-import * as fsPromises from 'node:fs/promises';
-
-vi.mock('node:fs/promises');
+import type { ContextEnvironment } from '../sidecar/environment.js';
+import { InMemoryFileSystem } from '../system/InMemoryFileSystem.js';
 
 describe('ToolMaskingProcessor', () => {
   let processor: ToolMaskingProcessor;
+  let env: ContextEnvironment;
+  let fileSystem: InMemoryFileSystem;
 
   beforeEach(() => {
     vi.resetAllMocks();
+    env = createMockEnvironment();
+    fileSystem = env.fileSystem as InMemoryFileSystem;
 
-    processor = new ToolMaskingProcessor(createMockEnvironment(), {
+    processor = new ToolMaskingProcessor(env, {
       stringLengthThresholdTokens: 100,
     });
   });
@@ -76,10 +79,6 @@ describe('ToolMaskingProcessor', () => {
     const state = getDummyState(true);
 
     const result = await processor.process(episodes, state);
-    require('fs').appendFileSync(
-      '/tmp/debug.json',
-      '\n\n' + JSON.stringify({ res: result[0].steps[0] }, null, 2),
-    );
 
     expect(result).toStrictEqual(episodes);
     expect((result[0].steps[0] as ToolExecution).presentation).toBeUndefined();
@@ -124,7 +123,7 @@ describe('ToolMaskingProcessor', () => {
     );
     expect((maskedObs as { error: string }).error).toBeNull();
 
-    // Check disk writes occurred
-    expect(fsPromises.writeFile).toHaveBeenCalledTimes(2);
+    // Check disk writes occurred to fake FS
+    expect(fileSystem.getFiles().size).toBe(2);
   });
 });

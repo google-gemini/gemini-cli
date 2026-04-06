@@ -8,8 +8,6 @@ import type { ContextAccountingState, ContextProcessor } from '../pipeline.js';
 import type { ContextEnvironment } from '../sidecar/environment.js';
 
 import { sanitizeFilenamePart } from '../../utils/fileUtils.js';
-import * as fsPromises from 'node:fs/promises';
-import path from 'node:path';
 import {
   ACTIVATE_SKILL_TOOL_NAME,
   MEMORY_TOOL_NAME,
@@ -50,15 +48,15 @@ export class ToolMaskingProcessor implements ContextProcessor {
 
     const newEpisodes = [...episodes];
     let currentDeficit = state.deficitTokens;
-    const limitChars = maskingConfig.stringLengthThresholdTokens * this.env.charsPerToken;
+    const limitChars = this.env.tokenCalculator.tokensToChars(maskingConfig.stringLengthThresholdTokens);
 
-    let toolOutputsDir = path.join(
+    let toolOutputsDir = this.env.fileSystem.join(
       this.env.projectTempDir,
       'tool-outputs',
     );
     const sessionId = this.env.sessionId;
     if (sessionId) {
-      toolOutputsDir = path.join(
+      toolOutputsDir = this.env.fileSystem.join(
         toolOutputsDir,
         `session-${sanitizeFilenamePart(sessionId)}`,
       );
@@ -75,14 +73,14 @@ export class ToolMaskingProcessor implements ContextProcessor {
       nodeType: string,
     ): Promise<string> => {
       if (!directoryCreated) {
-        await fsPromises.mkdir(toolOutputsDir, { recursive: true });
+        await this.env.fileSystem.mkdir(toolOutputsDir, { recursive: true });
         directoryCreated = true;
       }
 
-      const fileName = `${sanitizeFilenamePart(toolName).toLowerCase()}_${sanitizeFilenamePart(callId).toLowerCase()}_${nodeType}_${Math.random().toString(36).substring(7)}.txt`;
-      const filePath = path.join(toolOutputsDir, fileName);
+      const fileName = `${sanitizeFilenamePart(toolName).toLowerCase()}_${sanitizeFilenamePart(callId).toLowerCase()}_${nodeType}_${this.env.idGenerator.generateId()}.txt`;
+      const filePath = this.env.fileSystem.join(toolOutputsDir, fileName);
 
-      await fsPromises.writeFile(filePath, content, 'utf-8');
+      await this.env.fileSystem.writeFile(filePath, content);
 
       const fileSizeMB = (
         Buffer.byteLength(content, 'utf8') /

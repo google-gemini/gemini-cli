@@ -37,7 +37,7 @@ export class SemanticCompressionProcessor implements ContextProcessor {
 
     const semanticConfig = this.options;
     const limitTokens = semanticConfig.nodeThresholdTokens;
-    const thresholdChars = limitTokens * this.env.charsPerToken;
+    const thresholdChars = this.env.tokenCalculator.tokensToChars(limitTokens);
     this.modelToUse = 'gemini-2.5-flash';
 
     let currentDeficit = state.deficitTokens;

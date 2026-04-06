@@ -11,6 +11,9 @@ import type { Content } from '@google/genai';
 import { AgentChatHistory } from '../../core/agentChatHistory.js';
 import { ContextManager } from '../contextManager.js';
 
+import { InMemoryFileSystem } from '../system/InMemoryFileSystem.js';
+import { DeterministicIdGenerator } from '../system/DeterministicIdGenerator.js';
+
 export function createMockEnvironment(): ContextEnvironment {
   return {
     // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
@@ -27,6 +30,8 @@ export function createMockEnvironment(): ContextEnvironment {
     tracer: new ContextTracer({ targetDir: '/tmp', sessionId: 'mock-session' }),
     charsPerToken: 1,
     tokenCalculator: new ContextTokenCalculator(1),
+    fileSystem: new InMemoryFileSystem(),
+    idGenerator: new DeterministicIdGenerator('mock-uuid-'),
   };
 }
 

@@ -9,17 +9,19 @@ import { BlobDegradationProcessor } from './blobDegradationProcessor.js';
 import type { Episode, UserPrompt } from '../ir/types.js';
 import type { ContextAccountingState } from '../pipeline.js';
 import { randomUUID } from 'node:crypto';
-import * as fsPromises from 'node:fs/promises';
-
-vi.mock('node:fs/promises');
+import type { ContextEnvironment } from '../sidecar/environment.js';
+import { InMemoryFileSystem } from '../system/InMemoryFileSystem.js';
 
 describe('BlobDegradationProcessor', () => {
   let processor: BlobDegradationProcessor;
+  let env: ContextEnvironment;
+  let fileSystem: InMemoryFileSystem;
 
   beforeEach(() => {
     vi.resetAllMocks();
-
-    processor = new BlobDegradationProcessor(createMockEnvironment());
+    env = createMockEnvironment();
+    fileSystem = env.fileSystem as InMemoryFileSystem;
+    processor = new BlobDegradationProcessor(env);
   });
 
   const getDummyState = (
@@ -61,7 +63,6 @@ describe('BlobDegradationProcessor', () => {
       steps: [],
     };
 
-    // Fake token calculator says inlineData costs 258 tokens, text costs 10
     const state = getDummyState(false, 500, new Set());
     const result = await processor.process([ep], state);
 
@@ -79,7 +80,11 @@ describe('BlobDegradationProcessor', () => {
       'degraded to text to preserve context window',
     );
 
-    expect(fsPromises.writeFile).toHaveBeenCalledTimes(1);
+    // Verify it was written to fake FS
+    expect(fileSystem.getFiles().size).toBeGreaterThan(0);
+    const files = Array.from(fileSystem.getFiles().keys());
+    expect(files[0]).toContain('.gemini/tool-outputs/degraded-blobs/session-mock-session/blob_');
+    
     expect(result[0].trigger.metadata.transformations.length).toBe(1);
   });
 
@@ -118,6 +123,6 @@ describe('BlobDegradationProcessor', () => {
       'Original URI: gs://fake-bucket/doc.pdf',
     );
 
-    expect(fsPromises.writeFile).not.toHaveBeenCalled();
+    expect(fileSystem.getFiles().size).toBe(0);
   });
 });

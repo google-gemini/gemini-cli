@@ -8,8 +8,6 @@ import type { ContextAccountingState, ContextProcessor } from '../pipeline.js';
 import type { ContextEnvironment } from '../sidecar/environment.js';
 
 import { sanitizeFilenamePart } from '../../utils/fileUtils.js';
-import * as fsPromises from 'node:fs/promises';
-import path from 'node:path';
 import type { Part } from '@google/genai';
 
 export class BlobDegradationProcessor implements ContextProcessor {
@@ -32,13 +30,13 @@ export class BlobDegradationProcessor implements ContextProcessor {
     const newEpisodes = [...episodes];
     let directoryCreated = false;
 
-    let blobOutputsDir = path.join(
+    let blobOutputsDir = this.env.fileSystem.join(
       this.env.projectTempDir,
       'degraded-blobs',
     );
     const sessionId = this.env.sessionId;
     if (sessionId) {
-      blobOutputsDir = path.join(
+      blobOutputsDir = this.env.fileSystem.join(
         blobOutputsDir,
         `session-${sanitizeFilenamePart(sessionId)}`,
       );
@@ -46,7 +44,7 @@ export class BlobDegradationProcessor implements ContextProcessor {
 
     const ensureDir = async () => {
       if (!directoryCreated) {
-        await fsPromises.mkdir(blobOutputsDir, { recursive: true });
+        await this.env.fileSystem.mkdir(blobOutputsDir, { recursive: true });
         directoryCreated = true;
       }
     };
@@ -69,12 +67,12 @@ export class BlobDegradationProcessor implements ContextProcessor {
           if (part.type === 'inline_data') {
             await ensureDir();
             const ext = part.mimeType.split('/')[1] || 'bin';
-            const fileName = `blob_${Date.now()}_${Math.random().toString(36).substring(7)}.${ext}`;
-            const filePath = path.join(blobOutputsDir, fileName);
+            const fileName = `blob_${Date.now()}_${this.env.idGenerator.generateId()}.${ext}`;
+            const filePath = this.env.fileSystem.join(blobOutputsDir, fileName);
 
             // Base64 to buffer
             const buffer = Buffer.from(part.data, 'base64');
-            await fsPromises.writeFile(filePath, buffer);
+            await this.env.fileSystem.writeFile(filePath, buffer);
 
             const mb = (buffer.byteLength / 1024 / 1024).toFixed(2);
             newText = `[Multi-Modal Blob (${part.mimeType}, ${mb}MB) degraded to text to preserve context window. Saved to: ${filePath}]`;
