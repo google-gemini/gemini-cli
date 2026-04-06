@@ -271,11 +271,13 @@ mcpName = "my_server"
 toolName = "dangerous_tool"
 decision = "ask_user"
 priority = 100
+modes = ["default", "autoEdit"]
 
 [[safety_checker]]
 mcpName = "my_server"
 toolName = "write_data"
 priority = 200
+modes = ["default", "autoEdit"]
 [safety_checker.checker]
 type = "in-process"
 name = "allowed-path"
