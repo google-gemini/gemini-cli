@@ -36,7 +36,7 @@ export class HistoryObserver {
 
     this.unsubscribeHistory = this.chatHistory.subscribe((_event: HistoryEvent) => {
       // Rebuild the pristine IR graph from the full source history on every change.
-      const pristineEpisodes = IrMapper.toIr(this.chatHistory.get());
+      const pristineEpisodes = IrMapper.toIr(this.chatHistory.get(), this.sidecar.tokenCalculator);
       this.tracer.logEvent('HistoryObserver', 'Rebuilt pristine graph from chat history update', { episodeCount: pristineEpisodes.length });
       
       this.onIrRebuilt(pristineEpisodes);

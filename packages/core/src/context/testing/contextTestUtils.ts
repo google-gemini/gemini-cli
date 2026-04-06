@@ -26,6 +26,7 @@ export function createMockEnvironment(): ContextEnvironment {
     eventBus: new ContextEventBus(),
     tracer: new ContextTracer('/tmp', 'mock-session'),
     charsPerToken: 1,
+    tokenCalculator: new ContextTokenCalculator(1),
   };
 }
 
@@ -89,6 +90,7 @@ import { ContextTracer } from '../tracer.js';
 import { ContextEnvironmentImpl } from '../sidecar/environmentImpl.js';
 import { SidecarLoader } from '../sidecar/SidecarLoader.js';
 import { ContextEventBus } from '../eventBus.js';
+import { ContextTokenCalculator } from '../utils/contextTokenCalculator.js';
 import type { BaseLlmClient } from 'src/core/baseLlmClient.js';
 
 export function setupContextComponentTest(config: Config) {

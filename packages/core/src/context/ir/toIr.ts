@@ -16,7 +16,7 @@ import type {
   UserPrompt,
   SystemEvent,
 } from './types.js';
-import { estimateContextTokenCountSync } from '../utils/contextTokenCalculator.js';
+import type { ContextTokenCalculator } from '../utils/contextTokenCalculator.js';
 
 // WeakMap to provide stable, deterministic identity across parses for the exact same Content/Part references
 const nodeIdentityMap = new WeakMap<object, string>();
@@ -30,25 +30,19 @@ export function getStableId(obj: object): string {
   return id;
 }
 
-export let charsPerTokenConfig: { charsPerToken?: number } | undefined;
-
-export function setMapperConfig(cfg: { charsPerToken?: number }) {
-  charsPerTokenConfig = cfg;
-}
-
-export function createMetadata(parts: Part[]): IrMetadata {
-  const tokens = estimateContextTokenCountSync(parts, 0, charsPerTokenConfig);
-  return {
-    originalTokens: tokens,
-    currentTokens: tokens,
-    transformations: [],
-  };
-}
-
-export function toIr(history: readonly Content[]): Episode[] {
+export function toIr(history: readonly Content[], tokenCalculator: ContextTokenCalculator): Episode[] {
   const episodes: Episode[] = [];
   let currentEpisode: Partial<Episode> | null = null;
   const pendingCallParts: Map<string, Part> = new Map();
+
+  const createMetadata = (parts: Part[]): IrMetadata => {
+    const tokens = tokenCalculator.estimateTokensForParts(parts, 0);
+    return {
+      originalTokens: tokens,
+      currentTokens: tokens,
+      transformations: [],
+    };
+  };
 
   const finalizeEpisode = () => {
     if (currentEpisode && currentEpisode.trigger) {
@@ -67,15 +61,15 @@ export function toIr(history: readonly Content[]): Episode[] {
       );
 
       if (hasToolResponses) {
-        currentEpisode = parseToolResponses(msg, currentEpisode, pendingCallParts);
+        currentEpisode = parseToolResponses(msg, currentEpisode, pendingCallParts, tokenCalculator, createMetadata);
       }
 
       if (hasUserParts) {
         finalizeEpisode();
-        currentEpisode = parseUserParts(msg);
+        currentEpisode = parseUserParts(msg, createMetadata);
       }
     } else if (msg.role === 'model') {
-      currentEpisode = parseModelParts(msg, currentEpisode, pendingCallParts);
+      currentEpisode = parseModelParts(msg, currentEpisode, pendingCallParts, createMetadata);
     }
   }
 
@@ -91,6 +85,8 @@ function parseToolResponses(
   msg: Content,
   currentEpisode: Partial<Episode> | null,
   pendingCallParts: Map<string, Part>,
+  tokenCalculator: ContextTokenCalculator,
+  createMetadata: (parts: Part[]) => IrMetadata
 ): Partial<Episode> {
   if (!currentEpisode) {
     currentEpisode = {
@@ -113,9 +109,9 @@ function parseToolResponses(
       const matchingCall = pendingCallParts.get(callId);
 
       const intentTokens = matchingCall
-        ? estimateContextTokenCountSync([matchingCall])
+        ? tokenCalculator.estimateTokensForParts([matchingCall])
         : 0;
-      const obsTokens = estimateContextTokenCountSync([part]);
+      const obsTokens = tokenCalculator.estimateTokensForParts([part]);
 
       const step: ToolExecution = {
         id: getStableId(part),
@@ -150,7 +146,7 @@ function parseToolResponses(
   return currentEpisode;
 }
 
-function parseUserParts(msg: Content): Partial<Episode> {
+function parseUserParts(msg: Content, createMetadata: (parts: Part[]) => IrMetadata): Partial<Episode> {
   const semanticParts: SemanticPart[] = [];
   for (const p of msg.parts!) {
     if (p.text !== undefined)
@@ -192,6 +188,7 @@ function parseModelParts(
   msg: Content,
   currentEpisode: Partial<Episode> | null,
   pendingCallParts: Map<string, Part>,
+  createMetadata: (parts: Part[]) => IrMetadata
 ): Partial<Episode> {
   if (!currentEpisode) {
     currentEpisode = {

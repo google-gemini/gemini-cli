@@ -10,7 +10,7 @@ import type { ContextEnvironment } from '../sidecar/environment.js';
 import { debugLogger } from '../../utils/debugLogger.js';
 import { LlmRole } from '../../telemetry/types.js';
 import { getResponseText } from '../../utils/partUtils.js';
-import { estimateTokenCountSync } from '../../utils/tokenCalculation.js';
+import { estimateContextTokenCountSync } from '../utils/contextTokenCalculator.js';
 
 export class SemanticCompressionProcessor implements ContextProcessor {
   readonly name = 'SemanticCompression';
@@ -30,22 +30,14 @@ export class SemanticCompressionProcessor implements ContextProcessor {
     episodes: Episode[],
     state: ContextAccountingState,
   ): Promise<Episode[]> {
-    require('fs').appendFileSync(
-      '/tmp/debug2.json',
-      'SEMANTIC PROCESS: First episode ID: ' +
-        episodes[0]?.id +
-        '\nProtected IDs: ' +
-        Array.from(state.protectedEpisodeIds).join(', ') +
-        '\n',
-    );
     // If the budget is satisfied, or semantic compression isn't enabled
     if (state.isBudgetSatisfied) {
       return episodes;
     }
 
     const semanticConfig = this.options;
-    // We estimate 4 chars per token for truncation logic
-    const thresholdChars = semanticConfig.nodeThresholdTokens * 4;
+    const limitTokens = semanticConfig.nodeThresholdTokens;
+    const thresholdChars = limitTokens * this.env.charsPerToken;
     this.modelToUse = 'gemini-2.5-flash';
 
     let currentDeficit = state.deficitTokens;
@@ -70,8 +62,8 @@ export class SemanticCompressionProcessor implements ContextProcessor {
               part.text,
               'User Prompt',
             );
-            const newTokens = estimateTokenCountSync([{ text: summary }]);
-            const oldTokens = estimateTokenCountSync([{ text: part.text }]);
+            const newTokens = estimateContextTokenCountSync([{ text: summary }], 0, { charsPerToken: this.env.charsPerToken });
+            const oldTokens = estimateContextTokenCountSync([{ text: part.text }], 0, { charsPerToken: this.env.charsPerToken });
 
             if (newTokens < oldTokens) {
               part.presentation = { text: summary, tokens: newTokens };
@@ -96,8 +88,8 @@ export class SemanticCompressionProcessor implements ContextProcessor {
               step.text,
               'Agent Thought',
             );
-            const newTokens = estimateTokenCountSync([{ text: summary }]);
-            const oldTokens = estimateTokenCountSync([{ text: step.text }]);
+            const newTokens = estimateContextTokenCountSync([{ text: summary }], 0, { charsPerToken: this.env.charsPerToken });
+            const oldTokens = estimateContextTokenCountSync([{ text: step.text }], 0, { charsPerToken: this.env.charsPerToken });
 
             if (newTokens < oldTokens) {
               step.presentation = { text: summary, tokens: newTokens };
@@ -138,7 +130,7 @@ export class SemanticCompressionProcessor implements ContextProcessor {
             // Wrap the summary in an object so the Gemini API accepts it as a valid functionResponse.response
             const newObsObject = { summary };
 
-            const newObsTokens = estimateTokenCountSync([
+            const newObsTokens = estimateContextTokenCountSync([
               {
                 functionResponse: {
                   name: step.toolName,
@@ -146,7 +138,7 @@ export class SemanticCompressionProcessor implements ContextProcessor {
                   id: step.id,
                 },
               },
-            ]);
+            ], 0, { charsPerToken: this.env.charsPerToken });
 
             const oldObsTokens =
               step.presentation?.tokens.observation ?? step.tokens.observation;

@@ -10,7 +10,11 @@ import type { ContextEnvironment } from './environment.js';
 
 import type { ContextEventBus } from '../eventBus.js';
 
+import { ContextTokenCalculator } from '../utils/contextTokenCalculator.js';
+
 export class ContextEnvironmentImpl implements ContextEnvironment {
+  public readonly tokenCalculator: ContextTokenCalculator;
+
   constructor(
     public readonly llmClient: BaseLlmClient,
     public readonly sessionId: string,
@@ -20,5 +24,7 @@ export class ContextEnvironmentImpl implements ContextEnvironment {
     public readonly tracer: ContextTracer,
     public readonly charsPerToken: number,
     public readonly eventBus: ContextEventBus,
-  ) {}
+  ) {
+    this.tokenCalculator = new ContextTokenCalculator(this.charsPerToken);
+  }
 }
