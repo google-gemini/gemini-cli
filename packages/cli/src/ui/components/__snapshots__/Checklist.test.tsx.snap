@@ -22,9 +22,3 @@ exports[`<Checklist /> > renders summary view without in-progress item if none e
  Test List  1/2 completed
 "
 `;
-
-exports[`<Checklist /> > renders summary view without in-progress item if none exists 2`] = `
-"────────────────────────────────────────────────────────────────────────────────────────────────────
- Test List  1/2 completed
-"
-`;
