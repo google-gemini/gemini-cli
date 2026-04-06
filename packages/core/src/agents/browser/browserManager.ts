@@ -563,7 +563,9 @@ export class BrowserManager {
     // Add optional settings from config.
     // Force headless in seatbelt sandbox since Chrome profile/display access
     // may be restricted, and the user is running in a sandboxed environment.
-    if (browserConfig.customConfig.headless || isSeatbeltSandbox) {
+    const effectiveHeadless =
+      !!browserConfig.customConfig.headless || isSeatbeltSandbox;
+    if (effectiveHeadless) {
       mcpArgs.push('--headless');
     }
     if (browserConfig.customConfig.profilePath) {
@@ -669,8 +671,9 @@ export class BrowserManager {
 
           logBrowserAgentConnection(this.config, Date.now() - connectStartMs, {
             session_mode: sessionMode,
-            headless: !!browserConfig.customConfig.headless,
+            headless: effectiveHeadless,
             success: true,
+            tool_count: this.discoveredTools.length,
           });
         })(),
         new Promise<never>((_, reject) => {
@@ -694,7 +697,7 @@ export class BrowserManager {
 
       logBrowserAgentConnection(this.config, Date.now() - connectStartMs, {
         session_mode: sessionMode,
-        headless: !!browserConfig.customConfig.headless,
+        headless: effectiveHeadless,
         success: false,
         error_type: errorType,
       });

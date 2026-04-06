@@ -960,6 +960,7 @@ export function logBrowserAgentConnection(
       | 'timeout'
       | 'connection_refused'
       | 'unknown';
+    tool_count?: number;
   },
 ): void {
   ClearcutLogger.getInstance(config)?.logBrowserAgentConnectionEvent({
@@ -968,6 +969,7 @@ export function logBrowserAgentConnection(
     success: attributes.success,
     duration_ms: durationMs,
     error_type: attributes.error_type,
+    tool_count: attributes.tool_count,
   });
 
   recordBrowserAgentConnection(config, durationMs, attributes);
