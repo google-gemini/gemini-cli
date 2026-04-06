@@ -325,24 +325,7 @@ export class Storage {
     if (customDir) {
       const resolvedPath = path.resolve(this.getProjectRoot(), customDir);
       const realProjectRoot = resolveToRealPath(this.getProjectRoot());
-      let realResolvedPath = resolvedPath;
-
-      try {
-        realResolvedPath = resolveToRealPath(resolvedPath);
-      } catch (e: unknown) {
-        if (
-          !(
-            e &&
-            typeof e === 'object' &&
-            'code' in e &&
-            (e.code === 'ENOENT' || e.code === 'EISDIR')
-          )
-        ) {
-          throw e;
-        }
-        // Construct the fallback path safely against the real project root
-        realResolvedPath = path.resolve(realProjectRoot, customDir);
-      }
+      const realResolvedPath = resolveToRealPath(resolvedPath);
 
       if (!isSubpath(realProjectRoot, realResolvedPath)) {
         throw new Error(

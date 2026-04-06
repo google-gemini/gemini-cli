@@ -3275,6 +3275,9 @@ describe('Plans Directory Initialization', () => {
     debugMode: false,
     model: 'test-model',
     cwd: '/tmp/test',
+    planSettings: {
+      directory: 'plans',
+    },
   };
 
   beforeEach(() => {
@@ -3386,7 +3389,8 @@ describe('Plans Directory Initialization', () => {
 
     await config.initialize();
 
-    const plansDir = config.storage.getPlansDir();
+    // Even if getPlansDir is called manually, it should NOT create the directory
+    const plansDir = config.getPlansDir();
     expect(fs.mkdirSync).not.toHaveBeenCalled();
     expect(config.getWorkspaceContext().getDirectories()).not.toContain(
       plansDir,
