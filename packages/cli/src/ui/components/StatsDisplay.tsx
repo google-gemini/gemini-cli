@@ -12,6 +12,7 @@ import { formatDuration } from '../utils/formatters.js';
 import {
   useSessionStats,
   type ModelMetrics,
+  type RoleMetrics,
 } from '../contexts/SessionContext.js';
 import {
   getStatusColor,
@@ -23,6 +24,7 @@ import {
 import { computeSessionStats } from '../utils/computeStats.js';
 import { useSettings } from '../contexts/SettingsContext.js';
 import type { QuotaStats } from '../types.js';
+import { LlmRole } from '@google/gemini-cli-core';
 
 // A more flexible and powerful StatRow component
 interface StatRowProps {
@@ -77,12 +79,62 @@ interface ModelUsageTableProps {
   models: Record<string, ModelMetrics>;
 }
 
+interface ModelRow {
+  name: string;
+  displayName: string;
+  requests: number | string;
+  cachedTokens: string;
+  inputTokens: string;
+  outputTokens: string;
+  isSubRow: boolean;
+}
+
 const ModelUsageTable: React.FC<ModelUsageTableProps> = ({ models }) => {
   const nameWidth = 28;
   const requestsWidth = 8;
   const inputTokensWidth = 14;
   const cacheReadsWidth = 14;
   const outputTokensWidth = 14;
+
+  const rows: ModelRow[] = [];
+
+  Object.entries(models).forEach(([name, metrics]) => {
+    rows.push({
+      name,
+      displayName: name,
+      requests: metrics.api.totalRequests,
+      cachedTokens: metrics.tokens.cached.toLocaleString(),
+      inputTokens: metrics.tokens.prompt.toLocaleString(),
+      outputTokens: metrics.tokens.candidates.toLocaleString(),
+      isSubRow: false,
+    });
+
+    if (metrics.roles) {
+      const roleEntries = Object.entries(metrics.roles).filter(
+        (entry): entry is [string, RoleMetrics] =>
+          entry[1] !== undefined && entry[1].totalRequests > 0,
+      );
+
+      roleEntries.sort(([a], [b]) => {
+        if (a === b) return 0;
+        if (a === LlmRole.MAIN) return -1;
+        if (b === LlmRole.MAIN) return 1;
+        return a.localeCompare(b);
+      });
+
+      roleEntries.forEach(([role, roleMetrics]) => {
+        rows.push({
+          name: `${name}-${role}`,
+          displayName: `  ↳ ${role}`,
+          requests: roleMetrics.totalRequests,
+          cachedTokens: roleMetrics.tokens.cached.toLocaleString(),
+          inputTokens: roleMetrics.tokens.prompt.toLocaleString(),
+          outputTokens: roleMetrics.tokens.candidates.toLocaleString(),
+          isSubRow: true,
+        });
+      });
+    }
+  });
 
   return (
     <Box flexDirection="column" marginTop={1}>
@@ -131,31 +183,42 @@ const ModelUsageTable: React.FC<ModelUsageTableProps> = ({ models }) => {
       </Box>
 
       {/* Rows */}
-      {Object.entries(models).map(([name, modelMetrics]) => (
-        <Box key={name}>
+      {rows.map((row) => (
+        <Box key={row.name}>
           <Box width={nameWidth}>
-            <Text color={theme.text.primary} wrap="truncate-end">
-              {name}
+            <Text
+              color={row.isSubRow ? theme.text.secondary : theme.text.primary}
+              wrap="truncate-end"
+            >
+              {row.displayName}
             </Text>
           </Box>
           <Box width={requestsWidth} justifyContent="flex-end">
-            <Text color={theme.text.primary}>
-              {modelMetrics.api.totalRequests}
+            <Text
+              color={row.isSubRow ? theme.text.secondary : theme.text.primary}
+            >
+              {row.requests}
             </Text>
           </Box>
           <Box width={inputTokensWidth} justifyContent="flex-end">
-            <Text color={theme.text.primary}>
-              {modelMetrics.tokens.prompt.toLocaleString()}
+            <Text
+              color={row.isSubRow ? theme.text.secondary : theme.text.primary}
+            >
+              {row.inputTokens}
             </Text>
           </Box>
           <Box width={cacheReadsWidth} justifyContent="flex-end">
-            <Text color={theme.text.primary}>
-              {modelMetrics.tokens.cached.toLocaleString()}
+            <Text
+              color={row.isSubRow ? theme.text.secondary : theme.text.primary}
+            >
+              {row.cachedTokens}
             </Text>
           </Box>
           <Box width={outputTokensWidth} justifyContent="flex-end">
-            <Text color={theme.text.primary}>
-              {modelMetrics.tokens.candidates.toLocaleString()}
+            <Text
+              color={row.isSubRow ? theme.text.secondary : theme.text.primary}
+            >
+              {row.outputTokens}
             </Text>
           </Box>
         </Box>
