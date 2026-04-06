@@ -1313,18 +1313,6 @@ Logging in with Google... Restarting Gemini CLI to continue.
         slashCommands ?? [],
       );
 
-      if (config) {
-        if (parsedCommand.extensionContext) {
-          if (config.hasExtensionPlanDir(parsedCommand.extensionContext)) {
-            config.setActiveExtensionContext(parsedCommand.extensionContext);
-          } else {
-            config.setActiveExtensionContext(undefined);
-          }
-        } else if (parsedCommand.commandToExecute?.name === 'plan') {
-          config.setActiveExtensionContext(undefined);
-        }
-      }
-
       const isSlash = isSlashCommand(submittedValue.trim());
       const isIdle = streamingState === StreamingState.Idle;
       const isAgentRunning =

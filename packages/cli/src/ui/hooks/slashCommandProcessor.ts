@@ -368,7 +368,20 @@ export const useSlashCommandProcessor = (
         commandToExecute,
         args,
         canonicalPath: resolvedCommandPath,
+        extensionContext,
       } = parseSlashCommand(trimmed, commands);
+
+      if (config) {
+        if (extensionContext) {
+          if (config.hasExtensionPlanDir(extensionContext)) {
+            config.setActiveExtensionContext(extensionContext);
+          } else {
+            config.setActiveExtensionContext(undefined);
+          }
+        } else if (resolvedCommandPath?.[0] === 'plan') {
+          config.setActiveExtensionContext(undefined);
+        }
+      }
 
       // If the input doesn't match any known command, check if MCP servers
       // are still loading (the command might come from an MCP server).
