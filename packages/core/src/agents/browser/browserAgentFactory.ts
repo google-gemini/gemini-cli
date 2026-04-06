@@ -176,7 +176,8 @@ export async function createBrowserAgentDefinition(
       rule1.decision === rule2.decision &&
       rule1.priority === rule2.priority &&
       rule1.mcpName === rule2.mcpName &&
-      JSON.stringify(rule1.modes) === JSON.stringify(rule2.modes)
+      rule1.modes.length === rule2.modes.length &&
+      rule1.modes.every((m) => rule2.modes.includes(m))
     );
   }
 

@@ -474,6 +474,29 @@ describe('browserAgentFactory', () => {
       );
     });
 
+    it('should not register rule if it already exists with modes in different order', async () => {
+      const existingRule = {
+        toolName: 'mcp_browser_agent_fill',
+        decision: PolicyDecision.ASK_USER,
+        priority: 999,
+        // Reverse order of MODES_BY_PERMISSIVENESS
+        modes: [...MODES_BY_PERMISSIVENESS].reverse(),
+        source: 'BrowserAgent (Sensitive Actions)',
+        mcpName: BROWSER_AGENT_NAME,
+      };
+
+      mockPolicyEngine.getRules.mockReturnValue([existingRule]);
+
+      await createBrowserAgentDefinition(mockConfig, mockMessageBus);
+
+      // Should NOT add 'fill' rule again because it's already there (even if modes order differs)
+      expect(mockPolicyEngine.addRule).not.toHaveBeenCalledWith(
+        expect.objectContaining({
+          toolName: 'mcp_browser_agent_fill',
+        }),
+      );
+    });
+
     it('should register ALLOW rules for read-only tools', async () => {
       mockBrowserManager.getDiscoveredTools.mockResolvedValue([
         {
