@@ -10,7 +10,6 @@ import { ToolGroupMessage } from './ToolGroupMessage.js';
 import {
   UPDATE_TOPIC_TOOL_NAME,
   TOPIC_PARAM_TITLE,
-  TOPIC_PARAM_SUMMARY,
   TOPIC_PARAM_STRATEGIC_INTENT,
   makeFakeConfig,
   CoreToolCallStatus,
@@ -258,15 +257,42 @@ describe('<ToolGroupMessage />', () => {
       unmount();
     });
 
-    it('renders update_topic tool call prioritizing summary over strategic_intent', async () => {
+    it('renders update_topic tool call using TopicMessage', async () => {
       const toolCalls = [
         createToolCall({
-          callId: 'topic-tool-priority',
+          callId: 'topic-tool',
           name: UPDATE_TOPIC_TOOL_NAME,
           args: {
             [TOPIC_PARAM_TITLE]: 'Testing Topic',
-            [TOPIC_PARAM_SUMMARY]: 'This is the summary',
-            [TOPIC_PARAM_STRATEGIC_INTENT]: 'This should be ignored',
+            [TOPIC_PARAM_STRATEGIC_INTENT]: 'This is the description',
+          },
+        }),
+      ];
+      const item = createItem(toolCalls);
+
+      const { lastFrame, unmount } = await renderWithProviders(
+        <ToolGroupMessage {...baseProps} item={item} toolCalls={toolCalls} />,
+        {
+          config: baseMockConfig,
+          settings: fullVerbositySettings,
+        },
+      );
+
+      const output = lastFrame();
+      expect(output).toContain('Testing Topic: ');
+      expect(output).toContain('This is the description');
+      expect(output).toMatchSnapshot('update_topic_tool');
+      unmount();
+    });
+
+    it('renders update_topic tool call with summary instead of strategic_intent', async () => {
+      const toolCalls = [
+        createToolCall({
+          callId: 'topic-tool-summary',
+          name: UPDATE_TOPIC_TOOL_NAME,
+          args: {
+            [TOPIC_PARAM_TITLE]: 'Testing Topic',
+            summary: 'This is the summary',
           },
         }),
       ];
@@ -283,34 +309,6 @@ describe('<ToolGroupMessage />', () => {
       const output = lastFrame();
       expect(output).toContain('Testing Topic: ');
       expect(output).toContain('This is the summary');
-      expect(output).not.toContain('This should be ignored');
-      unmount();
-    });
-
-    it('renders update_topic tool call falling back to strategic_intent', async () => {
-      const toolCalls = [
-        createToolCall({
-          callId: 'topic-tool-fallback',
-          name: UPDATE_TOPIC_TOOL_NAME,
-          args: {
-            [TOPIC_PARAM_TITLE]: 'Testing Topic',
-            [TOPIC_PARAM_STRATEGIC_INTENT]: 'Fallback intent',
-          },
-        }),
-      ];
-      const item = createItem(toolCalls);
-
-      const { lastFrame, unmount } = await renderWithProviders(
-        <ToolGroupMessage {...baseProps} item={item} toolCalls={toolCalls} />,
-        {
-          config: baseMockConfig,
-          settings: fullVerbositySettings,
-        },
-      );
-
-      const output = lastFrame();
-      expect(output).toContain('Testing Topic: ');
-      expect(output).toContain('Fallback intent');
       unmount();
     });
 
@@ -321,7 +319,7 @@ describe('<ToolGroupMessage />', () => {
           name: UPDATE_TOPIC_TOOL_NAME,
           args: {
             [TOPIC_PARAM_TITLE]: 'Testing Topic',
-            [TOPIC_PARAM_SUMMARY]: 'This is the summary',
+            [TOPIC_PARAM_STRATEGIC_INTENT]: 'This is the description',
           },
         }),
         createToolCall({
