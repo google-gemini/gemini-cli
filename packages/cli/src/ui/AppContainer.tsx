@@ -1426,11 +1426,10 @@ Logging in with Google... Restarting Gemini CLI to continue.
   const handleTeamSelect = useCallback(
     async (teamName: string | undefined) => {
       await config.setActiveTeam(teamName);
-      settings.setValue(SettingScope.Workspace, 'general.activeTeam', teamName);
       setIsTeamSelectionActive(false);
       refreshStatic();
     },
-    [config, refreshStatic, settings],
+    [config, refreshStatic],
   );
   /**
    * Determines if the input prompt should be active and accept user input.

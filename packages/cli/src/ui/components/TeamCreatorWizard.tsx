@@ -38,38 +38,42 @@ type WizardStep =
   | 'confirmation'
   | 'success';
 
+const PROVIDER_COLORS: Record<string, string> = {
+  'claude-code': '#C15F3C', // Claude Orange (Exact)
+  codex: '#FFFFFF', // Codex White
+  gemini: '#A855F7', // Gemini Purple
+  antigravity: '#93C5FD', // Antigravity Light Blue
+  gemma: '#60A5FA', // Gemma Blue
+};
+
 const EXTERNAL_TEMPLATES: RosterListItem[] = [
   {
     name: 'claude-coder',
     kind: 'external',
     provider: 'claude-code',
     description: 'Expert Claude coder focused on direct action.',
-    logo: '󰈙',
-    logoColor: '#D7AFFF', // Purple
+    logoColor: PROVIDER_COLORS['claude-code'],
   },
   {
     name: 'codex-architect',
     kind: 'external',
     provider: 'codex',
     description: 'Specialized code generation and architectural patterns.',
-    logo: '󰘦',
-    logoColor: '#87D7D7', // Cyan
+    logoColor: PROVIDER_COLORS['codex'],
   },
   {
     name: 'antigravity-creative',
     kind: 'external',
     provider: 'antigravity',
     description: 'Creative problem solving and unconventional solutions.',
-    logo: '󱜙',
-    logoColor: '#FFFFAF', // Yellow
+    logoColor: PROVIDER_COLORS['antigravity'],
   },
   {
     name: 'gemma-helper',
     kind: 'external',
     provider: 'gemma',
     description: 'Lightweight and efficient general purpose assistant.',
-    logo: '󱜚',
-    logoColor: '#87AFFF', // Blue
+    logoColor: PROVIDER_COLORS['gemma'],
   },
 ];
 
@@ -81,6 +85,25 @@ interface RosterListItem {
   sourcePath?: string;
   logo?: string;
   logoColor?: string;
+}
+
+function ProviderTag({ provider }: { provider: string }) {
+  const label =
+    provider === 'claude-code'
+      ? 'Claude Code'
+      : provider === 'codex'
+        ? 'Codex'
+        : provider === 'antigravity'
+          ? 'Antigravity'
+          : provider === 'gemma'
+            ? 'Gemma'
+            : 'Gemini CLI';
+  const color = PROVIDER_COLORS[provider] || theme.ui.comment;
+  return (
+    <Text color={color} bold>
+      [{label}]
+    </Text>
+  );
 }
 
 export function TeamCreatorWizard({
@@ -99,6 +122,7 @@ export function TeamCreatorWizard({
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [createdPath, setCreatedPath] = useState<string | null>(null);
+  const [rosterMode, setRosterMode] = useState<'list' | 'action'>('list');
 
   const localAgents = useMemo(
     () =>
@@ -111,8 +135,8 @@ export function TeamCreatorWizard({
 
   const allAvailableAgents = useMemo((): RosterListItem[] => {
     const local: RosterListItem[] = localAgents.map((a) => {
-      let logo = '󰈙'; // Default
-      let logoColor = theme.text.accent;
+      let logo = '✦'; // Default Gemini Icon
+      let logoColor = PROVIDER_COLORS['gemini'];
 
       if (a.name === 'codebase-investigator') {
         logo = '🔍';
@@ -121,8 +145,7 @@ export function TeamCreatorWizard({
         logo = '󰞋';
         logoColor = '#FBBC04'; // Yellow
       } else if (a.name === 'generalist') {
-        logo = '󰈙';
-        logoColor = '#4285F4'; // Blue
+        logoColor = '#4285F4'; // Google Blue
       }
 
       return {
@@ -144,6 +167,7 @@ export function TeamCreatorWizard({
     }));
     return [...local, ...external];
   }, [localAgents]);
+
   const { settings } = useSettingsStore();
   const { stdin, setRawMode } = useStdin();
   const getPreferredEditor = useCallback(
@@ -177,11 +201,18 @@ export function TeamCreatorWizard({
   }, [step, teamName, displayName, instructions]);
 
   const handleBack = useCallback(() => {
-    if (step === 'roster') setStep('identity');
-    else if (step === 'objective') setStep('roster');
-    else if (step === 'confirmation') setStep('objective');
-    else if (step === 'identity') onCancel();
-    else if (step === 'success') onComplete();
+    if (step === 'roster') {
+      setStep('identity');
+      setRosterMode('list'); // Reset roster mode when going back
+    } else if (step === 'objective') {
+      setStep('roster');
+    } else if (step === 'confirmation') {
+      setStep('objective');
+    } else if (step === 'identity') {
+      onCancel();
+    } else if (step === 'success') {
+      onComplete();
+    }
   }, [step, onCancel, onComplete]);
 
   const handleToggleAgent = (name: string) => {
@@ -301,6 +332,10 @@ export function TeamCreatorWizard({
         return true;
       }
       if (key.name === 'tab') {
+        if (step === 'roster') {
+          setRosterMode((prev) => (prev === 'list' ? 'action' : 'list'));
+          return true;
+        }
         handleBack();
         return true;
       }
@@ -313,6 +348,32 @@ export function TeamCreatorWizard({
 
   useKeypress(handleIdentityKeyPress, {
     isActive: step === 'identity',
+    priority: true,
+  });
+
+  const handleRosterKeyPress = useCallback(
+    (key: Key) => {
+      if (key.sequence?.toLowerCase() === 'b') {
+        handleBack();
+        return true;
+      }
+      if (rosterMode === 'action') {
+        if (keyMatchers[Command.RETURN](key)) {
+          handleNext();
+          return true;
+        }
+      }
+      if (keyMatchers[Command.ESCAPE](key)) {
+        onCancel();
+        return true;
+      }
+      return false;
+    },
+    [handleNext, handleBack, onCancel, rosterMode, keyMatchers],
+  );
+
+  useKeypress(handleRosterKeyPress, {
+    isActive: step === 'roster',
     priority: true,
   });
 
@@ -413,10 +474,6 @@ export function TeamCreatorWizard({
         key: a.name,
         value: a,
       }));
-    rosterItems.push({
-      key: 'done',
-      value: { name: 'done', kind: 'meta' as const },
-    });
 
     return (
       <Box
@@ -426,42 +483,37 @@ export function TeamCreatorWizard({
         padding={1}
         width="100%"
       >
-        <Text bold color={theme.text.primary}>
-          Step 2: Team Roster
-        </Text>
-        <Box marginTop={1}>
+        <Box flexDirection="row" justifyContent="space-between">
+          <Text bold color={theme.text.primary}>
+            Step 2: Team Roster
+          </Text>
+          <Box>
+            <Text color={theme.text.secondary}>
+              Selected: {selectedAgents.size}
+            </Text>
+          </Box>
+        </Box>
+
+        <Box marginTop={1} flexDirection="column">
           <Text color={theme.text.secondary}>
-            Select agents to include in your team.
+            {rosterMode === 'list'
+              ? 'Select agents to include in your team:'
+              : 'Switch back to the list if you need to select more agents:'}
           </Text>
         </Box>
-        <Box marginTop={1}>
+
+        <Box marginTop={1} marginBottom={1} flexDirection="column">
           <BaseSelectionList<RosterListItem>
             items={rosterItems}
-            onSelect={(item) => {
-              if (item.name === 'done') handleNext();
-              else handleToggleAgent(item.name);
-            }}
-            maxItemsToShow={10}
+            onSelect={(item) => handleToggleAgent(item.name)}
+            maxItemsToShow={5}
             showScrollArrows={true}
+            isFocused={rosterMode === 'list'}
             renderItem={(item, context) => {
               const value = item.value;
-              if (value.name === 'done') {
-                return (
-                  <Text
-                    bold
-                    color={
-                      context.isSelected
-                        ? theme.text.accent
-                        : theme.text.primary
-                    }
-                  >
-                    [ Done - Continue to Objective ]
-                  </Text>
-                );
-              }
               const isChecked = selectedAgents.has(value.name);
               return (
-                <Box flexDirection="column">
+                <Box flexDirection="column" paddingLeft={1}>
                   <Box flexDirection="row">
                     <Text
                       color={
@@ -472,7 +524,7 @@ export function TeamCreatorWizard({
                     </Text>
                     <Text
                       color={
-                        context.isSelected
+                        context.isSelected && rosterMode === 'list'
                           ? theme.text.accent
                           : theme.text.primary
                       }
@@ -485,26 +537,30 @@ export function TeamCreatorWizard({
                       )}
                       {value.name}
                     </Text>
-                    {value.kind === 'external' ? (
-                      <Text color={theme.text.accent} bold>
-                        {' '}
-                        [EXTERNAL]
-                      </Text>
-                    ) : !value.sourcePath ? (
-                      <Text color={theme.ui.comment} italic>
-                        {' '}
-                        [BUILT-IN]
-                      </Text>
-                    ) : null}
-                    <Text color={theme.text.secondary}>
-                      {' '}
-                      ({value.kind}
-                      {value.provider ? `: ${value.provider}` : ''})
-                    </Text>
+                    {(() => {
+                      const p = value.provider || 'gemini';
+                      const label =
+                        p === 'claude-code'
+                          ? 'Claude Code'
+                          : p === 'codex'
+                            ? 'Codex'
+                            : p === 'antigravity'
+                              ? 'Antigravity'
+                              : p === 'gemma'
+                                ? 'Gemma'
+                                : 'Gemini CLI';
+                      const color = PROVIDER_COLORS[p] || theme.ui.comment;
+                      return (
+                        <Text color={color} bold>
+                          {' '}
+                          [{label}]
+                        </Text>
+                      );
+                    })()}
                   </Box>
                   {value.description && (
-                    <Text color={theme.text.secondary} italic>
-                      {'  '}
+                    <Text color={theme.text.secondary} italic wrap="truncate">
+                      {'    '}
                       {value.description}
                     </Text>
                   )}
@@ -513,9 +569,37 @@ export function TeamCreatorWizard({
             }}
           />
         </Box>
+
+        <Box
+          paddingX={1}
+          paddingY={0}
+          borderStyle="round"
+          borderColor={
+            rosterMode === 'action' ? theme.text.accent : theme.border.default
+          }
+          justifyContent="center"
+        >
+          <Text
+            bold
+            color={
+              rosterMode === 'action' ? theme.text.accent : theme.text.primary
+            }
+          >
+            {rosterMode === 'action' ? '> ' : '  '}[ Done - Continue to
+            Objective ]
+          </Text>
+        </Box>
+
         <DialogFooter
-          primaryAction="Enter to toggle/confirm"
-          navigationActions="Tab to go back"
+          primaryAction={
+            rosterMode === 'list'
+              ? 'Enter to toggle agent'
+              : 'Enter to continue'
+          }
+          navigationActions={
+            rosterMode === 'list' ? 'Tab to continue' : 'Tab to select agents'
+          }
+          extraParts={['[B]ack to Step 1']}
         />
       </Box>
     );
@@ -538,24 +622,27 @@ export function TeamCreatorWizard({
             Define what this team does and how it should work.
           </Text>
           {selectedAgents.size > 0 && (
-            <Box marginTop={1} flexDirection="row" flexWrap="wrap">
-              <Text color={theme.ui.comment}>Referencing agents: </Text>
-              {Array.from(selectedAgents).map((name, i) => {
-                const agent = allAvailableAgents.find((a) => a.name === name);
-                return (
-                  <Box key={name} flexDirection="row">
-                    {agent?.logo && (
-                      <Text color={agent.logoColor || theme.text.accent}>
-                        {agent.logo}{' '}
-                      </Text>
-                    )}
-                    <Text color={theme.ui.comment}>
-                      @{name}
-                      {i < selectedAgents.size - 1 ? ', ' : ''}
-                    </Text>
-                  </Box>
-                );
-              })}
+            <Box marginTop={1} flexDirection="column">
+              <Box flexDirection="row" flexWrap="wrap">
+                <Text color={theme.ui.comment}>Referencing agents: </Text>
+                {Array.from(selectedAgents).map((name, i) => {
+                  const agent = allAvailableAgents.find((a) => a.name === name);
+                  return (
+                    <Box key={name} flexDirection="row">
+                      {agent?.logo && (
+                        <Text color={agent.logoColor || theme.text.accent}>
+                          {agent.logo}{' '}
+                        </Text>
+                      )}
+                      <Text color={theme.ui.comment}>@{name} </Text>
+                      <ProviderTag provider={agent?.provider || 'gemini'} />
+                      {i < selectedAgents.size - 1 && (
+                        <Text color={theme.ui.comment}>, </Text>
+                      )}
+                    </Box>
+                  );
+                })}
+              </Box>
             </Box>
           )}
           <Box
@@ -602,9 +689,11 @@ export function TeamCreatorWizard({
               {displayName} ({teamName})
             </Text>
           </Text>
-          <Text color={theme.text.secondary}>
-            Description: <Text color={theme.text.primary}>{description}</Text>
-          </Text>
+          <Box marginTop={1}>
+            <Text color={theme.text.secondary}>
+              Description: <Text color={theme.text.primary}>{description}</Text>
+            </Text>
+          </Box>
           <Box marginTop={1}>
             <Text color={theme.text.secondary}>Roster:</Text>
           </Box>
@@ -618,7 +707,8 @@ export function TeamCreatorWizard({
                     {agent.logo}{' '}
                   </Text>
                 )}
-                <Text color={theme.text.primary}>{name}</Text>
+                <Text color={theme.text.primary}>{name} </Text>
+                <ProviderTag provider={agent?.provider || 'gemini'} />
               </Box>
             );
           })}
