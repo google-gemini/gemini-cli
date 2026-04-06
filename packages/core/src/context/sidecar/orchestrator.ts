@@ -34,7 +34,7 @@ export class PipelineOrchestrator {
         if (!this.instantiatedProcessors.has(procDef.processorId)) {
           const processorClass = ProcessorRegistry.get(procDef.processorId);
           if (!processorClass) {
-            throw new Error(`Unknown processor ID: ${procDef.processorId}`);
+            throw new Error(`Context Processor [${procDef.processorId}] is not registered.`);
           }
           // The Orchestrator injects standard dependencies required by processors
           // If a processor needs the eventBus (like Snapshot), it expects it via constructor.

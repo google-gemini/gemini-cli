@@ -130,6 +130,108 @@ describe('IrMapper', () => {
     // in one Content block, but the flat representation is semantically identical.
   });
 
+  it('should correctly handle multi-tool-calls grouped within a single turn without dropping observations', () => {
+    const rawHistory: Content[] = [
+      { role: 'user', parts: [{ text: 'Examine both of these tools please.' }] },
+      {
+        role: 'model',
+        parts: [
+          { text: 'I will call them concurrently.' },
+          {
+            functionCall: {
+              id: 'c1',
+              name: 'tool_one',
+              args: { p: 1 },
+            },
+          },
+          {
+            functionCall: {
+              id: 'c2',
+              name: 'tool_two',
+              args: { p: 2 },
+            },
+          },
+        ],
+      },
+      // Gemini forces the user turn to contain ALL function responses for that model turn
+      {
+        role: 'user',
+        parts: [
+          {
+            functionResponse: {
+              id: 'c1',
+              name: 'tool_one',
+              response: { r: 1 },
+            },
+          },
+          {
+            functionResponse: {
+              id: 'c2',
+              name: 'tool_two',
+              response: { r: 2 },
+            },
+          },
+        ],
+      },
+      {
+        role: 'model',
+        parts: [{ text: 'Both complete.' }],
+      },
+    ];
+
+    const tokenCalculator = new ContextTokenCalculator(4);
+    const episodes = IrMapper.toIr(rawHistory, tokenCalculator);
+
+    // It should collapse into a single episode
+    expect(episodes).toHaveLength(1);
+    const ep = episodes[0];
+
+    expect(ep.trigger.type).toBe('USER_PROMPT');
+
+    // The steps array should contain:
+    // 0: AgentThought ("I will call them concurrently")
+    // 1: ToolExecution(tool_one)
+    // 2: ToolExecution(tool_two)
+    
+    expect(ep.steps).toHaveLength(3);
+    
+    expect(ep.steps[0].type).toBe('AGENT_THOUGHT');
+    expect((ep.steps[0] as any).text).toBe('I will call them concurrently.');
+
+    expect(ep.steps[1].type).toBe('TOOL_EXECUTION');
+    expect((ep.steps[1] as ToolExecution).toolName).toBe('tool_one');
+    expect((ep.steps[1] as ToolExecution).intent).toEqual({ p: 1 });
+    expect((ep.steps[1] as ToolExecution).observation).toEqual({ r: 1 });
+
+    expect(ep.steps[2].type).toBe('TOOL_EXECUTION');
+    expect((ep.steps[2] as ToolExecution).toolName).toBe('tool_two');
+    expect((ep.steps[2] as ToolExecution).intent).toEqual({ p: 2 });
+    expect((ep.steps[2] as ToolExecution).observation).toEqual({ r: 2 });
+
+    // The final model turn should become the yield
+    expect(ep.yield).toBeDefined();
+    expect(ep.yield?.type).toBe('AGENT_YIELD');
+    expect(ep.yield?.text).toBe('Both complete.');
+    
+    // Now verify we can reconstitute it without dropping the multiple calls
+    const reconstituted = IrMapper.fromIr(episodes);
+    
+    // The reconstituted history should have exactly 4 turns, same as original
+    expect(reconstituted).toHaveLength(4);
+    
+    // Check that the Model turn has both function calls
+    expect(reconstituted[1].role).toBe('model');
+    expect(reconstituted[1].parts).toHaveLength(3); // text + call1 + call2
+    expect(reconstituted[1].parts![1].functionCall?.name).toBe('tool_one');
+    expect(reconstituted[1].parts![2].functionCall?.name).toBe('tool_two');
+    
+    // Check that the User turn has both function responses
+    expect(reconstituted[2].role).toBe('user');
+    expect(reconstituted[2].parts).toHaveLength(2); // response1 + response2
+    expect(reconstituted[2].parts![0].functionResponse?.name).toBe('tool_one');
+    expect(reconstituted[2].parts![1].functionResponse?.name).toBe('tool_two');
+  });
+
   it('should guarantee WeakMap ID stability across continuous mapping', () => {
     // 1. Initial history
     const history: Content[] = [

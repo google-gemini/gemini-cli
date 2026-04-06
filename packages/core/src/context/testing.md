@@ -11,22 +11,24 @@ Our testing strategy avoids the "endless tax" of brittle tests by strictly separ
 ## Audit Checklist & Coverage Tracker
 
 ### 1. The Tooling Library (`contextTestUtils.ts`)
-- [ ] Implement `ContextTestBuilder` or shared factory functions (`createDummyEpisode`, `createDummyState`).
-- [ ] Ensure all existing tests are migrated to use these helpers to establish the pattern.
+- [x] Implement `ContextTestBuilder` or shared factory functions (`createDummyEpisode`, `createDummyState`).
+- [x] Ensure all existing tests are migrated to use these helpers to establish the pattern.
 
-### 2. Unit Tests (The Processors)
-Goal: Ensure every processor gracefully handles boundary conditions (budget satisfied vs. deficit), skips protected IDs, and correctly transforms IR.
-- [ ] `BlobDegradationProcessor` (Mostly complete, needs migration to shared helpers)
-- [ ] `ToolMaskingProcessor` (Mostly complete, needs migration to shared helpers)
-- [ ] `HistorySquashingProcessor` (Audit coverage)
-- [ ] `SemanticCompressionProcessor` (Audit coverage)
-- [ ] `ContextTracer` (Complete)
-- [ ] `SidecarLoader` (Complete)
-- [ ] `IrMapper` / `IrProjector` (Audit coverage)
+### 2. Unit Tests (The Processors & Map/Reduce)
+Goal: Ensure every component gracefully handles boundary conditions (budget satisfied vs. deficit), skips protected IDs, and correctly transforms IR.
+- [x] `BlobDegradationProcessor` (Completed)
+- [x] `ToolMaskingProcessor` (Completed)
+- [x] `HistorySquashingProcessor` (Completed)
+- [x] `SemanticCompressionProcessor` (Completed)
+- [x] `StateSnapshotProcessor` (Completed)
+- [x] `EmergencyTruncationProcessor` (Completed)
+- [x] `ContextTracer` (Completed)
+- [x] `SidecarLoader` (Completed)
+- [x] `IrMapper` / `graphUtils` (Completed - Handles Multi-Tool Concurrency and Backwards Graph Traversal)
 
 ### 3. Component Tests (The Orchestration)
 Goal: Prove the sidecar configuration accurately drives runtime behavior without testing the processor logic itself.
-- [ ] `PipelineOrchestrator`: Test sync vs. async routing, and trigger setup.
+- [x] `PipelineOrchestrator`: Test sync vs. async routing, error swallowing, and trigger setup.
 - [ ] `ContextManager`: Test `subscribeToHistory` (Opportunistic triggers).
 - [ ] `ContextManager`: Test `project()` (Synchronous barrier triggers).
 
@@ -36,5 +38,5 @@ Goal: Prove the sidecar configuration accurately drives runtime behavior without
 ---
 
 ## Next Actions
-1. Migrate processor tests to shared factories to DRY up the suite.
-2. Go down the Unit Test checklist, ensuring full line/branch coverage for the core transformations.
+1. Audit the ContextManager component tests (opportunistic updates & sync barrier).
+2. Finalize the End-to-End "Day in the Life" Golden Snapshot test.
