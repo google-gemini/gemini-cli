@@ -17,7 +17,7 @@ import type {
   PermissionConfirmationRequest,
 } from '../types.js';
 import type { CommandContext, SlashCommand } from '../commands/types.js';
-import type { TextBuffer } from '../components/shared/text-buffer.js';
+
 import type {
   IdeContext,
   ApprovalMode,
@@ -143,11 +143,6 @@ export interface UIState {
   initError: string | null;
   pendingGeminiHistoryItems: HistoryItemWithoutId[];
   thought: ThoughtSummary | null;
-  shellModeActive: boolean;
-  userMessages: string[];
-  buffer: TextBuffer;
-  inputWidth: number;
-  suggestionsWidth: number;
   isInputActive: boolean;
   isResuming: boolean;
   shouldShowIdePrompt: boolean;
@@ -162,7 +157,6 @@ export interface UIState {
   renderMarkdown: boolean;
   ctrlCPressedOnce: boolean;
   ctrlDPressedOnce: boolean;
-  showEscapePrompt: boolean;
   shortcutsHelpVisible: boolean;
   cleanUiDetailsVisible: boolean;
   elapsedTime: number;
@@ -207,7 +201,6 @@ export interface UIState {
   embeddedShellFocused: boolean;
   showDebugProfiler: boolean;
   showFullTodos: boolean;
-  copyModeEnabled: boolean;
   bannerData: {
     defaultText: string;
     warningText: string;
