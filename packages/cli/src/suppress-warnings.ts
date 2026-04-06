@@ -24,8 +24,8 @@ process.emitWarning = ((
         ? options
         : undefined;
   if (code === 'DEP0040') return;
-  if (typeof options === 'string' || options === undefined) {
-    return originalEmitWarning(warning, options);
+  if (typeof options === 'string') {
+    return originalEmitWarning(warning, { code: options });
   }
   return originalEmitWarning(warning, options);
 }) as typeof process.emitWarning;

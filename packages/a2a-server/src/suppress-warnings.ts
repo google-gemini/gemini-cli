@@ -12,9 +12,21 @@
 //
 // Suppresses DEP0040 (punycode deprecation) — the -S flag required to pass
 // --no-warnings=DEP0040 via shebang is not supported on Windows.
-const originalEmitWarning = process.emitWarning;
-process.emitWarning = ((...args: unknown[]) => {
-  const [, , code] = args;
+const originalEmitWarning = process.emitWarning.bind(process);
+// eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
+process.emitWarning = ((
+  warning: string | Error,
+  options?: string | NodeJS.EmitWarningOptions,
+) => {
+  const code =
+    typeof options === 'object' && options !== null
+      ? options.code
+      : typeof options === 'string'
+        ? options
+        : undefined;
   if (code === 'DEP0040') return;
-  return Reflect.apply(originalEmitWarning, process, args);
+  if (typeof options === 'string') {
+    return originalEmitWarning(warning, { code: options });
+  }
+  return originalEmitWarning(warning, options);
 }) as typeof process.emitWarning;
