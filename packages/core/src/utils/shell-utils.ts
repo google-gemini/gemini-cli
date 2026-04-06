@@ -179,6 +179,7 @@ export interface ParsedCommandDetail {
   name: string;
   text: string;
   startIndex: number;
+  args?: string[];
 }
 
 interface CommandParseResult {
@@ -218,9 +219,16 @@ foreach ($commandAst in $commandAsts) {
   if ([string]::IsNullOrWhiteSpace($name)) {
     continue
   }
+  $args = @()
+  if ($commandAst.CommandElements.Count -gt 1) {
+    for ($i = 1; $i -lt $commandAst.CommandElements.Count; $i++) {
+      $args += $commandAst.CommandElements[$i].Extent.Text.Trim()
+    }
+  }
   $commandObjects += [PSCustomObject]@{
     name = $name
     text = $commandAst.Extent.Text.Trim()
+    args = $args
   }
 }
 [PSCustomObject]@{
@@ -302,6 +310,20 @@ function normalizeCommandName(raw: string): string {
   return raw.trim();
 }
 
+/**
+ * Normalizes a command name for sandbox policy lookups.
+ * Converts to lowercase and removes the .exe extension for cross-platform consistency.
+ *
+ * @param commandName - The command name to normalize.
+ * @returns The normalized command name.
+ */
+export function normalizeCommand(commandName: string): string {
+  // Split by both separators and get the last non-empty part
+  const parts = commandName.split(/[\\/]/).filter(Boolean);
+  const base = parts.length > 0 ? parts[parts.length - 1] : '';
+  return base.toLowerCase().replace(/\.exe$/, '');
+}
+
 function extractNameFromNode(node: Node): string | null {
   switch (node.type) {
     case 'command': {
@@ -355,11 +377,31 @@ function collectCommandDetails(
 
     const name = extractNameFromNode(current);
     if (name) {
-      details.push({
+      const detail: ParsedCommandDetail = {
         name,
         text: source.slice(current.startIndex, current.endIndex).trim(),
         startIndex: current.startIndex,
-      });
+      };
+
+      if (current.type === 'command') {
+        const args: string[] = [];
+        const nameNode = current.childForFieldName('name');
+        for (let i = 0; i < current.childCount; i += 1) {
+          const child = current.child(i);
+          if (
+            child &&
+            child.type === 'word' &&
+            child.startIndex !== nameNode?.startIndex
+          ) {
+            args.push(child.text);
+          }
+        }
+        if (args.length > 0) {
+          detail.args = args;
+        }
+      }
+
+      details.push(detail);
     }
 
     // Traverse all children to find all sub-components (commands, redirections, etc.)
@@ -455,7 +497,7 @@ export function parseBashCommandDetails(
         'Syntax Errors:',
         syntaxErrors,
       );
-    } catch (_e) {
+    } catch {
       // Ignore query errors
     } finally {
       query?.delete();
@@ -509,7 +551,7 @@ function parsePowerShellCommandDetails(
 
     let parsed: {
       success?: boolean;
-      commands?: Array<{ name?: string; text?: string }>;
+      commands?: Array<{ name?: string; text?: string; args?: string[] }>;
       hasRedirection?: boolean;
     } | null = null;
     try {
@@ -524,7 +566,7 @@ function parsePowerShellCommandDetails(
     }
 
     const details = (parsed.commands ?? [])
-      .map((commandDetail) => {
+      .map((commandDetail): ParsedCommandDetail | null => {
         if (!commandDetail || typeof commandDetail.name !== 'string') {
           return null;
         }
@@ -539,6 +581,9 @@ function parsePowerShellCommandDetails(
           name,
           text,
           startIndex: 0,
+          args: Array.isArray(commandDetail.args)
+            ? commandDetail.args
+            : undefined,
         };
       })
       .filter((detail): detail is ParsedCommandDetail => detail !== null);
@@ -914,7 +959,7 @@ export async function* execStreaming(
     if (!finished && child.exitCode === null && !child.killed) {
       try {
         child.kill();
-      } catch (_e) {
+      } catch {
         // ignore error if process is already dead
       }
       killedByGenerator = true;

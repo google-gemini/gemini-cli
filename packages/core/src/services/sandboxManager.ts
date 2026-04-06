@@ -57,19 +57,19 @@ export interface SandboxModeConfig {
   network?: boolean;
   approvedTools?: string[];
   allowOverrides?: boolean;
+  yolo?: boolean;
 }
 
 /**
  * Global configuration options used to initialize a SandboxManager.
  */
 export interface GlobalSandboxOptions {
-  /**
-   * The primary workspace path the sandbox is anchored to.
-   * This directory is granted full read and write access.
-   */
+  /** The absolute path to the primary workspace directory, granted full read/write access. */
   workspace: string;
-  /** Absolute paths to explicitly deny read/write access to (overrides allowlists). */
-  forbiddenPaths?: string[];
+  /** Absolute paths to explicitly include in the workspace context. */
+  includeDirectories?: string[];
+  /** An optional asynchronous resolver function for paths that should be explicitly denied. */
+  forbiddenPaths?: () => Promise<string[]>;
   /** The current sandbox mode behavior from config. */
   modeConfig?: SandboxModeConfig;
   /** The policy manager for persistent approvals. */
@@ -104,6 +104,8 @@ export interface SandboxedCommand {
   env: NodeJS.ProcessEnv;
   /** The working directory. */
   cwd?: string;
+  /** An optional cleanup function to be called after the command terminates. */
+  cleanup?: () => void;
 }
 
 /**
@@ -139,6 +141,16 @@ export interface SandboxManager {
    * Parses the output of a command to detect sandbox denials.
    */
   parseDenials(result: ShellExecutionResult): ParsedSandboxDenial | undefined;
+
+  /**
+   * Returns the primary workspace directory for this sandbox.
+   */
+  getWorkspace(): string;
+
+  /**
+   * Returns the global sandbox options for this sandbox.
+   */
+  getOptions(): GlobalSandboxOptions | undefined;
 }
 
 /**
@@ -237,6 +249,8 @@ export async function findSecretFiles(
  * through while applying environment sanitization.
  */
 export class NoopSandboxManager implements SandboxManager {
+  constructor(private options?: GlobalSandboxOptions) {}
+
   /**
    * Prepares a command by sanitizing the environment and passing through
    * the original program and arguments.
@@ -270,12 +284,22 @@ export class NoopSandboxManager implements SandboxManager {
   parseDenials(): undefined {
     return undefined;
   }
+
+  getWorkspace(): string {
+    return this.options?.workspace ?? process.cwd();
+  }
+
+  getOptions(): GlobalSandboxOptions | undefined {
+    return this.options;
+  }
 }
 
 /**
  * A SandboxManager implementation that just runs locally (no sandboxing yet).
  */
 export class LocalSandboxManager implements SandboxManager {
+  constructor(private options?: GlobalSandboxOptions) {}
+
   async prepareCommand(_req: SandboxRequest): Promise<SandboxedCommand> {
     throw new Error('Tool sandboxing is not yet implemented.');
   }
@@ -291,38 +315,78 @@ export class LocalSandboxManager implements SandboxManager {
   parseDenials(): undefined {
     return undefined;
   }
+
+  getWorkspace(): string {
+    return this.options?.workspace ?? process.cwd();
+  }
+
+  getOptions(): GlobalSandboxOptions | undefined {
+    return this.options;
+  }
+}
+
+/**
+ * Resolves sanitized allowed and forbidden paths for a request.
+ * Filters the workspace from allowed paths and ensures forbidden paths take precedence.
+ */
+export async function resolveSandboxPaths(
+  options: GlobalSandboxOptions,
+  req: SandboxRequest,
+): Promise<{
+  allowed: string[];
+  forbidden: string[];
+}> {
+  const forbidden = sanitizePaths(await options.forbiddenPaths?.());
+  const allowed = sanitizePaths(req.policy?.allowedPaths);
+
+  const workspaceIdentity = getPathIdentity(options.workspace);
+  const forbiddenIdentities = new Set(forbidden.map(getPathIdentity));
+
+  const filteredAllowed = allowed.filter((p) => {
+    const identity = getPathIdentity(p);
+    return identity !== workspaceIdentity && !forbiddenIdentities.has(identity);
+  });
+
+  return {
+    allowed: filteredAllowed,
+    forbidden,
+  };
 }
 
 /**
  * Sanitizes an array of paths by deduplicating them and ensuring they are absolute.
+ * Always returns an array (empty if input is null/undefined).
  */
-export function sanitizePaths(paths?: string[]): string[] | undefined {
-  if (!paths) return undefined;
+export function sanitizePaths(paths?: string[] | null): string[] {
+  if (!paths || paths.length === 0) return [];
 
-  // We use a Map to deduplicate paths based on their normalized,
-  // platform-specific identity e.g. handling case-insensitivity on Windows)
-  // while preserving the original string casing.
   const uniquePathsMap = new Map<string, string>();
   for (const p of paths) {
     if (!path.isAbsolute(p)) {
       throw new Error(`Sandbox path must be absolute: ${p}`);
     }
 
-    // Normalize the path (resolves slashes and redundant components)
-    let key = path.normalize(p);
-
-    // Windows file systems are case-insensitive, so we lowercase the key for
-    // deduplication
-    if (os.platform() === 'win32') {
-      key = key.toLowerCase();
-    }
-
+    const key = getPathIdentity(p);
     if (!uniquePathsMap.has(key)) {
       uniquePathsMap.set(key, p);
     }
   }
 
   return Array.from(uniquePathsMap.values());
+}
+
+/** Returns a normalized identity for a path, stripping trailing slashes and handling case sensitivity. */
+export function getPathIdentity(p: string): string {
+  let norm = path.normalize(p);
+
+  // Strip trailing slashes (except for root paths)
+  if (norm.length > 1 && (norm.endsWith('/') || norm.endsWith('\\'))) {
+    norm = norm.slice(0, -1);
+  }
+
+  const platform = os.platform();
+  const isCaseInsensitive = platform === 'win32' || platform === 'darwin';
+  return isCaseInsensitive ? norm.toLowerCase() : norm;
 }
 
 /**
