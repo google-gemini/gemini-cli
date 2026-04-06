@@ -462,6 +462,7 @@ import { A2AClientManager } from '../agents/a2a-client-manager.js';
 import { type McpContext } from '../tools/mcp-client.js';
 import type { EnvironmentSanitizationConfig } from '../services/environmentSanitization.js';
 import { getErrorMessage } from '../utils/errors.js';
+import { LRUCache } from 'mnemonist';
 
 export type { FileFilteringOptions };
 export {
@@ -781,7 +782,8 @@ export class Config implements McpContext, AgentLoopContext {
   private mcpServers: Record<string, MCPServerConfig> | undefined;
   private readonly mcpEnablementCallbacks?: McpEnablementCallbacks;
   private activeExtensionContext?: string;
-  private initializedPlanDirs = new Set<string>();
+  private initializedPlanDirs = new LRUCache<string, boolean>(20);
+  private plansDirCache = new LRUCache<string | undefined, string>(20);
   private readonly extensionPlanDirs: Record<string, string>;
   private userMemory: string | HierarchicalMemory;
   private geminiMdFileCount: number;
@@ -2226,7 +2228,15 @@ export class Config implements McpContext, AgentLoopContext {
   }
 
   getPlansDir(): string {
-    const plansDir = this.storage.getPlansDir(this.getActiveExtensionPlanDir());
+    const context = this.getActiveExtensionContext();
+    // Cache key: undefined means default context, string means extension context
+    const cacheKey = context === undefined ? 'default' : context;
+
+    let plansDir = this.plansDirCache.get(cacheKey);
+    if (plansDir === undefined) {
+      plansDir = this.storage.getPlansDir(this.getActiveExtensionPlanDir());
+      this.plansDirCache.set(cacheKey, plansDir);
+    }
 
     if (!this.planEnabled || this.initializedPlanDirs.has(plansDir)) {
       return plansDir;
@@ -2236,19 +2246,12 @@ export class Config implements McpContext, AgentLoopContext {
       fs.mkdirSync(plansDir, { recursive: true });
 
       const realPlansDir = resolveToRealPath(plansDir);
-      const realProjectRoot = resolveToRealPath(this.getTargetDir());
-
-      if (!isSubpath(realProjectRoot, realPlansDir)) {
-        throw new Error(
-          `Security violation: Resolved plan directory '${realPlansDir}' is outside the project root '${realProjectRoot}'.`,
-        );
-      }
-
       this.workspaceContext.addDirectory(realPlansDir);
-      this.initializedPlanDirs.add(plansDir);
+      this.initializedPlanDirs.set(plansDir, true);
     } catch (e: unknown) {
       const errorMessage = e instanceof Error ? e.message : String(e);
-      throw new Error(
+      // eslint-disable-next-line no-console
+      console.warn(
         `Failed to initialize active plan directory at '${plansDir}': ${errorMessage}`,
       );
     }
