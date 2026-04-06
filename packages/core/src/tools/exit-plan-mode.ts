@@ -60,11 +60,8 @@ export class ExitPlanModeTool extends BaseDeclarativeTool<
     }
 
     const safeFilename = path.basename(params.plan_filename);
-    const plansDir = resolveToRealPath(this.config.storage.getPlansDir());
-    const resolvedPath = path.join(
-      this.config.storage.getPlansDir(),
-      safeFilename,
-    );
+    const plansDir = resolveToRealPath(this.config.getPlansDir());
+    const resolvedPath = path.join(this.config.getPlansDir(), safeFilename);
 
     const realPath = resolveToRealPath(resolvedPath);
 
@@ -120,7 +117,7 @@ export class ExitPlanModeInvocation extends BaseToolInvocation<
 
     const pathError = await validatePlanPath(
       this.params.plan_filename,
-      this.config.storage.getPlansDir(),
+      this.config.getPlansDir(),
     );
     if (pathError) {
       this.planValidationError = pathError;
@@ -170,7 +167,7 @@ export class ExitPlanModeInvocation extends BaseToolInvocation<
   }
 
   getDescription(): string {
-    return `Requesting plan approval for: ${path.join(this.config.storage.getPlansDir(), this.params.plan_filename)}`;
+    return `Requesting plan approval for: ${path.join(this.config.getPlansDir(), this.params.plan_filename)}`;
   }
 
   /**
@@ -179,7 +176,7 @@ export class ExitPlanModeInvocation extends BaseToolInvocation<
    */
   private getResolvedPlanPath(): string {
     const safeFilename = path.basename(this.params.plan_filename);
-    return path.join(this.config.storage.getPlansDir(), safeFilename);
+    return path.join(this.config.getPlansDir(), safeFilename);
   }
 
   async execute(_signal: AbortSignal): Promise<ToolResult> {

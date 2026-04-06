@@ -132,9 +132,10 @@ describe('EditTool', () => {
       getDisableLLMCorrection: vi.fn(() => true),
       getExperiments: () => {},
       isPlanMode: vi.fn(() => false),
+      getPlansDir: vi.fn().mockReturnValue('/tmp/project/plans'),
       storage: {
         getProjectTempDir: vi.fn().mockReturnValue('/tmp/project'),
-        getPlansDir: vi.fn().mockReturnValue('/tmp/plans'),
+        getPlansDir: vi.fn().mockReturnValue('/tmp/project/plans'),
       },
       isPathAllowed(this: Config, absolutePath: string): boolean {
         const workspaceContext = this.getWorkspaceContext();
@@ -1314,6 +1315,7 @@ function doIt() {
       fs.mkdirSync(plansDir);
 
       vi.mocked(mockConfig.isPlanMode).mockReturnValue(true);
+      vi.mocked(mockConfig.getPlansDir).mockReturnValue(plansDir);
       vi.mocked(mockConfig.storage.getPlansDir).mockReturnValue(plansDir);
 
       const filePath = path.join(rootDir, 'test-file.txt');
