@@ -3796,7 +3796,8 @@ describe('loadCliConfig mcpEnabled', () => {
       ]);
 
       const config = await loadCliConfig(settings, 'test-session', argv);
-      expect(config.storage.getPlansDir()).toContain('ext-plans-dir');
+      config.setActiveExtensionContext('ext-plan');
+      expect(config.getPlansDir()).toContain('ext-plans-dir');
     });
 
     it('should NOT use plan directory from active extension when user has specified one', async () => {
