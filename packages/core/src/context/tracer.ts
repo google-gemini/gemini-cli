@@ -7,6 +7,7 @@
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 import { randomUUID } from 'node:crypto';
+import { debugLogger } from '../utils/debugLogger.js';
 
 export class ContextTracer {
   private traceDir: string;
@@ -23,7 +24,7 @@ export class ContextTracer {
         fs.mkdirSync(this.assetsDir, { recursive: true });
         this.logEvent('SYSTEM', 'Context Tracer Initialized', { sessionId });
       } catch (e) {
-        console.error('Failed to initialize ContextTracer', e);
+        debugLogger.error('Failed to initialize ContextTracer', e);
         this.enabled = false;
       }
     }

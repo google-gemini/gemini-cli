@@ -11,7 +11,7 @@ import { debugLogger } from '../../utils/debugLogger.js';
 import type { ContextEnvironment, ContextTracer } from '../sidecar/environment.js';
 import type { PipelineOrchestrator } from '../sidecar/orchestrator.js';
 import type { SidecarConfig } from '../sidecar/types.js';
-import { calculateEpisodeListTokens } from '../utils/contextTokenCalculator.js';
+
 
 export class IrProjector {
   /**
@@ -31,7 +31,7 @@ export class IrProjector {
     }
 
     const maxTokens = sidecar.budget.maxTokens;
-    let currentTokens = calculateEpisodeListTokens(workingBuffer);
+    let currentTokens = env.tokenCalculator.calculateEpisodeListTokens(workingBuffer);
 
     if (currentTokens <= maxTokens) {
       tracer.logEvent('IrProjector', `View is within maxTokens (${currentTokens} <= ${maxTokens}). Returning view.`);
@@ -50,7 +50,7 @@ export class IrProjector {
       isBudgetSatisfied: currentTokens <= sidecar.budget.maxTokens, 
     });
 
-    const finalTokens = calculateEpisodeListTokens(processedEpisodes);
+    const finalTokens = env.tokenCalculator.calculateEpisodeListTokens(processedEpisodes);
     tracer.logEvent('IrProjector', `Finished projection. Final token count: ${finalTokens}.`);
     debugLogger.log(`Context Manager finished. Final actual token count: ${finalTokens}.`);
 

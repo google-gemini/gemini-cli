@@ -7,6 +7,10 @@
 import { EventEmitter } from 'node:events';
 import type { Episode, Variant } from './ir/types.js';
 
+export interface PristineHistoryUpdatedEvent {
+  episodes: Episode[];
+}
+
 export interface ContextConsolidationEvent {
   episodes: Episode[];
   targetDeficit: number;
@@ -23,6 +27,14 @@ export interface VariantReadyEvent {
 }
 
 export class ContextEventBus extends EventEmitter {
+  emitPristineHistoryUpdated(event: PristineHistoryUpdatedEvent) {
+    this.emit('PRISTINE_HISTORY_UPDATED', event);
+  }
+
+  onPristineHistoryUpdated(listener: (event: PristineHistoryUpdatedEvent) => void) {
+    this.on('PRISTINE_HISTORY_UPDATED', listener);
+  }
+
   emitChunkReceived(event: IrChunkReceivedEvent) {
     this.emit('IR_CHUNK_RECEIVED', event);
   }

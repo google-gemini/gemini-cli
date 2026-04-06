@@ -5,7 +5,7 @@
  */
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { IrMapper } from './ir/mapper.js';
+
 import {
   createSyntheticHistory,
   createMockContextConfig,
@@ -46,7 +46,7 @@ describe('ContextManager Sync Pressure Barrier Tests', () => {
     ]);
 
     const rawHistoryLength = chatHistory.get().length;
-    IrMapper.setConfig({ charsPerToken: 1 });
+    
 
     // 5. Project History (Triggers Sync Barrier)
     const projection = await contextManager.projectCompressedHistory();

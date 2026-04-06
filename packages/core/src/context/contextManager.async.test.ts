@@ -1,4 +1,4 @@
-import { IrMapper } from './ir/mapper.js';
+
 /**
  * @license
  * Copyright 2026 Google LLC
@@ -17,7 +17,7 @@ describe('ContextManager Barrier Tests', () => {
     const { chatHistory, contextManager } = setupContextComponentTest(config);
 
     // 1. Shrink limits: 1 char = 1 token. RetainedTokens = 10. MaxTokens = 100.
-    IrMapper.setConfig({ charsPerToken: 1 });
+    
 
     contextManager['sidecar'].budget.retainedTokens = 5;
     contextManager['sidecar'].budget.maxTokens = 100;
@@ -80,7 +80,6 @@ describe('ContextManager Barrier Tests', () => {
     // 5. Verify Projection shrinks: 6 original messages replaced by 1 snapshot episode (1 text part) -> length 5.
     const projection = await contextManager.projectCompressedHistory();
     expect(projection.length).toBe(5);
-    // console.dir(projection, {depth: null});
     // projection[0] should be the snapshot yield
     expect(projection[0].parts![0].text).toBe('<SNAP>');
   });
@@ -90,7 +89,7 @@ describe('ContextManager Barrier Tests', () => {
     const { chatHistory, contextManager } = setupContextComponentTest(config);
 
     // 1. Shrink limits: maxTokens = 15.
-    IrMapper.setConfig({ charsPerToken: 1 });
+    
     contextManager['sidecar'].budget.maxTokens = 15;
 
     // 2. Build history: 2 turns. Total = 24 tokens.

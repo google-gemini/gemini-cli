@@ -7,7 +7,7 @@
 import type { Episode } from './types.js';
 import type { ContextTracer } from '../tracer.js';
 import { debugLogger } from '../../utils/debugLogger.js';
-import { calculateEpisodeListTokens } from '../utils/contextTokenCalculator.js';
+
 
 /**
  * Generates a computed view of the pristine log.
@@ -16,10 +16,13 @@ import { calculateEpisodeListTokens } from '../utils/contextTokenCalculator.js';
  * (snapshot > summary > masked) instead of the raw text.
  * Handles N-to-1 variant skipping automatically.
  */
+import type { ContextEnvironment } from "../sidecar/environment.js";
+
 export function generateWorkingBufferView(
   pristineEpisodes: Episode[],
   retainedTokens: number,
   tracer: ContextTracer,
+  env: ContextEnvironment,
 ): Episode[] {
   let currentEpisodes: Episode[] = [];
   let rollingTokens = 0;
@@ -72,7 +75,7 @@ export function generateWorkingBufferView(
         : undefined,
     };
 
-    const epTokens = calculateEpisodeListTokens([projectedEp]);
+    const epTokens = env.tokenCalculator.calculateEpisodeListTokens([projectedEp]);
 
     if (rollingTokens > retainedTokens && ep.variants) {
       const snapshot = ep.variants['snapshot'];
@@ -153,7 +156,7 @@ export function generateWorkingBufferView(
     }
 
     currentEpisodes.unshift(projectedEp);
-    rollingTokens += calculateEpisodeListTokens([projectedEp]);
+    rollingTokens += env.tokenCalculator.calculateEpisodeListTokens([projectedEp]);
   }
 
   return currentEpisodes;

@@ -10,7 +10,7 @@ import type { ContextEnvironment } from '../sidecar/environment.js';
 import { debugLogger } from '../../utils/debugLogger.js';
 import { LlmRole } from '../../telemetry/types.js';
 import { getResponseText } from '../../utils/partUtils.js';
-import { estimateContextTokenCountSync } from '../utils/contextTokenCalculator.js';
+
 
 export class SemanticCompressionProcessor implements ContextProcessor {
   readonly name = 'SemanticCompression';
@@ -62,8 +62,8 @@ export class SemanticCompressionProcessor implements ContextProcessor {
               part.text,
               'User Prompt',
             );
-            const newTokens = estimateContextTokenCountSync([{ text: summary }], 0, { charsPerToken: this.env.charsPerToken });
-            const oldTokens = estimateContextTokenCountSync([{ text: part.text }], 0, { charsPerToken: this.env.charsPerToken });
+            const newTokens = this.env.tokenCalculator.estimateTokensForParts([{ text: summary }]);
+            const oldTokens = this.env.tokenCalculator.estimateTokensForParts([{ text: part.text }]);
 
             if (newTokens < oldTokens) {
               part.presentation = { text: summary, tokens: newTokens };
@@ -88,8 +88,8 @@ export class SemanticCompressionProcessor implements ContextProcessor {
               step.text,
               'Agent Thought',
             );
-            const newTokens = estimateContextTokenCountSync([{ text: summary }], 0, { charsPerToken: this.env.charsPerToken });
-            const oldTokens = estimateContextTokenCountSync([{ text: step.text }], 0, { charsPerToken: this.env.charsPerToken });
+            const newTokens = this.env.tokenCalculator.estimateTokensForParts([{ text: summary }]);
+            const oldTokens = this.env.tokenCalculator.estimateTokensForParts([{ text: step.text }]);
 
             if (newTokens < oldTokens) {
               step.presentation = { text: summary, tokens: newTokens };
@@ -130,7 +130,7 @@ export class SemanticCompressionProcessor implements ContextProcessor {
             // Wrap the summary in an object so the Gemini API accepts it as a valid functionResponse.response
             const newObsObject = { summary };
 
-            const newObsTokens = estimateContextTokenCountSync([
+            const newObsTokens = this.env.tokenCalculator.estimateTokensForParts([
               {
                 functionResponse: {
                   name: step.toolName,
@@ -138,7 +138,7 @@ export class SemanticCompressionProcessor implements ContextProcessor {
                   id: step.id,
                 },
               },
-            ], 0, { charsPerToken: this.env.charsPerToken });
+            ]);
 
             const oldObsTokens =
               step.presentation?.tokens.observation ?? step.tokens.observation;

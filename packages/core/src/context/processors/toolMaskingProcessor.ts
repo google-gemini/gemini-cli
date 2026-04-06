@@ -6,7 +6,7 @@
 
 import type { ContextAccountingState, ContextProcessor } from '../pipeline.js';
 import type { ContextEnvironment } from '../sidecar/environment.js';
-import { estimateContextTokenCountSync } from '../utils/contextTokenCalculator.js';
+
 import { sanitizeFilenamePart } from '../../utils/fileUtils.js';
 import * as fsPromises from 'node:fs/promises';
 import path from 'node:path';
@@ -173,7 +173,7 @@ export class ToolMaskingProcessor implements ContextProcessor {
           step.presentation.observation = obsRes.masked;
 
           // Recalculate tokens perfectly
-          const newIntentTokens = estimateTokenCountSync([
+          const newIntentTokens = this.env.tokenCalculator.estimateTokensForParts([
             {
               functionCall: {
                 name: toolName,
@@ -182,7 +182,7 @@ export class ToolMaskingProcessor implements ContextProcessor {
               },
             },
           ]);
-          const newObsTokens = estimateTokenCountSync([
+          const newObsTokens = this.env.tokenCalculator.estimateTokensForParts([
             {
               functionResponse: {
                 name: toolName,

@@ -18,6 +18,7 @@ import { ContextEnvironmentImpl } from './sidecar/environmentImpl.js';
 import { SidecarLoader } from './sidecar/SidecarLoader.js';
 import { ContextTracer } from './tracer.js';
 import { ContextEventBus } from './eventBus.js';
+import { ContextTokenCalculator } from './utils/contextTokenCalculator.js';
 
 import type { Content } from '@google/genai';
 
@@ -46,6 +47,7 @@ describe('ContextManager Golden Tests', () => {
   beforeEach(() => {
     mockConfig = {
       isContextManagementEnabled: vi.fn().mockReturnValue(true),
+      getExperimentalContextSidecarConfig: vi.fn().mockReturnValue(undefined),
       getTargetDir: vi.fn().mockReturnValue('/tmp'),
       getSessionId: vi.fn().mockReturnValue('test-session'),
       getToolOutputMaskingConfig: vi.fn().mockResolvedValue({
@@ -68,7 +70,7 @@ describe('ContextManager Golden Tests', () => {
       }),
     };
 
-    const sidecar = SidecarLoader.fromLegacyConfig(mockConfig as any);
+    const sidecar = SidecarLoader.fromConfig(mockConfig as any);
     const tracer = new ContextTracer('/tmp', 'test-session');
     const eventBus = new ContextEventBus();
     const env = new ContextEnvironmentImpl(
@@ -118,7 +120,7 @@ describe('ContextManager Golden Tests', () => {
     const history = createLargeHistory();
     (contextManager as any).pristineEpisodes = (
       await import('./ir/mapper.js')
-    ).IrMapper.toIr(history);
+    ).IrMapper.toIr(history, new ContextTokenCalculator(4));
     const result = await contextManager.projectCompressedHistory();
     expect(result).toMatchSnapshot();
   });
@@ -127,7 +129,7 @@ describe('ContextManager Golden Tests', () => {
     const history = createLargeHistory();
     (contextManager as any).pristineEpisodes = (
       await import('./ir/mapper.js')
-    ).IrMapper.toIr(history);
+    ).IrMapper.toIr(history, new ContextTokenCalculator(4));
     // In Golden Tests, we just want to ensure the logic doesn't throw or alter unprotected history in weird ways.
     // Since we're skipping processors due to being under budget, it should equal history.
     const tracer2 = new ContextTracer('/tmp', 'test2');
@@ -153,7 +155,7 @@ describe('ContextManager Golden Tests', () => {
 
     (contextManager as any).pristineEpisodes = (
       await import('./ir/mapper.js')
-    ).IrMapper.toIr(history);
+    ).IrMapper.toIr(history, new ContextTokenCalculator(4));
     const result = await contextManager.projectCompressedHistory();
 
     expect(result.length).toEqual(history.length);

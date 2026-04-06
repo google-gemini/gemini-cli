@@ -6,7 +6,7 @@
 import type { Episode } from '../ir/types.js';
 import type { ContextAccountingState, ContextProcessor } from '../pipeline.js';
 import type { ContextEnvironment } from '../sidecar/environment.js';
-import { estimateContextTokenCountSync as estimateTokenCountSync } from '../utils/contextTokenCalculator.js';
+
 import { sanitizeFilenamePart } from '../../utils/fileUtils.js';
 import * as fsPromises from 'node:fs/promises';
 import path from 'node:path';
@@ -80,30 +80,28 @@ export class BlobDegradationProcessor implements ContextProcessor {
             newText = `[Multi-Modal Blob (${part.mimeType}, ${mb}MB) degraded to text to preserve context window. Saved to: ${filePath}]`;
 
             // Re-calculate tokens. Images are expensive (~258 tokens). The text is cheap (~20 tokens).
-            const oldTokens = estimateTokenCountSync([
+            const oldTokens = this.env.tokenCalculator.estimateTokensForParts([
               { inlineData: { mimeType: part.mimeType, data: part.data } },
             ]);
-            const newTokens = estimateTokenCountSync([{ text: newText }]);
+            const newTokens = this.env.tokenCalculator.estimateTokensForParts([{ text: newText }]);
             tokensSaved = oldTokens - newTokens;
           } else if (part.type === 'file_data') {
             newText = `[File Reference (${part.mimeType}) degraded to text to preserve context window. Original URI: ${part.fileUri}]`;
-            const oldTokens = estimateTokenCountSync([
+            const oldTokens = this.env.tokenCalculator.estimateTokensForParts([
               { fileData: { mimeType: part.mimeType, fileUri: part.fileUri } },
             ]);
-            const newTokens = estimateTokenCountSync([{ text: newText }]);
+            const newTokens = this.env.tokenCalculator.estimateTokensForParts([{ text: newText }]);
             tokensSaved = oldTokens - newTokens;
           } else if (part.type === 'raw_part') {
             newText = `[Unknown Part degraded to text to preserve context window.]`;
             // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
-            const oldTokens = estimateTokenCountSync([part.part as Part]);
-            const newTokens = estimateTokenCountSync([{ text: newText }]);
+            const oldTokens = this.env.tokenCalculator.estimateTokensForParts([part.part as Part]);
+            const newTokens = this.env.tokenCalculator.estimateTokensForParts([{ text: newText }]);
             tokensSaved = oldTokens - newTokens;
           }
 
           if (newText && tokensSaved > 0) {
-            const newTokens = estimateTokenCountSync([{ text: newText }], 0, {
-              charsPerToken: this.env.charsPerToken,
-            });
+            const newTokens = this.env.tokenCalculator.estimateTokensForParts([{ text: newText }]);
             part.presentation = { text: newText, tokens: newTokens };
 
             ep.trigger.metadata.transformations.push({

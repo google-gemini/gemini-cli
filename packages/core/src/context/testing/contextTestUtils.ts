@@ -77,6 +77,7 @@ export function createMockContextConfig(
     getUsageStatisticsEnabled: vi.fn().mockReturnValue(false),
     getTargetDir: vi.fn().mockReturnValue('/tmp'),
     getSessionId: vi.fn().mockReturnValue('test-session'),
+    getExperimentalContextSidecarConfig: vi.fn().mockReturnValue(undefined),
   };
 
   // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
@@ -95,7 +96,7 @@ import type { BaseLlmClient } from 'src/core/baseLlmClient.js';
 
 export function setupContextComponentTest(config: Config) {
   const chatHistory = new AgentChatHistory();
-  const sidecar = SidecarLoader.fromLegacyConfig(config);
+  const sidecar = SidecarLoader.fromConfig(config);
   const tracer = new ContextTracer('/tmp', 'test-session');
   const eventBus = new ContextEventBus();
   const env = new ContextEnvironmentImpl(

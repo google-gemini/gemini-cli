@@ -7,9 +7,10 @@
 import type { ContextProcessor, ContextAccountingState } from '../pipeline.js';
 import type { Episode, ToolExecution } from '../ir/types.js';
 import type { ContextEnvironment, ContextEventBus } from '../sidecar/environment.js';
-import { estimateContextTokenCountSync as estimateTokenCountSync } from '../utils/contextTokenCalculator.js';
+
 import { v4 as uuidv4 } from 'uuid';
 import { LlmRole } from '../../telemetry/llmRole.js';
+import { debugLogger } from 'src/utils/debugLogger.js';
 
 export interface StateSnapshotProcessorOptions {
   model?: string;
@@ -48,7 +49,7 @@ export class StateSnapshotProcessor implements ContextProcessor {
       for (let i = 1; i < episodes.length - 1; i++) {
         const ep = episodes[i];
         selectedEpisodes.push(ep);
-        deficitAccumulator += estimateTokenCountSync([
+        deficitAccumulator += this.env.tokenCalculator.estimateTokensForParts([
           { text: (ep.trigger as any)?.semanticParts?.[0]?.text ?? '' },
           { text: ep.yield?.text ?? '' },
         ]);
@@ -116,7 +117,7 @@ Output ONLY the raw factual snapshot, formatted compactly. Do not include markdo
 
       // Synthesize a new "Episode" representing this compressed block
       const newId = uuidv4();
-      const contentTokens = estimateTokenCountSync([{ text: snapshotText }]);
+      const contentTokens = this.env.tokenCalculator.estimateTokensForParts([{ text: snapshotText }]);
 
       return {
         id: newId,
@@ -144,7 +145,7 @@ Output ONLY the raw factual snapshot, formatted compactly. Do not include markdo
         },
       };
     } catch (error) {
-      console.error('Failed to synthesize snapshot:', error);
+      debugLogger.error('Failed to synthesize snapshot:', error);
       throw error;
     }
   }

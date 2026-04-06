@@ -6,6 +6,7 @@
 
 import { describe, it, expect } from 'vitest';
 import { IrMapper } from './mapper.js';
+import { ContextTokenCalculator } from '../utils/contextTokenCalculator.js';
 import type { Content } from '@google/genai';
 import type { UserPrompt, ToolExecution } from './types.js';
 
@@ -80,7 +81,8 @@ describe('IrMapper', () => {
       { role: 'model', parts: [{ text: 'Everything is done!' }] },
     ];
 
-    const episodes = IrMapper.toIr(rawHistory);
+    const tokenCalculator = new ContextTokenCalculator(4);
+    const episodes = IrMapper.toIr(rawHistory, tokenCalculator);
 
     expect(episodes).toHaveLength(1);
     const ep = episodes[0];
@@ -135,7 +137,8 @@ describe('IrMapper', () => {
       { role: 'model', parts: [{ text: 'Hi there' }] },
     ];
 
-    const initialIr = IrMapper.toIr(history);
+    const tokenCalculator = new ContextTokenCalculator(4);
+    const initialIr = IrMapper.toIr(history, tokenCalculator);
     expect(initialIr).toHaveLength(1);
 
     // Save the uniquely generated deterministic ID for the first episode
@@ -146,7 +149,7 @@ describe('IrMapper', () => {
     history.push({ role: 'user', parts: [{ text: 'How are you?' }] });
     history.push({ role: 'model', parts: [{ text: 'I am an AI.' }] });
 
-    const updatedIr = IrMapper.toIr(history);
+    const updatedIr = IrMapper.toIr(history, tokenCalculator);
     expect(updatedIr).toHaveLength(2);
 
     // 3. Verify ID Stability

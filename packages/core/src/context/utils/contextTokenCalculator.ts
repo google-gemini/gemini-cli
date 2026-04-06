@@ -8,6 +8,12 @@ import type { Part } from '@google/genai';
 import { estimateTokenCountSync as baseEstimate } from '../../utils/tokenCalculation.js';
 import type { Episode } from '../ir/types.js';
 
+/**
+ * The flat token cost assigned to a single multi-modal asset (like an image tile)
+ * by the Gemini API. We use this as a baseline heuristic for inlineData/fileData.
+ */
+const BASE_MULTIMODAL_TOKEN_COST = 258;
+
 export class ContextTokenCalculator {
   constructor(private readonly charsPerToken: number) {}
 
@@ -47,21 +53,19 @@ export class ContextTokenCalculator {
    * Deeply inspects the nested structure and uses the base tokenization math.
    */
   estimateTokensForParts(parts: Part[], depth: number = 0): number {
-    if (this.charsPerToken !== 4) {
-      let totalTokens = 0;
-      for (const part of parts) {
-        if (typeof part.text === 'string') {
-          totalTokens += Math.ceil(part.text.length / this.charsPerToken);
-        } else {
-          totalTokens += Math.ceil(
-            JSON.stringify(part).length / this.charsPerToken,
-          );
-        }
+    let totalTokens = 0;
+    for (const part of parts) {
+      if (typeof part.text === 'string') {
+        totalTokens += Math.ceil(part.text.length / this.charsPerToken);
+      } else if (part.inlineData !== undefined || part.fileData !== undefined) {
+        totalTokens += BASE_MULTIMODAL_TOKEN_COST;
+      } else {
+        totalTokens += Math.ceil(
+          JSON.stringify(part).length / this.charsPerToken,
+        );
       }
-      return totalTokens;
     }
-
-    // The baseEstimate no longer accepts config because we forked it!
-    return baseEstimate(parts, depth);
+    // Also include structural overhead
+    return totalTokens + baseEstimate(parts, depth);
   }
 }

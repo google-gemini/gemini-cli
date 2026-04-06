@@ -21,7 +21,7 @@ import type { SidecarConfig } from './sidecar/types.js';
 import { ProcessorRegistry } from './sidecar/registry.js';
 import { PipelineOrchestrator } from './sidecar/orchestrator.js';
 import { HistoryObserver } from './historyObserver.js';
-import { calculateEpisodeListTokens } from './utils/contextTokenCalculator.js';
+
 import { generateWorkingBufferView } from './ir/graphUtils.js';
 
 
@@ -63,6 +63,11 @@ export class ContextManager {
 
     this.orchestrator = new PipelineOrchestrator(this.sidecar, this.env, this.eventBus, this.tracer);
 
+    this.eventBus.onPristineHistoryUpdated((event) => {
+      this.pristineEpisodes = event.episodes;
+      this.evaluateTriggers();
+    });
+
     this.eventBus.onVariantReady((event) => {
       
       // Find the target episode in the pristine graph
@@ -93,6 +98,32 @@ export class ContextManager {
   }
 
   /**
+   * Evaluates if the current working buffer exceeds configured budget thresholds,
+   * firing consolidation events if necessary.
+   */
+  private evaluateTriggers() {
+    if (!this.sidecar.budget) return;
+
+    const workingBuffer = this.getWorkingBufferView();
+    const currentTokens = this.env.tokenCalculator.calculateEpisodeListTokens(workingBuffer);
+    
+    this.tracer.logEvent('ContextManager', 'Evaluated triggers', { currentTokens, retainedTokens: this.sidecar.budget.retainedTokens });
+
+    // 1. Eager Compute Trigger
+    this.eventBus.emitChunkReceived({ episodes: this.pristineEpisodes });
+
+    // 2. Budget Crossed Trigger
+    if (currentTokens > this.sidecar.budget.retainedTokens) {
+      const deficit = currentTokens - this.sidecar.budget.retainedTokens;
+      this.tracer.logEvent('ContextManager', 'Budget crossed. Emitting ConsolidationNeeded', { deficit });
+      this.eventBus.emitConsolidationNeeded({
+        episodes: workingBuffer, 
+        targetDeficit: deficit,
+      });
+    }
+  }
+
+  /**
    * Subscribes to the core AgentChatHistory to natively track all message events,
    * converting them seamlessly into pristine Episodes.
    */
@@ -105,10 +136,7 @@ export class ContextManager {
       chatHistory,
       this.eventBus,
       this.tracer,
-      this.sidecar,
-      (episodes) => { this.pristineEpisodes = episodes; },
-      () => this.getWorkingBufferView(),
-      (episodes) => calculateEpisodeListTokens(episodes)
+      this.env.tokenCalculator,
     );
 
     this.historyObserver.start();
@@ -125,7 +153,8 @@ export class ContextManager {
     return generateWorkingBufferView(
       this.pristineEpisodes,
       this.sidecar.budget.retainedTokens,
-      this.tracer
+      this.tracer,
+      this.env
     );
   }
 
