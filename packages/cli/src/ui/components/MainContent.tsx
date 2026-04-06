@@ -336,6 +336,10 @@ export const MainContent = () => {
     isAlternateBuffer,
   ]);
 
+  if (!uiState.isConfigInitialized) {
+    return null;
+  }
+
   if (isAlternateBufferOrTerminalBuffer) {
     return scrollableList;
   }
