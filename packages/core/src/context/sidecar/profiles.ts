@@ -24,6 +24,7 @@ export const defaultSidecarProfile: SidecarConfig = {
     {
       name: 'Immediate Sanitization',
       triggers: ['on_turn'],
+      execution: 'blocking',
       processors: [
         { processorId: 'ToolMaskingProcessor', options: { stringLengthThresholdTokens: 8000 } },
         { processorId: 'BlobDegradationProcessor', options: {} },
@@ -34,6 +35,7 @@ export const defaultSidecarProfile: SidecarConfig = {
     {
       name: 'Deep Background Compression',
       triggers: [{ type: 'timer', intervalMs: 5000 }, 'budget_exceeded'],
+      execution: 'background',
       processors: [
         { processorId: 'HistorySquashingProcessor', options: { maxTokensPerNode: 3000 } },
         { processorId: 'StateSnapshotProcessor', options: {} }

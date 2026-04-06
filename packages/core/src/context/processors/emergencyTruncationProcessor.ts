@@ -7,7 +7,7 @@
 import type { ContextProcessor, ContextAccountingState } from '../pipeline.js';
 import type { Episode } from '../ir/types.js';
 import type { ContextEnvironment } from '../sidecar/environment.js';
-import { estimateContextTokenCountSync } from '../utils/contextTokenCalculator.js';
+import { calculateEpisodeListTokens } from '../utils/contextTokenCalculator.js';
 
 export interface EmergencyTruncationProcessorOptions {}
 
@@ -32,8 +32,7 @@ export class EmergencyTruncationProcessor implements ContextProcessor {
     
     // We respect the global protected Episode IDs (like the system prompt at index 0)
     for (const ep of episodes) {
-      // Calculate individual episode tokens efficiently (assume metadata is accurate if present)
-      const epTokens = ep.yield?.metadata?.currentTokens ?? estimateContextTokenCountSync([{ text: ep.yield?.text ?? '' }]);
+      const epTokens = calculateEpisodeListTokens([ep]);
       
       if (remainingTokens > targetTokens && !state.protectedEpisodeIds.has(ep.id)) {
         remainingTokens -= epTokens;
