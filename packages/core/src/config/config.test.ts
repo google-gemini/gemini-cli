@@ -2130,8 +2130,18 @@ describe('BaseLlmClient Lifecycle', () => {
     usageStatisticsEnabled: false,
   };
 
+  it('should throw an error if getBaseLlmClient is called before experiments have been fetched', () => {
+    const config = new Config(baseParams);
+    // By default on a new Config instance, experiments are undefined
+    expect(() => config.getBaseLlmClient()).toThrow(
+      'BaseLlmClient not initialized. Ensure experiments have been fetched and configuration is ready.',
+    );
+  });
+
   it('should throw an error if getBaseLlmClient is called before refreshAuth', () => {
     const config = new Config(baseParams);
+    // Explicitly set experiments to avoid triggering the new missing-experiments error
+    config.setExperiments({ flags: {}, experimentIds: [] });
     expect(() => config.getBaseLlmClient()).toThrow(
       'BaseLlmClient not initialized. Ensure authentication has occurred and ContentGenerator is ready.',
     );

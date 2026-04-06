@@ -1634,6 +1634,11 @@ export class Config implements McpContext, AgentLoopContext {
   getBaseLlmClient(): BaseLlmClient {
     if (!this.baseLlmClient) {
       // Handle cases where initialization might be deferred or authentication failed
+      if (!this.experiments) {
+        throw new Error(
+          'BaseLlmClient not initialized. Ensure experiments have been fetched and configuration is ready.',
+        );
+      }
       if (this.contentGenerator) {
         this.baseLlmClient = new BaseLlmClient(
           this.getContentGenerator(),
