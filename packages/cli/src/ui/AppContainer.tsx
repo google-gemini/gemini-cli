@@ -1349,6 +1349,8 @@ Logging in with Google... Restarting Gemini CLI to continue.
         if (parsedCommand.extensionContext) {
           if (config.hasExtensionPlanDir(parsedCommand.extensionContext)) {
             config.setActiveExtensionContext(parsedCommand.extensionContext);
+          } else {
+            config.setActiveExtensionContext(undefined);
           }
         } else if (parsedCommand.commandToExecute?.name === 'plan') {
           config.setActiveExtensionContext(undefined);
