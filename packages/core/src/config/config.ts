@@ -2252,13 +2252,11 @@ export class Config implements McpContext, AgentLoopContext {
 
   getPlansDir(): string {
     const context = this.getActiveExtensionContext();
-    // Cache key: undefined means default context, string means extension context
-    const cacheKey = context === undefined ? 'default' : context;
 
-    let plansDir = this.plansDirCache.get(cacheKey);
+    let plansDir = this.plansDirCache.get(context);
     if (plansDir === undefined) {
       plansDir = this.storage.getPlansDir(this.getActiveExtensionPlanDir());
-      this.plansDirCache.set(cacheKey, plansDir);
+      this.plansDirCache.set(context, plansDir);
     }
 
     if (!this.planEnabled || this.initializedPlanDirs.has(plansDir)) {
@@ -2266,8 +2264,6 @@ export class Config implements McpContext, AgentLoopContext {
     }
 
     try {
-      fs.mkdirSync(plansDir, { recursive: true });
-
       const realPlansDir = resolveToRealPath(plansDir);
       const realProjectRoot = resolveToRealPath(this.getTargetDir());
 
@@ -2277,13 +2273,16 @@ export class Config implements McpContext, AgentLoopContext {
         );
       }
 
-      this.workspaceContext.addDirectory(realPlansDir);
       this.initializedPlanDirs.set(plansDir, true);
+      fs.mkdirSync(realPlansDir, { recursive: true });
+      this.workspaceContext.addDirectory(realPlansDir);
     } catch (e: unknown) {
       const errorMessage = e instanceof Error ? e.message : String(e);
-      // eslint-disable-next-line no-console
-      console.warn(
-        `Failed to initialize active plan directory at '${plansDir}': ${errorMessage}`,
+      if (errorMessage.includes('Security violation')) {
+        throw e;
+      }
+      process.stderr.write(
+        `Failed to initialize active plan directory at '${plansDir}': ${errorMessage}\n`,
       );
     }
     return plansDir;

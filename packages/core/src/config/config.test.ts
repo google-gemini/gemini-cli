@@ -3345,7 +3345,9 @@ describe('Plans Directory Initialization', () => {
   });
 
   it('should log a warning if the plan directory path is blocked by an existing file (EEXIST)', async () => {
-    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    const writeSpy = vi
+      .spyOn(process.stderr, 'write')
+      .mockImplementation(() => true);
     vi.spyOn(fs, 'mkdirSync').mockImplementation(() => {
       const err = new Error('File exists') as NodeJS.ErrnoException;
       err.code = 'EEXIST';
@@ -3359,33 +3361,16 @@ describe('Plans Directory Initialization', () => {
     await config.initialize();
     config.getPlansDir();
 
-    expect(warnSpy).toHaveBeenCalledWith(
+    expect(writeSpy).toHaveBeenCalledWith(
       expect.stringMatching(
         /Failed to initialize active plan directory.*File exists/,
       ),
     );
-    warnSpy.mockRestore();
+    writeSpy.mockRestore();
   });
 
-  it('should log a warning if the resolved plan directory is outside the project root (TOCTOU security violation)', async () => {
-    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
-
-    let isMalicious = false;
-    vi.spyOn(fs, 'mkdirSync').mockImplementation(() => {
-      // Simulate an attacker creating a symlink right after the initial check but before/during creation
-      isMalicious = true;
-      return undefined;
-    });
-
-    // When Config.getPlansDir calls resolveToRealPath AFTER creation, it resolves to an outside path.
-    const realpathSpy = vi
-      .spyOn(fs, 'realpathSync')
-      .mockImplementation((p: fs.PathLike) => {
-        const pStr = p.toString();
-        if (isMalicious && pStr.includes('plans'))
-          return '/outside/the/project/root/plans';
-        return pStr;
-      });
+  it('should throw a security violation if the resolved plan directory is outside the project root', async () => {
+    vi.spyOn(fs, 'mkdirSync').mockReturnValue(undefined);
 
     const config = new Config({
       ...baseParams,
@@ -3393,22 +3378,31 @@ describe('Plans Directory Initialization', () => {
     });
 
     await config.initialize();
+
+    // Bypass Storage check so we can specifically test Config's check
+    vi.spyOn(config.storage, 'getPlansDir').mockReturnValue('/tmp/test/plans');
+
+    const realpathSpy = vi
+      .spyOn(fs, 'realpathSync')
+      .mockImplementation((p: fs.PathLike) => {
+        const pStr = p.toString();
+        if (pStr.includes('plans')) return '/outside/the/project/root/plans';
+        return pStr;
+      });
+
     try {
-      config.getPlansDir();
+      expect(() => config.getPlansDir()).toThrow(
+        /Security violation: Resolved plan directory.*is outside the project root/,
+      );
     } finally {
       realpathSpy.mockRestore();
     }
-
-    expect(warnSpy).toHaveBeenCalledWith(
-      expect.stringMatching(
-        /Security violation: Resolved plan directory.*is outside the project root/,
-      ),
-    );
-    warnSpy.mockRestore();
   });
 
   it('should log a warning if mkdirSync fails during getPlansDir (e.g. EACCES)', async () => {
-    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    const writeSpy = vi
+      .spyOn(process.stderr, 'write')
+      .mockImplementation(() => true);
     vi.spyOn(fs, 'mkdirSync').mockImplementation(() => {
       const err = new Error('Permission denied') as NodeJS.ErrnoException;
       err.code = 'EACCES';
@@ -3422,12 +3416,12 @@ describe('Plans Directory Initialization', () => {
     await config.initialize();
     config.getPlansDir();
 
-    expect(warnSpy).toHaveBeenCalledWith(
+    expect(writeSpy).toHaveBeenCalledWith(
       expect.stringMatching(
         /Failed to initialize active plan directory.*Permission denied/,
       ),
     );
-    warnSpy.mockRestore();
+    writeSpy.mockRestore();
   });
 
   it('should deduplicate and cache when multiple extensions (or default) use the same directory', async () => {
