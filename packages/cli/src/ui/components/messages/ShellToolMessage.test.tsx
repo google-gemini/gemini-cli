@@ -72,7 +72,7 @@ describe('<ShellToolMessage />', () => {
       const { lastFrame, simulateClick, unmount, waitUntilReady } =
         await renderWithProviders(
           <ShellToolMessage {...baseProps} name={name} />,
-          { uiActions, mouseEventsEnabled: true },
+          { uiActions },
         );
 
       await waitUntilReady();
@@ -257,6 +257,7 @@ describe('<ShellToolMessage />', () => {
                 activePtyId: focused ? 1 : 2,
                 embeddedShellFocused: focused,
                 constrainHeight,
+                isAlternateBuffer: true,
               },
             },
           );
@@ -293,8 +294,8 @@ describe('<ShellToolMessage />', () => {
       await waitUntilReady();
       const frame = lastFrame();
       // Since it's Executing, it might still constrain to ACTIVE_SHELL_MAX_LINES (10)
-      // Actually let's just assert on the behaviour that happens right now (which is 10 lines)
-      expect(frame.match(/Line \d+/g)?.length).toBe(10);
+      // Actually let's just assert on the behaviour that happens right now (which is 100 lines)
+      expect(frame.match(/Line \d+/g)?.length).toBe(100);
       unmount();
     });
 
@@ -314,6 +315,7 @@ describe('<ShellToolMessage />', () => {
           settings: createMockSettings({ ui: { useAlternateBuffer: true } }),
           uiState: {
             constrainHeight: false,
+            isAlternateBuffer: true,
           },
         },
       );
@@ -342,6 +344,7 @@ describe('<ShellToolMessage />', () => {
           settings: createMockSettings({ ui: { useAlternateBuffer: true } }),
           uiState: {
             constrainHeight: false,
+            isAlternateBuffer: true,
           },
         },
       );

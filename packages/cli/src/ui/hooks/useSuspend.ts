@@ -13,22 +13,27 @@ import {
   exitAlternateScreen,
   enableLineWrapping,
   disableLineWrapping,
+  shouldEnterAlternateScreen,
+  type Config,
 } from '@google/gemini-cli-core';
 import process from 'node:process';
 import {
   cleanupTerminalOnExit,
   terminalCapabilityManager,
+  clearTerminalScreen,
 } from '../utils/terminalCapabilityManager.js';
 import { WARNING_PROMPT_DURATION_MS } from '../constants.js';
 import { formatCommand } from '../key/keybindingUtils.js';
 import { Command } from '../key/keyBindings.js';
+import type { MutableRefObject } from 'react';
 
 interface UseSuspendProps {
   handleWarning: (message: string) => void;
   setRawMode: (mode: boolean) => void;
   refreshStatic: () => void;
   setForceRerenderKey: (updater: (prev: number) => number) => void;
-  shouldUseAlternateScreen: boolean;
+  isAlternateBufferRef: MutableRefObject<boolean>;
+  config: Config;
 }
 
 export function useSuspend({
@@ -36,7 +41,8 @@ export function useSuspend({
   setRawMode,
   refreshStatic,
   setForceRerenderKey,
-  shouldUseAlternateScreen,
+  isAlternateBufferRef,
+  config,
 }: UseSuspendProps) {
   const [ctrlZPressCount, setCtrlZPressCount] = useState(0);
   const ctrlZTimerRef = useRef<NodeJS.Timeout | null>(null);
@@ -62,6 +68,12 @@ export function useSuspend({
       ctrlZTimerRef.current = null;
     }
     const suspendKey = formatCommand(Command.SUSPEND_APP);
+
+    const shouldUseAlternateScreen = shouldEnterAlternateScreen(
+      isAlternateBufferRef.current,
+      config.getScreenReader(),
+    );
+
     if (ctrlZPressCount > 1) {
       setCtrlZPressCount(0);
       if (process.platform === 'win32') {
@@ -70,10 +82,9 @@ export function useSuspend({
       }
 
       if (shouldUseAlternateScreen) {
-        // Leave alternate buffer before suspension so the shell stays usable.
+        clearTerminalScreen();
         exitAlternateScreen();
         enableLineWrapping();
-        writeToStdout('\x1b[2J\x1b[H');
       }
 
       // Cleanup before suspend.
@@ -99,7 +110,7 @@ export function useSuspend({
           if (shouldUseAlternateScreen) {
             enterAlternateScreen();
             disableLineWrapping();
-            writeToStdout('\x1b[2J\x1b[H');
+            clearTerminalScreen();
           }
 
           terminalCapabilityManager.enableSupportedModes();
@@ -148,9 +159,9 @@ export function useSuspend({
     setRawMode,
     refreshStatic,
     setForceRerenderKey,
-    shouldUseAlternateScreen,
+    isAlternateBufferRef,
+    config,
   ]);
-
   const handleSuspend = useCallback(() => {
     setCtrlZPressCount((prev) => prev + 1);
   }, []);

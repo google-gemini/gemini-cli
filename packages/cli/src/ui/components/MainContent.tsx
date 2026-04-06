@@ -336,19 +336,27 @@ export const MainContent = () => {
     isAlternateBuffer,
   ]);
 
+  const allStaticItems = useMemo(
+    () => [
+      <AppHeader key="app-header" version={version} />,
+      ...staticHistoryItems,
+      ...lastResponseHistoryItems,
+    ],
+    [version, staticHistoryItems, lastResponseHistoryItems],
+  );
+
   if (isAlternateBufferOrTerminalBuffer) {
+    if (uiState.isTransitioningAltBuffer) {
+      return pendingItems;
+    }
     return scrollableList;
   }
 
   return (
     <>
       <Static
-        key={uiState.historyRemountKey}
-        items={[
-          <AppHeader key="app-header" version={version} />,
-          ...staticHistoryItems,
-          ...lastResponseHistoryItems,
-        ]}
+        key={`main-history-static-${uiState.historyRemountKey}`}
+        items={uiState.isTransitioningAltBuffer ? [] : allStaticItems}
       >
         {(item) => item}
       </Static>

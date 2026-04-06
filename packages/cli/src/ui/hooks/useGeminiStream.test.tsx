@@ -108,7 +108,10 @@ const MockedGeminiClientClass = vi.hoisted(() =>
 );
 
 const MockedUserPromptEvent = vi.hoisted(() =>
-  vi.fn().mockImplementation(() => {}),
+  vi.fn().mockImplementation(() => ({
+    toLogBody: vi.fn().mockReturnValue(''),
+    toOpenTelemetryAttributes: vi.fn().mockReturnValue({}),
+  })),
 );
 const mockParseAndFormatApiError = vi.hoisted(() => vi.fn());
 const mockIsBackgroundExecutionData = vi.hoisted(

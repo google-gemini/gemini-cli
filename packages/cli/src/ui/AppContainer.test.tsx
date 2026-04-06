@@ -2690,6 +2690,92 @@ describe('AppContainer State Management', () => {
     });
   });
 
+  describe('Alternate Buffer Toggle (ALT+A)', () => {
+    let handleGlobalKeypress: (key: Key) => boolean;
+    let mockedUseKeypress: Mock;
+    let unmount: () => void;
+
+    const setupToggleTest = async (
+      isAlternateMode = false,
+      isScreenReader = false,
+    ) => {
+      vi.spyOn(mockConfig, 'getUseAlternateBuffer').mockReturnValue(
+        isAlternateMode,
+      );
+      vi.spyOn(mockConfig, 'getScreenReader').mockReturnValue(isScreenReader);
+
+      const testSettings = createMockSettings({
+        ui: { useAlternateBuffer: isAlternateMode },
+      });
+
+      const renderResult = await act(async () =>
+        renderAppContainer({
+          config: mockConfig,
+          settings: testSettings,
+        }),
+      );
+
+      unmount = renderResult.unmount;
+    };
+
+    const pressToggle = async () => {
+      await act(async () => {
+        handleGlobalKeypress({
+          name: 'a',
+          alt: true,
+          shift: false,
+          ctrl: false,
+          cmd: false,
+          insertable: false,
+          sequence: '',
+        } as Key);
+      });
+      await act(async () => {
+        vi.advanceTimersByTime(150);
+      });
+    };
+
+    beforeEach(() => {
+      vi.useFakeTimers();
+      mockedUseKeypress = vi.spyOn(useKeypressModule, 'useKeypress') as Mock;
+      mockedUseKeypress.mockImplementation(
+        (callback: (key: Key) => boolean, options: { isActive: boolean }) => {
+          if (options?.isActive) {
+            handleGlobalKeypress = callback;
+          }
+        },
+      );
+    });
+
+    afterEach(() => {
+      vi.useRealTimers();
+      vi.restoreAllMocks();
+    });
+
+    it('toggles alternate buffer mode on and off', async () => {
+      await setupToggleTest(false, false);
+      expect(capturedUIState.isAlternateBuffer).toBe(false);
+
+      await pressToggle();
+      expect(capturedUIState.isAlternateBuffer).toBe(true);
+
+      await pressToggle();
+      expect(capturedUIState.isAlternateBuffer).toBe(false);
+
+      unmount();
+    });
+
+    it('does not toggle when screen reader mode is on', async () => {
+      await setupToggleTest(false, true);
+      expect(capturedUIState.isAlternateBuffer).toBe(false);
+
+      await pressToggle();
+      expect(capturedUIState.isAlternateBuffer).toBe(false);
+
+      unmount();
+    });
+  });
+
   describe('Model Dialog Integration', () => {
     it('should provide isModelDialogOpen in the UIStateContext', async () => {
       mockedUseModelCommand.mockReturnValue({
