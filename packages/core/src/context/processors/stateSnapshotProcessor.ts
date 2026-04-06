@@ -49,7 +49,7 @@ export class StateSnapshotProcessor implements ContextProcessor {
         const ep = episodes[i];
         selectedEpisodes.push(ep);
         deficitAccumulator += estimateTokenCountSync([
-          { text: ep.trigger?.parts?.[0]?.text ?? '' },
+          { text: (ep.trigger as any)?.semanticParts?.[0]?.text ?? '' },
           { text: ep.yield?.text ?? '' },
         ]);
         if (deficitAccumulator >= targetDeficit) break;
@@ -87,7 +87,7 @@ Output ONLY the raw factual snapshot, formatted compactly. Do not include markdo
     let userPromptText = 'TRANSCRIPT TO SNAPSHOT:\n\n';
     for (const ep of episodes) {
       if (ep.trigger) {
-        userPromptText += `USER: ${ep.trigger.parts?.map((p: any) => p.text).join('')}\n`;
+        userPromptText += `USER: ${(ep.trigger as any).semanticParts?.map((p: any) => p.text).join('')}\n`;
       }
       for (const step of ep.steps) {
         if (step.type === 'TOOL_EXECUTION') {

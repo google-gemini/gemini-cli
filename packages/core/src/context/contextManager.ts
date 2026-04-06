@@ -21,12 +21,13 @@ import type { ContextEnvironment } from './sidecar/environment.js';
 import type { SidecarConfig } from './sidecar/types.js';
 import { ProcessorRegistry } from './sidecar/registry.js';
 import { PipelineOrchestrator } from './sidecar/orchestrator.js';
-import type { ContextProcessor } from './pipeline.js';
+
 
 import { ToolMaskingProcessor } from './processors/toolMaskingProcessor.js';
 import { BlobDegradationProcessor } from './processors/blobDegradationProcessor.js';
 import { SemanticCompressionProcessor } from './processors/semanticCompressionProcessor.js';
 import { HistorySquashingProcessor } from './processors/historySquashingProcessor.js';
+import { StateSnapshotProcessor } from './processors/stateSnapshotProcessor.js';
 
 export class ContextManager {
   
@@ -52,13 +53,14 @@ export class ContextManager {
        (this.env as any).setEventBus(this.eventBus);
     }
     
-    this.orchestrator = new PipelineOrchestrator(this.sidecar, this.env, this.eventBus, this.tracer);
-
-    // Register built-ins
+    // Register built-ins BEFORE creating Orchestrator
     ProcessorRegistry.register({ id: 'ToolMaskingProcessor', create: (env, opts) => new ToolMaskingProcessor(env, opts as any) });
     ProcessorRegistry.register({ id: 'BlobDegradationProcessor', create: (env, opts) => new BlobDegradationProcessor(env) });
     ProcessorRegistry.register({ id: 'SemanticCompressionProcessor', create: (env, opts) => new SemanticCompressionProcessor(env, opts as any) });
     ProcessorRegistry.register({ id: 'HistorySquashingProcessor', create: (env, opts) => new HistorySquashingProcessor(env, opts as any) });
+    ProcessorRegistry.register({ id: 'StateSnapshotProcessor', create: (env, opts) => StateSnapshotProcessor.create(env, opts as any) });
+
+    this.orchestrator = new PipelineOrchestrator(this.sidecar, this.env, this.eventBus, this.tracer);
 
     this.eventBus.onVariantReady((event) => {
       
@@ -153,28 +155,6 @@ export class ContextManager {
    */
   private async applyProcessorGraphs(episodes: Episode[]): Promise<Episode[]> {
     const mngConfig = this.sidecar;
-    const retainedLimit = mngConfig.budget.retainedTokens;
-    
-
-    // If we're incredibly small, maybe we just run the retained graph on everything?
-    // Let's divide the episodes exactly at the retained boundary.
-    const retainedWindow: Episode[] = [];
-    const normalWindow: Episode[] = [];
-    let rollingTokens = 0;
-
-    // Scan backwards to fill the retained window
-    for (let i = episodes.length - 1; i >= 0; i--) {
-      const ep = episodes[i];
-      const epTokens = this.calculateIrTokens([ep]);
-      if ((rollingTokens + epTokens <= retainedLimit && normalWindow.length === 0) || retainedWindow.length === 0) {
-        // We always put at least the latest episode in the retained window.
-        // We only add to retainedWindow if we haven't already started the normalWindow (contiguous block).
-        retainedWindow.unshift(ep);
-        rollingTokens += epTokens;
-      } else {
-        normalWindow.unshift(ep);
-      }
-    }
 
     const protectedIds = new Set<string>();
     // We must protect the System Episode, which is always index 0 of pristineEpisodes.
@@ -182,7 +162,9 @@ export class ContextManager {
       protectedIds.add(this.pristineEpisodes[0].id); // Structural invariant
     }
 
-    return this.orchestrator.executePipelineForking('Immediate Sanitization', this.getWorkingBufferView(), {
+    let currentTokens = this.calculateIrTokens(episodes);
+    
+    return this.orchestrator.executePipelineForking('Immediate Sanitization', episodes, {
       currentTokens: currentTokens,
       maxTokens: mngConfig.budget.maxTokens,
       retainedTokens: mngConfig.budget.retainedTokens,

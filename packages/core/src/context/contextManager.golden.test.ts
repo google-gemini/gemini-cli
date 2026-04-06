@@ -130,11 +130,8 @@ describe('ContextManager Golden Tests', () => {
     const tracer2 = new ContextTracer('/tmp', 'test2');
     contextManager = new ContextManager(
       {
-        pipelines: {
-          eagerBackground: [],
-          normalProcessingGraph: [],
-          retainedProcessingGraph: [],
-        },
+        budget: { retainedTokens: 100000, maxTokens: 150000 },
+        pipelines: [],
       } as any,
       {} as any,
       tracer2,

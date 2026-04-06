@@ -5,7 +5,6 @@
  */
 
 import type { ContextProcessor } from '../pipeline.js';
-import type { AsyncContextWorker } from '../workers/asyncContextWorker.js';
 import type { ContextEnvironment } from './environment.js';
 
 export interface ContextProcessorDef<
@@ -15,7 +14,7 @@ export interface ContextProcessorDef<
   create(
     env: ContextEnvironment,
     options: TOptions,
-  ): ContextProcessor | AsyncContextWorker;
+  ): ContextProcessor;
 }
 
 /**
