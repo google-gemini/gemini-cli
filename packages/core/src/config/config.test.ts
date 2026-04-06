@@ -3288,14 +3288,7 @@ describe('Plans Directory Initialization', () => {
   });
 
   it('should not eagerly create plans directory during initialization', async () => {
-    let planDirExists = false;
-    vi.spyOn(fs, 'existsSync').mockImplementation((path) =>
-      String(path).includes('plans') ? planDirExists : true,
-    );
-    vi.spyOn(fs, 'mkdirSync').mockImplementation((path) => {
-      if (String(path).includes('plans')) planDirExists = true;
-      return undefined;
-    });
+    vi.spyOn(fs, 'mkdirSync').mockReturnValue(undefined);
     const config = new Config({
       ...baseParams,
       plan: true,
@@ -3313,14 +3306,7 @@ describe('Plans Directory Initialization', () => {
   });
 
   it('should create plans directory and add it to workspace context when getPlansDir is called', async () => {
-    let planDirExists = false;
-    vi.spyOn(fs, 'existsSync').mockImplementation((path) =>
-      String(path).includes('plans') ? planDirExists : true,
-    );
-    vi.spyOn(fs, 'mkdirSync').mockImplementation((path) => {
-      if (String(path).includes('plans')) planDirExists = true;
-      return undefined;
-    });
+    vi.spyOn(fs, 'mkdirSync').mockReturnValue(undefined);
     const config = new Config({
       ...baseParams,
       plan: true,
@@ -3337,8 +3323,7 @@ describe('Plans Directory Initialization', () => {
     expect(context.getDirectories()).toContain(plansDir);
   });
 
-  it('should add plans directory to workspace context even if it already exists', async () => {
-    vi.spyOn(fs, 'existsSync').mockReturnValue(true);
+  it('should gracefully handle existing directories by relying on mkdirSync recursive: true', async () => {
     vi.spyOn(fs, 'mkdirSync').mockReturnValue(undefined);
     const config = new Config({
       ...baseParams,
@@ -3348,20 +3333,19 @@ describe('Plans Directory Initialization', () => {
     await config.initialize();
     const plansDir = config.getPlansDir();
 
-    // Should NOT try to create it if it exists
-    expect(fs.mkdirSync).not.toHaveBeenCalled();
+    // mkdirSync should be called unconditionally
+    expect(fs.mkdirSync).toHaveBeenCalledWith(plansDir, { recursive: true });
 
-    // But MUST still register it
+    // It MUST still register the directory
     const context = config.getWorkspaceContext();
     expect(context.getDirectories()).toContain(plansDir);
   });
 
-  it('should throw an error if mkdirSync fails during getPlansDir', async () => {
-    vi.spyOn(fs, 'existsSync').mockImplementation(
-      (path) => !String(path).includes('plans'),
-    );
+  it('should throw an error if the plan directory path is blocked by an existing file (EEXIST)', async () => {
     vi.spyOn(fs, 'mkdirSync').mockImplementation(() => {
-      throw { code: 'EACCES', message: 'Permission denied' };
+      const err = new Error('File exists') as NodeJS.ErrnoException;
+      err.code = 'EEXIST';
+      throw err;
     });
     const config = new Config({
       ...baseParams,
@@ -3371,14 +3355,29 @@ describe('Plans Directory Initialization', () => {
     await config.initialize();
 
     expect(() => config.getPlansDir()).toThrow(
-      /Failed to initialize active plan directory/,
+      /Failed to initialize active plan directory.*File exists/,
+    );
+  });
+
+  it('should throw an error if mkdirSync fails during getPlansDir (e.g. EACCES)', async () => {
+    vi.spyOn(fs, 'mkdirSync').mockImplementation(() => {
+      const err = new Error('Permission denied') as NodeJS.ErrnoException;
+      err.code = 'EACCES';
+      throw err;
+    });
+    const config = new Config({
+      ...baseParams,
+      plan: true,
+    });
+
+    await config.initialize();
+
+    expect(() => config.getPlansDir()).toThrow(
+      /Failed to initialize active plan directory.*Permission denied/,
     );
   });
 
   it('should NOT create plans directory or add it to workspace context when plan is disabled', async () => {
-    vi.spyOn(fs, 'existsSync').mockImplementation(
-      (path) => !String(path).includes('plans'),
-    );
     vi.spyOn(fs, 'mkdirSync').mockReturnValue(undefined);
     const config = new Config({
       ...baseParams,
