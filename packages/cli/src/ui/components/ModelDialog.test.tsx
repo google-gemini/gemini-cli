@@ -65,6 +65,15 @@ describe('<ModelDialog />', () => {
     getGemini31FlashLiteLaunchedSync: () => boolean;
     getProModelNoAccess: () => Promise<boolean>;
     getProModelNoAccessSync: () => boolean;
+    getLastRetrievedQuota: () =>
+      | {
+          buckets: Array<{
+            modelId?: string;
+            remainingFraction?: number;
+            resetTime?: string;
+          }>;
+        }
+      | undefined;
   }
 
   const mockConfig: MockConfig = {
@@ -76,6 +85,7 @@ describe('<ModelDialog />', () => {
     getGemini31FlashLiteLaunchedSync: mockGetGemini31FlashLiteLaunchedSync,
     getProModelNoAccess: mockGetProModelNoAccess,
     getProModelNoAccessSync: mockGetProModelNoAccessSync,
+    getLastRetrievedQuota: () => ({ buckets: [] }),
   };
 
   beforeEach(() => {

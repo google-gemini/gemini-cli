@@ -102,7 +102,8 @@ available combinations.
 | `app.showFullTodos`           | Toggle the full TODO list.                                                                                                                         | `Ctrl+T`           |
 | `app.showIdeContextDetail`    | Show IDE context details.                                                                                                                          | `Ctrl+G`           |
 | `app.toggleMarkdown`          | Toggle Markdown rendering.                                                                                                                         | `Alt+M`            |
-| `app.toggleCopyMode`          | Toggle copy mode when in alternate buffer mode.                                                                                                    | `Ctrl+S`           |
+| `app.toggleCopyMode`          | Toggle copy mode when in alternate buffer mode.                                                                                                    | `F9`               |
+| `app.toggleMouseMode`         | Toggle mouse mode (scrolling and clicking).                                                                                                        | `Ctrl+S`           |
 | `app.toggleYolo`              | Toggle YOLO (auto-approval) mode for tool calls.                                                                                                   | `Ctrl+Y`           |
 | `app.cycleApprovalMode`       | Cycle through approval modes: default (prompt), auto_edit (auto-approve edits), and plan (read-only). Plan mode is skipped when the agent is busy. | `Shift+Tab`        |
 | `app.showMoreLines`           | Expand and collapse blocks of content when not in alternate buffer mode.                                                                           | `Ctrl+O`           |
@@ -126,6 +127,9 @@ available combinations.
 | `background.unfocus`        | Move focus from background shell to Gemini.                        | `Shift+Tab` |
 | `background.unfocusList`    | Move focus from background shell list to Gemini.                   | `Tab`       |
 | `background.unfocusWarning` | Show warning when trying to move focus away from background shell. | `Tab`       |
+| `app.dumpFrame`             | Dump the current frame as a snapshot.                              | `F8`        |
+| `app.startRecording`        | Start recording the session.                                       | `F6`        |
+| `app.stopRecording`         | Stop recording the session.                                        | `F7`        |
 
 #### Extension Controls
 
