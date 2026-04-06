@@ -83,6 +83,8 @@ export interface ConversationRecord {
   lastUpdated: string;
   messages: MessageRecord[];
   summary?: string;
+  /** Raw memory notes extracted from the session (markdown) */
+  memoryScratchpad?: string;
   /** Workspace directories added during the session via /dir add */
   directories?: string[];
   /** The kind of conversation (main agent or subagent) */

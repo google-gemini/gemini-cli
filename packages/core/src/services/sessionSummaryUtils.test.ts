@@ -19,6 +19,7 @@ const mockReaddir = fs.readdir as unknown as ReturnType<typeof vi.fn>;
 vi.mock('./sessionSummaryService.js', () => ({
   SessionSummaryService: vi.fn().mockImplementation(() => ({
     generateSummary: vi.fn(),
+    generateMemoryExtraction: vi.fn(),
   })),
 }));
 
@@ -30,11 +31,16 @@ vi.mock('../core/baseLlmClient.js', () => ({
 // Helper to create a session with N user messages
 function createSessionWithUserMessages(
   count: number,
-  options: { summary?: string; sessionId?: string } = {},
+  options: {
+    summary?: string;
+    memoryScratchpad?: string;
+    sessionId?: string;
+  } = {},
 ) {
   return JSON.stringify({
     sessionId: options.sessionId ?? 'session-id',
     summary: options.summary,
+    memoryScratchpad: options.memoryScratchpad,
     messages: Array.from({ length: count }, (_, i) => ({
       id: String(i + 1),
       type: 'user',
@@ -47,6 +53,7 @@ describe('sessionSummaryUtils', () => {
   let mockConfig: Config;
   let mockContentGenerator: ContentGenerator;
   let mockGenerateSummary: ReturnType<typeof vi.fn>;
+  let mockGenerateMemoryExtraction: ReturnType<typeof vi.fn>;
 
   beforeEach(async () => {
     vi.clearAllMocks();
@@ -62,8 +69,12 @@ describe('sessionSummaryUtils', () => {
       },
     } as unknown as Config;
 
-    // Setup mock generateSummary function
+    // Setup mock functions
     mockGenerateSummary = vi.fn().mockResolvedValue('Add dark mode to the app');
+    mockGenerateMemoryExtraction = vi.fn().mockResolvedValue({
+      summary: 'Add dark mode to the app',
+      memoryScratchpad: '# Add dark mode to the app\n\noutcome: success',
+    });
 
     // Import the mocked module to access the constructor
     const { SessionSummaryService } = await import(
@@ -73,6 +84,7 @@ describe('sessionSummaryUtils', () => {
       SessionSummaryService as unknown as ReturnType<typeof vi.fn>
     ).mockImplementation(() => ({
       generateSummary: mockGenerateSummary,
+      generateMemoryExtraction: mockGenerateMemoryExtraction,
     }));
   });
 
@@ -98,11 +110,13 @@ describe('sessionSummaryUtils', () => {
       expect(result).toBeNull();
     });
 
-    it('should return null if most recent session already has summary', async () => {
+    it('should return null if most recent session already has memory scratchpad', async () => {
       vi.mocked(fs.access).mockResolvedValue(undefined);
       mockReaddir.mockResolvedValue(['session-2024-01-01T10-00-abc12345.json']);
       vi.mocked(fs.readFile).mockResolvedValue(
-        createSessionWithUserMessages(5, { summary: 'Existing summary' }),
+        createSessionWithUserMessages(5, {
+          memoryScratchpad: '# Existing extraction',
+        }),
       );
 
       const result = await getPreviousSession(mockConfig);
@@ -179,7 +193,7 @@ describe('sessionSummaryUtils', () => {
       await expect(generateSummary(mockConfig)).resolves.not.toThrow();
     });
 
-    it('should generate and save summary for session needing one', async () => {
+    it('should generate and save memory extraction for session needing one', async () => {
       const sessionPath = path.join(
         '/tmp/project',
         'chats',
@@ -195,11 +209,15 @@ describe('sessionSummaryUtils', () => {
 
       await generateSummary(mockConfig);
 
-      expect(mockGenerateSummary).toHaveBeenCalledTimes(1);
+      expect(mockGenerateMemoryExtraction).toHaveBeenCalledTimes(1);
       expect(fs.writeFile).toHaveBeenCalledTimes(1);
       expect(fs.writeFile).toHaveBeenCalledWith(
         sessionPath,
         expect.stringContaining('Add dark mode to the app'),
+      );
+      expect(fs.writeFile).toHaveBeenCalledWith(
+        sessionPath,
+        expect.stringContaining('memoryScratchpad'),
       );
     });
 

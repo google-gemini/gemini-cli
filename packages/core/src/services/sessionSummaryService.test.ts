@@ -940,3 +940,279 @@ describe('SessionSummaryService', () => {
     });
   });
 });
+
+describe('SessionSummaryService - generateMemoryExtraction', () => {
+  let service: SessionSummaryService;
+  let mockBaseLlmClient: BaseLlmClient;
+  let mockGenerateContent: ReturnType<typeof vi.fn>;
+
+  const sampleExtraction = `# Fix auth token refresh bug
+
+cwd: ~/projects/my-app
+outcome: success
+keywords: tokenManager, 401, race condition
+
+## What was done
+Debugged intermittent 401 errors caused by concurrent token refresh calls.
+
+## How the user works
+- Prefers seeing a proposed fix before any edits are made
+
+## What we learned
+- Token refresh lives in src/auth/tokenManager.ts`;
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    vi.useFakeTimers();
+
+    mockGenerateContent = vi.fn().mockResolvedValue({
+      candidates: [
+        {
+          content: {
+            parts: [{ text: sampleExtraction }],
+          },
+        },
+      ],
+    } as unknown as GenerateContentResponse);
+
+    mockBaseLlmClient = {
+      generateContent: mockGenerateContent,
+    } as unknown as BaseLlmClient;
+
+    service = new SessionSummaryService(mockBaseLlmClient);
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+    vi.restoreAllMocks();
+  });
+
+  it('should return summary parsed from heading and full scratchpad', async () => {
+    const messages: MessageRecord[] = [
+      {
+        id: '1',
+        timestamp: '2026-01-01T00:00:00Z',
+        type: 'user',
+        content: [{ text: 'Fix the auth token refresh bug' }],
+      },
+      {
+        id: '2',
+        timestamp: '2026-01-01T00:01:00Z',
+        type: 'gemini',
+        content: [{ text: 'I found a race condition in tokenManager.ts' }],
+      },
+    ];
+
+    const result = await service.generateMemoryExtraction({ messages });
+
+    expect(result).not.toBeNull();
+    expect(result!.summary).toBe('Fix auth token refresh bug');
+    expect(result!.memoryScratchpad).toBe(sampleExtraction);
+  });
+
+  it('should use promptId session-memory-extraction', async () => {
+    const messages: MessageRecord[] = [
+      {
+        id: '1',
+        timestamp: '2026-01-01T00:00:00Z',
+        type: 'user',
+        content: [{ text: 'Hello' }],
+      },
+    ];
+
+    await service.generateMemoryExtraction({ messages });
+
+    expect(mockGenerateContent).toHaveBeenCalledWith(
+      expect.objectContaining({
+        promptId: 'session-memory-extraction',
+      }),
+    );
+  });
+
+  it('should fall back to first line when no heading found', async () => {
+    mockGenerateContent.mockResolvedValue({
+      candidates: [
+        {
+          content: {
+            parts: [{ text: 'No heading here\n\nSome content' }],
+          },
+        },
+      ],
+    } as unknown as GenerateContentResponse);
+
+    const messages: MessageRecord[] = [
+      {
+        id: '1',
+        timestamp: '2026-01-01T00:00:00Z',
+        type: 'user',
+        content: [{ text: 'Hello' }],
+      },
+    ];
+
+    const result = await service.generateMemoryExtraction({ messages });
+
+    expect(result).not.toBeNull();
+    expect(result!.summary).toBe('No heading here');
+  });
+
+  it('should return null for empty messages', async () => {
+    const result = await service.generateMemoryExtraction({ messages: [] });
+
+    expect(result).toBeNull();
+    expect(mockGenerateContent).not.toHaveBeenCalled();
+  });
+
+  it('should return null when LLM returns empty text', async () => {
+    mockGenerateContent.mockResolvedValue({
+      candidates: [
+        {
+          content: {
+            parts: [{ text: '' }],
+          },
+        },
+      ],
+    } as unknown as GenerateContentResponse);
+
+    const messages: MessageRecord[] = [
+      {
+        id: '1',
+        timestamp: '2026-01-01T00:00:00Z',
+        type: 'user',
+        content: [{ text: 'Hello' }],
+      },
+    ];
+
+    const result = await service.generateMemoryExtraction({ messages });
+
+    expect(result).toBeNull();
+  });
+
+  it('should return null on timeout', async () => {
+    mockGenerateContent.mockImplementation(
+      ({ abortSignal }) =>
+        new Promise((resolve, reject) => {
+          const timeoutId = setTimeout(
+            () =>
+              resolve({
+                candidates: [{ content: { parts: [{ text: 'Too late' }] } }],
+              }),
+            60000,
+          );
+
+          abortSignal?.addEventListener(
+            'abort',
+            () => {
+              clearTimeout(timeoutId);
+              const abortError = new Error('Aborted');
+              abortError.name = 'AbortError';
+              reject(abortError);
+            },
+            { once: true },
+          );
+        }),
+    );
+
+    const messages: MessageRecord[] = [
+      {
+        id: '1',
+        timestamp: '2026-01-01T00:00:00Z',
+        type: 'user',
+        content: [{ text: 'Hello' }],
+      },
+    ];
+
+    const resultPromise = service.generateMemoryExtraction({
+      messages,
+      timeout: 100,
+    });
+
+    await vi.advanceTimersByTimeAsync(100);
+
+    const result = await resultPromise;
+    expect(result).toBeNull();
+  });
+
+  it('should return null on API error', async () => {
+    mockGenerateContent.mockRejectedValue(new Error('API Error'));
+
+    const messages: MessageRecord[] = [
+      {
+        id: '1',
+        timestamp: '2026-01-01T00:00:00Z',
+        type: 'user',
+        content: [{ text: 'Hello' }],
+      },
+    ];
+
+    const result = await service.generateMemoryExtraction({ messages });
+
+    expect(result).toBeNull();
+  });
+
+  it('should use larger message window than generateSummary', async () => {
+    const messages: MessageRecord[] = Array.from({ length: 60 }, (_, i) => ({
+      id: `${i}`,
+      timestamp: '2026-01-01T00:00:00Z',
+      type: i % 2 === 0 ? ('user' as const) : ('gemini' as const),
+      content: [{ text: `Message ${i}` }],
+    }));
+
+    await service.generateMemoryExtraction({ messages });
+
+    expect(mockGenerateContent).toHaveBeenCalledTimes(1);
+    const callArgs = mockGenerateContent.mock.calls[0][0];
+    const promptText = callArgs.contents[0].parts[0].text;
+
+    // Should include 50 messages (25 first + 25 last), not 20
+    const messageCount = (promptText.match(/Message \d+/g) || []).length;
+    expect(messageCount).toBe(50);
+  });
+
+  it('should truncate messages at 2000 chars instead of 500', async () => {
+    const longMessage = 'x'.repeat(2500);
+    const messages: MessageRecord[] = [
+      {
+        id: '1',
+        timestamp: '2026-01-01T00:00:00Z',
+        type: 'user',
+        content: [{ text: longMessage }],
+      },
+    ];
+
+    await service.generateMemoryExtraction({ messages });
+
+    const callArgs = mockGenerateContent.mock.calls[0][0];
+    const promptText = callArgs.contents[0].parts[0].text;
+
+    // Should contain 2000 x's + '...' but not the full 2500
+    expect(promptText).toContain('x'.repeat(2000));
+    expect(promptText).toContain('...');
+    expect(promptText).not.toContain('x'.repeat(2001));
+  });
+
+  it('should remove quotes from parsed summary', async () => {
+    mockGenerateContent.mockResolvedValue({
+      candidates: [
+        {
+          content: {
+            parts: [{ text: '# "Fix the bug"\n\nSome content' }],
+          },
+        },
+      ],
+    } as unknown as GenerateContentResponse);
+
+    const messages: MessageRecord[] = [
+      {
+        id: '1',
+        timestamp: '2026-01-01T00:00:00Z',
+        type: 'user',
+        content: [{ text: 'Fix the bug' }],
+      },
+    ];
+
+    const result = await service.generateMemoryExtraction({ messages });
+
+    expect(result).not.toBeNull();
+    expect(result!.summary).toBe('Fix the bug');
+  });
+});
