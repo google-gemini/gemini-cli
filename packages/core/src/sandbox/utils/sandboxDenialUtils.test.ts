@@ -4,18 +4,14 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { describe, it, expect, beforeEach } from 'vitest';
+import { describe, it, expect } from 'vitest';
 import {
   parsePosixSandboxDenials,
-  clearErrorCache,
+  createSandboxDenialCache,
 } from './sandboxDenialUtils.js';
 import type { ShellExecutionResult } from '../../services/shellExecutionService.js';
 
 describe('parsePosixSandboxDenials', () => {
-  beforeEach(() => {
-    clearErrorCache();
-  });
-
   it('should detect file system denial and extract paths', () => {
     const parsed = parsePosixSandboxDenials({
       output: 'ls: /root: Operation not permitted',
@@ -200,5 +196,32 @@ PermissionError: [Errno 13] Permission denied: '/etc/test_sandbox_denial'`;
       output,
     } as unknown as ShellExecutionResult);
     expect(parsed?.filePaths || []).not.toContain('/home/user/~/config');
+  });
+
+  it('should suppress redundant denials if cache is provided', () => {
+    const cache = createSandboxDenialCache();
+    const result = {
+      output: 'ls: /root: Operation not permitted',
+    } as unknown as ShellExecutionResult;
+
+    // First call: should process
+    const parsed1 = parsePosixSandboxDenials(result, cache);
+    expect(parsed1).toBeDefined();
+
+    // Second call: should be suppressed
+    const parsed2 = parsePosixSandboxDenials(result, cache);
+    expect(parsed2).toBeUndefined();
+  });
+
+  it('should not suppress denials if no cache is provided', () => {
+    const result = {
+      output: 'ls: /root: Operation not permitted',
+    } as unknown as ShellExecutionResult;
+
+    const parsed1 = parsePosixSandboxDenials(result);
+    expect(parsed1).toBeDefined();
+
+    const parsed2 = parsePosixSandboxDenials(result);
+    expect(parsed2).toBeDefined();
   });
 });

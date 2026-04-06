@@ -4,17 +4,21 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+import { LRUCache } from 'mnemonist';
 import { type ParsedSandboxDenial } from '../../services/sandboxManager.js';
 import type { ShellExecutionResult } from '../../services/shellExecutionService.js';
 
-const MAX_CACHE_SIZE = 5;
-const errorCache: string[] = [];
+/**
+ * Type for the sandbox denial error cache.
+ * Stores normalized error output to prevent redundant processing.
+ */
+export type SandboxDenialCache = LRUCache<string, boolean>;
 
 /**
- * Clears the error cache. Only used for testing.
+ * Creates a new sandbox denial cache with a standard LRU policy.
  */
-export function clearErrorCache(): void {
-  errorCache.length = 0;
+export function createSandboxDenialCache(maxSize = 10): SandboxDenialCache {
+  return new LRUCache<string, boolean>(maxSize);
 }
 
 /**
@@ -58,13 +62,14 @@ export function sanitizeExtractedPath(p: string): string | undefined {
  */
 export function parsePosixSandboxDenials(
   result: ShellExecutionResult,
+  cache?: SandboxDenialCache,
 ): ParsedSandboxDenial | undefined {
   const output = result.output || '';
   const errorOutput = result.error?.message;
   const combined = (output + ' ' + (errorOutput || '')).toLowerCase();
 
   const combinedTrimmed = combined.trim();
-  if (combinedTrimmed && errorCache.includes(combinedTrimmed)) {
+  if (combinedTrimmed && cache?.has(combinedTrimmed)) {
     return undefined;
   }
 
@@ -164,11 +169,8 @@ export function parsePosixSandboxDenials(
     }
   }
 
-  if (combinedTrimmed) {
-    errorCache.push(combinedTrimmed);
-    if (errorCache.length > MAX_CACHE_SIZE) {
-      errorCache.shift();
-    }
+  if (combinedTrimmed && cache) {
+    cache.set(combinedTrimmed, true);
   }
 
   return {

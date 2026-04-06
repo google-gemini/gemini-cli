@@ -31,7 +31,11 @@ import {
   isKnownSafeCommand,
   isDangerousCommand,
 } from '../utils/commandSafety.js';
-import { parsePosixSandboxDenials } from '../utils/sandboxDenialUtils.js';
+import {
+  parsePosixSandboxDenials,
+  createSandboxDenialCache,
+  type SandboxDenialCache,
+} from '../utils/sandboxDenialUtils.js';
 import { handleReadWriteCommands } from '../utils/sandboxReadWriteUtils.js';
 import { buildBwrapArgs } from './bwrapArgsBuilder.js';
 
@@ -132,6 +136,7 @@ function touch(filePath: string, isDirectory: boolean) {
 
 export class LinuxSandboxManager implements SandboxManager {
   private static maskFilePath: string | undefined;
+  private readonly denialCache: SandboxDenialCache = createSandboxDenialCache();
 
   constructor(private readonly options: GlobalSandboxOptions) {}
 
@@ -144,7 +149,7 @@ export class LinuxSandboxManager implements SandboxManager {
   }
 
   parseDenials(result: ShellExecutionResult): ParsedSandboxDenial | undefined {
-    return parsePosixSandboxDenials(result);
+    return parsePosixSandboxDenials(result, this.denialCache);
   }
 
   getWorkspace(): string {

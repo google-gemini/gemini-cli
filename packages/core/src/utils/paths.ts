@@ -379,6 +379,9 @@ export function isSubpath(parentPath: string, childPath: string): boolean {
  * @returns The resolved real path.
  */
 export function resolveToRealPath(pathStr: string): string {
+  if (typeof pathStr !== 'string' || pathStr.includes('\0')) {
+    throw new Error(`Invalid path: ${pathStr}`);
+  }
   let resolvedPath = pathStr;
 
   try {
