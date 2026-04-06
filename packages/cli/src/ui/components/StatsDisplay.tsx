@@ -128,7 +128,7 @@ const ModelUsageTable: React.FC<ModelUsageTableProps> = ({ models }) => {
           displayName: `  ↳ ${role}`,
           requests: roleMetrics.totalRequests,
           cachedTokens: roleMetrics.tokens.cached.toLocaleString(),
-          inputTokens: roleMetrics.tokens.input.toLocaleString(),
+          inputTokens: roleMetrics.tokens.prompt.toLocaleString(),
           outputTokens: roleMetrics.tokens.candidates.toLocaleString(),
           isSubRow: true,
         });
