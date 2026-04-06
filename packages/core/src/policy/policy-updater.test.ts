@@ -27,6 +27,7 @@ vi.mock('../utils/shell-utils.js', () => ({
   getCommandRoots: vi.fn(),
   stripShellWrapper: vi.fn(),
   hasRedirection: vi.fn(),
+  hasEnvPrefix: vi.fn(),
 }));
 interface ParsedPolicy {
   rule?: Array<{
@@ -95,6 +96,25 @@ describe('createPolicyUpdater', () => {
         argsPattern: new RegExp(
           escapeRegex('"command":"ls') + '(?:[\\s"]|\\\\")',
         ),
+      }),
+    );
+  });
+
+  it('should pass allowEnv to policyEngine.addRule', async () => {
+    createPolicyUpdater(policyEngine, messageBus, mockStorage);
+
+    await messageBus.publish({
+      type: MessageBusType.UPDATE_POLICY,
+      toolName: 'run_shell_command',
+      commandPrefix: 'ls',
+      persist: false,
+      allowEnv: true,
+    });
+
+    expect(policyEngine.addRule).toHaveBeenCalledWith(
+      expect.objectContaining({
+        toolName: 'run_shell_command',
+        allowEnv: true,
       }),
     );
   });
@@ -259,6 +279,7 @@ describe('ShellToolInvocation Policy Update', () => {
       (c: string) => c,
     );
     vi.mocked(shellUtils.hasRedirection).mockReturnValue(false);
+    vi.mocked(shellUtils.hasEnvPrefix).mockReturnValue(false);
   });
 
   it('should extract multiple root commands for chained commands', () => {
@@ -320,6 +341,33 @@ describe('ShellToolInvocation Policy Update', () => {
     expect(options!.allowRedirection).toBe(true);
     expect(shellUtils.hasRedirection).toHaveBeenCalledWith(
       'echo "hello" > file.txt',
+    );
+  });
+
+  it('should include allowEnv if command has environment prefix', () => {
+    vi.mocked(shellUtils.getCommandRoots).mockReturnValue(['ls']);
+    vi.mocked(shellUtils.hasEnvPrefix).mockReturnValue(true);
+
+    const invocation = new ShellToolInvocation(
+      mockConfig,
+      { command: 'PAGER=cat ls -la' },
+      mockMessageBus,
+      'run_shell_command',
+      'Shell',
+    );
+
+    const options = (
+      invocation as unknown as {
+        getPolicyUpdateOptions: (o: ToolConfirmationOutcome) => {
+          commandPrefix: string[];
+          allowEnv?: boolean;
+        };
+      }
+    ).getPolicyUpdateOptions(ToolConfirmationOutcome.ProceedAlways);
+    expect(options!.commandPrefix).toEqual(['ls']);
+    expect(options!.allowEnv).toBe(true);
+    expect(shellUtils.hasEnvPrefix).toHaveBeenCalledWith(
+      'PAGER=cat ls -la',
     );
   });
 });

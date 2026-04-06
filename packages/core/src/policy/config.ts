@@ -642,6 +642,7 @@ export function createPolicyUpdater(
               modes: message.modes,
               source: 'Dynamic (Confirmed)',
               allowRedirection: message.allowRedirection,
+              allowEnv: message.allowEnv,
             });
           }
         }
@@ -680,6 +681,7 @@ export function createPolicyUpdater(
           modes: message.modes,
           source: 'Dynamic (Confirmed)',
           allowRedirection: message.allowRedirection,
+          allowEnv: message.allowEnv,
         });
       }
 
