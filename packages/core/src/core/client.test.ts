@@ -219,7 +219,7 @@ describe('Gemini Client (client.ts)', () => {
       getSystemInstructionMemory: vi.fn().mockReturnValue(''),
       getSessionMemory: vi.fn().mockReturnValue(''),
       isJitContextEnabled: vi.fn().mockReturnValue(false),
-      getContextManager: vi.fn().mockReturnValue(undefined),
+      getMemoryContextManager: vi.fn().mockReturnValue(undefined),
       getDisableLoopDetection: vi.fn().mockReturnValue(false),
       getToolOutputMaskingConfig: vi.fn().mockReturnValue({
         protectionThresholdTokens: 50000,
@@ -385,19 +385,19 @@ describe('Gemini Client (client.ts)', () => {
       expect(JSON.stringify(newHistory)).not.toContain('some old message');
     });
 
-    it('should refresh ContextManager to reset JIT loaded paths', async () => {
+    it('should refresh MemoryContextManager to reset JIT loaded paths', async () => {
       const mockRefresh = vi.fn().mockResolvedValue(undefined);
-      vi.mocked(mockConfig.getContextManager).mockReturnValue({
+      vi.mocked(mockConfig.getMemoryContextManager).mockReturnValue({
         refresh: mockRefresh,
-      } as unknown as ReturnType<typeof mockConfig.getContextManager>);
+      } as unknown as ReturnType<typeof mockConfig.getMemoryContextManager>);
 
       await client.resetChat();
 
       expect(mockRefresh).toHaveBeenCalledTimes(1);
     });
 
-    it('should not fail when ContextManager is undefined', async () => {
-      vi.mocked(mockConfig.getContextManager).mockReturnValue(undefined);
+    it('should not fail when MemoryContextManager is undefined', async () => {
+      vi.mocked(mockConfig.getMemoryContextManager).mockReturnValue(undefined);
 
       await expect(client.resetChat()).resolves.not.toThrow();
     });
@@ -1487,7 +1487,7 @@ ${JSON.stringify(
             break;
           }
         }
-      } catch (_) {
+      } catch {
         // If the test framework times out, that also demonstrates the infinite loop
       }
 

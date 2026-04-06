@@ -166,7 +166,7 @@ describe('runNonInteractive', () => {
     };
 
     mockConfig = {
-      initialize: vi.fn().mockResolvedValue(undefined),
+      initialize: vi.fn().mockReturnValue(Promise.resolve(undefined)),
       getMessageBus: vi.fn().mockReturnValue({
         subscribe: vi.fn(),
         unsubscribe: vi.fn(),
@@ -190,6 +190,7 @@ describe('runNonInteractive', () => {
       isTrustedFolder: vi.fn().mockReturnValue(false),
       getRawOutput: vi.fn().mockReturnValue(false),
       getAcceptRawOutputRisk: vi.fn().mockReturnValue(false),
+      getAgentSessionNoninteractiveEnabled: vi.fn().mockReturnValue(false),
     } as unknown as Config;
 
     mockSettings = {
@@ -1712,7 +1713,7 @@ describe('runNonInteractive', () => {
           input,
           prompt_id: promptId,
         });
-      } catch (_error) {
+      } catch {
         // Expected exit
       }
 
