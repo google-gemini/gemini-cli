@@ -81,15 +81,17 @@ export const TopicMessage: React.FC<TopicMessageProps> = ({
   });
 
   useEffect(() => {
-    if (isExpandable && hasExtraSummary && overflowActions) {
+    if (isExpandable && hasExtraSummary && !isExpanded && overflowActions) {
       overflowActions.addOverflowingId(overflowId);
+    } else if (overflowActions) {
+      overflowActions.removeOverflowingId(overflowId);
     }
     return () => {
       if (overflowActions) {
         overflowActions.removeOverflowingId(overflowId);
       }
     };
-  }, [isExpandable, hasExtraSummary, overflowActions, overflowId]);
+  }, [isExpandable, hasExtraSummary, isExpanded, overflowActions, overflowId]);
 
   return (
     <Box ref={containerRef} flexDirection="column" marginLeft={2}>

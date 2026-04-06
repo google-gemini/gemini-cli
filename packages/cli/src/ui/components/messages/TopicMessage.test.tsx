@@ -12,6 +12,7 @@ import {
   TOPIC_PARAM_SUMMARY,
   TOPIC_PARAM_STRATEGIC_INTENT,
   CoreToolCallStatus,
+  UPDATE_TOPIC_TOOL_NAME,
 } from '@google/gemini-cli-core';
 
 describe('<TopicMessage />', () => {
@@ -36,7 +37,7 @@ describe('<TopicMessage />', () => {
         terminalWidth={80}
         availableTerminalHeight={height}
         callId="test-topic"
-        name="update_topic"
+        name={UPDATE_TOPIC_TOOL_NAME}
         description="Updating topic"
         status={CoreToolCallStatus.Success}
         confirmationDetails={undefined}
