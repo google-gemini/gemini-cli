@@ -3367,6 +3367,46 @@ describe('Plans Directory Initialization', () => {
     warnSpy.mockRestore();
   });
 
+  it('should log a warning if the resolved plan directory is outside the project root (TOCTOU security violation)', async () => {
+    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+
+    let isMalicious = false;
+    vi.spyOn(fs, 'mkdirSync').mockImplementation(() => {
+      // Simulate an attacker creating a symlink right after the initial check but before/during creation
+      isMalicious = true;
+      return undefined;
+    });
+
+    // When Config.getPlansDir calls resolveToRealPath AFTER creation, it resolves to an outside path.
+    const realpathSpy = vi
+      .spyOn(fs, 'realpathSync')
+      .mockImplementation((p: fs.PathLike) => {
+        const pStr = p.toString();
+        if (isMalicious && pStr.includes('plans'))
+          return '/outside/the/project/root/plans';
+        return pStr;
+      });
+
+    const config = new Config({
+      ...baseParams,
+      plan: true,
+    });
+
+    await config.initialize();
+    try {
+      config.getPlansDir();
+    } finally {
+      realpathSpy.mockRestore();
+    }
+
+    expect(warnSpy).toHaveBeenCalledWith(
+      expect.stringMatching(
+        /Security violation: Resolved plan directory.*is outside the project root/,
+      ),
+    );
+    warnSpy.mockRestore();
+  });
+
   it('should log a warning if mkdirSync fails during getPlansDir (e.g. EACCES)', async () => {
     const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
     vi.spyOn(fs, 'mkdirSync').mockImplementation(() => {

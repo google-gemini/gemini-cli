@@ -2269,6 +2269,14 @@ export class Config implements McpContext, AgentLoopContext {
       fs.mkdirSync(plansDir, { recursive: true });
 
       const realPlansDir = resolveToRealPath(plansDir);
+      const realProjectRoot = resolveToRealPath(this.getTargetDir());
+
+      if (!isSubpath(realProjectRoot, realPlansDir)) {
+        throw new Error(
+          `Security violation: Resolved plan directory '${realPlansDir}' is outside the project root '${realProjectRoot}'.`,
+        );
+      }
+
       this.workspaceContext.addDirectory(realPlansDir);
       this.initializedPlanDirs.set(plansDir, true);
     } catch (e: unknown) {
