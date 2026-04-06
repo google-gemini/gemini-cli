@@ -2233,9 +2233,7 @@ export class Config implements McpContext, AgentLoopContext {
     }
 
     try {
-      if (!fs.existsSync(plansDir)) {
-        fs.mkdirSync(plansDir, { recursive: true });
-      }
+      fs.mkdirSync(plansDir, { recursive: true });
 
       let realPlansDir = plansDir;
       try {
