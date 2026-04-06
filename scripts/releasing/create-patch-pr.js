@@ -6,10 +6,57 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { execSync } from 'node:child_process';
+import { execFileSync } from 'node:child_process';
 import yargs from 'yargs';
 import { hideBin } from 'yargs/helpers';
 
+function formatCommand(command, args) {
+  return [command, ...args].join(' ');
+}
+
+function runCommand(
+  command,
+  args,
+  { dryRun = false, throwOnError = true, options = {} } = {},
+) {
+  const renderedCommand = formatCommand(command, args);
+  console.log('> ${renderedCommand}');
+
+  if (dryRub) {
+    return '';
+  }
+
+  try {
+    const result = execFileSync(command, args, {
+      encoding: 'utf8',
+      ...options,
+    });
+
+    if (typeof result === 'string') {
+      return result.trim();
+    }
+
+    return result;
+  } catch (err) {
+    console.error('Command failed: ${renderedCommand}');
+    if (throwOnError) {
+      throw err;
+    }
+    return null;
+  }
+}
+function runGit(args, options = {}) {
+  return runCommand('git', args, options);
+}
+
+function validateCommitSha(commit) {
+  if (!/^[a-f0-9]{7,40}$/i.test(commit)) {
+    throw new Error(
+      'Invalid commit SHA: "${commit}". Expected 7-40 hexadecimal characters.',
+      );
+  }
+}
+  
 async function main() {
   const argv = await yargs(hideBin(process.argv))
     .option('commit', {
@@ -45,6 +92,7 @@ async function main() {
     .alias('help', 'h').argv;
 
   const { commit, channel, dryRun, pullRequestNumber } = argv;
+  validateCommitSha(commit);
 
   console.log(`Starting patch process for commit: ${commit}`);
   console.log(`Targeting channel: ${channel}`);
@@ -52,7 +100,7 @@ async function main() {
     console.log('Running in dry-run mode.');
   }
 
-  run('git fetch --all --tags --prune', dryRun);
+  runGit(['fetch', '--all', '--tags', '--prune'], { dryRun });
 
   const releaseInfo = getLatestReleaseInfo({ argv, channel });
   const latestTag = releaseInfo.currentTag;
@@ -67,8 +115,8 @@ async function main() {
       `Release branch ${releaseBranch} does not exist. Creating it from tag ${latestTag}...`,
     );
     try {
-      run(`git checkout -b ${releaseBranch} ${latestTag}`, dryRun);
-      run(`git push origin ${releaseBranch}`, dryRun);
+      runGit(['checkout', '-b', releaseBranch, latestTag], { dryRun });
+      runGit(['push', 'origin', releaseBranch], { dryRun });
     } catch (error) {
       // Check if this is a GitHub App workflows permission error
       if (
@@ -104,11 +152,20 @@ async function main() {
 
     // Check if there's already a PR for this branch
     try {
-      const prInfo = execSync(
-        `gh pr list --head ${hotfixBranch} --json number,url --jq '.[0] // empty'`,
-      )
-        .toString()
-        .trim();
+      const prInfo = runCommand(
+        'gh',
+        [
+          'pr',
+          'list',
+          '--head',
+          hotfixBranch,
+          '--json',
+          'number,url',
+          '--jq',
+          '.[0] // empty',
+          ],
+        { dryRun: false },
+        );
       if (prInfo && prInfo !== 'null' && prInfo !== '') {
         const pr = JSON.parse(prInfo);
         console.log(`Found existing PR #${pr.number}: ${pr.url}`);
@@ -132,24 +189,24 @@ async function main() {
   console.log(
     `Creating hotfix branch ${hotfixBranch} from ${releaseBranch}...`,
   );
-  run(`git checkout -b ${hotfixBranch} origin/${releaseBranch}`, dryRun);
-
+  runGit(['checkout', '-b', hotfixBranch, `origin/${releaseBranch}`], {
+    dryRun,
+  });
   // Ensure git user is configured properly for commits
   console.log('Configuring git user for cherry-pick commits...');
-  run('git config user.name "gemini-cli-robot"', dryRun);
-  run('git config user.email "gemini-cli-robot@google.com"', dryRun);
-
+  runGit(['config', 'user.name', 'gemini-cli-robot'], { dryRun });
+  runGit(['config', 'user.email', 'gemini-cli-robot@google.com'], { dryRun });
   // Cherry-pick the commit.
   console.log(`Cherry-picking commit ${commit} into ${hotfixBranch}...`);
   let hasConflicts = false;
   if (!dryRun) {
     try {
-      execSync(`git cherry-pick ${commit}`, { stdio: 'pipe' });
+     runGit(['cherry-pick', commit], { options: { stdio: 'pipe' } });
       console.log(`✅ Cherry-pick successful - no conflicts detected`);
     } catch (error) {
       // Check if this is a cherry-pick conflict
       try {
-        const status = execSync('git status --porcelain', { encoding: 'utf8' });
+        const status = runGit(['status', '--porcelain']);
         const conflictFiles = status
           .split('\n')
           .filter(
@@ -173,8 +230,8 @@ async function main() {
           console.log(
             `📝 Creating commit with conflict markers for manual resolution...`,
           );
-          execSync('git add .');
-          execSync(`git commit --no-edit --no-verify`);
+          runGit(['add', '.']);
+          runGit(['commit', '--no-edit', '--no-verify']);
           console.log(`✅ Committed cherry-pick with conflict markers`);
         } else {
           // Re-throw if it's not a conflict error
@@ -191,7 +248,7 @@ async function main() {
 
   // Push the hotfix branch.
   console.log(`Pushing hotfix branch ${hotfixBranch} to origin...`);
-  run(`git push --set-upstream origin ${hotfixBranch}`, dryRun);
+  runGit(['push', '--set-upstream', 'origin', hotfixBranch], { dryRun });
 
   // Create the pull request.
   console.log(
@@ -241,44 +298,47 @@ The commit has been created with conflict markers for easier manual resolution.
     console.log('\n--- Dry Run Summary ---');
     console.log(`Release Branch: ${releaseBranch}`);
     console.log(`Hotfix Branch: ${hotfixBranch}`);
-    console.log(`Pull Request Command: ${prCommand}`);
+    console.log(
+      'Pull Request Command: ${formatCommand('gh', [
+      'pr',
+      'create',
+      '--base',
+      releaseBranch,
+      '--head',
+      hotfixBranch,
+      '--title',
+      prTitle,
+      '--body',
+      prBody,
+      ])}',
+    );
     console.log('---------------------');
   }
 
   return { newBranch: hotfixBranch, created: true, hasConflicts };
 }
 
-function run(command, dryRun = false, throwOnError = true) {
-  console.log(`> ${command}`);
-  if (dryRun) {
-    return;
-  }
-  try {
-    return execSync(command).toString().trim();
-  } catch (err) {
-    console.error(`Command failed: ${command}`);
-    if (throwOnError) {
-      throw err;
-    }
-    return null;
-  }
-}
 
 function branchExists(branchName) {
-  try {
-    execSync(`git ls-remote --exit-code --heads origin ${branchName}`);
-    return true;
-  } catch {
-    return false;
-  }
+ const result = runGit(['ls-remote', '--exit-code', '--heads', 'origin', branchName],
+{
+  throwOnError: false,
+ });
+ return result !== null;
 }
 
 function getLatestReleaseInfo({ argv, channel } = {}) {
   console.log(`Fetching latest release info for channel: ${channel}...`);
   const patchFrom = channel; // 'stable' or 'preview'
-  const command = `node scripts/get-release-version.js --cli-package-name="${argv['cli-package-name']}" --type=patch --patch-from=${patchFrom}`;
   try {
-    const result = JSON.parse(execSync(command).toString().trim());
+    const result = JSON.parse(
+      runCommand('node', [
+        'scripts/get-release-version.js',
+        '--cli-package-name=${argv['cli-package-name']}',
+        '--type=patch',
+        '--patch-from=${patchFrom}',
+    }),
+  );
     console.log(`Current ${channel} tag: ${result.previousReleaseTag}`);
     console.log(`Next ${channel} version would be: ${result.releaseVersion}`);
     return {
