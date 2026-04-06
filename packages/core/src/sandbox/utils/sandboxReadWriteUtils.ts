@@ -18,6 +18,9 @@ function validatePaths(
   allowedPaths: string[],
 ): boolean {
   for (const p of paths) {
+    if (typeof p !== 'string' || p.includes('\0')) {
+      return false; // Reject malicious paths
+    }
     const resolvedPath = path.resolve(p);
     const resolvedWorkspace = path.resolve(workspace);
     const isInsideWorkspace =

@@ -167,4 +167,38 @@ PermissionError: [Errno 13] Permission denied: '/etc/test_sandbox_denial'`;
     } as unknown as ShellExecutionResult);
     expect(parsed?.filePaths).toContain('/mnt/usb/test');
   });
+
+  it('should reject paths with directory traversal', () => {
+    const output = 'ls: /etc/shadow/../../etc/passwd: Operation not permitted';
+    const parsed = parsePosixSandboxDenials({
+      output,
+    } as unknown as ShellExecutionResult);
+    expect(parsed?.filePaths || []).not.toContain(
+      '/etc/shadow/../../etc/passwd',
+    );
+  });
+
+  it('should reject home-relative paths with directory traversal', () => {
+    const output = "Operation not permitted, open '~/../../etc/shadow'";
+    const parsed = parsePosixSandboxDenials({
+      output,
+    } as unknown as ShellExecutionResult);
+    expect(parsed?.filePaths || []).not.toContain('~/../../etc/shadow');
+  });
+
+  it('should reject paths with null bytes', () => {
+    const output = "Operation not permitted, open '/etc/passwd\0/foo'";
+    const parsed = parsePosixSandboxDenials({
+      output,
+    } as unknown as ShellExecutionResult);
+    expect(parsed?.filePaths || []).not.toContain('/etc/passwd\0/foo');
+  });
+
+  it('should reject paths with internal tildes', () => {
+    const output = "Operation not permitted, open '/home/user/~/config'";
+    const parsed = parsePosixSandboxDenials({
+      output,
+    } as unknown as ShellExecutionResult);
+    expect(parsed?.filePaths || []).not.toContain('/home/user/~/config');
+  });
 });

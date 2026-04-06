@@ -12,6 +12,9 @@ export function isErrnoException(e: unknown): e is NodeJS.ErrnoException {
 }
 
 export function tryRealpath(p: string): string {
+  if (typeof p !== 'string' || p.includes('\0')) {
+    throw new Error(`Invalid path: ${p}`);
+  }
   try {
     return fs.realpathSync(p);
   } catch (e) {
