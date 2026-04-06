@@ -68,7 +68,11 @@ import type { Config } from '../config/config.js';
 import type { MessageBus } from '../confirmation-bus/message-bus.js';
 import type { PolicyEngine } from '../policy/policy-engine.js';
 import type { ToolRegistry } from '../tools/tool-registry.js';
-import { PolicyDecision, ApprovalMode } from '../policy/types.js';
+import {
+  PolicyDecision,
+  ApprovalMode,
+  MODES_BY_PERMISSIVENESS,
+} from '../policy/types.js';
 import {
   ToolConfirmationOutcome,
   type AnyDeclarativeTool,
@@ -684,6 +688,7 @@ describe('Scheduler (Orchestrator)', () => {
           toolName: '*',
           decision: PolicyDecision.DENY,
           denyMessage: 'Custom denial reason',
+          modes: MODES_BY_PERMISSIVENESS,
         },
       });
 
@@ -757,7 +762,11 @@ describe('Scheduler (Orchestrator)', () => {
     it('should return POLICY_VIOLATION error type when denied in Plan Mode', async () => {
       vi.mocked(checkPolicy).mockResolvedValue({
         decision: PolicyDecision.DENY,
-        rule: { toolName: '*', decision: PolicyDecision.DENY },
+        rule: {
+          toolName: '*',
+          decision: PolicyDecision.DENY,
+          modes: MODES_BY_PERMISSIVENESS,
+        },
       });
 
       mockConfig.getApprovalMode.mockReturnValue(ApprovalMode.PLAN);
@@ -790,6 +799,7 @@ describe('Scheduler (Orchestrator)', () => {
           toolName: '*',
           decision: PolicyDecision.DENY,
           denyMessage: customMessage,
+          modes: MODES_BY_PERMISSIVENESS,
         },
       });
 

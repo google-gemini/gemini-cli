@@ -90,12 +90,9 @@ function ruleMatches(
   subagent?: string,
 ): boolean {
   // Check if rule applies to current approval mode
-  if (rule.modes && rule.modes.length > 0) {
-    if (!rule.modes.includes(currentApprovalMode)) {
-      return false;
-    }
+  if (!rule.modes.includes(currentApprovalMode)) {
+    return false;
   }
-
   // Check subagent if specified (only for PolicyRule, SafetyCheckerRule doesn't have it)
   if ('subagent' in rule && rule.subagent !== undefined) {
     if (rule.subagent !== subagent) {

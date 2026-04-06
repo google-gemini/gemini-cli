@@ -60,7 +60,7 @@ const PolicyRuleSchema = z.object({
       message:
         'priority must be <= 999 to prevent tier overflow. Priorities >= 1000 would jump to the next tier.',
     }),
-  modes: z.array(z.nativeEnum(ApprovalMode)).optional(),
+  modes: z.array(z.nativeEnum(ApprovalMode)),
   interactive: z.boolean().optional(),
   toolAnnotations: z.record(z.any()).optional(),
   allowRedirection: z.boolean().optional(),
@@ -79,7 +79,7 @@ const SafetyCheckerRuleSchema = z.object({
   commandPrefix: z.union([z.string(), z.array(z.string())]).optional(),
   commandRegex: z.string().optional(),
   priority: z.number().int().default(0),
-  modes: z.array(z.nativeEnum(ApprovalMode)).optional(),
+  modes: z.array(z.nativeEnum(ApprovalMode)),
   toolAnnotations: z.record(z.any()).optional(),
   checker: z.discriminatedUnion('type', [
     z.object({
@@ -383,7 +383,7 @@ export async function loadPoliciesFromToml(
             message: 'Schema validation failed',
             details: formatSchemaError(validationResult.error, 0),
             suggestion:
-              'Ensure all required fields (decision, priority) are present with correct types',
+              'Ensure all required fields are present with correct types',
           });
           continue;
         }

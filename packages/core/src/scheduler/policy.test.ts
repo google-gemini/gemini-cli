@@ -21,7 +21,11 @@ import {
   MessageBusType,
   type SerializableConfirmationDetails,
 } from '../confirmation-bus/types.js';
-import { ApprovalMode, PolicyDecision } from '../policy/types.js';
+import {
+  ApprovalMode,
+  PolicyDecision,
+  MODES_BY_PERMISSIVENESS,
+} from '../policy/types.js';
 import { escapeRegex } from '../policy/utils.js';
 import {
   ToolConfirmationOutcome,
@@ -786,6 +790,7 @@ describe('policy.ts', () => {
         toolName: '*',
         decision: PolicyDecision.DENY,
         denyMessage: 'Custom Deny',
+        modes: MODES_BY_PERMISSIVENESS,
       };
 
       const { errorMessage, errorType } = getPolicyDenialError(

@@ -25,7 +25,11 @@ import {
   type ModelConfig,
   ModelConfigService,
 } from '../services/modelConfigService.js';
-import { PolicyDecision, PRIORITY_SUBAGENT_TOOL } from '../policy/types.js';
+import {
+  PolicyDecision,
+  PRIORITY_SUBAGENT_TOOL,
+  MODES_BY_PERMISSIVENESS,
+} from '../policy/types.js';
 import { A2AAgentError, AgentAuthConfigMissingError } from './a2a-errors.js';
 
 /**
@@ -388,6 +392,7 @@ export class AgentRegistry {
           ? PolicyDecision.ALLOW
           : PolicyDecision.ASK_USER,
       priority: PRIORITY_SUBAGENT_TOOL,
+      modes: MODES_BY_PERMISSIVENESS,
       source: 'AgentRegistry (Dynamic)',
     });
   }

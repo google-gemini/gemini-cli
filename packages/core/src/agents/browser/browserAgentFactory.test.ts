@@ -11,7 +11,11 @@ import {
 } from './browserAgentFactory.js';
 import { injectAutomationOverlay } from './automationOverlay.js';
 import { makeFakeConfig } from '../../test-utils/config.js';
-import { PolicyDecision, PRIORITY_SUBAGENT_TOOL } from '../../policy/types.js';
+import {
+  PolicyDecision,
+  PRIORITY_SUBAGENT_TOOL,
+  MODES_BY_PERMISSIVENESS,
+} from '../../policy/types.js';
 import type { Config } from '../../config/config.js';
 import type { MessageBus } from '../../confirmation-bus/message-bus.js';
 import type { PolicyEngine } from '../../policy/policy-engine.js';
@@ -372,6 +376,7 @@ describe('browserAgentFactory', () => {
           toolName: 'mcp_browser_agent_fill',
           decision: PolicyDecision.ASK_USER,
           priority: 999,
+          modes: MODES_BY_PERMISSIVENESS,
         }),
       );
 
@@ -380,6 +385,7 @@ describe('browserAgentFactory', () => {
           toolName: 'mcp_browser_agent_upload_file',
           decision: PolicyDecision.ASK_USER,
           priority: 999,
+          modes: MODES_BY_PERMISSIVENESS,
         }),
       );
 
@@ -388,6 +394,7 @@ describe('browserAgentFactory', () => {
           toolName: 'mcp_browser_agent_evaluate_script',
           decision: PolicyDecision.ASK_USER,
           priority: 999,
+          modes: MODES_BY_PERMISSIVENESS,
         }),
       );
     });
@@ -432,6 +439,7 @@ describe('browserAgentFactory', () => {
           toolName: 'mcp_browser_agent_take_snapshot',
           decision: PolicyDecision.ALLOW,
           priority: PRIORITY_SUBAGENT_TOOL,
+          modes: MODES_BY_PERMISSIVENESS,
         }),
       );
 
@@ -440,6 +448,7 @@ describe('browserAgentFactory', () => {
           toolName: 'mcp_browser_agent_take_screenshot',
           decision: PolicyDecision.ALLOW,
           priority: PRIORITY_SUBAGENT_TOOL,
+          modes: MODES_BY_PERMISSIVENESS,
         }),
       );
 
@@ -448,6 +457,7 @@ describe('browserAgentFactory', () => {
           toolName: 'mcp_browser_agent_list_pages',
           decision: PolicyDecision.ALLOW,
           priority: PRIORITY_SUBAGENT_TOOL,
+          modes: MODES_BY_PERMISSIVENESS,
         }),
       );
     });

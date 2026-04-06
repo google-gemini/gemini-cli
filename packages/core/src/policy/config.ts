@@ -11,6 +11,7 @@ import { fileURLToPath } from 'node:url';
 import { Storage } from '../config/storage.js';
 import {
   ApprovalMode,
+  MODES_BY_PERMISSIVENESS,
   type PolicyEngineConfig,
   PolicyDecision,
   type PolicyRule,
@@ -415,6 +416,7 @@ export async function createPolicyEngineConfig(
         mcpName: serverName,
         decision: PolicyDecision.DENY,
         priority: MCP_EXCLUDED_PRIORITY,
+        modes: MODES_BY_PERMISSIVENESS,
         source: 'Settings (MCP Excluded)',
       });
     }
@@ -428,6 +430,7 @@ export async function createPolicyEngineConfig(
         toolName: tool,
         decision: PolicyDecision.DENY,
         priority: EXCLUDE_TOOLS_FLAG_PRIORITY,
+        modes: MODES_BY_PERMISSIVENESS,
         source: 'Settings (Tools Excluded)',
       });
     }
@@ -456,6 +459,7 @@ export async function createPolicyEngineConfig(
                 decision: PolicyDecision.ALLOW,
                 priority: ALLOWED_TOOLS_FLAG_PRIORITY,
                 argsPattern: new RegExp(pattern),
+                modes: MODES_BY_PERMISSIVENESS,
                 source: 'Settings (Tools Allowed)',
               });
             }
@@ -467,6 +471,7 @@ export async function createPolicyEngineConfig(
             toolName,
             decision: PolicyDecision.ALLOW,
             priority: ALLOWED_TOOLS_FLAG_PRIORITY,
+            modes: MODES_BY_PERMISSIVENESS,
             source: 'Settings (Tools Allowed)',
           });
         }
@@ -479,6 +484,7 @@ export async function createPolicyEngineConfig(
           toolName,
           decision: PolicyDecision.ALLOW,
           priority: ALLOWED_TOOLS_FLAG_PRIORITY,
+          modes: MODES_BY_PERMISSIVENESS,
           source: 'Settings (Tools Allowed)',
         });
       }
@@ -499,6 +505,7 @@ export async function createPolicyEngineConfig(
           mcpName: serverName,
           decision: PolicyDecision.ALLOW,
           priority: TRUSTED_MCP_SERVER_PRIORITY,
+          modes: MODES_BY_PERMISSIVENESS,
           source: 'Settings (MCP Trusted)',
         });
       }
@@ -517,6 +524,7 @@ export async function createPolicyEngineConfig(
         mcpName: serverName,
         decision: PolicyDecision.ALLOW,
         priority: ALLOWED_MCP_SERVER_PRIORITY,
+        modes: MODES_BY_PERMISSIVENESS,
         source: 'Settings (MCP Allowed)',
       });
     }
@@ -638,7 +646,7 @@ export function createPolicyUpdater(
               priority,
               argsPattern: new RegExp(pattern),
               mcpName: message.mcpName,
-              modes: message.modes,
+              modes: message.modes ?? MODES_BY_PERMISSIVENESS,
               source: 'Dynamic (Confirmed)',
               allowRedirection: message.allowRedirection,
             });
@@ -676,7 +684,7 @@ export function createPolicyUpdater(
           priority,
           argsPattern,
           mcpName: message.mcpName,
-          modes: message.modes,
+          modes: message.modes ?? MODES_BY_PERMISSIVENESS,
           source: 'Dynamic (Confirmed)',
           allowRedirection: message.allowRedirection,
         });

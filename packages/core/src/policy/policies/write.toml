@@ -31,13 +31,14 @@
 toolName = "replace"
 decision = "ask_user"
 priority = 10
+modes = ["plan", "default", "autoEdit", "yolo"]
 interactive = true
 
 [[rule]]
 toolName = "replace"
 decision = "allow"
 priority = 15
-modes = ["autoEdit"]
+modes = ["plan", "default", "autoEdit", "yolo"]
 
 [rule.safety_checker]
 type = "in-process"
@@ -48,31 +49,35 @@ required_context = ["environment"]
 toolName = "save_memory"
 decision = "ask_user"
 priority = 10
+modes = ["plan", "default", "autoEdit", "yolo"]
 interactive = true
 
 [[rule]]
 toolName = "run_shell_command"
 decision = "ask_user"
 priority = 10
+modes = ["plan", "default", "autoEdit", "yolo"]
 interactive = true
 
 [[rule]]
 toolName = "write_file"
 decision = "ask_user"
 priority = 10
+modes = ["plan", "default", "autoEdit", "yolo"]
 interactive = true
 
 [[rule]]
 toolName = "activate_skill"
 decision = "ask_user"
 priority = 10
+modes = ["plan", "default", "autoEdit", "yolo"]
 interactive = true
 
 [[rule]]
 toolName = "write_file"
 decision = "allow"
 priority = 15
-modes = ["autoEdit"]
+modes = ["plan", "default", "autoEdit", "yolo"]
 
 [rule.safety_checker]
 type = "in-process"
@@ -83,12 +88,13 @@ required_context = ["environment"]
 toolName = "web_fetch"
 decision = "allow"
 priority = 15
-modes = ["autoEdit"]
+modes = ["plan", "default", "autoEdit", "yolo"]
 
 [[rule]]
 toolName = "web_fetch"
 decision = "ask_user"
 priority = 10
+modes = ["plan", "default", "autoEdit", "yolo"]
 interactive = true
 
 # Headless Denial Rule (Priority 10)
@@ -104,4 +110,5 @@ toolName = [
 ]
 decision = "deny"
 priority = 10
+modes = ["plan", "default", "autoEdit", "yolo"]
 interactive = false

@@ -14,7 +14,7 @@ import {
   type MockInstance,
 } from 'vitest';
 import { SimpleExtensionLoader } from './extensionLoader.js';
-import { PolicyDecision } from '../policy/types.js';
+import { PolicyDecision, MODES_BY_PERMISSIVENESS } from '../policy/types.js';
 import type { Config, GeminiCLIExtension } from '../config/config.js';
 import { type McpClientManager } from '../tools/mcp-client-manager.js';
 import type { GeminiClient } from '../core/client.js';
@@ -59,12 +59,14 @@ describe('SimpleExtensionLoader', () => {
         toolName: 'test-tool',
         decision: PolicyDecision.ALLOW,
         source: 'Extension (test-extension): policies.toml',
+        modes: MODES_BY_PERMISSIVENESS,
       },
     ],
     checkers: [
       {
         toolName: 'test-tool',
         checker: { type: 'external', name: 'test-checker' },
+        modes: MODES_BY_PERMISSIVENESS,
         source: 'Extension (test-extension): policies.toml',
       },
     ],

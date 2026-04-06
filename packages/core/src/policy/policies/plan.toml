@@ -33,12 +33,14 @@
 toolName = "enter_plan_mode"
 decision = "ask_user"
 priority = 50
+modes = ["plan"]
 interactive = true
 
 [[rule]]
 toolName = "enter_plan_mode"
 decision = "allow"
 priority = 50
+modes = ["plan"]
 interactive = false
 
 [[rule]]
@@ -59,12 +61,14 @@ interactive = true
 toolName = "exit_plan_mode"
 decision = "allow"
 priority = 70
+modes = ["plan"]
 interactive = false
 
 [[rule]]
 toolName = "exit_plan_mode"
 decision = "deny"
 priority = 50
+modes = ["plan"]
 denyMessage = "You are not currently in Plan Mode. Use enter_plan_mode first to design a plan."
 
 

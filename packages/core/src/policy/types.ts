@@ -161,9 +161,8 @@ export interface PolicyRule {
 
   /**
    * Approval modes this rule applies to.
-   * If undefined or empty, it applies to all modes.
    */
-  modes?: ApprovalMode[];
+  modes: ApprovalMode[];
 
   /**
    * If true, this rule only applies to interactive environments.
@@ -230,9 +229,8 @@ export interface SafetyCheckerRule {
 
   /**
    * Approval modes this rule applies to.
-   * If undefined or empty, it applies to all modes.
    */
-  modes?: ApprovalMode[];
+  modes: ApprovalMode[];
 
   /**
    * Source of the rule.

@@ -32,3 +32,4 @@ toolName = [
 ]
 decision = "allow"
 priority = 50
+modes = ["plan", "default", "autoEdit", "yolo"]

@@ -23,7 +23,7 @@ import { ExecutionLifecycleService } from './executionLifecycleService.js';
 import { PromptRegistry } from '../prompts/prompt-registry.js';
 import { ResourceRegistry } from '../resources/resource-registry.js';
 import { PolicyEngine } from '../policy/policy-engine.js';
-import { PolicyDecision } from '../policy/types.js';
+import { PolicyDecision, ApprovalMode } from '../policy/types.js';
 import { MessageBus } from '../confirmation-bus/message-bus.js';
 import { Storage } from '../config/storage.js';
 import type { AgentLoopContext } from '../config/agent-loop-context.js';
@@ -475,6 +475,7 @@ function buildAgentLoopContext(config: Config): AgentLoopContext {
         toolName: '*',
         decision: PolicyDecision.ALLOW,
         priority: 100,
+        modes: [ApprovalMode.DEFAULT],
       },
     ],
   });
