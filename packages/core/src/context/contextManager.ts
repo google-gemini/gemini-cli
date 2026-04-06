@@ -8,7 +8,6 @@ import type { Content } from '@google/genai';
 
 import type { AgentChatHistory } from '../core/agentChatHistory.js';
 import { debugLogger } from '../utils/debugLogger.js';
-import { IrMapper } from './ir/mapper.js';
 import type { Episode } from './ir/types.js';
 
 import { ContextEventBus } from './eventBus.js';
@@ -21,6 +20,9 @@ import type { ContextEnvironment } from './sidecar/environment.js';
 import type { SidecarConfig } from './sidecar/types.js';
 import { ProcessorRegistry } from './sidecar/registry.js';
 import { PipelineOrchestrator } from './sidecar/orchestrator.js';
+import { HistoryObserver } from './historyObserver.js';
+import { calculateEpisodeListTokens } from './utils/contextTokenCalculator.js';
+import { generateWorkingBufferView } from './ir/graphUtils.js';
 
 
 import { ToolMaskingProcessor } from './processors/toolMaskingProcessor.js';
@@ -28,6 +30,9 @@ import { BlobDegradationProcessor } from './processors/blobDegradationProcessor.
 import { SemanticCompressionProcessor } from './processors/semanticCompressionProcessor.js';
 import { HistorySquashingProcessor } from './processors/historySquashingProcessor.js';
 import { StateSnapshotProcessor } from './processors/stateSnapshotProcessor.js';
+import { EmergencyTruncationProcessor } from './processors/emergencyTruncationProcessor.js';
+
+import { IrProjector } from './ir/projector.js';
 
 export class ContextManager {
   
@@ -35,13 +40,13 @@ export class ContextManager {
   // The stateful, pristine Episodic Intermediate Representation graph.
   // This allows the agent to remember and summarize continuously without losing data across turns.
   private pristineEpisodes: Episode[] = [];
-  private unsubscribeHistory?: () => void;
   private readonly eventBus: ContextEventBus;
   
   
   // Internal sub-components
   // Synchronous processors are instantiated but effectively used as singletons within this class
   private orchestrator: PipelineOrchestrator;
+  private historyObserver?: HistoryObserver;
   
   
 
@@ -59,6 +64,7 @@ export class ContextManager {
     ProcessorRegistry.register({ id: 'SemanticCompressionProcessor', create: (env, opts) => new SemanticCompressionProcessor(env, opts as any) });
     ProcessorRegistry.register({ id: 'HistorySquashingProcessor', create: (env, opts) => new HistorySquashingProcessor(env, opts as any) });
     ProcessorRegistry.register({ id: 'StateSnapshotProcessor', create: (env, opts) => StateSnapshotProcessor.create(env, opts as any) });
+    ProcessorRegistry.register({ id: 'EmergencyTruncationProcessor', create: (env, opts) => EmergencyTruncationProcessor.create(env, opts as any) });
 
     this.orchestrator = new PipelineOrchestrator(this.sidecar, this.env, this.eventBus, this.tracer);
 
@@ -86,8 +92,8 @@ export class ContextManager {
    */
   shutdown() {
     this.orchestrator.shutdown();
-    if (this.unsubscribeHistory) {
-      this.unsubscribeHistory();
+    if (this.historyObserver) {
+      this.historyObserver.stop();
     }
   }
 
@@ -96,49 +102,21 @@ export class ContextManager {
    * converting them seamlessly into pristine Episodes.
    */
   subscribeToHistory(chatHistory: AgentChatHistory) {
-    if (this.unsubscribeHistory) {
-      this.unsubscribeHistory();
+    if (this.historyObserver) {
+      this.historyObserver.stop();
     }
 
-    this.unsubscribeHistory = chatHistory.subscribe((event) => {
-      // Rebuild the pristine IR graph from the full source history on every change.
-      // We must map the FULL array at once because IrMapper groups adjacent
-      // function calls and responses into unified Episodes. Pushing messages
-      // individually would shatter these episodic boundaries.
-      this.pristineEpisodes = IrMapper.toIr(chatHistory.get());
-      this.tracer.logEvent('ContextManager', 'Rebuilt pristine graph from chat history update', { episodeCount: this.pristineEpisodes.length });
-      this.checkTriggers();
-    });
-  }
+    this.historyObserver = new HistoryObserver(
+      chatHistory,
+      this.eventBus,
+      this.tracer,
+      this.sidecar,
+      (episodes) => { this.pristineEpisodes = episodes; },
+      () => this.getWorkingBufferView(),
+      (episodes) => calculateEpisodeListTokens(episodes)
+    );
 
-  private checkTriggers() {
-    if (!this.sidecar.budget) return;
-
-    const mngConfig = this.sidecar;
-    
-    // Calculate tokens based on the *Working Buffer View*, not the raw pristine log.
-    // This solves Bug 2: The View shrinks when variants are applied, preventing infinite GC loops.
-    const workingBuffer = this.getWorkingBufferView();
-    const currentTokens = this.calculateIrTokens(workingBuffer);
-    
-    this.tracer.logEvent('ContextManager', 'Evaluated triggers', { currentTokens, retainedTokens: mngConfig.budget.retainedTokens });
-
-    // 1. Eager Compute Trigger (Continuous Streaming)
-    // Broadcast the full pristine log to the async workers so they can proactively summarize partial massive files.
-    this.eventBus.emitChunkReceived({ episodes: this.pristineEpisodes });
-
-    // 2. The Ship of Theseus Trigger (retainedTokens crossed)
-    // If we exceed 65k, tell the background processors to opportunistically synthesize the oldest nodes.
-    if (currentTokens > mngConfig.budget.retainedTokens) {
-      const deficit = currentTokens - mngConfig.budget.retainedTokens;
-      this.tracer.logEvent('ContextManager', 'Budget crossed. Emitting ConsolidationNeeded', { deficit });
-      console.log('EMITTING CONSOLIDATION. Buffer:', workingBuffer.length, 'Deficit:', deficit);
-      this.eventBus.emitConsolidationNeeded({
-        
-        episodes: workingBuffer, // Pass the working buffer so they know what still needs compression
-        targetDeficit: deficit,
-      });
-    }
+    this.historyObserver.start();
   }
 
   /**
@@ -148,163 +126,12 @@ export class ContextManager {
    * (snapshot > summary > masked) instead of the raw text.
    * Handles N-to-1 variant skipping automatically.
    */
-  /**
-   * Applies the data-driven Sidecar configuration graphs.
-   * Splits the episodes into the 'retained' and 'normal' ranges,
-   * runs their respective processor pipelines sequentially, and recombines them.
-   */
-  private async applyProcessorGraphs(episodes: Episode[]): Promise<Episode[]> {
-    const mngConfig = this.sidecar;
-
-    const protectedIds = new Set<string>();
-    // We must protect the System Episode, which is always index 0 of pristineEpisodes.
-    if (this.pristineEpisodes.length > 0) {
-      protectedIds.add(this.pristineEpisodes[0].id); // Structural invariant
-    }
-
-    let currentTokens = this.calculateIrTokens(episodes);
-    
-    return this.orchestrator.executePipelineForking('Immediate Sanitization', episodes, {
-      currentTokens: currentTokens,
-      maxTokens: mngConfig.budget.maxTokens,
-      retainedTokens: mngConfig.budget.retainedTokens,
-      deficitTokens: Math.max(0, currentTokens - mngConfig.budget.maxTokens),
-      protectedEpisodeIds: protectedIds,
-      isBudgetSatisfied: currentTokens <= mngConfig.budget.maxTokens, 
-    });
-  }
-
   public getWorkingBufferView(): Episode[] {
-    const mngConfig = this.sidecar;
-    const retainedTokens = mngConfig.budget.retainedTokens;
-    
-    let currentEpisodes: Episode[] = [];
-    let rollingTokens = 0;
-    const skippedIds = new Set<string>();
-    this.tracer.logEvent('ViewGenerator', 'Generating Working Buffer View');
-
-    for (let i = this.pristineEpisodes.length - 1; i >= 0; i--) {
-      const ep = this.pristineEpisodes[i];
-      
-      // If this episode was already replaced by an N-to-1 Snapshot injected earlier in the sweep, skip it entirely!
-      // This solves Bug 1 (Duplicate Projection).
-      if (skippedIds.has(ep.id)) {
-        this.tracer.logEvent('ViewGenerator', `Skipping episode [${ep.id}] due to N-to-1 replacement.`);
-        continue;
-      }
-
-      let projectedEp = {
-        ...ep,
-        trigger: {
-          ...ep.trigger,
-          metadata: {
-            ...ep.trigger.metadata,
-            transformations: [...ep.trigger.metadata.transformations],
-          },
-          semanticParts:
-            ep.trigger.type === 'USER_PROMPT'
-              ? [...ep.trigger.semanticParts.map((sp) => ({ ...sp }))]
-              : undefined,
-        } as any,
-        steps: ep.steps.map(
-          (step) =>
-            ({
-              ...step,
-              metadata: {
-                ...step.metadata,
-                transformations: [...step.metadata.transformations],
-              },
-            }) as any,
-        ),
-        yield: ep.yield
-          ? {
-              ...ep.yield,
-              metadata: {
-                ...ep.yield.metadata,
-                transformations: [...ep.yield.metadata.transformations],
-              },
-            }
-          : undefined,
-      };
-
-      const epTokens = this.calculateIrTokens([projectedEp]);
-
-      if (ep.variants) { console.log('Checking variants for', ep.id, 'rollingTokens:', rollingTokens, 'retained:', retainedTokens); }
-      if (rollingTokens > retainedTokens && ep.variants) {
-        console.log('EVALUATING VARIANTS FOR', ep.id);
-        const snapshot = ep.variants['snapshot'];
-        const summary = ep.variants['summary'];
-        const masked = ep.variants['masked'];
-
-        if (
-          snapshot &&
-          snapshot.status === 'ready' &&
-          snapshot.type === 'snapshot'
-        ) {
-          projectedEp = snapshot.episode as any;
-          // Mark all the episodes this snapshot covers to be skipped by the backwards sweep.
-          for (const id of snapshot.replacedEpisodeIds) {
-            skippedIds.add(id);
-          }
-          this.tracer.logEvent('ViewGenerator', `Episode [${ep.id}] has SnapshotVariant. Selecting variant over raw text. Added [${snapshot.replacedEpisodeIds.join(',')}] to skippedIds.`);
-          debugLogger.log(
-            `Opportunistically swapped Episodes [${snapshot.replacedEpisodeIds.join(', ')}] for pre-computed Snapshot variant.`,
-          );
-        } else if (
-          summary &&
-          summary.status === 'ready' &&
-          summary.type === 'summary'
-        ) {
-          projectedEp.steps = [
-            {
-              id: ep.id + '-summary',
-              type: 'AGENT_THOUGHT',
-              text: summary.text,
-              metadata: {
-                originalTokens: epTokens,
-                currentTokens: summary.recoveredTokens || 50,
-                transformations: [
-                  {
-                    processorName: 'AsyncSemanticCompressor',
-                    action: 'SUMMARIZED',
-                    timestamp: Date.now(),
-                  },
-                ],
-              },
-            },
-          ] as any;
-          projectedEp.yield = undefined;
-          this.tracer.logEvent('ViewGenerator', `Episode [${ep.id}] has SummaryVariant. Selecting variant over raw text.`);
-          debugLogger.log(
-            `Opportunistically swapped Episode ${ep.id} for pre-computed Summary variant.`,
-          );
-        } else if (
-          masked &&
-          masked.status === 'ready' &&
-          masked.type === 'masked'
-        ) {
-          if (
-            projectedEp.trigger.type === 'USER_PROMPT' &&
-            projectedEp.trigger.semanticParts.length > 0
-          ) {
-            projectedEp.trigger.semanticParts[0].presentation = {
-              text: masked.text,
-              tokens: masked.recoveredTokens || 10,
-            };
-          }
-          this.tracer.logEvent('ViewGenerator', `Episode [${ep.id}] has MaskedVariant. Selecting variant over raw text.`);
-          debugLogger.log(
-            `Opportunistically swapped Episode ${ep.id} for pre-computed Masked variant.`,
-          );
-        }
-      }
-
-      currentEpisodes.unshift(projectedEp);
-      rollingTokens += this.calculateIrTokens([projectedEp]);
-    }
-
-    
-    return currentEpisodes;
+    return generateWorkingBufferView(
+      this.pristineEpisodes,
+      this.sidecar.budget.retainedTokens,
+      this.tracer
+    );
   }
 
   /**
@@ -313,7 +140,7 @@ export class ContextManager {
    */
   async projectCompressedHistory(): Promise<Content[]> {
     if (!this.sidecar.budget) {
-      return this._projectAndDump(IrMapper.fromIr(this.pristineEpisodes));
+      return IrProjector.projectAndDump(this.pristineEpisodes, this.env);
     }
 
     const mngConfig = this.sidecar;
@@ -323,14 +150,12 @@ export class ContextManager {
     // Get the dynamically computed Working Buffer View
     let currentEpisodes = this.getWorkingBufferView();
     
-    currentEpisodes = await this.applyProcessorGraphs(currentEpisodes);
-    
-    let currentTokens = this.calculateIrTokens(currentEpisodes);
+    let currentTokens = calculateEpisodeListTokens(currentEpisodes);
     
 
     if (currentTokens <= maxTokens) {
       this.tracer.logEvent('ContextManager', `View is within maxTokens (${currentTokens} <= ${maxTokens}). Returning view.`);
-      return this._projectAndDump(IrMapper.fromIr(currentEpisodes));
+      return IrProjector.projectAndDump(currentEpisodes, this.env);
     }
 
     this.tracer.logEvent('ContextManager', `View exceeds maxTokens (${currentTokens} > ${maxTokens}). Hitting Synchronous Pressure Barrier. Strategy: ${mngConfig.gcBackstop.strategy}`);
@@ -365,7 +190,7 @@ export class ContextManager {
     
 
     for (const ep of currentEpisodes) {
-      const epTokens = this.calculateIrTokens([ep]);
+      const epTokens = calculateEpisodeListTokens([ep]);
       if (remainingTokens > targetTokens && ep.id !== protectedEpisodeId) {
          console.log('DROPPING EPISODE:', ep.id, 'rem:', remainingTokens, 'tgt:', targetTokens);
 
@@ -389,40 +214,12 @@ export class ContextManager {
     }
     currentEpisodes = truncated;
 
-    const finalTokens = this.calculateIrTokens(currentEpisodes);
+    const finalTokens = calculateEpisodeListTokens(currentEpisodes);
     this.tracer.logEvent('ContextManager', `Finished projection. Final token count: ${finalTokens}.`);
     debugLogger.log(
       `Context Manager finished. Final actual token count: ${finalTokens}.`,
     );
 
-    return this._projectAndDump(IrMapper.fromIr(currentEpisodes));
-  }
-
-  private async _projectAndDump(contents: Content[]): Promise<Content[]> {
-    if (process.env['GEMINI_DUMP_CONTEXT'] === 'true') {
-      try {
-        const fs = await import('node:fs/promises');
-        const path = await import('node:path');
-        const dumpPath = path.join(this.env.getTraceDir(), '.gemini', 'projected_context.json');
-        await fs.mkdir(path.dirname(dumpPath), { recursive: true });
-        await fs.writeFile(dumpPath, JSON.stringify(contents, null, 2), 'utf-8');
-        debugLogger.log(`[Observability] Context successfully dumped to ${dumpPath}`);
-      } catch (e) {
-        debugLogger.error(`Failed to dump context: ${e}`);
-      }
-    }
-    return contents;
-  }
-
-  private calculateIrTokens(episodes: Episode[]): number {
-    let tokens = 0;
-    for (const ep of episodes) {
-      if (ep.trigger) tokens += ep.trigger.metadata.currentTokens;
-      for (const step of ep.steps) {
-        tokens += step.metadata.currentTokens;
-      }
-      if (ep.yield) tokens += ep.yield.metadata.currentTokens;
-    }
-    return tokens;
+    return IrProjector.projectAndDump(currentEpisodes, this.env);
   }
 }

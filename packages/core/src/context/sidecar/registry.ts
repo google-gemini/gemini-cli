@@ -7,6 +7,7 @@
 import type { ContextProcessor } from '../pipeline.js';
 import type { ContextEnvironment } from './environment.js';
 
+
 export interface ContextProcessorDef<
   TOptions extends Record<string, unknown> = any,
 > {

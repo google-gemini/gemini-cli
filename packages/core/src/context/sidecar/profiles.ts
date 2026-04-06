@@ -27,7 +27,8 @@ export const defaultSidecarProfile: SidecarConfig = {
       processors: [
         { processorId: 'ToolMaskingProcessor', options: { stringLengthThresholdTokens: 8000 } },
         { processorId: 'BlobDegradationProcessor', options: {} },
-        { processorId: 'SemanticCompressionProcessor', options: { nodeThresholdTokens: 5000, contextWindowPercentage: 0.2 } }
+        { processorId: 'SemanticCompressionProcessor', options: { nodeThresholdTokens: 5000, contextWindowPercentage: 0.2 } },
+        { processorId: 'EmergencyTruncationProcessor', options: {} }
       ]
     },
     {

@@ -6,6 +6,19 @@
 
 import type { Part } from '@google/genai';
 import { estimateTokenCountSync as baseEstimate } from '../../utils/tokenCalculation.js';
+import type { Episode } from '../ir/types.js';
+
+export function calculateEpisodeListTokens(episodes: Episode[]): number {
+  let tokens = 0;
+  for (const ep of episodes) {
+    if (ep.trigger) tokens += ep.trigger.metadata.currentTokens;
+    for (const step of ep.steps) {
+      tokens += step.metadata.currentTokens;
+    }
+    if (ep.yield) tokens += ep.yield.metadata.currentTokens;
+  }
+  return tokens;
+}
 
 export function estimateContextTokenCountSync(
   parts: Part[],
