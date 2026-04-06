@@ -1579,7 +1579,9 @@ describe('Server Config (config.ts)', () => {
       });
 
       expect(config.getSandboxEnabled()).toBe(false);
-      expect(config.getSandboxAllowedPaths()).toEqual([]);
+      expect(config.getSandboxAllowedPaths()).toEqual([
+        Storage.getGlobalTempDir(),
+      ]);
       expect(config.getSandboxNetworkAccess()).toBe(false);
     });
 
@@ -1597,7 +1599,11 @@ describe('Server Config (config.ts)', () => {
       });
 
       expect(config.getSandboxEnabled()).toBe(true);
-      expect(config.getSandboxAllowedPaths()).toEqual(['/tmp/foo', '/var/bar']);
+      expect(config.getSandboxAllowedPaths()).toEqual([
+        '/tmp/foo',
+        '/var/bar',
+        Storage.getGlobalTempDir(),
+      ]);
       expect(config.getSandboxNetworkAccess()).toBe(true);
       expect(config.getSandbox()?.command).toBe('docker');
       expect(config.getSandbox()?.image).toBe('my-image');
@@ -1614,7 +1620,10 @@ describe('Server Config (config.ts)', () => {
       });
 
       expect(config.getSandboxEnabled()).toBe(true);
-      expect(config.getSandboxAllowedPaths()).toEqual(['/only/this']);
+      expect(config.getSandboxAllowedPaths()).toEqual([
+        '/only/this',
+        Storage.getGlobalTempDir(),
+      ]);
       expect(config.getSandboxNetworkAccess()).toBe(false);
     });
 

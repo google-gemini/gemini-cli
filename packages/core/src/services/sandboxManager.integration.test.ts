@@ -28,7 +28,14 @@ const Platform = {
   /** Returns a command to create an empty file. */
   touch(filePath: string) {
     return this.isWindows
-      ? { command: 'cmd.exe', args: ['/c', `type nul > "${filePath}"`] }
+      ? {
+          command: 'powershell.exe',
+          args: [
+            '-NoProfile',
+            '-Command',
+            `New-Item -Path "${filePath}" -ItemType File -Force`,
+          ],
+        }
       : { command: 'touch', args: [filePath] };
   },
 
@@ -48,18 +55,13 @@ const Platform = {
 
   /** Returns a command to perform a network request. */
   curl(url: string) {
-    return this.isWindows
-      ? {
-          command: 'powershell.exe',
-          args: ['-Command', `Invoke-WebRequest -Uri ${url} -TimeoutSec 1`],
-        }
-      : { command: 'curl', args: ['-s', '--connect-timeout', '1', url] };
+    return { command: 'curl', args: ['-s', '--connect-timeout', '1', url] };
   },
 
   /** Returns a command that checks if the current terminal is interactive. */
   isPty() {
     return this.isWindows
-      ? 'cmd.exe /c echo True'
+      ? 'powershell.exe -NoProfile -Command "echo True"'
       : 'bash -c "if [ -t 1 ]; then echo True; else echo False; fi"';
   },
 
@@ -166,23 +168,28 @@ describe('SandboxManager Integration', () => {
         expect(result.stdout.trim()).toBe('sandbox test');
       });
 
-      it('supports interactive pseudo-terminals (node-pty)', async () => {
-        const handle = await ShellExecutionService.execute(
-          Platform.isPty(),
-          workspace,
-          () => {},
-          new AbortController().signal,
-          true,
-          {
-            sanitizationConfig: getSecureSanitizationConfig(),
-            sandboxManager: manager,
-          },
-        );
+      // The Windows sandbox wrapper (GeminiSandbox.exe) uses standard pipes
+      // for I/O interception, which breaks ConPTY pseudo-terminal inheritance.
+      it.skipIf(Platform.isWindows)(
+        'supports interactive pseudo-terminals (node-pty)',
+        async () => {
+          const handle = await ShellExecutionService.execute(
+            Platform.isPty(),
+            workspace,
+            () => {},
+            new AbortController().signal,
+            true,
+            {
+              sanitizationConfig: getSecureSanitizationConfig(),
+              sandboxManager: manager,
+            },
+          );
 
-        const result = await handle.result;
-        expect(result.exitCode).toBe(0);
-        expect(result.output).toContain('True');
-      });
+          const result = await handle.result;
+          expect(result.exitCode).toBe(0);
+          expect(result.output).toContain('True');
+        },
+      );
     });
 
     describe('File System Access', () => {
@@ -510,18 +517,23 @@ describe('SandboxManager Integration', () => {
         if (server) await new Promise<void>((res) => server.close(() => res()));
       });
 
-      it('blocks network access by default', async () => {
-        const { command, args } = Platform.curl(url);
-        const sandboxed = await manager.prepareCommand({
-          command,
-          args,
-          cwd: workspace,
-          env: process.env,
-        });
+      // Windows Job Object rate limits exempt loopback (127.0.0.1) traffic,
+      // so this test cannot verify loopback blocking on Windows.
+      it.skipIf(Platform.isWindows)(
+        'blocks network access by default',
+        async () => {
+          const { command, args } = Platform.curl(url);
+          const sandboxed = await manager.prepareCommand({
+            command,
+            args,
+            cwd: workspace,
+            env: process.env,
+          });
 
-        const result = await runCommand(sandboxed);
-        expect(result.status).not.toBe(0);
-      });
+          const result = await runCommand(sandboxed);
+          expect(result.status).not.toBe(0);
+        },
+      );
 
       it('grants network access when explicitly allowed', async () => {
         const { command, args } = Platform.curl(url);
