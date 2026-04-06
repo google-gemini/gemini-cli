@@ -6,15 +6,20 @@
 
 import { vi } from 'vitest';
 import type { Config } from '../../config/config.js';
-
 import type { ContextEnvironment } from '../sidecar/environment.js';
+import type { Content } from '@google/genai';
+import { AgentChatHistory } from '../../core/agentChatHistory.js';
+import { ContextManager } from '../contextManager.js';
+
 export function createMockEnvironment(): ContextEnvironment {
   return {
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
     getLlmClient: vi.fn().mockReturnValue({
       generateContent: vi.fn().mockResolvedValue({
         text: 'Mock LLM summary response',
       }),
-    }) as any,
+    } as unknown as BaseLlmClient),
+    getPromptId: vi.fn().mockReturnValue('mock-prompt-id'),
     getSessionId: vi.fn().mockReturnValue('mock-session'),
     getTraceDir: vi.fn().mockReturnValue('/tmp/.gemini/trace'),
     getProjectTempDir: vi.fn().mockReturnValue('/tmp/.gemini/tool-outputs'),
@@ -23,9 +28,6 @@ export function createMockEnvironment(): ContextEnvironment {
     getCharsPerToken: vi.fn().mockReturnValue(1),
   };
 }
-import type { Content } from '@google/genai';
-import { AgentChatHistory } from '../../core/agentChatHistory.js';
-import { ContextManager } from '../contextManager.js';
 
 /**
  * Creates a block of synthetic conversation history designed to consume a specific number of tokens.
@@ -76,6 +78,7 @@ export function createMockContextConfig(
     getSessionId: vi.fn().mockReturnValue('test-session'),
   };
 
+  // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
   return { ...defaultConfig, ...overrides } as unknown as Config;
 }
 
@@ -85,13 +88,15 @@ export function createMockContextConfig(
 import { ContextTracer } from '../tracer.js';
 import { ContextEnvironmentImpl } from '../sidecar/environmentImpl.js';
 import { SidecarLoader } from '../sidecar/SidecarLoader.js';
+import type { BaseLlmClient } from 'src/core/baseLlmClient.js';
 
 export function setupContextComponentTest(config: Config) {
   const chatHistory = new AgentChatHistory();
   const sidecar = SidecarLoader.fromLegacyConfig(config);
   const tracer = new ContextTracer('/tmp', 'test-session');
   const env = new ContextEnvironmentImpl(
-    config.getBaseLlmClient() as any,
+    config.getBaseLlmClient(),
+    'test prompt-id',
     'test-session',
     '/tmp',
     '/tmp/gemini-test',

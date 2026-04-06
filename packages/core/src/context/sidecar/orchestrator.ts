@@ -74,7 +74,7 @@ export class PipelineOrchestrator {
     this.tracer.logEvent('Orchestrator', `Triggering async pipeline: ${pipeline.name}`);
     // Retrieve the most recent pristine state from the bus.
     // The EventBus must hold the current graph state for orchestrated async execution.
-    const currentState = []; 
+    const currentState: Episode[] = []; 
     if (!currentState || currentState.length === 0) return;
 
     // We assume the eventBus or ContextManager keeps accounting state updated.

@@ -6,7 +6,7 @@
 
 import type { ContextProcessor, ContextAccountingState } from '../pipeline.js';
 import type { Episode, ToolExecution } from '../ir/types.js';
-import type { ContextEnvironment, ContextEventBus, ContextTracer } from '../sidecar/environment.js';
+import type { ContextEnvironment, ContextEventBus } from '../sidecar/environment.js';
 import { estimateContextTokenCountSync as estimateTokenCountSync } from '../utils/contextTokenCalculator.js';
 import { v4 as uuidv4 } from 'uuid';
 import { LlmRole } from '../../telemetry/llmRole.js';
@@ -25,8 +25,6 @@ export class StateSnapshotProcessor implements ContextProcessor {
   readonly name = 'StateSnapshotProcessor';
   readonly options: StateSnapshotProcessorOptions;
   private readonly env: ContextEnvironment;
-  private readonly eventBus: ContextEventBus;
-  private tracer?: ContextTracer;
   private isSynthesizing = false;
 
   constructor(
@@ -36,7 +34,6 @@ export class StateSnapshotProcessor implements ContextProcessor {
   ) {
     this.env = env;
     this.options = options;
-    this.eventBus = eventBus;
   }
 
   async process(episodes: Episode[], state: ContextAccountingState): Promise<Episode[]> {
@@ -52,7 +49,7 @@ export class StateSnapshotProcessor implements ContextProcessor {
         const ep = episodes[i];
         selectedEpisodes.push(ep);
         deficitAccumulator += estimateTokenCountSync([
-          { text: ep.trigger?.semanticParts?.[0]?.text ?? '' },
+          { text: ep.trigger?.parts?.[0]?.text ?? '' },
           { text: ep.yield?.text ?? '' },
         ]);
         if (deficitAccumulator >= targetDeficit) break;
@@ -90,7 +87,7 @@ Output ONLY the raw factual snapshot, formatted compactly. Do not include markdo
     let userPromptText = 'TRANSCRIPT TO SNAPSHOT:\n\n';
     for (const ep of episodes) {
       if (ep.trigger) {
-        userPromptText += `USER: ${ep.trigger.semanticParts?.map((p: any) => p.text).join('')}\n`;
+        userPromptText += `USER: ${ep.trigger.parts?.map((p: any) => p.text).join('')}\n`;
       }
       for (const step of ep.steps) {
         if (step.type === 'TOOL_EXECUTION') {
@@ -147,11 +144,6 @@ Output ONLY the raw factual snapshot, formatted compactly. Do not include markdo
         },
       };
     } catch (error) {
-      if (this.tracer) {
-        this.tracer.logEvent('WorkerError', 'Snapshot synthesis failed', {
-          error: error instanceof Error ? error.message : String(error),
-        });
-      }
       console.error('Failed to synthesize snapshot:', error);
       throw error;
     }

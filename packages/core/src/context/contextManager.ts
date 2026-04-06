@@ -20,8 +20,8 @@ import type { ContextEnvironment } from './sidecar/environment.js';
 
 import type { SidecarConfig } from './sidecar/types.js';
 import { ProcessorRegistry } from './sidecar/registry.js';
+import { PipelineOrchestrator } from './sidecar/orchestrator.js';
 import type { ContextProcessor } from './pipeline.js';
-import type { AsyncContextWorker } from './workers/asyncContextWorker.js';
 
 import { ToolMaskingProcessor } from './processors/toolMaskingProcessor.js';
 import { BlobDegradationProcessor } from './processors/blobDegradationProcessor.js';
@@ -40,7 +40,7 @@ export class ContextManager {
   
   // Internal sub-components
   // Synchronous processors are instantiated but effectively used as singletons within this class
-  private workers: AsyncContextWorker[] = [];
+  private orchestrator: PipelineOrchestrator;
   
   
 
@@ -48,16 +48,17 @@ export class ContextManager {
     
     
     this.eventBus = new ContextEventBus();
+    if ('setEventBus' in this.env) {
+       (this.env as any).setEventBus(this.eventBus);
+    }
     
-    
-    
+    this.orchestrator = new PipelineOrchestrator(this.sidecar, this.env, this.eventBus, this.tracer);
 
     // Register built-ins
     ProcessorRegistry.register({ id: 'ToolMaskingProcessor', create: (env, opts) => new ToolMaskingProcessor(env, opts as any) });
     ProcessorRegistry.register({ id: 'BlobDegradationProcessor', create: (env, opts) => new BlobDegradationProcessor(env) });
     ProcessorRegistry.register({ id: 'SemanticCompressionProcessor', create: (env, opts) => new SemanticCompressionProcessor(env, opts as any) });
     ProcessorRegistry.register({ id: 'HistorySquashingProcessor', create: (env, opts) => new HistorySquashingProcessor(env, opts as any) });
-    ProcessorRegistry.register({ id: 'StateSnapshotWorker', create: (env, opts) => new StateSnapshotWorker(env) });
 
     this.eventBus.onVariantReady((event) => {
       
@@ -76,25 +77,13 @@ export class ContextManager {
         );
       }
     });
-
-    // Initialize synchronous fallback processors
-    // Order matters: Fast, lossless masking -> Intelligent degradation -> Brutal truncation fallback
-
-    // Initialize and start background subconscious workers
-    for (const bgDef of this.sidecar.pipelines.eagerBackground) {
-      const worker = ProcessorRegistry.get(bgDef.processorId).create(this.env, bgDef.options) as AsyncContextWorker;
-      worker.start(this.eventBus);
-      this.workers.push(worker);
-    }
   }
 
   /**
    * Safely stops background workers and clears event listeners.
    */
   shutdown() {
-    for (const worker of this.workers) {
-      worker.stop();
-    }
+    this.orchestrator.shutdown();
     if (this.unsubscribeHistory) {
       this.unsubscribeHistory();
     }
@@ -193,34 +182,14 @@ export class ContextManager {
       protectedIds.add(this.pristineEpisodes[0].id); // Structural invariant
     }
 
-    const createAccountingState = (currentTotal: number) => ({
-      currentTokens: currentTotal,
+    return this.orchestrator.executePipelineForking('Immediate Sanitization', this.getWorkingBufferView(), {
+      currentTokens: currentTokens,
       maxTokens: mngConfig.budget.maxTokens,
       retainedTokens: mngConfig.budget.retainedTokens,
-      deficitTokens: Math.max(0, currentTotal - mngConfig.budget.maxTokens),
+      deficitTokens: Math.max(0, currentTokens - mngConfig.budget.maxTokens),
       protectedEpisodeIds: protectedIds,
-      isBudgetSatisfied: currentTotal <= mngConfig.budget.maxTokens, // We use maxTokens here so processors don't prematurely short-circuit if they are trying to prevent a barrier hit
+      isBudgetSatisfied: currentTokens <= mngConfig.budget.maxTokens, 
     });
-
-    // Run Retained Graph
-    let processedRetained = [...retainedWindow];
-    for (const def of mngConfig.pipelines.retainedProcessingGraph) {
-      const processor = ProcessorRegistry.get(def.processorId).create(this.env, def.options) as ContextProcessor;
-      this.tracer.logEvent('ContextManager', `Running ${processor.name} on retained window.`);
-      const state = createAccountingState(this.calculateIrTokens([...normalWindow, ...processedRetained]));
-      processedRetained = await processor.process(processedRetained, state);
-    }
-
-    // Run Normal Graph
-    let processedNormal = [...normalWindow];
-    for (const def of mngConfig.pipelines.normalProcessingGraph) {
-      const processor = ProcessorRegistry.get(def.processorId).create(this.env, def.options) as ContextProcessor;
-      this.tracer.logEvent('ContextManager', `Running ${processor.name} on normal window.`);
-      const state = createAccountingState(this.calculateIrTokens([...processedNormal, ...processedRetained]));
-      processedNormal = await processor.process(processedNormal, state);
-    }
-
-    return [...processedNormal, ...processedRetained];
   }
 
   public getWorkingBufferView(): Episode[] {

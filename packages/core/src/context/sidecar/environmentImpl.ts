@@ -23,7 +23,6 @@ export class ContextEnvironmentImpl implements ContextEnvironment {
     private charsPerToken: number,
   ) {}
 
-  // TODO(joshualitt): Idiomatic getters and setters
   setEventBus(bus: ContextEventBus) {
     this.eventBus = bus;
   }

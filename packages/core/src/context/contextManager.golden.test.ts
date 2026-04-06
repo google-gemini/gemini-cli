@@ -71,6 +71,7 @@ describe('ContextManager Golden Tests', () => {
     const tracer = new ContextTracer('/tmp', 'test-session');
     const env = new ContextEnvironmentImpl(
       {} as any,
+      'test-prompt-id',
       'test',
       '/tmp',
       '/tmp',
