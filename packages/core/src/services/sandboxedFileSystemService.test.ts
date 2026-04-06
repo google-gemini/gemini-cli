@@ -18,6 +18,7 @@ import type {
   SandboxManager,
   SandboxRequest,
   SandboxedCommand,
+  GlobalSandboxOptions,
 } from './sandboxManager.js';
 import { spawn, type ChildProcess } from 'node:child_process';
 import { EventEmitter } from 'node:events';
@@ -51,6 +52,13 @@ class MockSandboxManager implements SandboxManager {
 
   getWorkspace(): string {
     return path.resolve('/workspace');
+  }
+
+  getOptions(): GlobalSandboxOptions | undefined {
+    return {
+      workspace: path.resolve('/workspace'),
+      includeDirectories: [path.resolve('/test/cwd')],
+    };
   }
 }
 

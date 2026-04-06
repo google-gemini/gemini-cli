@@ -5,6 +5,8 @@
  */
 
 import { describe, expect } from 'vitest';
+import fs from 'node:fs';
+import path from 'node:path';
 import { evalTest } from './test-helper.js';
 
 describe('update_topic_behavior', () => {
@@ -108,6 +110,149 @@ describe('update_topic_behavior', () => {
         if (ratio > 0.25) {
           console.warn(
             `[Efficiency Warning] update_topic usage is high: ${(ratio * 100).toFixed(1)}% (Goal: ~20%)`,
+          );
+        }
+      }
+    },
+  });
+
+  evalTest('USUALLY_PASSES', {
+    name: 'update_topic should NOT be used for informational coding tasks (Obvious)',
+    approvalMode: 'default',
+    prompt:
+      'Explain the difference between Map and Object in JavaScript and provide a performance-focused code snippet for each.',
+    files: {
+      '.gemini/settings.json': JSON.stringify({
+        experimental: {
+          topicUpdateNarration: true,
+        },
+      }),
+    },
+    assert: async (rig) => {
+      const toolLogs = rig.readToolLogs();
+      const topicCalls = toolLogs.filter(
+        (l) => l.toolRequest.name === UPDATE_TOPIC_TOOL_NAME,
+      );
+
+      expect(
+        topicCalls.length,
+        `Expected 0 update_topic calls for an informational task, but found ${topicCalls.length}`,
+      ).toBe(0);
+    },
+  });
+
+  evalTest('USUALLY_PASSES', {
+    name: 'update_topic should NOT be used for surgical symbol searches (Grey Area)',
+    approvalMode: 'default',
+    prompt:
+      "Find the file where the 'UPDATE_TOPIC_TOOL_NAME' constant is defined.",
+    files: {
+      'packages/core/src/tools/tool-names.ts':
+        "export const UPDATE_TOPIC_TOOL_NAME = 'update_topic';",
+      '.gemini/settings.json': JSON.stringify({
+        experimental: {
+          topicUpdateNarration: true,
+        },
+      }),
+    },
+    assert: async (rig) => {
+      const toolLogs = rig.readToolLogs();
+      const topicCalls = toolLogs.filter(
+        (l) => l.toolRequest.name === UPDATE_TOPIC_TOOL_NAME,
+      );
+
+      expect(
+        topicCalls.length,
+        `Expected 0 update_topic calls for a surgical symbol search, but found ${topicCalls.length}`,
+      ).toBe(0);
+    },
+  });
+
+  evalTest('USUALLY_PASSES', {
+    name: 'update_topic should be used for medium complexity multi-step tasks',
+    prompt:
+      'Refactor the `users-api` project. Move the routing logic from src/app.ts into a new file src/routes.ts, and update app.ts to use the new routes file.',
+    files: {
+      'package.json': JSON.stringify(
+        {
+          name: 'users-api',
+          version: '1.0.0',
+        },
+        null,
+        2,
+      ),
+      'src/app.ts': `
+import express from 'express';
+const app = express();
+
+app.get('/users', (req, res) => {
+  res.json([{id: 1, name: 'Alice'}]);
+});
+
+app.post('/users', (req, res) => {
+  res.status(201).send();
+});
+
+export default app;
+      `,
+      '.gemini/settings.json': JSON.stringify({
+        experimental: {
+          topicUpdateNarration: true,
+        },
+      }),
+    },
+    assert: async (rig) => {
+      const toolLogs = rig.readToolLogs();
+      const topicCalls = toolLogs.filter(
+        (l) => l.toolRequest.name === UPDATE_TOPIC_TOOL_NAME,
+      );
+
+      // This is a multi-step task (read, create new file, edit old file).
+      // It should clear the bar and use update_topic at least at the start and end.
+      expect(topicCalls.length).toBeGreaterThanOrEqual(2);
+
+      // Verify it actually did the refactoring to ensure it didn't just fail immediately
+      expect(fs.existsSync(path.join(rig.testDir, 'src/routes.ts'))).toBe(true);
+    },
+  });
+
+  /**
+   * Regression test for a bug where update_topic was called multiple times in a
+   * row. We have seen cases of this occurring in earlier versions of the update_topic
+   * system instruction, prior to https://github.com/google-gemini/gemini-cli/pull/24640.
+   * This test demonstrated that there are cases where it can still occur and validates
+   * the prompt change that improves the behavior.
+   */
+  evalTest('USUALLY_PASSES', {
+    name: 'update_topic should not be called twice in a row',
+    prompt: `
+      We need to build a C compiler.
+
+      Before you write any code, you must formally declare your strategy.
+      First, declare that you will build a Lexer.
+      Then, immediately realize that is wrong and declare that you will actually build a Parser instead.
+
+      Finally, create 'parser.c'.
+    `,
+    files: {
+      'package.json': JSON.stringify({ name: 'test-project' }),
+      '.gemini/settings.json': JSON.stringify({
+        experimental: {
+          topicUpdateNarration: true,
+        },
+      }),
+    },
+    assert: async (rig) => {
+      const toolLogs = rig.readToolLogs();
+
+      // Check for back-to-back update_topic calls
+      for (let i = 1; i < toolLogs.length; i++) {
+        if (
+          toolLogs[i - 1].toolRequest.name === UPDATE_TOPIC_TOOL_NAME &&
+          toolLogs[i].toolRequest.name === UPDATE_TOPIC_TOOL_NAME
+        ) {
+          throw new Error(
+            `Detected back-to-back ${UPDATE_TOPIC_TOOL_NAME} calls at index ${i - 1} and ${i}`,
           );
         }
       }
