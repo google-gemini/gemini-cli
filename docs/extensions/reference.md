@@ -175,7 +175,7 @@ The manifest file defines the extension's behavior and configuration.
     settings. If not specified by either the extension or the user, the default
     is `tmp/<project>/<session-id>/plans/` in Gemini CLI's
     [temporary directory](../reference/configuration.md#temporary-directory)
-    (for example, `~/.cache/gemini-cli/tmp/<project>/<session-id>/plans/`).
+    (for example, `~/.cache/gemini-cli/<project>/<session-id>/plans/`).
 
 When Gemini CLI starts, it loads all the extensions and merges their
 configurations. If there are any conflicts, the workspace configuration takes

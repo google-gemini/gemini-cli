@@ -28,8 +28,9 @@ Settings are merged from four files. The precedence order for single-value
 settings (like `theme`) is:
 
 1. System Defaults (`system-defaults.json`)
-2. User Settings (`settings.json` in your user config directory, for example
-   `~/.config/gemini-cli/settings.json`)
+2. User Settings (`settings.json` in your
+   [user config directory](../reference/configuration.md#configuration-directory),
+   for example `~/.config/gemini-cli/settings.json`)
 3. Workspace Settings (`<project>/.gemini/settings.json`)
 4. System Overrides (`settings.json`)
 

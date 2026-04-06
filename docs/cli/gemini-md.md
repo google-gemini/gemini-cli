@@ -16,9 +16,11 @@ sends them to the model with every prompt. The CLI loads files in the following
 order:
 
 1.  **Global context file:**
-    - **Location:** `GEMINI.md` in your user config directory (for example,
-      `~/.config/gemini-cli/GEMINI.md`).
-    - **Scope:** Provides default instructions for all your projects.
+
+- **Location:** `GEMINI.md` in your
+  [user config directory](../reference/configuration.md#configuration-directory)
+  (for example, `~/.config/gemini-cli/GEMINI.md`).
+  - **Scope:** Provides default instructions for all your projects.
 
 2.  **Environment and workspace context files:**
     - **Location:** The CLI searches for `GEMINI.md` files in your configured

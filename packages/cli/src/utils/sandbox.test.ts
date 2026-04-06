@@ -84,7 +84,7 @@ vi.mock('@google/gemini-cli-core', async (importOriginal) => {
     Storage: {
       getGlobalGeminiDir: vi.fn(() => '/home/user/.config/gemini-cli'),
       getGlobalCacheDir: vi.fn(() => '/home/user/.cache/gemini-cli'),
-      getGlobalTempDir: vi.fn(() => '/home/user/.cache/gemini-cli/tmp'),
+      getGlobalTempDir: vi.fn(() => '/home/user/.cache/gemini-cli'),
     },
     debugLogger: {
       log: vi.fn(),
@@ -404,7 +404,7 @@ describe('sandbox', () => {
           '--volume',
           '/home/user/.cache/gemini-cli:/home/user/.cache/gemini-cli',
           '--volume',
-          '/home/user/.cache/gemini-cli/tmp:/home/user/.cache/gemini-cli/tmp',
+          '/home/user/.cache/gemini-cli:/home/user/.cache/gemini-cli',
         ]),
         expect.any(Object),
       );

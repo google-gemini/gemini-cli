@@ -332,7 +332,8 @@ Use the `/mcp auth` command to manage OAuth authentication:
 
 OAuth tokens are automatically:
 
-- **Stored securely** in `mcp-oauth-tokens.json` in your user config directory
+- **Stored securely** in `mcp-oauth-tokens.json` in your
+  [user config directory](../reference/configuration.md#configuration-directory)
   (for example, `~/.config/gemini-cli/mcp-oauth-tokens.json` on a typical
   Unix-like setup)
 - **Refreshed** when expired (if refresh tokens are available)

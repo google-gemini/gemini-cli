@@ -61,7 +61,7 @@ You can view traces in the Jaeger UI for local development.
     link to the Jaeger UI (usually `http://localhost:16686`).
     - **Collector logs:** `tmp/<projectHash>/otel/collector.log` in your
       [temporary directory](./reference/configuration.md#temporary-directory)
-      (for example, `~/.cache/gemini-cli/tmp/<projectHash>/otel/collector.log`)
+      (for example, `~/.cache/gemini-cli/<projectHash>/otel/collector.log`)
 
 2.  **Run Gemini CLI:**
 
@@ -112,8 +112,7 @@ Trace for custom processing or routing.
     Cloud Console.
     - **Collector logs:** `tmp/<projectHash>/otel/collector-gcp.log` in your
       [temporary directory](./reference/configuration.md#temporary-directory)
-      (for example,
-      `~/.cache/gemini-cli/tmp/<projectHash>/otel/collector-gcp.log`)
+      (for example, `~/.cache/gemini-cli/<projectHash>/otel/collector-gcp.log`)
 
 3.  **Run Gemini CLI:**
 

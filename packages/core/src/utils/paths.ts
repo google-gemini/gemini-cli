@@ -152,26 +152,26 @@ export function getUserConfigDir(): string {
 export function getUserCacheDir(): string {
   const explicitCacheDir = process.env[GEMINI_CACHE_DIR_ENV];
   if (explicitCacheDir) {
-    return explicitCacheDir;
+    return ensureDirectoryExists(explicitCacheDir);
   }
 
   const homeDir = realHomedir();
   if (!homeDir) {
-    return path.join(os.tmpdir(), USER_CONFIG_DIR_NAME);
+    return ensureDirectoryExists(path.join(os.tmpdir(), USER_CONFIG_DIR_NAME));
   }
 
   const xdgCacheHome =
     getAbsoluteEnvPath('XDG_CACHE_HOME') ?? path.join(homeDir, '.cache');
-  return path.join(xdgCacheHome, USER_CONFIG_DIR_NAME);
+  return ensureDirectoryExists(path.join(xdgCacheHome, USER_CONFIG_DIR_NAME));
 }
 
 export function getUserTmpDir(): string {
   const explicitTmpDir = process.env[GEMINI_TMP_DIR_ENV];
   if (explicitTmpDir) {
-    return explicitTmpDir;
+    return ensureDirectoryExists(explicitTmpDir);
   }
 
-  return path.join(getUserCacheDir(), 'tmp');
+  return getUserCacheDir();
 }
 
 /**

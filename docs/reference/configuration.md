@@ -89,11 +89,12 @@ memories, and history in a configuration directory.
 
 Gemini CLI stores cache-like artefacts in a cache directory.
 
-- **Exact override:** `$GEMINI_CACHE_DIR`. Gemini CLI uses this exact directory.
+- **Exact override:** `$GEMINI_CACHE_DIR`. Gemini CLI uses this exact directory
+  and creates it if it does not exist.
 - **Deprecated root override:** `$GEMINI_CLI_HOME`. Gemini CLI uses
   `$GEMINI_CLI_HOME/.gemini/cache`.
 - **Default:** `$XDG_CACHE_HOME/gemini-cli`, usually `~/.cache/gemini-cli` on
-  Unix-like systems.
+  Unix-like systems. Created if it does not exist.
 
 ### Temporary directory
 
@@ -101,11 +102,13 @@ Gemini CLI stores project-scoped temporary artefacts here, including plans,
 checkpoints, chats, shell history, telemetry collector files, and background
 process logs.
 
-- **Exact override:** `$GEMINI_TMP_DIR`. Gemini CLI uses this exact directory.
+- **Exact override:** `$GEMINI_TMP_DIR`. Gemini CLI uses this exact directory
+  and creates it if it does not exist.
 - **Deprecated root override:** `$GEMINI_CLI_HOME`. Gemini CLI uses
   `$GEMINI_CLI_HOME/.gemini/tmp`.
-- **Default:** The `tmp/` directory under the cache directory, usually
-  `~/.cache/gemini-cli/tmp` on Unix-like systems.
+- **Default:** The cache directory itself (`~/.cache/gemini-cli` on Unix-like
+  systems). When `$GEMINI_TMP_DIR` is unset, temporary and cache artefacts share
+  the same parent directory. Set `$GEMINI_TMP_DIR` to separate them.
 
 If `$GEMINI_CLI_HOME` is set together with any exact `*_DIR` override, Gemini
 CLI exits at startup with an error.
@@ -2099,7 +2102,7 @@ different projects, this history is stored in a project-specific directory
 within Gemini CLI's [temporary directory](#temporary-directory).
 
 - **Location:** `tmp/<project_hash>/shell_history` in your temporary directory
-  (for example, `~/.cache/gemini-cli/tmp/<project_hash>/shell_history`)
+  (for example, `~/.cache/gemini-cli/<project_hash>/shell_history`)
   - `<project_hash>` is a unique identifier generated from your project's root
     path.
   - The history is stored in a file named `shell_history`.
@@ -2152,10 +2155,12 @@ the `advanced.excludedEnvVars` setting in your `settings.json` file.
     PowerShell: `$env:GEMINI_CONFIG_DIR="C:\path\to\gemini-config"`)
 - **`$GEMINI_CACHE_DIR`**:
   - Specifies the exact cache directory for Gemini CLI.
+  - Gemini CLI creates this directory if it does not exist.
   - Example: `export GEMINI_CACHE_DIR="/path/to/gemini-cache"` (Windows
     PowerShell: `$env:GEMINI_CACHE_DIR="C:\path\to\gemini-cache"`)
 - **`$GEMINI_TMP_DIR`**:
   - Specifies the exact temporary directory for Gemini CLI.
+  - Gemini CLI creates this directory if it does not exist.
   - Example: `export GEMINI_TMP_DIR="/path/to/gemini-tmp"` (Windows PowerShell:
     `$env:GEMINI_TMP_DIR="C:\path\to\gemini-tmp"`)
 - **`$GEMINI_CLI_HOME`** (deprecated):

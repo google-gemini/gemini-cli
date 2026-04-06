@@ -354,11 +354,12 @@ persist them with the following methods:
 > shell can read them.
 
 2.  **Use a `.env` file:** Create a `.gemini/.env` file in your project
-    directory or a `.env` file in your user config directory. Gemini CLI
-    automatically loads variables from the first `.env` file it finds. It
-    searches upward from the current directory, checking each directory's
-    `.gemini/.env` first and then its `.env`. If no file is found before
-    reaching the filesystem root, Gemini CLI falls back to `.env` in your
+    directory or a `.env` file in your
+    [user config directory](../reference/configuration.md#configuration-directory).
+    Gemini CLI automatically loads variables from the first `.env` file it
+    finds. It searches upward from the current directory, checking each
+    directory's `.gemini/.env` first and then its `.env`. If no file is found
+    before reaching the filesystem root, Gemini CLI falls back to `.env` in your
     [configuration directory](../reference/configuration.md#configuration-directory),
     usually `~/.config/gemini-cli/.env` on Unix-like systems. If you still have
     legacy values in `~/.gemini/.env`, move or merge them into that file.

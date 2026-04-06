@@ -86,10 +86,10 @@ Slash commands provide meta-level control over the CLI itself.
       checkpoints are:
       - Linux/macOS: `tmp/<project_hash>/` in your
         [temporary directory](./configuration.md#temporary-directory) (for
-        example, `~/.cache/gemini-cli/tmp/<project_hash>/`)
+        example, `~/.cache/gemini-cli/<project_hash>/`)
       - Windows: `tmp\<project_hash>\` in your
         [temporary directory](./configuration.md#temporary-directory) (for
-        example, `%USERPROFILE%\.cache\gemini-cli\tmp\<project_hash>\`)
+        example, `%USERPROFILE%\.cache\gemini-cli\<project_hash>\`)
       - **Behavior:** Chats are saved into a project-specific directory,
         determined by where you run the CLI. Consequently, saved chats are only
         accessible when working within that same project.
@@ -118,8 +118,9 @@ Slash commands provide meta-level control over the CLI itself.
 - **Sub-commands:**
   - **`reload`**:
     - **Description:** Reload custom command definitions from all sources
-      (user-level `commands/` in your user config directory, for example
-      `~/.config/gemini-cli/commands/`; project-level
+      (user-level `commands/` in your
+      [user config directory](./configuration.md#configuration-directory), for
+      example `~/.config/gemini-cli/commands/`; project-level
       `<project>/.gemini/commands/`; MCP prompts; and extensions). Use this to
       pick up new or modified `.toml` files without restarting the CLI.
     - **Usage:** `/commands reload`

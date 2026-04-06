@@ -143,8 +143,9 @@ available combinations.
 ## Customizing Keybindings
 
 You can add alternative keybindings or remove default keybindings by creating a
-`keybindings.json` file in your user config directory (for example,
-`~/.config/gemini-cli/keybindings.json`).
+`keybindings.json` file in your
+[user config directory](./configuration.md#configuration-directory) (for
+example, `~/.config/gemini-cli/keybindings.json`).
 
 ### Configuration Format
 
