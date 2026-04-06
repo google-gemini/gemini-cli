@@ -3182,6 +3182,39 @@ describe('AppContainer State Management', () => {
       );
       unmount();
     });
+
+    it('clears activeExtensionContext when /plan is explicitly executed', async () => {
+      const { checkPermissions } = await import(
+        './hooks/atCommandProcessor.js'
+      );
+      vi.mocked(checkPermissions).mockResolvedValue([]);
+
+      mockedUseSlashCommandProcessor.mockReturnValue({
+        handleSlashCommand: vi.fn(),
+        slashCommands: [{ name: 'plan', description: 'test', action: vi.fn() }],
+        pendingHistoryItems: [],
+        commandContext: {},
+        shellConfirmationRequest: null,
+        confirmationRequest: null,
+      });
+
+      const spySetActiveExtensionContext = vi.spyOn(
+        mockConfig,
+        'setActiveExtensionContext',
+      );
+
+      const { unmount } = await act(async () => renderAppContainer());
+
+      expect(capturedUIActions).toBeTruthy();
+
+      await act(async () =>
+        capturedUIActions.handleFinalSubmit('/plan my task'),
+      );
+
+      expect(spySetActiveExtensionContext).toHaveBeenCalledWith(undefined);
+
+      unmount();
+    });
   });
 
   describe('Overflow Hint Handling', () => {

@@ -23,6 +23,8 @@ export const createMockConfig = (overrides: Partial<Config> = {}): Config =>
     isInteractive: vi.fn(() => false),
     isInitialized: vi.fn(() => true),
     setTerminalBackground: vi.fn(),
+    setActiveExtensionContext: vi.fn(),
+    hasExtensionPlanDir: vi.fn(() => true),
     storage: {
       getProjectTempDir: vi.fn().mockReturnValue('/tmp/gemini-test'),
       initialize: vi.fn().mockResolvedValue(undefined),
