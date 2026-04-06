@@ -716,6 +716,7 @@ export interface ConfigParameters {
   plan?: boolean;
   tracker?: boolean;
   planSettings?: PlanSettings;
+  extensionPlanDirs?: Record<string, string>;
   worktreeSettings?: WorktreeSettings;
   modelSteering?: boolean;
   onModelChange?: (model: string) => void;
@@ -779,6 +780,8 @@ export class Config implements McpContext, AgentLoopContext {
   private readonly extensionsEnabled: boolean;
   private mcpServers: Record<string, MCPServerConfig> | undefined;
   private readonly mcpEnablementCallbacks?: McpEnablementCallbacks;
+  private activeExtensionContext?: string;
+  private readonly extensionPlanDirs: Record<string, string>;
   private userMemory: string | HierarchicalMemory;
   private geminiMdFileCount: number;
   private geminiMdFilePaths: string[];
@@ -1030,6 +1033,7 @@ export class Config implements McpContext, AgentLoopContext {
     this.mcpServerCommand = params.mcpServerCommand;
     this.mcpServers = params.mcpServers;
     this.mcpEnablementCallbacks = params.mcpEnablementCallbacks;
+    this.extensionPlanDirs = params.extensionPlanDirs ?? {};
     this.mcpEnabled = params.mcpEnabled ?? true;
     this.extensionsEnabled = params.extensionsEnabled ?? true;
     this.allowedMcpServers = params.allowedMcpServers ?? [];
@@ -1389,20 +1393,6 @@ export class Config implements McpContext, AgentLoopContext {
     // Add pending directories to workspace context
     for (const dir of this.pendingIncludeDirectories) {
       this.workspaceContext.addDirectory(dir);
-    }
-
-    // Add plans directory to workspace context for plan file storage
-    if (this.planEnabled) {
-      const plansDir = this.storage.getPlansDir();
-      try {
-        await fs.promises.access(plansDir);
-        this.workspaceContext.addDirectory(plansDir);
-      } catch {
-        // Directory does not exist yet, so we don't add it to the workspace context.
-        // It will be created when the first plan is written. Since custom plan
-        // directories must be within the project root, they are automatically
-        // covered by the project-wide file discovery once created.
-      }
     }
 
     // Initialize centralized FileDiscoveryService
@@ -2213,6 +2203,51 @@ export class Config implements McpContext, AgentLoopContext {
 
   getMcpEnabled(): boolean {
     return this.mcpEnabled;
+  }
+
+  getActiveExtensionContext(): string | undefined {
+    return this.activeExtensionContext;
+  }
+
+  setActiveExtensionContext(context: string | undefined): void {
+    this.activeExtensionContext = context;
+  }
+
+  hasExtensionPlanDir(name: string): boolean {
+    return !!this.extensionPlanDirs[name];
+  }
+
+  getActiveExtensionPlanDir(): string | undefined {
+    if (this.activeExtensionContext) {
+      return this.extensionPlanDirs[this.activeExtensionContext];
+    }
+    return undefined;
+  }
+
+  getPlansDir(): string {
+    const plansDir = this.storage.getPlansDir(this.getActiveExtensionPlanDir());
+    try {
+      if (!fs.existsSync(plansDir)) {
+        fs.mkdirSync(plansDir, { recursive: true });
+      }
+
+      let realPlansDir = plansDir;
+      try {
+        const resolved = resolveToRealPath(plansDir);
+        if (resolved) {
+          realPlansDir = resolved;
+        }
+      } catch {
+        // Ignore failures in mock environments
+      }
+      this.workspaceContext.addDirectory(realPlansDir);
+    } catch (e: unknown) {
+      const errorMessage = e instanceof Error ? e.message : String(e);
+      throw new Error(
+        `Failed to initialize active plan directory at '${plansDir}': ${errorMessage}`,
+      );
+    }
+    return plansDir;
   }
 
   getMcpEnablementCallbacks(): McpEnablementCallbacks | undefined {
