@@ -8,25 +8,59 @@ import * as fs from 'node:fs';
 import type { Config } from '../../config/config.js';
 import type { SidecarConfig } from './types.js';
 import { defaultSidecarProfile } from './profiles.js';
-import { debugLogger } from 'src/utils/debugLogger.js';
-
+import { SchemaValidator } from '../../utils/schemaValidator.js';
+import { sidecarConfigSchema } from './schema.js';
 export class SidecarLoader {
   /**
+   * Loads and validates a sidecar config from a specific file path.
+   * Throws an error if the file cannot be read, parsed, or fails schema validation.
+   */
+  static loadFromFile(sidecarPath: string): SidecarConfig {
+    const fileContent = fs.readFileSync(sidecarPath, 'utf8');
+
+    if (!fileContent.trim()) {
+      throw new Error(`Sidecar configuration file at ${sidecarPath} is empty.`);
+    }
+
+    let parsed: unknown;
+    try {
+      parsed = JSON.parse(fileContent);
+    } catch (error) {
+      throw new Error(
+        `Failed to parse Sidecar configuration file at ${sidecarPath}: ${
+          error instanceof Error ? error.message : String(error)
+        }`,
+      );
+    }
+
+    const validationError = SchemaValidator.validate(sidecarConfigSchema, parsed);
+    if (validationError) {
+      throw new Error(
+        `Invalid sidecar configuration in ${sidecarPath}. Validation error: ${validationError}`,
+      );
+    }
+
+    // Schema has been validated.
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
+    return parsed as SidecarConfig;
+  }
+
+  /**
    * Generates a Sidecar JSON graph from the experimental config file path or defaults.
+   * If a config file is present but invalid, this will THROW to prevent silent misconfiguration.
    */
   static fromConfig(config: Config): SidecarConfig {
-    const sidecarPath = config.getExperimentalContextSidecarConfig()
+    const sidecarPath = config.getExperimentalContextSidecarConfig();
+
     if (sidecarPath && fs.existsSync(sidecarPath)) {
-      try {
-        const fileContent = fs.readFileSync(sidecarPath, 'utf8');
-        return JSON.parse(fileContent) as SidecarConfig;
-      } catch (error) {
-        debugLogger.error(
-          `Failed to parse Sidecar configuration file at ${sidecarPath}:`,
-          error,
-        );
-        // Fallback to default
+      const stat = fs.statSync(sidecarPath);
+      // If the file exists but is completely empty (0 bytes), it's safe to fallback.
+      if (stat.size === 0) {
+        return defaultSidecarProfile;
       }
+
+      // If the file has content, enforce strict validation and throw on failure.
+      return this.loadFromFile(sidecarPath);
     }
 
     return defaultSidecarProfile;

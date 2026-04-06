@@ -18,21 +18,23 @@ import { ContextTracer } from './tracer.js';
 import type { ContextEnvironment } from './sidecar/environment.js';
 
 import type { SidecarConfig } from './sidecar/types.js';
-import { ProcessorRegistry } from './sidecar/registry.js';
+
 import { PipelineOrchestrator } from './sidecar/orchestrator.js';
 import { HistoryObserver } from './historyObserver.js';
 
 import { generateWorkingBufferView } from './ir/graphUtils.js';
 
 
-import { ToolMaskingProcessor } from './processors/toolMaskingProcessor.js';
-import { BlobDegradationProcessor } from './processors/blobDegradationProcessor.js';
-import { SemanticCompressionProcessor } from './processors/semanticCompressionProcessor.js';
-import { HistorySquashingProcessor } from './processors/historySquashingProcessor.js';
-import { StateSnapshotProcessor } from './processors/stateSnapshotProcessor.js';
-import { EmergencyTruncationProcessor } from './processors/emergencyTruncationProcessor.js';
+
+
+
+
+
+
 
 import { IrProjector } from './ir/projector.js';
+
+import './sidecar/builtins.js';
 
 export class ContextManager {
   
@@ -53,14 +55,6 @@ export class ContextManager {
   constructor(private sidecar: SidecarConfig, private env: ContextEnvironment, private readonly tracer: ContextTracer) {
     this.eventBus = env.eventBus;
     
-    // Register built-ins BEFORE creating Orchestrator
-    ProcessorRegistry.register({ id: 'ToolMaskingProcessor', create: (env, opts) => new ToolMaskingProcessor(env, opts as any) });
-    ProcessorRegistry.register({ id: 'BlobDegradationProcessor', create: (env, opts) => new BlobDegradationProcessor(env) });
-    ProcessorRegistry.register({ id: 'SemanticCompressionProcessor', create: (env, opts) => new SemanticCompressionProcessor(env, opts as any) });
-    ProcessorRegistry.register({ id: 'HistorySquashingProcessor', create: (env, opts) => new HistorySquashingProcessor(env, opts as any) });
-    ProcessorRegistry.register({ id: 'StateSnapshotProcessor', create: (env, opts) => StateSnapshotProcessor.create(env, opts as any) });
-    ProcessorRegistry.register({ id: 'EmergencyTruncationProcessor', create: (env, opts) => EmergencyTruncationProcessor.create(env, opts as any) });
-
     this.orchestrator = new PipelineOrchestrator(this.sidecar, this.env, this.eventBus, this.tracer);
 
     this.eventBus.onPristineHistoryUpdated((event) => {

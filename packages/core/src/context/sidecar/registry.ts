@@ -12,6 +12,7 @@ export interface ContextProcessorDef<
   TOptions extends Record<string, unknown> = any,
 > {
   readonly id: string;
+  readonly schema?: object;
   create(
     env: ContextEnvironment,
     options: TOptions,
@@ -34,6 +35,16 @@ export class ProcessorRegistry {
       throw new Error(`Context Processor [${id}] is not registered.`);
     }
     return def;
+  }
+
+  static getSchemas(): object[] {
+    const schemas: object[] = [];
+    for (const def of this.processors.values()) {
+      if (def.schema) {
+        schemas.push(def.schema);
+      }
+    }
+    return schemas;
   }
 
   static clear() {

@@ -4,16 +4,18 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+import type { StateSnapshotProcessorOptions } from '../processors/stateSnapshotProcessor.js';
+
 /**
  * Definition of a processor or worker to be instantiated in the graph.
  */
-export interface ProcessorConfig {
-  /** The registered ID of the processor (e.g. 'SemanticCompressionProcessor') */
-  processorId: string;
-
-  /** Dynamic, processor-specific hyperparameters */
-  options: Record<string, unknown>;
-}
+export type ProcessorConfig =
+  | { processorId: 'ToolMaskingProcessor'; options: { stringLengthThresholdTokens: number } }
+  | { processorId: 'BlobDegradationProcessor'; options?: Record<string, unknown> }
+  | { processorId: 'SemanticCompressionProcessor'; options: { nodeThresholdTokens: number } }
+  | { processorId: 'HistorySquashingProcessor'; options: { maxTokensPerNode: number } }
+  | { processorId: 'StateSnapshotProcessor'; options: StateSnapshotProcessorOptions }
+  | { processorId: 'EmergencyTruncationProcessor'; options?: Record<string, unknown> };
 
 export type PipelineTrigger =
   | 'on_turn'
