@@ -112,10 +112,21 @@ describe('GlobTool', () => {
       const params: GlobToolParams = { pattern: '*.txt' };
       const invocation = globTool.build(params);
       const result = await invocation.execute(abortSignal);
-      expect(result.llmContent).toContain('Found 2 file(s)');
       expect(result.llmContent).toContain(path.join(tempRootDir, 'fileA.txt'));
-      expect(result.llmContent).toContain(path.join(tempRootDir, 'FileB.TXT'));
-      expect(result.returnDisplay).toBe('Found 2 matching file(s)');
+      if (process.platform === 'linux') {
+        // On Linux, nocase is disabled for performance so *.txt won't match FileB.TXT
+        expect(result.llmContent).toContain('Found 1 file(s)');
+        expect(result.llmContent).not.toContain(
+          path.join(tempRootDir, 'FileB.TXT'),
+        );
+        expect(result.returnDisplay).toBe('Found 1 matching file(s)');
+      } else {
+        expect(result.llmContent).toContain('Found 2 file(s)');
+        expect(result.llmContent).toContain(
+          path.join(tempRootDir, 'FileB.TXT'),
+        );
+        expect(result.returnDisplay).toBe('Found 2 matching file(s)');
+      }
     }, 30000);
 
     it('should find files case-sensitively when case_sensitive is true', async () => {
@@ -135,8 +146,13 @@ describe('GlobTool', () => {
 
       const result = await invocation.execute(abortSignal);
 
-      expect(result.llmContent).toContain('fileA.txt');
       expect(result.llmContent).toContain('FileB.TXT');
+      if (process.platform === 'linux') {
+        // On Linux, nocase is disabled so *.TXT won't match fileA.txt
+        expect(result.llmContent).not.toContain('fileA.txt');
+      } else {
+        expect(result.llmContent).toContain('fileA.txt');
+      }
     }, 30000);
 
     it('should find files case-insensitively when case_sensitive is false (pattern: *.TXT)', async () => {
@@ -146,35 +162,52 @@ describe('GlobTool', () => {
       };
       const invocation = globTool.build(params);
       const result = await invocation.execute(abortSignal);
+      // Explicit case_sensitive: false should enable nocase on all platforms
       expect(result.llmContent).toContain('Found 2 file(s)');
-      expect(result.llmContent).toContain(path.join(tempRootDir, 'fileA.txt'));
       expect(result.llmContent).toContain(path.join(tempRootDir, 'FileB.TXT'));
+      expect(result.llmContent).toContain(path.join(tempRootDir, 'fileA.txt'));
     }, 30000);
 
     it('should find files using a pattern that includes a subdirectory', async () => {
       const params: GlobToolParams = { pattern: 'sub/*.md' };
       const invocation = globTool.build(params);
       const result = await invocation.execute(abortSignal);
-      expect(result.llmContent).toContain('Found 2 file(s)');
       expect(result.llmContent).toContain(
         path.join(tempRootDir, 'sub', 'fileC.md'),
       );
-      expect(result.llmContent).toContain(
-        path.join(tempRootDir, 'sub', 'FileD.MD'),
-      );
+      if (process.platform === 'linux') {
+        // On Linux, nocase is disabled so sub/*.md won't match FileD.MD
+        expect(result.llmContent).toContain('Found 1 file(s)');
+        expect(result.llmContent).not.toContain(
+          path.join(tempRootDir, 'sub', 'FileD.MD'),
+        );
+      } else {
+        expect(result.llmContent).toContain('Found 2 file(s)');
+        expect(result.llmContent).toContain(
+          path.join(tempRootDir, 'sub', 'FileD.MD'),
+        );
+      }
     }, 30000);
 
     it('should find files in a specified relative path (relative to rootDir)', async () => {
       const params: GlobToolParams = { pattern: '*.md', dir_path: 'sub' };
       const invocation = globTool.build(params);
       const result = await invocation.execute(abortSignal);
-      expect(result.llmContent).toContain('Found 2 file(s)');
       expect(result.llmContent).toContain(
         path.join(tempRootDir, 'sub', 'fileC.md'),
       );
-      expect(result.llmContent).toContain(
-        path.join(tempRootDir, 'sub', 'FileD.MD'),
-      );
+      if (process.platform === 'linux') {
+        // On Linux, nocase is disabled so *.md won't match FileD.MD
+        expect(result.llmContent).toContain('Found 1 file(s)');
+        expect(result.llmContent).not.toContain(
+          path.join(tempRootDir, 'sub', 'FileD.MD'),
+        );
+      } else {
+        expect(result.llmContent).toContain('Found 2 file(s)');
+        expect(result.llmContent).toContain(
+          path.join(tempRootDir, 'sub', 'FileD.MD'),
+        );
+      }
     }, 30000);
 
     it('should find files using a deep globstar pattern (e.g., **/*.log)', async () => {
@@ -246,6 +279,35 @@ describe('GlobTool', () => {
       const invocation = globTool.build(params);
       const result = await invocation.execute(abortSignal);
       expect(result.error?.type).toBe(ToolErrorType.GLOB_EXECUTION_ERROR);
+    }, 30000);
+
+    it('should gracefully handle files deleted between glob and stat', async () => {
+      // Create files that glob will find
+      await fs.writeFile(path.join(tempRootDir, 'keep.dat'), 'keep');
+      await fs.writeFile(path.join(tempRootDir, 'vanish.dat'), 'vanish');
+
+      const params: GlobToolParams = { pattern: '*.dat' };
+      const invocation = globTool.build(params);
+
+      // Spy on fsPromises.stat to simulate a file disappearing after glob
+      const fsPromisesMod = await import('node:fs/promises');
+      const originalStat = fsPromisesMod.default.stat;
+      const statSpy = vi
+        .spyOn(fsPromisesMod.default, 'stat')
+        .mockImplementation(async (filePath, ...args) => {
+          if (String(filePath).includes('vanish.dat')) {
+            throw new Error('ENOENT: no such file or directory');
+          }
+          return originalStat(filePath, ...args);
+        });
+
+      const result = await invocation.execute(abortSignal);
+
+      expect(result.llmContent).toContain('keep.dat');
+      expect(result.llmContent).not.toContain('vanish.dat');
+      expect(result.llmContent).toContain('Found 1 file(s)');
+
+      statSpy.mockRestore();
     }, 30000);
   });
 

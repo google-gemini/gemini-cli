@@ -6,6 +6,7 @@
 
 import type { MessageBus } from '../confirmation-bus/message-bus.js';
 import fs from 'node:fs';
+import fsPromises from 'node:fs/promises';
 import path from 'node:path';
 import { glob, escape } from 'glob';
 import {
@@ -79,7 +80,8 @@ export interface GlobToolParams {
   dir_path?: string;
 
   /**
-   * Whether the search should be case-sensitive (optional, defaults to false)
+   * Whether the search should be case-sensitive (optional, defaults to false
+   * on macOS/Windows, true on Linux for performance)
    */
   case_sensitive?: boolean;
 
@@ -164,8 +166,17 @@ class GlobToolInvocation extends BaseToolInvocation<
       // Get centralized file discovery service
       const fileDiscovery = this.config.getFileService();
 
-      // Collect entries from all search directories
-      const allEntries: GlobPath[] = [];
+      // On Linux, nocase forces readdir at every directory level to simulate
+      // case-insensitive matching on a case-sensitive FS. Default to false
+      // there to avoid expensive readdir storms.
+      const nocase =
+        this.params.case_sensitive === undefined
+          ? process.platform !== 'linux'
+          : !this.params.case_sensitive;
+
+      // Phase 1: Fast discovery without stat (avoids thousands of stat calls
+      // on broad patterns). We stat only after filtering.
+      const allPaths: string[] = [];
       for (const searchDir of searchDirectories) {
         let pattern = this.params.pattern;
         const fullPath = path.join(searchDir, pattern);
@@ -173,25 +184,25 @@ class GlobToolInvocation extends BaseToolInvocation<
           pattern = escape(pattern);
         }
 
-        const entries = (await glob(pattern, {
+        const entries = await glob(pattern, {
           cwd: searchDir,
-          withFileTypes: true,
           nodir: true,
-          stat: true,
-          nocase: !this.params.case_sensitive,
+          nocase,
           dot: true,
           ignore: this.config.getFileExclusions().getGlobExcludes(),
           follow: false,
           signal,
-        })) as GlobPath[];
+          absolute: true,
+        });
 
-        allEntries.push(...entries);
+        allPaths.push(...entries);
       }
 
-      const relativePaths = allEntries.map((p) =>
-        path.relative(this.config.getTargetDir(), p.fullpath()),
+      const relativePaths = allPaths.map((p) =>
+        path.relative(this.config.getTargetDir(), p),
       );
 
+      // Phase 2: Apply gitignore / geminiignore filtering
       const { filteredPaths, ignoredCount } =
         fileDiscovery.filterFilesWithReport(relativePaths, {
           respectGitIgnore:
@@ -204,15 +215,39 @@ class GlobToolInvocation extends BaseToolInvocation<
             DEFAULT_FILE_FILTERING_OPTIONS.respectGeminiIgnore,
         });
 
-      const filteredAbsolutePaths = new Set(
-        filteredPaths.map((p) => path.resolve(this.config.getTargetDir(), p)),
-      );
+      // Phase 3: Stat only the filtered survivors in batches for recency sorting.
+      // Cap concurrency to avoid opening too many file descriptors at once.
+      const CONCURRENT_LIMIT = 20;
+      const statResults: GlobPath[] = [];
+      for (let i = 0; i < filteredPaths.length; i += CONCURRENT_LIMIT) {
+        if (signal.aborted) throw signal.reason;
+        const batch = filteredPaths.slice(i, i + CONCURRENT_LIMIT);
+        const batchResults = await Promise.allSettled(
+          batch.map(async (relativePath) => {
+            const absPath = path.resolve(
+              this.config.getTargetDir(),
+              relativePath,
+            );
+            const stats = await fsPromises.stat(absPath);
+            return {
+              fullpath: () => absPath,
+              mtimeMs: stats.mtimeMs,
+            };
+          }),
+        );
+        for (const result of batchResults) {
+          if (result.status === 'fulfilled') {
+            statResults.push(result.value);
+          }
+          if (result.status === 'rejected') {
+            debugLogger.debug(
+              `Stat failed (file may have been deleted): ${result.reason}`,
+            );
+          }
+        }
+      }
 
-      const filteredEntries = allEntries.filter((entry) =>
-        filteredAbsolutePaths.has(entry.fullpath()),
-      );
-
-      if (!filteredEntries || filteredEntries.length === 0) {
+      if (!statResults || statResults.length === 0) {
         let message = `No files found matching pattern "${this.params.pattern}"`;
         if (searchDirectories.length === 1) {
           message += ` within ${searchDirectories[0]}`;
@@ -234,7 +269,7 @@ class GlobToolInvocation extends BaseToolInvocation<
 
       // Sort the filtered entries using the new helper function
       const sortedEntries = sortFileEntries(
-        filteredEntries,
+        statResults,
         nowTimestamp,
         oneDayInMs,
       );

@@ -1057,7 +1057,6 @@ Logging in with Google... Restarting Gemini CLI to continue.
 
       if (config.isJitContextEnabled()) {
         await config.getMemoryContextManager()?.refresh();
-        config.updateSystemInstructionIfInitialized();
         flattenedMemory = flattenMemory(config.getUserMemory());
         fileCount = config.getGeminiMdFileCount();
       } else {
