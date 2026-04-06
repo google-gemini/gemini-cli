@@ -409,11 +409,13 @@ describe('extension tests', () => {
 toolName = "deny_tool"
 decision = "deny"
 priority = 500
+modes = ["plan", "default", "autoEdit"]
 
 [[rule]]
 toolName = "ask_tool"
 decision = "ask_user"
 priority = 100
+modes = ["plan", "default", "autoEdit"]
 `;
       fs.writeFileSync(
         path.join(policiesDir, 'policies.toml'),
@@ -454,6 +456,7 @@ priority = 100
 toolName = "allow_tool"
 decision = "allow"
 priority = 100
+modes = ["plan", "default", "autoEdit"]
 
 [[rule]]
 toolName = "yolo_tool"

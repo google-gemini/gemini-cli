@@ -91,6 +91,7 @@ describe('Workspace-Level Policies', () => {
 toolName = "test_tool"
 decision = "allow"
 priority = 10
+modes = ["plan", "default", "autoEdit", "yolo"]
 `; // Tier 1 -> 1.010
       }
       if (path.includes('user.toml')) {
@@ -98,6 +99,7 @@ priority = 10
 toolName = "test_tool"
 decision = "deny"
 priority = 10
+modes = ["plan", "default", "autoEdit", "yolo"]
 `; // Tier 4 -> 4.010
       }
       if (path.includes('workspace.toml')) {
@@ -105,6 +107,7 @@ priority = 10
 toolName = "test_tool"
 decision = "allow"
 priority = 10
+modes = ["plan", "default", "autoEdit", "yolo"]
 `; // Tier 3 -> 3.010
       }
       if (path.includes('admin.toml')) {
@@ -112,6 +115,7 @@ priority = 10
 toolName = "test_tool"
 decision = "deny"
 priority = 10
+modes = ["plan", "default", "autoEdit", "yolo"]
 `; // Tier 5 -> 5.010
       }
       return '';
@@ -194,7 +198,8 @@ priority = 10
       async () => `[[rule]]
 toolName="t"
 decision="allow"
-priority=10`,
+priority=10
+modes = ["plan", "default", "autoEdit", "yolo"]`,
     );
 
     vi.doMock('node:fs/promises', () => ({
@@ -259,7 +264,8 @@ priority=10`,
       async () => `[[rule]]
 toolName="p_tool"
 decision="allow"
-priority=500`,
+priority=500
+modes = ["plan", "default", "autoEdit", "yolo"]`,
     );
 
     vi.doMock('node:fs/promises', () => ({

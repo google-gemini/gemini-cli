@@ -38,7 +38,7 @@ interactive = true
 toolName = "replace"
 decision = "allow"
 priority = 15
-modes = ["plan", "default", "autoEdit", "yolo"]
+modes = ["autoEdit", "yolo"]
 
 [rule.safety_checker]
 type = "in-process"
@@ -63,7 +63,7 @@ interactive = true
 toolName = "write_file"
 decision = "ask_user"
 priority = 10
-modes = ["plan", "default", "autoEdit", "yolo"]
+modes = ["plan", "default"]
 interactive = true
 
 [[rule]]
@@ -77,7 +77,7 @@ interactive = true
 toolName = "write_file"
 decision = "allow"
 priority = 15
-modes = ["plan", "default", "autoEdit", "yolo"]
+modes = ["autoEdit", "yolo"]
 
 [rule.safety_checker]
 type = "in-process"
@@ -88,13 +88,13 @@ required_context = ["environment"]
 toolName = "web_fetch"
 decision = "allow"
 priority = 15
-modes = ["plan", "default", "autoEdit", "yolo"]
+modes = ["autoEdit", "yolo"]
 
 [[rule]]
 toolName = "web_fetch"
 decision = "ask_user"
 priority = 10
-modes = ["plan", "default", "autoEdit", "yolo"]
+modes = ["plan", "default"]
 interactive = true
 
 # Headless Denial Rule (Priority 10)
@@ -110,5 +110,5 @@ toolName = [
 ]
 decision = "deny"
 priority = 10
-modes = ["plan", "default", "autoEdit", "yolo"]
+modes = ["plan", "default"]
 interactive = false

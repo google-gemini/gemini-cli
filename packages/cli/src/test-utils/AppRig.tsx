@@ -23,6 +23,7 @@ import {
   ExtensionLoader,
   AuthType,
   ApprovalMode,
+  MODES_BY_PERMISSIVENESS,
   createPolicyEngineConfig,
   PolicyDecision,
   ToolConfirmationOutcome,
@@ -452,6 +453,7 @@ export class AppRig {
       toolName,
       decision,
       priority,
+      modes: MODES_BY_PERMISSIVENESS,
       source: 'AppRig Override',
     });
   }

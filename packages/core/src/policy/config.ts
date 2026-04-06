@@ -584,6 +584,7 @@ function createTomlRule(toolName: string, message: UpdatePolicy): TomlRule {
     decision: 'allow',
     priority: getAlwaysAllowPriorityFraction(),
     toolName,
+    modes: message.modes ?? MODES_BY_PERMISSIVENESS,
   };
 
   if (message.mcpName) {
@@ -598,10 +599,6 @@ function createTomlRule(toolName: string, message: UpdatePolicy): TomlRule {
 
   if (message.allowRedirection !== undefined) {
     rule.allowRedirection = message.allowRedirection;
-  }
-
-  if (message.modes) {
-    rule.modes = message.modes;
   }
 
   return rule;
