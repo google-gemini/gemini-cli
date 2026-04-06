@@ -51,6 +51,8 @@ import {
 import { act } from 'react';
 import { type InitializationResult } from './core/initializer.js';
 import { runNonInteractive } from './nonInteractiveCli.js';
+import * as userStartupWarningsModule from './utils/userStartupWarnings.js';
+
 // Hoisted constants and mocks
 const performance = vi.hoisted(() => ({
   now: vi.fn(),
@@ -645,13 +647,11 @@ describe('gemini.tsx main function kitty protocol', () => {
       .spyOn(debugLogger, 'log')
       .mockImplementation(() => {});
 
-    process.env['GEMINI_API_KEY'] = 'test-key';
+    vi.stubEnv('GEMINI_API_KEY', 'test-key');
     try {
       await main();
     } catch (e) {
       if (!(e instanceof MockProcessExitError)) throw e;
-    } finally {
-      delete process.env['GEMINI_API_KEY'];
     }
 
     if (flag === 'listExtensions') {
@@ -710,13 +710,11 @@ describe('gemini.tsx main function kitty protocol', () => {
       }),
     );
 
-    process.env['GEMINI_API_KEY'] = 'test-key';
+    vi.stubEnv('GEMINI_API_KEY', 'test-key');
     try {
       await main();
     } catch (e) {
       if (!(e instanceof MockProcessExitError)) throw e;
-    } finally {
-      delete process.env['GEMINI_API_KEY'];
     }
 
     expect(start_sandbox).toHaveBeenCalled();
@@ -764,13 +762,11 @@ describe('gemini.tsx main function kitty protocol', () => {
 
     vi.spyOn(themeManager, 'setActiveTheme').mockReturnValue(false);
 
-    process.env['GEMINI_API_KEY'] = 'test-key';
+    vi.stubEnv('GEMINI_API_KEY', 'test-key');
     try {
       await main();
     } catch (e) {
       if (!(e instanceof MockProcessExitError)) throw e;
-    } finally {
-      delete process.env['GEMINI_API_KEY'];
     }
 
     expect(debugLoggerWarnSpy).toHaveBeenCalledWith(
@@ -989,13 +985,11 @@ describe('gemini.tsx main function kitty protocol', () => {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     (process.stdin as any).isTTY = false;
 
-    process.env['GEMINI_API_KEY'] = 'test-key';
+    vi.stubEnv('GEMINI_API_KEY', 'test-key');
     try {
       await main();
     } catch (e) {
       if (!(e instanceof MockProcessExitError)) throw e;
-    } finally {
-      delete process.env['GEMINI_API_KEY'];
     }
 
     expect(readStdinSpy).toHaveBeenCalled();
@@ -1012,6 +1006,71 @@ describe('gemini.tsx main function kitty protocol', () => {
     expect(processExitSpy).toHaveBeenCalledWith(0);
     processExitSpy.mockRestore();
   });
+
+  it.each([
+    {
+      useAlternateBuffer: false,
+      description:
+        'false when useAlternateBuffer is false (even if terminal buffer is true)',
+    },
+    {
+      useAlternateBuffer: true,
+      description: 'true when useAlternateBuffer is true',
+    },
+  ])(
+    'should use getUseAlternateBuffer to evaluate isAlternateBuffer for startup warnings: $description',
+    async ({ useAlternateBuffer }) => {
+      const getUserStartupWarningsSpy = vi
+        .spyOn(userStartupWarningsModule, 'getUserStartupWarnings')
+        .mockResolvedValue([]);
+
+      vi.mocked(parseArguments).mockResolvedValue({
+        enabled: true,
+        allowedPaths: [],
+        networkAccess: false,
+        promptInteractive: false,
+      } as unknown as CliArgs);
+
+      vi.mocked(loadSettings).mockReturnValue(
+        createMockSettings({
+          merged: {
+            advanced: {},
+            security: { auth: {} },
+            ui: {},
+          },
+          workspace: { settings: {} },
+          setValue: vi.fn(),
+          forScope: () => ({ settings: {}, originalSettings: {}, path: '' }),
+        }),
+      );
+
+      const mockConfig = createMockConfig({
+        isInteractive: () => true,
+        getQuestion: () => '',
+        getSandbox: () => undefined,
+        getUseAlternateBuffer: () => useAlternateBuffer,
+        getUseTerminalBuffer: () => true, // Ensure we differentiate from isAlternateBufferEnabled
+        getScreenReader: () => false,
+      });
+
+      vi.mocked(loadCliConfig).mockResolvedValue(mockConfig);
+
+      vi.stubEnv('GEMINI_API_KEY', 'test-key');
+      try {
+        await main();
+      } catch (e) {
+        if (!(e instanceof MockProcessExitError)) throw e;
+      }
+
+      expect(getUserStartupWarningsSpy).toHaveBeenCalledWith(
+        expect.anything(),
+        undefined,
+        expect.objectContaining({ isAlternateBuffer: useAlternateBuffer }),
+      );
+
+      getUserStartupWarningsSpy.mockRestore();
+    },
+  );
 });
 
 describe('gemini.tsx main function exit codes', () => {
@@ -1132,15 +1191,13 @@ describe('gemini.tsx main function exit codes', () => {
       };
     });
 
-    process.env['GEMINI_API_KEY'] = 'test-key';
+    vi.stubEnv('GEMINI_API_KEY', 'test-key');
     try {
       await main();
       expect.fail('Should have thrown MockProcessExitError');
     } catch (e) {
       expect(e).toBeInstanceOf(MockProcessExitError);
       expect((e as MockProcessExitError).code).toBe(42);
-    } finally {
-      delete process.env['GEMINI_API_KEY'];
     }
   });
 
@@ -1165,15 +1222,13 @@ describe('gemini.tsx main function exit codes', () => {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     (process.stdin as any).isTTY = true;
 
-    process.env['GEMINI_API_KEY'] = 'test-key';
+    vi.stubEnv('GEMINI_API_KEY', 'test-key');
     try {
       await main();
       expect.fail('Should have thrown MockProcessExitError');
     } catch (e) {
       expect(e).toBeInstanceOf(MockProcessExitError);
       expect((e as MockProcessExitError).code).toBe(42);
-    } finally {
-      delete process.env['GEMINI_API_KEY'];
     }
   });
 
@@ -1210,13 +1265,12 @@ describe('gemini.tsx main function exit codes', () => {
         throw new MockProcessExitError(code);
       });
 
-    process.env['GEMINI_API_KEY'] = 'test-key';
+    vi.stubEnv('GEMINI_API_KEY', 'test-key');
     try {
       await main();
     } catch (e) {
       if (!(e instanceof MockProcessExitError)) throw e;
     } finally {
-      delete process.env['GEMINI_API_KEY'];
       processExitSpy.mockRestore();
     }
 
