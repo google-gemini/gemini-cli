@@ -4,34 +4,36 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { render } from '../../test-utils/render.js';
 import { CopyModeWarning } from './CopyModeWarning.js';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { useUIState, type UIState } from '../contexts/UIStateContext.js';
+import { renderWithProviders } from '../../test-utils/render.js';
+import { useInputState } from '../contexts/InputContext.js';
 
-vi.mock('../contexts/UIStateContext.js');
+vi.mock('../contexts/InputContext.js');
 
 describe('CopyModeWarning', () => {
-  const mockUseUIState = vi.mocked(useUIState);
-
   beforeEach(() => {
     vi.clearAllMocks();
   });
 
   it('renders nothing when copy mode is disabled', async () => {
-    mockUseUIState.mockReturnValue({
+    vi.mocked(useInputState).mockReturnValue({
       copyModeEnabled: false,
-    } as unknown as UIState);
-    const { lastFrame, unmount } = await render(<CopyModeWarning />);
+    } as unknown as ReturnType<typeof useInputState>);
+    const { lastFrame, unmount } = await renderWithProviders(
+      <CopyModeWarning />,
+    );
     expect(lastFrame({ allowEmpty: true })).toBe('');
     unmount();
   });
 
   it('renders warning when copy mode is enabled', async () => {
-    mockUseUIState.mockReturnValue({
+    vi.mocked(useInputState).mockReturnValue({
       copyModeEnabled: true,
-    } as unknown as UIState);
-    const { lastFrame, unmount } = await render(<CopyModeWarning />);
+    } as unknown as ReturnType<typeof useInputState>);
+    const { lastFrame, unmount } = await renderWithProviders(
+      <CopyModeWarning />,
+    );
     expect(lastFrame()).toContain('In Copy Mode');
     expect(lastFrame()).toContain('Use Page Up/Down to scroll');
     expect(lastFrame()).toContain('Press Ctrl+S or any other key to exit');
