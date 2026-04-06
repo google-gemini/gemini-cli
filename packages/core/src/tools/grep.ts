@@ -348,25 +348,27 @@ class GrepToolInvocation extends BaseToolInvocation<
         }
       }
 
-      return await new Promise((resolve) => {
-        const child = spawn(finalCommand, finalArgs, {
-          stdio: 'ignore',
-          shell: true,
-          env: finalEnv,
+      try {
+        return await new Promise((resolve) => {
+          const child = spawn(finalCommand, finalArgs, {
+            stdio: 'ignore',
+            shell: true,
+            env: finalEnv,
+          });
+          child.on('close', (code) => {
+            resolve(code === 0);
+          });
+          child.on('error', (err) => {
+            debugLogger.debug(
+              `[GrepTool] Failed to start process for '${command}':`,
+              err.message,
+            );
+            resolve(false);
+          });
         });
-        child.on('close', (code) => {
-          cleanup?.();
-          resolve(code === 0);
-        });
-        child.on('error', (err) => {
-          cleanup?.();
-          debugLogger.debug(
-            `[GrepTool] Failed to start process for '${command}':`,
-            err.message,
-          );
-          resolve(false);
-        });
-      });
+      } finally {
+        cleanup?.();
+      }
     } catch {
       return false;
     }
