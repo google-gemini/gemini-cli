@@ -1,0 +1,10 @@
+{
+  "mcpServers": {
+    "gemini-cli": {
+      "command": "node",
+      "args": [
+        "bundle/gemini.js"
+      ]
+    }
+  }
+}
