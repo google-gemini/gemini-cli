@@ -2,7 +2,7 @@
 network = false
 readonly = true
 approvedTools = []
-allowOverrides = false
+allowOverrides = true
 
 [modes.default]
 network = false

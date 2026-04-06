@@ -69,4 +69,41 @@ describe('SandboxPolicyManager', () => {
     const perms = manager.getCommandPermissions('npm');
     expect(perms.fileSystem?.read).toContain('/node_modules');
   });
+
+  describe('getModeConfig', () => {
+    it('should return default config for plan mode', () => {
+      const manager = new SandboxPolicyManager(configPath);
+      const config = manager.getModeConfig('plan');
+      expect(config.readonly).toBe(true);
+      expect(config.network).toBe(false);
+      // Regression test: allowOverrides must be true to support integration tests
+      // that use the sandbox manager manually with specific permissions.
+      expect(config.allowOverrides).toBe(true);
+    });
+
+    it('should return default config for default mode', () => {
+      const manager = new SandboxPolicyManager(configPath);
+      const config = manager.getModeConfig('default');
+      expect(config.readonly).toBe(false);
+      expect(config.network).toBe(false);
+      expect(config.allowOverrides).toBe(true);
+    });
+
+    it('should return default config for autoEdit mode', () => {
+      const manager = new SandboxPolicyManager(configPath);
+      const config = manager.getModeConfig('autoEdit');
+      expect(config.readonly).toBe(false);
+      expect(config.network).toBe(false);
+      expect(config.allowOverrides).toBe(true);
+    });
+
+    it('should return yolo config', () => {
+      const manager = new SandboxPolicyManager(configPath);
+      const config = manager.getModeConfig('yolo');
+      expect(config.readonly).toBe(false);
+      expect(config.network).toBe(true);
+      expect(config.allowOverrides).toBe(true);
+      expect(config.yolo).toBe(true);
+    });
+  });
 });
