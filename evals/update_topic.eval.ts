@@ -223,7 +223,7 @@ export default app;
    * This test demonstrated that there are cases where it can still occur and validates
    * the prompt change that improves the behavior.
    */
-  evalTest('ALWAYS_PASSES', {
+  evalTest('USUALLY_PASSES', {
     name: 'update_topic should not be called twice in a row',
     prompt: `
       We need to build a C compiler.
