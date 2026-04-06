@@ -3345,11 +3345,19 @@ describe('Plans Directory Initialization', () => {
 
   afterEach(() => {
     vi.mocked(fs.promises.mkdir).mockRestore();
-    vi.mocked(fs.promises.access).mockRestore?.();
+    vi.mocked(fs.mkdirSync).mockRestore?.();
+    vi.mocked(fs.existsSync).mockReturnValue(true); // Reset to default mock behavior
   });
 
-  it('should add plans directory to workspace context if it exists', async () => {
-    vi.spyOn(fs.promises, 'access').mockResolvedValue(undefined);
+  it('should not eagerly create plans directory during initialization', async () => {
+    let planDirExists = false;
+    vi.spyOn(fs, 'existsSync').mockImplementation((path) =>
+      String(path).includes('plans') ? planDirExists : true,
+    );
+    vi.spyOn(fs, 'mkdirSync').mockImplementation((path) => {
+      if (String(path).includes('plans')) planDirExists = true;
+      return undefined;
+    });
     const config = new Config({
       ...baseParams,
       plan: true,
@@ -3357,18 +3365,66 @@ describe('Plans Directory Initialization', () => {
 
     await config.initialize();
 
-    const plansDir = config.storage.getPlansDir();
     // Should NOT create the directory eagerly
-    expect(fs.promises.mkdir).not.toHaveBeenCalled();
-    // Should check if it exists
-    expect(fs.promises.access).toHaveBeenCalledWith(plansDir);
+    expect(fs.mkdirSync).not.toHaveBeenCalled();
+
+    // Using storage directly to avoid triggering creation
+    const plansDir = config.storage.getPlansDir();
+    const context = config.getWorkspaceContext();
+    expect(context.getDirectories()).not.toContain(plansDir);
+  });
+
+  it('should create plans directory and add it to workspace context when getPlansDir is called', async () => {
+    let planDirExists = false;
+    vi.spyOn(fs, 'existsSync').mockImplementation((path) =>
+      String(path).includes('plans') ? planDirExists : true,
+    );
+    vi.spyOn(fs, 'mkdirSync').mockImplementation((path) => {
+      if (String(path).includes('plans')) planDirExists = true;
+      return undefined;
+    });
+    const config = new Config({
+      ...baseParams,
+      plan: true,
+    });
+
+    await config.initialize();
+    const plansDir = config.getPlansDir();
+
+    expect(fs.mkdirSync).toHaveBeenCalledWith(plansDir, {
+      recursive: true,
+    });
 
     const context = config.getWorkspaceContext();
     expect(context.getDirectories()).toContain(plansDir);
   });
 
-  it('should NOT add plans directory to workspace context if it does not exist', async () => {
-    vi.spyOn(fs.promises, 'access').mockRejectedValue({ code: 'ENOENT' });
+  it('should add plans directory to workspace context even if it already exists', async () => {
+    vi.spyOn(fs, 'existsSync').mockReturnValue(true);
+    vi.spyOn(fs, 'mkdirSync').mockReturnValue(undefined);
+    const config = new Config({
+      ...baseParams,
+      plan: true,
+    });
+
+    await config.initialize();
+    const plansDir = config.getPlansDir();
+
+    // Should NOT try to create it if it exists
+    expect(fs.mkdirSync).not.toHaveBeenCalled();
+
+    // But MUST still register it
+    const context = config.getWorkspaceContext();
+    expect(context.getDirectories()).toContain(plansDir);
+  });
+
+  it('should throw an error if mkdirSync fails during getPlansDir', async () => {
+    vi.spyOn(fs, 'existsSync').mockImplementation(
+      (path) => !String(path).includes('plans'),
+    );
+    vi.spyOn(fs, 'mkdirSync').mockImplementation(() => {
+      throw { code: 'EACCES', message: 'Permission denied' };
+    });
     const config = new Config({
       ...baseParams,
       plan: true,
@@ -3376,15 +3432,16 @@ describe('Plans Directory Initialization', () => {
 
     await config.initialize();
 
-    const plansDir = config.storage.getPlansDir();
-    expect(fs.promises.mkdir).not.toHaveBeenCalled();
-    expect(fs.promises.access).toHaveBeenCalledWith(plansDir);
-
-    const context = config.getWorkspaceContext();
-    expect(context.getDirectories()).not.toContain(plansDir);
+    expect(() => config.getPlansDir()).toThrow(
+      /Failed to initialize active plan directory/,
+    );
   });
 
   it('should NOT create plans directory or add it to workspace context when plan is disabled', async () => {
+    vi.spyOn(fs, 'existsSync').mockImplementation(
+      (path) => !String(path).includes('plans'),
+    );
+    vi.spyOn(fs, 'mkdirSync').mockReturnValue(undefined);
     const config = new Config({
       ...baseParams,
       plan: false,
@@ -3393,9 +3450,10 @@ describe('Plans Directory Initialization', () => {
     await config.initialize();
 
     const plansDir = config.storage.getPlansDir();
-    expect(fs.promises.mkdir).not.toHaveBeenCalledWith(plansDir, {
-      recursive: true,
-    });
+    expect(fs.mkdirSync).not.toHaveBeenCalled();
+    expect(config.getWorkspaceContext().getDirectories()).not.toContain(
+      plansDir,
+    );
   });
 });
 
