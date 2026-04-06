@@ -284,23 +284,24 @@ export function useAtCompletion(props: UseAtCompletionProps): void {
         const initPromises: Array<Promise<void>> = [];
 
         for (const dir of directories) {
-          if (fileSearchMap.current.has(dir)) continue;
-
-          const searcher = FileSearchFactory.create({
-            projectRoot: dir,
-            ignoreDirs: [],
-            fileDiscoveryService: new FileDiscoveryService(
-              dir,
-              config?.getFileFilteringOptions(),
-            ),
-            cache: true,
-            cacheTtl: 30,
-            enableRecursiveFileSearch:
-              config?.getEnableRecursiveFileSearch() ?? true,
-            enableFuzzySearch:
-              config?.getFileFilteringEnableFuzzySearch() ?? true,
-            maxFiles: config?.getFileFilteringOptions()?.maxFileCount,
-          });
+          let searcher = fileSearchMap.current.get(dir);
+          if (!searcher) {
+            searcher = FileSearchFactory.create({
+              projectRoot: dir,
+              ignoreDirs: [],
+              fileDiscoveryService: new FileDiscoveryService(
+                dir,
+                config?.getFileFilteringOptions(),
+              ),
+              cache: true,
+              cacheTtl: 1,
+              enableRecursiveFileSearch:
+                config?.getEnableRecursiveFileSearch() ?? true,
+              enableFuzzySearch:
+                config?.getFileFilteringEnableFuzzySearch() ?? true,
+              maxFiles: config?.getFileFilteringOptions()?.maxFileCount,
+            });
+          }
 
           initPromises.push(
             searcher.initialize().then(() => {

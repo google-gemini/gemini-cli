@@ -137,21 +137,29 @@ class RecursiveFileSearch implements FileSearch {
   constructor(private readonly options: FileSearchOptions) {}
 
   async initialize(): Promise<void> {
-    this.ignore = loadIgnoreRules(
+    const nextIgnore = loadIgnoreRules(
       this.options.fileDiscoveryService,
       this.options.ignoreDirs,
     );
 
-    this.allFiles = await crawl({
+    const nextFiles = await crawl({
       crawlDirectory: this.options.projectRoot,
       cwd: this.options.projectRoot,
-      ignore: this.ignore,
+      ignore: nextIgnore,
       cache: this.options.cache,
       cacheTtl: this.options.cacheTtl,
       maxDepth: this.options.maxDepth,
       maxFiles: this.options.maxFiles ?? 20000,
     });
 
+    if (nextFiles === this.allFiles && this.ignore) {
+      // optimization: if the file list is referentially equal (from crawl cache)
+      // and we already have ignore rules, skip rebuilding the FZF index.
+      return;
+    }
+
+    this.ignore = nextIgnore;
+    this.allFiles = nextFiles;
     this.buildResultCache();
   }
 

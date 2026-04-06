@@ -7,6 +7,7 @@
 import { describe, it, expect, beforeEach, vi, afterEach } from 'vitest';
 import { act, useState } from 'react';
 import * as path from 'node:path';
+import * as fs from 'node:fs';
 import { renderHook } from '../../test-utils/render.js';
 import { waitFor } from '../../test-utils/async.js';
 import { useAtCompletion } from './useAtCompletion.js';
@@ -184,6 +185,50 @@ describe('useAtCompletion', () => {
         expect(result.current.suggestions.map((s) => s.value)).toEqual([
           'cRaZycAsE.txt',
         ]);
+      });
+    });
+
+    it('should pick up newly created files when re-triggered (@ menu re-opened)', async () => {
+      const structure: FileSystemStructure = { 'initial.txt': '' };
+      testRootDir = await createTmpDir(structure);
+
+      const { result, rerender } = await renderHook(
+        ({ enabled }) =>
+          useTestHarnessForAtCompletion(enabled, '', mockConfig, testRootDir),
+        { initialProps: { enabled: true } },
+      );
+
+      // Wait for initial suggestions
+      await waitFor(() => {
+        expect(result.current.suggestions.map((s) => s.value)).toContain(
+          'initial.txt',
+        );
+      });
+
+      // Add a new file to the disk
+      const newFile = path.join(testRootDir, 'newfile.txt');
+      await fs.promises.writeFile(newFile, '');
+
+      // Advance time to expire the 1s cache
+      vi.useFakeTimers();
+      act(() => {
+        vi.advanceTimersByTime(1100);
+      });
+      vi.useRealTimers();
+
+      // Toggle enabled to re-trigger initialize (close and open @ menu)
+      act(() => {
+        rerender({ enabled: false });
+      });
+      act(() => {
+        rerender({ enabled: true });
+      });
+
+      // Wait for the new file to appear in suggestions
+      await waitFor(() => {
+        expect(result.current.suggestions.map((s) => s.value)).toContain(
+          'newfile.txt',
+        );
       });
     });
   });

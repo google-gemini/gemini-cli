@@ -799,6 +799,45 @@ describe('FileSearch', () => {
     ]);
   });
 
+  it('should skip re-building the Fzf index if files have not changed (referential equality)', async () => {
+    tmpDir = await createTmpDir({
+      'file1.js': '',
+    });
+
+    const fileSearch = FileSearchFactory.create({
+      projectRoot: tmpDir,
+      fileDiscoveryService: new FileDiscoveryService(tmpDir, {
+        respectGitIgnore: false,
+        respectGeminiIgnore: false,
+      }),
+      ignoreDirs: [],
+      cache: true,
+      cacheTtl: 10000,
+      enableRecursiveFileSearch: true,
+      enableFuzzySearch: true,
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    }) as any;
+
+    await fileSearch.initialize();
+    const firstFzf = fileSearch.fzf;
+    const firstResultCache = fileSearch.resultCache;
+
+    expect(firstFzf).toBeDefined();
+    expect(firstResultCache).toBeDefined();
+
+    // Mock crawl to return the exact same array instance
+    const crawlSpy = vi
+      .spyOn(crawler, 'crawl')
+      .mockResolvedValue(fileSearch.allFiles);
+
+    await fileSearch.initialize();
+
+    // Verify that the internal state objects were NOT recreated
+    expect(fileSearch.fzf).toBe(firstFzf);
+    expect(fileSearch.resultCache).toBe(firstResultCache);
+    expect(crawlSpy).toHaveBeenCalled();
+  });
+
   describe('DirectoryFileSearch', () => {
     it('should search for files in the current directory', async () => {
       tmpDir = await createTmpDir({
