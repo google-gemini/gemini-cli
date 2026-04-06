@@ -1,6 +1,6 @@
 /**
  * @license
- * Copyright 2025 Google LLC
+ * Copyright 2026 Google LLC
  * SPDX-License-Identifier: Apache-2.0
  */
 
@@ -14,6 +14,7 @@ import { extensionsCommand } from '../commands/extensions.js';
 import { skillsCommand } from '../commands/skills.js';
 import { hooksCommand } from '../commands/hooks.js';
 import { gemmaCommand } from '../commands/gemma.js';
+import { updateCommand } from '../commands/update.js';
 import {
   setGeminiMdFilename as setServerGeminiMdFilename,
   getCurrentGeminiMdFilename,
@@ -183,6 +184,7 @@ export async function parseArguments(
         skillsCommand,
         hooksCommand,
         gemmaCommand,
+        updateCommand,
       ];
 
       const subcommands = commandModules.flatMap((mod) => {
@@ -263,6 +265,7 @@ export async function parseArguments(
   yargsInstance.command(skillsCommand);
   yargsInstance.command(hooksCommand);
   yargsInstance.command(gemmaCommand);
+  yargsInstance.command(updateCommand);
 
   yargsInstance
     .command('$0 [query..]', 'Launch Gemini CLI', (yargsInstance) =>
