@@ -65,6 +65,7 @@ class DiscoveredToolInvocation extends BaseToolInvocation<
     let finalCommand = callCommand;
     let finalArgs = args;
     let finalEnv = process.env;
+    let cleanupFunc: (() => void) | undefined;
 
     const sandboxManager = this.config.sandboxManager;
     if (sandboxManager) {
@@ -77,6 +78,7 @@ class DiscoveredToolInvocation extends BaseToolInvocation<
       finalCommand = prepared.program;
       finalArgs = prepared.args;
       finalEnv = prepared.env;
+      cleanupFunc = prepared.cleanup;
     }
 
     const child = spawn(finalCommand, finalArgs, {
@@ -101,6 +103,7 @@ class DiscoveredToolInvocation extends BaseToolInvocation<
       };
 
       const onError = (err: Error) => {
+        cleanupFunc?.();
         error = err;
       };
 
@@ -108,6 +111,7 @@ class DiscoveredToolInvocation extends BaseToolInvocation<
         _code: number | null,
         _signal: NodeJS.Signals | null,
       ) => {
+        cleanupFunc?.();
         code = _code;
         signal = _signal;
         cleanup();
@@ -374,6 +378,7 @@ export class ToolRegistry {
         .slice(1)
         .filter((p): p is string => typeof p === 'string');
       let finalEnv = process.env;
+      let cleanupFunc: (() => void) | undefined;
 
       const sandboxManager = this.config.sandboxManager;
       if (sandboxManager) {
@@ -386,6 +391,7 @@ export class ToolRegistry {
         finalCommand = prepared.program;
         finalArgs = prepared.args;
         finalEnv = prepared.env;
+        cleanupFunc = prepared.cleanup;
       }
 
       const proc = spawn(finalCommand, finalArgs, {
@@ -425,8 +431,12 @@ export class ToolRegistry {
       });
 
       await new Promise<void>((resolve, reject) => {
-        proc.on('error', reject);
+        proc.on('error', (err) => {
+          cleanupFunc?.();
+          reject(err);
+        });
         proc.on('close', (code) => {
+          cleanupFunc?.();
           stdout += stdoutDecoder.end();
           stderr += stderrDecoder.end();
 

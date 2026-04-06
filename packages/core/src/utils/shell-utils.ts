@@ -864,6 +864,7 @@ export const spawnAsync = async (
     });
 
     child.on('close', (code) => {
+      prepared.cleanup?.();
       if (code === 0) {
         resolve({ stdout, stderr });
       } else {
@@ -872,6 +873,7 @@ export const spawnAsync = async (
     });
 
     child.on('error', (err) => {
+      prepared.cleanup?.();
       reject(err);
     });
   });
@@ -969,11 +971,13 @@ export async function* execStreaming(
     await new Promise<void>((resolve, reject) => {
       // If an error occurred before we got here (e.g. spawn failure), reject immediately.
       if (error) {
+        prepared.cleanup?.();
         reject(error);
         return;
       }
 
       function checkExit(code: number | null) {
+        prepared.cleanup?.();
         // If we aborted or killed it manually, we treat it as success (stop waiting)
         if (options?.signal?.aborted || killedByGenerator) {
           resolve();
@@ -1003,7 +1007,10 @@ export async function* execStreaming(
         checkExit(child.exitCode);
       } else {
         child.on('close', (code) => checkExit(code));
-        child.on('error', (err) => reject(err));
+        child.on('error', (err) => {
+          prepared.cleanup?.();
+          reject(err);
+        });
       }
     });
   }

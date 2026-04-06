@@ -326,6 +326,7 @@ class GrepToolInvocation extends BaseToolInvocation<
       let finalCommand = checkCommand;
       let finalArgs = checkArgs;
       let finalEnv = process.env;
+      let cleanup: (() => void) | undefined;
 
       if (sandboxManager) {
         try {
@@ -338,6 +339,7 @@ class GrepToolInvocation extends BaseToolInvocation<
           finalCommand = prepared.program;
           finalArgs = prepared.args;
           finalEnv = prepared.env;
+          cleanup = prepared.cleanup;
         } catch (err) {
           debugLogger.debug(
             `[GrepTool] Sandbox preparation failed for '${command}':`,
@@ -352,8 +354,12 @@ class GrepToolInvocation extends BaseToolInvocation<
           shell: true,
           env: finalEnv,
         });
-        child.on('close', (code) => resolve(code === 0));
+        child.on('close', (code) => {
+          cleanup?.();
+          resolve(code === 0);
+        });
         child.on('error', (err) => {
+          cleanup?.();
           debugLogger.debug(
             `[GrepTool] Failed to start process for '${command}':`,
             err.message,

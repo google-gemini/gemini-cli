@@ -79,6 +79,7 @@ export class SandboxedFileSystemService implements FileSystemService {
       });
 
       child.on('close', (code) => {
+        prepared.cleanup?.();
         if (code === 0) {
           resolve(output);
         } else {
@@ -98,6 +99,7 @@ export class SandboxedFileSystemService implements FileSystemService {
       });
 
       child.on('error', (err) => {
+        prepared.cleanup?.();
         reject(
           new Error(
             `Sandbox Error: Failed to spawn read_file for '${filePath}': ${err.message}`,
@@ -153,6 +155,7 @@ export class SandboxedFileSystemService implements FileSystemService {
       });
 
       child.on('close', (code) => {
+        prepared.cleanup?.();
         if (code === 0) {
           resolve();
         } else {
@@ -165,6 +168,7 @@ export class SandboxedFileSystemService implements FileSystemService {
       });
 
       child.on('error', (err) => {
+        prepared.cleanup?.();
         reject(
           new Error(
             `Sandbox Error: Failed to spawn write_file for '${filePath}': ${err.message}`,
