@@ -2,7 +2,7 @@
 network = false
 readonly = true
 approvedTools = []
-allowOverrides = false
+allowOverrides = true
 
 [modes.default]
 network = false
@@ -17,4 +17,3 @@ approvedTools = ['sed', 'grep', 'awk', 'perl', 'cat', 'echo', 'Add-Content', 'Se
 allowOverrides = true
 
 [commands]
-
