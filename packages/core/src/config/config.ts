@@ -776,6 +776,7 @@ export class Config implements McpContext, AgentLoopContext {
   private mcpServers: Record<string, MCPServerConfig> | undefined;
   private readonly mcpEnablementCallbacks?: McpEnablementCallbacks;
   private activeExtensionContext?: string;
+  private initializedPlanDirs = new Set<string>();
   private readonly extensionPlanDirs: Record<string, string>;
   private userMemory: string | HierarchicalMemory;
   private geminiMdFileCount: number;
@@ -2263,6 +2264,11 @@ export class Config implements McpContext, AgentLoopContext {
 
   getPlansDir(): string {
     const plansDir = this.storage.getPlansDir(this.getActiveExtensionPlanDir());
+
+    if (this.initializedPlanDirs.has(plansDir)) {
+      return plansDir;
+    }
+
     try {
       if (!fs.existsSync(plansDir)) {
         fs.mkdirSync(plansDir, { recursive: true });
@@ -2278,6 +2284,7 @@ export class Config implements McpContext, AgentLoopContext {
         // Ignore failures in mock environments
       }
       this.workspaceContext.addDirectory(realPlansDir);
+      this.initializedPlanDirs.add(plansDir);
     } catch (e: unknown) {
       const errorMessage = e instanceof Error ? e.message : String(e);
       throw new Error(
