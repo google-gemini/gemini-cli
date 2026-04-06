@@ -8,6 +8,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { buildBwrapArgs, type BwrapArgsOptions } from './bwrapArgsBuilder.js';
 import fs from 'node:fs';
 import * as shellUtils from '../../utils/shell-utils.js';
+import os from 'node:os';
 
 vi.mock('node:fs', async () => {
   const actual = await vi.importActual<typeof import('node:fs')>('node:fs');
@@ -57,7 +58,7 @@ vi.mock('../../utils/shell-utils.js', async (importOriginal) => {
   };
 });
 
-describe('buildBwrapArgs', () => {
+describe.skipIf(os.platform() === 'win32')('buildBwrapArgs', () => {
   const workspace = '/home/user/workspace';
 
   beforeEach(() => {
