@@ -32,10 +32,12 @@ export class Storage {
   private projectIdentifier: string | undefined;
   private initPromise: Promise<void> | undefined;
   private customPlansDir: string | undefined;
+  private readonly realProjectRoot: string;
 
   constructor(targetDir: string, sessionId?: string) {
     this.targetDir = targetDir;
     this.sessionId = sessionId;
+    this.realProjectRoot = resolveToRealPath(targetDir);
   }
 
   setCustomPlansDir(dir: string | undefined): void {
@@ -324,12 +326,11 @@ export class Storage {
     const customDir = extensionPlanDir || this.customPlansDir;
     if (customDir) {
       const resolvedPath = path.resolve(this.getProjectRoot(), customDir);
-      const realProjectRoot = resolveToRealPath(this.getProjectRoot());
       const realResolvedPath = resolveToRealPath(resolvedPath);
 
-      if (!isSubpath(realProjectRoot, realResolvedPath)) {
+      if (!isSubpath(this.realProjectRoot, realResolvedPath)) {
         throw new Error(
-          `Custom plans directory '${customDir}' resolves to '${realResolvedPath}', which is outside the project root '${realProjectRoot}'.`,
+          `Custom plans directory '${customDir}' resolves to '${realResolvedPath}', which is outside the project root '${this.realProjectRoot}'.`,
         );
       }
 

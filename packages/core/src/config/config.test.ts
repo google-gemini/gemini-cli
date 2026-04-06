@@ -3344,7 +3344,8 @@ describe('Plans Directory Initialization', () => {
     expect(context.getDirectories()).toContain(plansDir);
   });
 
-  it('should throw an error if the plan directory path is blocked by an existing file (EEXIST)', async () => {
+  it('should log a warning if the plan directory path is blocked by an existing file (EEXIST)', async () => {
+    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
     vi.spyOn(fs, 'mkdirSync').mockImplementation(() => {
       const err = new Error('File exists') as NodeJS.ErrnoException;
       err.code = 'EEXIST';
@@ -3356,13 +3357,18 @@ describe('Plans Directory Initialization', () => {
     });
 
     await config.initialize();
+    config.getPlansDir();
 
-    expect(() => config.getPlansDir()).toThrow(
-      /Failed to initialize active plan directory.*File exists/,
+    expect(warnSpy).toHaveBeenCalledWith(
+      expect.stringMatching(
+        /Failed to initialize active plan directory.*File exists/,
+      ),
     );
+    warnSpy.mockRestore();
   });
 
-  it('should throw an error if mkdirSync fails during getPlansDir (e.g. EACCES)', async () => {
+  it('should log a warning if mkdirSync fails during getPlansDir (e.g. EACCES)', async () => {
+    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
     vi.spyOn(fs, 'mkdirSync').mockImplementation(() => {
       const err = new Error('Permission denied') as NodeJS.ErrnoException;
       err.code = 'EACCES';
@@ -3374,10 +3380,14 @@ describe('Plans Directory Initialization', () => {
     });
 
     await config.initialize();
+    config.getPlansDir();
 
-    expect(() => config.getPlansDir()).toThrow(
-      /Failed to initialize active plan directory.*Permission denied/,
+    expect(warnSpy).toHaveBeenCalledWith(
+      expect.stringMatching(
+        /Failed to initialize active plan directory.*Permission denied/,
+      ),
     );
+    warnSpy.mockRestore();
   });
 
   it('should deduplicate and cache when multiple extensions (or default) use the same directory', async () => {
