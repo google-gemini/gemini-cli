@@ -91,8 +91,6 @@ export const TopicMessage: React.FC<TopicMessageProps> = ({
     };
   }, [isExpandable, hasExtraSummary, overflowActions, overflowId]);
 
-  const toggleText = `(ctrl+o to ${isExpanded ? 'collapse' : 'expand'})`;
-
   return (
     <Box ref={containerRef} flexDirection="column" marginLeft={2}>
       <Box flexDirection="row" flexWrap="wrap">
@@ -104,11 +102,6 @@ export const TopicMessage: React.FC<TopicMessageProps> = ({
           <Text color={theme.text.secondary} wrap="wrap">
             {intent}
           </Text>
-        )}
-        {isExpandable && hasExtraSummary && (
-          <Box marginLeft={1}>
-            <Text color={theme.text.secondary}>{toggleText}</Text>
-          </Box>
         )}
       </Box>
       {isExpanded && hasExtraSummary && summary && (

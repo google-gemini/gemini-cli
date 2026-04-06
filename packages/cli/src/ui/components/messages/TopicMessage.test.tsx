@@ -51,7 +51,7 @@ describe('<TopicMessage />', () => {
     expect(frame).toContain('Test Topic:');
     expect(frame).toContain('This is the strategic intent.');
     expect(frame).not.toContain('This is the detailed summary');
-    expect(frame).toContain('(ctrl+o to expand)');
+    expect(frame).not.toContain('(ctrl+o to expand)');
   });
 
   it('renders summary when globally expanded (Ctrl+O)', async () => {
@@ -60,7 +60,7 @@ describe('<TopicMessage />', () => {
     expect(frame).toContain('Test Topic:');
     expect(frame).toContain('This is the strategic intent.');
     expect(frame).toContain('This is the detailed summary');
-    expect(frame).toContain('(ctrl+o to collapse)');
+    expect(frame).not.toContain('(ctrl+o to collapse)');
   });
 
   it('renders summary when selectively expanded via context', async () => {
@@ -69,7 +69,7 @@ describe('<TopicMessage />', () => {
     const frame = lastFrame();
     expect(frame).toContain('Test Topic:');
     expect(frame).toContain('This is the detailed summary');
-    expect(frame).toContain('(ctrl+o to collapse)');
+    expect(frame).not.toContain('(ctrl+o to collapse)');
   });
 
   it('calls toggleExpansion when clicked', async () => {
