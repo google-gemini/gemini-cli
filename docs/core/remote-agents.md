@@ -30,8 +30,9 @@ Remote subagents are defined as Markdown files (`.md`) with YAML frontmatter.
 You can place them in:
 
 1.  **Project-level:** `.gemini/agents/*.md` (Shared with your team)
-2.  **User-level:** `agents/*.md` in your user config directory (for example,
-    `~/.config/gemini-cli/agents/*.md`) (Personal agents)
+2.  **User-level:** `agents/*.md` in your
+    [user config directory](../reference/configuration.md#configuration-directory)
+    (for example, `~/.config/gemini-cli/agents/*.md`) (Personal agents)
 
 ### Configuration schema
 

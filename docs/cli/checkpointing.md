@@ -12,7 +12,9 @@ When you approve a tool that modifies the file system (like `write_file` or
 includes:
 
 1.  **A Git snapshot:** A commit is made in a special, shadow Git repository
-    located in your user config directory's `history/` area (for example,
+    located in your
+    [user config directory](../reference/configuration.md#configuration-directory)'s
+    `history/` area (for example,
     `~/.config/gemini-cli/history/<project_hash>`). This snapshot captures the
     complete state of your project files at that moment. It does **not**
     interfere with your own project's Git repository.
@@ -32,10 +34,9 @@ command. Restoring a checkpoint will:
 All checkpoint data, including the Git snapshot and conversation history, is
 stored locally on your machine. The Git snapshot is stored in the shadow
 repository while the conversation history and tool calls are saved in a JSON
-file in your project's temporary directory, typically
-`tmp/<project_hash>/checkpoints` in Gemini CLI's
+file in your project's
 [temporary directory](../reference/configuration.md#temporary-directory) (for
-example, `~/.cache/gemini-cli/tmp/<project_hash>/checkpoints`).
+example, `~/.cache/gemini-cli/<project_hash>/checkpoints`).
 
 ## Enabling the feature
 

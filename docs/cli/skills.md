@@ -38,9 +38,10 @@ Gemini CLI discovers skills from three primary locations:
 1.  **Workspace Skills**: Located in `.gemini/skills/` or the `.agents/skills/`
     alias. Workspace skills are typically committed to version control and
     shared with the team.
-2.  **User Skills**: Located in `skills/` under your user config directory (for
-    example, `~/.config/gemini-cli/skills/`) or the `~/.agents/skills/` alias.
-    These are personal skills available across all your workspaces.
+2.  **User Skills**: Located in `skills/` under your
+    [user config directory](../reference/configuration.md#configuration-directory)
+    (for example, `~/.config/gemini-cli/skills/`) or the `~/.agents/skills/`
+    alias. These are personal skills available across all your workspaces.
 3.  **Extension Skills**: Skills bundled within installed
     [extensions](../extensions/index.md).
 

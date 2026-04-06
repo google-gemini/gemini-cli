@@ -11,7 +11,8 @@ To create your first policy:
 
 1.  **Create the policy directory** if it doesn't exist:
 
-    The example paths below use the typical default user config directory.
+    The example paths below use the typical default
+    [user config directory](./configuration.md#configuration-directory).
 
     **macOS/Linux**
 
@@ -25,11 +26,11 @@ To create your first policy:
     New-Item -ItemType Directory -Force -Path "$env:USERPROFILE\.config\gemini-cli\policies"
     ```
 
-2.  **Create a new policy file** in the `policies/` directory under your user
-    config directory (for example,
-    `~/.config/gemini-cli/policies/my-rules.toml`). You can use any filename
-    ending in `.toml`; all such files in this directory will be loaded and
-    combined:
+2.  **Create a new policy file** in the `policies/` directory under your
+    [user config directory](./configuration.md#configuration-directory) (for
+    example, `~/.config/gemini-cli/policies/my-rules.toml`). You can use any
+    filename ending in `.toml`; all such files in this directory will be loaded
+    and combined:
     ```toml
     [[rule]]
     toolName = "run_shell_command"

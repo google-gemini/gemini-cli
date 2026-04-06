@@ -15,14 +15,7 @@ import {
 } from 'vitest';
 import { AcpFileSystemService } from './fileSystemService.js';
 import type { AgentSideConnection } from '@agentclientprotocol/sdk';
-import type { FileSystemService } from '@google/gemini-cli-core';
-import os from 'node:os';
-
-vi.mock('node:os', () => ({
-  default: {
-    homedir: vi.fn(),
-  },
-}));
+import { Storage, type FileSystemService } from '@google/gemini-cli-core';
 
 describe('AcpFileSystemService', () => {
   let mockConnection: Mocked<AgentSideConnection>;
@@ -40,7 +33,9 @@ describe('AcpFileSystemService', () => {
       readTextFile: vi.fn(),
       writeTextFile: vi.fn(),
     };
-    vi.mocked(os.homedir).mockReturnValue('/home/user');
+    vi.spyOn(Storage, 'getGlobalGeminiDir').mockReturnValue(
+      '/home/user/.config/gemini-cli',
+    );
   });
 
   afterEach(() => {

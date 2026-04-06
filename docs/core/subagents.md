@@ -156,11 +156,11 @@ under `agents.browser`:
 
 The available modes are:
 
-| Mode         | Description                                                                                                                                                                                                                                             |
-| :----------- | :------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| `persistent` | **(Default)** Launches Chrome with a persistent profile stored in your user config directory's `cli-browser-profile/` folder (for example, `~/.config/gemini-cli/cli-browser-profile/`). Cookies, history, and settings are preserved between sessions. |
-| `isolated`   | Launches Chrome with a temporary profile that is deleted after each session. Use this for clean-state automation.                                                                                                                                       |
-| `existing`   | Attaches to an already-running Chrome instance. You must enable remote debugging first by navigating to `chrome://inspect/#remote-debugging` in Chrome. No new browser process is launched.                                                             |
+| Mode         | Description                                                                                                                                                                                                                                                                                                      |
+| :----------- | :--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `persistent` | **(Default)** Launches Chrome with a persistent profile stored in your [user config directory](../reference/configuration.md#configuration-directory)'s `cli-browser-profile/` folder (for example, `~/.config/gemini-cli/cli-browser-profile/`). Cookies, history, and settings are preserved between sessions. |
+| `isolated`   | Launches Chrome with a temporary profile that is deleted after each session. Use this for clean-state automation.                                                                                                                                                                                                |
+| `existing`   | Attaches to an already-running Chrome instance. You must enable remote debugging first by navigating to `chrome://inspect/#remote-debugging` in Chrome. No new browser process is launched.                                                                                                                      |
 
 #### First-run consent
 

@@ -136,7 +136,7 @@ These are the only allowed tools:
   [`replace`](../tools/file-system.md#6-replace-edit) only allowed for `.md`
   files in the `tmp/<project>/<session-id>/plans/` directory under your
   [temporary directory](../reference/configuration.md#temporary-directory) (for
-  example, `~/.cache/gemini-cli/tmp/<project>/<session-id>/plans/`) or your
+  example, `~/.cache/gemini-cli/<project>/<session-id>/plans/`) or your
   [custom plans directory](#custom-plan-directory-and-policies).
 - **Memory:** [`save_memory`](../tools/memory.md)
 - **Skills:** [`activate_skill`](../cli/skills.md) (allows loading specialized
@@ -211,8 +211,10 @@ By default, read-only MCP tools require user confirmation in Plan Mode. You can
 use `toolAnnotations` and the `mcpName` wildcard to customize this behavior for
 your specific environment.
 
-`mcp-read-only.toml` in your user config directory's `policies/` directory (for
-example, `~/.config/gemini-cli/policies/mcp-read-only.toml`)
+`mcp-read-only.toml` in your
+[user config directory](../reference/configuration.md#configuration-directory)'s
+`policies/` directory (for example,
+`~/.config/gemini-cli/policies/mcp-read-only.toml`)
 
 ```toml
 [[rule]]
@@ -269,10 +271,11 @@ check ongoing changes in git."_
 
 ### Custom plan directory and policies
 
-By default, planning artifacts are stored in a managed temporary directory
-outside your project: `tmp/<project>/<session-id>/plans/` in Gemini CLI's
+By default, planning artifacts are stored in a managed
+[temporary directory](../reference/configuration.md#temporary-directory) outside
+your project: `tmp/<project>/<session-id>/plans/` in Gemini CLI's
 [temporary directory](../reference/configuration.md#temporary-directory) (for
-example, `~/.cache/gemini-cli/tmp/<project>/<session-id>/plans/`).
+example, `~/.cache/gemini-cli/<project>/<session-id>/plans/`).
 
 You can configure a custom directory for plans in your `settings.json`. For
 example, to store plans in a `.gemini/plans` directory within your project:

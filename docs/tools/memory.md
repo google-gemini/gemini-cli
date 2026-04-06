@@ -6,8 +6,9 @@ preferences, and project details across sessions.
 ## Technical reference
 
 This tool appends information to the `## Gemini Added Memories` section of your
-global `GEMINI.md` file in your user config directory (for example,
-`~/.config/gemini-cli/GEMINI.md`).
+global `GEMINI.md` file in your
+[user config directory](../reference/configuration.md#configuration-directory)
+(for example, `~/.config/gemini-cli/GEMINI.md`).
 
 ### Arguments
 

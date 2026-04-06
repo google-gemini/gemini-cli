@@ -52,7 +52,7 @@ describe('Storage – initialize', () => {
   it('sets up the registry and performs migration if `getProjectTempDir` is called', async () => {
     await storage.initialize();
     expect(storage.getProjectTempDir()).toBe(
-      path.join(MOCK_GLOBAL_CACHE_DIR, 'tmp', PROJECT_SLUG),
+      path.join(MOCK_GLOBAL_CACHE_DIR, PROJECT_SLUG),
     );
 
     // Verify registry initialization
@@ -79,7 +79,7 @@ vi.mock('../utils/paths.js', async (importOriginal) => {
     realHomedir: vi.fn(actual.realHomedir),
     getUserConfigDir: vi.fn(() => '/mock/home/.config/gemini-cli'),
     getUserCacheDir: vi.fn(() => '/mock/home/.cache/gemini-cli'),
-    getUserTmpDir: vi.fn(() => '/mock/home/.cache/gemini-cli/tmp'),
+    getUserTmpDir: vi.fn(() => '/mock/home/.cache/gemini-cli'),
   };
 });
 
@@ -149,15 +149,9 @@ describe('Storage – additional helpers', () => {
     expect(storage.getProjectAgentsDir()).toBe(expected);
   });
 
-  it('getProjectMemoryDir returns ~/.gemini/tmp/<identifier>/memory', async () => {
+  it('getProjectMemoryDir returns <tmpDir>/<identifier>/memory', async () => {
     await storage.initialize();
-    const expected = path.join(
-      os.homedir(),
-      GEMINI_DIR,
-      'tmp',
-      PROJECT_SLUG,
-      'memory',
-    );
+    const expected = path.join(MOCK_GLOBAL_CACHE_DIR, PROJECT_SLUG, 'memory');
     expect(storage.getProjectMemoryDir()).toBe(expected);
   });
 
@@ -166,8 +160,8 @@ describe('Storage – additional helpers', () => {
     expect(Storage.getMcpOAuthTokensPath()).toBe(expected);
   });
 
-  it('getGlobalBinDir returns ~/.cache/gemini-cli/tmp/bin', () => {
-    const expected = path.join(MOCK_GLOBAL_CACHE_DIR, 'tmp', 'bin');
+  it('getGlobalBinDir returns ~/.cache/gemini-cli/bin', () => {
+    const expected = path.join(MOCK_GLOBAL_CACHE_DIR, 'bin');
     expect(Storage.getGlobalBinDir()).toBe(expected);
   });
 
@@ -175,20 +169,18 @@ describe('Storage – additional helpers', () => {
     expect(Storage.getGlobalCacheDir()).toBe(MOCK_GLOBAL_CACHE_DIR);
   });
 
-  it('getGlobalTempDir returns ~/.cache/gemini-cli/tmp', () => {
-    expect(Storage.getGlobalTempDir()).toBe(
-      path.join(MOCK_GLOBAL_CACHE_DIR, 'tmp'),
-    );
+  it('getGlobalTempDir returns ~/.cache/gemini-cli', () => {
+    expect(Storage.getGlobalTempDir()).toBe(MOCK_GLOBAL_CACHE_DIR);
   });
 
-  it('getProjectTempPlansDir returns ~/.cache/gemini-cli/tmp/<identifier>/plans when no sessionId is provided', async () => {
+  it('getProjectTempPlansDir returns ~/.cache/gemini-cli/<identifier>/plans when no sessionId is provided', async () => {
     await storage.initialize();
     const tempDir = storage.getProjectTempDir();
     const expected = path.join(tempDir, 'plans');
     expect(storage.getProjectTempPlansDir()).toBe(expected);
   });
 
-  it('getProjectTempPlansDir returns ~/.cache/gemini-cli/tmp/<identifier>/<sessionId>/plans when sessionId is provided', async () => {
+  it('getProjectTempPlansDir returns ~/.cache/gemini-cli/<identifier>/<sessionId>/plans when sessionId is provided', async () => {
     const sessionId = 'test-session-id';
     const storageWithSession = new Storage(projectRoot, sessionId);
     ProjectRegistry.prototype.getShortId = vi
@@ -200,14 +192,14 @@ describe('Storage – additional helpers', () => {
     expect(storageWithSession.getProjectTempPlansDir()).toBe(expected);
   });
 
-  it('getProjectTempTrackerDir returns ~/.cache/gemini-cli/tmp/<identifier>/tracker when no sessionId is provided', async () => {
+  it('getProjectTempTrackerDir returns ~/.cache/gemini-cli/<identifier>/tracker when no sessionId is provided', async () => {
     await storage.initialize();
     const tempDir = storage.getProjectTempDir();
     const expected = path.join(tempDir, 'tracker');
     expect(storage.getProjectTempTrackerDir()).toBe(expected);
   });
 
-  it('getProjectTempTrackerDir returns ~/.cache/gemini-cli/tmp/<identifier>/<sessionId>/tracker when sessionId is provided', async () => {
+  it('getProjectTempTrackerDir returns ~/.cache/gemini-cli/<identifier>/<sessionId>/tracker when sessionId is provided', async () => {
     const sessionId = 'test-session-id';
     const storageWithSession = new Storage(projectRoot, sessionId);
     ProjectRegistry.prototype.getShortId = vi

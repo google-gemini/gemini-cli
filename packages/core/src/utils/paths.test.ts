@@ -166,9 +166,11 @@ describe('getUserConfigDir', () => {
 describe('getUserCacheDir', () => {
   beforeEach(() => {
     vi.stubEnv('HOME', '/mock/home');
+    vi.spyOn(fs, 'mkdirSync').mockImplementation(() => undefined);
   });
 
   afterEach(() => {
+    vi.restoreAllMocks();
     vi.unstubAllEnvs();
   });
 
@@ -177,9 +179,12 @@ describe('getUserCacheDir', () => {
     expect(getUserCacheDir()).toBe('/mock/cache/gemini-cli');
   });
 
-  it('uses GEMINI_CACHE_DIR exactly when set', () => {
+  it('uses GEMINI_CACHE_DIR exactly when set and creates directory', () => {
     vi.stubEnv('GEMINI_CACHE_DIR', '/exact/cache/path');
     expect(getUserCacheDir()).toBe('/exact/cache/path');
+    expect(fs.mkdirSync).toHaveBeenCalledWith('/exact/cache/path', {
+      recursive: true,
+    });
   });
 
   it('ignores relative XDG_CACHE_HOME values', () => {
@@ -191,20 +196,25 @@ describe('getUserCacheDir', () => {
 describe('getUserTmpDir', () => {
   beforeEach(() => {
     vi.stubEnv('HOME', '/mock/home');
+    vi.spyOn(fs, 'mkdirSync').mockImplementation(() => undefined);
   });
 
   afterEach(() => {
+    vi.restoreAllMocks();
     vi.unstubAllEnvs();
   });
 
-  it('uses GEMINI_TMP_DIR exactly when set', () => {
+  it('uses GEMINI_TMP_DIR exactly when set and creates directory', () => {
     vi.stubEnv('GEMINI_TMP_DIR', '/exact/tmp/path');
     expect(getUserTmpDir()).toBe('/exact/tmp/path');
+    expect(fs.mkdirSync).toHaveBeenCalledWith('/exact/tmp/path', {
+      recursive: true,
+    });
   });
 
-  it('defaults to the cache tmp directory', () => {
+  it('defaults to the cache directory when GEMINI_TMP_DIR is unset', () => {
     vi.stubEnv('XDG_CACHE_HOME', '/mock/cache');
-    expect(getUserTmpDir()).toBe('/mock/cache/gemini-cli/tmp');
+    expect(getUserTmpDir()).toBe('/mock/cache/gemini-cli');
   });
 });
 

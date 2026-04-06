@@ -10,8 +10,9 @@ all your projects, streamlining your workflow and ensuring consistency.
 Gemini CLI discovers commands from two locations, loaded in a specific order:
 
 1.  **User commands (global):** Located in the `commands/` directory under your
-    user config directory (for example, `~/.config/gemini-cli/commands/`). These
-    commands are available in any project you are working on.
+    [user config directory](../reference/configuration.md#configuration-directory)
+    (for example, `~/.config/gemini-cli/commands/`). These commands are
+    available in any project you are working on.
 2.  **Project commands (local):** Located in
     `<your-project-root>/.gemini/commands/`. These commands are specific to the
     current project and can be checked into version control to be shared with
