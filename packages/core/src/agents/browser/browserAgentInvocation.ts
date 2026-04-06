@@ -34,10 +34,7 @@ import {
   isToolActivityError,
 } from '../types.js';
 import type { MessageBus } from '../../confirmation-bus/message-bus.js';
-import {
-  createBrowserAgentDefinition,
-  cleanupBrowserAgent,
-} from './browserAgentFactory.js';
+import { createBrowserAgentDefinition } from './browserAgentFactory.js';
 import { removeInputBlocker } from './inputBlocker.js';
 import { logBrowserAgentTaskOutcome } from '../../telemetry/loggers.js';
 import {
@@ -444,7 +441,6 @@ ${output.result}`;
         } catch {
           // Ignore errors for removing the overlays.
         }
-        await cleanupBrowserAgent(browserManager, this.config, sessionMode);
       }
     }
   }
