@@ -168,10 +168,7 @@ class WriteFileToolInvocation extends BaseToolInvocation<
 
     if (this.config.isPlanMode()) {
       const safeFilename = path.basename(this.params.file_path);
-      this.resolvedPath = path.join(
-        this.config.storage.getPlansDir(),
-        safeFilename,
-      );
+      this.resolvedPath = path.join(this.config.getPlansDir(), safeFilename);
     } else {
       this.resolvedPath = path.resolve(
         this.config.getTargetDir(),
