@@ -107,6 +107,7 @@ const mockConfigInternal = {
   getDisableLLMCorrection: vi.fn(() => true),
   isPlanMode: vi.fn(() => false),
   getActiveModel: () => 'test-model',
+  getPlansDir: vi.fn().mockReturnValue('/tmp/plans'),
   storage: {
     getProjectTempDir: vi.fn().mockReturnValue('/tmp/project'),
   },
