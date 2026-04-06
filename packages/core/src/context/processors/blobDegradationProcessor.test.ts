@@ -3,9 +3,9 @@
  * Copyright 2026 Google LLC
  * SPDX-License-Identifier: Apache-2.0
  */
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { createMockEnvironment } from '../testing/contextTestUtils.js';
+import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { BlobDegradationProcessor } from './blobDegradationProcessor.js';
-import type { Config } from '../../config/config.js';
 import type { Episode, UserPrompt } from '../ir/types.js';
 import type { ContextAccountingState } from '../pipeline.js';
 import { randomUUID } from 'node:crypto';
@@ -14,19 +14,13 @@ import * as fsPromises from 'node:fs/promises';
 vi.mock('node:fs/promises');
 
 describe('BlobDegradationProcessor', () => {
-  let mockConfig: Config;
+  
   let processor: BlobDegradationProcessor;
 
   beforeEach(() => {
     vi.resetAllMocks();
-    mockConfig = {
-      storage: {
-        getProjectTempDir: vi.fn().mockReturnValue('/tmp/gemini'),
-      },
-      getSessionId: vi.fn().mockReturnValue('test-session'),
-    } as unknown as Config;
-
-    processor = new BlobDegradationProcessor(mockConfig);
+    
+    processor = new BlobDegradationProcessor(createMockEnvironment());
   });
 
   const getDummyState = (

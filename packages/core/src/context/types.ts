@@ -6,6 +6,7 @@
 
 export interface ContextManagementConfig {
   enabled: boolean;
+  charsPerToken?: number;
 
   /** The global orchestration budget */
   budget: {
@@ -13,10 +14,7 @@ export interface ContextManagementConfig {
     maxTokens: number;
     /** The target token count to aggressively drop to using asynchronous "Ship of Theseus" background GC */
     retainedTokens: number;
-    /** The number of recent Episodes to always protect from degradation (default: 1) */
-    protectedEpisodes: number;
-    /** Should we protect Episode 0 (the System Prompt/Architectural Initialization)? */
-    protectSystemEpisode: boolean;
+
     
     /** 
      * The strategy to use when maxTokens is exceeded.
@@ -41,8 +39,7 @@ export interface ContextManagementConfig {
     semanticCompression: {
       /** The threshold (in tokens) at which a text node is sent to the LLM for summarization */
       nodeThresholdTokens: number;
-      /** The model to use for generating the semantic summary */
-      compressionModel: string;
+
     };
   };
 }

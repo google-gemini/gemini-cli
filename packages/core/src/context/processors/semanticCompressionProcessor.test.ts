@@ -4,9 +4,9 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { createMockEnvironment } from '../testing/contextTestUtils.js';
+import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { SemanticCompressionProcessor } from './semanticCompressionProcessor.js';
-import type { Config } from '../../config/config.js';
 import type {
   Episode,
   UserPrompt,
@@ -17,7 +17,7 @@ import type { ContextAccountingState } from '../pipeline.js';
 import { randomUUID } from 'node:crypto';
 
 describe('SemanticCompressionProcessor', () => {
-  let mockConfig: Config;
+  
   let processor: SemanticCompressionProcessor;
   let generateContentMock: ReturnType<typeof vi.fn>;
 
@@ -26,21 +26,10 @@ describe('SemanticCompressionProcessor', () => {
       candidates: [{ content: { parts: [{ text: 'Mocked Summary!' }] } }],
     });
 
-    mockConfig = {
-      getContextManagementConfig: vi.fn().mockReturnValue({
-        strategies: {
-          semanticCompression: {
-            nodeThresholdTokens: 10,
-            compressionModel: 'test-model',
-          },
-        }, // Super small threshold
-      }),
-      getBaseLlmClient: vi.fn().mockReturnValue({
-        generateContent: generateContentMock,
-      }),
-    } as unknown as Config;
-
-    processor = new SemanticCompressionProcessor(mockConfig);
+    
+    const env = createMockEnvironment();
+    env.getLlmClient = vi.fn().mockReturnValue({ generateContent: generateContentMock }) as any;
+    processor = new SemanticCompressionProcessor(env, { nodeThresholdTokens: 2000 });
   });
 
   const getDummyState = (

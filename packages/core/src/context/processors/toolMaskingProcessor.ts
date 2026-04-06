@@ -5,7 +5,7 @@
  */
 
 import type { ContextAccountingState, ContextProcessor } from '../pipeline.js';
-import type { Config } from '../../config/config.js';
+import type { ContextEnvironment } from '../sidecar/environment.js';
 import { estimateTokenCountSync } from '../../utils/tokenCalculation.js';
 import { sanitizeFilenamePart } from '../../utils/fileUtils.js';
 import * as fsPromises from 'node:fs/promises';
@@ -29,18 +29,21 @@ const UNMASKABLE_TOOLS = new Set([
 
 export class ToolMaskingProcessor implements ContextProcessor {
   readonly name = 'ToolMasking';
-  private config: Config;
+  private env: ContextEnvironment;
+  private options: { stringLengthThresholdTokens: number };
 
-  constructor(config: Config) {
-    this.config = config;
+  constructor(env: ContextEnvironment, options: { stringLengthThresholdTokens: number }) {
+    this.env = env;
+    this.options = options;
   }
 
   async process(
     episodes: Episode[],
     state: ContextAccountingState,
   ): Promise<Episode[]> {
+    
     const maskingConfig =
-      this.config.getContextManagementConfig().strategies.toolMasking;
+      this.options;
     if (!maskingConfig) return episodes;
     if (state.isBudgetSatisfied) return episodes;
 
@@ -49,10 +52,10 @@ export class ToolMaskingProcessor implements ContextProcessor {
     const limitChars = maskingConfig.stringLengthThresholdTokens * 4;
 
     let toolOutputsDir = path.join(
-      this.config.storage.getProjectTempDir(),
+      this.env.getProjectTempDir(),
       'tool-outputs',
     );
-    const sessionId = this.config.getSessionId();
+    const sessionId = this.env.getSessionId();
     if (sessionId) {
       toolOutputsDir = path.join(
         toolOutputsDir,
@@ -121,6 +124,8 @@ export class ToolMaskingProcessor implements ContextProcessor {
           nodeType: string,
         ): Promise<{ masked: any; changed: boolean }> => {
           if (typeof obj === 'string') {
+            require('fs').appendFileSync('/tmp/debug.json', 'STRING FOUND. length: ' + obj.length + ' limitChars: ' + limitChars + '\n');
+            if (obj.length > 1000) console.log('Found string of length:', obj.length, 'limitChars is:', limitChars, 'isAlreadyMasked:', this.isAlreadyMasked(obj));
             if (obj.length > limitChars && !this.isAlreadyMasked(obj)) {
               const newString = await handleMasking(
                 obj,

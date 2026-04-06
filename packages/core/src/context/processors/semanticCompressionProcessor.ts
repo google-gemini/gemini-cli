@@ -6,7 +6,7 @@
 
 import type { Episode } from '../ir/types.js';
 import type { ContextAccountingState, ContextProcessor } from '../pipeline.js';
-import type { Config } from '../../config/config.js';
+import type { ContextEnvironment } from '../sidecar/environment.js';
 import { debugLogger } from '../../utils/debugLogger.js';
 import { LlmRole } from '../../telemetry/types.js';
 import { getResponseText } from '../../utils/partUtils.js';
@@ -14,24 +14,26 @@ import { estimateTokenCountSync } from '../../utils/tokenCalculation.js';
 
 export class SemanticCompressionProcessor implements ContextProcessor {
   readonly name = 'SemanticCompression';
-  private config: Config;
+  private env: ContextEnvironment;
+  private options: { nodeThresholdTokens: number };
   private modelToUse: string = 'chat-compression-2.5-flash-lite';
 
-  constructor(config: Config) {
-    this.config = config;
+  constructor(env: ContextEnvironment, options: { nodeThresholdTokens: number }) {
+    this.env = env;
+    this.options = options;
   }
 
   async process(
     episodes: Episode[],
     state: ContextAccountingState,
   ): Promise<Episode[]> {
+    require('fs').appendFileSync('/tmp/debug2.json', 'SEMANTIC PROCESS: First episode ID: ' + (episodes[0]?.id) + '\nProtected IDs: ' + Array.from(state.protectedEpisodeIds).join(', ') + '\n');
     // If the budget is satisfied, or semantic compression isn't enabled
     if (state.isBudgetSatisfied) {
       return episodes;
     }
 
-    const semanticConfig =
-      this.config.getContextManagementConfig().strategies.semanticCompression;
+    const semanticConfig = this.options;
     // We estimate 4 chars per token for truncation logic
     const thresholdChars = semanticConfig.nodeThresholdTokens * 4;
     this.modelToUse = 'gemini-2.5-flash';
@@ -169,7 +171,7 @@ export class SemanticCompressionProcessor implements ContextProcessor {
   ): Promise<string> {
     const promptMessage = `You are compressing an old episodic context buffer for an AI assistant.\nSummarize this ${contentType} block in 2-3 highly technical sentences. Keep all critical facts, file names, dependencies, and architectural decisions. Discard conversational filler and boilerplate.\n\nContent:\n${content.slice(0, 30000)}`;
 
-    const client = this.config.getBaseLlmClient();
+    const client = this.env.getLlmClient();
     try {
       const response = await client.generateContent({
         modelConfigKey: { model: this.modelToUse },

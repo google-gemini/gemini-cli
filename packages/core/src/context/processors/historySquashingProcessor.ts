@@ -6,15 +6,16 @@
 
 import type { Episode } from '../ir/types.js';
 import type { ContextAccountingState, ContextProcessor } from '../pipeline.js';
-import type { Config } from '../../config/config.js';
+import type { ContextEnvironment } from '../sidecar/environment.js';
 import { truncateProportionally } from '../truncation.js';
 
 export class HistorySquashingProcessor implements ContextProcessor {
   readonly name = 'HistorySquashing';
-  private config: Config;
+    private options: { maxTokensPerNode: number };
 
-  constructor(config: Config) {
-    this.config = config;
+  constructor(env: ContextEnvironment, options: { maxTokensPerNode: number }) {
+    
+    this.options = options;
   }
 
   private tryApplySquash(
@@ -54,8 +55,7 @@ export class HistorySquashingProcessor implements ContextProcessor {
       return episodes;
     }
 
-    const { maxTokensPerNode } =
-      this.config.getContextManagementConfig().strategies.historySquashing;
+    const { maxTokensPerNode } = this.options;
     // We estimate 4 chars per token for truncation logic
     const limitChars = maxTokensPerNode * 4;
 

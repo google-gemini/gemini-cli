@@ -6,7 +6,28 @@
 
 import { vi } from 'vitest';
 import type { Config } from '../../config/config.js';
-import type { GeminiClient } from '../../core/client.js';
+
+import type { ContextEnvironment } from '../sidecar/environment.js';
+
+export function createMockEnvironment(): ContextEnvironment {
+  return {
+    getLlmClient: vi.fn().mockReturnValue({
+      generateContent: vi.fn().mockResolvedValue({
+        text: 'Mock LLM summary response',
+      }),
+    }) as any,
+    getSessionId: vi.fn().mockReturnValue('mock-session'),
+    getTraceDir: vi.fn().mockReturnValue('/tmp/.gemini/trace'),
+    getProjectTempDir: vi.fn().mockReturnValue('/tmp'),
+    getTracer: vi.fn().mockReturnValue({
+      logEvent: vi.fn(),
+      saveAsset: vi.fn().mockReturnValue('mock-asset-id'),
+    }) as any,
+    getCharsPerToken: vi.fn().mockReturnValue(1),
+  };
+}
+
+
 import type { Content } from '@google/genai';
 import { AgentChatHistory } from '../../core/agentChatHistory.js';
 import { ContextManager } from '../contextManager.js';
@@ -20,7 +41,7 @@ export function createSyntheticHistory(
   tokensPerTurn: number,
 ): Content[] {
   const history: Content[] = [];
-  const charsPerTurn = tokensPerTurn * 4;
+  const charsPerTurn = tokensPerTurn * 1;
 
   for (let i = 0; i < numTurns; i++) {
     history.push({
@@ -45,23 +66,28 @@ export function createMockContextConfig(
 ): Config {
   const defaultConfig = {
     isContextManagementEnabled: vi.fn().mockReturnValue(true),
+    storage: {
+      getProjectTempDir: vi.fn().mockReturnValue('/tmp/gemini-test'),
+    },
     getContextManagementConfig: vi.fn().mockReturnValue({
       enabled: true,
+      charsPerToken: 1,
       strategies: {
         historySquashing: { maxTokensPerNode: 3000 },
         toolMasking: { stringLengthThresholdTokens: 10000 },
-        semanticCompression: {
-          nodeThresholdTokens: 5000,
-          compressionModel: 'gemini-2.5-flash',
-        },
+        semanticCompression: { nodeThresholdTokens: 5000 },
       },
-      budget: {
-        maxTokens: 150000,
-        retainedTokens: 65000,
-        protectedEpisodes: 1,
-        protectSystemEpisode: true,
-        maxPressureStrategy: 'truncate',
-      },
+      budget: { retainedTokens: 500, maxTokens: 150000, maxPressureStrategy: 'truncate', gcTarget: 'incremental', freeTokensTarget: 1000 },
+      gcBackstop: { strategy: 'truncate', target: 'freeNTokens', freeTokensTarget: 100 },
+      pipelines: {
+        eagerBackground: [{ processorId: 'StateSnapshotWorker', options: {} }],
+        retainedProcessingGraph: [{ processorId: 'HistorySquashingProcessor', options: { maxTokensPerNode: 3000 } }],
+        normalProcessingGraph: [
+          { processorId: 'ToolMaskingProcessor', options: { stringLengthThresholdTokens: 10000 } },
+          { processorId: 'BlobDegradationProcessor', options: {} },
+          { processorId: 'SemanticCompressionProcessor', options: { nodeThresholdTokens: 5000 } }
+        ]
+      }
     }),
     getBaseLlmClient: vi.fn().mockReturnValue(
       llmClientOverride || {
@@ -81,12 +107,16 @@ export function createMockContextConfig(
 /**
  * Wires up a full ContextManager component with an AgentChatHistory and active background workers.
  */
+import { ContextTracer } from '../tracer.js';
+import { ContextEnvironmentImpl } from '../sidecar/environmentImpl.js';
+import { SidecarLoader } from '../sidecar/SidecarLoader.js';
+
 export function setupContextComponentTest(config: Config) {
   const chatHistory = new AgentChatHistory();
-  const contextManager = new ContextManager(
-    config,
-    config.getBaseLlmClient() as unknown as GeminiClient,
-  );
+  const sidecar = SidecarLoader.fromLegacyConfig(config);
+  const tracer = new ContextTracer('/tmp', 'test-session');
+  const env = new ContextEnvironmentImpl(config.getBaseLlmClient() as any, 'test-session', '/tmp', '/tmp/gemini-test', tracer, 1);
+  const contextManager = new ContextManager(sidecar, env, tracer);
 
   // The async worker is now internally managed by ContextManager
 

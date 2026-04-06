@@ -4,9 +4,9 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { createMockEnvironment } from '../testing/contextTestUtils.js';
+import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { ToolMaskingProcessor } from './toolMaskingProcessor.js';
-import type { Config } from '../../config/config.js';
 import type { Episode, ToolExecution } from '../ir/types.js';
 import type { ContextAccountingState } from '../pipeline.js';
 import { randomUUID } from 'node:crypto';
@@ -15,22 +15,13 @@ import * as fsPromises from 'node:fs/promises';
 vi.mock('node:fs/promises');
 
 describe('ToolMaskingProcessor', () => {
-  let mockConfig: Config;
+  
   let processor: ToolMaskingProcessor;
 
   beforeEach(() => {
     vi.resetAllMocks();
-    mockConfig = {
-      getContextManagementConfig: vi.fn().mockReturnValue({
-        strategies: {
-          toolMasking: { stringLengthThresholdTokens: 100 },
-        },
-      }),
-      storage: { getProjectTempDir: vi.fn().mockReturnValue('/tmp/gemini') },
-      getSessionId: vi.fn().mockReturnValue('test-session'),
-    } as unknown as Config;
-
-    processor = new ToolMaskingProcessor(mockConfig);
+    
+    processor = new ToolMaskingProcessor(createMockEnvironment(), { stringLengthThresholdTokens: 100 });
   });
 
   const getDummyState = (
@@ -84,6 +75,7 @@ describe('ToolMaskingProcessor', () => {
     const state = getDummyState(true);
 
     const result = await processor.process(episodes, state);
+    require('fs').appendFileSync('/tmp/debug.json', '\n\n' + JSON.stringify({res: result[0].steps[0]}, null, 2));
 
     expect(result).toStrictEqual(episodes);
     expect((result[0].steps[0] as ToolExecution).presentation).toBeUndefined();

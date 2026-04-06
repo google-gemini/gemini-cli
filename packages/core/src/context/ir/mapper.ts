@@ -15,7 +15,7 @@ import type {
   AgentYield,
   UserPrompt,
 } from './types.js';
-import { estimateTokenCountSync } from '../../utils/tokenCalculation.js';
+import { estimateContextTokenCountSync as estimateTokenCountSync } from '../utils/contextTokenCalculator.js';
 
 // WeakMap to provide stable, deterministic identity across parses for the exact same Content/Part references
 const nodeIdentityMap = new WeakMap<object, string>();
@@ -30,6 +30,11 @@ function getStableId(obj: object): string {
 }
 
 export class IrMapper {
+  static setConfig(cfg: { charsPerToken?: number }) {
+    this.config = cfg;
+  }
+  private static config: { charsPerToken?: number } | undefined;
+
   /**
    * Translates a flat Gemini Content[] array into our rich Episodic Intermediate Representation.
    * Groups adjacent function calls and responses into unified ToolExecution nodes.
@@ -40,7 +45,7 @@ export class IrMapper {
     const pendingCallParts: Map<string, Part> = new Map();
 
     const createMetadata = (parts: Part[]): IrMetadata => {
-      const tokens = estimateTokenCountSync(parts);
+      const tokens = estimateTokenCountSync(parts, 0, IrMapper.config);
       return {
         originalTokens: tokens,
         currentTokens: tokens,

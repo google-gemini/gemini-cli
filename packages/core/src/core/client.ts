@@ -45,6 +45,9 @@ import type { ContentGenerator } from './contentGenerator.js';
 import { LoopDetectionService } from '../services/loopDetectionService.js';
 import { ChatCompressionService } from '../context/chatCompressionService.js';
 import { ContextManager } from '../context/contextManager.js';
+import { SidecarLoader } from '../context/sidecar/SidecarLoader.js';
+import { ContextEnvironmentImpl } from '../context/sidecar/environmentImpl.js';
+import { ContextTracer } from '../context/tracer.js';
 import { ideContextStore } from '../ide/ideContext.js';
 import {
   logContentRetryFailure,
@@ -113,7 +116,10 @@ export class GeminiClient {
     this.loopDetector = new LoopDetectionService(this.config);
     this.compressionService = new ChatCompressionService();
 
-    this.contextManager = new ContextManager(this.config, this);
+    const sidecar = SidecarLoader.fromLegacyConfig(this.config);
+    const tracer = new ContextTracer(typeof this.config.getTargetDir === 'function' ? this.config.getTargetDir() : '/tmp', typeof this.config.getSessionId === 'function' ? this.config.getSessionId() : 'test');
+    const env = new ContextEnvironmentImpl(this as any, typeof this.config.getSessionId === 'function' ? this.config.getSessionId() : 'test', typeof this.config.getTargetDir === 'function' ? this.config.getTargetDir() : '/tmp', this.config.storage?.getProjectTempDir ? this.config.storage.getProjectTempDir() : '/tmp', tracer, this.config.getContextManagementConfig && this.config.getContextManagementConfig() ? this.config.getContextManagementConfig().charsPerToken ?? 4 : 4);
+    this.contextManager = new ContextManager(sidecar, env, tracer);
     this.toolOutputMaskingService = new ToolOutputMaskingService();
     this.lastPromptId = this.config.getSessionId();
 

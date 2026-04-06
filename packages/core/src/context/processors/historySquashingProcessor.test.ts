@@ -3,9 +3,9 @@
  * Copyright 2026 Google LLC
  * SPDX-License-Identifier: Apache-2.0
  */
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { createMockEnvironment } from '../testing/contextTestUtils.js';
+import { describe, it, expect, beforeEach } from 'vitest';
 import { HistorySquashingProcessor } from './historySquashingProcessor.js';
-import type { Config } from '../../config/config.js';
 import type {
   Episode,
   UserPrompt,
@@ -16,19 +16,12 @@ import type { ContextAccountingState } from '../pipeline.js';
 import { randomUUID } from 'node:crypto';
 
 describe('HistorySquashingProcessor', () => {
-  let mockConfig: Config;
+  
   let processor: HistorySquashingProcessor;
 
   beforeEach(() => {
-    mockConfig = {
-      getContextManagementConfig: vi.fn().mockReturnValue({
-        strategies: {
-          historySquashing: { maxTokensPerNode: 100 }, // Extremely small limit for testing
-        },
-      }),
-    } as unknown as Config;
-
-    processor = new HistorySquashingProcessor(mockConfig);
+    
+    processor = new HistorySquashingProcessor(createMockEnvironment(), { maxTokensPerNode: 100 });
   });
 
   const getDummyState = (

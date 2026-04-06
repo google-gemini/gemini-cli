@@ -5,8 +5,8 @@
  */
 import type { Episode } from '../ir/types.js';
 import type { ContextAccountingState, ContextProcessor } from '../pipeline.js';
-import type { Config } from '../../config/config.js';
-import { estimateTokenCountSync } from '../../utils/tokenCalculation.js';
+import type { ContextEnvironment } from '../sidecar/environment.js';
+import { estimateContextTokenCountSync as estimateTokenCountSync } from '../utils/contextTokenCalculator.js';
 import { sanitizeFilenamePart } from '../../utils/fileUtils.js';
 import * as fsPromises from 'node:fs/promises';
 import path from 'node:path';
@@ -14,10 +14,10 @@ import type { Part } from '@google/genai';
 
 export class BlobDegradationProcessor implements ContextProcessor {
   readonly name = 'BlobDegradation';
-  private config: Config;
+  private env: ContextEnvironment;
 
-  constructor(config: Config) {
-    this.config = config;
+  constructor(env: ContextEnvironment, options: Record<string, unknown> = {}) {
+    this.env = env;
   }
 
   async process(
@@ -33,10 +33,10 @@ export class BlobDegradationProcessor implements ContextProcessor {
     let directoryCreated = false;
 
     let blobOutputsDir = path.join(
-      this.config.storage.getProjectTempDir(),
+      this.env.getProjectTempDir(),
       'degraded-blobs',
     );
-    const sessionId = this.config.getSessionId();
+    const sessionId = this.env.getSessionId();
     if (sessionId) {
       blobOutputsDir = path.join(
         blobOutputsDir,
@@ -101,7 +101,7 @@ export class BlobDegradationProcessor implements ContextProcessor {
           }
 
           if (newText && tokensSaved > 0) {
-            const newTokens = estimateTokenCountSync([{ text: newText }]);
+            const newTokens = estimateTokenCountSync([{ text: newText }], 0, { charsPerToken: this.env.getCharsPerToken() });
             part.presentation = { text: newText, tokens: newTokens };
 
             ep.trigger.metadata.transformations.push({

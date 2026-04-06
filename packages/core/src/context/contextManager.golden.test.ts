@@ -14,8 +14,11 @@ import {
   afterAll,
 } from 'vitest';
 import { ContextManager } from './contextManager.js';
-import type { Config } from '../config/config.js';
-import type { GeminiClient } from '../core/client.js';
+import { ContextEnvironmentImpl } from './sidecar/environmentImpl.js';
+import { SidecarLoader } from './sidecar/SidecarLoader.js';
+import { ContextTracer } from './tracer.js';
+
+
 import type { Content } from '@google/genai';
 
 expect.addSnapshotSerializer({
@@ -95,10 +98,10 @@ describe('ContextManager Golden Tests', () => {
       }),
     };
 
-    contextManager = new ContextManager(
-      mockConfig as Config,
-      {} as unknown as GeminiClient,
-    );
+    const sidecar = SidecarLoader.fromLegacyConfig(mockConfig as any);
+      const tracer = new ContextTracer('/tmp', 'test-session');
+      const env = new ContextEnvironmentImpl({} as any, 'test', '/tmp', '/tmp', tracer, 4);
+      contextManager = new ContextManager(sidecar, env, tracer);
     
   });
 
@@ -178,7 +181,26 @@ describe('ContextManager Golden Tests', () => {
     ).IrMapper.toIr(history);
     // In Golden Tests, we just want to ensure the logic doesn't throw or alter unprotected history in weird ways.
     // Since we're skipping processors due to being under budget, it should equal history.
+    mockConfig.getContextManagementConfig.mockReturnValue({
+      strategies: {
+        historySquashing: { maxTokensPerNode: 3000 },
+        toolMasking: { stringLengthThresholdTokens: 10000 },
+        semanticCompression: {
+          nodeThresholdTokens: 5000,
+        },
+      },
+      budget: {
+        maxTokens: 15000000,
+        retainedTokens: 50000,
+      },
+      gcBackstop: { target: 'incremental', strategy: 'truncate' },
+    });
+    const tracer2 = new ContextTracer('/tmp', 'test2');
+      contextManager = new ContextManager({ pipelines: { eagerBackground: [], normalProcessingGraph: [], retainedProcessingGraph: [] } } as any, {} as any, tracer2);
+    
+    (contextManager as any).pristineEpisodes = (await import('./ir/mapper.js')).IrMapper.toIr(history);
     const result = await contextManager.projectCompressedHistory();
+    
     expect(result.length).toEqual(history.length);
   });
 });

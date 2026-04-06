@@ -4,8 +4,8 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 import type { Content } from '@google/genai';
-import type { Config } from '../config/config.js';
-import type { GeminiClient } from '../core/client.js';
+
+
 import type { AgentChatHistory } from '../core/agentChatHistory.js';
 import { debugLogger } from '../utils/debugLogger.js';
 import { IrMapper } from './ir/mapper.js';
@@ -16,26 +16,51 @@ import { ContextTracer } from './tracer.js';
 
 import { StateSnapshotWorker } from './workers/stateSnapshotWorker.js';
 
+import type { ContextEnvironment } from './sidecar/environment.js';
+
+import type { SidecarConfig } from './sidecar/types.js';
+import { ProcessorRegistry } from './sidecar/registry.js';
+import type { ContextProcessor } from './pipeline.js';
+import type { AsyncContextWorker } from './workers/asyncContextWorker.js';
+
+import { ToolMaskingProcessor } from './processors/toolMaskingProcessor.js';
+import { BlobDegradationProcessor } from './processors/blobDegradationProcessor.js';
+import { SemanticCompressionProcessor } from './processors/semanticCompressionProcessor.js';
+import { HistorySquashingProcessor } from './processors/historySquashingProcessor.js';
+
 export class ContextManager {
-  private config: Config;
+  
   
   // The stateful, pristine Episodic Intermediate Representation graph.
   // This allows the agent to remember and summarize continuously without losing data across turns.
   private pristineEpisodes: Episode[] = [];
   private unsubscribeHistory?: () => void;
   private readonly eventBus: ContextEventBus;
-  private readonly tracer: ContextTracer;
+  
   
   // Internal sub-components
   // Synchronous processors are instantiated but effectively used as singletons within this class
-  private workers: StateSnapshotWorker[] = [];
+  private workers: AsyncContextWorker[] = [];
+  
+  
 
-  constructor(config: Config, _client: GeminiClient) {
-    this.config = config;
+  constructor(private sidecar: SidecarConfig, private env: ContextEnvironment, private readonly tracer: ContextTracer) {
+    
+    
     this.eventBus = new ContextEventBus();
-    this.tracer = new ContextTracer(config.getTargetDir(), config.getSessionId());
+    
+    
+    
+
+    // Register built-ins
+    ProcessorRegistry.register({ id: 'ToolMaskingProcessor', create: (env, opts) => new ToolMaskingProcessor(env, opts as any) });
+    ProcessorRegistry.register({ id: 'BlobDegradationProcessor', create: (env, opts) => new BlobDegradationProcessor(env) });
+    ProcessorRegistry.register({ id: 'SemanticCompressionProcessor', create: (env, opts) => new SemanticCompressionProcessor(env, opts as any) });
+    ProcessorRegistry.register({ id: 'HistorySquashingProcessor', create: (env, opts) => new HistorySquashingProcessor(env, opts as any) });
+    ProcessorRegistry.register({ id: 'StateSnapshotWorker', create: (env, opts) => new StateSnapshotWorker(env) });
 
     this.eventBus.onVariantReady((event) => {
+      
       // Find the target episode in the pristine graph
       const targetEp = this.pristineEpisodes.find(
         (ep) => ep.id === event.targetId,
@@ -56,9 +81,11 @@ export class ContextManager {
     // Order matters: Fast, lossless masking -> Intelligent degradation -> Brutal truncation fallback
 
     // Initialize and start background subconscious workers
-    const snapshotWorker = new StateSnapshotWorker(this.config);
-    snapshotWorker.start(this.eventBus, this.tracer);
-    this.workers.push(snapshotWorker);
+    for (const bgDef of this.sidecar.pipelines.eagerBackground) {
+      const worker = ProcessorRegistry.get(bgDef.processorId).create(this.env, bgDef.options) as AsyncContextWorker;
+      worker.start(this.eventBus);
+      this.workers.push(worker);
+    }
   }
 
   /**
@@ -94,14 +121,15 @@ export class ContextManager {
   }
 
   private checkTriggers() {
-    if (!this.config.isContextManagementEnabled()) return;
+    if (!this.sidecar.budget) return;
 
-    const mngConfig = this.config.getContextManagementConfig();
+    const mngConfig = this.sidecar;
     
     // Calculate tokens based on the *Working Buffer View*, not the raw pristine log.
     // This solves Bug 2: The View shrinks when variants are applied, preventing infinite GC loops.
     const workingBuffer = this.getWorkingBufferView();
     const currentTokens = this.calculateIrTokens(workingBuffer);
+    
     this.tracer.logEvent('ContextManager', 'Evaluated triggers', { currentTokens, retainedTokens: mngConfig.budget.retainedTokens });
 
     // 1. Eager Compute Trigger (Continuous Streaming)
@@ -113,7 +141,9 @@ export class ContextManager {
     if (currentTokens > mngConfig.budget.retainedTokens) {
       const deficit = currentTokens - mngConfig.budget.retainedTokens;
       this.tracer.logEvent('ContextManager', 'Budget crossed. Emitting ConsolidationNeeded', { deficit });
+      console.log('EMITTING CONSOLIDATION. Buffer:', workingBuffer.length, 'Deficit:', deficit);
       this.eventBus.emitConsolidationNeeded({
+        
         episodes: workingBuffer, // Pass the working buffer so they know what still needs compression
         targetDeficit: deficit,
       });
@@ -127,8 +157,74 @@ export class ContextManager {
    * (snapshot > summary > masked) instead of the raw text.
    * Handles N-to-1 variant skipping automatically.
    */
+  /**
+   * Applies the data-driven Sidecar configuration graphs.
+   * Splits the episodes into the 'retained' and 'normal' ranges,
+   * runs their respective processor pipelines sequentially, and recombines them.
+   */
+  private async applyProcessorGraphs(episodes: Episode[]): Promise<Episode[]> {
+    const mngConfig = this.sidecar;
+    const retainedLimit = mngConfig.budget.retainedTokens;
+    
+
+    // If we're incredibly small, maybe we just run the retained graph on everything?
+    // Let's divide the episodes exactly at the retained boundary.
+    const retainedWindow: Episode[] = [];
+    const normalWindow: Episode[] = [];
+    let rollingTokens = 0;
+
+    // Scan backwards to fill the retained window
+    for (let i = episodes.length - 1; i >= 0; i--) {
+      const ep = episodes[i];
+      const epTokens = this.calculateIrTokens([ep]);
+      if ((rollingTokens + epTokens <= retainedLimit && normalWindow.length === 0) || retainedWindow.length === 0) {
+        // We always put at least the latest episode in the retained window.
+        // We only add to retainedWindow if we haven't already started the normalWindow (contiguous block).
+        retainedWindow.unshift(ep);
+        rollingTokens += epTokens;
+      } else {
+        normalWindow.unshift(ep);
+      }
+    }
+
+    const protectedIds = new Set<string>();
+    // We must protect the System Episode, which is always index 0 of pristineEpisodes.
+    if (this.pristineEpisodes.length > 0) {
+      protectedIds.add(this.pristineEpisodes[0].id); // Structural invariant
+    }
+
+    const createAccountingState = (currentTotal: number) => ({
+      currentTokens: currentTotal,
+      maxTokens: mngConfig.budget.maxTokens,
+      retainedTokens: mngConfig.budget.retainedTokens,
+      deficitTokens: Math.max(0, currentTotal - mngConfig.budget.maxTokens),
+      protectedEpisodeIds: protectedIds,
+      isBudgetSatisfied: currentTotal <= mngConfig.budget.maxTokens, // We use maxTokens here so processors don't prematurely short-circuit if they are trying to prevent a barrier hit
+    });
+
+    // Run Retained Graph
+    let processedRetained = [...retainedWindow];
+    for (const def of mngConfig.pipelines.retainedProcessingGraph) {
+      const processor = ProcessorRegistry.get(def.processorId).create(this.env, def.options) as ContextProcessor;
+      this.tracer.logEvent('ContextManager', `Running ${processor.name} on retained window.`);
+      const state = createAccountingState(this.calculateIrTokens([...normalWindow, ...processedRetained]));
+      processedRetained = await processor.process(processedRetained, state);
+    }
+
+    // Run Normal Graph
+    let processedNormal = [...normalWindow];
+    for (const def of mngConfig.pipelines.normalProcessingGraph) {
+      const processor = ProcessorRegistry.get(def.processorId).create(this.env, def.options) as ContextProcessor;
+      this.tracer.logEvent('ContextManager', `Running ${processor.name} on normal window.`);
+      const state = createAccountingState(this.calculateIrTokens([...processedNormal, ...processedRetained]));
+      processedNormal = await processor.process(processedNormal, state);
+    }
+
+    return [...processedNormal, ...processedRetained];
+  }
+
   public getWorkingBufferView(): Episode[] {
-    const mngConfig = this.config.getContextManagementConfig();
+    const mngConfig = this.sidecar;
     const retainedTokens = mngConfig.budget.retainedTokens;
     
     let currentEpisodes: Episode[] = [];
@@ -182,7 +278,9 @@ export class ContextManager {
 
       const epTokens = this.calculateIrTokens([projectedEp]);
 
+      if (ep.variants) { console.log('Checking variants for', ep.id, 'rollingTokens:', rollingTokens, 'retained:', retainedTokens); }
       if (rollingTokens > retainedTokens && ep.variants) {
+        console.log('EVALUATING VARIANTS FOR', ep.id);
         const snapshot = ep.variants['snapshot'];
         const summary = ep.variants['summary'];
         const masked = ep.variants['masked'];
@@ -254,6 +352,7 @@ export class ContextManager {
       rollingTokens += this.calculateIrTokens([projectedEp]);
     }
 
+    
     return currentEpisodes;
   }
 
@@ -262,56 +361,67 @@ export class ContextManager {
    * This does NOT mutate the pristine episodic graph.
    */
   async projectCompressedHistory(): Promise<Content[]> {
-    if (!this.config.isContextManagementEnabled()) {
+    if (!this.sidecar.budget) {
       return this._projectAndDump(IrMapper.fromIr(this.pristineEpisodes));
     }
 
-    const mngConfig = this.config.getContextManagementConfig();
+    const mngConfig = this.sidecar;
     const maxTokens = mngConfig.budget.maxTokens;
     this.tracer.logEvent('ContextManager', 'Projection requested.');
 
     // Get the dynamically computed Working Buffer View
     let currentEpisodes = this.getWorkingBufferView();
+    
+    currentEpisodes = await this.applyProcessorGraphs(currentEpisodes);
+    
     let currentTokens = this.calculateIrTokens(currentEpisodes);
+    
 
     if (currentTokens <= maxTokens) {
       this.tracer.logEvent('ContextManager', `View is within maxTokens (${currentTokens} <= ${maxTokens}). Returning view.`);
       return this._projectAndDump(IrMapper.fromIr(currentEpisodes));
     }
 
-    this.tracer.logEvent('ContextManager', `View exceeds maxTokens (${currentTokens} > ${maxTokens}). Hitting Synchronous Pressure Barrier. Strategy: ${mngConfig.budget.maxPressureStrategy}`);
+    this.tracer.logEvent('ContextManager', `View exceeds maxTokens (${currentTokens} > ${maxTokens}). Hitting Synchronous Pressure Barrier. Strategy: ${mngConfig.gcBackstop.strategy}`);
     // --- The Synchronous Pressure Barrier ---
     // The background eager workers couldn't keep up, or a massive file was pasted.
     // The Working Buffer View is still over the absolute hard limit (maxTokens).
     // We MUST reduce tokens before returning, or the API request will 400.
     
     debugLogger.log(
-      `Context Manager Synchronous Barrier triggered: View at ${currentTokens} tokens (limit: ${maxTokens}). Strategy: ${mngConfig.budget.maxPressureStrategy}`,
+      `Context Manager Synchronous Barrier triggered: View at ${currentTokens} tokens (limit: ${maxTokens}). Strategy: ${mngConfig.gcBackstop.strategy}`,
     );
 
     // Calculate target based on gcTarget
     let targetTokens = maxTokens;
-    if (mngConfig.budget.gcTarget === 'max') {
+    
+    if (mngConfig.gcBackstop.target === 'max') {
         targetTokens = mngConfig.budget.retainedTokens;
-    } else if (mngConfig.budget.gcTarget === 'freeNTokens') {
-        targetTokens = maxTokens - (mngConfig.budget.freeTokensTarget ?? 10000);
+    } else if (mngConfig.gcBackstop.target === 'freeNTokens') {
+        targetTokens = maxTokens - (mngConfig.gcBackstop.freeTokensTarget ?? 10000);
     }
 
     // Structural invariant: We ALWAYS protect the architectural initialization turn (Turn 0)
     // We do NOT arbitrarily protect recent episodes (like currentEpisodes.length - 1)
     // because an episode can be unboundedly large, and protecting it would crash the LLM.
-    const protectedEpisodeId = currentEpisodes.length > 0 ? currentEpisodes[0].id : null;
+    const protectedEpisodeId = this.pristineEpisodes.length > 0 ? this.pristineEpisodes[0].id : null;
 
     let remainingTokens = currentTokens;
+    
     const truncated: Episode[] = [];
-    const strategy = mngConfig.budget.maxPressureStrategy;
+    
+    const strategy = mngConfig.gcBackstop.strategy;
+    
 
     for (const ep of currentEpisodes) {
       const epTokens = this.calculateIrTokens([ep]);
       if (remainingTokens > targetTokens && ep.id !== protectedEpisodeId) {
+         console.log('DROPPING EPISODE:', ep.id, 'rem:', remainingTokens, 'tgt:', targetTokens);
+
          remainingTokens -= epTokens;
          if (strategy === 'truncate') {
              this.tracer.logEvent('Barrier', `Truncating episode [${ep.id}].`);
+             
              debugLogger.log(`Barrier (truncate): Dropped Episode ${ep.id}`);
          } else if (strategy === 'compress') {
              this.tracer.logEvent('Barrier', `Compress fallback to truncate for [${ep.id}].`);
@@ -321,7 +431,9 @@ export class ContextManager {
              debugLogger.warn(`Synchronous rollingSummarizer barrier not fully implemented, truncating Episode ${ep.id}.`);
          }
       } else {
+         console.log('KEEPING EPISODE:', ep.id, 'rem:', remainingTokens, 'tgt:', targetTokens);
          truncated.push(ep);
+         
       }
     }
     currentEpisodes = truncated;
@@ -340,7 +452,7 @@ export class ContextManager {
       try {
         const fs = await import('node:fs/promises');
         const path = await import('node:path');
-        const dumpPath = path.join(this.config.getTargetDir(), '.gemini', 'projected_context.json');
+        const dumpPath = path.join(this.env.getTraceDir(), '.gemini', 'projected_context.json');
         await fs.mkdir(path.dirname(dumpPath), { recursive: true });
         await fs.writeFile(dumpPath, JSON.stringify(contents, null, 2), 'utf-8');
         debugLogger.log(`[Observability] Context successfully dumped to ${dumpPath}`);

@@ -5,7 +5,7 @@
  */
 
 import { randomUUID } from 'node:crypto';
-import type { Config } from '../../config/config.js';
+import type { ContextEnvironment } from '../sidecar/environment.js';
 import type { Episode, SnapshotVariant } from '../ir/types.js';
 import type { AsyncContextWorker } from './asyncContextWorker.js';
 import type {
@@ -13,7 +13,7 @@ import type {
   ContextConsolidationEvent,
 } from '../eventBus.js';
 import { debugLogger } from '../../utils/debugLogger.js';
-import { estimateTokenCountSync } from '../../utils/tokenCalculation.js';
+import { estimateContextTokenCountSync as estimateTokenCountSync } from '../utils/contextTokenCalculator.js';
 import { IrMapper } from '../ir/mapper.js';
 import { LlmRole } from '../../telemetry/llmRole.js';
 import type { ContextTracer } from '../tracer.js';
@@ -24,9 +24,10 @@ export class StateSnapshotWorker implements AsyncContextWorker {
   private tracer?: ContextTracer;
   private isSynthesizing = false;
 
-  constructor(private readonly _config: Config) {}
+  constructor(private readonly env: ContextEnvironment) {}
 
   start(bus: ContextEventBus, tracer?: ContextTracer): void {
+    console.log('Worker start() called with bus:', !!bus);
     this.bus = bus;
     this.tracer = tracer;
     this.bus.onConsolidationNeeded(this.handleConsolidation.bind(this));
@@ -42,6 +43,7 @@ export class StateSnapshotWorker implements AsyncContextWorker {
   private async handleConsolidation(
     event: ContextConsolidationEvent,
   ): Promise<void> {
+    console.log(`Worker handling consolidation. targetDeficit: ${event.targetDeficit}, isSynthesizing: ${this.isSynthesizing}`);
     if (this.isSynthesizing || event.targetDeficit <= 0) return;
 
     // Identify the "dying" block of episodes that need to be collected.
@@ -51,13 +53,17 @@ export class StateSnapshotWorker implements AsyncContextWorker {
       (ep) => !ep.variants?.['snapshot'],
     );
 
-    if (unprotectedOldest.length === 0) return;
+    if (unprotectedOldest.length === 0) {
+      
+      return;
+    }
 
     let targetDeficit = event.targetDeficit;
     const episodesToSynthesize: Episode[] = [];
     let tokensToSynthesize = 0;
 
     for (const ep of unprotectedOldest) {
+      console.log('Worker considering episode:', ep.id);
       if (tokensToSynthesize >= targetDeficit) break;
       episodesToSynthesize.push(ep);
       // Rough estimate of tokens in this episode
@@ -71,7 +77,9 @@ export class StateSnapshotWorker implements AsyncContextWorker {
 
     if (episodesToSynthesize.length === 0) return;
 
+    console.log(`Worker synthesized logic loop complete. Selected ${episodesToSynthesize.length} episodes for ~${tokensToSynthesize} tokens.`);
     this.isSynthesizing = true;
+    
 
     try {
       debugLogger.log(
@@ -79,7 +87,7 @@ export class StateSnapshotWorker implements AsyncContextWorker {
       );
       this.tracer?.logEvent('StateSnapshotWorker', `Consolidation requested. Synthesizing ${episodesToSynthesize.length} episodes for ~${tokensToSynthesize} tokens.`);
 
-      const client = this._config.getBaseLlmClient();
+      const client = this.env.getLlmClient();
       const rawContents = IrMapper.fromIr(episodesToSynthesize);
       const rawAssetId = this.tracer?.saveAsset('StateSnapshotWorker', 'episodes_to_synthesize', rawContents);
       this.tracer?.logEvent('StateSnapshotWorker', 'Dispatching LLM request for snapshot generation', { rawAssetId });
@@ -118,7 +126,7 @@ ${snapshotText || '[Failed to generate snapshot]'}
 
       const snapshotTokens = estimateTokenCountSync([
         { text: mockSnapshotText },
-      ]);
+      ], 0, { charsPerToken: this.env.getCharsPerToken() });
 
       const replacedEpisodeIds = episodesToSynthesize.map((e) => e.id);
 
@@ -173,6 +181,7 @@ ${snapshotText || '[Failed to generate snapshot]'}
 
       if (this.bus) {
         this.tracer?.logEvent('StateSnapshotWorker', `Emitting VARIANT_READY for targetId [${targetId}]`);
+        
         this.bus.emitVariantReady({
           targetId,
           variantId: 'snapshot',
