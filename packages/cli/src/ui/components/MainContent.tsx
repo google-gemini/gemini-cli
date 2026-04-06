@@ -91,20 +91,47 @@ export const MainContent = () => {
     const flags = new Array<boolean>(combinedHistory.length).fill(false);
 
     if (topicUpdateNarrationEnabled) {
-      let toolGroupInTurn = false;
+      let turnIsIntermediate = false;
+      let hasTopicToolInTurn = false;
+
       for (let i = combinedHistory.length - 1; i >= 0; i--) {
         const item = combinedHistory[i];
         if (item.type === 'user' || item.type === 'user_shell') {
-          toolGroupInTurn = false;
+          turnIsIntermediate = false;
+          hasTopicToolInTurn = false;
         } else if (item.type === 'tool_group') {
-          toolGroupInTurn = item.tools.some((t) => isTopicTool(t.name));
+          const hasTopic = item.tools.some((t) => isTopicTool(t.name));
+          const hasNonTopic = item.tools.some((t) => !isTopicTool(t.name));
+          if (hasTopic) {
+            hasTopicToolInTurn = true;
+          }
+          if (hasNonTopic) {
+            turnIsIntermediate = true;
+          }
         } else if (
-          (item.type === 'thinking' ||
-            item.type === 'gemini' ||
-            item.type === 'gemini_content') &&
-          toolGroupInTurn
+          item.type === 'thinking' ||
+          item.type === 'gemini' ||
+          item.type === 'gemini_content'
         ) {
-          flags[i] = true;
+          // Rule 1: Always suppress thinking when narration is enabled to avoid
+          // "flashing" as the model starts its response, and because the Topic
+          // UI provides the necessary high-level intent.
+          if (item.type === 'thinking') {
+            flags[i] = true;
+            continue;
+          }
+
+          // Rule 2: Suppress text in intermediate turns (turns containing non-topic
+          // tools) to hide mechanical narration.
+          if (turnIsIntermediate) {
+            flags[i] = true;
+          }
+
+          // Rule 3: Suppress text that precedes a topic tool in the same turn,
+          // as the topic tool "replaces" it.
+          if (hasTopicToolInTurn) {
+            flags[i] = true;
+          }
         }
       }
     }
