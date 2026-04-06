@@ -5,8 +5,8 @@
  */
 
 import type React from 'react';
-import { useEffect, useId } from 'react';
-import { Box, Text } from 'ink';
+import { useEffect, useId, useRef } from 'react';
+import { Box, Text, type DOMElement } from 'ink';
 import {
   UPDATE_TOPIC_TOOL_NAME,
   UPDATE_TOPIC_DISPLAY_NAME,
@@ -17,6 +17,8 @@ import {
 import type { IndividualToolCallDisplay } from '../../types.js';
 import { theme } from '../../semantic-colors.js';
 import { useOverflowActions } from '../../contexts/OverflowContext.js';
+import { useToolActions } from '../../contexts/ToolActionsContext.js';
+import { useMouseClick } from '../../hooks/useMouseClick.js';
 
 interface TopicMessageProps extends IndividualToolCallDisplay {
   terminalWidth: number;
@@ -28,14 +30,24 @@ export const isTopicTool = (name: string): boolean =>
   name === UPDATE_TOPIC_TOOL_NAME || name === UPDATE_TOPIC_DISPLAY_NAME;
 
 export const TopicMessage: React.FC<TopicMessageProps> = ({
+  callId,
   args,
   availableTerminalHeight,
   isExpandable = true,
 }) => {
-  const isExpanded = availableTerminalHeight === undefined;
+  const { isExpanded: isExpandedInContext, toggleExpansion } = useToolActions();
+
+  // Expansion is active if either:
+  // 1. The individual callId is expanded in the ToolActionsContext
+  // 2. The entire turn is expanded (Ctrl+O) which sets availableTerminalHeight to undefined
+  const isExpanded =
+    (isExpandedInContext ? isExpandedInContext(callId) : false) ||
+    availableTerminalHeight === undefined;
+
   const overflowActions = useOverflowActions();
   const uniqueId = useId();
   const overflowId = `topic-${uniqueId}`;
+  const containerRef = useRef<DOMElement>(null);
 
   const rawTitle = args?.[TOPIC_PARAM_TITLE];
   const title = typeof rawTitle === 'string' ? rawTitle : undefined;
@@ -58,6 +70,16 @@ export const TopicMessage: React.FC<TopicMessageProps> = ({
     strategicIntent !== summary
   );
 
+  const handleToggle = () => {
+    if (toggleExpansion && hasExtraSummary) {
+      toggleExpansion(callId);
+    }
+  };
+
+  useMouseClick(containerRef, handleToggle, {
+    isActive: isExpandable && hasExtraSummary,
+  });
+
   useEffect(() => {
     if (isExpandable && hasExtraSummary && overflowActions) {
       overflowActions.addOverflowingId(overflowId);
@@ -72,7 +94,7 @@ export const TopicMessage: React.FC<TopicMessageProps> = ({
   const toggleText = `(ctrl+o to ${isExpanded ? 'collapse' : 'expand'})`;
 
   return (
-    <Box flexDirection="column" marginLeft={2}>
+    <Box ref={containerRef} flexDirection="column" marginLeft={2}>
       <Box flexDirection="row" flexWrap="wrap">
         <Text color={theme.text.primary} bold wrap="truncate-end">
           {title || 'Topic'}

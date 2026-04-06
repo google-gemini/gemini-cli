@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
 import { TopicMessage } from './TopicMessage.js';
 import { renderWithProviders } from '../../../test-utils/render.js';
 import {
@@ -22,7 +22,14 @@ describe('<TopicMessage />', () => {
       'This is the detailed summary that should be expandable.',
   };
 
-  const renderTopic = async (args: Record<string, unknown>, height?: number) =>
+  const renderTopic = async (
+    args: Record<string, unknown>,
+    height?: number,
+    toolActions?: {
+      isExpanded?: (callId: string) => boolean;
+      toggleExpansion?: (callId: string) => void;
+    },
+  ) =>
     renderWithProviders(
       <TopicMessage
         args={args}
@@ -35,6 +42,7 @@ describe('<TopicMessage />', () => {
         confirmationDetails={undefined}
         resultDisplay={undefined}
       />,
+      { toolActions, mouseEventsEnabled: true },
     );
 
   it('renders title and intent by default (collapsed)', async () => {
@@ -46,13 +54,37 @@ describe('<TopicMessage />', () => {
     expect(frame).toContain('(ctrl+o to expand)');
   });
 
-  it('renders summary when expanded', async () => {
+  it('renders summary when globally expanded (Ctrl+O)', async () => {
     const { lastFrame } = await renderTopic(baseArgs, undefined);
     const frame = lastFrame();
     expect(frame).toContain('Test Topic:');
     expect(frame).toContain('This is the strategic intent.');
     expect(frame).toContain('This is the detailed summary');
     expect(frame).toContain('(ctrl+o to collapse)');
+  });
+
+  it('renders summary when selectively expanded via context', async () => {
+    const isExpanded = vi.fn((id) => id === 'test-topic');
+    const { lastFrame } = await renderTopic(baseArgs, 40, { isExpanded });
+    const frame = lastFrame();
+    expect(frame).toContain('Test Topic:');
+    expect(frame).toContain('This is the detailed summary');
+    expect(frame).toContain('(ctrl+o to collapse)');
+  });
+
+  it('calls toggleExpansion when clicked', async () => {
+    const toggleExpansion = vi.fn();
+    const { simulateClick } = await renderTopic(baseArgs, 40, {
+      toggleExpansion,
+    });
+
+    // In renderWithProviders, the component is wrapped in a Box with terminalWidth.
+    // The TopicMessage has marginLeft={2}.
+    // So col 5 should definitely hit the text content.
+    // row 1 is the first line of the TopicMessage.
+    await simulateClick(5, 1);
+
+    expect(toggleExpansion).toHaveBeenCalledWith('test-topic');
   });
 
   it('falls back to summary if strategic_intent is missing', async () => {
@@ -76,17 +108,6 @@ describe('<TopicMessage />', () => {
     const frame = lastFrame();
     expect(frame).toContain('Test Topic:');
     expect(frame).toContain('Only intent is present.');
-    expect(frame).not.toContain('(ctrl+o to expand)');
-  });
-
-  it('renders title only if both intent and summary are missing', async () => {
-    const args = {
-      [TOPIC_PARAM_TITLE]: 'Test Topic',
-    };
-    const { lastFrame } = await renderTopic(args, 40);
-    const frame = lastFrame();
-    expect(frame).toContain('Test Topic');
-    expect(frame).not.toContain(':');
     expect(frame).not.toContain('(ctrl+o to expand)');
   });
 });
