@@ -38,6 +38,8 @@ export function getModelConfigAlias<TOutput extends z.ZodTypeAny>(
   return `${definition.name}-config`;
 }
 
+export const DYNAMIC_RULE_SOURCE = 'AgentRegistry (Dynamic)';
+
 /**
  * Manages the discovery, loading, validation, and registration of
  * AgentDefinitions.
@@ -118,9 +120,7 @@ export class AgentRegistry {
     this.loadBuiltInAgents();
 
     // Clear old dynamic rules before reloading
-    this.config
-      .getPolicyEngine()
-      ?.removeRulesBySource('AgentRegistry (Dynamic)');
+    this.config.getPolicyEngine()?.removeRulesBySource(DYNAMIC_RULE_SOURCE);
 
     if (!this.config.isAgentsEnabled()) {
       return;
@@ -398,7 +398,7 @@ export class AgentRegistry {
         argsPattern: new RegExp(`"agent_name":\\s*"${definition.name}"`),
         decision: PolicyDecision.ASK_USER,
         priority: PRIORITY_SUBAGENT_TOOL + 0.1, // Higher priority to override blanket allow
-        source: 'AgentRegistry (Dynamic)',
+        source: DYNAMIC_RULE_SOURCE,
       });
     }
   }

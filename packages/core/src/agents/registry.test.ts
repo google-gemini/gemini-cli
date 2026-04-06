@@ -5,7 +5,11 @@
  */
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { AgentRegistry, getModelConfigAlias } from './registry.js';
+import {
+  AgentRegistry,
+  getModelConfigAlias,
+  DYNAMIC_RULE_SOURCE,
+} from './registry.js';
 import { makeFakeConfig } from '../test-utils/config.js';
 import type { AgentDefinition, LocalAgentDefinition } from './types.js';
 import type {
@@ -1147,7 +1151,7 @@ describe('AgentRegistry', () => {
       // Verify old dynamic rule was removed
       expect(removeRuleSpy).toHaveBeenCalledWith(
         'OverwrittenAgent',
-        'AgentRegistry (Dynamic)',
+        DYNAMIC_RULE_SOURCE,
       );
       // Verify new dynamic rule (remote -> ASK_USER) was added
       expect(addRuleSpy).toHaveBeenLastCalledWith(
