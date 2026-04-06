@@ -17,6 +17,7 @@ import {
 import type {
   SessionMetrics,
   ModelMetrics,
+  RoleMetrics,
   ToolCallStats,
 } from '@google/gemini-cli-core';
 import { uiTelemetryService, sessionId } from '@google/gemini-cli-core';
@@ -139,7 +140,7 @@ function areMetricsEqual(a: SessionMetrics, b: SessionMetrics): boolean {
   return true;
 }
 
-export type { SessionMetrics, ModelMetrics };
+export type { SessionMetrics, ModelMetrics, RoleMetrics };
 
 export interface SessionStatsState {
   sessionId: string;
