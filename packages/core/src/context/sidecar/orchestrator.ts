@@ -100,6 +100,7 @@ export class PipelineOrchestrator {
     }
 
     // Blocking execution
+    this.tracer.logEvent('Orchestrator', `Triggering synchronous pipeline: ${pipeline.name}`);
     let currentEpisodes = [...episodes];
     for (let i = 0; i < pipeline.processors.length; i++) {
       const procDef = pipeline.processors[i];
@@ -107,6 +108,7 @@ export class PipelineOrchestrator {
       if (!processor) continue;
 
       try {
+        this.tracer.logEvent('Orchestrator', `Executing processor: ${procDef.processorId}`);
         currentEpisodes = await processor.process(currentEpisodes, state);
       } catch (error) {
         debugLogger.error(`Pipeline ${pipeline.name} failed synchronously at ${procDef.processorId}:`, error);
@@ -131,6 +133,7 @@ export class PipelineOrchestrator {
       if (!processor) continue;
 
       try {
+        this.tracer.logEvent('Orchestrator', `Executing processor: ${procDef.processorId} (async)`);
         currentEpisodes = await processor.process(currentEpisodes, state);
       } catch (error) {
         debugLogger.error(`Pipeline ${pipeline.name} failed at ${procDef.processorId}:`, error);

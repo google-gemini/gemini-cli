@@ -27,7 +27,9 @@ export class IrProjector {
     protectedIds: Set<string>
   ): Promise<Content[]> {
     if (!sidecar.budget) {
-      return this.projectAndDump(workingBuffer, env);
+      const contents = IrMapper.fromIr(workingBuffer);
+      tracer.logEvent('IrProjector', 'Projected Context to LLM (No Budget)', { projectedContext: contents });
+      return contents;
     }
 
     const maxTokens = sidecar.budget.maxTokens;
@@ -35,7 +37,9 @@ export class IrProjector {
 
     if (currentTokens <= maxTokens) {
       tracer.logEvent('IrProjector', `View is within maxTokens (${currentTokens} <= ${maxTokens}). Returning view.`);
-      return this.projectAndDump(workingBuffer, env);
+      const contents = IrMapper.fromIr(workingBuffer);
+      tracer.logEvent('IrProjector', 'Projected Context to LLM', { projectedContext: contents });
+      return contents;
     }
 
     tracer.logEvent('IrProjector', `View exceeds maxTokens (${currentTokens} > ${maxTokens}). Hitting Synchronous Pressure Barrier.`);
@@ -54,29 +58,8 @@ export class IrProjector {
     tracer.logEvent('IrProjector', `Finished projection. Final token count: ${finalTokens}.`);
     debugLogger.log(`Context Manager finished. Final actual token count: ${finalTokens}.`);
 
-    return this.projectAndDump(processedEpisodes, env);
-  }
-
-  /**
-   * Converts the internal IR graph into a flat Content[] array for the LLM.
-   * If tracing is enabled via environment variables, dumps the payload to disk.
-   */
-  private static async projectAndDump(episodes: Episode[], env: ContextEnvironment): Promise<Content[]> {
-    const contents = IrMapper.fromIr(episodes);
-
-    if (process.env['GEMINI_DUMP_CONTEXT'] === 'true') {
-      try {
-        const fs = await import('node:fs/promises');
-        const path = await import('node:path');
-        const dumpPath = path.join(env.traceDir, '.gemini', 'projected_context.json');
-        await fs.mkdir(path.dirname(dumpPath), { recursive: true });
-        await fs.writeFile(dumpPath, JSON.stringify(contents, null, 2), 'utf-8');
-        debugLogger.log(`[Observability] Context successfully dumped to ${dumpPath}`);
-      } catch (e) {
-        debugLogger.error(`Failed to dump context: ${e}`);
-      }
-    }
-
+    const contents = IrMapper.fromIr(processedEpisodes);
+    tracer.logEvent('IrProjector', 'Projected Sanitized Context to LLM', { projectedContextSanitized: contents });
     return contents;
   }
 }

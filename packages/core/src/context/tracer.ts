@@ -14,6 +14,8 @@ export class ContextTracer {
   private assetsDir: string;
   private enabled: boolean;
 
+  private readonly MAX_INLINE_SIZE = 1000;
+
   constructor(targetDir: string, sessionId: string) {
     this.enabled = process.env['GEMINI_CONTEXT_TRACE'] === 'true';
     this.traceDir = path.join(targetDir, '.gemini', 'context_trace', sessionId);
@@ -37,9 +39,24 @@ export class ContextTracer {
   ) {
     if (!this.enabled) return;
     try {
+      let processedDetails: Record<string, unknown> | undefined;
+
+      if (details) {
+        processedDetails = {};
+        for (const [key, value] of Object.entries(details)) {
+          const strValue = typeof value === 'string' ? value : JSON.stringify(value);
+          if (strValue && strValue.length > this.MAX_INLINE_SIZE) {
+             const assetId = this.saveAsset(component, key, value);
+             processedDetails[key] = { $asset: assetId };
+          } else {
+             processedDetails[key] = value;
+          }
+        }
+      }
+
       const timestamp = new Date().toISOString();
-      const detailsStr = details
-        ? ` | Details: ${JSON.stringify(details)}`
+      const detailsStr = processedDetails
+        ? ` | Details: ${JSON.stringify(processedDetails)}`
         : '';
       const logLine = `[${timestamp}] [${component}] ${action}${detailsStr}\n`;
       fs.appendFileSync(
@@ -52,7 +69,7 @@ export class ContextTracer {
     }
   }
 
-  saveAsset(component: string, assetName: string, data: unknown): string {
+  private saveAsset(component: string, assetName: string, data: unknown): string {
     if (!this.enabled) return 'asset-recording-disabled';
     try {
       const assetId = `${Date.now()}-${randomUUID().slice(0, 6)}-${assetName}.json`;
