@@ -26,20 +26,19 @@ export const isTopicTool = (name: string): boolean =>
 export const TopicMessage: React.FC<TopicMessageProps> = ({ args }) => {
   const rawTitle = args?.[TOPIC_PARAM_TITLE];
   const title = typeof rawTitle === 'string' ? rawTitle : undefined;
-  const rawDescription =
-    args?.[TOPIC_PARAM_SUMMARY] || args?.[TOPIC_PARAM_STRATEGIC_INTENT];
-  const description =
-    typeof rawDescription === 'string' ? rawDescription : undefined;
+  const rawIntent =
+    args?.[TOPIC_PARAM_STRATEGIC_INTENT] || args?.[TOPIC_PARAM_SUMMARY];
+  const intent = typeof rawIntent === 'string' ? rawIntent : undefined;
 
   return (
     <Box flexDirection="row" marginLeft={2} flexWrap="wrap">
       <Text color={theme.text.primary} bold wrap="truncate-end">
         {title || 'Topic'}
-        {description && <Text>: </Text>}
+        {intent && <Text>: </Text>}
       </Text>
-      {description && (
+      {intent && (
         <Text color={theme.text.secondary} wrap="wrap">
-          {description}
+          {intent}
         </Text>
       )}
     </Box>
