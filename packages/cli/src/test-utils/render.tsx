@@ -598,6 +598,9 @@ const mockUIActions: UIActions = {
   clearAccountSuspension: vi.fn(),
 };
 
+import { type TextBuffer } from '../ui/components/shared/text-buffer.js';
+import { InputContext, type InputState } from '../ui/contexts/InputContext.js';
+
 let capturedOverflowState: OverflowState | undefined;
 let capturedOverflowActions: OverflowActions | undefined;
 const ContextCapture: React.FC<{ children: React.ReactNode }> = ({
@@ -614,6 +617,7 @@ export const renderWithProviders = async (
     shellFocus = true,
     settings = mockSettings,
     uiState: providedUiState,
+    inputState: providedInputState,
     width,
     mouseEventsEnabled = false,
     config,
@@ -625,6 +629,7 @@ export const renderWithProviders = async (
     shellFocus?: boolean;
     settings?: LoadedSettings;
     uiState?: Partial<UIState>;
+    inputState?: Partial<InputState>;
     width?: number;
     mouseEventsEnabled?: boolean;
     config?: Config;
@@ -658,6 +663,18 @@ export const renderWithProviders = async (
       },
     },
   ) as UIState;
+
+  const inputState = {
+    buffer: { text: '' } as unknown as TextBuffer,
+    userMessages: [],
+    shellModeActive: false,
+    showEscapePrompt: false,
+    copyModeEnabled: false,
+    inputWidth: 80,
+    suggestionsWidth: 40,
+    ...(providedUiState as unknown as Partial<InputState>),
+    ...providedInputState,
+  };
 
   if (persistentState?.get) {
     persistentStateMock.get.mockImplementation(persistentState.get);
@@ -708,63 +725,65 @@ export const renderWithProviders = async (
     <AppContext.Provider value={appState}>
       <ConfigContext.Provider value={config}>
         <SettingsContext.Provider value={settings}>
-          <UIStateContext.Provider value={finalUiState}>
-            <VimModeProvider>
-              <ShellFocusContext.Provider value={shellFocus}>
-                <SessionStatsProvider>
-                  <StreamingContext.Provider
-                    value={finalUiState.streamingState}
-                  >
-                    <UIActionsContext.Provider value={finalUIActions}>
-                      <OverflowProvider>
-                        <ToolActionsProvider
-                          config={config}
-                          toolCalls={allToolCalls}
-                          isExpanded={
-                            toolActions?.isExpanded ??
-                            vi.fn().mockReturnValue(false)
-                          }
-                          toggleExpansion={
-                            toolActions?.toggleExpansion ?? vi.fn()
-                          }
-                          toggleAllExpansion={
-                            toolActions?.toggleAllExpansion ?? vi.fn()
-                          }
-                        >
-                          <AskUserActionsProvider
-                            request={null}
-                            onSubmit={vi.fn()}
-                            onCancel={vi.fn()}
+          <InputContext.Provider value={inputState}>
+            <UIStateContext.Provider value={finalUiState}>
+              <VimModeProvider>
+                <ShellFocusContext.Provider value={shellFocus}>
+                  <SessionStatsProvider>
+                    <StreamingContext.Provider
+                      value={finalUiState.streamingState}
+                    >
+                      <UIActionsContext.Provider value={finalUIActions}>
+                        <OverflowProvider>
+                          <ToolActionsProvider
+                            config={config}
+                            toolCalls={allToolCalls}
+                            isExpanded={
+                              toolActions?.isExpanded ??
+                              vi.fn().mockReturnValue(false)
+                            }
+                            toggleExpansion={
+                              toolActions?.toggleExpansion ?? vi.fn()
+                            }
+                            toggleAllExpansion={
+                              toolActions?.toggleAllExpansion ?? vi.fn()
+                            }
                           >
-                            <KeypressProvider>
-                              <MouseProvider
-                                mouseEventsEnabled={mouseEventsEnabled}
-                              >
-                                <TerminalProvider>
-                                  <ScrollProvider>
-                                    <ContextCapture>
-                                      <Box
-                                        width={terminalWidth}
-                                        flexShrink={0}
-                                        flexGrow={0}
-                                        flexDirection="column"
-                                      >
-                                        {comp}
-                                      </Box>
-                                    </ContextCapture>
-                                  </ScrollProvider>
-                                </TerminalProvider>
-                              </MouseProvider>
-                            </KeypressProvider>
-                          </AskUserActionsProvider>
-                        </ToolActionsProvider>
-                      </OverflowProvider>
-                    </UIActionsContext.Provider>
-                  </StreamingContext.Provider>
-                </SessionStatsProvider>
-              </ShellFocusContext.Provider>
-            </VimModeProvider>
-          </UIStateContext.Provider>
+                            <AskUserActionsProvider
+                              request={null}
+                              onSubmit={vi.fn()}
+                              onCancel={vi.fn()}
+                            >
+                              <KeypressProvider>
+                                <MouseProvider
+                                  mouseEventsEnabled={mouseEventsEnabled}
+                                >
+                                  <TerminalProvider>
+                                    <ScrollProvider>
+                                      <ContextCapture>
+                                        <Box
+                                          width={terminalWidth}
+                                          flexShrink={0}
+                                          flexGrow={0}
+                                          flexDirection="column"
+                                        >
+                                          {comp}
+                                        </Box>
+                                      </ContextCapture>
+                                    </ScrollProvider>
+                                  </TerminalProvider>
+                                </MouseProvider>
+                              </KeypressProvider>
+                            </AskUserActionsProvider>
+                          </ToolActionsProvider>
+                        </OverflowProvider>
+                      </UIActionsContext.Provider>
+                    </StreamingContext.Provider>
+                  </SessionStatsProvider>
+                </ShellFocusContext.Provider>
+              </VimModeProvider>
+            </UIStateContext.Provider>
+          </InputContext.Provider>
         </SettingsContext.Provider>
       </ConfigContext.Provider>
     </AppContext.Provider>
