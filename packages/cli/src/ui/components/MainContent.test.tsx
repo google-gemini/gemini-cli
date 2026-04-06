@@ -6,7 +6,11 @@
 
 import { renderWithProviders } from '../../test-utils/render.js';
 import { createMockSettings } from '../../test-utils/settings.js';
-import { makeFakeConfig, CoreToolCallStatus } from '@google/gemini-cli-core';
+import {
+  makeFakeConfig,
+  CoreToolCallStatus,
+  UPDATE_TOPIC_TOOL_NAME,
+} from '@google/gemini-cli-core';
 import { waitFor } from '../../test-utils/async.js';
 import { MainContent } from './MainContent.js';
 import { getToolGroupBorderAppearance } from '../utils/borderStyles.js';
@@ -726,6 +730,158 @@ describe('MainContent', () => {
     // This snapshot will show no spurious line because the group is now correctly suppressed.
     expect(lastFrame()).toMatchSnapshot();
     unmount();
+  });
+
+  describe('Narration Suppression', () => {
+    const settingsWithNarration = createMockSettings({
+      merged: {
+        ui: { inlineThinkingMode: 'expanded' },
+        experimental: { topicUpdateNarration: true },
+      },
+    });
+
+    it('suppresses thinking ALWAYS when narration is enabled', async () => {
+      mockUseSettings.mockReturnValue(settingsWithNarration);
+      const uiState = {
+        ...defaultMockUiState,
+        history: [
+          { id: 1, type: 'user' as const, text: 'Hello' },
+          {
+            id: 2,
+            type: 'thinking' as const,
+            thought: {
+              subject: 'Thinking...',
+              description: 'Thinking about hello',
+            },
+          },
+          { id: 3, type: 'gemini' as const, text: 'I am helping.' },
+        ],
+      };
+
+      const { lastFrame, unmount } = await renderWithProviders(
+        <MainContent />,
+        {
+          uiState: uiState as Partial<UIState>,
+          settings: settingsWithNarration,
+        },
+      );
+
+      const output = lastFrame();
+      expect(output).not.toContain('Thinking...');
+      expect(output).toContain('I am helping.');
+      unmount();
+    });
+
+    it('suppresses text in intermediate turns (contains non-topic tools)', async () => {
+      mockUseSettings.mockReturnValue(settingsWithNarration);
+      const uiState = {
+        ...defaultMockUiState,
+        history: [
+          { id: 100, type: 'user' as const, text: 'Search' },
+          {
+            id: 101,
+            type: 'gemini' as const,
+            text: 'I will now search the files.',
+          },
+          {
+            id: 102,
+            type: 'tool_group' as const,
+            tools: [
+              {
+                callId: '1',
+                name: 'ls',
+                args: { path: '.' },
+                status: CoreToolCallStatus.Success,
+              },
+            ],
+          },
+        ],
+      };
+
+      const { lastFrame, unmount } = await renderWithProviders(
+        <MainContent />,
+        {
+          uiState: uiState as Partial<UIState>,
+          settings: settingsWithNarration,
+        },
+      );
+
+      const output = lastFrame();
+      expect(output).not.toContain('I will now search the files.');
+      unmount();
+    });
+
+    it('suppresses text that precedes a topic tool in the same turn', async () => {
+      mockUseSettings.mockReturnValue(settingsWithNarration);
+      const uiState = {
+        ...defaultMockUiState,
+        history: [
+          { id: 200, type: 'user' as const, text: 'Hello' },
+          { id: 201, type: 'gemini' as const, text: 'I will now help you.' },
+          {
+            id: 202,
+            type: 'tool_group' as const,
+            tools: [
+              {
+                callId: '1',
+                name: UPDATE_TOPIC_TOOL_NAME,
+                args: { title: 'Helping', summary: 'Helping the user' },
+                status: CoreToolCallStatus.Success,
+              },
+            ],
+          },
+        ],
+      };
+
+      const { lastFrame, unmount } = await renderWithProviders(
+        <MainContent />,
+        {
+          uiState: uiState as Partial<UIState>,
+          settings: settingsWithNarration,
+        },
+      );
+
+      const output = lastFrame();
+      expect(output).not.toContain('I will now help you.');
+      expect(output).toContain('Helping');
+      expect(output).toContain('Helping the user');
+      unmount();
+    });
+
+    it('shows text in the final turn if it comes AFTER the topic tool', async () => {
+      mockUseSettings.mockReturnValue(settingsWithNarration);
+      const uiState = {
+        ...defaultMockUiState,
+        history: [
+          { id: 300, type: 'user' as const, text: 'Hello' },
+          {
+            id: 301,
+            type: 'tool_group' as const,
+            tools: [
+              {
+                callId: '1',
+                name: UPDATE_TOPIC_TOOL_NAME,
+                args: { title: 'Final Answer', summary: 'I have finished' },
+                status: CoreToolCallStatus.Success,
+              },
+            ],
+          },
+          { id: 302, type: 'gemini' as const, text: 'Here is your answer.' },
+        ],
+      };
+
+      const { lastFrame, unmount } = await renderWithProviders(
+        <MainContent />,
+        {
+          uiState: uiState as Partial<UIState>,
+          settings: settingsWithNarration,
+        },
+      );
+
+      const output = lastFrame();
+      expect(output).toContain('Here is your answer.');
+      unmount();
+    });
   });
 
   it('renders multiple thinking messages sequentially correctly', async () => {
