@@ -510,21 +510,24 @@ export class ShellExecutionService {
     shellExecutionConfig: ShellExecutionConfig,
     isInteractive: boolean,
   ): Promise<ShellExecutionHandle> {
+    let cmdCleanup: (() => void) | undefined;
     try {
       const isWindows = os.platform() === 'win32';
+
+      const prepared = await this.prepareExecution(
+        commandToExecute,
+        cwd,
+        shellExecutionConfig,
+        isInteractive,
+      );
+      cmdCleanup = prepared.cleanup;
 
       const {
         program: finalExecutable,
         args: finalArgs,
         env: finalEnv,
         cwd: finalCwd,
-        cleanup: cmdCleanup,
-      } = await this.prepareExecution(
-        commandToExecute,
-        cwd,
-        shellExecutionConfig,
-        isInteractive,
-      );
+      } = prepared;
 
       const child = cpSpawn(finalExecutable, finalArgs, {
         cwd: finalCwd,
@@ -689,7 +692,6 @@ export class ShellExecutionService {
         signal: NodeJS.Signals | null,
       ) => {
         cleanup();
-        cmdCleanup?.();
 
         let combinedOutput = state.output;
         if (state.truncated) {
@@ -824,6 +826,8 @@ export class ShellExecutionService {
           executionMethod: 'none',
         }),
       };
+    } finally {
+      cmdCleanup?.();
     }
   }
 
@@ -840,23 +844,26 @@ export class ShellExecutionService {
       throw new Error('PTY implementation not found');
     }
     let spawnedPty: IPty | undefined;
+    let cmdCleanup: (() => void) | undefined;
 
     try {
       const cols = shellExecutionConfig.terminalWidth ?? 80;
       const rows = shellExecutionConfig.terminalHeight ?? 30;
+
+      const prepared = await this.prepareExecution(
+        commandToExecute,
+        cwd,
+        shellExecutionConfig,
+        true,
+      );
+      cmdCleanup = prepared.cleanup;
 
       const {
         program: finalExecutable,
         args: finalArgs,
         env: finalEnv,
         cwd: finalCwd,
-        cleanup: cmdCleanup,
-      } = await this.prepareExecution(
-        commandToExecute,
-        cwd,
-        shellExecutionConfig,
-        true,
-      );
+      } = prepared;
 
       // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
       const ptyProcess = ptyInfo.module.spawn(finalExecutable, finalArgs, {
@@ -1147,7 +1154,6 @@ export class ShellExecutionService {
 
           const finalize = () => {
             render(true);
-            cmdCleanup?.();
 
             const event: ShellOutputEvent = {
               type: 'exit',
@@ -1268,6 +1274,8 @@ export class ShellExecutionService {
           }),
         };
       }
+    } finally {
+      cmdCleanup?.();
     }
   }
 
