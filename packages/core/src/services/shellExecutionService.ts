@@ -692,6 +692,7 @@ export class ShellExecutionService {
         signal: NodeJS.Signals | null,
       ) => {
         cleanup();
+        cmdCleanup?.();
 
         let combinedOutput = state.output;
         if (state.truncated) {
@@ -813,6 +814,7 @@ export class ShellExecutionService {
     } catch (e) {
       // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
       const error = e as Error;
+      cmdCleanup?.();
       return {
         pid: undefined,
         result: Promise.resolve({
@@ -826,11 +828,8 @@ export class ShellExecutionService {
           executionMethod: 'none',
         }),
       };
-    } finally {
-      cmdCleanup?.();
     }
   }
-
   private static async executeWithPty(
     commandToExecute: string,
     cwd: string,
@@ -1154,6 +1153,7 @@ export class ShellExecutionService {
 
           const finalize = () => {
             render(true);
+            cmdCleanup?.();
 
             const event: ShellOutputEvent = {
               type: 'exit',
@@ -1243,6 +1243,7 @@ export class ShellExecutionService {
     } catch (e) {
       // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
       const error = e as Error;
+      cmdCleanup?.();
 
       if (spawnedPty) {
         try {
@@ -1274,11 +1275,8 @@ export class ShellExecutionService {
           }),
         };
       }
-    } finally {
-      cmdCleanup?.();
     }
   }
-
   /**
    * Writes a string to the pseudo-terminal (PTY) of a running process.
    *
