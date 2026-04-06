@@ -1308,6 +1308,17 @@ Logging in with Google... Restarting Gemini CLI to continue.
         }
       }
 
+      const parsedCommand = parseSlashCommand(
+        submittedValue,
+        slashCommands ?? [],
+      );
+
+      if (parsedCommand.extensionContext && config) {
+        if (config.hasExtensionPlanDir(parsedCommand.extensionContext)) {
+          config.setActiveExtensionContext(parsedCommand.extensionContext);
+        }
+      }
+
       const isSlash = isSlashCommand(submittedValue.trim());
       const isIdle = streamingState === StreamingState.Idle;
       const isAgentRunning =
@@ -1315,10 +1326,7 @@ Logging in with Google... Restarting Gemini CLI to continue.
         isToolExecuting(pendingHistoryItems);
 
       if (isSlash && isAgentRunning) {
-        const { commandToExecute } = parseSlashCommand(
-          submittedValue,
-          slashCommands ?? [],
-        );
+        const commandToExecute = parsedCommand.commandToExecute;
         if (commandToExecute?.isSafeConcurrent) {
           void handleSlashCommand(submittedValue);
           addInput(submittedValue);

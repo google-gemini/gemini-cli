@@ -609,9 +609,12 @@ export async function loadCliConfig(
   });
   await extensionManager.loadExtensions();
 
-  const extensionPlanSettings = extensionManager
-    .getExtensions()
-    .find((ext) => ext.isActive && ext.plan?.directory)?.plan;
+  const extensionPlanDirs: Record<string, string> = {};
+  for (const ext of extensionManager.getExtensions()) {
+    if (ext.isActive && ext.plan?.directory) {
+      extensionPlanDirs[ext.name] = ext.plan.directory;
+    }
+  }
 
   const experimentalJitContext = settings.experimental.jitContext;
 
@@ -969,9 +972,8 @@ export async function loadCliConfig(
     plan: settings.general?.plan?.enabled ?? true,
     tracker: settings.experimental?.taskTracker,
     directWebFetch: settings.experimental?.directWebFetch,
-    planSettings: settings.general?.plan?.directory
-      ? settings.general.plan
-      : (extensionPlanSettings ?? settings.general?.plan),
+    planSettings: settings.general?.plan,
+    extensionPlanDirs,
     enableEventDrivenScheduler: true,
     skillsSupport: settings.skills?.enabled ?? true,
     disabledSkills: settings.skills?.disabled,

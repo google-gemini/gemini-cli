@@ -10,6 +10,7 @@ export type ParsedSlashCommand = {
   commandToExecute: SlashCommand | undefined;
   args: string;
   canonicalPath: string[];
+  extensionContext?: string;
 };
 
 /**
@@ -69,6 +70,8 @@ export const parseSlashCommand = (
 
   const args = parts.slice(pathIndex).join(' ');
 
+  const extensionContext = commandToExecute?.extensionName;
+
   // Backtrack if the matched (sub)command doesn't take arguments but some were provided,
   // AND the parent command is capable of handling them.
   if (
@@ -82,8 +85,9 @@ export const parseSlashCommand = (
       commandToExecute: parentCommand,
       args: parts.slice(pathIndex - 1).join(' '),
       canonicalPath: canonicalPath.slice(0, -1),
+      extensionContext: parentCommand.extensionName,
     };
   }
 
-  return { commandToExecute, args, canonicalPath };
+  return { commandToExecute, args, canonicalPath, extensionContext };
 };
