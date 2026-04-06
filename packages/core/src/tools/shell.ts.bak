@@ -302,6 +302,7 @@ export class ShellToolInvocation extends BaseToolInvocation<
       // Start timeout
       resetTimeout();
 
+      const startTime = Date.now();
       const { result: resultPromise, pid } =
         await ShellExecutionService.execute(
           commandToExecute,
@@ -442,11 +443,7 @@ export class ShellToolInvocation extends BaseToolInvocation<
       } else {
         // Create a formatted error string for display, replacing the wrapper command
         // with the user-facing command.
-        const durationSeconds = Math.round((Date.now() - startTime) / 1000);
-        const llmContentParts = [
-          `Output: ${result.output || '(empty)'}`,
-          `Execution time: ${durationSeconds}s`,
-        ];
+        const llmContentParts = [`Output: ${result.output || '(empty)'}`];
 
         if (result.error) {
           const finalError = result.error.message.replaceAll(

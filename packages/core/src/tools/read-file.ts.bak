@@ -120,6 +120,25 @@ class ReadFileToolInvocation extends BaseToolInvocation<
       };
     }
 
+    const mimetype = getSpecificMimeType(this.resolvedPath);
+    const isBinary =
+      mimetype.startsWith('image/') ||
+      mimetype.startsWith('video/') ||
+      mimetype.startsWith('audio/') ||
+      mimetype === 'application/octet-stream' ||
+      mimetype === 'application/pdf';
+
+    if (isBinary) {
+      return {
+        llmContent: `Error: Cannot read binary file '${this.params.file_path}' (MIME type: ${mimetype}) as text. Reading binary data into the conversation history is prohibited as it causes context contamination and reasoning failure.`,
+        returnDisplay: 'Error: Binary file detected.',
+        error: {
+          message: `Binary file detected: ${mimetype}`,
+          type: ToolErrorType.READ_CONTENT_FAILURE,
+        },
+      };
+    }
+
     const result = await processSingleFileContent(
       this.resolvedPath,
       this.config.getTargetDir(),
@@ -159,6 +178,7 @@ ${result.llmContent}`;
       typeof result.llmContent === 'string'
         ? result.llmContent.split('\n').length
         : undefined;
+    const mimetype = getSpecificMimeType(this.resolvedPath);
     const programming_language = getProgrammingLanguage({
       file_path: this.resolvedPath,
     });
