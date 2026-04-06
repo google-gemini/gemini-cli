@@ -33,14 +33,14 @@
 toolName = "enter_plan_mode"
 decision = "ask_user"
 priority = 50
-modes = ["plan"]
+modes = ["default", "autoEdit", "yolo"]
 interactive = true
 
 [[rule]]
 toolName = "enter_plan_mode"
 decision = "allow"
 priority = 50
-modes = ["plan"]
+modes = ["default", "autoEdit", "yolo"]
 interactive = false
 
 [[rule]]
@@ -68,7 +68,7 @@ interactive = false
 toolName = "exit_plan_mode"
 decision = "deny"
 priority = 50
-modes = ["plan"]
+modes = ["default", "autoEdit", "yolo"]
 denyMessage = "You are not currently in Plan Mode. Use enter_plan_mode first to design a plan."
 
 
