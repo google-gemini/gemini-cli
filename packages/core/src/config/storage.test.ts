@@ -378,6 +378,28 @@ describe('Storage – additional helpers', () => {
         },
         expected: path.resolve(projectRoot, 'new-plans'),
       },
+      {
+        name: 'security escape via symbolic link with non-existent dir throws',
+        customDir: 'link-to-outside/new-dir',
+        setup: () => {
+          vi.mocked(fs.realpathSync).mockImplementation((p: fs.PathLike) => {
+            const pStr = p.toString();
+            if (pStr.includes('link-to-outside/new-dir')) {
+              const err = new Error('ENOENT') as NodeJS.ErrnoException;
+              err.code = 'ENOENT';
+              throw err;
+            }
+            if (pStr.includes('link-to-outside')) {
+              return '/outside/project/root';
+            }
+            return pStr;
+          });
+          return () => vi.mocked(fs.realpathSync).mockRestore();
+        },
+        expected: '',
+        expectedError:
+          "Custom plans directory 'link-to-outside/new-dir' resolves to '/outside/project/root/new-dir', which is outside the project root '/tmp/project'.",
+      },
     ];
 
     testCases.forEach(({ name, customDir, expected, expectedError, setup }) => {
