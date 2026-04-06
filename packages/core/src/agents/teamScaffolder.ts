@@ -8,6 +8,12 @@ import * as fs from 'node:fs/promises';
 import * as path from 'node:path';
 import { dump } from 'js-yaml';
 import { getErrorMessage } from '../utils/errors.js';
+import { type RegistryTeam } from './types.js';
+import {
+  cloneFromGit,
+  downloadFromGitHubRelease,
+  tryParseGithubUrl,
+} from '../utils/github.js';
 
 export interface ScaffoldTeamAgent {
   name: string;
@@ -102,6 +108,85 @@ ${dump(agentFrontmatter).trim()}
   } catch (error) {
     throw new Error(
       `Failed to scaffold team "${options.name}": ${getErrorMessage(error)}`,
+    );
+  }
+}
+
+/**
+ * Installs an Agent Team from a registry entry.
+ * Supports both source-based (Git/GitHub) and definition-only (metadata) teams.
+ *
+ * @param team The registry entry for the team.
+ * @param targetDir The root directory where teams are stored (e.g. .gemini/teams/).
+ * @returns The absolute path to the installed team directory.
+ */
+export async function installRegistryTeam(
+  team: RegistryTeam,
+  targetDir: string,
+): Promise<string> {
+  const teamSlug = team.name.toLowerCase().replace(/[^a-z0-9-_]/g, '-');
+  const teamDirPath = path.resolve(targetDir, teamSlug);
+
+  try {
+    // 1. Handle source-based installation if sourceUrl is provided
+    if (team.sourceUrl) {
+      await fs.mkdir(teamDirPath, { recursive: true });
+
+      const githubInfo = tryParseGithubUrl(team.sourceUrl);
+      if (githubInfo) {
+        // Try GitHub release download first, fallback to Git clone
+        const result = await downloadFromGitHubRelease(
+          {
+            source: team.sourceUrl,
+            type: 'github-release',
+          },
+          teamDirPath,
+          githubInfo,
+          'TEAM.md',
+        );
+
+        if (!result.success) {
+          await cloneFromGit(
+            {
+              source: team.sourceUrl,
+              type: 'git',
+            },
+            teamDirPath,
+          );
+        }
+      } else {
+        // Not a GitHub URL, use standard Git clone
+        await cloneFromGit(
+          {
+            source: team.sourceUrl,
+            type: 'git',
+          },
+          teamDirPath,
+        );
+      }
+    } else {
+      // 2. Handle definition-only installation (scaffold from metadata)
+      const scaffoldOptions: ScaffoldTeamOptions = {
+        name: team.name,
+        displayName: team.displayName,
+        description: team.description,
+        instructions: team.instructions,
+        agents: team.agents.map((agent) => ({
+          name: agent.name,
+          kind: 'external' as const,
+          provider: agent.provider,
+          description: agent.description,
+        })),
+        targetDir: targetDir,
+      };
+
+      await scaffoldTeam(scaffoldOptions);
+    }
+
+    return teamDirPath;
+  } catch (error) {
+    throw new Error(
+      `Failed to install team "${team.displayName}": ${getErrorMessage(error)}`,
     );
   }
 }

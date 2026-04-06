@@ -396,3 +396,24 @@ export interface TeamDefinition {
     filePath?: string;
   };
 }
+
+/**
+ * Represents a team entry in a remote or local registry.
+ */
+export interface RegistryTeam {
+  id: string;
+  name: string; // The slug
+  displayName: string;
+  description: string;
+  instructions: string;
+  agents: Array<{
+    name: string;
+    provider: string; // 'gemini', 'claude-code', etc.
+    description: string;
+  }>;
+  author?: string;
+  stars?: number;
+  lastUpdated?: string;
+  version?: string;
+  sourceUrl?: string; // Optional Git/GitHub source
+}

@@ -625,6 +625,16 @@ export async function loadCliConfig(
     );
   }
 
+  let teamRegistryURI =
+    process.env['GEMINI_CLI_TEAM_REGISTRY_URI'] ??
+    (trustedFolder ? settings.experimental?.teamRegistryURI : undefined);
+
+  if (teamRegistryURI && !teamRegistryURI.startsWith('http')) {
+    teamRegistryURI = resolveToRealPath(
+      path.resolve(cwd, resolvePath(teamRegistryURI)),
+    );
+  }
+
   let memoryContent: string | HierarchicalMemory = '';
   let fileCount = 0;
   let filePaths: string[] = [];
@@ -964,6 +974,7 @@ export async function loadCliConfig(
     enabledExtensions: argv.extensions,
     extensionLoader: extensionManager,
     extensionRegistryURI,
+    teamRegistryURI,
     enableExtensionReloading: settings.experimental?.extensionReloading,
     enableAgents: settings.experimental?.enableAgents,
     plan: settings.general?.plan?.enabled ?? true,

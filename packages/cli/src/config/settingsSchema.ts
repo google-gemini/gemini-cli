@@ -2009,6 +2009,16 @@ const SETTINGS_SCHEMA = {
           'The URI (web URL or local file path) of the extension registry.',
         showInDialog: false,
       },
+      teamRegistryURI: {
+        type: 'string',
+        label: 'Team Registry URI',
+        category: 'Experimental',
+        requiresRestart: true,
+        default: 'https://geminicli.com/teams.json',
+        description:
+          'The URI (web URL or local file path) of the agent team registry.',
+        showInDialog: false,
+      },
       extensionReloading: {
         type: 'boolean',
         label: 'Extension Reloading',

@@ -673,6 +673,7 @@ export interface ConfigParameters {
   shellExecutionConfig?: ShellExecutionConfig;
   extensionManagement?: boolean;
   extensionRegistryURI?: string;
+  teamRegistryURI?: string;
   truncateToolOutputThreshold?: number;
   eventEmitter?: EventEmitter;
   useWriteTodos?: boolean;
@@ -889,6 +890,7 @@ export class Config implements McpContext, AgentLoopContext {
   private shellExecutionConfig: ShellExecutionConfig;
   private readonly extensionManagement: boolean = true;
   private readonly extensionRegistryURI: string | undefined;
+  private readonly teamRegistryURI: string | undefined;
   private readonly truncateToolOutputThreshold: number;
   private compressionTruncationCounter = 0;
   private initialized = false;
@@ -1269,6 +1271,7 @@ export class Config implements McpContext, AgentLoopContext {
       (params.shellToolInactivityTimeout ?? 300) * 1000; // 5 minutes
     this.extensionManagement = params.extensionManagement ?? true;
     this.extensionRegistryURI = params.extensionRegistryURI;
+    this.teamRegistryURI = params.teamRegistryURI;
     this.enableExtensionReloading = params.enableExtensionReloading ?? false;
     this.storage = new Storage(this.targetDir, this._sessionId);
     this.storage.setCustomPlansDir(params.planSettings?.directory);
@@ -2272,6 +2275,10 @@ export class Config implements McpContext, AgentLoopContext {
 
   getExtensionRegistryURI(): string | undefined {
     return this.extensionRegistryURI;
+  }
+
+  getTeamRegistryURI(): string | undefined {
+    return this.teamRegistryURI;
   }
 
   getMcpClientManager(): McpClientManager | undefined {
