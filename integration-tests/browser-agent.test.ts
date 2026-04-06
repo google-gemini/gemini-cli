@@ -98,7 +98,9 @@ describe.skipIf(!chromeAvailable)('browser-agent', () => {
 
     const toolLogs = rig.readToolLogs();
     const browserAgentCall = toolLogs.find(
-      (t) => t.toolRequest.name === 'browser_agent',
+      (t) =>
+        t.toolRequest.name === 'invoke_agent' &&
+        JSON.parse(t.toolRequest.args).agent_name === 'browser_agent',
     );
     expect(
       browserAgentCall,
@@ -130,7 +132,9 @@ describe.skipIf(!chromeAvailable)('browser-agent', () => {
 
     const toolLogs = rig.readToolLogs();
     const browserCalls = toolLogs.filter(
-      (t) => t.toolRequest.name === 'browser_agent',
+      (t) =>
+        t.toolRequest.name === 'invoke_agent' &&
+        JSON.parse(t.toolRequest.args).agent_name === 'browser_agent',
     );
     expect(browserCalls.length).toBeGreaterThan(0);
 
@@ -161,7 +165,9 @@ describe.skipIf(!chromeAvailable)('browser-agent', () => {
 
     const toolLogs = rig.readToolLogs();
     const browserAgentCall = toolLogs.find(
-      (t) => t.toolRequest.name === 'browser_agent',
+      (t) =>
+        t.toolRequest.name === 'invoke_agent' &&
+        JSON.parse(t.toolRequest.args).agent_name === 'browser_agent',
     );
     expect(
       browserAgentCall,
@@ -221,7 +227,9 @@ describe.skipIf(!chromeAvailable)('browser-agent', () => {
 
     const toolLogs = rig.readToolLogs();
     const browserCalls = toolLogs.filter(
-      (t) => t.toolRequest.name === 'browser_agent',
+      (t) =>
+        t.toolRequest.name === 'invoke_agent' &&
+        JSON.parse(t.toolRequest.args).agent_name === 'browser_agent',
     );
     expect(browserCalls.length).toBeGreaterThan(0);
 
