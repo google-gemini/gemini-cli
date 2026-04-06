@@ -71,7 +71,7 @@ describe('ContextManager Golden Tests', () => {
     };
 
     const sidecar = SidecarLoader.fromConfig(mockConfig as any);
-    const tracer = new ContextTracer('/tmp', 'test-session');
+    const tracer = new ContextTracer({ targetDir: '/tmp', sessionId: 'test-session' });
     const eventBus = new ContextEventBus();
     const env = new ContextEnvironmentImpl(
       {} as any,
@@ -132,7 +132,7 @@ describe('ContextManager Golden Tests', () => {
     ).IrMapper.toIr(history, new ContextTokenCalculator(4));
     // In Golden Tests, we just want to ensure the logic doesn't throw or alter unprotected history in weird ways.
     // Since we're skipping processors due to being under budget, it should equal history.
-    const tracer2 = new ContextTracer('/tmp', 'test2');
+    const tracer2 = new ContextTracer({ targetDir: '/tmp', sessionId: 'test2' });
     const eventBus2 = new ContextEventBus();
     const env2 = new ContextEnvironmentImpl(
       {} as any,

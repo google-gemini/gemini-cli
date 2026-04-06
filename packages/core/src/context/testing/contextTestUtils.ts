@@ -24,7 +24,7 @@ export function createMockEnvironment(): ContextEnvironment {
     traceDir: '/tmp/.gemini/trace',
     projectTempDir: '/tmp/.gemini/tool-outputs',
     eventBus: new ContextEventBus(),
-    tracer: new ContextTracer('/tmp', 'mock-session'),
+    tracer: new ContextTracer({ targetDir: '/tmp', sessionId: 'mock-session' }),
     charsPerToken: 1,
     tokenCalculator: new ContextTokenCalculator(1),
   };
@@ -97,7 +97,7 @@ import type { BaseLlmClient } from 'src/core/baseLlmClient.js';
 export function setupContextComponentTest(config: Config) {
   const chatHistory = new AgentChatHistory();
   const sidecar = SidecarLoader.fromConfig(config);
-  const tracer = new ContextTracer('/tmp', 'test-session');
+  const tracer = new ContextTracer({ targetDir: '/tmp', sessionId: 'test-session' });
   const eventBus = new ContextEventBus();
   const env = new ContextEnvironmentImpl(
     config.getBaseLlmClient(),
