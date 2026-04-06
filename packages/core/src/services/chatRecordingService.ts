@@ -194,7 +194,7 @@ export class ChatRecordingService {
           chatsDir = path.join(chatsDir, safeParentId);
         }
 
-        fs.mkdirSync(chatsDir, { recursive: true });
+        fs.mkdirSync(chatsDir, { recursive: true, mode: 0o700 });
 
         const timestamp = new Date()
           .toISOString()
@@ -548,8 +548,11 @@ export class ChatRecordingService {
       const contentToWrite = JSON.stringify(conversation, null, 2);
       this.cachedLastConvData = contentToWrite;
       // Ensure directory exists before writing (handles cases where temp dir was cleaned)
-      fs.mkdirSync(path.dirname(this.conversationFile), { recursive: true });
-      fs.writeFileSync(this.conversationFile, contentToWrite);
+      fs.mkdirSync(path.dirname(this.conversationFile), {
+        recursive: true,
+        mode: 0o700,
+      });
+      fs.writeFileSync(this.conversationFile, contentToWrite, { mode: 0o600 });
     } catch (error) {
       // Handle disk full (ENOSPC) gracefully - disable recording but allow conversation to continue
       if (
