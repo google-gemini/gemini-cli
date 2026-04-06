@@ -56,3 +56,8 @@ patch_output.log
 
 .genkit
 .gemini-clipboard/
+
+# CMake build artifacts (not relevant for Node.js project)
+CMakeCache.txt
+CMakeFiles/
+CMakeLists.txt
