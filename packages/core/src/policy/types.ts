@@ -180,6 +180,13 @@ export interface PolicyRule {
   allowRedirection?: boolean;
 
   /**
+   * If true, allows environment variable prefixes even if the policy engine would normally
+   * downgrade ALLOW to ASK_USER for commands with env prefixes.
+   * Only applies when decision is ALLOW.
+   */
+  allowEnv?: boolean;
+
+  /**
    * Effect of the rule's source.
    * e.g. "my-policies.toml", "Settings (MCP Trusted)", etc.
    */

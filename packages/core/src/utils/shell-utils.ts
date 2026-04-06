@@ -751,6 +751,35 @@ export function hasRedirection(command: string): boolean {
   return fallbackCheck();
 }
 
+/**
+ * Checks if a command contains environment variable prefixes (e.g. `FOO=bar cmd`).
+ */
+export function hasEnvPrefix(command: string): boolean {
+  const fallbackCheck = () => /^[a-zA-Z_][a-zA-Z0-9_]*=/.test(command.trim());
+
+  const configuration = getShellConfiguration();
+
+  if (configuration.shell === 'bash' && bashLanguage) {
+    const tree = parseCommandTree(command);
+    if (!tree) return fallbackCheck();
+
+    const stack: Node[] = [tree.rootNode];
+    while (stack.length > 0) {
+      const current = stack.pop()!;
+      if (current.type === 'variable_assignment') {
+        return true;
+      }
+      for (let i = current.childCount - 1; i >= 0; i -= 1) {
+        const child = current.child(i);
+        if (child) stack.push(child);
+      }
+    }
+    return false;
+  }
+
+  return fallbackCheck();
+}
+
 export function splitCommands(command: string): string[] {
   const parsed = parseCommandDetails(command);
   if (!parsed || parsed.hasError) {
