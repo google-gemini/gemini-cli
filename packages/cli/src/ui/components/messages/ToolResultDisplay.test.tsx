@@ -28,6 +28,7 @@ describe('ToolResultDisplay', () => {
           underline: false,
           dim: false,
           inverse: false,
+          isUninitialized: false,
         },
       ],
     ];
@@ -179,6 +180,7 @@ describe('ToolResultDisplay', () => {
           underline: false,
           dim: false,
           inverse: false,
+          isUninitialized: false,
         },
       ],
     ];
@@ -275,6 +277,7 @@ describe('ToolResultDisplay', () => {
           underline: false,
           dim: false,
           inverse: false,
+          isUninitialized: false,
         },
       ],
       [
@@ -287,6 +290,7 @@ describe('ToolResultDisplay', () => {
           underline: false,
           dim: false,
           inverse: false,
+          isUninitialized: false,
         },
       ],
       [
@@ -299,6 +303,7 @@ describe('ToolResultDisplay', () => {
           underline: false,
           dim: false,
           inverse: false,
+          isUninitialized: false,
         },
       ],
       [
@@ -311,6 +316,7 @@ describe('ToolResultDisplay', () => {
           underline: false,
           dim: false,
           inverse: false,
+          isUninitialized: false,
         },
       ],
       [
@@ -323,6 +329,7 @@ describe('ToolResultDisplay', () => {
           underline: false,
           dim: false,
           inverse: false,
+          isUninitialized: false,
         },
       ],
     ];
@@ -362,6 +369,7 @@ describe('ToolResultDisplay', () => {
         underline: false,
         dim: false,
         inverse: false,
+        isUninitialized: false,
       },
     ]);
     const renderResult = await renderWithProviders(

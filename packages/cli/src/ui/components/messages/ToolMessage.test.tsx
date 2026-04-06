@@ -352,6 +352,7 @@ describe('<ToolMessage />', () => {
           underline: false,
           dim: false,
           inverse: false,
+          isUninitialized: false,
         },
       ],
     ];
