@@ -340,6 +340,8 @@ export class Storage {
         ) {
           throw e;
         }
+        // Construct the fallback path safely against the real project root
+        realResolvedPath = path.resolve(realProjectRoot, customDir);
       }
 
       if (!isSubpath(realProjectRoot, realResolvedPath)) {

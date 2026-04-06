@@ -358,6 +358,26 @@ describe('Storage – additional helpers', () => {
         expected: '',
         expectedError: `Custom plans directory 'symlink-to-outside' resolves to '${path.resolve('/outside/project/root')}', which is outside the project root '${resolveToRealPath(projectRoot)}'.`,
       },
+      {
+        name: 'non-existent plan dir in a symlinked project root',
+        customDir: 'new-plans',
+        setup: () => {
+          vi.mocked(fs.realpathSync).mockImplementation((p: fs.PathLike) => {
+            const pStr = p.toString();
+            if (pStr === projectRoot) {
+              return '/private/tmp/project';
+            }
+            if (pStr.includes('new-plans')) {
+              const err = new Error('ENOENT') as NodeJS.ErrnoException;
+              err.code = 'ENOENT';
+              throw err;
+            }
+            return pStr;
+          });
+          return () => vi.mocked(fs.realpathSync).mockRestore();
+        },
+        expected: path.resolve(projectRoot, 'new-plans'),
+      },
     ];
 
     testCases.forEach(({ name, customDir, expected, expectedError, setup }) => {
