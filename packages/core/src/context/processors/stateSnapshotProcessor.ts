@@ -19,7 +19,7 @@ export interface StateSnapshotProcessorOptions {
 
 export class StateSnapshotProcessor implements ContextProcessor {
   static create(env: ContextEnvironment, options: StateSnapshotProcessorOptions): StateSnapshotProcessor {
-    return new StateSnapshotProcessor(env, options, (env as any).getEventBus());
+    return new StateSnapshotProcessor(env, options, env.eventBus);
   }
   readonly id = 'StateSnapshotProcessor';
   readonly name = 'StateSnapshotProcessor';
@@ -76,7 +76,7 @@ export class StateSnapshotProcessor implements ContextProcessor {
   }
 
   private async synthesizeSnapshot(episodes: Episode[]): Promise<Episode> {
-    const client = this.env.getLlmClient();
+    const client = this.env.llmClient;
     const systemPrompt =
       this.options.systemInstruction ??
       `You are an expert Context Memory Manager. You will be provided with a raw transcript of older conversation turns between a user and an AI assistant.
@@ -106,7 +106,7 @@ Output ONLY the raw factual snapshot, formatted compactly. Do not include markdo
           modelConfigKey: { model: 'state-snapshot-processor' },
           contents: [{ role: 'user', parts: [{ text: userPromptText }] }],
           systemInstruction: { role: 'system', parts: [{ text: systemPrompt }] },
-          promptId: this.env.getPromptId(),
+          promptId: this.env.promptId,
           role: LlmRole.UTILITY_STATE_SNAPSHOT_PROCESSOR,
           abortSignal: new AbortController().signal,
         },

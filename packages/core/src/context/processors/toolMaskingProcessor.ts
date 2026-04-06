@@ -53,10 +53,10 @@ export class ToolMaskingProcessor implements ContextProcessor {
     const limitChars = maskingConfig.stringLengthThresholdTokens * 4;
 
     let toolOutputsDir = path.join(
-      this.env.getProjectTempDir(),
+      this.env.projectTempDir,
       'tool-outputs',
     );
-    const sessionId = this.env.getSessionId();
+    const sessionId = this.env.sessionId;
     if (sessionId) {
       toolOutputsDir = path.join(
         toolOutputsDir,

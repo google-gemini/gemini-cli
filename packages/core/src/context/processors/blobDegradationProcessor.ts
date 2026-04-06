@@ -33,10 +33,10 @@ export class BlobDegradationProcessor implements ContextProcessor {
     let directoryCreated = false;
 
     let blobOutputsDir = path.join(
-      this.env.getProjectTempDir(),
+      this.env.projectTempDir,
       'degraded-blobs',
     );
-    const sessionId = this.env.getSessionId();
+    const sessionId = this.env.sessionId;
     if (sessionId) {
       blobOutputsDir = path.join(
         blobOutputsDir,
@@ -102,7 +102,7 @@ export class BlobDegradationProcessor implements ContextProcessor {
 
           if (newText && tokensSaved > 0) {
             const newTokens = estimateTokenCountSync([{ text: newText }], 0, {
-              charsPerToken: this.env.getCharsPerToken(),
+              charsPerToken: this.env.charsPerToken,
             });
             part.presentation = { text: newText, tokens: newTokens };
 

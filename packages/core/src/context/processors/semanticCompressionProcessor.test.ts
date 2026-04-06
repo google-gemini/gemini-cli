@@ -15,6 +15,7 @@ import type {
 } from '../ir/types.js';
 import type { ContextAccountingState } from '../pipeline.js';
 import { randomUUID } from 'node:crypto';
+import type { BaseLlmClient } from 'src/core/baseLlmClient.js';
 
 describe('SemanticCompressionProcessor', () => {
   let processor: SemanticCompressionProcessor;
@@ -26,9 +27,7 @@ describe('SemanticCompressionProcessor', () => {
     });
 
     const env = createMockEnvironment();
-    env.getLlmClient = vi
-      .fn()
-      .mockReturnValue({ generateContent: generateContentMock }) as any;
+    vi.spyOn(env, 'llmClient', 'get').mockReturnValue({ generateContent: generateContentMock } as unknown as BaseLlmClient);
     processor = new SemanticCompressionProcessor(env, {
       nodeThresholdTokens: 2000,
     });

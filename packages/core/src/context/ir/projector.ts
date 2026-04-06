@@ -68,7 +68,7 @@ export class IrProjector {
       try {
         const fs = await import('node:fs/promises');
         const path = await import('node:path');
-        const dumpPath = path.join(env.getTraceDir(), '.gemini', 'projected_context.json');
+        const dumpPath = path.join(env.traceDir, '.gemini', 'projected_context.json');
         await fs.mkdir(path.dirname(dumpPath), { recursive: true });
         await fs.writeFile(dumpPath, JSON.stringify(contents, null, 2), 'utf-8');
         debugLogger.log(`[Observability] Context successfully dumped to ${dumpPath}`);

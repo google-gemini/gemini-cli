@@ -17,6 +17,7 @@ import { ContextManager } from './contextManager.js';
 import { ContextEnvironmentImpl } from './sidecar/environmentImpl.js';
 import { SidecarLoader } from './sidecar/SidecarLoader.js';
 import { ContextTracer } from './tracer.js';
+import { ContextEventBus } from './eventBus.js';
 
 import type { Content } from '@google/genai';
 
@@ -69,6 +70,7 @@ describe('ContextManager Golden Tests', () => {
 
     const sidecar = SidecarLoader.fromLegacyConfig(mockConfig as any);
     const tracer = new ContextTracer('/tmp', 'test-session');
+    const eventBus = new ContextEventBus();
     const env = new ContextEnvironmentImpl(
       {} as any,
       'test-prompt-id',
@@ -77,6 +79,7 @@ describe('ContextManager Golden Tests', () => {
       '/tmp',
       tracer,
       4,
+      eventBus
     );
     contextManager = new ContextManager(sidecar, env, tracer);
   });
@@ -128,12 +131,23 @@ describe('ContextManager Golden Tests', () => {
     // In Golden Tests, we just want to ensure the logic doesn't throw or alter unprotected history in weird ways.
     // Since we're skipping processors due to being under budget, it should equal history.
     const tracer2 = new ContextTracer('/tmp', 'test2');
+    const eventBus2 = new ContextEventBus();
+    const env2 = new ContextEnvironmentImpl(
+      {} as any,
+      'test-prompt-id',
+      'test',
+      '/tmp',
+      '/tmp',
+      tracer2,
+      4,
+      eventBus2
+    );
     contextManager = new ContextManager(
       {
         budget: { retainedTokens: 100000, maxTokens: 150000 },
         pipelines: [],
       } as any,
-      {} as any,
+      env2,
       tracer2,
     );
 

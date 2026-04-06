@@ -9,12 +9,13 @@
  export type { ContextTracer, ContextEventBus };
 
  export interface ContextEnvironment {
-  getLlmClient(): BaseLlmClient;
-  getPromptId(): string;
-  getSessionId(): string;
-  getTraceDir(): string;
-  getProjectTempDir(): string;
-  getEventBus(): ContextEventBus;
-  getTracer(): ContextTracer;
-  getCharsPerToken(): number;
+  readonly llmClient: BaseLlmClient;
+  readonly promptId: string;
+  readonly sessionId: string;
+  readonly traceDir: string;
+  readonly projectTempDir: string;
+  readonly tracer: ContextTracer;
+  readonly charsPerToken: number;
+  
+  readonly eventBus: ContextEventBus;
 }

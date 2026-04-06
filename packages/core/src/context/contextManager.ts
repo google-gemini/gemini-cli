@@ -51,12 +51,7 @@ export class ContextManager {
   
 
   constructor(private sidecar: SidecarConfig, private env: ContextEnvironment, private readonly tracer: ContextTracer) {
-    
-    
-    this.eventBus = new ContextEventBus();
-    if ('setEventBus' in this.env) {
-       (this.env as any).setEventBus(this.eventBus);
-    }
+    this.eventBus = env.eventBus;
     
     // Register built-ins BEFORE creating Orchestrator
     ProcessorRegistry.register({ id: 'ToolMaskingProcessor', create: (env, opts) => new ToolMaskingProcessor(env, opts as any) });

@@ -181,7 +181,7 @@ export class SemanticCompressionProcessor implements ContextProcessor {
   ): Promise<string> {
     const promptMessage = `You are compressing an old episodic context buffer for an AI assistant.\nSummarize this ${contentType} block in 2-3 highly technical sentences. Keep all critical facts, file names, dependencies, and architectural decisions. Discard conversational filler and boilerplate.\n\nContent:\n${content.slice(0, 30000)}`;
 
-    const client = this.env.getLlmClient();
+    const client = this.env.llmClient;
     try {
       const response = await client.generateContent({
         modelConfigKey: { model: this.modelToUse },

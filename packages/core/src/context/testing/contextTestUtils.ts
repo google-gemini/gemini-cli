@@ -14,18 +14,18 @@ import { ContextManager } from '../contextManager.js';
 export function createMockEnvironment(): ContextEnvironment {
   return {
     // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
-    getLlmClient: vi.fn().mockReturnValue({
+    llmClient: vi.fn().mockReturnValue({
       generateContent: vi.fn().mockResolvedValue({
         text: 'Mock LLM summary response',
       }),
-    } as unknown as BaseLlmClient),
-    getPromptId: vi.fn().mockReturnValue('mock-prompt-id'),
-    getSessionId: vi.fn().mockReturnValue('mock-session'),
-    getTraceDir: vi.fn().mockReturnValue('/tmp/.gemini/trace'),
-    getProjectTempDir: vi.fn().mockReturnValue('/tmp/.gemini/tool-outputs'),
-    getEventBus: vi.fn(),
-    getTracer: vi.fn(),
-    getCharsPerToken: vi.fn().mockReturnValue(1),
+    })() as unknown as BaseLlmClient,
+    promptId: 'mock-prompt-id',
+    sessionId: 'mock-session',
+    traceDir: '/tmp/.gemini/trace',
+    projectTempDir: '/tmp/.gemini/tool-outputs',
+    eventBus: new ContextEventBus(),
+    tracer: new ContextTracer('/tmp', 'mock-session'),
+    charsPerToken: 1,
   };
 }
 
@@ -88,12 +88,14 @@ export function createMockContextConfig(
 import { ContextTracer } from '../tracer.js';
 import { ContextEnvironmentImpl } from '../sidecar/environmentImpl.js';
 import { SidecarLoader } from '../sidecar/SidecarLoader.js';
+import { ContextEventBus } from '../eventBus.js';
 import type { BaseLlmClient } from 'src/core/baseLlmClient.js';
 
 export function setupContextComponentTest(config: Config) {
   const chatHistory = new AgentChatHistory();
   const sidecar = SidecarLoader.fromLegacyConfig(config);
   const tracer = new ContextTracer('/tmp', 'test-session');
+  const eventBus = new ContextEventBus();
   const env = new ContextEnvironmentImpl(
     config.getBaseLlmClient(),
     'test prompt-id',
@@ -102,6 +104,7 @@ export function setupContextComponentTest(config: Config) {
     '/tmp/gemini-test',
     tracer,
     1,
+    eventBus
   );
   const contextManager = new ContextManager(sidecar, env, tracer);
 
