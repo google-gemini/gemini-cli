@@ -69,26 +69,6 @@ export function createMockContextConfig(
     storage: {
       getProjectTempDir: vi.fn().mockReturnValue('/tmp/gemini-test'),
     },
-    getContextManagementConfig: vi.fn().mockReturnValue({
-      enabled: true,
-      charsPerToken: 1,
-      strategies: {
-        historySquashing: { maxTokensPerNode: 3000 },
-        toolMasking: { stringLengthThresholdTokens: 10000 },
-        semanticCompression: { nodeThresholdTokens: 5000 },
-      },
-      budget: { retainedTokens: 500, maxTokens: 150000, maxPressureStrategy: 'truncate', gcTarget: 'incremental', freeTokensTarget: 1000 },
-      gcBackstop: { strategy: 'truncate', target: 'freeNTokens', freeTokensTarget: 100 },
-      pipelines: {
-        eagerBackground: [{ processorId: 'StateSnapshotWorker', options: {} }],
-        retainedProcessingGraph: [{ processorId: 'HistorySquashingProcessor', options: { maxTokensPerNode: 3000 } }],
-        normalProcessingGraph: [
-          { processorId: 'ToolMaskingProcessor', options: { stringLengthThresholdTokens: 10000 } },
-          { processorId: 'BlobDegradationProcessor', options: {} },
-          { processorId: 'SemanticCompressionProcessor', options: { nodeThresholdTokens: 5000 } }
-        ]
-      }
-    }),
     getBaseLlmClient: vi.fn().mockReturnValue(
       llmClientOverride || {
         generateContent: vi.fn().mockResolvedValue({

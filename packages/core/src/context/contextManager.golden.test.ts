@@ -54,36 +54,6 @@ describe('ContextManager Golden Tests', () => {
         protectLatestTurn: false,
         protectionThresholdTokens: 100,
       }),
-      getContextManagementConfig: vi.fn().mockReturnValue({
-        strategies: {
-          historySquashing: { maxTokensPerNode: 3000 },
-          toolMasking: { stringLengthThresholdTokens: 10000 },
-          semanticCompression: {
-            nodeThresholdTokens: 5000,
-            compressionModel: 'chat-compression-2.5-flash-lite',
-          },
-        },
-        budget: {
-          maxTokens: 1000,
-          retainedTokens: 500,
-          protectedEpisodes: 1,
-          protectSystemEpisode: true,
-        },
-        historyWindow: { maxTokens: 1000, retainedTokens: 500 },
-        messageLimits: {
-          normalMaxTokens: 100,
-          retainedMaxTokens: 50,
-          normalizationHeadRatio: 0.1,
-        },
-        tools: {
-          outputMasking: {
-            enabled: true,
-            protectLatestTurn: false,
-            protectionThresholdTokens: 100,
-            minPrunableThresholdTokens: 50,
-          },
-        },
-      }),
       storage: { getProjectTempDir: vi.fn().mockReturnValue('/tmp') },
       getUsageStatisticsEnabled: vi.fn().mockReturnValue(false),
       getBaseLlmClient: vi.fn().mockReturnValue({
@@ -145,56 +115,12 @@ describe('ContextManager Golden Tests', () => {
   });
 
   it('should not modify history when under budget', async () => {
-    mockConfig.getContextManagementConfig.mockReturnValue({
-      strategies: {
-        historySquashing: { maxTokensPerNode: 3000 },
-        toolMasking: { stringLengthThresholdTokens: 10000 },
-        semanticCompression: {
-          nodeThresholdTokens: 5000,
-          compressionModel: 'chat-compression-2.5-flash-lite',
-        },
-      },
-      budget: {
-        maxTokens: 15000000,
-        retainedTokens: 50000,
-        protectedEpisodes: 1,
-        protectSystemEpisode: true,
-      },
-      historyWindow: { maxTokens: 100000, retainedTokens: 50000 },
-      messageLimits: {
-        normalMaxTokens: 100,
-        retainedMaxTokens: 50,
-        normalizationHeadRatio: 0.1,
-      },
-      tools: {
-        outputMasking: {
-          enabled: true,
-          protectLatestTurn: false,
-          protectionThresholdTokens: 100,
-          minPrunableThresholdTokens: 50,
-        },
-      },
-    });
     const history = createLargeHistory();
     (contextManager as any).pristineEpisodes = (
       await import('./ir/mapper.js')
     ).IrMapper.toIr(history);
     // In Golden Tests, we just want to ensure the logic doesn't throw or alter unprotected history in weird ways.
     // Since we're skipping processors due to being under budget, it should equal history.
-    mockConfig.getContextManagementConfig.mockReturnValue({
-      strategies: {
-        historySquashing: { maxTokensPerNode: 3000 },
-        toolMasking: { stringLengthThresholdTokens: 10000 },
-        semanticCompression: {
-          nodeThresholdTokens: 5000,
-        },
-      },
-      budget: {
-        maxTokens: 15000000,
-        retainedTokens: 50000,
-      },
-      gcBackstop: { target: 'incremental', strategy: 'truncate' },
-    });
     const tracer2 = new ContextTracer('/tmp', 'test2');
       contextManager = new ContextManager({ pipelines: { eagerBackground: [], normalProcessingGraph: [], retainedProcessingGraph: [] } } as any, {} as any, tracer2);
     

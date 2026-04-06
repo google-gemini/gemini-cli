@@ -258,7 +258,7 @@ describe('Gemini Client (client.ts)', () => {
       getProjectRoot: vi.fn().mockReturnValue('/test/project/root'),
       getIncludeDirectoryTree: vi.fn().mockReturnValue(true),
       storage: {
-        getProjectTempDir: vi.fn().mockReturnValue('/test/temp'),
+        getProjectTempDir: vi.fn().mockReturnValue('/tmp/gemini-test'),
       },
       getContentGenerator: vi.fn().mockReturnValue(mockContentGenerator),
       getBaseLlmClient: vi.fn().mockReturnValue({

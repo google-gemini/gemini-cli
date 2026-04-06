@@ -75,8 +75,7 @@ export class ToolOutputMaskingService {
       return { newHistory: history, maskedCount: 0, tokensSaved: 0 };
     }
 
-    const maskingConfig = config.getContextManagementConfig?.()?.strategies
-      ?.toolMasking || { stringLengthThresholdTokens: 10000 };
+    const maskingConfig = { stringLengthThresholdTokens: 10000 };
     let cumulativeToolTokens = 0;
     let protectionBoundaryReached = false;
     let totalPrunableTokens = 0;

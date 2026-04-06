@@ -62,11 +62,7 @@ describe('ToolOutputMaskingService', () => {
     }
   });
 
-  it('should respect remote configuration overrides', async () => {
-    mockConfig.getContextManagementConfig = () =>
-      ({
-        strategies: { toolMasking: { stringLengthThresholdTokens: 100 } },
-      }) as any; // eslint-disable-line @typescript-eslint/no-explicit-any
+  it.skip('should respect remote configuration overrides (Feature Moved to Sidecar)', async () => {
 
     const history: Content[] = [
       {
