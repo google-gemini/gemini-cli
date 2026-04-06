@@ -44,7 +44,10 @@ vi.mock('node:os', async (importOriginal) => {
 vi.mock('crypto');
 vi.mock('../utils/summarizer.js');
 
-import { escapeShellArg, initializeShellParsers } from '../utils/shell-utils.js';
+import {
+  escapeShellArg,
+  initializeShellParsers,
+} from '../utils/shell-utils.js';
 import { ShellTool, OUTPUT_UPDATE_INTERVAL_MS } from './shell.js';
 import { debugLogger } from '../index.js';
 import { type Config } from '../config/config.js';

@@ -395,12 +395,15 @@ describe('stripShellWrapper', () => {
 
   it('should preserve trailing newlines for wrapped execution commands', () => {
     expect(
-      stripShellWrapper(`bash -c "cat <<EOF
+      stripShellWrapper(
+        `bash -c "cat <<EOF
 text
 EOF
-"`, {
-        preserveTrailingWhitespace: true,
-      }),
+"`,
+        {
+          preserveTrailingWhitespace: true,
+        },
+      ),
     ).toEqual(`cat <<EOF
 text
 EOF
@@ -409,10 +412,13 @@ EOF
 
   it('should preserve trailing newlines for wrapped comment-only commands', () => {
     expect(
-      stripShellWrapper(`bash -c "# comment
-"`, {
-        preserveTrailingWhitespace: true,
-      }),
+      stripShellWrapper(
+        `bash -c "# comment
+"`,
+        {
+          preserveTrailingWhitespace: true,
+        },
+      ),
     ).toEqual(`# comment
 `);
   });

@@ -168,52 +168,58 @@ describe('run_shell_command', () => {
     });
   });
 
-  itBashOnly('should preserve trailing newlines for heredoc shell commands', async () => {
-    await rig.setup('should preserve trailing newlines for heredoc shell commands', {
-      fakeResponsesPath: join(
-        import.meta.dirname,
-        'shell-trailing-newline.responses',
-      ),
-      settings: { tools: { core: ['run_shell_command'] } },
-    });
+  itBashOnly(
+    'should preserve trailing newlines for heredoc shell commands',
+    async () => {
+      await rig.setup(
+        'should preserve trailing newlines for heredoc shell commands',
+        {
+          fakeResponsesPath: join(
+            import.meta.dirname,
+            'shell-trailing-newline.responses',
+          ),
+          settings: { tools: { core: ['run_shell_command'] } },
+        },
+      );
 
-    const result = await rig.run({
-      stdin: 'Run the heredoc command exactly as provided.',
-      approvalMode: 'yolo',
-    });
-
-    const foundToolCall = await rig.waitForToolCall(
-      'run_shell_command',
-      15000,
-      (args) => JSON.parse(args).command.includes('TRAILING_NEWLINE_20755'),
-    );
-
-    if (!foundToolCall || !result.includes('TRAILING_NEWLINE_20755')) {
-      printDebugInfo(rig, result, {
-        'Found tool call': foundToolCall,
-        ToolLogs: rig.readToolLogs(),
+      const result = await rig.run({
+        stdin: 'Run the heredoc command exactly as provided.',
+        approvalMode: 'yolo',
       });
-    }
 
-    expect(foundToolCall).toBe(true);
+      const foundToolCall = await rig.waitForToolCall(
+        'run_shell_command',
+        15000,
+        (args) => JSON.parse(args).command.includes('TRAILING_NEWLINE_20755'),
+      );
 
-    const toolCall = rig
-      .readToolLogs()
-      .find((toolCall) => toolCall.toolRequest.name === 'run_shell_command');
+      if (!foundToolCall || !result.includes('TRAILING_NEWLINE_20755')) {
+        printDebugInfo(rig, result, {
+          'Found tool call': foundToolCall,
+          ToolLogs: rig.readToolLogs(),
+        });
+      }
 
-    expect(toolCall).toBeDefined();
-    expect(toolCall!.toolRequest.success).toBe(true);
+      expect(foundToolCall).toBe(true);
 
-    const parsedArgs = JSON.parse(toolCall!.toolRequest.args) as {
-      command: string;
-    };
-    expect(parsedArgs.command.endsWith('\n')).toBe(true);
+      const toolCall = rig
+        .readToolLogs()
+        .find((toolCall) => toolCall.toolRequest.name === 'run_shell_command');
 
-    expect(result).toContain('TRAILING_NEWLINE_20755');
-    expect(result).not.toMatch(
-      /here-document delimited by end-of-file|syntax error: unexpected end of file/i,
-    );
-  });
+      expect(toolCall).toBeDefined();
+      expect(toolCall!.toolRequest.success).toBe(true);
+
+      const parsedArgs = JSON.parse(toolCall!.toolRequest.args) as {
+        command: string;
+      };
+      expect(parsedArgs.command.endsWith('\n')).toBe(true);
+
+      expect(result).toContain('TRAILING_NEWLINE_20755');
+      expect(result).not.toMatch(
+        /here-document delimited by end-of-file|syntax error: unexpected end of file/i,
+      );
+    },
+  );
 
   it.skip('should run allowed sub-command in non-interactive mode', async () => {
     await rig.setup('should run allowed sub-command in non-interactive mode');
