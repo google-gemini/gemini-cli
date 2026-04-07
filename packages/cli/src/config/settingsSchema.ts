@@ -1970,6 +1970,16 @@ const SETTINGS_SCHEMA = {
             description: 'Enable non-interactive agent sessions.',
             showInDialog: false,
           },
+          agentSessionInteractiveEnabled: {
+            type: 'boolean',
+            label: 'Interactive Agent Session Enabled',
+            category: 'Experimental',
+            requiresRestart: true,
+            default: false,
+            description:
+              'Enable the agent session implementation for the interactive CLI.',
+            showInDialog: false,
+          },
         },
       },
       enableAgents: {

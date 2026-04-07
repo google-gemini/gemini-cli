@@ -4,6 +4,8 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+import type { Kind } from '../tools/tools.js';
+
 export type WithMeta = { _meta?: Record<string, unknown> };
 
 export type Unsubscribe = () => void;
@@ -180,6 +182,16 @@ export interface ToolRequest {
   name: string;
   /** The arguments for the tool. */
   args: Record<string, unknown>;
+  /** UI specific metadata */
+  _meta?: {
+    legacyState?: {
+      displayName?: string;
+      isOutputMarkdown?: boolean;
+      description?: string;
+      kind?: Kind;
+    };
+    [key: string]: unknown;
+  };
 }
 
 /**
@@ -192,6 +204,18 @@ export interface ToolUpdate {
   displayContent?: ContentPart[];
   content?: ContentPart[];
   data?: Record<string, unknown>;
+  /** UI specific metadata */
+  _meta?: {
+    legacyState?: {
+      status?: string;
+      progressMessage?: string;
+      progress?: number;
+      progressTotal?: number;
+      pid?: number;
+      description?: string;
+    };
+    [key: string]: unknown;
+  };
 }
 
 export interface ToolResponse {
@@ -205,6 +229,13 @@ export interface ToolResponse {
   data?: Record<string, unknown>;
   /** When true, the tool call encountered an error that will be sent to the model. */
   isError?: boolean;
+  /** UI specific metadata */
+  _meta?: {
+    legacyState?: {
+      outputFile?: string;
+    };
+    [key: string]: unknown;
+  };
 }
 
 export type ElicitationRequest = {
