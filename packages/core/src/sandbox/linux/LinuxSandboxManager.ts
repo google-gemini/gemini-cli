@@ -27,6 +27,7 @@ import {
   verifySandboxOverrides,
   getCommandName,
 } from '../utils/commandUtils.js';
+import { assertValidPathString } from '../../utils/paths.js';
 import {
   isKnownSafeCommand,
   isDangerousCommand,
@@ -112,9 +113,7 @@ function getSeccompBpfPath(): string {
  * Ensures a file or directory exists.
  */
 function touch(filePath: string, isDirectory: boolean) {
-  if (typeof filePath !== 'string' || filePath.includes('\0')) {
-    throw new Error(`Invalid path: ${filePath}`);
-  }
+  assertValidPathString(filePath);
   try {
     // If it exists (even as a broken symlink), do nothing
     if (fs.lstatSync(filePath)) return;

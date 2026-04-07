@@ -35,7 +35,11 @@ import {
 } from './commandSafety.js';
 import { verifySandboxOverrides } from '../utils/commandUtils.js';
 import { parseWindowsSandboxDenials } from './windowsSandboxDenialUtils.js';
-import { isSubpath, resolveToRealPath } from '../../utils/paths.js';
+import {
+  isSubpath,
+  resolveToRealPath,
+  assertValidPathString,
+} from '../../utils/paths.js';
 import {
   type SandboxDenialCache,
   createSandboxDenialCache,
@@ -93,9 +97,7 @@ export class WindowsSandboxManager implements SandboxManager {
    * Ensures a file or directory exists.
    */
   private touch(filePath: string, isDirectory: boolean): void {
-    if (typeof filePath !== 'string' || filePath.includes('\0')) {
-      throw new Error(`Invalid path: ${filePath}`);
-    }
+    assertValidPathString(filePath);
     try {
       // If it exists (even as a broken symlink), do nothing
       if (fs.lstatSync(filePath)) return;

@@ -21,10 +21,12 @@ export function parseWindowsSandboxDenials(
 ): ParsedSandboxDenial | undefined {
   const output = result.output || '';
   const errorOutput = result.error?.message;
-  const combined = (output + ' ' + (errorOutput || '')).toLowerCase();
+  const fullText = output + '\n' + (errorOutput || '');
+  const combined = fullText.toLowerCase();
 
-  const combinedTrimmed = combined.trim();
-  if (combinedTrimmed && cache?.has(combinedTrimmed)) {
+  // Cache by the first 200 characters of the error to handle variable data (timestamps, PIDs)
+  const cacheKey = combined.trim().slice(0, 200);
+  if (cacheKey && cache?.has(cacheKey)) {
     return undefined;
   }
 
@@ -56,38 +58,24 @@ export function parseWindowsSandboxDenials(
 
   // 1. Quoted paths: 'C:\Foo Bar' or "C:\Foo Bar"
   const quotedRegex = /['"]((?:\\\\(?:\?|\.)\\)?[a-zA-Z]:[\\/][^'"]+)['"]/g;
-  for (const match of output.matchAll(quotedRegex)) {
+  for (const match of fullText.matchAll(quotedRegex)) {
     const sanitized = sanitizeExtractedPath(match[1]);
     if (sanitized) filePaths.add(sanitized);
-  }
-  if (errorOutput) {
-    for (const match of errorOutput.matchAll(quotedRegex)) {
-      const sanitized = sanitizeExtractedPath(match[1]);
-      if (sanitized) filePaths.add(sanitized);
-    }
   }
 
   // 2. Unquoted paths or paths in PowerShell error format: PermissionDenied: (C:\path:String)
   const generalRegex =
     /(?:^|[\s(])((?:\\\\(?:\?|\.)\\)?[a-zA-Z]:[\\/][^"'\s()<>|?*]+)/g;
-  for (const match of output.matchAll(generalRegex)) {
+  for (const match of fullText.matchAll(generalRegex)) {
     // Clean up trailing colon which might be part of the error message rather than the path
     let p = match[1];
     if (p.endsWith(':')) p = p.slice(0, -1);
     const sanitized = sanitizeExtractedPath(p);
     if (sanitized) filePaths.add(sanitized);
   }
-  if (errorOutput) {
-    for (const match of errorOutput.matchAll(generalRegex)) {
-      let p = match[1];
-      if (p.endsWith(':')) p = p.slice(0, -1);
-      const sanitized = sanitizeExtractedPath(p);
-      if (sanitized) filePaths.add(sanitized);
-    }
-  }
 
-  if (combinedTrimmed && cache) {
-    cache.set(combinedTrimmed, true);
+  if (cacheKey && cache) {
+    cache.set(cacheKey, true);
   }
 
   return {

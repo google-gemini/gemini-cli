@@ -8,6 +8,7 @@ import {
   type SandboxPermissions,
   type SandboxRequest,
 } from '../../services/sandboxManager.js';
+import { isValidPathString } from '../../utils/paths.js';
 
 /**
  * Validates if the requested paths are within the allowed workspace or allowed paths.
@@ -18,7 +19,7 @@ function validatePaths(
   allowedPaths: string[],
 ): boolean {
   for (const p of paths) {
-    if (typeof p !== 'string' || p.includes('\0')) {
+    if (!isValidPathString(p)) {
       return false; // Reject malicious paths
     }
     const resolvedPath = path.resolve(p);
