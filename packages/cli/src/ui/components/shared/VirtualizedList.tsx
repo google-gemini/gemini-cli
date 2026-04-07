@@ -85,32 +85,43 @@ const VirtualizedListItem = memo(
     width,
     containerWidth,
     itemKey,
-    itemRef,
+    index,
+    onSetRef,
   }: {
     content: React.ReactElement;
     shouldBeStatic: boolean;
     width: number | string | undefined;
     containerWidth: number;
     itemKey: string;
-    itemRef: (el: DOMElement | null) => void;
-  }) => (
-    <Box width="100%" flexDirection="column" flexShrink={0} ref={itemRef}>
-      {shouldBeStatic ? (
-        <StaticRender
-          width={typeof width === 'number' ? width : containerWidth}
-          key={
-            itemKey +
-            '-static-' +
-            (typeof width === 'number' ? width : containerWidth)
-          }
-        >
-          {content}
-        </StaticRender>
-      ) : (
-        content
-      )}
-    </Box>
-  ),
+    index: number;
+    onSetRef: (index: number, el: DOMElement | null) => void;
+  }) => {
+    const itemRef = useCallback(
+      (el: DOMElement | null) => {
+        onSetRef(index, el);
+      },
+      [index, onSetRef],
+    );
+
+    return (
+      <Box width="100%" flexDirection="column" flexShrink={0} ref={itemRef}>
+        {shouldBeStatic ? (
+          <StaticRender
+            width={typeof width === 'number' ? width : containerWidth}
+            key={
+              itemKey +
+              '-static-' +
+              (typeof width === 'number' ? width : containerWidth)
+            }
+          >
+            {content}
+          </StaticRender>
+        ) : (
+          content
+        )}
+      </Box>
+    );
+  },
 );
 
 VirtualizedListItem.displayName = 'VirtualizedListItem';
@@ -194,6 +205,10 @@ function VirtualizedList<T>(
 
   const containerObserverRef = useRef<ResizeObserver | null>(null);
   const nodeToKeyRef = useRef(new WeakMap<DOMElement, string>());
+
+  const onSetRef = useCallback((index: number, el: DOMElement | null) => {
+    itemRefs.current[index] = el;
+  }, []);
 
   const containerRefCallback = useCallback((node: DOMElement | null) => {
     containerObserverRef.current?.disconnect();
@@ -517,7 +532,6 @@ function VirtualizedList<T>(
     observedNodes.current = currentNodes;
   });
 
-  const renderedItems = [];
   const renderRangeStart =
     renderStatic || overflowToBackbuffer ? 0 : startIndex;
   const renderRangeEnd = renderStatic ? data.length - 1 : endIndex;
@@ -533,7 +547,12 @@ function VirtualizedList<T>(
     process.env['NODE_ENV'] === 'test' ||
     (width !== undefined && typeof width === 'number');
 
-  if (isReady) {
+  const renderedItems = useMemo(() => {
+    if (!isReady) {
+      return [];
+    }
+
+    const items = [];
     for (let i = renderRangeStart; i <= renderRangeEnd; i++) {
       const item = data[i];
       if (item) {
@@ -545,7 +564,7 @@ function VirtualizedList<T>(
         const content = renderItem({ item, index: i });
         const key = keyExtractor(item, i);
 
-        renderedItems.push(
+        items.push(
           <VirtualizedListItem
             key={key}
             itemKey={key}
@@ -553,16 +572,28 @@ function VirtualizedList<T>(
             shouldBeStatic={shouldBeStatic}
             width={width}
             containerWidth={containerWidth}
-            itemRef={(el: DOMElement | null) => {
-              if (i >= renderRangeStart && i <= renderRangeEnd) {
-                itemRefs.current[i] = el;
-              }
-            }}
+            index={i}
+            onSetRef={onSetRef}
           />,
         );
       }
     }
-  }
+    return items;
+  }, [
+    isReady,
+    renderRangeStart,
+    renderRangeEnd,
+    data,
+    startIndex,
+    endIndex,
+    renderStatic,
+    isStaticItem,
+    renderItem,
+    keyExtractor,
+    width,
+    containerWidth,
+    onSetRef,
+  ]);
 
   const { getScrollTop, setPendingScrollTop } = useBatchedScroll(scrollTop);
 
