@@ -8,6 +8,7 @@ import { describe, it, expect, beforeEach, vi, afterEach } from 'vitest';
 import { act, useState } from 'react';
 import * as path from 'node:path';
 import * as fs from 'node:fs';
+import * as crawlCache from '../../../../core/src/utils/filesearch/crawlCache.js';
 import { renderHook } from '../../test-utils/render.js';
 import { waitFor } from '../../test-utils/async.js';
 import { useAtCompletion } from './useAtCompletion.js';
@@ -70,7 +71,9 @@ describe('useAtCompletion', () => {
     if (testRootDir) {
       await cleanupTmpDir(testRootDir);
     }
+    crawlCache.clear();
     vi.restoreAllMocks();
+    vi.useRealTimers();
   });
 
   describe('File Search Logic', () => {
@@ -189,6 +192,7 @@ describe('useAtCompletion', () => {
     });
 
     it('should pick up newly created files when re-triggered (@ menu re-opened)', async () => {
+      vi.useFakeTimers();
       const structure: FileSystemStructure = { 'initial.txt': '' };
       testRootDir = await createTmpDir(structure);
 
@@ -209,12 +213,10 @@ describe('useAtCompletion', () => {
       const newFile = path.join(testRootDir, 'newfile.txt');
       await fs.promises.writeFile(newFile, '');
 
-      // Advance time to expire the 1s cache
-      vi.useFakeTimers();
+      // Advance timers by >5s to expire the crawler cache
       act(() => {
-        vi.advanceTimersByTime(1100);
+        vi.advanceTimersByTime(5100);
       });
-      vi.useRealTimers();
 
       // Toggle enabled to re-trigger initialize (close and open @ menu)
       act(() => {

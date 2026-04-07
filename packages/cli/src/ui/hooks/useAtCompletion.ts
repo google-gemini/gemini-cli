@@ -294,18 +294,24 @@ export function useAtCompletion(props: UseAtCompletionProps): void {
                 config?.getFileFilteringOptions(),
               ),
               cache: true,
-              cacheTtl: 1,
+              // use a short 5s TTL for the @ menu to ensure newly created files
+              // (by the agent or user) are discovered quickly, while still
+              // protecting against redundant crawls in very large repositories.
+              cacheTtl: 5,
               enableRecursiveFileSearch:
                 config?.getEnableRecursiveFileSearch() ?? true,
               enableFuzzySearch:
                 config?.getFileFilteringEnableFuzzySearch() ?? true,
               maxFiles: config?.getFileFilteringOptions()?.maxFileCount,
             });
+            fileSearchMap.current.set(dir, searcher);
           }
 
           initPromises.push(
             searcher.initialize().then(() => {
               if (initEpoch.current === currentEpoch) {
+                // Ensure we still have the latest version in the map
+                // (though set() above already did it, this handles potential concurrent resets)
                 fileSearchMap.current.set(dir, searcher);
               }
             }),

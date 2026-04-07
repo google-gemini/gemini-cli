@@ -140,50 +140,60 @@ class RecursiveFileSearch implements FileSearch {
   private allFiles: string[] = [];
   private fzf: AsyncFzf<string[]> | undefined;
   private initializationState = InitializationState.Uninitialized;
+  private initPromise: Promise<void> | null = null;
 
   constructor(private readonly options: FileSearchOptions) {}
 
   async initialize(): Promise<void> {
     if (this.initializationState === InitializationState.Initializing) {
-      return;
+      return this.initPromise || Promise.resolve();
     }
-    const prevState = this.initializationState;
-    this.initializationState = InitializationState.Initializing;
+
+    this.initPromise = (async () => {
+      const prevState = this.initializationState;
+      this.initializationState = InitializationState.Initializing;
+
+      try {
+        const nextIgnore = loadIgnoreRules(
+          this.options.fileDiscoveryService,
+          this.options.ignoreDirs,
+        );
+
+        const nextFiles = await crawl({
+          crawlDirectory: this.options.projectRoot,
+          cwd: this.options.projectRoot,
+          ignore: nextIgnore,
+          cache: this.options.cache,
+          cacheTtl: this.options.cacheTtl,
+          maxDepth: this.options.maxDepth,
+          maxFiles: this.options.maxFiles ?? 20000,
+        });
+
+        if (
+          nextFiles === this.allFiles &&
+          this.ignore &&
+          prevState === InitializationState.Initialized
+        ) {
+          this.initializationState = InitializationState.Initialized;
+          // optimization: if the file list is referentially equal (from crawl cache)
+          // and we already have ignore rules, skip rebuilding the FZF index.
+          return;
+        }
+
+        this.ignore = nextIgnore;
+        this.allFiles = nextFiles;
+        this.buildResultCache();
+        this.initializationState = InitializationState.Initialized;
+      } catch (e) {
+        this.initializationState = prevState;
+        throw e;
+      }
+    })();
 
     try {
-      const nextIgnore = loadIgnoreRules(
-        this.options.fileDiscoveryService,
-        this.options.ignoreDirs,
-      );
-
-      const nextFiles = await crawl({
-        crawlDirectory: this.options.projectRoot,
-        cwd: this.options.projectRoot,
-        ignore: nextIgnore,
-        cache: this.options.cache,
-        cacheTtl: this.options.cacheTtl,
-        maxDepth: this.options.maxDepth,
-        maxFiles: this.options.maxFiles ?? 20000,
-      });
-
-      if (
-        nextFiles === this.allFiles &&
-        this.ignore &&
-        prevState === InitializationState.Initialized
-      ) {
-        this.initializationState = InitializationState.Initialized;
-        // optimization: if the file list is referentially equal (from crawl cache)
-        // and we already have ignore rules, skip rebuilding the FZF index.
-        return;
-      }
-
-      this.ignore = nextIgnore;
-      this.allFiles = nextFiles;
-      this.buildResultCache();
-      this.initializationState = InitializationState.Initialized;
-    } catch (e) {
-      this.initializationState = prevState;
-      throw e;
+      await this.initPromise;
+    } finally {
+      this.initPromise = null;
     }
   }
 

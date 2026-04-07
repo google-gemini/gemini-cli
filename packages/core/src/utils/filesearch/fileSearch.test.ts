@@ -866,10 +866,12 @@ describe('FileSearch', () => {
     expect(crawlSpy).toHaveBeenCalledTimes(1);
 
     // Resolve the first one
-    crawlResolve!([]);
+    crawlResolve!(['file1.js']);
     await Promise.all([init1, init2]);
 
     expect(crawlSpy).toHaveBeenCalledTimes(1);
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    expect((fileSearch as any).allFiles).toEqual(['file1.js']);
   });
 
   describe('DirectoryFileSearch', () => {
