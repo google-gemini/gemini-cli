@@ -120,8 +120,9 @@ export class SimulationHarness {
       }
       
       // Inject the truncated view back into the graph
-      for (const ep of currentView) {
-          if (!currentHistory.find(c => c === ep)) {
+      for (let i = 0; i < currentView.length; i++) {
+          const ep = currentView[i];
+          if (!this.contextManager.getWorkingBufferView().find(c => c.id === ep.id)) {
                this.eventBus.emitVariantReady({
                   targetId: ep.id,
                   variantId: 'v-emergency',

@@ -10,6 +10,7 @@ import type { SidecarConfig, PipelineDef } from './types.js';
 import type { ContextEnvironment, ContextEventBus, ContextTracer } from './environment.js';
 import { ProcessorRegistry } from './registry.js';
 import { debugLogger } from '../../utils/debugLogger.js';
+import { EpisodeEditor } from '../ir/episodeEditor.js';
 
 export class PipelineOrchestrator {
   private activeTimers: NodeJS.Timeout[] = [];
@@ -109,7 +110,9 @@ export class PipelineOrchestrator {
 
       try {
         this.tracer.logEvent('Orchestrator', `Executing processor: ${procDef.processorId}`);
-        currentEpisodes = await processor.process(currentEpisodes, state);
+        const editor = new EpisodeEditor(currentEpisodes);
+        await processor.process(editor, state);
+        currentEpisodes = editor.getFinalEpisodes();
       } catch (error) {
         debugLogger.error(`Pipeline ${pipeline.name} failed synchronously at ${procDef.processorId}:`, error);
         return currentEpisodes; // Return what we have so far
@@ -135,28 +138,24 @@ export class PipelineOrchestrator {
       try {
         this.tracer.logEvent('Orchestrator', `Executing processor: ${procDef.processorId} (async)`);
         
-        // Before running, capture the state so we know what changed
-        const beforeMap = new Map(currentEpisodes.map(ep => [ep.id, ep]));
-        
-        currentEpisodes = await processor.process(currentEpisodes, state);
+        const editor = new EpisodeEditor(currentEpisodes);
+        await processor.process(editor, state);
+        currentEpisodes = editor.getFinalEpisodes();
         
         // Synthesize VariantReady events for anything that changed or was newly created
-        for (const ep of currentEpisodes) {
-           const original = beforeMap.get(ep.id);
-           
-           // If an episode was transformed, or if it's a completely new synthetic episode (like a Snapshot)
-           // we need to broadcast it so the ContextManager can cache it as a variant.
-           if (!original || original !== ep) {
+        for (const mutation of editor.getMutations()) {
+           // We only broadcast modifications or replacements
+           // (Insertions without replacement and deletions are not tracked as variants on an existing node)
+           if (mutation.type === 'modified' || mutation.type === 'replaced') {
               const variantId = `v-${procDef.processorId.toLowerCase()}`;
               
-              // Determine variant type. StateSnapshot generates full 'snapshot' replacement nodes. 
-              // Masking/Squashing generate 'masked' or 'summary' in-place variants.
               let vType: 'snapshot' | 'summary' | 'masked' = 'masked';
               if (procDef.processorId.includes('Snapshot')) vType = 'snapshot';
               else if (procDef.processorId.includes('Semantic')) vType = 'summary';
               
+              const ep = mutation.episode!;
               this.eventBus.emitVariantReady({
-                  targetId: ep.id, // The ID of the modified or new episode
+                  targetId: mutation.type === 'replaced' ? mutation.originalIds![0] : ep.id,
                   variantId,
                   // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
                   variant: {
@@ -165,8 +164,7 @@ export class PipelineOrchestrator {
                       episode: vType === 'snapshot' ? ep : undefined,
                       text: vType !== 'snapshot' ? (ep.yield?.text || (ep.trigger as any)?.semanticParts?.[0]?.presentation?.text || '') : undefined,
                       recoveredTokens: ep.yield?.metadata?.currentTokens || 10,
-                      // For snapshots, we look at the transformations metadata to see what it replaced
-                      replacedEpisodeIds: vType === 'snapshot' ? currentState.map(c => c.id).filter(id => id !== ep.id && !currentEpisodes.find(ce => ce.id === id)) : undefined,
+                      replacedEpisodeIds: mutation.originalIds,
                   } as any
               });
            }

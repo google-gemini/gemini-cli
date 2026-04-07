@@ -47,11 +47,11 @@ export class HistorySquashingProcessor implements ContextProcessor {
   }
 
   async process(
-    episodes: Episode[],
+    editor: EpisodeEditor,
     state: ContextAccountingState,
-  ): Promise<Episode[]> {
+  ): Promise<void> {
     if (state.isBudgetSatisfied) {
-      return episodes;
+      return;
     }
 
     const { maxTokensPerNode } = this.options;
@@ -60,29 +60,36 @@ export class HistorySquashingProcessor implements ContextProcessor {
 
     // We track how many tokens we still need to cut. If we hit 0, we can stop early!
     let currentDeficit = state.deficitTokens;
-    const newEpisodes = [...episodes];
 
-    for (let i = 0; i < newEpisodes.length; i++) {
+    for (const ep of editor.episodes) {
       if (currentDeficit <= 0) break;
-      if (state.protectedEpisodeIds.has(newEpisodes[i].id)) continue;
-
-      const ep = newEpisodes[i];
+      if (state.protectedEpisodeIds.has(ep.id)) continue;
 
       // 1. Squash User Prompts
       if (ep.trigger.type === 'USER_PROMPT') {
-        for (const part of ep.trigger.semanticParts) {
+        for (let j = 0; j < ep.trigger.semanticParts.length; j++) {
+          const part = ep.trigger.semanticParts[j];
           if (part.type === 'text') {
             const saved = this.tryApplySquash(
               part.text,
               limitChars,
               currentDeficit,
-              (p) => (part.presentation = p),
-              () =>
-                ep.trigger.metadata.transformations.push({
-                  processorName: this.name,
-                  action: 'TRUNCATED',
-                  timestamp: Date.now(),
-                }),
+              (p) => {
+                 editor.editEpisode(ep.id, 'SQUASH_PROMPT', (draft) => {
+                    if (draft.trigger.type === 'USER_PROMPT') {
+                       draft.trigger.semanticParts[j].presentation = p;
+                    }
+                 });
+              },
+              () => {
+                 editor.editEpisode(ep.id, 'SQUASH_PROMPT', (draft) => {
+                    draft.trigger.metadata.transformations.push({
+                      processorName: this.name,
+                      action: 'TRUNCATED',
+                      timestamp: Date.now(),
+                    });
+                 });
+              }
             );
             currentDeficit -= saved;
           }
@@ -90,22 +97,38 @@ export class HistorySquashingProcessor implements ContextProcessor {
       }
 
       // 2. Squash Model Thoughts
-      for (const step of ep.steps) {
-        if (currentDeficit <= 0) break;
-        if (step.type === 'AGENT_THOUGHT') {
-          const saved = this.tryApplySquash(
-            step.text,
-            limitChars,
-            currentDeficit,
-            (p) => (step.presentation = p),
-            () =>
-              step.metadata.transformations.push({
-                processorName: this.name,
-                action: 'TRUNCATED',
-                timestamp: Date.now(),
-              }),
-          );
-          currentDeficit -= saved;
+      if (ep.steps) {
+        for (let j = 0; j < ep.steps.length; j++) {
+          const step = ep.steps[j];
+          if (currentDeficit <= 0) break;
+          if (step.type === 'AGENT_THOUGHT') {
+            const saved = this.tryApplySquash(
+              step.text,
+              limitChars,
+              currentDeficit,
+              (p) => {
+                 editor.editEpisode(ep.id, 'SQUASH_THOUGHT', (draft) => {
+                    const draftStep = draft.steps![j];
+                    if (draftStep.type === 'AGENT_THOUGHT') {
+                       draftStep.presentation = p;
+                    }
+                 });
+              },
+              () => {
+                 editor.editEpisode(ep.id, 'SQUASH_THOUGHT', (draft) => {
+                    const draftStep = draft.steps![j];
+                    if (draftStep.type === 'AGENT_THOUGHT') {
+                        draftStep.metadata.transformations.push({
+                          processorName: this.name,
+                          action: 'TRUNCATED',
+                          timestamp: Date.now(),
+                        });
+                    }
+                 });
+              }
+            );
+            currentDeficit -= saved;
+          }
         }
       }
 
@@ -115,18 +138,25 @@ export class HistorySquashingProcessor implements ContextProcessor {
           ep.yield.text,
           limitChars,
           currentDeficit,
-          (p) => (ep.yield!.presentation = p),
-          () =>
-            ep.yield!.metadata.transformations.push({
-              processorName: this.name,
-              action: 'TRUNCATED',
-              timestamp: Date.now(),
-            }),
+          (p) => {
+              editor.editEpisode(ep.id, 'SQUASH_YIELD', (draft) => {
+                 if (draft.yield) draft.yield.presentation = p;
+              });
+          },
+          () => {
+              editor.editEpisode(ep.id, 'SQUASH_YIELD', (draft) => {
+                 if (draft.yield) {
+                     draft.yield.metadata.transformations.push({
+                      processorName: this.name,
+                      action: 'TRUNCATED',
+                      timestamp: Date.now(),
+                    });
+                 }
+              });
+          }
         );
         currentDeficit -= saved;
       }
     }
-
-    return newEpisodes;
   }
 }

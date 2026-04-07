@@ -10,6 +10,8 @@ import type { ContextEnvironment } from '../sidecar/environment.js';
 import { sanitizeFilenamePart } from '../../utils/fileUtils.js';
 import type { Part } from '@google/genai';
 
+import type { EpisodeEditor } from '../ir/episodeEditor.js';
+
 export class BlobDegradationProcessor implements ContextProcessor {
   readonly name = 'BlobDegradation';
   private env: ContextEnvironment;
@@ -19,15 +21,14 @@ export class BlobDegradationProcessor implements ContextProcessor {
   }
 
   async process(
-    episodes: Episode[],
+    editor: EpisodeEditor,
     state: ContextAccountingState,
-  ): Promise<Episode[]> {
+  ): Promise<void> {
     if (state.isBudgetSatisfied) {
-      return episodes;
+      return;
     }
 
     let currentDeficit = state.deficitTokens;
-    const newEpisodes = [...episodes];
     let directoryCreated = false;
 
     let blobOutputsDir = this.env.fileSystem.join(
@@ -50,13 +51,13 @@ export class BlobDegradationProcessor implements ContextProcessor {
     };
 
     // Forward scan, looking for bloated non-text parts to degrade
-    for (let i = 0; i < newEpisodes.length; i++) {
+    for (const ep of editor.episodes) {
       if (currentDeficit <= 0) break;
-      const ep = newEpisodes[i];
       if (state.protectedEpisodeIds.has(ep.id)) continue;
 
       if (ep.trigger.type === 'USER_PROMPT') {
-        for (const part of ep.trigger.semanticParts) {
+        for (let j = 0; j < ep.trigger.semanticParts.length; j++) {
+          const part = ep.trigger.semanticParts[j];
           if (currentDeficit <= 0) break;
           // We only target non-text parts that haven't already been masked
           if (part.type === 'text' || part.presentation) continue;
@@ -100,12 +101,16 @@ export class BlobDegradationProcessor implements ContextProcessor {
 
           if (newText && tokensSaved > 0) {
             const newTokens = this.env.tokenCalculator.estimateTokensForParts([{ text: newText }]);
-            part.presentation = { text: newText, tokens: newTokens };
-
-            ep.trigger.metadata.transformations.push({
-              processorName: this.name,
-              action: 'DEGRADED',
-              timestamp: Date.now(),
+            
+            editor.editEpisode(ep.id, 'DEGRADE_BLOB', (draft) => {
+              if (draft.trigger.type === 'USER_PROMPT') {
+                 draft.trigger.semanticParts[j].presentation = { text: newText, tokens: newTokens };
+                 draft.trigger.metadata.transformations.push({
+                   processorName: this.name,
+                   action: 'DEGRADED',
+                   timestamp: Date.now(),
+                 });
+              }
             });
 
             currentDeficit -= tokensSaved;
@@ -113,7 +118,5 @@ export class BlobDegradationProcessor implements ContextProcessor {
         }
       }
     }
-
-    return newEpisodes;
   }
 }

@@ -6,6 +6,8 @@
 
 import type { Episode } from './ir/types.js';
 
+import type { EpisodeEditor } from './ir/episodeEditor.js';
+
 /**
  * State object passed through the processing pipeline.
  * Contains global accounting logic and semantic protection rules.
@@ -38,11 +40,11 @@ export interface ContextProcessor {
   readonly name: string;
 
   /**
-   * Processes the episodic history payload based on the current accounting state.
-   * Processors should return a new or mutated array of episodes.
+   * Processes the episodic history payload via the provided EpisodeEditor, based on the current accounting state.
+   * Processors should safely mutate or replace episodes using the editor's API.
    */
   process(
-    episodes: Episode[],
+    editor: EpisodeEditor,
     state: ContextAccountingState,
-  ): Promise<Episode[]>;
+  ): Promise<void>;
 }

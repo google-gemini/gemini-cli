@@ -9,6 +9,8 @@ import type { Episode } from '../ir/types.js';
 import type { ContextEnvironment } from '../sidecar/environment.js';
 
 
+import type { EpisodeEditor } from '../ir/episodeEditor.js';
+
 export interface EmergencyTruncationProcessorOptions {}
 
 export class EmergencyTruncationProcessor implements ContextProcessor {
@@ -23,25 +25,25 @@ export class EmergencyTruncationProcessor implements ContextProcessor {
     this.options = options;
   }
 
-  async process(episodes: Episode[], state: ContextAccountingState): Promise<Episode[]> {
-    if (state.currentTokens <= state.maxTokens) return episodes;
+  async process(editor: EpisodeEditor, state: ContextAccountingState): Promise<void> {
+    if (state.currentTokens <= state.maxTokens) return;
 
     let remainingTokens = state.currentTokens;
     const targetTokens = state.maxTokens;
-    const truncated: Episode[] = [];
+    const toRemove: string[] = [];
     
     // We respect the global protected Episode IDs (like the system prompt at index 0)
-    for (const ep of episodes) {
+    for (const ep of editor.episodes) {
       const epTokens = this._env.tokenCalculator.calculateEpisodeListTokens([ep]);
       
       if (remainingTokens > targetTokens && !state.protectedEpisodeIds.has(ep.id)) {
         remainingTokens -= epTokens;
-        // Dropped! We do not add it to the truncated array.
-      } else {
-        truncated.push(ep);
+        toRemove.push(ep.id);
       }
     }
     
-    return truncated;
+    if (toRemove.length > 0) {
+      editor.removeEpisodes(toRemove, 'TRUNCATED');
+    }
   }
 }

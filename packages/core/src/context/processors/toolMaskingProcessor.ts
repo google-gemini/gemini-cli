@@ -25,10 +25,12 @@ const UNMASKABLE_TOOLS = new Set([
   EXIT_PLAN_MODE_TOOL_NAME,
 ]);
 
+import type { EpisodeEditor } from '../ir/episodeEditor.js';
+
 export class ToolMaskingProcessor implements ContextProcessor {
   readonly name = 'ToolMasking';
-  private env: ContextEnvironment;
   private options: { stringLengthThresholdTokens: number };
+  private env: ContextEnvironment;
 
   constructor(
     env: ContextEnvironment,
@@ -39,14 +41,13 @@ export class ToolMaskingProcessor implements ContextProcessor {
   }
 
   async process(
-    episodes: Episode[],
+    editor: EpisodeEditor,
     state: ContextAccountingState,
-  ): Promise<Episode[]> {
+  ): Promise<void> {
     const maskingConfig = this.options;
-    if (!maskingConfig) return episodes;
-    if (state.isBudgetSatisfied) return episodes;
+    if (!maskingConfig) return;
+    if (state.isBudgetSatisfied) return;
 
-    const newEpisodes = [...episodes];
     let currentDeficit = state.deficitTokens;
     const limitChars = this.env.tokenCalculator.tokensToChars(maskingConfig.stringLengthThresholdTokens);
 
@@ -92,9 +93,8 @@ export class ToolMaskingProcessor implements ContextProcessor {
     };
 
     // Forward scan, looking for massive intents or observations to mask
-    for (let i = 0; i < newEpisodes.length; i++) {
+    for (const ep of editor.episodes) {
       if (currentDeficit <= 0) break;
-      const ep = newEpisodes[i];
       if (!ep || !ep.steps || state.protectedEpisodeIds.has(ep.id)) continue;
 
       for (let j = 0; j < ep.steps.length; j++) {
@@ -167,9 +167,6 @@ export class ToolMaskingProcessor implements ContextProcessor {
         );
 
         if (intentRes.changed || obsRes.changed) {
-          step.presentation.intent = intentRes.masked;
-          step.presentation.observation = obsRes.masked;
-
           // Recalculate tokens perfectly
           const newIntentTokens = this.env.tokenCalculator.estimateTokensForParts([
             {
@@ -200,22 +197,41 @@ export class ToolMaskingProcessor implements ContextProcessor {
           const savings = oldTotal - newTotal;
 
           if (savings > 0) {
-            step.presentation.tokens = {
-              intent: newIntentTokens,
-              observation: newObsTokens,
-            };
-            step.metadata.transformations.push({
-              processorName: 'ToolMasking',
-              action: 'MASKED',
-              timestamp: Date.now(),
-            });
             currentDeficit -= savings;
+            this.env.tracer.logEvent('ToolMaskingProcessor', `Masked tool ${toolName}`, { recoveredTokens: savings });
+            
+            editor.editEpisode(ep.id, 'MASK_TOOL', (draft) => {
+              const draftStep = draft.steps![j];
+              if (draftStep.type !== 'TOOL_EXECUTION') return;
+              if (!draftStep.presentation) {
+                 draftStep.presentation = {
+                    intent: draftStep.intent,
+                    observation: draftStep.observation,
+                    tokens: draftStep.tokens,
+                 };
+              }
+              draftStep.presentation.intent = intentRes.masked;
+              draftStep.presentation.observation = obsRes.masked;
+              draftStep.presentation.tokens = {
+                intent: newIntentTokens,
+                observation: newObsTokens,
+              };
+              draftStep.metadata = {
+                ...draftStep.metadata,
+                transformations: [
+                  ...(draftStep.metadata?.transformations || []),
+                  {
+                    processorName: 'ToolMasking',
+                    action: 'MASKED',
+                    timestamp: Date.now(),
+                  }
+                ]
+              };
+            });
           }
         }
       }
     }
-
-    return newEpisodes;
   }
 
   private isAlreadyMasked(content: string): boolean {

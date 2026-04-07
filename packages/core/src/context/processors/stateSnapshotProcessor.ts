@@ -12,6 +12,8 @@ import { v4 as uuidv4 } from 'uuid';
 import { LlmRole } from '../../telemetry/llmRole.js';
 import { debugLogger } from 'src/utils/debugLogger.js';
 
+import type { EpisodeEditor } from '../ir/episodeEditor.js';
+
 export interface StateSnapshotProcessorOptions {
   model?: string;
   systemInstruction?: string;
@@ -37,17 +39,17 @@ export class StateSnapshotProcessor implements ContextProcessor {
     this.options = options;
   }
 
-  async process(episodes: Episode[], state: ContextAccountingState): Promise<Episode[]> {
+  async process(editor: EpisodeEditor, state: ContextAccountingState): Promise<void> {
     const targetDeficit = Math.max(0, state.currentTokens - state.retainedTokens);
-    if (this.isSynthesizing || targetDeficit <= 0) return episodes;
+    if (this.isSynthesizing || targetDeficit <= 0) return;
 
     this.isSynthesizing = true;
     try {
       let deficitAccumulator = 0;
       const selectedEpisodes: Episode[] = [];
 
-      for (let i = 1; i < episodes.length - 1; i++) {
-        const ep = episodes[i];
+      for (let i = 1; i < editor.episodes.length - 1; i++) {
+        const ep = editor.episodes[i];
         selectedEpisodes.push(ep);
         deficitAccumulator += this.env.tokenCalculator.estimateTokensForParts([
           { text: (ep.trigger as any)?.semanticParts?.[0]?.text ?? '' },
@@ -56,21 +58,14 @@ export class StateSnapshotProcessor implements ContextProcessor {
         if (deficitAccumulator >= targetDeficit) break;
       }
 
-      if (selectedEpisodes.length < 2) return episodes; // Not enough context to summarize
+      if (selectedEpisodes.length < 2) return; // Not enough context to summarize
 
       // Optimization: Do NOT emit VariantComputing, let the Orchestrator handle caching the final result.
       const snapshotEp: Episode = await this.synthesizeSnapshot(selectedEpisodes);
       
-      const newEpisodes = [...episodes];
+      const oldIds = selectedEpisodes.map(ep => ep.id);
+      editor.replaceEpisodes(oldIds, snapshotEp, 'STATE_SNAPSHOT');
       
-      // Calculate indices to splice
-      const firstIndex = newEpisodes.findIndex(e => e.id === selectedEpisodes[0].id);
-      
-      if (firstIndex !== -1) {
-        newEpisodes.splice(firstIndex, selectedEpisodes.length, snapshotEp);
-      }
-      
-      return newEpisodes;
     } finally {
       this.isSynthesizing = false;
     }
