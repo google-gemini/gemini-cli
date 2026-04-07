@@ -5,8 +5,8 @@
  */
 
 import type React from 'react';
-import { useCallback, useRef } from 'react';
-import { Text, Box, type DOMElement } from 'ink';
+import { useCallback } from 'react';
+import { Text, Box } from 'ink';
 import { useKeypress, type Key } from '../../hooks/useKeypress.js';
 import chalk from 'chalk';
 import { theme } from '../../semantic-colors.js';
@@ -14,8 +14,6 @@ import { expandPastePlaceholders, type TextBuffer } from './text-buffer.js';
 import { cpSlice, cpIndexToOffset } from '../../utils/textUtils.js';
 import { Command } from '../../key/keyMatchers.js';
 import { useKeyMatchers } from '../../hooks/useKeyMatchers.js';
-import { useMouseClick } from '../../hooks/useMouseClick.js';
-import { useAlternateBuffer } from '../../hooks/useAlternateBuffer.js';
 
 export interface TextInputProps {
   buffer: TextBuffer;
@@ -33,9 +31,6 @@ export function TextInput({
   focus = true,
 }: TextInputProps): React.JSX.Element {
   const keyMatchers = useKeyMatchers();
-  const isAlternateBuffer = useAlternateBuffer();
-  const containerRef = useRef<DOMElement>(null);
-
   const {
     text,
     handleInput,
@@ -44,17 +39,6 @@ export function TextInput({
     visualScrollRow,
   } = buffer;
   const [cursorVisualRowAbsolute, cursorVisualColAbsolute] = visualCursor;
-
-  useMouseClick(
-    containerRef,
-    (_event, relativeX, relativeY) => {
-      if (focus) {
-        const visRowAbsolute = visualScrollRow + relativeY;
-        buffer.moveToVisualPosition(visRowAbsolute, relativeX);
-      }
-    },
-    { isActive: focus && isAlternateBuffer, name: 'left-press' },
-  );
 
   const handleKeyPress = useCallback(
     (key: Key) => {
@@ -94,7 +78,7 @@ export function TextInput({
   }
 
   return (
-    <Box ref={containerRef} flexDirection="column">
+    <Box flexDirection="column">
       {viewportVisualLines.map((lineText, idx) => {
         const currentVisualRow = visualScrollRow + idx;
         const isCursorLine =
