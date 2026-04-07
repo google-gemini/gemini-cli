@@ -234,29 +234,41 @@ export function classifyGoogleError(error: unknown): unknown {
       (error instanceof Error ? error.message : String(error));
 
     // Extract RetryInfo from error details if available (e.g., MODEL_CAPACITY_EXHAUSTED)
+    const retryInfo = googleApiError?.details?.find(
+      (d): d is RetryInfo =>
+        d['@type'] === 'type.googleapis.com/google.rpc.RetryInfo',
+    );
+
     let retryDelaySeconds: number | undefined;
-    if (googleApiError?.details) {
-      const retryInfo = googleApiError.details.find(
-        (d): d is RetryInfo =>
-          d['@type'] === 'type.googleapis.com/google.rpc.RetryInfo',
-      );
-      if (retryInfo?.retryDelay) {
-        const parsedDelay = parseDurationInSeconds(retryInfo.retryDelay);
-        if (parsedDelay !== null) {
-          retryDelaySeconds = parsedDelay;
-        }
+    if (retryInfo?.retryDelay) {
+      const parsedDelay = parseDurationInSeconds(retryInfo.retryDelay);
+      if (parsedDelay !== null) {
+        retryDelaySeconds = parsedDelay;
       }
     }
 
-    return new RetryableQuotaError(
-      errorMessage,
-      googleApiError ?? {
-        code: 503,
-        message: errorMessage,
-        details: [],
-      },
-      retryDelaySeconds,
-    );
+    const cause = googleApiError ?? {
+      code: 503,
+      message: errorMessage,
+      details: [],
+    };
+
+    const finalMessage = retryInfo?.retryDelay
+      ? `${errorMessage}\nSuggested retry after ${retryInfo.retryDelay}.`
+      : errorMessage;
+
+    // Respect the MAX_RETRYABLE_DELAY_SECONDS threshold, matching the 429/499
+    // handler logic. If the server suggests waiting longer than 5 minutes, treat
+    // it as terminal so the CLI triggers the fallback/credits flow instead of
+    // silently waiting.
+    if (
+      retryDelaySeconds !== undefined &&
+      retryDelaySeconds > MAX_RETRYABLE_DELAY_SECONDS
+    ) {
+      return new TerminalQuotaError(finalMessage, cause, retryDelaySeconds);
+    }
+
+    return new RetryableQuotaError(finalMessage, cause, retryDelaySeconds);
   }
 
   if (
