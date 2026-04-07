@@ -511,15 +511,9 @@ const ChoiceQuestionView: React.FC<ChoiceQuestionViewProps> = ({
 }) => {
   const keyMatchers = useKeyMatchers();
   const isAlternateBuffer = useAlternateBuffer();
-
-  const questionOptions = useMemo(
-    () => question.options ?? [],
-    [question.options],
-  );
-
-  const showAllOption = question.multiSelect && questionOptions.length > 1;
+  const hasAll = question.multiSelect && (question.options?.length ?? 0) > 1;
   // Calculate total options including 'All' and 'Other' to ensure consistent numbering column width
-  const numOptions = questionOptions.length + (showAllOption ? 1 : 0) + 1;
+  const numOptions = (question.options?.length ?? 0) + (hasAll ? 1 : 0) + 1;
   const numLen = String(numOptions).length;
   const radioWidth = 2; // "● "
   const numberWidth = numLen + 2; // e.g., "1. "
@@ -531,6 +525,11 @@ const ChoiceQuestionView: React.FC<ChoiceQuestionViewProps> = ({
     radioWidth + numberWidth + checkboxWidth + checkmarkWidth + cursorPadding;
 
   const bufferWidth = availableWidth - horizontalPadding;
+
+  const questionOptions = useMemo(
+    () => question.options ?? [],
+    [question.options],
+  );
 
   // Initialize state from initialAnswer if returning to a previously answered question
   const initialReducerState = useMemo((): ChoiceQuestionState => {
@@ -726,7 +725,7 @@ const ChoiceQuestionView: React.FC<ChoiceQuestionViewProps> = ({
     );
 
     // Add 'All of the above' for multi-select
-    if (showAllOption) {
+    if (question.multiSelect && questionOptions.length > 1) {
       const allItem: OptionItem = {
         key: 'all',
         label: 'All of the above',
@@ -759,7 +758,7 @@ const ChoiceQuestionView: React.FC<ChoiceQuestionViewProps> = ({
     }
 
     return list;
-  }, [questionOptions, showAllOption, customOptionText, question.multiSelect]);
+  }, [questionOptions, question.multiSelect, customOptionText]);
 
   const handleHighlight = useCallback(
     (itemValue: OptionItem) => {
