@@ -209,8 +209,8 @@ async function restartAction(
 
   const s = extensionsToRestart.length > 1 ? 's' : '';
 
-  const reloadingMessage = {
-    type: MessageType.INFO,
+  const reloadingMessage: HistoryItemInfo = {
+    type: 'info',
     text: `Reloading ${extensionsToRestart.length} extension${s}...`,
     color: theme.text.primary,
   };

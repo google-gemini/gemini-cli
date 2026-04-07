@@ -180,6 +180,13 @@ export type HistoryItemInfo = HistoryItemBase & {
   marginBottom?: number;
 };
 
+export type HistoryItemAuthUrl = HistoryItemBase & {
+  type: 'auth_url';
+  heading: string;
+  url: string;
+  footerLines?: string[];
+};
+
 export type HistoryItemError = HistoryItemBase & {
   type: 'error';
   text: string;
@@ -386,6 +393,7 @@ export type HistoryItemWithoutId =
   | HistoryItemGemini
   | HistoryItemGeminiContent
   | HistoryItemInfo
+  | HistoryItemAuthUrl
   | HistoryItemError
   | HistoryItemWarning
   | HistoryItemAbout
@@ -412,6 +420,7 @@ export type HistoryItem = HistoryItemWithoutId & { id: number };
 // Message types used by internal command feedback (subset of HistoryItem types)
 export enum MessageType {
   INFO = 'info',
+  AUTH_URL = 'auth_url',
   ERROR = 'error',
   WARNING = 'warning',
   USER = 'user',

@@ -16,7 +16,7 @@ import { useKeypress } from '../hooks/useKeypress.js';
 import { loadTrustedFolders, TrustLevel } from '../../config/trustedFolders.js';
 import { expandHomeDir } from '../utils/directoryUtils.js';
 import * as path from 'node:path';
-import { MessageType, type HistoryItem } from '../types.js';
+import { MessageType, type HistoryItemWithoutId } from '../types.js';
 import { type Config } from '@google/gemini-cli-core';
 
 export enum MultiFolderTrustChoice {
@@ -33,7 +33,7 @@ export interface MultiFolderTrustDialogProps {
   finishAddingDirectories: (
     config: Config,
     addItem: (
-      itemData: Omit<HistoryItem, 'id'>,
+      itemData: HistoryItemWithoutId,
       baseTimestamp?: number,
     ) => number,
     added: string[],
@@ -41,7 +41,7 @@ export interface MultiFolderTrustDialogProps {
   ) => Promise<void>;
   config: Config;
   addItem: (
-    itemData: Omit<HistoryItem, 'id'>,
+    itemData: HistoryItemWithoutId,
     baseTimestamp?: number,
   ) => number;
 }

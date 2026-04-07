@@ -48,6 +48,7 @@ import {
 } from '../utils/terminal.js';
 import { coreEvents, CoreEvent } from '../utils/events.js';
 import { getConsentForOauth } from '../utils/authConsent.js';
+import { createOauthBrowserDisplayMessage } from '../utils/oauthDisplay.js';
 
 export const authEvents = new EventEmitter();
 
@@ -291,12 +292,9 @@ async function initOauthClient(
 
     const webLogin = await authWithWeb(client);
 
-    coreEvents.emit(CoreEvent.UserFeedback, {
-      severity: 'info',
-      message:
-        `\n\nAttempting to open authentication page in your browser.\n` +
-        `Otherwise navigate to:\n\n${webLogin.authUrl}\n\n\n`,
-    });
+    coreEvents.emitOauthDisplayMessage(
+      createOauthBrowserDisplayMessage(webLogin.authUrl),
+    );
     try {
       // Attempt to open the authentication URL in the default browser.
       // We do not use the `wait` option here because the main script's execution

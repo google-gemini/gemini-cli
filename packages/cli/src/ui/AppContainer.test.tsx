@@ -25,6 +25,7 @@ import {
   makeFakeConfig,
   CoreEvent,
   type UserFeedbackPayload,
+  type OauthDisplayMessagePayload,
   type ResumedSessionData,
   type StartupWarning,
   WarningPriority,
@@ -2838,6 +2839,44 @@ describe('AppContainer State Management', () => {
         expect.objectContaining({
           type: 'error',
           text: 'Test error message',
+        }),
+        expect.any(Number),
+      );
+      unmount!();
+    });
+
+    it('adds auth URL history item when OauthDisplayMessage event is received', async () => {
+      let unmount: () => void;
+      await act(async () => {
+        const result = await renderAppContainer();
+        unmount = result.unmount;
+      });
+      await waitFor(() => expect(capturedUIState).toBeTruthy());
+
+      const handler = mockCoreEvents.on.mock.calls.find(
+        (call: unknown[]) => call[0] === CoreEvent.OauthDisplayMessage,
+      )?.[1];
+      expect(handler).toBeDefined();
+
+      const payload: OauthDisplayMessagePayload = {
+        heading:
+          'Opening your browser for OAuth sign-in...\nIf the browser does not open, copy and paste this URL into your browser:',
+        url: 'https://accounts.google.com/o/oauth2/v2/auth?response_type=code&scope=openid',
+        footerLines: [
+          'TIP: Triple-click to select the entire URL, then copy and paste it into your browser.',
+        ],
+      };
+
+      act(() => {
+        handler(payload);
+      });
+
+      expect(mockedUseHistory().addItem).toHaveBeenCalledWith(
+        expect.objectContaining({
+          type: 'auth_url',
+          heading: payload.heading,
+          url: payload.url,
+          footerLines: payload.footerLines,
         }),
         expect.any(Number),
       );

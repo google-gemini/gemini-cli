@@ -117,6 +117,7 @@ export * from './utils/thoughtUtils.js';
 export * from './utils/secure-browser-launcher.js';
 export * from './utils/debugLogger.js';
 export * from './utils/events.js';
+export * from './utils/oauthDisplay.js';
 export * from './utils/extensionLoader.js';
 export * from './utils/package.js';
 export * from './utils/version.js';

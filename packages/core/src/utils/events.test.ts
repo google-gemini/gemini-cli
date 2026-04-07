@@ -11,6 +11,7 @@ import {
   coreEvents,
   type UserFeedbackPayload,
   type McpProgressPayload,
+  type OauthDisplayMessagePayload,
 } from './events.js';
 
 vi.mock('./debugLogger.js', () => ({
@@ -265,6 +266,41 @@ describe('CoreEventEmitter', () => {
       expect(listener).toHaveBeenCalledTimes(MAX_BACKLOG_SIZE);
       // Verify strictly that the FIRST call was Output 10 (0-9 dropped)
       expect(listener.mock.calls[0][0]).toMatchObject({ chunk: 'Output 10' });
+    });
+  });
+
+  describe('OauthDisplayMessage Event', () => {
+    it('should emit oauth display message immediately when a listener is present', () => {
+      const listener = vi.fn();
+      events.on(CoreEvent.OauthDisplayMessage, listener);
+
+      const payload: OauthDisplayMessagePayload = {
+        heading: 'Open this URL in your browser:',
+        url: 'https://example.com/oauth?response_type=code',
+        footerLines: ['Copy the full URL if it wraps.'],
+      };
+
+      events.emitOauthDisplayMessage(payload);
+
+      expect(listener).toHaveBeenCalledTimes(1);
+      expect(listener).toHaveBeenCalledWith(expect.objectContaining(payload));
+    });
+
+    it('should buffer oauth display message when no listener is present', () => {
+      const listener = vi.fn();
+      const payload: OauthDisplayMessagePayload = {
+        heading: 'Open this URL in your browser:',
+        url: 'https://example.com/oauth?response_type=code',
+      };
+
+      events.emitOauthDisplayMessage(payload);
+      expect(listener).not.toHaveBeenCalled();
+
+      events.on(CoreEvent.OauthDisplayMessage, listener);
+      events.drainBacklogs();
+
+      expect(listener).toHaveBeenCalledTimes(1);
+      expect(listener).toHaveBeenCalledWith(expect.objectContaining(payload));
     });
   });
 

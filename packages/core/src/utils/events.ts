@@ -70,6 +70,15 @@ export interface OutputPayload {
 }
 
 /**
+ * Payload for the 'oauth-display-message' event.
+ */
+export interface OauthDisplayMessagePayload {
+  heading: string;
+  url: string;
+  footerLines?: string[];
+}
+
+/**
  * Payload for the 'memory-changed' event.
  */
 export interface MemoryChangedPayload {
@@ -221,7 +230,7 @@ export interface CoreEvents extends ExtensionEvents {
   [CoreEvent.QuotaChanged]: [QuotaChangedPayload];
   [CoreEvent.ExternalEditorClosed]: never[];
   [CoreEvent.McpClientUpdate]: Array<Map<string, McpClient> | never>;
-  [CoreEvent.OauthDisplayMessage]: string[];
+  [CoreEvent.OauthDisplayMessage]: [OauthDisplayMessagePayload];
   [CoreEvent.SettingsChanged]: never[];
   [CoreEvent.HookStart]: [HookStartPayload];
   [CoreEvent.HookEnd]: [HookEndPayload];
@@ -317,6 +326,13 @@ export class CoreEventEmitter extends EventEmitter<CoreEvents> {
   ): void {
     const payload: OutputPayload = { isStderr, chunk, encoding };
     this._emitOrQueue(CoreEvent.Output, payload);
+  }
+
+  /**
+   * Broadcasts a copy-sensitive OAuth URL message.
+   */
+  emitOauthDisplayMessage(payload: OauthDisplayMessagePayload): void {
+    this._emitOrQueue(CoreEvent.OauthDisplayMessage, payload);
   }
 
   /**

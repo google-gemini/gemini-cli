@@ -14,6 +14,7 @@ import { OAuthUtils, ResourceMismatchError } from './oauth-utils.js';
 import { coreEvents } from '../utils/events.js';
 import { debugLogger } from '../utils/debugLogger.js';
 import { getConsentForOauth } from '../utils/authConsent.js';
+import { createOauthBrowserDisplayMessage } from '../utils/oauthDisplay.js';
 import {
   generatePKCEParams,
   startCallbackServer,
@@ -284,11 +285,6 @@ export class MCPOAuthProvider {
     config: MCPOAuthConfig,
     mcpServerUrl?: string,
   ): Promise<OAuthToken> {
-    // Helper function to display messages through handler or fallback to console.log
-    const displayMessage = (message: string) => {
-      coreEvents.emitFeedback('info', message);
-    };
-
     // If no authorization URL is provided, try to discover OAuth configuration
     if (!config.authorizationUrl && mcpServerUrl) {
       debugLogger.debug(`Starting OAuth for MCP server "${serverName}"…
@@ -452,13 +448,9 @@ export class MCPOAuthProvider {
       throw new FatalCancellationError('Authentication cancelled by user.');
     }
 
-    displayMessage(`→ Opening your browser for OAuth sign-in...
-
-If the browser does not open, copy and paste this URL into your browser:
-${authUrl}
-
-💡 TIP: Triple-click to select the entire URL, then copy and paste it into your browser.
-⚠️  Make sure to copy the COMPLETE URL - it may wrap across multiple lines.`);
+    coreEvents.emitOauthDisplayMessage(
+      createOauthBrowserDisplayMessage(authUrl),
+    );
 
     // Open browser securely (callback server is already running)
     try {

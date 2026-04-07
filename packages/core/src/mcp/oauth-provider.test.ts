@@ -30,6 +30,7 @@ vi.mock('./oauth-token-storage.js', () => {
 vi.mock('../utils/events.js', () => ({
   coreEvents: {
     emitFeedback: vi.fn(),
+    emitOauthDisplayMessage: vi.fn(),
     emitConsoleLog: vi.fn(),
   },
 }));
@@ -72,6 +73,7 @@ import {
 } from './oauth-utils.js';
 import { coreEvents } from '../utils/events.js';
 import { FatalCancellationError } from '../utils/errors.js';
+import { createOauthBrowserDisplayMessage } from '../utils/oauthDisplay.js';
 
 // Mock fetch globally
 const mockFetch = vi.fn();
@@ -255,6 +257,15 @@ describe('MCPOAuthProvider', () => {
 
       expect(mockOpenBrowserSecurely).toHaveBeenCalledWith(
         expect.stringContaining('authorize'),
+      );
+      const browserUrl = vi.mocked(mockOpenBrowserSecurely).mock.calls[0]?.[0];
+      expect(browserUrl).toBeTypeOf('string');
+      expect(coreEvents.emitOauthDisplayMessage).toHaveBeenCalledWith(
+        createOauthBrowserDisplayMessage(browserUrl as string),
+      );
+      expect(coreEvents.emitFeedback).not.toHaveBeenCalledWith(
+        'info',
+        expect.stringContaining('copy and paste this URL into your browser'),
       );
       const tokenStorage = new MCPOAuthTokenStorage();
       expect(tokenStorage.saveToken).toHaveBeenCalledWith(

@@ -10,6 +10,7 @@ import type {
   UserFeedbackPayload,
   AgentEvent,
   ContentPart,
+  OauthDisplayMessagePayload,
 } from '@google/gemini-cli-core';
 import { isSlashCommand } from './ui/utils/commandUtils.js';
 import type { LoadedSettings } from './config/settings.js';
@@ -48,6 +49,7 @@ import { ConsolePatcher } from './ui/utils/ConsolePatcher.js';
 import { handleAtCommand } from './ui/hooks/atCommandProcessor.js';
 import { handleError, handleToolError } from './utils/errors.js';
 import { TextOutput } from './ui/utils/textOutput.js';
+import { formatOauthDisplayMessage } from './utils/oauthDisplay.js';
 
 interface RunNonInteractiveParams {
   config: Config;
@@ -94,6 +96,10 @@ export async function runNonInteractive({
             : String(payload.error);
         process.stderr.write(`${errorToLog}\n`);
       }
+    };
+
+    const handleOauthDisplayMessage = (payload: OauthDisplayMessagePayload) => {
+      process.stdout.write(formatOauthDisplayMessage(payload));
     };
 
     const startTime = Date.now();
@@ -201,6 +207,7 @@ export async function runNonInteractive({
       setupStdinCancellation();
 
       coreEvents.on(CoreEvent.UserFeedback, handleUserFeedback);
+      coreEvents.on(CoreEvent.OauthDisplayMessage, handleOauthDisplayMessage);
       coreEvents.drainBacklogs();
 
       // Handle EPIPE errors when the output is piped to a command that closes early.
@@ -612,6 +619,7 @@ export async function runNonInteractive({
 
       consolePatcher.cleanup();
       coreEvents.off(CoreEvent.UserFeedback, handleUserFeedback);
+      coreEvents.off(CoreEvent.OauthDisplayMessage, handleOauthDisplayMessage);
     }
 
     if (errorToHandle) {

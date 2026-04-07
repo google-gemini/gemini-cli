@@ -19,10 +19,15 @@ import {
 import type { CallableTool } from '@google/genai';
 import { MessageType, type HistoryItemMcpStatus } from '../types.js';
 
+const mockAuthenticate = vi.hoisted(() => vi.fn());
+const mockCoreEvents = vi.hoisted(() => ({
+  on: vi.fn(),
+  removeListener: vi.fn(),
+}));
+
 vi.mock('@google/gemini-cli-core', async (importOriginal) => {
   const actual =
     await importOriginal<typeof import('@google/gemini-cli-core')>();
-  const mockAuthenticate = vi.fn();
   return {
     ...actual,
     getMCPServerStatus: vi.fn(),
@@ -34,6 +39,7 @@ vi.mock('@google/gemini-cli-core', async (importOriginal) => {
       getToken: vi.fn(),
       isTokenExpired: vi.fn(),
     })),
+    coreEvents: mockCoreEvents,
   };
 });
 
@@ -158,6 +164,54 @@ describe('mcpCommand', () => {
         type: 'message',
         messageType: 'error',
         content: 'Could not retrieve tool registry.',
+      });
+    });
+  });
+
+  describe('/mcp auth', () => {
+    it('does not attach an ad hoc OAuth display listener during authentication', async () => {
+      const mockMcpServers = {
+        secureServer: {
+          command: 'cmd',
+          oauth: { enabled: true },
+        },
+      };
+      const restartServer = vi.fn().mockResolvedValue(undefined);
+      const setTools = vi.fn().mockResolvedValue(undefined);
+
+      mockConfig.getMcpClientManager = vi.fn().mockReturnValue({
+        getBlockedMcpServers: vi.fn().mockReturnValue([]),
+        getMcpServers: vi.fn().mockReturnValue(mockMcpServers),
+        getLastError: vi.fn().mockReturnValue(undefined),
+        restartServer,
+      });
+
+      mockContext = createMockCommandContext({
+        services: {
+          agentContext: {
+            config: mockConfig,
+            toolRegistry: mockConfig.getToolRegistry(),
+            geminiClient: {
+              isInitialized: vi.fn().mockReturnValue(true),
+              setTools,
+            },
+          },
+        },
+      });
+
+      const result = await mcpCommand.action!(mockContext, 'auth secureServer');
+
+      expect(mockAuthenticate).toHaveBeenCalledWith(
+        'secureServer',
+        { enabled: true },
+        undefined,
+      );
+      expect(mockCoreEvents.on).not.toHaveBeenCalled();
+      expect(mockCoreEvents.removeListener).not.toHaveBeenCalled();
+      expect(result).toEqual({
+        type: 'message',
+        messageType: 'info',
+        content: "Successfully authenticated and reloaded tools for 'secureServer'",
       });
     });
   });

@@ -24,6 +24,7 @@ import { getConsentForOauth } from '../../utils/authConsent.js';
 import { FatalCancellationError, getErrorMessage } from '../../utils/errors.js';
 import { coreEvents } from '../../utils/events.js';
 import { debugLogger } from '../../utils/debugLogger.js';
+import { createOauthBrowserDisplayMessage } from '../../utils/oauthDisplay.js';
 import { Storage } from '../../config/storage.js';
 
 /**
@@ -249,19 +250,8 @@ export class OAuth2AuthProvider extends BaseA2AAuthProvider {
       throw new FatalCancellationError('Authentication cancelled by user.');
     }
 
-    coreEvents.emitFeedback(
-      'info',
-      `→ Opening your browser for OAuth sign-in...
-
-` +
-        `If the browser does not open, copy and paste this URL into your browser:
-` +
-        `${authUrl}
-
-` +
-        `💡 TIP: Triple-click to select the entire URL, then copy and paste it into your browser.
-` +
-        `⚠️  Make sure to copy the COMPLETE URL - it may wrap across multiple lines.`,
+    coreEvents.emitOauthDisplayMessage(
+      createOauthBrowserDisplayMessage(authUrl),
     );
 
     try {

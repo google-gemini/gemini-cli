@@ -5,24 +5,24 @@
  */
 
 import { useState, useRef, useCallback, useMemo } from 'react';
-import type { HistoryItem } from '../types.js';
+import type { HistoryItem, HistoryItemWithoutId } from '../types.js';
 import type { ChatRecordingService } from '@google/gemini-cli-core/src/services/chatRecordingService.js';
 
 // Type for the updater function passed to updateHistoryItem
 type HistoryItemUpdater = (
   prevItem: HistoryItem,
-) => Partial<Omit<HistoryItem, 'id'>>;
+) => Partial<HistoryItemWithoutId>;
 
 export interface UseHistoryManagerReturn {
   history: HistoryItem[];
   addItem: (
-    itemData: Omit<HistoryItem, 'id'>,
+    itemData: HistoryItemWithoutId,
     baseTimestamp?: number,
     isResuming?: boolean,
   ) => number; // Returns the generated ID
   updateItem: (
     id: number,
-    updates: Partial<Omit<HistoryItem, 'id'>> | HistoryItemUpdater,
+    updates: Partial<HistoryItemWithoutId> | HistoryItemUpdater,
   ) => void;
   clearItems: () => void;
   loadHistory: (newHistory: HistoryItem[]) => void;
@@ -63,12 +63,11 @@ export function useHistory({
   // Adds a new item to the history state with a unique ID.
   const addItem = useCallback(
     (
-      itemData: Omit<HistoryItem, 'id'>,
+      itemData: HistoryItemWithoutId,
       baseTimestamp: number = Date.now(),
       isResuming: boolean = false,
     ): number => {
       const id = getNextMessageId(baseTimestamp);
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
       const newItem: HistoryItem = { ...itemData, id } as HistoryItem;
 
       setHistory((prevHistory) => {
@@ -138,7 +137,7 @@ export function useHistory({
   const updateItem = useCallback(
     (
       id: number,
-      updates: Partial<Omit<HistoryItem, 'id'>> | HistoryItemUpdater,
+      updates: Partial<HistoryItemWithoutId> | HistoryItemUpdater,
     ) => {
       setHistory((prevHistory) =>
         prevHistory.map((item) => {

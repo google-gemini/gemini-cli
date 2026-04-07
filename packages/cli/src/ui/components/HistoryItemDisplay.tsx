@@ -36,6 +36,7 @@ import { ChatList } from './views/ChatList.js';
 import { ModelMessage } from './messages/ModelMessage.js';
 import { ThinkingMessage } from './messages/ThinkingMessage.js';
 import { HintMessage } from './messages/HintMessage.js';
+import { AuthUrlMessage } from './messages/AuthUrlMessage.js';
 import { getInlineThinkingMode } from '../utils/inlineThinkingMode.js';
 import { useSettings } from '../contexts/SettingsContext.js';
 
@@ -138,6 +139,13 @@ export const HistoryItemDisplay: React.FC<HistoryItemDisplayProps> = ({
           icon={itemForDisplay.icon}
           color={itemForDisplay.color}
           marginBottom={itemForDisplay.marginBottom}
+        />
+      )}
+      {itemForDisplay.type === 'auth_url' && (
+        <AuthUrlMessage
+          heading={itemForDisplay.heading}
+          url={itemForDisplay.url}
+          footerLines={itemForDisplay.footerLines}
         />
       )}
       {itemForDisplay.type === 'warning' && (
