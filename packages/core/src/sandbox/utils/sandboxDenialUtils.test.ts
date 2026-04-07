@@ -5,7 +5,10 @@
  */
 
 import { describe, it, expect } from 'vitest';
-import { parsePosixSandboxDenials } from './sandboxDenialUtils.js';
+import {
+  parsePosixSandboxDenials,
+  createSandboxDenialCache,
+} from './sandboxDenialUtils.js';
 import type { ShellExecutionResult } from '../../services/shellExecutionService.js';
 
 describe('parsePosixSandboxDenials', () => {
@@ -115,5 +118,110 @@ EACCES: permission denied, mkdir '/Users/galzahavi/.pnpm-store/v3'
     } as unknown as ShellExecutionResult);
     expect(parsed).toBeDefined();
     expect(parsed?.filePaths).toContain('/Users/galzahavi/.pnpm-store/v3');
+  });
+
+  it('should detect Python PermissionError and extract path accurately', () => {
+    const output = `Caught exception: [Errno 13] Permission denied: '/etc/test_sandbox_denial'
+Traceback (most recent call last):
+  File "/usr/local/google/home/davidapierce/gemini-cli/repro_sandbox.py", line 9, in <module>
+    raise e
+  File "/usr/local/google/home/davidapierce/gemini-cli/repro_sandbox.py", line 5, in <module>
+    with open('/etc/test_sandbox_denial', 'w') as f:
+         ~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+PermissionError: [Errno 13] Permission denied: '/etc/test_sandbox_denial'`;
+
+    const parsed = parsePosixSandboxDenials({
+      output,
+      exitCode: 1,
+      error: null,
+    } as unknown as ShellExecutionResult);
+
+    expect(parsed?.filePaths).toEqual(['/etc/test_sandbox_denial']);
+  });
+
+  it('should detect new keywords like "access denied" and "forbidden"', () => {
+    const parsed1 = parsePosixSandboxDenials({
+      output: 'Access denied to /var/log/syslog',
+      exitCode: 1,
+      error: null,
+    } as unknown as ShellExecutionResult);
+    expect(parsed1?.filePaths).toContain('/var/log/syslog');
+
+    const parsed2 = parsePosixSandboxDenials({
+      output: 'Forbidden: access to /root/secret is not allowed',
+      exitCode: 1,
+      error: null,
+    } as unknown as ShellExecutionResult);
+    expect(parsed2?.filePaths).toContain('/root/secret');
+  });
+
+  it('should detect read-only file system error', () => {
+    const parsed = parsePosixSandboxDenials({
+      output: 'rm: cannot remove /mnt/usb/test: Read-only file system',
+      exitCode: 1,
+      error: null,
+    } as unknown as ShellExecutionResult);
+    expect(parsed?.filePaths).toContain('/mnt/usb/test');
+  });
+
+  it('should reject paths with directory traversal', () => {
+    const output = 'ls: /etc/shadow/../../etc/passwd: Operation not permitted';
+    const parsed = parsePosixSandboxDenials({
+      output,
+    } as unknown as ShellExecutionResult);
+    expect(parsed?.filePaths || []).not.toContain(
+      '/etc/shadow/../../etc/passwd',
+    );
+  });
+
+  it('should reject home-relative paths with directory traversal', () => {
+    const output = "Operation not permitted, open '~/../../etc/shadow'";
+    const parsed = parsePosixSandboxDenials({
+      output,
+    } as unknown as ShellExecutionResult);
+    expect(parsed?.filePaths || []).not.toContain('~/../../etc/shadow');
+  });
+
+  it('should reject paths with null bytes', () => {
+    const output = "Operation not permitted, open '/etc/passwd\0/foo'";
+    const parsed = parsePosixSandboxDenials({
+      output,
+    } as unknown as ShellExecutionResult);
+    expect(parsed?.filePaths || []).not.toContain('/etc/passwd\0/foo');
+  });
+
+  it('should reject paths with internal tildes', () => {
+    const output = "Operation not permitted, open '/home/user/~/config'";
+    const parsed = parsePosixSandboxDenials({
+      output,
+    } as unknown as ShellExecutionResult);
+    expect(parsed?.filePaths || []).not.toContain('/home/user/~/config');
+  });
+
+  it('should suppress redundant denials if cache is provided', () => {
+    const cache = createSandboxDenialCache();
+    const result = {
+      output: 'ls: /root: Operation not permitted',
+    } as unknown as ShellExecutionResult;
+
+    // First call: should process
+    const parsed1 = parsePosixSandboxDenials(result, cache);
+    expect(parsed1).toBeDefined();
+
+    // Second call: should be suppressed
+    const parsed2 = parsePosixSandboxDenials(result, cache);
+    expect(parsed2).toBeUndefined();
+  });
+
+  it('should not suppress denials if no cache is provided', () => {
+    const result = {
+      output: 'ls: /root: Operation not permitted',
+    } as unknown as ShellExecutionResult;
+
+    const parsed1 = parsePosixSandboxDenials(result);
+    expect(parsed1).toBeDefined();
+
+    const parsed2 = parsePosixSandboxDenials(result);
+    expect(parsed2).toBeDefined();
   });
 });

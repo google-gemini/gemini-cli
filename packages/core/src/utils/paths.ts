@@ -370,6 +370,22 @@ export function isSubpath(parentPath: string, childPath: string): boolean {
 }
 
 /**
+ * Type guard to verify a value is a string and does not contain null bytes.
+ */
+export function isValidPathString(p: unknown): p is string {
+  return typeof p === 'string' && !p.includes('\0');
+}
+
+/**
+ * Asserts that a value is a valid path string, throwing an Error otherwise.
+ */
+export function assertValidPathString(p: unknown): asserts p is string {
+  if (!isValidPathString(p)) {
+    throw new Error(`Invalid path: ${String(p)}`);
+  }
+}
+
+/**
  * Resolves a path to its real path, sanitizing it first.
  * - Removes 'file://' protocol if present.
  * - Decodes URI components (e.g. %20 -> space).
@@ -379,6 +395,7 @@ export function isSubpath(parentPath: string, childPath: string): boolean {
  * @returns The resolved real path.
  */
 export function resolveToRealPath(pathStr: string): string {
+  assertValidPathString(pathStr);
   let resolvedPath = pathStr;
 
   try {
