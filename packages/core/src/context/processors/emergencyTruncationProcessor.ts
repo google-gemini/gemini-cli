@@ -4,11 +4,15 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import type { ContextProcessor, ContextAccountingState } from '../pipeline.js';
+import type {
+  ContextProcessor,
+  ContextAccountingState,
+  BackstopTargetOptions,
+} from '../pipeline.js';
 import type { ContextEnvironment } from '../sidecar/environment.js';
 import type { EpisodeEditor } from '../ir/episodeEditor.js';
 
-export type EmergencyTruncationProcessorOptions = Record<string, never>;
+export type EmergencyTruncationProcessorOptions = BackstopTargetOptions;
 
 export class EmergencyTruncationProcessor implements ContextProcessor {
   static create(
@@ -17,6 +21,21 @@ export class EmergencyTruncationProcessor implements ContextProcessor {
   ): EmergencyTruncationProcessor {
     return new EmergencyTruncationProcessor(env, options);
   }
+
+  static readonly schema = {
+    type: 'object',
+    properties: {
+      target: {
+        type: 'string',
+        enum: ['incremental', 'freeNTokens', 'max'],
+        description: 'How much of the targeted history to truncate.',
+      },
+      freeTokensTarget: {
+        type: 'number',
+        description: 'The number of tokens to free if target is freeNTokens.',
+      },
+    },
+  };
 
   readonly id = 'EmergencyTruncationProcessor';
   readonly name = 'EmergencyTruncationProcessor';
@@ -32,23 +51,41 @@ export class EmergencyTruncationProcessor implements ContextProcessor {
     editor: EpisodeEditor,
     state: ContextAccountingState,
   ): Promise<void> {
-    if (state.currentTokens <= state.maxTokens) return;
-
-    let remainingTokens = state.currentTokens;
-    const targetTokens = state.maxTokens;
     const toRemove: string[] = [];
 
-    // We respect the global protected Episode IDs (like the system prompt at index 0)
-    for (const ep of editor.getFullHistory()) {
+    // Calculate how many tokens we need to remove based on the configured knob
+    let targetTokensToRemove = 0;
+    const strategy = this.options.target ?? 'max';
+    
+    if (strategy === 'incremental') {
+       if (state.currentTokens <= state.maxTokens) return;
+       targetTokensToRemove = state.currentTokens - state.maxTokens;
+    } else if (strategy === 'freeNTokens') {
+       targetTokensToRemove = this.options.freeTokensTarget ?? 0;
+       if (targetTokensToRemove <= 0) return;
+    } else if (strategy === 'max') {
+       // 'max' means we remove all targets without stopping early
+       targetTokensToRemove = Infinity;
+    }
+
+    let removedTokens = 0;
+
+    // Iterate specifically over targets (which represent the aged-out delta).
+    // The editor returns targets from oldest to newest based on the working order.
+    // For truncation, we want to cut the oldest first.
+    for (const target of editor.targets) {
+      const ep = target.episode;
+      // We only truncate entire episodes here for safety and structural integrity
+      if (target.node !== ep) continue;
+      
+      if (removedTokens >= targetTokensToRemove) break;
+
       const epTokens = this._env.tokenCalculator.calculateEpisodeListTokens([
         ep,
       ]);
 
-      if (
-        remainingTokens > targetTokens &&
-        !state.protectedEpisodeIds.has(ep.id)
-      ) {
-        remainingTokens -= epTokens;
+      if (!state.protectedEpisodeIds.has(ep.id) && !toRemove.includes(ep.id)) {
+        removedTokens += epTokens;
         toRemove.push(ep.id);
       }
     }

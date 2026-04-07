@@ -89,39 +89,50 @@ export function registerBuiltInProcessors(registry: ProcessorRegistry) {
       },
       required: ['processorId', 'options'],
     },
-    create: (env, opts) => new HistorySquashingProcessor(env, opts),
+    create: (env, options) =>
+      HistorySquashingProcessor.create(env, options),
   });
 
   registry.register<StateSnapshotProcessorOptions>({
-    id: 'StateSnapshotProcessor',
-    schema: {
-      type: 'object',
-      properties: {
-        processorId: { const: 'StateSnapshotProcessor' },
-        options: {
-          type: 'object',
-          properties: {
-            model: { type: 'string' },
-            systemInstruction: { type: 'string' },
-            triggerDeficitTokens: { type: 'number' },
+      id: 'StateSnapshotProcessor',
+      schema: {
+        type: 'object',
+        properties: {
+          processorId: { const: 'StateSnapshotProcessor' },
+          options: {
+            type: 'object',
+            properties: {
+              model: { type: 'string' },
+              systemInstruction: { type: 'string' },
+              triggerDeficitTokens: { type: 'number' },
+              target: { type: 'string', enum: ['incremental', 'freeNTokens', 'max'] },
+              freeTokensTarget: { type: 'number' },
+            },
           },
         },
+        required: ['processorId'],
       },
-      required: ['processorId'],
-    },
-    create: (env, opts) => StateSnapshotProcessor.create(env, opts),
-  });
+      create: (env, options) =>
+        StateSnapshotProcessor.create(env, options),
+    });
 
-  registry.register<EmergencyTruncationProcessorOptions>({
-    id: 'EmergencyTruncationProcessor',
-    schema: {
-      type: 'object',
-      properties: {
-        processorId: { const: 'EmergencyTruncationProcessor' },
-        options: { type: 'object' },
+    registry.register<EmergencyTruncationProcessorOptions>({
+      id: 'EmergencyTruncationProcessor',
+      schema: {
+        type: 'object',
+        properties: {
+          processorId: { const: 'EmergencyTruncationProcessor' },
+          options: {
+            type: 'object',
+            properties: {
+              target: { type: 'string', enum: ['incremental', 'freeNTokens', 'max'] },
+              freeTokensTarget: { type: 'number' },
+            },
+          },
+        },
+        required: ['processorId'],
       },
-      required: ['processorId'],
-    },
-    create: (env, opts) => EmergencyTruncationProcessor.create(env, opts),
-  });
+      create: (env, options) =>
+        EmergencyTruncationProcessor.create(env, options),
+    });
 }

@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import type { ContextProcessor, ContextAccountingState } from '../pipeline.js';
+import type { ContextProcessor, ContextAccountingState, BackstopTargetOptions } from '../pipeline.js';
 import type { Episode } from '../ir/types.js';
 import type {
   ContextEnvironment,
@@ -16,7 +16,7 @@ import { debugLogger } from 'src/utils/debugLogger.js';
 import type { EpisodeEditor } from '../ir/episodeEditor.js';
 import { isSystemEvent, isToolExecution, isUserPrompt } from '../ir/graphUtils.js';
 
-export interface StateSnapshotProcessorOptions {
+export interface StateSnapshotProcessorOptions extends BackstopTargetOptions {
   model?: string;
   systemInstruction?: string;
   triggerDeficitTokens?: number;
@@ -29,6 +29,26 @@ export class StateSnapshotProcessor implements ContextProcessor {
   ): StateSnapshotProcessor {
     return new StateSnapshotProcessor(env, options, env.eventBus);
   }
+  
+  static readonly schema = {
+    type: 'object',
+    properties: {
+      target: {
+        type: 'string',
+        enum: ['incremental', 'freeNTokens', 'max'],
+        description: 'How much of the targeted history to summarize.',
+      },
+      freeTokensTarget: {
+        type: 'number',
+        description: 'The number of tokens to free if target is freeNTokens.',
+      },
+      systemInstruction: {
+        type: 'string',
+        description: 'Custom instructions for the summarizer model.',
+      },
+    },
+  };
+
   readonly id = 'StateSnapshotProcessor';
   readonly name = 'StateSnapshotProcessor';
   readonly options: StateSnapshotProcessorOptions;
@@ -48,35 +68,43 @@ export class StateSnapshotProcessor implements ContextProcessor {
     editor: EpisodeEditor,
     state: ContextAccountingState,
   ): Promise<void> {
-    const targetDeficit = Math.max(
-      0,
-      state.currentTokens - state.retainedTokens,
-    );
-    if (this.isSynthesizing || targetDeficit <= 0) return;
+    if (this.isSynthesizing) return;
+
+    // Calculate how many tokens we need to remove based on the configured knob
+    let targetTokensToRemove = 0;
+    const strategy = this.options.target ?? 'max';
+
+    if (strategy === 'incremental') {
+       if (state.currentTokens <= state.maxTokens) return;
+       targetTokensToRemove = state.currentTokens - state.maxTokens;
+    } else if (strategy === 'freeNTokens') {
+       targetTokensToRemove = this.options.freeTokensTarget ?? 0;
+       if (targetTokensToRemove <= 0) return;
+    } else if (strategy === 'max') {
+       // 'max' means we process all targets without stopping early
+       targetTokensToRemove = Infinity;
+    }
 
     this.isSynthesizing = true;
     try {
       let deficitAccumulator = 0;
       const selectedEpisodes: Episode[] = [];
 
-      for (let i = 1; i < editor.getFullHistory().length - 1; i++) {
-        const ep = editor.getFullHistory()[i];
+      // We scan through the targets oldest to newest to build the block we want to summarize
+      for (const target of editor.targets) {
+        const ep = target.episode;
+        // We only operate on entire episodes for a snapshot
+        if (target.node !== ep) continue;
+        
+        // Skip the very first episode (usually the system prompt)
+        if (ep.id === editor.getFullHistory()[0].id) continue;
+
         selectedEpisodes.push(ep);
-        let triggerText = '';
-        if (isUserPrompt(ep.trigger)) {
-          const firstPart = ep.trigger.semanticParts?.[0];
-          if (firstPart) {
-            triggerText =
-              firstPart.type === 'text'
-                ? firstPart.text
-                : (firstPart.presentation?.text ?? '');
-          }
-        }
-        deficitAccumulator += this.env.tokenCalculator.estimateTokensForParts([
-          { text: triggerText },
-          { text: ep.yield?.text ?? '' },
-        ]);
-        if (deficitAccumulator >= targetDeficit) break;
+        
+        const epTokens = this.env.tokenCalculator.calculateEpisodeListTokens([ep]);
+        deficitAccumulator += epTokens;
+
+        if (deficitAccumulator >= targetTokensToRemove) break;
       }
 
       if (selectedEpisodes.length < 2) return; // Not enough context to summarize

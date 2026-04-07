@@ -50,3 +50,18 @@ export interface ContextProcessor {
    */
   process(editor: EpisodeEditor, state: ContextAccountingState): Promise<void>;
 }
+
+/**
+ * Standardized configuration options for processors that act as a GC Backstop.
+ * Defines exactly how much of the targeted (degraded/aged-out) history should be cleared.
+ */
+export interface BackstopTargetOptions {
+  /**
+   * - 'incremental': Remove just enough to get under the threshold (maxTokens or retainedTokens).
+   * - 'freeNTokens': Remove enough to free an explicit number of tokens (defined in freeTokensTarget).
+   * - 'max': Remove/Summarize all explicitly targeted nodes (everything that aged out).
+   */
+  target?: 'incremental' | 'freeNTokens' | 'max';
+  /** If target is 'freeNTokens', this is the amount of tokens to clear. */
+  freeTokensTarget?: number;
+}
