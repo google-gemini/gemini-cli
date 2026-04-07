@@ -14,6 +14,7 @@ import { loadAgentsFromDirectory } from './agentLoader.js';
 import { CodebaseInvestigatorAgent } from './codebase-investigator.js';
 import { CliHelpAgent } from './cli-help-agent.js';
 import { GeneralistAgent } from './generalist-agent.js';
+import { WatcherAgent } from './watcher-agent.js';
 import { BrowserAgentDefinition } from './browser/browserAgentDefinition.js';
 import { MemoryManagerAgent } from './memory-manager-agent.js';
 import { AgentTool } from './agent-tool.js';
@@ -266,6 +267,7 @@ export class AgentRegistry {
     this.registerLocalAgent(CodebaseInvestigatorAgent(this.config));
     this.registerLocalAgent(CliHelpAgent(this.config));
     this.registerLocalAgent(GeneralistAgent(this.config));
+    this.registerLocalAgent(WatcherAgent(this.config));
 
     // Register the browser agent if enabled in settings.
     // Tools are configured dynamically at invocation time via browserAgentFactory.

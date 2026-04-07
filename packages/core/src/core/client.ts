@@ -45,6 +45,8 @@ import type { ContentGenerator } from './contentGenerator.js';
 import { LoopDetectionService } from '../services/loopDetectionService.js';
 import { ChatCompressionService } from '../context/chatCompressionService.js';
 import { AgentHistoryProvider } from '../context/agentHistoryProvider.js';
+import type { WatcherProgress } from '../agents/types.js';
+import { WatcherReportSchema } from '../agents/watcher-agent.js';
 import { ideContextStore } from '../ide/ideContext.js';
 import {
   logContentRetryFailure,
@@ -598,10 +600,28 @@ export class GeminiClient {
     isInvalidStreamRetry: boolean,
     displayContent?: PartListUnion,
   ): AsyncGenerator<ServerGeminiStreamEvent, Turn> {
-    // Re-initialize turn (it was empty before if in loop, or new instance)
     let turn = new Turn(this.getChat(), prompt_id);
 
     this.sessionTurnCount++;
+
+    if (
+      this.config.isExperimentalWatcherEnabled() &&
+      this.sessionTurnCount > 0 &&
+      this.sessionTurnCount % this.config.getExperimentalWatcherInterval() === 0
+    ) {
+      const watcherResult = await this.tryRunWatcher(prompt_id, signal);
+      if (watcherResult?.feedback) {
+        const feedback = watcherResult.feedback;
+        const feedbackRequest = [
+          {
+            text: `System: Feedback from Watcher (Review of last ${this.config.getExperimentalWatcherInterval()} turns):\n\n${feedback}`,
+          },
+        ];
+        // Inject feedback into the conversation
+        this.getChat().addHistory(createUserContent(feedbackRequest));
+      }
+    }
+
     if (
       this.config.getMaxSessionTurns() > 0 &&
       this.sessionTurnCount > this.config.getMaxSessionTurns()
@@ -1278,5 +1298,74 @@ export class GeminiClient {
       isInvalidStreamRetry,
       displayContent,
     );
+  }
+
+  private async tryRunWatcher(
+    prompt_id: string,
+    signal: AbortSignal,
+  ): Promise<WatcherProgress | undefined> {
+    const watcherTool = this.context.toolRegistry.getTool('watcher');
+    if (!watcherTool) {
+      return undefined;
+    }
+
+    const interval = this.config.getExperimentalWatcherInterval();
+    const history = this.getHistory();
+    // Get last N turns (approx)
+    const recentHistory = history
+      .slice(-interval * 2)
+      .map((m) => {
+        const role = m.role ?? 'unknown';
+        const parts =
+          m.parts
+            ?.map((p) => {
+              if (typeof p === 'string') return p;
+              if (p && typeof p === 'object') {
+                if ('text' in p && typeof p.text === 'string') return p.text;
+                if (
+                  'functionCall' in p &&
+                  p.functionCall &&
+                  typeof p.functionCall === 'object' &&
+                  'name' in p.functionCall &&
+                  'args' in p.functionCall
+                ) {
+                  return `[CALL: ${String(p.functionCall.name)}(${JSON.stringify(p.functionCall.args)})]`;
+                }
+                if (
+                  'functionResponse' in p &&
+                  p.functionResponse &&
+                  typeof p.functionResponse === 'object' &&
+                  'name' in p.functionResponse &&
+                  'response' in p.functionResponse
+                ) {
+                  return `[RESULT: ${String(p.functionResponse.name)} -> ${JSON.stringify(p.functionResponse.response)}]`;
+                }
+              }
+              return partToString(p, { verbose: true });
+            })
+            .join('\n') ?? '';
+        return `[${role.toUpperCase()}]: ${parts}`;
+      })
+      .join('\n\n');
+
+    try {
+      const invocation = watcherTool.build({ recentHistory });
+      const result = await invocation.execute(signal);
+
+      if (result.llmContent) {
+        try {
+          const contentString = partListUnionToString(result.llmContent);
+          const parsed = WatcherReportSchema.parse(JSON.parse(contentString));
+          return parsed as WatcherProgress;
+        } catch (e) {
+          debugLogger.warn('Failed to parse watcher output', e);
+          return undefined;
+        }
+      }
+    } catch (e) {
+      debugLogger.warn('Error running watcher subagent', e);
+    }
+
+    return undefined;
   }
 }

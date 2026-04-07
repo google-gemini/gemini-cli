@@ -105,6 +105,13 @@ export interface SubagentProgress {
   terminateReason?: AgentTerminateMode;
 }
 
+export interface WatcherProgress {
+  userDirections: string;
+  progressSummary: string;
+  evaluation: string;
+  feedback?: string;
+}
+
 export function isSubagentProgress(obj: unknown): obj is SubagentProgress {
   return (
     typeof obj === 'object' &&

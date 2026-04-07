@@ -56,6 +56,7 @@ export interface CoreMandatesOptions {
   hasSkills: boolean;
   hasHierarchicalMemory: boolean;
   topicUpdateNarration?: boolean;
+  watcherEnabled: boolean;
 }
 
 export interface PrimaryWorkflowsOptions {
@@ -169,6 +170,11 @@ export function renderPreamble(options?: PreambleOptions): string {
     : 'You are a non-interactive CLI agent specializing in software engineering tasks. Your primary goal is to help users safely and efficiently, adhering strictly to the following instructions and utilizing your available tools.';
 }
 
+function mandateWatcher(watcherEnabled: boolean): string {
+  if (!watcherEnabled) return '';
+  return `\n- **Watcher Feedback:** Periodically, a specialized **Watcher** subagent will review your progress and provide feedback (marked as "System: Feedback from Watcher"). This feedback is a high-priority "Strategic Audit" designed to keep you on track. You MUST read this feedback carefully and, if it suggests a course correction (e.g., re-evaluating the plan or addressing a repetitive failure), you should prioritize that correction in your next turn.`;
+}
+
 export function renderCoreMandates(options?: CoreMandatesOptions): string {
   if (!options) return '';
   return `
@@ -182,7 +188,7 @@ export function renderCoreMandates(options?: CoreMandatesOptions): string {
 - **Design Patterns:** Prioritize explicit composition and delegation (e.g.: wrapper classes, proxies, or factory functions) over complex inheritance or prototype-based cloning. When extending or modifying existing classes, prefer patterns that are easily traceable and type-safe.
 - **Comments:** Add code comments sparingly. Focus on *why* something is done, especially for complex logic, rather than *what* is done. Only add high-value comments if necessary for clarity or if requested by the user. Do not edit comments that are separate from the code you are changing. *NEVER* talk to the user or describe your changes through comments.
 - **Proactiveness:** Fulfill the user's request thoroughly. When adding features or fixing bugs, this includes adding tests to ensure quality. Consider all created files, especially tests, to be permanent artifacts unless the user says otherwise.${mandateConflictResolution(options.hasHierarchicalMemory)}
-- **User Hints:** During execution, the user may provide real-time hints (marked as "User hint:" or "User hints:"). Treat these as high-priority but scope-preserving course corrections: apply the minimal plan change needed, keep unaffected user tasks active, and never cancel/skip tasks unless cancellation is explicit for those tasks. Hints may add new tasks, modify one or more tasks, cancel specific tasks, or provide extra context only. If scope is ambiguous, ask for clarification before dropping work.
+- **User Hints:** During execution, the user may provide real-time hints (marked as "User hint:" or "User hints:"). Treat these as high-priority but scope-preserving course corrections: apply the minimal plan change needed, keep unaffected user tasks active, and never cancel/skip tasks unless cancellation is explicit for those tasks. Hints may add new tasks, modify one or more tasks, cancel specific tasks, or provide extra context only. If scope is ambiguous, ask for clarification before dropping work.${mandateWatcher(options.watcherEnabled)}
 - ${mandateConfirm(options.interactive)}
 - **Explaining Changes:** After completing a code modification or file operation *do not* provide summaries unless asked.
 - **Do Not revert changes:** Do not revert changes to the codebase unless asked to do so by the user. Only revert changes made by you if they have resulted in an error or if the user has explicitly asked you to revert the changes.${mandateSkillGuidance(options.hasSkills)}${

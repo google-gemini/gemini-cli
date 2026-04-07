@@ -2217,6 +2217,26 @@ const SETTINGS_SCHEMA = {
           'Enable the experimental Topic & Update communication model for reduced chattiness and structured progress reporting.',
         showInDialog: true,
       },
+      watcher: {
+        type: 'boolean',
+        label: 'Watcher Subagent',
+        category: 'Experimental',
+        requiresRestart: true,
+        default: false,
+        description:
+          'Enable the specialized Watcher subagent for periodic progress monitoring and strategic feedback.',
+        showInDialog: true,
+      },
+      watcherInterval: {
+        type: 'number',
+        label: 'Watcher Interval',
+        category: 'Experimental',
+        requiresRestart: true,
+        default: 20,
+        description:
+          'The number of turns between each Watcher subagent progress review.',
+        showInDialog: true,
+      },
     },
   },
   extensions: {
