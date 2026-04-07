@@ -33,7 +33,7 @@ describe('StateSnapshotProcessor', () => {
 
   it('bypasses processing if deficit is <= 0', async () => {
     const episodes = [
-      createDummyEpisode('ep-1', 'USER_PROMPT', [{ text: 'hello' }])
+      createDummyEpisode('ep-1', 'USER_PROMPT', [{ type: 'text', text: 'hello' }])
     ];
     // current: 100, max: 1000, retained: 200 (deficit 0)
     const state = createDummyState(false, 0, new Set(), 100, 1000, 200);
@@ -48,7 +48,7 @@ describe('StateSnapshotProcessor', () => {
   it('bypasses processing if not enough episodes to summarize (needs at least 2 inner episodes)', async () => {
     const episodes = [
       createDummyEpisode('ep-sys', 'SYSTEM_EVENT', []),
-      createDummyEpisode('ep-active', 'USER_PROMPT', [{ text: 'help' }]),
+      createDummyEpisode('ep-active', 'USER_PROMPT', [{ type: 'text', text: 'help' }]),
     ];
     
     // current: 1000, max: 10000, retained: 500. Target deficit = 500
@@ -64,9 +64,9 @@ describe('StateSnapshotProcessor', () => {
   it('summarizes intermediate episodes into a single snapshot episode', async () => {
     const episodes = [
       createDummyEpisode('ep-0', 'SYSTEM_EVENT', []),
-      createDummyEpisode('ep-1', 'USER_PROMPT', [{ text: 'old 1' }]),
-      createDummyEpisode('ep-2', 'USER_PROMPT', [{ text: 'old 2' }]),
-      createDummyEpisode('ep-3', 'USER_PROMPT', [{ text: 'current' }]),
+      createDummyEpisode('ep-1', 'USER_PROMPT', [{ type: 'text', text: 'old 1' }]),
+      createDummyEpisode('ep-2', 'USER_PROMPT', [{ type: 'text', text: 'old 2' }]),
+      createDummyEpisode('ep-3', 'USER_PROMPT', [{ type: 'text', text: 'current' }]),
     ];
     
     // Target deficit = 200

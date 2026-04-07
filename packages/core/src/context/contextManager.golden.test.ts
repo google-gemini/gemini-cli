@@ -21,6 +21,9 @@ import { ContextEventBus } from './eventBus.js';
 import { ContextTokenCalculator } from './utils/contextTokenCalculator.js';
 
 import type { Content } from '@google/genai';
+import type { BaseLlmClient } from '../core/baseLlmClient.js';
+import type { Episode } from './ir/types.js';
+import type { SidecarConfig } from './sidecar/types.js';
 
 expect.addSnapshotSerializer({
   test: (val) =>
@@ -74,7 +77,7 @@ describe('ContextManager Golden Tests', () => {
     const tracer = new ContextTracer({ targetDir: '/tmp', sessionId: 'test-session' });
     const eventBus = new ContextEventBus();
     const env = new ContextEnvironmentImpl(
-      {} as any,
+      { generateContent: async () => ({}), generateJson: async () => ({}) } as unknown as BaseLlmClient,
       'test-prompt-id',
       'test',
       '/tmp',
@@ -118,7 +121,7 @@ describe('ContextManager Golden Tests', () => {
 
   it('should process history and match golden snapshot', async () => {
     const history = createLargeHistory();
-    (contextManager as any).pristineEpisodes = (
+    (contextManager as unknown as { pristineEpisodes: Episode[] }).pristineEpisodes = (
       await import('./ir/mapper.js')
     ).IrMapper.toIr(history, new ContextTokenCalculator(4));
     const result = await contextManager.projectCompressedHistory();
@@ -127,7 +130,7 @@ describe('ContextManager Golden Tests', () => {
 
   it('should not modify history when under budget', async () => {
     const history = createLargeHistory();
-    (contextManager as any).pristineEpisodes = (
+    (contextManager as unknown as { pristineEpisodes: Episode[] }).pristineEpisodes = (
       await import('./ir/mapper.js')
     ).IrMapper.toIr(history, new ContextTokenCalculator(4));
     // In Golden Tests, we just want to ensure the logic doesn't throw or alter unprotected history in weird ways.
@@ -135,7 +138,7 @@ describe('ContextManager Golden Tests', () => {
     const tracer2 = new ContextTracer({ targetDir: '/tmp', sessionId: 'test2' });
     const eventBus2 = new ContextEventBus();
     const env2 = new ContextEnvironmentImpl(
-      {} as any,
+      { generateContent: async () => ({}), generateJson: async () => ({}) } as unknown as BaseLlmClient,
       'test-prompt-id',
       'test',
       '/tmp',
@@ -148,12 +151,12 @@ describe('ContextManager Golden Tests', () => {
       {
         budget: { retainedTokens: 100000, maxTokens: 150000 },
         pipelines: [],
-      } as any,
+      } as unknown as SidecarConfig,
       env2,
       tracer2,
     );
 
-    (contextManager as any).pristineEpisodes = (
+    (contextManager as unknown as { pristineEpisodes: Episode[] }).pristineEpisodes = (
       await import('./ir/mapper.js')
     ).IrMapper.toIr(history, new ContextTokenCalculator(4));
     const result = await contextManager.projectCompressedHistory();

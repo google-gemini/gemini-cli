@@ -8,6 +8,7 @@ import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { generateWorkingBufferView } from './graphUtils.js';
 import { createMockEnvironment, createDummyEpisode } from '../testing/contextTestUtils.js';
 import type { ContextEnvironment } from '../sidecar/environment.js';
+import type { AgentThought, UserPrompt } from './types.js';
 
 describe('graphUtils (View Generator)', () => {
   let env: ContextEnvironment;
@@ -21,8 +22,8 @@ describe('graphUtils (View Generator)', () => {
 
   it('returns pristine episodes untouched if under budget', () => {
     const episodes = [
-      createDummyEpisode('ep-1', 'USER_PROMPT', [{ text: '1' }]),
-      createDummyEpisode('ep-2', 'USER_PROMPT', [{ text: '2' }]),
+      createDummyEpisode('ep-1', 'USER_PROMPT', [{ type: 'text', text: '1' }]),
+      createDummyEpisode('ep-2', 'USER_PROMPT', [{ type: 'text', text: '2' }]),
     ];
     
     // We retain 5000 tokens. Total mock tokens = 200.
@@ -53,12 +54,12 @@ describe('graphUtils (View Generator)', () => {
     expect(view[1].id).toBe('ep-2'); // Unchanged (newest)
     
     expect(view[0].id).toBe('ep-1');
-    expect((view[0].trigger as any).semanticParts[0].presentation.text).toBe('<MASKED>');
+    expect((view[0].trigger as UserPrompt).semanticParts[0].presentation?.text).toBe('<MASKED>');
   });
 
   it('swaps to Summary variant when over budget', () => {
-    const ep1 = createDummyEpisode('ep-1', 'USER_PROMPT', [{ text: '1' }]);
-    const ep2 = createDummyEpisode('ep-2', 'USER_PROMPT', [{ text: '2' }]);
+    const ep1 = createDummyEpisode('ep-1', 'USER_PROMPT', [{ type: 'text', text: '1' }]);
+    const ep2 = createDummyEpisode('ep-2', 'USER_PROMPT', [{ type: 'text', text: '2' }]);
     
     ep1.variants = {
         'summary': { type: 'summary', status: 'ready', text: '<SUMMARY>', recoveredTokens: 50 }
@@ -71,15 +72,15 @@ describe('graphUtils (View Generator)', () => {
     // The summary completely replaces the internal steps and clears the yield.
     expect(view[0].steps).toHaveLength(1);
     expect(view[0].steps[0].type).toBe('AGENT_THOUGHT');
-    expect((view[0].steps[0] as any).text).toBe('<SUMMARY>');
+    expect((view[0].steps[0] as AgentThought).text).toBe('<SUMMARY>');
     expect(view[0].yield).toBeUndefined();
   });
 
   it('handles complex N-to-1 Snapshot skipping gracefully', () => {
-    const ep1 = createDummyEpisode('ep-1', 'USER_PROMPT', [{ text: '1' }]);
-    const ep2 = createDummyEpisode('ep-2', 'USER_PROMPT', [{ text: '2' }]);
-    const ep3 = createDummyEpisode('ep-3', 'USER_PROMPT', [{ text: '3' }]);
-    const ep4 = createDummyEpisode('ep-4', 'USER_PROMPT', [{ text: '4' }]);
+    const ep1 = createDummyEpisode('ep-1', 'USER_PROMPT', [{ type: 'text', text: '1' }]);
+    const ep2 = createDummyEpisode('ep-2', 'USER_PROMPT', [{ type: 'text', text: '2' }]);
+    const ep3 = createDummyEpisode('ep-3', 'USER_PROMPT', [{ type: 'text', text: '3' }]);
+    const ep4 = createDummyEpisode('ep-4', 'USER_PROMPT', [{ type: 'text', text: '4' }]);
     
     // ep-3 has a snapshot that replaces [ep-1, ep-2, ep-3]
     const snapshotEp = createDummyEpisode('snap-1', 'SYSTEM_EVENT', []);
@@ -103,8 +104,8 @@ describe('graphUtils (View Generator)', () => {
   });
 
   it('ignores variants that are not yet "ready"', () => {
-    const ep1 = createDummyEpisode('ep-1', 'USER_PROMPT', [{ text: '1' }]);
-    const ep2 = createDummyEpisode('ep-2', 'USER_PROMPT', [{ text: '2' }]);
+    const ep1 = createDummyEpisode('ep-1', 'USER_PROMPT', [{ type: 'text', text: '1' }]);
+    const ep2 = createDummyEpisode('ep-2', 'USER_PROMPT', [{ type: 'text', text: '2' }]);
     
     ep1.variants = {
         'masked': { type: 'masked', status: 'computing', text: '<MASKED>', recoveredTokens: 10 }
@@ -114,6 +115,6 @@ describe('graphUtils (View Generator)', () => {
     
     // Because the variant was computing, it must fall back to the raw pristine text.
     expect(view).toHaveLength(2);
-    expect((view[0].trigger as any).semanticParts[0].presentation).toBeUndefined();
+    expect((view[0].trigger as UserPrompt).semanticParts[0].presentation).toBeUndefined();
   });
 });

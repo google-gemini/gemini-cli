@@ -28,7 +28,7 @@ describe('EmergencyTruncationProcessor', () => {
 
   it('bypasses processing if currentTokens <= maxTokens', async () => {
     const episodes = [
-      createDummyEpisode('ep-1', 'USER_PROMPT', [{ text: 'short' }])
+      createDummyEpisode('ep-1', 'USER_PROMPT', [{ type: 'text', text: 'short' }])
     ];
     // State says we are under budget (5000 < 10000)
     const state = createDummyState(true, 0, new Set(), 5000, 10000); 
@@ -41,9 +41,9 @@ describe('EmergencyTruncationProcessor', () => {
   });
 
   it('truncates episodes from the front (oldest) until targetTokens is met', async () => {
-    const ep1 = createDummyEpisode('ep-1', 'USER_PROMPT', [{ text: 'oldest' }]);
-    const ep2 = createDummyEpisode('ep-2', 'USER_PROMPT', [{ text: 'middle' }]);
-    const ep3 = createDummyEpisode('ep-3', 'USER_PROMPT', [{ text: 'newest' }]);
+    const ep1 = createDummyEpisode('ep-1', 'USER_PROMPT', [{ type: 'text', text: 'oldest' }]);
+    const ep2 = createDummyEpisode('ep-2', 'USER_PROMPT', [{ type: 'text', text: 'middle' }]);
+    const ep3 = createDummyEpisode('ep-3', 'USER_PROMPT', [{ type: 'text', text: 'newest' }]);
     
     // Each is worth 100 tokens according to our mock
     const episodes = [ep1, ep2, ep3];
@@ -62,9 +62,9 @@ describe('EmergencyTruncationProcessor', () => {
   });
 
   it('never drops protected episodes (e.g. system instructions)', async () => {
-    const ep1 = createDummyEpisode('ep-1', 'USER_PROMPT', [{ text: 'protected system prompt' }]);
-    const ep2 = createDummyEpisode('ep-2', 'USER_PROMPT', [{ text: 'middle' }]);
-    const ep3 = createDummyEpisode('ep-3', 'USER_PROMPT', [{ text: 'newest' }]);
+    const ep1 = createDummyEpisode('ep-1', 'USER_PROMPT', [{ type: 'text', text: 'protected system prompt' }]);
+    const ep2 = createDummyEpisode('ep-2', 'USER_PROMPT', [{ type: 'text', text: 'middle' }]);
+    const ep3 = createDummyEpisode('ep-3', 'USER_PROMPT', [{ type: 'text', text: 'newest' }]);
     
     const episodes = [ep1, ep2, ep3];
     

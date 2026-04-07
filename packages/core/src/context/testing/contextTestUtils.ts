@@ -13,7 +13,7 @@ import { ContextManager } from '../contextManager.js';
 
 import { InMemoryFileSystem } from '../system/InMemoryFileSystem.js';
 import { DeterministicIdGenerator } from '../system/DeterministicIdGenerator.js';
-import type { Episode } from '../ir/types.js';
+import type { Episode, UserPrompt, SystemEvent, SemanticPart } from '../ir/types.js';
 import type { ContextAccountingState } from '../pipeline.js';
 import { randomUUID } from 'node:crypto';
 
@@ -38,21 +38,32 @@ export function createDummyState(
 export function createDummyEpisode(
   id: string,
   type: 'USER_PROMPT' | 'SYSTEM_EVENT',
-  parts: unknown[] = [],
+  parts: SemanticPart[] = [],
   toolSteps: Array<{ intent: Record<string, unknown>; observation: Record<string, unknown>; toolName?: string; tokens?: { intent: number; observation: number } }> = []
 ): Episode {
+  let trigger: UserPrompt | SystemEvent;
+
+  if (type === 'USER_PROMPT') {
+      trigger = {
+         id: randomUUID(),
+         type: 'USER_PROMPT',
+         semanticParts: parts,
+         metadata: { originalTokens: 100, currentTokens: 100, transformations: [] },
+      };
+  } else {
+      trigger = {
+         id: randomUUID(),
+         type: 'SYSTEM_EVENT',
+         name: 'dummy_event',
+         payload: {},
+         metadata: { originalTokens: 100, currentTokens: 100, transformations: [] },
+      };
+  }
+
   return {
     id,
     timestamp: Date.now(),
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
-    trigger: {
-      id: randomUUID(),
-      type,
-      name: type === 'SYSTEM_EVENT' ? 'dummy_event' : undefined,
-      payload: type === 'SYSTEM_EVENT' ? {} : undefined,
-      semanticParts: type === 'USER_PROMPT' ? parts as any : undefined,
-      metadata: { originalTokens: 100, currentTokens: 100, transformations: [] },
-    } as any,
+    trigger,
     steps: toolSteps.map(step => ({
       id: randomUUID(),
       type: 'TOOL_EXECUTION',
