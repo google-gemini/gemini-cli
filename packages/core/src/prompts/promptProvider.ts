@@ -234,10 +234,13 @@ export class PromptProvider {
     }
 
     // --- Finalization (Shell) ---
+    // Get persistent memory if available
+    const persistentMemory = context.config.getPersistentMemory?.() ?? undefined;
     const finalPrompt = activeSnippets.renderFinalShell(
       basePrompt,
       userMemory,
       contextFilenames,
+      persistentMemory,
     );
 
     // Sanitize erratic newlines from composition

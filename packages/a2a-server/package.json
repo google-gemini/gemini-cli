@@ -26,7 +26,7 @@
   ],
   "dependencies": {
     "@a2a-js/sdk": "0.3.11",
-    "@google-cloud/storage": "^7.16.0",
+    "@google-cloud/storage": "^5.18.3",
     "@google/gemini-cli-core": "file:../core",
     "express": "^5.1.0",
     "fs-extra": "^11.3.0",

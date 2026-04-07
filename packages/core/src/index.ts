@@ -8,6 +8,42 @@
 export * from './config/config.js';
 export * from './config/agent-loop-context.js';
 export * from './config/memory.js';
+
+// Export memory system (persistent typed memory) - selectively to avoid conflicts
+export {
+  MEMORY_TYPES,
+  parseMemoryType,
+  type MemoryType,
+  type MemoryFile,
+  type MemoryFrontmatter,
+  type MemoryIndexEntry,
+  type SessionLogEntry,
+  type SessionLogFile,
+} from './memory/types.js';
+export {
+  getMemoryDir,
+  getMemoryEntrypoint,
+  ensureMemoryDirExists,
+  createFrontmatter,
+  createDefaultMemoryIndex,
+  readMemoryFile,
+  scanMemoryFiles,
+  loadMemoryDirectory,
+  buildMemoryPrompt,
+} from './memory/memoryDiscovery.js';
+export {
+  getSessionLogsDir,
+  getSessionLogPath,
+  ensureSessionLogsDirExists,
+  appendSessionLog,
+  readSessionLog,
+  getRecentSessionLogs,
+} from './memory/sessionLog.js';
+export {
+  runConsolidation,
+  spawnConsolidationWorker,
+  maybeRunConsolidation,
+} from './memory/memoryConsolidation.js';
 export * from './config/defaultModelConfigs.js';
 export * from './config/models.js';
 export * from './config/constants.js';
@@ -140,6 +176,16 @@ export * from './services/modelConfigService.js';
 export * from './sandbox/windows/WindowsSandboxManager.js';
 export * from './services/sessionSummaryUtils.js';
 export { startMemoryService } from './services/memoryService.js';
+export * from './services/sessionLogger.js';
+export * from './services/sessionLogTypes.js';
+export * from './services/memoryConsolidator.js';
+export * from './services/daemonService.js';
+export * from './services/daemonFileWatcher.js';
+export * from './services/daemonProactive.js';
+export * from './services/daemonNotifier.js';
+export * from './services/daemonLogger.js';
+export * from './commands/daemon.js';
+export * from './templates/geminiMdTemplate.js';
 export * from './context/memoryContextManager.js';
 export * from './services/trackerService.js';
 export * from './services/trackerTypes.js';

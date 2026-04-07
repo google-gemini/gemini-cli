@@ -18,6 +18,7 @@ import {
 } from '../utils/memoryDiscovery.js';
 import type { Config } from '../config/config.js';
 import { coreEvents, CoreEvent } from '../utils/events.js';
+import { ensureGeminiMd } from '../templates/geminiMdTemplate.js';
 
 export class MemoryContextManager {
   private readonly loadedPaths: Set<string> = new Set();
@@ -47,12 +48,20 @@ export class MemoryContextManager {
   }
 
   private async discoverMemoryPaths() {
+    const isTrusted = this.config.isTrustedFolder();
+    if (isTrusted) {
+      const directories = [...this.config.getWorkspaceContext().getDirectories()];
+      if (directories.length > 0) {
+        await ensureGeminiMd(directories[0]);
+      }
+    }
+
     const [global, extension, project, userProjectMemory] = await Promise.all([
       getGlobalMemoryPaths(),
       Promise.resolve(
         getExtensionMemoryPaths(this.config.getExtensionLoader()),
       ),
-      this.config.isTrustedFolder()
+      isTrusted
         ? getEnvironmentMemoryPaths(
             [...this.config.getWorkspaceContext().getDirectories()],
             this.config.getMemoryBoundaryMarkers(),

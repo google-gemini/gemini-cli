@@ -85,6 +85,57 @@ async function generateAndSaveSummary(
   freshConversation.summary = summary;
   freshConversation.lastUpdated = new Date().toISOString();
   await fs.writeFile(sessionPath, JSON.stringify(freshConversation, null, 2));
+
+  // Determine prompt from conversation
+  const lastUserMessage = freshConversation.messages.filter((m) => m.type === 'user').pop();
+  let prompt = 'Unknown Prompt';
+  if (lastUserMessage?.content) {
+    if (typeof lastUserMessage.content === 'string') {
+      prompt = lastUserMessage.content;
+    } else if (Array.isArray(lastUserMessage.content)) {
+      prompt = lastUserMessage.content.map((p: any) => p.text || '').join('');
+    }
+  }
+
+  const durationMs =
+    new Date(freshConversation.lastUpdated).getTime() -
+    new Date(freshConversation.startTime).getTime();
+
+  // 1. Persist turn to JSONL logger
+  config.getSessionLogger().log(
+    freshConversation.sessionId,
+    prompt,
+    summary,
+    freshConversation.directories || [], // Using directories as proxy for now
+    durationMs > 0 ? durationMs : 0
+  );
+
+  // 2. Spawn Consolidation Worker (Phase 1)
+  try {
+    const workerScript = path.join(__dirname, 'memoryConsolidationWorker.js');
+    const { Worker } = await import('node:worker_threads');
+    
+    // We only spawn if we have an API key right now 
+    const apiKey = config.getContentGeneratorConfig()?.apiKey;
+    if (apiKey) {
+      new Worker(workerScript, {
+        workerData: {
+          projectRoot: config.getProjectRoot(),
+          logDir: config.storage.getSessionLogDir(),
+          geminiMdPath: path.join(config.getProjectRoot(), 'GEMINI.md'),
+          apiKey,
+          model: 'gemini-2.5-flash',
+          lookbackDays: 7
+        }
+      });
+      debugLogger.debug(`[SessionSummary] Spawned background memory consolidation worker`);
+    } else {
+      debugLogger.debug(`[SessionSummary] Skipping memory consolidation worker (no raw API key)`);
+    }
+  } catch (err) {
+    debugLogger.warn(`[SessionSummary] Failed to spawn memory consolidation worker`, err);
+  }
+
   debugLogger.debug(
     `[SessionSummary] Saved summary for ${sessionPath}: "${summary}"`,
   );
