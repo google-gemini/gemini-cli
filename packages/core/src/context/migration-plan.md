@@ -1,21 +1,21 @@
 # The Ship of Theseus Migration Checklist
 
-- [ ] **Phase 1: Core Types (`ir/types.ts`)**
-  - [ ] Add `ConcreteNode` and `LogicalNode` types.
-  - [ ] Add `episodeId` (or generic `parentId`) to all `ConcreteNode`
+- [x] **Phase 1: Core Types (`ir/types.ts`)**
+  - [x] Add `ConcreteNode` and `LogicalNode` types.
+  - [x] Add `episodeId` (or generic `parentId`) to all `ConcreteNode`
         interfaces.
-  - [ ] Add `replacesId` and `abstractsIds` pointers.
-  - [ ] Remove `variants` dictionary from `IrNode`.
+  - [x] Add `replacesId` and `abstractsIds` pointers.
+  - [x] Remove `variants` dictionary from `IrNode`.
 
-- [ ] **Phase 2: Processor Pipeline (`pipeline.ts`)**
-  - [ ] Delete `EpisodeEditor`.
-  - [ ] Define `ContextPatch`.
-  - [ ] Update `ContextProcessor` signature to accept `ProcessArgs` and return
+- [x] **Phase 2: Processor Pipeline (`pipeline.ts`)**
+  - [x] Delete `EpisodeEditor`.
+  - [x] Define `ContextPatch`.
+  - [x] Update `ContextProcessor` signature to accept `ProcessArgs` and return
         `Promise<ContextPatch[]>`.
 
-- [ ] **Phase 3: The Reducer (`sidecar/orchestrator.ts`)**
-  - [ ] Update `executePipeline` and `executeTriggerSync` to act as a reducer.
-  - [ ] Map `ContextPatch` results onto the flat Ship array.
+- [x] **Phase 3: The Reducer (`sidecar/orchestrator.ts`)**
+  - [x] Update `executePipeline` and `executeTriggerSync` to act as a reducer.
+  - [x] Map `ContextPatch` results onto the flat Ship array.
 
 - [ ] **Phase 4: Pristine Graph & Mapping (`contextManager.ts` & `ir/toIr.ts`)**
   - [ ] Update `toIr` to produce a flat list of `ConcreteNode`s and a tree of
