@@ -31,8 +31,8 @@ describe('planUtils', () => {
 
   describe('validatePlanPath', () => {
     it('should return null for a valid path within plans directory', async () => {
-      const planPath = path.join('plans', 'test.md');
-      const fullPath = path.join(tempRootDir, planPath);
+      const planPath = 'test.md';
+      const fullPath = path.join(plansDir, planPath);
       fs.writeFileSync(fullPath, '# My Plan');
 
       const result = await validatePlanPath(planPath, plansDir);
@@ -40,14 +40,14 @@ describe('planUtils', () => {
     });
 
     it('should return error for non-existent file', async () => {
-      const planPath = path.join('plans', 'ghost.md');
+      const planPath = 'ghost.md';
       const result = await validatePlanPath(planPath, plansDir);
       expect(result).toContain('Plan file does not exist');
     });
 
     it('should detect path traversal via symbolic links', async () => {
-      const maliciousPath = path.join('plans', 'malicious.md');
-      const fullMaliciousPath = path.join(tempRootDir, maliciousPath);
+      const maliciousPath = 'malicious.md';
+      const fullMaliciousPath = path.join(plansDir, maliciousPath);
       const outsideFile = path.join(tempRootDir, 'outside.txt');
       fs.writeFileSync(outsideFile, 'secret content');
 
