@@ -64,7 +64,7 @@ export const PLAIN_TEXT_FILE_PATH_REGEX = new RegExp(
     // Relative path with ./ or ../ prefix
     '|\\.\\.?\\/[-\\w.@]+(?:\\/[-\\w.@]+)*' +
     // Windows absolute path
-    '|[A-Za-z]:[/\\\\][-\\w.@ ]+(?:[/\\\\][-\\w.@ ]+)*' +
+    '|[A-Za-z]:[/\\][-\w.@]+(?:[/\\][-\w.@]+)*' +
     // Bare relative path (at least one /)
     '|[-\\w.@]+\\/[-\\w.@]+(?:\\/[-\\w.@]+)*' +
     ')' +
