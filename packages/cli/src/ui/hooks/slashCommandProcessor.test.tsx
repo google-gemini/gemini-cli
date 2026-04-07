@@ -1046,53 +1046,6 @@ describe('useSlashCommandProcessor', () => {
       expect(spySetContext).toHaveBeenCalledWith(undefined);
     });
 
-    it('clears active extension context when the canonical /plan command is executed', async () => {
-      const planCommand = createTestCommand({
-        name: 'plan',
-        action: vi.fn(),
-      });
-
-      const spySetContext = vi.spyOn(mockConfig, 'setActiveExtensionContext');
-
-      const hook = await setupProcessorHook({
-        builtinCommands: [planCommand],
-      });
-
-      await waitFor(() => expect(hook.current.slashCommands!.length).toBe(1));
-
-      await act(async () => {
-        await hook.current.handleSlashCommand('/plan my task');
-      });
-
-      expect(spySetContext).toHaveBeenCalledWith(undefined);
-    });
-
-    it('clears active extension context when a /plan alias or subcommand is executed', async () => {
-      const planCommand = createTestCommand({
-        name: 'plan',
-        subCommands: [
-          createTestCommand({
-            name: 'create',
-          }),
-        ],
-        action: vi.fn(),
-      });
-
-      const spySetContext = vi.spyOn(mockConfig, 'setActiveExtensionContext');
-
-      const hook = await setupProcessorHook({
-        builtinCommands: [planCommand],
-      });
-
-      await waitFor(() => expect(hook.current.slashCommands!.length).toBe(1));
-
-      await act(async () => {
-        await hook.current.handleSlashCommand('/plan create');
-      });
-
-      expect(spySetContext).toHaveBeenCalledWith(undefined);
-    });
-
     it('handles a sequence of context switches between extensions and default plan mode', async () => {
       const extA = createTestCommand({
         name: 'extA',
@@ -1137,12 +1090,6 @@ describe('useSlashCommandProcessor', () => {
       });
       // A concurrent command should NOT modify the active extension context
       expect(spySetContext).not.toHaveBeenCalled();
-
-      // 4. Run /plan (Default)
-      await act(async () => {
-        await hook.current.handleSlashCommand('/plan my task');
-      });
-      expect(spySetContext).toHaveBeenLastCalledWith(undefined);
     });
   });
 });

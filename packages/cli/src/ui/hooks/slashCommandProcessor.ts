@@ -378,8 +378,6 @@ export const useSlashCommandProcessor = (
           } else {
             config.setActiveExtensionContext(undefined);
           }
-        } else if (resolvedCommandPath?.[0] === 'plan') {
-          config.setActiveExtensionContext(undefined);
         }
       }
 
