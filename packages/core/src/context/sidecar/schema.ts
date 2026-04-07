@@ -3,7 +3,7 @@
  * Copyright 2026 Google LLC
  * SPDX-License-Identifier: Apache-2.0
  */
-import { ProcessorRegistry } from './registry.js';
+import type { ProcessorRegistry } from './registry.js';
 import './builtins.js';
 
 export function getSidecarConfigSchema(registry: ProcessorRegistry) {

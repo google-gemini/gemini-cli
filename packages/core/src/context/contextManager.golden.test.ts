@@ -1,5 +1,3 @@
-import { ProcessorRegistry } from "./sidecar/registry.js";
-import { registerBuiltInProcessors } from "./sidecar/builtins.js";
 /**
  * @license
  * Copyright 2026 Google LLC
@@ -21,11 +19,13 @@ import { SidecarLoader } from './sidecar/SidecarLoader.js';
 import { ContextTracer } from './tracer.js';
 import { ContextEventBus } from './eventBus.js';
 import { ContextTokenCalculator } from './utils/contextTokenCalculator.js';
-
 import type { Content } from '@google/genai';
 import type { BaseLlmClient } from '../core/baseLlmClient.js';
 import type { Episode } from './ir/types.js';
 import type { SidecarConfig } from './sidecar/types.js';
+import { ProcessorRegistry } from "./sidecar/registry.js";
+import { registerBuiltInProcessors } from "./sidecar/builtins.js";
+
 
 expect.addSnapshotSerializer({
   test: (val) =>

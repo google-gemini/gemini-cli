@@ -10,7 +10,7 @@ import { ProcessorRegistry } from './registry.js';
 import { createMockEnvironment, createDummyState, createDummyEpisode } from '../testing/contextTestUtils.js';
 import type { ContextEnvironment } from './environment.js';
 import type { ContextAccountingState, ContextProcessor } from '../pipeline.js';
-import type { SidecarConfig } from './types.js';
+import type { PipelineDef, ProcessorConfig, SidecarConfig } from './types.js';
 import type { ContextEventBus } from '../eventBus.js';
 
 import type { EpisodeEditor } from '../ir/episodeEditor.js';
@@ -56,26 +56,26 @@ class ThrowingProcessor implements ContextProcessor {
 describe('PipelineOrchestrator (Component)', () => {
   let env: ContextEnvironment;
   let eventBus: ContextEventBus;
+  let registry: ProcessorRegistry;
 
   beforeEach(() => {
     vi.resetAllMocks();
     env = createMockEnvironment();
     eventBus = env.eventBus;
+    registry = new ProcessorRegistry();
     
     // Register our test processors
-    ProcessorRegistry.register({ id: 'DummySyncProcessor', create: () => new DummySyncProcessor() });
-    ProcessorRegistry.register({ id: 'DummyAsyncProcessor', create: () => new DummyAsyncProcessor() });
-    ProcessorRegistry.register({ id: 'ThrowingProcessor', create: () => new ThrowingProcessor() });
+    registry.register({ id: 'DummySyncProcessor', create: () => new DummySyncProcessor() });
+    registry.register({ id: 'DummyAsyncProcessor', create: () => new DummyAsyncProcessor() });
+    registry.register({ id: 'ThrowingProcessor', create: () => new ThrowingProcessor() });
   });
 
   afterEach(() => {
     // Cleanup registry to not pollute other tests
-    (ProcessorRegistry as any).processors.delete('DummySyncProcessor');
-    (ProcessorRegistry as any).processors.delete('DummyAsyncProcessor');
-    (ProcessorRegistry as any).processors.delete('ThrowingProcessor');
+    registry.clear();
   });
 
-  const createConfig = (pipelines: any[]): SidecarConfig => ({
+  const createConfig = (pipelines: PipelineDef[]): SidecarConfig => ({
     budget: { maxTokens: 100, retainedTokens: 50 },
     gcBackstop: { strategy: 'truncate', target: 'max' },
     pipelines
@@ -87,11 +87,12 @@ describe('PipelineOrchestrator (Component)', () => {
         name: 'Sync',
         execution: 'blocking',
         triggers: [],
-        processors: [{ processorId: 'DummySyncProcessor' }]
+        processors: [{ processorId: 'DummySyncProcessor' } as unknown as ProcessorConfig]
       }
     ]);
     
-    const orchestrator = new PipelineOrchestrator(config, env, eventBus, env.tracer);
+    const orchestrator = new PipelineOrchestrator(config, env, eventBus, env.tracer, registry);
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     expect((orchestrator as any).instantiatedProcessors.has('DummySyncProcessor')).toBe(true);
   });
 
@@ -101,11 +102,11 @@ describe('PipelineOrchestrator (Component)', () => {
         name: 'Bad',
         execution: 'blocking',
         triggers: [],
-        processors: [{ processorId: 'DoesNotExist' }]
+        processors: [{ processorId: 'DoesNotExist' } as unknown as ProcessorConfig]
       }
     ]);
     
-    expect(() => new PipelineOrchestrator(config, env, eventBus, env.tracer))
+    expect(() => new PipelineOrchestrator(config, env, eventBus, env.tracer, registry))
         .toThrow('Context Processor [DoesNotExist] is not registered.');
   });
 
@@ -115,10 +116,10 @@ describe('PipelineOrchestrator (Component)', () => {
         name: 'SyncPipe',
         execution: 'blocking',
         triggers: [],
-        processors: [{ processorId: 'DummySyncProcessor' }]
+        processors: [{ processorId: 'DummySyncProcessor' } as unknown as ProcessorConfig]
       }
     ]);
-    const orchestrator = new PipelineOrchestrator(config, env, eventBus, env.tracer);
+    const orchestrator = new PipelineOrchestrator(config, env, eventBus, env.tracer, registry);
     
     const episodes = [createDummyEpisode('1', 'USER_PROMPT', [])];
     const state = createDummyState(false);
@@ -126,7 +127,7 @@ describe('PipelineOrchestrator (Component)', () => {
     const result = await orchestrator.executePipeline('SyncPipe', episodes, state);
     
     expect(result).toHaveLength(1);
-    expect((result[0] as any).dummyModified).toBe(true);
+    expect((result[0] as unknown as {dummyModified: boolean}).dummyModified).toBe(true);
   });
 
   it('executes background pipelines asynchronously without blocking the return', async () => {
@@ -135,10 +136,10 @@ describe('PipelineOrchestrator (Component)', () => {
         name: 'AsyncPipe',
         execution: 'background',
         triggers: [],
-        processors: [{ processorId: 'DummyAsyncProcessor' }]
+        processors: [{ processorId: 'DummyAsyncProcessor' } as unknown as ProcessorConfig]
       }
     ]);
-    const orchestrator = new PipelineOrchestrator(config, env, eventBus, env.tracer);
+    const orchestrator = new PipelineOrchestrator(config, env, eventBus, env.tracer, registry);
     
     const episodes = [createDummyEpisode('1', 'USER_PROMPT', [])];
     const state = createDummyState(false);
@@ -147,7 +148,7 @@ describe('PipelineOrchestrator (Component)', () => {
     const result = await orchestrator.executePipeline('AsyncPipe', episodes, state);
     
     expect(result).toHaveLength(1);
-    expect((result[0] as any).asyncModified).toBeUndefined(); // Not modified yet!
+    expect((result[0] as unknown as {asyncModified: unknown}).asyncModified).toBeUndefined(); // Not modified yet!
     
     // Wait for the background task to complete (50ms delay in DummyAsyncProcessor)
     await new Promise(resolve => setTimeout(resolve, 60));
@@ -159,10 +160,10 @@ describe('PipelineOrchestrator (Component)', () => {
         name: 'ThrowingPipe',
         execution: 'blocking',
         triggers: [],
-        processors: [{ processorId: 'ThrowingProcessor' }]
+        processors: [{ processorId: 'ThrowingProcessor' } as unknown as ProcessorConfig]
       }
     ]);
-    const orchestrator = new PipelineOrchestrator(config, env, eventBus, env.tracer);
+    const orchestrator = new PipelineOrchestrator(config, env, eventBus, env.tracer, registry);
     
     const episodes = [createDummyEpisode('1', 'USER_PROMPT', [])];
     const state = createDummyState(false);
@@ -180,14 +181,15 @@ describe('PipelineOrchestrator (Component)', () => {
         name: 'PressureRelief',
         execution: 'background',
         triggers: ['budget_exceeded'],
-        processors: [{ processorId: 'DummyAsyncProcessor' }]
+        processors: [{ processorId: 'DummyAsyncProcessor' } as unknown as ProcessorConfig]
       }
     ]);
     
     // Spy on the private method to see if the trigger fires it
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const executeSpy = vi.spyOn(PipelineOrchestrator.prototype as any, 'executePipelineAsync');
     
-    new PipelineOrchestrator(config, env, eventBus, env.tracer);
+    new PipelineOrchestrator(config, env, eventBus, env.tracer, registry);
     
     const episodes = [createDummyEpisode('1', 'USER_PROMPT', [])];
     

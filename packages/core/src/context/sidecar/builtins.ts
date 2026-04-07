@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { ProcessorRegistry } from './registry.js';
+import type { ProcessorRegistry } from './registry.js';
 import { ToolMaskingProcessor, type ToolMaskingProcessorOptions } from '../processors/toolMaskingProcessor.js';
 import { BlobDegradationProcessor } from '../processors/blobDegradationProcessor.js';
 import { SemanticCompressionProcessor, type SemanticCompressionProcessorOptions } from '../processors/semanticCompressionProcessor.js';

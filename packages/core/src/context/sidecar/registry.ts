@@ -23,10 +23,10 @@ export class ProcessorRegistry {
   private processors = new Map<string, ContextProcessorDef<unknown>>();
 
   register<TOptions>(def: ContextProcessorDef<TOptions>) {
-    this.processors.set(def.id, def as unknown as ContextProcessorDef<unknown>);
+    this.processors.set(def.id, def);
   }
 
-  get(id: string): ContextProcessorDef<unknown> {
+  get(id: string): ContextProcessorDef {
     const def = this.processors.get(id);
     if (!def) {
       throw new Error(`Context Processor [${id}] is not registered.`);

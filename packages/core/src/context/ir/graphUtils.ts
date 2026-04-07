@@ -41,19 +41,30 @@ export function generateWorkingBufferView(
       continue;
     }
 
-    let projectedEp = {
-      ...ep,
-      trigger: {
+    let projectedTrigger: typeof ep.trigger;
+    
+    if (ep.trigger.type === 'USER_PROMPT') {
+      projectedTrigger = {
         ...ep.trigger,
         metadata: {
-          ...ep.trigger?.metadata,
-          transformations: [...(ep.trigger?.metadata?.transformations || [])],
+          ...ep.trigger.metadata,
+          transformations: [...(ep.trigger.metadata?.transformations || [])],
         },
-        semanticParts:
-          ep.trigger?.type === 'USER_PROMPT'
-            ? [...(ep.trigger.semanticParts || []).map((sp) => ({ ...sp }))]
-            : undefined,
-      } as unknown as typeof ep.trigger,
+        semanticParts: ep.trigger.semanticParts.map(sp => ({...sp}))
+      };
+    } else {
+      projectedTrigger = {
+        ...ep.trigger,
+        metadata: {
+          ...ep.trigger.metadata,
+          transformations: [...(ep.trigger.metadata?.transformations || [])],
+        }
+      };
+    }
+
+    let projectedEp: Episode = {
+      ...ep,
+      trigger: projectedTrigger,
       steps: ep.steps.map(
         (step) =>
           ({
@@ -62,7 +73,7 @@ export function generateWorkingBufferView(
               ...step.metadata,
               transformations: [...(step.metadata?.transformations || [])],
             },
-          }) as unknown as typeof step,
+          })
       ),
       yield: ep.yield
         ? {
@@ -87,7 +98,7 @@ export function generateWorkingBufferView(
         snapshot.status === 'ready' &&
         snapshot.type === 'snapshot'
       ) {
-        projectedEp = snapshot.episode as any;
+        projectedEp = snapshot.episode;
         // Mark all the episodes this snapshot covers to be skipped by the backwards sweep.
         for (const id of snapshot.replacedEpisodeIds) {
           skippedIds.add(id);
@@ -121,7 +132,7 @@ export function generateWorkingBufferView(
               ],
             },
           },
-        ] as any;
+        ] as typeof projectedEp.steps;
         projectedEp.yield = undefined;
         tracer.logEvent(
           'ViewGenerator',

@@ -4,40 +4,19 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 import type { Content } from '@google/genai';
-
-
 import type { AgentChatHistory } from '../core/agentChatHistory.js';
 import { debugLogger } from '../utils/debugLogger.js';
 import type { Episode } from './ir/types.js';
-
 import type { ContextEventBus } from './eventBus.js';
 import type { ContextTracer } from './tracer.js';
-
-
-
 import type { ContextEnvironment } from './sidecar/environment.js';
-
 import type { SidecarConfig } from './sidecar/types.js';
-
 import { PipelineOrchestrator } from './sidecar/orchestrator.js';
 import { HistoryObserver } from './historyObserver.js';
-
 import { generateWorkingBufferView } from './ir/graphUtils.js';
-
-
-
-
-
-
-
-
-
 import { IrProjector } from './ir/projector.js';
-
-import './sidecar/builtins.js';
-
-import { ProcessorRegistry } from './sidecar/registry.js';
 import { registerBuiltInProcessors } from './sidecar/builtins.js';
+import { ProcessorRegistry } from './sidecar/registry.js';
 
 export class ContextManager {
   
