@@ -2276,11 +2276,22 @@ export class Config implements McpContext, AgentLoopContext {
     } catch (e: unknown) {
       mkdirError = e;
     }
+    let realPlansDir: string;
+    try {
+      realPlansDir = resolveToRealPath(plansDir);
+    } catch {
+      // Fallback to path.resolve if the directory doesn't exist yet (e.g. mkdirSync failed)
+      // so that the security check can still be performed on the absolute path.
+      realPlansDir = path.resolve(plansDir);
+    }
 
-    const realPlansDir = resolveToRealPath(plansDir);
     const realProjectRoot = this.storage.getRealProjectRoot();
-    const realGlobalGeminiDir = resolveToRealPath(Storage.getGlobalGeminiDir());
-
+    let realGlobalGeminiDir: string;
+    try {
+      realGlobalGeminiDir = resolveToRealPath(Storage.getGlobalGeminiDir());
+    } catch {
+      realGlobalGeminiDir = path.resolve(Storage.getGlobalGeminiDir());
+    }
     if (
       !isSubpath(realProjectRoot, realPlansDir) &&
       !isSubpath(realGlobalGeminiDir, realPlansDir)
