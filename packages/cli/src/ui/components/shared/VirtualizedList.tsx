@@ -29,6 +29,8 @@ export type VirtualizedListProps<T> = {
   keyExtractor: (item: T, index: number) => string;
   initialScrollIndex?: number;
   initialScrollOffsetInIndex?: number;
+  targetScrollIndex?: number;
+  backgroundColor?: string;
   scrollbarThumbColor?: string;
   renderStatic?: boolean;
   isStatic?: boolean;
@@ -39,6 +41,7 @@ export type VirtualizedListProps<T> = {
   stableScrollback?: boolean;
   copyModeEnabled?: boolean;
   fixedItemHeight?: boolean;
+  containerHeight?: number;
 };
 
 export type VirtualizedListRef<T> = {
@@ -82,32 +85,43 @@ const VirtualizedListItem = memo(
     width,
     containerWidth,
     itemKey,
-    itemRef,
+    index,
+    onSetRef,
   }: {
     content: React.ReactElement;
     shouldBeStatic: boolean;
     width: number | string | undefined;
     containerWidth: number;
     itemKey: string;
-    itemRef: (el: DOMElement | null) => void;
-  }) => (
-    <Box width="100%" flexDirection="column" flexShrink={0} ref={itemRef}>
-      {shouldBeStatic ? (
-        <StaticRender
-          width={typeof width === 'number' ? width : containerWidth}
-          key={
-            itemKey +
-            '-static-' +
-            (typeof width === 'number' ? width : containerWidth)
-          }
-        >
-          {content}
-        </StaticRender>
-      ) : (
-        content
-      )}
-    </Box>
-  ),
+    index: number;
+    onSetRef: (index: number, el: DOMElement | null) => void;
+  }) => {
+    const itemRef = useCallback(
+      (el: DOMElement | null) => {
+        onSetRef(index, el);
+      },
+      [index, onSetRef],
+    );
+
+    return (
+      <Box width="100%" flexDirection="column" flexShrink={0} ref={itemRef}>
+        {shouldBeStatic ? (
+          <StaticRender
+            width={typeof width === 'number' ? width : containerWidth}
+            key={
+              itemKey +
+              '-static-' +
+              (typeof width === 'number' ? width : containerWidth)
+            }
+          >
+            {content}
+          </StaticRender>
+        ) : (
+          content
+        )}
+      </Box>
+    );
+  },
 );
 
 VirtualizedListItem.displayName = 'VirtualizedListItem';
@@ -159,6 +173,17 @@ function VirtualizedList<T>(
       };
     }
 
+    if (typeof props.targetScrollIndex === 'number') {
+      // NOTE: When targetScrollIndex is specified, we rely on the component
+      // correctly tracking targetScrollIndex instead of initialScrollIndex.
+      // We set isInitialScrollSet.current = true inside the second layout effect
+      // to avoid it overwriting the targetScrollIndex.
+      return {
+        index: props.targetScrollIndex,
+        offset: 0,
+      };
+    }
+
     return { index: 0, offset: 0 };
   });
 
@@ -180,6 +205,10 @@ function VirtualizedList<T>(
 
   const containerObserverRef = useRef<ResizeObserver | null>(null);
   const nodeToKeyRef = useRef(new WeakMap<DOMElement, string>());
+
+  const onSetRef = useCallback((index: number, el: DOMElement | null) => {
+    itemRefs.current[index] = el;
+  }, []);
 
   const containerRefCallback = useCallback((node: DOMElement | null) => {
     containerObserverRef.current?.disconnect();
@@ -242,7 +271,7 @@ function VirtualizedList<T>(
     return { totalHeight, offsets };
   }, [heights, data, estimatedItemHeight, keyExtractor]);
 
-  const scrollableContainerHeight = containerHeight;
+  const scrollableContainerHeight = props.containerHeight ?? containerHeight;
 
   const getAnchorForScrollTop = useCallback(
     (
@@ -258,6 +287,32 @@ function VirtualizedList<T>(
     },
     [],
   );
+
+  const [prevTargetScrollIndex, setPrevTargetScrollIndex] = useState(
+    props.targetScrollIndex,
+  );
+  const prevOffsetsLength = useRef(offsets.length);
+
+  // NOTE: If targetScrollIndex is provided, and we haven't rendered items yet (offsets.length <= 1),
+  // we do NOT set scrollAnchor yet, because actualScrollTop wouldn't know the real offset!
+  // We wait until offsets populate.
+  if (
+    (props.targetScrollIndex !== undefined &&
+      props.targetScrollIndex !== prevTargetScrollIndex &&
+      offsets.length > 1) ||
+    (props.targetScrollIndex !== undefined &&
+      prevOffsetsLength.current <= 1 &&
+      offsets.length > 1)
+  ) {
+    if (props.targetScrollIndex !== prevTargetScrollIndex) {
+      setPrevTargetScrollIndex(props.targetScrollIndex);
+    }
+    prevOffsetsLength.current = offsets.length;
+    setIsStickingToBottom(false);
+    setScrollAnchor({ index: props.targetScrollIndex, offset: 0 });
+  } else {
+    prevOffsetsLength.current = offsets.length;
+  }
 
   const actualScrollTop = useMemo(() => {
     const offset = offsets[scrollAnchor.index];
@@ -309,9 +364,14 @@ function VirtualizedList<T>(
     const containerChanged =
       prevContainerHeight.current !== scrollableContainerHeight;
 
+    // If targetScrollIndex is provided, we NEVER auto-snap to the bottom
+    // because the parent is explicitly managing the scroll position.
+    const shouldAutoScroll = props.targetScrollIndex === undefined;
+
     if (
-      (listGrew && (isStickingToBottom || wasAtBottom)) ||
-      (isStickingToBottom && containerChanged)
+      shouldAutoScroll &&
+      ((listGrew && (isStickingToBottom || wasAtBottom)) ||
+        (isStickingToBottom && containerChanged))
     ) {
       const newIndex = data.length > 0 ? data.length - 1 : 0;
       if (
@@ -331,6 +391,7 @@ function VirtualizedList<T>(
         actualScrollTop > totalHeight - scrollableContainerHeight) &&
       data.length > 0
     ) {
+      // We still clamp the scroll top if it's completely out of bounds
       const newScrollTop = Math.max(0, totalHeight - scrollableContainerHeight);
       const newAnchor = getAnchorForScrollTop(newScrollTop, offsets);
       if (
@@ -359,6 +420,7 @@ function VirtualizedList<T>(
     getAnchorForScrollTop,
     offsets,
     isStickingToBottom,
+    props.targetScrollIndex,
   ]);
 
   useLayoutEffect(() => {
@@ -366,8 +428,14 @@ function VirtualizedList<T>(
       isInitialScrollSet.current ||
       offsets.length <= 1 ||
       totalHeight <= 0 ||
-      containerHeight <= 0
+      scrollableContainerHeight <= 0
     ) {
+      return;
+    }
+
+    if (props.targetScrollIndex !== undefined) {
+      // If we are strictly driving from targetScrollIndex, do not apply initialScrollIndex
+      isInitialScrollSet.current = true;
       return;
     }
 
@@ -404,19 +472,21 @@ function VirtualizedList<T>(
     initialScrollOffsetInIndex,
     offsets,
     totalHeight,
-    containerHeight,
+    scrollableContainerHeight,
     getAnchorForScrollTop,
     data.length,
     heights,
-    scrollableContainerHeight,
+    props.targetScrollIndex,
   ]);
 
   const startIndex = Math.max(
     0,
     findLastIndex(offsets, (offset) => offset <= actualScrollTop) - 1,
   );
+  const viewHeightForEndIndex =
+    scrollableContainerHeight > 0 ? scrollableContainerHeight : 50;
   const endIndexOffset = offsets.findIndex(
-    (offset) => offset > actualScrollTop + scrollableContainerHeight,
+    (offset) => offset > actualScrollTop + viewHeightForEndIndex,
   );
   const endIndex =
     endIndexOffset === -1
@@ -462,7 +532,6 @@ function VirtualizedList<T>(
     observedNodes.current = currentNodes;
   });
 
-  const renderedItems = [];
   const renderRangeStart =
     renderStatic || overflowToBackbuffer ? 0 : startIndex;
   const renderRangeEnd = renderStatic ? data.length - 1 : endIndex;
@@ -478,7 +547,12 @@ function VirtualizedList<T>(
     process.env['NODE_ENV'] === 'test' ||
     (width !== undefined && typeof width === 'number');
 
-  if (isReady) {
+  const renderedItems = useMemo(() => {
+    if (!isReady) {
+      return [];
+    }
+
+    const items = [];
     for (let i = renderRangeStart; i <= renderRangeEnd; i++) {
       const item = data[i];
       if (item) {
@@ -490,7 +564,7 @@ function VirtualizedList<T>(
         const content = renderItem({ item, index: i });
         const key = keyExtractor(item, i);
 
-        renderedItems.push(
+        items.push(
           <VirtualizedListItem
             key={key}
             itemKey={key}
@@ -498,16 +572,28 @@ function VirtualizedList<T>(
             shouldBeStatic={shouldBeStatic}
             width={width}
             containerWidth={containerWidth}
-            itemRef={(el: DOMElement | null) => {
-              if (i >= renderRangeStart && i <= renderRangeEnd) {
-                itemRefs.current[i] = el;
-              }
-            }}
+            index={i}
+            onSetRef={onSetRef}
           />,
         );
       }
     }
-  }
+    return items;
+  }, [
+    isReady,
+    renderRangeStart,
+    renderRangeEnd,
+    data,
+    startIndex,
+    endIndex,
+    renderStatic,
+    isStaticItem,
+    renderItem,
+    keyExtractor,
+    width,
+    containerWidth,
+    onSetRef,
+  ]);
 
   const { getScrollTop, setPendingScrollTop } = useBatchedScroll(scrollTop);
 
@@ -618,11 +704,11 @@ function VirtualizedList<T>(
       },
       getScrollIndex: () => scrollAnchor.index,
       getScrollState: () => {
-        const maxScroll = Math.max(0, totalHeight - containerHeight);
+        const maxScroll = Math.max(0, totalHeight - scrollableContainerHeight);
         return {
           scrollTop: Math.min(getScrollTop(), maxScroll),
           scrollHeight: totalHeight,
-          innerHeight: containerHeight,
+          innerHeight: scrollableContainerHeight,
         };
       },
     }),
@@ -635,7 +721,6 @@ function VirtualizedList<T>(
       scrollableContainerHeight,
       getScrollTop,
       setPendingScrollTop,
-      containerHeight,
     ],
   );
 
@@ -646,6 +731,7 @@ function VirtualizedList<T>(
       overflowX="hidden"
       scrollTop={copyModeEnabled ? 0 : scrollTop}
       scrollbarThumbColor={props.scrollbarThumbColor ?? theme.text.secondary}
+      backgroundColor={props.backgroundColor}
       width="100%"
       height="100%"
       flexDirection="column"
