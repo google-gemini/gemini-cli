@@ -10,6 +10,7 @@ import {
   type Config,
   type ResumedSessionData,
   convertSessionToClientHistory,
+  uiTelemetryService,
 } from '@google/gemini-cli-core';
 import type { Part } from '@google/genai';
 import type { HistoryItemWithoutId } from '../types.js';
@@ -109,6 +110,8 @@ export function useSessionResume({
       !hasLoadedResumedSession.current
     ) {
       hasLoadedResumedSession.current = true;
+      // Hydrate telemetry service with the resumed conversation to restore session ID and metrics
+      uiTelemetryService.hydrate(resumedSessionData.conversation);
       const historyData = convertSessionToHistoryFormats(
         resumedSessionData.conversation.messages,
       );
