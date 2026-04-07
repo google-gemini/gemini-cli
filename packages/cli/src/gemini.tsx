@@ -357,69 +357,73 @@ export async function main() {
       ? getNodeMemoryArgs(isDebugMode)
       : [];
 
+  async function performEarlyInit() {
+    const partialConfig = await loadCliConfig(
+      settings.merged,
+      sessionId,
+      argv,
+      {
+        projectHooks: settings.workspace.settings.hooks,
+      },
+    );
+    adminControlsListner.setConfig(partialConfig);
+
+    let authFailed = false;
+    if (!settings.merged.security.auth.useExternal && !argv.isCommand) {
+      try {
+        if (
+          partialConfig.isInteractive() &&
+          settings.merged.security.auth.selectedType
+        ) {
+          const err = validateAuthMethod(
+            settings.merged.security.auth.selectedType,
+          );
+          if (err) {
+            throw new Error(err);
+          }
+
+          await partialConfig.refreshAuth(
+            settings.merged.security.auth.selectedType,
+          );
+        } else if (!partialConfig.isInteractive()) {
+          const authType = await validateNonInteractiveAuth(
+            settings.merged.security.auth.selectedType,
+            settings.merged.security.auth.useExternal,
+            partialConfig,
+            settings,
+          );
+          await partialConfig.refreshAuth(authType);
+        }
+      } catch (err) {
+        if (err instanceof ValidationCancelledError) {
+          await runExitCleanup();
+          process.exit(ExitCodes.SUCCESS);
+        }
+
+        if (!(err instanceof ValidationRequiredError)) {
+          debugLogger.error('Error authenticating:', err);
+          authFailed = true;
+        }
+      }
+    }
+
+    const remoteAdminSettings = partialConfig.getRemoteAdminSettings();
+    if (remoteAdminSettings) {
+      settings.setRemoteAdminSettings(remoteAdminSettings);
+    }
+
+    await runDeferredCommand(settings.merged);
+
+    return { partialConfig, authFailed };
+  }
+
   if (!process.env['SANDBOX'] && !argv.isCommand) {
     const sandboxConfig = await loadSandboxConfig(settings.merged, argv);
 
     if (sandboxConfig) {
-      // Sandbox path: needs full config + auth before entering sandbox because
-      // the sandbox will interfere with the OAuth2 web redirect.
-      const partialConfig = await loadCliConfig(
-        settings.merged,
-        sessionId,
-        argv,
-        {
-          projectHooks: settings.workspace.settings.hooks,
-        },
-      );
-      adminControlsListner.setConfig(partialConfig);
+      const { partialConfig, authFailed } = await performEarlyInit();
 
-      let initialAuthFailed = false;
-      if (!settings.merged.security.auth.useExternal) {
-        try {
-          if (
-            partialConfig.isInteractive() &&
-            settings.merged.security.auth.selectedType
-          ) {
-            const err = validateAuthMethod(
-              settings.merged.security.auth.selectedType,
-            );
-            if (err) {
-              throw new Error(err);
-            }
-
-            await partialConfig.refreshAuth(
-              settings.merged.security.auth.selectedType,
-            );
-          } else if (!partialConfig.isInteractive()) {
-            const authType = await validateNonInteractiveAuth(
-              settings.merged.security.auth.selectedType,
-              settings.merged.security.auth.useExternal,
-              partialConfig,
-              settings,
-            );
-            await partialConfig.refreshAuth(authType);
-          }
-        } catch (err) {
-          if (err instanceof ValidationCancelledError) {
-            await runExitCleanup();
-            process.exit(ExitCodes.SUCCESS);
-          }
-
-          if (!(err instanceof ValidationRequiredError)) {
-            debugLogger.error('Error authenticating:', err);
-            initialAuthFailed = true;
-          }
-        }
-      }
-
-      const remoteAdminSettings = partialConfig.getRemoteAdminSettings();
-      if (remoteAdminSettings) {
-        settings.setRemoteAdminSettings(remoteAdminSettings);
-      }
-
-      await runDeferredCommand(settings.merged);
-
-      if (initialAuthFailed) {
+      if (authFailed) {
         await runExitCleanup();
         process.exit(ExitCodes.FATAL_AUTHENTICATION_ERROR);
       }
@@ -457,68 +461,10 @@ export async function main() {
       await runExitCleanup();
       process.exit(ExitCodes.SUCCESS);
     } else {
-      // Non-sandbox path: skip loadCliConfig + refreshAuth entirely.
-      // The child process handles all initialization on its own.
-      // This eliminates ~500-1000ms of duplicated work (extensions loading,
-      // hierarchical memory search, policy engine, and 3-5 network calls).
       await relaunchAppInChildProcess(memoryArgs, []);
     }
   } else {
-    // Non-relaunch path (sandbox env or command mode): auth is needed here
-    // because we won't be relaunching.
-    const partialConfig = await loadCliConfig(
-      settings.merged,
-      sessionId,
-      argv,
-      {
-        projectHooks: settings.workspace.settings.hooks,
-      },
-    );
-    adminControlsListner.setConfig(partialConfig);
-
-    if (!settings.merged.security.auth.useExternal && !argv.isCommand) {
-      try {
-        if (
-          partialConfig.isInteractive() &&
-          settings.merged.security.auth.selectedType
-        ) {
-          const err = validateAuthMethod(
-            settings.merged.security.auth.selectedType,
-          );
-          if (err) {
-            throw new Error(err);
-          }
-
-          await partialConfig.refreshAuth(
-            settings.merged.security.auth.selectedType,
-          );
-        } else if (!partialConfig.isInteractive()) {
-          const authType = await validateNonInteractiveAuth(
-            settings.merged.security.auth.selectedType,
-            settings.merged.security.auth.useExternal,
-            partialConfig,
-            settings,
-          );
-          await partialConfig.refreshAuth(authType);
-        }
-      } catch (err) {
-        if (err instanceof ValidationCancelledError) {
-          await runExitCleanup();
-          process.exit(ExitCodes.SUCCESS);
-        }
-
-        if (!(err instanceof ValidationRequiredError)) {
-          debugLogger.error('Error authenticating:', err);
-        }
-      }
-    }
-
-    const remoteAdminSettings = partialConfig.getRemoteAdminSettings();
-    if (remoteAdminSettings) {
-      settings.setRemoteAdminSettings(remoteAdminSettings);
-    }
-
-    await runDeferredCommand(settings.merged);
+    await performEarlyInit();
   }
 
   // We are now past the logic handling potentially launching a child process
