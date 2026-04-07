@@ -6,6 +6,7 @@
 
 import * as fs from 'node:fs';
 import * as path from 'node:path';
+import { LRUCache } from 'mnemonist';
 import { SecurityError } from '../core/errors.js';
 import { isSubpath, resolveToRealPath } from '../utils/paths.js';
 import { SandboxPolicyManager } from '../policy/sandboxPolicyManager.js';
@@ -783,7 +784,7 @@ export class Config implements McpContext, AgentLoopContext {
    */
   private activeExtensionContext?: string;
   private initializedPlanDirs = new Set<string>();
-  private plansDirCache = new Map<string | undefined, string>();
+  private globalGeminiDirCache = new LRUCache<string, string | undefined>(1);
   private readonly extensionPlanDirs: Record<string, string>;
   private userMemory: string | HierarchicalMemory;
   private geminiMdFileCount: number;
@@ -2258,26 +2259,23 @@ export class Config implements McpContext, AgentLoopContext {
   }
 
   getPlansDir(): string {
-    const context = this.getActiveExtensionContext();
-
-    let plansDir = this.plansDirCache.get(context);
-    if (plansDir === undefined) {
-      plansDir = this.storage.getPlansDir(this.getActiveExtensionPlanDir());
-      this.plansDirCache.set(context, plansDir);
-    }
+    const plansDir = this.storage.getPlansDir(this.getActiveExtensionPlanDir());
 
     if (this.initializedPlanDirs.has(plansDir)) {
       return plansDir;
     }
 
     const realProjectRoot = this.storage.getRealProjectRoot();
-    let realGlobalGeminiDir: string | undefined;
-    try {
-      realGlobalGeminiDir = resolveToRealPath(Storage.getGlobalGeminiDir());
-    } catch {
-      // If we can't securely resolve the global config dir (e.g. strict EACCES permissions on ~/),
-      // we gracefully degrade by not allowing it as a valid security boundary for plans.
-      realGlobalGeminiDir = undefined;
+    let realGlobalGeminiDir = this.globalGeminiDirCache.get('default');
+    if (!this.globalGeminiDirCache.has('default')) {
+      try {
+        realGlobalGeminiDir = resolveToRealPath(Storage.getGlobalGeminiDir());
+      } catch {
+        // If we can't securely resolve the global config dir (e.g. strict EACCES permissions on ~/),
+        // we gracefully degrade by not allowing it as a valid security boundary for plans.
+        realGlobalGeminiDir = undefined;
+      }
+      this.globalGeminiDirCache.set('default', realGlobalGeminiDir);
     }
 
     // 1. Lexical security check (before any filesystem mutation or return)
@@ -2305,14 +2303,18 @@ export class Config implements McpContext, AgentLoopContext {
       try {
         realPlansDir = resolveToRealPath(plansDir);
       } catch (e: unknown) {
-        if (mkdirError) {
+        if (
+          mkdirError &&
+          e instanceof Error &&
+          'code' in e &&
+          e.code === 'ENOENT'
+        ) {
           const errorMessage =
             mkdirError instanceof Error
               ? mkdirError.message
               : String(mkdirError);
-          // eslint-disable-next-line no-console
-          console.warn(
-            `Failed to initialize active plan directory at '${plansDir}': ${errorMessage}`,
+          process.stderr.write(
+            `Failed to initialize active plan directory at '${plansDir}': ${errorMessage}\n`,
           );
           this.initializedPlanDirs.add(plansDir);
           return plansDir;
