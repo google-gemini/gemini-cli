@@ -2271,18 +2271,20 @@ export class Config implements McpContext, AgentLoopContext {
     }
 
     const realProjectRoot = this.storage.getRealProjectRoot();
-    let realGlobalGeminiDir: string;
+    let realGlobalGeminiDir: string | undefined;
     try {
       realGlobalGeminiDir = resolveToRealPath(Storage.getGlobalGeminiDir());
     } catch {
-      realGlobalGeminiDir = path.resolve(Storage.getGlobalGeminiDir());
+      // If we can't securely resolve the global config dir (e.g. strict EACCES permissions on ~/),
+      // we gracefully degrade by not allowing it as a valid security boundary for plans.
+      realGlobalGeminiDir = undefined;
     }
 
     // 1. Lexical security check (before any filesystem mutation or return)
     const lexicalPlansDir = path.resolve(plansDir);
     if (
       !isSubpath(realProjectRoot, lexicalPlansDir) &&
-      !isSubpath(realGlobalGeminiDir, lexicalPlansDir)
+      (!realGlobalGeminiDir || !isSubpath(realGlobalGeminiDir, lexicalPlansDir))
     ) {
       throw new SecurityError(
         `Security violation: Plan directory '${lexicalPlansDir}' is outside both the project root '${realProjectRoot}' and the global configuration directory.`,
@@ -2302,15 +2304,15 @@ export class Config implements McpContext, AgentLoopContext {
       let realPlansDir: string;
       try {
         realPlansDir = resolveToRealPath(plansDir);
-      } catch {
-        // Fallback to path.resolve if the directory doesn't exist yet (e.g. mkdirSync failed)
-        // so that the security check can still be performed on the absolute path.
-        realPlansDir = path.resolve(plansDir);
+      } catch (e: unknown) {
+        throw new SecurityError(
+          `Security violation: Could not securely resolve plan directory '${plansDir}'. System error: ${e instanceof Error ? e.message : String(e)}`,
+        );
       }
 
       if (
         !isSubpath(realProjectRoot, realPlansDir) &&
-        !isSubpath(realGlobalGeminiDir, realPlansDir)
+        (!realGlobalGeminiDir || !isSubpath(realGlobalGeminiDir, realPlansDir))
       ) {
         throw new SecurityError(
           `Security violation: Resolved plan directory '${realPlansDir}' is outside both the project root '${realProjectRoot}' and the global configuration directory.`,
