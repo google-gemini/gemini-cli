@@ -19,7 +19,7 @@ Scope reviewed:
 
 The design is directionally sound and the migration goal is correct. However, the document is not yet principal-review ready due to:
 
-1. **Three non-compilable code samples** that will immediately erode reviewer confidence
+1. **Four non-compilable code samples** (C1-C4) that will immediately erode reviewer confidence
 2. **An under-specified translation boundary** — the ADK→AgentProtocol mapping is the real architecture, but the doc treats it as an afterthought
 3. **Overclaimed parity** in routing, telemetry, and approvals
 4. **Missing phased plan** with clear milestones and non-goals
@@ -91,19 +91,25 @@ Several statements currently read like native ADK parity when the real meaning i
 
 That distinction needs to be explicit everywhere the doc uses strong language like “validated” or “100% possible today.”
 
-### 4. Auth is materially overstated
+### 4. Auth architecture is deeper than header injection — Coast Assist requires a custom transport
 
-The auth section has real issues:
-- `LlmRequest` has no top-level `headers` field in `adk-js/core/src/models/llm_request.ts`
-- backend selection still depends on constructor-level `apiKey` vs Vertex config in `adk-js/core/src/models/google_llm.ts`
-- live/bidi handling is still a separate path with different behavior
+The auth section has two distinct problems:
 
-Important nuance:
-- unary header injection via `llmRequest.config.httpOptions.headers` and constructor `headers` does exist in `google_llm.ts`
-- but that is not enough to claim general auth support across the full runtime
+**Problem A: API surface mismatch (C1).** `LlmRequest` has no `headers` field. Per-request headers are possible via `llmRequest.config.httpOptions.headers`, and `Gemini` constructor accepts a `headers` param (`google_llm.ts:57,79`). This is fixable.
 
-Conclusion:
-- the doc should present auth as a bridge with caveats or a real blocker, not as a solved integration
+**Problem B: Coast Assist / `LOGIN_WITH_GOOGLE` uses a different backend entirely.** The current `CodeAssistServer` (`packages/core/src/code_assist/server.ts:407`) does NOT call the standard Gemini API. It uses `google-auth-library`'s `AuthClient.request()` to talk to a Code Assist backend endpoint. The OAuth flow (`packages/core/src/code_assist/oauth2.ts`) handles browser launch (L305), local callback server (L492-615), token exchange (L546-550), credential caching (L739-750), and automatic token refresh via `OAuth2Client`.
+
+This means `GcliAgentModel` cannot wrap a standard `Gemini` BaseLlm and just inject headers. For Coast Assist auth, `GcliAgentModel` must **extend `BaseLlm` directly** and implement its own HTTP transport using `AuthClient.request()`, translating between `LlmRequest`/`LlmResponse` and the Code Assist protocol.
+
+What works:
+- The OAuth dance itself (browser launch, token caching, refresh) runs before the agent session starts — no blocking inside `generateContentAsync`
+- `OAuth2Client.getAccessToken()` handles mid-session token refresh transparently
+- Per-request header injection works for API-key-based auth via `httpOptions.headers`
+
+What the design doc must change:
+- Stop assuming `Gemini` as the inner model — `GcliAgentModel extends BaseLlm` directly
+- Define two transport paths: standard Gemini API (API key) and Code Assist backend (OAuth)
+- The dummy-key workaround is irrelevant for Coast Assist — you never call `GoogleGenAI.models.generateContent`
 
 ### 5. Approval / elicitation bridging is acceptable only as a temporary non-native bridge
 
@@ -141,10 +147,28 @@ Routing:
 - model banning via simulated error is not the same as model routing
 
 Telemetry:
-- `event.id` is not a safe per-tool correlation key — use `functionCall.id`
-- ADK can batch multiple function calls or responses in one event (`getFunctionCalls` extracts multiple from one event; `mergeParallelFunctionResponseEvents` merges multiple responses)
-- token usage is not available on ADK `Event` — it lives on `LlmResponse` and is lost by the time events reach the runner output stream. The doc needs to define how token metrics reach telemetry
-- the sample APIs in the design do not match current `ClearcutLogger`
+- **The stream-interceptor approach in section 3.6 is wrong.** The correct mechanism is ADK's `BasePlugin` system.
+- `event.id` is not a safe per-tool correlation key — use `functionCall.id` via `beforeToolCallback`/`afterToolCallback`
+- ADK can batch multiple function calls or responses in one event — stream interception cannot distinguish them, but plugin hooks fire per-tool with distinct `functionCallId`
+- **Correction:** Token usage IS available on ADK events. `llm_agent.ts:831-834` spreads `LlmResponse` (including `usageMetadata`) into the event via `createEvent({...modelResponseEvent, ...llmResponse})`. Additionally, `afterModelCallback` receives the raw `LlmResponse` with `usageMetadata` directly — providing a second capture point.
+- HTTP-level metrics (status code, request duration) are NOT on ADK events — must be captured in the `GcliAgentModel` wrapper
+- The sample APIs in the design do not match the current `ClearcutLogger` taxonomy (~195 distinct metadata keys)
+
+**Recommended telemetry architecture:**
+
+| Metric Category | Capture Mechanism | ADK Hook |
+|---|---|---|
+| Token counts (input, output, cached, thinking) | `afterModelCallback` → `LlmResponse.usageMetadata` | `BasePlugin.afterModelCallback` |
+| Per-tool timing | Timer keyed on `functionCallId` | `BasePlugin.beforeToolCallback` / `afterToolCallback` |
+| Agent lifecycle | Start/end tracking | `BasePlugin.beforeAgentCallback` / `afterAgentCallback` |
+| Model errors | Error classification | `BasePlugin.onModelErrorCallback` |
+| HTTP status, API duration | Captured in model wrapper | `GcliAgentModel.generateContentAsync` |
+| Routing decisions, latency | Captured in model or beforeModelCallback | `beforeModelCallback` / model wrapper |
+| Context token breakdowns (system, tools, history) | Computed in request pipeline | Model wrapper |
+| Tool approval decisions | Injected from approval layer | `ApprovalBridge` |
+| Session config, compression, rewind, IDE, extensions, billing, slash commands, hooks, plan execution, onboarding | **Unchanged** — stays in current call sites | Existing gemini-cli code |
+
+~30% of Clearcut metrics map to ADK plugin hooks. ~70% remain in their current call sites unchanged.
 
 Plan mode:
 - current behavior is broader than prompt + tool filtering
@@ -236,15 +260,17 @@ The right formulation is:
 
 ### 3.1 Authentication Flexibility
 
-Assessment: bridgeable, not validated parity.
+Assessment: implementable, but the design doc’s approach is wrong for Coast Assist.
 
 Keep:
 - ADK `Gemini` does not natively accept the CLI’s auth shape
 
 Change:
-- fix request-shape examples
-- downgrade the workaround claim
-- state ownership of refresh, header precedence, and live/bidi caveats
+- `GcliAgentModel` must extend `BaseLlm` directly, not wrap `Gemini` — Coast Assist uses `AuthClient.request()` against a non-standard backend, not `GoogleGenAI`
+- fix `request.headers` to `llmRequest.config.httpOptions.headers` (C1)
+- define two transport paths: API-key (standard Gemini) and OAuth (Code Assist)
+- token refresh is transparent via `OAuth2Client` — this works as-is
+- browser-based OAuth runs before agent session starts — no blocking concern
 
 ### 3.2 Model Steering and Mid-Stream Injection
 
@@ -281,14 +307,17 @@ Required change:
 - list policy inputs lost unless extra context plumbing is added
 - separate short-term callback bridge from long-term native confirmation flow
 
-### 3.6 Telemetry and Observability
+### 3.6 Telemetry and Observability (Clearcut)
 
-Assessment: the design direction is fine, but the example implementation is incorrect.
+Assessment: fully implementable, but the stream-interceptor approach must be replaced with a `BasePlugin`.
 
 Required change:
-- correlate tools by function-call id, not event id
-- account for merged / parallel tool events
-- replace fake API examples with a telemetry parity matrix
+- replace stream interception with `ClearcutTelemetryPlugin extends BasePlugin`
+- use `afterModelCallback` for token counts (`LlmResponse.usageMetadata` is available)
+- use `beforeToolCallback`/`afterToolCallback` with `functionCallId` for per-tool timing
+- capture HTTP-level metrics (status code, duration) in `GcliAgentModel` wrapper
+- ~70% of Clearcut metrics stay in their current call sites unchanged — document which
+- replace fake API examples with a telemetry parity matrix showing capture mechanism per metric
 
 ### 3.7 Dynamic Model Routing and Configurability
 
@@ -390,8 +419,8 @@ Required change:
 
 ## Corrections to Earlier Reviews
 
-### Auth is bridgeable, not impossible
-Header injection works for unary requests via `llmRequest.config.httpOptions.headers` and constructor-level `headers` param. The criticism is that the design doc overclaims parity — not that auth is blocked.
+### Auth is implementable, not blocked
+API-key auth works via `httpOptions.headers`. Coast Assist / `LOGIN_WITH_GOOGLE` requires `GcliAgentModel` to extend `BaseLlm` directly with its own transport (using `AuthClient.request()`), not wrap `Gemini`. The OAuth flow, token refresh, and credential caching all work as-is — the issue was the design doc's assumption about the inner model, not auth capability.
 
 ### Persistence is simpler than initially claimed
 DB-level concerns (PESSIMISTIC_WRITE, stale-writer detection, concurrent append policy) come from `DatabaseSessionService` and don't apply. The file-backed service wraps existing `ChatRecordingService`. Only rewind semantics need deeper design.
@@ -416,7 +445,7 @@ The branch-stack dependency, hook-order risk, and `_meta.legacyState` leakage in
 - [ ] Fix compilation blockers (C1-C4) in design doc code samples
 - [ ] Implement `AdkRuntimeCore` wrapping ADK `Runner` + `LlmAgent`
 - [ ] Implement `AdkEventTranslator` (ADK `Event` → gemini-cli `AgentEvent`)
-- [ ] Implement `GcliAgentModel extends BaseLlm` with auth header injection and model rewrite
+- [ ] Implement `GcliAgentModel extends BaseLlm` with dual transport (API-key via `httpOptions.headers`, Coast Assist via `AuthClient.request()`)
 - [ ] Implement `GcliFileSessionService extends BaseSessionService` wrapping `ChatRecordingService`
 - [ ] Implement `GcliContextCompactor implements BaseContextCompactor` wrapping `ChatCompressionService`
 - [ ] Wire behind `experimental.adk` feature gate
@@ -436,8 +465,9 @@ The branch-stack dependency, hook-order risk, and `_meta.legacyState` leakage in
 - [ ] Model routing via `beforeModelCallback` + `RoutingContextBuilder` adapter
 - [ ] Policy enforcement via `beforeToolCallback` using existing callbacks (temporary bridge)
 - [ ] Quota/availability handling via `beforeModelCallback`
-- [ ] Telemetry projection from runner event stream (correlate on `functionCall.id`)
-- [ ] Token usage capture (solve the `LlmResponse` → event gap)
+- [ ] `ClearcutTelemetryPlugin extends BasePlugin` for token counts (`afterModelCallback`), per-tool timing (`beforeToolCallback`/`afterToolCallback` with `functionCallId`), agent lifecycle, model errors
+- [ ] HTTP-level telemetry (status code, duration) captured in `GcliAgentModel` wrapper
+- [ ] Verify ~70% of existing Clearcut call sites work unchanged
 
 **Non-goals for Phase 1:**
 - No interactive UI changes
@@ -496,14 +526,17 @@ The branch-stack dependency, hook-order risk, and `_meta.legacyState` leakage in
 
 | Concern | Level | ADK Mechanism |
 |---|---|---|
-| Auth headers | Transport | `BaseLlm` constructor / `httpOptions.headers` |
+| Auth (API key) | Transport | `BaseLlm` constructor / `httpOptions.headers` |
+| Auth (Coast Assist) | Transport | `BaseLlm` direct — custom transport via `AuthClient.request()` |
 | Model rewrite | Transport | `BaseLlm.generateContentAsync` model override |
 | Model routing | Agent | `beforeModelCallback` + `RoutingContextBuilder` |
 | Token compaction | Agent | `BaseContextCompactor` (native ADK) |
 | Quota/availability | Agent | `beforeModelCallback` |
 | Tool masking | Agent | `BaseLlmRequestProcessor` |
 | Tool confirmations | Agent+Consumer | `beforeToolCallback` + existing callbacks (phase 1) |
-| Telemetry | Consumer | Runner event wrapper (correlate on `functionCall.id`) |
+| Telemetry (lifecycle) | Agent | `ClearcutTelemetryPlugin` — `afterModelCallback`, `beforeToolCallback`/`afterToolCallback` |
+| Telemetry (HTTP) | Transport | `GcliAgentModel` wrapper (status code, duration) |
+| Telemetry (CLI) | Consumer | Existing call sites (~70% of Clearcut metrics, unchanged) |
 | UI rendering | Consumer | Event subscriber / adapter |
 | Subagent invocation | Agent | Custom `BaseTool` over shared runtime core |
 
