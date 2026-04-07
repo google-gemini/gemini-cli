@@ -81,6 +81,34 @@ describe('classifyGoogleError', () => {
     }
   });
 
+  it('should return RetryableQuotaError with retryDelayMs for 503 MODEL_CAPACITY_EXHAUSTED with RetryInfo', () => {
+    const apiError: GoogleApiError = {
+      code: 503,
+      message:
+        'No capacity available for model gemini-3.1-pro-high on the server',
+      details: [
+        {
+          '@type': 'type.googleapis.com/google.rpc.ErrorInfo',
+          domain: 'cloudcode-pa.googleapis.com',
+          metadata: { model: 'gemini-3.1-pro-high' },
+          reason: 'MODEL_CAPACITY_EXHAUSTED',
+        },
+        {
+          '@type': 'type.googleapis.com/google.rpc.RetryInfo',
+          retryDelay: '9s',
+        },
+      ],
+    };
+    vi.spyOn(errorParser, 'parseGoogleApiError').mockReturnValue(apiError);
+    const originalError = new Error(apiError.message);
+    const result = classifyGoogleError(originalError);
+    expect(result).toBeInstanceOf(RetryableQuotaError);
+    if (result instanceof RetryableQuotaError) {
+      expect(result.cause).toBe(apiError);
+      expect(result.retryDelayMs).toBe(9000);
+    }
+  });
+
   it('should return original error if code is not 429, 499 or 503', () => {
     const apiError: GoogleApiError = {
       code: 500,

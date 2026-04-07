@@ -232,6 +232,22 @@ export function classifyGoogleError(error: unknown): unknown {
     const errorMessage =
       googleApiError?.message ||
       (error instanceof Error ? error.message : String(error));
+
+    // Extract RetryInfo from error details if available (e.g., MODEL_CAPACITY_EXHAUSTED)
+    let retryDelaySeconds: number | undefined;
+    if (googleApiError?.details) {
+      const retryInfo = googleApiError.details.find(
+        (d): d is RetryInfo =>
+          d['@type'] === 'type.googleapis.com/google.rpc.RetryInfo',
+      );
+      if (retryInfo?.retryDelay) {
+        const parsedDelay = parseDurationInSeconds(retryInfo.retryDelay);
+        if (parsedDelay !== null) {
+          retryDelaySeconds = parsedDelay;
+        }
+      }
+    }
+
     return new RetryableQuotaError(
       errorMessage,
       googleApiError ?? {
@@ -239,6 +255,7 @@ export function classifyGoogleError(error: unknown): unknown {
         message: errorMessage,
         details: [],
       },
+      retryDelaySeconds,
     );
   }
 
