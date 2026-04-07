@@ -755,7 +755,9 @@ export function hasRedirection(command: string): boolean {
  * Checks if a command contains environment variable prefixes (e.g. `FOO=bar cmd`).
  */
 export function hasEnvPrefix(command: string): boolean {
-  const fallbackCheck = () => /^[a-zA-Z_][a-zA-Z0-9_]*=/.test(command.trim());
+  const fallbackCheck = () =>
+    /^(?:env\s+)?[a-zA-Z_][a-zA-Z0-9_]*=/.test(command.trim()) ||
+    /^env\s+/.test(command.trim());
 
   const configuration = getShellConfiguration();
 
@@ -767,6 +769,9 @@ export function hasEnvPrefix(command: string): boolean {
     while (stack.length > 0) {
       const current = stack.pop()!;
       if (current.type === 'variable_assignment') {
+        return true;
+      }
+      if (current.type === 'command_name' && current.text === 'env') {
         return true;
       }
       for (let i = current.childCount - 1; i >= 0; i -= 1) {

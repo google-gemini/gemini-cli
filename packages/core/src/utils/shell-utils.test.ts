@@ -23,6 +23,7 @@ import {
   stripShellWrapper,
   normalizeCommand,
   hasRedirection,
+  hasEnvPrefix,
   resolveExecutable,
 } from './shell-utils.js';
 import path from 'node:path';
@@ -619,5 +620,35 @@ describe('resolveExecutable', () => {
     mockAccess.mockRejectedValue(new Error('ENOENT'));
 
     expect(await resolveExecutable('unknown')).toBeUndefined();
+  });
+});
+
+describe('hasEnvPrefix', () => {
+  it('should detect simple environment variable assignments', () => {
+    expect(hasEnvPrefix('FOO=bar cmd')).toBe(true);
+    expect(hasEnvPrefix('FOO=bar')).toBe(true);
+    expect(hasEnvPrefix('FOO=bar baz=qux cmd')).toBe(true);
+  });
+
+  it('should detect quoted environment variable assignments', () => {
+    expect(hasEnvPrefix('FOO="bar baz" cmd')).toBe(true);
+    expect(hasEnvPrefix("FOO='bar baz' cmd")).toBe(true);
+  });
+
+  it('should detect environment variable assignments using env', () => {
+    expect(hasEnvPrefix('env FOO=bar cmd')).toBe(true);
+    expect(hasEnvPrefix('FOO=bar env cmd')).toBe(true);
+    expect(hasEnvPrefix('env FOO="bar baz" cmd')).toBe(true);
+    expect(hasEnvPrefix('env cmd')).toBe(true);
+  });
+
+  it('should not detect environment variables used in the command', () => {
+    expect(hasEnvPrefix('echo $FOO')).toBe(false);
+    expect(hasEnvPrefix('echo "${FOO}"')).toBe(false);
+  });
+
+  it('should not detect commands that just happen to have an equal sign later', () => {
+    expect(hasEnvPrefix('echo foo=bar')).toBe(false);
+    expect(hasEnvPrefix('cmd --opt=val')).toBe(false);
   });
 });
