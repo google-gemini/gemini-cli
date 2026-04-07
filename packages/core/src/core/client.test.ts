@@ -203,6 +203,7 @@ describe('Gemini Client (client.ts)', () => {
       authType: AuthType.USE_GEMINI,
     };
     mockConfig = {
+      getRequestTimeoutMs: vi.fn().mockReturnValue(undefined),
       getContentGeneratorConfig: vi
         .fn()
         .mockReturnValue(contentGeneratorConfig),

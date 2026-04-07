@@ -102,6 +102,7 @@ describe('BaseLlmClient', () => {
     );
 
     mockConfig = {
+      getRequestTimeoutMs: vi.fn().mockReturnValue(undefined),
       getSessionId: vi.fn().mockReturnValue('test-session-id'),
       getContentGeneratorConfig: vi
         .fn()

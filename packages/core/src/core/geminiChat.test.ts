@@ -142,6 +142,7 @@ describe('GeminiChat', () => {
     let currentActiveModel = 'gemini-pro';
 
     mockConfig = {
+      getRequestTimeoutMs: vi.fn().mockReturnValue(undefined),
       get config() {
         return this;
       },
