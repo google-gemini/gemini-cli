@@ -13,10 +13,10 @@ import {
   withEvalRetries,
   prepareWorkspace,
   BaseEvalCase,
+  EVAL_MODEL,
 } from './test-helper.js';
 import fs from 'node:fs';
 import path from 'node:path';
-import { DEFAULT_GEMINI_MODEL } from '@google/gemini-cli-core';
 
 /**
  * Config overrides for evals, with tool-restriction fields explicitly
@@ -51,7 +51,7 @@ export function appEvalTest(policy: EvalPolicy, evalCase: AppEvalCase) {
     await withEvalRetries(evalCase.name, async () => {
       const rig = new AppRig({
         configOverrides: {
-          model: DEFAULT_GEMINI_MODEL,
+          model: EVAL_MODEL,
           ...evalCase.configOverrides,
         },
       });

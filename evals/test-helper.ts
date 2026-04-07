@@ -16,9 +16,16 @@ import {
   Storage,
   getProjectHash,
   SESSION_FILE_PREFIX,
+  PREVIEW_GEMINI_FLASH_MODEL,
 } from '@google/gemini-cli-core';
 
 export * from '@google/gemini-cli-test-utils';
+
+/**
+ * The default model used for all evaluations.
+ * Can be overridden by setting the GEMINI_MODEL environment variable.
+ */
+export const EVAL_MODEL = process.env.GEMINI_MODEL || PREVIEW_GEMINI_FLASH_MODEL;
 
 // Indicates the consistency expectation for this test.
 // - ALWAYS_PASSES - Means that the test is expected to pass 100% of the time. These
@@ -95,7 +102,14 @@ export async function internalEvalTest(evalCase: EvalCase) {
     let isSuccess = false;
 
     try {
-      rig.setup(evalCase.name, evalCase.params);
+      const setupOptions = {
+        ...evalCase.params,
+        settings: {
+          model: { name: EVAL_MODEL },
+          ...evalCase.params?.settings,
+        },
+      };
+      rig.setup(evalCase.name, setupOptions);
 
       if (evalCase.setup) {
         await evalCase.setup(rig);

@@ -10,13 +10,12 @@ import {
   AgentHistoryProvider,
   ChatCompressionService,
   GeminiChat,
-  DEFAULT_GEMINI_MODEL,
 } from '@google/gemini-cli-core';
 import type { Content } from '@google/genai';
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { type EvalPolicy } from './test-helper.js';
+import { type EvalPolicy, EVAL_MODEL } from './test-helper.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -117,6 +116,7 @@ const configs: Record<string, CompressionConfig> = {
 };
 
 function componentEval(
+  name: string,
   policy: EvalPolicy,
   scenario: Scenario,
   configName: keyof typeof configs,
@@ -131,8 +131,8 @@ function componentEval(
   }
 
   componentEvalTest(policy, {
-    name: `Compression | ${scenario.scenarioId} | ${compConfig.name} | ${question.id}`,
-    configOverrides: { model: DEFAULT_GEMINI_MODEL },
+    name,
+    configOverrides: { model: EVAL_MODEL },
     assert: async (config) => {
       const originalTokens =
         (
@@ -205,18 +205,21 @@ describe('Compression Benchmark', () => {
   describe('Blind Guessing', () => {
     const scenario = getScenario('scenario-blind-guess');
     componentEval(
+      'ChatCompressionService - exact-error-string',
       'ALWAYS_PASSES',
       scenario,
       'ChatCompressionService',
       'exact-error-string',
     );
     componentEval(
+      'AgentHistoryProvider (Tight) - exact-error-string',
       'ALWAYS_PASSES',
       scenario,
       'AgentHistoryProvider (Tight)',
       'exact-error-string',
     );
     componentEval(
+      'AgentHistoryProvider (Generous) - exact-error-string',
       'ALWAYS_PASSES',
       scenario,
       'AgentHistoryProvider (Generous)',
@@ -227,18 +230,21 @@ describe('Compression Benchmark', () => {
   describe('Conditional Instructions', () => {
     const scenario = getScenario('scenario-conditional-instruction');
     componentEval(
+      'ChatCompressionService - error-handler',
       'ALWAYS_PASSES',
       scenario,
       'ChatCompressionService',
       'error-handler',
     );
     componentEval(
+      'AgentHistoryProvider (Tight) - error-handler',
       'ALWAYS_PASSES',
       scenario,
       'AgentHistoryProvider (Tight)',
       'error-handler',
     );
     componentEval(
+      'AgentHistoryProvider (Generous) - error-handler',
       'ALWAYS_PASSES',
       scenario,
       'AgentHistoryProvider (Generous)',
@@ -249,36 +255,42 @@ describe('Compression Benchmark', () => {
   describe('Constraints', () => {
     const scenario = getScenario('scenario-constraints');
     componentEval(
+      'ChatCompressionService - variable-naming',
       'ALWAYS_PASSES',
       scenario,
       'ChatCompressionService',
       'variable-naming',
     );
     componentEval(
+      'AgentHistoryProvider (Tight) - variable-naming',
       'ALWAYS_PASSES',
       scenario,
       'AgentHistoryProvider (Tight)',
       'variable-naming',
     );
     componentEval(
+      'AgentHistoryProvider (Generous) - variable-naming',
       'ALWAYS_PASSES',
       scenario,
       'AgentHistoryProvider (Generous)',
       'variable-naming',
     );
     componentEval(
+      'ChatCompressionService - deployment-target',
       'ALWAYS_PASSES',
       scenario,
       'ChatCompressionService',
       'deployment-target',
     );
     componentEval(
+      'AgentHistoryProvider (Tight) - deployment-target',
       'ALWAYS_PASSES',
       scenario,
       'AgentHistoryProvider (Tight)',
       'deployment-target',
     );
     componentEval(
+      'AgentHistoryProvider (Generous) - deployment-target',
       'ALWAYS_PASSES',
       scenario,
       'AgentHistoryProvider (Generous)',
@@ -289,18 +301,21 @@ describe('Compression Benchmark', () => {
   describe('Context Amnesia', () => {
     const scenario = getScenario('scenario-context-amnesia');
     componentEval(
+      'ChatCompressionService - recall-file-content',
       'ALWAYS_PASSES',
       scenario,
       'ChatCompressionService',
       'recall-file-content',
     );
     componentEval(
+      'AgentHistoryProvider (Tight) - recall-file-content',
       'ALWAYS_PASSES',
       scenario,
       'AgentHistoryProvider (Tight)',
       'recall-file-content',
     );
     componentEval(
+      'AgentHistoryProvider (Generous) - recall-file-content',
       'ALWAYS_PASSES',
       scenario,
       'AgentHistoryProvider (Generous)',
@@ -311,18 +326,21 @@ describe('Compression Benchmark', () => {
   describe('Context Thrashing', () => {
     const scenario = getScenario('scenario-context-thrashing');
     componentEval(
+      'ChatCompressionService - failed-edit-reason',
       'ALWAYS_PASSES',
       scenario,
       'ChatCompressionService',
       'failed-edit-reason',
     );
     componentEval(
+      'AgentHistoryProvider (Tight) - failed-edit-reason',
       'ALWAYS_PASSES',
       scenario,
       'AgentHistoryProvider (Tight)',
       'failed-edit-reason',
     );
     componentEval(
+      'AgentHistoryProvider (Generous) - failed-edit-reason',
       'ALWAYS_PASSES',
       scenario,
       'AgentHistoryProvider (Generous)',
@@ -333,18 +351,21 @@ describe('Compression Benchmark', () => {
   describe('Dependency Chain', () => {
     const scenario = getScenario('scenario-dependency-chain');
     componentEval(
+      'ChatCompressionService - migration-dependency',
       'ALWAYS_PASSES',
       scenario,
       'ChatCompressionService',
       'migration-dependency',
     );
     componentEval(
+      'AgentHistoryProvider (Tight) - migration-dependency',
       'ALWAYS_PASSES',
       scenario,
       'AgentHistoryProvider (Tight)',
       'migration-dependency',
     );
     componentEval(
+      'AgentHistoryProvider (Generous) - migration-dependency',
       'ALWAYS_PASSES',
       scenario,
       'AgentHistoryProvider (Generous)',
@@ -355,18 +376,21 @@ describe('Compression Benchmark', () => {
   describe('Massive Working Set', () => {
     const scenario = getScenario('scenario-massive-working-set');
     componentEval(
+      'ChatCompressionService - file-25-presence',
       'ALWAYS_PASSES',
       scenario,
       'ChatCompressionService',
       'file-25-presence',
     );
     componentEval(
+      'AgentHistoryProvider (Tight) - file-25-presence',
       'ALWAYS_PASSES',
       scenario,
       'AgentHistoryProvider (Tight)',
       'file-25-presence',
     );
     componentEval(
+      'AgentHistoryProvider (Generous) - file-25-presence',
       'ALWAYS_PASSES',
       scenario,
       'AgentHistoryProvider (Generous)',
@@ -377,18 +401,21 @@ describe('Compression Benchmark', () => {
   describe('Middle Reasoning', () => {
     const scenario = getScenario('scenario-middle-reasoning');
     componentEval(
+      'ChatCompressionService - conflict-pid',
       'ALWAYS_PASSES',
       scenario,
       'ChatCompressionService',
       'conflict-pid',
     );
     componentEval(
+      'AgentHistoryProvider (Tight) - conflict-pid',
       'ALWAYS_PASSES',
       scenario,
       'AgentHistoryProvider (Tight)',
       'conflict-pid',
     );
     componentEval(
+      'AgentHistoryProvider (Generous) - conflict-pid',
       'ALWAYS_PASSES',
       scenario,
       'AgentHistoryProvider (Generous)',
@@ -399,36 +426,42 @@ describe('Compression Benchmark', () => {
   describe('Milestones', () => {
     const scenario = getScenario('scenario-milestones');
     componentEval(
+      'ChatCompressionService - tax-function-name',
       'ALWAYS_PASSES',
       scenario,
       'ChatCompressionService',
       'tax-function-name',
     );
     componentEval(
+      'AgentHistoryProvider (Tight) - tax-function-name',
       'ALWAYS_PASSES',
       scenario,
       'AgentHistoryProvider (Tight)',
       'tax-function-name',
     );
     componentEval(
+      'AgentHistoryProvider (Generous) - tax-function-name',
       'ALWAYS_PASSES',
       scenario,
       'AgentHistoryProvider (Generous)',
       'tax-function-name',
     );
     componentEval(
+      'ChatCompressionService - milestone-name',
       'ALWAYS_PASSES',
       scenario,
       'ChatCompressionService',
       'milestone-name',
     );
     componentEval(
+      'AgentHistoryProvider (Tight) - milestone-name',
       'ALWAYS_PASSES',
       scenario,
       'AgentHistoryProvider (Tight)',
       'milestone-name',
     );
     componentEval(
+      'AgentHistoryProvider (Generous) - milestone-name',
       'ALWAYS_PASSES',
       scenario,
       'AgentHistoryProvider (Generous)',
@@ -439,18 +472,21 @@ describe('Compression Benchmark', () => {
   describe('Multi-Bug Tracking', () => {
     const scenario = getScenario('scenario-multi-bug-tracking');
     componentEval(
+      'ChatCompressionService - bug-list',
       'ALWAYS_PASSES',
       scenario,
       'ChatCompressionService',
       'bug-list',
     );
     componentEval(
+      'AgentHistoryProvider (Tight) - bug-list',
       'ALWAYS_PASSES',
       scenario,
       'AgentHistoryProvider (Tight)',
       'bug-list',
     );
     componentEval(
+      'AgentHistoryProvider (Generous) - bug-list',
       'ALWAYS_PASSES',
       scenario,
       'AgentHistoryProvider (Generous)',
@@ -461,18 +497,21 @@ describe('Compression Benchmark', () => {
   describe('Myopic Keyhole', () => {
     const scenario = getScenario('scenario-myopic-keyhole');
     componentEval(
+      'ChatCompressionService - macro-context-inheritance',
       'ALWAYS_PASSES',
       scenario,
       'ChatCompressionService',
       'macro-context-inheritance',
     );
     componentEval(
+      'AgentHistoryProvider (Tight) - macro-context-inheritance',
       'ALWAYS_PASSES',
       scenario,
       'AgentHistoryProvider (Tight)',
       'macro-context-inheritance',
     );
     componentEval(
+      'AgentHistoryProvider (Generous) - macro-context-inheritance',
       'ALWAYS_PASSES',
       scenario,
       'AgentHistoryProvider (Generous)',
@@ -483,18 +522,21 @@ describe('Compression Benchmark', () => {
   describe('Negative Constraints', () => {
     const scenario = getScenario('scenario-negative-constraints');
     componentEval(
+      'ChatCompressionService - import-constraint',
       'ALWAYS_PASSES',
       scenario,
       'ChatCompressionService',
       'import-constraint',
     );
     componentEval(
+      'AgentHistoryProvider (Tight) - import-constraint',
       'ALWAYS_PASSES',
       scenario,
       'AgentHistoryProvider (Tight)',
       'import-constraint',
     );
     componentEval(
+      'AgentHistoryProvider (Generous) - import-constraint',
       'ALWAYS_PASSES',
       scenario,
       'AgentHistoryProvider (Generous)',
@@ -505,18 +547,21 @@ describe('Compression Benchmark', () => {
   describe('Nested Logic', () => {
     const scenario = getScenario('scenario-nested-logic');
     componentEval(
+      'ChatCompressionService - fallback-mode',
       'ALWAYS_PASSES',
       scenario,
       'ChatCompressionService',
       'fallback-mode',
     );
     componentEval(
+      'AgentHistoryProvider (Tight) - fallback-mode',
       'ALWAYS_PASSES',
       scenario,
       'AgentHistoryProvider (Tight)',
       'fallback-mode',
     );
     componentEval(
+      'AgentHistoryProvider (Generous) - fallback-mode',
       'ALWAYS_PASSES',
       scenario,
       'AgentHistoryProvider (Generous)',
@@ -527,18 +572,21 @@ describe('Compression Benchmark', () => {
   describe('Replace Loop', () => {
     const scenario = getScenario('scenario-replace-loop');
     componentEval(
+      'ChatCompressionService - recall-exact-line',
       'ALWAYS_PASSES',
       scenario,
       'ChatCompressionService',
       'recall-exact-line',
     );
     componentEval(
+      'AgentHistoryProvider (Tight) - recall-exact-line',
       'ALWAYS_PASSES',
       scenario,
       'AgentHistoryProvider (Tight)',
       'recall-exact-line',
     );
     componentEval(
+      'AgentHistoryProvider (Generous) - recall-exact-line',
       'ALWAYS_PASSES',
       scenario,
       'AgentHistoryProvider (Generous)',
@@ -549,18 +597,21 @@ describe('Compression Benchmark', () => {
   describe('Spatial Scattering', () => {
     const scenario = getScenario('scenario-spatial-scattering');
     componentEval(
+      'ChatCompressionService - recall-target-directory',
       'ALWAYS_PASSES',
       scenario,
       'ChatCompressionService',
       'recall-target-directory',
     );
     componentEval(
+      'AgentHistoryProvider (Tight) - recall-target-directory',
       'ALWAYS_PASSES',
       scenario,
       'AgentHistoryProvider (Tight)',
       'recall-target-directory',
     );
     componentEval(
+      'AgentHistoryProvider (Generous) - recall-target-directory',
       'ALWAYS_PASSES',
       scenario,
       'AgentHistoryProvider (Generous)',
@@ -571,18 +622,21 @@ describe('Compression Benchmark', () => {
   describe('State Tracking', () => {
     const scenario = getScenario('scenario-state-tracking');
     componentEval(
+      'ChatCompressionService - next-step',
       'ALWAYS_PASSES',
       scenario,
       'ChatCompressionService',
       'next-step',
     );
     componentEval(
+      'AgentHistoryProvider (Tight) - next-step',
       'ALWAYS_PASSES',
       scenario,
       'AgentHistoryProvider (Tight)',
       'next-step',
     );
     componentEval(
+      'AgentHistoryProvider (Generous) - next-step',
       'ALWAYS_PASSES',
       scenario,
       'AgentHistoryProvider (Generous)',
@@ -593,18 +647,21 @@ describe('Compression Benchmark', () => {
   describe('Strategy Abandonment', () => {
     const scenario = getScenario('scenario-strategy-abandonment');
     componentEval(
+      'ChatCompressionService - recall-next-action',
       'ALWAYS_PASSES',
       scenario,
       'ChatCompressionService',
       'recall-next-action',
     );
     componentEval(
+      'AgentHistoryProvider (Tight) - recall-next-action',
       'ALWAYS_PASSES',
       scenario,
       'AgentHistoryProvider (Tight)',
       'recall-next-action',
     );
     componentEval(
+      'AgentHistoryProvider (Generous) - recall-next-action',
       'ALWAYS_PASSES',
       scenario,
       'AgentHistoryProvider (Generous)',
@@ -615,18 +672,21 @@ describe('Compression Benchmark', () => {
   describe('Subtle Preference', () => {
     const scenario = getScenario('scenario-subtle-preference');
     componentEval(
+      'ChatCompressionService - commit-prefix',
       'ALWAYS_PASSES',
       scenario,
       'ChatCompressionService',
       'commit-prefix',
     );
     componentEval(
+      'AgentHistoryProvider (Tight) - commit-prefix',
       'ALWAYS_PASSES',
       scenario,
       'AgentHistoryProvider (Tight)',
       'commit-prefix',
     );
     componentEval(
+      'AgentHistoryProvider (Generous) - commit-prefix',
       'ALWAYS_PASSES',
       scenario,
       'AgentHistoryProvider (Generous)',
@@ -637,18 +697,21 @@ describe('Compression Benchmark', () => {
   describe('Surgical Imprecision', () => {
     const scenario = getScenario('scenario-surgical-imprecision');
     componentEval(
+      'ChatCompressionService - surgical-edit-check',
       'ALWAYS_PASSES',
       scenario,
       'ChatCompressionService',
       'surgical-edit-check',
     );
     componentEval(
+      'AgentHistoryProvider (Tight) - surgical-edit-check',
       'ALWAYS_PASSES',
       scenario,
       'AgentHistoryProvider (Tight)',
       'surgical-edit-check',
     );
     componentEval(
+      'AgentHistoryProvider (Generous) - surgical-edit-check',
       'ALWAYS_PASSES',
       scenario,
       'AgentHistoryProvider (Generous)',
@@ -659,18 +722,21 @@ describe('Compression Benchmark', () => {
   describe('Symbol Location Amnesia', () => {
     const scenario = getScenario('scenario-symbol-location-amnesia');
     componentEval(
+      'ChatCompressionService - recall-symbol-file',
       'ALWAYS_PASSES',
       scenario,
       'ChatCompressionService',
       'recall-symbol-file',
     );
     componentEval(
+      'AgentHistoryProvider (Tight) - recall-symbol-file',
       'ALWAYS_PASSES',
       scenario,
       'AgentHistoryProvider (Tight)',
       'recall-symbol-file',
     );
     componentEval(
+      'AgentHistoryProvider (Generous) - recall-symbol-file',
       'ALWAYS_PASSES',
       scenario,
       'AgentHistoryProvider (Generous)',
@@ -681,36 +747,42 @@ describe('Compression Benchmark', () => {
   describe('Tool Noise', () => {
     const scenario = getScenario('scenario-tool-noise');
     componentEval(
+      'ChatCompressionService - fatal-error',
       'ALWAYS_PASSES',
       scenario,
       'ChatCompressionService',
       'fatal-error',
     );
     componentEval(
+      'AgentHistoryProvider (Tight) - fatal-error',
       'ALWAYS_PASSES',
       scenario,
       'AgentHistoryProvider (Tight)',
       'fatal-error',
     );
     componentEval(
+      'AgentHistoryProvider (Generous) - fatal-error',
       'ALWAYS_PASSES',
       scenario,
       'AgentHistoryProvider (Generous)',
       'fatal-error',
     );
     componentEval(
+      'ChatCompressionService - success-token',
       'ALWAYS_PASSES',
       scenario,
       'ChatCompressionService',
       'success-token',
     );
     componentEval(
+      'AgentHistoryProvider (Tight) - success-token',
       'ALWAYS_PASSES',
       scenario,
       'AgentHistoryProvider (Tight)',
       'success-token',
     );
     componentEval(
+      'AgentHistoryProvider (Generous) - success-token',
       'ALWAYS_PASSES',
       scenario,
       'AgentHistoryProvider (Generous)',
@@ -721,18 +793,21 @@ describe('Compression Benchmark', () => {
   describe('Variable Leak', () => {
     const scenario = getScenario('scenario-variable-leak');
     componentEval(
+      'ChatCompressionService - debug-token',
       'ALWAYS_PASSES',
       scenario,
       'ChatCompressionService',
       'debug-token',
     );
     componentEval(
+      'AgentHistoryProvider (Tight) - debug-token',
       'ALWAYS_PASSES',
       scenario,
       'AgentHistoryProvider (Tight)',
       'debug-token',
     );
     componentEval(
+      'AgentHistoryProvider (Generous) - debug-token',
       'ALWAYS_PASSES',
       scenario,
       'AgentHistoryProvider (Generous)',
@@ -743,18 +818,21 @@ describe('Compression Benchmark', () => {
   describe('Verification Abandonment', () => {
     const scenario = getScenario('scenario-verification-abandonment');
     componentEval(
+      'ChatCompressionService - recall-next-discipline',
       'ALWAYS_PASSES',
       scenario,
       'ChatCompressionService',
       'recall-next-discipline',
     );
     componentEval(
+      'AgentHistoryProvider (Tight) - recall-next-discipline',
       'ALWAYS_PASSES',
       scenario,
       'AgentHistoryProvider (Tight)',
       'recall-next-discipline',
     );
     componentEval(
+      'AgentHistoryProvider (Generous) - recall-next-discipline',
       'ALWAYS_PASSES',
       scenario,
       'AgentHistoryProvider (Generous)',
@@ -765,18 +843,21 @@ describe('Compression Benchmark', () => {
   describe('Working Set Amnesia', () => {
     const scenario = getScenario('scenario-working-set-amnesia');
     componentEval(
+      'ChatCompressionService - recall-modified-file',
       'ALWAYS_PASSES',
       scenario,
       'ChatCompressionService',
       'recall-modified-file',
     );
     componentEval(
+      'AgentHistoryProvider (Tight) - recall-modified-file',
       'ALWAYS_PASSES',
       scenario,
       'AgentHistoryProvider (Tight)',
       'recall-modified-file',
     );
     componentEval(
+      'AgentHistoryProvider (Generous) - recall-modified-file',
       'ALWAYS_PASSES',
       scenario,
       'AgentHistoryProvider (Generous)',
@@ -787,18 +868,21 @@ describe('Compression Benchmark', () => {
   describe('XML Robustness', () => {
     const scenario = getScenario('scenario-xml-robustness');
     componentEval(
+      'ChatCompressionService - xml-injection',
       'ALWAYS_PASSES',
       scenario,
       'ChatCompressionService',
       'xml-injection',
     );
     componentEval(
+      'AgentHistoryProvider (Tight) - xml-injection',
       'ALWAYS_PASSES',
       scenario,
       'AgentHistoryProvider (Tight)',
       'xml-injection',
     );
     componentEval(
+      'AgentHistoryProvider (Generous) - xml-injection',
       'ALWAYS_PASSES',
       scenario,
       'AgentHistoryProvider (Generous)',

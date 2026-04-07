@@ -5,7 +5,7 @@
  */
 
 import { describe, expect } from 'vitest';
-import { evalTest } from './test-helper.js';
+import { evalTest, EVAL_MODEL } from './test-helper.js';
 import path from 'node:path';
 import fs from 'node:fs';
 import crypto from 'node:crypto';
@@ -87,7 +87,7 @@ Output too large. Full output available at: ${outputFilePath}
             id: 'msg_2',
             timestamp: new Date().toISOString(),
             type: 'gemini',
-            model: 'gemini-3-flash-preview',
+            model: EVAL_MODEL,
             toolCalls: [
               {
                 id: 'call_1',
@@ -222,7 +222,7 @@ Output too large. Full output available at: ${outputFilePath}
             id: 'msg_2',
             timestamp: new Date().toISOString(),
             type: 'gemini',
-            model: 'gemini-3-flash-preview',
+            model: EVAL_MODEL,
             toolCalls: [
               {
                 id: 'call_1',
