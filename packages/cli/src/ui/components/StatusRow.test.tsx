@@ -104,7 +104,7 @@ describe('<StatusRow />', () => {
     );
 
     await waitUntilReady();
-    expect(lastFrame()).toContain('! Shell awaiting input (Tab to focus)');
+    expect(lastFrame()).toContain('! Shell awaiting input? (Tab to focus)');
   });
 
   it('renders tip with absolute positioning when it fits but might collide (verification of container logic)', async () => {
