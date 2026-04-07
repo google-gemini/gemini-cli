@@ -1318,8 +1318,8 @@ function doIt() {
       vi.mocked(mockConfig.getPlansDir).mockReturnValue(plansDir);
       vi.mocked(mockConfig.storage.getPlansDir).mockReturnValue(plansDir);
 
-      const filePath = path.join(rootDir, 'test-file.txt');
-      const planFilePath = path.join(plansDir, 'test-file.txt');
+      const filePath = 'test-file.txt';
+      const planFilePath = path.join(plansDir, filePath);
       const initialContent = 'some initial content';
       fs.writeFileSync(planFilePath, initialContent, 'utf8');
 

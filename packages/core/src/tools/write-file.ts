@@ -48,6 +48,7 @@ import { debugLogger } from '../utils/debugLogger.js';
 import { WRITE_FILE_DEFINITION } from './definitions/coreTools.js';
 import { resolveToolDeclaration } from './definitions/resolver.js';
 import { detectOmissionPlaceholders } from './omissionPlaceholderDetector.js';
+import { resolveAndValidatePlanPath } from '../utils/planUtils.js';
 import { isGemini3Model } from '../config/models.js';
 import { discoverJitContext, appendJitContext } from './jit-context.js';
 
@@ -167,8 +168,10 @@ class WriteFileToolInvocation extends BaseToolInvocation<
     );
 
     if (this.config.isPlanMode()) {
-      const safeFilename = path.basename(this.params.file_path);
-      this.resolvedPath = path.join(this.config.getPlansDir(), safeFilename);
+      this.resolvedPath = resolveAndValidatePlanPath(
+        this.params.file_path,
+        this.config.getPlansDir(),
+      );
     } else {
       this.resolvedPath = path.resolve(
         this.config.getTargetDir(),
@@ -493,7 +496,19 @@ export class WriteFileTool
       return `Missing or empty "file_path"`;
     }
 
-    const resolvedPath = path.resolve(this.config.getTargetDir(), filePath);
+    let resolvedPath: string;
+    if (this.config.isPlanMode()) {
+      try {
+        resolvedPath = resolveAndValidatePlanPath(
+          filePath,
+          this.config.getPlansDir(),
+        );
+      } catch (err) {
+        return err instanceof Error ? err.message : String(err);
+      }
+    } else {
+      resolvedPath = path.resolve(this.config.getTargetDir(), filePath);
+    }
 
     const validationError = this.config.validatePathAccess(resolvedPath);
     if (validationError) {

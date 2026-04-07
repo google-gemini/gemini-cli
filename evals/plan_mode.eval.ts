@@ -360,4 +360,41 @@ describe('plan_mode', () => {
       assertModelHasOutput(result);
     },
   });
+
+  evalTest('ALWAYS_PASSES', {
+    name: 'should handle nested plan directories correctly',
+    approvalMode: ApprovalMode.PLAN,
+    params: {
+      settings,
+    },
+    prompt:
+      'Please create a new architectural plan in a nested folder called "architecture/frontend-v2.md" within the plans directory. The plan should contain the text "# Frontend V2 Plan". Do not ask for user approval, just create the plan.',
+    assert: async (rig, result) => {
+      await rig.waitForTelemetryReady();
+      const toolLogs = rig.readToolLogs();
+
+      const writeCalls = toolLogs.filter((log) =>
+        ['write_file', 'replace'].includes(log.toolRequest.name),
+      );
+
+      const wroteToNestedPath = writeCalls.some((log) => {
+        try {
+          const args = JSON.parse(log.toolRequest.args);
+          return (
+            args.file_path &&
+            args.file_path.includes('architecture/frontend-v2.md')
+          );
+        } catch {
+          return false;
+        }
+      });
+
+      expect(
+        wroteToNestedPath,
+        'Expected model to successfully target the nested plan file path',
+      ).toBe(true);
+
+      assertModelHasOutput(result);
+    },
+  });
 });
