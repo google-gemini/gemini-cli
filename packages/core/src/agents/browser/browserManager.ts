@@ -30,7 +30,7 @@ import * as path from 'node:path';
 import * as fs from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { injectAutomationOverlay } from './automationOverlay.js';
-import { recordBrowserAgentConnection } from '../../telemetry/metrics.js';
+import { logBrowserAgentConnection } from '../../telemetry/loggers.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -563,7 +563,9 @@ export class BrowserManager {
     // Add optional settings from config.
     // Force headless in seatbelt sandbox since Chrome profile/display access
     // may be restricted, and the user is running in a sandboxed environment.
-    if (browserConfig.customConfig.headless || isSeatbeltSandbox) {
+    const effectiveHeadless =
+      !!browserConfig.customConfig.headless || isSeatbeltSandbox;
+    if (effectiveHeadless) {
       mcpArgs.push('--headless');
     }
     if (browserConfig.customConfig.profilePath) {
@@ -667,15 +669,12 @@ export class BrowserManager {
           // clear the action counter for each connection
           this.actionCounter = 0;
 
-          recordBrowserAgentConnection(
-            this.config,
-            Date.now() - connectStartMs,
-            {
-              session_mode: sessionMode,
-              headless: !!browserConfig.customConfig.headless,
-              success: true,
-            },
-          );
+          logBrowserAgentConnection(this.config, Date.now() - connectStartMs, {
+            session_mode: sessionMode,
+            headless: effectiveHeadless,
+            success: true,
+            tool_count: this.discoveredTools.length,
+          });
         })(),
         new Promise<never>((_, reject) => {
           timeoutId = setTimeout(
@@ -696,9 +695,9 @@ export class BrowserManager {
         error instanceof Error ? error.message : String(error);
       const errorType = BrowserManager.classifyConnectionError(rawErrorMessage);
 
-      recordBrowserAgentConnection(this.config, Date.now() - connectStartMs, {
+      logBrowserAgentConnection(this.config, Date.now() - connectStartMs, {
         session_mode: sessionMode,
-        headless: !!browserConfig.customConfig.headless,
+        headless: effectiveHeadless,
         success: false,
         error_type: errorType,
       });

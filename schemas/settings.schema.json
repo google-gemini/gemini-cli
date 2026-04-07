@@ -2574,8 +2574,8 @@
       "properties": {
         "toolSandboxing": {
           "title": "Tool Sandboxing",
-          "description": "Experimental tool-level sandboxing (implementation in progress).",
-          "markdownDescription": "Experimental tool-level sandboxing (implementation in progress).\n\n- Category: `Security`\n- Requires restart: `no`\n- Default: `false`",
+          "description": "Tool-level sandboxing. Isolates individual tools instead of the entire CLI process.",
+          "markdownDescription": "Tool-level sandboxing. Isolates individual tools instead of the entire CLI process.\n\n- Category: `Security`\n- Requires restart: `yes`\n- Default: `false`",
           "default": false,
           "type": "boolean"
         },
@@ -2773,6 +2773,13 @@
               "title": "Agent Session Non-interactive Enabled",
               "description": "Enable non-interactive agent sessions.",
               "markdownDescription": "Enable non-interactive agent sessions.\n\n- Category: `Experimental`\n- Requires restart: `yes`\n- Default: `false`",
+              "default": false,
+              "type": "boolean"
+            },
+            "agentSessionInteractiveEnabled": {
+              "title": "Interactive Agent Session Enabled",
+              "description": "Enable the agent session implementation for the interactive CLI.",
+              "markdownDescription": "Enable the agent session implementation for the interactive CLI.\n\n- Category: `Experimental`\n- Requires restart: `yes`\n- Default: `false`",
               "default": false,
               "type": "boolean"
             }

@@ -1711,10 +1711,10 @@ const SETTINGS_SCHEMA = {
         type: 'boolean',
         label: 'Tool Sandboxing',
         category: 'Security',
-        requiresRestart: false,
+        requiresRestart: true,
         default: false,
         description:
-          'Experimental tool-level sandboxing (implementation in progress).',
+          'Tool-level sandboxing. Isolates individual tools instead of the entire CLI process.',
         showInDialog: true,
       },
       disableYoloMode: {
@@ -1968,6 +1968,16 @@ const SETTINGS_SCHEMA = {
             requiresRestart: true,
             default: false,
             description: 'Enable non-interactive agent sessions.',
+            showInDialog: false,
+          },
+          agentSessionInteractiveEnabled: {
+            type: 'boolean',
+            label: 'Interactive Agent Session Enabled',
+            category: 'Experimental',
+            requiresRestart: true,
+            default: false,
+            description:
+              'Enable the agent session implementation for the interactive CLI.',
             showInDialog: false,
           },
         },

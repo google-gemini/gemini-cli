@@ -1624,6 +1624,7 @@ export function recordBrowserAgentConnection(
       | 'timeout'
       | 'connection_refused'
       | 'unknown';
+    tool_count?: number;
   },
 ): void {
   if (!isMetricsInitialized) return;
@@ -1635,6 +1636,7 @@ export function recordBrowserAgentConnection(
     session_mode: attributes.session_mode,
     headless: attributes.headless,
     success: attributes.success,
+    tool_count: attributes.tool_count,
   });
 
   if (!attributes.success && browserAgentConnectionFailureCounter) {

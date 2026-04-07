@@ -155,6 +155,7 @@ const createMockSerializeTerminalToObjectReturnValue = (
       underline: false,
       dim: false,
       inverse: false,
+      isUninitialized: false,
       fg: '#ffffff',
       bg: '#000000',
     },
@@ -173,6 +174,7 @@ const createExpectedAnsiOutput = (text: string | string[]): AnsiOutput => {
       underline: false,
       dim: false,
       inverse: false,
+      isUninitialized: false,
       fg: '',
       bg: '',
     } as AnsiToken,
@@ -2015,6 +2017,7 @@ describe('ShellExecutionService environment variables', () => {
       isDangerousCommand: vi.fn().mockReturnValue(false),
       parseDenials: vi.fn().mockReturnValue(undefined),
       getWorkspace: vi.fn().mockReturnValue('/workspace'),
+      getOptions: vi.fn().mockReturnValue(undefined),
     };
 
     const configWithSandbox: ShellExecutionConfig = {

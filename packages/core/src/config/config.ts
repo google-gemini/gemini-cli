@@ -160,7 +160,7 @@ import {
 } from '../code_assist/experiments/experiments.js';
 import { AgentRegistry } from '../agents/registry.js';
 import { AcknowledgedAgentsService } from '../agents/acknowledgedAgents.js';
-import { setGlobalProxy } from '../utils/fetch.js';
+import { setGlobalProxy, updateGlobalFetchTimeouts } from '../utils/fetch.js';
 import { SubagentTool } from '../agents/subagent-tool.js';
 import { ExperimentFlags } from '../code_assist/experiments/flagNames.js';
 import { debugLogger } from '../utils/debugLogger.js';
@@ -225,6 +225,7 @@ export interface GemmaModelRouterSettings {
 
 export interface ADKSettings {
   agentSessionNoninteractiveEnabled?: boolean;
+  agentSessionInteractiveEnabled?: boolean;
 }
 
 export interface ExtensionSetting {
@@ -508,6 +509,7 @@ export enum AuthProviderType {
 export interface SandboxConfig {
   enabled: boolean;
   allowedPaths?: string[];
+  includeDirectories?: string[];
   networkAccess?: boolean;
   command?:
     | 'docker'
@@ -524,6 +526,7 @@ export const ConfigSchema = z.object({
     .object({
       enabled: z.boolean().default(false),
       allowedPaths: z.array(z.string()).default([]),
+      includeDirectories: z.array(z.string()).default([]),
       networkAccess: z.boolean().default(false),
       command: z
         .enum([
@@ -892,6 +895,7 @@ export class Config implements McpContext, AgentLoopContext {
 
   private readonly gemmaModelRouter: GemmaModelRouterSettings;
   private readonly agentSessionNoninteractiveEnabled: boolean;
+  private readonly agentSessionInteractiveEnabled: boolean;
 
   private readonly continueOnFailedApiCall: boolean;
   private readonly retryFetchErrors: boolean;
@@ -906,8 +910,8 @@ export class Config implements McpContext, AgentLoopContext {
   private readonly acceptRawOutputRisk: boolean;
   private readonly dynamicModelConfiguration: boolean;
   private pendingIncludeDirectories: string[];
-  private readonly enableHooks: boolean;
   private readonly enableHooksUI: boolean;
+  private readonly enableHooks: boolean;
 
   private hooks: { [K in HookEventName]?: HookDefinition[] } | undefined;
   private projectHooks:
@@ -965,6 +969,11 @@ export class Config implements McpContext, AgentLoopContext {
       ? {
           enabled: params.sandbox.enabled || params.toolSandboxing || false,
           allowedPaths: params.sandbox.allowedPaths ?? [],
+          includeDirectories: [
+            ...(params.sandbox.includeDirectories ?? []),
+            ...(params.sandbox.allowedPaths ?? []),
+            Storage.getGlobalTempDir(),
+          ],
           networkAccess: params.sandbox.networkAccess ?? false,
           command: params.sandbox.command,
           image: params.sandbox.image,
@@ -972,6 +981,7 @@ export class Config implements McpContext, AgentLoopContext {
       : {
           enabled: params.toolSandboxing || false,
           allowedPaths: [],
+          includeDirectories: [Storage.getGlobalTempDir()],
           networkAccess: false,
         };
 
@@ -994,7 +1004,10 @@ export class Config implements McpContext, AgentLoopContext {
       {
         workspace: this.targetDir,
         forbiddenPaths: this.getSandboxForbiddenPaths.bind(this),
-        includeDirectories: this.pendingIncludeDirectories,
+        includeDirectories: [
+          ...this.pendingIncludeDirectories,
+          Storage.getGlobalTempDir(),
+        ],
         policyManager: this._sandboxPolicyManager,
       },
       initialApprovalMode,
@@ -1002,7 +1015,7 @@ export class Config implements McpContext, AgentLoopContext {
 
     if (
       !(this._sandboxManager instanceof NoopSandboxManager) &&
-      this.sandbox.enabled
+      this.sandbox?.enabled
     ) {
       this.fileSystemService = new SandboxedFileSystemService(
         this._sandboxManager,
@@ -1314,6 +1327,8 @@ export class Config implements McpContext, AgentLoopContext {
 
     this.agentSessionNoninteractiveEnabled =
       params.adk?.agentSessionNoninteractiveEnabled ?? false;
+    this.agentSessionInteractiveEnabled =
+      params.adk?.agentSessionInteractiveEnabled ?? false;
     this.retryFetchErrors = params.retryFetchErrors ?? true;
     this.maxAttempts = Math.min(
       params.maxAttempts ?? DEFAULT_MAX_ATTEMPTS,
@@ -1533,9 +1548,6 @@ export class Config implements McpContext, AgentLoopContext {
     // Only assign to instance properties after successful initialization
     this.contentGeneratorConfig = newContentGeneratorConfig;
 
-    // Initialize BaseLlmClient now that the ContentGenerator is available
-    this.baseLlmClient = new BaseLlmClient(this.contentGenerator, this);
-
     const codeAssistServer = getCodeAssistServer(this);
     const quotaPromise = codeAssistServer?.projectId
       ? this.refreshUserQuota()
@@ -1550,6 +1562,17 @@ export class Config implements McpContext, AgentLoopContext {
         debugLogger.error('Failed to fetch experiments', e);
         return undefined;
       });
+
+    // Fetch experiments and update timeouts before continuing initialization
+    const experiments = await this.experimentsPromise;
+
+    const requestTimeoutMs = this.getRequestTimeoutMs();
+    if (requestTimeoutMs !== undefined) {
+      updateGlobalFetchTimeouts(requestTimeoutMs);
+    }
+
+    // Initialize BaseLlmClient now that the ContentGenerator and experiments are available
+    this.baseLlmClient = new BaseLlmClient(this.contentGenerator, this);
 
     await quotaPromise;
 
@@ -1569,9 +1592,6 @@ export class Config implements McpContext, AgentLoopContext {
     ) {
       this.setModel(DEFAULT_GEMINI_MODEL_AUTO);
     }
-
-    // Fetch admin controls
-    const experiments = await this.experimentsPromise;
 
     const adminControlsEnabled =
       experiments?.flags[ExperimentFlags.ENABLE_ADMIN_CONTROLS]?.boolValue ??
@@ -1618,6 +1638,11 @@ export class Config implements McpContext, AgentLoopContext {
   getBaseLlmClient(): BaseLlmClient {
     if (!this.baseLlmClient) {
       // Handle cases where initialization might be deferred or authentication failed
+      if (!this.experiments) {
+        throw new Error(
+          'BaseLlmClient not initialized. Ensure experiments have been fetched and configuration is ready.',
+        );
+      }
       if (this.contentGenerator) {
         this.baseLlmClient = new BaseLlmClient(
           this.getContentGenerator(),
@@ -1702,7 +1727,10 @@ export class Config implements McpContext, AgentLoopContext {
       {
         workspace: this.targetDir,
         forbiddenPaths: this.getSandboxForbiddenPaths.bind(this),
-        includeDirectories: this.pendingIncludeDirectories,
+        includeDirectories: [
+          ...this.pendingIncludeDirectories,
+          Storage.getGlobalTempDir(),
+        ],
         policyManager: this._sandboxPolicyManager,
       },
       this.getApprovalMode(),
@@ -1981,7 +2009,12 @@ export class Config implements McpContext, AgentLoopContext {
   }
 
   getSandboxAllowedPaths(): string[] {
-    return this.sandbox?.allowedPaths ?? [];
+    const paths = [...(this.sandbox?.allowedPaths ?? [])];
+    const globalTempDir = Storage.getGlobalTempDir();
+    if (!paths.includes(globalTempDir)) {
+      paths.push(globalTempDir);
+    }
+    return paths;
   }
 
   getSandboxNetworkAccess(): boolean {
@@ -3131,6 +3164,21 @@ export class Config implements McpContext, AgentLoopContext {
   }
 
   /**
+   * Returns the configured default request timeout in milliseconds.
+   */
+  getRequestTimeoutMs(): number | undefined {
+    const flag =
+      this.experiments?.flags?.[ExperimentFlags.DEFAULT_REQUEST_TIMEOUT];
+    if (flag?.intValue !== undefined) {
+      const seconds = parseInt(flag.intValue, 10);
+      if (Number.isInteger(seconds) && seconds >= 0) {
+        return seconds * 1000; // Convert seconds to milliseconds
+      }
+    }
+    return undefined;
+  }
+
+  /**
    * Returns whether Gemini 3.1 Flash Lite has been launched.
    *
    * Note: This method should only be called after startup, once experiments have been loaded.
@@ -3375,6 +3423,10 @@ export class Config implements McpContext, AgentLoopContext {
 
   getAgentSessionNoninteractiveEnabled(): boolean {
     return this.agentSessionNoninteractiveEnabled;
+  }
+
+  getAgentSessionInteractiveEnabled(): boolean {
+    return this.agentSessionInteractiveEnabled;
   }
 
   /**
