@@ -9,18 +9,22 @@ import { PipelineOrchestrator } from './orchestrator.js';
 import { ProcessorRegistry } from './registry.js';
 import { createMockEnvironment, createDummyState, createDummyEpisode } from '../testing/contextTestUtils.js';
 import type { ContextEnvironment } from './environment.js';
-import type { ContextProcessor } from '../pipeline.js';
+import type { ContextAccountingState, ContextProcessor } from '../pipeline.js';
 import type { SidecarConfig } from './types.js';
 import type { ContextEventBus } from '../eventBus.js';
+
+import type { EpisodeEditor } from '../ir/episodeEditor.js';
 
 // Create a Dummy Processor for testing Orchestration routing
 class DummySyncProcessor implements ContextProcessor {
   static create() { return new DummySyncProcessor(); }
   constructor() {}
   readonly name = 'DummySync';
-  async process(editor: any, _state: any) {
-    editor.editEpisode(editor.episodes[0].id, 'DUMMY_EDIT', (draft: any) => {
-        draft.dummyModified = true;
+  readonly id = 'DummySync';
+  readonly options = {};
+  async process(editor: EpisodeEditor, _state: ContextAccountingState) {
+    editor.editEpisode(editor.episodes[0].id, 'DUMMY_EDIT', (draft: unknown) => {
+        (draft as Record<string, unknown>)['dummyModified'] = true;
     });
   }
 }
@@ -29,9 +33,11 @@ class DummyAsyncProcessor implements ContextProcessor {
   static create() { return new DummyAsyncProcessor(); }
   constructor() {}
   readonly name = 'DummyAsync';
-  async process(editor: any, _state: any) {
-    editor.editEpisode(editor.episodes[0].id, 'DUMMY_EDIT', (draft: any) => {
-        draft.dummyAsyncModified = true;
+  readonly id = 'DummyAsync';
+  readonly options = {};
+  async process(editor: EpisodeEditor, _state: ContextAccountingState) {
+    editor.editEpisode(editor.episodes[0].id, 'DUMMY_EDIT', (draft: unknown) => {
+        (draft as Record<string, unknown>)['dummyAsyncModified'] = true;
     });
   }
 }
@@ -40,7 +46,9 @@ class ThrowingProcessor implements ContextProcessor {
   static create() { return new ThrowingProcessor(); }
   constructor() {}
   readonly name = 'Throwing';
-  async process(editor: any, state: any): Promise<void> {
+  readonly id = 'Throwing';
+  readonly options = {};
+  async process(_editor: EpisodeEditor, _state: ContextAccountingState): Promise<void> {
     throw new Error('Processor failed intentionally');
   }
 }

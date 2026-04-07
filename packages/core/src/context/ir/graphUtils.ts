@@ -53,7 +53,7 @@ export function generateWorkingBufferView(
           ep.trigger?.type === 'USER_PROMPT'
             ? [...(ep.trigger.semanticParts || []).map((sp) => ({ ...sp }))]
             : undefined,
-      } as any,
+      } as unknown as typeof ep.trigger,
       steps: ep.steps.map(
         (step) =>
           ({
@@ -62,7 +62,7 @@ export function generateWorkingBufferView(
               ...step.metadata,
               transformations: [...(step.metadata?.transformations || [])],
             },
-          }) as any,
+          }) as unknown as typeof step,
       ),
       yield: ep.yield
         ? {
