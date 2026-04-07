@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import type { EpisodeEditor } from './ir/episodeEditor.js';
+import type { ConcreteNode, IrMetadata } from './ir/types.js';
 
 /**
  * State object passed through the processing pipeline.
@@ -19,36 +19,70 @@ export interface ContextAccountingState {
   readonly deficitTokens: number;
 
   /**
-   * Set of Episode IDs that the orchestrator has deemed highly protected.
-   * Processors should generally skip mutating these episodes unless doing proactive/required transforms.
+   * Set of Logical Node IDs (like Tasks or Episodes) that the orchestrator has deemed highly protected.
+   * Processors should generally skip mutating Concrete Nodes that belong to these parents.
    */
-  readonly protectedEpisodeIds: Set<string>;
+  readonly protectedLogicalIds: ReadonlySet<string>;
 
   /**
    * True if currentTokens <= retainedTokens.
    */
   readonly isBudgetSatisfied: boolean;
+}
 
-  /**
-   * If this pipeline was triggered by a specific event (e.g., a new turn),
-   * this contains the specific Node IDs (Episodes, Steps, or Triggers) that should be evaluated.
-   * If undefined, the processor may evaluate the entire graph.
+/**
+ * A declarative instruction from a processor on how to modify the Ship.
+ * Applied sequentially by the Orchestrator (Reducer).
+ */
+export interface ContextPatch {
+  /** The IDs of the Concrete Nodes to remove from the Ship. */
+  readonly removedIds: ReadonlyArray<string>;
+  
+  /** 
+   * The new synthetic Concrete Nodes (e.g., MaskedTool, Snapshot) to insert.
+   * If omitted or empty, this patch acts as a pure deletion.
    */
-  readonly targetNodeIds?: Set<string>;
+  readonly insertedNodes?: ReadonlyArray<ConcreteNode>;
+
+  /** The index at which to insert the new nodes. If omitted, they replace the first removedId. */
+  readonly insertionIndex?: number;
+  
+  /** Audit metadata explaining who made this patch, when, and why. */
+  readonly metadata: IrMetadata;
+}
+
+export interface ProcessArgs {
+  /** The flat, sequential array of current renderable nodes (The Ship). */
+  readonly ship: ReadonlyArray<ConcreteNode>;
+  
+  /** 
+   * The specific subset of Concrete Node IDs that triggered this execution.
+   * For 'new_message', these are the new nodes. For 'retained_exceeded', the aged-out nodes.
+   */
+  readonly triggerTargets: ReadonlySet<string>;
+  
+  /** The token budget and accounting state. */
+  readonly state: ContextAccountingState;
+  
+  /** 
+   * An escape hatch allowing the processor to query the original, uncompressed
+   * state of a node from the Pristine Graph.
+   */
+  readonly getPristineNode: (id: string) => ConcreteNode | undefined;
 }
 
 /**
  * Interface for all context degradation strategies.
+ * Processors are pure functions that return ContextPatches.
  */
 export interface ContextProcessor {
+  /** Unique ID for registry mapping. */
+  readonly id: string;
   /** Unique name for telemetry and logging. */
   readonly name: string;
 
-  /**
-   * Processes the episodic history payload via the provided EpisodeEditor, based on the current accounting state.
-   * Processors should safely mutate or replace episodes using the editor's API.
-   */
-  process(editor: EpisodeEditor, state: ContextAccountingState): Promise<void>;
+  /** Returns an array of declarative patches to apply to the Ship. */
+  process(args: ProcessArgs): Promise<ContextPatch[]>;
 }
 
 /**
