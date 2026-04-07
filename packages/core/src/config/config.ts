@@ -2305,6 +2305,18 @@ export class Config implements McpContext, AgentLoopContext {
       try {
         realPlansDir = resolveToRealPath(plansDir);
       } catch (e: unknown) {
+        if (mkdirError) {
+          const errorMessage =
+            mkdirError instanceof Error
+              ? mkdirError.message
+              : String(mkdirError);
+          // eslint-disable-next-line no-console
+          console.warn(
+            `Failed to initialize active plan directory at '${plansDir}': ${errorMessage}`,
+          );
+          this.initializedPlanDirs.add(plansDir);
+          return plansDir;
+        }
         throw new SecurityError(
           `Security violation: Could not securely resolve plan directory '${plansDir}'. System error: ${e instanceof Error ? e.message : String(e)}`,
         );
