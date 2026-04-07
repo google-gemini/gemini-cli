@@ -310,6 +310,20 @@ function normalizeCommandName(raw: string): string {
   return raw.trim();
 }
 
+/**
+ * Normalizes a command name for sandbox policy lookups.
+ * Converts to lowercase and removes the .exe extension for cross-platform consistency.
+ *
+ * @param commandName - The command name to normalize.
+ * @returns The normalized command name.
+ */
+export function normalizeCommand(commandName: string): string {
+  // Split by both separators and get the last non-empty part
+  const parts = commandName.split(/[\\/]/).filter(Boolean);
+  const base = parts.length > 0 ? parts[parts.length - 1] : '';
+  return base.toLowerCase().replace(/\.exe$/, '');
+}
+
 function extractNameFromNode(node: Node): string | null {
   switch (node.type) {
     case 'command': {

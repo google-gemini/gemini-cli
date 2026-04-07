@@ -32,11 +32,11 @@ import { createAnalyzeScreenshotTool } from './analyzeScreenshot.js';
 import { injectAutomationOverlay } from './automationOverlay.js';
 import { injectInputBlocker } from './inputBlocker.js';
 import { debugLogger } from '../../utils/debugLogger.js';
+import { recordBrowserAgentToolDiscovery } from '../../telemetry/metrics.js';
 import {
-  recordBrowserAgentToolDiscovery,
-  recordBrowserAgentVisionStatus,
-  recordBrowserAgentCleanup,
-} from '../../telemetry/metrics.js';
+  logBrowserAgentVisionStatus,
+  logBrowserAgentCleanup,
+} from '../../telemetry/loggers.js';
 import {
   PolicyDecision,
   PRIORITY_SUBAGENT_TOOL,
@@ -248,7 +248,7 @@ export async function createBrowserAgentDefinition(
   const allTools: AnyDeclarativeTool[] = [...mcpTools];
   const visionDisabledReason = getVisionDisabledReason();
 
-  recordBrowserAgentVisionStatus(config, {
+  logBrowserAgentVisionStatus(config, {
     enabled: !visionDisabledReason,
     disabled_reason: visionDisabledReason?.code,
   });
@@ -299,13 +299,13 @@ export async function cleanupBrowserAgent(
   const startMs = Date.now();
   try {
     await browserManager.close();
-    recordBrowserAgentCleanup(config, Date.now() - startMs, {
+    logBrowserAgentCleanup(config, Date.now() - startMs, {
       session_mode: sessionMode,
       success: true,
     });
     debugLogger.log('Browser agent cleanup complete');
   } catch (error) {
-    recordBrowserAgentCleanup(config, Date.now() - startMs, {
+    logBrowserAgentCleanup(config, Date.now() - startMs, {
       session_mode: sessionMode,
       success: false,
     });

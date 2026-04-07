@@ -9,7 +9,7 @@ import { StatusRow } from './StatusRow.js';
 import { describe, it, expect, vi, beforeEach, type Mock } from 'vitest';
 import { useComposerStatus } from '../hooks/useComposerStatus.js';
 import { type UIState } from '../contexts/UIStateContext.js';
-import { type TextBuffer } from '../components/shared/text-buffer.js';
+
 import { type SessionStatsState } from '../contexts/SessionContext.js';
 import { type ThoughtSummary } from '../types.js';
 import { ApprovalMode } from '@google/gemini-cli-core';
@@ -29,13 +29,11 @@ describe('<StatusRow />', () => {
     elapsedTime: 0,
     currentWittyPhrase: undefined,
     activeHooks: [],
-    buffer: { text: '' } as unknown as TextBuffer,
     sessionStats: { lastPromptTokenCount: 0 } as unknown as SessionStatsState,
     shortcutsHelpVisible: false,
     contextFileNames: [],
     showApprovalModeIndicator: ApprovalMode.DEFAULT,
     allowPlanMode: false,
-    shellModeActive: false,
     renderMarkdown: true,
     currentModel: 'gemini-3',
   };

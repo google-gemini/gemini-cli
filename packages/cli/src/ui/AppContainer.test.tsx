@@ -122,13 +122,17 @@ vi.mock('ink', async (importOriginal) => {
   };
 });
 
+import { InputContext, type InputState } from './contexts/InputContext.js';
+
 // Helper component will read the context values provided by AppContainer
 // so we can assert against them in our tests.
 let capturedUIState: UIState;
+let capturedInputState: InputState;
 let capturedUIActions: UIActions;
 let capturedOverflowActions: OverflowActions;
 function TestContextConsumer() {
   capturedUIState = useContext(UIStateContext)!;
+  capturedInputState = useContext(InputContext)!;
   capturedUIActions = useContext(UIActionsContext)!;
   capturedOverflowActions = useOverflowActions()!;
   return null;
@@ -3036,7 +3040,7 @@ describe('AppContainer State Management', () => {
       });
 
       const { unmount } = await act(async () => renderAppContainer());
-      expect(capturedUIState.userMessages).toContain('previous message');
+      expect(capturedInputState.userMessages).toContain('previous message');
 
       const { onCancelSubmit } = extractUseGeminiStreamArgs(
         mockedUseGeminiStream.mock.lastCall!,
@@ -3064,8 +3068,8 @@ describe('AppContainer State Management', () => {
       const { rerender, unmount } = await act(async () => renderAppContainer());
 
       // Verify userMessages is populated from inputHistory
-      expect(capturedUIState.userMessages).toContain('first prompt');
-      expect(capturedUIState.userMessages).toContain('second prompt');
+      expect(capturedInputState.userMessages).toContain('first prompt');
+      expect(capturedInputState.userMessages).toContain('second prompt');
 
       // Clear the conversation history (simulating /clear command)
       const mockClearItems = vi.fn();
@@ -3084,8 +3088,8 @@ describe('AppContainer State Management', () => {
 
       // Verify that userMessages still contains the input history
       // (it should not be affected by clearing conversation history)
-      expect(capturedUIState.userMessages).toContain('first prompt');
-      expect(capturedUIState.userMessages).toContain('second prompt');
+      expect(capturedInputState.userMessages).toContain('first prompt');
+      expect(capturedInputState.userMessages).toContain('second prompt');
 
       unmount();
     });
