@@ -9,7 +9,6 @@ import fs from 'node:fs';
 import path from 'node:path';
 import os from 'node:os';
 import crypto from 'node:crypto';
-import type { Config } from '../config/config.js';
 import { debugLogger } from '../utils/debugLogger.js';
 import {
   type SandboxPermissions,
@@ -937,7 +936,7 @@ export class ShellToolInvocation extends BaseToolInvocation<
           this.context.geminiClient,
           signal,
         );
-        const threshold = this.config.getTruncateToolOutputThreshold();
+        const threshold = this.context.config.getTruncateToolOutputThreshold();
         const fullOutputFilePath =
           threshold > 0 && totalBytesWritten >= threshold
             ? outputFilePath
@@ -945,7 +944,7 @@ export class ShellToolInvocation extends BaseToolInvocation<
 
         const toolResult: ToolResult = {
           llmContent: summary,
-          returnDisplay: typeof returnDisplayMessage !== 'undefined' ? returnDisplayMessage : returnDisplay,
+          returnDisplay,
           fullOutputFilePath,
           ...executionError,
         };
@@ -955,7 +954,7 @@ export class ShellToolInvocation extends BaseToolInvocation<
         return toolResult;
       }
 
-      const threshold = this.config.getTruncateToolOutputThreshold();
+      const threshold = this.context.config.getTruncateToolOutputThreshold();
       const fullOutputFilePath =
         threshold > 0 && totalBytesWritten >= threshold
           ? outputFilePath
