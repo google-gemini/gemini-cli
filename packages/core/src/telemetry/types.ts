@@ -2443,3 +2443,74 @@ export class TokenStorageInitializationEvent implements BaseTelemetryEvent {
     return `Token storage initialized. Type: ${this.type}. Forced: ${this.forced}`;
   }
 }
+
+export const EVENT_MEMORY_EXTRACTION = 'gemini_cli.memory.extraction';
+export class MemoryExtractionEvent implements BaseTelemetryEvent {
+  'event.name': 'memory_extraction';
+  'event.timestamp': string;
+  success: boolean;
+  duration_ms: number;
+  message_count: number;
+  scratchpad_length: number;
+  fallback: boolean;
+
+  constructor(
+    success: boolean,
+    duration_ms: number,
+    message_count: number,
+    scratchpad_length: number,
+    fallback: boolean,
+  ) {
+    this['event.name'] = 'memory_extraction';
+    this['event.timestamp'] = new Date().toISOString();
+    this.success = success;
+    this.duration_ms = duration_ms;
+    this.message_count = message_count;
+    this.scratchpad_length = scratchpad_length;
+    this.fallback = fallback;
+  }
+
+  toOpenTelemetryAttributes(config: Config): LogAttributes {
+    return {
+      ...getCommonAttributes(config),
+      'event.name': EVENT_MEMORY_EXTRACTION,
+      'event.timestamp': this['event.timestamp'],
+      success: this.success,
+      duration_ms: this.duration_ms,
+      message_count: this.message_count,
+      scratchpad_length: this.scratchpad_length,
+      fallback: this.fallback,
+    };
+  }
+
+  toLogBody(): string {
+    return `Memory extraction ${this.success ? 'succeeded' : 'failed'}. Duration: ${this.duration_ms}ms. Messages: ${this.message_count}. Scratchpad: ${this.scratchpad_length} chars. Fallback: ${this.fallback}`;
+  }
+}
+
+export const EVENT_MEMORY_EXTRACTION_SKIPPED =
+  'gemini_cli.memory.extraction_skipped';
+export class MemoryExtractionSkippedEvent implements BaseTelemetryEvent {
+  'event.name': 'memory_extraction_skipped';
+  'event.timestamp': string;
+  skip_reason: string;
+
+  constructor(skip_reason: string) {
+    this['event.name'] = 'memory_extraction_skipped';
+    this['event.timestamp'] = new Date().toISOString();
+    this.skip_reason = skip_reason;
+  }
+
+  toOpenTelemetryAttributes(config: Config): LogAttributes {
+    return {
+      ...getCommonAttributes(config),
+      'event.name': EVENT_MEMORY_EXTRACTION_SKIPPED,
+      'event.timestamp': this['event.timestamp'],
+      skip_reason: this.skip_reason,
+    };
+  }
+
+  toLogBody(): string {
+    return `Memory extraction skipped. Reason: ${this.skip_reason}`;
+  }
+}

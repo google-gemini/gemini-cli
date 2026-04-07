@@ -53,6 +53,8 @@ import type {
   StartupStatsEvent,
   OnboardingStartEvent,
   OnboardingSuccessEvent,
+  MemoryExtractionEvent,
+  MemoryExtractionSkippedEvent,
 } from '../types.js';
 import type {
   CreditsUsedEvent,
@@ -139,6 +141,8 @@ export enum EventNames {
   BROWSER_AGENT_VISION_STATUS = 'browser_agent_vision_status',
   BROWSER_AGENT_TASK_OUTCOME = 'browser_agent_task_outcome',
   BROWSER_AGENT_CLEANUP = 'browser_agent_cleanup',
+  MEMORY_EXTRACTION = 'memory_extraction',
+  MEMORY_EXTRACTION_SKIPPED = 'memory_extraction_skipped',
 }
 
 export interface LogResponse {
@@ -2075,6 +2079,58 @@ export class ClearcutLogger {
 
     this.enqueueLogEvent(
       this.createLogEvent(EventNames.BROWSER_AGENT_CLEANUP, data),
+    );
+    this.flushIfNeeded();
+  }
+
+  // ==========================================================================
+  // Memory Extraction Events
+  // ==========================================================================
+
+  logMemoryExtractionEvent(event: MemoryExtractionEvent): void {
+    const data: EventValue[] = [
+      {
+        gemini_cli_key: EventMetadataKey.GEMINI_CLI_MEMORY_EXTRACTION_SUCCESS,
+        value: event.success.toString(),
+      },
+      {
+        gemini_cli_key:
+          EventMetadataKey.GEMINI_CLI_MEMORY_EXTRACTION_DURATION_MS,
+        value: event.duration_ms.toString(),
+      },
+      {
+        gemini_cli_key:
+          EventMetadataKey.GEMINI_CLI_MEMORY_EXTRACTION_MESSAGE_COUNT,
+        value: event.message_count.toString(),
+      },
+      {
+        gemini_cli_key:
+          EventMetadataKey.GEMINI_CLI_MEMORY_EXTRACTION_SCRATCHPAD_LENGTH,
+        value: event.scratchpad_length.toString(),
+      },
+      {
+        gemini_cli_key: EventMetadataKey.GEMINI_CLI_MEMORY_EXTRACTION_FALLBACK,
+        value: event.fallback.toString(),
+      },
+    ];
+
+    this.enqueueLogEvent(
+      this.createLogEvent(EventNames.MEMORY_EXTRACTION, data),
+    );
+    this.flushIfNeeded();
+  }
+
+  logMemoryExtractionSkippedEvent(event: MemoryExtractionSkippedEvent): void {
+    const data: EventValue[] = [
+      {
+        gemini_cli_key:
+          EventMetadataKey.GEMINI_CLI_MEMORY_EXTRACTION_SKIP_REASON,
+        value: event.skip_reason,
+      },
+    ];
+
+    this.enqueueLogEvent(
+      this.createLogEvent(EventNames.MEMORY_EXTRACTION_SKIPPED, data),
     );
     this.flushIfNeeded();
   }

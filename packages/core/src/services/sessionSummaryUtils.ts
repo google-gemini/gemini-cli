@@ -12,6 +12,11 @@ import {
   SESSION_FILE_PREFIX,
   type ConversationRecord,
 } from './chatRecordingService.js';
+import { ClearcutLogger } from '../telemetry/clearcut-logger/clearcut-logger.js';
+import {
+  MemoryExtractionEvent,
+  MemoryExtractionSkippedEvent,
+} from '../telemetry/types.js';
 import fs from 'node:fs/promises';
 import path from 'node:path';
 
@@ -56,11 +61,15 @@ async function generateAndSaveSummary(
   }
   const baseLlmClient = new BaseLlmClient(contentGenerator, config);
   const summaryService = new SessionSummaryService(baseLlmClient);
+  const logger = ClearcutLogger.getInstance(config);
+  const messageCount = conversation.messages.length;
 
   // Generate memory extraction (produces both summary and scratchpad)
+  const startTime = Date.now();
   const result = await summaryService.generateMemoryExtraction({
     messages: conversation.messages,
   });
+  const durationMs = Date.now() - startTime;
 
   if (!result) {
     // Fall back to simple summary if extraction fails
@@ -69,7 +78,13 @@ async function generateAndSaveSummary(
     });
     if (summary) {
       await saveSummaryOnly(sessionPath, summary);
+      logger?.logMemoryExtractionEvent(
+        new MemoryExtractionEvent(true, durationMs, messageCount, 0, true),
+      );
     } else {
+      logger?.logMemoryExtractionEvent(
+        new MemoryExtractionEvent(false, durationMs, messageCount, 0, false),
+      );
       debugLogger.warn(
         `[SessionSummary] Failed to generate summary for ${sessionPath}`,
       );
@@ -95,6 +110,17 @@ async function generateAndSaveSummary(
   freshConversation.memoryScratchpad = result.memoryScratchpad;
   freshConversation.lastUpdated = new Date().toISOString();
   await fs.writeFile(sessionPath, JSON.stringify(freshConversation, null, 2));
+
+  logger?.logMemoryExtractionEvent(
+    new MemoryExtractionEvent(
+      true,
+      durationMs,
+      messageCount,
+      result.memoryScratchpad.length,
+      false,
+    ),
+  );
+
   debugLogger.debug(
     `[SessionSummary] Saved memory scratchpad for ${sessionPath}: "${result.summary}"`,
   );
@@ -208,6 +234,10 @@ export async function generateSummary(config: Config): Promise<void> {
     const sessionPath = await getPreviousSession(config);
     if (sessionPath) {
       await generateAndSaveSummary(config, sessionPath);
+    } else {
+      ClearcutLogger.getInstance(config)?.logMemoryExtractionSkippedEvent(
+        new MemoryExtractionSkippedEvent('no_eligible_session'),
+      );
     }
   } catch (error) {
     // Log but don't throw - we want graceful degradation

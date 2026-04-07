@@ -28,6 +28,13 @@ vi.mock('../core/baseLlmClient.js', () => ({
   BaseLlmClient: vi.fn(),
 }));
 
+// Mock the ClearcutLogger module
+vi.mock('../telemetry/clearcut-logger/clearcut-logger.js', () => ({
+  ClearcutLogger: {
+    getInstance: vi.fn().mockReturnValue(undefined),
+  },
+}));
+
 // Helper to create a session with N user messages
 function createSessionWithUserMessages(
   count: number,
