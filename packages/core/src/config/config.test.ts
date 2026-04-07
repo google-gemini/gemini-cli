@@ -3367,7 +3367,7 @@ describe('Plans Directory Initialization', () => {
     expect(context.getDirectories()).not.toContain(plansDir);
   });
 
-  it('should create plans directory and add it to workspace context when getPlansDir is called', async () => {
+  it('should create plans directory and add it to workspace context when getPlansDir is called and ApprovalMode.PLAN is active', async () => {
     vi.spyOn(fs, 'mkdirSync').mockReturnValue(undefined);
     const config = new Config({
       ...baseParams,
@@ -3375,6 +3375,7 @@ describe('Plans Directory Initialization', () => {
     });
 
     await config.initialize();
+    config.setApprovalMode(ApprovalMode.PLAN);
     const plansDir = config.getPlansDir();
 
     expect(fs.mkdirSync).toHaveBeenCalledWith(plansDir, {
@@ -3385,7 +3386,7 @@ describe('Plans Directory Initialization', () => {
     expect(context.getDirectories()).toContain(plansDir);
   });
 
-  it('should gracefully handle existing directories by relying on mkdirSync recursive: true', async () => {
+  it('should NOT create plans directory if ApprovalMode is not PLAN even if plan is enabled', async () => {
     vi.spyOn(fs, 'mkdirSync').mockReturnValue(undefined);
     const config = new Config({
       ...baseParams,
@@ -3393,6 +3394,23 @@ describe('Plans Directory Initialization', () => {
     });
 
     await config.initialize();
+    // Default mode is DEFAULT, not PLAN
+    const plansDir = config.getPlansDir();
+
+    expect(fs.mkdirSync).not.toHaveBeenCalled();
+    const context = config.getWorkspaceContext();
+    expect(context.getDirectories()).not.toContain(plansDir);
+  });
+
+  it('should gracefully handle existing directories by relying on mkdirSync recursive: true when in PLAN mode', async () => {
+    vi.spyOn(fs, 'mkdirSync').mockReturnValue(undefined);
+    const config = new Config({
+      ...baseParams,
+      plan: true,
+    });
+
+    await config.initialize();
+    config.setApprovalMode(ApprovalMode.PLAN);
     const plansDir = config.getPlansDir();
 
     // mkdirSync should be called unconditionally
@@ -3403,7 +3421,10 @@ describe('Plans Directory Initialization', () => {
     expect(context.getDirectories()).toContain(plansDir);
   });
 
-  it('should throw an error if the plan directory path is blocked by an existing file (EEXIST)', async () => {
+  it('should log a warning if the plan directory path is blocked by an existing file (EEXIST) in PLAN mode', async () => {
+    const writeSpy = vi
+      .spyOn(process.stderr, 'write')
+      .mockImplementation(() => true);
     vi.spyOn(fs, 'mkdirSync').mockImplementation(() => {
       const err = new Error('File exists') as NodeJS.ErrnoException;
       err.code = 'EEXIST';
@@ -3415,13 +3436,21 @@ describe('Plans Directory Initialization', () => {
     });
 
     await config.initialize();
+    config.setApprovalMode(ApprovalMode.PLAN);
+    config.getPlansDir();
 
-    expect(() => config.getPlansDir()).toThrow(
-      /Failed to initialize active plan directory.*File exists/,
+    expect(writeSpy).toHaveBeenCalledWith(
+      expect.stringMatching(
+        /Failed to initialize active plan directory.*File exists/,
+      ),
     );
+    writeSpy.mockRestore();
   });
 
-  it('should throw an error if mkdirSync fails during getPlansDir (e.g. EACCES)', async () => {
+  it('should log a warning if mkdirSync fails during getPlansDir (e.g. EACCES) in PLAN mode', async () => {
+    const writeSpy = vi
+      .spyOn(process.stderr, 'write')
+      .mockImplementation(() => true);
     vi.spyOn(fs, 'mkdirSync').mockImplementation(() => {
       const err = new Error('Permission denied') as NodeJS.ErrnoException;
       err.code = 'EACCES';
@@ -3433,10 +3462,15 @@ describe('Plans Directory Initialization', () => {
     });
 
     await config.initialize();
+    config.setApprovalMode(ApprovalMode.PLAN);
+    config.getPlansDir();
 
-    expect(() => config.getPlansDir()).toThrow(
-      /Failed to initialize active plan directory.*Permission denied/,
+    expect(writeSpy).toHaveBeenCalledWith(
+      expect.stringMatching(
+        /Failed to initialize active plan directory.*Permission denied/,
+      ),
     );
+    writeSpy.mockRestore();
   });
 
   it('should NOT create plans directory or add it to workspace context when plan is disabled', async () => {

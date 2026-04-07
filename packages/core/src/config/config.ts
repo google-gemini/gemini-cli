@@ -2269,26 +2269,31 @@ export class Config implements McpContext, AgentLoopContext {
       return plansDir;
     }
 
-    try {
-      fs.mkdirSync(plansDir, { recursive: true });
-
-      let realPlansDir = plansDir;
+    if (this.planEnabled && this.isPlanMode()) {
       try {
-        const resolved = resolveToRealPath(plansDir);
-        if (resolved) {
-          realPlansDir = resolved;
+        fs.mkdirSync(plansDir, { recursive: true });
+
+        let realPlansDir = plansDir;
+        try {
+          const resolved = resolveToRealPath(plansDir);
+          if (resolved) {
+            realPlansDir = resolved;
+          }
+        } catch {
+          // Ignore failures in mock environments
         }
-      } catch {
-        // Ignore failures in mock environments
+        this.workspaceContext.addDirectory(realPlansDir);
+        this.initializedPlanDirs.add(plansDir);
+      } catch (e: unknown) {
+        const errorMessage = e instanceof Error ? e.message : String(e);
+        process.stderr.write(
+          `Failed to initialize active plan directory at '${plansDir}': ${errorMessage}\n`,
+        );
       }
-      this.workspaceContext.addDirectory(realPlansDir);
+    } else if (!this.planEnabled) {
       this.initializedPlanDirs.add(plansDir);
-    } catch (e: unknown) {
-      const errorMessage = e instanceof Error ? e.message : String(e);
-      throw new Error(
-        `Failed to initialize active plan directory at '${plansDir}': ${errorMessage}`,
-      );
     }
+
     return plansDir;
   }
 
