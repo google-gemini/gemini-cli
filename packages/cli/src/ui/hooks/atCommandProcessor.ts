@@ -238,15 +238,28 @@ async function resolveFilePaths(
       continue;
     }
 
+    // Convert absolute paths to relative for the ignore check. The `ignore`
+    // library throws RangeError on absolute or `..`-prefixed paths, which
+    // happens for clipboard images saved to a temp directory outside the project.
+    let ignoreCheckPath = pathName;
+    if (path.isAbsolute(pathName)) {
+      const targetDir = config.getWorkspaceContext().getDirectories()[0];
+      if (targetDir) {
+        ignoreCheckPath = path.relative(targetDir, pathName);
+      }
+    }
+    const isOutsideProject = ignoreCheckPath.startsWith('..');
     const gitIgnored =
+      !isOutsideProject &&
       respectFileIgnore.respectGitIgnore &&
-      fileDiscovery.shouldIgnoreFile(pathName, {
+      fileDiscovery.shouldIgnoreFile(ignoreCheckPath, {
         respectGitIgnore: true,
         respectGeminiIgnore: false,
       });
     const geminiIgnored =
+      !isOutsideProject &&
       respectFileIgnore.respectGeminiIgnore &&
-      fileDiscovery.shouldIgnoreFile(pathName, {
+      fileDiscovery.shouldIgnoreFile(ignoreCheckPath, {
         respectGitIgnore: false,
         respectGeminiIgnore: true,
       });

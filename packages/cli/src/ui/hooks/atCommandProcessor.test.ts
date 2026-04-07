@@ -682,6 +682,40 @@ describe('handleAtCommand', () => {
     });
   });
 
+  describe('absolute and out-of-project paths', () => {
+    it('should not crash on absolute paths outside the project (e.g., clipboard images)', async () => {
+      // Clipboard images are saved to a temp directory outside the project.
+      // The `ignore` library throws RangeError on absolute paths, so we must
+      // skip the ignore check for them.
+      const tempImageDir = path.join(os.tmpdir(), 'gemini-test-images');
+      await fsPromises.mkdir(tempImageDir, { recursive: true });
+      const tempImagePath = path.join(tempImageDir, 'clipboard-test.png');
+      // Create a minimal valid PNG file (1x1 pixel)
+      const pngHeader = Buffer.from([
+        0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a,
+      ]);
+      await fsPromises.writeFile(tempImagePath, pngHeader);
+
+      try {
+        const query = `explain this image @${tempImagePath}`;
+
+        const result = await handleAtCommand({
+          query,
+          config: mockConfig,
+          addItem: mockAddItem,
+          onDebugMessage: mockOnDebugMessage,
+          messageId: 250,
+          signal: abortController.signal,
+        });
+
+        // Should not throw RangeError — the path is resolved, not crashed
+        expect(result.error).toBeUndefined();
+      } finally {
+        await fsPromises.rm(tempImageDir, { recursive: true, force: true });
+      }
+    });
+  });
+
   describe('when recursive file search is disabled', () => {
     beforeEach(() => {
       vi.mocked(mockConfig.getEnableRecursiveFileSearch).mockReturnValue(false);
