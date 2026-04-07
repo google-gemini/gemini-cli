@@ -472,6 +472,7 @@ export class MCPServerConfig {
     // For streamable http transport
     readonly httpUrl?: string,
     readonly headers?: Record<string, string>,
+    readonly httpMethod?: 'GET' | 'POST',
     // For websocket transport
     readonly tcp?: string,
     // Transport type (optional, for use with 'url' field)
@@ -2325,9 +2326,8 @@ export class Config implements McpContext, AgentLoopContext {
     if (this.experimentalJitContext && this.memoryContextManager) {
       await this.memoryContextManager.refresh();
     } else {
-      const { refreshServerHierarchicalMemory } = await import(
-        '../utils/memoryDiscovery.js'
-      );
+      const { refreshServerHierarchicalMemory } =
+        await import('../utils/memoryDiscovery.js');
       await refreshServerHierarchicalMemory(this);
     }
     if (this._geminiClient?.isInitialized()) {

@@ -997,12 +997,18 @@ function createTransportRequestInit(
     }
   }
 
-  return {
+  const requestInit: RequestInit = {
     headers: {
       ...expandedHeaders,
       ...headers,
     },
   };
+
+  if (mcpServerConfig.httpMethod) {
+    requestInit.method = mcpServerConfig.httpMethod;
+  }
+
+  return requestInit;
 }
 
 /**
