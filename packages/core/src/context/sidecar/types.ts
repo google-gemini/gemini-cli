@@ -11,7 +11,7 @@ import type { StateSnapshotProcessorOptions } from '../processors/stateSnapshotP
  */
 export type ProcessorConfig =
   | { processorId: 'ToolMaskingProcessor'; options: { stringLengthThresholdTokens: number } }
-  | { processorId: 'BlobDegradationProcessor'; options?: Record<string, unknown> }
+  | { processorId: 'BlobDegradationProcessor'; options?: object }
   | { processorId: 'SemanticCompressionProcessor'; options: { nodeThresholdTokens: number } }
   | { processorId: 'HistorySquashingProcessor'; options: { maxTokensPerNode: number } }
   | { processorId: 'StateSnapshotProcessor'; options: StateSnapshotProcessorOptions }

@@ -44,18 +44,25 @@ export class ContextManager {
   private pristineEpisodes: Episode[] = [];
   private readonly eventBus: ContextEventBus;
   
-  
   // Internal sub-components
   // Synchronous processors are instantiated but effectively used as singletons within this class
   private orchestrator: PipelineOrchestrator;
   private historyObserver?: HistoryObserver;
-  
-  
 
-  constructor(private sidecar: SidecarConfig, private env: ContextEnvironment, private readonly tracer: ContextTracer) {
+  static create(sidecar: SidecarConfig, env: ContextEnvironment, tracer: ContextTracer, orchestrator?: PipelineOrchestrator): ContextManager {
+      const orch = orchestrator || new PipelineOrchestrator(sidecar, env, env.eventBus, tracer);
+      return new ContextManager(sidecar, env, tracer, orch);
+  }
+
+  // Use ContextManager.create() instead
+  private constructor(
+      private sidecar: SidecarConfig, 
+      private env: ContextEnvironment, 
+      private readonly tracer: ContextTracer,
+      orchestrator: PipelineOrchestrator
+  ) {
     this.eventBus = env.eventBus;
-    
-    this.orchestrator = new PipelineOrchestrator(this.sidecar, this.env, this.eventBus, this.tracer);
+    this.orchestrator = orchestrator;
 
     this.eventBus.onPristineHistoryUpdated((event) => {
       this.pristineEpisodes = event.episodes;

@@ -5,15 +5,15 @@
  */
 
 import { ProcessorRegistry } from './registry.js';
-import { ToolMaskingProcessor } from '../processors/toolMaskingProcessor.js';
+import { ToolMaskingProcessor, type ToolMaskingProcessorOptions } from '../processors/toolMaskingProcessor.js';
 import { BlobDegradationProcessor } from '../processors/blobDegradationProcessor.js';
-import { SemanticCompressionProcessor } from '../processors/semanticCompressionProcessor.js';
-import { HistorySquashingProcessor } from '../processors/historySquashingProcessor.js';
-import { StateSnapshotProcessor } from '../processors/stateSnapshotProcessor.js';
-import { EmergencyTruncationProcessor } from '../processors/emergencyTruncationProcessor.js';
+import { SemanticCompressionProcessor, type SemanticCompressionProcessorOptions } from '../processors/semanticCompressionProcessor.js';
+import { HistorySquashingProcessor, type HistorySquashingProcessorOptions } from '../processors/historySquashingProcessor.js';
+import { StateSnapshotProcessor, type StateSnapshotProcessorOptions } from '../processors/stateSnapshotProcessor.js';
+import { EmergencyTruncationProcessor, type EmergencyTruncationProcessorOptions } from '../processors/emergencyTruncationProcessor.js';
 
 export function registerBuiltInProcessors() {
-  ProcessorRegistry.register({
+  ProcessorRegistry.register<ToolMaskingProcessorOptions>({
     id: 'ToolMaskingProcessor',
     schema: {
       type: 'object',
@@ -30,7 +30,7 @@ export function registerBuiltInProcessors() {
     create: (env, opts) => new ToolMaskingProcessor(env, opts)
   });
 
-  ProcessorRegistry.register({
+  ProcessorRegistry.register<Record<string, never>>({
     id: 'BlobDegradationProcessor',
     schema: {
       type: 'object',
@@ -43,7 +43,7 @@ export function registerBuiltInProcessors() {
     create: (env) => new BlobDegradationProcessor(env)
   });
 
-  ProcessorRegistry.register({
+  ProcessorRegistry.register<SemanticCompressionProcessorOptions>({
     id: 'SemanticCompressionProcessor',
     schema: {
       type: 'object',
@@ -60,7 +60,7 @@ export function registerBuiltInProcessors() {
     create: (env, opts) => new SemanticCompressionProcessor(env, opts)
   });
 
-  ProcessorRegistry.register({
+  ProcessorRegistry.register<HistorySquashingProcessorOptions>({
     id: 'HistorySquashingProcessor',
     schema: {
       type: 'object',
@@ -77,7 +77,7 @@ export function registerBuiltInProcessors() {
     create: (env, opts) => new HistorySquashingProcessor(env, opts)
   });
 
-  ProcessorRegistry.register({
+  ProcessorRegistry.register<StateSnapshotProcessorOptions>({
     id: 'StateSnapshotProcessor',
     schema: {
       type: 'object',
@@ -97,7 +97,7 @@ export function registerBuiltInProcessors() {
     create: (env, opts) => StateSnapshotProcessor.create(env, opts)
   });
 
-  ProcessorRegistry.register({
+  ProcessorRegistry.register<EmergencyTruncationProcessorOptions>({
     id: 'EmergencyTruncationProcessor',
     schema: {
       type: 'object',

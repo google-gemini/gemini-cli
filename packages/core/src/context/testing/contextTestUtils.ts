@@ -165,7 +165,7 @@ export function setupContextComponentTest(config: Config) {
     1,
     eventBus
   );
-  const contextManager = new ContextManager(sidecar, env, tracer);
+  const contextManager = ContextManager.create(sidecar, env, tracer);
 
   // The async worker is now internally managed by ContextManager
 

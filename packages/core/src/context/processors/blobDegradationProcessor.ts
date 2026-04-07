@@ -11,11 +11,19 @@ import type { Part } from '@google/genai';
 
 import type { EpisodeEditor } from '../ir/episodeEditor.js';
 
+export type BlobDegradationProcessorOptions = Record<string, never>;
+
 export class BlobDegradationProcessor implements ContextProcessor {
-  readonly name = 'BlobDegradation';
+  static create(env: ContextEnvironment, _options: BlobDegradationProcessorOptions): BlobDegradationProcessor {
+    return new BlobDegradationProcessor(env);
+  }
+
+  readonly id = 'BlobDegradationProcessor';
+  readonly name = 'BlobDegradationProcessor';
+  readonly options = {};
   private env: ContextEnvironment;
 
-  constructor(env: ContextEnvironment, _options: Record<string, unknown> = {}) {
+  constructor(env: ContextEnvironment) {
     this.env = env;
   }
 

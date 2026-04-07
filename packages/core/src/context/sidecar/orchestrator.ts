@@ -39,7 +39,7 @@ export class PipelineOrchestrator {
           }
           // The Orchestrator injects standard dependencies required by processors
           // If a processor needs the eventBus (like Snapshot), it expects it via constructor.
-          const instance = processorClass.create(this.env, procDef.options);
+          const instance = processorClass.create(this.env, procDef.options ?? {});
           this.instantiatedProcessors.set(procDef.processorId, instance);
         }
       }
@@ -171,7 +171,7 @@ export class PipelineOrchestrator {
                       type: 'snapshot',
                       episode: ep,
                       recoveredTokens: ep.yield?.metadata?.currentTokens || 10,
-                      replacedEpisodeIds: mutation.originalIds,
+                      replacedEpisodeIds: mutation.originalIds || [],
                   } : {
                       status: 'ready',
                       type: vType,

@@ -7,10 +7,7 @@
 import type { ContextProcessor } from '../pipeline.js';
 import type { ContextEnvironment } from './environment.js';
 
-
-export interface ContextProcessorDef<
-  TOptions extends Record<string, unknown> = Record<string, unknown>,
-> {
+export interface ContextProcessorDef<TOptions = object> {
   readonly id: string;
   readonly schema?: object;
   create(
@@ -23,9 +20,9 @@ export interface ContextProcessorDef<
  * Registry for mapping declarative sidecar configs to running Processor instances.
  */
 export class ProcessorRegistry {
-  private static processors = new Map<string, ContextProcessorDef>();
+  private static processors = new Map<string, ContextProcessorDef<unknown>>();
 
-  static register(def: ContextProcessorDef) {
+  static register<TOptions>(def: ContextProcessorDef<TOptions>) {
     this.processors.set(def.id, def);
   }
 

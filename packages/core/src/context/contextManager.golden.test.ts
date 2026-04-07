@@ -83,7 +83,7 @@ describe('ContextManager Golden Tests', () => {
       4,
       eventBus
     );
-    contextManager = new ContextManager(sidecar, env, tracer);
+    contextManager = ContextManager.create(sidecar, env, tracer);
   });
 
   const createLargeHistory = (): Content[] => [
@@ -144,7 +144,7 @@ describe('ContextManager Golden Tests', () => {
       4,
       eventBus2
     );
-    contextManager = new ContextManager(
+    contextManager = ContextManager.create(
       {
         budget: { retainedTokens: 100000, maxTokens: 150000 },
         pipelines: [],

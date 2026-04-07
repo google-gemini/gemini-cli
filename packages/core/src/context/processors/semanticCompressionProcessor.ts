@@ -13,15 +13,35 @@ import { getResponseText } from '../../utils/partUtils.js';
 
 import type { EpisodeEditor } from '../ir/episodeEditor.js';
 
+export interface SemanticCompressionProcessorOptions {
+  nodeThresholdTokens: number;
+}
+
 export class SemanticCompressionProcessor implements ContextProcessor {
-  readonly name = 'SemanticCompression';
+  static create(env: ContextEnvironment, options: SemanticCompressionProcessorOptions): SemanticCompressionProcessor {
+    return new SemanticCompressionProcessor(env, options);
+  }
+
+  static readonly schema = {
+    type: 'object',
+    properties: {
+      nodeThresholdTokens: {
+        type: 'number',
+        description: 'The token threshold above which nodes are summarized.',
+      },
+    },
+    required: ['nodeThresholdTokens'],
+  };
+
+  readonly id = 'SemanticCompressionProcessor';
+  readonly name = 'SemanticCompressionProcessor';
+  readonly options: SemanticCompressionProcessorOptions;
   private env: ContextEnvironment;
-  private options: { nodeThresholdTokens: number };
   private modelToUse: string = 'chat-compression-2.5-flash-lite';
 
   constructor(
     env: ContextEnvironment,
-    options: { nodeThresholdTokens: number },
+    options: SemanticCompressionProcessorOptions,
   ) {
     this.env = env;
     this.options = options;

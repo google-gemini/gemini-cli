@@ -3,6 +3,12 @@
  * Copyright 2026 Google LLC
  * SPDX-License-Identifier: Apache-2.0
  */
+import type { BaseLlmClient } from "../../core/baseLlmClient.js";
+/**
+ * @license
+ * Copyright 2026 Google LLC
+ * SPDX-License-Identifier: Apache-2.0
+ */
 
 import { ContextManager } from '../contextManager.js';
 import { AgentChatHistory } from '../../core/agentChatHistory.js';
@@ -11,14 +17,9 @@ import type { SidecarConfig } from '../sidecar/types.js';
 import { ContextEnvironmentImpl } from '../sidecar/environmentImpl.js';
 import { ContextTracer } from '../tracer.js';
 import { ContextEventBus } from '../eventBus.js';
-
-import { BlobDegradationProcessor } from '../processors/blobDegradationProcessor.js';
-import { ToolMaskingProcessor } from '../processors/toolMaskingProcessor.js';
-import { HistorySquashingProcessor } from '../processors/historySquashingProcessor.js';
-import { SemanticCompressionProcessor } from '../processors/semanticCompressionProcessor.js';
-import { StateSnapshotProcessor } from '../processors/stateSnapshotProcessor.js';
-import { EmergencyTruncationProcessor } from '../processors/emergencyTruncationProcessor.js';
-import { ProcessorRegistry } from '../sidecar/registry.js';
+import { PipelineOrchestrator } from '../sidecar/orchestrator.js';
+import { registerBuiltInProcessors } from '../sidecar/builtins.js';
+import { debugLogger } from "../../utils/debugLogger.js";
 
 export interface TurnSummary {
   turnIndex: number;
@@ -29,13 +30,15 @@ export interface TurnSummary {
 export class SimulationHarness {
   readonly chatHistory: AgentChatHistory;
   contextManager!: ContextManager;
+  env!: ContextEnvironmentImpl;
+  orchestrator!: PipelineOrchestrator;
   readonly eventBus: ContextEventBus;
   config!: SidecarConfig;
   private tracer!: ContextTracer;
   private currentTurnIndex = 0;
   private tokenTrajectory: TurnSummary[] = [];
 
-  static async create(config: SidecarConfig, mockLlmClient: any, mockTempDir = '/tmp/sim'): Promise<SimulationHarness> {
+  static async create(config: SidecarConfig, mockLlmClient: BaseLlmClient, mockTempDir = '/tmp/sim'): Promise<SimulationHarness> {
     const harness = new SimulationHarness();
     await harness.init(config, mockLlmClient, mockTempDir);
     return harness;
@@ -48,26 +51,20 @@ export class SimulationHarness {
 
   private async init(
     config: SidecarConfig,
-    mockLlmClient: any,
+    mockLlmClient: BaseLlmClient,
     mockTempDir: string
   ) {
     this.config = config;
     // Register all standard processors
-    ProcessorRegistry.register({ id: 'BlobDegradationProcessor', create: (env, opts) => new BlobDegradationProcessor(env) });
-    ProcessorRegistry.register({ id: 'ToolMaskingProcessor', create: (env, opts) => new ToolMaskingProcessor(env, opts) });
-    ProcessorRegistry.register({ id: 'HistorySquashingProcessor', create: (env, opts) => new HistorySquashingProcessor(env, opts) });
-    ProcessorRegistry.register({ id: 'SemanticCompressionProcessor', create: (env, opts) => new SemanticCompressionProcessor(env, opts) });
-    ProcessorRegistry.register({ id: 'StateSnapshotProcessor', create: (env, opts) => new StateSnapshotProcessor(env, opts, env.eventBus) });
-    ProcessorRegistry.register({ id: 'EmergencyTruncationProcessor', create: (env, opts) => new EmergencyTruncationProcessor(env, opts) });
+    registerBuiltInProcessors();
 
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
-    (this as any).tracer = new ContextTracer({ targetDir: mockTempDir, sessionId: 'sim-session' });
+    this.tracer = new ContextTracer({ targetDir: mockTempDir, sessionId: 'sim-session' });
 
     // Using real token calculator instead of mock, so we test actual string sizes
     const InMemoryFS = (await import('../system/InMemoryFileSystem.js')).InMemoryFileSystem;
     const DetIdGen = (await import('../system/DeterministicIdGenerator.js')).DeterministicIdGenerator;
 
-    const env = new ContextEnvironmentImpl(
+    this.env = new ContextEnvironmentImpl(
       mockLlmClient,
       'sim-prompt',
       'sim-session',
@@ -80,7 +77,8 @@ export class SimulationHarness {
       new DetIdGen()
     );
 
-    this.contextManager = new ContextManager(config, env, this.tracer);
+    this.orchestrator = new PipelineOrchestrator(config, this.env, this.eventBus, this.tracer);
+    this.contextManager = ContextManager.create(config, this.env, this.tracer, this.orchestrator);
     this.contextManager.subscribeToHistory(this.chatHistory);
   }
 
@@ -91,32 +89,34 @@ export class SimulationHarness {
   async simulateTurn(messages: Content[]) {
     // 1. Append the new messages
     const currentHistory = this.chatHistory.get();
-    await this.chatHistory.set([...currentHistory, ...messages]);
+    this.chatHistory.set([...currentHistory, ...messages]);
     
     // 2. Measure tokens immediately after append (Before background processing)
-    const tokensBefore = (this.contextManager as any).env.tokenCalculator.calculateEpisodeListTokens(
+    const tokensBefore = this.env.tokenCalculator.calculateEpisodeListTokens(
       this.contextManager.getWorkingBufferView()
     );
-    console.log(`[Turn ${this.currentTurnIndex}] Tokens BEFORE: ${tokensBefore}`);
+    debugLogger.log(`[Turn ${this.currentTurnIndex}] Tokens BEFORE: ${tokensBefore}`);
     
     // 3. Yield to event loop to allow internal async subscribers and orchestrator to finish
     await new Promise(resolve => setTimeout(resolve, 50));
     
     // 3.1 Simulate what projectCompressedHistory does with the sync handlers
     let currentView = this.contextManager.getWorkingBufferView();
-    const currentTokens = (this.contextManager as any).env.tokenCalculator.calculateEpisodeListTokens(currentView);
+    const currentTokens = this.env.tokenCalculator.calculateEpisodeListTokens(currentView);
     if (this.config.budget && currentTokens > this.config.budget.maxTokens) {
-      console.log(`[Turn ${this.currentTurnIndex}] Sync panic triggered! ${currentTokens} > ${this.config.budget.maxTokens}`);
+      debugLogger.log(`[Turn ${this.currentTurnIndex}] Sync panic triggered! ${currentTokens} > ${this.config.budget.maxTokens}`);
       const syncPipelines = this.config.pipelines.filter(p => p.execution === 'blocking');
-      const orchestrator = (this.contextManager as any).orchestrator;
+      const orchestrator = this.orchestrator;
       for (const pipe of syncPipelines) {
-         currentView = await orchestrator.executePipeline(pipe.name, currentView, {
+         await orchestrator.executePipeline(pipe.name, currentView, {
             currentTokens,
             maxTokens: this.config.budget.maxTokens,
             retainedTokens: this.config.budget.retainedTokens,
+            isBudgetSatisfied: false,
             deficitTokens: currentTokens - this.config.budget.maxTokens,
             protectedEpisodeIds: new Set()
          });
+         currentView = this.contextManager.getWorkingBufferView();
       }
       
       // Inject the truncated view back into the graph
@@ -126,13 +126,12 @@ export class SimulationHarness {
                this.eventBus.emitVariantReady({
                   targetId: ep.id,
                   variantId: 'v-emergency',
-                  // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
                   variant: {
                       status: 'ready',
                       type: 'masked', // Truncation is technically a mask
                       text: ep.yield?.text || '',
                       recoveredTokens: 0,
-                  } as any
+                  }
               });
           }
       }
@@ -141,10 +140,10 @@ export class SimulationHarness {
     }
     
     // 4. Measure tokens after background processors have (hopefully) emitted variants
-    const tokensAfter = (this.contextManager as any).env.tokenCalculator.calculateEpisodeListTokens(
+    const tokensAfter = this.env.tokenCalculator.calculateEpisodeListTokens(
       this.contextManager.getWorkingBufferView()
     );
-    console.log(`[Turn ${this.currentTurnIndex}] Tokens AFTER: ${tokensAfter}`);
+    debugLogger.log(`[Turn ${this.currentTurnIndex}] Tokens AFTER: ${tokensAfter}`);
     
     this.tokenTrajectory.push({
       turnIndex: this.currentTurnIndex++,

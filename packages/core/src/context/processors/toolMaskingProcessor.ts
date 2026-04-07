@@ -26,14 +26,34 @@ const UNMASKABLE_TOOLS = new Set([
 
 import type { EpisodeEditor } from '../ir/episodeEditor.js';
 
+export interface ToolMaskingProcessorOptions {
+  stringLengthThresholdTokens: number;
+}
+
 export class ToolMaskingProcessor implements ContextProcessor {
-  readonly name = 'ToolMasking';
-  private options: { stringLengthThresholdTokens: number };
+  static create(env: ContextEnvironment, options: ToolMaskingProcessorOptions): ToolMaskingProcessor {
+    return new ToolMaskingProcessor(env, options);
+  }
+
+  static readonly schema = {
+    type: 'object',
+    properties: {
+      stringLengthThresholdTokens: {
+        type: 'number',
+        description: 'The token threshold above which tool intents/observations are masked.',
+      },
+    },
+    required: ['stringLengthThresholdTokens'],
+  };
+
+  readonly id = 'ToolMaskingProcessor';
+  readonly name = 'ToolMaskingProcessor';
+  readonly options: ToolMaskingProcessorOptions;
   private env: ContextEnvironment;
 
   constructor(
     env: ContextEnvironment,
-    options: { stringLengthThresholdTokens: number },
+    options: ToolMaskingProcessorOptions,
   ) {
     this.env = env;
     this.options = options;

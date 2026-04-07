@@ -9,11 +9,31 @@ import type { ContextEnvironment } from '../sidecar/environment.js';
 import { truncateProportionally } from '../truncation.js';
 import type { EpisodeEditor } from '../ir/episodeEditor.js';
 
-export class HistorySquashingProcessor implements ContextProcessor {
-  readonly name = 'HistorySquashing';
-  private options: { maxTokensPerNode: number };
+export interface HistorySquashingProcessorOptions {
+  maxTokensPerNode: number;
+}
 
-  constructor(env: ContextEnvironment, options: { maxTokensPerNode: number }) {
+export class HistorySquashingProcessor implements ContextProcessor {
+  static create(env: ContextEnvironment, options: HistorySquashingProcessorOptions): HistorySquashingProcessor {
+    return new HistorySquashingProcessor(env, options);
+  }
+
+  static readonly schema = {
+    type: 'object',
+    properties: {
+      maxTokensPerNode: {
+        type: 'number',
+        description: 'The maximum tokens a node can have before being truncated.',
+      },
+    },
+    required: ['maxTokensPerNode'],
+  };
+
+  readonly id = 'HistorySquashingProcessor';
+  readonly name = 'HistorySquashingProcessor';
+  readonly options: HistorySquashingProcessorOptions;
+
+  constructor(env: ContextEnvironment, options: HistorySquashingProcessorOptions) {
     this.options = options;
   }
 
