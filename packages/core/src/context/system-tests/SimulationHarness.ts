@@ -20,6 +20,7 @@ import { ContextEventBus } from '../eventBus.js';
 import { PipelineOrchestrator } from '../sidecar/orchestrator.js';
 import { registerBuiltInProcessors } from '../sidecar/builtins.js';
 import { debugLogger } from "../../utils/debugLogger.js";
+import { ProcessorRegistry } from "../sidecar/registry.js";
 
 export interface TurnSummary {
   turnIndex: number;
@@ -55,8 +56,9 @@ export class SimulationHarness {
     mockTempDir: string
   ) {
     this.config = config;
+    const registry = new ProcessorRegistry();
     // Register all standard processors
-    registerBuiltInProcessors();
+    registerBuiltInProcessors(registry);
 
     this.tracer = new ContextTracer({ targetDir: mockTempDir, sessionId: 'sim-session' });
 
@@ -77,8 +79,8 @@ export class SimulationHarness {
       new DetIdGen()
     );
 
-    this.orchestrator = new PipelineOrchestrator(config, this.env, this.eventBus, this.tracer);
-    this.contextManager = ContextManager.create(config, this.env, this.tracer, this.orchestrator);
+    this.orchestrator = new PipelineOrchestrator(config, this.env, this.eventBus, this.tracer, registry);
+    this.contextManager = ContextManager.create(config, this.env, this.tracer, this.orchestrator, registry);
     this.contextManager.subscribeToHistory(this.chatHistory);
   }
 

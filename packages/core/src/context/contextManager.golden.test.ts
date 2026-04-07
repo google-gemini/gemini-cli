@@ -1,3 +1,5 @@
+import { ProcessorRegistry } from "./sidecar/registry.js";
+import { registerBuiltInProcessors } from "./sidecar/builtins.js";
 /**
  * @license
  * Copyright 2026 Google LLC
@@ -73,7 +75,10 @@ describe('ContextManager Golden Tests', () => {
       }),
     };
 
-    const sidecar = SidecarLoader.fromConfig(mockConfig);
+    const registry = new ProcessorRegistry();
+    registerBuiltInProcessors(registry);
+
+    const sidecar = SidecarLoader.fromConfig(mockConfig, registry);
     const tracer = new ContextTracer({ targetDir: '/tmp', sessionId: 'test-session' });
     const eventBus = new ContextEventBus();
     const env = new ContextEnvironmentImpl(
@@ -86,7 +91,7 @@ describe('ContextManager Golden Tests', () => {
       4,
       eventBus
     );
-    contextManager = ContextManager.create(sidecar, env, tracer);
+    contextManager = ContextManager.create(sidecar, env, tracer, undefined, registry);
   });
 
   const createLargeHistory = (): Content[] => [

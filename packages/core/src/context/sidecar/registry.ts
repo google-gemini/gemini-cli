@@ -20,13 +20,13 @@ export interface ContextProcessorDef<TOptions = object> {
  * Registry for mapping declarative sidecar configs to running Processor instances.
  */
 export class ProcessorRegistry {
-  private static processors = new Map<string, ContextProcessorDef<unknown>>();
+  private processors = new Map<string, ContextProcessorDef<unknown>>();
 
-  static register<TOptions>(def: ContextProcessorDef<TOptions>) {
-    this.processors.set(def.id, def);
+  register<TOptions>(def: ContextProcessorDef<TOptions>) {
+    this.processors.set(def.id, def as unknown as ContextProcessorDef<unknown>);
   }
 
-  static get(id: string): ContextProcessorDef {
+  get(id: string): ContextProcessorDef<unknown> {
     const def = this.processors.get(id);
     if (!def) {
       throw new Error(`Context Processor [${id}] is not registered.`);
@@ -34,7 +34,7 @@ export class ProcessorRegistry {
     return def;
   }
 
-  static getSchemas(): object[] {
+  getSchemas(): object[] {
     const schemas: object[] = [];
     for (const def of this.processors.values()) {
       if (def.schema) {
@@ -44,7 +44,7 @@ export class ProcessorRegistry {
     return schemas;
   }
 
-  static clear() {
+  clear() {
     this.processors.clear();
   }
 }

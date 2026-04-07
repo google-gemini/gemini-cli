@@ -160,10 +160,14 @@ import { SidecarLoader } from '../sidecar/SidecarLoader.js';
 import { ContextEventBus } from '../eventBus.js';
 import { ContextTokenCalculator } from '../utils/contextTokenCalculator.js';
 import type { BaseLlmClient } from 'src/core/baseLlmClient.js';
+import { ProcessorRegistry } from '../sidecar/registry.js';
+import { registerBuiltInProcessors } from '../sidecar/builtins.js';
 
 export function setupContextComponentTest(config: Config) {
   const chatHistory = new AgentChatHistory();
-  const sidecar = SidecarLoader.fromConfig(config);
+  const registry = new ProcessorRegistry();
+  registerBuiltInProcessors(registry);
+  const sidecar = SidecarLoader.fromConfig(config, registry);
   const tracer = new ContextTracer({ targetDir: '/tmp', sessionId: 'test-session' });
   const eventBus = new ContextEventBus();
   const env = new ContextEnvironmentImpl(
@@ -176,7 +180,7 @@ export function setupContextComponentTest(config: Config) {
     1,
     eventBus
   );
-  const contextManager = ContextManager.create(sidecar, env, tracer);
+  const contextManager = ContextManager.create(sidecar, env, tracer, undefined, registry);
 
   // The async worker is now internally managed by ContextManager
 

@@ -8,7 +8,7 @@ import type { Episode } from '../ir/types.js';
 import type { ContextProcessor, ContextAccountingState } from '../pipeline.js';
 import type { SidecarConfig, PipelineDef } from './types.js';
 import type { ContextEnvironment, ContextEventBus, ContextTracer } from './environment.js';
-import { ProcessorRegistry } from './registry.js';
+import type { ProcessorRegistry } from './registry.js';
 import { debugLogger } from '../../utils/debugLogger.js';
 import { EpisodeEditor } from '../ir/episodeEditor.js';
 
@@ -20,7 +20,8 @@ export class PipelineOrchestrator {
     private readonly config: SidecarConfig,
     private readonly env: ContextEnvironment,
     private readonly eventBus: ContextEventBus,
-    private readonly tracer: ContextTracer
+    private readonly tracer: ContextTracer,
+    private readonly registry: ProcessorRegistry
   ) {
     this.instantiateProcessors();
     this.registerTriggers();
@@ -33,7 +34,7 @@ export class PipelineOrchestrator {
     for (const pipeline of this.config.pipelines) {
       for (const procDef of pipeline.processors) {
         if (!this.instantiatedProcessors.has(procDef.processorId)) {
-          const processorClass = ProcessorRegistry.get(procDef.processorId);
+          const processorClass = this.registry.get(procDef.processorId);
           if (!processorClass) {
             throw new Error(`Context Processor [${procDef.processorId}] is not registered.`);
           }

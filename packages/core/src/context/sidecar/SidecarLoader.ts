@@ -8,16 +8,21 @@ import type { Config } from '../../config/config.js';
 import type { SidecarConfig } from './types.js';
 import { defaultSidecarProfile } from './profiles.js';
 import { SchemaValidator } from '../../utils/schemaValidator.js';
-import { sidecarConfigSchema } from './schema.js';
+import { getSidecarConfigSchema } from './schema.js';
 import type { IFileSystem } from '../system/IFileSystem.js';
 import { NodeFileSystem } from '../system/NodeFileSystem.js';
+import type { ProcessorRegistry } from './registry.js';
 
 export class SidecarLoader {
   /**
    * Loads and validates a sidecar config from a specific file path.
    * Throws an error if the file cannot be read, parsed, or fails schema validation.
    */
-  static loadFromFile(sidecarPath: string, fileSystem: IFileSystem = new NodeFileSystem()): SidecarConfig {
+  static loadFromFile(
+    sidecarPath: string, 
+    registry: ProcessorRegistry,
+    fileSystem: IFileSystem = new NodeFileSystem()
+  ): SidecarConfig {
     const fileContent = fileSystem.readFileSync(sidecarPath, 'utf8');
 
     if (!fileContent.trim()) {
@@ -35,7 +40,7 @@ export class SidecarLoader {
       );
     }
 
-    const validationError = SchemaValidator.validate(sidecarConfigSchema, parsed);
+    const validationError = SchemaValidator.validate(getSidecarConfigSchema(registry), parsed);
     if (validationError) {
       throw new Error(
         `Invalid sidecar configuration in ${sidecarPath}. Validation error: ${validationError}`,
@@ -51,7 +56,11 @@ export class SidecarLoader {
    * Generates a Sidecar JSON graph from the experimental config file path or defaults.
    * If a config file is present but invalid, this will THROW to prevent silent misconfiguration.
    */
-  static fromConfig(config: Config, fileSystem: IFileSystem = new NodeFileSystem()): SidecarConfig {
+  static fromConfig(
+    config: Config, 
+    registry: ProcessorRegistry,
+    fileSystem: IFileSystem = new NodeFileSystem()
+  ): SidecarConfig {
     const sidecarPath = config.getExperimentalContextSidecarConfig();
 
     if (sidecarPath && fileSystem.existsSync(sidecarPath)) {
@@ -62,7 +71,7 @@ export class SidecarLoader {
       }
 
       // If the file has content, enforce strict validation and throw on failure.
-      return this.loadFromFile(sidecarPath, fileSystem);
+      return this.loadFromFile(sidecarPath, registry, fileSystem);
     }
 
     return defaultSidecarProfile;

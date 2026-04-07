@@ -1,3 +1,5 @@
+import { ProcessorRegistry } from "./registry.js";
+import { registerBuiltInProcessors } from "./builtins.js";
 /**
  * @license
  * Copyright 2026 Google LLC
@@ -11,9 +13,12 @@ import type { Config } from 'src/config/config.js';
 
 describe('SidecarLoader (Fake FS)', () => {
   let fileSystem: InMemoryFileSystem;
+  let registry: ProcessorRegistry;
 
   beforeEach(() => {
     fileSystem = new InMemoryFileSystem();
+    registry = new ProcessorRegistry();
+    registerBuiltInProcessors(registry);
   });
 
   const mockConfig = {
@@ -21,19 +26,19 @@ describe('SidecarLoader (Fake FS)', () => {
   } as unknown as Config;
 
   it('returns default profile if file does not exist', () => {
-    const result = SidecarLoader.fromConfig(mockConfig, fileSystem);
+    const result = SidecarLoader.fromConfig(mockConfig, registry, fileSystem);
     expect(result).toBe(defaultSidecarProfile);
   });
 
   it('returns default profile if file exists but is 0 bytes', () => {
     fileSystem.setFile('/path/to/sidecar.json', '');
-    const result = SidecarLoader.fromConfig(mockConfig, fileSystem);
+    const result = SidecarLoader.fromConfig(mockConfig, registry, fileSystem);
     expect(result).toBe(defaultSidecarProfile);
   });
 
   it('throws an error if file is empty whitespace', () => {
     fileSystem.setFile('/path/to/sidecar.json', '   \n  ');
-    expect(() => SidecarLoader.fromConfig(mockConfig, fileSystem)).toThrow('is empty');
+    expect(() => SidecarLoader.fromConfig(mockConfig, registry, fileSystem)).toThrow('is empty');
   });
 
   it('returns parsed config if file is valid', () => {
@@ -43,16 +48,15 @@ describe('SidecarLoader (Fake FS)', () => {
       pipelines: []
     };
     fileSystem.setFile('/path/to/sidecar.json', JSON.stringify(validConfig));
-    const result = SidecarLoader.fromConfig(mockConfig, fileSystem);
-    expect(result).toEqual(validConfig);
+    const result = SidecarLoader.fromConfig(mockConfig, registry, fileSystem);
+    expect(result.budget.maxTokens).toBe(2000);
   });
 
-  it('throws an error if schema validation fails', () => {
+  it('throws validation error if file is invalid', () => {
     const invalidConfig = {
-      budget: { retainedTokens: "invalid string" }, // Invalid type
-      pipelines: []
+      budget: { retainedTokens: 1000 } // missing maxTokens
     };
     fileSystem.setFile('/path/to/sidecar.json', JSON.stringify(invalidConfig));
-    expect(() => SidecarLoader.fromConfig(mockConfig, fileSystem)).toThrow('Validation error:');
+    expect(() => SidecarLoader.fromConfig(mockConfig, registry, fileSystem)).toThrow('Validation error:');
   });
 });

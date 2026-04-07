@@ -12,8 +12,8 @@ import { HistorySquashingProcessor, type HistorySquashingProcessorOptions } from
 import { StateSnapshotProcessor, type StateSnapshotProcessorOptions } from '../processors/stateSnapshotProcessor.js';
 import { EmergencyTruncationProcessor, type EmergencyTruncationProcessorOptions } from '../processors/emergencyTruncationProcessor.js';
 
-export function registerBuiltInProcessors() {
-  ProcessorRegistry.register<ToolMaskingProcessorOptions>({
+export function registerBuiltInProcessors(registry: ProcessorRegistry) {
+  registry.register<ToolMaskingProcessorOptions>({
     id: 'ToolMaskingProcessor',
     schema: {
       type: 'object',
@@ -30,7 +30,7 @@ export function registerBuiltInProcessors() {
     create: (env, opts) => new ToolMaskingProcessor(env, opts)
   });
 
-  ProcessorRegistry.register<Record<string, never>>({
+  registry.register<Record<string, never>>({
     id: 'BlobDegradationProcessor',
     schema: {
       type: 'object',
@@ -43,7 +43,7 @@ export function registerBuiltInProcessors() {
     create: (env) => new BlobDegradationProcessor(env)
   });
 
-  ProcessorRegistry.register<SemanticCompressionProcessorOptions>({
+  registry.register<SemanticCompressionProcessorOptions>({
     id: 'SemanticCompressionProcessor',
     schema: {
       type: 'object',
@@ -60,7 +60,7 @@ export function registerBuiltInProcessors() {
     create: (env, opts) => new SemanticCompressionProcessor(env, opts)
   });
 
-  ProcessorRegistry.register<HistorySquashingProcessorOptions>({
+  registry.register<HistorySquashingProcessorOptions>({
     id: 'HistorySquashingProcessor',
     schema: {
       type: 'object',
@@ -77,7 +77,7 @@ export function registerBuiltInProcessors() {
     create: (env, opts) => new HistorySquashingProcessor(env, opts)
   });
 
-  ProcessorRegistry.register<StateSnapshotProcessorOptions>({
+  registry.register<StateSnapshotProcessorOptions>({
     id: 'StateSnapshotProcessor',
     schema: {
       type: 'object',
@@ -97,7 +97,7 @@ export function registerBuiltInProcessors() {
     create: (env, opts) => StateSnapshotProcessor.create(env, opts)
   });
 
-  ProcessorRegistry.register<EmergencyTruncationProcessorOptions>({
+  registry.register<EmergencyTruncationProcessorOptions>({
     id: 'EmergencyTruncationProcessor',
     schema: {
       type: 'object',
@@ -110,6 +110,3 @@ export function registerBuiltInProcessors() {
     create: (env, opts) => EmergencyTruncationProcessor.create(env, opts)
   });
 }
-
-// Automatically register them upon import
-registerBuiltInProcessors();

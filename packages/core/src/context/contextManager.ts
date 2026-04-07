@@ -36,6 +36,9 @@ import { IrProjector } from './ir/projector.js';
 
 import './sidecar/builtins.js';
 
+import { ProcessorRegistry } from './sidecar/registry.js';
+import { registerBuiltInProcessors } from './sidecar/builtins.js';
+
 export class ContextManager {
   
   
@@ -49,8 +52,12 @@ export class ContextManager {
   private orchestrator: PipelineOrchestrator;
   private historyObserver?: HistoryObserver;
 
-  static create(sidecar: SidecarConfig, env: ContextEnvironment, tracer: ContextTracer, orchestrator?: PipelineOrchestrator): ContextManager {
-      const orch = orchestrator || new PipelineOrchestrator(sidecar, env, env.eventBus, tracer);
+  static create(sidecar: SidecarConfig, env: ContextEnvironment, tracer: ContextTracer, orchestrator?: PipelineOrchestrator, registry?: ProcessorRegistry): ContextManager {
+      if (!registry) {
+        registry = new ProcessorRegistry();
+        registerBuiltInProcessors(registry);
+      }
+      const orch = orchestrator || new PipelineOrchestrator(sidecar, env, env.eventBus, tracer, registry);
       return new ContextManager(sidecar, env, tracer, orch);
   }
 
