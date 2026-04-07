@@ -327,6 +327,7 @@ describe('gemini.tsx main function cleanup', () => {
       refreshAuth: vi.fn(),
       getRemoteAdminSettings: vi.fn(() => undefined),
       getUseAlternateBuffer: vi.fn(() => false),
+      getUseTerminalBuffer: vi.fn(() => false),
       ...overrides,
     } as unknown as Config;
   }

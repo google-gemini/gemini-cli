@@ -257,25 +257,35 @@ export class AgentRegistry {
     // Tools are configured dynamically at invocation time via browserAgentFactory.
     const browserConfig = this.config.getBrowserAgentConfig();
     if (browserConfig.enabled) {
-      this.registerLocalAgent(BrowserAgentDefinition(this.config));
+      // In container sandboxes (Docker/Podman/gVisor/LXC), Chrome is not
+      // available inside the container. The browser agent can only work with
+      // sessionMode "existing" (connecting to a host Chrome instance).
+      const sandboxType = process.env['SANDBOX'];
+      const isContainerSandbox =
+        !!sandboxType &&
+        sandboxType !== 'sandbox-exec' &&
+        sandboxType !== 'sandbox:none';
+      const sessionMode =
+        browserConfig.customConfig.sessionMode ?? 'persistent';
+
+      if (isContainerSandbox && sessionMode !== 'existing') {
+        coreEvents.emitFeedback(
+          'info',
+          'Browser agent disabled in container sandbox. ' +
+            'To use it, set sessionMode to "existing" in settings and start Chrome ' +
+            'with --remote-debugging-port=9222 on the host.',
+        );
+      } else {
+        this.registerLocalAgent(BrowserAgentDefinition(this.config));
+      }
     }
 
     // Register the memory manager agent as a replacement for the save_memory tool.
+    // The agent declares its own workspaceDirectories (e.g. ~/.gemini) which are
+    // scoped to its execution via runWithScopedWorkspaceContext in LocalAgentExecutor,
+    // keeping the main agent's workspace context clean.
     if (this.config.isMemoryManagerEnabled()) {
       this.registerLocalAgent(MemoryManagerAgent(this.config));
-
-      // Ensure the global .gemini directory is accessible to tools.
-      // This allows the save_memory agent to read and write to it.
-      // Access control is enforced by the Policy Engine (memory-manager.toml).
-      try {
-        const globalDir = Storage.getGlobalGeminiDir();
-        this.config.getWorkspaceContext().addDirectory(globalDir);
-      } catch (e) {
-        debugLogger.warn(
-          `[AgentRegistry] Could not add global .gemini directory to workspace:`,
-          e,
-        );
-      }
     }
   }
 

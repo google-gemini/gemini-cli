@@ -107,7 +107,8 @@ toolName = [
   "activate_skill",
   "codebase_investigator",
   "cli_help",
-  "get_internal_docs"
+  "get_internal_docs",
+  "complete_task"
 ]
 decision = "allow"
 priority = 70
@@ -121,14 +122,14 @@ priority = 70
 modes = ["plan"]
 
 [[rule]]
-toolName = ["ask_user", "save_memory"]
+toolName = ["ask_user", "save_memory", "web_fetch"]
 decision = "ask_user"
 priority = 70
 modes = ["plan"]
 interactive = true
 
 [[rule]]
-toolName = ["ask_user", "save_memory"]
+toolName = ["ask_user", "save_memory", "web_fetch"]
 decision = "deny"
 priority = 70
 modes = ["plan"]
