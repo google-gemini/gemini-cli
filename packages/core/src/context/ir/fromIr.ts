@@ -5,35 +5,68 @@
  */
 
 import type { Content, Part } from '@google/genai';
-import type { Episode, EpisodeStep, UserPrompt, AgentYield } from './types.js';
-import { isAgentThought, isToolExecution, isUserPrompt } from './graphUtils.js';
+import type {
+  ConcreteNode,
+  UserPrompt,
+  AgentThought,
+  ToolExecution,
+  AgentYield,
+  MaskedTool,
+  Snapshot,
+  RollingSummary,
+} from './types.js';
 
-export function fromIr(episodes: Episode[]): Content[] {
+export function fromIr(ship: ReadonlyArray<ConcreteNode>): Content[] {
   const history: Content[] = [];
+  const agentParts: Part[] = [];
 
-  for (const ep of episodes) {
-    if (isUserPrompt(ep.trigger)) {
-      const triggerContent = serializeTrigger(ep.trigger);
-      if (triggerContent) history.push(triggerContent);
+  const flushAgentParts = () => {
+    if (agentParts.length > 0) {
+      history.push({ role: 'model', parts: [...agentParts] });
+      agentParts.length = 0;
     }
+  };
 
-    const stepContents = serializeSteps(ep.steps);
-    history.push(...stepContents);
-
-    if (ep.yield) {
-      history.push(serializeYield(ep.yield));
+  for (const node of ship) {
+    if (node.type === 'USER_PROMPT') {
+      flushAgentParts();
+      const content = serializeUserPrompt(node as UserPrompt);
+      if (content) history.push(content);
+    } else if (node.type === 'SYSTEM_EVENT') {
+      flushAgentParts();
+      // System events do not map strictly to Gemini Content parts unless synthesized.
+    } else if (node.type === 'AGENT_THOUGHT') {
+      agentParts.push(serializeAgentThought(node as AgentThought));
+    } else if (node.type === 'TOOL_EXECUTION') {
+      const parts = serializeToolExecution(node as ToolExecution);
+      agentParts.push(parts.call);
+      flushAgentParts();
+      history.push({ role: 'user', parts: [parts.response] });
+    } else if (node.type === 'MASKED_TOOL') {
+      const parts = serializeMaskedTool(node as MaskedTool);
+      agentParts.push(parts.call);
+      flushAgentParts();
+      history.push({ role: 'user', parts: [parts.response] });
+    } else if (node.type === 'AGENT_YIELD') {
+      agentParts.push(serializeAgentYield(node as AgentYield));
+      flushAgentParts();
+    } else if (node.type === 'SNAPSHOT') {
+      flushAgentParts();
+      history.push({ role: 'user', parts: [{ text: (node as Snapshot).text }] });
+    } else if (node.type === 'ROLLING_SUMMARY') {
+      flushAgentParts();
+      history.push({ role: 'user', parts: [{ text: (node as RollingSummary).text }] });
     }
   }
 
+  flushAgentParts();
   return history;
 }
 
-function serializeTrigger(trigger: UserPrompt): Content | null {
+function serializeUserPrompt(prompt: UserPrompt): Content | null {
   const parts: Part[] = [];
-  for (const sp of trigger.semanticParts) {
-    if (sp.presentation) {
-      parts.push({ text: sp.presentation.text });
-    } else if (sp.type === 'text') {
+  for (const sp of prompt.semanticParts) {
+    if (sp.type === 'text') {
       parts.push({ text: sp.text });
     } else if (sp.type === 'inline_data') {
       parts.push({
@@ -50,59 +83,52 @@ function serializeTrigger(trigger: UserPrompt): Content | null {
   return parts.length > 0 ? { role: 'user', parts } : null;
 }
 
-function serializeSteps(steps: EpisodeStep[]): Content[] {
-  const history: Content[] = [];
-  let pendingModelParts: Part[] = [];
-  let pendingUserParts: Part[] = [];
-
-  const flushPending = () => {
-    if (pendingModelParts.length > 0) {
-      history.push({ role: 'model', parts: [...pendingModelParts] });
-      pendingModelParts = [];
-    }
-    if (pendingUserParts.length > 0) {
-      history.push({ role: 'user', parts: [...pendingUserParts] });
-      pendingUserParts = [];
-    }
-  };
-
-  for (const step of steps) {
-    if (isAgentThought(step)) {
-      if (pendingUserParts.length > 0) flushPending();
-      pendingModelParts.push({
-        text: step.presentation?.text ?? step.text,
-      });
-    } else if (isToolExecution(step)) {
-      pendingModelParts.push({
-        functionCall: {
-          name: step.toolName,
-          args: step.intent,
-          id: step.id,
-        },
-      });
-      const observation = step.presentation
-        ? step.presentation.observation
-        : step.observation;
-      pendingUserParts.push({
-        functionResponse: {
-          name: step.toolName,
-          response:
-            typeof observation === 'string'
-              ? { message: observation }
-              : observation,
-          id: step.id,
-        },
-      });
-    }
-  }
-  flushPending();
-
-  return history;
+function serializeAgentThought(thought: AgentThought): Part {
+  return { text: thought.text };
 }
 
-function serializeYield(yieldNode: AgentYield): Content {
+function serializeToolExecution(
+  tool: ToolExecution,
+): { call: Part; response: Part } {
   return {
-    role: 'model',
-    parts: [{ text: yieldNode.presentation?.text ?? yieldNode.text }],
+    call: {
+      functionCall: {
+        id: tool.id,
+        name: tool.toolName,
+        args: tool.intent,
+      },
+    },
+    response: {
+      functionResponse: {
+        id: tool.id,
+        name: tool.toolName,
+        response: typeof tool.observation === 'string' ? { message: tool.observation } : tool.observation as object,
+      },
+    },
   };
+}
+
+function serializeMaskedTool(
+  tool: MaskedTool,
+): { call: Part; response: Part } {
+  return {
+    call: {
+      functionCall: {
+        id: tool.id,
+        name: tool.toolName,
+        args: tool.intent ?? {},
+      },
+    },
+    response: {
+      functionResponse: {
+        id: tool.id,
+        name: tool.toolName,
+        response: typeof tool.observation === 'string' ? { message: tool.observation } : (tool.observation ?? {}),
+      },
+    },
+  };
+}
+
+function serializeAgentYield(yieldNode: AgentYield): Part {
+  return { text: yieldNode.text };
 }

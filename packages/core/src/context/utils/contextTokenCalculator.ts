@@ -6,13 +6,13 @@
 
 import type { Part } from '@google/genai';
 import { estimateTokenCountSync as baseEstimate } from '../../utils/tokenCalculation.js';
-import type { Episode } from '../ir/types.js';
+import { BASE_MULTIMODAL_TOKEN_COST } from '../ir/types.js';
 
 /**
  * The flat token cost assigned to a single multi-modal asset (like an image tile)
  * by the Gemini API. We use this as a baseline heuristic for inlineData/fileData.
  */
-const BASE_MULTIMODAL_TOKEN_COST = 258;
+import type { ConcreteNode } from '../ir/types.js';
 
 export class ContextTokenCalculator {
   constructor(private readonly charsPerToken: number) {}
@@ -33,17 +33,13 @@ export class ContextTokenCalculator {
   }
 
   /**
-   * Calculates the total token count for a complete Episodic IR graph.
+   * Calculates the total token count for a flat array of ConcreteNodes (The Ship).
    * This is fast because it relies on pre-computed metadata where available.
    */
-  calculateEpisodeListTokens(episodes: Episode[]): number {
+  calculateConcreteListTokens(ship: ReadonlyArray<ConcreteNode>): number {
     let tokens = 0;
-    for (const ep of episodes) {
-      if (ep.trigger) tokens += ep.trigger.metadata.currentTokens;
-      for (const step of ep.steps) {
-        tokens += step.metadata.currentTokens;
-      }
-      if (ep.yield) tokens += ep.yield.metadata.currentTokens;
+    for (const node of ship) {
+       tokens += node.metadata.currentTokens;
     }
     return tokens;
   }

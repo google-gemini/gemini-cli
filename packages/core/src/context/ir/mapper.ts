@@ -5,7 +5,7 @@
  */
 
 import type { Content } from '@google/genai';
-import type { Episode } from './types.js';
+import type { Episode, ConcreteNode } from './types.js';
 import { toIr } from './toIr.js';
 import { fromIr } from './fromIr.js';
 import type { ContextTokenCalculator } from '../utils/contextTokenCalculator.js';
@@ -23,9 +23,9 @@ export class IrMapper {
   }
 
   /**
-   * Re-serializes the Episodic IR back into a flat Gemini Content[] array.
+   * Re-serializes a flat array of ConcreteNodes back into a flat Gemini Content[] array.
    */
-  static fromIr(episodes: Episode[]): Content[] {
-    return fromIr(episodes);
+  static fromIr(ship: ReadonlyArray<ConcreteNode>): Content[] {
+    return fromIr(ship);
   }
 }
