@@ -15,7 +15,6 @@ import { cpSlice, cpIndexToOffset } from '../../utils/textUtils.js';
 import { Command } from '../../key/keyMatchers.js';
 import { useKeyMatchers } from '../../hooks/useKeyMatchers.js';
 import { useMouseClick } from '../../hooks/useMouseClick.js';
-import { useAlternateBuffer } from '../../hooks/useAlternateBuffer.js';
 
 export interface TextInputProps {
   buffer: TextBuffer;
@@ -33,7 +32,6 @@ export function TextInput({
   focus = true,
 }: TextInputProps): React.JSX.Element {
   const keyMatchers = useKeyMatchers();
-  const isAlternateBuffer = useAlternateBuffer();
   const containerRef = useRef<DOMElement>(null);
 
   const {
@@ -53,7 +51,7 @@ export function TextInput({
         buffer.moveToVisualPosition(visRowAbsolute, relativeX);
       }
     },
-    { isActive: focus && !isAlternateBuffer, name: 'left-press' },
+    { isActive: focus, name: 'left-press' },
   );
 
   const handleKeyPress = useCallback(
@@ -80,7 +78,7 @@ export function TextInput({
 
   if (showPlaceholder) {
     return (
-      <Box>
+      <Box ref={containerRef}>
         {focus ? (
           <Text terminalCursorFocus={focus} terminalCursorPosition={0}>
             {chalk.inverse(placeholder[0] || ' ')}

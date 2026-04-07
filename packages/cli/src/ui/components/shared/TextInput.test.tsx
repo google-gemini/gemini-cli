@@ -12,7 +12,6 @@ import { TextInput } from './TextInput.js';
 import { useKeypress } from '../../hooks/useKeypress.js';
 import { useTextBuffer, type TextBuffer } from './text-buffer.js';
 import { useMouseClick } from '../../hooks/useMouseClick.js';
-import { useAlternateBuffer } from '../../hooks/useAlternateBuffer.js';
 
 // Mocks
 vi.mock('../../hooks/useKeypress.js', () => ({
@@ -21,10 +20,6 @@ vi.mock('../../hooks/useKeypress.js', () => ({
 
 vi.mock('../../hooks/useMouseClick.js', () => ({
   useMouseClick: vi.fn(),
-}));
-
-vi.mock('../../hooks/useAlternateBuffer.js', () => ({
-  useAlternateBuffer: vi.fn(() => false),
 }));
 
 vi.mock('./text-buffer.js', async (importOriginal) => {
@@ -88,7 +83,6 @@ describe('TextInput', () => {
 
   beforeEach(() => {
     vi.resetAllMocks();
-    vi.mocked(useAlternateBuffer).mockReturnValue(false);
     // Reset the internal state of the mock buffer for each test
     const buffer = {
       text: '',
@@ -96,6 +90,7 @@ describe('TextInput', () => {
       cursor: [0, 0],
       visualCursor: [0, 0],
       viewportVisualLines: [''],
+      visualScrollRow: 0,
       pastedContent: {} as Record<string, string>,
       handleInput: vi.fn((key) => {
         if (key.sequence) {
@@ -421,7 +416,7 @@ describe('TextInput', () => {
     unmount();
   });
 
-  it('registers mouse click handler for free-form text input when not in alternate buffer', async () => {
+  it('registers mouse click handler for free-form text input', async () => {
     const { unmount } = await render(
       <TextInput buffer={mockBuffer} onSubmit={onSubmit} onCancel={onCancel} />,
     );
@@ -434,16 +429,21 @@ describe('TextInput', () => {
     unmount();
   });
 
-  it('disables mouse click handler when in alternate buffer', async () => {
-    vi.mocked(useAlternateBuffer).mockReturnValue(true);
+  it('registers mouse click handler for placeholder view', async () => {
+    mockBuffer.text = '';
     const { unmount } = await render(
-      <TextInput buffer={mockBuffer} onSubmit={onSubmit} onCancel={onCancel} />,
+      <TextInput
+        buffer={mockBuffer}
+        placeholder="test"
+        onSubmit={onSubmit}
+        onCancel={onCancel}
+      />,
     );
 
     expect(mockedUseMouseClick).toHaveBeenCalledWith(
       expect.any(Object),
       expect.any(Function),
-      expect.objectContaining({ isActive: false, name: 'left-press' }),
+      expect.objectContaining({ isActive: true, name: 'left-press' }),
     );
     unmount();
   });
