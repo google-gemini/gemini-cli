@@ -69,7 +69,9 @@ export const Help: React.FC<Help> = ({ commands }) => (
       Commands:
     </Text>
     {commands
-      .filter((command) => command.description && !command.hidden)
+      .filter(
+        (command) => command.name && command.description && !command.hidden,
+      )
       .map((command: SlashCommand) => (
         <Box key={command.name} flexDirection="column">
           <Text color={theme.text.primary}>
@@ -85,7 +87,7 @@ export const Help: React.FC<Help> = ({ commands }) => (
           </Text>
           {command.subCommands &&
             command.subCommands
-              .filter((subCommand) => !subCommand.hidden)
+              .filter((subCommand) => !subCommand.hidden && subCommand.name)
               .map((subCommand) => (
                 <Text key={subCommand.name} color={theme.text.primary}>
                   <Text bold color={theme.text.accent}>
