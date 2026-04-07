@@ -2270,35 +2270,36 @@ export class Config implements McpContext, AgentLoopContext {
       return plansDir;
     }
 
+    let mkdirError: unknown;
     try {
       fs.mkdirSync(plansDir, { recursive: true });
-
-      const realPlansDir = resolveToRealPath(plansDir);
-      const realProjectRoot = this.storage.getRealProjectRoot();
-      const realGlobalGeminiDir = resolveToRealPath(
-        Storage.getGlobalGeminiDir(),
-      );
-
-      if (
-        !isSubpath(realProjectRoot, realPlansDir) &&
-        !isSubpath(realGlobalGeminiDir, realPlansDir)
-      ) {
-        throw new SecurityError(
-          `Security violation: Resolved plan directory '${realPlansDir}' is outside both the project root '${realProjectRoot}' and the global configuration directory.`,
-        );
-      }
-
-      this.initializedPlanDirs.add(plansDir);
-      this.workspaceContext.addDirectory(realPlansDir);
     } catch (e: unknown) {
-      if (e instanceof SecurityError) {
-        throw e;
-      }
-      this.initializedPlanDirs.add(plansDir); // Don't try again and spam stderr
-      const errorMessage = e instanceof Error ? e.message : String(e);
+      mkdirError = e;
+    }
+
+    const realPlansDir = resolveToRealPath(plansDir);
+    const realProjectRoot = this.storage.getRealProjectRoot();
+    const realGlobalGeminiDir = resolveToRealPath(Storage.getGlobalGeminiDir());
+
+    if (
+      !isSubpath(realProjectRoot, realPlansDir) &&
+      !isSubpath(realGlobalGeminiDir, realPlansDir)
+    ) {
+      throw new SecurityError(
+        `Security violation: Resolved plan directory '${realPlansDir}' is outside both the project root '${realProjectRoot}' and the global configuration directory.`,
+      );
+    }
+
+    this.initializedPlanDirs.add(plansDir);
+
+    if (mkdirError) {
+      const errorMessage =
+        mkdirError instanceof Error ? mkdirError.message : String(mkdirError);
       process.stderr.write(
         `Failed to initialize active plan directory at '${plansDir}': ${errorMessage}\n`,
       );
+    } else {
+      this.workspaceContext.addDirectory(realPlansDir);
     }
     return plansDir;
   }
