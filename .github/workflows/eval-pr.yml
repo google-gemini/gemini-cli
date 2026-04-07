@@ -1,7 +1,7 @@
 name: 'Evals: PR Evaluation & Regression'
 
 on:
-  pull_request:
+  pull_request_target:
     types: ['opened', 'synchronize', 'reopened', 'ready_for_review']
     paths:
       - 'packages/core/src/prompts/**'
@@ -23,13 +23,73 @@ permissions:
   actions: 'read'
 
 jobs:
+  detect-changes:
+    name: 'Detect Steering Changes'
+    runs-on: 'gemini-cli-ubuntu-16-core'
+    # Security: pull_request_target allows secrets, so we must gate carefully.
+    # Detection should not run code from the fork.
+    if: "github.repository == 'google-gemini/gemini-cli' && github.event.pull_request.draft == false"
+    outputs:
+      SHOULD_RUN: '${{ steps.detect.outputs.SHOULD_RUN }}'
+      STEERING_DETECTED: '${{ steps.detect.outputs.STEERING_DETECTED }}'
+    steps:
+      - name: 'Checkout'
+        uses: 'actions/checkout@08eba0b27e820071cde6df949e0beb9ba4906955' # ratchet:actions/checkout@v5
+        with:
+          # Check out the trusted code from main for detection
+          fetch-depth: 0
+
+      - name: 'Detect Steering Changes'
+        id: 'detect'
+        env:
+          # Use the PR's head SHA for comparison without checking it out
+          PR_HEAD_SHA: '${{ github.event.pull_request.head.sha }}'
+        run: |
+          # Fetch the fork's PR branch for analysis
+          git fetch origin pull/${{ github.event.pull_request.number }}/head:pr-head
+
+          # Run the trusted script from main
+          SHOULD_RUN=$(node scripts/changed_prompt.js)
+          STEERING_DETECTED=$(node scripts/changed_prompt.js --steering-only)
+          echo "SHOULD_RUN=$SHOULD_RUN" >> "$GITHUB_OUTPUT"
+          echo "STEERING_DETECTED=$STEERING_DETECTED" >> "$GITHUB_OUTPUT"
+
+      - name: 'Notify Approval Required'
+        if: "steps.detect.outputs.SHOULD_RUN == 'true'"
+        env:
+          GH_TOKEN: '${{ secrets.GITHUB_TOKEN }}'
+        run: |
+          RUN_URL="https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+          COMMENT_BODY="### 🛑 Action Required: Evaluation Approval
+
+          Steering changes have been detected in this PR. To prevent regressions, a maintainer must approve the evaluation run before this PR can be merged.
+
+          **Maintainers:**
+          1. Go to the [**Workflow Run Summary**]($RUN_URL).
+          2. Click the yellow **'Review deployments'** button.
+          3. Select the **'eval-gate'** environment and click **'Approve'**.
+
+          Once approved, the evaluation results will be posted here automatically.
+
+          <!-- eval-approval-notification -->"
+
+          # Check if comment already exists to avoid spamming
+          COMMENT_ID=$(gh pr view ${{ github.event.pull_request.number }} --json comments --jq '.comments[] | select(.body | contains("<!-- eval-approval-notification -->")) | .url' | grep -oE "[0-9]+$" | head -n 1)
+
+          if [ -z "$COMMENT_ID" ]; then
+            gh pr comment ${{ github.event.pull_request.number }} --body "$COMMENT_BODY"
+          else
+            echo "Updating existing notification comment $COMMENT_ID..."
+            gh api -X PATCH "repos/${{ github.repository }}/issues/comments/$COMMENT_ID" -F body="$COMMENT_BODY"
+          fi
+
   pr-evaluation:
     name: 'Evaluate Steering & Regressions'
+    needs: 'detect-changes'
+    if: "needs.detect-changes.outputs.SHOULD_RUN == 'true'"
+    # Manual approval gate via environment
+    environment: 'eval-gate'
     runs-on: 'gemini-cli-ubuntu-16-core'
-    if: "github.repository == 'google-gemini/gemini-cli' && (github.event_name != 'pull_request' || (github.event.pull_request.draft == false && github.event.pull_request.head.repo.full_name == github.repository))"
-    # External contributors' PRs will wait for approval in this environment
-    environment: |-
-      ${{ (github.event.pull_request.head.repo.full_name == github.repository) && 'internal' || 'external-evals' }}
     env:
       # CENTRALIZED MODEL LIST
       MODEL_LIST: 'gemini-3-flash-preview'
@@ -38,7 +98,25 @@ jobs:
       - name: 'Checkout'
         uses: 'actions/checkout@08eba0b27e820071cde6df949e0beb9ba4906955' # ratchet:actions/checkout@v5
         with:
+          # Check out the fork's PR code for the actual evaluation
+          # This only runs AFTER manual approval
+          ref: '${{ github.event.pull_request.head.sha }}'
           fetch-depth: 0
+
+      - name: 'Remove Approval Notification'
+        # Run even if other steps fail, to ensure we clean up the "Action Required" message
+        if: 'always()'
+        env:
+          GH_TOKEN: '${{ secrets.GITHUB_TOKEN }}'
+          PR_NUMBER: '${{ github.event.pull_request.number }}'
+        run: |
+          echo "Debug: PR_NUMBER is '$PR_NUMBER'"
+          # Search for the notification comment by its hidden tag
+          COMMENT_ID=$(gh pr view "$PR_NUMBER" --json comments --jq '.comments[] | select(.body | contains("<!-- eval-approval-notification -->")) | .url' | grep -oE "[0-9]+$" | head -n 1)
+          if [ -n "$COMMENT_ID" ]; then
+            echo "Removing notification comment $COMMENT_ID now that run is approved..."
+            gh api -X DELETE "repos/${{ github.repository }}/issues/comments/$COMMENT_ID"
+          fi
 
       - name: 'Set up Node.js'
         uses: 'actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020' # ratchet:actions/setup-node@v4.4.0
@@ -46,24 +124,14 @@ jobs:
           node-version-file: '.nvmrc'
           cache: 'npm'
 
-      - name: 'Detect Steering Changes'
-        id: 'detect'
-        run: |
-          SHOULD_RUN=$(node scripts/changed_prompt.js)
-          STEERING_DETECTED=$(node scripts/changed_prompt.js --steering-only)
-          echo "SHOULD_RUN=$SHOULD_RUN" >> "$GITHUB_OUTPUT"
-          echo "STEERING_DETECTED=$STEERING_DETECTED" >> "$GITHUB_OUTPUT"
-
       - name: 'Install dependencies'
-        if: "steps.detect.outputs.SHOULD_RUN == 'true'"
         run: 'npm ci'
 
       - name: 'Build project'
-        if: "steps.detect.outputs.SHOULD_RUN == 'true'"
         run: 'npm run build'
 
       - name: 'Analyze PR Content (Guidance)'
-        if: "steps.detect.outputs.STEERING_DETECTED == 'true'"
+        if: "needs.detect-changes.outputs.STEERING_DETECTED == 'true'"
         id: 'analysis'
         env:
           GH_TOKEN: '${{ secrets.GITHUB_TOKEN }}'
@@ -81,7 +149,6 @@ jobs:
           fi
 
       - name: 'Execute Regression Check'
-        if: "steps.detect.outputs.SHOULD_RUN == 'true'"
         env:
           GEMINI_API_KEY: '${{ secrets.GEMINI_API_KEY }}'
           GH_TOKEN: '${{ secrets.GITHUB_TOKEN }}'
@@ -96,7 +163,7 @@ jobs:
           fi
 
       - name: 'Post or Update PR Comment'
-        if: "always() && (steps.detect.outputs.STEERING_DETECTED == 'true' || env.REPORT_FILE != '')"
+        if: "always() && (needs.detect-changes.outputs.STEERING_DETECTED == 'true' || env.REPORT_FILE != '')"
         env:
           GH_TOKEN: '${{ secrets.GITHUB_TOKEN }}'
         run: |
@@ -107,7 +174,7 @@ jobs:
               echo ""
             fi
 
-            if [[ "${{ steps.detect.outputs.STEERING_DETECTED }}" == "true" ]]; then
+            if [[ "${{ needs.detect-changes.outputs.STEERING_DETECTED }}" == "true" ]]; then
               echo "### 🧠 Model Steering Guidance"
               echo ""
               echo "This PR modifies files that affect the model's behavior (prompts, tools, or instructions)."
