@@ -6,6 +6,7 @@
 
 import * as fs from 'node:fs';
 import * as path from 'node:path';
+import { SecurityError } from '../core/errors.js';
 import { SandboxPolicyManager } from '../policy/sandboxPolicyManager.js';
 import { inspect } from 'node:util';
 import process from 'node:process';
@@ -451,7 +452,6 @@ import { A2AClientManager } from '../agents/a2a-client-manager.js';
 import { type McpContext } from '../tools/mcp-client.js';
 import type { EnvironmentSanitizationConfig } from '../services/environmentSanitization.js';
 import { getErrorMessage } from '../utils/errors.js';
-import { LRUCache } from 'mnemonist';
 
 export type { FileFilteringOptions };
 export {
@@ -775,9 +775,15 @@ export class Config implements McpContext, AgentLoopContext {
   private readonly extensionsEnabled: boolean;
   private mcpServers: Record<string, MCPServerConfig> | undefined;
   private readonly mcpEnablementCallbacks?: McpEnablementCallbacks;
+  /**
+   * The persistent context used to route tools (e.g. plans, tasks) to the correct
+   * extension directory.
+   * This is a persistent session state (similar to `approvalMode`). It remains active
+   * across multiple LLM turns until explicitly changed by another command.
+   */
   private activeExtensionContext?: string;
-  private initializedPlanDirs = new LRUCache<string, boolean>(20);
-  private plansDirCache = new LRUCache<string | undefined, string>(20);
+  private initializedPlanDirs = new Set<string>();
+  private plansDirCache = new Map<string | undefined, string>();
   private readonly extensionPlanDirs: Record<string, string>;
   private userMemory: string | HierarchicalMemory;
   private geminiMdFileCount: number;
@@ -2244,8 +2250,9 @@ export class Config implements McpContext, AgentLoopContext {
   }
 
   getActiveExtensionPlanDir(): string | undefined {
-    if (this.activeExtensionContext) {
-      return this.extensionPlanDirs[this.activeExtensionContext];
+    const context = this.getActiveExtensionContext();
+    if (context) {
+      return this.extensionPlanDirs[context];
     }
     return undefined;
   }
@@ -2264,23 +2271,31 @@ export class Config implements McpContext, AgentLoopContext {
     }
 
     try {
-      const realPlansDir = resolveToRealPath(plansDir);
-      const realProjectRoot = resolveToRealPath(this.getTargetDir());
+      fs.mkdirSync(plansDir, { recursive: true });
 
-      if (!isSubpath(realProjectRoot, realPlansDir)) {
-        throw new Error(
-          `Security violation: Resolved plan directory '${realPlansDir}' is outside the project root '${realProjectRoot}'.`,
+      const realPlansDir = resolveToRealPath(plansDir);
+      const realProjectRoot = this.storage.getRealProjectRoot();
+      const realGlobalGeminiDir = resolveToRealPath(
+        Storage.getGlobalGeminiDir(),
+      );
+
+      if (
+        !isSubpath(realProjectRoot, realPlansDir) &&
+        !isSubpath(realGlobalGeminiDir, realPlansDir)
+      ) {
+        throw new SecurityError(
+          `Security violation: Resolved plan directory '${realPlansDir}' is outside both the project root '${realProjectRoot}' and the global configuration directory.`,
         );
       }
 
-      this.initializedPlanDirs.set(plansDir, true);
-      fs.mkdirSync(realPlansDir, { recursive: true });
+      this.initializedPlanDirs.add(plansDir);
       this.workspaceContext.addDirectory(realPlansDir);
     } catch (e: unknown) {
-      const errorMessage = e instanceof Error ? e.message : String(e);
-      if (errorMessage.includes('Security violation')) {
+      if (e instanceof SecurityError) {
         throw e;
       }
+      this.initializedPlanDirs.add(plansDir); // Don't try again and spam stderr
+      const errorMessage = e instanceof Error ? e.message : String(e);
       process.stderr.write(
         `Failed to initialize active plan directory at '${plansDir}': ${errorMessage}\n`,
       );

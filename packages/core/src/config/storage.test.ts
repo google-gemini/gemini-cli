@@ -24,7 +24,7 @@ vi.mock('fs', async (importOriginal) => {
 });
 
 import { Storage } from './storage.js';
-import { GEMINI_DIR, homedir, resolveToRealPath } from '../utils/paths.js';
+import { GEMINI_DIR, homedir } from '../utils/paths.js';
 import { ProjectRegistry } from './projectRegistry.js';
 import { StorageMigration } from './storageMigration.js';
 
@@ -104,7 +104,7 @@ describe('Storage - Security', () => {
 
 describe('Storage – additional helpers', () => {
   const projectRoot = resolveToRealPath(path.resolve('/tmp/project'));
-  const storage = new Storage(projectRoot);
+  let storage = new Storage(projectRoot);
 
   beforeEach(() => {
     ProjectRegistry.prototype.getShortId = vi
@@ -307,12 +307,6 @@ describe('Storage – additional helpers', () => {
         expected: path.resolve(projectRoot, '.my-plans'),
       },
       {
-        name: 'custom absolute path outside throws',
-        customDir: path.resolve('/absolute/path/to/plans'),
-        expected: '',
-        expectedError: `Custom plans directory '${path.resolve('/absolute/path/to/plans')}' resolves to '${path.resolve('/absolute/path/to/plans')}', which is outside the project root '${resolveToRealPath(projectRoot)}'.`,
-      },
-      {
         name: 'absolute path that happens to be inside project root',
         customDir: path.join(projectRoot, 'internal-plans'),
         expected: path.join(projectRoot, 'internal-plans'),
@@ -333,30 +327,9 @@ describe('Storage – additional helpers', () => {
         expected: () => storage.getProjectTempPlansDir(),
       },
       {
-        name: 'escaping relative path throws',
-        customDir: '../escaped-plans',
-        expected: '',
-        expectedError: `Custom plans directory '../escaped-plans' resolves to '${resolveToRealPath(path.resolve(projectRoot, '../escaped-plans'))}', which is outside the project root '${resolveToRealPath(projectRoot)}'.`,
-      },
-      {
         name: 'hidden directory starting with ..',
         customDir: '..plans',
         expected: path.resolve(projectRoot, '..plans'),
-      },
-      {
-        name: 'security escape via symbolic link throws',
-        customDir: 'symlink-to-outside',
-        setup: () => {
-          vi.mocked(fs.realpathSync).mockImplementation((p: fs.PathLike) => {
-            if (p.toString().includes('symlink-to-outside')) {
-              return path.resolve('/outside/project/root');
-            }
-            return p.toString();
-          });
-          return () => vi.mocked(fs.realpathSync).mockRestore();
-        },
-        expected: '',
-        expectedError: `Custom plans directory 'symlink-to-outside' resolves to '${path.resolve('/outside/project/root')}', which is outside the project root '${resolveToRealPath(projectRoot)}'.`,
       },
       {
         name: 'non-existent plan dir in a symlinked project root',
@@ -378,33 +351,14 @@ describe('Storage – additional helpers', () => {
         },
         expected: path.resolve(projectRoot, 'new-plans'),
       },
-      {
-        name: 'security escape via symbolic link with non-existent dir throws',
-        customDir: 'link-to-outside/new-dir',
-        setup: () => {
-          vi.mocked(fs.realpathSync).mockImplementation((p: fs.PathLike) => {
-            const pStr = p.toString();
-            if (pStr.includes('link-to-outside/new-dir')) {
-              const err = new Error('ENOENT') as NodeJS.ErrnoException;
-              err.code = 'ENOENT';
-              throw err;
-            }
-            if (pStr.includes('link-to-outside')) {
-              return '/outside/project/root';
-            }
-            return pStr;
-          });
-          return () => vi.mocked(fs.realpathSync).mockRestore();
-        },
-        expected: '',
-        expectedError:
-          "Custom plans directory 'link-to-outside/new-dir' resolves to '/outside/project/root/new-dir', which is outside the project root '/tmp/project'.",
-      },
     ];
 
     testCases.forEach(({ name, customDir, expected, expectedError, setup }) => {
       it(`should handle ${name}`, async () => {
         const cleanup = setup?.();
+        if (setup) {
+          storage = new Storage(projectRoot, 'test-session');
+        }
         try {
           if (name.includes('default behavior')) {
             await storage.initialize();

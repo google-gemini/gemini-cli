@@ -12,13 +12,11 @@ import {
   GEMINI_DIR,
   homedir,
   GOOGLE_ACCOUNTS_FILENAME,
-  isSubpath,
   resolveToRealPath,
   normalizePath,
 } from '../utils/paths.js';
 import { ProjectRegistry } from './projectRegistry.js';
 import { StorageMigration } from './storageMigration.js';
-
 export const OAUTH_FILE = 'oauth_creds.json';
 const TMP_DIR_NAME = 'tmp';
 const BIN_DIR_NAME = 'bin';
@@ -38,6 +36,10 @@ export class Storage {
     this.targetDir = targetDir;
     this.sessionId = sessionId;
     this.realProjectRoot = resolveToRealPath(targetDir);
+  }
+
+  getRealProjectRoot(): string {
+    return this.realProjectRoot;
   }
 
   setCustomPlansDir(dir: string | undefined): void {
@@ -325,16 +327,7 @@ export class Storage {
   getPlansDir(extensionPlanDir?: string): string {
     const customDir = extensionPlanDir || this.customPlansDir;
     if (customDir) {
-      const resolvedPath = path.resolve(this.getProjectRoot(), customDir);
-      const realResolvedPath = resolveToRealPath(resolvedPath);
-
-      if (!isSubpath(this.realProjectRoot, realResolvedPath)) {
-        throw new Error(
-          `Custom plans directory '${customDir}' resolves to '${realResolvedPath}', which is outside the project root '${this.realProjectRoot}'.`,
-        );
-      }
-
-      return resolvedPath;
+      return path.resolve(this.getProjectRoot(), customDir);
     }
     return this.getProjectTempPlansDir();
   }

@@ -3369,8 +3369,13 @@ describe('Plans Directory Initialization', () => {
     writeSpy.mockRestore();
   });
 
-  it('should throw a security violation if the resolved plan directory is outside the project root', async () => {
-    vi.spyOn(fs, 'mkdirSync').mockReturnValue(undefined);
+  it('should throw a security violation and verify mkdirSync runs before realpathSync (TOCTOU mitigation)', async () => {
+    const callOrder: string[] = [];
+
+    vi.spyOn(fs, 'mkdirSync').mockImplementation(() => {
+      callOrder.push('mkdirSync');
+      return undefined;
+    });
 
     const config = new Config({
       ...baseParams,
@@ -3386,14 +3391,19 @@ describe('Plans Directory Initialization', () => {
       .spyOn(fs, 'realpathSync')
       .mockImplementation((p: fs.PathLike) => {
         const pStr = p.toString();
-        if (pStr.includes('plans')) return '/outside/the/project/root/plans';
+        // Ignore the calls from storage/initialization
+        if (pStr.includes('plans')) {
+          callOrder.push('realpathSync');
+          return '/outside/the/project/root/plans';
+        }
         return pStr;
       });
 
     try {
       expect(() => config.getPlansDir()).toThrow(
-        /Security violation: Resolved plan directory.*is outside the project root/,
+        /Security violation: Resolved plan directory.*is outside both the project root.*and the global configuration directory/,
       );
+      expect(callOrder).toEqual(['mkdirSync', 'realpathSync']);
     } finally {
       realpathSpy.mockRestore();
     }

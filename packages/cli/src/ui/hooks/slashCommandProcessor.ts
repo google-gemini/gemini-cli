@@ -371,7 +371,7 @@ export const useSlashCommandProcessor = (
         extensionContext,
       } = parseSlashCommand(trimmed, commands);
 
-      if (config) {
+      if (config && commandToExecute && !commandToExecute.isSafeConcurrent) {
         if (extensionContext) {
           if (config.hasExtensionPlanDir(extensionContext)) {
             config.setActiveExtensionContext(extensionContext);

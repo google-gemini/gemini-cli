@@ -1130,17 +1130,18 @@ describe('useSlashCommandProcessor', () => {
       });
       expect(spySetContext).toHaveBeenLastCalledWith('extB');
 
-      // 3. Run /plan (Default)
-      await act(async () => {
-        await hook.current.handleSlashCommand('/plan my task');
-      });
-      expect(spySetContext).toHaveBeenLastCalledWith(undefined);
-
-      // 4. Run /clear (Global)
+      // 3. Run /help (Concurrent global command)
+      spySetContext.mockClear();
       await act(async () => {
         await hook.current.handleSlashCommand('/help');
       });
-      // Context should still be undefined
+      // A concurrent command should NOT modify the active extension context
+      expect(spySetContext).not.toHaveBeenCalled();
+
+      // 4. Run /plan (Default)
+      await act(async () => {
+        await hook.current.handleSlashCommand('/plan my task');
+      });
       expect(spySetContext).toHaveBeenLastCalledWith(undefined);
     });
   });
