@@ -39,8 +39,8 @@ function isCompleteEpisode(ep: Partial<Episode>): ep is Episode {
   return (
     typeof ep.id === 'string' &&
     typeof ep.timestamp === 'number' &&
-    !!ep.trigger &&
-    Array.isArray(ep.steps)
+    Array.isArray(ep.children) &&
+    ep.children.length > 0
   );
 }
 
@@ -120,14 +120,14 @@ function parseToolResponses(
     currentEpisode = {
       id: getStableId(msg),
       timestamp: Date.now(),
-      trigger: {
+      children: [{
         id: getStableId(msg.parts![0] || msg),
         type: 'SYSTEM_EVENT',
         name: 'history_resume',
         payload: {},
         metadata: createMetadata([]),
-      } as SystemEvent,
-      steps: [],
+      },
+      ],
     };
   }
 
@@ -161,7 +161,7 @@ function parseToolResponses(
           transformations: [],
         },
       };
-      currentEpisode.steps!.push(step);
+      currentEpisode.children!.push(step);
       if (callId) pendingCallParts.delete(callId);
     }
   }
@@ -203,8 +203,7 @@ function parseUserParts(
     type: 'EPISODE',
     id: getStableId(msg),
     timestamp: Date.now(),
-    trigger,
-    steps: [],
+    children: [trigger],
   };
 }
 
@@ -218,14 +217,14 @@ function parseModelParts(
     currentEpisode = {
       id: getStableId(msg),
       timestamp: Date.now(),
-      trigger: {
+      children: [{
         id: getStableId(msg.parts![0] || msg),
         type: 'SYSTEM_EVENT',
         name: 'model_init',
         payload: {},
         metadata: createMetadata([]),
-      } as SystemEvent,
-      steps: [],
+      },
+      ],
     };
   }
 
@@ -240,15 +239,15 @@ function parseModelParts(
         text: part.text,
         metadata: createMetadata([part]),
       };
-      currentEpisode.steps!.push(thought);
+      currentEpisode.children!.push(thought);
     }
   }
   return currentEpisode;
 }
 
 function finalizeYield(currentEpisode: Partial<Episode>) {
-  if (currentEpisode.steps && currentEpisode.steps.length > 0) {
-    const lastStep = currentEpisode.steps[currentEpisode.steps.length - 1];
+  if (currentEpisode.children && currentEpisode.children.length > 0) {
+    const lastStep = currentEpisode.children[currentEpisode.children.length - 1];
     if (isAgentThought(lastStep)) {
       const yieldNode: AgentYield = {
         id: lastStep.id,
@@ -256,8 +255,8 @@ function finalizeYield(currentEpisode: Partial<Episode>) {
         text: lastStep.text,
         metadata: lastStep.metadata,
       };
-      currentEpisode.steps.pop();
-      currentEpisode.yield = yieldNode;
+      currentEpisode.children.pop();
+      currentEpisode.children.push(yieldNode);
     }
   }
 }

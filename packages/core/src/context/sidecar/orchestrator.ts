@@ -35,7 +35,7 @@ export class PipelineOrchestrator {
       for (const procDef of pipeline.processors) {
         if (!this.instantiatedProcessors.has(procDef.processorId)) {
           const factory = this.registry.get(procDef.processorId);
-          const instance = factory.create(this.env, procDef.options);
+          const instance = factory.create(this.env, procDef.options || {});
           this.instantiatedProcessors.set(procDef.processorId, instance);
         }
       }
