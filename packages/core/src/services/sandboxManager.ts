@@ -146,6 +146,11 @@ export interface SandboxManager {
    * Returns the primary workspace directory for this sandbox.
    */
   getWorkspace(): string;
+
+  /**
+   * Returns the global sandbox options for this sandbox.
+   */
+  getOptions(): GlobalSandboxOptions | undefined;
 }
 
 /**
@@ -283,6 +288,10 @@ export class NoopSandboxManager implements SandboxManager {
   getWorkspace(): string {
     return this.options?.workspace ?? process.cwd();
   }
+
+  getOptions(): GlobalSandboxOptions | undefined {
+    return this.options;
+  }
 }
 
 /**
@@ -309,6 +318,10 @@ export class LocalSandboxManager implements SandboxManager {
 
   getWorkspace(): string {
     return this.options?.workspace ?? process.cwd();
+  }
+
+  getOptions(): GlobalSandboxOptions | undefined {
+    return this.options;
   }
 }
 

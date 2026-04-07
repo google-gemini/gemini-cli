@@ -194,6 +194,8 @@ import {
 } from './hooks/useVisibilityToggle.js';
 import { useKeyMatchers } from './hooks/useKeyMatchers.js';
 
+import { InputContext } from './contexts/InputContext.js';
+
 /**
  * The fraction of the terminal width to allocate to the shell.
  * This provides horizontal padding.
@@ -2326,6 +2328,27 @@ Logging in with Google... Restarting Gemini CLI to continue.
     };
   }, [config, refreshStatic]);
 
+  const inputState = useMemo(
+    () => ({
+      buffer,
+      userMessages: inputHistory,
+      shellModeActive,
+      showEscapePrompt,
+      copyModeEnabled,
+      inputWidth,
+      suggestionsWidth,
+    }),
+    [
+      buffer,
+      inputHistory,
+      shellModeActive,
+      showEscapePrompt,
+      copyModeEnabled,
+      inputWidth,
+      suggestionsWidth,
+    ],
+  );
+
   const uiState: UIState = useMemo(
     () => ({
       history: historyManager.history,
@@ -2369,11 +2392,6 @@ Logging in with Google... Restarting Gemini CLI to continue.
       initError,
       pendingGeminiHistoryItems,
       thought,
-      shellModeActive,
-      userMessages: inputHistory,
-      buffer,
-      inputWidth,
-      suggestionsWidth,
       isInputActive,
       isResuming,
       shouldShowIdePrompt,
@@ -2389,7 +2407,6 @@ Logging in with Google... Restarting Gemini CLI to continue.
       renderMarkdown,
       ctrlCPressedOnce: ctrlCPressCount >= 1,
       ctrlDPressedOnce: ctrlDPressCount >= 1,
-      showEscapePrompt,
       shortcutsHelpVisible,
       cleanUiDetailsVisible,
       isFocused,
@@ -2441,7 +2458,6 @@ Logging in with Google... Restarting Gemini CLI to continue.
       embeddedShellFocused,
       showDebugProfiler,
       customDialog,
-      copyModeEnabled,
       transientMessage,
       bannerData,
       bannerVisible,
@@ -2496,11 +2512,6 @@ Logging in with Google... Restarting Gemini CLI to continue.
       initError,
       pendingGeminiHistoryItems,
       thought,
-      shellModeActive,
-      inputHistory,
-      buffer,
-      inputWidth,
-      suggestionsWidth,
       isInputActive,
       isResuming,
       shouldShowIdePrompt,
@@ -2516,7 +2527,6 @@ Logging in with Google... Restarting Gemini CLI to continue.
       renderMarkdown,
       ctrlCPressCount,
       ctrlDPressCount,
-      showEscapePrompt,
       shortcutsHelpVisible,
       cleanUiDetailsVisible,
       isFocused,
@@ -2568,7 +2578,6 @@ Logging in with Google... Restarting Gemini CLI to continue.
       customDialog,
       apiKeyDefaultValue,
       authState,
-      copyModeEnabled,
       transientMessage,
       bannerData,
       bannerVisible,
@@ -2755,32 +2764,34 @@ Logging in with Google... Restarting Gemini CLI to continue.
 
   return (
     <UIStateContext.Provider value={uiState}>
-      <UIActionsContext.Provider value={uiActions}>
-        <ConfigContext.Provider value={config}>
-          <AppContext.Provider
-            value={{
-              version: props.version,
-              startupWarnings: props.startupWarnings || [],
-            }}
-          >
-            <ToolActionsProvider
-              config={config}
-              toolCalls={allToolCalls}
-              isExpanded={isExpanded}
-              toggleExpansion={toggleExpansion}
-              toggleAllExpansion={toggleAllExpansion}
+      <InputContext.Provider value={inputState}>
+        <UIActionsContext.Provider value={uiActions}>
+          <ConfigContext.Provider value={config}>
+            <AppContext.Provider
+              value={{
+                version: props.version,
+                startupWarnings: props.startupWarnings || [],
+              }}
             >
-              <ShellFocusContext.Provider value={isFocused}>
-                <MouseProvider mouseEventsEnabled={mouseMode}>
-                  <ScrollProvider>
-                    <App key={`app-${forceRerenderKey}`} />
-                  </ScrollProvider>
-                </MouseProvider>
-              </ShellFocusContext.Provider>
-            </ToolActionsProvider>
-          </AppContext.Provider>
-        </ConfigContext.Provider>
-      </UIActionsContext.Provider>
+              <ToolActionsProvider
+                config={config}
+                toolCalls={allToolCalls}
+                isExpanded={isExpanded}
+                toggleExpansion={toggleExpansion}
+                toggleAllExpansion={toggleAllExpansion}
+              >
+                <ShellFocusContext.Provider value={isFocused}>
+                  <MouseProvider mouseEventsEnabled={mouseMode}>
+                    <ScrollProvider>
+                      <App key={`app-${forceRerenderKey}`} />
+                    </ScrollProvider>
+                  </MouseProvider>
+                </ShellFocusContext.Provider>
+              </ToolActionsProvider>
+            </AppContext.Provider>
+          </ConfigContext.Provider>
+        </UIActionsContext.Provider>
+      </InputContext.Provider>
     </UIStateContext.Provider>
   );
 };
