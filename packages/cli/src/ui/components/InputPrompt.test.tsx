@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { renderWithProviders } from '../../test-utils/render.js';
+import { renderWithProviders, cleanup } from '../../test-utils/render.js';
 import { createMockSettings } from '../../test-utils/settings.js';
 import { makeFakeConfig } from '@google/gemini-cli-core';
 import { waitFor } from '../../test-utils/async.js';
@@ -23,6 +23,7 @@ import {
 import {
   ApprovalMode,
   debugLogger,
+  coreEvents,
   type Config,
 } from '@google/gemini-cli-core';
 import * as path from 'node:path';
@@ -93,6 +94,8 @@ vi.mock('ink', async (importOriginal) => {
 
 afterEach(() => {
   vi.restoreAllMocks();
+  vi.useRealTimers();
+  cleanup();
 });
 
 const mockSlashCommands: SlashCommand[] = [
@@ -236,6 +239,7 @@ describe('InputPrompt', () => {
 
   beforeEach(() => {
     vi.resetAllMocks();
+    coreEvents.removeAllListeners();
     vi.spyOn(
       terminalCapabilityManager,
       'isKittyProtocolEnabled',
