@@ -12,6 +12,7 @@ import type { Writable } from 'node:stream';
 import os from 'node:os';
 import fs, { mkdirSync } from 'node:fs';
 import path from 'node:path';
+import crypto from 'node:crypto';
 import type { IPty } from '@lydell/node-pty';
 import { getCachedEncodingForBuffer } from '../utils/systemEncoding.js';
 import {
@@ -370,32 +371,114 @@ export class ShellExecutionService {
     shouldUseNodePty: boolean,
     shellExecutionConfig: ShellExecutionConfig,
   ): Promise<ShellExecutionHandle> {
+    const outputFileName = `gemini_shell_output_${crypto.randomBytes(6).toString('hex')}.log`;
+    const outputFilePath = path.join(os.tmpdir(), outputFileName);
+    const outputStream = fs.createWriteStream(outputFilePath);
+
+    let isBinaryStream = false;
+    let totalBytesWritten = 0;
+
+    const interceptedOnOutputEvent = (event: ShellOutputEvent) => {
+      switch (event.type) {
+        case 'raw_data':
+          break;
+        case 'file_data':
+          if (!isBinaryStream) {
+            outputStream.write(event.chunk);
+            totalBytesWritten += Buffer.byteLength(event.chunk);
+          }
+          break;
+        case 'binary_detected':
+        case 'binary_progress':
+          isBinaryStream = true;
+          break;
+        default:
+          break;
+      }
+      onOutputEvent(event);
+    };
+
+    let handlePromise: Promise<ShellExecutionHandle>;
+
     if (shouldUseNodePty) {
-      const ptyInfo = await getPty();
-      if (ptyInfo) {
-        try {
-          return await this.executeWithPty(
+      handlePromise = getPty().then((ptyInfo) => {
+        if (ptyInfo) {
+          return this.executeWithPty(
             commandToExecute,
             cwd,
-            onOutputEvent,
+            interceptedOnOutputEvent,
             abortSignal,
             shellExecutionConfig,
             ptyInfo,
+          ).catch(() =>
+            this.childProcessFallback(
+              commandToExecute,
+              cwd,
+              interceptedOnOutputEvent,
+              abortSignal,
+              shellExecutionConfig,
+              shouldUseNodePty,
+            ),
           );
-        } catch {
-          // Fallback to child_process
         }
-      }
+        return this.childProcessFallback(
+          commandToExecute,
+          cwd,
+          interceptedOnOutputEvent,
+          abortSignal,
+          shellExecutionConfig,
+          shouldUseNodePty,
+        );
+      });
+    } else {
+      handlePromise = this.childProcessFallback(
+        commandToExecute,
+        cwd,
+        interceptedOnOutputEvent,
+        abortSignal,
+        shellExecutionConfig,
+        shouldUseNodePty,
+      );
     }
 
-    return this.childProcessFallback(
-      commandToExecute,
-      cwd,
-      onOutputEvent,
-      abortSignal,
-      shellExecutionConfig,
-      shouldUseNodePty,
-    );
+    const handle = await handlePromise;
+
+    const wrappedResultPromise = handle.result
+      .then(async (result) => {
+        await new Promise<void>((resolve) => {
+          outputStream.end(resolve);
+        });
+        // The threshold logic is handled later by ToolExecutor/caller, so we just return the full file path if anything was written
+        if (
+          totalBytesWritten > 0 &&
+          !result.backgrounded &&
+          !abortSignal.aborted &&
+          !result.error
+        ) {
+          return {
+            ...result,
+            fullOutputFilePath: outputFilePath,
+          };
+        } else {
+          if (!outputStream.closed) {
+            outputStream.destroy();
+          }
+          await fs.promises.unlink(outputFilePath).catch(() => undefined);
+          return result;
+        }
+      })
+      .catch(async (err) => {
+        if (!outputStream.closed) {
+          outputStream.destroy();
+        }
+        await fs.promises.unlink(outputFilePath).catch(() => undefined);
+        throw err;
+      });
+
+    return {
+      pid: handle.pid,
+      result: wrappedResultPromise,
+    };
   }
 
   private static appendAndTruncate(

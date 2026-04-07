@@ -33,7 +33,16 @@ const mockIsBinary = vi.hoisted(() => vi.fn());
 const mockPlatform = vi.hoisted(() => vi.fn());
 const mockHomedir = vi.hoisted(() => vi.fn());
 const mockMkdirSync = vi.hoisted(() => vi.fn());
-const mockCreateWriteStream = vi.hoisted(() => vi.fn());
+const mockCreateWriteStream = vi.hoisted(() =>
+  vi.fn().mockReturnValue({
+    write: vi.fn(),
+    end: vi.fn().mockImplementation((cb?: () => void) => {
+      if (cb) cb();
+    }),
+    destroy: vi.fn(),
+    closed: false,
+  }),
+);
 const mockGetPty = vi.hoisted(() => vi.fn());
 const mockSerializeTerminalToObject = vi.hoisted(() => vi.fn());
 const mockResolveExecutable = vi.hoisted(() => vi.fn());
@@ -92,6 +101,7 @@ vi.mock('node:os', () => ({
   default: {
     platform: mockPlatform,
     homedir: mockHomedir,
+    tmpdir: () => '/tmp',
     constants: {
       signals: {
         SIGTERM: 15,
@@ -208,6 +218,15 @@ describe('ShellExecutionService', () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
+    mockCreateWriteStream.mockReturnValue({
+      write: vi.fn(),
+      end: vi.fn().mockImplementation((cb?: () => void) => {
+        if (cb) cb();
+      }),
+      destroy: vi.fn(),
+      closed: false,
+      on: vi.fn(),
+    });
     ExecutionLifecycleService.resetForTest();
     ShellExecutionService.resetForTest();
     mockSerializeTerminalToObject.mockReturnValue([]);
@@ -621,7 +640,7 @@ describe('ShellExecutionService', () => {
     });
 
     it('should handle a synchronous spawn error', async () => {
-      mockGetPty.mockImplementation(() => null);
+      mockGetPty.mockResolvedValue(null);
 
       mockCpSpawn.mockImplementation(() => {
         throw new Error('Simulated PTY spawn error');
@@ -725,7 +744,13 @@ describe('ShellExecutionService', () => {
   });
 
   describe('Backgrounding', () => {
-    let mockWriteStream: { write: Mock; end: Mock; on: Mock };
+    let mockWriteStream: {
+      write: Mock;
+      end: Mock;
+      on: Mock;
+      destroy: Mock;
+      closed: boolean;
+    };
     let mockBgChildProcess: EventEmitter & Partial<ChildProcess>;
 
     beforeEach(async () => {
@@ -733,6 +758,8 @@ describe('ShellExecutionService', () => {
         write: vi.fn(),
         end: vi.fn().mockImplementation((cb) => cb?.()),
         on: vi.fn(),
+        destroy: vi.fn(),
+        closed: false,
       };
 
       mockMkdirSync.mockReturnValue(undefined);

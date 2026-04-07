@@ -27,6 +27,7 @@ export interface ExecutionResult {
   pid: number | undefined;
   executionMethod: ExecutionMethod;
   backgrounded?: boolean;
+  fullOutputFilePath?: string;
 }
 
 export interface ExecutionHandle {
