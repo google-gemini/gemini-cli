@@ -52,7 +52,7 @@ function runGit(args, options = {}) {
 function validateCommitSha(commit) {
   if (!/^[a-f0-9]{7,40}$/i.test(commit)) {
     throw new Error(
-      `Invalid commit SHA: "${commit}". Expected 7-40 hexadecimal characters.`, 
+      "Invalid commit SHA: " + commit + ". Expected 7-40 hexadecimal characters.");
   }
 }
 
