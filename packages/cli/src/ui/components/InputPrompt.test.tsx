@@ -409,6 +409,7 @@ describe('InputPrompt', () => {
         getTargetDir: () => path.join('test', 'project', 'src'),
         getVimMode: () => false,
         getUseBackgroundColor: () => true,
+        getUseTerminalBuffer: () => true,
         getTerminalBackground: () => undefined,
         getWorkspaceContext: () => ({
           getDirectories: () => ['/test/project/src'],
