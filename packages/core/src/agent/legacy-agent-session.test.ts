@@ -17,6 +17,9 @@ import type {
   ToolCallRequestInfo,
 } from '../scheduler/types.js';
 import { CoreToolCallStatus } from '../scheduler/types.js';
+import type { GeminiClient } from '../core/client.js';
+import type { Scheduler } from '../scheduler/scheduler.js';
+import type { Config } from '../config/config.js';
 
 // ---------------------------------------------------------------------------
 // Mock helpers
@@ -24,7 +27,7 @@ import { CoreToolCallStatus } from '../scheduler/types.js';
 
 function createMockDeps(
   overrides?: Partial<LegacyAgentSessionDeps>,
-): LegacyAgentSessionDeps {
+): Required<LegacyAgentSessionDeps> {
   const mockClient = {
     sendMessageStream: vi.fn(),
     getChat: vi.fn().mockReturnValue({
@@ -40,18 +43,22 @@ function createMockDeps(
   const mockConfig = {
     getMaxSessionTurns: vi.fn().mockReturnValue(-1),
     getModel: vi.fn().mockReturnValue('gemini-2.5-pro'),
+    getGeminiClient: vi.fn().mockReturnValue(mockClient),
+    getMessageBus: vi.fn().mockImplementation(() => ({
+      subscribe: vi.fn(),
+      unsubscribe: vi.fn(),
+    })),
   };
 
   return {
-    client: mockClient as unknown as LegacyAgentSessionDeps['client'],
-
-    scheduler: mockScheduler as unknown as LegacyAgentSessionDeps['scheduler'],
-
-    config: mockConfig as unknown as LegacyAgentSessionDeps['config'],
+    client: mockClient as unknown as GeminiClient,
+    scheduler: mockScheduler as unknown as Scheduler,
+    config: mockConfig as unknown as Config,
     promptId: 'test-prompt',
     streamId: 'test-stream',
+    getPreferredEditor: vi.fn().mockReturnValue(undefined),
     ...overrides,
-  };
+  } as Required<LegacyAgentSessionDeps>;
 }
 
 async function* makeStream(
@@ -129,7 +136,7 @@ async function collectEvents(
 // ---------------------------------------------------------------------------
 
 describe('LegacyAgentSession', () => {
-  let deps: LegacyAgentSessionDeps;
+  let deps: Required<LegacyAgentSessionDeps>;
 
   beforeEach(() => {
     deps = createMockDeps();
