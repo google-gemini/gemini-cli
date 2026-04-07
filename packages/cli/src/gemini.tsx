@@ -130,16 +130,29 @@ export function getNodeMemoryArgs(isDebugMode: boolean): string[] {
     return [];
   }
 
+  const args: string[] = [];
+
+  // Automatically expand the V8 External Pointer Table to 256MB to prevent
+  // out-of-memory crashes during high native-handle concurrency.
+  const eptFlag = '--max-external-pointer-table-size=268435456';
+  if (
+    !process.execArgv.some((arg) =>
+      arg.startsWith('--max-external-pointer-table-size'),
+    )
+  ) {
+    args.push(eptFlag);
+  }
+
   if (targetMaxOldSpaceSizeInMB > currentMaxOldSpaceSizeMb) {
     if (isDebugMode) {
       debugLogger.debug(
         `Need to relaunch with more memory: ${targetMaxOldSpaceSizeInMB.toFixed(2)} MB`,
       );
     }
-    return [`--max-old-space-size=${targetMaxOldSpaceSizeInMB}`];
+    args.push(`--max-old-space-size=${targetMaxOldSpaceSizeInMB}`);
   }
 
-  return [];
+  return args;
 }
 
 export function setupUnhandledRejectionHandler() {

@@ -400,8 +400,10 @@ describe('getNodeMemoryArgs', () => {
     v8GetHeapStatisticsSpy.mockReturnValue({
       heap_size_limit: 8 * 1024 * 1024 * 1024, // 8GB
     });
-    // Target is 50% of 16GB = 8GB. Current is 8GB. No relaunch needed.
-    expect(getNodeMemoryArgs(false)).toEqual([]);
+    // Target is 50% of 16GB = 8GB. Current is 8GB. Relaunch needed for EPT size only.
+    expect(getNodeMemoryArgs(false)).toEqual([
+      '--max-external-pointer-table-size=268435456',
+    ]);
   });
 
   it('should return memory args if current heap limit is insufficient', () => {
@@ -409,8 +411,11 @@ describe('getNodeMemoryArgs', () => {
     v8GetHeapStatisticsSpy.mockReturnValue({
       heap_size_limit: 4 * 1024 * 1024 * 1024, // 4GB
     });
-    // Target is 50% of 16GB = 8GB. Current is 4GB. Relaunch needed.
-    expect(getNodeMemoryArgs(false)).toEqual(['--max-old-space-size=8192']);
+    // Target is 50% of 16GB = 8GB. Current is 4GB. Relaunch needed for both.
+    expect(getNodeMemoryArgs(false)).toEqual([
+      '--max-external-pointer-table-size=268435456',
+      '--max-old-space-size=8192',
+    ]);
   });
 
   it('should log debug info when isDebugMode is true', () => {
