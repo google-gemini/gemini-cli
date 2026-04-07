@@ -20,9 +20,9 @@ import { theme } from '../semantic-colors.js';
 import { useInputHistory } from '../hooks/useInputHistory.js';
 import { escapeAtSymbols } from '../hooks/atCommandProcessor.js';
 import {
-  ScrollableList,
-  type ScrollableListRef,
-} from './shared/ScrollableList.js';
+  FixedScrollableList,
+  type FixedScrollableListRef,
+} from './shared/FixedScrollableList.js';
 import { ListeningIndicator } from './ListeningIndicator.js';
 import { HalfLinePaddedBox } from './shared/HalfLinePaddedBox.js';
 import {
@@ -290,7 +290,7 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
   const pasteTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const innerBoxRef = useRef<DOMElement>(null);
   const hasUserNavigatedSuggestions = useRef(false);
-  const listRef = useRef<ScrollableListRef<ScrollableItem>>(null);
+  const listRef = useRef<FixedScrollableListRef<ScrollableItem>>(null);
 
   const { isRecording, handleVoiceInput, resetTurnBaseline } = useVoiceMode({
     buffer,
@@ -1869,14 +1869,13 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
                 height={Math.min(buffer.viewportHeight, scrollableData.length)}
                 width="100%"
               >
-                {config.getUseTerminalBuffer() ? (
-                  <ScrollableList
+                {isAlternateBuffer ? (
+                  <FixedScrollableList
                     ref={listRef}
                     hasFocus={focus}
                     data={scrollableData}
                     renderItem={renderItem}
-                    estimatedItemHeight={() => 1}
-                    fixedItemHeight={true}
+                    itemHeight={1}
                     keyExtractor={(item) =>
                       item.type === 'visualLine'
                         ? `line-${item.absoluteVisualIdx}`
@@ -1884,7 +1883,7 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
                     }
                     width={inputWidth + SCROLLBAR_GUTTER_WIDTH}
                     backgroundColor={listBackgroundColor}
-                    containerHeight={Math.min(
+                    maxHeight={Math.min(
                       buffer.viewportHeight,
                       scrollableData.length,
                     )}

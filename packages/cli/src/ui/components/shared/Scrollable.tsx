@@ -13,6 +13,7 @@ import {
   useLayoutEffect,
   useEffect,
   useId,
+  useContext,
 } from 'react';
 import { Box, ResizeObserver, type DOMElement } from 'ink';
 import { useKeypress, type Key } from '../../hooks/useKeypress.js';
@@ -22,9 +23,11 @@ import { useBatchedScroll } from '../../hooks/useBatchedScroll.js';
 import { Command } from '../../key/keyMatchers.js';
 import { useOverflowActions } from '../../contexts/OverflowContext.js';
 import { useKeyMatchers } from '../../hooks/useKeyMatchers.js';
+import { VirtualizedListContext } from './VirtualizedList.js';
 
 interface ScrollableProps {
   children?: React.ReactNode;
+  itemKey?: string;
   width?: number;
   height?: number | string;
   maxWidth?: number;
@@ -40,6 +43,7 @@ interface ScrollableProps {
 
 export const Scrollable: React.FC<ScrollableProps> = ({
   children,
+  itemKey,
   width,
   height,
   maxWidth,
@@ -53,7 +57,16 @@ export const Scrollable: React.FC<ScrollableProps> = ({
   stableScrollback,
 }) => {
   const keyMatchers = useKeyMatchers();
-  const [scrollTop, setScrollTop] = useState(0);
+  const virtualizedListContext = useContext(VirtualizedListContext);
+
+  const [scrollTop, setScrollTop] = useState(() => {
+    if (itemKey && virtualizedListContext) {
+      const state = virtualizedListContext.getItemState(itemKey, 'scrollTop');
+      return typeof state === 'number' ? state : 0;
+    }
+    return 0;
+  });
+
   const viewportRef = useRef<DOMElement | null>(null);
   const contentRef = useRef<DOMElement | null>(null);
   const overflowActions = useOverflowActions();
@@ -72,6 +85,19 @@ export const Scrollable: React.FC<ScrollableProps> = ({
   useLayoutEffect(() => {
     scrollTopRef.current = scrollTop;
   }, [scrollTop]);
+
+  useEffect(
+    () => () => {
+      if (itemKey && virtualizedListContext) {
+        virtualizedListContext.setItemState(
+          itemKey,
+          'scrollTop',
+          scrollTopRef.current,
+        );
+      }
+    },
+    [itemKey, virtualizedListContext],
+  );
 
   useEffect(() => {
     if (reportOverflow && size.scrollHeight > size.innerHeight) {

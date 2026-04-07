@@ -13,14 +13,58 @@ import {
   useMemo,
   useCallback,
   memo,
+  useEffect,
+  createContext,
 } from 'react';
 import type React from 'react';
 import { theme } from '../../semantic-colors.js';
 import { useBatchedScroll } from '../../hooks/useBatchedScroll.js';
 
-import { type DOMElement, Box, ResizeObserver, StaticRender } from 'ink';
+import {
+  type DOMElement,
+  Box,
+  ResizeObserver,
+  StaticRender,
+  getBoundingBox,
+  getScrollTop as getInkScrollTop,
+  useApp,
+} from 'ink';
+import {
+  useMouse,
+  useMouseContext,
+  type MouseEvent,
+} from '../../contexts/MouseContext.js';
+
+import { debugLogger } from '@google/gemini-cli-core';
 
 export const SCROLL_TO_ITEM_END = Number.MAX_SAFE_INTEGER;
+
+export interface ClickableArea {
+  id: string;
+  box: { x: number; y: number; width: number; height: number };
+}
+
+export interface VirtualizedListContextValue {
+  registerInteractivity: (
+    itemKey: string,
+    options: { scroll?: boolean; click?: boolean },
+  ) => void;
+  setItemState: (itemKey: string, stateKey: string, value: unknown) => void;
+  getItemState: (itemKey: string, stateKey: string) => unknown;
+  isItemToggled: (itemKey: string) => boolean;
+  toggleItem: (itemKey: string) => void;
+  registerClickCallback: (
+    itemKey: string,
+    areaId: string,
+    callback: () => void,
+  ) => void;
+  unregisterClickCallback: (itemKey: string, areaId: string) => void;
+  registerClickableArea: (el: DOMElement, areaId: string) => void;
+  unregisterClickableArea: (el: DOMElement) => void;
+}
+
+export const VirtualizedListContext =
+  createContext<VirtualizedListContextValue | null>(null);
 
 export type VirtualizedListProps<T> = {
   data: T[];
@@ -39,9 +83,9 @@ export type VirtualizedListProps<T> = {
   overflowToBackbuffer?: boolean;
   scrollbar?: boolean;
   stableScrollback?: boolean;
-  copyModeEnabled?: boolean;
   fixedItemHeight?: boolean;
   containerHeight?: number;
+  maxScrollbackLength?: number;
 };
 
 export type VirtualizedListRef<T> = {
@@ -78,53 +122,118 @@ function findLastIndex<T>(
   return -1;
 }
 
+function findOffsetIndexAtOrBefore(offsets: number[], target: number): number {
+  let low = 0;
+  let high = offsets.length - 1;
+  let result = 0;
+
+  while (low <= high) {
+    const mid = Math.floor((low + high) / 2);
+    const offset = offsets[mid] ?? 0;
+    if (offset <= target) {
+      result = mid;
+      low = mid + 1;
+    } else {
+      high = mid - 1;
+    }
+  }
+
+  return Math.min(result, Math.max(0, offsets.length - 2));
+}
+
+const isDOMElement = (node: unknown): node is DOMElement =>
+  Boolean(
+    node &&
+      typeof node === 'object' &&
+      'nodeName' in node &&
+      (node as { nodeName?: unknown }).nodeName &&
+      (node as { nodeName?: unknown }).nodeName !== '#text',
+  );
+
+const extractClickableAreas = (
+  rootNode: DOMElement,
+  clickableAreaMap: Map<DOMElement, string>,
+): ClickableArea[] => {
+  const rootBox = getBoundingBox(rootNode);
+  const results: ClickableArea[] = [];
+
+  const traverse = (current: DOMElement) => {
+    const clickableId = clickableAreaMap.get(current);
+
+    if (clickableId) {
+      const childBox = getBoundingBox(current);
+
+      results.push({
+        id: clickableId,
+        box: {
+          x: (childBox.x ?? 0) - (rootBox.x ?? 0),
+          y: (childBox.y ?? 0) - (rootBox.y ?? 0),
+          width: childBox.width ?? 0,
+          height: childBox.height ?? 0,
+        },
+      });
+    }
+
+    for (const child of current.childNodes || []) {
+      if (isDOMElement(child)) {
+        traverse(child);
+      }
+    }
+  };
+
+  traverse(rootNode);
+  return results;
+};
+
 const VirtualizedListItem = memo(
   ({
     content,
-    shouldBeStatic,
-    width,
-    containerWidth,
     itemKey,
     index,
     onSetRef,
   }: {
     content: React.ReactElement;
-    shouldBeStatic: boolean;
-    width: number | string | undefined;
-    containerWidth: number;
     itemKey: string;
     index: number;
-    onSetRef: (index: number, el: DOMElement | null) => void;
+    onSetRef: (index: number, itemKey: string, el: DOMElement | null) => void;
   }) => {
     const itemRef = useCallback(
       (el: DOMElement | null) => {
-        onSetRef(index, el);
+        onSetRef(index, itemKey, el);
       },
-      [index, onSetRef],
+      [index, itemKey, onSetRef],
     );
 
     return (
-      <Box width="100%" flexDirection="column" flexShrink={0} ref={itemRef}>
-        {shouldBeStatic ? (
-          <StaticRender
-            width={typeof width === 'number' ? width : containerWidth}
-            key={
-              itemKey +
-              '-static-' +
-              (typeof width === 'number' ? width : containerWidth)
-            }
-          >
-            {content}
-          </StaticRender>
-        ) : (
-          content
-        )}
+      <Box
+        width="100%"
+        flexDirection="column"
+        flexShrink={0}
+        ref={itemRef}
+        // @ts-expect-error custom attribute for testing
+        nodeType="item-root"
+      >
+        {content}
       </Box>
     );
   },
 );
 
 VirtualizedListItem.displayName = 'VirtualizedListItem';
+
+interface VirtualizedListInternalState {
+  container: DOMElement | null;
+  itemRefs: Array<DOMElement | null>;
+  measuredHeights: number[];
+  measuredKeys: string[];
+  isInitialScrollSet: boolean;
+  containerObserver: ResizeObserver | null;
+  prevOffsetsLength: number;
+  prevDataLength: number;
+  prevTotalHeight: number;
+  prevScrollTop: number;
+  prevContainerHeight: number;
+}
 
 function VirtualizedList<T>(
   props: VirtualizedListProps<T>,
@@ -144,15 +253,18 @@ function VirtualizedList<T>(
     overflowToBackbuffer,
     scrollbar = true,
     stableScrollback,
-    copyModeEnabled = false,
-    fixedItemHeight = false,
+    maxScrollbackLength: maxScrollbackLengthProp,
   } = props;
-  const dataRef = useRef(data);
-  useLayoutEffect(() => {
-    dataRef.current = data;
-  }, [data]);
 
-  const [scrollAnchor, setScrollAnchor] = useState(() => {
+  const app = useApp();
+  const maxScrollbackLength =
+    maxScrollbackLengthProp ?? app.options.maxScrollbackLength ?? 1000;
+
+  const [scrollAnchor, setScrollAnchor] = useState<{
+    index: number;
+    offset: number;
+    isBottom?: boolean;
+  }>(() => {
     const scrollToEnd =
       initialScrollIndex === SCROLL_TO_ITEM_END ||
       (typeof initialScrollIndex === 'number' &&
@@ -196,23 +308,241 @@ function VirtualizedList<T>(
     return scrollToEnd;
   });
 
-  const containerRef = useRef<DOMElement | null>(null);
   const [containerHeight, setContainerHeight] = useState(0);
   const [containerWidth, setContainerWidth] = useState(0);
-  const itemRefs = useRef<Array<DOMElement | null>>([]);
-  const [heights, setHeights] = useState<Record<string, number>>({});
-  const isInitialScrollSet = useRef(false);
+  const [measurementVersion, setMeasurementVersion] = useState(0);
 
-  const containerObserverRef = useRef<ResizeObserver | null>(null);
-  const nodeToKeyRef = useRef(new WeakMap<DOMElement, string>());
+  const interactiveKeys = useRef(
+    new Map<string, { scroll?: boolean; click?: boolean }>(),
+  );
+  const itemStates = useRef(new Map<string, Map<string, unknown>>());
+  const [toggledKeys, setToggledKeys] = useState(() => new Set<string>());
+  const toggledKeysRef = useRef(toggledKeys);
+  toggledKeysRef.current = toggledKeys;
+  const [temporarilyInteractiveIndexes, setTemporarilyInteractiveIndexes] =
+    useState(() => new Set<number>());
+  const renderedAsStatic = useRef<boolean[]>([]);
+  const maxRenderRangeEnd = useRef(0);
+  const [pendingReplayEvent, setPendingReplayEvent] = useState<{
+    index: number;
+    event: MouseEvent;
+  } | null>(null);
 
-  const onSetRef = useCallback((index: number, el: DOMElement | null) => {
-    itemRefs.current[index] = el;
-  }, []);
+  const pendingReplayEventRef = useRef(pendingReplayEvent);
+  pendingReplayEventRef.current = pendingReplayEvent;
+
+  const itemClickableAreas = useRef<Map<string, ClickableArea[]>>(new Map());
+  const clickableAreaMap = useRef<Map<DOMElement, string>>(new Map());
+  const itemMetaMap = useRef(
+    new WeakMap<DOMElement, { index: number; key: string }>(),
+  );
+  const clickCallbacks = useRef<Map<string, Map<string, () => void>>>(
+    new Map(),
+  );
+
+  const { broadcast } = useMouseContext();
+  const broadcastRef = useRef(broadcast);
+  broadcastRef.current = broadcast;
+
+  const virtualizedListContextValue = useMemo<VirtualizedListContextValue>(
+    () => ({
+      registerInteractivity: (itemKey, options) => {
+        interactiveKeys.current.set(itemKey, options);
+      },
+      setItemState: (itemKey, stateKey, value) => {
+        let stateMap = itemStates.current.get(itemKey);
+        if (!stateMap) {
+          stateMap = new Map();
+          itemStates.current.set(itemKey, stateMap);
+        }
+        stateMap.set(stateKey, value);
+      },
+      getItemState: (itemKey, stateKey) =>
+        itemStates.current.get(itemKey)?.get(stateKey),
+      isItemToggled: (itemKey) => toggledKeys.has(itemKey),
+      toggleItem: (itemKey) => {
+        setToggledKeys((prev) => {
+          const next = new Set(prev);
+          if (next.has(itemKey)) {
+            next.delete(itemKey);
+          } else {
+            next.add(itemKey);
+          }
+          return next;
+        });
+      },
+      registerClickCallback: (itemKey, areaId, callback) => {
+        let itemMap = clickCallbacks.current.get(itemKey);
+        if (!itemMap) {
+          itemMap = new Map();
+          clickCallbacks.current.set(itemKey, itemMap);
+        }
+        itemMap.set(areaId, callback);
+      },
+      unregisterClickCallback: (itemKey, areaId) => {
+        const itemMap = clickCallbacks.current.get(itemKey);
+        if (itemMap) {
+          itemMap.delete(areaId);
+          if (itemMap.size === 0) {
+            clickCallbacks.current.delete(itemKey);
+          }
+        }
+      },
+      registerClickableArea: (el, areaId) => {
+        clickableAreaMap.current.set(el, areaId);
+      },
+      unregisterClickableArea: (el) => {
+        clickableAreaMap.current.delete(el);
+      },
+      toggledKeys,
+    }),
+    [toggledKeys],
+  );
+
+  const state = useRef<VirtualizedListInternalState>({
+    container: null,
+    itemRefs: [],
+    measuredHeights: [],
+    measuredKeys: [],
+    isInitialScrollSet: false,
+    containerObserver: null,
+    prevOffsetsLength: -1,
+    prevDataLength: -1,
+    prevTotalHeight: -1,
+    prevScrollTop: -1,
+    prevContainerHeight: -1,
+  });
+
+  const onStaticRender = useCallback(
+    (index: number, key: string, node: DOMElement) => {
+      const height = Math.round(getBoundingBox(node).height ?? 0);
+      if (
+        state.current.measuredHeights[index] !== height ||
+        state.current.measuredKeys[index] !== key
+      ) {
+        state.current.measuredHeights[index] = height;
+        state.current.measuredKeys[index] = key;
+        setMeasurementVersion((v) => v + 1);
+      }
+
+      if (itemClickableAreas.current.has(key)) {
+        // If we already have areas for this item, don't re-extract.
+        // This is especially important for static items because children might
+        // have null dimensions in some environments (like tests) or might be
+        // cleared from the DOM after caching.
+        return;
+      }
+
+      const areas = extractClickableAreas(node, clickableAreaMap.current);
+      if (areas.length > 0) {
+        // In some test environments, dimensions might be null/0.
+        // We only overwrite if we get valid dimensions or if we don't have areas yet.
+        const hasValidDimensions = areas.some(
+          (a) => a.box.width > 0 || a.box.height > 0,
+        );
+        if (hasValidDimensions || !itemClickableAreas.current.has(key)) {
+          itemClickableAreas.current.set(key, areas);
+        }
+      }
+    },
+    [],
+  );
+
+  const itemsObserver = useMemo(
+    () =>
+      new ResizeObserver((entries) => {
+        let changed = false;
+        for (const entry of entries) {
+          if (!isDOMElement(entry.target)) continue;
+          const meta = itemMetaMap.current.get(entry.target);
+          if (meta) {
+            const { index, key } = meta;
+            const height = Math.round(entry.contentRect.height);
+            if (
+              height >= 0 &&
+              state.current.itemRefs[index] === entry.target &&
+              (state.current.measuredHeights[index] !== height ||
+                state.current.measuredKeys[index] !== key)
+            ) {
+              state.current.measuredHeights[index] = height;
+              state.current.measuredKeys[index] = key;
+              changed = true;
+            }
+            if (height > 0) {
+              const areas = extractClickableAreas(
+                entry.target,
+                clickableAreaMap.current,
+              );
+              if (areas.length > 0) {
+                itemClickableAreas.current.set(key, areas);
+
+                const pending = pendingReplayEventRef.current;
+                if (pending && pending.index === index) {
+                  debugLogger.log(
+                    `[Mouse] Replaying event index=${index} from observer`,
+                  );
+                  broadcastRef.current(pending.event);
+                  setPendingReplayEvent(null);
+                }
+              } else {
+                itemClickableAreas.current.delete(key);
+              }
+            }
+          }
+        }
+        if (changed) {
+          setMeasurementVersion((v) => v + 1);
+        }
+      }),
+    [],
+  );
+
+  const onSetRef = useCallback(
+    (index: number, itemKey: string, el: DOMElement | null) => {
+      const oldEl = state.current.itemRefs[index];
+      if (oldEl && oldEl !== el) {
+        if (!isStatic) {
+          itemsObserver.unobserve(oldEl);
+          itemMetaMap.current.delete(oldEl);
+        }
+      }
+
+      state.current.itemRefs[index] = el;
+
+      if (el) {
+        itemMetaMap.current.set(el, { index, key: itemKey });
+
+        if (!isStatic) {
+          itemsObserver.observe(el);
+        }
+
+        // Try to extract clickable areas immediately if dimensions are already available
+        const areas = extractClickableAreas(el, clickableAreaMap.current);
+        if (areas.length > 0) {
+          const hasValidDimensions = areas.some(
+            (a) => a.box.width > 0 || a.box.height > 0,
+          );
+          if (hasValidDimensions) {
+            itemClickableAreas.current.set(itemKey, areas);
+
+            const pending = pendingReplayEventRef.current;
+            if (pending && pending.index === index) {
+              debugLogger.log(
+                `[Mouse] Replaying event index=${index} immediately`,
+              );
+              broadcastRef.current(pending.event);
+              setPendingReplayEvent(null);
+            }
+          }
+        }
+      }
+    },
+    [itemsObserver, isStatic],
+  );
 
   const containerRefCallback = useCallback((node: DOMElement | null) => {
-    containerObserverRef.current?.disconnect();
-    containerRef.current = node;
+    state.current.containerObserver?.disconnect();
+    state.current.container = node;
     if (node) {
       const observer = new ResizeObserver((entries) => {
         const entry = entries[0];
@@ -224,52 +554,33 @@ function VirtualizedList<T>(
         }
       });
       observer.observe(node);
-      containerObserverRef.current = observer;
+      state.current.containerObserver = observer;
     }
   }, []);
 
-  const itemsObserver = useMemo(
-    () =>
-      new ResizeObserver((entries) => {
-        setHeights((prev) => {
-          let next: Record<string, number> | null = null;
-          for (const entry of entries) {
-            const key = nodeToKeyRef.current.get(entry.target);
-            if (key !== undefined) {
-              const height = Math.round(entry.contentRect.height);
-              if (prev[key] !== height) {
-                if (!next) {
-                  next = { ...prev };
-                }
-                next[key] = height;
-              }
-            }
-          }
-          return next ?? prev;
-        });
-      }),
-    [],
-  );
-
-  useLayoutEffect(
+  useEffect(
     () => () => {
-      containerObserverRef.current?.disconnect();
+      state.current.containerObserver?.disconnect();
       itemsObserver.disconnect();
     },
     [itemsObserver],
   );
 
-  const { totalHeight, offsets } = useMemo(() => {
+  const { totalHeight, offsets } = (() => {
     const offsets: number[] = [0];
     let totalHeight = 0;
     for (let i = 0; i < data.length; i++) {
       const key = keyExtractor(data[i], i);
-      const height = heights[key] ?? estimatedItemHeight(i);
+      const cachedHeight =
+        state.current.measuredKeys[i] === key
+          ? state.current.measuredHeights[i]
+          : undefined;
+      const height = cachedHeight ?? estimatedItemHeight(i);
       totalHeight += height;
       offsets.push(totalHeight);
     }
     return { totalHeight, offsets };
-  }, [heights, data, estimatedItemHeight, keyExtractor]);
+  })();
 
   const scrollableContainerHeight = props.containerHeight ?? containerHeight;
 
@@ -277,11 +588,35 @@ function VirtualizedList<T>(
     (
       scrollTop: number,
       offsets: number[],
-    ): { index: number; offset: number } => {
-      const index = findLastIndex(offsets, (offset) => offset <= scrollTop);
-      if (index === -1) {
+      totalHeight: number,
+      scrollableContainerHeight: number,
+    ): { index: number; offset: number; isBottom?: boolean } => {
+      const isNearBottom =
+        totalHeight > 0 &&
+        scrollTop > (totalHeight - scrollableContainerHeight) / 2;
+
+      if (isNearBottom) {
+        const scrollBottom = scrollTop + scrollableContainerHeight;
+        const rawIndex = findLastIndex(
+          offsets,
+          (offset) => offset <= scrollBottom,
+        );
+        if (rawIndex === -1) {
+          return { index: 0, offset: 0, isBottom: true };
+        }
+        const index = Math.min(rawIndex, Math.max(0, offsets.length - 2));
+        return {
+          index,
+          offset: scrollBottom - offsets[index],
+          isBottom: true,
+        };
+      }
+
+      const rawIndex = findLastIndex(offsets, (offset) => offset <= scrollTop);
+      if (rawIndex === -1) {
         return { index: 0, offset: 0 };
       }
+      const index = Math.min(rawIndex, Math.max(0, offsets.length - 2));
 
       return { index, offset: scrollTop - offsets[index] };
     },
@@ -291,7 +626,6 @@ function VirtualizedList<T>(
   const [prevTargetScrollIndex, setPrevTargetScrollIndex] = useState(
     props.targetScrollIndex,
   );
-  const prevOffsetsLength = useRef(offsets.length);
 
   // NOTE: If targetScrollIndex is provided, and we haven't rendered items yet (offsets.length <= 1),
   // we do NOT set scrollAnchor yet, because actualScrollTop wouldn't know the real offset!
@@ -301,17 +635,17 @@ function VirtualizedList<T>(
       props.targetScrollIndex !== prevTargetScrollIndex &&
       offsets.length > 1) ||
     (props.targetScrollIndex !== undefined &&
-      prevOffsetsLength.current <= 1 &&
+      state.current.prevOffsetsLength <= 1 &&
       offsets.length > 1)
   ) {
     if (props.targetScrollIndex !== prevTargetScrollIndex) {
       setPrevTargetScrollIndex(props.targetScrollIndex);
     }
-    prevOffsetsLength.current = offsets.length;
+    state.current.prevOffsetsLength = offsets.length;
     setIsStickingToBottom(false);
     setScrollAnchor({ index: props.targetScrollIndex, offset: 0 });
-  } else {
-    prevOffsetsLength.current = offsets.length;
+  } else if (offsets.length > 1) {
+    state.current.prevOffsetsLength = offsets.length;
   }
 
   const actualScrollTop = useMemo(() => {
@@ -323,46 +657,91 @@ function VirtualizedList<T>(
     if (scrollAnchor.offset === SCROLL_TO_ITEM_END) {
       const item = data[scrollAnchor.index];
       const key = item ? keyExtractor(item, scrollAnchor.index) : '';
-      const itemHeight = heights[key] ?? 0;
+      const cachedHeight =
+        state.current.measuredKeys[scrollAnchor.index] === key
+          ? state.current.measuredHeights[scrollAnchor.index]
+          : undefined;
+      const itemHeight =
+        cachedHeight ?? estimatedItemHeight(scrollAnchor.index) ?? 0;
       return offset + itemHeight - scrollableContainerHeight;
+    }
+
+    if (scrollAnchor.isBottom) {
+      return offset + scrollAnchor.offset - scrollableContainerHeight;
     }
 
     return offset + scrollAnchor.offset;
   }, [
     scrollAnchor,
     offsets,
-    heights,
     scrollableContainerHeight,
     data,
     keyExtractor,
+    estimatedItemHeight,
   ]);
 
-  const scrollTop = isStickingToBottom
+  const startIndex = Math.max(
+    0,
+    findLastIndex(offsets, (offset) => offset <= actualScrollTop) - 1,
+  );
+  const viewHeightForEndIndex =
+    scrollableContainerHeight > 0 ? scrollableContainerHeight : 50;
+  const endIndexOffset = offsets.findIndex(
+    (offset) => offset > actualScrollTop + viewHeightForEndIndex,
+  );
+  const endIndex =
+    endIndexOffset === -1
+      ? data.length - 1
+      : Math.min(data.length - 1, endIndexOffset);
+
+  const backbufferStartIndex = useMemo(() => {
+    if (
+      overflowToBackbuffer &&
+      typeof maxScrollbackLength === 'number' &&
+      maxScrollbackLength > 0
+    ) {
+      // Cull at measured item boundaries. If the target line falls inside a
+      // tall item, keep that whole item so the backbuffer has no blank gap.
+      const targetOffset = Math.max(0, actualScrollTop - maxScrollbackLength);
+      return findOffsetIndexAtOrBefore(offsets, targetOffset);
+    }
+    return 0;
+  }, [overflowToBackbuffer, maxScrollbackLength, actualScrollTop, offsets]);
+
+  const culledHeight =
+    overflowToBackbuffer && maxScrollbackLength > 0
+      ? (offsets[backbufferStartIndex] ?? 0)
+      : 0;
+
+  const logicalScrollTop = isStickingToBottom
     ? Number.MAX_SAFE_INTEGER
     : actualScrollTop;
 
-  const prevDataLength = useRef(data.length);
-  const prevTotalHeight = useRef(totalHeight);
-  const prevScrollTop = useRef(actualScrollTop);
-  const prevContainerHeight = useRef(scrollableContainerHeight);
-
   useLayoutEffect(() => {
+    if (state.current.prevDataLength === -1) {
+      state.current.prevDataLength = data.length;
+      state.current.prevTotalHeight = totalHeight;
+      state.current.prevScrollTop = actualScrollTop;
+      state.current.prevContainerHeight = scrollableContainerHeight;
+      return;
+    }
+
     const contentPreviouslyFit =
-      prevTotalHeight.current <= prevContainerHeight.current;
+      state.current.prevTotalHeight <= state.current.prevContainerHeight;
     const wasScrolledToBottomPixels =
-      prevScrollTop.current >=
-      prevTotalHeight.current - prevContainerHeight.current - 1;
+      state.current.prevScrollTop >=
+      state.current.prevTotalHeight - state.current.prevContainerHeight - 1;
     const wasAtBottom = contentPreviouslyFit || wasScrolledToBottomPixels;
 
-    if (wasAtBottom && actualScrollTop >= prevScrollTop.current) {
+    if (wasAtBottom && actualScrollTop >= state.current.prevScrollTop) {
       if (!isStickingToBottom) {
         setIsStickingToBottom(true);
       }
     }
 
-    const listGrew = data.length > prevDataLength.current;
+    const listGrew = data.length > state.current.prevDataLength;
     const containerChanged =
-      prevContainerHeight.current !== scrollableContainerHeight;
+      state.current.prevContainerHeight !== scrollableContainerHeight;
 
     // If targetScrollIndex is provided, we NEVER auto-snap to the bottom
     // because the parent is explicitly managing the scroll position.
@@ -393,23 +772,33 @@ function VirtualizedList<T>(
     ) {
       // We still clamp the scroll top if it's completely out of bounds
       const newScrollTop = Math.max(0, totalHeight - scrollableContainerHeight);
-      const newAnchor = getAnchorForScrollTop(newScrollTop, offsets);
+      const newAnchor = getAnchorForScrollTop(
+        newScrollTop,
+        offsets,
+        totalHeight,
+        scrollableContainerHeight,
+      );
       if (
         scrollAnchor.index !== newAnchor.index ||
-        scrollAnchor.offset !== newAnchor.offset
+        scrollAnchor.offset !== newAnchor.offset ||
+        scrollAnchor.isBottom !== newAnchor.isBottom
       ) {
         setScrollAnchor(newAnchor);
       }
     } else if (data.length === 0) {
-      if (scrollAnchor.index !== 0 || scrollAnchor.offset !== 0) {
+      if (
+        scrollAnchor.index !== 0 ||
+        scrollAnchor.offset !== 0 ||
+        scrollAnchor.isBottom !== undefined
+      ) {
         setScrollAnchor({ index: 0, offset: 0 });
       }
     }
 
-    prevDataLength.current = data.length;
-    prevTotalHeight.current = totalHeight;
-    prevScrollTop.current = actualScrollTop;
-    prevContainerHeight.current = scrollableContainerHeight;
+    state.current.prevDataLength = data.length;
+    state.current.prevTotalHeight = totalHeight;
+    state.current.prevScrollTop = actualScrollTop;
+    state.current.prevContainerHeight = scrollableContainerHeight;
   }, [
     data.length,
     totalHeight,
@@ -417,6 +806,7 @@ function VirtualizedList<T>(
     scrollableContainerHeight,
     scrollAnchor.index,
     scrollAnchor.offset,
+    scrollAnchor.isBottom,
     getAnchorForScrollTop,
     offsets,
     isStickingToBottom,
@@ -425,7 +815,7 @@ function VirtualizedList<T>(
 
   useLayoutEffect(() => {
     if (
-      isInitialScrollSet.current ||
+      state.current.isInitialScrollSet ||
       offsets.length <= 1 ||
       totalHeight <= 0 ||
       scrollableContainerHeight <= 0
@@ -435,7 +825,7 @@ function VirtualizedList<T>(
 
     if (props.targetScrollIndex !== undefined) {
       // If we are strictly driving from targetScrollIndex, do not apply initialScrollIndex
-      isInitialScrollSet.current = true;
+      state.current.isInitialScrollSet = true;
       return;
     }
 
@@ -451,7 +841,7 @@ function VirtualizedList<T>(
           offset: SCROLL_TO_ITEM_END,
         });
         setIsStickingToBottom(true);
-        isInitialScrollSet.current = true;
+        state.current.isInitialScrollSet = true;
         return;
       }
 
@@ -464,8 +854,15 @@ function VirtualizedList<T>(
         Math.min(totalHeight - scrollableContainerHeight, newScrollTop),
       );
 
-      setScrollAnchor(getAnchorForScrollTop(clampedScrollTop, offsets));
-      isInitialScrollSet.current = true;
+      setScrollAnchor(
+        getAnchorForScrollTop(
+          clampedScrollTop,
+          offsets,
+          totalHeight,
+          scrollableContainerHeight,
+        ),
+      );
+      state.current.isInitialScrollSet = true;
     }
   }, [
     initialScrollIndex,
@@ -475,66 +872,69 @@ function VirtualizedList<T>(
     scrollableContainerHeight,
     getAnchorForScrollTop,
     data.length,
-    heights,
+    measurementVersion,
     props.targetScrollIndex,
   ]);
 
-  const startIndex = Math.max(
-    0,
-    findLastIndex(offsets, (offset) => offset <= actualScrollTop) - 1,
-  );
-  const viewHeightForEndIndex =
-    scrollableContainerHeight > 0 ? scrollableContainerHeight : 50;
-  const endIndexOffset = offsets.findIndex(
-    (offset) => offset > actualScrollTop + viewHeightForEndIndex,
-  );
-  const endIndex =
-    endIndexOffset === -1
-      ? data.length - 1
-      : Math.min(data.length - 1, endIndexOffset);
+  useEffect(() => {
+    setTemporarilyInteractiveIndexes((prev) => {
+      if (prev.size === 0) return prev;
+      let changed = false;
+      const next = new Set(prev);
+      for (const index of prev) {
+        if (index > endIndex) {
+          next.delete(index);
+          changed = true;
+        }
+      }
+      return changed ? next : prev;
+    });
+  }, [endIndex]);
 
-  const topSpacerHeight =
-    renderStatic === true || overflowToBackbuffer === true
-      ? 0
-      : (offsets[startIndex] ?? 0);
-  const bottomSpacerHeight = renderStatic
-    ? 0
-    : totalHeight - (offsets[endIndex + 1] ?? totalHeight);
+  const renderRangeStart = useMemo(() => {
+    if (overflowToBackbuffer) {
+      if (typeof maxScrollbackLength === 'number' && maxScrollbackLength > 0) {
+        return backbufferStartIndex;
+      }
+      return 0;
+    }
+    return startIndex;
+  }, [
+    overflowToBackbuffer,
+    maxScrollbackLength,
+    backbufferStartIndex,
+    startIndex,
+  ]);
 
-  // Maintain a stable set of observed nodes using useLayoutEffect
-  const observedNodes = useRef<Set<DOMElement>>(new Set());
-  useLayoutEffect(() => {
-    const currentNodes = new Set<DOMElement>();
-    const observeStart = renderStatic || overflowToBackbuffer ? 0 : startIndex;
-    const observeEnd = renderStatic ? data.length - 1 : endIndex;
+  const topSpacerHeight = Math.max(0, offsets[renderRangeStart] - culledHeight);
 
-    for (let i = observeStart; i <= observeEnd; i++) {
-      const node = itemRefs.current[i];
+  let renderRangeEnd = endIndex;
+  if (maxRenderRangeEnd.current > endIndex) {
+    let allStatic = true;
+    const currentMax = Math.min(
+      maxRenderRangeEnd.current,
+      data.length > 0 ? data.length - 1 : 0,
+    );
+    for (let i = endIndex + 1; i <= currentMax; i++) {
       const item = data[i];
-      if (node && item) {
-        currentNodes.add(node);
-        const key = keyExtractor(item, i);
-        // Always update the key mapping because React can reuse nodes at different indices/keys
-        nodeToKeyRef.current.set(node, key);
-        if (!isStatic && !fixedItemHeight && !observedNodes.current.has(node)) {
-          itemsObserver.observe(node);
-        }
+      if (!item) continue;
+      const isStaticByDefault =
+        renderStatic === true || isStaticItem?.(item, i) === true;
+      if (!isStaticByDefault) {
+        allStatic = false;
+        break;
       }
     }
-    for (const node of observedNodes.current) {
-      if (!currentNodes.has(node)) {
-        if (!isStatic && !fixedItemHeight) {
-          itemsObserver.unobserve(node);
-        }
-        nodeToKeyRef.current.delete(node);
-      }
+    if (allStatic) {
+      renderRangeEnd = currentMax;
     }
-    observedNodes.current = currentNodes;
-  });
+  }
+  maxRenderRangeEnd.current = renderRangeEnd;
 
-  const renderRangeStart =
-    renderStatic || overflowToBackbuffer ? 0 : startIndex;
-  const renderRangeEnd = renderStatic ? data.length - 1 : endIndex;
+  const bottomSpacerHeight = Math.max(
+    0,
+    totalHeight - (offsets[renderRangeEnd + 1] ?? totalHeight),
+  );
 
   // Always evaluate shouldBeStatic, width, etc. if we have a known width from the prop.
   // If containerHeight or containerWidth is 0 we defer rendering unless a static render or defined width overrides.
@@ -542,10 +942,24 @@ function VirtualizedList<T>(
   // BUT the initial render MUST render *something* with a width if width prop is provided to avoid layout shifts.
   // We MUST wait for containerHeight > 0 before rendering, especially if renderStatic is true.
   // If containerHeight is 0, we will misclassify items as isOutsideViewport and permanently print them to StaticRender!
+  const itemCache = useRef(
+    new Map<
+      string,
+      {
+        item: T;
+        element: React.ReactElement;
+        shouldBeStatic: boolean;
+        width: number | string | undefined;
+        containerWidth: number;
+        index: number;
+        isToggled: boolean;
+        renderItem: typeof renderItem;
+      }
+    >(),
+  );
+
   const isReady =
-    containerHeight > 0 ||
-    process.env['NODE_ENV'] === 'test' ||
-    (width !== undefined && typeof width === 'number');
+    containerHeight > 0 || (width !== undefined && typeof width === 'number');
 
   const renderedItems = useMemo(() => {
     if (!isReady) {
@@ -557,27 +971,110 @@ function VirtualizedList<T>(
       const item = data[i];
       if (item) {
         const isOutsideViewport = i < startIndex || i > endIndex;
-        const shouldBeStatic =
+        const isStaticByDefault =
           (renderStatic === true && isOutsideViewport) ||
           isStaticItem?.(item, i) === true;
 
-        const content = renderItem({ item, index: i });
-        const key = keyExtractor(item, i);
+        const isTemporarilyInteractive =
+          temporarilyInteractiveIndexes.has(i) && i <= endIndex;
+        const shouldBeStatic = isStaticByDefault && !isTemporarilyInteractive;
+        renderedAsStatic.current[i] = shouldBeStatic;
 
-        items.push(
-          <VirtualizedListItem
-            key={key}
-            itemKey={key}
-            content={content}
-            shouldBeStatic={shouldBeStatic}
-            width={width}
-            containerWidth={containerWidth}
-            index={i}
-            onSetRef={onSetRef}
-          />,
-        );
+        const key = keyExtractor(item, i);
+        const cached = itemCache.current.get(key);
+
+        const isToggled = toggledKeys.has(key);
+
+        let contentElement: React.ReactElement;
+        if (
+          cached &&
+          cached.item === item &&
+          cached.shouldBeStatic === shouldBeStatic &&
+          cached.width === width &&
+          cached.containerWidth === containerWidth &&
+          cached.index === i &&
+          cached.isToggled === isToggled &&
+          cached.renderItem === renderItem
+        ) {
+          contentElement = cached.element;
+        } else {
+          if (shouldBeStatic) {
+            contentElement = (
+              <StaticRender
+                key={`${key}-static-${typeof width === 'number' ? width : containerWidth}`}
+                width={typeof width === 'number' ? width : containerWidth}
+                onRender={(node: DOMElement) => onStaticRender(i, key, node)}
+              >
+                {() => renderItem({ item, index: i })}
+              </StaticRender>
+            );
+          } else {
+            contentElement = (
+              <VirtualizedListItem
+                key={key}
+                itemKey={key}
+                content={renderItem({ item, index: i })}
+                index={i}
+                onSetRef={onSetRef}
+              />
+            );
+          }
+          itemCache.current.set(key, {
+            item,
+            element: contentElement,
+            shouldBeStatic,
+            width,
+            containerWidth,
+            index: i,
+            isToggled,
+            renderItem,
+          });
+        }
+
+        items.push(contentElement);
+
+        if (
+          !renderStatic &&
+          state.current.measuredKeys[i] !== key &&
+          !shouldBeStatic
+        ) {
+          const fillerHeight = Math.max(0, estimatedItemHeight(i) - 1);
+          if (fillerHeight > 0) {
+            items.push(
+              <Box
+                key={key + '-filler'}
+                height={fillerHeight}
+                flexShrink={0}
+              />,
+            );
+          }
+        }
       }
     }
+
+    // Cleanup cache to avoid memory leaks
+    if (
+      itemCache.current.size >
+      Math.max(100, (renderRangeEnd - renderRangeStart + 1) * 3)
+    ) {
+      const keysToKeep = new Set<string>();
+      for (
+        let i = Math.max(0, renderRangeStart - 50);
+        i <= Math.min(data.length - 1, renderRangeEnd + 50);
+        i++
+      ) {
+        const item = data[i];
+        if (item) {
+          keysToKeep.add(keyExtractor(item, i));
+        }
+      }
+      for (const key of itemCache.current.keys()) {
+        if (!keysToKeep.has(key)) {
+          itemCache.current.delete(key);
+        }
+      }
+    }
+
     return items;
   }, [
     isReady,
@@ -593,9 +1090,157 @@ function VirtualizedList<T>(
     width,
     containerWidth,
     onSetRef,
+    estimatedItemHeight,
+    temporarilyInteractiveIndexes,
+    onStaticRender,
+    toggledKeys,
   ]);
 
-  const { getScrollTop, setPendingScrollTop } = useBatchedScroll(scrollTop);
+  const { getScrollTop, setPendingScrollTop } =
+    useBatchedScroll(logicalScrollTop);
+
+  useLayoutEffect(() => {
+    // This effect is now just for cases where items are already mounted but not yet replayed
+    if (pendingReplayEvent) {
+      const { index, event } = pendingReplayEvent;
+      const key = keyExtractor(data[index], index);
+      const areas = itemClickableAreas.current.get(key);
+      if (areas && areas.length > 0) {
+        debugLogger.log(`[Mouse] Replaying event index=${index} from effect`);
+        broadcast(event);
+        setPendingReplayEvent(null);
+      }
+    }
+  }, [pendingReplayEvent, broadcast, data, keyExtractor]);
+
+  const handleMouse = useCallback(
+    (event: MouseEvent) => {
+      if (!state.current.container) return;
+
+      const isClick = event.name === 'left-press';
+      const isScroll =
+        event.name === 'scroll-up' || event.name === 'scroll-down';
+      if (!isClick && !isScroll) return;
+
+      const { x, y, width, height } = getBoundingBox(state.current.container);
+      const mouseX = event.col - 1;
+      const mouseY = event.row - 1;
+
+      const relativeX = mouseX - x;
+      const relativeY = mouseY - y;
+
+      if (
+        relativeX >= 0 &&
+        relativeX < width &&
+        relativeY >= 0 &&
+        relativeY < height
+      ) {
+        // getScrollTop() might return MAX_SAFE_INTEGER if stuck to bottom.
+        // We need the true rendered layout scroll top which ink exposes directly via getScrollTop.
+        const trueScrollTop =
+          getInkScrollTop(state.current.container) + culledHeight;
+        const absoluteY = trueScrollTop + relativeY;
+
+        const index = findLastIndex(offsets, (offset) => offset <= absoluteY);
+
+        if (index !== -1) {
+          const item = data[index];
+          if (item) {
+            const itemKey = keyExtractor(item, index);
+            const options = interactiveKeys.current.get(itemKey);
+
+            // Determine if the click was exactly on the first line of the item
+            const itemStartY = offsets[index] ?? 0;
+            const isFirstLineClick = isClick && absoluteY === itemStartY;
+
+            // Hit-test against explicitly defined clickable areas inside the item
+            if (isClick && itemClickableAreas.current.has(itemKey)) {
+              const mouseRelativeY = absoluteY - itemStartY;
+              const areas = itemClickableAreas.current.get(itemKey) ?? [];
+
+              for (const area of areas) {
+                if (
+                  relativeX >= area.box.x &&
+                  relativeX < area.box.x + area.box.width &&
+                  mouseRelativeY >= area.box.y &&
+                  mouseRelativeY < area.box.y + area.box.height
+                ) {
+                  debugLogger.log(
+                    `[Mouse] Clicked inside tagged area: ${area.id} in itemKey: ${itemKey}`,
+                  );
+
+                  if (renderedAsStatic.current[index]) {
+                    debugLogger.log(
+                      `[Mouse] Waking up static item index=${index} due to click on area=${area.id}`,
+                    );
+                    setTemporarilyInteractiveIndexes((prev) => {
+                      const next = new Set(prev);
+                      next.add(index);
+                      return next;
+                    });
+                    setPendingReplayEvent({ index, event });
+                    return;
+                  }
+
+                  const callback = clickCallbacks.current
+                    .get(itemKey)
+                    ?.get(area.id);
+                  if (callback) {
+                    debugLogger.log(
+                      `[Mouse] Dispatching click callback for area=${area.id} in itemKey=${itemKey}`,
+                    );
+                    callback();
+                    return;
+                  }
+
+                  break;
+                }
+              }
+            }
+
+            debugLogger.log(
+              `[Mouse] itemKey=${itemKey} options=${JSON.stringify(options)}`,
+            );
+            if (options) {
+              if (isFirstLineClick && options.click) {
+                if (renderedAsStatic.current[index]) {
+                  debugLogger.log(
+                    `[Mouse] Waking up static item index=${index} due to first-line click`,
+                  );
+                  setTemporarilyInteractiveIndexes((prev) => {
+                    const next = new Set(prev);
+                    next.add(index);
+                    return next;
+                  });
+                  setPendingReplayEvent({ index, event });
+                  return;
+                }
+                debugLogger.log(
+                  `[Mouse] First line click detected. Toggling itemKey=${itemKey}.`,
+                );
+                virtualizedListContextValue.toggleItem(itemKey);
+              } else if (
+                renderedAsStatic.current[index] &&
+                isScroll &&
+                options.scroll
+              ) {
+                // Only wake up the item for scroll events
+                setTemporarilyInteractiveIndexes((prev) => {
+                  const next = new Set(prev);
+                  next.add(index);
+                  return next;
+                });
+                setPendingReplayEvent({ index, event });
+              }
+            }
+          }
+        }
+      }
+    },
+    [offsets, data, keyExtractor, virtualizedListContextValue, culledHeight],
+  );
+
+  useMouse(handleMouse, { isActive: true });
 
   useImperativeHandle(
     ref,
@@ -614,11 +1259,20 @@ function VirtualizedList<T>(
         }
         setPendingScrollTop(newScrollTop);
         setScrollAnchor(
-          getAnchorForScrollTop(Math.min(newScrollTop, maxScroll), offsets),
+          getAnchorForScrollTop(
+            Math.min(newScrollTop, maxScroll),
+            offsets,
+            totalHeight,
+            scrollableContainerHeight,
+          ),
         );
       },
       scrollTo: (offset: number) => {
-        const maxScroll = Math.max(0, totalHeight - scrollableContainerHeight);
+        const effectiveTotalHeight = totalHeight - culledHeight;
+        const maxScroll = Math.max(
+          0,
+          effectiveTotalHeight - scrollableContainerHeight,
+        );
         if (offset >= maxScroll || offset === SCROLL_TO_ITEM_END) {
           setIsStickingToBottom(true);
           setPendingScrollTop(Number.MAX_SAFE_INTEGER);
@@ -630,9 +1284,16 @@ function VirtualizedList<T>(
           }
         } else {
           setIsStickingToBottom(false);
-          const newScrollTop = Math.max(0, offset);
+          const newScrollTop = Math.max(0, offset + culledHeight);
           setPendingScrollTop(newScrollTop);
-          setScrollAnchor(getAnchorForScrollTop(newScrollTop, offsets));
+          setScrollAnchor(
+            getAnchorForScrollTop(
+              newScrollTop,
+              offsets,
+              totalHeight,
+              scrollableContainerHeight,
+            ),
+          );
         }
       },
       scrollToEnd: () => {
@@ -669,7 +1330,14 @@ function VirtualizedList<T>(
             ),
           );
           setPendingScrollTop(newScrollTop);
-          setScrollAnchor(getAnchorForScrollTop(newScrollTop, offsets));
+          setScrollAnchor(
+            getAnchorForScrollTop(
+              newScrollTop,
+              offsets,
+              totalHeight,
+              scrollableContainerHeight,
+            ),
+          );
         }
       },
       scrollToItem: ({
@@ -698,16 +1366,30 @@ function VirtualizedList<T>(
               ),
             );
             setPendingScrollTop(newScrollTop);
-            setScrollAnchor(getAnchorForScrollTop(newScrollTop, offsets));
+            setScrollAnchor(
+              getAnchorForScrollTop(
+                newScrollTop,
+                offsets,
+                totalHeight,
+                scrollableContainerHeight,
+              ),
+            );
           }
         }
       },
       getScrollIndex: () => scrollAnchor.index,
       getScrollState: () => {
-        const maxScroll = Math.max(0, totalHeight - scrollableContainerHeight);
+        const effectiveTotalHeight = totalHeight - culledHeight;
+        const maxScroll = Math.max(
+          0,
+          effectiveTotalHeight - scrollableContainerHeight,
+        );
         return {
-          scrollTop: Math.min(getScrollTop(), maxScroll),
-          scrollHeight: totalHeight,
+          scrollTop: Math.min(
+            Math.max(0, getScrollTop() - culledHeight),
+            maxScroll,
+          ),
+          scrollHeight: effectiveTotalHeight,
           innerHeight: scrollableContainerHeight,
         };
       },
@@ -721,36 +1403,42 @@ function VirtualizedList<T>(
       scrollableContainerHeight,
       getScrollTop,
       setPendingScrollTop,
+      culledHeight,
     ],
   );
 
   return (
-    <Box
-      ref={containerRefCallback}
-      overflowY={copyModeEnabled ? 'hidden' : 'scroll'}
-      overflowX="hidden"
-      scrollTop={copyModeEnabled ? 0 : scrollTop}
-      scrollbarThumbColor={props.scrollbarThumbColor ?? theme.text.secondary}
-      backgroundColor={props.backgroundColor}
-      width="100%"
-      height="100%"
-      flexDirection="column"
-      paddingRight={copyModeEnabled ? 0 : 1}
-      overflowToBackbuffer={overflowToBackbuffer}
-      scrollbar={scrollbar}
-      stableScrollback={stableScrollback}
-    >
+    <VirtualizedListContext.Provider value={virtualizedListContextValue}>
       <Box
-        flexShrink={0}
+        ref={containerRefCallback}
+        overflowY="scroll"
+        overflowX="hidden"
+        scrollTop={
+          isStickingToBottom
+            ? Number.MAX_SAFE_INTEGER
+            : Math.max(0, getScrollTop() - culledHeight)
+        }
+        scrollbarThumbColor={props.scrollbarThumbColor ?? theme.text.secondary}
+        backgroundColor={props.backgroundColor}
         width="100%"
+        height="100%"
         flexDirection="column"
-        marginTop={copyModeEnabled ? -actualScrollTop : 0}
+        paddingRight={1}
+        overflowToBackbuffer={overflowToBackbuffer}
+        scrollbar={scrollbar}
+        stableScrollback={stableScrollback}
       >
-        <Box height={topSpacerHeight} flexShrink={0} />
-        {renderedItems}
-        <Box height={bottomSpacerHeight} flexShrink={0} />
+        <Box flexShrink={0} width="100%" flexDirection="column">
+          {topSpacerHeight > 0 ? (
+            <Box height={topSpacerHeight} flexShrink={0} />
+          ) : null}
+          {renderedItems}
+          {bottomSpacerHeight > 0 ? (
+            <Box height={bottomSpacerHeight} flexShrink={0} />
+          ) : null}
+        </Box>
       </Box>
-    </Box>
+    </VirtualizedListContext.Provider>
   );
 }
 

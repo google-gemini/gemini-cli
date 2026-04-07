@@ -14,6 +14,11 @@ import {
   CoreToolCallStatus,
   UPDATE_TOPIC_TOOL_NAME,
 } from '@google/gemini-cli-core';
+import { VirtualizedListContext } from '../shared/VirtualizedList.js';
+import { Box, type DOMElement, getBoundingBox } from 'ink';
+import { useMouse } from '../../contexts/MouseContext.js';
+import { useCallback, useRef } from 'react';
+import type React from 'react';
 
 describe('<TopicMessage />', () => {
   const baseArgs = {
@@ -30,21 +35,86 @@ describe('<TopicMessage />', () => {
       isExpanded?: (callId: string) => boolean;
       toggleExpansion?: (callId: string) => void;
     },
-  ) =>
-    renderWithProviders(
-      <TopicMessage
-        args={args}
-        terminalWidth={80}
-        availableTerminalHeight={height}
-        callId="test-topic"
-        name={UPDATE_TOPIC_TOOL_NAME}
-        description="Updating topic"
-        status={CoreToolCallStatus.Success}
-        confirmationDetails={undefined}
-        resultDisplay={undefined}
-      />,
+    virtualizedListProps?: {
+      itemKey?: string;
+    },
+  ) => {
+    const defaultItemKey = virtualizedListProps?.itemKey || 'test-topic-key';
+
+    const MockVirtualizedListWrapper: React.FC<{
+      children: React.ReactNode;
+    }> = ({ children }) => {
+      const callbacks = useRef(new Map<string, () => void>());
+
+      const mockListContext = {
+        registerInteractivity: vi.fn(),
+        setItemState: vi.fn(),
+        getItemState: vi.fn(),
+        isItemToggled: vi.fn().mockReturnValue(false),
+        toggleItem: vi.fn(),
+        registerClickCallback: vi.fn((key, id, cb) => {
+          if (key === defaultItemKey) callbacks.current.set(id, cb);
+        }),
+        unregisterClickCallback: vi.fn((key, id) => {
+          if (key === defaultItemKey) callbacks.current.delete(id);
+        }),
+        registerClickableArea: vi.fn(),
+        unregisterClickableArea: vi.fn(),
+        toggledKeys: new Set<string>(),
+      };
+
+      const containerRef = useRef<DOMElement>(null);
+      const handleMouse = useCallback(
+        (event: { name: string; col: number; row: number }) => {
+          if (event.name === 'left-press' && containerRef.current) {
+            const {
+              x,
+              y,
+              width,
+              height: elHeight,
+            } = getBoundingBox(containerRef.current);
+            const mouseX = event.col - 1;
+            const mouseY = event.row - 1;
+            if (
+              mouseX >= x &&
+              mouseX < x + width &&
+              mouseY >= y &&
+              mouseY < y + elHeight
+            ) {
+              const cb = callbacks.current.get('toggle');
+              if (cb) cb();
+            }
+          }
+        },
+        [callbacks],
+      );
+      useMouse(handleMouse, { isActive: true });
+
+      return (
+        <VirtualizedListContext.Provider value={mockListContext}>
+          <Box ref={containerRef}>{children}</Box>
+        </VirtualizedListContext.Provider>
+      );
+    };
+
+    return renderWithProviders(
+      <MockVirtualizedListWrapper>
+        <TopicMessage
+          args={args}
+          itemKey={defaultItemKey}
+          terminalWidth={80}
+          availableTerminalHeight={height}
+          callId="test-topic"
+          name={UPDATE_TOPIC_TOOL_NAME}
+          description="Updating topic"
+          status={CoreToolCallStatus.Success}
+          confirmationDetails={undefined}
+          resultDisplay={undefined}
+        />
+      </MockVirtualizedListWrapper>,
       { toolActions, mouseEventsEnabled: true },
     );
+  };
 
   it('renders title and intent by default (collapsed)', async () => {
     const { lastFrame } = await renderTopic(baseArgs, 40);

@@ -15,6 +15,7 @@ import { useAlternateBuffer } from '../hooks/useAlternateBuffer.js';
 
 interface MarkdownDisplayProps {
   text: string;
+  itemKey?: string;
   isPending: boolean;
   availableTerminalHeight?: number;
   terminalWidth: number;
