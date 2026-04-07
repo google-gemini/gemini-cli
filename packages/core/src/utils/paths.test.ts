@@ -105,7 +105,7 @@ describe('getUserConfigDir', () => {
     );
   });
 
-  it('prefers XDG when both XDG and legacy dirs exist and warns once', () => {
+  it('prefers XDG when both XDG and legacy dirs exist and only warns on the first call', () => {
     vi.stubEnv('XDG_CONFIG_HOME', '/mock/home/.config');
     const xdgDir = path.join('/mock/home/.config', 'gemini-cli');
     const legacyDir = path.join('/mock/home', '.gemini');
@@ -117,6 +117,7 @@ describe('getUserConfigDir', () => {
       .spyOn(coreEvents, 'emitFeedback')
       .mockImplementation(() => {});
 
+    expect(getUserConfigDir()).toBe(xdgDir);
     expect(getUserConfigDir()).toBe(xdgDir);
     expect(warnSpy).toHaveBeenCalledTimes(1);
   });
