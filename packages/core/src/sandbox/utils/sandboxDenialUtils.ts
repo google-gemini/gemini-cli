@@ -7,6 +7,7 @@
 import { LRUCache } from 'mnemonist';
 import { type ParsedSandboxDenial } from '../../services/sandboxManager.js';
 import type { ShellExecutionResult } from '../../services/shellExecutionService.js';
+import { isValidPathString } from '../../utils/paths.js';
 
 /**
  * Type for the sandbox denial error cache.
@@ -26,10 +27,7 @@ export function createSandboxDenialCache(maxSize = 10): SandboxDenialCache {
  * Filters out paths containing '..' or null bytes.
  */
 export function sanitizeExtractedPath(p: string): string | undefined {
-  if (!p || typeof p !== 'string') return undefined;
-
-  // Reject paths with null bytes
-  if (p.includes('\0')) return undefined;
+  if (!isValidPathString(p)) return undefined;
 
   // Reject paths with directory traversal components
   const parts = p.split(/[/\\]/);
@@ -47,6 +45,9 @@ export function sanitizeExtractedPath(p: string): string | undefined {
 
   // Collapse multiple slashes
   normalized = normalized.replace(/\/+/g, '/');
+
+  // Remove single dot segments
+  normalized = normalized.replace(/\/\.\//g, '/');
 
   // Remove trailing slashes (unless it's exactly '/')
   if (normalized.length > 1 && normalized.endsWith('/')) {
@@ -66,10 +67,12 @@ export function parsePosixSandboxDenials(
 ): ParsedSandboxDenial | undefined {
   const output = result.output || '';
   const errorOutput = result.error?.message;
-  const combined = (output + ' ' + (errorOutput || '')).toLowerCase();
+  const fullText = output + '\n' + (errorOutput || '');
+  const combined = fullText.toLowerCase();
 
-  const combinedTrimmed = combined.trim();
-  if (combinedTrimmed && cache?.has(combinedTrimmed)) {
+  // Cache by the first 200 characters of the error to handle variable data (timestamps, PIDs)
+  const cacheKey = combined.trim().slice(0, 200);
+  if (cacheKey && cache?.has(cacheKey)) {
     return undefined;
   }
 
@@ -120,35 +123,28 @@ export function parsePosixSandboxDenials(
   // Extract denied paths (POSIX absolute paths or home-relative paths starting with ~)
   const regexes = [
     // format: /path: operation not permitted
-    /(?:^|\s)['"]?((?:\/|~)(?:[\w.\-/:~]*[\w.\-/~])?)['"]?[^\w/]*operation not permitted/gi,
+    /(?:^|\s)['"]?((?:\/|~)(?:[\w.\-/:~]*[\w.\-/~])?)['"]?[\s:,'"[\]]*operation not permitted/gi,
     // format: operation not permitted, open '/path'
-    /operation not permitted[^\w/]*open[^\w/]*['"]?((?:\/|~)(?:[\w.\-/:~]*[\w.\-/~])?)['"]?/gi,
+    /operation not permitted[\s:,'"[\]]*open[\s:,'"[\]]*['"]?((?:\/|~)(?:[\w.\-/:~]*[\w.\-/~])?)['"]?/gi,
     // format: permission denied, open '/path'
-    /permission denied[^\w/]*open[^\w/]*['"]?((?:\/|~)(?:[\w.\-/:~]*[\w.\-/~])?)['"]?/gi,
+    /permission denied[\s:,'"[\]]*open[\s:,'"[\]]*['"]?((?:\/|~)(?:[\w.\-/:~]*[\w.\-/~])?)['"]?/gi,
     // format: npm error path /path or npm ERR! path /path
     /npm[\s!]*[A-Za-z]*err[A-Za-z!]*[\s!]+path[\s!]*((?:\/|~)(?:[\w.\-/:~]*[\w.\-/~])?)/gi,
     // format: eacces: permission denied, mkdir '/path'
-    /eacces[^\w/]*permission denied[^\w/]*\w+[^\w/]*['"]?((?:\/|~)[\w.\-/:~]*[\w.\-/~])?/gi,
+    /eacces[\s:,'"[\]]*permission denied[\s:,'"[\]]*\w+[\s:,'"[\]]*['"]?((?:\/|~)[\w.\-/:~]*[\w.\-/~])?/gi,
     // format: PermissionError: [Errno 13] Permission denied: '/path'
-    /permissionerror[^\w/]*(?:[^'"]*)['"]((?:\/|~)[\w.\-/:~]*[\w.\-/~])?['"]/gi,
+    /permissionerror[\s:,'"[\]]*(?:[^'"]*)['"]((?:\/|~)[\w.\-/:~]*[\w.\-/~])?['"]/gi,
     // format: FileNotFoundError: [Errno 2] No such file or directory: '/path' (sometimes returned in sandbox denials if directory is hidden)
-    /filenotfounderror[^\w/]*(?:[^'"]*)['"]((?:\/|~)[\w.\-/:~]*[\w.\-/~])?['"]/gi,
+    /filenotfounderror[\s:,'"[\]]*(?:[^'"]*)['"]((?:\/|~)[\w.\-/:~]*[\w.\-/~])?['"]/gi,
     // format: Error: EACCES: permission denied, open '/path'
-    /error[^\w/]*eacces[^\w/]*permission denied[^\w/]*(?:[^'"]*)['"]((?:\/|~)[\w.\-/:~]*[\w.\-/~])?['"]/gi,
+    /error[\s:,'"[\]]*eacces[\s:,'"[\]]*permission denied[\s:,'"[\]]*(?:[^'"]*)['"]((?:\/|~)[\w.\-/:~]*[\w.\-/~])?['"]/gi,
   ];
 
   for (const regex of regexes) {
     let match;
-    while ((match = regex.exec(output)) !== null) {
+    while ((match = regex.exec(fullText)) !== null) {
       const sanitized = sanitizeExtractedPath(match[1]);
       if (sanitized) filePaths.add(sanitized);
-    }
-    if (errorOutput) {
-      regex.lastIndex = 0; // Reset for next use
-      while ((match = regex.exec(errorOutput)) !== null) {
-        const sanitized = sanitizeExtractedPath(match[1]);
-        if (sanitized) filePaths.add(sanitized);
-      }
     }
   }
 
@@ -157,20 +153,14 @@ export function parsePosixSandboxDenials(
     const fallbackRegex =
       /(?:^|[\s"'[\]])(\/[a-zA-Z0-9_.-]+(?:\/[a-zA-Z0-9_.-]+)+)(?:$|[\s"'[\]:])/gi;
     let m;
-    while ((m = fallbackRegex.exec(output)) !== null) {
+    while ((m = fallbackRegex.exec(fullText)) !== null) {
       const sanitized = sanitizeExtractedPath(m[1]);
       if (sanitized) filePaths.add(sanitized);
     }
-    if (errorOutput) {
-      while ((m = fallbackRegex.exec(errorOutput)) !== null) {
-        const sanitized = sanitizeExtractedPath(m[1]);
-        if (sanitized) filePaths.add(sanitized);
-      }
-    }
   }
 
-  if (combinedTrimmed && cache) {
-    cache.set(combinedTrimmed, true);
+  if (cacheKey && cache) {
+    cache.set(cacheKey, true);
   }
 
   return {
