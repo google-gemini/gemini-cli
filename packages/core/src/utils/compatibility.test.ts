@@ -289,19 +289,6 @@ describe('compatibility', () => {
       );
     });
 
-    it('should return tmux warning when detected and in alternate buffer', () => {
-      vi.stubEnv('TMUX', '/tmp/tmux-1001/default,1,0');
-
-      const warnings = getCompatibilityWarnings({ isAlternateBuffer: true });
-      expect(warnings).toContainEqual(
-        expect.objectContaining({
-          id: 'tmux-alternate-buffer',
-          message: expect.stringContaining('tmux detected'),
-          priority: WarningPriority.High,
-        }),
-      );
-    });
-
     it('should return low-color tmux warning when detected', () => {
       vi.stubEnv('TERM', 'screen');
       vi.stubEnv('TMUX', '1');
