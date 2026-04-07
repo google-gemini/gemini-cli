@@ -432,7 +432,7 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
             slashCommands,
           );
           if (commandToExecute?.isSafeConcurrent) {
-            inputHistory.handleSubmit(trimmedMessage);
+            handleSubmitAndClear(trimmedMessage);
             return;
           }
         }
@@ -450,6 +450,7 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
       streamingState,
       setQueueErrorMessage,
       slashCommands,
+      handleSubmitAndClear,
     ],
   );
 
