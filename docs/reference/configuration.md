@@ -1606,6 +1606,12 @@ their corresponding top-level category object in your `settings.json` file.
   - **Default:** `false`
   - **Requires restart:** Yes
 
+- **`experimental.adk.agentSessionInteractiveEnabled`** (boolean):
+  - **Description:** Enable the agent session implementation for the interactive
+    CLI.
+  - **Default:** `false`
+  - **Requires restart:** Yes
+
 - **`experimental.enableAgents`** (boolean):
   - **Description:** Enable local and remote subagents.
   - **Default:** `true`

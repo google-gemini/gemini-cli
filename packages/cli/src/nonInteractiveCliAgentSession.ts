@@ -37,6 +37,7 @@ import {
   LegacyAgentSession,
   ToolErrorType,
   geminiPartsToContentParts,
+  debugLogger,
 } from '@google/gemini-cli-core';
 
 import type { Part } from '@google/genai';
@@ -599,6 +600,7 @@ export async function runNonInteractive({
             // Explicitly ignore these non-interactive events
             break;
           default:
+            debugLogger.error('Unknown agent event type:', event);
             event satisfies never;
             break;
         }

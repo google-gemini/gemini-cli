@@ -105,7 +105,8 @@ function ensureSandboxAvailable(): boolean {
   if (platform === 'win32') {
     // Windows sandboxing relies on icacls, which is a core system utility and
     // always available.
-    return true;
+    // TODO: reenable once flakiness is addressed
+    return false;
   }
 
   if (platform === 'darwin') {
