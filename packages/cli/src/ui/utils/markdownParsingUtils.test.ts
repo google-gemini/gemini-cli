@@ -257,11 +257,11 @@ describe('parsingUtils', () => {
         );
       });
 
-      it('should not wrap non-http markdown links with OSC 8', () => {
+      it('should wrap markdown links that contain file paths with OSC 8', () => {
         const input = 'See [file](./README.md)';
         const output = parseMarkdownToANSI(input, undefined, hyperlinkOpts);
-        // Should not have OSC 8 wrapping for non-http URLs in markdown links
-        expect(output).not.toContain(OSC8_START);
+        expect(output).toContain(OSC8_START);
+        expect(output).toContain('file://');
       });
 
       it('should wrap inline code file paths with OSC 8 when enabled', () => {
@@ -291,8 +291,14 @@ describe('parsingUtils', () => {
         const output = parseMarkdownToANSI(input, undefined, hyperlinkOpts);
         expect(output).toContain(OSC8_START);
         expect(output).toContain('file://');
-        // The URI should point to the file (without line number in path)
-        expect(output).toContain('src/index.ts');
+        expect(output).toContain('#L42');
+      });
+
+      it('should preserve line and column for plain-text file paths', () => {
+        const input = 'Check src/index.ts:42:10 now';
+        const output = parseMarkdownToANSI(input, undefined, hyperlinkOpts);
+        expect(output).toContain(OSC8_START);
+        expect(output).toContain('#L42,10');
       });
 
       it('should not interfere with bold/italic formatting', () => {

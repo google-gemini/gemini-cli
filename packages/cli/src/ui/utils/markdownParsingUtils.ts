@@ -87,16 +87,13 @@ const colorizeWithFileLinks = (
     return ansiColorize(text, color);
   }
 
-  // Reset the regex state for each call
-  const regex = new RegExp(
-    PLAIN_TEXT_FILE_PATH_REGEX.source,
-    PLAIN_TEXT_FILE_PATH_REGEX.flags,
-  );
   let result = '';
   let lastIdx = 0;
-  let m;
 
-  while ((m = regex.exec(text)) !== null) {
+  for (const m of text.matchAll(PLAIN_TEXT_FILE_PATH_REGEX)) {
+    if (m.index === undefined) {
+      continue;
+    }
     // Skip if this looks like part of a URL (preceded by ://)
     const precedingText = text.slice(Math.max(0, m.index - 3), m.index);
     if (precedingText.includes('://')) {
@@ -108,11 +105,13 @@ const colorizeWithFileLinks = (
     }
 
     const filePath = m[1];
+    const line = m[2];
+    const col = m[3];
     const fullMatch = m[0];
-    const uri = resolveFileUri(filePath);
+    const uri = resolveFileUri(filePath, line, col);
     result += wrapHyperlink(ansiColorize(fullMatch, color), uri);
 
-    lastIdx = regex.lastIndex;
+    lastIdx = m.index + fullMatch.length;
   }
 
   if (lastIdx === 0) return ansiColorize(text, color);
@@ -238,7 +237,13 @@ export const parseMarkdownToANSI = (
           const styled = ansiColorize(codeContent, theme.text.accent);
           if (enableHyperlinks && looksLikeFilePath(codeContent)) {
             const pathPart = extractFilePath(codeContent);
-            styledPart = wrapHyperlink(styled, resolveFileUri(pathPart));
+            const suffixMatch = codeContent.match(/:(\d+)(?::(\d+))?$/);
+            const uri = resolveFileUri(
+              pathPart,
+              suffixMatch?.[1],
+              suffixMatch?.[2],
+            );
+            styledPart = wrapHyperlink(styled, uri);
           } else {
             styledPart = styled;
           }
@@ -257,8 +262,14 @@ export const parseMarkdownToANSI = (
             ansiColorize(' (', baseColor) +
             ansiColorize(url, theme.text.link) +
             ansiColorize(')', baseColor);
-          if (enableHyperlinks && /^https?:\/\//.test(url)) {
-            styledPart = wrapHyperlink(linkOutput, url);
+          const isHttp = /^https?:\/\//.test(url);
+          if (enableHyperlinks && (isHttp || looksLikeFilePath(url))) {
+            const pathPart = extractFilePath(url);
+            const suffixMatch = url.match(/:(\d+)(?::(\d+))?$/);
+            const uri = isHttp
+              ? url
+              : resolveFileUri(pathPart, suffixMatch?.[1], suffixMatch?.[2]);
+            styledPart = wrapHyperlink(linkOutput, uri);
           } else {
             styledPart = linkOutput;
           }
