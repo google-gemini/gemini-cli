@@ -136,7 +136,8 @@ describe('TableRenderer', () => {
     const { lastFrame, unmount } = renderResult;
     const output = lastFrame();
     expect(output).toContain('Tiny');
-    expect(output).toContain('definitely needs');
+    expect(output).toContain('definitely');
+    expect(output).toContain('needs');
     await expect(renderResult).toMatchSvgSnapshot();
     unmount();
   });

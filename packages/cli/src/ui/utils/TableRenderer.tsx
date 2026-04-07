@@ -27,6 +27,7 @@ interface TableRendererProps {
 }
 
 const MIN_COLUMN_WIDTH = 5;
+const MAX_COLUMN_WIDTH = 30;
 const COLUMN_PADDING = 2;
 const TABLE_MARGIN = 2;
 
@@ -113,8 +114,11 @@ export const TableRenderer: React.FC<TableRendererProps> = ({
           maxWordWidth = Math.max(maxWordWidth, cellWordWidth);
         });
 
-        const minWidth = maxWordWidth;
-        const maxWidth = Math.max(minWidth, maxContentWidth);
+        const minWidth = Math.min(maxWordWidth, MAX_COLUMN_WIDTH);
+        const maxWidth = Math.min(
+          Math.max(minWidth, maxContentWidth),
+          MAX_COLUMN_WIDTH,
+        );
 
         return { minWidth, maxWidth };
       },
