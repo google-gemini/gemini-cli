@@ -6,12 +6,14 @@
 
 import fs from 'node:fs';
 import path from 'node:path';
+import { assertValidPathString } from '../../utils/paths.js';
 
 export function isErrnoException(e: unknown): e is NodeJS.ErrnoException {
   return e instanceof Error && 'code' in e;
 }
 
 export function tryRealpath(p: string): string {
+  assertValidPathString(p);
   try {
     return fs.realpathSync(p);
   } catch (e) {

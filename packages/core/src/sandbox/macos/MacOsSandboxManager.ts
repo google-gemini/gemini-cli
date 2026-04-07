@@ -32,10 +32,16 @@ import {
   getCommandName as getFullCommandName,
   isStrictlyApproved,
 } from '../utils/commandUtils.js';
-import { parsePosixSandboxDenials } from '../utils/sandboxDenialUtils.js';
+import {
+  parsePosixSandboxDenials,
+  createSandboxDenialCache,
+  type SandboxDenialCache,
+} from '../utils/sandboxDenialUtils.js';
 import { handleReadWriteCommands } from '../utils/sandboxReadWriteUtils.js';
 
 export class MacOsSandboxManager implements SandboxManager {
+  private readonly denialCache: SandboxDenialCache = createSandboxDenialCache();
+
   constructor(private readonly options: GlobalSandboxOptions) {}
 
   isKnownSafeCommand(args: string[]): boolean {
@@ -52,7 +58,7 @@ export class MacOsSandboxManager implements SandboxManager {
   }
 
   parseDenials(result: ShellExecutionResult): ParsedSandboxDenial | undefined {
-    return parsePosixSandboxDenials(result);
+    return parsePosixSandboxDenials(result, this.denialCache);
   }
 
   getWorkspace(): string {
