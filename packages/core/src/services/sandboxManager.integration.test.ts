@@ -19,52 +19,54 @@ import path from 'node:path';
 import http from 'node:http';
 
 /**
- * Abstracts platform-specific shell commands for integration testing.
+ * Cross-platform command wrappers using Node.js inline scripts.
+ * Avoids shell-specific quirks and initialization hangs under restricted sandbox tokens.
  */
 const Platform = {
   isWindows: os.platform() === 'win32',
 
-  /** Returns a command to create an empty file. */
   touch(filePath: string) {
-    return this.isWindows
-      ? {
-          command: 'powershell.exe',
-          args: [
-            '-NoProfile',
-            '-Command',
-            `New-Item -Path "${filePath}" -ItemType File -Force`,
-          ],
-        }
-      : { command: 'touch', args: [filePath] };
+    return {
+      command: process.execPath,
+      args: [
+        '-e',
+        `require("node:fs").writeFileSync(${JSON.stringify(filePath)}, "")`,
+      ],
+    };
   },
 
-  /** Returns a command to read a file's content. */
   cat(filePath: string) {
-    return this.isWindows
-      ? { command: 'cmd.exe', args: ['/c', `type "${filePath}"`] }
-      : { command: 'cat', args: [filePath] };
+    return {
+      command: process.execPath,
+      args: [
+        '-e',
+        `console.log(require("node:fs").readFileSync(${JSON.stringify(filePath)}, "utf8"))`,
+      ],
+    };
   },
 
-  /** Returns a command to echo a string. */
   echo(text: string) {
-    return this.isWindows
-      ? { command: 'cmd.exe', args: ['/c', `echo ${text}`] }
-      : { command: 'echo', args: [text] };
+    return {
+      command: process.execPath,
+      args: ['-e', `console.log(${JSON.stringify(text)})`],
+    };
   },
 
-  /** Returns a command to perform a network request. */
   curl(url: string) {
-    return { command: 'curl', args: ['-s', '--connect-timeout', '1', url] };
+    return {
+      command: process.execPath,
+      args: [
+        '-e',
+        `require("node:http").get(${JSON.stringify(url)}, (res) => { res.on("data", (d) => process.stdout.write(d)); res.on("end", () => process.exit(0)); }).on("error", () => process.exit(1));`,
+      ],
+    };
   },
 
-  /** Returns a command that checks if the current terminal is interactive. */
   isPty() {
-    return this.isWindows
-      ? 'powershell.exe -NoProfile -Command "echo True"'
-      : 'bash -c "if [ -t 1 ]; then echo True; else echo False; fi"';
+    // ShellExecutionService.execute expects a raw shell string
+    return `"${process.execPath}" -e "console.log(process.stdout.isTTY ? 'True' : 'False')"`;
   },
 
-  /** Returns a path that is strictly outside the workspace and likely blocked. */
   getExternalBlockedPath() {
     return this.isWindows
       ? 'C:\\Windows\\System32\\drivers\\etc\\hosts'
