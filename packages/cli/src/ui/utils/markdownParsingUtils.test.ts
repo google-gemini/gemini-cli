@@ -222,5 +222,87 @@ describe('parsingUtils', () => {
         ),
       );
     });
+
+    describe('hyperlinks', () => {
+      const OSC8_START = '\x1b]8;;';
+      const OSC8_END = '\x07';
+      const hyperlink = (text: string, uri: string) =>
+        `${OSC8_START}${uri}${OSC8_END}${text}${OSC8_START}${OSC8_END}`;
+      const hyperlinkOpts = { enableHyperlinks: true };
+
+      it('should not add hyperlinks when disabled (default)', () => {
+        const input = 'Visit https://example.com today';
+        const output = parseMarkdownToANSI(input);
+        expect(output).not.toContain(OSC8_START);
+      });
+
+      it('should wrap plain URLs with OSC 8 when enabled', () => {
+        const input = 'Visit https://example.com today';
+        const output = parseMarkdownToANSI(input, undefined, hyperlinkOpts);
+        expect(output).toBe(
+          `${primary('Visit ')}${hyperlink(link('https://example.com'), 'https://example.com')}${primary(' today')}`,
+        );
+      });
+
+      it('should wrap markdown links with OSC 8 when enabled', () => {
+        const input = 'Check [docs](https://docs.example.com)';
+        const output = parseMarkdownToANSI(input, undefined, hyperlinkOpts);
+        const linkOutput =
+          primary('docs') +
+          primary(' (') +
+          link('https://docs.example.com') +
+          primary(')');
+        expect(output).toBe(
+          `${primary('Check ')}${hyperlink(linkOutput, 'https://docs.example.com')}`,
+        );
+      });
+
+      it('should not wrap non-http markdown links with OSC 8', () => {
+        const input = 'See [file](./README.md)';
+        const output = parseMarkdownToANSI(input, undefined, hyperlinkOpts);
+        // Should not have OSC 8 wrapping for non-http URLs in markdown links
+        expect(output).not.toContain(OSC8_START);
+      });
+
+      it('should wrap inline code file paths with OSC 8 when enabled', () => {
+        const input = 'Edit `src/utils/file.ts`';
+        const output = parseMarkdownToANSI(input, undefined, hyperlinkOpts);
+        expect(output).toContain(OSC8_START);
+        expect(output).toContain('file://');
+        expect(output).toContain(accent('src/utils/file.ts'));
+      });
+
+      it('should not wrap non-path inline code with OSC 8', () => {
+        const input = 'Use `const x = 1` in your code';
+        const output = parseMarkdownToANSI(input, undefined, hyperlinkOpts);
+        expect(output).not.toContain(OSC8_START);
+        expect(output).toContain(accent('const x = 1'));
+      });
+
+      it('should detect file paths in plain text and wrap with OSC 8', () => {
+        const input = 'Look at src/utils/file.ts for details';
+        const output = parseMarkdownToANSI(input, undefined, hyperlinkOpts);
+        expect(output).toContain(OSC8_START);
+        expect(output).toContain('file://');
+      });
+
+      it('should handle inline code with line numbers', () => {
+        const input = 'Error at `src/index.ts:42`';
+        const output = parseMarkdownToANSI(input, undefined, hyperlinkOpts);
+        expect(output).toContain(OSC8_START);
+        expect(output).toContain('file://');
+        // The URI should point to the file (without line number in path)
+        expect(output).toContain('src/index.ts');
+      });
+
+      it('should not interfere with bold/italic formatting', () => {
+        const input = '**bold text** and *italic*';
+        const output = parseMarkdownToANSI(input, undefined, hyperlinkOpts);
+        // Should still have bold and italic formatting, no spurious hyperlinks
+        expect(output).not.toContain(OSC8_START);
+        expect(output).toContain(chalk.bold(primary('bold text')));
+        expect(output).toContain(chalk.italic(primary('italic')));
+      });
+    });
   });
 });
