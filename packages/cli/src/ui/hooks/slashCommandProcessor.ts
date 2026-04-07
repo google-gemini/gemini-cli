@@ -372,13 +372,11 @@ export const useSlashCommandProcessor = (
       } = parseSlashCommand(trimmed, commands);
 
       if (config && commandToExecute && !commandToExecute.isSafeConcurrent) {
-        if (extensionContext) {
-          if (config.hasExtensionPlanDir(extensionContext)) {
-            config.setActiveExtensionContext(extensionContext);
-          } else {
-            config.setActiveExtensionContext(undefined);
-          }
-        }
+        config.setActiveExtensionContext(
+          extensionContext && config.hasExtensionPlanDir(extensionContext)
+            ? extensionContext
+            : undefined,
+        );
       }
 
       // If the input doesn't match any known command, check if MCP servers
