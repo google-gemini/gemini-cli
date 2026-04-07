@@ -26,66 +26,49 @@ describe('skillUtils', () => {
     vi.unstubAllEnvs();
   });
 
-  const itif = (condition: boolean) => (condition ? it : it.skip);
-
   describe('linkSkill', () => {
-    // TODO: issue 19388 - Enable linkSkill tests on Windows
-    itif(process.platform !== 'win32')(
-      'should successfully link from a local directory',
-      async () => {
-        // Create a mock skill directory
-        const mockSkillSourceDir = path.join(tempDir, 'mock-skill-source');
-        const skillSubDir = path.join(mockSkillSourceDir, 'test-skill');
-        await fs.mkdir(skillSubDir, { recursive: true });
-        await fs.writeFile(
-          path.join(skillSubDir, 'SKILL.md'),
-          '---\nname: test-skill\ndescription: test\n---\nbody',
-        );
+    it('should successfully link from a local directory', async () => {
+      // Create a mock skill directory
+      const mockSkillSourceDir = path.join(tempDir, 'mock-skill-source');
+      const skillSubDir = path.join(mockSkillSourceDir, 'test-skill');
+      await fs.mkdir(skillSubDir, { recursive: true });
+      await fs.writeFile(
+        path.join(skillSubDir, 'SKILL.md'),
+        '---\nname: test-skill\ndescription: test\n---\nbody',
+      );
 
-        const skills = await linkSkill(
-          mockSkillSourceDir,
-          'workspace',
-          () => {},
-        );
-        expect(skills.length).toBe(1);
-        expect(skills[0].name).toBe('test-skill');
+      const skills = await linkSkill(mockSkillSourceDir, 'workspace', () => {});
+      expect(skills.length).toBe(1);
+      expect(skills[0].name).toBe('test-skill');
 
-        const linkedPath = path.join(tempDir, '.gemini/skills', 'test-skill');
-        const stats = await fs.lstat(linkedPath);
-        expect(stats.isSymbolicLink()).toBe(true);
+      const linkedPath = path.join(tempDir, '.gemini/skills', 'test-skill');
+      const stats = await fs.lstat(linkedPath);
+      expect(stats.isSymbolicLink()).toBe(true);
 
-        const linkTarget = await fs.readlink(linkedPath);
-        expect(path.resolve(linkTarget)).toBe(path.resolve(skillSubDir));
-      },
-    );
+      const linkTarget = await fs.readlink(linkedPath);
+      expect(path.resolve(linkTarget)).toBe(path.resolve(skillSubDir));
+    });
 
-    itif(process.platform !== 'win32')(
-      'should overwrite existing skill at destination',
-      async () => {
-        const mockSkillSourceDir = path.join(tempDir, 'mock-skill-source');
-        const skillSubDir = path.join(mockSkillSourceDir, 'test-skill');
-        await fs.mkdir(skillSubDir, { recursive: true });
-        await fs.writeFile(
-          path.join(skillSubDir, 'SKILL.md'),
-          '---\nname: test-skill\ndescription: test\n---\nbody',
-        );
+    it('should overwrite existing skill at destination', async () => {
+      const mockSkillSourceDir = path.join(tempDir, 'mock-skill-source');
+      const skillSubDir = path.join(mockSkillSourceDir, 'test-skill');
+      await fs.mkdir(skillSubDir, { recursive: true });
+      await fs.writeFile(
+        path.join(skillSubDir, 'SKILL.md'),
+        '---\nname: test-skill\ndescription: test\n---\nbody',
+      );
 
-        const targetDir = path.join(tempDir, '.gemini/skills');
-        await fs.mkdir(targetDir, { recursive: true });
-        const existingPath = path.join(targetDir, 'test-skill');
-        await fs.mkdir(existingPath);
+      const targetDir = path.join(tempDir, '.gemini/skills');
+      await fs.mkdir(targetDir, { recursive: true });
+      const existingPath = path.join(targetDir, 'test-skill');
+      await fs.mkdir(existingPath);
 
-        const skills = await linkSkill(
-          mockSkillSourceDir,
-          'workspace',
-          () => {},
-        );
-        expect(skills.length).toBe(1);
+      const skills = await linkSkill(mockSkillSourceDir, 'workspace', () => {});
+      expect(skills.length).toBe(1);
 
-        const stats = await fs.lstat(existingPath);
-        expect(stats.isSymbolicLink()).toBe(true);
-      },
-    );
+      const stats = await fs.lstat(existingPath);
+      expect(stats.isSymbolicLink()).toBe(true);
+    });
 
     it('should abort linking if consent is rejected', async () => {
       const mockSkillSourceDir = path.join(tempDir, 'mock-skill-source');
@@ -237,39 +220,40 @@ describe('skillUtils', () => {
       expect(result).toBeNull();
     });
 
-    itif(process.platform !== 'win32')(
-      'should successfully uninstall a skill even if its name was updated after linking',
-      async () => {
-        // 1. Create source skill
-        const sourceDir = path.join(tempDir, 'source-skill');
-        await fs.mkdir(sourceDir, { recursive: true });
-        const skillMdPath = path.join(sourceDir, 'SKILL.md');
-        await fs.writeFile(
-          skillMdPath,
-          '---\nname: original-name\ndescription: test\n---\nbody',
-        );
+    it('should successfully uninstall a skill even if its name was updated after linking', async () => {
+      // 1. Create source skill
+      const sourceDir = path.join(tempDir, 'source-skill');
+      await fs.mkdir(sourceDir, { recursive: true });
+      const skillMdPath = path.join(sourceDir, 'SKILL.md');
+      await fs.writeFile(
+        skillMdPath,
+        '---\nname: original-name\ndescription: test\n---\nbody',
+      );
 
-        // 2. Link it
-        const skillsDir = path.join(tempDir, '.gemini/skills');
-        await fs.mkdir(skillsDir, { recursive: true });
-        const destPath = path.join(skillsDir, 'original-name');
-        await fs.symlink(sourceDir, destPath, 'dir');
+      // 2. Link it
+      const skillsDir = path.join(tempDir, '.gemini/skills');
+      await fs.mkdir(skillsDir, { recursive: true });
+      const destPath = path.join(skillsDir, 'original-name');
+      await fs.symlink(
+        sourceDir,
+        destPath,
+        process.platform === 'win32' ? 'junction' : 'dir',
+      );
 
-        // 3. Update name in source
-        await fs.writeFile(
-          skillMdPath,
-          '---\nname: updated-name\ndescription: test\n---\nbody',
-        );
+      // 3. Update name in source
+      await fs.writeFile(
+        skillMdPath,
+        '---\nname: updated-name\ndescription: test\n---\nbody',
+      );
 
-        // 4. Uninstall by NEW name (this is the bug fix)
-        const result = await uninstallSkill('updated-name', 'user');
-        expect(result).not.toBeNull();
-        expect(result?.location).toBe(destPath);
+      // 4. Uninstall by NEW name (this is the bug fix)
+      const result = await uninstallSkill('updated-name', 'user');
+      expect(result).not.toBeNull();
+      expect(result?.location).toBe(destPath);
 
-        const exists = await fs.lstat(destPath).catch(() => null);
-        expect(exists).toBeNull();
-      },
-    );
+      const exists = await fs.lstat(destPath).catch(() => null);
+      expect(exists).toBeNull();
+    });
 
     it('should successfully uninstall a skill by directory name if metadata is missing (fallback)', async () => {
       const skillsDir = path.join(tempDir, '.gemini/skills');
