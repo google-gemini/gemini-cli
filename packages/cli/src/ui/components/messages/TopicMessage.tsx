@@ -5,7 +5,7 @@
  */
 
 import type React from 'react';
-import { useEffect, useId, useRef } from 'react';
+import { useEffect, useId, useRef, useCallback } from 'react';
 import { Box, Text, type DOMElement } from 'ink';
 import {
   UPDATE_TOPIC_TOOL_NAME,
@@ -63,33 +63,34 @@ export const TopicMessage: React.FC<TopicMessageProps> = ({
   const intent = strategicIntent || summary;
 
   // Extra summary: only if both exist and are different (or just summary if we want to show it below)
-  // According to requirements: "show intent and we need to make it optionally expandable ... to show the summary"
   const hasExtraSummary = !!(
     strategicIntent &&
     summary &&
     strategicIntent !== summary
   );
 
-  const handleToggle = () => {
+  const handleToggle = useCallback(() => {
     if (toggleExpansion && hasExtraSummary) {
       toggleExpansion(callId);
     }
-  };
+  }, [toggleExpansion, hasExtraSummary, callId]);
 
   useMouseClick(containerRef, handleToggle, {
     isActive: isExpandable && hasExtraSummary,
   });
 
   useEffect(() => {
-    if (isExpandable && hasExtraSummary && !isExpanded && overflowActions) {
+    // Only register if there is more content (summary) and it's currently hidden
+    const hasHiddenContent = isExpandable && hasExtraSummary && !isExpanded;
+
+    if (hasHiddenContent && overflowActions) {
       overflowActions.addOverflowingId(overflowId);
     } else if (overflowActions) {
       overflowActions.removeOverflowingId(overflowId);
     }
+
     return () => {
-      if (overflowActions) {
-        overflowActions.removeOverflowingId(overflowId);
-      }
+      overflowActions?.removeOverflowingId(overflowId);
     };
   }, [isExpandable, hasExtraSummary, isExpanded, overflowActions, overflowId]);
 
