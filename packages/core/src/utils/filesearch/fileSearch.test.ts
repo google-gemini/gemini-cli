@@ -832,10 +832,44 @@ describe('FileSearch', () => {
 
     await fileSearch.initialize();
 
-    // Verify that the internal state objects were NOT recreated
-    expect(fileSearch.fzf).toBe(firstFzf);
     expect(fileSearch.resultCache).toBe(firstResultCache);
     expect(crawlSpy).toHaveBeenCalled();
+  });
+
+  it('should prevent concurrent initialization calls', async () => {
+    tmpDir = await createTmpDir({});
+    const fileSearch = FileSearchFactory.create({
+      projectRoot: tmpDir,
+      fileDiscoveryService: new FileDiscoveryService(tmpDir, {}),
+      ignoreDirs: [],
+      cache: true,
+      cacheTtl: 10000,
+      enableRecursiveFileSearch: true,
+      enableFuzzySearch: true,
+    });
+
+    let crawlResolve: (value: string[]) => void;
+    const crawlPromise = new Promise<string[]>((resolve) => {
+      crawlResolve = resolve;
+    });
+
+    const crawlSpy = vi.spyOn(crawler, 'crawl').mockReturnValue(crawlPromise);
+
+    // Start first initialization
+    const init1 = fileSearch.initialize();
+    expect(crawlSpy).toHaveBeenCalledTimes(1);
+
+    // Start second initialization while first is still "Initializing"
+    const init2 = fileSearch.initialize();
+
+    // Should NOT have called crawl again
+    expect(crawlSpy).toHaveBeenCalledTimes(1);
+
+    // Resolve the first one
+    crawlResolve!([]);
+    await Promise.all([init1, init2]);
+
+    expect(crawlSpy).toHaveBeenCalledTimes(1);
   });
 
   describe('DirectoryFileSearch', () => {

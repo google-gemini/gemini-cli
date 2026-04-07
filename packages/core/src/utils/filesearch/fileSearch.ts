@@ -63,6 +63,12 @@ export interface FileSearchOptions {
   maxFiles?: number;
 }
 
+enum InitializationState {
+  Uninitialized,
+  Initializing,
+  Initialized,
+}
+
 export class AbortError extends Error {
   constructor(message = 'Search aborted') {
     super(message);
@@ -133,34 +139,52 @@ class RecursiveFileSearch implements FileSearch {
   private resultCache: ResultCache | undefined;
   private allFiles: string[] = [];
   private fzf: AsyncFzf<string[]> | undefined;
+  private initializationState = InitializationState.Uninitialized;
 
   constructor(private readonly options: FileSearchOptions) {}
 
   async initialize(): Promise<void> {
-    const nextIgnore = loadIgnoreRules(
-      this.options.fileDiscoveryService,
-      this.options.ignoreDirs,
-    );
-
-    const nextFiles = await crawl({
-      crawlDirectory: this.options.projectRoot,
-      cwd: this.options.projectRoot,
-      ignore: nextIgnore,
-      cache: this.options.cache,
-      cacheTtl: this.options.cacheTtl,
-      maxDepth: this.options.maxDepth,
-      maxFiles: this.options.maxFiles ?? 20000,
-    });
-
-    if (nextFiles === this.allFiles && this.ignore) {
-      // optimization: if the file list is referentially equal (from crawl cache)
-      // and we already have ignore rules, skip rebuilding the FZF index.
+    if (this.initializationState === InitializationState.Initializing) {
       return;
     }
+    const prevState = this.initializationState;
+    this.initializationState = InitializationState.Initializing;
 
-    this.ignore = nextIgnore;
-    this.allFiles = nextFiles;
-    this.buildResultCache();
+    try {
+      const nextIgnore = loadIgnoreRules(
+        this.options.fileDiscoveryService,
+        this.options.ignoreDirs,
+      );
+
+      const nextFiles = await crawl({
+        crawlDirectory: this.options.projectRoot,
+        cwd: this.options.projectRoot,
+        ignore: nextIgnore,
+        cache: this.options.cache,
+        cacheTtl: this.options.cacheTtl,
+        maxDepth: this.options.maxDepth,
+        maxFiles: this.options.maxFiles ?? 20000,
+      });
+
+      if (
+        nextFiles === this.allFiles &&
+        this.ignore &&
+        prevState === InitializationState.Initialized
+      ) {
+        this.initializationState = InitializationState.Initialized;
+        // optimization: if the file list is referentially equal (from crawl cache)
+        // and we already have ignore rules, skip rebuilding the FZF index.
+        return;
+      }
+
+      this.ignore = nextIgnore;
+      this.allFiles = nextFiles;
+      this.buildResultCache();
+      this.initializationState = InitializationState.Initialized;
+    } catch (e) {
+      this.initializationState = prevState;
+      throw e;
+    }
   }
 
   async search(
