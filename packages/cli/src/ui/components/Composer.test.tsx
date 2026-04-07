@@ -245,20 +245,37 @@ const createMockConfig = (overrides = {}): Config =>
     ...overrides,
   }) as unknown as Config;
 
+import { InputContext, type InputState } from '../contexts/InputContext.js';
+
 const renderComposer = async (
   uiState: UIState,
   settings = createMockSettings({ ui: {} }),
   config = createMockConfig(),
   uiActions = createMockUIActions(),
+  inputStateOverrides: Partial<InputState> = {},
 ) => {
+  const inputState = {
+    buffer: { text: '' } as unknown as TextBuffer,
+    userMessages: [],
+    shellModeActive: false,
+    showEscapePrompt: false,
+    copyModeEnabled: false,
+    inputWidth: 80,
+    suggestionsWidth: 40,
+    ...(uiState as unknown as Partial<InputState>),
+    ...inputStateOverrides,
+  };
+
   const result = await render(
     <ConfigContext.Provider value={config as unknown as Config}>
       <SettingsContext.Provider value={settings as unknown as LoadedSettings}>
-        <UIStateContext.Provider value={uiState}>
-          <UIActionsContext.Provider value={uiActions}>
-            <Composer isFocused={true} />
-          </UIActionsContext.Provider>
-        </UIStateContext.Provider>
+        <InputContext.Provider value={inputState}>
+          <UIStateContext.Provider value={uiState}>
+            <UIActionsContext.Provider value={uiActions}>
+              <Composer isFocused={true} />
+            </UIActionsContext.Provider>
+          </UIStateContext.Provider>
+        </InputContext.Provider>
       </SettingsContext.Provider>
     </ConfigContext.Provider>,
   );
@@ -541,7 +558,6 @@ describe('Composer', () => {
       const uiState = createMockUIState({
         ctrlCPressedOnce: false,
         ctrlDPressedOnce: false,
-        showEscapePrompt: false,
       });
 
       const { lastFrame } = await renderComposer(uiState);
@@ -631,7 +647,6 @@ describe('Composer', () => {
       async (mode) => {
         const uiState = createMockUIState({
           showApprovalModeIndicator: mode,
-          shellModeActive: false,
         });
 
         const { lastFrame } = await renderComposer(uiState);
@@ -641,11 +656,15 @@ describe('Composer', () => {
     );
 
     it('shows ShellModeIndicator when shell mode is active', async () => {
-      const uiState = createMockUIState({
-        shellModeActive: true,
-      });
+      const uiState = createMockUIState();
 
-      const { lastFrame } = await renderComposer(uiState);
+      const { lastFrame } = await renderComposer(
+        uiState,
+        undefined,
+        undefined,
+        undefined,
+        { shellModeActive: true },
+      );
 
       expect(lastFrame()).toMatch(/ShellModeIndic[\s\S]*tor/);
     });
@@ -724,11 +743,16 @@ describe('Composer', () => {
     it('shows Esc rewind prompt in minimal mode without showing full UI', async () => {
       const uiState = createMockUIState({
         cleanUiDetailsVisible: false,
-        showEscapePrompt: true,
         history: [{ id: 1, type: 'user', text: 'msg' }],
       });
 
-      const { lastFrame } = await renderComposer(uiState);
+      const { lastFrame } = await renderComposer(
+        uiState,
+        undefined,
+        undefined,
+        undefined,
+        { showEscapePrompt: true },
+      );
       const output = lastFrame();
       expect(output).toContain('Press Esc again to rewind.');
       expect(output).not.toContain('ContextSummaryDisplay');
@@ -828,11 +852,16 @@ describe('Composer', () => {
   describe('Shortcuts Hint', () => {
     it('restores shortcuts hint after 200ms debounce when buffer is empty', async () => {
       const uiState = createMockUIState({
-        buffer: { text: '' } as unknown as TextBuffer,
         cleanUiDetailsVisible: false,
       });
 
-      const { lastFrame } = await renderComposer(uiState);
+      const { lastFrame } = await renderComposer(
+        uiState,
+        undefined,
+        undefined,
+        undefined,
+        { buffer: { text: '' } as unknown as TextBuffer },
+      );
 
       await act(async () => {
         await vi.advanceTimersByTimeAsync(250);
@@ -845,11 +874,16 @@ describe('Composer', () => {
 
     it('hides shortcuts hint when text is typed in buffer', async () => {
       const uiState = createMockUIState({
-        buffer: { text: 'hello' } as unknown as TextBuffer,
         cleanUiDetailsVisible: false,
       });
 
-      const { lastFrame } = await renderComposer(uiState);
+      const { lastFrame } = await renderComposer(
+        uiState,
+        undefined,
+        undefined,
+        undefined,
+        { buffer: { text: 'hello' } as unknown as TextBuffer },
+      );
 
       expect(lastFrame()).not.toContain('press tab twice for more');
       expect(lastFrame()).not.toContain('? for shortcuts');

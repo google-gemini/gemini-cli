@@ -293,7 +293,7 @@ describe('WebFetchTool', () => {
         })),
       },
       isInteractive: () => false,
-      isAutoDistillationEnabled: vi.fn().mockReturnValue(false),
+      isContextManagementEnabled: vi.fn().mockReturnValue(false),
     } as unknown as Config;
   });
 
@@ -1120,8 +1120,8 @@ describe('WebFetchTool', () => {
       expect(result.error?.type).toBe(ToolErrorType.WEB_FETCH_PROCESSING_ERROR);
     });
 
-    it('should bypass truncation if isAutoDistillationEnabled is true', async () => {
-      vi.spyOn(mockConfig, 'isAutoDistillationEnabled').mockReturnValue(true);
+    it('should bypass truncation if isContextManagementEnabled is true', async () => {
+      vi.spyOn(mockConfig, 'isContextManagementEnabled').mockReturnValue(true);
       const largeContent = 'a'.repeat(300000); // Larger than MAX_CONTENT_LENGTH (250000)
       mockFetch('https://example.com/large-text', {
         status: 200,
@@ -1136,8 +1136,8 @@ describe('WebFetchTool', () => {
       expect((result.llmContent as string).length).toBe(300000); // No truncation
     });
 
-    it('should truncate if isAutoDistillationEnabled is false', async () => {
-      vi.spyOn(mockConfig, 'isAutoDistillationEnabled').mockReturnValue(false);
+    it('should truncate if isContextManagementEnabled is false', async () => {
+      vi.spyOn(mockConfig, 'isContextManagementEnabled').mockReturnValue(false);
       const largeContent = 'a'.repeat(300000); // Larger than MAX_CONTENT_LENGTH (250000)
       mockFetch('https://example.com/large-text2', {
         status: 200,

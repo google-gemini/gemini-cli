@@ -28,6 +28,7 @@ describe('ToolResultDisplay', () => {
           underline: false,
           dim: false,
           inverse: false,
+          isUninitialized: false,
         },
       ],
     ];
@@ -179,6 +180,7 @@ describe('ToolResultDisplay', () => {
           underline: false,
           dim: false,
           inverse: false,
+          isUninitialized: false,
         },
       ],
     ];
@@ -275,6 +277,7 @@ describe('ToolResultDisplay', () => {
           underline: false,
           dim: false,
           inverse: false,
+          isUninitialized: false,
         },
       ],
       [
@@ -287,6 +290,7 @@ describe('ToolResultDisplay', () => {
           underline: false,
           dim: false,
           inverse: false,
+          isUninitialized: false,
         },
       ],
       [
@@ -299,6 +303,7 @@ describe('ToolResultDisplay', () => {
           underline: false,
           dim: false,
           inverse: false,
+          isUninitialized: false,
         },
       ],
       [
@@ -311,6 +316,7 @@ describe('ToolResultDisplay', () => {
           underline: false,
           dim: false,
           inverse: false,
+          isUninitialized: false,
         },
       ],
       [
@@ -323,6 +329,7 @@ describe('ToolResultDisplay', () => {
           underline: false,
           dim: false,
           inverse: false,
+          isUninitialized: false,
         },
       ],
     ];
@@ -344,9 +351,10 @@ describe('ToolResultDisplay', () => {
 
     expect(output).not.toContain('Line 1');
     expect(output).not.toContain('Line 2');
-    expect(output).not.toContain('Line 3');
+    expect(output).toContain('Line 3');
     expect(output).toContain('Line 4');
     expect(output).toContain('Line 5');
+    expect(output).toMatchSnapshot();
     unmount();
   });
 
@@ -361,9 +369,10 @@ describe('ToolResultDisplay', () => {
         underline: false,
         dim: false,
         inverse: false,
+        isUninitialized: false,
       },
     ]);
-    const { lastFrame, waitUntilReady, unmount } = await renderWithProviders(
+    const renderResult = await renderWithProviders(
       <ToolResultDisplay
         resultDisplay={ansiResult}
         terminalWidth={80}
@@ -376,12 +385,10 @@ describe('ToolResultDisplay', () => {
         uiState: { constrainHeight: true },
       },
     );
+    const { waitUntilReady, unmount } = renderResult;
     await waitUntilReady();
-    const output = lastFrame();
 
-    // It SHOULD truncate to 25 lines because maxLines is provided
-    expect(output).not.toContain('Line 1');
-    expect(output).toContain('Line 50');
+    await expect(renderResult).toMatchSvgSnapshot();
     unmount();
   });
 });

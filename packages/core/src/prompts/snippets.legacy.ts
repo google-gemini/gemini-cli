@@ -37,7 +37,7 @@ export interface SystemPromptOptions {
   hookContext?: boolean;
   primaryWorkflows?: PrimaryWorkflowsOptions;
   planningWorkflow?: PlanningWorkflowOptions;
-  taskTracker?: boolean;
+  taskTracker?: string;
   operationalGuidelines?: OperationalGuidelinesOptions;
   sandbox?: SandboxOptions;
   interactiveYoloMode?: boolean;
@@ -63,7 +63,7 @@ export interface PrimaryWorkflowsOptions {
   enableWriteTodosTool: boolean;
   enableEnterPlanModeTool: boolean;
   approvedPlan?: { path: string };
-  taskTracker?: boolean;
+  taskTracker?: string;
   topicUpdateNarration?: boolean;
 }
 
@@ -95,7 +95,6 @@ export interface PlanningWorkflowOptions {
   planModeToolsList: string;
   plansDir: string;
   approvedPlanPath?: string;
-  taskTracker?: boolean;
 }
 
 export interface AgentSkillOptions {
@@ -132,7 +131,7 @@ ${
     : renderPrimaryWorkflows(options.primaryWorkflows)
 }
 
-${options.taskTracker ? renderTaskTracker() : ''}
+${options.taskTracker ? renderTaskTracker(options.taskTracker) : ''}
 
 ${renderOperationalGuidelines(options.operationalGuidelines)}
 
@@ -178,6 +177,8 @@ export function renderCoreMandates(options?: CoreMandatesOptions): string {
 - **Libraries/Frameworks:** NEVER assume a library/framework is available or appropriate. Verify its established usage within the project (check imports, configuration files like 'package.json', 'Cargo.toml', 'requirements.txt', 'build.gradle', etc., or observe neighboring files) before employing it.
 - **Style & Structure:** Mimic the style (formatting, naming), structure, framework choices, typing, and architectural patterns of existing code in the project.
 - **Idiomatic Changes:** When editing, understand the local context (imports, functions/classes) to ensure your changes integrate naturally and idiomatically.
+- **Types, Warnings & Linters:** NEVER use hacks like disabling or suppressing warnings, bypassing the type system (e.g.: casts in TypeScript), or employing "hidden" logic (e.g.: reflection, prototype manipulation) unless explicitly instructed to by the user. Instead, use explicit and idiomatic language features (e.g.: type guards, explicit class instantiation, or object spread) that maintain structural integrity and type safety.
+- **Design Patterns:** Prioritize explicit composition and delegation (e.g.: wrapper classes, proxies, or factory functions) over complex inheritance or prototype-based cloning. When extending or modifying existing classes, prefer patterns that are easily traceable and type-safe.
 - **Comments:** Add code comments sparingly. Focus on *why* something is done, especially for complex logic, rather than *what* is done. Only add high-value comments if necessary for clarity or if requested by the user. Do not edit comments that are separate from the code you are changing. *NEVER* talk to the user or describe your changes through comments.
 - **Proactiveness:** Fulfill the user's request thoroughly. When adding features or fixing bugs, this includes adding tests to ensure quality. Consider all created files, especially tests, to be permanent artifacts unless the user says otherwise.${mandateConflictResolution(options.hasHierarchicalMemory)}
 - **User Hints:** During execution, the user may provide real-time hints (marked as "User hint:" or "User hints:"). Treat these as high-priority but scope-preserving course corrections: apply the minimal plan change needed, keep unaffected user tasks active, and never cancel/skip tasks unless cancellation is explicit for those tasks. Hints may add new tasks, modify one or more tasks, cancel specific tasks, or provide extra context only. If scope is ambiguous, ask for clarification before dropping work.
@@ -491,10 +492,10 @@ An approved plan is available for this task.
 `;
 }
 
-export function renderTaskTracker(): string {
+export function renderTaskTracker(trackerDir: string): string {
   return `
 # TASK MANAGEMENT PROTOCOL
-You are operating with a persistent file-based task tracking system located at \`.tracker/tasks/\`. You must adhere to the following rules:
+You are operating with a persistent file-based task tracking system located at \`${trackerDir}\`. You must adhere to the following rules:
 
 1.  **NO IN-MEMORY LISTS**: Do not maintain a mental list of tasks or write markdown checkboxes in the chat. Use the provided tools (\`${TRACKER_CREATE_TASK_TOOL_NAME}\`, \`${TRACKER_LIST_TASKS_TOOL_NAME}\`, \`${TRACKER_UPDATE_TASK_TOOL_NAME}\`) for all state management.
 2.  **IMMEDIATE DECOMPOSITION**: Upon receiving a task, evaluate its functional complexity and scope. If the request involves more than a single atomic modification, or necessitates research before execution, you MUST immediately decompose it into discrete entries using \`${TRACKER_CREATE_TASK_TOOL_NAME}\`.
@@ -502,7 +503,8 @@ You are operating with a persistent file-based task tracking system located at \
 4.  **PLAN MODE INTEGRATION**: If an approved plan exists, you MUST use the \`${TRACKER_CREATE_TASK_TOOL_NAME}\` tool to decompose it into discrete tasks before writing any code. Maintain a bidirectional understanding between the plan document and the task graph.
 5.  **VERIFICATION**: Before marking a task as complete, verify the work is actually done (e.g., run the test, check the file existence).
 6.  **STATE OVER CHAT**: If the user says "I think we finished that," but the tool says it is 'pending', trust the tool--or verify explicitly before updating.
-7.  **DEPENDENCY MANAGEMENT**: Respect task topology. Never attempt to execute a task if its dependencies are not marked as 'closed'. If you are blocked, focus only on the leaf nodes of the task graph.`.trim();
+7.  **DEPENDENCY MANAGEMENT**: Respect task topology. Never attempt to execute a task if its dependencies are not marked as 'closed'. If you are blocked, focus only on the leaf nodes of the task graph.
+8.  **DETAILED TASKS**: Ensure that the tasks created have highly detailed titles and descriptions. The description MUST provide significantly more specific details and technical context than the title.`.trim();
 }
 
 // --- Leaf Helpers (Strictly strings or simple calls) ---
@@ -518,10 +520,12 @@ function mandateTopicUpdateModel(): string {
 ## Topic Updates
 As you work, the user follows along by reading topic updates that you publish with ${UPDATE_TOPIC_TOOL_NAME}. Keep them informed by doing the following:
 
-- Always call ${UPDATE_TOPIC_TOOL_NAME} in your first and last turn. The final turn should always recap what was done.
+- Usage Exception: NEVER use ${UPDATE_TOPIC_TOOL_NAME} for answering questions, providing explanations, or performing isolated lookup tasks (e.g. reading a single file, running a quick search, or checking a version). It is STRICTLY for orchestrating multi-step codebase modifications or complex investigations involving 3 or more tool calls.
+- Always call ${UPDATE_TOPIC_TOOL_NAME} in your first turn.
+- For tasks taking multiple turns, also call ${UPDATE_TOPIC_TOOL_NAME} in your last turn to recap what was done.
 - Each topic update should give a concise description of what you are doing for the next few turns in the \`${TOPIC_PARAM_SUMMARY}\` parameter.
 - Provide topic updates whenever you change "topics". A topic is typically a discrete subgoal and will be every 3 to 10 turns. Do not use ${UPDATE_TOPIC_TOOL_NAME} on every turn.
-- The typical user message should call ${UPDATE_TOPIC_TOOL_NAME} 3 or more times. Each corresponds to a distinct phase of the task, such as "Researching X", "Researching Y", "Implementing Z with X", and "Testing Z".
+- The typical complex user message should call ${UPDATE_TOPIC_TOOL_NAME} 3 or more times. Each corresponds to a distinct phase of the task, such as "Researching X", "Researching Y", "Implementing Z with X", and "Testing Z".
 - Remember to call ${UPDATE_TOPIC_TOOL_NAME} when you experience an unexpected event (e.g., a test failure, compilation error, environment issue, or unexpected learning) that requires a strategic detour.
 - **Examples:**
   - ${UPDATE_TOPIC_TOOL_NAME}(${TOPIC_PARAM_TITLE}="Researching Parser", ${TOPIC_PARAM_SUMMARY}="I am starting an investigation into the parser timeout bug. My goal is to first understand the current test coverage and then attempt to reproduce the failure. This phase will focus on identifying the bottleneck in the main loop before we move to implementation.")
