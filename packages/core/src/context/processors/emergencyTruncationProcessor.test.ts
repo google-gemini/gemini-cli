@@ -7,6 +7,7 @@
 import { createMockEnvironment, createDummyState, createDummyEpisode } from '../testing/contextTestUtils.js';
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { EmergencyTruncationProcessor } from './emergencyTruncationProcessor.js';
+import { EpisodeEditor } from '../ir/episodeEditor.js';
 import type { ContextEnvironment } from '../sidecar/environment.js';
 
 describe('EmergencyTruncationProcessor', () => {
@@ -32,7 +33,9 @@ describe('EmergencyTruncationProcessor', () => {
     // State says we are under budget (5000 < 10000)
     const state = createDummyState(true, 0, new Set(), 5000, 10000); 
 
-    const result = await processor.process(episodes, state);
+    const editor = new EpisodeEditor(episodes);
+    await processor.process(editor, state);
+    const result = editor.getFinalEpisodes();
     expect(result).toStrictEqual(episodes);
     expect(result.length).toBe(1);
   });
@@ -48,7 +51,9 @@ describe('EmergencyTruncationProcessor', () => {
     // We have 300 tokens, but max is 200. We need to drop 100 tokens.
     const state = createDummyState(false, 100, new Set(), 300, 200);
 
-    const result = await processor.process(episodes, state);
+    const editor = new EpisodeEditor(episodes);
+    await processor.process(editor, state);
+    const result = editor.getFinalEpisodes();
     
     // It should drop the FIRST episode (ep-1) and keep the rest.
     expect(result.length).toBe(2);
@@ -67,7 +72,9 @@ describe('EmergencyTruncationProcessor', () => {
     // However, ep-1 is protected!
     const state = createDummyState(false, 100, new Set(['ep-1']), 300, 200);
 
-    const result = await processor.process(episodes, state);
+    const editor = new EpisodeEditor(episodes);
+    await processor.process(editor, state);
+    const result = editor.getFinalEpisodes();
     
     // It should SKIP dropping ep-1 (protected) and drop ep-2 instead.
     expect(result.length).toBe(2);
@@ -85,7 +92,9 @@ describe('EmergencyTruncationProcessor', () => {
     // We have 300 tokens, max is 50. We need to drop 250 tokens!
     const state = createDummyState(false, 250, new Set(), 300, 50);
 
-    const result = await processor.process(episodes, state);
+    const editor = new EpisodeEditor(episodes);
+    await processor.process(editor, state);
+    const result = editor.getFinalEpisodes();
     
     // It must drop ep1 (100t) and ep2 (100t). 
     // Remaining is ep3 (100t). 

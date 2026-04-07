@@ -6,6 +6,7 @@
 import { createMockEnvironment, createDummyState, createDummyEpisode } from '../testing/contextTestUtils.js';
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { BlobDegradationProcessor } from './blobDegradationProcessor.js';
+import { EpisodeEditor } from '../ir/episodeEditor.js';
 import type { UserPrompt } from '../ir/types.js';
 import type { ContextEnvironment } from '../sidecar/environment.js';
 import { InMemoryFileSystem } from '../system/InMemoryFileSystem.js';
@@ -35,7 +36,9 @@ describe('BlobDegradationProcessor', () => {
     ]);
 
     const state = createDummyState(false, 500);
-    const result = await processor.process([ep], state);
+    const editor = new EpisodeEditor([ep]);
+    await processor.process(editor, state);
+    const result = editor.getFinalEpisodes();
 
     const parts = (result[0].trigger as UserPrompt).semanticParts;
 
@@ -65,7 +68,9 @@ describe('BlobDegradationProcessor', () => {
     ]);
 
     const state = createDummyState(false, 500);
-    const result = await processor.process([ep], state);
+    const editor = new EpisodeEditor([ep]);
+    await processor.process(editor, state);
+    const result = editor.getFinalEpisodes();
 
     const parts = (result[0].trigger as UserPrompt).semanticParts;
     expect(parts[0].presentation).toBeDefined();

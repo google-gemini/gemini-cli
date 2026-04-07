@@ -5,7 +5,6 @@
  */
 
 import type { ContextProcessor, ContextAccountingState } from '../pipeline.js';
-import type { Episode } from '../ir/types.js';
 import type { ContextEnvironment } from '../sidecar/environment.js';
 
 

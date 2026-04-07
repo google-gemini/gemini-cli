@@ -11,19 +11,17 @@ import { createMockEnvironment, createDummyState, createDummyEpisode } from '../
 import type { ContextEnvironment } from './environment.js';
 import type { ContextProcessor } from '../pipeline.js';
 import type { SidecarConfig } from './types.js';
-import { ContextEventBus } from '../eventBus.js';
-
-import type { Episode } from '../ir/types.js';
+import type { ContextEventBus } from '../eventBus.js';
 
 // Create a Dummy Processor for testing Orchestration routing
 class DummySyncProcessor implements ContextProcessor {
   static create() { return new DummySyncProcessor(); }
   constructor() {}
   readonly name = 'DummySync';
-  async process(episodes: any[], _state: any) {
-    const copy = [...episodes];
-    copy[0] = { ...copy[0], dummyModified: true };
-    return copy;
+  async process(editor: any, _state: any) {
+    editor.editEpisode(editor.episodes[0].id, 'DUMMY_EDIT', (draft: any) => {
+        draft.dummyModified = true;
+    });
   }
 }
 
@@ -31,19 +29,18 @@ class DummyAsyncProcessor implements ContextProcessor {
   static create() { return new DummyAsyncProcessor(); }
   constructor() {}
   readonly name = 'DummyAsync';
-  async process(episodes: any[], _state: any) {
-    await new Promise(resolve => setTimeout(resolve, 50));
-    const copy = [...episodes];
-    copy[0] = { ...copy[0], asyncModified: true };
-    return copy;
+  async process(editor: any, _state: any) {
+    editor.editEpisode(editor.episodes[0].id, 'DUMMY_EDIT', (draft: any) => {
+        draft.dummyAsyncModified = true;
+    });
   }
 }
 
 class ThrowingProcessor implements ContextProcessor {
   static create() { return new ThrowingProcessor(); }
   constructor() {}
-  readonly name = 'Thrower';
-  async process(): Promise<Episode[]> {
+  readonly name = 'Throwing';
+  async process(editor: any, state: any): Promise<void> {
     throw new Error('Processor failed intentionally');
   }
 }

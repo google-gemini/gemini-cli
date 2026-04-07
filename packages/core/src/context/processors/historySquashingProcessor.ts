@@ -4,10 +4,10 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import type { Episode } from '../ir/types.js';
 import type { ContextAccountingState, ContextProcessor } from '../pipeline.js';
 import type { ContextEnvironment } from '../sidecar/environment.js';
 import { truncateProportionally } from '../truncation.js';
+import type { EpisodeEditor } from '../ir/episodeEditor.js';
 
 export class HistorySquashingProcessor implements ContextProcessor {
   readonly name = 'HistorySquashing';

@@ -15,7 +15,6 @@ import {
   ENTER_PLAN_MODE_TOOL_NAME,
   EXIT_PLAN_MODE_TOOL_NAME,
 } from '../../tools/tool-names.js';
-import type { Episode } from '../ir/types.js';
 
 const UNMASKABLE_TOOLS = new Set([
   ACTIVATE_SKILL_TOOL_NAME,

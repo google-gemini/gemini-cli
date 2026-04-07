@@ -6,6 +6,7 @@
 import { createMockEnvironment, createDummyState, createDummyEpisode } from '../testing/contextTestUtils.js';
 import { describe, it, expect, beforeEach } from 'vitest';
 import { HistorySquashingProcessor } from './historySquashingProcessor.js';
+import { EpisodeEditor } from '../ir/episodeEditor.js';
 import type {
   UserPrompt,
   AgentThought,
@@ -44,7 +45,9 @@ describe('HistorySquashingProcessor', () => {
     const episodes = [createThoughtEpisode('1', 'short text', 'short thought')];
     const state = createDummyState(true);
 
-    const result = await processor.process(episodes, state);
+    const editor = new EpisodeEditor(episodes);
+    await processor.process(editor, state);
+    const result = editor.getFinalEpisodes();
 
     expect(result).toStrictEqual(episodes);
     expect(
@@ -58,7 +61,9 @@ describe('HistorySquashingProcessor', () => {
     const episodes = [createThoughtEpisode('ep-1', longText, 'short thought')];
     const state = createDummyState(false, 100, new Set(['ep-1']));
 
-    const result = await processor.process(episodes, state);
+    const editor = new EpisodeEditor(episodes);
+    await processor.process(editor, state);
+    const result = editor.getFinalEpisodes();
 
     expect(
       (result[0].trigger as UserPrompt).semanticParts[0].presentation,
@@ -71,7 +76,9 @@ describe('HistorySquashingProcessor', () => {
     const episodes = [createThoughtEpisode('ep-2', longUser, longModel)];
     const state = createDummyState(false, 500); // High deficit, force truncation
 
-    const result = await processor.process(episodes, state);
+    const editor = new EpisodeEditor(episodes);
+    await processor.process(editor, state);
+    const result = editor.getFinalEpisodes();
 
     const userPart = (result[0].trigger as UserPrompt).semanticParts[0];
     const thoughtPart = result[0].steps[0] as AgentThought;
@@ -103,7 +110,9 @@ describe('HistorySquashingProcessor', () => {
     // Original = ~250 tokens. Limit = 100. Truncation saves ~150 tokens.
     const state = createDummyState(false, 150);
 
-    const result = await processor.process(episodes, state);
+    const editor = new EpisodeEditor(episodes);
+    await processor.process(editor, state);
+    const result = editor.getFinalEpisodes();
 
     // First episode should be truncated
     const ep1Part = (result[0].trigger as UserPrompt).semanticParts[0];
@@ -129,7 +138,9 @@ describe('HistorySquashingProcessor', () => {
     };
 
     const state = createDummyState(false, 500);
-    const result = await processor.process([ep], state);
+    const editor = new EpisodeEditor([ep]);
+    await processor.process(editor, state);
+    const result = editor.getFinalEpisodes();
 
     const yieldPart = result[0].yield as AgentYield;
     const yieldPresentation = yieldPart.presentation as { text: string };

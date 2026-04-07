@@ -7,6 +7,7 @@
 import { createMockEnvironment } from '../testing/contextTestUtils.js';
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { ToolMaskingProcessor } from './toolMaskingProcessor.js';
+import { EpisodeEditor } from '../ir/episodeEditor.js';
 import type { Episode, ToolExecution } from '../ir/types.js';
 import type { ContextAccountingState } from '../pipeline.js';
 import { randomUUID } from 'node:crypto';
@@ -78,7 +79,9 @@ describe('ToolMaskingProcessor', () => {
     ];
     const state = getDummyState(true);
 
-    const result = await processor.process(episodes, state);
+    const editor = new EpisodeEditor(episodes);
+    await processor.process(editor, state);
+    const result = editor.getFinalEpisodes();
 
     expect(result).toStrictEqual(episodes);
     expect((result[0].steps[0] as ToolExecution).presentation).toBeUndefined();
@@ -95,7 +98,9 @@ describe('ToolMaskingProcessor', () => {
     const episodes = [createDummyEpisode('ep-1', intentPayload, obsPayload)];
     const state = getDummyState(false, 1000, new Set()); // Huge deficit
 
-    const result = await processor.process(episodes, state);
+    const editor = new EpisodeEditor(episodes);
+    await processor.process(editor, state);
+    const result = editor.getFinalEpisodes();
 
     const toolStep = result[0].steps[0] as ToolExecution;
 

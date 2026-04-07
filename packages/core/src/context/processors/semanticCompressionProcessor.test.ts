@@ -7,6 +7,7 @@
 import { createMockEnvironment, createDummyState, createDummyEpisode } from '../testing/contextTestUtils.js';
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { SemanticCompressionProcessor } from './semanticCompressionProcessor.js';
+import { EpisodeEditor } from '../ir/episodeEditor.js';
 import type {
   UserPrompt,
   ToolExecution,
@@ -75,7 +76,9 @@ describe('SemanticCompressionProcessor', () => {
     const episodes = [createEpisodeWithThoughtsAndTools('1', 'short', 'short', 'short')];
     const state = createDummyState(true);
 
-    await processor.process(episodes, state);
+    const editor = new EpisodeEditor(episodes);
+    await processor.process(editor, state);
+    
     expect(generateContentMock).not.toHaveBeenCalled();
   });
 
@@ -86,7 +89,9 @@ describe('SemanticCompressionProcessor', () => {
     ];
     const state = createDummyState(false, 1000, new Set(['ep-1']));
 
-    await processor.process(episodes, state);
+    const editor = new EpisodeEditor(episodes);
+    await processor.process(editor, state);
+    
     expect(generateContentMock).not.toHaveBeenCalled();
   });
 
@@ -97,10 +102,13 @@ describe('SemanticCompressionProcessor', () => {
     ];
     const state = createDummyState(false, 50000); // Massive deficit, forces all 3 to summarize
 
-    const result = await processor.process(episodes, state);
+    const editor = new EpisodeEditor(episodes);
+    await processor.process(editor, state);
+    
     expect(generateContentMock).toHaveBeenCalledTimes(3);
 
     // Verify presentation layers were injected
+    const result = editor.getFinalEpisodes();
     const userPart = (result[0].trigger as UserPrompt).semanticParts[0];
     const thoughtPart = result[0].steps[0] as AgentThought;
     const toolPart = result[0].steps[1] as ToolExecution;
@@ -126,7 +134,9 @@ describe('SemanticCompressionProcessor', () => {
     // Set deficit low enough that ONE summary solves the problem
     const state = createDummyState(false, 5);
 
-    await processor.process(episodes, state);
+    const editor = new EpisodeEditor(episodes);
+    await processor.process(editor, state);
+    
     // It should only compress the UserPrompt and then stop
     expect(generateContentMock).toHaveBeenCalledTimes(1);
   });

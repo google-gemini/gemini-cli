@@ -7,6 +7,7 @@
 import { createMockEnvironment, createDummyState, createDummyEpisode } from '../testing/contextTestUtils.js';
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { StateSnapshotProcessor } from './stateSnapshotProcessor.js';
+import { EpisodeEditor } from '../ir/episodeEditor.js';
 import type { ContextEnvironment } from '../sidecar/environment.js';
 import type { BaseLlmClient } from '../../core/baseLlmClient.js';
 
@@ -37,7 +38,9 @@ describe('StateSnapshotProcessor', () => {
     // current: 100, max: 1000, retained: 200 (deficit 0)
     const state = createDummyState(false, 0, new Set(), 100, 1000, 200);
 
-    const result = await processor.process(episodes, state);
+    const editor = new EpisodeEditor(episodes);
+    await processor.process(editor, state);
+    const result = editor.getFinalEpisodes();
     expect(result).toStrictEqual(episodes);
     expect(generateContentMock).not.toHaveBeenCalled();
   });
@@ -51,7 +54,9 @@ describe('StateSnapshotProcessor', () => {
     // current: 1000, max: 10000, retained: 500. Target deficit = 500
     const state = createDummyState(false, 500, new Set(), 1000, 10000, 500);
 
-    const result = await processor.process(episodes, state);
+    const editor = new EpisodeEditor(episodes);
+    await processor.process(editor, state);
+    const result = editor.getFinalEpisodes();
     expect(result).toStrictEqual(episodes);
     expect(generateContentMock).not.toHaveBeenCalled();
   });
@@ -67,7 +72,9 @@ describe('StateSnapshotProcessor', () => {
     // Target deficit = 200
     const state = createDummyState(false, 200, new Set(), 1000, 10000, 800);
 
-    const result = await processor.process(episodes, state);
+    const editor = new EpisodeEditor(episodes);
+    await processor.process(editor, state);
+    const result = editor.getFinalEpisodes();
     
     // We started with 4 episodes.
     // Episodes [1, 2] were synthesized into a single new Snapshot episode.

@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import type { Episode } from '../ir/types.js';
+import type { IrMetadata } from '../ir/types.js';
 import type { ContextAccountingState, ContextProcessor } from '../pipeline.js';
 import type { ContextEnvironment } from '../sidecar/environment.js';
 import { debugLogger } from '../../utils/debugLogger.js';
@@ -166,7 +166,7 @@ export class SemanticCompressionProcessor implements ContextProcessor {
                         observation: newObsObject,
                         tokens: { intent: intentTokens as number, observation: newObsTokens },
                       };
-                      if (!draftStep.metadata) { draftStep.metadata = { transformations: [] } };
+                      if (!draftStep.metadata) { draftStep.metadata = { transformations: [], currentTokens: 0, originalTokens: 0 } as unknown as IrMetadata };
                       if (!draftStep.metadata.transformations) { draftStep.metadata.transformations = [] };
                       draftStep.metadata.transformations.push({
                         processorName: this.name,
