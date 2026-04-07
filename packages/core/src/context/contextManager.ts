@@ -132,7 +132,6 @@ export class ContextManager {
       this.tracer,
       this.env.tokenCalculator,
     );
-
     this.historyObserver.start();
   }
 
