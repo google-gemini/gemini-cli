@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, type Mock } from 'vitest';
 import { renderWithProviders } from '../../../test-utils/render.js';
 import {
   BaseSelectionList,
@@ -14,8 +14,10 @@ import {
 import { useSelectionList } from '../../hooks/useSelectionList.js';
 import { Text } from 'ink';
 import type { theme } from '../../semantic-colors.js';
+import { useMouseClick } from '../../hooks/useMouseClick.js';
 
 vi.mock('../../hooks/useSelectionList.js');
+vi.mock('../../hooks/useMouseClick.js');
 
 const mockTheme = {
   text: { primary: 'COLOR_PRIMARY', secondary: 'COLOR_SECONDARY' },
@@ -35,6 +37,7 @@ describe('BaseSelectionList', () => {
   const mockOnSelect = vi.fn();
   const mockOnHighlight = vi.fn();
   const mockRenderItem = vi.fn();
+  const mockSetActiveIndex = vi.fn();
 
   const items = [
     { value: 'A', label: 'Item A', key: 'A' },
@@ -54,7 +57,7 @@ describe('BaseSelectionList', () => {
   ) => {
     vi.mocked(useSelectionList).mockReturnValue({
       activeIndex,
-      setActiveIndex: vi.fn(),
+      setActiveIndex: mockSetActiveIndex,
     });
 
     mockRenderItem.mockImplementation(
@@ -480,6 +483,59 @@ describe('BaseSelectionList', () => {
       expect(output).toContain('Item 1');
       expect(output).toContain('Item 10');
       expect(mockRenderItem).toHaveBeenCalledTimes(10);
+      unmount();
+    });
+  });
+
+  describe('Mouse Interaction', () => {
+    it('should register mouse click handler for each item', async () => {
+      const { unmount } = await renderComponent();
+
+      // items are A, B (disabled), C
+      expect(useMouseClick).toHaveBeenCalledTimes(3);
+      unmount();
+    });
+
+    it('should call onSelect and setActiveIndex when an enabled item is clicked', async () => {
+      const { unmount, waitUntilReady } = await renderComponent();
+      await waitUntilReady();
+
+      // items[0] is 'A' (enabled)
+      // items[1] is 'B' (disabled)
+      // items[2] is 'C' (enabled)
+
+      // Get the mouse click handler for the third item (index 2)
+      const mouseClickHandler = (useMouseClick as Mock).mock.calls[2][1];
+
+      mouseClickHandler();
+
+      expect(mockSetActiveIndex).toHaveBeenCalledWith(2);
+      expect(mockOnSelect).toHaveBeenCalledWith('C');
+      unmount();
+    });
+
+    it('should not call onSelect when a disabled item is clicked', async () => {
+      const { unmount, waitUntilReady } = await renderComponent();
+      await waitUntilReady();
+
+      // items[1] is 'B' (disabled)
+      const mouseClickHandler = (useMouseClick as Mock).mock.calls[1][1];
+
+      mouseClickHandler();
+
+      expect(mockSetActiveIndex).not.toHaveBeenCalled();
+      expect(mockOnSelect).not.toHaveBeenCalled();
+      unmount();
+    });
+
+    it('should pass isActive: isFocused to useMouseClick', async () => {
+      const { unmount } = await renderComponent({ isFocused: false });
+
+      expect(useMouseClick).toHaveBeenCalledWith(
+        expect.any(Object),
+        expect.any(Function),
+        { isActive: false },
+      );
       unmount();
     });
   });
