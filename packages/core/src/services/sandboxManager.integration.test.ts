@@ -68,7 +68,7 @@ const Platform = {
   /** Returns a path that is strictly outside the workspace and likely blocked. */
   getExternalBlockedPath() {
     return this.isWindows
-      ? 'C:\\Windows\\System32\\drivers\\etc\\hosts'
+      ? 'C:\\gemini_blocked_test.txt'
       : '/Users/Shared/.gemini_test_blocked';
   },
 };
@@ -103,10 +103,9 @@ function ensureSandboxAvailable(): boolean {
   const platform = os.platform();
 
   if (platform === 'win32') {
-    // Windows sandboxing relies on icacls, which is a core system utility and
-    // always available.
-    // TODO: reenable once flakiness is addressed
-    return false;
+    // Windows sandboxing relies on the GeminiSandbox.exe helper, which is compiled
+    // using the built-in .NET Framework compiler (csc.exe) and is always available.
+    return true;
   }
 
   if (platform === 'darwin') {

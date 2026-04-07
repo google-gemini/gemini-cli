@@ -41,7 +41,6 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 // S-1-16-4096 is the SID for "Low Mandatory Level" (Low Integrity)
-const LOW_INTEGRITY_SID = '*S-1-16-4096';
 
 /**
  * A SandboxManager implementation for Windows that uses Restricted Tokens,
@@ -50,8 +49,15 @@ const LOW_INTEGRITY_SID = '*S-1-16-4096';
  */
 export class WindowsSandboxManager implements SandboxManager {
   static readonly HELPER_EXE = 'GeminiSandbox.exe';
-  private readonly helperPath: string;
+  static readonly HELPER_SOURCE = 'GeminiSandbox.cs';
+
+  private helperPath: string;
   private initialized = false;
+
+  /**
+   * Optimistically caches modified ACLs to prevent redundant Win32 API calls.
+   * Skips even if a previous application failed.
+   */
   private readonly allowedCache = new Set<string>();
   private readonly deniedCache = new Set<string>();
 
@@ -72,119 +78,51 @@ export class WindowsSandboxManager implements SandboxManager {
     return isDangerousCommand(args);
   }
 
-  parseDenials(result: ShellExecutionResult): ParsedSandboxDenial | undefined {
-    return parseWindowsSandboxDenials(result);
-  }
-
-  getWorkspace(): string {
-    return this.options.workspace;
-  }
-
-  getOptions(): GlobalSandboxOptions {
-    return this.options;
-  }
-
-  /**
-   * Ensures a file or directory exists.
-   */
-  private touch(filePath: string, isDirectory: boolean): void {
-    try {
-      // If it exists (even as a broken symlink), do nothing
-      if (fs.lstatSync(filePath)) return;
-    } catch {
-      // Ignore ENOENT
-    }
-
-    if (isDirectory) {
-      fs.mkdirSync(filePath, { recursive: true });
-    } else {
-      const dir = path.dirname(filePath);
-      if (!fs.existsSync(dir)) {
-        fs.mkdirSync(dir, { recursive: true });
-      }
-      fs.closeSync(fs.openSync(filePath, 'a'));
-    }
-  }
-
   private async ensureInitialized(): Promise<void> {
     if (this.initialized) return;
-    if (os.platform() !== 'win32') {
-      this.initialized = true;
-      return;
-    }
 
     try {
       if (!fs.existsSync(this.helperPath)) {
         debugLogger.log(
-          `WindowsSandboxManager: Helper not found at ${this.helperPath}. Attempting to compile...`,
+          'WindowsSandboxManager: Helper not found at',
+          this.helperPath,
         );
-        // If the exe doesn't exist, we try to compile it from the .cs file
-        const sourcePath = this.helperPath.replace(/\.exe$/, '.cs');
+        const sourcePath = path.resolve(
+          __dirname,
+          WindowsSandboxManager.HELPER_SOURCE,
+        );
         if (fs.existsSync(sourcePath)) {
-          const systemRoot = process.env['SystemRoot'] || 'C:\\Windows';
-          const cscPaths = [
-            'csc.exe', // Try in PATH first
-            path.join(
+          debugLogger.log(
+            'WindowsSandboxManager: Compiling helper from source...',
+          );
+          try {
+            // Try to compile using csc.exe (C# compiler, usually in Windows\Microsoft.NET\Framework64\v4.0.30319)
+            const systemRoot = process.env['SystemRoot'] || 'C:\\Windows';
+            const cscPath = path.join(
               systemRoot,
               'Microsoft.NET',
               'Framework64',
               'v4.0.30319',
               'csc.exe',
-            ),
-            path.join(
-              systemRoot,
-              'Microsoft.NET',
-              'Framework',
-              'v4.0.30319',
-              'csc.exe',
-            ),
-            // Added newer framework paths
-            path.join(
-              systemRoot,
-              'Microsoft.NET',
-              'Framework64',
-              'v4.8',
-              'csc.exe',
-            ),
-            path.join(
-              systemRoot,
-              'Microsoft.NET',
-              'Framework',
-              'v4.8',
-              'csc.exe',
-            ),
-            path.join(
-              systemRoot,
-              'Microsoft.NET',
-              'Framework64',
-              'v3.5',
-              'csc.exe',
-            ),
-          ];
-
-          let compiled = false;
-          for (const csc of cscPaths) {
-            try {
+            );
+            if (fs.existsSync(cscPath)) {
+              await spawnAsync(cscPath, [
+                '/target:exe',
+                `/out:${this.helperPath}`,
+                sourcePath,
+              ]);
               debugLogger.log(
-                `WindowsSandboxManager: Trying to compile using ${csc}...`,
+                `WindowsSandboxManager: Compiled helper to ${this.helperPath}`,
               );
-              // We use spawnAsync but we don't need to capture output
-              await spawnAsync(csc, ['/out:' + this.helperPath, sourcePath]);
+            } else {
               debugLogger.log(
-                `WindowsSandboxManager: Successfully compiled sandbox helper at ${this.helperPath}`,
-              );
-              compiled = true;
-              break;
-            } catch (e) {
-              debugLogger.log(
-                `WindowsSandboxManager: Failed to compile using ${csc}: ${e instanceof Error ? e.message : String(e)}`,
+                'WindowsSandboxManager: csc.exe not found. Cannot compile helper.',
               );
             }
-          }
-
-          if (!compiled) {
+          } catch (e) {
             debugLogger.log(
-              'WindowsSandboxManager: Failed to compile sandbox helper from any known CSC path.',
+              'WindowsSandboxManager: Failed to compile helper:',
+              e,
             );
           }
         } else {
@@ -274,7 +212,9 @@ export class WindowsSandboxManager implements SandboxManager {
     // New files created within these roots will inherit the Low label.
     const writableRoots: string[] = [];
 
-    // 1. Workspace access
+    // 1. Determine filesystem permissions to grant
+    const pathsToGrant = new Set<string>();
+
     const isApproved = allowOverrides
       ? await isStrictlyApproved(
           command,
@@ -284,43 +224,24 @@ export class WindowsSandboxManager implements SandboxManager {
       : false;
 
     if (!isReadonlyMode || isApproved) {
-      await this.grantLowIntegrityAccess(this.options.workspace);
+      pathsToGrant.add(this.options.workspace);
       writableRoots.push(this.options.workspace);
     }
 
-    // 2. Globally included directories
-    const includeDirs = sanitizePaths(this.options.includeDirectories);
-    for (const includeDir of includeDirs) {
-      await this.grantLowIntegrityAccess(includeDir);
-      writableRoots.push(includeDir);
-    }
-
-    // 3. Explicitly allowed paths from the request policy
-    for (const allowedPath of allowedPaths) {
-      const resolved = resolveToRealPath(allowedPath);
-      try {
-        await fs.promises.access(resolved, fs.constants.F_OK);
-      } catch {
-        throw new Error(
-          `Sandbox request rejected: Allowed path does not exist: ${resolved}. ` +
-            'On Windows, granular sandbox access can only be granted to existing paths to avoid broad parent directory permissions.',
-        );
-      }
-      await this.grantLowIntegrityAccess(resolved);
+    allowedPaths.forEach((p) => {
+      const resolved = resolveToRealPath(p);
+      pathsToGrant.add(resolved);
       writableRoots.push(resolved);
-    }
+    });
 
-    // 4. Additional write paths (e.g. from internal __write command)
-    const additionalWritePaths = sanitizePaths(
-      mergedAdditional.fileSystem?.write,
-    );
-    for (const writePath of additionalWritePaths) {
-      const resolved = resolveToRealPath(writePath);
-      try {
-        await fs.promises.access(resolved, fs.constants.F_OK);
-        await this.grantLowIntegrityAccess(resolved);
-        continue;
-      } catch {
+    const extraWritePaths =
+      sanitizePaths(mergedAdditional.fileSystem?.write) || [];
+    extraWritePaths.forEach((p) => {
+      const resolved = resolveToRealPath(p);
+      if (fs.existsSync(resolved)) {
+        pathsToGrant.add(resolved);
+        writableRoots.push(resolved);
+      } else {
         // If the file doesn't exist, it's only allowed if it resides within a granted root.
         const isInherited = writableRoots.some((root) =>
           isSubpath(root, resolved),
@@ -333,207 +254,150 @@ export class WindowsSandboxManager implements SandboxManager {
           );
         }
       }
-    }
+    });
 
-    // 2. Collect secret files and apply protective ACLs
-    // On Windows, we explicitly deny access to secret files for Low Integrity
-    // processes to ensure they cannot be read or written.
-    const secretsToBlock: string[] = [];
+    const includeDirs = sanitizePaths(this.options.includeDirectories);
+    includeDirs.forEach((p) => {
+      const resolved = resolveToRealPath(p);
+      pathsToGrant.add(resolved);
+      writableRoots.push(resolved);
+    });
+
+    // 2. Identify forbidden paths and secrets to deny
+    const pathsToDeny = new Set<string>();
+    forbiddenPaths.forEach((p) => pathsToDeny.add(resolveToRealPath(p)));
+
+    // Scoped scan for secrets to explicitly block for Low Integrity processes
     const searchDirs = new Set([
       this.options.workspace,
       ...allowedPaths,
       ...includeDirs,
     ]);
-    for (const dir of searchDirs) {
-      try {
-        // We use maxDepth 3 to catch common nested secrets while keeping performance high.
-        const secretFiles = await findSecretFiles(dir, 3);
-        for (const secretFile of secretFiles) {
-          try {
-            secretsToBlock.push(secretFile);
-            await this.denyLowIntegrityAccess(secretFile);
-          } catch (e) {
-            debugLogger.log(
-              `WindowsSandboxManager: Failed to secure secret file ${secretFile}`,
-              e,
-            );
-          }
+    await Promise.all(
+      Array.from(searchDirs).map(async (dir) => {
+        try {
+          // We use maxDepth 3 to catch common nested secrets while keeping performance high.
+          const secrets = await findSecretFiles(dir, 3);
+          secrets.forEach((s) => pathsToDeny.add(resolveToRealPath(s)));
+        } catch (e) {
+          debugLogger.log(
+            `WindowsSandboxManager: Secret scan failed for ${dir}`,
+            e,
+          );
         }
-      } catch (e) {
-        debugLogger.log(
-          `WindowsSandboxManager: Failed to find secret files in ${dir}`,
-          e,
-        );
-      }
-    }
+      }),
+    );
 
-    // Denies access to forbiddenPaths for Low Integrity processes.
-    // Note: Denying access to arbitrary paths (like system files) via icacls
-    // is restricted to avoid host corruption. External commands rely on
-    // Low Integrity read/write restrictions, while internal commands
-    // use the manifest for enforcement.
-    for (const forbiddenPath of forbiddenPaths) {
+    // 3. Reconcile Grant and Deny paths
+    for (const p of pathsToGrant) {
+      if (pathsToDeny.has(p)) {
+        pathsToGrant.delete(p);
+        continue;
+      }
+
       try {
-        await this.denyLowIntegrityAccess(forbiddenPath);
-      } catch (e) {
-        debugLogger.log(
-          `WindowsSandboxManager: Failed to secure forbidden path ${forbiddenPath}`,
-          e,
-        );
+        await fs.promises.access(p, fs.constants.F_OK);
+      } catch {
+        // If it doesn't exist, we can't grant access on Windows.
+        pathsToGrant.delete(p);
       }
     }
 
-    // 3. Protected governance files
-    // These must exist on the host before running the sandbox to prevent
-    // the sandboxed process from creating them with Low integrity.
-    // By being created as Medium integrity, they are write-protected from Low processes.
+    // 4. Generate setup manifest operations (L = Grant, D = Deny)
+    const opResults = await Promise.all([
+      ...Array.from(pathsToGrant).map((p) => this.getLowIntegrityOp(p, 'L')),
+      ...Array.from(pathsToDeny).map((p) => this.getLowIntegrityOp(p, 'D')),
+    ]);
+
+    const pendingAcls = opResults.filter(
+      (op): op is string => op !== undefined,
+    );
+
+    // 5. Ensure governance files are write-protected
     for (const file of GOVERNANCE_FILES) {
-      const filePath = path.join(this.options.workspace, file.path);
-      this.touch(filePath, file.isDirectory);
+      this.touch(
+        path.join(this.options.workspace, file.path),
+        file.isDirectory,
+      );
     }
 
-    // 4. Forbidden paths manifest
-    // We use a manifest file to avoid command-line length limits.
-    const allForbidden = Array.from(
-      new Set([...secretsToBlock, ...forbiddenPaths]),
-    );
-    const tempDir = fs.mkdtempSync(
-      path.join(os.tmpdir(), 'gemini-cli-forbidden-'),
-    );
-    const manifestPath = path.join(tempDir, 'manifest.txt');
-    fs.writeFileSync(manifestPath, allForbidden.join('\n'));
-
-    // 5. Construct the helper command
-    // GeminiSandbox.exe <network:0|1> <cwd> --forbidden-manifest <path> <command> [args...]
-    const program = this.helperPath;
-
-    const finalArgs = [
-      networkAccess ? '1' : '0',
-      req.cwd,
-      '--forbidden-manifest',
-      manifestPath,
-      command,
-      ...args,
-    ];
+    // 6. Create setup manifest if needed
+    let manifestPath: string | undefined;
+    if (pendingAcls.length > 0) {
+      manifestPath = path.join(
+        os.tmpdir(),
+        `gemini-cli-sandbox-${Date.now()}-${Math.random().toString(36).slice(2)}.txt`,
+      );
+      fs.writeFileSync(manifestPath, pendingAcls.join('\n'), { mode: 0o600 });
+    }
 
     const finalEnv = { ...sanitizedEnv };
 
     return {
-      program,
-      args: finalArgs,
+      program: this.helperPath,
+      args: [
+        networkAccess ? '1' : '0',
+        req.cwd,
+        ...(manifestPath ? ['--setup-manifest', manifestPath] : []),
+        command,
+        ...args,
+      ],
       env: finalEnv,
       cwd: req.cwd,
       cleanup: () => {
-        try {
-          fs.rmSync(tempDir, { recursive: true, force: true });
-        } catch {
-          // Ignore errors
+        if (manifestPath) {
+          try {
+            fs.unlinkSync(manifestPath);
+          } catch {
+            // Ignore cleanup errors
+          }
         }
       },
     };
   }
 
   /**
-   * Grants "Low Mandatory Level" access to a path using icacls.
+   * Resolves a path and generates a Grant (L) or Deny (D) operation for the setup manifest.
+   * Checks for platform, caches, system directories, and existence (for Deny).
    */
-  private async grantLowIntegrityAccess(targetPath: string): Promise<void> {
-    if (os.platform() !== 'win32') {
-      return;
-    }
+  private async getLowIntegrityOp(
+    targetPath: string,
+    mode: 'L' | 'D',
+  ): Promise<string | undefined> {
+    if (os.platform() !== 'win32') return undefined;
 
-    const resolvedPath = resolveToRealPath(targetPath);
-    if (this.allowedCache.has(resolvedPath)) {
-      return;
-    }
+    const resolved = resolveToRealPath(targetPath);
+    const cache = mode === 'L' ? this.allowedCache : this.deniedCache;
+    if (cache.has(resolved)) return undefined;
 
-    // Explicitly reject UNC paths to prevent credential theft/SSRF,
-    // but allow local extended-length and device paths.
+    // Security: Block UNC paths for Grants (prevents NTLM exfiltration/SSRF)
     if (
-      resolvedPath.startsWith('\\\\') &&
-      !resolvedPath.startsWith('\\\\?\\') &&
-      !resolvedPath.startsWith('\\\\.\\')
+      mode === 'L' &&
+      resolved.startsWith('\\\\') &&
+      !resolved.startsWith('\\\\?\\') &&
+      !resolved.startsWith('\\\\.\\')
     ) {
       debugLogger.log(
-        'WindowsSandboxManager: Rejecting UNC path for Low Integrity grant:',
-        resolvedPath,
+        'WindowsSandboxManager: Rejecting UNC path for grant:',
+        resolved,
       );
-      return;
+      return undefined;
     }
 
-    if (this.isSystemDirectory(resolvedPath)) {
-      return;
-    }
+    if (this.isSystemDirectory(resolved)) return undefined;
 
-    try {
-      // 1. Grant explicit Modify access to the Low Integrity SID
-      // 2. Set the Mandatory Label to Low to allow "Write Up" from Low processes
-      await spawnAsync('icacls', [
-        resolvedPath,
-        '/grant',
-        `${LOW_INTEGRITY_SID}:(OI)(CI)(M)`,
-        '/setintegritylevel',
-        '(OI)(CI)Low',
-      ]);
-      this.allowedCache.add(resolvedPath);
-    } catch (e) {
-      debugLogger.log(
-        'WindowsSandboxManager: icacls failed for',
-        resolvedPath,
-        e,
-      );
-    }
-  }
-
-  /**
-   * Explicitly denies access to a path for Low Integrity processes using icacls.
-   */
-  private async denyLowIntegrityAccess(targetPath: string): Promise<void> {
-    if (os.platform() !== 'win32') {
-      return;
-    }
-
-    const resolvedPath = resolveToRealPath(targetPath);
-    if (this.deniedCache.has(resolvedPath)) {
-      return;
-    }
-
-    // Never modify ACEs for system directories
-    if (this.isSystemDirectory(resolvedPath)) {
-      return;
-    }
-
-    // icacls flags: (OI) Object Inherit, (CI) Container Inherit, (F) Full Access Deny.
-    // Omit /T (recursive) for performance; (OI)(CI) ensures inheritance for new items.
-    // Windows dynamically evaluates existing items, though deep explicit Allow ACEs
-    // could potentially bypass this inherited Deny rule.
-    const DENY_ALL_INHERIT = '(OI)(CI)(F)';
-
-    // icacls fails on non-existent paths, so we cannot explicitly deny
-    // paths that do not yet exist (unlike macOS/Linux).
-    // Skip to prevent sandbox initialization failure.
-    try {
-      await fs.promises.stat(resolvedPath);
-    } catch (e: unknown) {
-      if (isNodeError(e) && e.code === 'ENOENT') {
-        return;
+    // Deny ops fail if the path doesn't exist
+    if (mode === 'D') {
+      try {
+        await fs.promises.stat(resolved);
+      } catch (e: unknown) {
+        if (isNodeError(e) && e.code === 'ENOENT') return undefined;
+        throw e;
       }
-      throw e;
     }
 
-    try {
-      await spawnAsync('icacls', [
-        resolvedPath,
-        '/deny',
-        `${LOW_INTEGRITY_SID}:${DENY_ALL_INHERIT}`,
-      ]);
-      this.deniedCache.add(resolvedPath);
-    } catch (e) {
-      throw new Error(
-        `Failed to deny access to forbidden path: ${resolvedPath}. ${
-          e instanceof Error ? e.message : String(e)
-        }`,
-      );
-    }
+    cache.add(resolved);
+    return `${mode} ${resolved}`;
   }
 
   private isSystemDirectory(resolvedPath: string): boolean {
@@ -543,9 +407,44 @@ export class WindowsSandboxManager implements SandboxManager {
       process.env['ProgramFiles(x86)'] || 'C:\\Program Files (x86)';
 
     return (
-      resolvedPath.toLowerCase().startsWith(systemRoot.toLowerCase()) ||
-      resolvedPath.toLowerCase().startsWith(programFiles.toLowerCase()) ||
-      resolvedPath.toLowerCase().startsWith(programFilesX86.toLowerCase())
+      isSubpath(systemRoot, resolvedPath) ||
+      isSubpath(programFiles, resolvedPath) ||
+      isSubpath(programFilesX86, resolvedPath)
     );
+  }
+
+  /**
+   * Touches a file or directory to ensure it exists.
+   */
+  private touch(filePath: string, isDirectory: boolean): void {
+    try {
+      if (isDirectory) {
+        if (!fs.existsSync(filePath)) {
+          fs.mkdirSync(filePath, { recursive: true });
+        }
+      } else {
+        const dir = path.dirname(filePath);
+        if (!fs.existsSync(dir)) {
+          fs.mkdirSync(dir, { recursive: true });
+        }
+        if (!fs.existsSync(filePath)) {
+          fs.writeFileSync(filePath, '');
+        }
+      }
+    } catch (e) {
+      debugLogger.log(`WindowsSandboxManager: Failed to touch ${filePath}:`, e);
+    }
+  }
+
+  parseDenials(result: ShellExecutionResult): ParsedSandboxDenial | undefined {
+    return parseWindowsSandboxDenials(result);
+  }
+
+  getWorkspace(): string {
+    return this.options.workspace;
+  }
+
+  getOptions(): GlobalSandboxOptions | undefined {
+    return this.options;
   }
 }

@@ -143,6 +143,12 @@ public class GeminiSandbox {
     static extern bool ConvertStringSidToSid(string StringSid, out IntPtr ptrSid);
 
     [DllImport("advapi32.dll", SetLastError = true)]
+    static extern bool InitializeAcl(IntPtr pAcl, uint nAclLength, uint dwAclRevision);
+
+    [DllImport("advapi32.dll", SetLastError = true)]
+    static extern bool AddMandatoryAce(IntPtr pAcl, uint dwAceRevision, uint AceFlags, uint MandatoryPolicy, IntPtr pLabelSid);
+
+    [DllImport("advapi32.dll", SetLastError = true)]
     static extern bool SetTokenInformation(IntPtr TokenHandle, int TokenInformationClass, IntPtr TokenInformation, uint TokenInformationLength);
 
     [StructLayout(LayoutKind.Sequential)]
@@ -156,33 +162,99 @@ public class GeminiSandbox {
         public SID_AND_ATTRIBUTES Label;
     }
 
+    [DllImport("advapi32.dll", CharSet = CharSet.Auto, SetLastError = true)]
+    static extern bool ConvertStringSecurityDescriptorToSecurityDescriptor(string StringSecurityDescriptor, uint StringSDRevision, out IntPtr SecurityDescriptor, out uint SecurityDescriptorSize);
+
+    [DllImport("advapi32.dll", SetLastError = true)]
+    static extern bool GetSecurityDescriptorSacl(IntPtr pSecurityDescriptor, out bool lpbSaclPresent, out IntPtr pSacl, out bool lpbSaclDefaulted);
+
+    [DllImport("advapi32.dll", CharSet = CharSet.Auto, SetLastError = true)]
+    static extern uint SetNamedSecurityInfo(string pObjectName, int ObjectType, uint SecurityInfo, IntPtr psidOwner, IntPtr psidGroup, IntPtr pDacl, IntPtr pSacl);
+
+    [DllImport("kernel32.dll")]
+    static extern IntPtr LocalFree(IntPtr hMem);
+
+    [StructLayout(LayoutKind.Sequential, Pack = 1)]
+    struct TOKEN_PRIVILEGES {
+        public uint PrivilegeCount;
+        public LUID_AND_ATTRIBUTES Privileges;
+    }
+
+    [StructLayout(LayoutKind.Sequential)]
+    struct LUID_AND_ATTRIBUTES {
+        public LUID Luid;
+        public uint Attributes;
+    }
+
+    [StructLayout(LayoutKind.Sequential)]
+    struct LUID {
+        public uint LowPart;
+        public int HighPart;
+    }
+
+    [DllImport("advapi32.dll", SetLastError = true)]
+    static extern bool AdjustTokenPrivileges(IntPtr TokenHandle, bool DisableAllPrivileges, ref TOKEN_PRIVILEGES NewState, uint BufferLength, IntPtr PreviousState, IntPtr ReturnLength);
+
+    [DllImport("advapi32.dll", SetLastError = true, CharSet = CharSet.Auto)]
+    static extern bool LookupPrivilegeValue(string lpSystemName, string lpName, out LUID lpLuid);
+
+    private const string SE_SECURITY_NAME = "SeSecurityPrivilege";
+    private const uint SE_PRIVILEGE_ENABLED = 0x00000002;
+    private const uint TOKEN_ADJUST_PRIVILEGES = 0x0020;
+    private const uint TOKEN_QUERY = 0x0008;
+
+    private static void EnablePrivilege(string privilege) {
+        IntPtr hToken;
+        if (OpenProcessToken(GetCurrentProcess(), TOKEN_ADJUST_PRIVILEGES | TOKEN_QUERY, out hToken)) {
+            try {
+                LUID luid;
+                if (LookupPrivilegeValue(null, privilege, out luid)) {
+                    TOKEN_PRIVILEGES tp = new TOKEN_PRIVILEGES();
+                    tp.PrivilegeCount = 1;
+                    tp.Privileges.Luid = luid;
+                    tp.Privileges.Attributes = SE_PRIVILEGE_ENABLED;
+                    AdjustTokenPrivileges(hToken, false, ref tp, 0, IntPtr.Zero, IntPtr.Zero);
+                }
+            } finally {
+                CloseHandle(hToken);
+            }
+        }
+    }
+
     private const int TokenIntegrityLevel = 25;
     private const uint SE_GROUP_INTEGRITY = 0x00000020;
     private const uint TOKEN_ALL_ACCESS = 0xF01FF;
     private const uint DISABLE_MAX_PRIVILEGE = 0x1;
+    private const int SE_FILE_OBJECT = 1;
+    private const uint LABEL_SECURITY_INFORMATION = 0x00000010;
+    private const uint SECURITY_MANDATORY_LOW_RID = 0x00001000;
+    private const uint SYSTEM_MANDATORY_LABEL_NO_WRITE_UP = 0x1;
+    private const uint CONTAINER_INHERIT_ACE = 0x2;
+    private const uint OBJECT_INHERIT_ACE = 0x1;
+
+    private static HashSet<string> forbiddenPaths = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
 
     static int Main(string[] args) {
         if (args.Length < 3) {
-            Console.Error.WriteLine("Usage: GeminiSandbox.exe <network:0|1> <cwd> [--forbidden-manifest <path>] <command> [args...]");
-            Console.Error.WriteLine("Internal commands: __read <path>, __write <path>");
+            Console.Error.WriteLine("Usage: GeminiSandbox.exe <network:0|1> <cwd> [--setup-manifest <path>] <command> [args...]");
+            Console.Error.WriteLine("Internal commands: __read <path>, __write <path>, __apply_batch_acls <manifestPath>");
             return 1;
         }
 
-        bool networkAccess = args[0] == "1";
-        string cwd = args[1];
-        HashSet<string> forbiddenPaths = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-        int argIndex = 2;
+        int argIndex = 0;
+        string networkArg = args[argIndex++];
+        bool networkAccess = networkArg == "1";
+        string cwd = args[argIndex++];
 
-        if (argIndex < args.Length && args[argIndex] == "--forbidden-manifest") {
+        // Batch ACL command: __apply_batch_acls <manifestPath> (maintained for backward compatibility/standalone use)
+        if (networkArg == "__apply_batch_acls") {
+            ApplyManifest(cwd); // In this case, cwd is actually the manifest path
+            return 0;
+        }
+
+        if (argIndex < args.Length && args[argIndex] == "--setup-manifest") {
             if (argIndex + 1 < args.Length) {
-                string manifestPath = args[argIndex + 1];
-                if (File.Exists(manifestPath)) {
-                    foreach (string line in File.ReadAllLines(manifestPath)) {
-                        if (!string.IsNullOrWhiteSpace(line)) {
-                            forbiddenPaths.Add(GetNormalizedPath(line.Trim()));
-                        }
-                    }
-                }
+                ApplyManifest(args[argIndex + 1]);
                 argIndex += 2;
             }
         }
@@ -278,7 +350,7 @@ public class GeminiSandbox {
                     return 1;
                 }
                 string path = args[argIndex + 1];
-                CheckForbidden(path, forbiddenPaths);
+                CheckForbidden(path, cwd);
                 return RunInImpersonation(hRestrictedToken, () => {
                     try {
                         using (FileStream fs = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.Read))
@@ -297,7 +369,7 @@ public class GeminiSandbox {
                     return 1;
                 }
                 string path = args[argIndex + 1];
-                CheckForbidden(path, forbiddenPaths);
+                CheckForbidden(path, cwd);
 
                 try {
                     using (MemoryStream ms = new MemoryStream()) {
@@ -321,18 +393,28 @@ public class GeminiSandbox {
             }
 
             // External Process
+            string commandLine = "";
+            for (int i = argIndex; i < args.Length; i++) {
+                if (i > argIndex) commandLine += " ";
+                commandLine += QuoteArgument(args[i]);
+            }
+
+            // Third layer of defense: block the external process if it's trying to touch a forbidden path directly
+            foreach (string arg in args) {
+                try {
+                    CheckForbidden(arg, cwd);
+                } catch (Exception e) {
+                    Console.Error.WriteLine(e.Message);
+                    return 1;
+                }
+            }
+
             STARTUPINFO si = new STARTUPINFO();
             si.cb = (uint)Marshal.SizeOf(si);
             si.dwFlags = 0x00000100; // STARTF_USESTDHANDLES
             si.hStdInput = GetStdHandle(-10);
             si.hStdOutput = GetStdHandle(-11);
             si.hStdError = GetStdHandle(-12);
-
-            string commandLine = "";
-            for (int i = argIndex; i < args.Length; i++) {
-                if (i > argIndex) commandLine += " ";
-                commandLine += QuoteArgument(args[i]);
-            }
 
             // Creation Flags: 0x01000000 (CREATE_BREAKAWAY_FROM_JOB) to allow job assignment if parent is in job
             // 0x00000004 (CREATE_SUSPENDED) to prevent the process from executing before being placed in the job
@@ -356,7 +438,7 @@ public class GeminiSandbox {
                 int err = Marshal.GetLastWin32Error();
                 Console.Error.WriteLine("Error: WaitForSingleObject failed (" + err + ")");
             }
-            
+
             uint exitCode = 0;
             if (!GetExitCodeProcess(pi.hProcess, out exitCode)) {
                 int err = Marshal.GetLastWin32Error();
@@ -395,21 +477,97 @@ public class GeminiSandbox {
         }
     }
 
-    private static string GetNormalizedPath(string path) {
-        string fullPath = Path.GetFullPath(path);
-        StringBuilder longPath = new StringBuilder(1024);
-        uint result = GetLongPathName(fullPath, longPath, (uint)longPath.Capacity);
-        if (result > 0 && result < longPath.Capacity) {
-            return longPath.ToString();
+    private static void SetLowIntegritySacl(string path) {
+        IntPtr pSid = IntPtr.Zero;
+        IntPtr pSacl = IntPtr.Zero;
+        try {
+            if (ConvertStringSidToSid("S-1-16-4096", out pSid)) {
+                uint cbAcl = 100;
+                pSacl = Marshal.AllocHGlobal((int)cbAcl);
+                if (InitializeAcl(pSacl, cbAcl, 2)) {
+                    if (AddMandatoryAce(pSacl, 2, CONTAINER_INHERIT_ACE | OBJECT_INHERIT_ACE, SYSTEM_MANDATORY_LABEL_NO_WRITE_UP, pSid)) {
+                        SetNamedSecurityInfo(path, 1, 16, IntPtr.Zero, IntPtr.Zero, IntPtr.Zero, pSacl);
+                    }
+                }
+            }
+        } catch {
+            // Ignore errors for individual paths
+        } finally {
+            if (pSid != IntPtr.Zero) LocalFree(pSid);
+            if (pSacl != IntPtr.Zero) Marshal.FreeHGlobal(pSacl);
         }
-        return fullPath;
     }
 
-    private static void CheckForbidden(string path, HashSet<string> forbiddenPaths) {
-        string fullPath = GetNormalizedPath(path);
+    private static void ApplyManifest(string manifestPath) {
+        EnablePrivilege(SE_SECURITY_NAME);
+        if (!File.Exists(manifestPath)) return;
+        foreach (string rawLine in File.ReadAllLines(manifestPath)) {
+            string line = rawLine.Trim();
+            if (string.IsNullOrEmpty(line) || line.Length < 3) continue;
+
+            // Handle UTF-8 BOM if present on the first line
+            if ((int)line[0] == 65279) line = line.Substring(1).Trim();
+            if (line.Length < 3) continue;
+
+            char op = line[0];
+            string path = line.Substring(1).Trim();
+
+            if (op == 'L') {
+                SetLowIntegritySacl(path);
+
+                try {
+                    if (Directory.Exists(path)) {
+                        DirectoryInfo dInfo = new DirectoryInfo(path);
+                        DirectorySecurity ds = dInfo.GetAccessControl();
+                        ds.AddAccessRule(new FileSystemAccessRule(new SecurityIdentifier("S-1-16-4096"), FileSystemRights.Modify, InheritanceFlags.ContainerInherit | InheritanceFlags.ObjectInherit, PropagationFlags.None, AccessControlType.Allow));
+                        dInfo.SetAccessControl(ds);
+                    } else if (File.Exists(path)) {
+                        FileInfo fInfo = new FileInfo(path);
+                        FileSecurity fs = fInfo.GetAccessControl();
+                        fs.AddAccessRule(new FileSystemAccessRule(new SecurityIdentifier("S-1-16-4096"), FileSystemRights.Modify, AccessControlType.Allow));
+                        fInfo.SetAccessControl(fs);
+                    }
+                } catch {
+                    // Ignore access errors
+                }
+            } else if (op == 'D') {
+                DenyLowIntegrityDacl(path);
+                forbiddenPaths.Add(GetNormalizedPath(path, null));
+            }
+        }
+    }
+
+    private static string GetNormalizedPath(string path, string basePath) {
+        try {
+            string absolutePath = path;
+            if (!Path.IsPathRooted(path) && !string.IsNullOrEmpty(basePath)) {
+                absolutePath = Path.Combine(basePath, path);
+            }
+            string fullPath = Path.GetFullPath(absolutePath);
+            StringBuilder longPath = new StringBuilder(1024);
+            uint result = GetLongPathName(fullPath, longPath, (uint)longPath.Capacity);
+            if (result > 0 && result < longPath.Capacity) {
+                return longPath.ToString();
+            }
+            return fullPath;
+        } catch {
+            return path;
+        }
+    }
+
+    private static void CheckForbidden(string arg, string basePath) {
         foreach (string forbidden in forbiddenPaths) {
-            if (fullPath.Equals(forbidden, StringComparison.OrdinalIgnoreCase) || fullPath.StartsWith(forbidden + Path.DirectorySeparatorChar, StringComparison.OrdinalIgnoreCase)) {
-                throw new UnauthorizedAccessException("Access to forbidden path is denied: " + path);
+            if (arg.IndexOf(forbidden, StringComparison.OrdinalIgnoreCase) >= 0) {
+                 throw new UnauthorizedAccessException("Access to forbidden path is denied (matched " + forbidden + "): " + arg);
+            }
+        }
+
+        // Also check normalized path for direct hits
+        string fullPath = GetNormalizedPath(arg, basePath);
+        foreach (string forbidden in forbiddenPaths) {
+            if (fullPath.Equals(forbidden, StringComparison.OrdinalIgnoreCase) ||
+                fullPath.StartsWith(forbidden + Path.DirectorySeparatorChar, StringComparison.OrdinalIgnoreCase)) {
+                throw new UnauthorizedAccessException("Access to forbidden path is denied: " + arg);
             }
         }
     }
@@ -455,5 +613,24 @@ public class GeminiSandbox {
         }
         sb.Append('\"');
         return sb.ToString();
+    }
+
+
+    private static void DenyLowIntegrityDacl(string path) {
+        try {
+            if (Directory.Exists(path)) {
+                DirectorySecurity ds = Directory.GetAccessControl(path);
+                ds.SetAccessRuleProtection(true, true);
+                ds.AddAccessRule(new FileSystemAccessRule(new SecurityIdentifier("S-1-16-4096"), FileSystemRights.FullControl, InheritanceFlags.ContainerInherit | InheritanceFlags.ObjectInherit, PropagationFlags.None, AccessControlType.Deny));
+                Directory.SetAccessControl(path, ds);
+            } else if (File.Exists(path)) {
+                FileSecurity fs = File.GetAccessControl(path);
+                fs.SetAccessRuleProtection(true, true);
+                fs.AddAccessRule(new FileSystemAccessRule(new SecurityIdentifier("S-1-16-4096"), FileSystemRights.FullControl, AccessControlType.Deny));
+                File.SetAccessControl(path, fs);
+            }
+        } catch (Exception e) {
+            Console.Error.WriteLine("Error in DenyLowIntegrityDacl for " + path + ": " + e.Message);
+        }
     }
 }
