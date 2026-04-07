@@ -20,9 +20,8 @@ function runCommand(
   { dryRun = false, throwOnError = true, options = {} } = {},
 ) {
   const renderedCommand = formatCommand(command, args);
-  console.log('> ${renderedCommand}');
-
-  if (dryRub) {
+  console.log(`> ${renderedCommand}`); 
+  if (dryRun) { 
     return '';
   }
 
@@ -38,13 +37,14 @@ function runCommand(
 
     return result;
   } catch (err) {
-    console.error('Command failed: ${renderedCommand}');
+    console.error(`Command failed: ${renderedCommand}`); 
     if (throwOnError) {
       throw err;
     }
     return null;
   }
 }
+
 function runGit(args, options = {}) {
   return runCommand('git', args, options);
 }
@@ -52,11 +52,10 @@ function runGit(args, options = {}) {
 function validateCommitSha(commit) {
   if (!/^[a-f0-9]{7,40}$/i.test(commit)) {
     throw new Error(
-      'Invalid commit SHA: "${commit}". Expected 7-40 hexadecimal characters.',
-      );
+      `Invalid commit SHA: "${commit}". Expected 7-40 hexadecimal characters.`, 
   }
 }
-  
+
 async function main() {
   const argv = await yargs(hideBin(process.argv))
     .option('commit', {
@@ -118,7 +117,6 @@ async function main() {
       runGit(['checkout', '-b', releaseBranch, latestTag], { dryRun });
       runGit(['push', 'origin', releaseBranch], { dryRun });
     } catch (error) {
-      // Check if this is a GitHub App workflows permission error
       if (
         error.message.match(/refusing to allow a GitHub App/i) &&
         error.message.match(/workflows?['`]? permission/i)
@@ -138,7 +136,6 @@ async function main() {
         );
         process.exit(1);
       } else {
-        // Re-throw other errors
         throw error;
       }
     }
@@ -150,7 +147,6 @@ async function main() {
   if (branchExists(hotfixBranch)) {
     console.log(`Hotfix branch ${hotfixBranch} already exists.`);
 
-    // Check if there's already a PR for this branch
     try {
       const prInfo = runCommand(
         'gh',
@@ -163,9 +159,9 @@ async function main() {
           'number,url',
           '--jq',
           '.[0] // empty',
-          ],
+        ],
         { dryRun: false },
-        );
+      );
       if (prInfo && prInfo !== 'null' && prInfo !== '') {
         const pr = JSON.parse(prInfo);
         console.log(`Found existing PR #${pr.number}: ${pr.url}`);
@@ -192,19 +188,16 @@ async function main() {
   runGit(['checkout', '-b', hotfixBranch, `origin/${releaseBranch}`], {
     dryRun,
   });
-  // Ensure git user is configured properly for commits
   console.log('Configuring git user for cherry-pick commits...');
   runGit(['config', 'user.name', 'gemini-cli-robot'], { dryRun });
   runGit(['config', 'user.email', 'gemini-cli-robot@google.com'], { dryRun });
-  // Cherry-pick the commit.
   console.log(`Cherry-picking commit ${commit} into ${hotfixBranch}...`);
   let hasConflicts = false;
   if (!dryRun) {
     try {
-     runGit(['cherry-pick', commit], { options: { stdio: 'pipe' } });
+      runGit(['cherry-pick', commit], { options: { stdio: 'pipe' } });
       console.log(`✅ Cherry-pick successful - no conflicts detected`);
     } catch (error) {
-      // Check if this is a cherry-pick conflict
       try {
         const status = runGit(['status', '--porcelain']);
         const conflictFiles = status
@@ -225,8 +218,6 @@ async function main() {
           conflictFiles.forEach((file) =>
             console.log(`   - ${file.substring(3)}`),
           );
-
-          // Add all files (including conflict markers) and commit
           console.log(
             `📝 Creating commit with conflict markers for manual resolution...`,
           );
@@ -234,11 +225,9 @@ async function main() {
           runGit(['commit', '--no-edit', '--no-verify']);
           console.log(`✅ Committed cherry-pick with conflict markers`);
         } else {
-          // Re-throw if it's not a conflict error
           throw error;
         }
       } catch {
-        // Re-throw original error if we can't determine the status
         throw error;
       }
     }
@@ -283,8 +272,23 @@ The commit has been created with conflict markers for easier manual resolution.
     prBody += '\n\n**[DRY RUN]**';
   }
 
-  const prCommand = `gh pr create --base ${releaseBranch} --head ${hotfixBranch} --title "${prTitle}" --body "${prBody}"`;
-  run(prCommand, dryRun);
+ 
+  runCommand(
+    'gh',
+    [
+      'pr',
+      'create',
+      '--base',
+      releaseBranch,
+      '--head',
+      hotfixBranch,
+      '--title',
+      prTitle,
+      '--body',
+      prBody,
+    ],
+    { dryRun },
+  );
 
   if (hasConflicts) {
     console.log(
@@ -299,18 +303,18 @@ The commit has been created with conflict markers for easier manual resolution.
     console.log(`Release Branch: ${releaseBranch}`);
     console.log(`Hotfix Branch: ${hotfixBranch}`);
     console.log(
-      'Pull Request Command: ${formatCommand('gh', [
-      'pr',
-      'create',
-      '--base',
-      releaseBranch,
-      '--head',
-      hotfixBranch,
-      '--title',
-      prTitle,
-      '--body',
-      prBody,
-      ])}',
+      `Pull Request Command: ${formatCommand('gh', [
+        'pr',
+        'create',
+        '--base',
+        releaseBranch,
+        '--head',
+        hotfixBranch,
+        '--title',
+        prTitle,
+        '--body',
+        prBody,
+      ])}`,
     );
     console.log('---------------------');
   }
@@ -318,27 +322,26 @@ The commit has been created with conflict markers for easier manual resolution.
   return { newBranch: hotfixBranch, created: true, hasConflicts };
 }
 
-
 function branchExists(branchName) {
- const result = runGit(['ls-remote', '--exit-code', '--heads', 'origin', branchName],
-{
-  throwOnError: false,
- });
- return result !== null;
+  const result = runGit(
+    ['ls-remote', '--exit-code', '--heads', 'origin', branchName],
+    { throwOnError: false },
+  );
+  return result !== null;
 }
 
 function getLatestReleaseInfo({ argv, channel } = {}) {
   console.log(`Fetching latest release info for channel: ${channel}...`);
-  const patchFrom = channel; // 'stable' or 'preview'
+  const patchFrom = channel;
   try {
     const result = JSON.parse(
       runCommand('node', [
         'scripts/get-release-version.js',
-        '--cli-package-name=${argv['cli-package-name']}',
+        `--cli-package-name=${argv['cli-package-name']}`,
         '--type=patch',
-        '--patch-from=${patchFrom}',
-    }),
-  );
+        `--patch-from=${patchFrom}`,                      
+      ]),
+    );
     console.log(`Current ${channel} tag: ${result.previousReleaseTag}`);
     console.log(`Next ${channel} version would be: ${result.releaseVersion}`);
     return {
