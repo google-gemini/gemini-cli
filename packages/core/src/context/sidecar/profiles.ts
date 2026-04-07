@@ -15,11 +15,6 @@ export const defaultSidecarProfile: SidecarConfig = {
     retainedTokens: 65000,
     maxTokens: 150000,
   },
-  gcBackstop: {
-    strategy: 'truncate',
-    target: 'incremental',
-    freeTokensTarget: 10000,
-  },
   pipelines: [
     {
       name: 'Immediate Sanitization',
@@ -31,11 +26,6 @@ export const defaultSidecarProfile: SidecarConfig = {
           options: { stringLengthThresholdTokens: 8000 },
         },
         { processorId: 'BlobDegradationProcessor', options: {} },
-        {
-          processorId: 'SemanticCompressionProcessor',
-          options: { nodeThresholdTokens: 5000 },
-        },
-        { processorId: 'EmergencyTruncationProcessor', options: {} },
       ],
     },
     {
@@ -47,7 +37,20 @@ export const defaultSidecarProfile: SidecarConfig = {
           processorId: 'HistorySquashingProcessor',
           options: { maxTokensPerNode: 3000 },
         },
+        {
+          processorId: 'SemanticCompressionProcessor',
+          options: { nodeThresholdTokens: 5000 },
+        },
         { processorId: 'StateSnapshotProcessor', options: {} },
+      ],
+    },
+    {
+      name: 'Emergency Backstop',
+      triggers: ['gc_backstop'],
+      execution: 'blocking',
+      processors: [
+        { processorId: 'StateSnapshotProcessor', options: {} },
+        { processorId: 'EmergencyTruncationProcessor', options: {} },
       ],
     },
   ],

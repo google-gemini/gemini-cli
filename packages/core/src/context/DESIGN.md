@@ -21,6 +21,7 @@ The architecture is built upon seven core principles that distinguish it from th
 5.  **Pluggability:** `ContextProcessor`s are isolated plugins with typed schemas. They are registered via Dependency Injection and can be arranged into arbitrary pipelines.
 6.  **Debuggability:** A built-in `ContextTracer` tracks every step of the pipeline, providing full audit trails of exactly when, why, and how a message was altered.
 7.  **Testability:** Global state has been eliminated. The system uses strict Dependency Injection (`ProcessorRegistry`, `ContextEnvironment`, `ContextEventBus`), making every layer easily unit-testable.
+8.  **Orthogonality via Targets:** Processors do not implicitly scan the entire history graph. The `ContextManager` computes exact Deltas (e.g., new nodes just added, or specific nodes that just aged out of the retained buffer). Processors are sandboxed by the `EpisodeEditor` to only iterate over and mutate these specific `targetNodes`, ensuring surgical and highly efficient reductions.
 
 ---
 
@@ -58,13 +59,14 @@ To understand how these pieces fit together, let's walk through the lifecycle of
 4.  **Registration:** The new `Episode` is added to the `ContextManager`'s pristine graph.
 
 ### Phase 2: Triggering the Pipelines
-1.  **Event Emission:** The `ContextManager` fires a `PristineHistoryUpdatedEvent` over the `ContextEventBus`.
-2.  **Orchestration:** The `PipelineOrchestrator` hears the event and evaluates its configured `PipelineDef`s. It finds a pipeline with the trigger `on_turn`.
-3.  **Execution:** The Orchestrator begins running the processors in that pipeline sequentially. If the pipeline is marked `execution: 'background'`, this happens asynchronously.
+1.  **Delta Generation:** The `ContextManager` receives the updated pristine graph. It diffs it against the previous state and extracts a Delta—the exact Set of new `IrNode` IDs.
+2.  **Event Emission:** The `ContextManager` fires a `ChunkReceivedEvent` (with the Delta targets) over the `ContextEventBus`.
+3.  **Orchestration:** The `PipelineOrchestrator` hears the event and evaluates its configured `PipelineDef`s. It finds a pipeline with the trigger `on_turn`.
+4.  **Execution:** The Orchestrator creates an `EpisodeEditor` heavily sandboxed to *only* allow access to the targeted Delta nodes, and begins running the processors in that pipeline sequentially.
 
 ### Phase 3: Processing & Safe Editing
-1.  **Processing:** A processor (e.g., `ToolMaskingProcessor`) receives the `EpisodeEditor`. It identifies a massive JSON payload in the tool execution.
-2.  **Editing:** Instead of deleting the JSON, it calls `editor.editEpisode()`. It creates a `MaskedVariant` containing a string summary of the JSON.
+1.  **Processing:** A processor (e.g., `ToolMaskingProcessor`) receives the `EpisodeEditor`. It iterates over `editor.targets` (ignoring the rest of the historical graph). It identifies a massive JSON payload in one of the new tool executions.
+2.  **Editing:** Instead of deleting the JSON, it calls `editor.editEpisode()`. It creates a `MaskedVariant` containing a string summary of the JSON. If it had attempted to edit a node outside its target Delta, the editor would have thrown an error.
 3.  **Auditing:** The editor automatically appends a record to the node's `IrMetadata.transformations` indicating that the `ToolMaskingProcessor` applied a `MASKED` action.
 
 ### Phase 4: Async Resolution

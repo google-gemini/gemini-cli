@@ -33,7 +33,6 @@ describe('System Lifecycle Golden Tests', () => {
 
   const getAggressiveConfig = (): SidecarConfig => ({
     budget: { maxTokens: 4000, retainedTokens: 2000 }, // Extremely tight limits
-    gcBackstop: { strategy: 'truncate', target: 'max' },
     pipelines: [
       {
         name: 'Pressure Relief', // Emits from eventBus 'budget_exceeded'

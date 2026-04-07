@@ -13,7 +13,7 @@ export function getSidecarConfigSchema(registry: ProcessorRegistry) {
     title: 'SidecarConfig',
     description: 'The Data-Driven Schema for the Context Manager.',
     type: 'object',
-    required: ['budget', 'gcBackstop', 'pipelines'],
+    required: ['budget', 'pipelines'],
     properties: {
       budget: {
         type: 'object',
@@ -29,25 +29,6 @@ export function getSidecarConfigSchema(registry: ProcessorRegistry) {
             type: 'number',
             description:
               'The absolute maximum token count allowed before synchronous truncation kicks in.',
-          },
-        },
-      },
-      gcBackstop: {
-        type: 'object',
-        description:
-          "Defines what happens when the pipeline fails to compress under 'maxTokens'",
-        required: ['strategy', 'target'],
-        properties: {
-          strategy: {
-            type: 'string',
-            enum: ['truncate', 'compress', 'rollingSummarizer'],
-          },
-          target: {
-            type: 'string',
-            enum: ['incremental', 'freeNTokens', 'max'],
-          },
-          freeTokensTarget: {
-            type: 'number',
           },
         },
       },

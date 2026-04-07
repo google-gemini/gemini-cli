@@ -6,7 +6,7 @@
 
 import type { Episode } from '../ir/types.js';
 import type { ContextProcessor, ContextAccountingState } from '../pipeline.js';
-import type { SidecarConfig, PipelineDef } from './types.js';
+import type { SidecarConfig, PipelineDef, PipelineTrigger } from './types.js';
 import type {
   ContextEnvironment,
   ContextEventBus,
@@ -111,6 +111,49 @@ export class PipelineOrchestrator {
    * Executes a pipeline asynchronously in the background. This is the "Eventual Consistency" path.
    * When the pipeline resolves, it emits a VariantReady event to cache the new graph.
    */
+  /**
+   * Synchronously executes all pipelines configured with a specific trigger.
+   * Forces them to run in a blocking manner regardless of their 'execution' setting
+   * (useful for emergency backstops right before sending a prompt).
+   */
+  async executeTriggerSync(
+    trigger: PipelineTrigger,
+    episodes: Episode[],
+    state: ContextAccountingState,
+  ): Promise<Episode[]> {
+    let currentEpisodes = [...episodes];
+    const pipelines = this.config.pipelines.filter((p) => p.triggers.includes(trigger));
+    
+    for (const pipeline of pipelines) {
+      this.tracer.logEvent(
+        'Orchestrator',
+        `Triggering synchronous emergency pipeline via [${trigger}]: ${pipeline.name}`,
+      );
+      
+      for (let i = 0; i < pipeline.processors.length; i++) {
+        const procDef = pipeline.processors[i];
+        const processor = this.instantiatedProcessors.get(procDef.processorId);
+        if (!processor) continue;
+
+        try {
+          this.tracer.logEvent(
+            'Orchestrator',
+            `Executing processor: ${procDef.processorId}`,
+          );
+          const editor = new EpisodeEditor(currentEpisodes, state.targetNodeIds);
+          await processor.process(editor, state);
+          currentEpisodes = editor.getFinalEpisodes();
+        } catch (error) {
+          debugLogger.error(
+            `Pipeline ${pipeline.name} failed synchronously at ${procDef.processorId}:`,
+            error,
+          );
+        }
+      }
+    }
+    return currentEpisodes;
+  }
+
   /**
    * Executes a pipeline based on its configured execution strategy ('blocking' or 'background').
    */

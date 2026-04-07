@@ -60,8 +60,24 @@ export class IrProjector {
       `Context Manager Synchronous Barrier triggered: View at ${currentTokens} tokens (limit: ${maxTokens}).`,
     );
 
-    const processedEpisodes = await orchestrator.executePipeline(
-      'Immediate Sanitization',
+    // Calculate exactly which nodes aged out of the retainedTokens budget to form our target delta
+    const agedOutNodes = new Set<string>();
+    let rollingTokens = 0;
+    // Start from newest and count backwards
+    for (let i = workingBuffer.length - 1; i >= 0; i--) {
+      const ep = workingBuffer[i];
+      const epTokens = env.tokenCalculator.calculateEpisodeListTokens([ep]);
+      rollingTokens += epTokens;
+      if (rollingTokens > sidecar.budget.retainedTokens) {
+        agedOutNodes.add(ep.id);
+        agedOutNodes.add(ep.trigger.id);
+        for (const step of ep.steps) agedOutNodes.add(step.id);
+        if (ep.yield) agedOutNodes.add(ep.yield.id);
+      }
+    }
+
+    const processedEpisodes = await orchestrator.executeTriggerSync(
+      'gc_backstop',
       workingBuffer,
       {
         currentTokens,
@@ -70,6 +86,7 @@ export class IrProjector {
         deficitTokens: Math.max(0, currentTokens - sidecar.budget.maxTokens),
         protectedEpisodeIds: protectedIds,
         isBudgetSatisfied: currentTokens <= sidecar.budget.maxTokens,
+        targetNodeIds: agedOutNodes,
       },
     );
 

@@ -36,6 +36,7 @@ export type PipelineTrigger =
   | 'on_turn'
   | 'post_turn'
   | 'budget_exceeded'
+  | 'gc_backstop'
   | { type: 'timer'; intervalMs: number };
 
 export interface PipelineDef {
@@ -53,13 +54,6 @@ export interface SidecarConfig {
   budget: {
     retainedTokens: number;
     maxTokens: number;
-  };
-
-  /** Defines what happens when the pipeline fails to compress under 'maxTokens' */
-  gcBackstop: {
-    strategy: 'truncate' | 'compress' | 'rollingSummarizer';
-    target: 'incremental' | 'freeNTokens' | 'max';
-    freeTokensTarget?: number;
   };
 
   /** The execution graphs for context manipulation */

@@ -111,7 +111,6 @@ describe('PipelineOrchestrator (Component)', () => {
 
   const createConfig = (pipelines: PipelineDef[]): SidecarConfig => ({
     budget: { maxTokens: 100, retainedTokens: 50 },
-    gcBackstop: { strategy: 'truncate', target: 'max' },
     pipelines,
   });
 

@@ -47,7 +47,6 @@ describe('SidecarLoader (Fake FS)', () => {
   it('returns parsed config if file is valid', () => {
     const validConfig = {
       budget: { retainedTokens: 1000, maxTokens: 2000 },
-      gcBackstop: { strategy: 'truncate', target: 'max' },
       pipelines: [],
     };
     fileSystem.setFile('/path/to/sidecar.json', JSON.stringify(validConfig));
