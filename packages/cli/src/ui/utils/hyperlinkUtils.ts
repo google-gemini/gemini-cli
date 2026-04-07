@@ -79,10 +79,17 @@ export const PLAIN_TEXT_FILE_PATH_REGEX = new RegExp(
  */
 export function resolveFileUri(
   filePath: string,
+  line?: string,
+  col?: string,
   cwd: string = process.cwd(),
 ): string {
   const resolved = path.isAbsolute(filePath)
     ? filePath
     : path.resolve(cwd, filePath);
-  return `file://${resolved}`;
+  let uri = pathToFileURL(resolved).toString();
+  if (line) {
+    uri += "#L" + line;
+    if (col) uri += "," + col;
+  }
+  return uri;
 }
