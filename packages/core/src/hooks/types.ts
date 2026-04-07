@@ -734,6 +734,8 @@ export interface HookExecutionResult {
   exitCode?: number;
   duration: number;
   error?: Error;
+  /** The format of the output provided by the hook */
+  outputFormat?: 'json' | 'text';
 }
 
 /**
