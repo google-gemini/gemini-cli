@@ -23,8 +23,8 @@ export const ScreenReaderAppLayout: React.FC = () => {
   return (
     <Box
       flexDirection="column"
-      width="90%"
-      height="100%"
+      width={uiState.terminalWidth}
+      height={uiState.terminalHeight}
       ref={uiState.rootUiRef}
     >
       <Notifications />
