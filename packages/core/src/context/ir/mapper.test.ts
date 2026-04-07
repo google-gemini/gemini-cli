@@ -8,7 +8,7 @@ import { describe, it, expect } from 'vitest';
 import { IrMapper } from './mapper.js';
 import { ContextTokenCalculator } from '../utils/contextTokenCalculator.js';
 import type { Content } from '@google/genai';
-import type { UserPrompt, ToolExecution } from './types.js';
+import type { UserPrompt, ToolExecution, AgentThought } from './types.js';
 
 describe('IrMapper', () => {
   it('should correctly map a complex conversation into Episodes and back', () => {
@@ -196,7 +196,7 @@ describe('IrMapper', () => {
     expect(ep.steps).toHaveLength(3);
     
     expect(ep.steps[0].type).toBe('AGENT_THOUGHT');
-    expect((ep.steps[0] as any).text).toBe('I will call them concurrently.');
+    expect((ep.steps[0] as AgentThought).text).toBe('I will call them concurrently.');
 
     expect(ep.steps[1].type).toBe('TOOL_EXECUTION');
     expect((ep.steps[1] as ToolExecution).toolName).toBe('tool_one');

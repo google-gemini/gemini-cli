@@ -44,24 +44,24 @@ export class InMemoryFileSystem implements IFileSystem {
     return content;
   }
   
-  writeFileSync(p: string, data: string | Buffer, encoding?: 'utf-8'): void {
+  writeFileSync(p: string, data: string | Buffer, _encoding?: 'utf-8'): void {
     this.files.set(this.normalize(p), data);
   }
   
-  appendFileSync(p: string, data: string, encoding: 'utf-8'): void {
+  appendFileSync(p: string, data: string, _encoding: 'utf-8'): void {
     const norm = this.normalize(p);
     const existing = this.files.get(norm) || '';
     const existingStr = Buffer.isBuffer(existing) ? existing.toString('utf8') : existing;
     this.files.set(norm, existingStr + data);
   }
   
-  mkdirSync(p: string, options?: { recursive?: boolean }): void {}
+  mkdirSync(_p: string, _options?: { recursive?: boolean }): void {}
 
   async writeFile(p: string, data: string | Buffer): Promise<void> {
     this.writeFileSync(p, data);
   }
 
-  async mkdir(p: string, options?: { recursive?: boolean }): Promise<void> {}
+  async mkdir(_p: string, _options?: { recursive?: boolean }): Promise<void> {}
 
   join(...paths: string[]): string {
     return this.normalize(paths.join('/'));

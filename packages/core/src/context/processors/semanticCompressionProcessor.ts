@@ -4,7 +4,6 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import type { IrMetadata } from '../ir/types.js';
 import type { ContextAccountingState, ContextProcessor } from '../pipeline.js';
 import type { ContextEnvironment } from '../sidecar/environment.js';
 import { debugLogger } from '../../utils/debugLogger.js';
@@ -125,7 +124,7 @@ export class SemanticCompressionProcessor implements ContextProcessor {
             } else {
               try {
                 stringifiedObs = JSON.stringify(rawObs);
-              } catch (_e) {
+              } catch {
                 stringifiedObs = String(rawObs);
               }
             }
@@ -166,7 +165,7 @@ export class SemanticCompressionProcessor implements ContextProcessor {
                         observation: newObsObject,
                         tokens: { intent: intentTokens, observation: newObsTokens },
                       };
-                      if (!draftStep.metadata) { draftStep.metadata = { transformations: [], currentTokens: 0, originalTokens: 0 } as unknown as IrMetadata };
+                      if (!draftStep.metadata) { draftStep.metadata = { transformations: [], currentTokens: 0, originalTokens: 0 }  };
                       if (!draftStep.metadata.transformations) { draftStep.metadata.transformations = [] };
                       draftStep.metadata.transformations.push({
                         processorName: this.name,
@@ -202,8 +201,8 @@ export class SemanticCompressionProcessor implements ContextProcessor {
       });
       const text = getResponseText(response) ?? '';
       return `[Semantic Summary of old ${contentType}]\n${text.trim()}`;
-    } catch (_e) {
-      debugLogger.warn('Semantic compression LLM call failed: ' + String(_e));
+    } catch (e) {
+      debugLogger.warn(`Semantic compression LLM call failed: ${e}`);
       // If we fail to summarize, we just return the original truncated by 50% as a fail-safe, or the original.
       // Returning original is safer to prevent data loss on API failure.
       return content;

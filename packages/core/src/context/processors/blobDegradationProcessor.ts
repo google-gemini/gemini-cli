@@ -15,7 +15,7 @@ export class BlobDegradationProcessor implements ContextProcessor {
   readonly name = 'BlobDegradation';
   private env: ContextEnvironment;
 
-  constructor(env: ContextEnvironment, options: Record<string, unknown> = {}) {
+  constructor(env: ContextEnvironment, _options: Record<string, unknown> = {}) {
     this.env = env;
   }
 

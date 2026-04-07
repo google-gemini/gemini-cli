@@ -10,7 +10,7 @@ import type { ContextEnvironment } from '../sidecar/environment.js';
 
 import type { EpisodeEditor } from '../ir/episodeEditor.js';
 
-export interface EmergencyTruncationProcessorOptions {}
+export type EmergencyTruncationProcessorOptions = Record<string, never>;
 
 export class EmergencyTruncationProcessor implements ContextProcessor {
   static create(env: ContextEnvironment, options: EmergencyTruncationProcessorOptions): EmergencyTruncationProcessor {

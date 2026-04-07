@@ -81,7 +81,7 @@ export class ContextTracer {
         'utf-8',
       );
     } catch (e) {
-      // fail silently in trace
+      debugLogger.warn(`Tracing failed: ${e}`);
     }
   }
 

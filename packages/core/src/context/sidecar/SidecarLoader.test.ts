@@ -7,6 +7,7 @@ import { describe, it, expect, beforeEach } from 'vitest';
 import { SidecarLoader } from './SidecarLoader.js';
 import { defaultSidecarProfile } from './profiles.js';
 import { InMemoryFileSystem } from '../system/InMemoryFileSystem.js';
+import type { Config } from 'src/config/config.js';
 
 describe('SidecarLoader (Fake FS)', () => {
   let fileSystem: InMemoryFileSystem;
@@ -17,7 +18,7 @@ describe('SidecarLoader (Fake FS)', () => {
 
   const mockConfig = {
     getExperimentalContextSidecarConfig: () => '/path/to/sidecar.json'
-  } as any;
+  } as unknown as Config;
 
   it('returns default profile if file does not exist', () => {
     const result = SidecarLoader.fromConfig(mockConfig, fileSystem);

@@ -39,7 +39,7 @@ export class PipelineOrchestrator {
           }
           // The Orchestrator injects standard dependencies required by processors
           // If a processor needs the eventBus (like Snapshot), it expects it via constructor.
-          const instance = processorClass.create(this.env, procDef.options) as unknown as ContextProcessor;
+          const instance = processorClass.create(this.env, procDef.options);
           this.instantiatedProcessors.set(procDef.processorId, instance);
         }
       }
@@ -69,7 +69,7 @@ export class PipelineOrchestrator {
                 deficitTokens: event.targetDeficit,
                 protectedEpisodeIds: new Set()
              };
-             this.executePipelineAsync(pipeline, event.episodes, state);
+             void this.executePipelineAsync(pipeline, event.episodes, state);
           });
         }
       }
@@ -154,18 +154,30 @@ export class PipelineOrchestrator {
               else if (procDef.processorId.includes('Semantic')) vType = 'summary';
               
               const ep = mutation.episode!;
+              let fallbackText = '';
+              if (ep.yield?.text) fallbackText = ep.yield.text;
+              else if (ep.trigger?.type === 'USER_PROMPT') {
+                 const firstPart = ep.trigger.semanticParts?.[0];
+                 if (firstPart) {
+                    fallbackText = firstPart.type === 'text' ? (firstPart.presentation?.text || firstPart.text) : '';
+                 }
+              }
+
               this.eventBus.emitVariantReady({
                   targetId: mutation.type === 'replaced' ? mutation.originalIds![0] : ep.id,
                   variantId,
-                  // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
-                  variant: {
+                  variant: (vType === 'snapshot' ? {
                       status: 'ready',
-                      type: vType,
-                      episode: vType === 'snapshot' ? ep : undefined,
-                      text: vType !== 'snapshot' ? (ep.yield?.text || (ep.trigger as any)?.semanticParts?.[0]?.presentation?.text || '') : undefined,
+                      type: 'snapshot',
+                      episode: ep,
                       recoveredTokens: ep.yield?.metadata?.currentTokens || 10,
                       replacedEpisodeIds: mutation.originalIds,
-                  } as any
+                  } : {
+                      status: 'ready',
+                      type: vType,
+                      text: fallbackText,
+                      recoveredTokens: ep.yield?.metadata?.currentTokens || 10,
+                  })
               });
            }
         }

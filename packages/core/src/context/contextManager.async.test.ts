@@ -30,7 +30,7 @@ describe('ContextManager Barrier Tests', () => {
     }
 
     // Set history directly to avoid event races
-    await chatHistory.set(tinyHistory);
+    chatHistory.set(tinyHistory);
 
     // 3. Pre-verify baseline length.
     const baseline = await contextManager.projectCompressedHistory();
@@ -99,7 +99,7 @@ describe('ContextManager Barrier Tests', () => {
       { role: 'user', parts: [{ text: 'U1' }] },
       { role: 'model', parts: [{ text: 'M1_LARGE!!' }] },
     ];
-    await chatHistory.set(history);
+    chatHistory.set(history);
 
     const projection = await contextManager.projectCompressedHistory();
 

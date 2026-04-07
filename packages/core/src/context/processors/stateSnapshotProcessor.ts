@@ -5,7 +5,7 @@
  */
 
 import type { ContextProcessor, ContextAccountingState } from '../pipeline.js';
-import type { Episode, ToolExecution } from '../ir/types.js';
+import type { Episode } from '../ir/types.js';
 import type { ContextEnvironment, ContextEventBus } from '../sidecar/environment.js';
 
 import { v4 as uuidv4 } from 'uuid';
@@ -33,7 +33,7 @@ export class StateSnapshotProcessor implements ContextProcessor {
   constructor(
     env: ContextEnvironment,
     options: StateSnapshotProcessorOptions,
-    eventBus: ContextEventBus,
+    _eventBus: ContextEventBus,
   ) {
     this.env = env;
     this.options = options;
@@ -51,8 +51,15 @@ export class StateSnapshotProcessor implements ContextProcessor {
       for (let i = 1; i < editor.episodes.length - 1; i++) {
         const ep = editor.episodes[i];
         selectedEpisodes.push(ep);
+        let triggerText = '';
+        if (ep.trigger?.type === 'USER_PROMPT') {
+           const firstPart = ep.trigger.semanticParts?.[0];
+           if (firstPart) {
+               triggerText = firstPart.type === 'text' ? firstPart.text : (firstPart.presentation?.text ?? '');
+           }
+        }
         deficitAccumulator += this.env.tokenCalculator.estimateTokensForParts([
-          { text: (ep.trigger as any)?.semanticParts?.[0]?.text ?? '' },
+          { text: triggerText },
           { text: ep.yield?.text ?? '' },
         ]);
         if (deficitAccumulator >= targetDeficit) break;
@@ -82,12 +89,19 @@ Output ONLY the raw factual snapshot, formatted compactly. Do not include markdo
 
     let userPromptText = 'TRANSCRIPT TO SNAPSHOT:\n\n';
     for (const ep of episodes) {
-      if (ep.trigger) {
-        userPromptText += `USER: ${(ep.trigger as any).semanticParts?.map((p: any) => p.text).join('')}\n`;
+      if (ep.trigger?.type === 'USER_PROMPT') {
+        const partsText = ep.trigger.semanticParts.map(p => {
+          if (p.type === 'text') return p.text;
+          if (p.presentation) return p.presentation.text;
+          return '';
+        }).join('');
+        userPromptText += `USER: ${partsText}\n`;
+      } else if (ep.trigger?.type === 'SYSTEM_EVENT') {
+        userPromptText += `[SYSTEM EVENT: ${ep.trigger.name}]\n`;
       }
       for (const step of ep.steps) {
         if (step.type === 'TOOL_EXECUTION') {
-          userPromptText += `[Tool Called: ${(step).toolName}]\n`;
+          userPromptText += `[Tool Called: ${step.toolName}]\n`;
         }
       }
       if (ep.yield) {

@@ -9,7 +9,7 @@ import type { ContextEnvironment } from './environment.js';
 
 
 export interface ContextProcessorDef<
-  TOptions extends Record<string, unknown> = any,
+  TOptions extends Record<string, unknown> = Record<string, unknown>,
 > {
   readonly id: string;
   readonly schema?: object;
