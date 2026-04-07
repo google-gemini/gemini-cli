@@ -3,15 +3,16 @@
  * Copyright 2026 Google LLC
  * SPDX-License-Identifier: Apache-2.0
  */
-import { createMockEnvironment, createDummyState, createDummyEpisode } from '../testing/contextTestUtils.js';
+
+import {
+  createMockEnvironment,
+  createDummyState,
+  createDummyEpisode,
+} from '../testing/contextTestUtils.js';
 import { describe, it, expect, beforeEach } from 'vitest';
 import { HistorySquashingProcessor } from './historySquashingProcessor.js';
 import { EpisodeEditor } from '../ir/episodeEditor.js';
-import type {
-  UserPrompt,
-  AgentThought,
-  AgentYield,
-} from '../ir/types.js';
+import type { UserPrompt, AgentThought, AgentYield } from '../ir/types.js';
 import { randomUUID } from 'node:crypto';
 
 describe('HistorySquashingProcessor', () => {
@@ -23,8 +24,14 @@ describe('HistorySquashingProcessor', () => {
     });
   });
 
-  const createThoughtEpisode = (id: string, userText: string, modelThought: string) => {
-    const ep = createDummyEpisode(id, 'USER_PROMPT', [{ type: 'text', text: userText }]);
+  const createThoughtEpisode = (
+    id: string,
+    userText: string,
+    modelThought: string,
+  ) => {
+    const ep = createDummyEpisode(id, 'USER_PROMPT', [
+      { type: 'text', text: userText },
+    ]);
     // Replace the tool steps with a thought step for this test
     ep.steps = [
       {

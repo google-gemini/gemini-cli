@@ -3,6 +3,7 @@
  * Copyright 2026 Google LLC
  * SPDX-License-Identifier: Apache-2.0
  */
+
 import type { Content } from '@google/genai';
 import type { AgentChatHistory } from '../core/agentChatHistory.js';
 import { debugLogger } from '../utils/debugLogger.js';
@@ -19,33 +20,39 @@ import { registerBuiltInProcessors } from './sidecar/builtins.js';
 import { ProcessorRegistry } from './sidecar/registry.js';
 
 export class ContextManager {
-  
-  
   // The stateful, pristine Episodic Intermediate Representation graph.
   // This allows the agent to remember and summarize continuously without losing data across turns.
   private pristineEpisodes: Episode[] = [];
   private readonly eventBus: ContextEventBus;
-  
+
   // Internal sub-components
   // Synchronous processors are instantiated but effectively used as singletons within this class
   private orchestrator: PipelineOrchestrator;
   private historyObserver?: HistoryObserver;
 
-  static create(sidecar: SidecarConfig, env: ContextEnvironment, tracer: ContextTracer, orchestrator?: PipelineOrchestrator, registry?: ProcessorRegistry): ContextManager {
-      if (!registry) {
-        registry = new ProcessorRegistry();
-        registerBuiltInProcessors(registry);
-      }
-      const orch = orchestrator || new PipelineOrchestrator(sidecar, env, env.eventBus, tracer, registry);
-      return new ContextManager(sidecar, env, tracer, orch);
+  static create(
+    sidecar: SidecarConfig,
+    env: ContextEnvironment,
+    tracer: ContextTracer,
+    orchestrator?: PipelineOrchestrator,
+    registry?: ProcessorRegistry,
+  ): ContextManager {
+    if (!registry) {
+      registry = new ProcessorRegistry();
+      registerBuiltInProcessors(registry);
+    }
+    const orch =
+      orchestrator ||
+      new PipelineOrchestrator(sidecar, env, env.eventBus, tracer, registry);
+    return new ContextManager(sidecar, env, tracer, orch);
   }
 
   // Use ContextManager.create() instead
   private constructor(
-      private sidecar: SidecarConfig, 
-      private env: ContextEnvironment, 
-      private readonly tracer: ContextTracer,
-      orchestrator: PipelineOrchestrator
+    private sidecar: SidecarConfig,
+    private env: ContextEnvironment,
+    private readonly tracer: ContextTracer,
+    orchestrator: PipelineOrchestrator,
   ) {
     this.eventBus = env.eventBus;
     this.orchestrator = orchestrator;
@@ -56,7 +63,6 @@ export class ContextManager {
     });
 
     this.eventBus.onVariantReady((event) => {
-      
       // Find the target episode in the pristine graph
       const targetEp = this.pristineEpisodes.find(
         (ep) => ep.id === event.targetId,
@@ -66,7 +72,10 @@ export class ContextManager {
           targetEp.variants = {};
         }
         targetEp.variants[event.variantId] = event.variant;
-        this.tracer.logEvent('ContextManager', `Received async variant [${event.variantId}] for Episode ${event.targetId}`);
+        this.tracer.logEvent(
+          'ContextManager',
+          `Received async variant [${event.variantId}] for Episode ${event.targetId}`,
+        );
         debugLogger.log(
           `ContextManager: Received async variant [${event.variantId}] for Episode ${event.targetId}.`,
         );
@@ -92,9 +101,13 @@ export class ContextManager {
     if (!this.sidecar.budget) return;
 
     const workingBuffer = this.getWorkingBufferView();
-    const currentTokens = this.env.tokenCalculator.calculateEpisodeListTokens(workingBuffer);
-    
-    this.tracer.logEvent('ContextManager', 'Evaluated triggers', { currentTokens, retainedTokens: this.sidecar.budget.retainedTokens });
+    const currentTokens =
+      this.env.tokenCalculator.calculateEpisodeListTokens(workingBuffer);
+
+    this.tracer.logEvent('ContextManager', 'Evaluated triggers', {
+      currentTokens,
+      retainedTokens: this.sidecar.budget.retainedTokens,
+    });
 
     // 1. Eager Compute Trigger
     this.eventBus.emitChunkReceived({ episodes: this.pristineEpisodes });
@@ -102,9 +115,13 @@ export class ContextManager {
     // 2. Budget Crossed Trigger
     if (currentTokens > this.sidecar.budget.retainedTokens) {
       const deficit = currentTokens - this.sidecar.budget.retainedTokens;
-      this.tracer.logEvent('ContextManager', 'Budget crossed. Emitting ConsolidationNeeded', { deficit });
+      this.tracer.logEvent(
+        'ContextManager',
+        'Budget crossed. Emitting ConsolidationNeeded',
+        { deficit },
+      );
       this.eventBus.emitConsolidationNeeded({
-        episodes: workingBuffer, 
+        episodes: workingBuffer,
         targetDeficit: deficit,
       });
     }
@@ -131,7 +148,7 @@ export class ContextManager {
   /**
    * Generates a computed view of the pristine log.
    * Sweeps backwards (newest to oldest), tracking rolling tokens.
-   * When rollingTokens > retainedTokens, it injects the "best" available ready variant 
+   * When rollingTokens > retainedTokens, it injects the "best" available ready variant
    * (snapshot > summary > masked) instead of the raw text.
    * Handles N-to-1 variant skipping automatically.
    */
@@ -140,7 +157,7 @@ export class ContextManager {
       this.pristineEpisodes,
       this.sidecar.budget.retainedTokens,
       this.tracer,
-      this.env
+      this.env,
     );
   }
 
@@ -154,14 +171,14 @@ export class ContextManager {
     if (this.pristineEpisodes.length > 0) {
       protectedIds.add(this.pristineEpisodes[0].id); // Structural invariant
     }
-    
+
     return IrProjector.project(
       this.getWorkingBufferView(),
       this.orchestrator,
       this.sidecar,
       this.tracer,
       this.env,
-      protectedIds
+      protectedIds,
     );
   }
 }

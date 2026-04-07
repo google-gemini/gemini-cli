@@ -9,8 +9,6 @@ import type { ContextEnvironment } from '../sidecar/environment.js';
 import { debugLogger } from '../../utils/debugLogger.js';
 import { LlmRole } from '../../telemetry/types.js';
 import { getResponseText } from '../../utils/partUtils.js';
-
-
 import type { EpisodeEditor } from '../ir/episodeEditor.js';
 
 export interface SemanticCompressionProcessorOptions {
@@ -18,7 +16,10 @@ export interface SemanticCompressionProcessorOptions {
 }
 
 export class SemanticCompressionProcessor implements ContextProcessor {
-  static create(env: ContextEnvironment, options: SemanticCompressionProcessorOptions): SemanticCompressionProcessor {
+  static create(
+    env: ContextEnvironment,
+    options: SemanticCompressionProcessorOptions,
+  ): SemanticCompressionProcessor {
     return new SemanticCompressionProcessor(env, options);
   }
 
@@ -82,19 +83,26 @@ export class SemanticCompressionProcessor implements ContextProcessor {
               part.text,
               'User Prompt',
             );
-            const newTokens = this.env.tokenCalculator.estimateTokensForParts([{ text: summary }]);
-            const oldTokens = this.env.tokenCalculator.estimateTokensForParts([{ text: part.text }]);
+            const newTokens = this.env.tokenCalculator.estimateTokensForParts([
+              { text: summary },
+            ]);
+            const oldTokens = this.env.tokenCalculator.estimateTokensForParts([
+              { text: part.text },
+            ]);
 
             if (newTokens < oldTokens) {
               editor.editEpisode(ep.id, 'SUMMARIZE_PROMPT', (draft) => {
-                 if (draft.trigger.type === 'USER_PROMPT') {
-                    draft.trigger.semanticParts[j].presentation = { text: summary, tokens: newTokens };
-                    draft.trigger.metadata.transformations.push({
-                      processorName: this.name,
-                      action: 'SUMMARIZED',
-                      timestamp: Date.now(),
-                    });
-                 }
+                if (draft.trigger.type === 'USER_PROMPT') {
+                  draft.trigger.semanticParts[j].presentation = {
+                    text: summary,
+                    tokens: newTokens,
+                  };
+                  draft.trigger.metadata.transformations.push({
+                    processorName: this.name,
+                    action: 'SUMMARIZED',
+                    timestamp: Date.now(),
+                  });
+                }
               });
               currentDeficit -= oldTokens - newTokens;
             }
@@ -114,20 +122,27 @@ export class SemanticCompressionProcessor implements ContextProcessor {
                 step.text,
                 'Agent Thought',
               );
-              const newTokens = this.env.tokenCalculator.estimateTokensForParts([{ text: summary }]);
-              const oldTokens = this.env.tokenCalculator.estimateTokensForParts([{ text: step.text }]);
+              const newTokens = this.env.tokenCalculator.estimateTokensForParts(
+                [{ text: summary }],
+              );
+              const oldTokens = this.env.tokenCalculator.estimateTokensForParts(
+                [{ text: step.text }],
+              );
 
               if (newTokens < oldTokens) {
                 editor.editEpisode(ep.id, 'SUMMARIZE_THOUGHT', (draft) => {
-                   const draftStep = draft.steps[j];
-                   if (draftStep.type === 'AGENT_THOUGHT') {
-                      draftStep.presentation = { text: summary, tokens: newTokens };
-                      draftStep.metadata.transformations.push({
-                        processorName: this.name,
-                        action: 'SUMMARIZED',
-                        timestamp: Date.now(),
-                      });
-                   }
+                  const draftStep = draft.steps[j];
+                  if (draftStep.type === 'AGENT_THOUGHT') {
+                    draftStep.presentation = {
+                      text: summary,
+                      tokens: newTokens,
+                    };
+                    draftStep.metadata.transformations.push({
+                      processorName: this.name,
+                      action: 'SUMMARIZED',
+                      timestamp: Date.now(),
+                    });
+                  }
                 });
                 currentDeficit -= oldTokens - newTokens;
               }
@@ -161,38 +176,53 @@ export class SemanticCompressionProcessor implements ContextProcessor {
               // Wrap the summary in an object so the Gemini API accepts it as a valid functionResponse.response
               const newObsObject = { summary };
 
-              const newObsTokens = this.env.tokenCalculator.estimateTokensForParts([
-                {
-                  functionResponse: {
-                    name: step.toolName,
-                    response: newObsObject as unknown as Record<string, unknown>, // eslint-disable-line @typescript-eslint/no-unsafe-type-assertion
-                    id: step.id,
+              const newObsTokens =
+                this.env.tokenCalculator.estimateTokensForParts([
+                  {
+                    functionResponse: {
+                      name: step.toolName,
+                      response: newObsObject,
+                      id: step.id,
+                    },
                   },
-                },
-              ]);
+                ]);
 
               const oldObsTokens =
-                step.presentation?.tokens?.observation ?? step.tokens?.observation ?? step.tokens;
+                step.presentation?.tokens?.observation ??
+                step.tokens?.observation ??
+                step.tokens;
               const intentTokens =
                 step.presentation?.tokens?.intent ?? step.tokens?.intent ?? 0;
 
               if (newObsTokens < oldObsTokens) {
                 editor.editEpisode(ep.id, 'SUMMARIZE_TOOL', (draft) => {
-                   const draftStep = draft.steps[j];
-                   if (draftStep.type === 'TOOL_EXECUTION') {
-                      draftStep.presentation = {
-                        intent: draftStep.presentation?.intent ?? draftStep.intent,
-                        observation: newObsObject,
-                        tokens: { intent: intentTokens, observation: newObsTokens },
+                  const draftStep = draft.steps[j];
+                  if (draftStep.type === 'TOOL_EXECUTION') {
+                    draftStep.presentation = {
+                      intent:
+                        draftStep.presentation?.intent ?? draftStep.intent,
+                      observation: newObsObject,
+                      tokens: {
+                        intent: intentTokens,
+                        observation: newObsTokens,
+                      },
+                    };
+                    if (!draftStep.metadata) {
+                      draftStep.metadata = {
+                        transformations: [],
+                        currentTokens: 0,
+                        originalTokens: 0,
                       };
-                      if (!draftStep.metadata) { draftStep.metadata = { transformations: [], currentTokens: 0, originalTokens: 0 }  };
-                      if (!draftStep.metadata.transformations) { draftStep.metadata.transformations = [] };
-                      draftStep.metadata.transformations.push({
-                        processorName: this.name,
-                        action: 'SUMMARIZED',
-                        timestamp: Date.now(),
-                      });
-                   }
+                    }
+                    if (!draftStep.metadata.transformations) {
+                      draftStep.metadata.transformations = [];
+                    }
+                    draftStep.metadata.transformations.push({
+                      processorName: this.name,
+                      action: 'SUMMARIZED',
+                      timestamp: Date.now(),
+                    });
+                  }
                 });
                 currentDeficit -= oldObsTokens - newObsTokens;
               }

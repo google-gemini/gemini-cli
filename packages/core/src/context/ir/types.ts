@@ -4,6 +4,8 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+import type { Part } from '@google/genai';
+
 /**
  * Universal Audit Metadata
  * Tracks the lifecycle and transformations of a node or part within the IR.
@@ -96,7 +98,7 @@ export type SemanticPart =
     }
   | {
       type: 'raw_part';
-      part: unknown;
+      part: Part;
       presentation?: { text: string; tokens: number };
     };
 

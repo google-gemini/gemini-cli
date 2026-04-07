@@ -46,7 +46,6 @@ describe('ContextManager Sync Pressure Barrier Tests', () => {
     ]);
 
     const rawHistoryLength = chatHistory.get().length;
-    
 
     // 5. Project History (Triggers Sync Barrier)
     const projection = await contextManager.projectCompressedHistory();

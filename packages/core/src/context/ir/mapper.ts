@@ -15,7 +15,10 @@ export class IrMapper {
    * Translates a flat Gemini Content[] array into our rich Episodic Intermediate Representation.
    * Groups adjacent function calls and responses into unified ToolExecution nodes.
    */
-  static toIr(history: readonly Content[], tokenCalculator: ContextTokenCalculator): Episode[] {
+  static toIr(
+    history: readonly Content[],
+    tokenCalculator: ContextTokenCalculator,
+  ): Episode[] {
     return toIr(history, tokenCalculator);
   }
 

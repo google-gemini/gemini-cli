@@ -3,6 +3,7 @@
  * Copyright 2026 Google LLC
  * SPDX-License-Identifier: Apache-2.0
  */
+
 import type { EpisodeEditor } from './ir/episodeEditor.js';
 
 /**
@@ -40,8 +41,5 @@ export interface ContextProcessor {
    * Processes the episodic history payload via the provided EpisodeEditor, based on the current accounting state.
    * Processors should safely mutate or replace episodes using the editor's API.
    */
-  process(
-    editor: EpisodeEditor,
-    state: ContextAccountingState,
-  ): Promise<void>;
+  process(editor: EpisodeEditor, state: ContextAccountingState): Promise<void>;
 }

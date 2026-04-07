@@ -31,7 +31,9 @@ export class ContextEventBus extends EventEmitter {
     this.emit('PRISTINE_HISTORY_UPDATED', event);
   }
 
-  onPristineHistoryUpdated(listener: (event: PristineHistoryUpdatedEvent) => void) {
+  onPristineHistoryUpdated(
+    listener: (event: PristineHistoryUpdatedEvent) => void,
+  ) {
     this.on('PRISTINE_HISTORY_UPDATED', listener);
   }
 

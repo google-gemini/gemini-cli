@@ -26,20 +26,29 @@ export const defaultSidecarProfile: SidecarConfig = {
       triggers: ['on_turn'],
       execution: 'blocking',
       processors: [
-        { processorId: 'ToolMaskingProcessor', options: { stringLengthThresholdTokens: 8000 } },
+        {
+          processorId: 'ToolMaskingProcessor',
+          options: { stringLengthThresholdTokens: 8000 },
+        },
         { processorId: 'BlobDegradationProcessor', options: {} },
-        { processorId: 'SemanticCompressionProcessor', options: { nodeThresholdTokens: 5000 } },
-        { processorId: 'EmergencyTruncationProcessor', options: {} }
-      ]
+        {
+          processorId: 'SemanticCompressionProcessor',
+          options: { nodeThresholdTokens: 5000 },
+        },
+        { processorId: 'EmergencyTruncationProcessor', options: {} },
+      ],
     },
     {
       name: 'Deep Background Compression',
       triggers: [{ type: 'timer', intervalMs: 5000 }, 'budget_exceeded'],
       execution: 'background',
       processors: [
-        { processorId: 'HistorySquashingProcessor', options: { maxTokensPerNode: 3000 } },
-        { processorId: 'StateSnapshotProcessor', options: {} }
-      ]
-    }
-  ]
+        {
+          processorId: 'HistorySquashingProcessor',
+          options: { maxTokensPerNode: 3000 },
+        },
+        { processorId: 'StateSnapshotProcessor', options: {} },
+      ],
+    },
+  ],
 };

@@ -6,7 +6,6 @@
 
 import type { ContextAccountingState, ContextProcessor } from '../pipeline.js';
 import type { ContextEnvironment } from '../sidecar/environment.js';
-
 import { sanitizeFilenamePart } from '../../utils/fileUtils.js';
 import {
   ACTIVATE_SKILL_TOOL_NAME,
@@ -15,6 +14,7 @@ import {
   ENTER_PLAN_MODE_TOOL_NAME,
   EXIT_PLAN_MODE_TOOL_NAME,
 } from '../../tools/tool-names.js';
+import type { EpisodeEditor } from '../ir/episodeEditor.js';
 
 const UNMASKABLE_TOOLS = new Set([
   ACTIVATE_SKILL_TOOL_NAME,
@@ -24,14 +24,50 @@ const UNMASKABLE_TOOLS = new Set([
   EXIT_PLAN_MODE_TOOL_NAME,
 ]);
 
-import type { EpisodeEditor } from '../ir/episodeEditor.js';
-
 export interface ToolMaskingProcessorOptions {
   stringLengthThresholdTokens: number;
 }
 
+type MaskableValue =
+  | string
+  | number
+  | boolean
+  | null
+  | MaskableValue[]
+  | { [key: string]: MaskableValue };
+
+function isMaskableValue(val: unknown): val is MaskableValue {
+  if (
+    val === null ||
+    typeof val === 'string' ||
+    typeof val === 'number' ||
+    typeof val === 'boolean'
+  ) {
+    return true;
+  }
+  if (Array.isArray(val)) {
+    return val.every(isMaskableValue);
+  }
+  if (typeof val === 'object') {
+    return Object.values(val).every(isMaskableValue);
+  }
+  return false;
+}
+
+function isMaskableRecord(val: unknown): val is Record<string, MaskableValue> {
+  return (
+    typeof val === 'object' &&
+    val !== null &&
+    !Array.isArray(val) &&
+    isMaskableValue(val)
+  );
+}
+
 export class ToolMaskingProcessor implements ContextProcessor {
-  static create(env: ContextEnvironment, options: ToolMaskingProcessorOptions): ToolMaskingProcessor {
+  static create(
+    env: ContextEnvironment,
+    options: ToolMaskingProcessorOptions,
+  ): ToolMaskingProcessor {
     return new ToolMaskingProcessor(env, options);
   }
 
@@ -40,7 +76,8 @@ export class ToolMaskingProcessor implements ContextProcessor {
     properties: {
       stringLengthThresholdTokens: {
         type: 'number',
-        description: 'The token threshold above which tool intents/observations are masked.',
+        description:
+          'The token threshold above which tool intents/observations are masked.',
       },
     },
     required: ['stringLengthThresholdTokens'],
@@ -51,10 +88,7 @@ export class ToolMaskingProcessor implements ContextProcessor {
   readonly options: ToolMaskingProcessorOptions;
   private env: ContextEnvironment;
 
-  constructor(
-    env: ContextEnvironment,
-    options: ToolMaskingProcessorOptions,
-  ) {
+  constructor(env: ContextEnvironment, options: ToolMaskingProcessorOptions) {
     this.env = env;
     this.options = options;
   }
@@ -68,7 +102,9 @@ export class ToolMaskingProcessor implements ContextProcessor {
     if (state.isBudgetSatisfied) return;
 
     let currentDeficit = state.deficitTokens;
-    const limitChars = this.env.tokenCalculator.tokensToChars(maskingConfig.stringLengthThresholdTokens);
+    const limitChars = this.env.tokenCalculator.tokensToChars(
+      maskingConfig.stringLengthThresholdTokens,
+    );
 
     let toolOutputsDir = this.env.fileSystem.join(
       this.env.projectTempDir,
@@ -135,12 +171,10 @@ export class ToolMaskingProcessor implements ContextProcessor {
 
         const callId = step.id || Date.now().toString();
 
-        /* eslint-disable @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-assignment */
-
         const maskAsync = async (
-          obj: any,
+          obj: MaskableValue,
           nodeType: string,
-        ): Promise<{ masked: any; changed: boolean }> => {
+        ): Promise<{ masked: MaskableValue; changed: boolean }> => {
           if (typeof obj === 'string') {
             if (obj.length > limitChars && !this.isAlreadyMasked(obj)) {
               const newString = await handleMasking(
@@ -155,7 +189,7 @@ export class ToolMaskingProcessor implements ContextProcessor {
           }
           if (Array.isArray(obj)) {
             let changed = false;
-            const masked = [];
+            const masked: MaskableValue[] = [];
             for (const item of obj) {
               const res = await maskAsync(item, nodeType);
               if (res.changed) changed = true;
@@ -165,7 +199,7 @@ export class ToolMaskingProcessor implements ContextProcessor {
           }
           if (typeof obj === 'object' && obj !== null) {
             let changed = false;
-            const masked: Record<string, any> = {};
+            const masked: Record<string, MaskableValue> = {};
             for (const [key, value] of Object.entries(obj)) {
               const res = await maskAsync(value, nodeType);
               if (res.changed) changed = true;
@@ -176,31 +210,50 @@ export class ToolMaskingProcessor implements ContextProcessor {
           return { masked: obj, changed: false };
         };
 
-        const intentRes = await maskAsync(
-          step.presentation.intent ?? step.intent,
-          'intent',
-        );
-        const obsRes = await maskAsync(
-          step.presentation.observation ?? step.observation,
-          'observation',
-        );
+        const rawIntent = step.presentation?.intent ?? step.intent;
+        const rawObs = step.presentation?.observation ?? step.observation;
+
+        if (!isMaskableRecord(rawIntent)) {
+          throw new Error(
+            `ToolMaskingProcessor: step intent is not a valid JSON record. CallID: ${callId}`,
+          );
+        }
+        if (!isMaskableValue(rawObs)) {
+          throw new Error(
+            `ToolMaskingProcessor: step observation is not a valid JSON value. CallID: ${callId}`,
+          );
+        }
+
+        const intentRes = await maskAsync(rawIntent, 'intent');
+        const obsRes = await maskAsync(rawObs, 'observation');
 
         if (intentRes.changed || obsRes.changed) {
+          const maskedIntent = isMaskableRecord(intentRes.masked)
+            ? (intentRes.masked as Record<string, unknown>)
+            : undefined;
+          const maskedObs = isMaskableRecord(obsRes.masked)
+            ? (obsRes.masked as Record<string, unknown>)
+            : undefined;
+
           // Recalculate tokens perfectly
-          const newIntentTokens = this.env.tokenCalculator.estimateTokensForParts([
-            {
-              functionCall: {
-                name: toolName,
-                args: intentRes.masked,
-                id: callId,
+          const newIntentTokens =
+            this.env.tokenCalculator.estimateTokensForParts([
+              {
+                functionCall: {
+                  name: toolName,
+                  args: maskedIntent,
+                  id: callId,
+                },
               },
-            },
-          ]);
+            ]);
           const newObsTokens = this.env.tokenCalculator.estimateTokensForParts([
             {
               functionResponse: {
                 name: toolName,
-                response: obsRes.masked,
+                response:
+                  typeof obsRes.masked === 'string'
+                    ? { message: obsRes.masked }
+                    : maskedObs,
                 id: callId,
               },
             },
@@ -217,20 +270,27 @@ export class ToolMaskingProcessor implements ContextProcessor {
 
           if (savings > 0) {
             currentDeficit -= savings;
-            this.env.tracer.logEvent('ToolMaskingProcessor', `Masked tool ${toolName}`, { recoveredTokens: savings });
-            
+            this.env.tracer.logEvent(
+              'ToolMaskingProcessor',
+              `Masked tool ${toolName}`,
+              { recoveredTokens: savings },
+            );
+
             editor.editEpisode(ep.id, 'MASK_TOOL', (draft) => {
               const draftStep = draft.steps[j];
               if (draftStep.type !== 'TOOL_EXECUTION') return;
               if (!draftStep.presentation) {
-                 draftStep.presentation = {
-                    intent: draftStep.intent,
-                    observation: draftStep.observation,
-                    tokens: draftStep.tokens,
-                 };
+                draftStep.presentation = {
+                  intent: draftStep.intent,
+                  observation: draftStep.observation,
+                  tokens: draftStep.tokens,
+                };
               }
-              draftStep.presentation.intent = intentRes.masked;
-              draftStep.presentation.observation = obsRes.masked;
+              draftStep.presentation.intent = maskedIntent ?? {};
+              draftStep.presentation.observation =
+                typeof obsRes.masked === 'string'
+                  ? { message: obsRes.masked }
+                  : (maskedObs ?? {});
               draftStep.presentation.tokens = {
                 intent: newIntentTokens,
                 observation: newObsTokens,
@@ -243,8 +303,8 @@ export class ToolMaskingProcessor implements ContextProcessor {
                     processorName: 'ToolMasking',
                     action: 'MASKED',
                     timestamp: Date.now(),
-                  }
-                ]
+                  },
+                ],
               };
             });
           }

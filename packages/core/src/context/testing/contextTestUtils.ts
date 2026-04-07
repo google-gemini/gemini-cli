@@ -10,10 +10,14 @@ import type { ContextEnvironment } from '../sidecar/environment.js';
 import type { Content } from '@google/genai';
 import { AgentChatHistory } from '../../core/agentChatHistory.js';
 import { ContextManager } from '../contextManager.js';
-
 import { InMemoryFileSystem } from '../system/InMemoryFileSystem.js';
 import { DeterministicIdGenerator } from '../system/DeterministicIdGenerator.js';
-import type { Episode, UserPrompt, SystemEvent, SemanticPart } from '../ir/types.js';
+import type {
+  Episode,
+  UserPrompt,
+  SystemEvent,
+  SemanticPart,
+} from '../ir/types.js';
 import type { ContextAccountingState } from '../pipeline.js';
 import { randomUUID } from 'node:crypto';
 
@@ -39,39 +43,56 @@ export function createDummyEpisode(
   id: string,
   type: 'USER_PROMPT' | 'SYSTEM_EVENT',
   parts: SemanticPart[] = [],
-  toolSteps: Array<{ intent: Record<string, unknown>; observation: Record<string, unknown>; toolName?: string; tokens?: { intent: number; observation: number } }> = []
+  toolSteps: Array<{
+    intent: Record<string, unknown>;
+    observation: Record<string, unknown>;
+    toolName?: string;
+    tokens?: { intent: number; observation: number };
+  }> = [],
 ): Episode {
   let trigger: UserPrompt | SystemEvent;
 
   if (type === 'USER_PROMPT') {
-      trigger = {
-         id: randomUUID(),
-         type: 'USER_PROMPT',
-         semanticParts: parts,
-         metadata: { originalTokens: 100, currentTokens: 100, transformations: [] },
-      };
+    trigger = {
+      id: randomUUID(),
+      type: 'USER_PROMPT',
+      semanticParts: parts,
+      metadata: {
+        originalTokens: 100,
+        currentTokens: 100,
+        transformations: [],
+      },
+    };
   } else {
-      trigger = {
-         id: randomUUID(),
-         type: 'SYSTEM_EVENT',
-         name: 'dummy_event',
-         payload: {},
-         metadata: { originalTokens: 100, currentTokens: 100, transformations: [] },
-      };
+    trigger = {
+      id: randomUUID(),
+      type: 'SYSTEM_EVENT',
+      name: 'dummy_event',
+      payload: {},
+      metadata: {
+        originalTokens: 100,
+        currentTokens: 100,
+        transformations: [],
+      },
+    };
   }
 
   return {
     id,
     timestamp: Date.now(),
     trigger,
-    steps: toolSteps.map(step => ({
+    steps: toolSteps.map((step) => ({
       id: randomUUID(),
       type: 'TOOL_EXECUTION',
       toolName: step.toolName || 'test_tool',
       intent: step.intent,
       observation: step.observation,
       tokens: step.tokens || { intent: 50, observation: 50 },
-      metadata: { originalTokens: 100, currentTokens: 100, transformations: [] },
+      metadata: {
+        originalTokens: 100,
+        currentTokens: 100,
+        transformations: [],
+      },
     })),
   };
 }
@@ -168,7 +189,10 @@ export function setupContextComponentTest(config: Config) {
   const registry = new ProcessorRegistry();
   registerBuiltInProcessors(registry);
   const sidecar = SidecarLoader.fromConfig(config, registry);
-  const tracer = new ContextTracer({ targetDir: '/tmp', sessionId: 'test-session' });
+  const tracer = new ContextTracer({
+    targetDir: '/tmp',
+    sessionId: 'test-session',
+  });
   const eventBus = new ContextEventBus();
   const env = new ContextEnvironmentImpl(
     config.getBaseLlmClient(),
@@ -178,9 +202,15 @@ export function setupContextComponentTest(config: Config) {
     '/tmp/gemini-test',
     tracer,
     1,
-    eventBus
+    eventBus,
   );
-  const contextManager = ContextManager.create(sidecar, env, tracer, undefined, registry);
+  const contextManager = ContextManager.create(
+    sidecar,
+    env,
+    tracer,
+    undefined,
+    registry,
+  );
 
   // The async worker is now internally managed by ContextManager
 

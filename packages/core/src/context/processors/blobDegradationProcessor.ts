@@ -3,18 +3,19 @@
  * Copyright 2026 Google LLC
  * SPDX-License-Identifier: Apache-2.0
  */
+
 import type { ContextAccountingState, ContextProcessor } from '../pipeline.js';
 import type { ContextEnvironment } from '../sidecar/environment.js';
-
 import { sanitizeFilenamePart } from '../../utils/fileUtils.js';
-import type { Part } from '@google/genai';
-
 import type { EpisodeEditor } from '../ir/episodeEditor.js';
 
 export type BlobDegradationProcessorOptions = Record<string, never>;
 
 export class BlobDegradationProcessor implements ContextProcessor {
-  static create(env: ContextEnvironment, _options: BlobDegradationProcessorOptions): BlobDegradationProcessor {
+  static create(
+    env: ContextEnvironment,
+    _options: BlobDegradationProcessorOptions,
+  ): BlobDegradationProcessor {
     return new BlobDegradationProcessor(env);
   }
 
@@ -89,34 +90,46 @@ export class BlobDegradationProcessor implements ContextProcessor {
             const oldTokens = this.env.tokenCalculator.estimateTokensForParts([
               { inlineData: { mimeType: part.mimeType, data: part.data } },
             ]);
-            const newTokens = this.env.tokenCalculator.estimateTokensForParts([{ text: newText }]);
+            const newTokens = this.env.tokenCalculator.estimateTokensForParts([
+              { text: newText },
+            ]);
             tokensSaved = oldTokens - newTokens;
           } else if (part.type === 'file_data') {
             newText = `[File Reference (${part.mimeType}) degraded to text to preserve context window. Original URI: ${part.fileUri}]`;
             const oldTokens = this.env.tokenCalculator.estimateTokensForParts([
               { fileData: { mimeType: part.mimeType, fileUri: part.fileUri } },
             ]);
-            const newTokens = this.env.tokenCalculator.estimateTokensForParts([{ text: newText }]);
+            const newTokens = this.env.tokenCalculator.estimateTokensForParts([
+              { text: newText },
+            ]);
             tokensSaved = oldTokens - newTokens;
           } else if (part.type === 'raw_part') {
             newText = `[Unknown Part degraded to text to preserve context window.]`;
-            // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
-            const oldTokens = this.env.tokenCalculator.estimateTokensForParts([part.part as Part]);
-            const newTokens = this.env.tokenCalculator.estimateTokensForParts([{ text: newText }]);
+            const oldTokens = this.env.tokenCalculator.estimateTokensForParts([
+              part.part,
+            ]);
+            const newTokens = this.env.tokenCalculator.estimateTokensForParts([
+              { text: newText },
+            ]);
             tokensSaved = oldTokens - newTokens;
           }
 
           if (newText && tokensSaved > 0) {
-            const newTokens = this.env.tokenCalculator.estimateTokensForParts([{ text: newText }]);
-            
+            const newTokens = this.env.tokenCalculator.estimateTokensForParts([
+              { text: newText },
+            ]);
+
             editor.editEpisode(ep.id, 'DEGRADE_BLOB', (draft) => {
               if (draft.trigger.type === 'USER_PROMPT') {
-                 draft.trigger.semanticParts[j].presentation = { text: newText, tokens: newTokens };
-                 draft.trigger.metadata.transformations.push({
-                   processorName: this.name,
-                   action: 'DEGRADED',
-                   timestamp: Date.now(),
-                 });
+                draft.trigger.semanticParts[j].presentation = {
+                  text: newText,
+                  tokens: newTokens,
+                };
+                draft.trigger.metadata.transformations.push({
+                  processorName: this.name,
+                  action: 'DEGRADED',
+                  timestamp: Date.now(),
+                });
               }
             });
 

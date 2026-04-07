@@ -7,7 +7,7 @@
 import type { Episode } from './types.js';
 import type { ContextTracer } from '../tracer.js';
 import { debugLogger } from '../../utils/debugLogger.js';
-
+import type { ContextEnvironment } from '../sidecar/environment.js';
 
 /**
  * Generates a computed view of the pristine log.
@@ -16,7 +16,6 @@ import { debugLogger } from '../../utils/debugLogger.js';
  * (snapshot > summary > masked) instead of the raw text.
  * Handles N-to-1 variant skipping automatically.
  */
-import type { ContextEnvironment } from "../sidecar/environment.js";
 
 export function generateWorkingBufferView(
   pristineEpisodes: Episode[],
@@ -42,7 +41,7 @@ export function generateWorkingBufferView(
     }
 
     let projectedTrigger: typeof ep.trigger;
-    
+
     if (ep.trigger.type === 'USER_PROMPT') {
       projectedTrigger = {
         ...ep.trigger,
@@ -50,7 +49,7 @@ export function generateWorkingBufferView(
           ...ep.trigger.metadata,
           transformations: [...(ep.trigger.metadata?.transformations || [])],
         },
-        semanticParts: ep.trigger.semanticParts.map(sp => ({...sp}))
+        semanticParts: ep.trigger.semanticParts.map((sp) => ({ ...sp })),
       };
     } else {
       projectedTrigger = {
@@ -58,23 +57,20 @@ export function generateWorkingBufferView(
         metadata: {
           ...ep.trigger.metadata,
           transformations: [...(ep.trigger.metadata?.transformations || [])],
-        }
+        },
       };
     }
 
     let projectedEp: Episode = {
       ...ep,
       trigger: projectedTrigger,
-      steps: ep.steps.map(
-        (step) =>
-          ({
-            ...step,
-            metadata: {
-              ...step.metadata,
-              transformations: [...(step.metadata?.transformations || [])],
-            },
-          })
-      ),
+      steps: ep.steps.map((step) => ({
+        ...step,
+        metadata: {
+          ...step.metadata,
+          transformations: [...(step.metadata?.transformations || [])],
+        },
+      })),
       yield: ep.yield
         ? {
             ...ep.yield,
@@ -86,7 +82,9 @@ export function generateWorkingBufferView(
         : undefined,
     };
 
-    const epTokens = env.tokenCalculator.calculateEpisodeListTokens([projectedEp]);
+    const epTokens = env.tokenCalculator.calculateEpisodeListTokens([
+      projectedEp,
+    ]);
 
     if (rollingTokens > retainedTokens && ep.variants) {
       const snapshot = ep.variants['snapshot'];
@@ -167,7 +165,9 @@ export function generateWorkingBufferView(
     }
 
     currentEpisodes.unshift(projectedEp);
-    rollingTokens += env.tokenCalculator.calculateEpisodeListTokens([projectedEp]);
+    rollingTokens += env.tokenCalculator.calculateEpisodeListTokens([
+      projectedEp,
+    ]);
   }
 
   return currentEpisodes;

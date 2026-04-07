@@ -19,9 +19,9 @@ export class SidecarLoader {
    * Throws an error if the file cannot be read, parsed, or fails schema validation.
    */
   static loadFromFile(
-    sidecarPath: string, 
+    sidecarPath: string,
     registry: ProcessorRegistry,
-    fileSystem: IFileSystem = new NodeFileSystem()
+    fileSystem: IFileSystem = new NodeFileSystem(),
   ): SidecarConfig {
     const fileContent = fileSystem.readFileSync(sidecarPath, 'utf8');
 
@@ -40,7 +40,10 @@ export class SidecarLoader {
       );
     }
 
-    const validationError = SchemaValidator.validate(getSidecarConfigSchema(registry), parsed);
+    const validationError = SchemaValidator.validate(
+      getSidecarConfigSchema(registry),
+      parsed,
+    );
     if (validationError) {
       throw new Error(
         `Invalid sidecar configuration in ${sidecarPath}. Validation error: ${validationError}`,
@@ -48,8 +51,13 @@ export class SidecarLoader {
     }
 
     // Schema has been validated.
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
-    return parsed as SidecarConfig;
+    const isSidecarConfig = (val: unknown): val is SidecarConfig => true;
+    if (isSidecarConfig(parsed)) {
+      return parsed;
+    }
+    throw new Error(
+      'Unreachable: schema validation passed but type predicate failed.',
+    );
   }
 
   /**
@@ -57,9 +65,9 @@ export class SidecarLoader {
    * If a config file is present but invalid, this will THROW to prevent silent misconfiguration.
    */
   static fromConfig(
-    config: Config, 
+    config: Config,
     registry: ProcessorRegistry,
-    fileSystem: IFileSystem = new NodeFileSystem()
+    fileSystem: IFileSystem = new NodeFileSystem(),
   ): SidecarConfig {
     const sidecarPath = config.getExperimentalContextSidecarConfig();
 

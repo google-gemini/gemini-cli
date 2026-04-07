@@ -9,11 +9,8 @@ import type { ContextEnvironment } from './environment.js';
 
 export interface ContextProcessorDef<TOptions = object> {
   readonly id: string;
-  readonly schema?: object;
-  create(
-    env: ContextEnvironment,
-    options: TOptions,
-  ): ContextProcessor;
+  readonly schema: object;
+  create(env: ContextEnvironment, options: TOptions): ContextProcessor;
 }
 
 /**

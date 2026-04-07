@@ -12,9 +12,14 @@ import type { BaseLlmClient } from '../../core/baseLlmClient.js';
 expect.addSnapshotSerializer({
   test: (val) =>
     typeof val === 'string' &&
-    (/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(val) || 
-     /^\/tmp\/sim/.test(val)), // Mask temp directories and UUIDs
-  print: (val) => (typeof val === 'string' && /^\/tmp\/sim/.test(val) ? '"<MOCKED_DIR>"' : '"<UUID>"'),
+    (/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(
+      val,
+    ) ||
+      /^\/tmp\/sim/.test(val)), // Mask temp directories and UUIDs
+  print: (val) =>
+    typeof val === 'string' && /^\/tmp\/sim/.test(val)
+      ? '"<MOCKED_DIR>"'
+      : '"<UUID>"',
 });
 
 describe('System Lifecycle Golden Tests', () => {
@@ -36,69 +41,106 @@ describe('System Lifecycle Golden Tests', () => {
         triggers: ['budget_exceeded'],
         processors: [
           { processorId: 'BlobDegradationProcessor' },
-          { processorId: 'ToolMaskingProcessor', options: { stringLengthThresholdTokens: 50 } }, // Mask any tool string > 200 chars
-          { processorId: 'StateSnapshotProcessor', options: {} } // Squash old history
-        ]
+          {
+            processorId: 'ToolMaskingProcessor',
+            options: { stringLengthThresholdTokens: 50 },
+          }, // Mask any tool string > 200 chars
+          { processorId: 'StateSnapshotProcessor', options: {} }, // Squash old history
+        ],
       },
       {
         name: 'Immediate Sanitization', // The magic string the projector is hardcoded to use
         execution: 'blocking',
         triggers: ['budget_exceeded'],
         processors: [
-          { processorId: 'EmergencyTruncationProcessor', options: {} }
-        ]
-      }
-    ]
+          { processorId: 'EmergencyTruncationProcessor', options: {} },
+        ],
+      },
+    ],
   });
 
   const mockLlmClient = {
     generateContent: vi.fn().mockResolvedValue({
       text: '<MOCKED_STATE_SNAPSHOT_SUMMARY>',
-    })
+    }),
   } as unknown as BaseLlmClient;
 
   it('Scenario 1: Organic Growth with Huge Tool Output & Images', async () => {
-    const harness = await SimulationHarness.create(getAggressiveConfig(), mockLlmClient);
+    const harness = await SimulationHarness.create(
+      getAggressiveConfig(),
+      mockLlmClient,
+    );
 
     // Turn 0: System Prompt
     await harness.simulateTurn([
       { role: 'user', parts: [{ text: 'System Instructions' }] },
-      { role: 'model', parts: [{ text: 'Ack.' }] }
+      { role: 'model', parts: [{ text: 'Ack.' }] },
     ]);
 
     // Turn 1: Normal conversation
     await harness.simulateTurn([
       { role: 'user', parts: [{ text: 'Hello!' }] },
-      { role: 'model', parts: [{ text: 'Hi, how can I help?' }] }
+      { role: 'model', parts: [{ text: 'Hi, how can I help?' }] },
     ]);
 
     // Turn 2: Massive Tool Output (Should trigger ToolMaskingProcessor in background)
     await harness.simulateTurn([
       { role: 'user', parts: [{ text: 'Read the logs.' }] },
-      { role: 'model', parts: [{ functionCall: { name: 'run_shell_command', args: { cmd: 'cat server.log' } } }] },
-      { role: 'user', parts: [{ functionResponse: { name: 'run_shell_command', response: { output: 'LOG '.repeat(5000) } } }] },
-      { role: 'model', parts: [{ text: 'The logs are very long.' }] }
+      {
+        role: 'model',
+        parts: [
+          {
+            functionCall: {
+              name: 'run_shell_command',
+              args: { cmd: 'cat server.log' },
+            },
+          },
+        ],
+      },
+      {
+        role: 'user',
+        parts: [
+          {
+            functionResponse: {
+              name: 'run_shell_command',
+              response: { output: 'LOG '.repeat(5000) },
+            },
+          },
+        ],
+      },
+      { role: 'model', parts: [{ text: 'The logs are very long.' }] },
     ]);
 
     // Turn 3: Multi-modal blob (Should trigger BlobDegradationProcessor)
     await harness.simulateTurn([
-      { role: 'user', parts: [{ text: 'Look at this architecture diagram:' }, { inlineData: { mimeType: 'image/png', data: 'fake_base64_data_'.repeat(1000) } }] },
-      { role: 'model', parts: [{ text: 'Nice diagram.' }] }
+      {
+        role: 'user',
+        parts: [
+          { text: 'Look at this architecture diagram:' },
+          {
+            inlineData: {
+              mimeType: 'image/png',
+              data: 'fake_base64_data_'.repeat(1000),
+            },
+          },
+        ],
+      },
+      { role: 'model', parts: [{ text: 'Nice diagram.' }] },
     ]);
 
     // Turn 4: More conversation to trigger StateSnapshot
     await harness.simulateTurn([
       { role: 'user', parts: [{ text: 'Can we refactor?' }] },
-      { role: 'model', parts: [{ text: 'Yes we can.' }] }
+      { role: 'model', parts: [{ text: 'Yes we can.' }] },
     ]);
 
     // Get final state
     const goldenState = await harness.getGoldenState();
-    
-    // In a perfectly functioning opportunistic system, the token trajectory should show 
+
+    // In a perfectly functioning opportunistic system, the token trajectory should show
     // the massive spikes in Turn 2 and 3 being immediately resolved by the background tasks.
     // The final projection should fit neatly under the Max Tokens limit.
-    
+
     expect(goldenState).toMatchSnapshot();
   });
 });

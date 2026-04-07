@@ -6,12 +6,13 @@
 
 import type { ContextProcessor, ContextAccountingState } from '../pipeline.js';
 import type { Episode } from '../ir/types.js';
-import type { ContextEnvironment, ContextEventBus } from '../sidecar/environment.js';
-
+import type {
+  ContextEnvironment,
+  ContextEventBus,
+} from '../sidecar/environment.js';
 import { v4 as uuidv4 } from 'uuid';
 import { LlmRole } from '../../telemetry/llmRole.js';
 import { debugLogger } from 'src/utils/debugLogger.js';
-
 import type { EpisodeEditor } from '../ir/episodeEditor.js';
 
 export interface StateSnapshotProcessorOptions {
@@ -21,7 +22,10 @@ export interface StateSnapshotProcessorOptions {
 }
 
 export class StateSnapshotProcessor implements ContextProcessor {
-  static create(env: ContextEnvironment, options: StateSnapshotProcessorOptions): StateSnapshotProcessor {
+  static create(
+    env: ContextEnvironment,
+    options: StateSnapshotProcessorOptions,
+  ): StateSnapshotProcessor {
     return new StateSnapshotProcessor(env, options, env.eventBus);
   }
   readonly id = 'StateSnapshotProcessor';
@@ -39,8 +43,14 @@ export class StateSnapshotProcessor implements ContextProcessor {
     this.options = options;
   }
 
-  async process(editor: EpisodeEditor, state: ContextAccountingState): Promise<void> {
-    const targetDeficit = Math.max(0, state.currentTokens - state.retainedTokens);
+  async process(
+    editor: EpisodeEditor,
+    state: ContextAccountingState,
+  ): Promise<void> {
+    const targetDeficit = Math.max(
+      0,
+      state.currentTokens - state.retainedTokens,
+    );
     if (this.isSynthesizing || targetDeficit <= 0) return;
 
     this.isSynthesizing = true;
@@ -53,10 +63,13 @@ export class StateSnapshotProcessor implements ContextProcessor {
         selectedEpisodes.push(ep);
         let triggerText = '';
         if (ep.trigger?.type === 'USER_PROMPT') {
-           const firstPart = ep.trigger.semanticParts?.[0];
-           if (firstPart) {
-               triggerText = firstPart.type === 'text' ? firstPart.text : (firstPart.presentation?.text ?? '');
-           }
+          const firstPart = ep.trigger.semanticParts?.[0];
+          if (firstPart) {
+            triggerText =
+              firstPart.type === 'text'
+                ? firstPart.text
+                : (firstPart.presentation?.text ?? '');
+          }
         }
         deficitAccumulator += this.env.tokenCalculator.estimateTokensForParts([
           { text: triggerText },
@@ -68,11 +81,11 @@ export class StateSnapshotProcessor implements ContextProcessor {
       if (selectedEpisodes.length < 2) return; // Not enough context to summarize
 
       // Optimization: Do NOT emit VariantComputing, let the Orchestrator handle caching the final result.
-      const snapshotEp: Episode = await this.synthesizeSnapshot(selectedEpisodes);
-      
-      const oldIds = selectedEpisodes.map(ep => ep.id);
+      const snapshotEp: Episode =
+        await this.synthesizeSnapshot(selectedEpisodes);
+
+      const oldIds = selectedEpisodes.map((ep) => ep.id);
       editor.replaceEpisodes(oldIds, snapshotEp, 'STATE_SNAPSHOT');
-      
     } finally {
       this.isSynthesizing = false;
     }
@@ -90,11 +103,13 @@ Output ONLY the raw factual snapshot, formatted compactly. Do not include markdo
     let userPromptText = 'TRANSCRIPT TO SNAPSHOT:\n\n';
     for (const ep of episodes) {
       if (ep.trigger?.type === 'USER_PROMPT') {
-        const partsText = ep.trigger.semanticParts.map(p => {
-          if (p.type === 'text') return p.text;
-          if (p.presentation) return p.presentation.text;
-          return '';
-        }).join('');
+        const partsText = ep.trigger.semanticParts
+          .map((p) => {
+            if (p.type === 'text') return p.text;
+            if (p.presentation) return p.presentation.text;
+            return '';
+          })
+          .join('');
         userPromptText += `USER: ${partsText}\n`;
       } else if (ep.trigger?.type === 'SYSTEM_EVENT') {
         userPromptText += `[SYSTEM EVENT: ${ep.trigger.name}]\n`;
@@ -111,22 +126,22 @@ Output ONLY the raw factual snapshot, formatted compactly. Do not include markdo
     }
 
     try {
-      const response = await client.generateContent(
-        {
-          modelConfigKey: { model: 'state-snapshot-processor' },
-          contents: [{ role: 'user', parts: [{ text: userPromptText }] }],
-          systemInstruction: { role: 'system', parts: [{ text: systemPrompt }] },
-          promptId: this.env.promptId,
-          role: LlmRole.UTILITY_STATE_SNAPSHOT_PROCESSOR,
-          abortSignal: new AbortController().signal,
-        },
-      );
+      const response = await client.generateContent({
+        modelConfigKey: { model: 'state-snapshot-processor' },
+        contents: [{ role: 'user', parts: [{ text: userPromptText }] }],
+        systemInstruction: { role: 'system', parts: [{ text: systemPrompt }] },
+        promptId: this.env.promptId,
+        role: LlmRole.UTILITY_STATE_SNAPSHOT_PROCESSOR,
+        abortSignal: new AbortController().signal,
+      });
 
       const snapshotText = response.text;
 
       // Synthesize a new "Episode" representing this compressed block
       const newId = uuidv4();
-      const contentTokens = this.env.tokenCalculator.estimateTokensForParts([{ text: snapshotText }]);
+      const contentTokens = this.env.tokenCalculator.estimateTokensForParts([
+        { text: snapshotText },
+      ]);
 
       return {
         id: newId,
@@ -149,7 +164,13 @@ Output ONLY the raw factual snapshot, formatted compactly. Do not include markdo
           metadata: {
             originalTokens: contentTokens,
             currentTokens: contentTokens,
-            transformations: [{ processorName: 'StateSnapshotProcessor', action: 'SYNTHESIZED', timestamp: Date.now() }],
+            transformations: [
+              {
+                processorName: 'StateSnapshotProcessor',
+                action: 'SYNTHESIZED',
+                timestamp: Date.now(),
+              },
+            ],
           },
         },
       };

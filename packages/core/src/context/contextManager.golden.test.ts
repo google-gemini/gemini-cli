@@ -23,9 +23,9 @@ import type { Content } from '@google/genai';
 import type { BaseLlmClient } from '../core/baseLlmClient.js';
 import type { Episode } from './ir/types.js';
 import type { SidecarConfig } from './sidecar/types.js';
-import { ProcessorRegistry } from "./sidecar/registry.js";
-import { registerBuiltInProcessors } from "./sidecar/builtins.js";
-
+import { ProcessorRegistry } from './sidecar/registry.js';
+import { registerBuiltInProcessors } from './sidecar/builtins.js';
+import { IrMapper } from './ir/mapper.js';
 
 expect.addSnapshotSerializer({
   test: (val) =>
@@ -79,19 +79,31 @@ describe('ContextManager Golden Tests', () => {
     registerBuiltInProcessors(registry);
 
     const sidecar = SidecarLoader.fromConfig(mockConfig, registry);
-    const tracer = new ContextTracer({ targetDir: '/tmp', sessionId: 'test-session' });
+    const tracer = new ContextTracer({
+      targetDir: '/tmp',
+      sessionId: 'test-session',
+    });
     const eventBus = new ContextEventBus();
     const env = new ContextEnvironmentImpl(
-      { generateContent: async () => ({}), generateJson: async () => ({}) } as unknown as BaseLlmClient,
+      {
+        generateContent: async () => ({}),
+        generateJson: async () => ({}),
+      } as unknown as BaseLlmClient,
       'test-prompt-id',
       'test',
       '/tmp',
       '/tmp',
       tracer,
       4,
-      eventBus
+      eventBus,
     );
-    contextManager = ContextManager.create(sidecar, env, tracer, undefined, registry);
+    contextManager = ContextManager.create(
+      sidecar,
+      env,
+      tracer,
+      undefined,
+      registry,
+    );
   });
 
   const createLargeHistory = (): Content[] => [
@@ -126,31 +138,37 @@ describe('ContextManager Golden Tests', () => {
 
   it('should process history and match golden snapshot', async () => {
     const history = createLargeHistory();
-    (contextManager as unknown as { pristineEpisodes: Episode[] }).pristineEpisodes = (
-      await import('./ir/mapper.js')
-    ).IrMapper.toIr(history, new ContextTokenCalculator(4));
+    (
+      contextManager as unknown as { pristineEpisodes: Episode[] }
+    ).pristineEpisodes = IrMapper.toIr(history, new ContextTokenCalculator(4));
     const result = await contextManager.projectCompressedHistory();
     expect(result).toMatchSnapshot();
   });
 
   it('should not modify history when under budget', async () => {
     const history = createLargeHistory();
-    (contextManager as unknown as { pristineEpisodes: Episode[] }).pristineEpisodes = (
-      await import('./ir/mapper.js')
-    ).IrMapper.toIr(history, new ContextTokenCalculator(4));
+    (
+      contextManager as unknown as { pristineEpisodes: Episode[] }
+    ).pristineEpisodes = IrMapper.toIr(history, new ContextTokenCalculator(4));
     // In Golden Tests, we just want to ensure the logic doesn't throw or alter unprotected history in weird ways.
     // Since we're skipping processors due to being under budget, it should equal history.
-    const tracer2 = new ContextTracer({ targetDir: '/tmp', sessionId: 'test2' });
+    const tracer2 = new ContextTracer({
+      targetDir: '/tmp',
+      sessionId: 'test2',
+    });
     const eventBus2 = new ContextEventBus();
     const env2 = new ContextEnvironmentImpl(
-      { generateContent: async () => ({}), generateJson: async () => ({}) } as unknown as BaseLlmClient,
+      {
+        generateContent: async () => ({}),
+        generateJson: async () => ({}),
+      } as unknown as BaseLlmClient,
       'test-prompt-id',
       'test',
       '/tmp',
       '/tmp',
       tracer2,
       4,
-      eventBus2
+      eventBus2,
     );
     contextManager = ContextManager.create(
       {
@@ -161,9 +179,9 @@ describe('ContextManager Golden Tests', () => {
       tracer2,
     );
 
-    (contextManager as unknown as { pristineEpisodes: Episode[] }).pristineEpisodes = (
-      await import('./ir/mapper.js')
-    ).IrMapper.toIr(history, new ContextTokenCalculator(4));
+    (
+      contextManager as unknown as { pristineEpisodes: Episode[] }
+    ).pristineEpisodes = IrMapper.toIr(history, new ContextTokenCalculator(4));
     const result = await contextManager.projectCompressedHistory();
 
     expect(result.length).toEqual(history.length);

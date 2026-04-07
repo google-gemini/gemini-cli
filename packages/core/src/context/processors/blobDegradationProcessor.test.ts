@@ -3,7 +3,12 @@
  * Copyright 2026 Google LLC
  * SPDX-License-Identifier: Apache-2.0
  */
-import { createMockEnvironment, createDummyState, createDummyEpisode } from '../testing/contextTestUtils.js';
+
+import {
+  createMockEnvironment,
+  createDummyState,
+  createDummyEpisode,
+} from '../testing/contextTestUtils.js';
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { BlobDegradationProcessor } from './blobDegradationProcessor.js';
 import { EpisodeEditor } from '../ir/episodeEditor.js';
@@ -47,14 +52,20 @@ describe('BlobDegradationProcessor', () => {
 
     // Inline data should be degraded
     expect(parts[1].presentation).toBeDefined();
-    expect(parts[1].presentation!.text).toContain('[Multi-Modal Blob (image/png');
-    expect(parts[1].presentation!.text).toContain('degraded to text to preserve context window');
+    expect(parts[1].presentation!.text).toContain(
+      '[Multi-Modal Blob (image/png',
+    );
+    expect(parts[1].presentation!.text).toContain(
+      'degraded to text to preserve context window',
+    );
 
     // Verify it was written to fake FS
     expect(fileSystem.getFiles().size).toBeGreaterThan(0);
     const files = Array.from(fileSystem.getFiles().keys());
-    expect(files[0]).toContain('.gemini/tool-outputs/degraded-blobs/session-mock-session/blob_');
-    
+    expect(files[0]).toContain(
+      '.gemini/tool-outputs/degraded-blobs/session-mock-session/blob_',
+    );
+
     expect(result[0].trigger.metadata.transformations.length).toBe(1);
   });
 
@@ -74,8 +85,12 @@ describe('BlobDegradationProcessor', () => {
 
     const parts = (result[0].trigger as UserPrompt).semanticParts;
     expect(parts[0].presentation).toBeDefined();
-    expect(parts[0].presentation!.text).toContain('[File Reference (application/pdf)');
-    expect(parts[0].presentation!.text).toContain('Original URI: gs://fake-bucket/doc.pdf');
+    expect(parts[0].presentation!.text).toContain(
+      '[File Reference (application/pdf)',
+    );
+    expect(parts[0].presentation!.text).toContain(
+      'Original URI: gs://fake-bucket/doc.pdf',
+    );
 
     expect(fileSystem.getFiles().size).toBe(0);
   });

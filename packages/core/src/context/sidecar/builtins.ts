@@ -5,12 +5,27 @@
  */
 
 import type { ProcessorRegistry } from './registry.js';
-import { ToolMaskingProcessor, type ToolMaskingProcessorOptions } from '../processors/toolMaskingProcessor.js';
+import {
+  ToolMaskingProcessor,
+  type ToolMaskingProcessorOptions,
+} from '../processors/toolMaskingProcessor.js';
 import { BlobDegradationProcessor } from '../processors/blobDegradationProcessor.js';
-import { SemanticCompressionProcessor, type SemanticCompressionProcessorOptions } from '../processors/semanticCompressionProcessor.js';
-import { HistorySquashingProcessor, type HistorySquashingProcessorOptions } from '../processors/historySquashingProcessor.js';
-import { StateSnapshotProcessor, type StateSnapshotProcessorOptions } from '../processors/stateSnapshotProcessor.js';
-import { EmergencyTruncationProcessor, type EmergencyTruncationProcessorOptions } from '../processors/emergencyTruncationProcessor.js';
+import {
+  SemanticCompressionProcessor,
+  type SemanticCompressionProcessorOptions,
+} from '../processors/semanticCompressionProcessor.js';
+import {
+  HistorySquashingProcessor,
+  type HistorySquashingProcessorOptions,
+} from '../processors/historySquashingProcessor.js';
+import {
+  StateSnapshotProcessor,
+  type StateSnapshotProcessorOptions,
+} from '../processors/stateSnapshotProcessor.js';
+import {
+  EmergencyTruncationProcessor,
+  type EmergencyTruncationProcessorOptions,
+} from '../processors/emergencyTruncationProcessor.js';
 
 export function registerBuiltInProcessors(registry: ProcessorRegistry) {
   registry.register<ToolMaskingProcessorOptions>({
@@ -22,12 +37,12 @@ export function registerBuiltInProcessors(registry: ProcessorRegistry) {
         options: {
           type: 'object',
           properties: { stringLengthThresholdTokens: { type: 'number' } },
-          required: ['stringLengthThresholdTokens']
-        }
+          required: ['stringLengthThresholdTokens'],
+        },
       },
-      required: ['processorId', 'options']
+      required: ['processorId', 'options'],
     },
-    create: (env, opts) => new ToolMaskingProcessor(env, opts)
+    create: (env, opts) => new ToolMaskingProcessor(env, opts),
   });
 
   registry.register<Record<string, never>>({
@@ -36,11 +51,11 @@ export function registerBuiltInProcessors(registry: ProcessorRegistry) {
       type: 'object',
       properties: {
         processorId: { const: 'BlobDegradationProcessor' },
-        options: { type: 'object' }
+        options: { type: 'object' },
       },
-      required: ['processorId']
+      required: ['processorId'],
     },
-    create: (env) => new BlobDegradationProcessor(env)
+    create: (env) => new BlobDegradationProcessor(env),
   });
 
   registry.register<SemanticCompressionProcessorOptions>({
@@ -52,12 +67,12 @@ export function registerBuiltInProcessors(registry: ProcessorRegistry) {
         options: {
           type: 'object',
           properties: { nodeThresholdTokens: { type: 'number' } },
-          required: ['nodeThresholdTokens']
-        }
+          required: ['nodeThresholdTokens'],
+        },
       },
-      required: ['processorId', 'options']
+      required: ['processorId', 'options'],
     },
-    create: (env, opts) => new SemanticCompressionProcessor(env, opts)
+    create: (env, opts) => new SemanticCompressionProcessor(env, opts),
   });
 
   registry.register<HistorySquashingProcessorOptions>({
@@ -69,12 +84,12 @@ export function registerBuiltInProcessors(registry: ProcessorRegistry) {
         options: {
           type: 'object',
           properties: { maxTokensPerNode: { type: 'number' } },
-          required: ['maxTokensPerNode']
-        }
+          required: ['maxTokensPerNode'],
+        },
       },
-      required: ['processorId', 'options']
+      required: ['processorId', 'options'],
     },
-    create: (env, opts) => new HistorySquashingProcessor(env, opts)
+    create: (env, opts) => new HistorySquashingProcessor(env, opts),
   });
 
   registry.register<StateSnapshotProcessorOptions>({
@@ -88,13 +103,13 @@ export function registerBuiltInProcessors(registry: ProcessorRegistry) {
           properties: {
             model: { type: 'string' },
             systemInstruction: { type: 'string' },
-            triggerDeficitTokens: { type: 'number' }
-          }
-        }
+            triggerDeficitTokens: { type: 'number' },
+          },
+        },
       },
-      required: ['processorId']
+      required: ['processorId'],
     },
-    create: (env, opts) => StateSnapshotProcessor.create(env, opts)
+    create: (env, opts) => StateSnapshotProcessor.create(env, opts),
   });
 
   registry.register<EmergencyTruncationProcessorOptions>({
@@ -103,10 +118,10 @@ export function registerBuiltInProcessors(registry: ProcessorRegistry) {
       type: 'object',
       properties: {
         processorId: { const: 'EmergencyTruncationProcessor' },
-        options: { type: 'object' }
+        options: { type: 'object' },
       },
-      required: ['processorId']
+      required: ['processorId'],
     },
-    create: (env, opts) => EmergencyTruncationProcessor.create(env, opts)
+    create: (env, opts) => EmergencyTruncationProcessor.create(env, opts),
   });
 }

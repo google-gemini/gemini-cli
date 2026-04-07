@@ -13,27 +13,27 @@ export class NodeFileSystem implements IFileSystem {
   existsSync(p: string): boolean {
     return fs.existsSync(p);
   }
-  
+
   statSyncSize(p: string): number {
     return fs.statSync(p).size;
   }
-  
+
   readFileSync(p: string, encoding: 'utf8'): string {
     return fs.readFileSync(p, encoding);
   }
-  
+
   writeFileSync(p: string, data: string | Buffer, encoding?: 'utf-8'): void {
     if (Buffer.isBuffer(data)) {
-       fs.writeFileSync(p, data);
+      fs.writeFileSync(p, data);
     } else {
-       fs.writeFileSync(p, data, encoding);
+      fs.writeFileSync(p, data, encoding);
     }
   }
-  
+
   appendFileSync(p: string, data: string, encoding: 'utf-8'): void {
     fs.appendFileSync(p, data, encoding);
   }
-  
+
   mkdirSync(p: string, options?: { recursive?: boolean }): void {
     fs.mkdirSync(p, options);
   }

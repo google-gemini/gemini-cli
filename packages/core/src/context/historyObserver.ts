@@ -4,7 +4,10 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import type { AgentChatHistory, HistoryEvent } from '../core/agentChatHistory.js';
+import type {
+  AgentChatHistory,
+  HistoryEvent,
+} from '../core/agentChatHistory.js';
 import { IrMapper } from './ir/mapper.js';
 import type { ContextTokenCalculator } from './utils/contextTokenCalculator.js';
 import type { ContextEventBus } from './eventBus.js';
@@ -30,13 +33,24 @@ export class HistoryObserver {
       this.unsubscribeHistory();
     }
 
-    this.unsubscribeHistory = this.chatHistory.subscribe((_event: HistoryEvent) => {
-      // Rebuild the pristine IR graph from the full source history on every change.
-      const pristineEpisodes = IrMapper.toIr(this.chatHistory.get(), this.tokenCalculator);
-      this.tracer.logEvent('HistoryObserver', 'Rebuilt pristine graph from chat history update', { episodeCount: pristineEpisodes.length });
-      
-      this.eventBus.emitPristineHistoryUpdated({ episodes: pristineEpisodes });
-    });
+    this.unsubscribeHistory = this.chatHistory.subscribe(
+      (_event: HistoryEvent) => {
+        // Rebuild the pristine IR graph from the full source history on every change.
+        const pristineEpisodes = IrMapper.toIr(
+          this.chatHistory.get(),
+          this.tokenCalculator,
+        );
+        this.tracer.logEvent(
+          'HistoryObserver',
+          'Rebuilt pristine graph from chat history update',
+          { episodeCount: pristineEpisodes.length },
+        );
+
+        this.eventBus.emitPristineHistoryUpdated({
+          episodes: pristineEpisodes,
+        });
+      },
+    );
   }
 
   stop() {

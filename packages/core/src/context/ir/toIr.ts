@@ -30,7 +30,23 @@ export function getStableId(obj: object): string {
   return id;
 }
 
-export function toIr(history: readonly Content[], tokenCalculator: ContextTokenCalculator): Episode[] {
+function isRecord(v: unknown): v is Record<string, unknown> {
+  return typeof v === 'object' && v !== null && !Array.isArray(v);
+}
+
+function isCompleteEpisode(ep: Partial<Episode>): ep is Episode {
+  return (
+    typeof ep.id === 'string' &&
+    typeof ep.timestamp === 'number' &&
+    !!ep.trigger &&
+    Array.isArray(ep.steps)
+  );
+}
+
+export function toIr(
+  history: readonly Content[],
+  tokenCalculator: ContextTokenCalculator,
+): Episode[] {
   const episodes: Episode[] = [];
   let currentEpisode: Partial<Episode> | null = null;
   const pendingCallParts: Map<string, Part> = new Map();
@@ -45,8 +61,8 @@ export function toIr(history: readonly Content[], tokenCalculator: ContextTokenC
   };
 
   const finalizeEpisode = () => {
-    if (currentEpisode && currentEpisode.trigger) {
-      episodes.push(currentEpisode as unknown as Episode); // eslint-disable-line @typescript-eslint/no-unsafe-type-assertion
+    if (currentEpisode && isCompleteEpisode(currentEpisode)) {
+      episodes.push(currentEpisode);
     }
     currentEpisode = null;
   };
@@ -61,7 +77,13 @@ export function toIr(history: readonly Content[], tokenCalculator: ContextTokenC
       );
 
       if (hasToolResponses) {
-        currentEpisode = parseToolResponses(msg, currentEpisode, pendingCallParts, tokenCalculator, createMetadata);
+        currentEpisode = parseToolResponses(
+          msg,
+          currentEpisode,
+          pendingCallParts,
+          tokenCalculator,
+          createMetadata,
+        );
       }
 
       if (hasUserParts) {
@@ -69,7 +91,12 @@ export function toIr(history: readonly Content[], tokenCalculator: ContextTokenC
         currentEpisode = parseUserParts(msg, createMetadata);
       }
     } else if (msg.role === 'model') {
-      currentEpisode = parseModelParts(msg, currentEpisode, pendingCallParts, createMetadata);
+      currentEpisode = parseModelParts(
+        msg,
+        currentEpisode,
+        pendingCallParts,
+        createMetadata,
+      );
     }
   }
 
@@ -86,7 +113,7 @@ function parseToolResponses(
   currentEpisode: Partial<Episode> | null,
   pendingCallParts: Map<string, Part>,
   tokenCalculator: ContextTokenCalculator,
-  createMetadata: (parts: Part[]) => IrMetadata
+  createMetadata: (parts: Part[]) => IrMetadata,
 ): Partial<Episode> {
   if (!currentEpisode) {
     currentEpisode = {
@@ -117,18 +144,12 @@ function parseToolResponses(
         id: getStableId(part),
         type: 'TOOL_EXECUTION',
         toolName: part.functionResponse.name || 'unknown',
-        intent:
-          // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
-          (matchingCall?.functionCall?.args as unknown as Record<
-            string,
-            unknown
-          >) || {},
-        observation:
-          // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
-          (part.functionResponse.response as unknown as Record<
-            string,
-            unknown
-          >) || {},
+        intent: isRecord(matchingCall?.functionCall?.args)
+          ? matchingCall.functionCall.args
+          : {},
+        observation: isRecord(part.functionResponse.response)
+          ? part.functionResponse.response
+          : {},
         tokens: {
           intent: intentTokens,
           observation: obsTokens,
@@ -146,7 +167,10 @@ function parseToolResponses(
   return currentEpisode;
 }
 
-function parseUserParts(msg: Content, createMetadata: (parts: Part[]) => IrMetadata): Partial<Episode> {
+function parseUserParts(
+  msg: Content,
+  createMetadata: (parts: Part[]) => IrMetadata,
+): Partial<Episode> {
   const semanticParts: SemanticPart[] = [];
   for (const p of msg.parts!) {
     if (p.text !== undefined)
@@ -171,9 +195,7 @@ function parseUserParts(msg: Content, createMetadata: (parts: Part[]) => IrMetad
     id: getStableId(msg.parts![0] || msg),
     type: 'USER_PROMPT',
     semanticParts,
-    metadata: createMetadata(
-      msg.parts!.filter((p) => !p.functionResponse),
-    ),
+    metadata: createMetadata(msg.parts!.filter((p) => !p.functionResponse)),
   };
 
   return {
@@ -188,7 +210,7 @@ function parseModelParts(
   msg: Content,
   currentEpisode: Partial<Episode> | null,
   pendingCallParts: Map<string, Part>,
-  createMetadata: (parts: Part[]) => IrMetadata
+  createMetadata: (parts: Part[]) => IrMetadata,
 ): Partial<Episode> {
   if (!currentEpisode) {
     currentEpisode = {

@@ -28,19 +28,26 @@ export class ContextTracer {
   constructor(
     options: ContextTracerOptions,
     fileSystem: IFileSystem = new NodeFileSystem(),
-    idGenerator: IIdGenerator = new NodeIdGenerator()
+    idGenerator: IIdGenerator = new NodeIdGenerator(),
   ) {
     this.enabled = options.enabled ?? false;
     this.fileSystem = fileSystem;
     this.idGenerator = idGenerator;
 
-    this.traceDir = this.fileSystem.join(options.targetDir, '.gemini', 'context_trace', options.sessionId);
+    this.traceDir = this.fileSystem.join(
+      options.targetDir,
+      '.gemini',
+      'context_trace',
+      options.sessionId,
+    );
     this.assetsDir = this.fileSystem.join(this.traceDir, 'assets');
 
     if (this.enabled) {
       try {
         this.fileSystem.mkdirSync(this.assetsDir, { recursive: true });
-        this.logEvent('SYSTEM', 'Context Tracer Initialized', { sessionId: options.sessionId });
+        this.logEvent('SYSTEM', 'Context Tracer Initialized', {
+          sessionId: options.sessionId,
+        });
       } catch (e) {
         debugLogger.error('Failed to initialize ContextTracer', e);
         this.enabled = false;
@@ -60,12 +67,13 @@ export class ContextTracer {
       if (details) {
         processedDetails = {};
         for (const [key, value] of Object.entries(details)) {
-          const strValue = typeof value === 'string' ? value : JSON.stringify(value);
+          const strValue =
+            typeof value === 'string' ? value : JSON.stringify(value);
           if (strValue && strValue.length > this.MAX_INLINE_SIZE) {
-             const assetId = this.saveAsset(component, key, value);
-             processedDetails[key] = { $asset: assetId };
+            const assetId = this.saveAsset(component, key, value);
+            processedDetails[key] = { $asset: assetId };
           } else {
-             processedDetails[key] = value;
+            processedDetails[key] = value;
           }
         }
       }
@@ -85,13 +93,21 @@ export class ContextTracer {
     }
   }
 
-  private saveAsset(component: string, assetName: string, data: unknown): string {
+  private saveAsset(
+    component: string,
+    assetName: string,
+    data: unknown,
+  ): string {
     if (!this.enabled) return 'asset-recording-disabled';
     try {
       const assetId = `${Date.now()}-${this.idGenerator.generateId()}-${assetName}.json`;
       const assetPath = this.fileSystem.join(this.assetsDir, assetId);
 
-      this.fileSystem.writeFileSync(assetPath, JSON.stringify(data, null, 2), 'utf-8');
+      this.fileSystem.writeFileSync(
+        assetPath,
+        JSON.stringify(data, null, 2),
+        'utf-8',
+      );
       this.logEvent(component, `Saved asset: ${assetName}`, { assetId });
       return assetId;
     } catch (e) {

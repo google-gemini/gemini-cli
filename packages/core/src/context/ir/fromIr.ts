@@ -43,8 +43,7 @@ function serializeTrigger(trigger: UserPrompt): Content | null {
         fileData: { mimeType: sp.mimeType, fileUri: sp.fileUri },
       });
     } else if (sp.type === 'raw_part') {
-      // eslint-disable-next-line @typescript-eslint/no-unnecessary-type-assertion, @typescript-eslint/no-unsafe-type-assertion
-      parts.push(sp.part as unknown as Part);
+      parts.push(sp.part);
     }
   }
   return parts.length > 0 ? { role: 'user', parts } : null;
@@ -76,7 +75,7 @@ function serializeSteps(steps: EpisodeStep[]): Content[] {
       pendingModelParts.push({
         functionCall: {
           name: step.toolName,
-          args: step.intent as unknown as Record<string, unknown>, // eslint-disable-line @typescript-eslint/no-unsafe-type-assertion
+          args: step.intent,
           id: step.id,
         },
       });
@@ -86,7 +85,10 @@ function serializeSteps(steps: EpisodeStep[]): Content[] {
       pendingUserParts.push({
         functionResponse: {
           name: step.toolName,
-          response: observation as unknown as Record<string, unknown>, // eslint-disable-line @typescript-eslint/no-unsafe-type-assertion
+          response:
+            typeof observation === 'string'
+              ? { message: observation }
+              : observation,
           id: step.id,
         },
       });

@@ -1,4 +1,3 @@
-
 /**
  * @license
  * Copyright 2026 Google LLC
@@ -17,7 +16,6 @@ describe('ContextManager Barrier Tests', () => {
     const { chatHistory, contextManager } = setupContextComponentTest(config);
 
     // 1. Shrink limits: 1 char = 1 token. RetainedTokens = 10. MaxTokens = 100.
-    
 
     contextManager['sidecar'].budget.retainedTokens = 5;
     contextManager['sidecar'].budget.maxTokens = 100;
@@ -89,7 +87,7 @@ describe('ContextManager Barrier Tests', () => {
     const { chatHistory, contextManager } = setupContextComponentTest(config);
 
     // 1. Shrink limits: maxTokens = 15.
-    
+
     contextManager['sidecar'].budget.maxTokens = 15;
 
     // 2. Build history: 2 turns. Total = 24 tokens.

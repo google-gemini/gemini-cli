@@ -7,9 +7,7 @@
 import type { BaseLlmClient } from '../../core/baseLlmClient.js';
 import type { ContextTracer } from '../tracer.js';
 import type { ContextEnvironment } from './environment.js';
-
 import type { ContextEventBus } from '../eventBus.js';
-
 import { ContextTokenCalculator } from '../utils/contextTokenCalculator.js';
 import type { IFileSystem } from '../system/IFileSystem.js';
 import { NodeFileSystem } from '../system/NodeFileSystem.js';

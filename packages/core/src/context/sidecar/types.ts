@@ -10,12 +10,27 @@ import type { StateSnapshotProcessorOptions } from '../processors/stateSnapshotP
  * Definition of a processor or worker to be instantiated in the graph.
  */
 export type ProcessorConfig =
-  | { processorId: 'ToolMaskingProcessor'; options: { stringLengthThresholdTokens: number } }
+  | {
+      processorId: 'ToolMaskingProcessor';
+      options: { stringLengthThresholdTokens: number };
+    }
   | { processorId: 'BlobDegradationProcessor'; options?: object }
-  | { processorId: 'SemanticCompressionProcessor'; options: { nodeThresholdTokens: number } }
-  | { processorId: 'HistorySquashingProcessor'; options: { maxTokensPerNode: number } }
-  | { processorId: 'StateSnapshotProcessor'; options: StateSnapshotProcessorOptions }
-  | { processorId: 'EmergencyTruncationProcessor'; options?: Record<string, unknown> };
+  | {
+      processorId: 'SemanticCompressionProcessor';
+      options: { nodeThresholdTokens: number };
+    }
+  | {
+      processorId: 'HistorySquashingProcessor';
+      options: { maxTokensPerNode: number };
+    }
+  | {
+      processorId: 'StateSnapshotProcessor';
+      options: StateSnapshotProcessorOptions;
+    }
+  | {
+      processorId: 'EmergencyTruncationProcessor';
+      options?: Record<string, unknown>;
+    };
 
 export type PipelineTrigger =
   | 'on_turn'
