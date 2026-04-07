@@ -5,6 +5,7 @@
  */
 
 import path from 'node:path';
+import { pathToFileURL } from 'node:url';
 
 // OSC 8 hyperlink escape sequences
 const OSC8_START = '\x1b]8;;';
