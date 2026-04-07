@@ -36,7 +36,7 @@ import {
 import type { MessageBus } from '../../confirmation-bus/message-bus.js';
 import { createBrowserAgentDefinition } from './browserAgentFactory.js';
 import { removeInputBlocker } from './inputBlocker.js';
-import { recordBrowserAgentTaskOutcome } from '../../telemetry/metrics.js';
+import { logBrowserAgentTaskOutcome } from '../../telemetry/loggers.js';
 import {
   sanitizeThoughtContent,
   sanitizeToolArgs,
@@ -397,7 +397,7 @@ ${output.result}`;
         },
       };
     } finally {
-      recordBrowserAgentTaskOutcome(this.config, {
+      logBrowserAgentTaskOutcome(this.config, {
         success: taskSuccess,
         session_mode: sessionMode,
         vision_enabled: visionEnabled,
