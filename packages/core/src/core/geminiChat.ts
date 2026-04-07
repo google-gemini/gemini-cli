@@ -597,6 +597,21 @@ export class GeminiChat {
           );
         }
 
+        if (beforeModelResult.modifiedModel) {
+          modelToUse = resolveModel(
+            beforeModelResult.modifiedModel,
+            useGemini3_1,
+            useGemini3_1FlashLite,
+            false,
+            hasAccessToPreview,
+            this.context.config,
+          );
+          lastModelToUse = modelToUse;
+          // Re-evaluate contentsToUse based on the new model's feature support
+          contentsToUse = supportsModernFeatures(modelToUse)
+            ? [...contentsForPreviewModel]
+            : [...requestContents];
+        }
         if (beforeModelResult.modifiedConfig) {
           Object.assign(config, beforeModelResult.modifiedConfig);
         }
