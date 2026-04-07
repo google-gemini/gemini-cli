@@ -379,15 +379,30 @@ describe('initializeOutputListenersAndFlush', () => {
 describe('getNodeMemoryArgs', () => {
   let osTotalMemSpy: MockInstance;
   let v8GetHeapStatisticsSpy: MockInstance;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  let originalConfig: any;
 
   beforeEach(() => {
     osTotalMemSpy = vi.spyOn(os, 'totalmem');
     v8GetHeapStatisticsSpy = vi.spyOn(v8, 'getHeapStatistics');
     delete process.env['GEMINI_CLI_NO_RELAUNCH'];
+
+    originalConfig = process.config;
+    Object.defineProperty(process, 'config', {
+      value: {
+        ...originalConfig,
+        variables: { ...originalConfig?.variables, v8_enable_sandbox: 1 },
+      },
+      configurable: true,
+    });
   });
 
   afterEach(() => {
     vi.restoreAllMocks();
+    Object.defineProperty(process, 'config', {
+      value: originalConfig,
+      configurable: true,
+    });
   });
 
   it('should return empty array if GEMINI_CLI_NO_RELAUNCH is set', () => {
