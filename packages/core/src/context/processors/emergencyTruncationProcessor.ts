@@ -39,7 +39,7 @@ export class EmergencyTruncationProcessor implements ContextProcessor {
     const toRemove: string[] = [];
 
     // We respect the global protected Episode IDs (like the system prompt at index 0)
-    for (const ep of editor.episodes) {
+    for (const ep of editor.getFullHistory()) {
       const epTokens = this._env.tokenCalculator.calculateEpisodeListTokens([
         ep,
       ]);

@@ -9,15 +9,18 @@ import type { Episode, Variant } from './ir/types.js';
 
 export interface PristineHistoryUpdatedEvent {
   episodes: Episode[];
+  newNodes: Set<string>;
 }
 
 export interface ContextConsolidationEvent {
   episodes: Episode[];
   targetDeficit: number;
+  targetNodeIds: Set<string>;
 }
 
 export interface IrChunkReceivedEvent {
   episodes: Episode[];
+  targetNodeIds: Set<string>;
 }
 
 export interface VariantReadyEvent {

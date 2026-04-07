@@ -78,6 +78,7 @@ export function createDummyEpisode(
   }
 
   return {
+    type: 'EPISODE',
     id,
     timestamp: Date.now(),
     trigger,

@@ -17,6 +17,7 @@ import type {
   SystemEvent,
 } from './types.js';
 import type { ContextTokenCalculator } from '../utils/contextTokenCalculator.js';
+import { isAgentThought } from './graphUtils.js';
 
 // WeakMap to provide stable, deterministic identity across parses for the exact same Content/Part references
 const nodeIdentityMap = new WeakMap<object, string>();
@@ -199,6 +200,7 @@ function parseUserParts(
   };
 
   return {
+    type: 'EPISODE',
     id: getStableId(msg),
     timestamp: Date.now(),
     trigger,
@@ -247,7 +249,7 @@ function parseModelParts(
 function finalizeYield(currentEpisode: Partial<Episode>) {
   if (currentEpisode.steps && currentEpisode.steps.length > 0) {
     const lastStep = currentEpisode.steps[currentEpisode.steps.length - 1];
-    if (lastStep.type === 'AGENT_THOUGHT') {
+    if (isAgentThought(lastStep)) {
       const yieldNode: AgentYield = {
         id: lastStep.id,
         type: 'AGENT_YIELD',

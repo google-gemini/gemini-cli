@@ -14,6 +14,7 @@ import { v4 as uuidv4 } from 'uuid';
 import { LlmRole } from '../../telemetry/llmRole.js';
 import { debugLogger } from 'src/utils/debugLogger.js';
 import type { EpisodeEditor } from '../ir/episodeEditor.js';
+import { isSystemEvent, isToolExecution, isUserPrompt } from '../ir/graphUtils.js';
 
 export interface StateSnapshotProcessorOptions {
   model?: string;
@@ -58,11 +59,11 @@ export class StateSnapshotProcessor implements ContextProcessor {
       let deficitAccumulator = 0;
       const selectedEpisodes: Episode[] = [];
 
-      for (let i = 1; i < editor.episodes.length - 1; i++) {
-        const ep = editor.episodes[i];
+      for (let i = 1; i < editor.getFullHistory().length - 1; i++) {
+        const ep = editor.getFullHistory()[i];
         selectedEpisodes.push(ep);
         let triggerText = '';
-        if (ep.trigger?.type === 'USER_PROMPT') {
+        if (isUserPrompt(ep.trigger)) {
           const firstPart = ep.trigger.semanticParts?.[0];
           if (firstPart) {
             triggerText =
@@ -102,7 +103,7 @@ Output ONLY the raw factual snapshot, formatted compactly. Do not include markdo
 
     let userPromptText = 'TRANSCRIPT TO SNAPSHOT:\n\n';
     for (const ep of episodes) {
-      if (ep.trigger?.type === 'USER_PROMPT') {
+      if (isUserPrompt(ep.trigger)) {
         const partsText = ep.trigger.semanticParts
           .map((p) => {
             if (p.type === 'text') return p.text;
@@ -111,11 +112,11 @@ Output ONLY the raw factual snapshot, formatted compactly. Do not include markdo
           })
           .join('');
         userPromptText += `USER: ${partsText}\n`;
-      } else if (ep.trigger?.type === 'SYSTEM_EVENT') {
+      } else if (isSystemEvent(ep.trigger)) {
         userPromptText += `[SYSTEM EVENT: ${ep.trigger.name}]\n`;
       }
       for (const step of ep.steps) {
-        if (step.type === 'TOOL_EXECUTION') {
+        if (isToolExecution(step)) {
           userPromptText += `[Tool Called: ${step.toolName}]\n`;
         }
       }
@@ -144,6 +145,7 @@ Output ONLY the raw factual snapshot, formatted compactly. Do not include markdo
       ]);
 
       return {
+        type: 'EPISODE',
         id: newId,
         timestamp: Date.now(),
         trigger: {

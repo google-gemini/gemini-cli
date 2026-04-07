@@ -28,6 +28,13 @@ export interface ContextAccountingState {
    * True if currentTokens <= retainedTokens.
    */
   readonly isBudgetSatisfied: boolean;
+
+  /**
+   * If this pipeline was triggered by a specific event (e.g., a new turn),
+   * this contains the specific Node IDs (Episodes, Steps, or Triggers) that should be evaluated.
+   * If undefined, the processor may evaluate the entire graph.
+   */
+  readonly targetNodeIds?: Set<string>;
 }
 
 /**

@@ -21,6 +21,8 @@ import type { ContextTracer } from './tracer.js';
 export class HistoryObserver {
   private unsubscribeHistory?: () => void;
 
+  private seenNodeIds = new Set<string>();
+
   constructor(
     private readonly chatHistory: AgentChatHistory,
     private readonly eventBus: ContextEventBus,
@@ -40,14 +42,38 @@ export class HistoryObserver {
           this.chatHistory.get(),
           this.tokenCalculator,
         );
+        
+        const newNodes = new Set<string>();
+        for (const ep of pristineEpisodes) {
+          if (!this.seenNodeIds.has(ep.id)) {
+            newNodes.add(ep.id);
+            this.seenNodeIds.add(ep.id);
+          }
+          if (!this.seenNodeIds.has(ep.trigger.id)) {
+            newNodes.add(ep.trigger.id);
+            this.seenNodeIds.add(ep.trigger.id);
+          }
+          for (const step of ep.steps) {
+            if (!this.seenNodeIds.has(step.id)) {
+               newNodes.add(step.id);
+               this.seenNodeIds.add(step.id);
+            }
+          }
+          if (ep.yield && !this.seenNodeIds.has(ep.yield.id)) {
+             newNodes.add(ep.yield.id);
+             this.seenNodeIds.add(ep.yield.id);
+          }
+        }
+
         this.tracer.logEvent(
           'HistoryObserver',
           'Rebuilt pristine graph from chat history update',
-          { episodeCount: pristineEpisodes.length },
+          { episodeCount: pristineEpisodes.length, newNodesCount: newNodes.size },
         );
 
         this.eventBus.emitPristineHistoryUpdated({
           episodes: pristineEpisodes,
+          newNodes,
         });
       },
     );

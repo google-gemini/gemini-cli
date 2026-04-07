@@ -10,6 +10,7 @@ import { debugLogger } from '../../utils/debugLogger.js';
 import { LlmRole } from '../../telemetry/types.js';
 import { getResponseText } from '../../utils/partUtils.js';
 import type { EpisodeEditor } from '../ir/episodeEditor.js';
+import { isAgentThought, isToolExecution, isUserPrompt } from '../ir/graphUtils.js';
 
 export interface SemanticCompressionProcessorOptions {
   nodeThresholdTokens: number;
@@ -65,12 +66,13 @@ export class SemanticCompressionProcessor implements ContextProcessor {
     let currentDeficit = state.deficitTokens;
 
     // We scan backwards (oldest to newest would also work, but older is safer to degrade first)
-    for (const ep of editor.episodes) {
+    for (const target of editor.targets) {
+      const ep = target.episode;
       if (currentDeficit <= 0) break;
       if (state.protectedEpisodeIds.has(ep.id)) continue;
 
       // 1. Compress User Prompts
-      if (ep.trigger.type === 'USER_PROMPT') {
+      if (target.node === ep.trigger && isUserPrompt(ep.trigger)) {
         for (let j = 0; j < ep.trigger.semanticParts.length; j++) {
           const part = ep.trigger.semanticParts[j];
           if (currentDeficit <= 0) break;
@@ -92,7 +94,7 @@ export class SemanticCompressionProcessor implements ContextProcessor {
 
             if (newTokens < oldTokens) {
               editor.editEpisode(ep.id, 'SUMMARIZE_PROMPT', (draft) => {
-                if (draft.trigger.type === 'USER_PROMPT') {
+                if (isUserPrompt(draft.trigger)) {
                   draft.trigger.semanticParts[j].presentation = {
                     text: summary,
                     tokens: newTokens,
@@ -111,12 +113,10 @@ export class SemanticCompressionProcessor implements ContextProcessor {
       }
 
       // 2. Compress Model Thoughts
-      if (ep.steps) {
-        for (let j = 0; j < ep.steps.length; j++) {
-          const step = ep.steps[j];
-          if (currentDeficit <= 0) break;
-          if (step.type === 'AGENT_THOUGHT') {
-            if (step.presentation) continue;
+      if (isAgentThought(target.node)) {
+        const step = target.node;
+        const j = ep.steps.findIndex(s => s.id === step.id);
+        if (j !== -1 && currentDeficit > 0 && !step.presentation) {
             if (step.text.length > thresholdChars) {
               const summary = await this.generateSummary(
                 step.text,
@@ -132,11 +132,21 @@ export class SemanticCompressionProcessor implements ContextProcessor {
               if (newTokens < oldTokens) {
                 editor.editEpisode(ep.id, 'SUMMARIZE_THOUGHT', (draft) => {
                   const draftStep = draft.steps[j];
-                  if (draftStep.type === 'AGENT_THOUGHT') {
+                  if (isAgentThought(draftStep)) {
                     draftStep.presentation = {
                       text: summary,
                       tokens: newTokens,
                     };
+                    if (!draftStep.metadata) {
+                      draftStep.metadata = {
+                        transformations: [],
+                        currentTokens: 0,
+                        originalTokens: 0,
+                      };
+                    }
+                    if (!draftStep.metadata.transformations) {
+                      draftStep.metadata.transformations = [];
+                    }
                     draftStep.metadata.transformations.push({
                       processorName: this.name,
                       action: 'SUMMARIZED',
@@ -147,11 +157,15 @@ export class SemanticCompressionProcessor implements ContextProcessor {
                 currentDeficit -= oldTokens - newTokens;
               }
             }
-          }
+        }
+      }
 
-          // 3. Compress Tool Observations
-          if (step.type === 'TOOL_EXECUTION') {
-            const rawObs = step.presentation?.observation ?? step.observation;
+      // 3. Compress Tool Observations
+      if (isToolExecution(target.node)) {
+        const step = target.node;
+        const j = ep.steps.findIndex(s => s.id === step.id);
+        if (j !== -1 && currentDeficit > 0 && !step.presentation) {
+            const rawObs = (step.presentation as any)?.observation ?? step.observation;
 
             let stringifiedObs = '';
             if (typeof rawObs === 'string') {
@@ -164,40 +178,33 @@ export class SemanticCompressionProcessor implements ContextProcessor {
               }
             }
 
-            if (
-              stringifiedObs.length > thresholdChars &&
-              !stringifiedObs.includes('<tool_output_masked>')
-            ) {
+            if (stringifiedObs.length > thresholdChars) {
               const summary = await this.generateSummary(
                 stringifiedObs,
-                `Tool Output (${step.toolName})`,
+                step.toolName,
               );
-
-              // Wrap the summary in an object so the Gemini API accepts it as a valid functionResponse.response
               const newObsObject = { summary };
 
-              const newObsTokens =
-                this.env.tokenCalculator.estimateTokensForParts([
-                  {
-                    functionResponse: {
-                      name: step.toolName,
-                      response: newObsObject,
-                      id: step.id,
-                    },
+              const newObsTokens = this.env.tokenCalculator.estimateTokensForParts([
+                {
+                  functionResponse: {
+                    name: step.toolName,
+                    response: newObsObject,
+                    id: step.id,
                   },
-                ]);
+                },
+              ]);
 
               const oldObsTokens =
-                step.presentation?.tokens?.observation ??
-                step.tokens?.observation ??
-                step.tokens;
+                (step.presentation as any)?.tokens?.observation ??
+                step.tokens?.observation ?? step.tokens;
               const intentTokens =
-                step.presentation?.tokens?.intent ?? step.tokens?.intent ?? 0;
+                (step.presentation as any)?.tokens?.intent ?? step.tokens?.intent ?? 0;
 
               if (newObsTokens < oldObsTokens) {
                 editor.editEpisode(ep.id, 'SUMMARIZE_TOOL', (draft) => {
                   const draftStep = draft.steps[j];
-                  if (draftStep.type === 'TOOL_EXECUTION') {
+                  if (isToolExecution(draftStep)) {
                     draftStep.presentation = {
                       intent:
                         draftStep.presentation?.intent ?? draftStep.intent,
@@ -227,7 +234,6 @@ export class SemanticCompressionProcessor implements ContextProcessor {
                 currentDeficit -= oldObsTokens - newObsTokens;
               }
             }
-          }
         }
       }
     }

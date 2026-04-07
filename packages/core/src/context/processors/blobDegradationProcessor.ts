@@ -8,6 +8,7 @@ import type { ContextAccountingState, ContextProcessor } from '../pipeline.js';
 import type { ContextEnvironment } from '../sidecar/environment.js';
 import { sanitizeFilenamePart } from '../../utils/fileUtils.js';
 import type { EpisodeEditor } from '../ir/episodeEditor.js';
+import { isUserPrompt } from '../ir/graphUtils.js';
 
 export type BlobDegradationProcessorOptions = Record<string, never>;
 
@@ -59,11 +60,14 @@ export class BlobDegradationProcessor implements ContextProcessor {
     };
 
     // Forward scan, looking for bloated non-text parts to degrade
-    for (const ep of editor.episodes) {
+    for (const target of editor.targets) {
+      const ep = target.episode;
+      if (target.node !== ep.trigger) continue;
+      
       if (currentDeficit <= 0) break;
       if (state.protectedEpisodeIds.has(ep.id)) continue;
 
-      if (ep.trigger.type === 'USER_PROMPT') {
+      if (isUserPrompt(ep.trigger)) {
         for (let j = 0; j < ep.trigger.semanticParts.length; j++) {
           const part = ep.trigger.semanticParts[j];
           if (currentDeficit <= 0) break;
@@ -120,7 +124,7 @@ export class BlobDegradationProcessor implements ContextProcessor {
             ]);
 
             editor.editEpisode(ep.id, 'DEGRADE_BLOB', (draft) => {
-              if (draft.trigger.type === 'USER_PROMPT') {
+              if (isUserPrompt(draft.trigger)) {
                 draft.trigger.semanticParts[j].presentation = {
                   text: newText,
                   tokens: newTokens,

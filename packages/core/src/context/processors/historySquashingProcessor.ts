@@ -8,6 +8,7 @@ import type { ContextAccountingState, ContextProcessor } from '../pipeline.js';
 import type { ContextEnvironment } from '../sidecar/environment.js';
 import { truncateProportionally } from '../truncation.js';
 import type { EpisodeEditor } from '../ir/episodeEditor.js';
+import { isAgentThought, isUserPrompt } from '../ir/graphUtils.js';
 
 export interface HistorySquashingProcessorOptions {
   maxTokensPerNode: number;
@@ -88,12 +89,13 @@ export class HistorySquashingProcessor implements ContextProcessor {
     // We track how many tokens we still need to cut. If we hit 0, we can stop early!
     let currentDeficit = state.deficitTokens;
 
-    for (const ep of editor.episodes) {
+    for (const target of editor.targets) {
+      const ep = target.episode;
       if (currentDeficit <= 0) break;
       if (state.protectedEpisodeIds.has(ep.id)) continue;
 
       // 1. Squash User Prompts
-      if (ep.trigger.type === 'USER_PROMPT') {
+      if (target.node === ep.trigger && isUserPrompt(ep.trigger)) {
         for (let j = 0; j < ep.trigger.semanticParts.length; j++) {
           const part = ep.trigger.semanticParts[j];
           if (part.type === 'text') {
@@ -103,7 +105,7 @@ export class HistorySquashingProcessor implements ContextProcessor {
               currentDeficit,
               (p) => {
                 editor.editEpisode(ep.id, 'SQUASH_PROMPT', (draft) => {
-                  if (draft.trigger.type === 'USER_PROMPT') {
+                  if (isUserPrompt(draft.trigger)) {
                     draft.trigger.semanticParts[j].presentation = p;
                   }
                 });
@@ -124,11 +126,10 @@ export class HistorySquashingProcessor implements ContextProcessor {
       }
 
       // 2. Squash Model Thoughts
-      if (ep.steps) {
-        for (let j = 0; j < ep.steps.length; j++) {
-          const step = ep.steps[j];
-          if (currentDeficit <= 0) break;
-          if (step.type === 'AGENT_THOUGHT') {
+      if (isAgentThought(target.node)) {
+        const step = target.node;
+        const j = ep.steps.findIndex(s => s.id === step.id);
+        if (j !== -1 && currentDeficit > 0) {
             const saved = this.tryApplySquash(
               step.text,
               limitChars,
@@ -136,7 +137,7 @@ export class HistorySquashingProcessor implements ContextProcessor {
               (p) => {
                 editor.editEpisode(ep.id, 'SQUASH_THOUGHT', (draft) => {
                   const draftStep = draft.steps[j];
-                  if (draftStep.type === 'AGENT_THOUGHT') {
+                  if (isAgentThought(draftStep)) {
                     draftStep.presentation = p;
                   }
                 });
@@ -144,7 +145,7 @@ export class HistorySquashingProcessor implements ContextProcessor {
               () => {
                 editor.editEpisode(ep.id, 'SQUASH_THOUGHT', (draft) => {
                   const draftStep = draft.steps[j];
-                  if (draftStep.type === 'AGENT_THOUGHT') {
+                  if (isAgentThought(draftStep)) {
                     draftStep.metadata.transformations.push({
                       processorName: this.name,
                       action: 'TRUNCATED',
@@ -155,12 +156,11 @@ export class HistorySquashingProcessor implements ContextProcessor {
               },
             );
             currentDeficit -= saved;
-          }
         }
       }
 
       // 3. Squash Agent Yields
-      if (currentDeficit > 0 && ep.yield) {
+      if (currentDeficit > 0 && target.node === ep.yield && ep.yield) {
         const saved = this.tryApplySquash(
           ep.yield.text,
           limitChars,

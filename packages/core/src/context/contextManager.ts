@@ -59,7 +59,7 @@ export class ContextManager {
 
     this.eventBus.onPristineHistoryUpdated((event) => {
       this.pristineEpisodes = event.episodes;
-      this.evaluateTriggers();
+      this.evaluateTriggers(event.newNodes);
     });
 
     this.eventBus.onVariantReady((event) => {
@@ -97,7 +97,7 @@ export class ContextManager {
    * Evaluates if the current working buffer exceeds configured budget thresholds,
    * firing consolidation events if necessary.
    */
-  private evaluateTriggers() {
+  private evaluateTriggers(newNodes: Set<string>) {
     if (!this.sidecar.budget) return;
 
     const workingBuffer = this.getWorkingBufferView();
@@ -109,20 +109,40 @@ export class ContextManager {
       retainedTokens: this.sidecar.budget.retainedTokens,
     });
 
-    // 1. Eager Compute Trigger
-    this.eventBus.emitChunkReceived({ episodes: this.pristineEpisodes });
+    // 1. Eager Compute Trigger (on_turn)
+    if (newNodes.size > 0) {
+      this.eventBus.emitChunkReceived({ episodes: this.pristineEpisodes, targetNodeIds: newNodes });
+    }
 
     // 2. Budget Crossed Trigger
     if (currentTokens > this.sidecar.budget.retainedTokens) {
       const deficit = currentTokens - this.sidecar.budget.retainedTokens;
+      
+      // Calculate exactly which nodes aged out of the retainedTokens budget to form our target delta
+      const agedOutNodes = new Set<string>();
+      let rollingTokens = 0;
+      // Start from newest and count backwards
+      for (let i = workingBuffer.length - 1; i >= 0; i--) {
+        const ep = workingBuffer[i];
+        const epTokens = this.env.tokenCalculator.calculateEpisodeListTokens([ep]);
+        rollingTokens += epTokens;
+        if (rollingTokens > this.sidecar.budget.retainedTokens) {
+          agedOutNodes.add(ep.id);
+          agedOutNodes.add(ep.trigger.id);
+          for (const step of ep.steps) agedOutNodes.add(step.id);
+          if (ep.yield) agedOutNodes.add(ep.yield.id);
+        }
+      }
+
       this.tracer.logEvent(
         'ContextManager',
         'Budget crossed. Emitting ConsolidationNeeded',
-        { deficit },
+        { deficit, agedOutCount: agedOutNodes.size },
       );
       this.eventBus.emitConsolidationNeeded({
         episodes: workingBuffer,
         targetDeficit: deficit,
+        targetNodeIds: agedOutNodes,
       });
     }
   }

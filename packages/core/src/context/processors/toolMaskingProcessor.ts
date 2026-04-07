@@ -148,7 +148,7 @@ export class ToolMaskingProcessor implements ContextProcessor {
     };
 
     // Forward scan, looking for massive intents or observations to mask
-    for (const ep of editor.episodes) {
+    for (const ep of editor.getFullHistory()) {
       if (currentDeficit <= 0) break;
       if (!ep || !ep.steps || state.protectedEpisodeIds.has(ep.id)) continue;
 

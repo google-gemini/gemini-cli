@@ -47,6 +47,7 @@ describe('ToolMaskingProcessor', () => {
     intent: Record<string, unknown>,
     observation: Record<string, unknown>,
   ): Episode => ({
+    type: 'EPISODE',
     id,
     timestamp: Date.now(),
     trigger: {

@@ -4,10 +4,34 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import type { Episode } from './types.js';
+import type { Episode, IrNode, AgentThought, ToolExecution, UserPrompt, AgentYield, SystemEvent } from './types.js';
 import type { ContextTracer } from '../tracer.js';
 import { debugLogger } from '../../utils/debugLogger.js';
 import type { ContextEnvironment } from '../sidecar/environment.js';
+
+export function isEpisode(node: IrNode | Episode): node is Episode {
+  return node.type === 'EPISODE';
+}
+
+export function isAgentThought(node: IrNode | Episode): node is AgentThought {
+  return node.type === 'AGENT_THOUGHT';
+}
+
+export function isToolExecution(node: IrNode | Episode): node is ToolExecution {
+  return node.type === 'TOOL_EXECUTION';
+}
+
+export function isUserPrompt(node: IrNode | Episode): node is UserPrompt {
+  return node.type === 'USER_PROMPT';
+}
+
+export function isAgentYield(node: IrNode | Episode): node is AgentYield {
+  return node.type === 'AGENT_YIELD';
+}
+
+export function isSystemEvent(node: IrNode | Episode): node is SystemEvent {
+  return node.type === 'SYSTEM_EVENT';
+}
 
 /**
  * Generates a computed view of the pristine log.
@@ -42,7 +66,7 @@ export function generateWorkingBufferView(
 
     let projectedTrigger: typeof ep.trigger;
 
-    if (ep.trigger.type === 'USER_PROMPT') {
+    if (isUserPrompt(ep.trigger)) {
       projectedTrigger = {
         ...ep.trigger,
         metadata: {
@@ -63,6 +87,7 @@ export function generateWorkingBufferView(
 
     let projectedEp: Episode = {
       ...ep,
+      type: 'EPISODE',
       trigger: projectedTrigger,
       steps: ep.steps.map((step) => ({
         ...step,
@@ -145,7 +170,7 @@ export function generateWorkingBufferView(
         masked.type === 'masked'
       ) {
         if (
-          projectedEp.trigger.type === 'USER_PROMPT' &&
+          isUserPrompt(projectedEp.trigger) &&
           projectedEp.trigger.semanticParts &&
           projectedEp.trigger.semanticParts.length > 0
         ) {

@@ -15,6 +15,7 @@ import type {
 import type { ProcessorRegistry } from './registry.js';
 import { debugLogger } from '../../utils/debugLogger.js';
 import { EpisodeEditor } from '../ir/episodeEditor.js';
+import { isUserPrompt } from '../ir/graphUtils.js';
 
 export class PipelineOrchestrator {
   private activeTimers: NodeJS.Timeout[] = [];
@@ -78,6 +79,20 @@ export class PipelineOrchestrator {
               isBudgetSatisfied: false,
               deficitTokens: event.targetDeficit,
               protectedEpisodeIds: new Set(),
+              targetNodeIds: event.targetNodeIds,
+            };
+            void this.executePipelineAsync(pipeline, event.episodes, state);
+          });
+        } else if (trigger === 'on_turn') {
+          this.eventBus.onChunkReceived((event) => {
+            const state: ContextAccountingState = {
+              currentTokens: 0,
+              retainedTokens: this.config.budget.retainedTokens,
+              maxTokens: this.config.budget.maxTokens,
+              isBudgetSatisfied: false,
+              deficitTokens: 0,
+              protectedEpisodeIds: new Set(),
+              targetNodeIds: event.targetNodeIds,
             };
             void this.executePipelineAsync(pipeline, event.episodes, state);
           });
@@ -130,7 +145,7 @@ export class PipelineOrchestrator {
           'Orchestrator',
           `Executing processor: ${procDef.processorId}`,
         );
-        const editor = new EpisodeEditor(currentEpisodes);
+        const editor = new EpisodeEditor(currentEpisodes, state.targetNodeIds);
         await processor.process(editor, state);
         currentEpisodes = editor.getFinalEpisodes();
       } catch (error) {
@@ -171,7 +186,7 @@ export class PipelineOrchestrator {
           `Executing processor: ${procDef.processorId} (async)`,
         );
 
-        const editor = new EpisodeEditor(currentEpisodes);
+        const editor = new EpisodeEditor(currentEpisodes, state.targetNodeIds);
         await processor.process(editor, state);
         currentEpisodes = editor.getFinalEpisodes();
 
@@ -190,7 +205,7 @@ export class PipelineOrchestrator {
             const ep = mutation.episode!;
             let fallbackText = '';
             if (ep.yield?.text) fallbackText = ep.yield.text;
-            else if (ep.trigger?.type === 'USER_PROMPT') {
+            else if (isUserPrompt(ep.trigger)) {
               const firstPart = ep.trigger.semanticParts?.[0];
               if (firstPart) {
                 fallbackText =

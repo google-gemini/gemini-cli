@@ -28,8 +28,9 @@ class DummySyncProcessor implements ContextProcessor {
   readonly id = 'DummySync';
   readonly options = {};
   async process(editor: EpisodeEditor, _state: ContextAccountingState) {
+    if (editor.targets.length === 0) return;
     editor.editEpisode(
-      editor.episodes[0].id,
+      editor.targets[0].episode.id,
       'DUMMY_EDIT',
       (draft: unknown) => {
         (draft as Record<string, unknown>)['dummyModified'] = true;
@@ -47,8 +48,9 @@ class DummyAsyncProcessor implements ContextProcessor {
   readonly id = 'DummyAsync';
   readonly options = {};
   async process(editor: EpisodeEditor, _state: ContextAccountingState) {
+    if (editor.targets.length === 0) return;
     editor.editEpisode(
-      editor.episodes[0].id,
+      editor.targets[0].episode.id,
       'DUMMY_EDIT',
       (draft: unknown) => {
         (draft as Record<string, unknown>)['dummyAsyncModified'] = true;
@@ -285,7 +287,7 @@ describe('PipelineOrchestrator (Component)', () => {
     const episodes = [createDummyEpisode('1', 'USER_PROMPT', [])];
 
     // Emit the trigger
-    eventBus.emitConsolidationNeeded({ episodes, targetDeficit: 100 });
+    eventBus.emitConsolidationNeeded({ episodes, targetDeficit: 100, targetNodeIds: new Set() });
 
     expect(executeSpy).toHaveBeenCalled();
   });

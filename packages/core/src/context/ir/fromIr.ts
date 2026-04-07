@@ -6,12 +6,13 @@
 
 import type { Content, Part } from '@google/genai';
 import type { Episode, EpisodeStep, UserPrompt, AgentYield } from './types.js';
+import { isAgentThought, isToolExecution, isUserPrompt } from './graphUtils.js';
 
 export function fromIr(episodes: Episode[]): Content[] {
   const history: Content[] = [];
 
   for (const ep of episodes) {
-    if (ep.trigger.type === 'USER_PROMPT') {
+    if (isUserPrompt(ep.trigger)) {
       const triggerContent = serializeTrigger(ep.trigger);
       if (triggerContent) history.push(triggerContent);
     }
@@ -66,12 +67,12 @@ function serializeSteps(steps: EpisodeStep[]): Content[] {
   };
 
   for (const step of steps) {
-    if (step.type === 'AGENT_THOUGHT') {
+    if (isAgentThought(step)) {
       if (pendingUserParts.length > 0) flushPending();
       pendingModelParts.push({
         text: step.presentation?.text ?? step.text,
       });
-    } else if (step.type === 'TOOL_EXECUTION') {
+    } else if (isToolExecution(step)) {
       pendingModelParts.push({
         functionCall: {
           name: step.toolName,

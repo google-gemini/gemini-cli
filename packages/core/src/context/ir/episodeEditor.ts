@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import type { Episode } from './types.js';
+import type { Episode, IrNode } from './types.js';
 
 export interface MutationRecord {
   episodeId: string;
@@ -19,27 +19,89 @@ export class EpisodeEditor {
   private workingOrder: string[];
   private workingMap: Map<string, Episode>;
   private mutations: MutationRecord[] = [];
+  private targetNodes?: Set<string>;
 
-  constructor(episodes: Episode[]) {
+  constructor(episodes: Episode[], targetNodes?: Set<string>) {
     this.originalMap = new Map(episodes.map((e) => [e.id, e]));
     this.workingOrder = episodes.map((e) => e.id);
     this.workingMap = new Map(episodes.map((e) => [e.id, e]));
+    this.targetNodes = targetNodes;
   }
 
   /**
-   * Provides a readonly view of the current working state of the episodes.
-   * Processors should iterate over this to decide what to mutate.
+   * Provides a readonly view of the specific targets this processor is allowed to touch.
+   * If no targets were specified (e.g. fallback pipeline), it returns the entire history.
    */
-  get episodes(): readonly Episode[] {
+  get targets(): Array<{ episode: Episode; node: IrNode | Episode }> {
+    const results: Array<{ episode: Episode; node: IrNode | Episode }> = [];
+    
+    for (const epId of this.workingOrder) {
+      const ep = this.workingMap.get(epId)!;
+      
+      // If we don't have restricted targets, everything is a target
+      if (!this.targetNodes) {
+        results.push({ episode: ep, node: ep });
+        continue;
+      }
+      
+      // Check episode itself
+      if (this.targetNodes.has(ep.id)) {
+        results.push({ episode: ep, node: ep });
+      }
+      // Check trigger
+      if (this.targetNodes.has(ep.trigger.id)) {
+        results.push({ episode: ep, node: ep.trigger });
+      }
+      // Check steps
+      for (const step of ep.steps) {
+        if (this.targetNodes.has(step.id)) {
+          results.push({ episode: ep, node: step });
+        }
+      }
+      // Check yield
+      if (ep.yield && this.targetNodes.has(ep.yield.id)) {
+        results.push({ episode: ep, node: ep.yield });
+      }
+    }
+    
+    return results;
+  }
+  
+  /**
+   * Returns the full history for READ-ONLY context purposes.
+   * Processors should not iterate over this array to decide what to mutate.
+   * They should iterate over `editor.targets`.
+   */
+  getFullHistory(): readonly Episode[] {
     return this.workingOrder.map((id) => this.workingMap.get(id)!);
+  }
+
+  private isTargeted(episodeId: string): boolean {
+     if (!this.targetNodes) return true;
+     if (this.targetNodes.has(episodeId)) return true;
+     
+     const ep = this.workingMap.get(episodeId);
+     if (!ep) return false;
+     
+     if (this.targetNodes.has(ep.trigger.id)) return true;
+     if (ep.yield && this.targetNodes.has(ep.yield.id)) return true;
+     for (const step of ep.steps) {
+        if (this.targetNodes.has(step.id)) return true;
+     }
+     
+     return false;
   }
 
   /**
    * Safely edits an existing episode.
-   * The framework will handle deeply cloning the episode before passing it to the mutator,
-   * guaranteeing that original references are never modified.
+   * The framework will handle deeply cloning the episode before passing it to the mutator.
+   * Throws an error if the processor attempts to edit a non-targeted node.
    */
   editEpisode(id: string, action: string, mutator: (draft: Episode) => void) {
+    if (!this.isTargeted(id)) {
+       throw new Error(`EpisodeEditor: Processor attempted to edit Episode ${id} which is outside its allowed target scope.`);
+    }
+
     const ep = this.workingMap.get(id);
     if (!ep) return;
 
@@ -82,6 +144,12 @@ export class EpisodeEditor {
    * It inserts the new episode at the lowest index of the removed episodes.
    */
   replaceEpisodes(oldIds: string[], newEpisode: Episode, action: string) {
+    for (const id of oldIds) {
+      if (!this.isTargeted(id)) {
+        throw new Error(`EpisodeEditor: Processor attempted to replace Episode ${id} which is outside its allowed target scope.`);
+      }
+    }
+
     const indices = oldIds
       .map((id) => this.workingOrder.indexOf(id))
       .filter((i) => i !== -1);
@@ -112,6 +180,12 @@ export class EpisodeEditor {
    * Removes episodes from the graph completely (e.g., emergency truncation).
    */
   removeEpisodes(oldIds: string[], action: string) {
+    for (const id of oldIds) {
+      if (!this.isTargeted(id)) {
+        throw new Error(`EpisodeEditor: Processor attempted to remove Episode ${id} which is outside its allowed target scope.`);
+      }
+    }
+
     this.workingOrder = this.workingOrder.filter((id) => !oldIds.includes(id));
     for (const id of oldIds) {
       this.workingMap.delete(id);

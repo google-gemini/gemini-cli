@@ -48,6 +48,7 @@ describe('ContextManager Barrier Tests', () => {
         type: 'snapshot',
         replacedEpisodeIds: replacedIds,
         episode: {
+          type: 'EPISODE',
           id: 'snapshot-ep',
           timestamp: Date.now(),
           trigger: {

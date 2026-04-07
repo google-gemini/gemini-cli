@@ -188,6 +188,7 @@ export interface AgentYield extends IrNode {
  * internal reasoning and observations (Steps).
  */
 export interface Episode {
+  readonly type: 'EPISODE';
   readonly id: string;
   /** When the episode began */
   readonly timestamp: number;
