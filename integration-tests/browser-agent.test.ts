@@ -253,18 +253,21 @@ describe.skipIf(!chromeAvailable)('browser-agent', () => {
           browser: {
             headless: true,
             sessionMode: 'isolated',
+            allowedDomains: ['example.com'],
           },
         },
       },
     });
 
     const result = await rig.run({
-      args: 'Browse to example.com twice: first get the page title, then check for links.',
+      args: 'First, ask the browser agent to get the page title of example.com. After you receive that response, you MUST invoke the browser agent a second time to check for links on the page.',
     });
 
     const toolLogs = rig.readToolLogs();
     const browserCalls = toolLogs.filter(
-      (t) => t.toolRequest.name === 'browser_agent',
+      (t) =>
+        t.toolRequest.name === 'invoke_agent' &&
+        JSON.parse(t.toolRequest.args).agent_name === 'browser_agent',
     );
 
     // Both browser_agent invocations must succeed — if the browser was
