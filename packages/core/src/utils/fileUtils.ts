@@ -536,13 +536,43 @@ export async function processSingleFileContent(
       case 'pdf':
       case 'audio':
       case 'video': {
+        const detectedMime =
+          mime.getType(filePath) || 'application/octet-stream';
+
+        // Additional validation for images to provide clearer errors and avoid API rejections
+        if (fileType === 'image') {
+          const supportedImageTypes = [
+            'image/png',
+            'image/jpeg',
+            'image/webp',
+            'image/heic',
+            'image/heif',
+          ];
+          if (!supportedImageTypes.includes(detectedMime)) {
+            throw new Error(
+              `Unsupported image format: ${detectedMime}. ` +
+                `Supported formats: PNG, JPEG, WEBP, HEIC, HEIF.`,
+            );
+          }
+
+          // Check file size to prevent excessively large uploads
+          const stats = await fs.promises.stat(filePath);
+          const maxSize = 20 * 1024 * 1024; // 20MB
+          if (stats.size > maxSize) {
+            const sizeMB = (stats.size / (1024 * 1024)).toFixed(1);
+            throw new Error(
+              `Image file too large (${sizeMB} MB). Maximum allowed size is 20MB.`,
+            );
+          }
+        }
+
         const contentBuffer = await fs.promises.readFile(filePath);
         const base64Data = contentBuffer.toString('base64');
         return {
           llmContent: {
             inlineData: {
               data: base64Data,
-              mimeType: mime.getType(filePath) || 'application/octet-stream',
+              mimeType: detectedMime,
             },
           },
           returnDisplay: `Read ${fileType} file: ${relativePathForDisplay}`,
