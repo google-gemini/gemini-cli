@@ -123,20 +123,25 @@ export const MainContent = () => {
 
           // Rule 2: Suppress text in intermediate turns (turns containing non-topic
           // tools) to hide mechanical narration.
-          if (turnIsIntermediate) {
+          if (turnIsIntermediate && !showConfirmationQueue) {
             flags[i] = true;
           }
 
           // Rule 3: Suppress text that precedes a topic tool in the same turn,
           // as the topic tool "replaces" it.
-          if (hasTopicToolInTurn) {
+          if (hasTopicToolInTurn && !showConfirmationQueue) {
             flags[i] = true;
           }
         }
       }
     }
     return flags;
-  }, [uiState.history, pendingHistoryItems, topicUpdateNarrationEnabled]);
+  }, [
+    uiState.history,
+    pendingHistoryItems,
+    topicUpdateNarrationEnabled,
+    showConfirmationQueue,
+  ]);
 
   const augmentedHistory = useMemo(
     () =>

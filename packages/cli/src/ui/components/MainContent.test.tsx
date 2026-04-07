@@ -66,7 +66,7 @@ vi.mock('../hooks/useAlternateBuffer.js', () => ({
 }));
 
 vi.mock('../hooks/useConfirmingTool.js', () => ({
-  useConfirmingTool: vi.fn(),
+  useConfirmingTool: vi.fn(() => null),
 }));
 
 vi.mock('./AppHeader.js', () => ({
