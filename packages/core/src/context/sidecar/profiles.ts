@@ -18,7 +18,7 @@ export const defaultSidecarProfile: SidecarConfig = {
   pipelines: [
     {
       name: 'Immediate Sanitization',
-      triggers: ['on_turn'],
+      triggers: ['new_message'],
       execution: 'blocking',
       processors: [
         {
@@ -30,7 +30,7 @@ export const defaultSidecarProfile: SidecarConfig = {
     },
     {
       name: 'Deep Background Compression',
-      triggers: [{ type: 'timer', intervalMs: 5000 }, 'budget_exceeded'],
+      triggers: [{ type: 'timer', intervalMs: 5000 }, 'retained_exceeded'],
       execution: 'background',
       processors: [
         {

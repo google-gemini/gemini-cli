@@ -35,9 +35,9 @@ describe('System Lifecycle Golden Tests', () => {
     budget: { maxTokens: 4000, retainedTokens: 2000 }, // Extremely tight limits
     pipelines: [
       {
-        name: 'Pressure Relief', // Emits from eventBus 'budget_exceeded'
+        name: 'Pressure Relief', // Emits from eventBus 'retained_exceeded'
         execution: 'background',
-        triggers: ['budget_exceeded'],
+        triggers: ['retained_exceeded'],
         processors: [
           { processorId: 'BlobDegradationProcessor' },
           {
@@ -50,7 +50,7 @@ describe('System Lifecycle Golden Tests', () => {
       {
         name: 'Immediate Sanitization', // The magic string the projector is hardcoded to use
         execution: 'blocking',
-        triggers: ['budget_exceeded'],
+        triggers: ['retained_exceeded'],
         processors: [
           { processorId: 'EmergencyTruncationProcessor', options: {} },
         ],

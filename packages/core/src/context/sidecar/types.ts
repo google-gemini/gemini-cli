@@ -33,9 +33,8 @@ export type ProcessorConfig =
     };
 
 export type PipelineTrigger =
-  | 'on_turn'
-  | 'post_turn'
-  | 'budget_exceeded'
+  | 'new_message'
+  | 'retained_exceeded'
   | 'gc_backstop'
   | { type: 'timer'; intervalMs: number };
 

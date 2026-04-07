@@ -48,7 +48,7 @@ export function getSidecarConfigSchema(registry: ProcessorRegistry) {
                 anyOf: [
                   {
                     type: 'string',
-                    enum: ['on_turn', 'post_turn', 'budget_exceeded'],
+                    enum: ['new_message', 'retained_exceeded', 'gc_backstop'],
                   },
                   {
                     type: 'object',

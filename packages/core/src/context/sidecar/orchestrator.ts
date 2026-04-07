@@ -70,7 +70,7 @@ export class PipelineOrchestrator {
             // If needed, we will pass it via event bus.
           }, trigger.intervalMs);
           this.activeTimers.push(timer);
-        } else if (trigger === 'budget_exceeded') {
+        } else if (trigger === 'retained_exceeded') {
           this.eventBus.onConsolidationNeeded((event) => {
             const state: ContextAccountingState = {
               currentTokens: 0,
@@ -83,7 +83,7 @@ export class PipelineOrchestrator {
             };
             void this.executePipelineAsync(pipeline, event.episodes, state);
           });
-        } else if (trigger === 'on_turn') {
+        } else if (trigger === 'new_message') {
           this.eventBus.onChunkReceived((event) => {
             const state: ContextAccountingState = {
               currentTokens: 0,

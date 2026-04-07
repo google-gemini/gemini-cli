@@ -262,12 +262,12 @@ describe('PipelineOrchestrator (Component)', () => {
     expect(result).toStrictEqual(episodes);
   });
 
-  it('automatically binds to budget_exceeded trigger via EventBus', () => {
+  it('automatically binds to retained_exceeded trigger via EventBus', () => {
     const config = createConfig([
       {
         name: 'PressureRelief',
         execution: 'background',
-        triggers: ['budget_exceeded'],
+        triggers: ['retained_exceeded'],
         processors: [
           { processorId: 'DummyAsyncProcessor' } as unknown as ProcessorConfig,
         ],
