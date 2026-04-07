@@ -816,6 +816,16 @@ const SETTINGS_SCHEMA = {
           'Enable incremental rendering for the UI. This option will reduce flickering but may cause rendering artifacts. Only supported when useAlternateBuffer is enabled.',
         showInDialog: true,
       },
+      maxScrollbackLength: {
+        type: 'number',
+        label: 'Max Scrollback Length',
+        category: 'UI',
+        requiresRestart: true,
+        default: 1000,
+        description:
+          'Maximum number of lines to keep in the terminal scrollback buffer.',
+        showInDialog: true,
+      },
       showSpinner: {
         type: 'boolean',
         label: 'Show Spinner',

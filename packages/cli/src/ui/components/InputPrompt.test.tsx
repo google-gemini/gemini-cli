@@ -432,6 +432,7 @@ describe('InputPrompt', () => {
     vi.mocked(clipboardy.read).mockResolvedValue('');
 
     props = {
+      maxAvailableWidth: 80,
       onQueueMessage: vi.fn(),
 
       buffer: mockBuffer,

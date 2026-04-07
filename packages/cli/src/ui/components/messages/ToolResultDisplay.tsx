@@ -22,7 +22,7 @@ import { useUIState } from '../../contexts/UIStateContext.js';
 import { tryParseJSON } from '../../../utils/jsonoutput.js';
 import { useAlternateBuffer } from '../../hooks/useAlternateBuffer.js';
 import { Scrollable } from '../shared/Scrollable.js';
-import { ScrollableList } from '../shared/ScrollableList.js';
+import { FixedScrollableList } from '../shared/FixedScrollableList.js';
 import { SCROLL_TO_ITEM_END } from '../shared/VirtualizedList.js';
 import { ACTIVE_SHELL_MAX_LINES } from '../../constants.js';
 import { calculateToolContentMaxLines } from '../../utils/toolLayoutUtils.js';
@@ -213,12 +213,12 @@ export const ToolResultDisplay: React.FC<ToolResultDisplayProps> = ({
     // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
     const data = resultDisplay as AnsiOutput;
 
-    // Calculate list height: if not constrained, use full data length.
-    // If constrained (e.g. alternate buffer), limit to available height
-    // to ensure virtualization works and fits within the viewport.
-    const listHeight = !constrainHeight
-      ? data.length
-      : Math.min(data.length, limit);
+    // In alternate buffer, always constrain to limit to ensure virtualization works and fits viewport.
+    const listHeight = isAlternateBuffer
+      ? Math.min(data.length, limit)
+      : !constrainHeight
+        ? data.length
+        : Math.min(data.length, limit);
 
     if (isAlternateBuffer) {
       const initialScrollIndex =
@@ -226,13 +226,12 @@ export const ToolResultDisplay: React.FC<ToolResultDisplayProps> = ({
 
       return (
         <Box width={childWidth} flexDirection="column" maxHeight={listHeight}>
-          <ScrollableList
+          <FixedScrollableList
             width={childWidth}
-            containerHeight={listHeight}
+            maxHeight={listHeight}
             data={data}
             renderItem={renderVirtualizedAnsiLine}
-            estimatedItemHeight={() => 1}
-            fixedItemHeight={true}
+            itemHeight={1}
             keyExtractor={keyExtractor}
             initialScrollIndex={initialScrollIndex}
             hasFocus={hasFocus}

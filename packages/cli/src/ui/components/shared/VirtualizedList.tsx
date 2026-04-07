@@ -13,6 +13,7 @@ import {
   useMemo,
   useCallback,
   memo,
+  useEffect,
 } from 'react';
 import type React from 'react';
 import { theme } from '../../semantic-colors.js';
@@ -39,9 +40,9 @@ export type VirtualizedListProps<T> = {
   overflowToBackbuffer?: boolean;
   scrollbar?: boolean;
   stableScrollback?: boolean;
-  copyModeEnabled?: boolean;
   fixedItemHeight?: boolean;
   containerHeight?: number;
+  maxScrollbackLength?: number;
 };
 
 export type VirtualizedListRef<T> = {
@@ -78,53 +79,66 @@ function findLastIndex<T>(
   return -1;
 }
 
+const MemoizedStaticItem = memo(
+  ({
+    content,
+    width,
+    itemKey,
+  }: {
+    content: React.ReactElement;
+    width: number;
+    itemKey: string;
+  }) => (
+    <StaticRender width={width} key={itemKey}>
+      {() => content}
+    </StaticRender>
+  ),
+);
+
+MemoizedStaticItem.displayName = 'MemoizedStaticItem';
+
 const VirtualizedListItem = memo(
   ({
     content,
-    shouldBeStatic,
-    width,
-    containerWidth,
     itemKey,
     index,
     onSetRef,
   }: {
     content: React.ReactElement;
-    shouldBeStatic: boolean;
-    width: number | string | undefined;
-    containerWidth: number;
     itemKey: string;
     index: number;
-    onSetRef: (index: number, el: DOMElement | null) => void;
+    onSetRef: (index: number, itemKey: string, el: DOMElement | null) => void;
   }) => {
     const itemRef = useCallback(
       (el: DOMElement | null) => {
-        onSetRef(index, el);
+        onSetRef(index, itemKey, el);
       },
-      [index, onSetRef],
+      [index, itemKey, onSetRef],
     );
 
     return (
       <Box width="100%" flexDirection="column" flexShrink={0} ref={itemRef}>
-        {shouldBeStatic ? (
-          <StaticRender
-            width={typeof width === 'number' ? width : containerWidth}
-            key={
-              itemKey +
-              '-static-' +
-              (typeof width === 'number' ? width : containerWidth)
-            }
-          >
-            {content}
-          </StaticRender>
-        ) : (
-          content
-        )}
+        {content}
       </Box>
     );
   },
 );
 
 VirtualizedListItem.displayName = 'VirtualizedListItem';
+
+interface VirtualizedListInternalState {
+  container: DOMElement | null;
+  itemRefs: Array<DOMElement | null>;
+  measuredHeights: number[];
+  measuredKeys: string[];
+  isInitialScrollSet: boolean;
+  containerObserver: ResizeObserver | null;
+  prevOffsetsLength: number;
+  prevDataLength: number;
+  prevTotalHeight: number;
+  prevScrollTop: number;
+  prevContainerHeight: number;
+}
 
 function VirtualizedList<T>(
   props: VirtualizedListProps<T>,
@@ -144,15 +158,14 @@ function VirtualizedList<T>(
     overflowToBackbuffer,
     scrollbar = true,
     stableScrollback,
-    copyModeEnabled = false,
-    fixedItemHeight = false,
+    maxScrollbackLength,
   } = props;
-  const dataRef = useRef(data);
-  useLayoutEffect(() => {
-    dataRef.current = data;
-  }, [data]);
 
-  const [scrollAnchor, setScrollAnchor] = useState(() => {
+  const [scrollAnchor, setScrollAnchor] = useState<{
+    index: number;
+    offset: number;
+    isBottom?: boolean;
+  }>(() => {
     const scrollToEnd =
       initialScrollIndex === SCROLL_TO_ITEM_END ||
       (typeof initialScrollIndex === 'number' &&
@@ -196,23 +209,87 @@ function VirtualizedList<T>(
     return scrollToEnd;
   });
 
-  const containerRef = useRef<DOMElement | null>(null);
   const [containerHeight, setContainerHeight] = useState(0);
   const [containerWidth, setContainerWidth] = useState(0);
-  const itemRefs = useRef<Array<DOMElement | null>>([]);
-  const [heights, setHeights] = useState<Record<string, number>>({});
-  const isInitialScrollSet = useRef(false);
+  const [measurementVersion, setMeasurementVersion] = useState(0);
 
-  const containerObserverRef = useRef<ResizeObserver | null>(null);
-  const nodeToKeyRef = useRef(new WeakMap<DOMElement, string>());
+  const state = useRef<VirtualizedListInternalState>({
+    container: null,
+    itemRefs: [],
+    measuredHeights: [],
+    measuredKeys: [],
+    isInitialScrollSet: false,
+    containerObserver: null,
+    prevOffsetsLength: -1,
+    prevDataLength: -1,
+    prevTotalHeight: -1,
+    prevScrollTop: -1,
+    prevContainerHeight: -1,
+  });
 
-  const onSetRef = useCallback((index: number, el: DOMElement | null) => {
-    itemRefs.current[index] = el;
-  }, []);
+  const itemsObserver = useMemo(
+    () =>
+      new ResizeObserver((entries) => {
+        let changed = false;
+        for (const entry of entries) {
+          // Extract index and key safely from the element
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-type-assertion, @typescript-eslint/no-unsafe-assignment
+          const target = entry.target as any;
+          // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
+          const index = target._virtualIndex;
+          // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
+          const key = target._virtualKey;
+          if (typeof index === 'number' && key !== undefined) {
+            const height = Math.round(entry.contentRect.height);
+            // Ignore 0 height measurements which can happen when an element is unmounting
+            if (
+              height > 0 &&
+              (state.current.measuredHeights[index] !== height ||
+                state.current.measuredKeys[index] !== key)
+            ) {
+              state.current.measuredHeights[index] = height;
+              // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
+              state.current.measuredKeys[index] = key;
+              changed = true;
+            }
+          }
+        }
+        if (changed) {
+          setMeasurementVersion((v) => v + 1);
+        }
+      }),
+    [],
+  );
+
+  const onSetRef = useCallback(
+    (index: number, itemKey: string, el: DOMElement | null) => {
+      const oldEl = state.current.itemRefs[index];
+      if (oldEl && oldEl !== el) {
+        if (!isStatic) {
+          itemsObserver.unobserve(oldEl);
+        }
+      }
+
+      state.current.itemRefs[index] = el;
+
+      if (el) {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-type-assertion, @typescript-eslint/no-unsafe-assignment
+        const target = el as any;
+
+        target._virtualIndex = index;
+
+        target._virtualKey = itemKey;
+        if (!isStatic) {
+          itemsObserver.observe(el);
+        }
+      }
+    },
+    [itemsObserver, isStatic],
+  );
 
   const containerRefCallback = useCallback((node: DOMElement | null) => {
-    containerObserverRef.current?.disconnect();
-    containerRef.current = node;
+    state.current.containerObserver?.disconnect();
+    state.current.container = node;
     if (node) {
       const observer = new ResizeObserver((entries) => {
         const entry = entries[0];
@@ -224,52 +301,33 @@ function VirtualizedList<T>(
         }
       });
       observer.observe(node);
-      containerObserverRef.current = observer;
+      state.current.containerObserver = observer;
     }
   }, []);
 
-  const itemsObserver = useMemo(
-    () =>
-      new ResizeObserver((entries) => {
-        setHeights((prev) => {
-          let next: Record<string, number> | null = null;
-          for (const entry of entries) {
-            const key = nodeToKeyRef.current.get(entry.target);
-            if (key !== undefined) {
-              const height = Math.round(entry.contentRect.height);
-              if (prev[key] !== height) {
-                if (!next) {
-                  next = { ...prev };
-                }
-                next[key] = height;
-              }
-            }
-          }
-          return next ?? prev;
-        });
-      }),
-    [],
-  );
-
-  useLayoutEffect(
+  useEffect(
     () => () => {
-      containerObserverRef.current?.disconnect();
+      state.current.containerObserver?.disconnect();
       itemsObserver.disconnect();
     },
     [itemsObserver],
   );
 
-  const { totalHeight, offsets } = useMemo(() => {
+  const { totalHeight, offsets } = (() => {
     const offsets: number[] = [0];
     let totalHeight = 0;
     for (let i = 0; i < data.length; i++) {
       const key = keyExtractor(data[i], i);
-      const height = heights[key] ?? estimatedItemHeight(i);
+      const cachedHeight =
+        state.current.measuredKeys[i] === key
+          ? state.current.measuredHeights[i]
+          : undefined;
+      const height = cachedHeight ?? estimatedItemHeight(i);
       totalHeight += height;
       offsets.push(totalHeight);
     }
     return { totalHeight, offsets };
-  }, [heights, data, estimatedItemHeight, keyExtractor]);
+  })();
 
   const scrollableContainerHeight = props.containerHeight ?? containerHeight;
 
@@ -277,7 +335,29 @@ function VirtualizedList<T>(
     (
       scrollTop: number,
       offsets: number[],
-    ): { index: number; offset: number } => {
+      totalHeight: number,
+      scrollableContainerHeight: number,
+    ): { index: number; offset: number; isBottom?: boolean } => {
+      const isNearBottom =
+        totalHeight > 0 &&
+        scrollTop > (totalHeight - scrollableContainerHeight) / 2;
+
+      if (isNearBottom) {
+        const scrollBottom = scrollTop + scrollableContainerHeight;
+        const index = findLastIndex(
+          offsets,
+          (offset) => offset <= scrollBottom,
+        );
+        if (index === -1) {
+          return { index: 0, offset: 0, isBottom: true };
+        }
+        return {
+          index,
+          offset: scrollBottom - offsets[index],
+          isBottom: true,
+        };
+      }
+
       const index = findLastIndex(offsets, (offset) => offset <= scrollTop);
       if (index === -1) {
         return { index: 0, offset: 0 };
@@ -291,7 +371,6 @@ function VirtualizedList<T>(
   const [prevTargetScrollIndex, setPrevTargetScrollIndex] = useState(
     props.targetScrollIndex,
   );
-  const prevOffsetsLength = useRef(offsets.length);
 
   // NOTE: If targetScrollIndex is provided, and we haven't rendered items yet (offsets.length <= 1),
   // we do NOT set scrollAnchor yet, because actualScrollTop wouldn't know the real offset!
@@ -301,17 +380,17 @@ function VirtualizedList<T>(
       props.targetScrollIndex !== prevTargetScrollIndex &&
       offsets.length > 1) ||
     (props.targetScrollIndex !== undefined &&
-      prevOffsetsLength.current <= 1 &&
+      state.current.prevOffsetsLength <= 1 &&
       offsets.length > 1)
   ) {
     if (props.targetScrollIndex !== prevTargetScrollIndex) {
       setPrevTargetScrollIndex(props.targetScrollIndex);
     }
-    prevOffsetsLength.current = offsets.length;
+    state.current.prevOffsetsLength = offsets.length;
     setIsStickingToBottom(false);
     setScrollAnchor({ index: props.targetScrollIndex, offset: 0 });
-  } else {
-    prevOffsetsLength.current = offsets.length;
+  } else if (offsets.length > 1) {
+    state.current.prevOffsetsLength = offsets.length;
   }
 
   const actualScrollTop = useMemo(() => {
@@ -323,46 +402,58 @@ function VirtualizedList<T>(
     if (scrollAnchor.offset === SCROLL_TO_ITEM_END) {
       const item = data[scrollAnchor.index];
       const key = item ? keyExtractor(item, scrollAnchor.index) : '';
-      const itemHeight = heights[key] ?? 0;
+      const cachedHeight =
+        state.current.measuredKeys[scrollAnchor.index] === key
+          ? state.current.measuredHeights[scrollAnchor.index]
+          : undefined;
+      const itemHeight =
+        cachedHeight ?? estimatedItemHeight(scrollAnchor.index) ?? 0;
       return offset + itemHeight - scrollableContainerHeight;
+    }
+
+    if (scrollAnchor.isBottom) {
+      return offset + scrollAnchor.offset - scrollableContainerHeight;
     }
 
     return offset + scrollAnchor.offset;
   }, [
     scrollAnchor,
     offsets,
-    heights,
     scrollableContainerHeight,
     data,
     keyExtractor,
+    estimatedItemHeight,
   ]);
 
   const scrollTop = isStickingToBottom
     ? Number.MAX_SAFE_INTEGER
     : actualScrollTop;
 
-  const prevDataLength = useRef(data.length);
-  const prevTotalHeight = useRef(totalHeight);
-  const prevScrollTop = useRef(actualScrollTop);
-  const prevContainerHeight = useRef(scrollableContainerHeight);
-
   useLayoutEffect(() => {
+    if (state.current.prevDataLength === -1) {
+      state.current.prevDataLength = data.length;
+      state.current.prevTotalHeight = totalHeight;
+      state.current.prevScrollTop = actualScrollTop;
+      state.current.prevContainerHeight = scrollableContainerHeight;
+      return;
+    }
+
     const contentPreviouslyFit =
-      prevTotalHeight.current <= prevContainerHeight.current;
+      state.current.prevTotalHeight <= state.current.prevContainerHeight;
     const wasScrolledToBottomPixels =
-      prevScrollTop.current >=
-      prevTotalHeight.current - prevContainerHeight.current - 1;
+      state.current.prevScrollTop >=
+      state.current.prevTotalHeight - state.current.prevContainerHeight - 1;
     const wasAtBottom = contentPreviouslyFit || wasScrolledToBottomPixels;
 
-    if (wasAtBottom && actualScrollTop >= prevScrollTop.current) {
+    if (wasAtBottom && actualScrollTop >= state.current.prevScrollTop) {
       if (!isStickingToBottom) {
         setIsStickingToBottom(true);
       }
     }
 
-    const listGrew = data.length > prevDataLength.current;
+    const listGrew = data.length > state.current.prevDataLength;
     const containerChanged =
-      prevContainerHeight.current !== scrollableContainerHeight;
+      state.current.prevContainerHeight !== scrollableContainerHeight;
 
     // If targetScrollIndex is provided, we NEVER auto-snap to the bottom
     // because the parent is explicitly managing the scroll position.
@@ -393,23 +484,33 @@ function VirtualizedList<T>(
     ) {
       // We still clamp the scroll top if it's completely out of bounds
       const newScrollTop = Math.max(0, totalHeight - scrollableContainerHeight);
-      const newAnchor = getAnchorForScrollTop(newScrollTop, offsets);
+      const newAnchor = getAnchorForScrollTop(
+        newScrollTop,
+        offsets,
+        totalHeight,
+        scrollableContainerHeight,
+      );
       if (
         scrollAnchor.index !== newAnchor.index ||
-        scrollAnchor.offset !== newAnchor.offset
+        scrollAnchor.offset !== newAnchor.offset ||
+        scrollAnchor.isBottom !== newAnchor.isBottom
       ) {
         setScrollAnchor(newAnchor);
       }
     } else if (data.length === 0) {
-      if (scrollAnchor.index !== 0 || scrollAnchor.offset !== 0) {
+      if (
+        scrollAnchor.index !== 0 ||
+        scrollAnchor.offset !== 0 ||
+        scrollAnchor.isBottom !== undefined
+      ) {
         setScrollAnchor({ index: 0, offset: 0 });
       }
     }
 
-    prevDataLength.current = data.length;
-    prevTotalHeight.current = totalHeight;
-    prevScrollTop.current = actualScrollTop;
-    prevContainerHeight.current = scrollableContainerHeight;
+    state.current.prevDataLength = data.length;
+    state.current.prevTotalHeight = totalHeight;
+    state.current.prevScrollTop = actualScrollTop;
+    state.current.prevContainerHeight = scrollableContainerHeight;
   }, [
     data.length,
     totalHeight,
@@ -417,6 +518,7 @@ function VirtualizedList<T>(
     scrollableContainerHeight,
     scrollAnchor.index,
     scrollAnchor.offset,
+    scrollAnchor.isBottom,
     getAnchorForScrollTop,
     offsets,
     isStickingToBottom,
@@ -425,7 +527,7 @@ function VirtualizedList<T>(
 
   useLayoutEffect(() => {
     if (
-      isInitialScrollSet.current ||
+      state.current.isInitialScrollSet ||
       offsets.length <= 1 ||
       totalHeight <= 0 ||
       scrollableContainerHeight <= 0
@@ -435,7 +537,7 @@ function VirtualizedList<T>(
 
     if (props.targetScrollIndex !== undefined) {
       // If we are strictly driving from targetScrollIndex, do not apply initialScrollIndex
-      isInitialScrollSet.current = true;
+      state.current.isInitialScrollSet = true;
       return;
     }
 
@@ -451,7 +553,7 @@ function VirtualizedList<T>(
           offset: SCROLL_TO_ITEM_END,
         });
         setIsStickingToBottom(true);
-        isInitialScrollSet.current = true;
+        state.current.isInitialScrollSet = true;
         return;
       }
 
@@ -464,8 +566,15 @@ function VirtualizedList<T>(
         Math.min(totalHeight - scrollableContainerHeight, newScrollTop),
       );
 
-      setScrollAnchor(getAnchorForScrollTop(clampedScrollTop, offsets));
-      isInitialScrollSet.current = true;
+      setScrollAnchor(
+        getAnchorForScrollTop(
+          clampedScrollTop,
+          offsets,
+          totalHeight,
+          scrollableContainerHeight,
+        ),
+      );
+      state.current.isInitialScrollSet = true;
     }
   }, [
     initialScrollIndex,
@@ -475,7 +584,7 @@ function VirtualizedList<T>(
     scrollableContainerHeight,
     getAnchorForScrollTop,
     data.length,
-    heights,
+    measurementVersion,
     props.targetScrollIndex,
   ]);
 
@@ -493,48 +602,32 @@ function VirtualizedList<T>(
       ? data.length - 1
       : Math.min(data.length - 1, endIndexOffset);
 
-  const topSpacerHeight =
-    renderStatic === true || overflowToBackbuffer === true
-      ? 0
-      : (offsets[startIndex] ?? 0);
-  const bottomSpacerHeight = renderStatic
-    ? 0
-    : totalHeight - (offsets[endIndex + 1] ?? totalHeight);
-
-  // Maintain a stable set of observed nodes using useLayoutEffect
-  const observedNodes = useRef<Set<DOMElement>>(new Set());
-  useLayoutEffect(() => {
-    const currentNodes = new Set<DOMElement>();
-    const observeStart = renderStatic || overflowToBackbuffer ? 0 : startIndex;
-    const observeEnd = renderStatic ? data.length - 1 : endIndex;
-
-    for (let i = observeStart; i <= observeEnd; i++) {
-      const node = itemRefs.current[i];
-      const item = data[i];
-      if (node && item) {
-        currentNodes.add(node);
-        const key = keyExtractor(item, i);
-        // Always update the key mapping because React can reuse nodes at different indices/keys
-        nodeToKeyRef.current.set(node, key);
-        if (!isStatic && !fixedItemHeight && !observedNodes.current.has(node)) {
-          itemsObserver.observe(node);
-        }
+  const renderRangeStart = useMemo(() => {
+    if (overflowToBackbuffer) {
+      if (typeof maxScrollbackLength === 'number' && maxScrollbackLength > 0) {
+        const targetOffset = Math.max(0, actualScrollTop - maxScrollbackLength);
+        const index = findLastIndex(
+          offsets,
+          (offset) => offset <= targetOffset,
+        );
+        return Math.max(0, index - 1);
       }
+      return 0;
     }
-    for (const node of observedNodes.current) {
-      if (!currentNodes.has(node)) {
-        if (!isStatic && !fixedItemHeight) {
-          itemsObserver.unobserve(node);
-        }
-        nodeToKeyRef.current.delete(node);
-      }
-    }
-    observedNodes.current = currentNodes;
-  });
+    return startIndex;
+  }, [
+    overflowToBackbuffer,
+    maxScrollbackLength,
+    actualScrollTop,
+    offsets,
+    startIndex,
+  ]);
 
-  const renderRangeStart =
-    renderStatic || overflowToBackbuffer ? 0 : startIndex;
-  const renderRangeEnd = renderStatic ? data.length - 1 : endIndex;
+  const topSpacerHeight = offsets[renderRangeStart];
+  const bottomSpacerHeight =
+    totalHeight - (offsets[endIndex + 1] ?? totalHeight);
+
+  const renderRangeEnd = endIndex;
 
   // Always evaluate shouldBeStatic, width, etc. if we have a known width from the prop.
   // If containerHeight or containerWidth is 0 we defer rendering unless a static render or defined width overrides.
@@ -564,18 +657,43 @@ function VirtualizedList<T>(
         const content = renderItem({ item, index: i });
         const key = keyExtractor(item, i);
 
-        items.push(
-          <VirtualizedListItem
-            key={key}
-            itemKey={key}
-            content={content}
-            shouldBeStatic={shouldBeStatic}
-            width={width}
-            containerWidth={containerWidth}
-            index={i}
-            onSetRef={onSetRef}
-          />,
-        );
+        if (shouldBeStatic) {
+          items.push(
+            <MemoizedStaticItem
+              key={`${key}-static`}
+              itemKey={`${key}-static-${typeof width === 'number' ? width : containerWidth}`}
+              width={typeof width === 'number' ? width : containerWidth}
+              content={content}
+            />,
+          );
+        } else {
+          items.push(
+            <VirtualizedListItem
+              key={key}
+              itemKey={key}
+              content={content}
+              index={i}
+              onSetRef={onSetRef}
+            />,
+          );
+        }
+
+        if (
+          !renderStatic &&
+          state.current.measuredKeys[i] !== key &&
+          !shouldBeStatic
+        ) {
+          const fillerHeight = Math.max(0, estimatedItemHeight(i) - 1);
+          if (fillerHeight > 0) {
+            items.push(
+              <Box
+                key={key + '-filler'}
+                height={fillerHeight}
+                flexShrink={0}
+              />,
+            );
+          }
+        }
       }
     }
     return items;
@@ -593,6 +711,7 @@ function VirtualizedList<T>(
     width,
     containerWidth,
     onSetRef,
+    estimatedItemHeight,
   ]);
 
   const { getScrollTop, setPendingScrollTop } = useBatchedScroll(scrollTop);
@@ -614,7 +733,12 @@ function VirtualizedList<T>(
         }
         setPendingScrollTop(newScrollTop);
         setScrollAnchor(
-          getAnchorForScrollTop(Math.min(newScrollTop, maxScroll), offsets),
+          getAnchorForScrollTop(
+            Math.min(newScrollTop, maxScroll),
+            offsets,
+            totalHeight,
+            scrollableContainerHeight,
+          ),
         );
       },
       scrollTo: (offset: number) => {
@@ -632,7 +756,14 @@ function VirtualizedList<T>(
           setIsStickingToBottom(false);
           const newScrollTop = Math.max(0, offset);
           setPendingScrollTop(newScrollTop);
-          setScrollAnchor(getAnchorForScrollTop(newScrollTop, offsets));
+          setScrollAnchor(
+            getAnchorForScrollTop(
+              newScrollTop,
+              offsets,
+              totalHeight,
+              scrollableContainerHeight,
+            ),
+          );
         }
       },
       scrollToEnd: () => {
@@ -669,7 +800,14 @@ function VirtualizedList<T>(
             ),
           );
           setPendingScrollTop(newScrollTop);
-          setScrollAnchor(getAnchorForScrollTop(newScrollTop, offsets));
+          setScrollAnchor(
+            getAnchorForScrollTop(
+              newScrollTop,
+              offsets,
+              totalHeight,
+              scrollableContainerHeight,
+            ),
+          );
         }
       },
       scrollToItem: ({
@@ -698,7 +836,14 @@ function VirtualizedList<T>(
               ),
             );
             setPendingScrollTop(newScrollTop);
-            setScrollAnchor(getAnchorForScrollTop(newScrollTop, offsets));
+            setScrollAnchor(
+              getAnchorForScrollTop(
+                newScrollTop,
+                offsets,
+                totalHeight,
+                scrollableContainerHeight,
+              ),
+            );
           }
         }
       },
@@ -727,28 +872,27 @@ function VirtualizedList<T>(
   return (
     <Box
       ref={containerRefCallback}
-      overflowY={copyModeEnabled ? 'hidden' : 'scroll'}
+      overflowY="scroll"
       overflowX="hidden"
-      scrollTop={copyModeEnabled ? 0 : scrollTop}
+      scrollTop={scrollTop}
       scrollbarThumbColor={props.scrollbarThumbColor ?? theme.text.secondary}
       backgroundColor={props.backgroundColor}
       width="100%"
       height="100%"
       flexDirection="column"
-      paddingRight={copyModeEnabled ? 0 : 1}
+      paddingRight={1}
       overflowToBackbuffer={overflowToBackbuffer}
       scrollbar={scrollbar}
       stableScrollback={stableScrollback}
     >
-      <Box
-        flexShrink={0}
-        width="100%"
-        flexDirection="column"
-        marginTop={copyModeEnabled ? -actualScrollTop : 0}
-      >
-        <Box height={topSpacerHeight} flexShrink={0} />
+      <Box flexShrink={0} width="100%" flexDirection="column">
+        {topSpacerHeight > 0 ? (
+          <Box height={topSpacerHeight} flexShrink={0} />
+        ) : null}
         {renderedItems}
-        <Box height={bottomSpacerHeight} flexShrink={0} />
+        {bottomSpacerHeight > 0 ? (
+          <Box height={bottomSpacerHeight} flexShrink={0} />
+        ) : null}
       </Box>
     </Box>
   );

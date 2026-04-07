@@ -155,8 +155,7 @@ export async function startInteractiveUI(
         }
         profiler.reportFrameRendered();
       },
-      standardReactLayoutTiming:
-        useAlternateBuffer || config.getUseTerminalBuffer(),
+      standardReactLayoutTiming: false,
       patchConsole: false,
       alternateBuffer: useAlternateBuffer,
       terminalBuffer: config.getUseTerminalBuffer(),
@@ -167,6 +166,9 @@ export async function startInteractiveUI(
         useAlternateBuffer &&
         !isShpool,
       debugRainbow: settings.merged.ui.debugRainbow === true,
+
+      // @ts-expect-error Custom option in our fork of ink
+      maxScrollbackLength: settings.merged.ui.maxScrollbackLength,
     },
   );
 

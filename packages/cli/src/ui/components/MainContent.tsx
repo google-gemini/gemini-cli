@@ -22,6 +22,7 @@ import { MAX_GEMINI_MESSAGE_LINES } from '../constants.js';
 import { useConfirmingTool } from '../hooks/useConfirmingTool.js';
 import { ToolConfirmationQueue } from './ToolConfirmationQueue.js';
 import { appEvents, AppEvent } from '../../utils/events.js';
+import { useInputState } from '../contexts/InputContext.js';
 
 const MemoizedHistoryItemDisplay = memo(HistoryItemDisplay);
 const MemoizedAppHeader = memo(AppHeader);
@@ -37,6 +38,7 @@ export const MainContent = () => {
   const config = useConfig();
   const useTerminalBuffer = config.getUseTerminalBuffer();
   const isAlternateBuffer = config.getUseAlternateBuffer();
+  const { copyModeEnabled } = useInputState();
 
   const confirmingTool = useConfirmingTool();
   const showConfirmationQueue = confirmingTool !== null;
@@ -234,7 +236,7 @@ export const MainContent = () => {
     [showHeaderDetails, version, pendingItems],
   );
 
-  const estimatedItemHeight = useCallback(() => 100, []);
+  const estimatedItemHeight = useCallback(() => 10, []);
 
   const keyExtractor = useCallback(
     (item: (typeof virtualizedData)[number], _index: number) => {
@@ -271,7 +273,7 @@ export const MainContent = () => {
           renderStatic={useTerminalBuffer}
           isStaticItem={useTerminalBuffer ? isStaticItem : undefined}
           overflowToBackbuffer={useTerminalBuffer && !isAlternateBuffer}
-          scrollbar={mouseMode}
+          scrollbar={mouseMode && !copyModeEnabled}
         />
         // TODO(jacobr): consider adding stableScrollback={!config.getUseAlternateBuffer()}
         // as that will reduce the # of cases where we will have to clear the
@@ -295,6 +297,7 @@ export const MainContent = () => {
     isStaticItem,
     mouseMode,
     isAlternateBuffer,
+    copyModeEnabled,
   ]);
 
   if (!uiState.isConfigInitialized) {

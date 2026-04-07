@@ -505,6 +505,13 @@
           "default": true,
           "type": "boolean"
         },
+        "maxScrollbackLength": {
+          "title": "Max Scrollback Length",
+          "description": "Maximum number of lines to keep in the terminal scrollback buffer.",
+          "markdownDescription": "Maximum number of lines to keep in the terminal scrollback buffer.\n\n- Category: `UI`\n- Requires restart: `yes`\n- Default: `1000`",
+          "default": 1000,
+          "type": "number"
+        },
         "showSpinner": {
           "title": "Show Spinner",
           "description": "Show the spinner during operations.",
