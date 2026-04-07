@@ -230,6 +230,7 @@ export * from './tools/mcp-client.js';
 export * from './tools/mcp-tool.js';
 export * from './tools/write-todos.js';
 export * from './tools/trackerTools.js';
+export * from './tools/visualize.js';
 export * from './tools/activate-skill.js';
 export * from './tools/ask-user.js';
 

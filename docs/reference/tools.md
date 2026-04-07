@@ -92,6 +92,27 @@ each tool.
 | [`ask_user`](../tools/ask-user.md) | `Communicate` | Requests clarification or missing information via an interactive dialog.               |
 | [`write_todos`](../tools/todos.md) | `Other`       | Maintains an internal list of subtasks. The model uses this to track its own progress. |
 
+### Visualization
+
+| Tool                                 | Kind   | Description                                                                                   |
+| :----------------------------------- | :----- | :-------------------------------------------------------------------------------------------- |
+| [`visualize`](../tools/visualize.md) | `Read` | Renders Mermaid diagrams (`flowchart`, `sequence`, `class`, `erd`) as terminal-friendly text. |
+
+### Memory
+
+### Interaction
+
+| Tool                               | Kind          | Description                                                                            |
+| :--------------------------------- | :------------ | :------------------------------------------------------------------------------------- |
+| [`ask_user`](../tools/ask-user.md) | `Communicate` | Requests clarification or missing information via an interactive dialog.               |
+| [`write_todos`](../tools/todos.md) | `Other`       | Maintains an internal list of subtasks. The model uses this to track its own progress. |
+
+### Visualization
+
+| Tool                                 | Kind   | Description                                                                                   |
+| :----------------------------------- | :----- | :-------------------------------------------------------------------------------------------- |
+| [`visualize`](../tools/visualize.md) | `Read` | Renders Mermaid diagrams (`flowchart`, `sequence`, `class`, `erd`) as terminal-friendly text. |
+
 ### Memory
 
 | Tool                                             | Kind    | Description                                                                          |
