@@ -327,8 +327,8 @@
         "compactToolOutput": {
           "title": "Compact Tool Output",
           "description": "Display tool outputs (like directory listings and file reads) in a compact, structured format.",
-          "markdownDescription": "Display tool outputs (like directory listings and file reads) in a compact, structured format.\n\n- Category: `UI`\n- Requires restart: `no`\n- Default: `false`",
-          "default": false,
+          "markdownDescription": "Display tool outputs (like directory listings and file reads) in a compact, structured format.\n\n- Category: `UI`\n- Requires restart: `no`\n- Default: `true`",
+          "default": true,
           "type": "boolean"
         },
         "hideBanner": {
@@ -453,6 +453,20 @@
           "description": "Use an alternate screen buffer for the UI, preserving shell history.",
           "markdownDescription": "Use an alternate screen buffer for the UI, preserving shell history.\n\n- Category: `UI`\n- Requires restart: `yes`\n- Default: `false`",
           "default": false,
+          "type": "boolean"
+        },
+        "renderProcess": {
+          "title": "Render Process",
+          "description": "Enable Ink render process for the UI.",
+          "markdownDescription": "Enable Ink render process for the UI.\n\n- Category: `UI`\n- Requires restart: `yes`\n- Default: `true`",
+          "default": true,
+          "type": "boolean"
+        },
+        "terminalBuffer": {
+          "title": "Terminal Buffer",
+          "description": "Use the new terminal buffer architecture for rendering.",
+          "markdownDescription": "Use the new terminal buffer architecture for rendering.\n\n- Category: `UI`\n- Requires restart: `yes`\n- Default: `true`",
+          "default": true,
           "type": "boolean"
         },
         "useBackgroundColor": {
@@ -2426,8 +2440,8 @@
             "showColor": {
               "title": "Show Color",
               "description": "Show color in shell output.",
-              "markdownDescription": "Show color in shell output.\n\n- Category: `Tools`\n- Requires restart: `no`\n- Default: `false`",
-              "default": false,
+              "markdownDescription": "Show color in shell output.\n\n- Category: `Tools`\n- Requires restart: `no`\n- Default: `true`",
+              "default": true,
               "type": "boolean"
             },
             "inactivityTimeout": {
@@ -2560,8 +2574,8 @@
       "properties": {
         "toolSandboxing": {
           "title": "Tool Sandboxing",
-          "description": "Experimental tool-level sandboxing (implementation in progress).",
-          "markdownDescription": "Experimental tool-level sandboxing (implementation in progress).\n\n- Category: `Security`\n- Requires restart: `no`\n- Default: `false`",
+          "description": "Tool-level sandboxing. Isolates individual tools instead of the entire CLI process.",
+          "markdownDescription": "Tool-level sandboxing. Isolates individual tools instead of the entire CLI process.\n\n- Category: `Security`\n- Requires restart: `yes`\n- Default: `false`",
           "default": false,
           "type": "boolean"
         },
@@ -2908,6 +2922,13 @@
           "title": "Memory Manager Agent",
           "description": "Replace the built-in save_memory tool with a memory manager subagent that supports adding, removing, de-duplicating, and organizing memories.",
           "markdownDescription": "Replace the built-in save_memory tool with a memory manager subagent that supports adding, removing, de-duplicating, and organizing memories.\n\n- Category: `Experimental`\n- Requires restart: `yes`\n- Default: `false`",
+          "default": false,
+          "type": "boolean"
+        },
+        "generalistProfile": {
+          "title": "Use the generalist profile to manage agent contexts.",
+          "description": "Suitable for general coding and software development tasks.",
+          "markdownDescription": "Suitable for general coding and software development tasks.\n\n- Category: `Experimental`\n- Requires restart: `yes`\n- Default: `false`",
           "default": false,
           "type": "boolean"
         },

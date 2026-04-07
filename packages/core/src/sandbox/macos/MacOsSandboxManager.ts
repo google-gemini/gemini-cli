@@ -59,6 +59,10 @@ export class MacOsSandboxManager implements SandboxManager {
     return this.options.workspace;
   }
 
+  getOptions(): GlobalSandboxOptions {
+    return this.options;
+  }
+
   async prepareCommand(req: SandboxRequest): Promise<SandboxedCommand> {
     await initializeShellParsers();
     const sanitizationConfig = getSecureSanitizationConfig(

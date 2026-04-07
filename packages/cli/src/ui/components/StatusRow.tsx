@@ -5,7 +5,7 @@
  */
 
 import type React from 'react';
-import { useCallback, useRef, useState } from 'react';
+import { useCallback, useRef, useState, useEffect } from 'react';
 import { Box, Text, ResizeObserver, type DOMElement } from 'ink';
 import {
   isUserVisibleHook,
@@ -77,6 +77,13 @@ export const StatusNode: React.FC<{
 }) => {
   const observerRef = useRef<ResizeObserver | null>(null);
 
+  useEffect(
+    () => () => {
+      observerRef.current?.disconnect();
+    },
+    [],
+  );
+
   const onRefChange = useCallback(
     (node: DOMElement | null) => {
       if (observerRef.current) {
@@ -146,6 +153,8 @@ export const StatusNode: React.FC<{
   );
 };
 
+import { useInputState } from '../contexts/InputContext.js';
+
 export const StatusRow: React.FC<StatusRowProps> = ({
   showUiDetails,
   isNarrow,
@@ -155,6 +164,7 @@ export const StatusRow: React.FC<StatusRowProps> = ({
   hasPendingActionRequired,
 }) => {
   const uiState = useUIState();
+  const inputState = useInputState();
   const settings = useSettings();
   const {
     isInteractiveShellWaiting,
@@ -168,6 +178,13 @@ export const StatusRow: React.FC<StatusRowProps> = ({
   const [statusWidth, setStatusWidth] = useState(0);
   const [tipWidth, setTipWidth] = useState(0);
   const tipObserverRef = useRef<ResizeObserver | null>(null);
+
+  useEffect(
+    () => () => {
+      tipObserverRef.current?.disconnect();
+    },
+    [],
+  );
 
   const onTipRefChange = useCallback((node: DOMElement | null) => {
     if (tipObserverRef.current) {
@@ -211,7 +228,7 @@ export const StatusRow: React.FC<StatusRowProps> = ({
       settings.merged.ui.showShortcutsHint &&
       !hideUiDetailsForSuggestions &&
       !hasPendingActionRequired &&
-      uiState.buffer.text.length === 0
+      inputState.buffer.text.length === 0
     ) {
       return showUiDetails ? '? for shortcuts' : 'press tab twice for more';
     }
@@ -377,13 +394,14 @@ export const StatusRow: React.FC<StatusRowProps> = ({
           >
             {showUiDetails ? (
               <>
-                {!hideUiDetailsForSuggestions && !uiState.shellModeActive && (
-                  <ApprovalModeIndicator
-                    approvalMode={uiState.showApprovalModeIndicator}
-                    allowPlanMode={uiState.allowPlanMode}
-                  />
-                )}
-                {uiState.shellModeActive && (
+                {!hideUiDetailsForSuggestions &&
+                  !inputState.shellModeActive && (
+                    <ApprovalModeIndicator
+                      approvalMode={uiState.showApprovalModeIndicator}
+                      allowPlanMode={uiState.allowPlanMode}
+                    />
+                  )}
+                {inputState.shellModeActive && (
                   <Box marginLeft={LAYOUT.INDICATOR_LEFT_MARGIN}>
                     <ShellModeIndicator />
                   </Box>

@@ -17,7 +17,7 @@ import type {
   PermissionConfirmationRequest,
 } from '../types.js';
 import type { CommandContext, SlashCommand } from '../commands/types.js';
-import type { TextBuffer } from '../components/shared/text-buffer.js';
+
 import type {
   IdeContext,
   ApprovalMode,
@@ -119,6 +119,7 @@ export interface UIState {
   editorError: string | null;
   isEditorDialogOpen: boolean;
   showPrivacyNotice: boolean;
+  mouseMode: boolean;
   corgiMode: boolean;
   debugMessage: string;
   quittingMessages: HistoryItem[] | null;
@@ -144,11 +145,6 @@ export interface UIState {
   initError: string | null;
   pendingGeminiHistoryItems: HistoryItemWithoutId[];
   thought: ThoughtSummary | null;
-  shellModeActive: boolean;
-  userMessages: string[];
-  buffer: TextBuffer;
-  inputWidth: number;
-  suggestionsWidth: number;
   isInputActive: boolean;
   isResuming: boolean;
   shouldShowIdePrompt: boolean;
@@ -163,7 +159,6 @@ export interface UIState {
   renderMarkdown: boolean;
   ctrlCPressedOnce: boolean;
   ctrlDPressedOnce: boolean;
-  showEscapePrompt: boolean;
   shortcutsHelpVisible: boolean;
   cleanUiDetailsVisible: boolean;
   elapsedTime: number;
@@ -193,7 +188,7 @@ export interface UIState {
   sessionStats: SessionStatsState;
   terminalWidth: number;
   terminalHeight: number;
-  mainControlsRef: React.RefCallback<DOMElement | null>;
+  mainControlsRef: (node: DOMElement | null) => void;
   // NOTE: This is for performance profiling only.
   rootUiRef: React.MutableRefObject<DOMElement | null>;
   currentIDE: IdeInfo | null;
@@ -208,7 +203,6 @@ export interface UIState {
   embeddedShellFocused: boolean;
   showDebugProfiler: boolean;
   showFullTodos: boolean;
-  copyModeEnabled: boolean;
   bannerData: {
     defaultText: string;
     warningText: string;

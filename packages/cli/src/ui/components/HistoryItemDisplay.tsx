@@ -134,6 +134,7 @@ export const HistoryItemDisplay: React.FC<HistoryItemDisplayProps> = ({
         <InfoMessage
           text={itemForDisplay.text}
           secondaryText={itemForDisplay.secondaryText}
+          source={itemForDisplay.source}
           icon={itemForDisplay.icon}
           color={itemForDisplay.color}
           marginBottom={itemForDisplay.marginBottom}
@@ -164,23 +165,9 @@ export const HistoryItemDisplay: React.FC<HistoryItemDisplayProps> = ({
       {itemForDisplay.type === 'stats' && (
         <StatsDisplay
           duration={itemForDisplay.duration}
-          quotas={itemForDisplay.quotas}
           selectedAuthType={itemForDisplay.selectedAuthType}
           userEmail={itemForDisplay.userEmail}
           tier={itemForDisplay.tier}
-          currentModel={itemForDisplay.currentModel}
-          quotaStats={
-            itemForDisplay.pooledRemaining !== undefined ||
-            itemForDisplay.pooledLimit !== undefined ||
-            itemForDisplay.pooledResetTime !== undefined
-              ? {
-                  remaining: itemForDisplay.pooledRemaining,
-                  limit: itemForDisplay.pooledLimit,
-                  resetTime: itemForDisplay.pooledResetTime,
-                }
-              : undefined
-          }
-          creditBalance={itemForDisplay.creditBalance}
         />
       )}
       {itemForDisplay.type === 'model_stats' && (
