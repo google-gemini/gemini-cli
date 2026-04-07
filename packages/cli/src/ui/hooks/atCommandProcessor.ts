@@ -245,10 +245,16 @@ async function resolveFilePaths(
     if (path.isAbsolute(pathName)) {
       const targetDir = config.getWorkspaceContext().getDirectories()[0];
       if (targetDir) {
-        ignoreCheckPath = path.relative(targetDir, pathName);
+        ignoreCheckPath = path.relative(
+          resolveToRealPath(targetDir),
+          resolveToRealPath(pathName),
+        );
       }
     }
-    const isOutsideProject = ignoreCheckPath.startsWith('..');
+    // On Windows, path.relative() between different drives (e.g., C: vs D:)
+    // returns an absolute path instead of a `..`-prefixed one, so check both.
+    const isOutsideProject =
+      ignoreCheckPath.startsWith('..') || path.isAbsolute(ignoreCheckPath);
     const gitIgnored =
       !isOutsideProject &&
       respectFileIgnore.respectGitIgnore &&

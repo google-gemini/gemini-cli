@@ -714,6 +714,31 @@ describe('handleAtCommand', () => {
         await fsPromises.rm(tempImageDir, { recursive: true, force: true });
       }
     });
+
+    it('should handle cross-drive absolute paths on Windows without crashing', async () => {
+      // On Windows, path.relative() between different drives (e.g., C: vs D:)
+      // returns an absolute path instead of a `..`-prefixed one. The ignore
+      // check must handle this case without throwing.
+      const fakeCrossDrivePath =
+        process.platform === 'win32'
+          ? 'Z:\\temp\\clipboard-cross-drive.png'
+          : '/mnt/other-drive/clipboard-cross-drive.png';
+
+      const query = `explain this image @${fakeCrossDrivePath}`;
+
+      const result = await handleAtCommand({
+        query,
+        config: mockConfig,
+        addItem: mockAddItem,
+        onDebugMessage: mockOnDebugMessage,
+        messageId: 251,
+        signal: abortController.signal,
+      });
+
+      // Should not throw RangeError — cross-drive paths are treated as
+      // outside the project and skip the ignore check entirely.
+      expect(result.error).toBeUndefined();
+    });
   });
 
   describe('when recursive file search is disabled', () => {
