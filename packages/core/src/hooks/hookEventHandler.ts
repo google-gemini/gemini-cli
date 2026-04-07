@@ -460,11 +460,7 @@ export class HookEventHandler {
       logHookCall(this.context.config, hookCallEvent);
 
       // Emit structured system message event for UI display
-      if (
-        this.context.config.getShowHookOutput() &&
-        result.output?.systemMessage &&
-        result.outputFormat === 'json'
-      ) {
+      if (result.output?.systemMessage && result.outputFormat === 'json') {
         coreEvents.emitHookSystemMessage({
           hookName,
           eventName,

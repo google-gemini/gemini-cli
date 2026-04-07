@@ -686,7 +686,6 @@ export interface ConfigParameters {
   modelConfigServiceConfig?: ModelConfigServiceConfig;
   enableHooks?: boolean;
   enableHooksUI?: boolean;
-  showHookOutput?: boolean;
   experiments?: Experiments;
   contextManagement?: Partial<ContextManagementConfig>;
   hooks?: { [K in HookEventName]?: HookDefinition[] };
@@ -909,9 +908,8 @@ export class Config implements McpContext, AgentLoopContext {
   private readonly acceptRawOutputRisk: boolean;
   private readonly dynamicModelConfiguration: boolean;
   private pendingIncludeDirectories: string[];
-  private readonly enableHooks: boolean;
   private readonly enableHooksUI: boolean;
-  private readonly showHookOutput: boolean;
+  private readonly enableHooks: boolean;
 
   private hooks: { [K in HookEventName]?: HookDefinition[] } | undefined;
   private projectHooks:
@@ -1257,7 +1255,6 @@ export class Config implements McpContext, AgentLoopContext {
     this.workspacePoliciesDir = params.workspacePoliciesDir;
     this.enableHooksUI = params.enableHooksUI ?? true;
     this.enableHooks = params.enableHooks ?? true;
-    this.showHookOutput = params.showHookOutput ?? false;
     this.disabledHooks = params.disabledHooks ?? [];
 
     this.continueOnFailedApiCall = params.continueOnFailedApiCall ?? true;
@@ -3385,10 +3382,6 @@ export class Config implements McpContext, AgentLoopContext {
 
   getEnableHooksUI(): boolean {
     return this.enableHooksUI;
-  }
-
-  getShowHookOutput(): boolean {
-    return this.showHookOutput;
   }
 
   getGemmaModelRouterEnabled(): boolean {

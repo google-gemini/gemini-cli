@@ -1739,11 +1739,6 @@ their corresponding top-level category object in your `settings.json` file.
   - **Default:** `true`
   - **Requires restart:** Yes
 
-- **`hooksConfig.showOutput`** (boolean):
-  - **Description:** Display an info message when a hook returns it in its
-    output.
-  - **Default:** `false`
-
 - **`hooksConfig.disabled`** (array):
   - **Description:** List of hook names (commands) that should be disabled.
     Hooks in this list will not execute even if configured.

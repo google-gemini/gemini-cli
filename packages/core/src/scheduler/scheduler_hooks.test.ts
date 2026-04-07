@@ -69,7 +69,6 @@ function createMockConfig(overrides: Partial<Config> = {}): Config {
     getGeminiClient: () => null,
     getMessageBus: () => createMockMessageBus(),
     getEnableHooks: () => true,
-    getShowHookOutput: () => false,
     getExperiments: () => {},
     getTelemetryLogPromptsEnabled: () => false,
     getPolicyEngine: () =>

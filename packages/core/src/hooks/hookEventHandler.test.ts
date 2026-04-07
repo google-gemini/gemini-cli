@@ -80,7 +80,6 @@ describe('HookEventHandler', () => {
       getGeminiClient: vi.fn().mockReturnValue(mockGeminiClient),
       getSessionId: vi.fn().mockReturnValue('test-session'),
       getWorkingDir: vi.fn().mockReturnValue('/test/project'),
-      getShowHookOutput: vi.fn().mockReturnValue(false),
     } as unknown as Config;
 
     mockHookPlanner = {

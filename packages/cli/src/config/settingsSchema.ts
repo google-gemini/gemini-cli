@@ -2285,16 +2285,6 @@ const SETTINGS_SCHEMA = {
           'Canonical toggle for the hooks system. When disabled, no hooks will be executed.',
         showInDialog: true,
       },
-      showOutput: {
-        type: 'boolean',
-        label: 'Show Hook Output',
-        category: 'Advanced',
-        requiresRestart: false,
-        default: false,
-        description:
-          'Display an info message when a hook returns it in its output.',
-        showInDialog: true,
-      },
       disabled: {
         type: 'array',
         label: 'Disabled Hooks',
