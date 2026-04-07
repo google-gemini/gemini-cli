@@ -12,7 +12,7 @@ import type { Episode, ToolExecution } from '../ir/types.js';
 import type { ContextAccountingState } from '../pipeline.js';
 import { randomUUID } from 'node:crypto';
 import type { ContextEnvironment } from '../sidecar/environment.js';
-import { InMemoryFileSystem } from '../system/InMemoryFileSystem.js';
+import type { InMemoryFileSystem } from '../system/InMemoryFileSystem.js';
 
 describe('ToolMaskingProcessor', () => {
   let processor: ToolMaskingProcessor;

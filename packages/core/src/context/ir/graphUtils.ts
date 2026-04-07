@@ -24,7 +24,7 @@ export function generateWorkingBufferView(
   tracer: ContextTracer,
   env: ContextEnvironment,
 ): Episode[] {
-  let currentEpisodes: Episode[] = [];
+  const currentEpisodes: Episode[] = [];
   let rollingTokens = 0;
   const skippedIds = new Set<string>();
   tracer.logEvent('ViewGenerator', 'Generating Working Buffer View');

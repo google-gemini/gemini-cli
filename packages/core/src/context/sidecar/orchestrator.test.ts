@@ -52,7 +52,7 @@ describe('PipelineOrchestrator (Component)', () => {
   beforeEach(() => {
     vi.resetAllMocks();
     env = createMockEnvironment();
-    eventBus = env.eventBus as ContextEventBus;
+    eventBus = env.eventBus;
     
     // Register our test processors
     ProcessorRegistry.register({ id: 'DummySyncProcessor', create: () => new DummySyncProcessor() });

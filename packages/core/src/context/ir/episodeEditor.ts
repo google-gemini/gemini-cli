@@ -30,7 +30,7 @@ export class EpisodeEditor {
    * Provides a readonly view of the current working state of the episodes.
    * Processors should iterate over this to decide what to mutate.
    */
-  get episodes(): ReadonlyArray<Episode> {
+  get episodes(): readonly Episode[] {
     return this.workingOrder.map(id => this.workingMap.get(id)!);
   }
   

@@ -39,7 +39,7 @@ export function createDummyEpisode(
   id: string,
   type: 'USER_PROMPT' | 'SYSTEM_EVENT',
   parts: unknown[] = [],
-  toolSteps: { intent: Record<string, unknown>; observation: Record<string, unknown>; toolName?: string; tokens?: { intent: number; observation: number } }[] = []
+  toolSteps: Array<{ intent: Record<string, unknown>; observation: Record<string, unknown>; toolName?: string; tokens?: { intent: number; observation: number } }> = []
 ): Episode {
   return {
     id,

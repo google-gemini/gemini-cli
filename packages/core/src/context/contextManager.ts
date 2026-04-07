@@ -10,8 +10,8 @@ import type { AgentChatHistory } from '../core/agentChatHistory.js';
 import { debugLogger } from '../utils/debugLogger.js';
 import type { Episode } from './ir/types.js';
 
-import { ContextEventBus } from './eventBus.js';
-import { ContextTracer } from './tracer.js';
+import type { ContextEventBus } from './eventBus.js';
+import type { ContextTracer } from './tracer.js';
 
 
 
@@ -142,7 +142,7 @@ export class ContextManager {
    * (snapshot > summary > masked) instead of the raw text.
    * Handles N-to-1 variant skipping automatically.
    */
-  public getWorkingBufferView(): Episode[] {
+  getWorkingBufferView(): Episode[] {
     return generateWorkingBufferView(
       this.pristineEpisodes,
       this.sidecar.budget.retainedTokens,

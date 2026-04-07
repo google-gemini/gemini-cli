@@ -70,7 +70,7 @@ describe('ContextManager Golden Tests', () => {
       }),
     };
 
-    const sidecar = SidecarLoader.fromConfig(mockConfig as any);
+    const sidecar = SidecarLoader.fromConfig(mockConfig);
     const tracer = new ContextTracer({ targetDir: '/tmp', sessionId: 'test-session' });
     const eventBus = new ContextEventBus();
     const env = new ContextEnvironmentImpl(

@@ -200,7 +200,7 @@ export class ToolMaskingProcessor implements ContextProcessor {
             this.env.tracer.logEvent('ToolMaskingProcessor', `Masked tool ${toolName}`, { recoveredTokens: savings });
             
             editor.editEpisode(ep.id, 'MASK_TOOL', (draft) => {
-              const draftStep = draft.steps![j];
+              const draftStep = draft.steps[j];
               if (draftStep.type !== 'TOOL_EXECUTION') return;
               if (!draftStep.presentation) {
                  draftStep.presentation = {

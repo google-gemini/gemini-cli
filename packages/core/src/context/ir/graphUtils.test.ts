@@ -16,9 +16,7 @@ describe('graphUtils (View Generator)', () => {
     vi.resetAllMocks();
     env = createMockEnvironment();
     // Our token mock is 1 char = 1 token for simplicity
-    vi.spyOn(env.tokenCalculator, 'calculateEpisodeListTokens').mockImplementation((eps) => {
-        return eps.reduce((acc, ep) => acc + (ep.trigger.metadata.originalTokens || 100), 0);
-    });
+    vi.spyOn(env.tokenCalculator, 'calculateEpisodeListTokens').mockImplementation((eps) => eps.reduce((acc, ep) => acc + (ep.trigger.metadata.originalTokens || 100), 0));
   });
 
   it('returns pristine episodes untouched if under budget', () => {

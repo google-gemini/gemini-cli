@@ -108,7 +108,7 @@ export class HistorySquashingProcessor implements ContextProcessor {
               currentDeficit,
               (p) => {
                  editor.editEpisode(ep.id, 'SQUASH_THOUGHT', (draft) => {
-                    const draftStep = draft.steps![j];
+                    const draftStep = draft.steps[j];
                     if (draftStep.type === 'AGENT_THOUGHT') {
                        draftStep.presentation = p;
                     }
@@ -116,7 +116,7 @@ export class HistorySquashingProcessor implements ContextProcessor {
               },
               () => {
                  editor.editEpisode(ep.id, 'SQUASH_THOUGHT', (draft) => {
-                    const draftStep = draft.steps![j];
+                    const draftStep = draft.steps[j];
                     if (draftStep.type === 'AGENT_THOUGHT') {
                         draftStep.metadata.transformations.push({
                           processorName: this.name,

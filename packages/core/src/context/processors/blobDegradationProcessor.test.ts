@@ -9,7 +9,7 @@ import { BlobDegradationProcessor } from './blobDegradationProcessor.js';
 import { EpisodeEditor } from '../ir/episodeEditor.js';
 import type { UserPrompt } from '../ir/types.js';
 import type { ContextEnvironment } from '../sidecar/environment.js';
-import { InMemoryFileSystem } from '../system/InMemoryFileSystem.js';
+import type { InMemoryFileSystem } from '../system/InMemoryFileSystem.js';
 
 describe('BlobDegradationProcessor', () => {
   let processor: BlobDegradationProcessor;

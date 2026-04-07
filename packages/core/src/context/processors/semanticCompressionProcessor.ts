@@ -100,7 +100,7 @@ export class SemanticCompressionProcessor implements ContextProcessor {
 
               if (newTokens < oldTokens) {
                 editor.editEpisode(ep.id, 'SUMMARIZE_THOUGHT', (draft) => {
-                   const draftStep = draft.steps![j];
+                   const draftStep = draft.steps[j];
                    if (draftStep.type === 'AGENT_THOUGHT') {
                       draftStep.presentation = { text: summary, tokens: newTokens };
                       draftStep.metadata.transformations.push({
@@ -159,12 +159,12 @@ export class SemanticCompressionProcessor implements ContextProcessor {
 
               if (newObsTokens < oldObsTokens) {
                 editor.editEpisode(ep.id, 'SUMMARIZE_TOOL', (draft) => {
-                   const draftStep = draft.steps![j];
+                   const draftStep = draft.steps[j];
                    if (draftStep.type === 'TOOL_EXECUTION') {
                       draftStep.presentation = {
                         intent: draftStep.presentation?.intent ?? draftStep.intent,
                         observation: newObsObject,
-                        tokens: { intent: intentTokens as number, observation: newObsTokens },
+                        tokens: { intent: intentTokens, observation: newObsTokens },
                       };
                       if (!draftStep.metadata) { draftStep.metadata = { transformations: [], currentTokens: 0, originalTokens: 0 } as unknown as IrMetadata };
                       if (!draftStep.metadata.transformations) { draftStep.metadata.transformations = [] };

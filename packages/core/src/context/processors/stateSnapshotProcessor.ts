@@ -87,7 +87,7 @@ Output ONLY the raw factual snapshot, formatted compactly. Do not include markdo
       }
       for (const step of ep.steps) {
         if (step.type === 'TOOL_EXECUTION') {
-          userPromptText += `[Tool Called: ${(step as ToolExecution).toolName}]\n`;
+          userPromptText += `[Tool Called: ${(step).toolName}]\n`;
         }
       }
       if (ep.yield) {

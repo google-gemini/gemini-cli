@@ -18,10 +18,10 @@ describe('EmergencyTruncationProcessor', () => {
     vi.resetAllMocks();
     env = createMockEnvironment();
     // Force token calculator to return exactly what we tell it for deterministic testing
-    vi.spyOn(env.tokenCalculator, 'calculateEpisodeListTokens').mockImplementation((episodes) => {
+    vi.spyOn(env.tokenCalculator, 'calculateEpisodeListTokens').mockImplementation((episodes) => 
         // Just sum up the metadata originalTokens for our dummy episodes
-        return episodes.reduce((acc, ep) => acc + (ep.trigger.metadata.originalTokens || 100), 0);
-    });
+         episodes.reduce((acc, ep) => acc + (ep.trigger.metadata.originalTokens || 100), 0)
+    );
 
     processor = new EmergencyTruncationProcessor(env, {});
   });

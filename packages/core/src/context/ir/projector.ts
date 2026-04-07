@@ -33,7 +33,7 @@ export class IrProjector {
     }
 
     const maxTokens = sidecar.budget.maxTokens;
-    let currentTokens = env.tokenCalculator.calculateEpisodeListTokens(workingBuffer);
+    const currentTokens = env.tokenCalculator.calculateEpisodeListTokens(workingBuffer);
 
     if (currentTokens <= maxTokens) {
       tracer.logEvent('IrProjector', `View is within maxTokens (${currentTokens} <= ${maxTokens}). Returning view.`);
@@ -46,7 +46,7 @@ export class IrProjector {
     debugLogger.log(`Context Manager Synchronous Barrier triggered: View at ${currentTokens} tokens (limit: ${maxTokens}).`);
 
     const processedEpisodes = await orchestrator.executePipeline('Immediate Sanitization', workingBuffer, {
-      currentTokens: currentTokens,
+      currentTokens,
       maxTokens: sidecar.budget.maxTokens,
       retainedTokens: sidecar.budget.retainedTokens,
       deficitTokens: Math.max(0, currentTokens - sidecar.budget.maxTokens),

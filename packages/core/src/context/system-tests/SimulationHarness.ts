@@ -27,10 +27,10 @@ export interface TurnSummary {
 }
 
 export class SimulationHarness {
-  public readonly chatHistory: AgentChatHistory;
-  public contextManager!: ContextManager;
-  public readonly eventBus: ContextEventBus;
-  public config!: SidecarConfig;
+  readonly chatHistory: AgentChatHistory;
+  contextManager!: ContextManager;
+  readonly eventBus: ContextEventBus;
+  config!: SidecarConfig;
   private tracer!: ContextTracer;
   private currentTurnIndex = 0;
   private tokenTrajectory: TurnSummary[] = [];
@@ -54,11 +54,11 @@ export class SimulationHarness {
     this.config = config;
     // Register all standard processors
     ProcessorRegistry.register({ id: 'BlobDegradationProcessor', create: (env, opts) => new BlobDegradationProcessor(env) });
-    ProcessorRegistry.register({ id: 'ToolMaskingProcessor', create: (env, opts) => new ToolMaskingProcessor(env, opts as any) });
-    ProcessorRegistry.register({ id: 'HistorySquashingProcessor', create: (env, opts) => new HistorySquashingProcessor(env, opts as any) });
-    ProcessorRegistry.register({ id: 'SemanticCompressionProcessor', create: (env, opts) => new SemanticCompressionProcessor(env, opts as any) });
-    ProcessorRegistry.register({ id: 'StateSnapshotProcessor', create: (env, opts) => new StateSnapshotProcessor(env, opts as any, env.eventBus) });
-    ProcessorRegistry.register({ id: 'EmergencyTruncationProcessor', create: (env, opts) => new EmergencyTruncationProcessor(env, opts as any) });
+    ProcessorRegistry.register({ id: 'ToolMaskingProcessor', create: (env, opts) => new ToolMaskingProcessor(env, opts) });
+    ProcessorRegistry.register({ id: 'HistorySquashingProcessor', create: (env, opts) => new HistorySquashingProcessor(env, opts) });
+    ProcessorRegistry.register({ id: 'SemanticCompressionProcessor', create: (env, opts) => new SemanticCompressionProcessor(env, opts) });
+    ProcessorRegistry.register({ id: 'StateSnapshotProcessor', create: (env, opts) => new StateSnapshotProcessor(env, opts, env.eventBus) });
+    ProcessorRegistry.register({ id: 'EmergencyTruncationProcessor', create: (env, opts) => new EmergencyTruncationProcessor(env, opts) });
 
     // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
     (this as any).tracer = new ContextTracer({ targetDir: mockTempDir, sessionId: 'sim-session' });

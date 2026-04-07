@@ -17,19 +17,19 @@ import type { IIdGenerator } from '../system/IIdGenerator.js';
 import { NodeIdGenerator } from '../system/NodeIdGenerator.js';
 
 export class ContextEnvironmentImpl implements ContextEnvironment {
-  public readonly tokenCalculator: ContextTokenCalculator;
-  public readonly fileSystem: IFileSystem;
-  public readonly idGenerator: IIdGenerator;
+  readonly tokenCalculator: ContextTokenCalculator;
+  readonly fileSystem: IFileSystem;
+  readonly idGenerator: IIdGenerator;
 
   constructor(
-    public readonly llmClient: BaseLlmClient,
-    public readonly sessionId: string,
-    public readonly promptId: string,
-    public readonly traceDir: string,
-    public readonly projectTempDir: string,
-    public readonly tracer: ContextTracer,
-    public readonly charsPerToken: number,
-    public readonly eventBus: ContextEventBus,
+    readonly llmClient: BaseLlmClient,
+    readonly sessionId: string,
+    readonly promptId: string,
+    readonly traceDir: string,
+    readonly projectTempDir: string,
+    readonly tracer: ContextTracer,
+    readonly charsPerToken: number,
+    readonly eventBus: ContextEventBus,
     fileSystem?: IFileSystem,
     idGenerator?: IIdGenerator,
   ) {

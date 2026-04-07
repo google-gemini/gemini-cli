@@ -27,7 +27,7 @@ export function registerBuiltInProcessors() {
       },
       required: ['processorId', 'options']
     },
-    create: (env, opts) => new ToolMaskingProcessor(env, opts as any)
+    create: (env, opts) => new ToolMaskingProcessor(env, opts)
   });
 
   ProcessorRegistry.register({
@@ -57,7 +57,7 @@ export function registerBuiltInProcessors() {
       },
       required: ['processorId', 'options']
     },
-    create: (env, opts) => new SemanticCompressionProcessor(env, opts as any)
+    create: (env, opts) => new SemanticCompressionProcessor(env, opts)
   });
 
   ProcessorRegistry.register({
@@ -74,7 +74,7 @@ export function registerBuiltInProcessors() {
       },
       required: ['processorId', 'options']
     },
-    create: (env, opts) => new HistorySquashingProcessor(env, opts as any)
+    create: (env, opts) => new HistorySquashingProcessor(env, opts)
   });
 
   ProcessorRegistry.register({
@@ -94,7 +94,7 @@ export function registerBuiltInProcessors() {
       },
       required: ['processorId']
     },
-    create: (env, opts) => StateSnapshotProcessor.create(env, opts as any)
+    create: (env, opts) => StateSnapshotProcessor.create(env, opts)
   });
 
   ProcessorRegistry.register({
@@ -107,7 +107,7 @@ export function registerBuiltInProcessors() {
       },
       required: ['processorId']
     },
-    create: (env, opts) => EmergencyTruncationProcessor.create(env, opts as any)
+    create: (env, opts) => EmergencyTruncationProcessor.create(env, opts)
   });
 }
 
