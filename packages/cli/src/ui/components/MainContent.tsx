@@ -123,13 +123,19 @@ export const MainContent = () => {
 
           // Rule 2: Suppress text in intermediate turns (turns containing non-topic
           // tools) to hide mechanical narration.
-          if (turnIsIntermediate && !showConfirmationQueue) {
+
+          const isCurrentTurn = i > lastUserPromptIndex;
+          // Scoping the bypass to the current turn prevents old narration from reappearing.
+          // This logic affects the rendered height of the history list by conditionally hiding turns.
+          const bypassSuppression = isCurrentTurn && showConfirmationQueue;
+
+          if (turnIsIntermediate && !bypassSuppression) {
             flags[i] = true;
           }
 
           // Rule 3: Suppress text that precedes a topic tool in the same turn,
           // as the topic tool "replaces" it.
-          if (hasTopicToolInTurn && !showConfirmationQueue) {
+          if (hasTopicToolInTurn && !bypassSuppression) {
             flags[i] = true;
           }
         }
@@ -141,6 +147,7 @@ export const MainContent = () => {
     pendingHistoryItems,
     topicUpdateNarrationEnabled,
     showConfirmationQueue,
+    lastUserPromptIndex,
   ]);
 
   const augmentedHistory = useMemo(

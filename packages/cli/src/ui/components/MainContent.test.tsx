@@ -882,6 +882,82 @@ describe('MainContent', () => {
       expect(output).toContain('Here is your answer.');
       unmount();
     });
+
+    it('bypasses suppression for the current turn during confirmation, but keeps old turns suppressed', async () => {
+      const { useConfirmingTool } = await import(
+        '../hooks/useConfirmingTool.js'
+      );
+      vi.mocked(useConfirmingTool).mockReturnValue({
+        tool: {
+          callId: 'call-1',
+          name: 'some_tool',
+          status: CoreToolCallStatus.AwaitingApproval,
+          confirmationDetails: {
+            type: 'confirm_shell_command' as const,
+            command: 'echo "hello"',
+          },
+        },
+        index: 0,
+        total: 1,
+      } as unknown as ConfirmingToolState);
+
+      mockUseSettings.mockReturnValue(settingsWithNarration);
+      const uiState = {
+        ...defaultMockUiState,
+        history: [
+          // Previous turn: should remain suppressed
+          { id: 10, type: 'user' as const, text: 'Old Turn' },
+          { id: 11, type: 'gemini' as const, text: 'Old narration' },
+          {
+            id: 12,
+            type: 'tool_group' as const,
+            tools: [
+              {
+                callId: 'old',
+                name: 'ls',
+                status: CoreToolCallStatus.Success,
+                description: '',
+                resultDisplay: '',
+                confirmationDetails: undefined,
+              } as IndividualToolCallDisplay,
+            ],
+          },
+          // Current turn: should be bypassed (shown)
+          { id: 20, type: 'user' as const, text: 'Current Turn' },
+          { id: 21, type: 'gemini' as const, text: 'Current narration' },
+        ],
+        pendingHistoryItems: [
+          {
+            type: 'tool_group' as const,
+            tools: [
+              {
+                callId: 'call-1',
+                name: 'some_tool',
+                status: CoreToolCallStatus.AwaitingApproval,
+                description: '',
+                resultDisplay: '',
+                confirmationDetails: undefined,
+              } as IndividualToolCallDisplay,
+            ],
+          },
+        ],
+      };
+
+      const { lastFrame, unmount } = await renderWithProviders(
+        <MainContent />,
+        {
+          uiState: uiState as Partial<UIState>,
+          settings: settingsWithNarration,
+        },
+      );
+
+      const output = lastFrame();
+      // Old narration should STILL be suppressed
+      expect(output).not.toContain('Old narration');
+      // Current narration should be VISIBLE because of the bypass
+      expect(output).toContain('Current narration');
+      unmount();
+    });
   });
 
   it('renders multiple thinking messages sequentially correctly', async () => {
