@@ -742,7 +742,7 @@ describe('BrowserAgentInvocation', () => {
       );
     });
 
-    it('should call cleanupBrowserAgent with correct params', async () => {
+    it('should not call cleanupBrowserAgent (cleanup is handled by BrowserManager.resetAll)', async () => {
       const invocation = new BrowserAgentInvocation(
         mockConfig,
         mockParams,
@@ -750,11 +750,7 @@ describe('BrowserAgentInvocation', () => {
       );
       await invocation.execute(new AbortController().signal, vi.fn());
 
-      expect(cleanupBrowserAgent).toHaveBeenCalledWith(
-        expect.anything(),
-        mockConfig,
-        'persistent',
-      );
+      expect(cleanupBrowserAgent).not.toHaveBeenCalled();
     });
   });
 

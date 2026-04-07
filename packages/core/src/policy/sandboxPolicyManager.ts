@@ -64,7 +64,7 @@ export class SandboxPolicyManager {
                 network: false,
                 readonly: true,
                 approvedTools: [],
-                allowOverrides: false,
+                allowOverrides: true,
               },
               default: {
                 network: false,
