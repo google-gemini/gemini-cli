@@ -35,59 +35,50 @@ process.on('uncaughtException', (error) => {
   process.exit(1);
 });
 
+async function getMemoryNodeArgs(): Promise<string[]> {
+  let autoConfigureMemory = true;
+  try {
+    const { readFileSync } = await import('node:fs');
+    const { join } = await import('node:path');
+    // Respect GEMINI_CLI_HOME environment variable, falling back to os.homedir()
+    const baseDir =
+      process.env['GEMINI_CLI_HOME'] || join(os.homedir(), '.gemini');
+    const settingsPath = join(baseDir, 'settings.json');
+    const rawSettings = readFileSync(settingsPath, 'utf8');
+    const settings = JSON.parse(rawSettings);
+    if (settings?.advanced?.autoConfigureMemory === false) {
+      autoConfigureMemory = false;
+    }
+  } catch {
+    // ignore
+  }
+
+  if (autoConfigureMemory) {
+    const totalMemoryMB = os.totalmem() / (1024 * 1024);
+    const heapStats = v8.getHeapStatistics();
+    const currentMaxOldSpaceSizeMb = Math.floor(
+      heapStats.heap_size_limit / 1024 / 1024,
+    );
+    const targetMaxOldSpaceSizeInMB = Math.floor(totalMemoryMB * 0.5);
+
+    if (targetMaxOldSpaceSizeInMB > currentMaxOldSpaceSizeMb) {
+      return [`--max-old-space-size=${targetMaxOldSpaceSizeInMB}`];
+    }
+  }
+
+  return [];
+}
+
 async function run() {
   if (!process.env['GEMINI_CLI_NO_RELAUNCH'] && !process.env['SANDBOX']) {
     // --- Lightweight Parent Process / Daemon ---
     // We avoid importing heavy dependencies here to save ~1.5s of startup time.
 
-    // Check memory arguments (lightweight version)
     const nodeArgs: string[] = [...process.execArgv];
     const scriptArgs = process.argv.slice(2);
-    const isCommand =
-      scriptArgs.length > 0 &&
-      [
-        'mcp',
-        'extensions',
-        'extension',
-        'skills',
-        'skill',
-        'hooks',
-        'hook',
-      ].includes(scriptArgs[0]);
 
-    if (!isCommand) {
-      let autoConfigureMemory = true;
-      try {
-        const { readFileSync } = await import('node:fs');
-        const { join } = await import('node:path');
-        const homedir = os.homedir();
-        const settingsPath = join(homedir, '.gemini', 'settings.json');
-        const rawSettings = readFileSync(settingsPath, 'utf8');
-        const settings = JSON.parse(rawSettings);
-        if (settings?.advanced?.autoConfigureMemory === false) {
-          autoConfigureMemory = false;
-        }
-      } catch {
-        // ignore
-      }
-
-      if (autoConfigureMemory) {
-        // We allocate 50% of system memory because parsing large codebases, handling
-        // huge contexts (like massive prompts or full repo context), and maintaining
-        // terminal UI states in Ink requires significantly more memory than the V8 default
-        // (which is ~2GB-4GB). Without this, the app easily crashes with Out of Memory errors.
-        const totalMemoryMB = os.totalmem() / (1024 * 1024);
-        const heapStats = v8.getHeapStatistics();
-        const currentMaxOldSpaceSizeMb = Math.floor(
-          heapStats.heap_size_limit / 1024 / 1024,
-        );
-        const targetMaxOldSpaceSizeInMB = Math.floor(totalMemoryMB * 0.5);
-
-        if (targetMaxOldSpaceSizeInMB > currentMaxOldSpaceSizeMb) {
-          nodeArgs.push(`--max-old-space-size=${targetMaxOldSpaceSizeInMB}`);
-        }
-      }
-    }
+    const memoryArgs = await getMemoryNodeArgs();
+    nodeArgs.push(...memoryArgs);
 
     const script = process.argv[1];
     nodeArgs.push(script);
