@@ -29,12 +29,14 @@ import {
   ToolListChangedNotificationSchema,
   PromptListChangedNotificationSchema,
   ProgressNotificationSchema,
+  NotificationSchema,
   type GetPromptResult,
   type Prompt,
   type ReadResourceResult,
   type Resource,
   type Tool as McpTool,
 } from '@modelcontextprotocol/sdk/types.js';
+import { z } from 'zod/v4';
 import { parse } from 'shell-quote';
 import {
   AuthProviderType,
@@ -66,10 +68,12 @@ import type {
   WorkspaceContext,
 } from '../utils/workspaceContext.js';
 import { getToolCallContext } from '../utils/toolCallContext.js';
+import { escapeXml, sanitizeXmlKey } from '../utils/textUtils.js';
 import type { ToolRegistry } from './tool-registry.js';
 import { debugLogger } from '../utils/debugLogger.js';
 import { type MessageBus } from '../confirmation-bus/message-bus.js';
 import { coreEvents } from '../utils/events.js';
+import { activeChannels, removeChannel } from '../channels/types.js';
 import {
   type ResourceRegistry,
   type MCPResource,
@@ -286,6 +290,7 @@ export class McpClient implements McpProgressReporter {
       registries.promptRegistry.removePromptsByServer(this.serverName);
       registries.resourceRegistry.removeResourcesByServer(this.serverName);
     }
+    removeChannel(this.serverName);
     this.updateStatus(MCPServerStatus.DISCONNECTING);
     const client = this.client;
     this.client = undefined;
@@ -478,6 +483,67 @@ export class McpClient implements McpProgressReporter {
         }
       },
     );
+
+    // Channel capability: if the server declares experimental['gemini/channel'],
+    // listen for channel notifications and route them through coreEvents.
+    // Only register if this server is in the --channels list.
+    const channelCap = capabilities?.experimental?.['gemini/channel'];
+    const enabledChannels = this.cliConfig.getChannels();
+    if (channelCap && enabledChannels.includes(this.serverName)) {
+      debugLogger.log(
+        `Server '${this.serverName}' declares gemini/channel capability. Listening for channel messages...`,
+      );
+
+      const channelCapRecord: Record<string, unknown> =
+        channelCap != null && typeof channelCap === 'object'
+          ? Object.fromEntries(Object.entries(channelCap))
+          : {};
+      const rawDisplayName = channelCapRecord['displayName'];
+      activeChannels.set(this.serverName, {
+        supportsReply: capabilities?.tools != null,
+        displayName:
+          typeof rawDisplayName === 'string' ? rawDisplayName : undefined,
+      });
+
+      const ChannelNotificationSchema = NotificationSchema.extend({
+        method: z.literal('notifications/gemini/channel'),
+      });
+      this.client.setNotificationHandler(
+        ChannelNotificationSchema,
+        (notification) => {
+          const params: Record<string, unknown> = Object.fromEntries(
+            Object.entries(notification.params ?? {}),
+          );
+          const content = params['content'];
+          if (typeof content !== 'string' || !content) return;
+
+          const rawMeta = params['meta'];
+          const metaObj: Record<string, string> =
+            rawMeta != null && typeof rawMeta === 'object'
+              ? Object.fromEntries(
+                  Object.entries(rawMeta).map(([k, v]) => [k, String(v)]),
+                )
+              : {};
+          metaObj['user'] =
+            metaObj['user'] ?? String(params['sender'] ?? 'unknown');
+
+          const attrs = Object.entries(metaObj)
+            .filter(([, v]) => v !== '')
+            .map(([k, v]) => `${sanitizeXmlKey(k)}="${escapeXml(v)}"`)
+            .join(' ');
+
+          const safeContent = content.replace(/<\/channel/gi, '&lt;/channel');
+
+          const source = escapeXml(this.serverName);
+          const formattedXml = `<channel source="${source}"${attrs ? ' ' + attrs : ''}>\n${safeContent}\n</channel>`;
+
+          coreEvents.emitChannelMessage({
+            channelName: this.serverName,
+            content: formattedXml,
+          });
+        },
+      );
+    }
   }
 
   /**
@@ -1761,6 +1827,7 @@ export interface McpContext {
       source?: string;
     }>;
   };
+  getChannels(): string[];
 }
 
 /**

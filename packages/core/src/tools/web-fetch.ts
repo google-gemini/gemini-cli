@@ -19,7 +19,7 @@ import { ToolErrorType } from './tool-error.js';
 import { getErrorMessage } from '../utils/errors.js';
 import { getResponseText } from '../utils/partUtils.js';
 import { fetchWithTimeout, isPrivateIp } from '../utils/fetch.js';
-import { truncateString } from '../utils/textUtils.js';
+import { truncateString, escapeXml } from '../utils/textUtils.js';
 import { convert } from 'html-to-text';
 import {
   logWebFetchFallbackAttempt,
@@ -186,18 +186,6 @@ interface GroundingSupportItem {
 
 function isGroundingSupportItem(item: unknown): item is GroundingSupportItem {
   return typeof item === 'object' && item !== null;
-}
-
-/**
- * Sanitizes text for safe embedding in XML tags.
- */
-function sanitizeXml(text: string): string {
-  return text
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;')
-    .replace(/'/g, '&apos;');
 }
 
 /**
@@ -444,10 +432,10 @@ class WebFetchToolInvocation extends BaseToolInvocation<
       .map((url) => {
         const content = finalContentsByUrl.get(url);
         if (content !== undefined) {
-          return `<source url="${sanitizeXml(url)}">\n${sanitizeXml(content)}\n</source>`;
+          return `<source url="${escapeXml(url)}">\n${escapeXml(content)}\n</source>`;
         }
         const error = errors.find((e) => e.url === url);
-        return `<source url="${sanitizeXml(url)}">\nError: ${sanitizeXml(error?.message || 'Unknown error')}\n</source>`;
+        return `<source url="${escapeXml(url)}">\nError: ${escapeXml(error?.message || 'Unknown error')}\n</source>`;
       })
       .join('\n');
 
@@ -456,7 +444,7 @@ class WebFetchToolInvocation extends BaseToolInvocation<
       const fallbackPrompt = `Follow the user's instructions below using the provided webpage content.
 
 <user_instructions>
-${sanitizeXml(this.params.prompt ?? '')}
+${escapeXml(this.params.prompt ?? '')}
 </user_instructions>
 
 I was unable to access the URL(s) directly using the primary fetch tool. Instead, I have fetched the raw content of the page(s). Please use the following content to answer the request. Do not attempt to access the URL(s) again.
@@ -789,7 +777,7 @@ Response: ${rawResponseText}`;
       const sanitizedPrompt = `Follow the user's instructions to process the authorized URLs.
 
 <user_instructions>
-${sanitizeXml(userPrompt)}
+${escapeXml(userPrompt)}
 </user_instructions>
 
 <authorized_urls>

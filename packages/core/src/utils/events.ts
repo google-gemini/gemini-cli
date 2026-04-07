@@ -13,6 +13,7 @@ import type {
   TokenStorageInitializationEvent,
   KeychainAvailabilityEvent,
 } from '../telemetry/types.js';
+import type { ChannelMessagePayload } from '../channels/types.js';
 import { debugLogger } from './debugLogger.js';
 
 /**
@@ -40,6 +41,12 @@ export interface UserFeedbackPayload {
    * or verbose output, while keeping the 'message' field clean for end users.
    */
   error?: unknown;
+  /**
+   * Optional semantic style hint for the UI.
+   * 'channel' renders with secondary text color and a » icon,
+   * suitable for channel status messages.
+   */
+  style?: 'channel';
 }
 
 /**
@@ -195,6 +202,7 @@ export enum CoreEvent {
   QuotaChanged = 'quota-changed',
   TelemetryKeychainAvailability = 'telemetry-keychain-availability',
   TelemetryTokenStorageType = 'telemetry-token-storage-type',
+  ChannelMessage = 'channel-message',
 }
 
 /**
@@ -228,6 +236,7 @@ export interface CoreEvents extends ExtensionEvents {
   [CoreEvent.SlashCommandConflicts]: [SlashCommandConflictsPayload];
   [CoreEvent.TelemetryKeychainAvailability]: [KeychainAvailabilityEvent];
   [CoreEvent.TelemetryTokenStorageType]: [TokenStorageInitializationEvent];
+  [CoreEvent.ChannelMessage]: [ChannelMessagePayload];
 }
 
 type EventBacklogItem = {
@@ -282,8 +291,14 @@ export class CoreEventEmitter extends EventEmitter<CoreEvents> {
     severity: FeedbackSeverity,
     message: string,
     error?: unknown,
+    options?: { style?: 'channel' },
   ): void {
-    const payload: UserFeedbackPayload = { severity, message, error };
+    const payload: UserFeedbackPayload = {
+      severity,
+      message,
+      error,
+      ...options,
+    };
     this._emitOrQueue(CoreEvent.UserFeedback, payload);
   }
 
@@ -401,6 +416,15 @@ export class CoreEventEmitter extends EventEmitter<CoreEvents> {
   ): void {
     const payload: QuotaChangedPayload = { remaining, limit, resetTime };
     this.emit(CoreEvent.QuotaChanged, payload);
+  }
+
+  /**
+   * Forwards a channel message from an MCP server that declared the
+   * `gemini/channel` experimental capability.
+   * Buffers automatically if the UI hasn't subscribed yet.
+   */
+  emitChannelMessage(payload: ChannelMessagePayload): void {
+    this._emitOrQueue(CoreEvent.ChannelMessage, payload);
   }
 
   /**

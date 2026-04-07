@@ -39,6 +39,7 @@ import {
 } from './types.js';
 import { checkPermissions } from './hooks/atCommandProcessor.js';
 import { MessageType, StreamingState } from './types.js';
+import { theme } from './semantic-colors.js';
 import { ToolActionsProvider } from './contexts/ToolActionsContext.js';
 import { MouseProvider } from './contexts/MouseContext.js';
 import { ScrollProvider } from './contexts/ScrollProvider.js';
@@ -69,6 +70,7 @@ import {
   refreshServerHierarchicalMemory,
   flattenMemory,
   type MemoryChangedPayload,
+  type ChannelMessagePayload,
   writeToStdout,
   disableMouseEvents,
   enterAlternateScreen,
@@ -1273,6 +1275,20 @@ Logging in with Google... Restarting Gemini CLI to continue.
     isMcpReady,
   });
 
+  // Listen for external channel messages from MCP servers declaring
+  // experimental['gemini/channel'] and inject them into the message queue.
+  const channelsEnabled = config.getChannels().length > 0;
+  useEffect(() => {
+    if (!channelsEnabled) return;
+    const handler = (payload: ChannelMessagePayload) => {
+      addMessage(payload.content);
+    };
+    coreEvents.on(CoreEvent.ChannelMessage, handler);
+    return () => {
+      coreEvents.off(CoreEvent.ChannelMessage, handler);
+    };
+  }, [channelsEnabled, addMessage]);
+
   cancelHandlerRef.current = useCallback(
     (shouldRestorePrompt: boolean = true) => {
       if (isToolAwaitingConfirmation(pendingHistoryItems)) {
@@ -2094,10 +2110,16 @@ Logging in with Google... Restarting Gemini CLI to continue.
           );
       }
 
+      const isChannel = payload.style === 'channel';
       historyManager.addItem(
         {
           type,
           text: payload.message,
+          ...(isChannel && {
+            icon: '» ',
+            color: theme.text.secondary,
+            marginTop: 0,
+          }),
         },
         Date.now(),
       );

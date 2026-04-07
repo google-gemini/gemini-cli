@@ -31,6 +31,7 @@ import { getMCPServerStatus } from '@google/gemini-cli-core';
 import { ToolsList } from './views/ToolsList.js';
 import { SkillsList } from './views/SkillsList.js';
 import { AgentsStatus } from './views/AgentsStatus.js';
+import { ChannelsList } from './views/ChannelsList.js';
 import { McpStatus } from './views/McpStatus.js';
 import { ChatList } from './views/ChatList.js';
 import { ModelMessage } from './messages/ModelMessage.js';
@@ -136,6 +137,7 @@ export const HistoryItemDisplay: React.FC<HistoryItemDisplayProps> = ({
           secondaryText={itemForDisplay.secondaryText}
           icon={itemForDisplay.icon}
           color={itemForDisplay.color}
+          marginTop={itemForDisplay.marginTop}
           marginBottom={itemForDisplay.marginBottom}
         />
       )}
@@ -237,6 +239,9 @@ export const HistoryItemDisplay: React.FC<HistoryItemDisplayProps> = ({
           agents={itemForDisplay.agents}
           terminalWidth={terminalWidth}
         />
+      )}
+      {itemForDisplay.type === 'channels_list' && (
+        <ChannelsList channels={itemForDisplay.channels} />
       )}
       {itemForDisplay.type === 'mcp_status' && (
         <McpStatus {...itemForDisplay} serverStatus={getMCPServerStatus} />

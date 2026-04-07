@@ -121,6 +121,27 @@ export function truncateString(
  * @param replacements A record of keys to their replacement values.
  * @returns The resulting string with placeholders replaced.
  */
+/**
+ * Escapes a string for safe embedding in XML content or attributes.
+ * Replaces &, <, >, ", and ' with their XML entity equivalents.
+ */
+export function escapeXml(s: string): string {
+  return s
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&apos;');
+}
+
+/**
+ * Strips characters that are not valid in XML element/attribute names.
+ * Only allows alphanumeric characters and underscores.
+ */
+export function sanitizeXmlKey(s: string): string {
+  return s.replace(/[^a-zA-Z0-9_]/g, '');
+}
+
 export function safeTemplateReplace(
   template: string,
   replacements: Record<string, string>,
