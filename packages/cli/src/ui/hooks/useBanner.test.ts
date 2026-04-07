@@ -13,7 +13,7 @@ import {
   type MockedFunction,
 } from 'vitest';
 import { renderHook } from '../../test-utils/render.js';
-import { useBanner } from './useBanner.js';
+import { useBanner, _clearSessionBannersForTest } from './useBanner.js';
 import { persistentState } from '../../utils/persistentState.js';
 import crypto from 'node:crypto';
 
@@ -56,6 +56,7 @@ describe('useBanner', () => {
 
   beforeEach(() => {
     vi.resetAllMocks();
+    _clearSessionBannersForTest();
 
     // Default persistentState behavior: return empty object (no counts)
     mockedPersistentStateGet.mockReturnValue({});
@@ -101,13 +102,18 @@ describe('useBanner', () => {
     );
   });
 
-  it('should NOT increment count if warning text is shown instead', async () => {
+  it('should increment count if warning text is shown instead', async () => {
     const data = { defaultText: 'Standard', warningText: 'Warning' };
 
     await renderHook(() => useBanner(data));
 
-    // Since warning text takes precedence, default banner logic (and increment) is skipped
-    expect(mockedPersistentStateSet).not.toHaveBeenCalled();
+    // Warning text now also gets counted
+    expect(mockedPersistentStateSet).toHaveBeenCalledWith(
+      'defaultBannerShownCount',
+      {
+        [crypto.createHash('sha256').update(data.warningText).digest('hex')]: 1,
+      },
+    );
   });
 
   it('should handle newline replacements', async () => {
