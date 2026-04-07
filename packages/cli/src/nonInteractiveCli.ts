@@ -528,6 +528,7 @@ export async function runNonInteractive(
       // Cleanup stdin cancellation before other cleanup
       cleanupStdinCancellation();
 
+      scheduler.dispose();
       consolePatcher.cleanup();
       coreEvents.off(CoreEvent.UserFeedback, handleUserFeedback);
     }

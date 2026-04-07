@@ -610,6 +610,7 @@ export async function runNonInteractive({
       cleanupStdinCancellation();
       abortController.signal.removeEventListener('abort', abortSession);
 
+      scheduler.dispose();
       consolePatcher.cleanup();
       coreEvents.off(CoreEvent.UserFeedback, handleUserFeedback);
     }
