@@ -84,10 +84,19 @@ export class FileKeychain implements Keychain {
           'Unsupported state or unable to authenticate data',
         )
       ) {
-        throw new Error(
-          `Corrupted credentials file detected at: ${this.tokenFilePath}\n` +
-            `Please delete or rename this file to resolve the issue.`,
+        // Corrupted credentials file detected. Attempt to recover by moving the bad file aside.
+        try {
+          await fs.rename(this.tokenFilePath, `${this.tokenFilePath}.corrupt`);
+        } catch {
+          // Ignore rename failures; we'll still return empty data.
+        }
+        // Return empty credentials; user can re-enter their API key.
+        // eslint-disable-next-line no-console
+        console.error(
+          `Warning: Corrupted credentials file was detected and has been moved to ${this.tokenFilePath}.corrupt. ` +
+            'Please re-authenticate if needed.',
         );
+        return {};
       }
       throw error;
     }
