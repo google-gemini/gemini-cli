@@ -373,6 +373,7 @@ describe('BrowserManager', () => {
           session_mode: 'persistent',
           headless: false,
           success: true,
+          tool_count: 4,
         },
       );
     });
