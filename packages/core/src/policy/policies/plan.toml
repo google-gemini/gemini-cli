@@ -107,7 +107,8 @@ toolName = [
   "activate_skill",
   "codebase_investigator",
   "cli_help",
-  "get_internal_docs"
+  "get_internal_docs",
+  "complete_task"
 ]
 decision = "allow"
 priority = 70
