@@ -1492,9 +1492,10 @@ their corresponding top-level category object in your `settings.json` file.
 #### `security`
 
 - **`security.toolSandboxing`** (boolean):
-  - **Description:** Experimental tool-level sandboxing (implementation in
-    progress).
+  - **Description:** Tool-level sandboxing. Isolates individual tools instead of
+    the entire CLI process.
   - **Default:** `false`
+  - **Requires restart:** Yes
 
 - **`security.disableYoloMode`** (boolean):
   - **Description:** Disable YOLO mode, even if enabled by a flag.
