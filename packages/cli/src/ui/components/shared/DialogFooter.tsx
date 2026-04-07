@@ -16,7 +16,7 @@ export interface DialogFooterProps {
   /** Exit shortcut (defaults to "Esc to cancel") */
   cancelAction?: string;
   /** Custom keyboard shortcut hints (e.g., ["Ctrl+P to edit"]) */
-  extraParts?: string[];
+  extraParts?: React.ReactNode[];
 }
 
 /**
@@ -29,16 +29,28 @@ export const DialogFooter: React.FC<DialogFooterProps> = ({
   cancelAction = 'Esc to cancel',
   extraParts = [],
 }) => {
-  const parts = [primaryAction];
+  const textParts: string[] = [primaryAction];
   if (navigationActions) {
-    parts.push(navigationActions);
+    textParts.push(navigationActions);
   }
-  parts.push(...extraParts);
-  parts.push(cancelAction);
+
+  // We split string parts and node parts to properly render nodes without forcing them into a single string join
+  const stringExtras = extraParts.filter(
+    (p): p is string => typeof p === 'string',
+  );
+  const nodeExtras = extraParts.filter((p) => typeof p !== 'string');
+
+  textParts.push(...stringExtras);
+  textParts.push(cancelAction);
 
   return (
-    <Box marginTop={1}>
-      <Text color={theme.text.secondary}>{parts.join(' · ')}</Text>
+    <Box marginTop={1} flexDirection="column">
+      {nodeExtras.map((part, i) => (
+        <Box key={i}>{part}</Box>
+      ))}
+      <Box>
+        <Text color={theme.text.secondary}>{textParts.join(' · ')}</Text>
+      </Box>
     </Box>
   );
 };
