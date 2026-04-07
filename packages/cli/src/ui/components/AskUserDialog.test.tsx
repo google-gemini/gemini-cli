@@ -189,9 +189,8 @@ describe('AskUserDialog', () => {
     await waitFor(async () => {
       await waitUntilReady();
       // Verify visual state (checkmarks on all options)
-      expect(lastFrame()).toContain('[x] All of the above');
+      expect(lastFrame()).toMatchSnapshot();
     });
-    expect(lastFrame()).toMatchSnapshot();
   });
 
   it('handles custom option in single select with inline typing', async () => {
@@ -630,9 +629,8 @@ describe('AskUserDialog', () => {
 
     await waitFor(async () => {
       await waitUntilReady();
-      expect(lastFrame()).toContain('Review');
+      expect(lastFrame()).toMatchSnapshot();
     });
-    expect(lastFrame()).toMatchSnapshot();
 
     writeKey(stdin, '\x1b[D'); // Left arrow back
 
@@ -676,9 +674,8 @@ describe('AskUserDialog', () => {
 
     await waitFor(async () => {
       await waitUntilReady();
-      expect(lastFrame()).toContain('Review');
+      expect(lastFrame()).toMatchSnapshot();
     });
-    expect(lastFrame()).toMatchSnapshot();
   });
 
   it('submits with unanswered questions when user confirms on Review', async () => {
@@ -1375,9 +1372,8 @@ describe('AskUserDialog', () => {
 
       await waitFor(async () => {
         await waitUntilReady();
-        expect(lastFrame()).toContain('Type another language...');
+        expect(lastFrame()).toMatchSnapshot();
       });
-      expect(lastFrame()).toMatchSnapshot();
     });
 
     it('uses default placeholder when not provided', async () => {
@@ -1410,9 +1406,8 @@ describe('AskUserDialog', () => {
 
       await waitFor(async () => {
         await waitUntilReady();
-        expect(lastFrame()).toContain('Enter a custom value');
+        expect(lastFrame()).toMatchSnapshot();
       });
-      expect(lastFrame()).toMatchSnapshot();
     });
 
     it('supports "Other" option for yesno questions', async () => {
