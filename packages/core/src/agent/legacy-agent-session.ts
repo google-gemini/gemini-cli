@@ -54,6 +54,8 @@ export interface LegacyAgentSessionDeps {
   getPreferredEditor?: () => EditorType | undefined;
 }
 
+const schedulerMap = new WeakMap<Config, Scheduler>();
+
 export class LegacyAgentProtocol implements AgentProtocol {
   private _events: AgentEvent[] = [];
   private _subscribers = new Set<(event: AgentEvent) => void>();
@@ -74,13 +76,23 @@ export class LegacyAgentProtocol implements AgentProtocol {
     this._config = deps.config;
     this._client = deps.client ?? deps.config.getGeminiClient();
     this._promptId = deps.promptId ?? deps.config.promptId ?? '';
-    this._scheduler =
-      deps.scheduler ??
-      new Scheduler({
-        context: deps.config,
-        schedulerId: 'legacy-agent-scheduler',
-        getPreferredEditor: deps.getPreferredEditor ?? (() => undefined),
-      });
+
+    if (deps.scheduler) {
+      this._scheduler = deps.scheduler;
+    } else {
+      let scheduler = schedulerMap.get(deps.config);
+      if (!scheduler) {
+        const sessionId = deps.config.getSessionId();
+        const schedulerId = `legacy-agent-scheduler-${sessionId}`;
+        scheduler = new Scheduler({
+          context: deps.config,
+          schedulerId,
+          getPreferredEditor: deps.getPreferredEditor ?? (() => undefined),
+        });
+        schedulerMap.set(deps.config, scheduler);
+      }
+      this._scheduler = scheduler;
+    }
   }
 
   get events(): readonly AgentEvent[] {
