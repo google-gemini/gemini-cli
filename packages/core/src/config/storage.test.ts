@@ -103,7 +103,7 @@ describe('Storage - Security', () => {
 });
 
 describe('Storage – additional helpers', () => {
-  const projectRoot = resolveToRealPath(path.resolve('/tmp/project'));
+  const projectRoot = path.resolve('/tmp/project');
   let storage = new Storage(projectRoot);
 
   beforeEach(() => {

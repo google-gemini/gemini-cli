@@ -2279,13 +2279,18 @@ export class Config implements McpContext, AgentLoopContext {
     }
 
     // 1. Lexical security check (before any filesystem mutation or return)
-    const lexicalPlansDir = path.resolve(plansDir);
+    // We compare purely unresolved paths here to avoid static analyzer warnings about mixing resolved and unresolved paths.
+    // The physical security check happens AFTER mkdirSync.
+    const unresolvedProjectRoot = path.resolve(this.storage.getProjectRoot());
+    const unresolvedGlobalDir = path.resolve(Storage.getGlobalGeminiDir());
+    const unresolvedPlansDir = path.resolve(plansDir);
+
     if (
-      !isSubpath(realProjectRoot, lexicalPlansDir) &&
-      (!realGlobalGeminiDir || !isSubpath(realGlobalGeminiDir, lexicalPlansDir))
+      !isSubpath(unresolvedProjectRoot, unresolvedPlansDir) &&
+      !isSubpath(unresolvedGlobalDir, unresolvedPlansDir)
     ) {
       throw new SecurityError(
-        `Security violation: Plan directory '${lexicalPlansDir}' is outside both the project root '${realProjectRoot}' and the global configuration directory.`,
+        `Security violation: Plan directory '${unresolvedPlansDir}' is outside both the project root '${unresolvedProjectRoot}' and the global configuration directory.`,
       );
     }
 
