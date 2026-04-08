@@ -7,8 +7,7 @@
 import type { Part } from '@google/genai';
 import { estimateTokenCountSync as baseEstimate } from '../../utils/tokenCalculation.js';
 import type { ConcreteNode } from '../ir/types.js';
-import { isUserPrompt, isAgentThought, isToolExecution, isMaskedTool, isAgentYield, isSnapshot, isRollingSummary } from '../ir/graphUtils.js';
-import { serializeUserPrompt, serializeAgentThought, serializeToolExecution, serializeMaskedTool, serializeAgentYield } from '../ir/fromIr.js';
+import type { IrNodeBehaviorRegistry } from '../ir/behaviorRegistry.js';
 
 /**
  * The flat token cost assigned to a single multi-modal asset (like an image tile)
@@ -19,7 +18,10 @@ import { serializeUserPrompt, serializeAgentThought, serializeToolExecution, ser
 export class ContextTokenCalculator {
   private readonly tokenCache = new Map<string, number>();
 
-  constructor(private readonly charsPerToken: number) {}
+  constructor(
+    private readonly charsPerToken: number,
+    private readonly registry: IrNodeBehaviorRegistry
+  ) {}
 
   /**
    * Estimates tokens for a simple string based on character count.
@@ -42,23 +44,9 @@ export class ContextTokenCalculator {
    * Because nodes are immutable, this cost never changes for this node ID.
    */
   cacheNodeTokens(node: ConcreteNode): number {
-    let tokens = 0;
-    if (isUserPrompt(node)) {
-      const content = serializeUserPrompt(node);
-      if (content && content.parts) tokens = this.estimateTokensForParts(content.parts as Part[]);
-    } else if (isAgentThought(node)) {
-      tokens = this.estimateTokensForParts([serializeAgentThought(node)]);
-    } else if (isToolExecution(node)) {
-      const parts = serializeToolExecution(node);
-      tokens = this.estimateTokensForParts([parts.call, parts.response]);
-    } else if (isMaskedTool(node)) {
-      const parts = serializeMaskedTool(node);
-      tokens = this.estimateTokensForParts([parts.call, parts.response]);
-    } else if (isAgentYield(node)) {
-      tokens = this.estimateTokensForParts([serializeAgentYield(node)]);
-    } else if (isSnapshot(node) || isRollingSummary(node)) {
-      tokens = this.estimateTokensForParts([{ text: node.text }]);
-    }
+    const behavior = this.registry.get(node.type);
+    const parts = behavior.getEstimatableParts(node);
+    const tokens = this.estimateTokensForParts(parts);
     this.tokenCache.set(node.id, tokens);
     return tokens;
   }

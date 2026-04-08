@@ -25,8 +25,8 @@ export class ContextEnvironmentImpl implements ContextEnvironment {
   readonly fileSystem: IFileSystem;
   readonly idGenerator: IIdGenerator;
   readonly inbox: LiveInbox;
-  readonly behaviorRegistry: import('../ir/behaviorRegistry.js').IrNodeBehaviorRegistry;
-  readonly irMapper: import('../ir/mapper.js').IrMapper;
+  readonly behaviorRegistry: IrNodeBehaviorRegistry;
+  readonly irMapper: IrMapper;
 
   constructor(
     readonly llmClient: BaseLlmClient,
@@ -40,13 +40,12 @@ export class ContextEnvironmentImpl implements ContextEnvironment {
     fileSystem?: IFileSystem,
     idGenerator?: IIdGenerator,
   ) {
-    this.tokenCalculator = new ContextTokenCalculator(this.charsPerToken);
+    this.behaviorRegistry = new IrNodeBehaviorRegistry();
+    registerBuiltInBehaviors(this.behaviorRegistry);
+    this.tokenCalculator = new ContextTokenCalculator(this.charsPerToken, this.behaviorRegistry);
     this.fileSystem = fileSystem || new NodeFileSystem();
     this.idGenerator = idGenerator || new NodeIdGenerator();
     this.inbox = new LiveInbox();
-    
-    this.behaviorRegistry = new IrNodeBehaviorRegistry();
-    registerBuiltInBehaviors(this.behaviorRegistry);
     this.irMapper = new IrMapper(this.behaviorRegistry);
   }
 }

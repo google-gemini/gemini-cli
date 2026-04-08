@@ -10,6 +10,8 @@ import type { ContextTracer } from '../tracer.js';
 import type { IFileSystem } from '../system/IFileSystem.js';
 import type { IIdGenerator } from '../system/IIdGenerator.js';
 import type { LiveInbox } from './inbox.js';
+import type { IrNodeBehaviorRegistry } from '../ir/behaviorRegistry.js';
+import type { IrMapper } from '../ir/mapper.js';
 
 export type { ContextTracer, ContextEventBus };
 
@@ -26,6 +28,6 @@ export interface ContextEnvironment {
   readonly idGenerator: IIdGenerator;
   readonly eventBus: ContextEventBus;
   readonly inbox: LiveInbox;
-  readonly behaviorRegistry: import('../ir/behaviorRegistry.js').IrNodeBehaviorRegistry;
-  readonly irMapper: import('../ir/mapper.js').IrMapper;
+  readonly behaviorRegistry: IrNodeBehaviorRegistry;
+  readonly irMapper: IrMapper;
 }

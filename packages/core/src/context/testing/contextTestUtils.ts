@@ -123,7 +123,7 @@ export function createMockEnvironment(
     eventBus: new ContextEventBus(),
     tracer: new ContextTracer({ targetDir: '/tmp', sessionId: 'mock-session' }),
     charsPerToken: 1,
-    tokenCalculator: new ContextTokenCalculator(1),
+    tokenCalculator: new ContextTokenCalculator(1, registry),
     fileSystem: new InMemoryFileSystem(),
     idGenerator: new DeterministicIdGenerator('mock-uuid-'),
     behaviorRegistry: registry,

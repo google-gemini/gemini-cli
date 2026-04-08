@@ -123,12 +123,6 @@ export class SemanticCompressionProcessor implements ContextProcessor {
         }
 
         if (modified) {
-             newParts.map(p => {
-               if (p.type === 'text') return { text: p.text };
-               if (p.type === 'inline_data') return { inlineData: { mimeType: p.mimeType, data: p.data } };
-               if (p.type === 'file_data') return { fileData: { mimeType: p.mimeType, fileUri: p.fileUri } };
-               return (p as Extract<import('../ir/types.js').SemanticPart, { type: 'raw_part' }>).part;
-             });
            returnedNodes.push({
              ...prompt,
              id: this.env.idGenerator.generateId(),

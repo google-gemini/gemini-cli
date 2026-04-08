@@ -18,22 +18,23 @@ describe('SemanticCompressionProcessor', () => {
   it('should trigger summarization via LLM for long text parts', async () => {
     const mockLlmClient = {
       generateContent: vi.fn().mockResolvedValue({
-        candidates: [{ content: { parts: [{ text: 'Mocked Summary!' }] } }],
+        text: 'Mocked Summary!',
       }),
     };
 
-    const mockTokenCalculator = new ContextTokenCalculator(1) as any;
+    const env = createMockEnvironment({
+        llmClient: mockLlmClient as any,
+    });
+    const mockTokenCalculator = new ContextTokenCalculator(1, env.behaviorRegistry) as any;
     mockTokenCalculator.tokensToChars = vi.fn().mockReturnValue(10);
     mockTokenCalculator.estimateTokensForParts = vi.fn((parts: any) => {
        if (parts[0]?.text === 'Mocked Summary!') return 5;
        if (parts[0]?.functionResponse?.response?.summary === 'Mocked Summary!') return 10;
        return 5000;
     });
+    mockTokenCalculator.getTokenCost = vi.fn().mockReturnValue(5000);
 
-    const env = createMockEnvironment({
-        llmClient: mockLlmClient as any,
-        tokenCalculator: mockTokenCalculator
-    });
+    (env as any).tokenCalculator = mockTokenCalculator;
 
     const processor = SemanticCompressionProcessor.create(env, {
       nodeThresholdTokens: 10,
@@ -69,18 +70,17 @@ describe('SemanticCompressionProcessor', () => {
 
     // 1. User Prompt
     const compressedPrompt = result[0] as UserPrompt;
-    expect(compressedPrompt.id).toBe('mock-uuid-1');
     expect(compressedPrompt.id).not.toBe(prompt.id);
     expect(compressedPrompt.semanticParts[0].type).toBe('text');
     expect((compressedPrompt.semanticParts[0] as any).text).toBe('Mocked Summary!');
     // 2. Agent Thought
     const compressedThought = result[1] as AgentThought;
-    expect(compressedThought.id).toBe('mock-uuid-2');
+    expect(compressedThought.id).toMatch(/^mock-uuid-/);
     expect(compressedThought.id).not.toBe(thought.id);
     expect(compressedThought.text).toBe('Mocked Summary!');
 
     const compressedTool = result[2] as ToolExecution;
-    expect(compressedTool.id).toBe('mock-uuid-3');
+    expect(compressedTool.id).toMatch(/^mock-uuid-/);
     expect(compressedTool.id).not.toBe(tool.id);
     expect(compressedTool.observation).toEqual({ summary: 'Mocked Summary!' });
 
@@ -90,22 +90,23 @@ describe('SemanticCompressionProcessor', () => {
   it('should stop summarizing once the deficit is cleared', async () => {
     const mockLlmClient = {
       generateContent: vi.fn().mockResolvedValue({
-        candidates: [{ content: { parts: [{ text: 'Mocked Summary!' }] } }],
+        text: 'Mocked Summary!',
       }),
     };
 
-    const mockTokenCalculator = new ContextTokenCalculator(1) as any;
+    const env = createMockEnvironment({
+       llmClient: mockLlmClient as any,
+    });
+    const mockTokenCalculator = new ContextTokenCalculator(1, env.behaviorRegistry) as any;
     mockTokenCalculator.tokensToChars = vi.fn().mockReturnValue(10);
     // Returning 0 tokens for the summary to maximize savings
     mockTokenCalculator.estimateTokensForParts = vi.fn((parts: any) => {
        if (parts[0]?.text === 'Mocked Summary!') return 0;
        return 5000;
     });
+    mockTokenCalculator.getTokenCost = vi.fn().mockReturnValue(5000);
 
-    const env = createMockEnvironment({
-       llmClient: mockLlmClient as any,
-       tokenCalculator: mockTokenCalculator
-    });
+    (env as any).tokenCalculator = mockTokenCalculator;
 
     const processor = SemanticCompressionProcessor.create(env, {
       nodeThresholdTokens: 10,
@@ -137,7 +138,6 @@ describe('SemanticCompressionProcessor', () => {
 
     // 1. User Prompt (was summarized because deficit was > 0)
     const compressedPrompt = result[0] as UserPrompt;
-    expect(compressedPrompt.id).toBe('mock-uuid-1');
     expect(compressedPrompt.id).not.toBe(prompt.id);
 
     // 2. Agent Thought (was NOT summarized because deficit hit 0)

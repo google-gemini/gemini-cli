@@ -18,7 +18,6 @@ import { ContextEnvironmentImpl } from './sidecar/environmentImpl.js';
 import { SidecarLoader } from './sidecar/SidecarLoader.js';
 import { ContextTracer } from './tracer.js';
 import { ContextEventBus } from './eventBus.js';
-import { ContextTokenCalculator } from './utils/contextTokenCalculator.js';
 import type { Content } from '@google/genai';
 import type { BaseLlmClient } from '../core/baseLlmClient.js';
 import type { Episode } from './ir/types.js';
@@ -140,7 +139,7 @@ describe('ContextManager Golden Tests', () => {
     const history = createLargeHistory();
     (
       contextManager as unknown as { pristineEpisodes: Episode[] }
-    ).pristineEpisodes = (contextManager as any).env.irMapper.toIr(history, new ContextTokenCalculator(4));
+    ).pristineEpisodes = (contextManager as any).env.irMapper.toIr(history, (contextManager as any).env.tokenCalculator);
     const result = await contextManager.projectCompressedHistory();
     expect(result).toMatchSnapshot();
   });

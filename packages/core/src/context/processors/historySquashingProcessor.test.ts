@@ -15,7 +15,8 @@ import { ContextTokenCalculator } from '../utils/contextTokenCalculator.js';
 
 describe('HistorySquashingProcessor', () => {
   it('should truncate nodes that exceed maxTokensPerNode', async () => {
-    const mockTokenCalculator = new ContextTokenCalculator(1) as any;
+    const env = createMockEnvironment();
+    const mockTokenCalculator = new ContextTokenCalculator(1, env.behaviorRegistry) as any;
     mockTokenCalculator.tokensToChars = vi.fn().mockReturnValue(10); // Limit is 10 chars
 
     mockTokenCalculator.estimateTokensForString = vi.fn((text: string) => {
@@ -24,9 +25,7 @@ describe('HistorySquashingProcessor', () => {
     });
     mockTokenCalculator.estimateTokensForParts = vi.fn(() => 1);
 
-    const env = createMockEnvironment({
-        tokenCalculator: mockTokenCalculator
-    });
+    (env as any).tokenCalculator = mockTokenCalculator;
 
     const processor = HistorySquashingProcessor.create(env, {
       maxTokensPerNode: 1, // Will equal 10 chars limit
@@ -80,7 +79,8 @@ describe('HistorySquashingProcessor', () => {
   });
 
   it('should stop truncating once the deficit is cleared', async () => {
-    const mockTokenCalculator = new ContextTokenCalculator(1) as any;
+    const env = createMockEnvironment();
+    const mockTokenCalculator = new ContextTokenCalculator(1, env.behaviorRegistry) as any;
     mockTokenCalculator.tokensToChars = vi.fn().mockReturnValue(10); 
     mockTokenCalculator.estimateTokensForString = vi.fn((text: string) => {
         if (text.includes('OMITTED')) return 0; // Huge savings
@@ -88,9 +88,7 @@ describe('HistorySquashingProcessor', () => {
     });
     mockTokenCalculator.estimateTokensForParts = vi.fn(() => 0);
 
-    const env = createMockEnvironment({
-        tokenCalculator: mockTokenCalculator
-    });
+    (env as any).tokenCalculator = mockTokenCalculator;
 
     const processor = HistorySquashingProcessor.create(env, {
       maxTokensPerNode: 1,

@@ -141,7 +141,7 @@ export class ContextManager {
     }
 
     this.historyObserver = new HistoryObserver(
-      this.chatHistory,
+      chatHistory,
       this.env.eventBus,
       this.tracer,
       this.env.tokenCalculator,
