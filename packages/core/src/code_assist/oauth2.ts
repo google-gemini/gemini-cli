@@ -432,16 +432,24 @@ async function authWithUserCode(client: OAuth2Client): Promise<boolean> {
         terminal: true,
       });
 
+      const abortController = new AbortController();
       authTimeoutId = setTimeout(() => {
-        rl.close();
-        reject(
+        abortController.abort(
           new FatalAuthenticationError(
             'Authorization timed out after 5 minutes.',
           ),
         );
       }, 300000); // 5 minute timeout
+      authTimeoutId.unref();
+
+      const onAbort = () => {
+        rl.close();
+        reject(abortController.signal.reason);
+      };
+      abortController.signal.addEventListener('abort', onAbort, { once: true });
 
       rl.question('Enter the authorization code: ', (code) => {
+        abortController.signal.removeEventListener('abort', onAbort);
         rl.close();
         resolve(code.trim());
       });
