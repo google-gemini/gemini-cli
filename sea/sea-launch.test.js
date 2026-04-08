@@ -351,56 +351,74 @@ describe('sea-launch', () => {
     });
 
     it('recreates runtime if existing has wrong permissions', () => {
-      const deps = {
-        fs: {
-          existsSync: vi.fn().mockReturnValueOnce(true).mockReturnValue(false),
-          rmSync: vi.fn(),
-          mkdirSync: vi.fn(),
-          writeFileSync: vi.fn(),
-          renameSync: vi.fn(),
-          readFileSync: vi.fn().mockReturnValue('content'),
-          openSync: vi.fn(() => 1),
-          readSync: vi.fn((fd, buffer) => {
-            if (!buffer._readDone) {
-              buffer._readDone = true;
-              return 1;
-            }
-            return 0;
-          }),
-          closeSync: vi.fn(),
-          lstatSync: vi.fn(() => ({
-            isDirectory: () => true,
-            uid: 1000,
-            mode: S_IFDIR | 0o777, // Too open
-          })),
-        },
-        os: {
-          userInfo: () => ({ username: 'user' }),
-          tmpdir: () => '/tmp',
-        },
-        path: path,
-        processEnv: {},
-        crypto: {
-          createHash: vi.fn(() => {
-            const hash = {
-              update: vi.fn().mockReturnThis(),
-              digest: vi.fn(() => 'h1'),
-            };
-            return hash;
-          }),
-        },
-        processUid: 1000,
-        processPid: 123,
-      };
-
-      mockGetAsset.mockReturnValue(Buffer.from('asset_content'));
-
-      prepareRuntime(mockManifest, mockGetAsset, deps);
-
-      expect(deps.fs.rmSync).toHaveBeenCalledWith(
-        expect.stringContaining('gemini-runtime'),
-        expect.anything(),
+      const originalDescriptor = Object.getOwnPropertyDescriptor(
+        process,
+        'platform',
       );
+      Object.defineProperty(process, 'platform', {
+        value: 'linux',
+        configurable: true,
+      });
+
+      try {
+        const deps = {
+          fs: {
+            existsSync: vi
+              .fn()
+              .mockReturnValueOnce(true)
+              .mockReturnValue(false),
+            rmSync: vi.fn(),
+            mkdirSync: vi.fn(),
+            writeFileSync: vi.fn(),
+            renameSync: vi.fn(),
+            readFileSync: vi.fn().mockReturnValue('content'),
+            openSync: vi.fn(() => 1),
+            readSync: vi.fn((fd, buffer) => {
+              if (!buffer._readDone) {
+                buffer._readDone = true;
+                return 1;
+              }
+              return 0;
+            }),
+            closeSync: vi.fn(),
+            lstatSync: vi.fn(() => ({
+              isDirectory: () => true,
+              uid: 1000,
+              mode: S_IFDIR | 0o777, // Too open
+            })),
+          },
+          os: {
+            userInfo: () => ({ username: 'user' }),
+            tmpdir: () => '/tmp',
+          },
+          path: path.posix,
+          processEnv: {},
+          crypto: {
+            createHash: vi.fn(() => {
+              const hash = {
+                update: vi.fn().mockReturnThis(),
+                digest: vi.fn(() => 'h1'),
+              };
+              return hash;
+            }),
+          },
+          processUid: 1000,
+          processPid: 123,
+        };
+
+        mockGetAsset.mockReturnValue(Buffer.from('asset_content'));
+
+        prepareRuntime(mockManifest, mockGetAsset, deps);
+
+        expect(deps.fs.rmSync).toHaveBeenCalledWith(
+          expect.stringContaining('gemini-runtime'),
+          expect.anything(),
+        );
+      } finally {
+        if (originalDescriptor) {
+          Object.defineProperty(process, 'platform', originalDescriptor);
+        }
+      }
     });
 
     it('creates new runtime if existing is invalid (integrity check)', () => {
