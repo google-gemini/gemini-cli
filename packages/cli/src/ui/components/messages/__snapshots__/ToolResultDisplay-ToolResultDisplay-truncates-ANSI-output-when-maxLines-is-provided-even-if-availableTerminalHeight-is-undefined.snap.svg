@@ -4,7 +4,7 @@
   </style>
   <rect width="920" height="445" fill="#000000" />
   <g transform="translate(10, 10)">
-    <text x="0" y="2" fill="#ffffff" textLength="900" lengthAdjust="spacingAndGlyphs">Line 26                                                                                             </text>
+    <text x="0" y="2" fill="#afafaf" textLength="234" lengthAdjust="spacingAndGlyphs">... 26 hidden (Ctrl+O) ...</text>
     <text x="0" y="19" fill="#ffffff" textLength="900" lengthAdjust="spacingAndGlyphs">Line 27                                                                                             </text>
     <text x="0" y="36" fill="#ffffff" textLength="900" lengthAdjust="spacingAndGlyphs">Line 28                                                                                             </text>
     <text x="0" y="53" fill="#ffffff" textLength="900" lengthAdjust="spacingAndGlyphs">Line 29                                                                                             </text>
@@ -16,31 +16,18 @@
     <text x="0" y="155" fill="#ffffff" textLength="900" lengthAdjust="spacingAndGlyphs">Line 35                                                                                             </text>
     <text x="0" y="172" fill="#ffffff" textLength="900" lengthAdjust="spacingAndGlyphs">Line 36                                                                                             </text>
     <text x="0" y="189" fill="#ffffff" textLength="900" lengthAdjust="spacingAndGlyphs">Line 37                                                                                             </text>
-    <text x="0" y="206" fill="#ffffff" textLength="675" lengthAdjust="spacingAndGlyphs">Line 38                                                                    </text>
-    <text x="675" y="206" fill="#333333" textLength="9" lengthAdjust="spacingAndGlyphs">▄</text>
-    <text x="0" y="223" fill="#ffffff" textLength="675" lengthAdjust="spacingAndGlyphs">Line 39                                                                    </text>
-    <text x="675" y="223" fill="#333333" textLength="9" lengthAdjust="spacingAndGlyphs">█</text>
-    <text x="0" y="240" fill="#ffffff" textLength="675" lengthAdjust="spacingAndGlyphs">Line 40                                                                    </text>
-    <text x="675" y="240" fill="#333333" textLength="9" lengthAdjust="spacingAndGlyphs">█</text>
-    <text x="0" y="257" fill="#ffffff" textLength="675" lengthAdjust="spacingAndGlyphs">Line 41                                                                    </text>
-    <text x="675" y="257" fill="#333333" textLength="9" lengthAdjust="spacingAndGlyphs">█</text>
-    <text x="0" y="274" fill="#ffffff" textLength="675" lengthAdjust="spacingAndGlyphs">Line 42                                                                    </text>
-    <text x="675" y="274" fill="#333333" textLength="9" lengthAdjust="spacingAndGlyphs">█</text>
-    <text x="0" y="291" fill="#ffffff" textLength="675" lengthAdjust="spacingAndGlyphs">Line 43                                                                    </text>
-    <text x="675" y="291" fill="#333333" textLength="9" lengthAdjust="spacingAndGlyphs">█</text>
-    <text x="0" y="308" fill="#ffffff" textLength="675" lengthAdjust="spacingAndGlyphs">Line 44                                                                    </text>
-    <text x="675" y="308" fill="#333333" textLength="9" lengthAdjust="spacingAndGlyphs">█</text>
-    <text x="0" y="325" fill="#ffffff" textLength="675" lengthAdjust="spacingAndGlyphs">Line 45                                                                    </text>
-    <text x="675" y="325" fill="#333333" textLength="9" lengthAdjust="spacingAndGlyphs">█</text>
-    <text x="0" y="342" fill="#ffffff" textLength="675" lengthAdjust="spacingAndGlyphs">Line 46                                                                    </text>
-    <text x="675" y="342" fill="#333333" textLength="9" lengthAdjust="spacingAndGlyphs">█</text>
-    <text x="0" y="359" fill="#ffffff" textLength="675" lengthAdjust="spacingAndGlyphs">Line 47                                                                    </text>
-    <text x="675" y="359" fill="#333333" textLength="9" lengthAdjust="spacingAndGlyphs">█</text>
-    <text x="0" y="376" fill="#ffffff" textLength="675" lengthAdjust="spacingAndGlyphs">Line 48                                                                    </text>
-    <text x="675" y="376" fill="#333333" textLength="9" lengthAdjust="spacingAndGlyphs">█</text>
-    <text x="0" y="393" fill="#ffffff" textLength="675" lengthAdjust="spacingAndGlyphs">Line 49                                                                    </text>
-    <text x="675" y="393" fill="#333333" textLength="9" lengthAdjust="spacingAndGlyphs">█</text>
-    <text x="0" y="410" fill="#ffffff" textLength="675" lengthAdjust="spacingAndGlyphs">Line 50                                                                    </text>
-    <text x="675" y="410" fill="#333333" textLength="9" lengthAdjust="spacingAndGlyphs">█</text>
+    <text x="0" y="206" fill="#ffffff" textLength="900" lengthAdjust="spacingAndGlyphs">Line 38                                                                                             </text>
+    <text x="0" y="223" fill="#ffffff" textLength="900" lengthAdjust="spacingAndGlyphs">Line 39                                                                                             </text>
+    <text x="0" y="240" fill="#ffffff" textLength="900" lengthAdjust="spacingAndGlyphs">Line 40                                                                                             </text>
+    <text x="0" y="257" fill="#ffffff" textLength="900" lengthAdjust="spacingAndGlyphs">Line 41                                                                                             </text>
+    <text x="0" y="274" fill="#ffffff" textLength="900" lengthAdjust="spacingAndGlyphs">Line 42                                                                                             </text>
+    <text x="0" y="291" fill="#ffffff" textLength="900" lengthAdjust="spacingAndGlyphs">Line 43                                                                                             </text>
+    <text x="0" y="308" fill="#ffffff" textLength="900" lengthAdjust="spacingAndGlyphs">Line 44                                                                                             </text>
+    <text x="0" y="325" fill="#ffffff" textLength="900" lengthAdjust="spacingAndGlyphs">Line 45                                                                                             </text>
+    <text x="0" y="342" fill="#ffffff" textLength="900" lengthAdjust="spacingAndGlyphs">Line 46                                                                                             </text>
+    <text x="0" y="359" fill="#ffffff" textLength="900" lengthAdjust="spacingAndGlyphs">Line 47                                                                                             </text>
+    <text x="0" y="376" fill="#ffffff" textLength="900" lengthAdjust="spacingAndGlyphs">Line 48                                                                                             </text>
+    <text x="0" y="393" fill="#ffffff" textLength="900" lengthAdjust="spacingAndGlyphs">Line 49                                                                                             </text>
+    <text x="0" y="410" fill="#ffffff" textLength="900" lengthAdjust="spacingAndGlyphs">Line 50                                                                                             </text>
   </g>
 </svg>
