@@ -22,13 +22,50 @@ import fs from 'node:fs';
 async function main() {
   const modelList = process.env.MODEL_LIST || 'gemini-3-flash-preview';
   const models = modelList.split(',').map((m) => m.trim());
+  const isRelatedMode = process.argv.includes('--related');
 
   let combinedReport = '';
   let hasRegression = false;
+  let detectionRationale = '';
+  let affectedSuitesStr = '';
 
   console.log(
     `🚀 Starting evaluation orchestration for models: ${models.join(', ')}`,
   );
+
+  if (isRelatedMode) {
+    console.log('🔍 Identifying related evaluations based on changes...');
+    try {
+      const detectionOutput = execSync(
+        `node scripts/changed_prompt.js --related --json`,
+        { encoding: 'utf-8', stdio: ['inherit', 'pipe', 'inherit'] },
+      ).trim();
+      const detection = JSON.parse(detectionOutput);
+
+      if (detection.affectedSuites && detection.affectedSuites.length > 0) {
+        affectedSuitesStr = detection.affectedSuites.join(',');
+        detectionRationale = '### 🧪 Related Evaluation Rationale\n\n';
+        detection.rationales.forEach((r) => {
+          detectionRationale += `- ${r}\n`;
+        });
+        detectionRationale +=
+          '\n_Something missing? [Update evals/suites.json](evals/README.md#related-testing-with-related) to adjust detection logic._\n\n---\n\n';
+      } else if (!detection.detected) {
+        console.log('✅ No related changes detected. Skipping evaluations.');
+        process.exit(0);
+      } else {
+        console.log(
+          '⚠️ Changes detected but no specific suites matched. Running full stable suite for safety.',
+        );
+        detectionRationale =
+          '### 🧪 Related Evaluation Rationale\n\n- No specific suites matched. Running full stable suite for safety.\n\n---\n\n';
+      }
+    } catch (e) {
+      console.error(`❌ Error during suite detection: ${e.message}`);
+      detectionRationale =
+        '### 🧪 Related Evaluation Rationale\n\n- Error during suite detection. Running full stable suite for safety.\n\n---\n\n';
+    }
+  }
 
   for (const model of models) {
     console.log(`\n--- Processing Model: ${model} ---`);
@@ -36,8 +73,11 @@ async function main() {
     try {
       // 1. Identify Trustworthy Evals
       console.log(`🔍 Identifying trustworthy tests for ${model}...`);
+      const suitesFlag = affectedSuitesStr
+        ? `--suites ${affectedSuitesStr}`
+        : '';
       const output = execSync(
-        `node scripts/get_trustworthy_evals.js "${model}"`,
+        `node scripts/get_trustworthy_evals.js "${model}" ${suitesFlag}`,
         {
           encoding: 'utf-8',
           stdio: ['inherit', 'pipe', 'inherit'], // Capture stdout but pass stdin/stderr
@@ -83,7 +123,8 @@ async function main() {
 
   // Always save the combined report to a file so the workflow can capture it cleanly
   if (combinedReport) {
-    fs.writeFileSync('eval_regression_report.md', combinedReport);
+    const finalReport = detectionRationale + combinedReport;
+    fs.writeFileSync('eval_regression_report.md', finalReport);
     console.log(
       '\n📊 Final Markdown report saved to eval_regression_report.md',
     );

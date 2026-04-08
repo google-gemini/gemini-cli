@@ -500,6 +500,9 @@ function main() {
   if (args.includes('--check-github-actions-pinning')) {
     runGithubActionsPinningLinter();
   }
+  if (args.includes('--eval-suites')) {
+    runEvalSuiteLinter();
+  }
 
   if (args.length === 0) {
     setupLinters();
@@ -511,7 +514,17 @@ function main() {
     runSensitiveKeywordLinter();
     runTSConfigLinter();
     runGithubActionsPinningLinter();
+    runEvalSuiteLinter();
     console.log('\nAll linting checks passed!');
+  }
+}
+
+export function runEvalSuiteLinter() {
+  console.log('\nRunning eval suite linter...');
+  try {
+    execSync('node scripts/validate_eval_suites.js', { stdio: 'inherit' });
+  } catch {
+    process.exit(1);
   }
 }
 

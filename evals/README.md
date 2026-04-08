@@ -227,10 +227,18 @@ in Pull Requests. These can also be run locally for debugging.
 ### Running Regression Checks Locally
 
 You can simulate the PR regression check locally to verify your changes before
-pushing:
+pushing. To optimize your workflow and reduce LLM costs, use the **`--related`**
+flag to run only the tests relevant to your specific changes:
 
 ```bash
-# Run the full regression loop for a specific model
+# Run the targeted regression loop for your changes
+MODEL_LIST=gemini-3-flash-preview node scripts/run_eval_regression.js --related
+```
+
+To run the full regression loop for a specific model (all stable tests):
+
+```bash
+# Run everything
 MODEL_LIST=gemini-3-flash-preview node scripts/run_eval_regression.js
 ```
 
@@ -242,6 +250,38 @@ OUTPUT=$(node scripts/get_trustworthy_evals.js "gemini-3-flash-preview")
 
 # 2. Run the regression logic for those tests
 node scripts/run_regression_check.js "gemini-3-flash-preview" "$OUTPUT"
+```
+
+### Related Testing with `--related`
+
+The project uses a "Smart Eval" system to identify which behavioral evaluations
+are affected by your code changes. This is controlled by the `--related` flag
+available in `scripts/run_eval_regression.js`.
+
+#### How it Works
+
+1.  **Change Detection**: The system uses Git to identify modified files in your
+    branch compared to `main`.
+2.  **Suite Mapping**: Modified files are matched against patterns in
+    `evals/suites.json`. This file maps core files (e.g., `grep.ts`) to their
+    corresponding evaluations.
+3.  **Targeted Execution**: Only the evaluations belonging to the affected
+    suites are executed.
+4.  **Global Fallback**: If changes are detected in core system prompts or
+    unmapped files, the system automatically falls back to running the full
+    stable evaluation suite for safety.
+
+#### Updating Detection Logic
+
+If you add a new tool or functional area, you should update `evals/suites.json`
+to ensure your new evaluations are triggered correctly.
+
+```json
+"my_new_tool": {
+  "description": "Description of the tool",
+  "patterns": ["packages/core/src/tools/my-new-tool.ts"],
+  "evals": ["evals/my_new_tool.eval.ts"]
+}
 ```
 
 ### The Regression Quality Bar

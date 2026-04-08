@@ -13,6 +13,7 @@
  * to ensure high-signal validation and minimize noise.
  */
 
+import fs from 'node:fs';
 import { fetchNightlyHistory, escapeRegex } from './eval_utils.js';
 
 const LOOKBACK_COUNT = 6;
@@ -25,16 +26,55 @@ const AGGREGATE_PASS_RATE_THRESHOLD = 0.8; // Weekly signal (e.g., 15/18)
  */
 function main() {
   const targetModel = process.argv[2];
-  if (!targetModel) {
+  if (!targetModel || targetModel.startsWith('--')) {
     console.error('❌ Error: No target model specified.');
     process.exit(1);
   }
+
+  // Parse --suites argument
+  const suitesArgIndex = process.argv.indexOf('--suites');
+  let requestedSuites = null;
+  if (suitesArgIndex !== -1 && process.argv[suitesArgIndex + 1]) {
+    requestedSuites = process.argv[suitesArgIndex + 1]
+      .split(',')
+      .map((s) => s.trim());
+  }
+
   console.error(`🔍 Identifying trustworthy evals for model: ${targetModel}`);
+  if (requestedSuites) {
+    console.error(`📂 Filtering by suites: ${requestedSuites.join(', ')}`);
+  }
 
   const history = fetchNightlyHistory(LOOKBACK_COUNT);
   if (history.length === 0) {
     console.error('❌ No historical data found.');
     process.exit(1);
+  }
+
+  // Load suites configuration
+  let allowedFiles = null;
+  let runAllStable = false;
+  if (requestedSuites) {
+    try {
+      const suitesConfig = JSON.parse(
+        fs.readFileSync('evals/suites.json', 'utf-8'),
+      );
+      allowedFiles = new Set();
+      for (const suiteName of requestedSuites) {
+        const suite = suitesConfig[suiteName];
+        if (suite) {
+          if (suite.evals.includes('ALL_ALWAYS_PASSING')) {
+            runAllStable = true;
+          } else {
+            suite.evals.forEach((file) => allowedFiles.add(file));
+          }
+        }
+      }
+    } catch (e) {
+      console.error(
+        `⚠️ Warning: Could not load evals/suites.json or match suites: ${e.message}`,
+      );
+    }
   }
 
   // Aggregate results for the target model across all history
@@ -83,11 +123,28 @@ function main() {
     const isAggregateHighSignal = aggregateRate > AGGREGATE_PASS_RATE_THRESHOLD;
 
     if (isDailyStable && isAggregateHighSignal) {
-      trustworthyTests.push(testName);
-      if (info.file) {
-        const match = info.file.match(/evals\/.*\.eval\.ts/);
-        if (match) {
-          trustworthyFiles.add(match[0]);
+      // Suite filtering logic
+      let isFileAllowed = true;
+      if (requestedSuites && !runAllStable) {
+        if (info.file) {
+          const match = info.file.match(/evals\/.*\.eval\.ts/);
+          if (match && !allowedFiles.has(match[0])) {
+            isFileAllowed = false;
+          } else if (!match) {
+            isFileAllowed = false;
+          }
+        } else {
+          isFileAllowed = false;
+        }
+      }
+
+      if (isFileAllowed) {
+        trustworthyTests.push(testName);
+        if (info.file) {
+          const match = info.file.match(/evals\/.*\.eval\.ts/);
+          if (match) {
+            trustworthyFiles.add(match[0]);
+          }
         }
       }
     } else {
@@ -99,10 +156,14 @@ function main() {
     `✅ Found ${trustworthyTests.length} trustworthy tests across ${trustworthyFiles.size} files:`,
   );
   trustworthyTests.sort().forEach((name) => console.error(`   - ${name}`));
-  console.error(`\n⚪ Ignored ${volatileTests.length} volatile tests.`);
-  console.error(
-    `🆕 Ignored ${newTests.length} tests with insufficient history.`,
-  );
+  if (volatileTests.length > 0) {
+    console.error(`\n⚪ Ignored ${volatileTests.length} volatile tests.`);
+  }
+  if (newTests.length > 0) {
+    console.error(
+      `🆕 Ignored ${newTests.length} tests with insufficient history.`,
+    );
+  }
 
   // Output the list of names as a regex-friendly pattern for vitest -t
   const pattern = trustworthyTests.map((name) => escapeRegex(name)).join('|');
