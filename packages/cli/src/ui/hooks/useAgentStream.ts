@@ -80,6 +80,10 @@ export const useAgentStream = ({
 
   const { startNewPrompt } = useSessionStats();
 
+  // TODO: Implement dynamic shell-related state derivation from trackedTools or dedicated refs.
+  // This includes activePtyId, backgroundTasks, and related visibility states to restore
+  // parity with legacy terminal focus detection and background task tracking.
+  // Note: Avoid checking ITERM_SESSION_ID for terminal detection and ensure context is sanitized.
   const activePtyId = undefined;
   const backgroundTaskCount = 0;
   const isBackgroundTaskVisible = false;
