@@ -1715,13 +1715,13 @@ describe('PolicyEngine', () => {
 
   describe('Plan Mode vs Subagent Priority (Regression)', () => {
     it('should DENY subagents in Plan Mode despite dynamic allow rules', async () => {
-      // Plan Mode Deny (1.06) > Subagent Allow (1.05)
+      // Plan Mode Deny (1.04) > Subagent Allow (1.03)
 
       const fixedRules: PolicyRule[] = [
         {
           toolName: '*',
           decision: PolicyDecision.DENY,
-          priority: 1.06,
+          priority: 1.04,
           modes: [ApprovalMode.PLAN],
         },
         {
@@ -2930,6 +2930,12 @@ describe('PolicyEngine', () => {
             modes: [ApprovalMode.PLAN],
           },
           {
+            toolName: 'web_fetch',
+            decision: PolicyDecision.ASK_USER,
+            priority: 70,
+            modes: [ApprovalMode.PLAN],
+          },
+          {
             toolName: '*',
             decision: PolicyDecision.DENY,
             priority: 60,
@@ -2972,7 +2978,6 @@ describe('PolicyEngine', () => {
       const excluded = engine.getExcludedTools(toolMetadata, allToolNames);
       // These should be excluded (caught by catch-all DENY)
       expect(excluded.has('shell')).toBe(true);
-      expect(excluded.has('web_fetch')).toBe(true);
       expect(excluded.has('write_todos')).toBe(true);
       expect(excluded.has('memory')).toBe(true);
       // write_file and replace are excluded unless they have argsPattern rules
@@ -2988,6 +2993,7 @@ describe('PolicyEngine', () => {
       expect(excluded.has('list_directory')).toBe(false);
       expect(excluded.has('google_web_search')).toBe(false);
       expect(excluded.has('activate_skill')).toBe(false);
+      expect(excluded.has('web_fetch')).toBe(false);
       expect(excluded.has('ask_user')).toBe(false);
       expect(excluded.has('exit_plan_mode')).toBe(false);
       expect(excluded.has('save_memory')).toBe(false);
@@ -3622,6 +3628,152 @@ describe('PolicyEngine', () => {
           )
         ).decision,
       ).toBe(PolicyDecision.ALLOW);
+    });
+  });
+
+  describe('additional_permissions', () => {
+    const workspace = '/workspace';
+    let mockSandboxManager: SandboxManager;
+    let engine: PolicyEngine;
+
+    beforeEach(() => {
+      mockSandboxManager = {
+        prepareCommand: vi.fn(),
+        isKnownSafeCommand: vi.fn().mockReturnValue(false),
+        isDangerousCommand: vi.fn().mockReturnValue(false),
+        parseDenials: vi.fn(),
+        getWorkspace: vi.fn().mockReturnValue(workspace),
+      } as never as SandboxManager;
+
+      engine = new PolicyEngine({
+        rules: [
+          {
+            toolName: 'run_shell_command',
+            decision: PolicyDecision.ALLOW,
+            modes: [ApprovalMode.AUTO_EDIT],
+          },
+        ],
+        approvalMode: ApprovalMode.AUTO_EDIT,
+        sandboxManager: mockSandboxManager,
+      });
+    });
+
+    it('should allow permissions exactly at the workspace root', async () => {
+      const call = {
+        name: 'run_shell_command',
+        args: {
+          command: 'ls',
+          additional_permissions: {
+            fileSystem: {
+              read: [workspace],
+            },
+          },
+        },
+      };
+      expect((await engine.check(call, undefined)).decision).toBe(
+        PolicyDecision.ALLOW,
+      );
+    });
+
+    it('should allow permissions for subpaths of the workspace', async () => {
+      const call = {
+        name: 'run_shell_command',
+        args: {
+          command: 'ls',
+          additional_permissions: {
+            fileSystem: {
+              read: [`${workspace}/subdir/file.txt`],
+            },
+          },
+        },
+      };
+      expect((await engine.check(call, undefined)).decision).toBe(
+        PolicyDecision.ALLOW,
+      );
+    });
+
+    it('should downgrade ALLOW to ASK_USER if a read path is outside workspace', async () => {
+      const call = {
+        name: 'run_shell_command',
+        args: {
+          command: 'ls',
+          additional_permissions: {
+            fileSystem: {
+              read: ['/outside'],
+            },
+          },
+        },
+      };
+      expect((await engine.check(call, undefined)).decision).toBe(
+        PolicyDecision.ASK_USER,
+      );
+    });
+
+    it('should downgrade ALLOW to ASK_USER if a write path is outside workspace', async () => {
+      const call = {
+        name: 'run_shell_command',
+        args: {
+          command: 'ls',
+          additional_permissions: {
+            fileSystem: {
+              write: ['/outside/secret.txt'],
+            },
+          },
+        },
+      };
+      expect((await engine.check(call, undefined)).decision).toBe(
+        PolicyDecision.ASK_USER,
+      );
+    });
+
+    it('should downgrade ALLOW to ASK_USER if any path in a list is outside workspace', async () => {
+      const call = {
+        name: 'run_shell_command',
+        args: {
+          command: 'ls',
+          additional_permissions: {
+            fileSystem: {
+              read: [`${workspace}/safe`, '/outside'],
+            },
+          },
+        },
+      };
+      expect((await engine.check(call, undefined)).decision).toBe(
+        PolicyDecision.ASK_USER,
+      );
+    });
+
+    it('should handle missing or empty fileSystem permissions gracefully (ALLOW)', async () => {
+      const call = {
+        name: 'run_shell_command',
+        args: {
+          command: 'ls',
+          additional_permissions: {
+            network: true,
+          },
+        },
+      };
+      expect((await engine.check(call, undefined)).decision).toBe(
+        PolicyDecision.ALLOW,
+      );
+    });
+
+    it('should handle non-array fileSystem paths gracefully', async () => {
+      const call = {
+        name: 'run_shell_command',
+        args: {
+          command: 'ls',
+          additional_permissions: {
+            fileSystem: {
+              read: '/not/an/array' as never as string[],
+            },
+          },
+        },
+      };
+      // It should just ignore the non-array and keep ALLOW if no other rules trigger
+      expect((await engine.check(call, undefined)).decision).toBe(
+        PolicyDecision.ALLOW,
+      );
     });
   });
 });

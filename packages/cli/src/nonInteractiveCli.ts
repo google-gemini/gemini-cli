@@ -46,6 +46,7 @@ import {
   handleMaxTurnsExceededError,
 } from './utils/errors.js';
 import { TextOutput } from './ui/utils/textOutput.js';
+import { runNonInteractive as runNonInteractiveAgentSession } from './nonInteractiveCliAgentSession.js';
 
 interface RunNonInteractiveParams {
   config: Config;
@@ -55,13 +56,16 @@ interface RunNonInteractiveParams {
   resumedSessionData?: ResumedSessionData;
 }
 
-export async function runNonInteractive({
-  config,
-  settings,
-  input,
-  prompt_id,
-  resumedSessionData,
-}: RunNonInteractiveParams): Promise<void> {
+export async function runNonInteractive(
+  params: RunNonInteractiveParams,
+): Promise<void> {
+  const useAgentSession = params.config.getAgentSessionNoninteractiveEnabled();
+  if (useAgentSession) {
+    return runNonInteractiveAgentSession(params);
+  }
+
+  const { config, settings, input, prompt_id, resumedSessionData } = params;
+
   return promptIdContext.run(prompt_id, async () => {
     const consolePatcher = new ConsolePatcher({
       stderr: true,
@@ -183,6 +187,7 @@ export async function runNonInteractive({
     };
 
     let errorToHandle: unknown | undefined;
+    let scheduler: Scheduler | undefined;
     try {
       consolePatcher.patch();
 
@@ -211,7 +216,7 @@ export async function runNonInteractive({
       });
 
       const geminiClient = config.getGeminiClient();
-      const scheduler = new Scheduler({
+      scheduler = new Scheduler({
         context: config,
         messageBus: config.getMessageBus(),
         getPreferredEditor: () => undefined,
@@ -524,6 +529,7 @@ export async function runNonInteractive({
       // Cleanup stdin cancellation before other cleanup
       cleanupStdinCancellation();
 
+      scheduler?.dispose();
       consolePatcher.cleanup();
       coreEvents.off(CoreEvent.UserFeedback, handleUserFeedback);
     }

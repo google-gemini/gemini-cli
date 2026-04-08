@@ -2,7 +2,6 @@
   "experimental": {
     "extensionReloading": true,
     "modelSteering": true,
-    "memoryManager": true,
     "topicUpdateNarration": true
   },
   "general": {

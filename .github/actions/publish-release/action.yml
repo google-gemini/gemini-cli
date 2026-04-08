@@ -291,8 +291,25 @@ runs:
         INPUTS_PREVIOUS_TAG: '${{ inputs.previous-tag }}'
       shell: 'bash'
       run: |
+        rm -f gemini-cli-bundle.zip
+        (cd bundle && chmod +x gemini.js && zip -r ../gemini-cli-bundle.zip .)
+
+        echo "Testing the generated bundle archive..."
+        rm -rf test-bundle
+        mkdir -p test-bundle
+        unzip -q gemini-cli-bundle.zip -d test-bundle
+
+        # Verify it runs and outputs a version
+        BUNDLE_VERSION=$(node test-bundle/gemini.js --version | xargs)
+        echo "Bundle version output: ${BUNDLE_VERSION}"
+        if [[ -z "${BUNDLE_VERSION}" ]]; then
+          echo "Error: Bundle failed to execute or return version."
+          exit 1
+        fi
+        rm -rf test-bundle
+
         gh release create "${INPUTS_RELEASE_TAG}" \
-          bundle/gemini.js \
+          gemini-cli-bundle.zip \
           --target "${STEPS_RELEASE_BRANCH_OUTPUTS_BRANCH_NAME}" \
           --title "Release ${INPUTS_RELEASE_TAG}" \
           --notes-start-tag "${INPUTS_PREVIOUS_TAG}" \

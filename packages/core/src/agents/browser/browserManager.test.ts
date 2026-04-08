@@ -46,6 +46,10 @@ vi.mock('../../utils/debugLogger.js', () => ({
   },
 }));
 
+vi.mock('../../telemetry/metrics.js', () => ({
+  recordBrowserAgentConnection: vi.fn(),
+}));
+
 // Mock browser consent to always grant consent by default
 vi.mock('../../utils/browserConsent.js', () => ({
   getBrowserConsentIfNeeded: vi.fn().mockResolvedValue(true),
@@ -78,6 +82,7 @@ vi.mock('node:fs', async (importOriginal) => {
 import * as fs from 'node:fs';
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { StdioClientTransport } from '@modelcontextprotocol/sdk/client/stdio.js';
+import { recordBrowserAgentConnection } from '../../telemetry/metrics.js';
 import { getBrowserConsentIfNeeded } from '../../utils/browserConsent.js';
 import { debugLogger } from '../../utils/debugLogger.js';
 
@@ -154,7 +159,9 @@ describe('BrowserManager', () => {
         expect.objectContaining({
           command: 'node',
           args: expect.arrayContaining([
-            expect.stringMatching(/bundled\/chrome-devtools-mcp\.mjs$/),
+            expect.stringMatching(
+              /(dist[\\/])?bundled[\\/]chrome-devtools-mcp\.mjs$/,
+            ),
           ]),
         }),
       );
@@ -170,7 +177,7 @@ describe('BrowserManager', () => {
           command: 'node',
           args: expect.arrayContaining([
             expect.stringMatching(
-              /(dist\/)?bundled\/chrome-devtools-mcp\.mjs$/,
+              /(dist[\\/])?bundled[\\/]chrome-devtools-mcp\.mjs$/,
             ),
           ]),
         }),
@@ -355,6 +362,22 @@ describe('BrowserManager', () => {
   });
 
   describe('MCP connection', () => {
+    it('should record connection success metrics', async () => {
+      const manager = new BrowserManager(mockConfig);
+      await manager.ensureConnection();
+
+      expect(recordBrowserAgentConnection).toHaveBeenCalledWith(
+        mockConfig,
+        expect.any(Number),
+        {
+          session_mode: 'persistent',
+          headless: false,
+          success: true,
+          tool_count: 4,
+        },
+      );
+    });
+
     it('should spawn npx chrome-devtools-mcp with --experimental-vision (persistent mode by default)', async () => {
       const manager = new BrowserManager(mockConfig);
       await manager.ensureConnection();
@@ -546,6 +569,18 @@ describe('BrowserManager', () => {
       await expect(manager.ensureConnection()).rejects.toThrow(
         /Failed to connect to existing Chrome instance/,
       );
+
+      expect(recordBrowserAgentConnection).toHaveBeenCalledWith(
+        existingConfig,
+        expect.any(Number),
+        {
+          session_mode: 'existing',
+          headless: false,
+          success: false,
+          error_type: 'connection_refused',
+        },
+      );
+
       // Create a fresh manager to verify the error message includes remediation steps
       const manager2 = new BrowserManager(existingConfig);
       await expect(manager2.ensureConnection()).rejects.toThrow(
@@ -576,6 +611,18 @@ describe('BrowserManager', () => {
       await expect(manager.ensureConnection()).rejects.toThrow(
         /Close all Chrome windows using this profile/,
       );
+
+      expect(recordBrowserAgentConnection).toHaveBeenCalledWith(
+        mockConfig,
+        expect.any(Number),
+        {
+          session_mode: 'persistent',
+          headless: false,
+          success: false,
+          error_type: 'profile_locked',
+        },
+      );
+
       const manager2 = new BrowserManager(mockConfig);
       await expect(manager2.ensureConnection()).rejects.toThrow(
         /Set sessionMode to "isolated"/,
@@ -602,6 +649,17 @@ describe('BrowserManager', () => {
       await expect(manager.ensureConnection()).rejects.toThrow(
         /Chrome is not installed/,
       );
+
+      expect(recordBrowserAgentConnection).toHaveBeenCalledWith(
+        mockConfig,
+        expect.any(Number),
+        {
+          session_mode: 'persistent',
+          headless: false,
+          success: false,
+          error_type: 'timeout',
+        },
+      );
     });
 
     it('should include sessionMode in generic fallback error', async () => {
@@ -621,6 +679,61 @@ describe('BrowserManager', () => {
 
       await expect(manager.ensureConnection()).rejects.toThrow(
         /sessionMode: persistent/,
+      );
+
+      expect(recordBrowserAgentConnection).toHaveBeenCalledWith(
+        mockConfig,
+        expect.any(Number),
+        {
+          session_mode: 'persistent',
+          headless: false,
+          success: false,
+          error_type: 'unknown',
+        },
+      );
+    });
+
+    it('should classify non-connection-refused errors in existing mode as unknown', async () => {
+      vi.mocked(Client).mockImplementation(
+        () =>
+          ({
+            connect: vi
+              .fn()
+              .mockRejectedValue(new Error('Some unexpected error')),
+            close: vi.fn().mockResolvedValue(undefined),
+            listTools: vi.fn(),
+            callTool: vi.fn(),
+          }) as unknown as InstanceType<typeof Client>,
+      );
+
+      const existingConfig = makeFakeConfig({
+        agents: {
+          overrides: {
+            browser_agent: {
+              enabled: true,
+            },
+          },
+          browser: {
+            sessionMode: 'existing',
+          },
+        },
+      });
+
+      const manager = new BrowserManager(existingConfig);
+
+      await expect(manager.ensureConnection()).rejects.toThrow(
+        /Failed to connect to existing Chrome instance/,
+      );
+
+      expect(recordBrowserAgentConnection).toHaveBeenCalledWith(
+        existingConfig,
+        expect.any(Number),
+        {
+          session_mode: 'existing',
+          headless: false,
+          success: false,
+          error_type: 'unknown',
+        },
       );
     });
 
@@ -759,6 +872,122 @@ describe('BrowserManager', () => {
       const instance2 = BrowserManager.getInstance(config2);
 
       expect(instance1).not.toBe(instance2);
+    });
+
+    it('should throw when acquired instance is requested in persistent mode', () => {
+      // mockConfig defaults to persistent mode
+      const instance1 = BrowserManager.getInstance(mockConfig);
+      instance1.acquire();
+
+      expect(() => BrowserManager.getInstance(mockConfig)).toThrow(
+        /Cannot launch a concurrent browser agent in "persistent" session mode/,
+      );
+    });
+
+    it('should throw when acquired instance is requested in existing mode', () => {
+      const existingConfig = makeFakeConfig({
+        agents: {
+          overrides: { browser_agent: { enabled: true } },
+          browser: { sessionMode: 'existing' },
+        },
+      });
+
+      const instance1 = BrowserManager.getInstance(existingConfig);
+      instance1.acquire();
+
+      expect(() => BrowserManager.getInstance(existingConfig)).toThrow(
+        /Cannot launch a concurrent browser agent in "existing" session mode/,
+      );
+    });
+
+    it('should return a different instance when the primary is acquired in isolated mode', () => {
+      const isolatedConfig = makeFakeConfig({
+        agents: {
+          overrides: { browser_agent: { enabled: true } },
+          browser: { sessionMode: 'isolated' },
+        },
+      });
+
+      const instance1 = BrowserManager.getInstance(isolatedConfig);
+      instance1.acquire();
+
+      const instance2 = BrowserManager.getInstance(isolatedConfig);
+
+      expect(instance2).not.toBe(instance1);
+      expect(instance1.isAcquired()).toBe(true);
+      expect(instance2.isAcquired()).toBe(false);
+    });
+
+    it('should reuse the primary when it has been released', () => {
+      const instance1 = BrowserManager.getInstance(mockConfig);
+      instance1.acquire();
+      instance1.release();
+
+      const instance2 = BrowserManager.getInstance(mockConfig);
+
+      expect(instance2).toBe(instance1);
+      expect(instance1.isAcquired()).toBe(false);
+    });
+
+    it('should reuse a released parallel instance in isolated mode', () => {
+      const isolatedConfig = makeFakeConfig({
+        agents: {
+          overrides: { browser_agent: { enabled: true } },
+          browser: { sessionMode: 'isolated' },
+        },
+      });
+
+      const instance1 = BrowserManager.getInstance(isolatedConfig);
+      instance1.acquire();
+
+      const instance2 = BrowserManager.getInstance(isolatedConfig);
+      instance2.acquire();
+      instance2.release();
+
+      // Primary is still acquired, parallel is released — should reuse parallel
+      const instance3 = BrowserManager.getInstance(isolatedConfig);
+      expect(instance3).toBe(instance2);
+    });
+
+    it('should create multiple parallel instances in isolated mode', () => {
+      const isolatedConfig = makeFakeConfig({
+        agents: {
+          overrides: { browser_agent: { enabled: true } },
+          browser: { sessionMode: 'isolated' },
+        },
+      });
+
+      const instance1 = BrowserManager.getInstance(isolatedConfig);
+      instance1.acquire();
+
+      const instance2 = BrowserManager.getInstance(isolatedConfig);
+      instance2.acquire();
+
+      const instance3 = BrowserManager.getInstance(isolatedConfig);
+
+      expect(instance1).not.toBe(instance2);
+      expect(instance2).not.toBe(instance3);
+      expect(instance1).not.toBe(instance3);
+    });
+
+    it('should throw when MAX_PARALLEL_INSTANCES is reached in isolated mode', () => {
+      const isolatedConfig = makeFakeConfig({
+        agents: {
+          overrides: { browser_agent: { enabled: true } },
+          browser: { sessionMode: 'isolated' },
+        },
+      });
+
+      // Acquire MAX_PARALLEL_INSTANCES instances
+      for (let i = 0; i < BrowserManager.MAX_PARALLEL_INSTANCES; i++) {
+        const instance = BrowserManager.getInstance(isolatedConfig);
+        instance.acquire();
+      }
+
+      // Next call should throw
+      expect(() => BrowserManager.getInstance(isolatedConfig)).toThrow(
+        /Maximum number of parallel browser instances/,
+      );
     });
   });
 
@@ -996,6 +1225,28 @@ describe('BrowserManager', () => {
       const manager = new BrowserManager(mockConfig);
       await manager.callTool('click', { uid: 'bad' });
     });
+
+    it('should NOT re-inject overlay if select_page is called with bringToFront: false', async () => {
+      mockConfig = makeFakeConfig({
+        agents: {
+          overrides: {
+            browser_agent: {
+              enabled: true,
+            },
+          },
+          browser: {
+            headless: false,
+            disableUserInput: true,
+          },
+        },
+      });
+
+      const manager = new BrowserManager(mockConfig);
+      await manager.callTool('select_page', { pageId: 1, bringToFront: false });
+
+      expect(injectAutomationOverlay).not.toHaveBeenCalled();
+      expect(injectInputBlocker).not.toHaveBeenCalled();
+    });
   });
 
   describe('Rate limiting', () => {
@@ -1043,6 +1294,98 @@ describe('BrowserManager', () => {
       await expect(manager.callTool('take_snapshot', {})).rejects.toThrow(
         /maximum action limit \(1\)/,
       );
+    });
+  });
+
+  describe('sandbox behavior', () => {
+    afterEach(() => {
+      vi.unstubAllEnvs();
+    });
+
+    it('should force --isolated and --headless when in seatbelt sandbox with persistent mode', async () => {
+      vi.stubEnv('SANDBOX', 'sandbox-exec');
+      const feedbackSpy = vi
+        .spyOn(coreEvents, 'emitFeedback')
+        .mockImplementation(() => {});
+
+      const manager = new BrowserManager(mockConfig); // default persistent mode
+      await manager.ensureConnection();
+
+      const args = vi.mocked(StdioClientTransport).mock.calls[0]?.[0]
+        ?.args as string[];
+      expect(args).toContain('--isolated');
+      expect(args).toContain('--headless');
+      expect(args).not.toContain('--userDataDir');
+      expect(args).not.toContain('--autoConnect');
+      expect(feedbackSpy).toHaveBeenCalledWith(
+        'info',
+        expect.stringContaining('isolated browser session'),
+      );
+    });
+
+    it('should preserve --autoConnect when in seatbelt sandbox with existing mode', async () => {
+      vi.stubEnv('SANDBOX', 'sandbox-exec');
+      const existingConfig = makeFakeConfig({
+        agents: {
+          overrides: { browser_agent: { enabled: true } },
+          browser: { sessionMode: 'existing' },
+        },
+      });
+
+      const manager = new BrowserManager(existingConfig);
+      await manager.ensureConnection();
+
+      const args = vi.mocked(StdioClientTransport).mock.calls[0]?.[0]
+        ?.args as string[];
+      expect(args).toContain('--autoConnect');
+      expect(args).not.toContain('--isolated');
+      // Headless should NOT be forced for existing mode in seatbelt
+      expect(args).not.toContain('--headless');
+    });
+
+    it('should use --browser-url with resolved IP for container sandbox with existing mode', async () => {
+      vi.stubEnv('SANDBOX', 'docker-container-0');
+      // Mock DNS resolution of host.docker.internal
+      const dns = await import('node:dns');
+      vi.spyOn(dns.promises, 'lookup').mockResolvedValue({
+        address: '192.168.127.254',
+        family: 4,
+      });
+      const feedbackSpy = vi
+        .spyOn(coreEvents, 'emitFeedback')
+        .mockImplementation(() => {});
+      const existingConfig = makeFakeConfig({
+        agents: {
+          overrides: { browser_agent: { enabled: true } },
+          browser: { sessionMode: 'existing' },
+        },
+      });
+
+      const manager = new BrowserManager(existingConfig);
+      await manager.ensureConnection();
+
+      const args = vi.mocked(StdioClientTransport).mock.calls[0]?.[0]
+        ?.args as string[];
+      expect(args).toContain('--browser-url');
+      expect(args).toContain('http://192.168.127.254:9222');
+      expect(args).not.toContain('--autoConnect');
+      expect(feedbackSpy).toHaveBeenCalledWith(
+        'info',
+        expect.stringContaining('192.168.127.254:9222'),
+      );
+    });
+
+    it('should not override session mode when not in sandbox', async () => {
+      vi.stubEnv('SANDBOX', '');
+      const manager = new BrowserManager(mockConfig);
+      await manager.ensureConnection();
+
+      const args = vi.mocked(StdioClientTransport).mock.calls[0]?.[0]
+        ?.args as string[];
+      // Default persistent mode: no --isolated, no --autoConnect
+      expect(args).not.toContain('--isolated');
+      expect(args).not.toContain('--autoConnect');
+      expect(args).toContain('--userDataDir');
     });
   });
 });
