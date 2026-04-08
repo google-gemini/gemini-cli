@@ -397,6 +397,11 @@ export async function parseArguments(
             return trimmed;
           },
         })
+        .option('session-id', {
+          type: 'string',
+          description:
+            'Start a new session with a specific session ID (for deterministic orchestration).',
+        })
         .option('list-sessions', {
           type: 'boolean',
           description:
