@@ -382,14 +382,8 @@ export async function resolveSandboxPaths(
   const globalIncludes = expand(options.includeDirectories);
   const policyAllowed = expand(req.policy?.allowedPaths);
 
-  const policyRead = expand(
-    overridePermissions?.fileSystem?.read ??
-      req.policy?.additionalPermissions?.fileSystem?.read,
-  );
-  const policyWrite = expand(
-    overridePermissions?.fileSystem?.write ??
-      req.policy?.additionalPermissions?.fileSystem?.write,
-  );
+  const policyRead = expand(overridePermissions?.fileSystem?.read);
+  const policyWrite = expand(overridePermissions?.fileSystem?.write);
 
   const resolvedWorkspace = resolveToRealPath(options.workspace);
 
