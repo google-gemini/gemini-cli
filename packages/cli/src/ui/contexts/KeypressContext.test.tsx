@@ -442,20 +442,13 @@ describe('KeypressContext', () => {
   });
 
   describe('Windows Terminal Backspace handling', () => {
-    let originalPlatform: string;
-
-    beforeAll(() => {
-      originalPlatform = process.platform;
-    });
-
     afterEach(() => {
       vi.unstubAllEnvs();
-      Object.defineProperty(process, 'platform', { value: originalPlatform });
     });
 
-    it('should NOT treat \\b as ctrl when WT_SESSION is NOT present and platform is not win32', async () => {
+    it('should NOT treat \\b as ctrl when WT_SESSION is NOT present and OS is not Windows_NT', async () => {
       vi.stubEnv('WT_SESSION', '');
-      Object.defineProperty(process, 'platform', { value: 'linux' });
+      vi.stubEnv('OS', 'Linux');
       const { keyHandler } = await setupKeypressTest();
 
       act(() => {
@@ -470,9 +463,9 @@ describe('KeypressContext', () => {
       );
     });
 
-    it('should treat \\b as ctrl when WT_SESSION IS present (even if not win32)', async () => {
+    it('should treat \\b as ctrl when WT_SESSION IS present (even if not Windows_NT)', async () => {
       vi.stubEnv('WT_SESSION', 'some-id');
-      Object.defineProperty(process, 'platform', { value: 'linux' });
+      vi.stubEnv('OS', 'Linux');
       const { keyHandler } = await setupKeypressTest();
 
       act(() => {
@@ -487,9 +480,9 @@ describe('KeypressContext', () => {
       );
     });
 
-    it('should treat \\b as ctrl when platform is win32', async () => {
+    it('should treat \\b as ctrl when OS is Windows_NT', async () => {
       vi.stubEnv('WT_SESSION', '');
-      Object.defineProperty(process, 'platform', { value: 'win32' });
+      vi.stubEnv('OS', 'Windows_NT');
       const { keyHandler } = await setupKeypressTest();
 
       act(() => {
@@ -504,9 +497,9 @@ describe('KeypressContext', () => {
       );
     });
 
-    it('should treat \\x7f as regular backspace regardless of WT_SESSION or platform', async () => {
+    it('should treat \\x7f as regular backspace regardless of WT_SESSION or OS', async () => {
       vi.stubEnv('WT_SESSION', 'some-id');
-      Object.defineProperty(process, 'platform', { value: 'win32' });
+      vi.stubEnv('OS', 'Windows_NT');
       const { keyHandler } = await setupKeypressTest();
 
       act(() => {

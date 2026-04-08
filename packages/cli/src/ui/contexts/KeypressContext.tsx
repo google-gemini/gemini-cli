@@ -658,7 +658,7 @@ function* emitKeys(
       // We scope this to Windows/WT_SESSION to avoid breaking other unixes where \b is a plain backspace.
       if (
         typeof process !== 'undefined' &&
-        (process.platform === 'win32' || !!process.env?.['WT_SESSION'])
+        (process.env?.['OS'] === 'Windows_NT' || !!process.env?.['WT_SESSION'])
       ) {
         ctrl = true;
       }
