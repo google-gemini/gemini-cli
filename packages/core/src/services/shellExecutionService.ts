@@ -1341,6 +1341,11 @@ export class ShellExecutionService {
     const activePty = this.activePtys.get(pid);
     const activeChild = this.activeChildProcesses.get(pid);
 
+    // If the process has already exited, there is no need to background it.
+    if (!activePty && !activeChild) {
+      return;
+    }
+
     const resolvedSessionId =
       sessionId ?? activePty?.sessionId ?? activeChild?.sessionId;
     const resolvedCommand =

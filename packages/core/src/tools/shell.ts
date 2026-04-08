@@ -515,7 +515,13 @@ export class ShellToolInvocation extends BaseToolInvocation<
         if (shouldAutoPromote && currentPid) {
           if (this._autoPromoteTimer) clearTimeout(this._autoPromoteTimer);
           this._autoPromoteTimer = setTimeout(() => {
-            ShellExecutionService.background(currentPid!);
+            const sessionId =
+              this.context.config?.getSessionId?.() ?? 'default';
+            ShellExecutionService.background(
+              currentPid!,
+              sessionId,
+              strippedCommand,
+            );
           }, waitMs);
         }
       };
