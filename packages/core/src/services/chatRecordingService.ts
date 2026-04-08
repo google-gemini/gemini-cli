@@ -577,6 +577,12 @@ export class ChatRecordingService {
   ) {
     const conversation = this.readConversation();
     updateFn(conversation);
+    // Enforce a hard limit of 1000 items to prevent unbounded memory and file growth
+    if (conversation.messages.length > 1000) {
+      conversation.messages = conversation.messages.slice(
+        conversation.messages.length - 1000,
+      );
+    }
     this.writeConversation(conversation);
   }
 
