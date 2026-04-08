@@ -442,12 +442,20 @@ describe('KeypressContext', () => {
   });
 
   describe('Windows Terminal Backspace handling', () => {
-    afterEach(() => {
-      vi.unstubAllEnvs();
+    let originalPlatform: string;
+
+    beforeAll(() => {
+      originalPlatform = process.platform;
     });
 
-    it('should NOT treat \\b as ctrl when WT_SESSION is NOT present', async () => {
+    afterEach(() => {
+      vi.unstubAllEnvs();
+      Object.defineProperty(process, 'platform', { value: originalPlatform });
+    });
+
+    it('should NOT treat \\b as ctrl when WT_SESSION is NOT present and platform is not win32', async () => {
       vi.stubEnv('WT_SESSION', '');
+      Object.defineProperty(process, 'platform', { value: 'linux' });
       const { keyHandler } = await setupKeypressTest();
 
       act(() => {
@@ -462,8 +470,9 @@ describe('KeypressContext', () => {
       );
     });
 
-    it('should treat \\b as ctrl when WT_SESSION IS present', async () => {
+    it('should treat \\b as ctrl when WT_SESSION IS present (even if not win32)', async () => {
       vi.stubEnv('WT_SESSION', 'some-id');
+      Object.defineProperty(process, 'platform', { value: 'linux' });
       const { keyHandler } = await setupKeypressTest();
 
       act(() => {
@@ -478,8 +487,26 @@ describe('KeypressContext', () => {
       );
     });
 
-    it('should treat \\x7f as regular backspace regardless of WT_SESSION', async () => {
+    it('should treat \\b as ctrl when platform is win32', async () => {
+      vi.stubEnv('WT_SESSION', '');
+      Object.defineProperty(process, 'platform', { value: 'win32' });
+      const { keyHandler } = await setupKeypressTest();
+
+      act(() => {
+        stdin.write('\b');
+      });
+
+      expect(keyHandler).toHaveBeenCalledWith(
+        expect.objectContaining({
+          name: 'backspace',
+          ctrl: true,
+        }),
+      );
+    });
+
+    it('should treat \\x7f as regular backspace regardless of WT_SESSION or platform', async () => {
       vi.stubEnv('WT_SESSION', 'some-id');
+      Object.defineProperty(process, 'platform', { value: 'win32' });
       const { keyHandler } = await setupKeypressTest();
 
       act(() => {
