@@ -180,9 +180,20 @@ class RecursiveFileSearch implements FileSearch {
           return;
         }
 
+        const nextResultCache = new ResultCache(nextFiles);
+        let nextFzf: AsyncFzf<string[]> | undefined = undefined;
+        if (this.options.enableFuzzySearch) {
+          nextFzf = new AsyncFzf(nextFiles, {
+            fuzzy: nextFiles.length > 20000 ? 'v1' : 'v2',
+            forward: false,
+            tiebreakers: [byBasenamePrefix, byMatchPosFromEnd, byLengthAsc],
+          });
+        }
+
         this.ignore = nextIgnore;
         this.allFiles = nextFiles;
-        this.buildResultCache();
+        this.resultCache = nextResultCache;
+        this.fzf = nextFzf;
         this.initializationState = InitializationState.Initialized;
       } catch (e) {
         this.initializationState = prevState;
@@ -262,20 +273,6 @@ class RecursiveFileSearch implements FileSearch {
       }
     }
     return results;
-  }
-
-  private buildResultCache(): void {
-    this.resultCache = new ResultCache(this.allFiles);
-    if (this.options.enableFuzzySearch) {
-      // The v1 algorithm is much faster since it only looks at the first
-      // occurrence of the pattern. We use it for search spaces that have >20k
-      // files, because the v2 algorithm is just too slow in those cases.
-      this.fzf = new AsyncFzf(this.allFiles, {
-        fuzzy: this.allFiles.length > 20000 ? 'v1' : 'v2',
-        forward: false,
-        tiebreakers: [byBasenamePrefix, byMatchPosFromEnd, byLengthAsc],
-      });
-    }
   }
 }
 
