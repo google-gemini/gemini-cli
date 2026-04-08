@@ -291,6 +291,14 @@ export class GeminiClient {
 
   private lastUsedModelId?: string;
 
+  private getDeclaredTools(modelId?: string): Tool[] {
+    const toolDeclarations =
+      this.context.toolRegistry.getFunctionDeclarations(modelId);
+    return toolDeclarations.length > 0
+      ? [{ functionDeclarations: toolDeclarations }]
+      : [];
+  }
+
   async setTools(modelId?: string): Promise<void> {
     if (!this.chat) {
       return;
@@ -301,10 +309,7 @@ export class GeminiClient {
     }
     this.lastUsedModelId = modelId;
 
-    const toolRegistry = this.context.toolRegistry;
-    const toolDeclarations = toolRegistry.getFunctionDeclarations(modelId);
-    const tools: Tool[] = [{ functionDeclarations: toolDeclarations }];
-    this.getChat().setTools(tools);
+    this.getChat().setTools(this.getDeclaredTools(modelId));
   }
 
   async resetChat(): Promise<void> {
@@ -369,9 +374,7 @@ export class GeminiClient {
     this.hasFailedCompressionAttempt = false;
     this.lastUsedModelId = undefined;
 
-    const toolRegistry = this.context.toolRegistry;
-    const toolDeclarations = toolRegistry.getFunctionDeclarations();
-    const tools: Tool[] = [{ functionDeclarations: toolDeclarations }];
+    const tools = this.getDeclaredTools();
 
     const history = await getInitialChatHistory(this.config, extraHistory);
 
@@ -386,10 +389,7 @@ export class GeminiClient {
         resumedSessionData,
         async (modelId: string) => {
           this.lastUsedModelId = modelId;
-          const toolRegistry = this.context.toolRegistry;
-          const toolDeclarations =
-            toolRegistry.getFunctionDeclarations(modelId);
-          return [{ functionDeclarations: toolDeclarations }];
+          return this.getDeclaredTools(modelId);
         },
       );
     } catch (error) {

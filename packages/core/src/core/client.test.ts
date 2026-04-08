@@ -424,6 +424,25 @@ describe('Gemini Client (client.ts)', () => {
       expect(history[1]).toEqual(extraHistory[0]);
       expect(history[2]).toEqual(extraHistory[1]);
     });
+
+    it('should not attach an empty tools wrapper when no tools are declared', async () => {
+      const chat = await client.startChat();
+
+      expect(chat['tools']).toEqual([]);
+    });
+  });
+
+  describe('setTools', () => {
+    it('should not attach an empty tools wrapper when no tools are declared', async () => {
+      const mockChat = {
+        setTools: vi.fn(),
+      } as unknown as GeminiChat;
+      client['chat'] = mockChat;
+
+      await client.setTools();
+
+      expect(mockChat.setTools).toHaveBeenCalledWith([]);
+    });
   });
 
   describe('tryCompressChat', () => {
