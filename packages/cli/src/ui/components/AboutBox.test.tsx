@@ -25,10 +25,9 @@ describe('AboutBox', () => {
   };
 
   it('renders with required props', async () => {
-    const { lastFrame, waitUntilReady, unmount } = renderWithProviders(
+    const { lastFrame, unmount } = await renderWithProviders(
       <AboutBox {...defaultProps} />,
     );
-    await waitUntilReady();
     const output = lastFrame();
     expect(output).toContain('About Gemini CLI');
     expect(output).toContain('1.0.0');
@@ -46,10 +45,9 @@ describe('AboutBox', () => {
     ['tier', 'Enterprise', 'Tier'],
   ])('renders optional prop %s', async (prop, value, label) => {
     const props = { ...defaultProps, [prop]: value };
-    const { lastFrame, waitUntilReady, unmount } = renderWithProviders(
+    const { lastFrame, unmount } = await renderWithProviders(
       <AboutBox {...props} />,
     );
-    await waitUntilReady();
     const output = lastFrame();
     expect(output).toContain(label);
     expect(output).toContain(value);
@@ -58,10 +56,9 @@ describe('AboutBox', () => {
 
   it('renders Auth Method with email when userEmail is provided', async () => {
     const props = { ...defaultProps, userEmail: 'test@example.com' };
-    const { lastFrame, waitUntilReady, unmount } = renderWithProviders(
+    const { lastFrame, unmount } = await renderWithProviders(
       <AboutBox {...props} />,
     );
-    await waitUntilReady();
     const output = lastFrame();
     expect(output).toContain('Signed in with Google (test@example.com)');
     unmount();
@@ -69,10 +66,9 @@ describe('AboutBox', () => {
 
   it('renders Auth Method correctly when not oauth', async () => {
     const props = { ...defaultProps, selectedAuthType: 'api-key' };
-    const { lastFrame, waitUntilReady, unmount } = renderWithProviders(
+    const { lastFrame, unmount } = await renderWithProviders(
       <AboutBox {...props} />,
     );
-    await waitUntilReady();
     const output = lastFrame();
     expect(output).toContain('api-key');
     unmount();

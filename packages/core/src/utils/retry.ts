@@ -99,8 +99,46 @@ function getNetworkErrorCode(error: unknown): string | undefined {
   return undefined;
 }
 
-const FETCH_FAILED_MESSAGE = 'fetch failed';
-const INCOMPLETE_JSON_MESSAGE = 'incomplete json segment';
+export const FETCH_FAILED_MESSAGE = 'fetch failed';
+export const INCOMPLETE_JSON_MESSAGE = 'incomplete json segment';
+
+/**
+ * Categorizes an error for retry telemetry purposes.
+ * Returns a safe string without PII.
+ */
+export function getRetryErrorType(error: unknown): string {
+  if (error === 'Invalid content') {
+    return 'INVALID_CONTENT';
+  }
+
+  const errorCode = getNetworkErrorCode(error);
+  if (errorCode && RETRYABLE_NETWORK_CODES.includes(errorCode)) {
+    return errorCode;
+  }
+
+  if (error instanceof Error) {
+    const lowerMessage = error.message.toLowerCase();
+    if (lowerMessage.includes(FETCH_FAILED_MESSAGE)) {
+      return 'FETCH_FAILED';
+    }
+    if (lowerMessage.includes(INCOMPLETE_JSON_MESSAGE)) {
+      return 'INCOMPLETE_JSON';
+    }
+  }
+
+  const status = getErrorStatus(error);
+  if (status !== undefined) {
+    if (status === 429) return 'QUOTA_EXCEEDED';
+    if (status >= 500 && status < 600) return 'SERVER_ERROR';
+    return `HTTP_${status}`;
+  }
+
+  if (error instanceof Error) {
+    return error.name;
+  }
+
+  return 'UNKNOWN';
+}
 
 /**
  * Default predicate function to determine if a retry should be attempted.
@@ -194,6 +232,11 @@ export async function retryWithBackoff<T>(
 
   let attempt = 0;
   let currentDelay = initialDelayMs;
+  const throwIfAborted = () => {
+    if (signal?.aborted) {
+      throw createAbortError();
+    }
+  };
 
   while (attempt < maxAttempts) {
     if (signal?.aborted) {
@@ -208,6 +251,7 @@ export async function retryWithBackoff<T>(
         // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
         shouldRetryOnContent(result as GenerateContentResponse)
       ) {
+        throwIfAborted();
         const jitter = currentDelay * 0.3 * (Math.random() * 2 - 1);
         const delayWithJitter = Math.max(0, currentDelay + jitter);
         if (onRetry) {
@@ -228,6 +272,7 @@ export async function retryWithBackoff<T>(
       if (error instanceof Error && error.name === 'AbortError') {
         throw error;
       }
+      throwIfAborted();
 
       const classifiedError = classifyGoogleError(error);
 

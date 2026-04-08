@@ -42,33 +42,19 @@ export interface ShellToolMessageProps extends ToolMessageProps {
 
 export const ShellToolMessage: React.FC<ShellToolMessageProps> = ({
   name,
-
   description,
-
   resultDisplay,
-
   status,
-
   availableTerminalHeight,
-
   terminalWidth,
-
   emphasis = 'medium',
-
   renderOutputAsMarkdown = true,
-
   ptyId,
-
   config,
-
   isFirst,
-
   borderColor,
-
   borderDimColor,
-
   isExpandable,
-
   originalRequestName,
 }) => {
   const {
@@ -142,11 +128,9 @@ export const ShellToolMessage: React.FC<ShellToolMessageProps> = ({
   }, [isThisShellFocused, embeddedShellFocused, setEmbeddedShellFocused]);
 
   const headerRef = React.useRef<DOMElement>(null);
-
   const contentRef = React.useRef<DOMElement>(null);
 
   // The shell is focusable if it's the shell command, it's executing, and the interactive shell is enabled.
-
   const isThisShellFocusable = checkIsShellFocusable(name, status, config);
 
   const handleFocus = () => {
@@ -156,7 +140,6 @@ export const ShellToolMessage: React.FC<ShellToolMessageProps> = ({
   };
 
   useMouseClick(headerRef, handleFocus, { isActive: !!isThisShellFocusable });
-
   useMouseClick(contentRef, handleFocus, { isActive: !!isThisShellFocusable });
 
   const { shouldShowFocusHint } = useFocusHint(

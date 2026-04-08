@@ -5,12 +5,24 @@
  */
 
 import type React from 'react';
+import {
+  useCallback,
+  useEffect,
+  useState,
+  useRef,
+  useMemo,
+  Fragment,
+} from 'react';
 import clipboardy from 'clipboardy';
-import { useCallback, useEffect, useState, useRef, useMemo } from 'react';
 import { Box, Text, useStdout, type DOMElement } from 'ink';
 import { SuggestionsDisplay, MAX_WIDTH } from './SuggestionsDisplay.js';
 import { theme } from '../semantic-colors.js';
 import { useInputHistory } from '../hooks/useInputHistory.js';
+import { escapeAtSymbols } from '../hooks/atCommandProcessor.js';
+import {
+  ScrollableList,
+  type ScrollableListRef,
+} from './shared/ScrollableList.js';
 import { HalfLinePaddedBox } from './shared/HalfLinePaddedBox.js';
 import {
   type TextBuffer,
@@ -34,13 +46,16 @@ import {
   useCommandCompletion,
   CompletionMode,
 } from '../hooks/useCommandCompletion.js';
-import type { Key } from '../hooks/useKeypress.js';
-import { useKeypress } from '../hooks/useKeypress.js';
+import { useKeypress, type Key } from '../hooks/useKeypress.js';
 import { Command } from '../key/keyMatchers.js';
 import { formatCommand } from '../key/keybindingUtils.js';
 import type { CommandContext, SlashCommand } from '../commands/types.js';
-import type { Config } from '@google/gemini-cli-core';
-import { ApprovalMode, coreEvents, debugLogger } from '@google/gemini-cli-core';
+import {
+  ApprovalMode,
+  coreEvents,
+  debugLogger,
+  type Config,
+} from '@google/gemini-cli-core';
 import {
   parseInputForHighlighting,
   parseSegmentsFromTokens,
@@ -55,12 +70,14 @@ import {
   isAutoExecutableCommand,
   isSlashCommand,
 } from '../utils/commandUtils.js';
+import { parseSlashCommand } from '../../utils/commands.js';
 import * as path from 'node:path';
 import { SCREEN_READER_USER_PREFIX } from '../textConstants.js';
 import { getSafeLowColorBackground } from '../themes/color-utils.js';
 import { isLowColorDepth } from '../utils/terminalUtils.js';
 import { useShellFocusState } from '../contexts/ShellFocusContext.js';
 import { useUIState } from '../contexts/UIStateContext.js';
+import { useInputState } from '../contexts/InputContext.js';
 import {
   appEvents,
   AppEvent,
@@ -90,19 +107,18 @@ export function isTerminalPasteTrusted(
   return kittyProtocolSupported;
 }
 
+export type ScrollableItem =
+  | { type: 'visualLine'; lineText: string; absoluteVisualIdx: number }
+  | { type: 'ghostLine'; ghostLine: string; index: number };
+
 export interface InputPromptProps {
-  buffer: TextBuffer;
   onSubmit: (value: string) => void;
-  userMessages: readonly string[];
   onClearScreen: () => void;
   config: Config;
   slashCommands: readonly SlashCommand[];
   commandContext: CommandContext;
   placeholder?: string;
   focus?: boolean;
-  inputWidth: number;
-  suggestionsWidth: number;
-  shellModeActive: boolean;
   setShellModeActive: (value: boolean) => void;
   approvalMode: ApprovalMode;
   onEscapePromptChange?: (showPrompt: boolean) => void;
@@ -112,6 +128,7 @@ export interface InputPromptProps {
   setQueueErrorMessage: (message: string | null) => void;
   streamingState: StreamingState;
   popAllMessages?: () => string | undefined;
+  onQueueMessage?: (message: string) => void;
   suggestionsPosition?: 'above' | 'below';
   setBannerVisible: (visible: boolean) => void;
 }
@@ -184,18 +201,13 @@ export function tryTogglePasteExpansion(buffer: TextBuffer): boolean {
 }
 
 export const InputPrompt: React.FC<InputPromptProps> = ({
-  buffer,
   onSubmit,
-  userMessages,
   onClearScreen,
   config,
   slashCommands,
   commandContext,
   placeholder = '  Type your message or @path/to/file',
   focus = true,
-  inputWidth,
-  suggestionsWidth,
-  shellModeActive,
   setShellModeActive,
   approvalMode,
   onEscapePromptChange,
@@ -205,9 +217,19 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
   setQueueErrorMessage,
   streamingState,
   popAllMessages,
+  onQueueMessage,
   suggestionsPosition = 'below',
   setBannerVisible,
 }) => {
+  const inputState = useInputState();
+  const {
+    buffer,
+    userMessages,
+    shellModeActive,
+    copyModeEnabled,
+    inputWidth,
+    suggestionsWidth,
+  } = inputState;
   const isHelpDismissKey = useIsHelpDismissKey();
   const keyMatchers = useKeyMatchers();
   const { stdout } = useStdout();
@@ -223,8 +245,8 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
     terminalWidth,
     activePtyId,
     history,
-    backgroundShells,
-    backgroundShellHeight,
+    backgroundTasks,
+    backgroundTaskHeight,
     shortcutsHelpVisible,
   } = useUIState();
   const [suppressCompletion, setSuppressCompletion] = useState(false);
@@ -259,6 +281,7 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
   const pasteTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const innerBoxRef = useRef<DOMElement>(null);
   const hasUserNavigatedSuggestions = useRef(false);
+  const listRef = useRef<ScrollableListRef<ScrollableItem>>(null);
 
   const [reverseSearchActive, setReverseSearchActive] = useState(false);
   const [commandSearchActive, setCommandSearchActive] = useState(false);
@@ -326,7 +349,12 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
     isShellSuggestionsVisible,
   } = completion;
 
-  const showCursor = focus && isShellFocused && !isEmbeddedShellFocused;
+  const showCursor =
+    focus && isShellFocused && !isEmbeddedShellFocused && !copyModeEnabled;
+
+  useEffect(() => {
+    appEvents.emit(AppEvent.ScrollToBottom);
+  }, [buffer.text, buffer.cursor]);
 
   // Notify parent component about escape prompt state changes
   useEffect(() => {
@@ -405,6 +433,17 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
         (isSlash || isShell) &&
         streamingState === StreamingState.Responding
       ) {
+        if (isSlash) {
+          const { commandToExecute } = parseSlashCommand(
+            trimmedMessage,
+            slashCommands,
+          );
+          if (commandToExecute?.isSafeConcurrent) {
+            handleSubmitAndClear(trimmedMessage);
+            return;
+          }
+        }
+
         setQueueErrorMessage(
           `${isShell ? 'Shell' : 'Slash'} commands cannot be queued`,
         );
@@ -412,7 +451,14 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
       }
       inputHistory.handleSubmit(trimmedMessage);
     },
-    [inputHistory, shellModeActive, streamingState, setQueueErrorMessage],
+    [
+      inputHistory,
+      shellModeActive,
+      streamingState,
+      setQueueErrorMessage,
+      slashCommands,
+      handleSubmitAndClear,
+    ],
   );
 
   // Effect to reset completion if history navigation just occurred and set the text
@@ -494,7 +540,11 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
         stdout.write('\x1b]52;c;?\x07');
       } else {
         const textToInsert = await clipboardy.read();
-        buffer.insert(textToInsert, { paste: true });
+        const escapedText = settings.ui?.escapePastedAtSymbols
+          ? escapeAtSymbols(textToInsert)
+          : textToInsert;
+        buffer.insert(escapedText, { paste: true });
+
         if (isLargePaste(textToInsert)) {
           appEvents.emit(AppEvent.TransientMessage, {
             message: `Press ${formatCommand(Command.EXPAND_PASTE)} to expand pasted text`,
@@ -521,7 +571,10 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
       if (isEmbeddedShellFocused) {
         setEmbeddedShellFocused(false);
       }
-      const visualRow = buffer.visualScrollRow + relY;
+      const currentScrollTop = Math.round(
+        listRef.current?.getScrollState().scrollTop ?? buffer.visualScrollRow,
+      );
+      const visualRow = currentScrollTop + relY;
       buffer.moveToVisualPosition(visualRow, relX);
     },
     { isActive: focus },
@@ -535,7 +588,10 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
     (_event, relX, relY) => {
       if (!isAlternateBuffer) return;
 
-      const visualLine = buffer.viewportVisualLines[relY];
+      const currentScrollTop = Math.round(
+        listRef.current?.getScrollState().scrollTop ?? buffer.visualScrollRow,
+      );
+      const visualLine = buffer.allVisualLines[currentScrollTop + relY];
       if (!visualLine) return;
 
       // Even if we click past the end of the line, we might want to collapse an expanded paste
@@ -543,10 +599,7 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
 
       const logicalPos = isPastEndOfLine
         ? null
-        : buffer.getLogicalPositionFromVisual(
-            buffer.visualScrollRow + relY,
-            relX,
-          );
+        : buffer.getLogicalPositionFromVisual(currentScrollTop + relY, relX);
 
       // Check for paste placeholder (collapsed state)
       if (logicalPos) {
@@ -568,7 +621,9 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
 
       // If we didn't click a placeholder to expand, check if we are inside or after
       // an expanded paste region and collapse it.
-      const row = buffer.visualScrollRow + relY;
+      const visualRow = currentScrollTop + relY;
+      const mapEntry = buffer.visualToLogicalMap[visualRow];
+      const row = mapEntry ? mapEntry[0] : visualRow;
       const expandedId = buffer.getExpandedPasteAtLine(row);
       if (expandedId) {
         buffer.togglePasteExpansion(
@@ -657,14 +712,11 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
         return true;
       }
 
-      if (
-        key.name === 'escape' &&
-        (streamingState === StreamingState.Responding ||
-          streamingState === StreamingState.WaitingForConfirmation)
-      ) {
-        return false;
-      }
+      const isGenerating =
+        streamingState === StreamingState.Responding ||
+        streamingState === StreamingState.WaitingForConfirmation;
 
+      const isQueueMessageKey = keyMatchers[Command.QUEUE_MESSAGE](key);
       const isPlainTab =
         key.name === 'tab' && !key.shift && !key.alt && !key.ctrl && !key.cmd;
       const hasTabCompletionInteraction =
@@ -672,6 +724,29 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
         Boolean(completion.promptCompletion.text) ||
         reverseSearchActive ||
         commandSearchActive;
+
+      if (
+        isGenerating &&
+        isQueueMessageKey &&
+        !hasTabCompletionInteraction &&
+        buffer.text.trim().length > 0
+      ) {
+        const trimmedMessage = buffer.text.trim();
+        const isSlash = isSlashCommand(trimmedMessage);
+
+        if (isSlash || shellModeActive) {
+          setQueueErrorMessage(
+            `${shellModeActive ? 'Shell' : 'Slash'} commands cannot be queued`,
+          );
+        } else if (onQueueMessage) {
+          onQueueMessage(buffer.text);
+          buffer.setText('');
+          resetCompletionState();
+          resetReverseSearchCompletionState();
+        }
+        resetPlainTabPress();
+        return true;
+      }
 
       if (isPlainTab && shellModeActive) {
         resetPlainTabPress();
@@ -729,8 +804,15 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
             pasteTimeoutRef.current = null;
           }, 40);
         }
-        // Ensure we never accidentally interpret paste as regular input.
-        buffer.handleInput(key);
+        if (settings.ui?.escapePastedAtSymbols) {
+          buffer.handleInput({
+            ...key,
+            sequence: escapeAtSymbols(key.sequence || ''),
+          });
+        } else {
+          buffer.handleInput(key);
+        }
+
         if (key.sequence && isLargePaste(key.sequence)) {
           appEvents.emit(AppEvent.TransientMessage, {
             message: `Press ${formatCommand(Command.EXPAND_PASTE)} to expand pasted text`,
@@ -839,6 +921,12 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
           setShellModeActive(false);
           resetEscapeState();
           return true;
+        }
+
+        // If we're generating and no local overlay consumed Escape, let it
+        // propagate to the global cancellation handler.
+        if (isGenerating) {
+          return false;
         }
 
         handleEscPress();
@@ -1184,6 +1272,15 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
         return true;
       }
 
+      if (keyMatchers[Command.DEPRECATED_OPEN_EXTERNAL_EDITOR](key)) {
+        const cmdKey = formatCommand(Command.OPEN_EXTERNAL_EDITOR);
+        appEvents.emit(AppEvent.TransientMessage, {
+          message: `Use ${cmdKey} to open the external editor.`,
+          type: TransientMessageType.Hint,
+        });
+        return true;
+      }
+
       // Ctrl+V for clipboard paste
       if (keyMatchers[Command.PASTE_CLIPBOARD](key)) {
         // eslint-disable-next-line @typescript-eslint/no-floating-promises
@@ -1198,7 +1295,7 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
       if (keyMatchers[Command.FOCUS_SHELL_INPUT](key)) {
         if (
           activePtyId ||
-          (backgroundShells.size > 0 && backgroundShellHeight > 0)
+          (backgroundTasks.size > 0 && backgroundTaskHeight > 0)
         ) {
           setEmbeddedShellFocused(true);
           return true;
@@ -1255,11 +1352,14 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
       shortcutsHelpVisible,
       setShortcutsHelpVisible,
       tryLoadQueuedMessages,
+      onQueueMessage,
+      setQueueErrorMessage,
+      resetReverseSearchCompletionState,
       setBannerVisible,
       activePtyId,
       setEmbeddedShellFocused,
-      backgroundShells.size,
-      backgroundShellHeight,
+      backgroundTasks.size,
+      backgroundTaskHeight,
       streamingState,
       handleEscPress,
       registerPlainTabPress,
@@ -1270,18 +1370,17 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
       forceShowShellSuggestions,
       keyMatchers,
       isHelpDismissKey,
+      settings,
     ],
   );
 
   useKeypress(handleInput, {
-    isActive: !isEmbeddedShellFocused,
+    isActive: !isEmbeddedShellFocused && !copyModeEnabled,
     priority: true,
   });
 
-  const linesToRender = buffer.viewportVisualLines;
   const [cursorVisualRowAbsolute, cursorVisualColAbsolute] =
     buffer.visualCursor;
-  const scrollVisualRow = buffer.visualScrollRow;
 
   const getGhostTextLines = useCallback(() => {
     if (
@@ -1396,6 +1495,155 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
 
   const { inlineGhost, additionalLines } = getGhostTextLines();
 
+  const scrollableData = useMemo(() => {
+    const items: ScrollableItem[] = buffer.allVisualLines.map(
+      (lineText, index) => ({
+        type: 'visualLine',
+        lineText,
+        absoluteVisualIdx: index,
+      }),
+    );
+
+    additionalLines.forEach((ghostLine, index) => {
+      items.push({
+        type: 'ghostLine',
+        ghostLine,
+        index,
+      });
+    });
+
+    return items;
+  }, [buffer.allVisualLines, additionalLines]);
+
+  const renderItem = useCallback(
+    ({ item }: { item: ScrollableItem; index: number }) => {
+      if (item.type === 'ghostLine') {
+        const padding = Math.max(0, inputWidth - stringWidth(item.ghostLine));
+        return (
+          <Box height={1}>
+            <Text color={theme.text.secondary}>
+              {item.ghostLine}
+              {' '.repeat(padding)}
+            </Text>
+          </Box>
+        );
+      }
+
+      const { lineText, absoluteVisualIdx } = item;
+      // console.log('renderItem called with:', lineText);
+      const mapEntry = buffer.visualToLogicalMap[absoluteVisualIdx];
+      if (!mapEntry) return <Text> </Text>;
+
+      const isOnCursorLine =
+        focus && absoluteVisualIdx === cursorVisualRowAbsolute;
+      const renderedLine: React.ReactNode[] = [];
+      const [logicalLineIdx] = mapEntry;
+      const logicalLine = buffer.lines[logicalLineIdx] || '';
+      const transformations =
+        buffer.transformationsByLine[logicalLineIdx] ?? [];
+      const tokens = parseInputForHighlighting(
+        logicalLine,
+        logicalLineIdx,
+        transformations,
+        ...(focus && buffer.cursor[0] === logicalLineIdx
+          ? [buffer.cursor[1]]
+          : []),
+      );
+      const visualStartCol =
+        buffer.visualToTransformedMap[absoluteVisualIdx] ?? 0;
+      const visualEndCol = visualStartCol + cpLen(lineText);
+      const segments = parseSegmentsFromTokens(
+        tokens,
+        visualStartCol,
+        visualEndCol,
+      );
+      let charCount = 0;
+      segments.forEach((seg, segIdx) => {
+        const segLen = cpLen(seg.text);
+        let display = seg.text;
+        if (isOnCursorLine) {
+          const relCol = cursorVisualColAbsolute;
+          const segStart = charCount;
+          const segEnd = segStart + segLen;
+          if (relCol >= segStart && relCol < segEnd) {
+            const charToHighlight = cpSlice(
+              display,
+              relCol - segStart,
+              relCol - segStart + 1,
+            );
+            const highlighted = showCursor
+              ? chalk.inverse(charToHighlight)
+              : charToHighlight;
+            display =
+              cpSlice(display, 0, relCol - segStart) +
+              highlighted +
+              cpSlice(display, relCol - segStart + 1);
+          }
+          charCount = segEnd;
+        } else {
+          charCount += segLen;
+        }
+        const color =
+          seg.type === 'command' || seg.type === 'file' || seg.type === 'paste'
+            ? theme.text.accent
+            : theme.text.primary;
+        renderedLine.push(
+          <Text key={`token-${segIdx}`} color={color}>
+            {display}
+          </Text>,
+        );
+      });
+
+      const currentLineGhost = isOnCursorLine ? inlineGhost : '';
+      if (
+        isOnCursorLine &&
+        cursorVisualColAbsolute === cpLen(lineText) &&
+        !currentLineGhost
+      ) {
+        renderedLine.push(
+          <Text key={`cursor-end-${cursorVisualColAbsolute}`}>
+            {showCursor ? chalk.inverse(' ') : ' '}
+          </Text>,
+        );
+      }
+      const showCursorBeforeGhost =
+        focus &&
+        isOnCursorLine &&
+        cursorVisualColAbsolute === cpLen(lineText) &&
+        currentLineGhost;
+      return (
+        <Box height={1}>
+          <Text
+            terminalCursorFocus={showCursor && isOnCursorLine}
+            terminalCursorPosition={cpIndexToOffset(
+              lineText,
+              cursorVisualColAbsolute,
+            )}
+          >
+            {renderedLine}
+            {showCursorBeforeGhost && (showCursor ? chalk.inverse(' ') : ' ')}
+            {currentLineGhost && (
+              <Text color={theme.text.secondary}>{currentLineGhost}</Text>
+            )}
+          </Text>
+        </Box>
+      );
+    },
+    [
+      buffer.visualToLogicalMap,
+      buffer.lines,
+      buffer.transformationsByLine,
+      buffer.cursor,
+      buffer.visualToTransformedMap,
+      focus,
+      cursorVisualRowAbsolute,
+      cursorVisualColAbsolute,
+      showCursor,
+      inlineGhost,
+      inputWidth,
+    ],
+  );
+
   const useBackgroundColor = config.getUseBackgroundColor();
   const isLowColor = isLowColorDepth();
   const terminalBg = theme.background.primary || 'black';
@@ -1412,6 +1660,46 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
     }
     return false;
   }, [useBackgroundColor, isLowColor, terminalBg]);
+
+  const prevCursorRef = useRef(buffer.visualCursor);
+  const prevTextRef = useRef(buffer.text);
+
+  // Effect to ensure cursor remains visible after interactions
+  useEffect(() => {
+    const cursorChanged = prevCursorRef.current !== buffer.visualCursor;
+    const textChanged = prevTextRef.current !== buffer.text;
+
+    prevCursorRef.current = buffer.visualCursor;
+    prevTextRef.current = buffer.text;
+
+    if (!cursorChanged && !textChanged) return;
+
+    if (!listRef.current || !focus) return;
+    const { scrollTop, innerHeight } = listRef.current.getScrollState();
+    if (innerHeight === 0) return;
+
+    const cursorVisualRow = buffer.visualCursor[0];
+    const actualScrollTop = Math.round(scrollTop);
+
+    // If cursor is out of the currently visible viewport...
+    if (
+      cursorVisualRow < actualScrollTop ||
+      cursorVisualRow >= actualScrollTop + innerHeight
+    ) {
+      // Calculate minimal scroll to make it visible
+      let newScrollTop = actualScrollTop;
+      if (cursorVisualRow < actualScrollTop) {
+        newScrollTop = cursorVisualRow;
+      } else if (cursorVisualRow >= actualScrollTop + innerHeight) {
+        newScrollTop = cursorVisualRow - innerHeight + 1;
+      }
+
+      listRef.current.scrollToIndex({ index: newScrollTop });
+    }
+  }, [buffer.visualCursor, buffer.text, focus]);
+
+  const listBackgroundColor =
+    useLineFallback || !useBackgroundColor ? undefined : theme.background.input;
 
   useEffect(() => {
     if (onSuggestionsVisibilityChange) {
@@ -1543,153 +1831,51 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
                 <Text color={theme.text.secondary}>{placeholder}</Text>
               )
             ) : (
-              linesToRender
-                .map((lineText: string, visualIdxInRenderedSet: number) => {
-                  const absoluteVisualIdx =
-                    scrollVisualRow + visualIdxInRenderedSet;
-                  const mapEntry = buffer.visualToLogicalMap[absoluteVisualIdx];
-                  if (!mapEntry) return null;
-
-                  const cursorVisualRow =
-                    cursorVisualRowAbsolute - scrollVisualRow;
-                  const isOnCursorLine =
-                    focus && visualIdxInRenderedSet === cursorVisualRow;
-
-                  const renderedLine: React.ReactNode[] = [];
-
-                  const [logicalLineIdx] = mapEntry;
-                  const logicalLine = buffer.lines[logicalLineIdx] || '';
-                  const transformations =
-                    buffer.transformationsByLine[logicalLineIdx] ?? [];
-                  const tokens = parseInputForHighlighting(
-                    logicalLine,
-                    logicalLineIdx,
-                    transformations,
-                    ...(focus && buffer.cursor[0] === logicalLineIdx
-                      ? [buffer.cursor[1]]
-                      : []),
-                  );
-                  const startColInTransformed =
-                    buffer.visualToTransformedMap[absoluteVisualIdx] ?? 0;
-                  const visualStartCol = startColInTransformed;
-                  const visualEndCol = visualStartCol + cpLen(lineText);
-                  const segments = parseSegmentsFromTokens(
-                    tokens,
-                    visualStartCol,
-                    visualEndCol,
-                  );
-                  let charCount = 0;
-                  segments.forEach((seg, segIdx) => {
-                    const segLen = cpLen(seg.text);
-                    let display = seg.text;
-
-                    if (isOnCursorLine) {
-                      const relativeVisualColForHighlight =
-                        cursorVisualColAbsolute;
-                      const segStart = charCount;
-                      const segEnd = segStart + segLen;
-                      if (
-                        relativeVisualColForHighlight >= segStart &&
-                        relativeVisualColForHighlight < segEnd
-                      ) {
-                        const charToHighlight = cpSlice(
-                          display,
-                          relativeVisualColForHighlight - segStart,
-                          relativeVisualColForHighlight - segStart + 1,
-                        );
-                        const highlighted = showCursor
-                          ? chalk.inverse(charToHighlight)
-                          : charToHighlight;
-                        display =
-                          cpSlice(
-                            display,
-                            0,
-                            relativeVisualColForHighlight - segStart,
-                          ) +
-                          highlighted +
-                          cpSlice(
-                            display,
-                            relativeVisualColForHighlight - segStart + 1,
-                          );
-                      }
-                      charCount = segEnd;
-                    } else {
-                      // Advance the running counter even when not on cursor line
-                      charCount += segLen;
+              <Box
+                flexDirection="column"
+                height={Math.min(buffer.viewportHeight, scrollableData.length)}
+                width="100%"
+              >
+                {isAlternateBuffer ? (
+                  <ScrollableList
+                    ref={listRef}
+                    hasFocus={focus}
+                    data={scrollableData}
+                    renderItem={renderItem}
+                    estimatedItemHeight={() => 1}
+                    fixedItemHeight={true}
+                    keyExtractor={(item) =>
+                      item.type === 'visualLine'
+                        ? `line-${item.absoluteVisualIdx}`
+                        : `ghost-${item.index}`
                     }
-
-                    const color =
-                      seg.type === 'command' ||
-                      seg.type === 'file' ||
-                      seg.type === 'paste'
-                        ? theme.text.accent
-                        : theme.text.primary;
-
-                    renderedLine.push(
-                      <Text key={`token-${segIdx}`} color={color}>
-                        {display}
-                      </Text>,
-                    );
-                  });
-
-                  const currentLineGhost = isOnCursorLine ? inlineGhost : '';
-                  if (
-                    isOnCursorLine &&
-                    cursorVisualColAbsolute === cpLen(lineText)
-                  ) {
-                    if (!currentLineGhost) {
-                      renderedLine.push(
-                        <Text key={`cursor-end-${cursorVisualColAbsolute}`}>
-                          {showCursor ? chalk.inverse(' ') : ' '}
-                        </Text>,
+                    width={inputWidth}
+                    backgroundColor={listBackgroundColor}
+                    containerHeight={Math.min(
+                      buffer.viewportHeight,
+                      scrollableData.length,
+                    )}
+                  />
+                ) : (
+                  scrollableData
+                    .slice(
+                      buffer.visualScrollRow,
+                      buffer.visualScrollRow + buffer.viewportHeight,
+                    )
+                    .map((item, index) => {
+                      const actualIndex = buffer.visualScrollRow + index;
+                      const key =
+                        item.type === 'visualLine'
+                          ? `line-${item.absoluteVisualIdx}`
+                          : `ghost-${item.index}`;
+                      return (
+                        <Fragment key={key}>
+                          {renderItem({ item, index: actualIndex })}
+                        </Fragment>
                       );
-                    }
-                  }
-
-                  const showCursorBeforeGhost =
-                    focus &&
-                    isOnCursorLine &&
-                    cursorVisualColAbsolute === cpLen(lineText) &&
-                    currentLineGhost;
-
-                  return (
-                    <Box key={`line-${visualIdxInRenderedSet}`} height={1}>
-                      <Text
-                        terminalCursorFocus={showCursor && isOnCursorLine}
-                        terminalCursorPosition={cpIndexToOffset(
-                          lineText,
-                          cursorVisualColAbsolute,
-                        )}
-                      >
-                        {renderedLine}
-                        {showCursorBeforeGhost &&
-                          (showCursor ? chalk.inverse(' ') : ' ')}
-                        {currentLineGhost && (
-                          <Text color={theme.text.secondary}>
-                            {currentLineGhost}
-                          </Text>
-                        )}
-                      </Text>
-                    </Box>
-                  );
-                })
-                .concat(
-                  additionalLines.map((ghostLine, index) => {
-                    const padding = Math.max(
-                      0,
-                      inputWidth - stringWidth(ghostLine),
-                    );
-                    return (
-                      <Text
-                        key={`ghost-line-${index}`}
-                        color={theme.text.secondary}
-                      >
-                        {ghostLine}
-                        {' '.repeat(padding)}
-                      </Text>
-                    );
-                  }),
-                )
+                    })
+                )}
+              </Box>
             )}
           </Box>
         </Box>

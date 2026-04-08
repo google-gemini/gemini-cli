@@ -14,6 +14,7 @@ import {
   type ToolCallRecord,
   type MessageRecord,
 } from './chatRecordingService.js';
+import type { WorkspaceContext } from '../utils/workspaceContext.js';
 import { CoreToolCallStatus } from '../scheduler/types.js';
 import type { Content, Part } from '@google/genai';
 import type { Config } from '../config/config.js';
@@ -43,6 +44,13 @@ describe('ChatRecordingService', () => {
     );
 
     mockConfig = {
+      get config() {
+        return this;
+      },
+      toolRegistry: {
+        getTool: vi.fn(),
+      },
+      promptId: 'test-session-id',
       getSessionId: vi.fn().mockReturnValue('test-session-id'),
       getProjectRoot: vi.fn().mockReturnValue('/test/project/root'),
       storage: {
@@ -50,6 +58,9 @@ describe('ChatRecordingService', () => {
       },
       getModel: vi.fn().mockReturnValue('gemini-pro'),
       getDebugMode: vi.fn().mockReturnValue(false),
+      getWorkspaceContext: vi.fn().mockReturnValue({
+        getDirectories: vi.fn().mockReturnValue([]),
+      }),
       getToolRegistry: vi.fn().mockReturnValue({
         getTool: vi.fn().mockReturnValue({
           displayName: 'Test Tool',
@@ -58,6 +69,13 @@ describe('ChatRecordingService', () => {
         }),
       }),
     } as unknown as Config;
+
+    // Ensure mockConfig.config points to itself for AgentLoopContext parity
+    Object.defineProperty(mockConfig, 'config', {
+      get() {
+        return mockConfig;
+      },
+    });
 
     vi.mocked(getProjectHash).mockReturnValue('test-project-hash');
     chatRecordingService = new ChatRecordingService(mockConfig);
@@ -99,6 +117,55 @@ describe('ChatRecordingService', () => {
         fs.readFileSync(sessionFile, 'utf8'),
       ) as ConversationRecord;
       expect(conversation.kind).toBe('subagent');
+    });
+
+    it('should create a subdirectory for subagents if parentSessionId is present', () => {
+      const parentSessionId = 'test-parent-uuid';
+      Object.defineProperty(mockConfig, 'parentSessionId', {
+        value: parentSessionId,
+        writable: true,
+        configurable: true,
+      });
+
+      chatRecordingService.initialize(undefined, 'subagent');
+      chatRecordingService.recordMessage({
+        type: 'user',
+        content: 'ping',
+        model: 'm',
+      });
+
+      const chatsDir = path.join(testTempDir, 'chats');
+      const subagentDir = path.join(chatsDir, parentSessionId);
+      expect(fs.existsSync(subagentDir)).toBe(true);
+
+      const files = fs.readdirSync(subagentDir);
+      expect(files.length).toBeGreaterThan(0);
+      expect(files[0]).toBe('test-session-id.json');
+    });
+
+    it('should inherit workspace directories for subagents during initialization', () => {
+      const mockDirectories = ['/project/dir1', '/project/dir2'];
+      vi.mocked(mockConfig.getWorkspaceContext).mockReturnValue({
+        getDirectories: vi.fn().mockReturnValue(mockDirectories),
+      } as unknown as WorkspaceContext);
+
+      // Initialize as a subagent
+      chatRecordingService.initialize(undefined, 'subagent');
+
+      // Recording a message triggers the disk write (deferred until then)
+      chatRecordingService.recordMessage({
+        type: 'user',
+        content: 'ping',
+        model: 'm',
+      });
+
+      const sessionFile = chatRecordingService.getConversationFilePath()!;
+      const conversation = JSON.parse(
+        fs.readFileSync(sessionFile, 'utf8'),
+      ) as ConversationRecord;
+
+      expect(conversation.kind).toBe('subagent');
+      expect(conversation.directories).toEqual(mockDirectories);
     });
 
     it('should resume from an existing session if provided', () => {
@@ -370,6 +437,36 @@ describe('ChatRecordingService', () => {
       expect(geminiMsg.toolCalls![0].name).toBe('testTool');
     });
 
+    it('should preserve dynamic description and NOT overwrite with generic one', () => {
+      chatRecordingService.recordMessage({
+        type: 'gemini',
+        content: '',
+        model: 'gemini-pro',
+      });
+
+      const dynamicDescription = 'DYNAMIC DESCRIPTION (e.g. Read file foo.txt)';
+      const toolCall: ToolCallRecord = {
+        id: 'tool-1',
+        name: 'testTool',
+        args: {},
+        status: CoreToolCallStatus.Success,
+        timestamp: new Date().toISOString(),
+        description: dynamicDescription,
+      };
+
+      chatRecordingService.recordToolCalls('gemini-pro', [toolCall]);
+
+      const sessionFile = chatRecordingService.getConversationFilePath()!;
+      const conversation = JSON.parse(
+        fs.readFileSync(sessionFile, 'utf8'),
+      ) as ConversationRecord;
+      const geminiMsg = conversation.messages[0] as MessageRecord & {
+        type: 'gemini';
+      };
+
+      expect(geminiMsg.toolCalls![0].description).toBe(dynamicDescription);
+    });
+
     it('should create a new message if the last message is not from gemini', () => {
       chatRecordingService.recordMessage({
         type: 'user',
@@ -400,8 +497,9 @@ describe('ChatRecordingService', () => {
   });
 
   describe('deleteSession', () => {
-    it('should delete the session file, tool outputs, session directory, and logs if they exist', () => {
+    it('should delete the session file, tool outputs, session directory, and logs if they exist', async () => {
       const sessionId = 'test-session-id';
+      const shortId = '12345678';
       const chatsDir = path.join(testTempDir, 'chats');
       const logsDir = path.join(testTempDir, 'logs');
       const toolOutputsDir = path.join(testTempDir, 'tool-outputs');
@@ -412,8 +510,12 @@ describe('ChatRecordingService', () => {
       fs.mkdirSync(toolOutputsDir, { recursive: true });
       fs.mkdirSync(sessionDir, { recursive: true });
 
-      const sessionFile = path.join(chatsDir, `${sessionId}.json`);
-      fs.writeFileSync(sessionFile, '{}');
+      // Create main session file with timestamp
+      const sessionFile = path.join(
+        chatsDir,
+        `session-2023-01-01T00-00-${shortId}.json`,
+      );
+      fs.writeFileSync(sessionFile, JSON.stringify({ sessionId }));
 
       const logFile = path.join(logsDir, `session-${sessionId}.jsonl`);
       fs.writeFileSync(logFile, '{}');
@@ -421,7 +523,8 @@ describe('ChatRecordingService', () => {
       const toolOutputDir = path.join(toolOutputsDir, `session-${sessionId}`);
       fs.mkdirSync(toolOutputDir, { recursive: true });
 
-      chatRecordingService.deleteSession(sessionId);
+      // Call with shortId
+      await chatRecordingService.deleteSession(shortId);
 
       expect(fs.existsSync(sessionFile)).toBe(false);
       expect(fs.existsSync(logFile)).toBe(false);
@@ -429,10 +532,134 @@ describe('ChatRecordingService', () => {
       expect(fs.existsSync(sessionDir)).toBe(false);
     });
 
-    it('should not throw if session file does not exist', () => {
-      expect(() =>
+    it('should delete subagent files and their logs when parent is deleted', async () => {
+      const parentSessionId = '12345678-session-id';
+      const shortId = '12345678';
+      const subagentSessionId = 'subagent-session-id';
+      const chatsDir = path.join(testTempDir, 'chats');
+      const logsDir = path.join(testTempDir, 'logs');
+      const toolOutputsDir = path.join(testTempDir, 'tool-outputs');
+
+      fs.mkdirSync(chatsDir, { recursive: true });
+      fs.mkdirSync(logsDir, { recursive: true });
+      fs.mkdirSync(toolOutputsDir, { recursive: true });
+
+      // Create parent session file
+      const parentFile = path.join(
+        chatsDir,
+        `session-2023-01-01T00-00-${shortId}.json`,
+      );
+      fs.writeFileSync(
+        parentFile,
+        JSON.stringify({ sessionId: parentSessionId }),
+      );
+
+      // Create subagent session file in subdirectory
+      const subagentDir = path.join(chatsDir, parentSessionId);
+      fs.mkdirSync(subagentDir, { recursive: true });
+      const subagentFile = path.join(subagentDir, `${subagentSessionId}.json`);
+      fs.writeFileSync(
+        subagentFile,
+        JSON.stringify({ sessionId: subagentSessionId, kind: 'subagent' }),
+      );
+
+      // Create logs for both
+      const parentLog = path.join(logsDir, `session-${parentSessionId}.jsonl`);
+      fs.writeFileSync(parentLog, '{}');
+      const subagentLog = path.join(
+        logsDir,
+        `session-${subagentSessionId}.jsonl`,
+      );
+      fs.writeFileSync(subagentLog, '{}');
+
+      // Create tool outputs for both
+      const parentToolOutputDir = path.join(
+        toolOutputsDir,
+        `session-${parentSessionId}`,
+      );
+      fs.mkdirSync(parentToolOutputDir, { recursive: true });
+      const subagentToolOutputDir = path.join(
+        toolOutputsDir,
+        `session-${subagentSessionId}`,
+      );
+      fs.mkdirSync(subagentToolOutputDir, { recursive: true });
+
+      // Call with parent sessionId
+      await chatRecordingService.deleteSession(parentSessionId);
+
+      expect(fs.existsSync(parentFile)).toBe(false);
+      expect(fs.existsSync(subagentFile)).toBe(false);
+      expect(fs.existsSync(subagentDir)).toBe(false); // Subagent directory should be deleted
+      expect(fs.existsSync(parentLog)).toBe(false);
+      expect(fs.existsSync(subagentLog)).toBe(false);
+      expect(fs.existsSync(parentToolOutputDir)).toBe(false);
+      expect(fs.existsSync(subagentToolOutputDir)).toBe(false);
+    });
+
+    it('should delete subagent files and their logs when parent is deleted (legacy flat structure)', async () => {
+      const parentSessionId = '12345678-session-id';
+      const shortId = '12345678';
+      const subagentSessionId = 'subagent-session-id';
+      const chatsDir = path.join(testTempDir, 'chats');
+      const logsDir = path.join(testTempDir, 'logs');
+
+      fs.mkdirSync(chatsDir, { recursive: true });
+      fs.mkdirSync(logsDir, { recursive: true });
+
+      // Create parent session file
+      const parentFile = path.join(
+        chatsDir,
+        `session-2023-01-01T00-00-${shortId}.json`,
+      );
+      fs.writeFileSync(
+        parentFile,
+        JSON.stringify({ sessionId: parentSessionId }),
+      );
+
+      // Create legacy subagent session file (flat in chatsDir)
+      const subagentFile = path.join(
+        chatsDir,
+        `session-2023-01-01T00-01-${shortId}.json`,
+      );
+      fs.writeFileSync(
+        subagentFile,
+        JSON.stringify({ sessionId: subagentSessionId, kind: 'subagent' }),
+      );
+
+      // Call with parent sessionId
+      await chatRecordingService.deleteSession(parentSessionId);
+
+      expect(fs.existsSync(parentFile)).toBe(false);
+      expect(fs.existsSync(subagentFile)).toBe(false);
+    });
+
+    it('should delete by basename', async () => {
+      const sessionId = 'test-session-id';
+      const shortId = '12345678';
+      const chatsDir = path.join(testTempDir, 'chats');
+      const logsDir = path.join(testTempDir, 'logs');
+
+      fs.mkdirSync(chatsDir, { recursive: true });
+      fs.mkdirSync(logsDir, { recursive: true });
+
+      const basename = `session-2023-01-01T00-00-${shortId}`;
+      const sessionFile = path.join(chatsDir, `${basename}.json`);
+      fs.writeFileSync(sessionFile, JSON.stringify({ sessionId }));
+
+      const logFile = path.join(logsDir, `session-${sessionId}.jsonl`);
+      fs.writeFileSync(logFile, '{}');
+
+      // Call with basename
+      await chatRecordingService.deleteSession(basename);
+
+      expect(fs.existsSync(sessionFile)).toBe(false);
+      expect(fs.existsSync(logFile)).toBe(false);
+    });
+
+    it('should not throw if session file does not exist', async () => {
+      await expect(
         chatRecordingService.deleteSession('non-existent'),
-      ).not.toThrow();
+      ).resolves.not.toThrow();
     });
   });
 

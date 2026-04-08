@@ -17,6 +17,7 @@ import { ToolGroupMessage } from './messages/ToolGroupMessage.js';
 import { GeminiMessageContent } from './messages/GeminiMessageContent.js';
 import { CompressionMessage } from './messages/CompressionMessage.js';
 import { WarningMessage } from './messages/WarningMessage.js';
+import { SubagentHistoryMessage } from './messages/SubagentHistoryMessage.js';
 import { Box } from 'ink';
 import { AboutBox } from './AboutBox.js';
 import { StatsDisplay } from './StatsDisplay.js';
@@ -48,6 +49,8 @@ interface HistoryItemDisplayProps {
   isExpandable?: boolean;
   isFirstThinking?: boolean;
   isFirstAfterThinking?: boolean;
+  isToolGroupBoundary?: boolean;
+  suppressNarration?: boolean;
 }
 
 export const HistoryItemDisplay: React.FC<HistoryItemDisplayProps> = ({
@@ -60,20 +63,35 @@ export const HistoryItemDisplay: React.FC<HistoryItemDisplayProps> = ({
   isExpandable,
   isFirstThinking = false,
   isFirstAfterThinking = false,
+  isToolGroupBoundary = false,
+  suppressNarration = false,
 }) => {
   const settings = useSettings();
   const inlineThinkingMode = getInlineThinkingMode(settings);
   const itemForDisplay = useMemo(() => escapeAnsiCtrlCodes(item), [item]);
 
-  const needsTopMarginAfterThinking =
-    isFirstAfterThinking && inlineThinkingMode !== 'off';
+  const needTopMargin = !!(
+    (isFirstAfterThinking && inlineThinkingMode !== 'off') ||
+    isToolGroupBoundary
+  );
+
+  // If there's a topic update in this turn, we suppress the regular narration
+  // and thoughts as they are being "replaced" by the update_topic tool.
+  if (
+    suppressNarration &&
+    (itemForDisplay.type === 'thinking' ||
+      itemForDisplay.type === 'gemini' ||
+      itemForDisplay.type === 'gemini_content')
+  ) {
+    return null;
+  }
 
   return (
     <Box
       flexDirection="column"
       key={itemForDisplay.id}
       width={terminalWidth}
-      marginTop={needsTopMarginAfterThinking ? 1 : 0}
+      marginTop={needTopMargin ? 1 : 0}
     >
       {/* Render standard message types */}
       {itemForDisplay.type === 'thinking' && inlineThinkingMode !== 'off' && (
@@ -116,6 +134,7 @@ export const HistoryItemDisplay: React.FC<HistoryItemDisplayProps> = ({
         <InfoMessage
           text={itemForDisplay.text}
           secondaryText={itemForDisplay.secondaryText}
+          source={itemForDisplay.source}
           icon={itemForDisplay.icon}
           color={itemForDisplay.color}
           marginBottom={itemForDisplay.marginBottom}
@@ -146,23 +165,9 @@ export const HistoryItemDisplay: React.FC<HistoryItemDisplayProps> = ({
       {itemForDisplay.type === 'stats' && (
         <StatsDisplay
           duration={itemForDisplay.duration}
-          quotas={itemForDisplay.quotas}
           selectedAuthType={itemForDisplay.selectedAuthType}
           userEmail={itemForDisplay.userEmail}
           tier={itemForDisplay.tier}
-          currentModel={itemForDisplay.currentModel}
-          quotaStats={
-            itemForDisplay.pooledRemaining !== undefined ||
-            itemForDisplay.pooledLimit !== undefined ||
-            itemForDisplay.pooledResetTime !== undefined
-              ? {
-                  remaining: itemForDisplay.pooledRemaining,
-                  limit: itemForDisplay.pooledLimit,
-                  resetTime: itemForDisplay.pooledResetTime,
-                }
-              : undefined
-          }
-          creditBalance={itemForDisplay.creditBalance}
         />
       )}
       {itemForDisplay.type === 'model_stats' && (
@@ -200,6 +205,13 @@ export const HistoryItemDisplay: React.FC<HistoryItemDisplayProps> = ({
           borderTop={itemForDisplay.borderTop}
           borderBottom={itemForDisplay.borderBottom}
           isExpandable={isExpandable}
+          isToolGroupBoundary={isToolGroupBoundary}
+        />
+      )}
+      {itemForDisplay.type === 'subagent' && (
+        <SubagentHistoryMessage
+          item={itemForDisplay}
+          terminalWidth={terminalWidth}
         />
       )}
       {itemForDisplay.type === 'compression' && (
