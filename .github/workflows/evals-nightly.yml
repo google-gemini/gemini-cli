@@ -68,7 +68,7 @@ jobs:
           GEMINI_API_KEY: '${{ secrets.GEMINI_API_KEY }}'
           GEMINI_MODEL: '${{ matrix.model }}'
           RUN_EVALS: 'true'
-          EVAL_SUITE_TYPE: '${{ github.event.inputs.suite_type || 'behavioral' }}'
+          EVAL_SUITE_TYPE: "${{ github.event.inputs.suite_type || 'behavioral' }}"
           EVAL_SUITE_NAME: '${{ github.event.inputs.suite_name }}'
           TEST_NAME_PATTERN: '${{ github.event.inputs.test_name_pattern }}'
           # Disable Vitest internal retries to avoid double-retrying;
