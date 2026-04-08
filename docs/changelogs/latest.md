@@ -23,8 +23,6 @@ npm install -g @google/gemini-cli
 - **Security & Permission Hardening:** Implemented secret visibility lockdown
   for environment files and integrated integrity controls for Windows
   sandboxing.
-- **New Review Skill:** Added a specialized skill to proactively identify
-  duplicated code and reinvented wheels during PR reviews.
 
 ## What's Changed
 
