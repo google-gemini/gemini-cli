@@ -5065,8 +5065,8 @@ describe('InputPrompt', () => {
         input: '\x12',
       },
       {
-        name: 'Ctrl+X hotkey is pressed',
-        input: '\x18',
+        name: 'Ctrl+G hotkey is pressed',
+        input: '\x07',
       },
       {
         name: 'F12 hotkey is pressed',

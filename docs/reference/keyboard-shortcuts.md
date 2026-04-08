@@ -86,13 +86,14 @@ available combinations.
 
 #### Text Input
 
-| Command                    | Action                                                                    | Keys                                                                                |
-| -------------------------- | ------------------------------------------------------------------------- | ----------------------------------------------------------------------------------- |
-| `input.submit`             | Submit the current prompt.                                                | `Enter`                                                                             |
-| `input.queueMessage`       | Queue the current prompt to be processed after the current task finishes. | `Tab`                                                                               |
-| `input.newline`            | Insert a newline without submitting.                                      | `Ctrl+Enter`<br />`Cmd/Win+Enter`<br />`Alt+Enter`<br />`Shift+Enter`<br />`Ctrl+J` |
-| `input.openExternalEditor` | Open the current prompt or the plan in an external editor.                | `Ctrl+X`                                                                            |
-| `input.paste`              | Paste from the clipboard.                                                 | `Ctrl+V`<br />`Cmd/Win+V`<br />`Alt+V`                                              |
+| Command                              | Action                                                                    | Keys                                                                                |
+| ------------------------------------ | ------------------------------------------------------------------------- | ----------------------------------------------------------------------------------- |
+| `input.submit`                       | Submit the current prompt.                                                | `Enter`                                                                             |
+| `input.queueMessage`                 | Queue the current prompt to be processed after the current task finishes. | `Tab`                                                                               |
+| `input.newline`                      | Insert a newline without submitting.                                      | `Ctrl+Enter`<br />`Cmd/Win+Enter`<br />`Alt+Enter`<br />`Shift+Enter`<br />`Ctrl+J` |
+| `input.openExternalEditor`           | Open the current prompt or the plan in an external editor.                | `Ctrl+G`                                                                            |
+| `input.deprecatedOpenExternalEditor` | Deprecated command to open external editor.                               | `Ctrl+X`                                                                            |
+| `input.paste`                        | Paste from the clipboard.                                                 | `Ctrl+V`<br />`Cmd/Win+V`<br />`Alt+V`                                              |
 
 #### App Controls
 
@@ -100,7 +101,7 @@ available combinations.
 | ----------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------ |
 | `app.showErrorDetails`        | Toggle detailed error information.                                                                                                                 | `F12`              |
 | `app.showFullTodos`           | Toggle the full TODO list.                                                                                                                         | `Ctrl+T`           |
-| `app.showIdeContextDetail`    | Show IDE context details.                                                                                                                          | `Ctrl+G`           |
+| `app.showIdeContextDetail`    | Show IDE context details.                                                                                                                          | `F4`               |
 | `app.toggleMarkdown`          | Toggle Markdown rendering.                                                                                                                         | `Alt+M`            |
 | `app.toggleCopyMode`          | Toggle copy mode when in alternate buffer mode.                                                                                                    | `F9`               |
 | `app.toggleMouseMode`         | Toggle mouse mode (scrolling and clicking).                                                                                                        | `Ctrl+S`           |

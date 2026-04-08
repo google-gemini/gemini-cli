@@ -77,6 +77,7 @@ export enum Command {
   QUEUE_MESSAGE = 'input.queueMessage',
   NEWLINE = 'input.newline',
   OPEN_EXTERNAL_EDITOR = 'input.openExternalEditor',
+  DEPRECATED_OPEN_EXTERNAL_EDITOR = 'input.deprecatedOpenExternalEditor',
   PASTE_CLIPBOARD = 'input.paste',
 
   // App Controls
@@ -375,7 +376,8 @@ export const defaultKeyBindingConfig: KeyBindingConfig = new Map([
       new KeyBinding('ctrl+j'),
     ],
   ],
-  [Command.OPEN_EXTERNAL_EDITOR, [new KeyBinding('ctrl+x')]],
+  [Command.OPEN_EXTERNAL_EDITOR, [new KeyBinding('ctrl+g')]],
+  [Command.DEPRECATED_OPEN_EXTERNAL_EDITOR, [new KeyBinding('ctrl+x')]],
   [
     Command.PASTE_CLIPBOARD,
     [
@@ -388,7 +390,7 @@ export const defaultKeyBindingConfig: KeyBindingConfig = new Map([
   // App Controls
   [Command.SHOW_ERROR_DETAILS, [new KeyBinding('f12')]],
   [Command.SHOW_FULL_TODOS, [new KeyBinding('ctrl+t')]],
-  [Command.SHOW_IDE_CONTEXT_DETAIL, [new KeyBinding('ctrl+g')]],
+  [Command.SHOW_IDE_CONTEXT_DETAIL, [new KeyBinding('f4')]],
   [Command.TOGGLE_MARKDOWN, [new KeyBinding('alt+m')]],
   [Command.TOGGLE_COPY_MODE, [new KeyBinding('f9')]],
   [Command.TOGGLE_MOUSE_MODE, [new KeyBinding('ctrl+s')]],
@@ -510,6 +512,7 @@ export const commandCategories: readonly CommandCategory[] = [
       Command.QUEUE_MESSAGE,
       Command.NEWLINE,
       Command.OPEN_EXTERNAL_EDITOR,
+      Command.DEPRECATED_OPEN_EXTERNAL_EDITOR,
       Command.PASTE_CLIPBOARD,
     ],
   },
@@ -626,6 +629,8 @@ export const commandDescriptions: Readonly<Record<Command, string>> = {
   [Command.NEWLINE]: 'Insert a newline without submitting.',
   [Command.OPEN_EXTERNAL_EDITOR]:
     'Open the current prompt or the plan in an external editor.',
+  [Command.DEPRECATED_OPEN_EXTERNAL_EDITOR]:
+    'Deprecated command to open external editor.',
   [Command.PASTE_CLIPBOARD]: 'Paste from the clipboard.',
 
   // App Controls
