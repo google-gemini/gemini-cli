@@ -25,6 +25,7 @@ import http from 'node:http';
  */
 const Platform = {
   isWindows: os.platform() === 'win32',
+  isMac: os.platform() === 'darwin',
 
   /** Returns a command to create an empty file. */
   touch(filePath: string) {
@@ -104,8 +105,8 @@ async function runCommand(command: SandboxedCommand) {
 }
 
 /**
- * Asserts the result of a sandboxed command execution.
- * Provides detailed diagnostics on failure to help debug flakiness in CI.
+ * Asserts the result of a sandboxed command execution, and provides detailed
+ * diagnostics on failure.
  */
 function assertResult(
   result: { status: number; stdout: string; stderr: string },
@@ -141,13 +142,12 @@ describe('SandboxManager Integration', () => {
   const tempDirectories: string[] = [];
 
   /**
-   * Creates a tracked temporary directory.
+   * Creates a temporary directory.
    * - macOS: Created in process.cwd() to avoid the seatbelt profile's global os.tmpdir() whitelist.
-   * - Win/Linux: Created in os.tmpdir() because enforcing sandbox restrictions deeply inside a git repo is profoundly slow.
+   * - Win/Linux: Created in os.tmpdir() because enforcing sandbox restrictions inside a large directory can be very slow.
    */
   function createTempDir(prefix = 'gemini-sandbox-test-'): string {
-    const isMac = os.platform() === 'darwin';
-    const baseDir = isMac
+    const baseDir = Platform.isMac
       ? path.join(process.cwd(), `.${prefix}`)
       : path.join(os.tmpdir(), prefix);
 
@@ -166,12 +166,10 @@ describe('SandboxManager Integration', () => {
 
   afterAll(() => {
     for (const dir of tempDirectories) {
-      if (fs.existsSync(dir)) {
-        try {
-          fs.rmSync(dir, { recursive: true, force: true });
-        } catch {
-          // Best-effort cleanup
-        }
+      try {
+        fs.rmSync(dir, { recursive: true, force: true });
+      } catch {
+        // Best-effort cleanup
       }
     }
   });
@@ -310,7 +308,7 @@ describe('SandboxManager Integration', () => {
       const nestedDir = path.join(forbiddenDir, 'nested');
       const nestedFile = path.join(nestedDir, 'test.txt');
 
-      // Create the base forbidden directory first so the manager can apply rules to it
+      // Create the base forbidden directory first so the manager can restrict access to it.
       fs.mkdirSync(forbiddenDir);
 
       const osManager = createSandboxManager(
@@ -321,9 +319,7 @@ describe('SandboxManager Integration', () => {
         },
       );
 
-      // Execute a dummy command to force the manager to initialize its restrictions.
-      // On some platforms, sandbox boundaries are dynamically propagated through
-      // directory inheritance rules, which requires the parent directory to exist first.
+      // Execute a dummy command so the manager initializes its restrictions.
       const dummyCommand = await osManager.prepareCommand({
         ...Platform.echo('init'),
         cwd: tempWorkspace,
@@ -404,81 +400,85 @@ describe('SandboxManager Integration', () => {
       expect(result.stdout.trim()).toBe('survived');
     });
 
-    it('prevents creation of non-existent forbidden paths', async () => {
-      // Windows icacls cannot explicitly protect paths that have not yet been created.
-      if (Platform.isWindows) return;
+    // Windows icacls cannot explicitly protect paths that have not yet been created.
+    it.skipIf(Platform.isWindows)(
+      'prevents creation of non-existent forbidden paths',
+      async () => {
+        const tempWorkspace = createTempDir('workspace-');
+        const nonExistentFile = path.join(tempWorkspace, 'never-created.txt');
 
-      const tempWorkspace = createTempDir('workspace-');
-      const nonExistentFile = path.join(tempWorkspace, 'never-created.txt');
+        const osManager = createSandboxManager(
+          { enabled: true },
+          {
+            workspace: tempWorkspace,
+            forbiddenPaths: async () => [nonExistentFile],
+          },
+        );
 
-      const osManager = createSandboxManager(
-        { enabled: true },
-        {
-          workspace: tempWorkspace,
-          forbiddenPaths: async () => [nonExistentFile],
-        },
-      );
+        // We use touch to attempt creation of the file
+        const { command: cmdTouch, args: argsTouch } =
+          Platform.touch(nonExistentFile);
 
-      // We use touch to attempt creation of the file
-      const { command: cmdTouch, args: argsTouch } =
-        Platform.touch(nonExistentFile);
+        const sandboxedCmd = await osManager.prepareCommand({
+          command: cmdTouch,
+          args: argsTouch,
+          cwd: tempWorkspace,
+          env: process.env,
+        });
 
-      const sandboxedCmd = await osManager.prepareCommand({
-        command: cmdTouch,
-        args: argsTouch,
-        cwd: tempWorkspace,
-        env: process.env,
-      });
+        // Execute the command, we expect it to fail (permission denied or read-only file system)
+        const result = await runCommand(sandboxedCmd);
 
-      // Execute the command, we expect it to fail (permission denied or read-only file system)
-      const result = await runCommand(sandboxedCmd);
+        assertResult(result, sandboxedCmd, 'failure');
+        expect(fs.existsSync(nonExistentFile)).toBe(false);
+      },
+    );
 
-      assertResult(result, sandboxedCmd, 'failure');
-      expect(fs.existsSync(nonExistentFile)).toBe(false);
-    });
+    // Windows requires Administrator privileges or Developer Mode to create symlinks.
+    it.skipIf(Platform.isWindows)(
+      'blocks access to both a symlink and its target when the symlink is forbidden',
+      async () => {
+        const tempWorkspace = createTempDir('workspace-');
+        const targetFile = path.join(tempWorkspace, 'target.txt');
+        const symlinkFile = path.join(tempWorkspace, 'link.txt');
 
-    it('blocks access to both a symlink and its target when the symlink is forbidden', async () => {
-      if (Platform.isWindows) return;
+        fs.writeFileSync(targetFile, 'secret data');
+        fs.symlinkSync(targetFile, symlinkFile);
 
-      const tempWorkspace = createTempDir('workspace-');
-      const targetFile = path.join(tempWorkspace, 'target.txt');
-      const symlinkFile = path.join(tempWorkspace, 'link.txt');
+        const osManager = createSandboxManager(
+          { enabled: true },
+          {
+            workspace: tempWorkspace,
+            forbiddenPaths: async () => [symlinkFile],
+          },
+        );
 
-      fs.writeFileSync(targetFile, 'secret data');
-      fs.symlinkSync(targetFile, symlinkFile);
+        // Attempt to read the target file directly
+        const { command: cmdTarget, args: argsTarget } =
+          Platform.cat(targetFile);
+        const commandTarget = await osManager.prepareCommand({
+          command: cmdTarget,
+          args: argsTarget,
+          cwd: tempWorkspace,
+          env: process.env,
+        });
 
-      const osManager = createSandboxManager(
-        { enabled: true },
-        {
-          workspace: tempWorkspace,
-          forbiddenPaths: async () => [symlinkFile],
-        },
-      );
+        const resultTarget = await runCommand(commandTarget);
+        assertResult(resultTarget, commandTarget, 'failure');
 
-      // Attempt to read the target file directly
-      const { command: cmdTarget, args: argsTarget } = Platform.cat(targetFile);
-      const commandTarget = await osManager.prepareCommand({
-        command: cmdTarget,
-        args: argsTarget,
-        cwd: tempWorkspace,
-        env: process.env,
-      });
+        // Attempt to read via the symlink
+        const { command: cmdLink, args: argsLink } = Platform.cat(symlinkFile);
+        const commandLink = await osManager.prepareCommand({
+          command: cmdLink,
+          args: argsLink,
+          cwd: tempWorkspace,
+          env: process.env,
+        });
 
-      const resultTarget = await runCommand(commandTarget);
-      assertResult(resultTarget, commandTarget, 'failure');
-
-      // Attempt to read via the symlink
-      const { command: cmdLink, args: argsLink } = Platform.cat(symlinkFile);
-      const commandLink = await osManager.prepareCommand({
-        command: cmdLink,
-        args: argsLink,
-        cwd: tempWorkspace,
-        env: process.env,
-      });
-
-      const resultLink = await runCommand(commandLink);
-      assertResult(resultLink, commandLink, 'failure');
-    });
+        const resultLink = await runCommand(commandLink);
+        assertResult(resultLink, commandLink, 'failure');
+      },
+    );
   });
 
   describe('Network Access', () => {
