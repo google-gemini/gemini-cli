@@ -79,6 +79,8 @@ export interface AgentEventCommon {
   _meta?: {
     /** source of the event e.g. 'user' | 'ext:{ext_name}/hooks/{hook_name}' */
     source?: string;
+    /** Whether this event is part of an auto-continuation loop. */
+    isContinuation?: boolean;
     [key: string]: unknown;
   };
 }
@@ -300,6 +302,8 @@ export interface Usage {
   inputTokens?: number;
   outputTokens?: number;
   cachedTokens?: number;
+  /** Whether this usage report is for a continued response. */
+  is_continuation?: boolean;
   cost?: { amount: number; currency?: string };
 }
 

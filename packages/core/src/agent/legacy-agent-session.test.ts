@@ -1413,4 +1413,111 @@ describe('LegacyAgentSession', () => {
       expect(err?._meta?.['status']).toBe('RESOURCE_EXHAUSTED');
     });
   });
+
+  describe('Length Continuation', () => {
+    it('triggers continuation when finishReason is MAX_TOKENS', async () => {
+      const sendMock = deps.client.sendMessageStream as ReturnType<
+        typeof vi.fn
+      >;
+
+      // First call returns MAX_TOKENS
+      sendMock.mockReturnValueOnce(
+        makeStream([
+          { type: GeminiEventType.Content, value: 'part 1' },
+          {
+            type: GeminiEventType.Finished,
+            value: {
+              reason: FinishReason.MAX_TOKENS,
+              usageMetadata: undefined,
+            },
+          },
+        ]),
+      );
+
+      // Second call (continuation) returns STOP
+      sendMock.mockReturnValueOnce(
+        makeStream([
+          { type: GeminiEventType.Content, value: 'part 2' },
+          {
+            type: GeminiEventType.Finished,
+            value: { reason: FinishReason.STOP, usageMetadata: undefined },
+          },
+        ]),
+      );
+
+      const session = new LegacyAgentSession(deps);
+      const events: AgentEvent[] = [];
+      session.subscribe((e) => events.push(e));
+
+      await session.send(makeMessageSend('start'));
+
+      // Wait for the stream to complete
+      for await (const _ of session.stream()) {
+        // just consume
+      }
+
+      // Verify events
+      const messages = events.filter(
+        (e): e is AgentEvent<'message'> => e.type === 'message',
+      );
+
+      // Expected messages:
+      // 1. User: "start" (emitted by LegacyAgentProtocol.send)
+      // 2. Agent: "part 1"
+      // 3. User: continuation prompt (injected)
+      // 4. Agent: "part 2"
+
+      expect(messages).toHaveLength(4);
+      expect(messages[0].content[0]).toMatchObject({ text: 'start' });
+      expect(messages[1].content[0]).toMatchObject({ text: 'part 1' });
+      expect(messages[2].content[0]).toMatchObject({
+        text: expect.stringContaining('truncated'),
+      });
+      expect(messages[2]._meta).toMatchObject({ isContinuation: true });
+      expect(messages[3].content[0]).toMatchObject({ text: 'part 2' });
+
+      expect(sendMock).toHaveBeenCalledTimes(2);
+      // Verify second call used continuation prompt
+      expect(sendMock).toHaveBeenLastCalledWith(
+        expect.arrayContaining([
+          { text: expect.stringContaining('truncated') },
+        ]),
+        expect.anything(),
+        expect.anything(),
+        undefined,
+        false,
+        undefined,
+      );
+    });
+
+    it('stops after maxContinuations (3)', async () => {
+      const sendMock = deps.client.sendMessageStream as ReturnType<
+        typeof vi.fn
+      >;
+
+      // Mock 5 calls all returning MAX_TOKENS
+      for (let i = 0; i < 5; i++) {
+        sendMock.mockReturnValueOnce(
+          makeStream([
+            { type: GeminiEventType.Content, value: `part ${i + 1}` },
+            {
+              type: GeminiEventType.Finished,
+              value: {
+                reason: FinishReason.MAX_TOKENS,
+                usageMetadata: undefined,
+              },
+            },
+          ]),
+        );
+      }
+
+      const session = new LegacyAgentSession(deps);
+      await session.send(makeMessageSend('start'));
+
+      await collectEvents(session);
+
+      // Should have called sendMessageStream 1 (original) + 3 (continuations) = 4 times
+      expect(sendMock).toHaveBeenCalledTimes(4);
+    });
+  });
 });

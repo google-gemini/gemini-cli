@@ -27,12 +27,14 @@ import {
 } from './types.js';
 import { ToolErrorType } from '../tools/tool-error.js';
 import { UPDATE_TOPIC_TOOL_NAME } from '../tools/tool-names.js';
+import { debugLogger } from '../utils/debugLogger.js';
 import { PolicyDecision, type ApprovalMode } from '../policy/types.js';
 import {
   ToolConfirmationOutcome,
   type AnyDeclarativeTool,
 } from '../tools/tools.js';
 import { getToolSuggestion } from '../utils/tool-utils.js';
+import { normalizeToolName, getClosestMatch } from '../utils/fuzzy-matcher.js';
 import { runInDevTraceSpan } from '../telemetry/trace.js';
 import { logToolCall } from '../telemetry/loggers.js';
 import { ToolCallEvent } from '../telemetry/types.js';
@@ -318,7 +320,43 @@ export class Scheduler {
           schedulerId: this.schedulerId,
           parentCallId: this.parentCallId,
         };
-        const tool = toolRegistry.getTool(request.name);
+        let tool = toolRegistry.getTool(request.name);
+
+        if (!tool) {
+          // Attempt normalization: kebab-case to snake_case
+          const normalizedName = normalizeToolName(request.name);
+          if (normalizedName !== request.name) {
+            tool = toolRegistry.getTool(normalizedName);
+            if (tool) {
+              debugLogger.log(
+                `Repaired tool name: ${request.name} -> ${normalizedName} (via normalization)`,
+              );
+              enrichedRequest.name = normalizedName;
+              enrichedRequest.originalRequestName =
+                enrichedRequest.originalRequestName || request.name;
+            }
+          }
+        }
+
+        if (!tool) {
+          // Attempt fuzzy matching: Levenshtein distance <= 2
+          const fuzzyResult = getClosestMatch(
+            request.name,
+            toolRegistry.getAllToolNames(),
+            2,
+          );
+          if (fuzzyResult.repairedName && !fuzzyResult.isAmbiguous) {
+            tool = toolRegistry.getTool(fuzzyResult.repairedName);
+            if (tool) {
+              debugLogger.log(
+                `Repaired tool name: ${request.name} -> ${fuzzyResult.repairedName} (via fuzzy matching, distance: ${fuzzyResult.distance})`,
+              );
+              enrichedRequest.name = fuzzyResult.repairedName;
+              enrichedRequest.originalRequestName =
+                enrichedRequest.originalRequestName || request.name;
+            }
+          }
+        }
 
         if (!tool) {
           return {
@@ -767,11 +805,44 @@ export class Scheduler {
       const originalRequestName =
         result.request.originalRequestName || result.request.name;
 
-      const newTool = this.context.toolRegistry.getTool(tailRequest.name);
+      let newTool = this.context.toolRegistry.getTool(tailRequest.name);
+      let repairedTailName = tailRequest.name;
+
+      if (!newTool) {
+        // Attempt normalization: kebab-case to snake_case
+        const normalizedName = normalizeToolName(tailRequest.name);
+        if (normalizedName !== tailRequest.name) {
+          newTool = this.context.toolRegistry.getTool(normalizedName);
+          if (newTool) {
+            debugLogger.log(
+              `Repaired tail tool name: ${tailRequest.name} -> ${normalizedName} (via normalization)`,
+            );
+            repairedTailName = normalizedName;
+          }
+        }
+      }
+
+      if (!newTool) {
+        // Attempt fuzzy matching: Levenshtein distance <= 2
+        const fuzzyResult = getClosestMatch(
+          tailRequest.name,
+          this.context.toolRegistry.getAllToolNames(),
+          2,
+        );
+        if (fuzzyResult.repairedName && !fuzzyResult.isAmbiguous) {
+          newTool = this.context.toolRegistry.getTool(fuzzyResult.repairedName);
+          if (newTool) {
+            debugLogger.log(
+              `Repaired tail tool name: ${tailRequest.name} -> ${fuzzyResult.repairedName} (via fuzzy matching, distance: ${fuzzyResult.distance})`,
+            );
+            repairedTailName = fuzzyResult.repairedName;
+          }
+        }
+      }
 
       const newRequest: ToolCallRequestInfo = {
         callId: originalCallId,
-        name: tailRequest.name,
+        name: repairedTailName,
         args: tailRequest.args,
         originalRequestName,
         originalRequestArgs:

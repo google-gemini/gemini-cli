@@ -10,7 +10,7 @@
  */
 
 import { GeminiEventType } from '../core/turn.js';
-import type { Part } from '@google/genai';
+import type { Part, FinishReason } from '@google/genai';
 import type { GeminiClient } from '../core/client.js';
 import type { Config } from '../config/config.js';
 import type { ToolCallRequestInfo } from '../scheduler/types.js';
@@ -178,6 +178,8 @@ export class LegacyAgentProtocol implements AgentProtocol {
     let currentParts: Part[] = initialParts;
     let currentDisplayContent = initialDisplayContent;
     let turnCount = 0;
+    let continuationCount = 0;
+    const maxContinuations = 3;
     const maxTurns = this._config.getMaxSessionTurns();
 
     while (true) {
@@ -192,6 +194,8 @@ export class LegacyAgentProtocol implements AgentProtocol {
       }
 
       const toolCallRequests: ToolCallRequestInfo[] = [];
+      let finishReason: FinishReason | undefined;
+
       const responseStream = this._client.sendMessageStream(
         currentParts,
         this._abortController.signal,
@@ -221,7 +225,11 @@ export class LegacyAgentProtocol implements AgentProtocol {
             this._finishStream('failed');
             return;
           case GeminiEventType.Finished:
-            if (toolCallRequests.length === 0) {
+            finishReason = event.value.reason;
+            if (
+              toolCallRequests.length === 0 &&
+              finishReason !== 'MAX_TOKENS'
+            ) {
               this._finishStream(mapFinishReason(event.value.reason));
               return;
             }
@@ -242,7 +250,30 @@ export class LegacyAgentProtocol implements AgentProtocol {
       }
 
       if (toolCallRequests.length === 0) {
-        this._finishStream('completed');
+        if (
+          finishReason === 'MAX_TOKENS' &&
+          continuationCount < maxContinuations
+        ) {
+          continuationCount++;
+          debugLogger.log(
+            `Response truncated (MAX_TOKENS). Triggering continuation ${continuationCount}/${maxContinuations}...`,
+          );
+
+          const continuationPrompt =
+            '[System: Your previous response was truncated due to length. Please continue exactly where you left off.]';
+
+          const continuationMessage = this._makeUserMessageEvent(
+            [{ type: 'text', text: continuationPrompt }],
+            undefined,
+            { isContinuation: true },
+          );
+          this._emit([continuationMessage]);
+
+          currentParts = [{ text: continuationPrompt }];
+          continue;
+        }
+
+        this._finishStream(mapFinishReason(finishReason) || 'completed');
         return;
       }
 
