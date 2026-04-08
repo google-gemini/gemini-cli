@@ -14,6 +14,7 @@ import {
   type ConsoleLogPayload,
   type UserFeedbackPayload,
   sessionId,
+  uiTelemetryService,
   logUserPrompt,
   AuthType,
   UserPromptEvent,
@@ -611,6 +612,9 @@ export async function main() {
         };
         // Use the existing session ID to continue recording to the same session
         config.setSessionId(resumedSessionData.conversation.sessionId);
+        // Sync the session ID to the UI telemetry service so the exit message
+        // displays the correct session ID for --resume (fixes #24820)
+        uiTelemetryService.hydrate(resumedSessionData.conversation);
       } catch (error) {
         if (
           error instanceof SessionError &&
