@@ -307,4 +307,48 @@ describe.skipIf(!chromeAvailable)('browser-agent', () => {
 
     await run.expectText('successfully written', 15000);
   });
+
+  it('should handle concurrent browser agents with isolated session mode', async () => {
+    rig.setup('browser-concurrent', {
+      fakeResponsesPath: join(__dirname, 'browser-agent.concurrent.responses'),
+      settings: {
+        agents: {
+          overrides: {
+            browser_agent: {
+              enabled: true,
+            },
+          },
+          browser: {
+            headless: true,
+            // Isolated mode supports concurrent browser agents.
+            // Persistent/existing modes reject concurrent calls to prevent
+            // Chrome profile lock conflicts.
+            sessionMode: 'isolated',
+          },
+        },
+      },
+    });
+
+    const result = await rig.run({
+      args: 'Launch two browser agents concurrently to check example.com',
+    });
+
+    assertModelHasOutput(result);
+
+    const toolLogs = rig.readToolLogs();
+    const browserCalls = toolLogs.filter(
+      (t) => t.toolRequest.name === 'browser_agent',
+    );
+
+    // Both browser_agent invocations should have been called
+    expect(browserCalls.length).toBe(2);
+
+    // Both should complete successfully (no errors)
+    for (const call of browserCalls) {
+      expect(
+        call.toolRequest.success,
+        `browser_agent call failed: ${JSON.stringify(call.toolRequest)}`,
+      ).toBe(true);
+    }
+  });
 });
