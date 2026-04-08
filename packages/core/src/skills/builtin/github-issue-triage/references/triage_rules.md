@@ -100,7 +100,7 @@ Search for duplicates using `gh issue list --search "<keywords>" --repo <owner/r
 ## Step 6: Triage Summary
 Review the issue comments to see if a community member has already identified the root cause.
 - If a root cause is identified: determine if it is a very simple fix. If it is a simple fix, post guidance for the fix, categorize the issue as **Maintainer-only**, and explain why. If it is not a simple fix, determine whether it should be **Maintainer-only** or **Help-wanted** and explain why. 
-- If no root cause is identified: State whether the issue should be categorized as **Maintainer-only** (epic, core architecture, sensitive fixes, internal tasks, or issues requiring deep investigation) or **Help-wanted** (good for community, general bugs, features, or tasks ready for external help). Your comment should be brief and clearly explain *why* it fits that category. 
+- If no root cause is identified: State whether the issue should be categorized as **Maintainer-only** (epic, core architecture, sensitive fixes, internal tasks, or issues requiring deep investigation) or **Help-wanted** (small well-defined features, easy-to-fix bugs, good for community, or tasks ready for external help). Your comment should be brief and clearly explain *why* it fits that category. 
 - If you categorized the issue as **Help-wanted**, also run `gh issue edit <issue_url> --remove-label "status/need-triage" --add-label "help wanted"`. 
 - If you categorized the issue as **Maintainer-only**, also run `gh issue edit <issue_url> --remove-label "status/need-triage" --add-label "🔒 maintainer only"`.
 - Action: `gh issue comment <issue_url> --body "### Triage Summary\n\n<your summary>"`
