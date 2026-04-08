@@ -69,6 +69,94 @@ export class HookEventHandler {
     this.hookAggregator = hookAggregator;
   }
 
+  private getObjectKeys(value: unknown): string[] {
+    if (typeof value !== 'object' || value === null || Array.isArray(value)) {
+      return [];
+    }
+
+    return Object.keys(value);
+  }
+
+  private summarizeHookInput(
+    eventName: HookEventName,
+    input: HookInput,
+  ): Record<string, unknown> {
+    const base = {
+      session_id: input.session_id,
+      transcript_path: input.transcript_path,
+      cwd: input.cwd,
+      hook_event_name: input.hook_event_name,
+      timestamp: input.timestamp,
+    };
+
+    switch (eventName) {
+      case HookEventName.BeforeTool:
+      case HookEventName.AfterTool:
+        return {
+          ...base,
+          tool_name: 'tool_name' in input ? input.tool_name : undefined,
+          tool_input_keys:
+            'tool_input' in input ? this.getObjectKeys(input.tool_input) : [],
+          tool_response_keys:
+            'tool_response' in input
+              ? this.getObjectKeys(input.tool_response)
+              : [],
+        };
+
+      case HookEventName.BeforeAgent:
+        return {
+          ...base,
+          prompt_length:
+            'prompt' in input && typeof input.prompt === 'string'
+              ? input.prompt.length
+              : 0,
+        };
+
+      case HookEventName.AfterAgent:
+        return {
+          ...base,
+          prompt_length:
+            'prompt' in input && typeof input.prompt === 'string'
+              ? input.prompt.length
+              : 0,
+          prompt_response_length:
+            'prompt_response' in input &&
+            typeof input.prompt_response === 'string'
+              ? input.prompt_response.length
+              : 0,
+          stop_hook_active:
+            'stop_hook_active' in input ? input.stop_hook_active : undefined,
+        };
+
+      case HookEventName.BeforeModel:
+      case HookEventName.AfterModel:
+      case HookEventName.BeforeToolSelection:
+        return {
+          ...base,
+          has_llm_request: 'llm_request' in input,
+          has_llm_response: 'llm_response' in input,
+        };
+
+      default:
+        return base;
+    }
+  }
+
+  private summarizeHookOutput(
+    output: Record<string, unknown> | undefined,
+  ): Record<string, unknown> | undefined {
+    if (!output) return undefined;
+
+    return {
+      keys: Object.keys(output),
+      continue: output.continue,
+      decision: output.decision,
+      suppressOutput: output.suppressOutput,
+      hasReason: typeof output.reason === 'string',
+      hasSystemMessage: typeof output.systemMessage === 'string',
+    };
+  }
+
   /**
    * Fire a BeforeTool event
    * Called by handleHookExecutionRequest - executes hooks directly
@@ -299,6 +387,11 @@ export class HookEventHandler {
         };
       }
 
+      debugLogger.debug(
+        `Hook lifecycle ${eventName}: invoking ${plan.hookConfigs.length} hook(s) [` +
+          `${plan.hookConfigs.map((c) => this.getHookName(c)).join(', ')}]`,
+      );
+
       const onHookStart = (config: HookConfig, index: number) => {
         coreEvents.emitHookStart({
           hookName: this.getHookName(config),
@@ -447,10 +540,10 @@ export class HookEventHandler {
         eventName,
         hookType,
         hookName,
-        { ...input },
+        this.summarizeHookInput(eventName, input),
         result.duration,
         result.success,
-        result.output ? { ...result.output } : undefined,
+        this.summarizeHookOutput(result.output),
         result.exitCode,
         result.stdout,
         result.stderr,

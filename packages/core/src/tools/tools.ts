@@ -158,6 +158,14 @@ export interface PolicyUpdateOptions {
 /**
  * A convenience base class for ToolInvocation.
  */
+
+function toRecord(value: unknown): Record<string, unknown> {
+  if (isRecord(value)) {
+    return value;
+  }
+  throw new Error('Tool parameters must be a record.');
+}
+
 export abstract class BaseToolInvocation<
   TParams extends object,
   TResult extends ToolResult,
@@ -295,8 +303,8 @@ export abstract class BaseToolInvocation<
       correlationId,
       toolCall: {
         name: this._toolName,
-        // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
-        args: this.params as Record<string, unknown>,
+         
+        args: toRecord(this.params),
       },
       serverName: this._serverName,
       toolAnnotations: this._toolAnnotations,
