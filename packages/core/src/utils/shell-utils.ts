@@ -108,6 +108,8 @@ export async function resolveExecutable(
 let bashLanguage: Language | null = null;
 let treeSitterInitialization: Promise<void> | null = null;
 let treeSitterInitializationError: Error | null = null;
+let parserState: 'uninitialized' | 'initializing' | 'initialized' | 'error' =
+  'uninitialized';
 
 class ShellParserInitializationError extends Error {
   constructor(cause: Error) {
@@ -163,12 +165,13 @@ async function loadBashLanguage(): Promise<void> {
 }
 
 export async function initializeShellParsers(): Promise<void> {
-  if (!treeSitterInitialization) {
+  if (parserState === 'uninitialized') {
+    parserState = 'initializing';
     let timerId: NodeJS.Timeout | undefined;
     const timeoutPromise = new Promise<void>((_, reject) => {
       timerId = setTimeout(
         () => reject(new Error('Tree-sitter initialization timed out')),
-        5000,
+        30000,
       );
     });
     treeSitterInitialization = Promise.race([
@@ -178,7 +181,11 @@ export async function initializeShellParsers(): Promise<void> {
       .finally(() => {
         if (timerId) clearTimeout(timerId);
       })
+      .then(() => {
+        parserState = 'initialized';
+      })
       .catch((error) => {
+        parserState = 'error';
         treeSitterInitialization = null;
         // Log the error but don't throw, allowing the application to fall back to safe defaults (ASK_USER)
         // or regex checks where appropriate.
@@ -186,7 +193,9 @@ export async function initializeShellParsers(): Promise<void> {
       });
   }
 
-  await treeSitterInitialization;
+  if (treeSitterInitialization) {
+    await treeSitterInitialization;
+  }
 }
 
 export interface ParsedCommandDetail {
