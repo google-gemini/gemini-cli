@@ -290,8 +290,8 @@ export class WindowsSandboxManager implements SandboxManager {
       : false;
 
     if (!isReadonlyMode || isApproved) {
-      await this.grantLowIntegrityAccess(resolvedPaths.workspace);
-      writableRoots.push(resolvedPaths.workspace);
+      await this.grantLowIntegrityAccess(resolvedPaths.workspace.resolved);
+      writableRoots.push(resolvedPaths.workspace.resolved);
     }
 
     // 2. Globally included directories
@@ -340,7 +340,7 @@ export class WindowsSandboxManager implements SandboxManager {
     // processes to ensure they cannot be read or written.
     const secretsToBlock: string[] = [];
     const searchDirs = new Set([
-      resolvedPaths.workspace,
+      resolvedPaths.workspace.resolved,
       ...resolvedPaths.policyAllowed,
       ...resolvedPaths.globalIncludes,
     ]);
@@ -388,7 +388,7 @@ export class WindowsSandboxManager implements SandboxManager {
     // the sandboxed process from creating them with Low integrity.
     // By being created as Medium integrity, they are write-protected from Low processes.
     for (const file of GOVERNANCE_FILES) {
-      const filePath = path.join(resolvedPaths.workspace, file.path);
+      const filePath = path.join(resolvedPaths.workspace.resolved, file.path);
       this.touch(filePath, file.isDirectory);
     }
 

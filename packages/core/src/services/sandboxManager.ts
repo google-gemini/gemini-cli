@@ -32,7 +32,12 @@ import { resolveToRealPath } from '../utils/paths.js';
  */
 export interface ResolvedSandboxPaths {
   /** The primary workspace directory. */
-  workspace: string;
+  workspace: {
+    /** The original path provided in the sandbox options. */
+    original: string;
+    /** The real path. */
+    resolved: string;
+  };
   /** Explicitly denied paths. */
   forbidden: string[];
   /** Directories included globally across all commands in this sandbox session. */
@@ -355,8 +360,6 @@ export async function resolveSandboxPaths(
   req: SandboxRequest,
   overridePermissions?: SandboxPermissions,
 ): Promise<ResolvedSandboxPaths> {
-  const workspace = resolveToRealPath(options.workspace);
-
   /**
    * Helper that expands each path to include its realpath (if it's a symlink)
    * and pipes the result through sanitizePaths for deduplication and absolute path enforcement.
@@ -388,22 +391,29 @@ export async function resolveSandboxPaths(
       req.policy?.additionalPermissions?.fileSystem?.write,
   );
 
-  const workspaceIdentity = getPathIdentity(workspace);
+  const resolvedWorkspace = resolveToRealPath(options.workspace);
+
+  const workspaceIdentities = new Set(
+    [options.workspace, resolvedWorkspace].map(getPathIdentity),
+  );
   const forbiddenIdentities = new Set(forbidden.map(getPathIdentity));
 
   /**
-   * Filters out any paths that are explicitly forbidden or match the workspace root.
+   * Filters out any paths that are explicitly forbidden or match the workspace root (original or resolved).
    */
   const filter = (paths: string[]) =>
     paths.filter((p) => {
       const identity = getPathIdentity(p);
       return (
-        identity !== workspaceIdentity && !forbiddenIdentities.has(identity)
+        !workspaceIdentities.has(identity) && !forbiddenIdentities.has(identity)
       );
     });
 
   return {
-    workspace,
+    workspace: {
+      original: options.workspace,
+      resolved: resolvedWorkspace,
+    },
     forbidden,
     globalIncludes: filter(globalIncludes),
     policyAllowed: filter(policyAllowed),
