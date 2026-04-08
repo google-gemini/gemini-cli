@@ -57,16 +57,13 @@ export interface ContextAccountingState {
 export interface ProcessArgs {
   /** The rich buffer containing current nodes and their history. */
   readonly buffer: ContextWorkingBuffer;
-
-  /** The full, read-only view of the ship. */
-  readonly ship: readonly ConcreteNode[];
   
   /** 
    * The unprotected, mutable subset of nodes targeted by this trigger.
    * The Orchestrator strictly filters out ANY protected nodes (like active tasks) before calling.
    * Processors can assume all targets passed here are legally theirs to mutate or drop.
    */
-  readonly targets: ConcreteNode[];
+  readonly targets: readonly ConcreteNode[];
   
   /** The token budget and accounting state. */
   readonly state: ContextAccountingState;

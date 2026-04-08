@@ -12,11 +12,10 @@ import type {
   ToolExecution,
   AgentYield,
   MaskedTool,
-  Snapshot,
-  RollingSummary,
 } from './types.js';
+import { isAgentThought, isAgentYield, isSystemEvent, isSnapshot, isRollingSummary, isMaskedTool, isToolExecution, isUserPrompt } from './graphUtils.js';
 
-export function fromIr(ship: ReadonlyArray<ConcreteNode>): Content[] {
+export function fromIr(ship: readonly ConcreteNode[]): Content[] {
   const history: Content[] = [];
   const agentParts: Part[] = [];
 
@@ -28,34 +27,34 @@ export function fromIr(ship: ReadonlyArray<ConcreteNode>): Content[] {
   };
 
   for (const node of ship) {
-    if (node.type === 'USER_PROMPT') {
+    if (isUserPrompt(node)) {
       flushAgentParts();
-      const content = serializeUserPrompt(node as UserPrompt);
+      const content = serializeUserPrompt(node);
       if (content) history.push(content);
-    } else if (node.type === 'SYSTEM_EVENT') {
+    } else if (isSystemEvent(node)) {
       flushAgentParts();
       // System events do not map strictly to Gemini Content parts unless synthesized.
-    } else if (node.type === 'AGENT_THOUGHT') {
-      agentParts.push(serializeAgentThought(node as AgentThought));
-    } else if (node.type === 'TOOL_EXECUTION') {
-      const parts = serializeToolExecution(node as ToolExecution);
+    } else if (isAgentThought(node)) {
+      agentParts.push(serializeAgentThought(node));
+    } else if (isToolExecution(node)) {
+      const parts = serializeToolExecution(node);
       agentParts.push(parts.call);
       flushAgentParts();
       history.push({ role: 'user', parts: [parts.response] });
-    } else if (node.type === 'MASKED_TOOL') {
-      const parts = serializeMaskedTool(node as MaskedTool);
+    } else if (isMaskedTool(node)) {
+      const parts = serializeMaskedTool(node);
       agentParts.push(parts.call);
       flushAgentParts();
       history.push({ role: 'user', parts: [parts.response] });
-    } else if (node.type === 'AGENT_YIELD') {
-      agentParts.push(serializeAgentYield(node as AgentYield));
+    } else if (isAgentYield(node)) {
+      agentParts.push(serializeAgentYield(node));
       flushAgentParts();
-    } else if (node.type === 'SNAPSHOT') {
+    } else if (isSnapshot(node)) {
       flushAgentParts();
-      history.push({ role: 'user', parts: [{ text: (node as Snapshot).text }] });
-    } else if (node.type === 'ROLLING_SUMMARY') {
+      history.push({ role: 'user', parts: [{ text: (node).text }] });
+    } else if (isRollingSummary(node)) {
       flushAgentParts();
-      history.push({ role: 'user', parts: [{ text: (node as RollingSummary).text }] });
+      history.push({ role: 'user', parts: [{ text: (node).text }] });
     }
   }
 
@@ -102,7 +101,7 @@ function serializeToolExecution(
       functionResponse: {
         id: tool.id,
         name: tool.toolName,
-        response: typeof tool.observation === "string" ? { message: tool.observation } : tool.observation as Record<string, unknown>,
+        response: typeof tool.observation === "string" ? { message: tool.observation } : tool.observation,
       },
     },
   };

@@ -25,7 +25,7 @@ export class IrMapper {
   /**
    * Re-serializes a flat array of ConcreteNodes back into a flat Gemini Content[] array.
    */
-  static fromIr(ship: ReadonlyArray<ConcreteNode>): Content[] {
+  static fromIr(ship: readonly ConcreteNode[]): Content[] {
     return fromIr(ship);
   }
 }

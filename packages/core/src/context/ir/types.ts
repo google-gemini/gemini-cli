@@ -68,7 +68,7 @@ export interface BaseConcreteNode extends IrNode {
   readonly replacesId?: string;
   
   /** If this node is a synthetic summary of N nodes, this points to the original IDs */
-  readonly abstractsIds?: ReadonlyArray<string>;
+  readonly abstractsIds?: readonly string[];
 }
 
 /**
@@ -100,7 +100,7 @@ export type SemanticPart =
  */
 export interface UserPrompt extends BaseConcreteNode {
   readonly type: 'USER_PROMPT';
-  readonly semanticParts: ReadonlyArray<SemanticPart>;
+  readonly semanticParts: readonly SemanticPart[];
 }
 
 export interface SystemEvent extends BaseConcreteNode {
@@ -189,7 +189,7 @@ export interface Episode extends IrNode {
   readonly type: 'EPISODE';
   readonly timestamp: number;
   /** References to the Concrete Node IDs that conceptually belong to this Episode. */
-  concreteNodeIds: ReadonlyArray<string>;
+  concreteNodeIds: readonly string[];
 }
 
 export interface Task extends IrNode {
@@ -198,7 +198,7 @@ export interface Task extends IrNode {
   readonly goal: string;
   readonly status: 'active' | 'completed' | 'failed';
   /** References to the Episode IDs that belong to this task */
-  readonly episodeIds: ReadonlyArray<string>;
+  readonly episodeIds: readonly string[];
 }
 
 export type LogicalNode = Task | Episode;
