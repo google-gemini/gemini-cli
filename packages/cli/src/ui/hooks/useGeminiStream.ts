@@ -1580,6 +1580,7 @@ export const useGeminiStream = (
           operation: options?.isContinuation
             ? GeminiCliOperation.SystemPrompt
             : GeminiCliOperation.UserPrompt,
+          sessionId: config.getSessionId(),
         },
         async ({ metadata: spanMetadata }) => {
           spanMetadata.input = query;
