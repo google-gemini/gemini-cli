@@ -373,6 +373,7 @@ describe('BrowserManager', () => {
           session_mode: 'persistent',
           headless: false,
           success: true,
+          tool_count: 4,
         },
       );
     });
@@ -871,6 +872,122 @@ describe('BrowserManager', () => {
       const instance2 = BrowserManager.getInstance(config2);
 
       expect(instance1).not.toBe(instance2);
+    });
+
+    it('should throw when acquired instance is requested in persistent mode', () => {
+      // mockConfig defaults to persistent mode
+      const instance1 = BrowserManager.getInstance(mockConfig);
+      instance1.acquire();
+
+      expect(() => BrowserManager.getInstance(mockConfig)).toThrow(
+        /Cannot launch a concurrent browser agent in "persistent" session mode/,
+      );
+    });
+
+    it('should throw when acquired instance is requested in existing mode', () => {
+      const existingConfig = makeFakeConfig({
+        agents: {
+          overrides: { browser_agent: { enabled: true } },
+          browser: { sessionMode: 'existing' },
+        },
+      });
+
+      const instance1 = BrowserManager.getInstance(existingConfig);
+      instance1.acquire();
+
+      expect(() => BrowserManager.getInstance(existingConfig)).toThrow(
+        /Cannot launch a concurrent browser agent in "existing" session mode/,
+      );
+    });
+
+    it('should return a different instance when the primary is acquired in isolated mode', () => {
+      const isolatedConfig = makeFakeConfig({
+        agents: {
+          overrides: { browser_agent: { enabled: true } },
+          browser: { sessionMode: 'isolated' },
+        },
+      });
+
+      const instance1 = BrowserManager.getInstance(isolatedConfig);
+      instance1.acquire();
+
+      const instance2 = BrowserManager.getInstance(isolatedConfig);
+
+      expect(instance2).not.toBe(instance1);
+      expect(instance1.isAcquired()).toBe(true);
+      expect(instance2.isAcquired()).toBe(false);
+    });
+
+    it('should reuse the primary when it has been released', () => {
+      const instance1 = BrowserManager.getInstance(mockConfig);
+      instance1.acquire();
+      instance1.release();
+
+      const instance2 = BrowserManager.getInstance(mockConfig);
+
+      expect(instance2).toBe(instance1);
+      expect(instance1.isAcquired()).toBe(false);
+    });
+
+    it('should reuse a released parallel instance in isolated mode', () => {
+      const isolatedConfig = makeFakeConfig({
+        agents: {
+          overrides: { browser_agent: { enabled: true } },
+          browser: { sessionMode: 'isolated' },
+        },
+      });
+
+      const instance1 = BrowserManager.getInstance(isolatedConfig);
+      instance1.acquire();
+
+      const instance2 = BrowserManager.getInstance(isolatedConfig);
+      instance2.acquire();
+      instance2.release();
+
+      // Primary is still acquired, parallel is released — should reuse parallel
+      const instance3 = BrowserManager.getInstance(isolatedConfig);
+      expect(instance3).toBe(instance2);
+    });
+
+    it('should create multiple parallel instances in isolated mode', () => {
+      const isolatedConfig = makeFakeConfig({
+        agents: {
+          overrides: { browser_agent: { enabled: true } },
+          browser: { sessionMode: 'isolated' },
+        },
+      });
+
+      const instance1 = BrowserManager.getInstance(isolatedConfig);
+      instance1.acquire();
+
+      const instance2 = BrowserManager.getInstance(isolatedConfig);
+      instance2.acquire();
+
+      const instance3 = BrowserManager.getInstance(isolatedConfig);
+
+      expect(instance1).not.toBe(instance2);
+      expect(instance2).not.toBe(instance3);
+      expect(instance1).not.toBe(instance3);
+    });
+
+    it('should throw when MAX_PARALLEL_INSTANCES is reached in isolated mode', () => {
+      const isolatedConfig = makeFakeConfig({
+        agents: {
+          overrides: { browser_agent: { enabled: true } },
+          browser: { sessionMode: 'isolated' },
+        },
+      });
+
+      // Acquire MAX_PARALLEL_INSTANCES instances
+      for (let i = 0; i < BrowserManager.MAX_PARALLEL_INSTANCES; i++) {
+        const instance = BrowserManager.getInstance(isolatedConfig);
+        instance.acquire();
+      }
+
+      // Next call should throw
+      expect(() => BrowserManager.getInstance(isolatedConfig)).toThrow(
+        /Maximum number of parallel browser instances/,
+      );
     });
   });
 

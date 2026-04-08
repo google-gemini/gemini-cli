@@ -938,6 +938,8 @@ export async function loadCliConfig(
       : undefined,
     blockedEnvironmentVariables:
       settings.security?.environmentVariableRedaction?.blocked,
+    allowedEnvironmentVariables:
+      settings.security?.environmentVariableRedaction?.allowed,
     enableEnvironmentVariableRedaction:
       settings.security?.environmentVariableRedaction?.enabled,
     userMemory: memoryContent,
