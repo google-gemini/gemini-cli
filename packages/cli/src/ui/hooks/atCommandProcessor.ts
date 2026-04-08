@@ -31,6 +31,26 @@ const REF_CONTENT_HEADER = `\n${REFERENCE_CONTENT_START}`;
 const REF_CONTENT_FOOTER = `\n${REFERENCE_CONTENT_END}`;
 
 /**
+ * Escapes unescaped @ symbols so they are not interpreted as @path commands.
+ */
+export function escapeAtSymbols(text: string): string {
+  return text.replace(/(?<!\\)@/g, '\\@');
+}
+
+/**
+ * Unescapes \@ back to @ correctly, preserving \\@ sequences.
+ */
+export function unescapeLiteralAt(text: string): string {
+  return text.replace(/\\@/g, (match, offset, full) => {
+    let backslashCount = 0;
+    for (let i = offset - 1; i >= 0 && full[i] === '\\'; i--) {
+      backslashCount++;
+    }
+    return backslashCount % 2 === 0 ? '@' : '\\@';
+  });
+}
+
+/**
  * Regex source for the path/command part of an @ reference.
  * It uses strict ASCII whitespace delimiters to allow Unicode characters like NNBSP in filenames.
  *
@@ -49,6 +69,7 @@ interface HandleAtCommandParams {
   onDebugMessage: (message: string) => void;
   messageId: number;
   signal: AbortSignal;
+  escapePastedAtSymbols?: boolean;
 }
 
 interface HandleAtCommandResult {
@@ -65,7 +86,10 @@ interface AtCommandPart {
  * Parses a query string to find all '@<path>' commands and text segments.
  * Handles \ escaped spaces within paths.
  */
-function parseAllAtCommands(query: string): AtCommandPart[] {
+function parseAllAtCommands(
+  query: string,
+  escapePastedAtSymbols = false,
+): AtCommandPart[] {
   const parts: AtCommandPart[] = [];
   let lastIndex = 0;
 
@@ -85,7 +109,9 @@ function parseAllAtCommands(query: string): AtCommandPart[] {
     if (matchIndex > lastIndex) {
       parts.push({
         type: 'text',
-        content: query.substring(lastIndex, matchIndex),
+        content: escapePastedAtSymbols
+          ? unescapeLiteralAt(query.substring(lastIndex, matchIndex))
+          : query.substring(lastIndex, matchIndex),
       });
     }
 
@@ -98,7 +124,12 @@ function parseAllAtCommands(query: string): AtCommandPart[] {
 
   // Add remaining text
   if (lastIndex < query.length) {
-    parts.push({ type: 'text', content: query.substring(lastIndex) });
+    parts.push({
+      type: 'text',
+      content: escapePastedAtSymbols
+        ? unescapeLiteralAt(query.substring(lastIndex))
+        : query.substring(lastIndex),
+    });
   }
 
   // Filter out empty text parts that might result from consecutive @paths or leading/trailing spaces
@@ -635,8 +666,9 @@ export async function handleAtCommand({
   onDebugMessage,
   messageId: userMessageTimestamp,
   signal,
+  escapePastedAtSymbols = false,
 }: HandleAtCommandParams): Promise<HandleAtCommandResult> {
-  const commandParts = parseAllAtCommands(query);
+  const commandParts = parseAllAtCommands(query, escapePastedAtSymbols);
 
   const { agentParts, resourceParts, fileParts } = categorizeAtCommands(
     commandParts,

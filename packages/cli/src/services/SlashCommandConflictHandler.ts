@@ -154,6 +154,10 @@ export class SlashCommandConflictHandler {
         return extensionName
           ? `extension '${extensionName}' command`
           : 'extension command';
+      case CommandKind.SKILL:
+        return extensionName
+          ? `extension '${extensionName}' skill`
+          : 'skill command';
       case CommandKind.MCP_PROMPT:
         return mcpServerName
           ? `MCP server '${mcpServerName}' command`

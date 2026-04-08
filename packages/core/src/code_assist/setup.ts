@@ -15,17 +15,24 @@ import {
 } from './types.js';
 import { CodeAssistServer, type HttpOptions } from './server.js';
 import type { AuthClient } from 'google-auth-library';
-import type { ValidationHandler } from '../fallback/types.js';
 import { ChangeAuthRequestedError } from '../utils/errors.js';
 import { ValidationRequiredError } from '../utils/googleQuotaErrors.js';
 import { debugLogger } from '../utils/debugLogger.js';
 import { createCache, type CacheService } from '../utils/cache.js';
+import type { Config } from '../config/config.js';
+import {
+  logOnboardingStart,
+  logOnboardingSuccess,
+  OnboardingStartEvent,
+  OnboardingSuccessEvent,
+} from '../telemetry/index.js';
 
 export class ProjectIdRequiredError extends Error {
   constructor() {
     super(
       'This account requires setting the GOOGLE_CLOUD_PROJECT or GOOGLE_CLOUD_PROJECT_ID env var. See https://goo.gle/gemini-cli-auth-docs#workspace-gca',
     );
+    this.name = 'ProjectIdRequiredError';
   }
 }
 
@@ -36,6 +43,7 @@ export class ProjectIdRequiredError extends Error {
 export class ValidationCancelledError extends Error {
   constructor() {
     super('User cancelled account validation');
+    this.name = 'ValidationCancelledError';
   }
 }
 
@@ -45,6 +53,7 @@ export class IneligibleTierError extends Error {
   constructor(ineligibleTiers: IneligibleTier[]) {
     const reasons = ineligibleTiers.map((t) => t.reasonMessage).join(', ');
     super(reasons);
+    this.name = 'IneligibleTierError';
     this.ineligibleTiers = ineligibleTiers;
   }
 }
@@ -54,6 +63,7 @@ export interface UserData {
   userTier: UserTierId;
   userTierName?: string;
   paidTier?: GeminiUserTier;
+  hasOnboardedPreviously?: boolean;
 }
 
 // Cache to store the results of setupUser to avoid redundant network calls.
@@ -94,7 +104,8 @@ export function resetUserDataCacheForTesting() {
  * retry, auth change, or cancellation.
  *
  * @param client - The authenticated client to use for API calls
- * @param validationHandler - Optional handler for account validation flow
+ * @param config - The CLI configuration
+ * @param httpOptions - Optional HTTP options
  * @returns The user's project ID, tier ID, and tier name
  * @throws {ValidationRequiredError} If account validation is required
  * @throws {ProjectIdRequiredError} If no project ID is available and required
@@ -103,7 +114,7 @@ export function resetUserDataCacheForTesting() {
  */
 export async function setupUser(
   client: AuthClient,
-  validationHandler?: ValidationHandler,
+  config: Config,
   httpOptions: HttpOptions = {},
 ): Promise<UserData> {
   const projectId =
@@ -119,7 +130,7 @@ export async function setupUser(
   );
 
   return projectCache.getOrCreate(projectId, () =>
-    _doSetupUser(client, projectId, validationHandler, httpOptions),
+    _doSetupUser(client, projectId, config, httpOptions),
   );
 }
 
@@ -129,7 +140,7 @@ export async function setupUser(
 async function _doSetupUser(
   client: AuthClient,
   projectId: string | undefined,
-  validationHandler?: ValidationHandler,
+  config: Config,
   httpOptions: HttpOptions = {},
 ): Promise<UserData> {
   const caServer = new CodeAssistServer(
@@ -145,6 +156,8 @@ async function _doSetupUser(
     platform: 'PLATFORM_UNSPECIFIED',
     pluginType: 'GEMINI',
   };
+
+  const validationHandler = config.getValidationHandler();
 
   let loadRes: LoadCodeAssistResponse;
   while (true) {
@@ -194,6 +207,8 @@ async function _doSetupUser(
             UserTierId.STANDARD,
           userTierName: loadRes.paidTier?.name ?? loadRes.currentTier.name,
           paidTier: loadRes.paidTier ?? undefined,
+          hasOnboardedPreviously:
+            loadRes.currentTier.hasOnboardedPreviously ?? true,
         };
       }
 
@@ -206,6 +221,8 @@ async function _doSetupUser(
         loadRes.paidTier?.id ?? loadRes.currentTier.id ?? UserTierId.STANDARD,
       userTierName: loadRes.paidTier?.name ?? loadRes.currentTier.name,
       paidTier: loadRes.paidTier ?? undefined,
+      hasOnboardedPreviously:
+        loadRes.currentTier.hasOnboardedPreviously ?? true,
     };
   }
 
@@ -236,6 +253,9 @@ async function _doSetupUser(
     };
   }
 
+  logOnboardingStart(config, new OnboardingStartEvent());
+  const onboardingStartTime = Date.now();
+
   let lroRes = await caServer.onboardUser(onboardReq);
   if (!lroRes.done && lroRes.name) {
     const operationName = lroRes.name;
@@ -245,12 +265,18 @@ async function _doSetupUser(
     }
   }
 
+  logOnboardingSuccess(
+    config,
+    new OnboardingSuccessEvent(tier.name, Date.now() - onboardingStartTime),
+  );
+
   if (!lroRes.response?.cloudaicompanionProject?.id) {
     if (projectId) {
       return {
         projectId,
         userTier: tier.id ?? UserTierId.STANDARD,
         userTierName: tier.name,
+        hasOnboardedPreviously: tier.hasOnboardedPreviously ?? false,
       };
     }
 
@@ -261,6 +287,7 @@ async function _doSetupUser(
     projectId: lroRes.response.cloudaicompanionProject.id,
     userTier: tier.id ?? UserTierId.STANDARD,
     userTierName: tier.name,
+    hasOnboardedPreviously: tier.hasOnboardedPreviously ?? false,
   };
 }
 

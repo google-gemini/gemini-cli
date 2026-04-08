@@ -7,7 +7,6 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import process from 'node:process';
-import type { Config } from '../config/config.js';
 import type { HierarchicalMemory } from '../config/memory.js';
 import { GEMINI_DIR } from '../utils/paths.js';
 import { ApprovalMode } from '../policy/types.js';
@@ -31,6 +30,7 @@ import {
 import { resolveModel, supportsModernFeatures } from '../config/models.js';
 import { DiscoveredMCPTool } from '../tools/mcp-tool.js';
 import { getAllGeminiMdFilenames } from '../tools/memoryTool.js';
+import type { AgentLoopContext } from '../config/agent-loop-context.js';
 
 /**
  * Orchestrates prompt generation by gathering context and building options.
@@ -40,7 +40,7 @@ export class PromptProvider {
    * Generates the core system prompt.
    */
   getCoreSystemPrompt(
-    config: Config,
+    context: AgentLoopContext,
     userMemory?: string | HierarchicalMemory,
     interactiveOverride?: boolean,
   ): string {
@@ -48,27 +48,43 @@ export class PromptProvider {
       process.env['GEMINI_SYSTEM_MD'],
     );
 
-    const interactiveMode = interactiveOverride ?? config.isInteractive();
-    const approvalMode = config.getApprovalMode?.() ?? ApprovalMode.DEFAULT;
+    const interactiveMode =
+      interactiveOverride ?? context.config.isInteractive();
+    const approvalMode =
+      context.config.getApprovalMode?.() ?? ApprovalMode.DEFAULT;
     const isPlanMode = approvalMode === ApprovalMode.PLAN;
     const isYoloMode = approvalMode === ApprovalMode.YOLO;
-    const skills = config.getSkillManager().getSkills();
-    const toolNames = config.getToolRegistry().getAllToolNames();
+    const skills = context.config.getSkillManager().getSkills();
+    const toolNames = context.toolRegistry.getAllToolNames();
     const enabledToolNames = new Set(toolNames);
-    const approvedPlanPath = config.getApprovedPlanPath();
+
+    const approvedPlanPath = context.config.getApprovedPlanPath();
 
     const desiredModel = resolveModel(
-      config.getActiveModel(),
-      config.getGemini31LaunchedSync?.() ?? false,
+      context.config.getActiveModel(),
+      context.config.getGemini31LaunchedSync?.() ?? false,
+      context.config.getGemini31FlashLiteLaunchedSync?.() ?? false,
+      false,
+      context.config.getHasAccessToPreviewModel?.() ?? true,
+      context.config,
     );
     const isModernModel = supportsModernFeatures(desiredModel);
     const activeSnippets = isModernModel ? snippets : legacySnippets;
     const contextFilenames = getAllGeminiMdFilenames();
 
+    let trackerDir = context.config.isTrackerEnabled()
+      ? context.config.storage.getProjectTempTrackerDir()
+      : undefined;
+
+    if (trackerDir) {
+      // Sanitize path to prevent prompt injection
+      trackerDir = trackerDir.replace(/\n/g, ' ').replace(/\]/g, '');
+    }
+
     // --- Context Gathering ---
     let planModeToolsList = '';
     if (isPlanMode) {
-      const allTools = config.getToolRegistry().getAllTools();
+      const allTools = context.toolRegistry.getAllTools();
       planModeToolsList = allTools
         .map((t) => {
           if (t instanceof DiscoveredMCPTool) {
@@ -100,7 +116,7 @@ export class PromptProvider {
       );
       basePrompt = applySubstitutions(
         basePrompt,
-        config,
+        context.config,
         skillsPrompt,
         isModernModel,
       );
@@ -122,9 +138,10 @@ export class PromptProvider {
           hasSkills: skills.length > 0,
           hasHierarchicalMemory,
           contextFilenames,
+          topicUpdateNarration: context.config.isTopicUpdateNarrationEnabled(),
         })),
         subAgents: this.withSection('agentContexts', () =>
-          config
+          context.config
             .getAgentRegistry()
             .getAllDefinitions()
             .map((d) => ({
@@ -142,6 +159,7 @@ export class PromptProvider {
             })),
           skills.length > 0,
         ),
+        taskTracker: trackerDir,
         hookContext: isSectionEnabled('hookContext') || undefined,
         primaryWorkflows: this.withSection(
           'primaryWorkflows',
@@ -159,30 +177,38 @@ export class PromptProvider {
             approvedPlan: approvedPlanPath
               ? { path: approvedPlanPath }
               : undefined,
-            taskTracker: config.isTrackerEnabled(),
+            taskTracker: trackerDir,
+            topicUpdateNarration:
+              context.config.isTopicUpdateNarrationEnabled(),
           }),
           !isPlanMode,
         ),
         planningWorkflow: this.withSection(
           'planningWorkflow',
           () => ({
+            interactive: interactiveMode,
             planModeToolsList,
-            plansDir: config.storage.getPlansDir(),
-            approvedPlanPath: config.getApprovedPlanPath(),
-            taskTracker: config.isTrackerEnabled(),
+            plansDir: context.config.storage.getPlansDir(),
+            approvedPlanPath: context.config.getApprovedPlanPath(),
           }),
           isPlanMode,
         ),
-        taskTracker: config.isTrackerEnabled(),
         operationalGuidelines: this.withSection(
           'operationalGuidelines',
           () => ({
             interactive: interactiveMode,
-            enableShellEfficiency: config.getEnableShellOutputEfficiency(),
-            interactiveShellEnabled: config.isInteractiveShellEnabled(),
+            enableShellEfficiency:
+              context.config.getEnableShellOutputEfficiency(),
+            interactiveShellEnabled: context.config.isInteractiveShellEnabled(),
+            topicUpdateNarration:
+              context.config.isTopicUpdateNarrationEnabled(),
+            memoryManagerEnabled: context.config.isMemoryManagerEnabled(),
           }),
         ),
-        sandbox: this.withSection('sandbox', () => getSandboxMode()),
+        sandbox: this.withSection('sandbox', () => ({
+          mode: getSandboxMode(),
+          toolSandboxingEnabled: context.config.getSandboxEnabled(),
+        })),
         interactiveYoloMode: this.withSection(
           'interactiveYoloMode',
           () => true,
@@ -215,7 +241,18 @@ export class PromptProvider {
     );
 
     // Sanitize erratic newlines from composition
-    const sanitizedPrompt = finalPrompt.replace(/\n{3,}/g, '\n\n');
+    let sanitizedPrompt = finalPrompt.replace(/\n{3,}/g, '\n\n');
+
+    // Context Reinjection (Active Topic)
+    if (context.config.isTopicUpdateNarrationEnabled()) {
+      const activeTopic = context.config.topicState.getTopic();
+      if (activeTopic) {
+        const sanitizedTopic = activeTopic
+          .replace(/\n/g, ' ')
+          .replace(/\]/g, '');
+        sanitizedPrompt += `\n\n[Active Topic: ${sanitizedTopic}]`;
+      }
+    }
 
     // Write back to file if requested
     this.maybeWriteSystemMd(
@@ -227,14 +264,20 @@ export class PromptProvider {
     return sanitizedPrompt;
   }
 
-  getCompressionPrompt(config: Config): string {
+  getCompressionPrompt(context: AgentLoopContext): string {
     const desiredModel = resolveModel(
-      config.getActiveModel(),
-      config.getGemini31LaunchedSync?.() ?? false,
+      context.config.getActiveModel(),
+      context.config.getGemini31LaunchedSync?.() ?? false,
+      context.config.getGemini31FlashLiteLaunchedSync?.() ?? false,
+      false,
+      context.config.getHasAccessToPreviewModel?.() ?? true,
+      context.config,
     );
     const isModernModel = supportsModernFeatures(desiredModel);
     const activeSnippets = isModernModel ? snippets : legacySnippets;
-    return activeSnippets.getCompressionPrompt(config.getApprovedPlanPath());
+    return activeSnippets.getCompressionPrompt(
+      context.config.getApprovedPlanPath(),
+    );
   }
 
   private withSection<T>(

@@ -11,7 +11,7 @@ import { assertModelHasOutput } from '../integration-tests/test-helper.js';
 describe('Hierarchical Memory', () => {
   const conflictResolutionTest =
     'Agent follows hierarchy for contradictory instructions';
-  evalTest('USUALLY_PASSES', {
+  evalTest('ALWAYS_PASSES', {
     name: conflictResolutionTest,
     params: {
       settings: {

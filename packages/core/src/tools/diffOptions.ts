@@ -76,3 +76,39 @@ export function getDiffStat(
     user_removed_chars: userStats.removedChars,
   };
 }
+
+/**
+ * Extracts line and character stats from a unified diff patch string.
+ * This is useful for reconstructing stats for rejected or errored operations
+ * where the full strings may no longer be easily accessible.
+ */
+export function getDiffStatFromPatch(patch: string): DiffStat {
+  let addedLines = 0;
+  let removedLines = 0;
+  let addedChars = 0;
+  let removedChars = 0;
+
+  const lines = patch.split('\n');
+  for (const line of lines) {
+    // Only count lines that are additions or removals,
+    // excluding the diff headers (--- and +++) and metadata (\)
+    if (line.startsWith('+') && !line.startsWith('+++')) {
+      addedLines++;
+      addedChars += line.length - 1;
+    } else if (line.startsWith('-') && !line.startsWith('---')) {
+      removedLines++;
+      removedChars += line.length - 1;
+    }
+  }
+
+  return {
+    model_added_lines: addedLines,
+    model_removed_lines: removedLines,
+    model_added_chars: addedChars,
+    model_removed_chars: removedChars,
+    user_added_lines: 0,
+    user_removed_lines: 0,
+    user_added_chars: 0,
+    user_removed_chars: 0,
+  };
+}

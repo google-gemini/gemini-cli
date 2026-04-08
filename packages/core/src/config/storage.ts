@@ -266,6 +266,18 @@ export class Storage {
     return path.join(historyDir, identifier);
   }
 
+  getProjectMemoryDir(): string {
+    return this.getProjectMemoryTempDir();
+  }
+
+  getProjectMemoryTempDir(): string {
+    return path.join(this.getProjectTempDir(), 'memory');
+  }
+
+  getProjectSkillsMemoryDir(): string {
+    return path.join(this.getProjectMemoryTempDir(), 'skills');
+  }
+
   getWorkspaceSettingsPath(): string {
     return path.join(this.getGeminiDir(), 'settings.json');
   }
@@ -302,6 +314,9 @@ export class Storage {
   }
 
   getProjectTempTrackerDir(): string {
+    if (this.sessionId) {
+      return path.join(this.getProjectTempDir(), this.sessionId, 'tracker');
+    }
     return path.join(this.getProjectTempDir(), 'tracker');
   }
 

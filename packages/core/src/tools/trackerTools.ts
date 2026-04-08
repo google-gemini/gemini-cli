@@ -23,11 +23,87 @@ import {
   TRACKER_UPDATE_TASK_TOOL_NAME,
   TRACKER_VISUALIZE_TOOL_NAME,
 } from './tool-names.js';
-import type { ToolResult } from './tools.js';
+import type { ToolResult, TodoList, TodoStatus } from './tools.js';
 import { BaseDeclarativeTool, BaseToolInvocation, Kind } from './tools.js';
 import { ToolErrorType } from './tool-error.js';
 import type { TrackerTask, TaskType } from '../services/trackerTypes.js';
-import { TaskStatus } from '../services/trackerTypes.js';
+import { TaskStatus, TASK_TYPE_LABELS } from '../services/trackerTypes.js';
+import type { TrackerService } from '../services/trackerService.js';
+
+export async function buildTodosReturnDisplay(
+  service: TrackerService,
+): Promise<TodoList> {
+  const tasks = await service.listTasks();
+  const childrenMap = new Map<string, TrackerTask[]>();
+  const roots: TrackerTask[] = [];
+
+  for (const task of tasks) {
+    if (task.parentId) {
+      if (!childrenMap.has(task.parentId)) {
+        childrenMap.set(task.parentId, []);
+      }
+      childrenMap.get(task.parentId)!.push(task);
+    } else {
+      roots.push(task);
+    }
+  }
+
+  const statusOrder: Record<TaskStatus, number> = {
+    [TaskStatus.IN_PROGRESS]: 0,
+    [TaskStatus.OPEN]: 1,
+    [TaskStatus.BLOCKED]: 2,
+    [TaskStatus.CLOSED]: 3,
+  };
+
+  const sortTasks = (a: TrackerTask, b: TrackerTask) => {
+    if (statusOrder[a.status] !== statusOrder[b.status]) {
+      return statusOrder[a.status] - statusOrder[b.status];
+    }
+    return a.id.localeCompare(b.id);
+  };
+
+  roots.sort(sortTasks);
+
+  const todos: TodoList['todos'] = [];
+
+  const addTask = (task: TrackerTask, depth: number, visited: Set<string>) => {
+    if (visited.has(task.id)) {
+      todos.push({
+        description: `${'  '.repeat(depth)}[CYCLE DETECTED: ${task.id}]`,
+        status: 'cancelled',
+      });
+      return;
+    }
+    visited.add(task.id);
+
+    let status: TodoStatus = 'pending';
+    if (task.status === TaskStatus.IN_PROGRESS) {
+      status = 'in_progress';
+    } else if (task.status === TaskStatus.CLOSED) {
+      status = 'completed';
+    } else if (task.status === TaskStatus.BLOCKED) {
+      status = 'blocked';
+    }
+
+    const indent = '  '.repeat(depth);
+    const description = `${indent}${task.type}: ${task.title} (${task.id})`;
+
+    todos.push({ description, status });
+
+    const children = childrenMap.get(task.id) ?? [];
+    children.sort(sortTasks);
+    for (const child of children) {
+      addTask(child, depth + 1, visited);
+    }
+    visited.delete(task.id);
+  };
+
+  for (const root of roots) {
+    addTask(root, 0, new Set());
+  }
+
+  return { todos };
+}
 
 // --- tracker_create_task ---
 
@@ -71,7 +147,7 @@ class TrackerCreateTaskInvocation extends BaseToolInvocation<
       });
       return {
         llmContent: `Created task ${task.id}: ${task.title}`,
-        returnDisplay: `Created task ${task.id}.`,
+        returnDisplay: await buildTodosReturnDisplay(this.service),
       };
     } catch (error) {
       const errorMessage =
@@ -155,7 +231,7 @@ class TrackerUpdateTaskInvocation extends BaseToolInvocation<
       const task = await this.service.updateTask(id, updates);
       return {
         llmContent: `Updated task ${task.id}. Status: ${task.status}`,
-        returnDisplay: `Updated task ${task.id}.`,
+        returnDisplay: await buildTodosReturnDisplay(this.service),
       };
     } catch (error) {
       const errorMessage =
@@ -239,7 +315,7 @@ class TrackerGetTaskInvocation extends BaseToolInvocation<
     }
     return {
       llmContent: JSON.stringify(task, null, 2),
-      returnDisplay: `Retrieved task ${task.id}.`,
+      returnDisplay: await buildTodosReturnDisplay(this.service),
     };
   }
 }
@@ -327,7 +403,7 @@ class TrackerListTasksInvocation extends BaseToolInvocation<
       .join('\n');
     return {
       llmContent: content,
-      returnDisplay: `Listed ${tasks.length} tasks.`,
+      returnDisplay: await buildTodosReturnDisplay(this.service),
     };
   }
 }
@@ -427,7 +503,7 @@ class TrackerAddDependencyInvocation extends BaseToolInvocation<
       await this.service.updateTask(task.id, { dependencies: newDeps });
       return {
         llmContent: `Linked ${task.id} -> ${dep.id}.`,
-        returnDisplay: 'Dependency added.',
+        returnDisplay: await buildTodosReturnDisplay(this.service),
       };
     } catch (error) {
       const errorMessage =
@@ -512,14 +588,8 @@ class TrackerVisualizeInvocation extends BaseToolInvocation<
     const statusEmojis: Record<TaskStatus, string> = {
       open: '⭕',
       in_progress: '🚧',
-      blocked: '🚫',
+      blocked: '⛔',
       closed: '✅',
-    };
-
-    const typeLabels: Record<TaskType, string> = {
-      epic: '[EPIC]',
-      task: '[TASK]',
-      bug: '[BUG]',
     };
 
     const childrenMap = new Map<string, TrackerTask[]>();
@@ -550,14 +620,15 @@ class TrackerVisualizeInvocation extends BaseToolInvocation<
       visited.add(task.id);
 
       const indent = '  '.repeat(depth);
-      output += `${indent}${statusEmojis[task.status]} ${task.id} ${typeLabels[task.type]} ${task.title}\n`;
+      output += `${indent}${statusEmojis[task.status]} ${task.id} ${TASK_TYPE_LABELS[task.type]} ${task.title}\n`;
       if (task.dependencies.length > 0) {
         output += `${indent}  └─ Depends on: ${task.dependencies.join(', ')}\n`;
       }
       const children = childrenMap.get(task.id) ?? [];
       for (const child of children) {
-        renderTask(child, depth + 1, new Set(visited));
+        renderTask(child, depth + 1, visited);
       }
+      visited.delete(task.id);
     };
 
     for (const root of roots) {
@@ -566,7 +637,7 @@ class TrackerVisualizeInvocation extends BaseToolInvocation<
 
     return {
       llmContent: output,
-      returnDisplay: output,
+      returnDisplay: await buildTodosReturnDisplay(this.service),
     };
   }
 }

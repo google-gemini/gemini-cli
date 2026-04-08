@@ -20,11 +20,12 @@ import { makeRelative, shortenPath } from '../utils/paths.js';
 import type { Config } from '../config/config.js';
 import { DEFAULT_FILE_FILTERING_OPTIONS } from '../config/constants.js';
 import { ToolErrorType } from './tool-error.js';
-import { LS_TOOL_NAME } from './tool-names.js';
+import { LS_TOOL_NAME, LS_DISPLAY_NAME } from './tool-names.js';
 import { buildDirPathArgsPattern } from '../policy/utils.js';
 import { debugLogger } from '../utils/debugLogger.js';
 import { LS_DEFINITION } from './definitions/coreTools.js';
 import { resolveToolDeclaration } from './definitions/resolver.js';
+import { discoverJitContext, appendJitContext } from './jit-context.js';
 
 /**
  * Parameters for the LS tool
@@ -142,7 +143,6 @@ class LSToolInvocation extends BaseToolInvocation<LSToolParams, ToolResult> {
   ): ToolResult {
     return {
       llmContent,
-      // Keep returnDisplay simpler in core logic
       returnDisplay: `Error: ${returnDisplay}`,
       error: {
         message: llmContent,
@@ -270,6 +270,12 @@ class LSToolInvocation extends BaseToolInvocation<LSToolParams, ToolResult> {
         resultMessage += `\n\n(${ignoredCount} ignored)`;
       }
 
+      // Discover JIT subdirectory context for the listed directory
+      const jitContext = await discoverJitContext(this.config, resolvedDirPath);
+      if (jitContext) {
+        resultMessage = appendJitContext(resultMessage, jitContext);
+      }
+
       let displayMessage = `Listed ${entries.length} item(s).`;
       if (ignoredCount > 0) {
         displayMessage += ` (${ignoredCount} ignored)`;
@@ -277,7 +283,12 @@ class LSToolInvocation extends BaseToolInvocation<LSToolParams, ToolResult> {
 
       return {
         llmContent: resultMessage,
-        returnDisplay: displayMessage,
+        returnDisplay: {
+          summary: displayMessage,
+          files: entries.map(
+            (entry) => `${entry.isDirectory ? '[DIR] ' : ''}${entry.name}`,
+          ),
+        },
       };
     } catch (error) {
       const errorMsg = `Error listing directory: ${error instanceof Error ? error.message : String(error)}`;
@@ -302,7 +313,7 @@ export class LSTool extends BaseDeclarativeTool<LSToolParams, ToolResult> {
   ) {
     super(
       LSTool.Name,
-      'ReadFolder',
+      LS_DISPLAY_NAME,
       LS_DEFINITION.base.description!,
       Kind.Search,
       LS_DEFINITION.base.parametersJsonSchema,
