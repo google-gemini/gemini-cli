@@ -62,6 +62,7 @@ export const useAgentStream = ({
     StreamingState.Idle,
   );
   const [thought, setThought] = useState<ThoughtSummary | null>(null);
+  const [lastOutputTime, setLastOutputTime] = useState<number>(Date.now());
 
   const currentStreamIdRef = useRef<string | null>(null);
   const userMessageTimestampRef = useRef<number>(0);
@@ -103,8 +104,6 @@ export const useAgentStream = ({
     [trackedTools],
   );
 
-  const lastOutputTime = Date.now(); // We could track actual time if needed, simplified for now
-
   // TODO: Support LoopDetection confirmation requests
   const [loopDetectionConfirmationRequest] =
     useState<LoopDetectionConfirmationRequest | null>(null);
@@ -135,6 +134,7 @@ export const useAgentStream = ({
 
   const handleEvent = useCallback(
     (event: AgentEvent) => {
+      setLastOutputTime(Date.now());
       switch (event.type) {
         case 'agent_start':
           setStreamingState(StreamingState.Responding);
@@ -280,7 +280,15 @@ export const useAgentStream = ({
           break;
       }
     },
-    [addItem, flushPendingText, setPendingHistoryItem, setTrackedTools],
+    [
+      addItem,
+      flushPendingText,
+      setPendingHistoryItem,
+      setTrackedTools,
+      setStreamingState,
+      setThought,
+      setLastOutputTime,
+    ],
   );
 
   useEffect(() => {
@@ -299,7 +307,9 @@ export const useAgentStream = ({
       if (!agent) return;
 
       const timestamp = Date.now();
+      setLastOutputTime(timestamp);
       userMessageTimestampRef.current = timestamp;
+
       geminiMessageBufferRef.current = '';
 
       if (!options?.isContinuation) {
