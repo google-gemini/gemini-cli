@@ -10,6 +10,7 @@ import { getProjectHash } from '../utils/paths.js';
 import path from 'node:path';
 import * as fs from 'node:fs';
 import { sanitizeFilenamePart } from '../utils/fileUtils.js';
+import { isNodeError } from '../utils/errors.js';
 import {
   deleteSessionArtifactsAsync,
   deleteSubagentSessionDirAndArtifactsAsync,
@@ -322,13 +323,13 @@ export async function loadConversationRecord(
       // Fallback for legacy monolithic JSON files
       try {
         const fileContent = await fs.promises.readFile(filePath, 'utf8');
-        // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
-        const legacyRecord = JSON.parse(fileContent) as ConversationRecord;
-        if (
-          legacyRecord &&
-          typeof legacyRecord === 'object' &&
-          legacyRecord.sessionId
-        ) {
+        const parsed = JSON.parse(fileContent) as unknown;
+
+        const isLegacyRecord = (val: unknown): val is ConversationRecord =>
+          typeof val === 'object' && val !== null && 'sessionId' in val;
+
+        if (isLegacyRecord(parsed)) {
+          const legacyRecord = parsed;
           if (options?.metadataOnly) {
             let fallbackFirstUserMessageStr: string | undefined;
             const firstUserMessage = legacyRecord.messages?.find(
@@ -551,12 +552,7 @@ export class ChatRecordingService {
       this.queuedThoughts = [];
       this.queuedTokens = null;
     } catch (error) {
-      if (
-        error instanceof Error &&
-        'code' in error &&
-        // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
-        (error as NodeJS.ErrnoException).code === 'ENOSPC'
-      ) {
+      if (isNodeError(error) && error.code === 'ENOSPC') {
         this.conversationFile = null;
         debugLogger.warn(ENOSPC_WARNING_MESSAGE);
         return;
@@ -573,12 +569,7 @@ export class ChatRecordingService {
       fs.mkdirSync(path.dirname(this.conversationFile), { recursive: true });
       fs.appendFileSync(this.conversationFile, line);
     } catch (error) {
-      if (
-        error instanceof Error &&
-        'code' in error &&
-        // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
-        (error as NodeJS.ErrnoException).code === 'ENOSPC'
-      ) {
+      if (isNodeError(error) && error.code === 'ENOSPC') {
         this.conversationFile = null;
         debugLogger.warn(ENOSPC_WARNING_MESSAGE);
       } else {
