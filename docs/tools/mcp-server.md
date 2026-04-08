@@ -290,7 +290,7 @@ When connecting to an OAuth-enabled server:
 > OAuth authentication requires that your local machine can:
 >
 > - Open a web browser for authentication
-> - Receive redirects on `http://localhost:7777/oauth/callback`
+> - Receive redirects on `http://localhost:<random-port>/oauth/callback` (or a specific port if configured via `redirectUri`)
 
 This feature will not work in:
 
@@ -323,8 +323,8 @@ Use the `/mcp auth` command to manage OAuth authentication:
   if omitted)
 - **`tokenUrl`** (string): OAuth token endpoint (auto-discovered if omitted)
 - **`scopes`** (string[]): Required OAuth scopes
-- **`redirectUri`** (string): Custom redirect URI (defaults to
-  `http://localhost:7777/oauth/callback`)
+- **`redirectUri`** (string): Custom redirect URI (defaults to an OS-assigned
+  random port, e.g., `http://localhost:<random-port>/oauth/callback`)
 - **`tokenParamName`** (string): Query parameter name for tokens in SSE URLs
 - **`audiences`** (string[]): Audiences the token is valid for
 
