@@ -124,7 +124,10 @@ const createInitialModelMetrics = (): ModelMetrics => ({
 });
 
 const createInitialMetrics = (): SessionMetrics => ({
-  models: {},
+  // Use Object.create(null) for key-indexed objects to prevent prototype
+  // pollution when user-controlled strings (model names, tool names) from
+  // session files are used as object keys.
+  models: Object.create(null) as Record<string, ModelMetrics>,
   tools: {
     totalCalls: 0,
     totalSuccess: 0,
@@ -136,7 +139,7 @@ const createInitialMetrics = (): SessionMetrics => ({
       [ToolCallDecision.MODIFY]: 0,
       [ToolCallDecision.AUTO_ACCEPT]: 0,
     },
-    byName: {},
+    byName: Object.create(null) as Record<string, ToolCallStats>,
   },
   files: {
     totalLinesAdded: 0,
