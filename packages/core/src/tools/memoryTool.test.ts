@@ -18,7 +18,7 @@ import {
   setGeminiMdFilename,
   getCurrentGeminiMdFilename,
   getAllGeminiMdFilenames,
-  DEFAULT_CONTEXT_FILENAME,
+  DEFAULT_CONTEXT_FILENAMES,
   getProjectMemoryFilePath,
 } from './memoryTool.js';
 import type { Storage } from '../config/storage.js';
@@ -76,7 +76,7 @@ describe('MemoryTool', () => {
 
   afterEach(() => {
     vi.restoreAllMocks();
-    setGeminiMdFilename(DEFAULT_CONTEXT_FILENAME);
+    setGeminiMdFilename(DEFAULT_CONTEXT_FILENAMES);
   });
 
   describe('setGeminiMdFilename', () => {
@@ -100,6 +100,17 @@ describe('MemoryTool', () => {
       setGeminiMdFilename(newNames);
       expect(getCurrentGeminiMdFilename()).toBe('CUSTOM_CONTEXT.md');
       expect(getAllGeminiMdFilenames()).toEqual(newNames);
+    });
+
+    it('should include AGENTS.md in default filenames', () => {
+      setGeminiMdFilename(DEFAULT_CONTEXT_FILENAMES);
+      expect(getAllGeminiMdFilenames()).toEqual(['GEMINI.md', 'AGENTS.md']);
+      expect(getCurrentGeminiMdFilename()).toBe('GEMINI.md');
+    });
+
+    it('should allow overriding defaults to exclude AGENTS.md', () => {
+      setGeminiMdFilename('GEMINI.md');
+      expect(getAllGeminiMdFilenames()).toEqual(['GEMINI.md']);
     });
   });
 
