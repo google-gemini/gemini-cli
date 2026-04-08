@@ -130,17 +130,6 @@ export class BlobDegradationProcessor implements ContextProcessor {
            ...prompt,
            id: this.env.idGenerator.generateId(), // Issue a new ID because it was modified
            semanticParts: newParts,
-           metadata: {
-             ...prompt.metadata,
-             transformations: [
-               ...prompt.metadata.transformations,
-               {
-                 processorName: this.name,
-                 action: 'DEGRADED',
-                 timestamp: Date.now(),
-               }
-             ]
-           }
         };
         returnedNodes.push(degradedNode);
       } else {

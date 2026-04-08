@@ -251,7 +251,7 @@ export class ToolMaskingProcessor implements ContextProcessor {
         const newObsTokens = this.env.tokenCalculator.estimateTokensForParts([obsPart]);
 
         const tokensSaved =
-          (step.metadata.currentTokens) -
+          this.env.tokenCalculator.getTokenCost(step) -
           (newIntentTokens + newObsTokens);
 
         if (tokensSaved > 0) {
@@ -264,18 +264,6 @@ export class ToolMaskingProcessor implements ContextProcessor {
               intent: newIntentTokens,
               observation: newObsTokens,
             },
-            metadata: {
-              ...step.metadata,
-              currentTokens: newIntentTokens + newObsTokens,
-              transformations: [
-                ...step.metadata.transformations,
-                {
-                  processorName: this.name,
-                  action: 'MASKED',
-                  timestamp: Date.now(),
-                }
-              ]
-            }
           };
 
           returnedNodes.push(maskedNode);

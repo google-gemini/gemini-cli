@@ -152,7 +152,6 @@ export class SimulationHarness {
             variant: {
               type: 'MASKED_TOOL',
               id: 'mock-id',
-              metadata: { currentTokens: 0, originalTokens: 0, transformations: [] },
               tokens: { intent: 0, observation: 0 },
               intent: {}, observation: {}, toolName: 'tool',
             },

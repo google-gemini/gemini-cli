@@ -8,7 +8,6 @@ import type { Content, Part } from '@google/genai';
 import { randomUUID } from 'node:crypto';
 import type {
   Episode,
-  IrMetadata,
   SemanticPart,
   ToolExecution,
   AgentThought,
@@ -50,14 +49,7 @@ export function toIr(
   let currentEpisode: Partial<Episode> | null = null;
   const pendingCallParts: Map<string, Part> = new Map();
 
-  const createMetadata = (parts: Part[]): IrMetadata => {
-    const tokens = tokenCalculator.estimateTokensForParts(parts, 0);
-    return {
-      originalTokens: tokens,
-      currentTokens: tokens,
-      transformations: [],
-    };
-  };
+
 
   const finalizeEpisode = () => {
     if (currentEpisode && isCompleteEpisode(currentEpisode)) {
@@ -81,20 +73,19 @@ export function toIr(
           currentEpisode,
           pendingCallParts,
           tokenCalculator,
-          createMetadata,
+
         );
       }
 
       if (hasUserParts) {
         finalizeEpisode();
-        currentEpisode = parseUserParts(msg, createMetadata);
+        currentEpisode = parseUserParts(msg);
       }
     } else if (msg.role === 'model') {
       currentEpisode = parseModelParts(
         msg,
         currentEpisode,
         pendingCallParts,
-        createMetadata,
       );
     }
   }
@@ -112,7 +103,6 @@ function parseToolResponses(
   currentEpisode: Partial<Episode> | null,
   pendingCallParts: Map<string, Part>,
   tokenCalculator: ContextTokenCalculator,
-  _createMetadata: (parts: Part[]) => IrMetadata,
 ): Partial<Episode> {
   if (!currentEpisode) {
     currentEpisode = {
@@ -146,11 +136,6 @@ function parseToolResponses(
           intent: intentTokens,
           observation: obsTokens,
         },
-        metadata: {
-          originalTokens: intentTokens + obsTokens,
-          currentTokens: intentTokens + obsTokens,
-          transformations: [],
-        },
       };
       currentEpisode.concreteNodes = [
         ...(currentEpisode.concreteNodes || []),
@@ -164,7 +149,6 @@ function parseToolResponses(
 
 function parseUserParts(
   msg: Content,
-  _createMetadata: (parts: Part[]) => IrMetadata,
 ): Partial<Episode> {
   const semanticParts: SemanticPart[] = [];
   for (const p of msg.parts!) {
@@ -190,9 +174,7 @@ function parseUserParts(
     id: getStableId(msg.parts![0] || msg),
     type: 'USER_PROMPT',
     semanticParts,
-    metadata: _createMetadata(msg.parts!.filter((p) => !p.functionResponse)),
   };
-
   return {
     id: getStableId(msg),
     timestamp: Date.now(),
@@ -204,7 +186,6 @@ function parseModelParts(
   msg: Content,
   currentEpisode: Partial<Episode> | null,
   pendingCallParts: Map<string, Part>,
-  _createMetadata: (parts: Part[]) => IrMetadata,
 ): Partial<Episode> {
   if (!currentEpisode) {
     currentEpisode = {
@@ -223,8 +204,8 @@ function parseModelParts(
         id: getStableId(part),
         type: 'AGENT_THOUGHT',
         text: part.text,
-        metadata: _createMetadata([part]),
       };
+
       currentEpisode.concreteNodes = [
         ...(currentEpisode.concreteNodes || []),
         thought,
@@ -240,11 +221,6 @@ function finalizeYield(currentEpisode: Partial<Episode>) {
       id: randomUUID(),
       type: 'AGENT_YIELD',
       text: 'Yield', // Synthesized yield since we don't have the original concrete node
-      metadata: {
-        originalTokens: 1,
-        currentTokens: 1,
-        transformations: [],
-      },
     };
     const existingNodes = currentEpisode.concreteNodes || [];
     currentEpisode.concreteNodes = [...existingNodes, yieldNode];

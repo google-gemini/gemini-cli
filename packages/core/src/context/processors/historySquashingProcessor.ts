@@ -121,14 +121,6 @@ export class HistorySquashingProcessor implements ContextProcessor {
             ...prompt,
             id: this.env.idGenerator.generateId(),
             semanticParts: newParts,
-            metadata: {
-              ...prompt.metadata,
-              currentTokens: newTokens,
-              transformations: [
-                ...prompt.metadata.transformations,
-                { processorName: this.name, action: 'TRUNCATED', timestamp: Date.now() }
-              ]
-            }
           });
         } else {
           returnedNodes.push(node);
@@ -147,14 +139,6 @@ export class HistorySquashingProcessor implements ContextProcessor {
             ...thought,
             id: this.env.idGenerator.generateId(),
             text: squashResult.text,
-            metadata: {
-              ...thought.metadata,
-              currentTokens: squashResult.newTokens,
-              transformations: [
-                ...thought.metadata.transformations,
-                { processorName: this.name, action: 'TRUNCATED', timestamp: Date.now() }
-              ]
-            }
           });
         } else {
           returnedNodes.push(node);
@@ -173,14 +157,6 @@ export class HistorySquashingProcessor implements ContextProcessor {
             ...agentYield,
             id: this.env.idGenerator.generateId(),
             text: squashResult.text,
-            metadata: {
-              ...agentYield.metadata,
-              currentTokens: squashResult.newTokens,
-              transformations: [
-                ...agentYield.metadata.transformations,
-                { processorName: this.name, action: 'TRUNCATED', timestamp: Date.now() }
-              ]
-            }
           });
         } else {
           returnedNodes.push(node);

@@ -7,6 +7,8 @@
 import type { Part } from '@google/genai';
 import { estimateTokenCountSync as baseEstimate } from '../../utils/tokenCalculation.js';
 import type { ConcreteNode } from '../ir/types.js';
+import { isUserPrompt, isAgentThought, isToolExecution, isMaskedTool, isAgentYield, isSnapshot, isRollingSummary } from '../ir/graphUtils.js';
+import { serializeUserPrompt, serializeAgentThought, serializeToolExecution, serializeMaskedTool, serializeAgentYield } from '../ir/fromIr.js';
 
 /**
  * The flat token cost assigned to a single multi-modal asset (like an image tile)
@@ -15,10 +17,13 @@ import type { ConcreteNode } from '../ir/types.js';
 
 
 export class ContextTokenCalculator {
+  private readonly tokenCache = new Map<string, number>();
+
   constructor(private readonly charsPerToken: number) {}
 
   /**
-   * Fast, simple heuristic estimation for a raw string.
+   * Estimates tokens for a simple string based on character count.
+   * Fast, but inherently inaccurate compared to real model tokenization.
    */
   estimateTokensForString(text: string): number {
     return Math.ceil(text.length / this.charsPerToken);
@@ -33,17 +38,52 @@ export class ContextTokenCalculator {
   }
 
   /**
-   * Calculates the total token count for a flat array of ConcreteNodes (The Ship).
-   * This is fast because it relies on pre-computed metadata where available.
+   * Pre-calculates and caches the token cost of a newly minted node.
+   * Because nodes are immutable, this cost never changes for this node ID.
+   */
+  cacheNodeTokens(node: ConcreteNode): number {
+    let tokens = 0;
+    if (isUserPrompt(node)) {
+      const content = serializeUserPrompt(node);
+      if (content && content.parts) tokens = this.estimateTokensForParts(content.parts as Part[]);
+    } else if (isAgentThought(node)) {
+      tokens = this.estimateTokensForParts([serializeAgentThought(node)]);
+    } else if (isToolExecution(node)) {
+      const parts = serializeToolExecution(node);
+      tokens = this.estimateTokensForParts([parts.call, parts.response]);
+    } else if (isMaskedTool(node)) {
+      const parts = serializeMaskedTool(node);
+      tokens = this.estimateTokensForParts([parts.call, parts.response]);
+    } else if (isAgentYield(node)) {
+      tokens = this.estimateTokensForParts([serializeAgentYield(node)]);
+    } else if (isSnapshot(node) || isRollingSummary(node)) {
+      tokens = this.estimateTokensForParts([{ text: node.text }]);
+    }
+    this.tokenCache.set(node.id, tokens);
+    return tokens;
+  }
+
+  /**
+   * Retrieves the token cost of a single node from the cache.
+   * If it misses the cache, it computes it and caches it.
+   */
+  getTokenCost(node: ConcreteNode): number {
+    const cached = this.tokenCache.get(node.id);
+    if (cached !== undefined) return cached;
+    return this.cacheNodeTokens(node);
+  }
+
+  /**
+   * Fast calculation for a flat array of ConcreteNodes (The Ship).
+   * It relies entirely on the O(1) sidecar token cache.
    */
   calculateConcreteListTokens(ship: readonly ConcreteNode[]): number {
     let tokens = 0;
     for (const node of ship) {
-       tokens += node.metadata.currentTokens;
+       tokens += this.getTokenCost(node);
     }
     return tokens;
   }
-
   /**
    * Slower, precise estimation for a Gemini Content/Part graph.
    * Deeply inspects the nested structure and uses the base tokenization math.

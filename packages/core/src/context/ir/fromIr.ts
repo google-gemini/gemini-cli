@@ -62,7 +62,7 @@ export function fromIr(ship: readonly ConcreteNode[]): Content[] {
   return history;
 }
 
-function serializeUserPrompt(prompt: UserPrompt): Content | null {
+export function serializeUserPrompt(prompt: UserPrompt): Content | null {
   const parts: Part[] = [];
   for (const sp of prompt.semanticParts) {
     if (sp.type === 'text') {
@@ -82,11 +82,11 @@ function serializeUserPrompt(prompt: UserPrompt): Content | null {
   return parts.length > 0 ? { role: 'user', parts } : null;
 }
 
-function serializeAgentThought(thought: AgentThought): Part {
+export function serializeAgentThought(thought: AgentThought): Part {
   return { text: thought.text };
 }
 
-function serializeToolExecution(
+export function serializeToolExecution(
   tool: ToolExecution,
 ): { call: Part; response: Part } {
   return {
@@ -107,7 +107,7 @@ function serializeToolExecution(
   };
 }
 
-function serializeMaskedTool(
+export function serializeMaskedTool(
   tool: MaskedTool,
 ): { call: Part; response: Part } {
   return {
@@ -128,6 +128,6 @@ function serializeMaskedTool(
   };
 }
 
-function serializeAgentYield(yieldNode: AgentYield): Part {
+export function serializeAgentYield(yieldNode: AgentYield): Part {
   return { text: yieldNode.text };
 }

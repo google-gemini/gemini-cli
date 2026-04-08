@@ -65,8 +65,6 @@ describe('HistorySquashingProcessor', () => {
     expect(squashedPrompt.id).not.toBe(prompt.id);
     expect(squashedPrompt.semanticParts[0].type).toBe('text');
     expect((squashedPrompt.semanticParts[0] as any).text).toContain('[... OMITTED');
-    expect(squashedPrompt.metadata.transformations.length).toBe(1);
-    expect(squashedPrompt.metadata.transformations[0].action).toBe('TRUNCATED');
 
     // 2. Agent Thought
     const squashedThought = result[1] as AgentThought;

@@ -6,32 +6,6 @@
 
 import type { Part } from '@google/genai';
 
-/**
- * Universal Audit Metadata
- * Tracks the lifecycle and transformations of a node or part within the IR.
- * This guarantees perfect reversibility and enables long-term memory offloading.
- */
-export interface IrMetadata {
-  /** The estimated number of tokens this entity originally consumed. */
-  readonly originalTokens: number;
-  /** The current estimated number of tokens this entity consumes in its degraded state. */
-  readonly currentTokens: number;
-  /** An audit trail of all transformations applied by ContextProcessors. */
-  readonly transformations: ReadonlyArray<{
-    readonly processorName: string;
-    readonly action:
-      | 'MASKED'
-      | 'TRUNCATED'
-      | 'DEGRADED'
-      | 'SUMMARIZED'
-      | 'EVICTED'
-      | 'SYNTHESIZED';
-    readonly timestamp: number;
-    /** Pointer to where the original uncompressed payload was saved (if applicable) */
-    readonly diskPointer?: string;
-  }>;
-}
-
 export type IrNodeType =
   // Organic Concrete Nodes
   | 'USER_PROMPT'
@@ -53,7 +27,6 @@ export type IrNodeType =
 export interface IrNode {
   readonly id: string;
   readonly type: IrNodeType;
-  readonly metadata: IrMetadata;
 }
 
 /**

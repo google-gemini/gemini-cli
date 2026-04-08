@@ -15,7 +15,6 @@ describe('ToolMaskingProcessor', () => {
   it('should write large strings to disk and replace them with a masked pointer', async () => {
     const env = createMockEnvironment();
     // 1 token = 1 char for simplicity
-    env.tokenCalculator.tokensToChars = vi.fn().mockReturnValue(10);
     // Fake token calculator says new tokens are 5
     env.tokenCalculator.estimateTokensForParts = vi.fn().mockReturnValue(5);
 
@@ -30,11 +29,6 @@ describe('ToolMaskingProcessor', () => {
         result: 'this is a really long string that should get masked out because it exceeds 10 chars',
         metadata: 'short',
       },
-      metadata: {
-        currentTokens: 150,
-        originalTokens: 150,
-        transformations: []
-      }
     });
 
     const result = await processor.process({
@@ -56,13 +50,10 @@ describe('ToolMaskingProcessor', () => {
     expect(obs.metadata).toBe('short'); // Untouched
 
     // Transformation logged
-    expect(masked.metadata.transformations.length).toBe(1);
-    expect(masked.metadata.transformations[0].action).toBe('MASKED');
   });
 
   it('should skip unmaskable tools', async () => {
     const env = createMockEnvironment();
-    env.tokenCalculator.tokensToChars = vi.fn().mockReturnValue(10);
 
     const processor = ToolMaskingProcessor.create(env, {
       stringLengthThresholdTokens: 10,

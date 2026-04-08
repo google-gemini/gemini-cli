@@ -75,7 +75,7 @@ export class IrProjector {
     // Start from newest and count backwards
     for (let i = ship.length - 1; i >= 0; i--) {
       const node = ship[i];
-      const nodeTokens = node.metadata.currentTokens;
+      const nodeTokens = env.tokenCalculator.calculateConcreteListTokens([node]);
       rollingTokens += nodeTokens;
       if (rollingTokens > sidecar.budget.retainedTokens) {
         agedOutNodes.add(node.id);

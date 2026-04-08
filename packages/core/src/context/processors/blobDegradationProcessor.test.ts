@@ -63,8 +63,6 @@ describe('BlobDegradationProcessor', () => {
     expect((degradedPart as any).text).toContain('[Multi-Modal Blob (image/png, 0.00MB) degraded to text');
 
     // The transformation should be logged
-    expect(modifiedPrompt.metadata.transformations.length).toBe(1);
-    expect(modifiedPrompt.metadata.transformations[0].action).toBe('DEGRADED');
   });
 
   it('should stop degrading once the deficit is cleared', async () => {

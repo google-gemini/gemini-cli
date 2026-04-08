@@ -123,26 +123,16 @@ export class SemanticCompressionProcessor implements ContextProcessor {
         }
 
         if (modified) {
-           const newTokens = this.env.tokenCalculator.estimateTokensForParts(
              newParts.map(p => {
                if (p.type === 'text') return { text: p.text };
                if (p.type === 'inline_data') return { inlineData: { mimeType: p.mimeType, data: p.data } };
                if (p.type === 'file_data') return { fileData: { mimeType: p.mimeType, fileUri: p.fileUri } };
                return (p as Extract<import('../ir/types.js').SemanticPart, { type: 'raw_part' }>).part;
-             })
-           );
+             });
            returnedNodes.push({
              ...prompt,
              id: this.env.idGenerator.generateId(),
              semanticParts: newParts,
-             metadata: {
-                ...prompt.metadata,
-                currentTokens: newTokens,
-                transformations: [
-                  ...prompt.metadata.transformations,
-                  { processorName: this.name, action: 'SUMMARIZED', timestamp: Date.now() }
-                ]
-             }
            });
         } else {
            returnedNodes.push(node);
@@ -156,7 +146,7 @@ export class SemanticCompressionProcessor implements ContextProcessor {
         if (thought.text.length > thresholdChars) {
            const summary = await this.generateSummary(thought.text, 'Agent Thought');
            const newTokens = this.env.tokenCalculator.estimateTokensForParts([{ text: summary }]);
-           const oldTokens = thought.metadata.currentTokens;
+           const oldTokens = this.env.tokenCalculator.getTokenCost(thought);
 
            if (newTokens < oldTokens) {
              currentDeficit -= (oldTokens - newTokens);
@@ -164,14 +154,6 @@ export class SemanticCompressionProcessor implements ContextProcessor {
                 ...thought,
                 id: this.env.idGenerator.generateId(),
                 text: summary,
-                metadata: {
-                  ...thought.metadata,
-                  currentTokens: newTokens,
-                  transformations: [
-                    ...thought.metadata.transformations,
-                    { processorName: this.name, action: 'SUMMARIZED', timestamp: Date.now() }
-                  ]
-                }
              });
              continue;
            }
@@ -210,7 +192,7 @@ export class SemanticCompressionProcessor implements ContextProcessor {
               },
             ]);
 
-            const oldObsTokens = tool.tokens?.observation ?? tool.metadata.currentTokens;
+            const oldObsTokens = tool.tokens?.observation ?? this.env.tokenCalculator.getTokenCost(tool);
             const intentTokens = tool.tokens?.intent ?? 0;
 
             if (newObsTokens < oldObsTokens) {
@@ -223,14 +205,6 @@ export class SemanticCompressionProcessor implements ContextProcessor {
                    intent: intentTokens,
                    observation: newObsTokens,
                  },
-                 metadata: {
-                   ...tool.metadata,
-                   currentTokens: intentTokens + newObsTokens,
-                   transformations: [
-                     ...tool.metadata.transformations,
-                     { processorName: this.name, action: 'SUMMARIZED', timestamp: Date.now() }
-                   ]
-                 }
                });
                continue;
             }

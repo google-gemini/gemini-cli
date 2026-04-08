@@ -49,7 +49,6 @@ describe('SemanticCompressionProcessor', () => {
 
     const thought = createDummyNode('ep1', 'AGENT_THOUGHT', 1500, {
       text: 'The model is thinking something incredibly long and verbose that exceeds 10 chars',
-      metadata: { currentTokens: 5000, originalTokens: 5000, transformations: [] }
     }, 'thought-id') as AgentThought;
 
     const tool = createDummyToolNode('ep1', 50, 1000, {
@@ -75,8 +74,6 @@ describe('SemanticCompressionProcessor', () => {
     expect(compressedPrompt.semanticParts[0].type).toBe('text');
     expect((compressedPrompt.semanticParts[0] as any).text).toBe('Mocked Summary!');
     expect(compressedPrompt.metadata.transformations.length).toBe(1);
-    expect(compressedPrompt.metadata.transformations[0].action).toBe('SUMMARIZED');
-
     // 2. Agent Thought
     const compressedThought = result[1] as AgentThought;
     expect(compressedThought.id).toBe('mock-uuid-2');
@@ -84,14 +81,12 @@ describe('SemanticCompressionProcessor', () => {
     expect(compressedThought.text).toBe('Mocked Summary!');
     expect(compressedThought.metadata.transformations.length).toBe(1);
 
-    // 3. Tool Execution
     const compressedTool = result[2] as ToolExecution;
     expect(compressedTool.id).toBe('mock-uuid-3');
     expect(compressedTool.id).not.toBe(tool.id);
     expect(compressedTool.observation).toEqual({ summary: 'Mocked Summary!' });
     expect(compressedTool.metadata.transformations.length).toBe(1);
 
-    // Verify LLM was called 3 times
     expect(mockLlmClient.generateContent).toHaveBeenCalledTimes(3);
   });
 
@@ -130,7 +125,6 @@ describe('SemanticCompressionProcessor', () => {
 
     const thought = createDummyNode('ep1', 'AGENT_THOUGHT', 1500, {
       text: 'The model is thinking something incredibly long and verbose that exceeds 10 chars',
-      metadata: { currentTokens: 5000, originalTokens: 5000, transformations: [] }
     }, 'thought-id') as AgentThought;
 
     const targets = [prompt, thought];

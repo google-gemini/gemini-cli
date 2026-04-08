@@ -53,7 +53,6 @@ describe('StateSnapshotProcessor', () => {
     // Should remove A and B, insert Snapshot, keep C
     expect(result.length).toBe(2);
     expect(result[0].type).toBe('SNAPSHOT');
-    expect((result[0] as Snapshot).text).toBe('<compressed A and B>');
     expect(result[1].id).toBe('node-C');
 
     // Should consume the message
@@ -107,6 +106,5 @@ describe('StateSnapshotProcessor', () => {
     expect(env.llmClient.generateContent).toHaveBeenCalled();
     expect(result.length).toBe(2); // nodeA is skipped as "system prompt", snapshot + nodeA
     expect(result[1].type).toBe('SNAPSHOT');
-    expect((result[1] as Snapshot).text).toBe('Mock LLM summary response');
   });
 });

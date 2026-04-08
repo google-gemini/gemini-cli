@@ -73,7 +73,6 @@ export class StateSnapshotProcessor implements ContextProcessor, ContextWorker {
         if (isValid) {
           // If valid, apply it!
           const newId = this.env.idGenerator.generateId();
-          const tokens = this.env.tokenCalculator.estimateTokensForString(newText);
           
           const snapshotNode: Snapshot = {
             id: newId,
@@ -81,13 +80,6 @@ export class StateSnapshotProcessor implements ContextProcessor, ContextWorker {
             type: 'SNAPSHOT',
             timestamp: Date.now(),
             text: newText,
-            metadata: {
-              currentTokens: tokens,
-              originalTokens: tokens,
-              transformations: [
-                { processorName: this.name, action: 'SYNTHESIZED', timestamp: Date.now() }
-              ]
-            }
           };
 
           // Remove the consumed nodes and insert the snapshot at the earliest index
@@ -131,7 +123,7 @@ export class StateSnapshotProcessor implements ContextProcessor, ContextWorker {
       }
       
       nodesToSummarize.push(node);
-      deficitAccumulator += node.metadata.currentTokens;
+      deficitAccumulator += this.env.tokenCalculator.getTokenCost(node);
 
       if (deficitAccumulator >= targetTokensToRemove) break;
     }
@@ -142,20 +134,12 @@ export class StateSnapshotProcessor implements ContextProcessor, ContextWorker {
        const snapshotText = await this.synthesizeSnapshot(nodesToSummarize);
        const newId = this.env.idGenerator.generateId();
        const tokens = this.env.tokenCalculator.estimateTokensForString(snapshotText);
-
        const snapshotNode: Snapshot = {
             id: newId,
             logicalParentId: newId,
             type: 'SNAPSHOT',
             timestamp: Date.now(),
             text: snapshotText,
-            metadata: {
-              currentTokens: tokens,
-              originalTokens: tokens,
-              transformations: [
-                { processorName: this.name, action: 'SYNTHESIZED', timestamp: Date.now() }
-              ]
-            }
        };
 
        const consumedIds = nodesToSummarize.map(n => n.id);

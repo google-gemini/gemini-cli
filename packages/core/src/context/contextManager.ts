@@ -116,7 +116,7 @@ export class ContextManager {
       // Walk backwards finding nodes that fall out of the retained budget
       for (let i = this.currentShip.length - 1; i >= 0; i--) {
         const node = this.currentShip[i];
-        rollingTokens += node.metadata.currentTokens;
+        rollingTokens += this.env.tokenCalculator.calculateConcreteListTokens([node]);
         if (rollingTokens > this.sidecar.budget.retainedTokens) {
           agedOutNodes.add(node.id);
         }

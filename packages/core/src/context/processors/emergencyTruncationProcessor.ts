@@ -77,7 +77,7 @@ export class EmergencyTruncationProcessor implements ContextProcessor {
         continue;
       }
 
-      removedTokens += node.metadata.currentTokens;
+      removedTokens += this.env.tokenCalculator.getTokenCost(node);
     }
 
     return keptNodes;
