@@ -398,9 +398,10 @@ export async function createPolicyEngineConfig(
   // TOML policy priorities (before transformation):
   //   10: Write tools default to ASK_USER (becomes 1.010 in default tier)
   //   15: Auto-edit tool override (becomes 1.015 in default tier)
+  //   30: Unknown subagents (blocked by Plan Mode's 40)
+  //   40: Plan mode catch-all DENY override (becomes 1.040 in default tier)
   //   50: Read-only tools (becomes 1.050 in default tier)
-  //   60: Plan mode catch-all DENY override (becomes 1.060 in default tier)
-  //   70: Plan mode explicit ALLOW override (becomes 1.070 in default tier)
+  //   70: Mode transition overrides (becomes 1.070 in default tier)
   //   999: YOLO mode allow-all (becomes 1.999 in default tier)
 
   // MCP servers that are explicitly excluded in settings.mcp.excluded

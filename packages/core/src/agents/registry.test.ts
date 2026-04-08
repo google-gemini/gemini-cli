@@ -1075,7 +1075,7 @@ describe('AgentRegistry', () => {
         expect.objectContaining({
           toolName: 'PolicyTestAgent',
           decision: PolicyDecision.ALLOW,
-          priority: 1.05,
+          priority: 1.03,
         }),
       );
     });
@@ -1102,7 +1102,7 @@ describe('AgentRegistry', () => {
         expect.objectContaining({
           toolName: 'RemotePolicyAgent',
           decision: PolicyDecision.ASK_USER,
-          priority: 1.05,
+          priority: 1.03,
         }),
       );
     });

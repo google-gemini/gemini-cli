@@ -890,8 +890,8 @@ priority = 100
           readOnlyHint: true,
         });
         expect(annotationRule!.decision).toBe(PolicyDecision.ASK_USER);
-        // Priority 70 in tier 1 => 1.070
-        expect(annotationRule!.priority).toBe(1.07);
+        // Priority 50 in tier 1 => 1.050
+        expect(annotationRule!.priority).toBe(1.05);
 
         // Verify deny rule was loaded correctly
         const denyRule = result.rules.find(
@@ -904,8 +904,8 @@ priority = 100
           denyRule,
           'Should have loaded the catch-all deny rule',
         ).toBeDefined();
-        // Priority 60 in tier 1 => 1.060
-        expect(denyRule!.priority).toBe(1.06);
+        // Priority 40 in tier 1 => 1.040
+        expect(denyRule!.priority).toBe(1.04);
 
         // 2. Initialize Policy Engine in Plan Mode
         const engine = new PolicyEngine({
@@ -974,12 +974,23 @@ priority = 100
 
     it('should override default subagent rules when in Plan Mode for unknown subagents', async () => {
       const planTomlPath = path.resolve(__dirname, 'policies', 'plan.toml');
-      const fileContent = await fs.readFile(planTomlPath, 'utf-8');
+      const readOnlyTomlPath = path.resolve(
+        __dirname,
+        'policies',
+        'read-only.toml',
+      );
+      const planContent = await fs.readFile(planTomlPath, 'utf-8');
+      const readOnlyContent = await fs.readFile(readOnlyTomlPath, 'utf-8');
+
       const tempPolicyDir = await fs.mkdtemp(
         path.join(os.tmpdir(), 'plan-policy-test-'),
       );
       try {
-        await fs.writeFile(path.join(tempPolicyDir, 'plan.toml'), fileContent);
+        await fs.writeFile(path.join(tempPolicyDir, 'plan.toml'), planContent);
+        await fs.writeFile(
+          path.join(tempPolicyDir, 'read-only.toml'),
+          readOnlyContent,
+        );
         const getPolicyTier = () => 1; // Default tier
 
         // 1. Load the actual Plan Mode policies
@@ -1004,6 +1015,7 @@ priority = 100
 
         // 4. Verify Behavior:
         // The Plan Mode "Catch-All Deny" (from plan.toml) should override the Subagent Allow
+        // Plan Mode Deny (1.04) > Subagent Allow (1.03)
         const checkResult = await engine.check(
           { name: 'unknown_subagent' },
           undefined,
@@ -1015,7 +1027,7 @@ priority = 100
         ).toBe(PolicyDecision.DENY);
 
         // 5. Verify Explicit Allows still work
-        // e.g. 'read_file' should be allowed because its priority in plan.toml (70) is higher than the deny (60)
+        // e.g. 'read_file' should be allowed because its priority in read-only.toml (50) is higher than the deny (40)
         const readResult = await engine.check({ name: 'read_file' }, undefined);
         expect(
           readResult.decision,
@@ -1023,6 +1035,7 @@ priority = 100
         ).toBe(PolicyDecision.ALLOW);
 
         // 6. Verify Built-in Research Subagents are ALLOWED
+        // codebase_investigator is priority 50 in read-only.toml
         const codebaseResult = await engine.check(
           { name: 'codebase_investigator' },
           undefined,
