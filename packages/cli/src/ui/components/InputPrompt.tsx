@@ -1849,7 +1849,7 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
                         ? `line-${item.absoluteVisualIdx}`
                         : `ghost-${item.index}`
                     }
-                    width={inputWidth}
+                    width={inputWidth + 1 /* space for scrollbar */}
                     backgroundColor={listBackgroundColor}
                     containerHeight={Math.min(
                       buffer.viewportHeight,
