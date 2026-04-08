@@ -9,6 +9,7 @@ import { SessionSummaryService } from './sessionSummaryService.js';
 import type { BaseLlmClient } from '../core/baseLlmClient.js';
 import type { MessageRecord } from './chatRecordingService.js';
 import type { GenerateContentResponse } from '@google/genai';
+import { CoreToolCallStatus } from '../scheduler/types.js';
 
 describe('SessionSummaryService', () => {
   let service: SessionSummaryService;
@@ -1214,5 +1215,59 @@ Debugged intermittent 401 errors caused by concurrent token refresh calls.
 
     expect(result).not.toBeNull();
     expect(result!.summary).toBe('Fix the bug');
+  });
+
+  it('should include recorded tool calls when gemini content is empty', async () => {
+    const messages: MessageRecord[] = [
+      {
+        id: '1',
+        timestamp: '2026-01-01T00:00:00Z',
+        type: 'user',
+        content: [{ text: 'Figure out why session memory is missing context' }],
+      },
+      {
+        id: '2',
+        timestamp: '2026-01-01T00:01:00Z',
+        type: 'gemini',
+        content: [{ text: '' }],
+        toolCalls: [
+          {
+            id: 'tool-1',
+            name: 'run_shell_command',
+            args: {
+              command:
+                'cat packages/core/src/services/sessionSummaryService.ts',
+            },
+            result: [
+              {
+                functionResponse: {
+                  id: 'tool-1',
+                  name: 'run_shell_command',
+                  response: {
+                    output:
+                      'packages/core/src/services/sessionSummaryService.ts',
+                  },
+                },
+              },
+            ],
+            status: CoreToolCallStatus.Success,
+            timestamp: '2026-01-01T00:01:05Z',
+          },
+        ],
+      },
+    ];
+
+    await service.generateMemoryExtraction({ messages });
+
+    const callArgs = mockGenerateContent.mock.calls[0][0];
+    const promptText = callArgs.contents[0].parts[0].text as string;
+
+    expect(promptText).toContain('Tool: run_shell_command');
+    expect(promptText).toContain(
+      '"command":"cat packages/core/src/services/sessionSummaryService.ts"',
+    );
+    expect(promptText).toContain(
+      'packages/core/src/services/sessionSummaryService.ts',
+    );
   });
 });

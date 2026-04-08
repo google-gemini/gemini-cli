@@ -4,13 +4,14 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import type { MessageRecord } from './chatRecordingService.js';
+import type { MessageRecord, ToolCallRecord } from './chatRecordingService.js';
 import type { BaseLlmClient } from '../core/baseLlmClient.js';
 import { partListUnionToString } from '../core/geminiRequest.js';
 import { debugLogger } from '../utils/debugLogger.js';
 import type { Content } from '@google/genai';
 import { getResponseText } from '../utils/partUtils.js';
 import { LlmRole } from '../telemetry/types.js';
+import { safeJsonStringify } from '../utils/safeJsonStringify.js';
 
 const DEFAULT_MAX_MESSAGES = 20;
 const DEFAULT_TIMEOUT_MS = 5000;
@@ -280,15 +281,15 @@ export class SessionSummaryService {
     maxMessages: number,
     maxMessageLength: number,
   ): string | null {
-    const filteredMessages = messages.filter((msg) => {
-      if (msg.type !== 'user' && msg.type !== 'gemini') {
-        return false;
-      }
-      const content = partListUnionToString(msg.content);
-      return content.trim().length > 0;
-    });
+    const filteredMessages = messages
+      .filter((msg) => msg.type === 'user' || msg.type === 'gemini')
+      .map((msg) => ({
+        msg,
+        content: this.formatMessageForConversation(msg),
+      }))
+      .filter(({ content }) => content.length > 0);
 
-    let relevantMessages: MessageRecord[];
+    let relevantMessages: typeof filteredMessages;
     if (filteredMessages.length <= maxMessages) {
       relevantMessages = filteredMessages;
     } else {
@@ -304,9 +305,8 @@ export class SessionSummaryService {
     }
 
     return relevantMessages
-      .map((msg) => {
+      .map(({ msg, content }) => {
         const role = msg.type === 'user' ? 'User' : 'Assistant';
-        const content = partListUnionToString(msg.content);
         const characters = Array.from(content);
         const truncated =
           characters.length > maxMessageLength
@@ -315,5 +315,59 @@ export class SessionSummaryService {
         return `${role}: ${truncated}`;
       })
       .join('\n\n');
+  }
+
+  private formatMessageForConversation(msg: MessageRecord): string {
+    const sections: string[] = [];
+    const content = partListUnionToString(msg.content).trim();
+
+    if (content) {
+      sections.push(content);
+    }
+
+    if (msg.type === 'gemini' && msg.toolCalls?.length) {
+      sections.push(
+        ...msg.toolCalls.map((toolCall) =>
+          this.formatToolCallForConversation(toolCall),
+        ),
+      );
+    }
+
+    return sections.join('\n');
+  }
+
+  private formatToolCallForConversation(toolCall: ToolCallRecord): string {
+    const lines = [`Tool: ${toolCall.name}`, `Status: ${toolCall.status}`];
+
+    if (Object.keys(toolCall.args).length > 0) {
+      lines.push(`Args: ${this.stringifyForConversation(toolCall.args)}`);
+    }
+
+    const result = this.stringifyToolCallResult(toolCall);
+    if (result) {
+      lines.push(`Result: ${result}`);
+    }
+
+    return lines.join('\n');
+  }
+
+  private stringifyToolCallResult(toolCall: ToolCallRecord): string {
+    if (!toolCall.result) {
+      return '';
+    }
+
+    return this.stringifyForConversation(toolCall.result);
+  }
+
+  private stringifyForConversation(value: unknown): string {
+    if (value === undefined || value === null) {
+      return '';
+    }
+
+    if (typeof value === 'string') {
+      return value;
+    }
+
+    return safeJsonStringify(value);
   }
 }
