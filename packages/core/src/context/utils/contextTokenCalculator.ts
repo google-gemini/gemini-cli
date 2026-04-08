@@ -6,10 +6,9 @@
 
 import type { Part } from '@google/genai';
 import { estimateTokenCountSync as baseEstimate } from '../../utils/tokenCalculation.js';
-
+import type { ConcreteNode } from '../ir/types.js';
 
 /**
-import type { ConcreteNode } from "../ir/types.js";
  * The flat token cost assigned to a single multi-modal asset (like an image tile)
  * by the Gemini API. We use this as a baseline heuristic for inlineData/fileData.
  */

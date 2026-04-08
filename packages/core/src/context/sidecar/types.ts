@@ -4,8 +4,6 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import type { StateSnapshotProcessorOptions } from '../processors/stateSnapshotProcessor.js';
-
 /**
  * Definition of a processor or worker to be instantiated in the graph.
  */
@@ -25,12 +23,17 @@ export type ProcessorConfig =
     }
   | {
       processorId: 'StateSnapshotProcessor';
-      options: StateSnapshotProcessorOptions;
+      options?: Record<string, unknown>;
     }
   | {
       processorId: 'EmergencyTruncationProcessor';
       options?: Record<string, unknown>;
     };
+
+export interface WorkerConfig {
+  workerId: string;
+  options?: Record<string, unknown>;
+}
 
 export type PipelineTrigger =
   | 'new_message'
@@ -57,4 +60,7 @@ export interface SidecarConfig {
 
   /** The execution graphs for context manipulation */
   pipelines: PipelineDef[];
+
+  /** Background actors that generate data for pipelines */
+  workers?: WorkerConfig[];
 }

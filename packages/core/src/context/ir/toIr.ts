@@ -14,10 +14,8 @@ import type {
   AgentThought,
   AgentYield,
   UserPrompt,
-  SystemEvent,
 } from './types.js';
 import type { ContextTokenCalculator } from '../utils/contextTokenCalculator.js';
-import { isAgentThought } from './graphUtils.js';
 
 // WeakMap to provide stable, deterministic identity across parses for the exact same Content/Part references
 const nodeIdentityMap = new WeakMap<object, string>();

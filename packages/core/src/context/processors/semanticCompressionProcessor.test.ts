@@ -56,7 +56,6 @@ describe('SemanticCompressionProcessor', () => {
 
     const result = await processor.process({
       buffer: {} as any,
-      ship: [],
       targets,
       state,
       inbox: {} as any,
@@ -133,7 +132,6 @@ describe('SemanticCompressionProcessor', () => {
 
     const result = await processor.process({
       buffer: {} as any,
-      ship: [],
       targets,
       state,
       inbox: {} as any,

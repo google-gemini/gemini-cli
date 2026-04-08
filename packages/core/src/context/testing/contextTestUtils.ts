@@ -5,22 +5,24 @@
  */
 
 import { vi } from 'vitest';
-import type { Config } from '../../config/config.js';
-import type { ContextEnvironment } from '../sidecar/environment.js';
-import type { Content } from '@google/genai';
 import { AgentChatHistory } from '../../core/agentChatHistory.js';
-import type { ConcreteNode, ToolExecution } from "../ir/types.js";
 import { ContextManager } from '../contextManager.js';
 import { InMemoryFileSystem } from '../system/InMemoryFileSystem.js';
 import { DeterministicIdGenerator } from '../system/DeterministicIdGenerator.js';
-import type {
-  Episode,
-  UserPrompt,
-  SystemEvent,
-  SemanticPart,
-} from '../ir/types.js';
-import type { ContextAccountingState } from '../pipeline.js';
 import { randomUUID } from 'node:crypto';
+import { ContextTracer } from '../tracer.js';
+import { ContextEnvironmentImpl } from '../sidecar/environmentImpl.js';
+import { SidecarLoader } from '../sidecar/SidecarLoader.js';
+import { ContextEventBus } from '../eventBus.js';
+import { ContextTokenCalculator } from '../utils/contextTokenCalculator.js';
+import { ProcessorRegistry } from '../sidecar/registry.js';
+import { registerBuiltInProcessors } from '../sidecar/builtins.js';
+import type { ContextAccountingState } from '../pipeline.js';
+import type { ConcreteNode, ToolExecution } from '../ir/types.js';
+import type { ContextEnvironment } from '../sidecar/environment.js';
+import type { Config } from '../../config/config.js';
+import type { BaseLlmClient } from '../../core/baseLlmClient.js';
+import type { Content } from '@google/genai';
 
 export function createDummyState(
   isSatisfied = false,
@@ -47,6 +49,7 @@ export function createDummyNode(
   overrides?: Partial<ConcreteNode>,
   id?: string
 ): ConcreteNode {
+  // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
   return {
     id: id || randomUUID(),
     episodeId: logicalParentId,
@@ -73,6 +76,7 @@ export function createDummyToolNode(
   overrides?: Partial<ToolExecution>,
   id?: string
 ): ToolExecution {
+  // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
   return {
     id: id || randomUUID(),
     episodeId: logicalParentId,
@@ -95,64 +99,7 @@ export function createDummyToolNode(
   } as unknown as ToolExecution;
 }
 
-export function createDummyEpisode(
-  id: string,
-  type: 'USER_PROMPT' | 'SYSTEM_EVENT',
-  parts: SemanticPart[] = [],
-  toolSteps: Array<{
-    intent: Record<string, unknown>;
-    observation: Record<string, unknown>;
-    toolName?: string;
-    tokens?: { intent: number; observation: number };
-  }> = [],
-): Episode {
-  let trigger: UserPrompt | SystemEvent;
 
-  if (type === 'USER_PROMPT') {
-    trigger = {
-      id: randomUUID(),
-      type: 'USER_PROMPT',
-      semanticParts: parts,
-      metadata: {
-        originalTokens: 100,
-        currentTokens: 100,
-        transformations: [],
-      },
-    };
-  } else {
-    trigger = {
-      id: randomUUID(),
-      type: 'SYSTEM_EVENT',
-      name: 'dummy_event',
-      payload: {},
-      metadata: {
-        originalTokens: 100,
-        currentTokens: 100,
-        transformations: [],
-      },
-    };
-  }
-
-  return {
-    type: 'EPISODE',
-    id,
-    timestamp: Date.now(),
-    trigger,
-    steps: toolSteps.map((step) => ({
-      id: randomUUID(),
-      type: 'TOOL_EXECUTION',
-      toolName: step.toolName || 'test_tool',
-      intent: step.intent,
-      observation: step.observation,
-      tokens: step.tokens || { intent: 50, observation: 50 },
-      metadata: {
-        originalTokens: 100,
-        currentTokens: 100,
-        transformations: [],
-      },
-    })),
-  };
-}
 
 export function createMockEnvironment(overrides?: Partial<ContextEnvironment>): ContextEnvironment {
   return {
@@ -233,14 +180,6 @@ export function createMockContextConfig(
 /**
  * Wires up a full ContextManager component with an AgentChatHistory and active background workers.
  */
-import { ContextTracer } from '../tracer.js';
-import { ContextEnvironmentImpl } from '../sidecar/environmentImpl.js';
-import { SidecarLoader } from '../sidecar/SidecarLoader.js';
-import { ContextEventBus } from '../eventBus.js';
-import { ContextTokenCalculator } from '../utils/contextTokenCalculator.js';
-import type { BaseLlmClient } from 'src/core/baseLlmClient.js';
-import { ProcessorRegistry } from '../sidecar/registry.js';
-import { registerBuiltInProcessors } from '../sidecar/builtins.js';
 
 export function setupContextComponentTest(config: Config) {
   const chatHistory = new AgentChatHistory();

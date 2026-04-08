@@ -47,7 +47,6 @@ describe('HistorySquashingProcessor', () => {
 
     const result = await processor.process({
       buffer: {} as any,
-      ship: [],
       targets,
       state,
       inbox: {} as any,
@@ -111,7 +110,6 @@ describe('HistorySquashingProcessor', () => {
 
     const result = await processor.process({
       buffer: {} as any,
-      ship: [],
       targets,
       state,
       inbox: {} as any,

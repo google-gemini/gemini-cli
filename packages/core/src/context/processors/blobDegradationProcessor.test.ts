@@ -35,7 +35,6 @@ describe('BlobDegradationProcessor', () => {
 
     const result = await processor.process({
       buffer: {} as any,
-      ship: [],
       targets,
       state,
       inbox: {} as any,
@@ -86,7 +85,6 @@ describe('BlobDegradationProcessor', () => {
 
     const result = await processor.process({
       buffer: {} as any,
-      ship: [],
       targets,
       state,
       inbox: {} as any,
@@ -116,7 +114,6 @@ describe('BlobDegradationProcessor', () => {
 
     const result = await processor.process({
       buffer: {} as any,
-      ship: [],
       targets,
       state,
       inbox: {} as any,

@@ -1,6 +1,6 @@
 import { ProcessorRegistry } from './registry.js';
 import { EmergencyTruncationProcessor, type EmergencyTruncationProcessorOptions } from '../processors/emergencyTruncationProcessor.js';
-import { BlobDegradationProcessor, type BlobDegradationProcessorOptions } from '../processors/blobDegradationProcessor.js';
+import { BlobDegradationProcessor } from '../processors/blobDegradationProcessor.js';
 
 export function registerBuiltInProcessors(registry: ProcessorRegistry) {
   registry.register<Record<string, never>>({

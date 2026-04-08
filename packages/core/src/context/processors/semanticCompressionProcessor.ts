@@ -1,7 +1,6 @@
 import type { ContextProcessor, ProcessArgs } from '../pipeline.js';
 import type { ContextEnvironment } from '../sidecar/environment.js';
 import { debugLogger } from '../../utils/debugLogger.js';
-import { LlmRole } from '../../telemetry/types.js';
 import { getResponseText } from '../../utils/partUtils.js';
 import type { ConcreteNode, UserPrompt, AgentThought, ToolExecution } from '../ir/types.js';
 
@@ -32,7 +31,6 @@ export class SemanticCompressionProcessor implements ContextProcessor {
   readonly name = 'SemanticCompressionProcessor';
   readonly options: SemanticCompressionProcessorOptions;
   private env: ContextEnvironment;
-  private modelToUse: string = 'gemini-2.5-flash';
 
   constructor(
     env: ContextEnvironment,
@@ -49,9 +47,13 @@ export class SemanticCompressionProcessor implements ContextProcessor {
     try {
       const response = await this.env.llmClient.generateContent(
         {
+          role: 'user' as any,
+          modelConfigKey: 'default' as any,
+          promptId: this.env.promptId,
+          abortSignal: new AbortController().signal,
           contents: [
             {
-              role: 'user',
+              role: 'user' as any,
               parts: [{ text }],
             },
           ],
@@ -63,8 +65,7 @@ export class SemanticCompressionProcessor implements ContextProcessor {
               },
             ],
           },
-        },
-        this.modelToUse
+        }
       );
       return getResponseText(response) || text;
     } catch (e) {

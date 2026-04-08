@@ -13,7 +13,7 @@ import {
   createDummyNode,
 } from '../testing/contextTestUtils.js';
 import type { ContextEnvironment } from './environment.js';
-import type { ContextAccountingState, ContextProcessor } from '../pipeline.js';
+import type { ContextProcessor } from '../pipeline.js';
 import type { PipelineDef, ProcessorConfig, SidecarConfig } from './types.js';
 import type { ContextEventBus } from '../eventBus.js';
 
@@ -154,13 +154,13 @@ describe('PipelineOrchestrator (Component)', () => {
       registry,
     );
 
-    const episodes = [createDummyNode('1', 'USER_PROMPT')];
+    const ship = [createDummyNode('1', 'USER_PROMPT')];
     const state = createDummyState(false);
 
     const result = await orchestrator.executeTriggerSync(
       'new_message',
-      episodes,
-      new Set(episodes.map(e => e.id)),
+      ship,
+      new Set(ship.map(s => s.id)),
       state,
     );
 
@@ -189,14 +189,14 @@ describe('PipelineOrchestrator (Component)', () => {
       registry,
     );
 
-    const episodes = [createDummyNode('1', 'USER_PROMPT')];
+    const ship = [createDummyNode('1', 'USER_PROMPT')];
     const state = createDummyState(false);
 
     // This should resolve immediately with the UNMODIFIED array because execution is background
     const result = await orchestrator.executeTriggerSync(
       'new_message',
-      episodes,
-      new Set(episodes.map(e => e.id)),
+      ship,
+      new Set(ship.map(s => s.id)),
       state,
     );
 
@@ -228,19 +228,19 @@ describe('PipelineOrchestrator (Component)', () => {
       registry,
     );
 
-    const episodes = [createDummyNode('1', 'USER_PROMPT')];
+    const ship = [createDummyNode('1', 'USER_PROMPT')];
     const state = createDummyState(false);
 
     // It should not throw! It should swallow the error and return the unmodified array.
     const result = await orchestrator.executeTriggerSync(
       'new_message',
-      episodes,
-      new Set(episodes.map(e => e.id)),
+      ship,
+      new Set(ship.map(s => s.id)),
       state,
     );
 
     expect(result).toHaveLength(1);
-    expect(result).toStrictEqual(episodes);
+    expect(result).toStrictEqual(ship);
   });
 
   it('automatically binds to retained_exceeded trigger via EventBus', () => {
@@ -264,10 +264,10 @@ describe('PipelineOrchestrator (Component)', () => {
 
     new PipelineOrchestrator(config, env, eventBus, env.tracer, registry);
 
-    const episodes = [createDummyNode('1', 'USER_PROMPT')];
+    const ship = [createDummyNode('1', 'USER_PROMPT')];
 
     // Emit the trigger
-    eventBus.emitConsolidationNeeded({ episodes, targetDeficit: 100, targetNodeIds: new Set() });
+    eventBus.emitConsolidationNeeded({ ship, targetDeficit: 100, targetNodeIds: new Set() });
 
     expect(executeSpy).toHaveBeenCalled();
   });

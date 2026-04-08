@@ -14,10 +14,13 @@ import { NodeFileSystem } from '../system/NodeFileSystem.js';
 import type { IIdGenerator } from '../system/IIdGenerator.js';
 import { NodeIdGenerator } from '../system/NodeIdGenerator.js';
 
+import { LiveInbox } from './inbox.js';
+
 export class ContextEnvironmentImpl implements ContextEnvironment {
   readonly tokenCalculator: ContextTokenCalculator;
   readonly fileSystem: IFileSystem;
   readonly idGenerator: IIdGenerator;
+  readonly inbox: LiveInbox;
 
   constructor(
     readonly llmClient: BaseLlmClient,
@@ -34,5 +37,6 @@ export class ContextEnvironmentImpl implements ContextEnvironment {
     this.tokenCalculator = new ContextTokenCalculator(this.charsPerToken);
     this.fileSystem = fileSystem || new NodeFileSystem();
     this.idGenerator = idGenerator || new NodeIdGenerator();
+    this.inbox = new LiveInbox();
   }
 }

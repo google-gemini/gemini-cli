@@ -150,10 +150,11 @@ export class SimulationHarness {
             targetId: ep.id,
             variantId: 'v-emergency',
             variant: {
-              status: 'ready',
-              type: 'masked', // Truncation is technically a mask
-              text: ep.yield?.text || '',
-              recoveredTokens: 0,
+              type: 'MASKED_TOOL',
+              id: 'mock-id',
+              metadata: { currentTokens: 0, originalTokens: 0, transformations: [] },
+              tokens: { intent: 0, observation: 0 },
+              intent: {}, observation: {}, toolName: 'tool',
             },
           });
         }

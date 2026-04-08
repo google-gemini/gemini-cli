@@ -5,7 +5,7 @@
  */
 
 import type { ConcreteNode } from '../ir/types.js';
-import type { ContextProcessor, ContextAccountingState, ContextPatch } from '../pipeline.js';
+import type { ContextProcessor, ContextWorker, ContextAccountingState } from '../pipeline.js';
 import type { SidecarConfig, PipelineDef, PipelineTrigger } from './types.js';
 import type {
   ContextEnvironment,
@@ -14,10 +14,12 @@ import type {
 } from './environment.js';
 import type { ProcessorRegistry } from './registry.js';
 import { debugLogger } from '../../utils/debugLogger.js';
+import { InboxSnapshotImpl } from './inbox.js';
 
 export class PipelineOrchestrator {
   private activeTimers: NodeJS.Timeout[] = [];
   private readonly instantiatedProcessors = new Map<string, ContextProcessor>();
+  private readonly instantiatedWorkers = new Map<string, ContextWorker>();
 
   constructor(
     private readonly config: SidecarConfig,
@@ -27,6 +29,7 @@ export class PipelineOrchestrator {
     private readonly registry: ProcessorRegistry,
   ) {
     this.instantiateProcessors();
+    this.instantiateWorkers();
     this.setupTriggers();
   }
 
@@ -35,14 +38,26 @@ export class PipelineOrchestrator {
       for (const procDef of pipeline.processors) {
         if (!this.instantiatedProcessors.has(procDef.processorId)) {
           const factory = this.registry.get(procDef.processorId);
-          const instance = factory.create(this.env, procDef.options || {});
+          const instance = factory.create(this.env, procDef.options || {}) as ContextProcessor;
           this.instantiatedProcessors.set(procDef.processorId, instance);
         }
       }
     }
   }
 
+  private instantiateWorkers() {
+    if (!this.config.workers) return;
+    for (const workerDef of this.config.workers) {
+      if (!this.instantiatedWorkers.has(workerDef.workerId)) {
+        const factory = this.registry.get(workerDef.workerId);
+        const instance = factory.create(this.env, workerDef.options || {}) as unknown as ContextWorker;
+        this.instantiatedWorkers.set(workerDef.workerId, instance);
+      }
+    }
+  }
+
   private setupTriggers() {
+    // 1. Pipeline Triggers
     for (const pipeline of this.config.pipelines) {
       for (const trigger of pipeline.triggers) {
         if (typeof trigger === 'object' && trigger.type === 'timer') {
@@ -60,7 +75,6 @@ export class PipelineOrchestrator {
               deficitTokens: event.targetDeficit,
               protectedLogicalIds: new Set(),
             };
-            // Note: In a real implementation, event.episodes needs to be mapped to the Concrete Ship
             void this.executePipelineAsync(pipeline, [], event.targetNodeIds, state);
           });
         } else if (trigger === 'new_message') {
@@ -78,6 +92,23 @@ export class PipelineOrchestrator {
         }
       }
     }
+
+    // 2. Worker Triggers (onNodesAdded is roughly onChunkReceived for now)
+    this.eventBus.onChunkReceived((event) => {
+       // Fire all workers that care about new nodes
+       for (const worker of this.instantiatedWorkers.values()) {
+          if (worker.triggers.onNodesAdded) {
+             const inboxSnapshot = new InboxSnapshotImpl(this.env.inbox.getMessages());
+             // Fire and forget
+             worker.execute({ targets: [], inbox: inboxSnapshot }).catch(e => {
+                debugLogger.error(`Worker ${worker.name} failed onNodesAdded:`, e);
+             });
+          }
+       }
+    });
+
+    // We don't have a formal event bus for inbox publish yet, but we will soon.
+    // For now the workers are just registered.
   }
 
   shutdown() {
@@ -86,10 +117,6 @@ export class PipelineOrchestrator {
     }
   }
 
-  /**
-   * Evaluates the subset returned by the processor against the original targets,
-   * deducing the removed and inserted nodes, and updating the Ship accordingly.
-   */
   applyProcessorDiff(
     ship: ReadonlyArray<ConcreteNode>,
     targets: ReadonlyArray<ConcreteNode>,
@@ -102,9 +129,6 @@ export class PipelineOrchestrator {
     const removedIds = new Set<string>();
     const newNodes: ConcreteNode[] = [];
 
-    // 1. Identify Removals & Modifications
-    // If a target is missing from returnedMap -> Removed
-    // If a target is in returnedMap but !== object ref -> Modified (Remove old, Insert new)
     for (const t of targets) {
       const returnedNode = returnedMap.get(t.id);
       if (!returnedNode) {
@@ -115,7 +139,6 @@ export class PipelineOrchestrator {
       }
     }
 
-    // 2. Identify pure Additions (New synthetic nodes)
     for (const r of returnedNodes) {
       if (!targetSet.has(r.id)) {
         newNodes.push(r);
@@ -123,10 +146,9 @@ export class PipelineOrchestrator {
     }
 
     if (removedIds.size === 0 && newNodes.length === 0) {
-       return ship; // No changes
+       return ship;
     }
 
-    // Find the earliest index in the ship where a removal occurred so we know where to insert
     let earliestRemovalIdx = mutableShip.length;
     let i = 0;
     while (i < mutableShip.length) {
@@ -138,10 +160,7 @@ export class PipelineOrchestrator {
       }
     }
 
-    // Insert new nodes exactly where the old nodes were removed
     if (newNodes.length > 0) {
-      // NOTE: Metadata appending (who, what, when) should ideally happen here
-      // But for V1, processors still construct the new nodes with metadata inside.
       mutableShip.splice(earliestRemovalIdx, 0, ...newNodes);
     }
 
@@ -157,6 +176,9 @@ export class PipelineOrchestrator {
     let currentShip = ship;
     const pipelines = this.config.pipelines.filter((p) => p.triggers.includes(trigger));
     
+    // Freeze the inbox for this pipeline run
+    const inboxSnapshot = new InboxSnapshotImpl(this.env.inbox.getMessages());
+
     for (const pipeline of pipelines) {
       for (const procDef of pipeline.processors) {
         const processor = this.instantiatedProcessors.get(procDef.processorId);
@@ -168,18 +190,16 @@ export class PipelineOrchestrator {
             `Executing processor synchronously: ${procDef.processorId}`,
           );
 
-          // 1. Filter out protected nodes
           const allowedTargets = currentShip.filter(n => 
              triggerTargets.has(n.id) && 
              (!n.logicalParentId || !state.protectedLogicalIds.has(n.logicalParentId))
           );
           
           const returnedNodes = await processor.process({
-            ship: currentShip,
+            buffer: {} as any, // TODO: Implement ContextWorkingBuffer fully
             targets: allowedTargets,
             state,
-            buffer: {} as any, // TODO: Implement ContextWorkingBuffer fully
-            inbox: {} as any, // TODO: Implement ContextInbox fully
+            inbox: inboxSnapshot,
           });
           
           currentShip = this.applyProcessorDiff(currentShip, allowedTargets, returnedNodes);
@@ -192,6 +212,9 @@ export class PipelineOrchestrator {
         }
       }
     }
+
+    // Success! Drain consumed messages
+    this.env.inbox.drainConsumed(inboxSnapshot.getConsumedIds());
 
     return currentShip;
   }
@@ -209,6 +232,7 @@ export class PipelineOrchestrator {
     if (!ship || ship.length === 0) return;
 
     let currentShip = ship;
+    const inboxSnapshot = new InboxSnapshotImpl(this.env.inbox.getMessages());
 
     for (const procDef of pipeline.processors) {
       const processor = this.instantiatedProcessors.get(procDef.processorId);
@@ -220,18 +244,16 @@ export class PipelineOrchestrator {
           `Executing processor: ${procDef.processorId} (async)`,
         );
 
-        // 1. Filter out protected nodes
         const allowedTargets = currentShip.filter(n => 
             triggerTargets.has(n.id) && 
             (!n.logicalParentId || !state.protectedLogicalIds.has(n.logicalParentId))
         );
 
         const returnedNodes = await processor.process({
-            ship: currentShip,
+            buffer: {} as any,
             targets: allowedTargets,
             state,
-            buffer: {} as any, // TODO: Implement ContextWorkingBuffer fully
-            inbox: {} as any, // TODO: Implement ContextInbox fully
+            inbox: inboxSnapshot,
         });
 
         currentShip = this.applyProcessorDiff(currentShip, allowedTargets, returnedNodes);
@@ -244,5 +266,7 @@ export class PipelineOrchestrator {
         return; 
       }
     }
+
+    this.env.inbox.drainConsumed(inboxSnapshot.getConsumedIds());
   }
 }
