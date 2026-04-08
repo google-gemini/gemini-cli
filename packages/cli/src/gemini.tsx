@@ -319,7 +319,9 @@ export async function main() {
 
   const argv = await argvPromise;
 
-  const { sessionId, resumedSessionData } = await resolveSessionId(argv.resume);
+  const { sessionId: resolvedSessionId, resumedSessionData } =
+    await resolveSessionId(argv.resume);
+  const sessionId = argv.sessionId ?? resolvedSessionId;
 
   if (
     (argv.allowedTools && argv.allowedTools.length > 0) ||
