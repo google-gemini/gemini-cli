@@ -133,7 +133,6 @@ export class StateSnapshotProcessor implements ContextProcessor, ContextWorker {
     try {
        const snapshotText = await this.synthesizeSnapshot(nodesToSummarize);
        const newId = this.env.idGenerator.generateId();
-       const tokens = this.env.tokenCalculator.estimateTokensForString(snapshotText);
        const snapshotNode: Snapshot = {
             id: newId,
             logicalParentId: newId,

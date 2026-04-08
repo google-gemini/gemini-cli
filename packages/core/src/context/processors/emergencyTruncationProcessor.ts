@@ -39,11 +39,13 @@ export class EmergencyTruncationProcessor implements ContextProcessor {
 
   readonly id = 'EmergencyTruncationProcessor';
   readonly name = 'EmergencyTruncationProcessor';
+  private readonly env: ContextEnvironment;
   readonly options: EmergencyTruncationProcessorOptions;
   constructor(
-    _env: ContextEnvironment,
+    env: ContextEnvironment,
     options: EmergencyTruncationProcessorOptions,
   ) {
+    this.env = env;
     this.options = options;
   }
 

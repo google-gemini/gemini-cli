@@ -17,6 +17,7 @@ describe('ToolMaskingProcessor', () => {
     // 1 token = 1 char for simplicity
     // Fake token calculator says new tokens are 5
     env.tokenCalculator.estimateTokensForParts = vi.fn().mockReturnValue(5);
+    env.tokenCalculator.getTokenCost = vi.fn().mockReturnValue(150);
 
     const processor = ToolMaskingProcessor.create(env, {
       stringLengthThresholdTokens: 10,

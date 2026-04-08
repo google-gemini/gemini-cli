@@ -133,28 +133,28 @@ exports[`System Lifecycle Golden Tests > Scenario 1: Organic Growth with Huge To
   ],
   "tokenTrajectory": [
     {
-      "tokensAfterBackground": 12,
-      "tokensBeforeBackground": 12,
+      "tokensAfterBackground": 14,
+      "tokensBeforeBackground": 14,
       "turnIndex": 0,
     },
     {
-      "tokensAfterBackground": 25,
-      "tokensBeforeBackground": 25,
+      "tokensAfterBackground": 29,
+      "tokensBeforeBackground": 29,
       "turnIndex": 1,
     },
     {
-      "tokensAfterBackground": 10070,
-      "tokensBeforeBackground": 10070,
+      "tokensAfterBackground": 10137,
+      "tokensBeforeBackground": 10137,
       "turnIndex": 2,
     },
     {
-      "tokensAfterBackground": 13353,
-      "tokensBeforeBackground": 13353,
+      "tokensAfterBackground": 13422,
+      "tokensBeforeBackground": 13422,
       "turnIndex": 3,
     },
     {
-      "tokensAfterBackground": 13367,
-      "tokensBeforeBackground": 13367,
+      "tokensAfterBackground": 13438,
+      "tokensBeforeBackground": 13438,
       "turnIndex": 4,
     },
   ],

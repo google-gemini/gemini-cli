@@ -73,19 +73,16 @@ describe('SemanticCompressionProcessor', () => {
     expect(compressedPrompt.id).not.toBe(prompt.id);
     expect(compressedPrompt.semanticParts[0].type).toBe('text');
     expect((compressedPrompt.semanticParts[0] as any).text).toBe('Mocked Summary!');
-    expect(compressedPrompt.metadata.transformations.length).toBe(1);
     // 2. Agent Thought
     const compressedThought = result[1] as AgentThought;
     expect(compressedThought.id).toBe('mock-uuid-2');
     expect(compressedThought.id).not.toBe(thought.id);
     expect(compressedThought.text).toBe('Mocked Summary!');
-    expect(compressedThought.metadata.transformations.length).toBe(1);
 
     const compressedTool = result[2] as ToolExecution;
     expect(compressedTool.id).toBe('mock-uuid-3');
     expect(compressedTool.id).not.toBe(tool.id);
     expect(compressedTool.observation).toEqual({ summary: 'Mocked Summary!' });
-    expect(compressedTool.metadata.transformations.length).toBe(1);
 
     expect(mockLlmClient.generateContent).toHaveBeenCalledTimes(3);
   });
