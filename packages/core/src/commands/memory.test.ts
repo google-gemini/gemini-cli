@@ -417,6 +417,46 @@ describe('memory commands', () => {
         'A skill named "my-skill" already exists in global skills.',
       );
     });
+
+    it('should detect conflicts based on the normalized skill name', async () => {
+      await writeSkillMd(
+        'inbox-skill',
+        'gke:prs-troubleshooter',
+        'A test skill',
+      );
+      await fs.mkdir(
+        path.join(globalSkillsDir, 'existing-gke-prs-troubleshooter'),
+        { recursive: true },
+      );
+      await fs.writeFile(
+        path.join(
+          globalSkillsDir,
+          'existing-gke-prs-troubleshooter',
+          'SKILL.md',
+        ),
+        [
+          '---',
+          'name: gke-prs-troubleshooter',
+          'description: Existing skill',
+          '---',
+          'Existing body content',
+          '',
+        ].join('\n'),
+      );
+
+      const result = await moveInboxSkill(moveConfig, 'inbox-skill', 'global');
+
+      expect(result.success).toBe(false);
+      expect(result.message).toBe(
+        'A skill named "gke-prs-troubleshooter" already exists in global skills.',
+      );
+      await expect(
+        fs.access(path.join(skillsDir, 'inbox-skill', 'SKILL.md')),
+      ).resolves.toBeUndefined();
+      await expect(
+        fs.access(path.join(globalSkillsDir, 'inbox-skill')),
+      ).rejects.toThrow();
+    });
   });
 
   describe('dismissInboxSkill', () => {

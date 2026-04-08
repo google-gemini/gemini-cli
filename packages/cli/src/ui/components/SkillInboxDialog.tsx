@@ -18,6 +18,7 @@ import {
   type Config,
   type InboxSkill,
   type InboxSkillDestination,
+  getErrorMessage,
   listInboxSkills,
   moveInboxSkill,
   dismissInboxSkill,
@@ -74,6 +75,7 @@ export const SkillInboxDialog: React.FC<SkillInboxDialogProps> = ({
   onReloadSkills,
 }) => {
   const keyMatchers = useKeyMatchers();
+  const isTrustedFolder = config.isTrustedFolder();
   const [phase, setPhase] = useState<Phase>('list');
   const [skills, setSkills] = useState<InboxSkill[]>([]);
   const [loading, setLoading] = useState(true);
@@ -116,11 +118,25 @@ export const SkillInboxDialog: React.FC<SkillInboxDialogProps> = ({
 
   const destinationItems: Array<SelectionListItem<DestinationChoice>> = useMemo(
     () =>
-      DESTINATION_CHOICES.map((choice) => ({
-        key: choice.destination,
-        value: choice,
-      })),
-    [],
+      DESTINATION_CHOICES.map((choice) => {
+        if (choice.destination === 'project' && !isTrustedFolder) {
+          return {
+            key: choice.destination,
+            value: {
+              ...choice,
+              description:
+                '.gemini/skills — unavailable until this workspace is trusted',
+            },
+            disabled: true,
+          };
+        }
+
+        return {
+          key: choice.destination,
+          value: choice,
+        };
+      }),
+    [isTrustedFolder],
   );
 
   const handleSelectSkill = useCallback((skill: InboxSkill) => {
@@ -130,35 +146,68 @@ export const SkillInboxDialog: React.FC<SkillInboxDialogProps> = ({
   }, []);
 
   const handleSelectDestination = useCallback(
-    async (choice: DestinationChoice) => {
+    (choice: DestinationChoice) => {
       if (!selectedSkill) return;
 
-      let result: { success: boolean; message: string };
-      if (choice.destination === 'dismiss') {
-        result = await dismissInboxSkill(config, selectedSkill.dirName);
-      } else {
-        result = await moveInboxSkill(
-          config,
-          selectedSkill.dirName,
-          choice.destination,
-        );
+      if (choice.destination === 'project' && !config.isTrustedFolder()) {
+        setFeedback({
+          text: 'Project skills are unavailable until this workspace is trusted.',
+          isError: true,
+        });
+        return;
       }
 
-      setFeedback({ text: result.message, isError: !result.success });
+      setFeedback(null);
 
-      if (result.success) {
-        // Remove the skill from the local list
-        setSkills((prev) =>
-          prev.filter((s) => s.dirName !== selectedSkill.dirName),
-        );
-        setSelectedSkill(null);
-        setPhase('list');
+      void (async () => {
+        try {
+          let result: { success: boolean; message: string };
+          if (choice.destination === 'dismiss') {
+            result = await dismissInboxSkill(config, selectedSkill.dirName);
+          } else {
+            result = await moveInboxSkill(
+              config,
+              selectedSkill.dirName,
+              choice.destination,
+            );
+          }
 
-        // Reload skills so the moved skill is discoverable
-        if (choice.destination !== 'dismiss') {
-          await onReloadSkills();
+          setFeedback({ text: result.message, isError: !result.success });
+
+          if (!result.success) {
+            return;
+          }
+
+          // Remove the skill from the local list.
+          setSkills((prev) =>
+            prev.filter((skill) => skill.dirName !== selectedSkill.dirName),
+          );
+          setSelectedSkill(null);
+          setPhase('list');
+
+          if (choice.destination === 'dismiss') {
+            return;
+          }
+
+          try {
+            await onReloadSkills();
+          } catch (error) {
+            setFeedback({
+              text: `${result.message} Failed to reload skills: ${getErrorMessage(error)}`,
+              isError: true,
+            });
+          }
+        } catch (error) {
+          const operation =
+            choice.destination === 'dismiss'
+              ? 'dismiss skill'
+              : 'install skill';
+          setFeedback({
+            text: `Failed to ${operation}: ${getErrorMessage(error)}`,
+            isError: true,
+          });
         }
-      }
+      })();
     },
     [config, selectedSkill, onReloadSkills],
   );

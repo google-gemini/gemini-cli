@@ -9,7 +9,7 @@ import * as path from 'node:path';
 import type { Config } from '../config/config.js';
 import { Storage } from '../config/storage.js';
 import { flattenMemory } from '../config/memory.js';
-import { loadSkillFromFile } from '../skills/skillLoader.js';
+import { loadSkillFromFile, loadSkillsFromDir } from '../skills/skillLoader.js';
 import { readExtractionState } from '../services/memoryService.js';
 import { refreshServerHierarchicalMemory } from '../utils/memoryDiscovery.js';
 import type { MessageActionReturn, ToolActionReturn } from './types.js';
@@ -166,6 +166,14 @@ export async function listInboxSkills(config: Config): Promise<InboxSkill[]> {
 
 export type InboxSkillDestination = 'global' | 'project';
 
+async function getSkillNameForConflictCheck(
+  skillDir: string,
+  fallbackName: string,
+): Promise<string> {
+  const skill = await loadSkillFromFile(path.join(skillDir, 'SKILL.md'));
+  return skill?.name ?? fallbackName;
+}
+
 /**
  * Copies an inbox skill to the target skills directory.
  */
@@ -191,15 +199,24 @@ export async function moveInboxSkill(
       ? Storage.getUserSkillsDir()
       : config.storage.getProjectSkillsDir();
   const targetPath = path.join(targetBase, dirName);
+  const skillName = await getSkillNameForConflictCheck(sourcePath, dirName);
 
   try {
     await fs.access(targetPath);
     return {
       success: false,
-      message: `A skill named "${dirName}" already exists in ${destination} skills.`,
+      message: `A skill named "${skillName}" already exists in ${destination} skills.`,
     };
   } catch {
     // Target doesn't exist — good
+  }
+
+  const existingTargetSkills = await loadSkillsFromDir(targetBase);
+  if (existingTargetSkills.some((skill) => skill.name === skillName)) {
+    return {
+      success: false,
+      message: `A skill named "${skillName}" already exists in ${destination} skills.`,
+    };
   }
 
   await fs.mkdir(targetBase, { recursive: true });
