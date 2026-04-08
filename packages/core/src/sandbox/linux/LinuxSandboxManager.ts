@@ -5,8 +5,7 @@
  */
 
 import fs from 'node:fs';
-import { debugLogger } from '../../utils/debugLogger.js';
-import { join, dirname, normalize } from 'node:path';
+import { join, dirname } from 'node:path';
 import os from 'node:os';
 import {
   type SandboxManager,
@@ -15,23 +14,31 @@ import {
   type SandboxedCommand,
   type SandboxPermissions,
   GOVERNANCE_FILES,
-  sanitizePaths,
+  type ParsedSandboxDenial,
+  resolveSandboxPaths,
 } from '../../services/sandboxManager.js';
+import type { ShellExecutionResult } from '../../services/shellExecutionService.js';
 import {
   sanitizeEnvironment,
   getSecureSanitizationConfig,
 } from '../../services/environmentSanitization.js';
-import { type SandboxPolicyManager } from '../../policy/sandboxPolicyManager.js';
 import {
   isStrictlyApproved,
   verifySandboxOverrides,
   getCommandName,
 } from '../utils/commandUtils.js';
+import { assertValidPathString } from '../../utils/paths.js';
 import {
-  tryRealpath,
-  resolveGitWorktreePaths,
-  isErrnoException,
-} from '../utils/fsUtils.js';
+  isKnownSafeCommand,
+  isDangerousCommand,
+} from '../utils/commandSafety.js';
+import {
+  parsePosixSandboxDenials,
+  createSandboxDenialCache,
+  type SandboxDenialCache,
+} from '../utils/sandboxDenialUtils.js';
+import { handleReadWriteCommands } from '../utils/sandboxReadWriteUtils.js';
+import { buildBwrapArgs } from './bwrapArgsBuilder.js';
 
 let cachedBpfPath: string | undefined;
 
@@ -85,9 +92,20 @@ function getSeccompBpfPath(): string {
     buf.writeUInt32LE(inst.k, offset + 4);
   }
 
-  const bpfPath = join(os.tmpdir(), `gemini-cli-seccomp-${process.pid}.bpf`);
+  const tempDir = fs.mkdtempSync(join(os.tmpdir(), 'gemini-cli-seccomp-'));
+  const bpfPath = join(tempDir, 'seccomp.bpf');
   fs.writeFileSync(bpfPath, buf);
   cachedBpfPath = bpfPath;
+
+  // Cleanup on exit
+  process.on('exit', () => {
+    try {
+      fs.rmSync(tempDir, { recursive: true, force: true });
+    } catch {
+      // Ignore errors
+    }
+  });
+
   return bpfPath;
 }
 
@@ -95,6 +113,7 @@ function getSeccompBpfPath(): string {
  * Ensures a file or directory exists.
  */
 function touch(filePath: string, isDirectory: boolean) {
+  assertValidPathString(filePath);
   try {
     // If it exists (even as a broken symlink), do nothing
     if (fs.lstatSync(filePath)) return;
@@ -110,27 +129,15 @@ function touch(filePath: string, isDirectory: boolean) {
   }
 }
 
-import {
-  isKnownSafeCommand,
-  isDangerousCommand,
-} from '../utils/commandSafety.js';
-
 /**
  * A SandboxManager implementation for Linux that uses Bubblewrap (bwrap).
  */
 
-export interface LinuxSandboxOptions extends GlobalSandboxOptions {
-  modeConfig?: {
-    readonly?: boolean;
-    network?: boolean;
-    approvedTools?: string[];
-    allowOverrides?: boolean;
-  };
-  policyManager?: SandboxPolicyManager;
-}
-
 export class LinuxSandboxManager implements SandboxManager {
-  constructor(private readonly options: LinuxSandboxOptions) {}
+  private static maskFilePath: string | undefined;
+  private readonly denialCache: SandboxDenialCache = createSandboxDenialCache();
+
+  constructor(private readonly options: GlobalSandboxOptions) {}
 
   isKnownSafeCommand(args: string[]): boolean {
     return isKnownSafeCommand(args);
@@ -140,19 +147,72 @@ export class LinuxSandboxManager implements SandboxManager {
     return isDangerousCommand(args);
   }
 
+  parseDenials(result: ShellExecutionResult): ParsedSandboxDenial | undefined {
+    return parsePosixSandboxDenials(result, this.denialCache);
+  }
+
+  getWorkspace(): string {
+    return this.options.workspace;
+  }
+
+  getOptions(): GlobalSandboxOptions {
+    return this.options;
+  }
+
+  private getMaskFilePath(): string {
+    if (
+      LinuxSandboxManager.maskFilePath &&
+      fs.existsSync(LinuxSandboxManager.maskFilePath)
+    ) {
+      return LinuxSandboxManager.maskFilePath;
+    }
+    const tempDir = fs.mkdtempSync(join(os.tmpdir(), 'gemini-cli-mask-file-'));
+    const maskPath = join(tempDir, 'mask');
+    fs.writeFileSync(maskPath, '');
+    fs.chmodSync(maskPath, 0);
+    LinuxSandboxManager.maskFilePath = maskPath;
+
+    // Cleanup on exit
+    process.on('exit', () => {
+      try {
+        fs.rmSync(tempDir, { recursive: true, force: true });
+      } catch {
+        // Ignore errors
+      }
+    });
+
+    return maskPath;
+  }
+
   async prepareCommand(req: SandboxRequest): Promise<SandboxedCommand> {
     const isReadonlyMode = this.options.modeConfig?.readonly ?? true;
     const allowOverrides = this.options.modeConfig?.allowOverrides ?? true;
 
     verifySandboxOverrides(allowOverrides, req.policy);
 
-    const commandName = await getCommandName(req);
+    let command = req.command;
+    let args = req.args;
+
+    // Translate virtual commands for sandboxed file system access
+    if (command === '__read') {
+      command = 'cat';
+    } else if (command === '__write') {
+      command = 'sh';
+      args = ['-c', 'cat > "$1"', '_', ...args];
+    }
+
+    const commandName = await getCommandName({ ...req, command, args });
     const isApproved = allowOverrides
-      ? await isStrictlyApproved(req, this.options.modeConfig?.approvedTools)
+      ? await isStrictlyApproved(
+          { ...req, command, args },
+          this.options.modeConfig?.approvedTools,
+        )
       : false;
-    const workspaceWrite = !isReadonlyMode || isApproved;
+    const isYolo = this.options.modeConfig?.yolo ?? false;
+    const workspaceWrite = !isReadonlyMode || isApproved || isYolo;
+
     const networkAccess =
-      this.options.modeConfig?.network ?? req.policy?.networkAccess ?? false;
+      this.options.modeConfig?.network || req.policy?.networkAccess || isYolo;
 
     const persistentPermissions = allowOverrides
       ? this.options.policyManager?.getCommandPermissions(commandName)
@@ -176,160 +236,53 @@ export class LinuxSandboxManager implements SandboxManager {
         false,
     };
 
+    const { command: finalCommand, args: finalArgs } = handleReadWriteCommands(
+      req,
+      mergedAdditional,
+      this.options.workspace,
+      req.policy?.allowedPaths,
+    );
+
     const sanitizationConfig = getSecureSanitizationConfig(
       req.policy?.sanitizationConfig,
     );
 
     const sanitizedEnv = sanitizeEnvironment(req.env, sanitizationConfig);
 
-    const bwrapArgs: string[] = [
-      '--unshare-all',
-      '--new-session', // Isolate session
-      '--die-with-parent', // Prevent orphaned runaway processes
-    ];
-
-    if (mergedAdditional.network) {
-      bwrapArgs.push('--share-net');
-    }
-
-    bwrapArgs.push(
-      '--ro-bind',
-      '/',
-      '/',
-      '--dev', // Creates a safe, minimal /dev (replaces --dev-bind)
-      '/dev',
-      '--proc', // Creates a fresh procfs for the unshared PID namespace
-      '/proc',
-      '--tmpfs', // Provides an isolated, writable /tmp directory
-      '/tmp',
-    );
-
-    const workspacePath = tryRealpath(this.options.workspace);
-
-    const bindFlag = workspaceWrite ? '--bind-try' : '--ro-bind-try';
-
-    if (workspaceWrite) {
-      bwrapArgs.push(
-        '--bind-try',
-        this.options.workspace,
-        this.options.workspace,
-      );
-      if (workspacePath !== this.options.workspace) {
-        bwrapArgs.push('--bind-try', workspacePath, workspacePath);
-      }
-    } else {
-      bwrapArgs.push(
-        '--ro-bind-try',
-        this.options.workspace,
-        this.options.workspace,
-      );
-      if (workspacePath !== this.options.workspace) {
-        bwrapArgs.push('--ro-bind-try', workspacePath, workspacePath);
-      }
-    }
-
-    const { worktreeGitDir, mainGitDir } =
-      resolveGitWorktreePaths(workspacePath);
-    if (worktreeGitDir) {
-      bwrapArgs.push(bindFlag, worktreeGitDir, worktreeGitDir);
-    }
-    if (mainGitDir) {
-      bwrapArgs.push(bindFlag, mainGitDir, mainGitDir);
-    }
-
-    const allowedPaths = sanitizePaths(req.policy?.allowedPaths) || [];
-    const normalizedWorkspace = normalize(workspacePath).replace(/\/$/, '');
-    for (const allowedPath of allowedPaths) {
-      const resolved = tryRealpath(allowedPath);
-      if (!fs.existsSync(resolved)) continue;
-      const normalizedAllowedPath = normalize(resolved).replace(/\/$/, '');
-      if (normalizedAllowedPath !== normalizedWorkspace) {
-        if (
-          !workspaceWrite &&
-          normalizedAllowedPath.startsWith(normalizedWorkspace + '/')
-        ) {
-          bwrapArgs.push('--ro-bind-try', resolved, resolved);
-        } else {
-          bwrapArgs.push('--bind-try', resolved, resolved);
-        }
-      }
-    }
-
-    const additionalReads =
-      sanitizePaths(mergedAdditional.fileSystem?.read) || [];
-    for (const p of additionalReads) {
-      try {
-        const safeResolvedPath = tryRealpath(p);
-        bwrapArgs.push('--ro-bind-try', safeResolvedPath, safeResolvedPath);
-      } catch (e: unknown) {
-        debugLogger.warn(e instanceof Error ? e.message : String(e));
-      }
-    }
-
-    const additionalWrites =
-      sanitizePaths(mergedAdditional.fileSystem?.write) || [];
-    for (const p of additionalWrites) {
-      try {
-        const safeResolvedPath = tryRealpath(p);
-        bwrapArgs.push('--bind-try', safeResolvedPath, safeResolvedPath);
-      } catch (e: unknown) {
-        debugLogger.warn(e instanceof Error ? e.message : String(e));
-      }
-    }
+    const { allowed: allowedPaths, forbidden: forbiddenPaths } =
+      await resolveSandboxPaths(this.options, req);
 
     for (const file of GOVERNANCE_FILES) {
       const filePath = join(this.options.workspace, file.path);
       touch(filePath, file.isDirectory);
-      const realPath = tryRealpath(filePath);
-      bwrapArgs.push('--ro-bind', filePath, filePath);
-      if (realPath !== filePath) {
-        bwrapArgs.push('--ro-bind', realPath, realPath);
-      }
     }
 
-    const forbiddenPaths = sanitizePaths(req.policy?.forbiddenPaths) || [];
-    for (const p of forbiddenPaths) {
-      let resolved: string;
-      try {
-        resolved = tryRealpath(p); // Forbidden paths should still resolve to block the real path
-        if (!fs.existsSync(resolved)) continue;
-      } catch (e: unknown) {
-        debugLogger.warn(
-          `Failed to resolve forbidden path ${p}: ${e instanceof Error ? e.message : String(e)}`,
-        );
-        bwrapArgs.push('--ro-bind', '/dev/null', p);
-        continue;
-      }
-      try {
-        const stat = fs.statSync(resolved);
-        if (stat.isDirectory()) {
-          bwrapArgs.push('--tmpfs', resolved, '--remount-ro', resolved);
-        } else {
-          bwrapArgs.push('--ro-bind', '/dev/null', resolved);
-        }
-      } catch (e: unknown) {
-        if (isErrnoException(e) && e.code === 'ENOENT') {
-          bwrapArgs.push('--symlink', '/dev/null', resolved);
-        } else {
-          debugLogger.warn(
-            `Failed to stat forbidden path ${resolved}: ${e instanceof Error ? e.message : String(e)}`,
-          );
-          bwrapArgs.push('--ro-bind', '/dev/null', resolved);
-        }
-      }
-    }
+    const bwrapArgs = await buildBwrapArgs({
+      workspace: this.options.workspace,
+      workspaceWrite,
+      networkAccess,
+      allowedPaths,
+      forbiddenPaths,
+      additionalPermissions: mergedAdditional,
+      includeDirectories: this.options.includeDirectories || [],
+      maskFilePath: this.getMaskFilePath(),
+      isWriteCommand: req.command === '__write',
+    });
 
     const bpfPath = getSeccompBpfPath();
-
     bwrapArgs.push('--seccomp', '9');
-    bwrapArgs.push('--', req.command, ...req.args);
+
+    const argsPath = this.writeArgsToTempFile(bwrapArgs);
 
     const shArgs = [
       '-c',
-      'bpf_path="$1"; shift; exec bwrap "$@" 9< "$bpf_path"',
+      'bpf_path="$1"; args_path="$2"; shift 2; exec bwrap --args 8 "$@" 8< "$args_path" 9< "$bpf_path"',
       '_',
       bpfPath,
-      ...bwrapArgs,
+      argsPath,
+      '--',
+      finalCommand,
+      ...finalArgs,
     ];
 
     return {
@@ -337,6 +290,23 @@ export class LinuxSandboxManager implements SandboxManager {
       args: shArgs,
       env: sanitizedEnv,
       cwd: req.cwd,
+      cleanup: () => {
+        try {
+          fs.unlinkSync(argsPath);
+        } catch {
+          // Ignore cleanup errors
+        }
+      },
     };
+  }
+
+  private writeArgsToTempFile(args: string[]): string {
+    const tempFile = join(
+      os.tmpdir(),
+      `gemini-cli-bwrap-args-${Date.now()}-${Math.random().toString(36).slice(2)}.args`,
+    );
+    const content = Buffer.from(args.join('\0') + '\0');
+    fs.writeFileSync(tempFile, content, { mode: 0o600 });
+    return tempFile;
   }
 }
