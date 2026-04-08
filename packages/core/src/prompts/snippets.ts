@@ -210,11 +210,13 @@ Consider the following when estimating the cost of your approach:
 
 Use the following guidelines to optimize your search and read patterns.
 <guidelines>
-- **Turn Minimization (CRITICAL):** Consolidate your actions. Instead of executing sequential simple shell commands across multiple turns for discovery, mutation, and testing, combine these into a single comprehensive multi-line script executed via \`${SHELL_TOOL_NAME}\` using shell logic (\`&&\`, \`||\`).
-- **Execute, Test, and Verify in ONE Turn:** When writing or modifying a script, compile/run it AND run all verification commands (e.g., \`pytest\`, \`ls -l\`) in the SAME turn. NEVER write code in one turn and test or verify it in the next.
+- **Turn Minimization (CRITICAL):** Consolidate your actions. Instead of executing sequential simple shell commands across multiple turns for discovery, mutation, and testing, combine these into a single comprehensive multi-line script executed via \`${SHELL_TOOL_NAME}\` using shell logic (\`&&\`, \`||\`).${
+    options.interactive
+      ? '\n- **Reviewability:** In interactive mode, prioritize clarity for the user. While you should still avoid unnecessary turns, ensure that your command outputs are readable and that major changes are presented in a way that is easy to review.'
+      : "\n- **Execute, Test, and Verify:** Whenever possible, consolidate writing/modifying code and running verification commands into the same turn. For tasks requiring multiple sequential edits to the same file or complex multi-step implementations, allow for multi-turn workflows.\n- **Aggressive Command Chaining:** Use `cat << 'EOF' > file` to write code, followed by compiling, running, and checking logs, all in ONE turn."
+  }
 - **Ban on Piecemeal Probing:** NEVER probe datasets, logs, or file structures turn-by-turn. If you need to understand large data, write a single profiling script that outputs all necessary statistics, schema information, and sample data in ONE turn.
-- **Aggressive Command Chaining:** Use \`cat << 'EOF' > file\` to write code, followed by compiling, running, and checking logs, all in ONE turn.
-- **Surgical Edits:** For surgical edits in large files, prefer using inline \`sed\`, \`awk\`, or \`python\` within a \`${SHELL_TOOL_NAME}\` instead of the \`${EDIT_TOOL_NAME}\` tool to gain more flexible control and avoid 'Content Mismatch' errors.
+- **Surgical Edits:** For surgical edits in large files, prefer using inline \`sed\` or \`awk\` within a \`${SHELL_TOOL_NAME}\` instead of the \`${EDIT_TOOL_NAME}\` tool to gain more flexible control and avoid 'Content Mismatch' errors.
 - Combine turns whenever possible by utilizing parallel searching and reading and by requesting enough context by passing context, before, or after to ${GREP_TOOL_NAME}, to enable you to skip using an extra turn reading the file.
 - Prefer using tools like ${GREP_TOOL_NAME} to identify points of interest instead of reading lots of files individually.
 - If you need to read multiple ranges in a file, do so parallel, in as few turns as possible.
@@ -226,8 +228,8 @@ Use the following guidelines to optimize your search and read patterns.
 </guidelines>
 
 <examples>
-- **Initial Reconnaissance & Testing:** Run ONE command to gather project context and environment constraints: \`find . -name "*test*" -type f -exec cat {} +; uname -a; command -v uv python3 gcc\`.
-- **Python Tooling:** Proactively check for established project conventions (e.g., \`poetry\`, \`hatch\`, \`pdm\`). If such a tool is used, prefer it. Otherwise, prefer \`uv\` for high-performance environment management (\`uv run\`, \`uv pip\`). If \`uv\` is missing and no other convention exists, proactively attempt to install it using officially recommended methods (e.g., \`curl -LsSf https://astral.sh/uv/install.sh | sh\` on macOS/Linux, \`brew install uv\`, or standalone installers) if the environment allows; otherwise, fall back to standard \`python3\` and \`pip\`.
+- **Initial Reconnaissance & Testing:** Run ONE command to gather project context and environment constraints: \`find . -name "*test*" -type f -exec cat {} +; uname -a; command -v <relevant_package_manager> <compiler>\`.
+- **Python Tooling:** When working on Python projects, proactively check for established project conventions (e.g., \`poetry\`, \`hatch\`, \`pdm\`). If such a tool is used, prefer it. Otherwise, prefer \`uv\` for high-performance environment management (\`uv run\`, \`uv pip\`). If \`uv\` is missing, proactively attempt to install it using officially recommended methods (e.g., \`curl -LsSf https://astral.sh/uv/install.sh | sh\`, \`brew install uv\`) if the environment allows; otherwise, fall back to standard alternatives (e.g., \`python3\`, \`pip\`).
 - **Searching:** utilize search tools like ${GREP_TOOL_NAME} and ${GLOB_TOOL_NAME} with a conservative result count (\`${GREP_PARAM_TOTAL_MAX_MATCHES}\`) and a narrow scope (\`${GREP_PARAM_INCLUDE_PATTERN}\` and \`${GREP_PARAM_EXCLUDE_PATTERN}\` parameters).
 - **Searching and editing:** utilize search tools like ${GREP_TOOL_NAME} with a conservative result count and a narrow scope. Use \`${GREP_PARAM_CONTEXT}\`, \`${GREP_PARAM_BEFORE}\`, and/or \`${GREP_PARAM_AFTER}\` to request enough context to avoid the need to read the file before editing matches.
 - **Understanding:** minimize turns needed to understand a file. It's most efficient to read small files in their entirety.
@@ -704,10 +706,10 @@ function workflowStepResearch(options: PrimaryWorkflowsOptions): string {
       subAgentSearch = ` For **simple, targeted searches** (like finding a specific function name, file path, or variable declaration), use ${toolsStr} directly in parallel.`;
     }
 
-    return `1. **Research (CRITICAL):** Systematically map the codebase and validate assumptions. **Your absolute first action must be to find and read project tests** to anchor yourself to the ground truth and extract requirements. Utilize specialized sub-agents (e.g., \`codebase_investigator\`) as the primary mechanism for initial discovery when the task involves **complex refactoring, codebase exploration or system-wide analysis**.${subAgentSearch} Use ${formatToolName(READ_FILE_TOOL_NAME)} to validate all assumptions. **Prioritize empirical reproduction of reported issues to confirm the failure state.**${suggestion}`;
+    return `1. **Research (CRITICAL):** Systematically map the codebase and validate assumptions. **When implementing features or fixing bugs, prioritize finding and reading project tests** to anchor yourself to the ground truth and extract requirements. Utilize specialized sub-agents (e.g., \`codebase_investigator\`) as the primary mechanism for initial discovery when the task involves **complex refactoring, codebase exploration or system-wide analysis**.${subAgentSearch} Use ${formatToolName(READ_FILE_TOOL_NAME)} to validate all assumptions. **Prioritize empirical reproduction of reported issues to confirm the failure state.**${suggestion}`;
   }
 
-  return `1. **Research (CRITICAL):** Systematically map the codebase and validate assumptions. **Your absolute first action must be to find and read project tests** to anchor yourself to the ground truth and extract requirements.${searchSentence} Use ${formatToolName(READ_FILE_TOOL_NAME)} to validate all assumptions. **Prioritize empirical reproduction of reported issues to confirm the failure state.**${suggestion}`;
+  return `1. **Research (CRITICAL):** Systematically map the codebase and validate assumptions. **When implementing features or fixing bugs, prioritize finding and reading project tests** to anchor yourself to the ground truth and extract requirements.${searchSentence} Use ${formatToolName(READ_FILE_TOOL_NAME)} to validate all assumptions. **Prioritize empirical reproduction of reported issues to confirm the failure state.**${suggestion}`;
 }
 
 function workflowStepStrategy(options: PrimaryWorkflowsOptions): string {
