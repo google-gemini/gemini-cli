@@ -4,6 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+import React from 'react';
 import {
   addMemory,
   listMemoryFiles,
@@ -13,9 +14,11 @@ import {
 import { MessageType } from '../types.js';
 import {
   CommandKind,
+  type OpenCustomDialogActionReturn,
   type SlashCommand,
   type SlashCommandActionReturn,
 } from './types.js';
+import { SkillInboxDialog } from '../components/SkillInboxDialog.js';
 
 export const memoryCommand: SlashCommand = {
   name: 'memory',
@@ -122,6 +125,46 @@ export const memoryCommand: SlashCommand = {
           },
           Date.now(),
         );
+      },
+    },
+    {
+      name: 'inbox',
+      description:
+        'Review skills extracted from past sessions and move them to global or project skills',
+      kind: CommandKind.BUILT_IN,
+      autoExecute: true,
+      action: (
+        context,
+      ): OpenCustomDialogActionReturn | SlashCommandActionReturn | void => {
+        const config = context.services.agentContext?.config;
+        if (!config) {
+          return {
+            type: 'message',
+            messageType: 'error',
+            content: 'Config not loaded.',
+          };
+        }
+
+        if (!config.isMemoryManagerEnabled()) {
+          return {
+            type: 'message',
+            messageType: 'info',
+            content:
+              'The memory inbox requires the experimental memory manager. Enable it with: experimental.memoryManager = true in settings.',
+          };
+        }
+
+        return {
+          type: 'custom_dialog',
+          component: React.createElement(SkillInboxDialog, {
+            config,
+            onClose: () => context.ui.removeComponent(),
+            onReloadSkills: async () => {
+              await config.reloadSkills();
+              context.ui.reloadCommands();
+            },
+          }),
+        };
       },
     },
   ],
