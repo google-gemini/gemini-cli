@@ -20,11 +20,13 @@ import http from 'node:http';
 
 /**
  * Cross-platform command wrappers using Node.js inline scripts.
- * Avoids shell-specific quirks and initialization hangs under restricted sandbox tokens.
+ * Ensures consistent execution behavior and reliable exit codes across
+ * different host operating systems and restricted sandbox environments.
  */
 const Platform = {
   isWindows: os.platform() === 'win32',
 
+  /** Returns a command to create an empty file. */
   touch(filePath: string) {
     return {
       command: process.execPath,
@@ -35,6 +37,7 @@ const Platform = {
     };
   },
 
+  /** Returns a command to read a file's content. */
   cat(filePath: string) {
     return {
       command: process.execPath,
@@ -45,6 +48,7 @@ const Platform = {
     };
   },
 
+  /** Returns a command to echo a string. */
   echo(text: string) {
     return {
       command: process.execPath,
@@ -52,6 +56,7 @@ const Platform = {
     };
   },
 
+  /** Returns a command to perform a network request. */
   curl(url: string) {
     return {
       command: process.execPath,
@@ -62,11 +67,13 @@ const Platform = {
     };
   },
 
+  /** Returns a command that checks if the current terminal is interactive. */
   isPty() {
     // ShellExecutionService.execute expects a raw shell string
     return `"${process.execPath}" -e "console.log(process.stdout.isTTY ? 'True' : 'False')"`;
   },
 
+  /** Returns a path that is strictly outside the workspace and likely blocked. */
   getExternalBlockedPath() {
     return this.isWindows
       ? 'C:\\Windows\\System32\\drivers\\etc\\hosts'
@@ -303,8 +310,8 @@ describe('SandboxManager Integration', () => {
       const nestedDir = path.join(forbiddenDir, 'nested');
       const nestedFile = path.join(nestedDir, 'test.txt');
 
-      fs.mkdirSync(nestedDir, { recursive: true });
-      fs.writeFileSync(nestedFile, 'secret');
+      // Create the base forbidden directory first so the manager can apply rules to it
+      fs.mkdirSync(forbiddenDir);
 
       const osManager = createSandboxManager(
         { enabled: true },
@@ -313,6 +320,21 @@ describe('SandboxManager Integration', () => {
           forbiddenPaths: async () => [forbiddenDir],
         },
       );
+
+      // Execute a dummy command to force the manager to initialize its restrictions.
+      // On some platforms, sandbox boundaries are dynamically propagated through
+      // directory inheritance rules, which requires the parent directory to exist first.
+      const dummyCommand = await osManager.prepareCommand({
+        ...Platform.echo('init'),
+        cwd: tempWorkspace,
+        env: process.env,
+      });
+      await runCommand(dummyCommand);
+
+      // Now create the nested items. They will inherit the sandbox restrictions from their parent.
+      fs.mkdirSync(nestedDir, { recursive: true });
+      fs.writeFileSync(nestedFile, 'secret');
+
       const { command, args } = Platform.cat(nestedFile);
 
       const sandboxed = await osManager.prepareCommand({
