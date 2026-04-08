@@ -25,7 +25,6 @@ import type { Episode } from './ir/types.js';
 import type { SidecarConfig } from './sidecar/types.js';
 import { ProcessorRegistry } from './sidecar/registry.js';
 import { registerBuiltInProcessors } from './sidecar/builtins.js';
-import { IrMapper } from './ir/mapper.js';
 import { createMockContextConfig, setupContextComponentTest } from './testing/contextTestUtils.js';
 
 expect.addSnapshotSerializer({
@@ -141,7 +140,7 @@ describe('ContextManager Golden Tests', () => {
     const history = createLargeHistory();
     (
       contextManager as unknown as { pristineEpisodes: Episode[] }
-    ).pristineEpisodes = IrMapper.toIr(history, new ContextTokenCalculator(4));
+    ).pristineEpisodes = (contextManager as any).env.irMapper.toIr(history, new ContextTokenCalculator(4));
     const result = await contextManager.projectCompressedHistory();
     expect(result).toMatchSnapshot();
   });

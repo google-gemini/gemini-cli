@@ -26,4 +26,6 @@ export interface ContextEnvironment {
   readonly idGenerator: IIdGenerator;
   readonly eventBus: ContextEventBus;
   readonly inbox: LiveInbox;
+  readonly behaviorRegistry: import('../ir/behaviorRegistry.js').IrNodeBehaviorRegistry;
+  readonly irMapper: import('../ir/mapper.js').IrMapper;
 }

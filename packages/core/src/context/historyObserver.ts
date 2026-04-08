@@ -28,6 +28,7 @@ export class HistoryObserver {
     private readonly eventBus: ContextEventBus,
     private readonly tracer: ContextTracer,
     private readonly tokenCalculator: ContextTokenCalculator,
+    private readonly irMapper: IrMapper,
   ) {}
 
   start() {
@@ -40,7 +41,7 @@ export class HistoryObserver {
         // Rebuild the pristine IR graph from the full source history on every change.
         // Wait, toIr still returns an Episode[].
         // We actually need to map the Episode[] to a flat ConcreteNode[] here to form the 'ship'.
-        const pristineEpisodes = IrMapper.toIr(
+        const pristineEpisodes = this.irMapper.toIr(
           this.chatHistory.get(),
           this.tokenCalculator,
         );

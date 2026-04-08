@@ -141,10 +141,11 @@ export class ContextManager {
     }
 
     this.historyObserver = new HistoryObserver(
-      chatHistory,
-      this.eventBus,
+      this.chatHistory,
+      this.env.eventBus,
       this.tracer,
       this.env.tokenCalculator,
+      this.env.irMapper,
     );
     this.historyObserver.start();
   }

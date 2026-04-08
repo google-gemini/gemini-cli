@@ -5,7 +5,6 @@
  */
 
 import type { Content } from '@google/genai';
-import { IrMapper } from './mapper.js';
 import type { ConcreteNode } from './types.js';
 import { debugLogger } from '../../utils/debugLogger.js';
 import type {
@@ -29,7 +28,7 @@ export class IrProjector {
     protectedIds: Set<string>,
   ): Promise<Content[]> {
     if (!sidecar.budget) {
-      const contents = IrMapper.fromIr(ship);
+      const contents = env.irMapper.fromIr(ship);
       tracer.logEvent('IrProjector', 'Projected Context to LLM (No Budget)', {
         projectedContext: contents,
       });
@@ -54,7 +53,7 @@ export class IrProjector {
         'IrProjector',
         `View is within maxTokens (${currentTokens} <= ${maxTokens}). Returning view.`,
       );
-      const contents = IrMapper.fromIr(ship);
+      const contents = env.irMapper.fromIr(ship);
       tracer.logEvent('IrProjector', 'Projected Context to LLM', {
         projectedContext: contents,
       });
@@ -116,7 +115,7 @@ export class IrProjector {
 
     const visibleShip = processedShip.filter((n) => !skipList.has(n.id));
 
-    const contents = IrMapper.fromIr(visibleShip);
+    const contents = env.irMapper.fromIr(visibleShip);
     tracer.logEvent('IrProjector', 'Projected Sanitized Context to LLM', {
       projectedContextSanitized: contents,
     });

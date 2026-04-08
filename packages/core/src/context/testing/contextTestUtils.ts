@@ -15,6 +15,9 @@ import { ContextEnvironmentImpl } from '../sidecar/environmentImpl.js';
 import { SidecarLoader } from '../sidecar/SidecarLoader.js';
 import { ContextEventBus } from '../eventBus.js';
 import { ContextTokenCalculator } from '../utils/contextTokenCalculator.js';
+import { IrNodeBehaviorRegistry } from '../ir/behaviorRegistry.js';
+import { registerBuiltInBehaviors } from '../ir/builtinBehaviors.js';
+import { IrMapper } from '../ir/mapper.js';
 import { ProcessorRegistry } from '../sidecar/registry.js';
 import { registerBuiltInProcessors } from '../sidecar/builtins.js';
 import type { ContextAccountingState } from '../pipeline.js';
@@ -102,6 +105,10 @@ export function createDummyToolNode(
 export function createMockEnvironment(
   overrides?: Partial<ContextEnvironment>,
 ): ContextEnvironment {
+  const registry = new IrNodeBehaviorRegistry();
+  registerBuiltInBehaviors(registry);
+  const irMapper = new IrMapper(registry);
+
   return {
     // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
     llmClient: vi.fn().mockReturnValue({
@@ -119,6 +126,8 @@ export function createMockEnvironment(
     tokenCalculator: new ContextTokenCalculator(1),
     fileSystem: new InMemoryFileSystem(),
     idGenerator: new DeterministicIdGenerator('mock-uuid-'),
+    behaviorRegistry: registry,
+    irMapper,
     ...overrides,
   } as ContextEnvironment;
 }

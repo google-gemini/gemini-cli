@@ -16,10 +16,8 @@ import type {
 } from './types.js';
 import type { ContextTokenCalculator } from '../utils/contextTokenCalculator.js';
 
-// WeakMap to provide stable, deterministic identity across parses for the exact same Content/Part references
-const nodeIdentityMap = new WeakMap<object, string>();
-
-export function getStableId(obj: object): string {
+// We remove the global nodeIdentityMap and instead rely on one passed from IrMapper
+export function getStableId(obj: object, nodeIdentityMap: WeakMap<object, string>): string {
   let id = nodeIdentityMap.get(obj);
   if (!id) {
     id = randomUUID();
@@ -44,6 +42,7 @@ function isCompleteEpisode(ep: Partial<Episode>): ep is Episode {
 export function toIr(
   history: readonly Content[],
   tokenCalculator: ContextTokenCalculator,
+  nodeIdentityMap: WeakMap<object, string>
 ): Episode[] {
   const episodes: Episode[] = [];
   let currentEpisode: Partial<Episode> | null = null;
@@ -73,20 +72,21 @@ export function toIr(
           currentEpisode,
           pendingCallParts,
           tokenCalculator,
-
+          nodeIdentityMap
         );
       }
 
       if (hasUserParts) {
         finalizeEpisode();
-        currentEpisode = parseUserParts(msg);
+        currentEpisode = parseUserParts(msg, nodeIdentityMap);
       }
     } else if (msg.role === 'model') {
       currentEpisode = parseModelParts(
         msg,
         currentEpisode,
         pendingCallParts,
-      );
+        nodeIdentityMap
+        );
     }
   }
 
@@ -103,10 +103,11 @@ function parseToolResponses(
   currentEpisode: Partial<Episode> | null,
   pendingCallParts: Map<string, Part>,
   tokenCalculator: ContextTokenCalculator,
+  nodeIdentityMap: WeakMap<object, string>
 ): Partial<Episode> {
   if (!currentEpisode) {
     currentEpisode = {
-      id: getStableId(msg),
+      id: getStableId(msg, nodeIdentityMap),
       timestamp: Date.now(),
       concreteNodes: [],
     };
@@ -123,7 +124,7 @@ function parseToolResponses(
       const obsTokens = tokenCalculator.estimateTokensForParts([part]);
 
       const step: ToolExecution = {
-        id: getStableId(part),
+        id: getStableId(part, nodeIdentityMap),
         type: 'TOOL_EXECUTION',
         toolName: part.functionResponse.name || 'unknown',
         intent: isRecord(matchingCall?.functionCall?.args)
@@ -149,6 +150,7 @@ function parseToolResponses(
 
 function parseUserParts(
   msg: Content,
+  nodeIdentityMap: WeakMap<object, string>
 ): Partial<Episode> {
   const semanticParts: SemanticPart[] = [];
   for (const p of msg.parts!) {
@@ -171,12 +173,12 @@ function parseUserParts(
   }
 
   const trigger: UserPrompt = {
-    id: getStableId(msg.parts![0] || msg),
+    id: getStableId(msg.parts![0] || msg, nodeIdentityMap),
     type: 'USER_PROMPT',
     semanticParts,
   };
   return {
-    id: getStableId(msg),
+    id: getStableId(msg, nodeIdentityMap),
     timestamp: Date.now(),
     concreteNodes: [trigger],
   };
@@ -186,10 +188,11 @@ function parseModelParts(
   msg: Content,
   currentEpisode: Partial<Episode> | null,
   pendingCallParts: Map<string, Part>,
+  nodeIdentityMap: WeakMap<object, string>
 ): Partial<Episode> {
   if (!currentEpisode) {
     currentEpisode = {
-      id: getStableId(msg),
+      id: getStableId(msg, nodeIdentityMap),
       timestamp: Date.now(),
       concreteNodes: [],
     };
@@ -201,7 +204,7 @@ function parseModelParts(
       if (callId) pendingCallParts.set(callId, part);
     } else if (part.text) {
       const thought: AgentThought = {
-        id: getStableId(part),
+        id: getStableId(part, nodeIdentityMap),
         type: 'AGENT_THOUGHT',
         text: part.text,
       };
