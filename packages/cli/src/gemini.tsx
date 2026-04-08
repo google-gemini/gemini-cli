@@ -348,80 +348,82 @@ export async function main() {
     }
   }
 
-  const partialConfig = await loadCliConfig(settings.merged, sessionId, argv, {
-    projectHooks: settings.workspace.settings.hooks,
-  });
-  adminControlsListner.setConfig(partialConfig);
-
-  // Refresh auth to fetch remote admin settings from CCPA and before entering
-  // the sandbox because the sandbox will interfere with the Oauth2 web
-  // redirect.
-  let initialAuthFailed = false;
-  if (!settings.merged.security.auth.useExternal && !argv.isCommand) {
-    try {
-      if (
-        partialConfig.isInteractive() &&
-        settings.merged.security.auth.selectedType
-      ) {
-        const err = validateAuthMethod(
-          settings.merged.security.auth.selectedType,
-        );
-        if (err) {
-          throw new Error(err);
-        }
-
-        await partialConfig.refreshAuth(
-          settings.merged.security.auth.selectedType,
-        );
-      } else if (!partialConfig.isInteractive()) {
-        const authType = await validateNonInteractiveAuth(
-          settings.merged.security.auth.selectedType,
-          settings.merged.security.auth.useExternal,
-          partialConfig,
-          settings,
-        );
-        await partialConfig.refreshAuth(authType);
-      }
-    } catch (err) {
-      if (err instanceof ValidationCancelledError) {
-        // User cancelled verification, exit immediately.
-        await runExitCleanup();
-        process.exit(ExitCodes.SUCCESS);
-      }
-
-      // If validation is required, we don't treat it as a fatal failure.
-      // We allow the app to start, and the React-based ValidationDialog
-      // will handle it.
-      if (!(err instanceof ValidationRequiredError)) {
-        debugLogger.error('Error authenticating:', err);
-        initialAuthFailed = true;
-      }
-    }
-  }
-
-  const remoteAdminSettings = partialConfig.getRemoteAdminSettings();
-  // Set remote admin settings if returned from CCPA.
-  if (remoteAdminSettings) {
-    settings.setRemoteAdminSettings(remoteAdminSettings);
-  }
-
-  // Run deferred command now that we have admin settings.
-  await runDeferredCommand(settings.merged);
-
-  // hop into sandbox if we are outside and sandboxing is enabled
-  if (!process.env['SANDBOX'] && !argv.isCommand) {
-    const memoryArgs = settings.merged.advanced.autoConfigureMemory
+  // Determine memory args and sandbox config early — these are needed
+  // regardless of whether we take the fast (relaunch) or full (sandbox) path.
+  const memoryArgs =
+    !process.env['SANDBOX'] &&
+    !argv.isCommand &&
+    settings.merged.advanced.autoConfigureMemory
       ? getNodeMemoryArgs(isDebugMode)
       : [];
+
+  async function performEarlyInit() {
+    const partialConfig = await loadCliConfig(
+      settings.merged,
+      sessionId,
+      argv,
+      {
+        projectHooks: settings.workspace.settings.hooks,
+      },
+    );
+    adminControlsListner.setConfig(partialConfig);
+
+    let authFailed = false;
+    if (!settings.merged.security.auth.useExternal && !argv.isCommand) {
+      try {
+        if (
+          partialConfig.isInteractive() &&
+          settings.merged.security.auth.selectedType
+        ) {
+          const err = validateAuthMethod(
+            settings.merged.security.auth.selectedType,
+          );
+          if (err) {
+            throw new Error(err);
+          }
+
+          await partialConfig.refreshAuth(
+            settings.merged.security.auth.selectedType,
+          );
+        } else if (!partialConfig.isInteractive()) {
+          const authType = await validateNonInteractiveAuth(
+            settings.merged.security.auth.selectedType,
+            settings.merged.security.auth.useExternal,
+            partialConfig,
+            settings,
+          );
+          await partialConfig.refreshAuth(authType);
+        }
+      } catch (err) {
+        if (err instanceof ValidationCancelledError) {
+          await runExitCleanup();
+          process.exit(ExitCodes.SUCCESS);
+        }
+
+        if (!(err instanceof ValidationRequiredError)) {
+          debugLogger.error('Error authenticating:', err);
+          authFailed = true;
+        }
+      }
+    }
+
+    const remoteAdminSettings = partialConfig.getRemoteAdminSettings();
+    if (remoteAdminSettings) {
+      settings.setRemoteAdminSettings(remoteAdminSettings);
+    }
+
+    await runDeferredCommand(settings.merged);
+
+    return { partialConfig, authFailed };
+  }
+
+  if (!process.env['SANDBOX'] && !argv.isCommand) {
     const sandboxConfig = await loadSandboxConfig(settings.merged, argv);
-    // We intentionally omit the list of extensions here because extensions
-    // should not impact auth or setting up the sandbox.
-    // TODO(jacobr): refactor loadCliConfig so there is a minimal version
-    // that only initializes enough config to enable refreshAuth or find
-    // another way to decouple refreshAuth from requiring a config.
 
     if (sandboxConfig) {
-      if (initialAuthFailed) {
+      const { partialConfig, authFailed } = await performEarlyInit();
+
+      if (authFailed) {
         await runExitCleanup();
         process.exit(ExitCodes.FATAL_AUTHENTICATION_ERROR);
       }
@@ -442,11 +444,9 @@ export async function main() {
             (arg) => arg === '--prompt' || arg === '-p',
           );
           if (promptIndex > -1 && finalArgs.length > promptIndex + 1) {
-            // If there's a prompt argument, prepend stdin to it
             finalArgs[promptIndex + 1] =
               `${stdinData}\n\n${finalArgs[promptIndex + 1]}`;
           } else {
-            // If there's no prompt argument, add stdin as the prompt
             finalArgs.push('--prompt', stdinData);
           }
         }
@@ -461,10 +461,10 @@ export async function main() {
       await runExitCleanup();
       process.exit(ExitCodes.SUCCESS);
     } else {
-      // Relaunch app so we always have a child process that can be internally
-      // restarted if needed.
-      await relaunchAppInChildProcess(memoryArgs, [], remoteAdminSettings);
+      await relaunchAppInChildProcess(memoryArgs, []);
     }
+  } else {
+    await performEarlyInit();
   }
 
   // We are now past the logic handling potentially launching a child process
