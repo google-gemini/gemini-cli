@@ -84,6 +84,7 @@ export class ToolExecutor {
       {
         operation: GeminiCliOperation.ToolCall,
         logPrompts: this.config.getTelemetryLogPromptsEnabled(),
+        sessionId: this.config.getSessionId(),
         attributes: {
           [GEN_AI_TOOL_NAME]: toolName,
           [GEN_AI_TOOL_CALL_ID]: callId,

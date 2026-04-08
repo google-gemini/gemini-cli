@@ -86,6 +86,7 @@ describe('<ModelDialog />', () => {
     getProModelNoAccess: mockGetProModelNoAccess,
     getProModelNoAccessSync: mockGetProModelNoAccessSync,
     getLastRetrievedQuota: () => ({ buckets: [] }),
+    getSessionId: () => 'test-session-id',
   };
 
   beforeEach(() => {

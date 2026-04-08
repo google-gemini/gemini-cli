@@ -9,7 +9,7 @@ import {
   partListUnionToString,
   SESSION_FILE_PREFIX,
   CoreToolCallStatus,
-  type Config,
+  type Storage,
   type ConversationRecord,
   type MessageRecord,
 } from '@google/gemini-cli-core';
@@ -399,17 +399,14 @@ export const getSessionFiles = async (
  * Utility class for session discovery and selection.
  */
 export class SessionSelector {
-  constructor(private config: Config) {}
+  constructor(private storage: Storage) {}
 
   /**
    * Lists all available sessions for the current project.
    */
   async listSessions(): Promise<SessionInfo[]> {
-    const chatsDir = path.join(
-      this.config.storage.getProjectTempDir(),
-      'chats',
-    );
-    return getSessionFiles(chatsDir, this.config.getSessionId());
+    const chatsDir = path.join(this.storage.getProjectTempDir(), 'chats');
+    return getSessionFiles(chatsDir);
   }
 
   /**
@@ -452,10 +449,7 @@ export class SessionSelector {
       return sortedSessions[index - 1];
     }
 
-    const chatsDir = path.join(
-      this.config.storage.getProjectTempDir(),
-      'chats',
-    );
+    const chatsDir = path.join(this.storage.getProjectTempDir(), 'chats');
     throw SessionError.invalidSessionIdentifier(trimmedIdentifier, chatsDir);
   }
 
@@ -507,10 +501,7 @@ export class SessionSelector {
   private async selectSession(
     sessionInfo: SessionInfo,
   ): Promise<SessionSelectionResult> {
-    const chatsDir = path.join(
-      this.config.storage.getProjectTempDir(),
-      'chats',
-    );
+    const chatsDir = path.join(this.storage.getProjectTempDir(), 'chats');
     const sessionPath = path.join(chatsDir, sessionInfo.fileName);
 
     try {
