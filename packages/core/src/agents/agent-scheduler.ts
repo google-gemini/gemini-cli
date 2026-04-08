@@ -85,5 +85,9 @@ export async function scheduleAgentTools(
     onWaitingForConfirmation,
   });
 
-  return scheduler.schedule(requests, signal);
+  try {
+    return await scheduler.schedule(requests, signal);
+  } finally {
+    scheduler.dispose();
+  }
 }
