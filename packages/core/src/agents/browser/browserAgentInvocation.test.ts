@@ -192,7 +192,10 @@ describe('BrowserAgentInvocation', () => {
           promptConfig: { query: '', systemPrompt: '' },
           toolConfig: { tools: ['analyze_screenshot', 'click'] },
         },
-        browserManager: {} as never,
+        browserManager: {
+          release: vi.fn(),
+          callTool: vi.fn().mockResolvedValue({ content: [] }),
+        } as never,
         visionEnabled: true,
         sessionMode: 'persistent',
       });
@@ -766,6 +769,7 @@ describe('BrowserAgentInvocation', () => {
           }
           return { isError: false };
         }),
+        release: vi.fn(),
       };
 
       vi.mocked(createBrowserAgentDefinition).mockResolvedValue({
