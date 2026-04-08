@@ -23,7 +23,14 @@ Check if ANY of the following conditions are met:
 If there is a cross-referenced PR in `cross_references` where `is_pr` is `true` and `is_merged` is `false` (and its state is `closed` or it has an automated closure comment):
 1. Use `gh pr view <pr_url> --json author,comments,state,title,body` to analyze the PR.
 2. Check the comments to see if it was closed by an automated bot (e.g., `gemini-cli` bot closing it automatically due to missing labels like 'help wanted' after 14 days).
-3. Analyze the PR's title, body, and comments to determine if it implements a valid and useful feature/fix and is worth resuming. Critically evaluate the PR's approach for correctness and safety. Ensure it does not introduce breaking changes, make false assumptions (e.g., making an optional configuration mandatory for all users), or negatively impact other workflows.
+3. Analyze the PR's title, body, and comments to determine if it implements a valid and useful feature/fix and is worth resuming. 
+4. **Existing Feature Check**: Check if the requested feature is actually already implemented natively in the codebase (e.g., an existing hotkey, setting, or command). Search the codebase using `grep_search` if unsure.
+- If the feature is ALREADY IMPLEMENTED:
+  a. Do NOT reopen the PR.
+  b. Execute `gh issue close <issue_url> --comment "This feature is actually already implemented! <Provide a brief explanation of how to use the feature>.\n\nI'm going to close this issue since the functionality already exists natively. Let us know if you run into any other issues!" --reason "completed"`
+  c. Comment on the PR: `gh pr comment <pr_url> --body "@<author_username>, thank you for your contribution! We've reviewed this again and decided to keep it closed. The core feature requested in the parent issue is actually already implemented natively in the CLI. We appreciate the effort, but this specific PR is no longer needed!"`
+  d. **STOP EXECUTION**.
+5. Critically evaluate the PR's approach for correctness and safety. Ensure it does not introduce breaking changes, make false assumptions (e.g., making an optional configuration mandatory for all users), or negatively impact other workflows.
 - If the PR's approach is flawed or introduces breaking changes:
   a. Do NOT reopen the PR.
   b. Determine if the issue itself should be **Maintainer-only** or **Help-wanted** (using the criteria below).
