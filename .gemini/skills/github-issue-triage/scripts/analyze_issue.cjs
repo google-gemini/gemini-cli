@@ -63,7 +63,7 @@ async function analyzeIssue(issueLink, maintainersList) {
     result.is_feature_request = result.labels.some(l => {
       const lower = l.toLowerCase();
       return lower.includes('feature') || lower.includes('enhancement');
-    });
+    }) || issue.title.toLowerCase().includes('feature') || issue.title.toLowerCase().includes('proposal');
     
     result.is_high_priority = result.labels.some(l => {
       const lower = l.toLowerCase();
