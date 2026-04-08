@@ -83,7 +83,12 @@ export function useHistory({
             return prevHistory; // Don't add the duplicate
           }
         }
-        return [...prevHistory, newItem];
+        const newHistory = [...prevHistory, newItem];
+        // Enforce a hard limit of 1000 items to prevent unbounded memory growth
+        if (newHistory.length > 1000) {
+          return newHistory.slice(newHistory.length - 1000);
+        }
+        return newHistory;
       });
 
       // Record UI-specific messages, but don't do it if we're actually loading
