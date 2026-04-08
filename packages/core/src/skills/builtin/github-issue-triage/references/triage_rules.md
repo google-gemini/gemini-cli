@@ -25,7 +25,7 @@ If there is a cross-referenced PR in `cross_references` where `is_pr` is `true` 
 2. Check the comments to see if it was closed by an automated bot (e.g., `gemini-cli` bot closing it automatically due to missing labels like 'help wanted' after 14 days).
 3. Analyze the PR's title, body, and comments to determine if it implements a valid and useful feature/fix and is worth resuming.
 - If it is worth resuming AND was closed by a bot:
-  a. Determine if the issue should be **Maintainer-only** (epic, core architecture, sensitive fixes, internal tasks, or issues requiring deep investigation) or **Help-wanted** (good for community, general bugs, features, or tasks ready for external help).
+  a. Determine if the issue should be **Maintainer-only** (epic, core architecture, sensitive fixes, internal tasks, issues requiring deep investigation, changes to key UI/UX that affect all users, or modifications to core internal data structures and IPC mechanisms) or **Help-wanted** (small well-defined features, easy-to-fix bugs, good for community, or tasks ready for external help).
   b. If it should be **Maintainer-only**:
      - Execute `gh issue edit <issue_url> --remove-label "status/need-triage" --add-label "🔒 maintainer only"`
      - **STOP EXECUTION**. (Do not reopen the PR).
@@ -100,7 +100,7 @@ Search for duplicates using `gh issue list --search "<keywords>" --repo <owner/r
 ## Step 6: Triage Summary
 Review the issue comments to see if a community member has already identified the root cause.
 - If a root cause is identified: determine if it is a very simple fix. If it is a simple fix, post guidance for the fix, categorize the issue as **Maintainer-only**, and explain why. If it is not a simple fix, determine whether it should be **Maintainer-only** or **Help-wanted** and explain why. 
-- If no root cause is identified: State whether the issue should be categorized as **Maintainer-only** (epic, core architecture, sensitive fixes, internal tasks, issues requiring deep investigation, or changes to key UI/UX that affect all users) or **Help-wanted** (small well-defined features, easy-to-fix bugs, good for community, or tasks ready for external help). Your comment should be brief and clearly explain *why* it fits that category. 
+- If no root cause is identified: State whether the issue should be categorized as **Maintainer-only** (epic, core architecture, sensitive fixes, internal tasks, issues requiring deep investigation, changes to key UI/UX that affect all users, or modifications to core internal data structures and IPC mechanisms) or **Help-wanted** (small well-defined features, easy-to-fix bugs, good for community, or tasks ready for external help). Your comment should be brief and clearly explain *why* it fits that category. 
 - If you categorized the issue as **Help-wanted**, also run `gh issue edit <issue_url> --remove-label "status/need-triage" --add-label "help wanted"`. 
 - If you categorized the issue as **Maintainer-only**, also run `gh issue edit <issue_url> --remove-label "status/need-triage" --add-label "🔒 maintainer only"`.
 - Action: `gh issue comment <issue_url> --body "### Triage Summary\n\n<your summary>"`
