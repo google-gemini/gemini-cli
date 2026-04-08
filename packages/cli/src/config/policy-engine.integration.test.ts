@@ -520,8 +520,8 @@ describe('Policy Engine Integration Tests', () => {
       const readOnlyToolRule = rules.find(
         (r) => r.toolName === 'glob' && !r.subagent,
       );
-      // Priority 70 in default tier → 1.07 (Overriding Plan Mode Deny)
-      expect(readOnlyToolRule?.priority).toBeCloseTo(1.07, 5);
+      // Priority 50 in default tier → 1.05 (Overriding Plan Mode Deny)
+      expect(readOnlyToolRule?.priority).toBeCloseTo(1.05, 5);
 
       // Verify the engine applies these priorities correctly
       expect(
@@ -677,8 +677,8 @@ describe('Policy Engine Integration Tests', () => {
       expect(server1Rule?.priority).toBe(4.1); // Allowed servers (user tier)
 
       const globRule = rules.find((r) => r.toolName === 'glob' && !r.subagent);
-      // Priority 70 in default tier → 1.07
-      expect(globRule?.priority).toBeCloseTo(1.07, 5); // Auto-accept read-only
+      // Priority 50 in default tier → 1.05
+      expect(globRule?.priority).toBeCloseTo(1.05, 5); // Auto-accept read-only
 
       // The PolicyEngine will sort these by priority when it's created
       const engine = new PolicyEngine(config);
