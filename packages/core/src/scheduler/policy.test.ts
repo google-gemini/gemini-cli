@@ -51,8 +51,8 @@ describe('policy.ts', () => {
       const mockConfig = {
         getApprovalMode: vi.fn().mockReturnValue(ApprovalMode.DEFAULT),
         getPolicyEngine: vi.fn().mockReturnValue(mockPolicyEngine),
+        getSessionId: vi.fn().mockReturnValue('test-session-id'),
       } as unknown as Mocked<Config>;
-
       (mockConfig as unknown as { config: Config }).config =
         mockConfig as Config;
 
@@ -79,8 +79,8 @@ describe('policy.ts', () => {
       const mockConfig = {
         getApprovalMode: vi.fn().mockReturnValue(ApprovalMode.DEFAULT),
         getPolicyEngine: vi.fn().mockReturnValue(mockPolicyEngine),
+        getSessionId: vi.fn().mockReturnValue('test-session-id'),
       } as unknown as Mocked<Config>;
-
       (mockConfig as unknown as { config: Config }).config =
         mockConfig as Config;
 
@@ -161,8 +161,8 @@ describe('policy.ts', () => {
       const mockConfig = {
         getApprovalMode: vi.fn().mockReturnValue(ApprovalMode.DEFAULT),
         getPolicyEngine: vi.fn().mockReturnValue(mockPolicyEngine),
+        getSessionId: vi.fn().mockReturnValue('test-session-id'),
       } as unknown as Mocked<Config>;
-
       (mockConfig as unknown as { config: Config }).config =
         mockConfig as Config;
 
@@ -226,8 +226,8 @@ describe('policy.ts', () => {
       const mockConfig = {
         getApprovalMode: vi.fn().mockReturnValue(ApprovalMode.DEFAULT),
         getPolicyEngine: vi.fn().mockReturnValue(mockPolicyEngine),
+        getSessionId: vi.fn().mockReturnValue('test-session-id'),
       } as unknown as Mocked<Config>;
-
       const toolCall = {
         request: { name: 'test-tool', args: {}, isClientInitiated: true },
         tool: { name: 'test-tool' },
@@ -243,8 +243,8 @@ describe('policy.ts', () => {
       const mockConfig = {
         getApprovalMode: vi.fn().mockReturnValue(ApprovalMode.DEFAULT),
         setApprovalMode: vi.fn(),
+        getSessionId: vi.fn().mockReturnValue('test-session-id'),
       } as unknown as Mocked<Config>;
-
       (mockConfig as unknown as { config: Config }).config =
         mockConfig as Config;
       const mockMessageBus = {
@@ -273,8 +273,8 @@ describe('policy.ts', () => {
       const mockConfig = {
         getApprovalMode: vi.fn().mockReturnValue(ApprovalMode.DEFAULT),
         setApprovalMode: vi.fn(),
+        getSessionId: vi.fn().mockReturnValue('test-session-id'),
       } as unknown as Mocked<Config>;
-
       (mockConfig as unknown as { config: Config }).config =
         mockConfig as Config;
       const mockMessageBus = {
@@ -307,6 +307,7 @@ describe('policy.ts', () => {
         isTrustedFolder: vi.fn().mockReturnValue(false),
         getWorkspacePoliciesDir: vi.fn().mockReturnValue(undefined),
         setApprovalMode: vi.fn(),
+        getSessionId: vi.fn().mockReturnValue('test-session-id'),
       } as unknown as Mocked<Config>;
 
       (mockConfig as unknown as { config: Config }).config =
@@ -339,8 +340,8 @@ describe('policy.ts', () => {
       const mockConfig = {
         getApprovalMode: vi.fn().mockReturnValue(ApprovalMode.DEFAULT),
         setApprovalMode: vi.fn(),
+        getSessionId: vi.fn().mockReturnValue('test-session-id'),
       } as unknown as Mocked<Config>;
-
       (mockConfig as unknown as { config: Config }).config =
         mockConfig as Config;
       const mockMessageBus = {
@@ -379,8 +380,8 @@ describe('policy.ts', () => {
       const mockConfig = {
         getApprovalMode: vi.fn().mockReturnValue(ApprovalMode.DEFAULT),
         setApprovalMode: vi.fn(),
+        getSessionId: vi.fn().mockReturnValue('test-session-id'),
       } as unknown as Mocked<Config>;
-
       (mockConfig as unknown as { config: Config }).config =
         mockConfig as Config;
       const mockMessageBus = {
@@ -420,8 +421,8 @@ describe('policy.ts', () => {
       const mockConfig = {
         getApprovalMode: vi.fn().mockReturnValue(ApprovalMode.DEFAULT),
         setApprovalMode: vi.fn(),
+        getSessionId: vi.fn().mockReturnValue('test-session-id'),
       } as unknown as Mocked<Config>;
-
       (mockConfig as unknown as { config: Config }).config =
         mockConfig as Config;
       const mockMessageBus = {
@@ -447,8 +448,8 @@ describe('policy.ts', () => {
       const mockConfig = {
         getApprovalMode: vi.fn().mockReturnValue(ApprovalMode.DEFAULT),
         setApprovalMode: vi.fn(),
+        getSessionId: vi.fn().mockReturnValue('test-session-id'),
       } as unknown as Mocked<Config>;
-
       (mockConfig as unknown as { config: Config }).config =
         mockConfig as Config;
       const mockMessageBus = {
@@ -473,8 +474,8 @@ describe('policy.ts', () => {
       const mockConfig = {
         getApprovalMode: vi.fn().mockReturnValue(ApprovalMode.DEFAULT),
         setApprovalMode: vi.fn(),
+        getSessionId: vi.fn().mockReturnValue('test-session-id'),
       } as unknown as Mocked<Config>;
-
       (mockConfig as unknown as { config: Config }).config =
         mockConfig as Config;
       const mockMessageBus = {
@@ -499,8 +500,8 @@ describe('policy.ts', () => {
       const mockConfig = {
         getApprovalMode: vi.fn().mockReturnValue(ApprovalMode.DEFAULT),
         setApprovalMode: vi.fn(),
+        getSessionId: vi.fn().mockReturnValue('test-session-id'),
       } as unknown as Mocked<Config>;
-
       (mockConfig as unknown as { config: Config }).config =
         mockConfig as Config;
       const mockMessageBus = {
@@ -540,8 +541,8 @@ describe('policy.ts', () => {
       const mockConfig = {
         getApprovalMode: vi.fn().mockReturnValue(ApprovalMode.DEFAULT),
         setApprovalMode: vi.fn(),
+        getSessionId: vi.fn().mockReturnValue('test-session-id'),
       } as unknown as Mocked<Config>;
-
       (mockConfig as unknown as { config: Config }).config =
         mockConfig as Config;
       const mockMessageBus = {
@@ -583,6 +584,7 @@ describe('policy.ts', () => {
         isTrustedFolder: vi.fn().mockReturnValue(false),
         getWorkspacePoliciesDir: vi.fn().mockReturnValue(undefined),
         setApprovalMode: vi.fn(),
+        getSessionId: vi.fn().mockReturnValue('test-session-id'),
       } as unknown as Mocked<Config>;
 
       (mockConfig as unknown as { config: Config }).config =
@@ -628,6 +630,7 @@ describe('policy.ts', () => {
           .fn()
           .mockReturnValue('/mock/project/policies'),
         setApprovalMode: vi.fn(),
+        getSessionId: vi.fn().mockReturnValue('test-session-id'),
       } as unknown as Mocked<Config>;
       const mockMessageBus = {
         publish: vi.fn(),
@@ -659,6 +662,7 @@ describe('policy.ts', () => {
           .fn()
           .mockReturnValue('/mock/project/policies'),
         setApprovalMode: vi.fn(),
+        getSessionId: vi.fn().mockReturnValue('test-session-id'),
       } as unknown as Mocked<Config>;
       const mockMessageBus = {
         publish: vi.fn(),
@@ -689,6 +693,7 @@ describe('policy.ts', () => {
         getWorkspacePoliciesDir: vi.fn().mockReturnValue(undefined),
         getTargetDir: vi.fn().mockReturnValue('/mock/dir'),
         setApprovalMode: vi.fn(),
+        getSessionId: vi.fn().mockReturnValue('test-session-id'),
       } as unknown as Mocked<Config>;
       const mockMessageBus = {
         publish: vi.fn(),
@@ -727,6 +732,7 @@ describe('policy.ts', () => {
       const mockConfig = {
         getApprovalMode: vi.fn().mockReturnValue(ApprovalMode.DEFAULT),
         setApprovalMode: vi.fn(),
+        getSessionId: vi.fn().mockReturnValue('test-session-id'),
       } as unknown as Mocked<Config>;
       const mockMessageBus = {
         publish: vi.fn(),
@@ -766,6 +772,7 @@ describe('policy.ts', () => {
     it('should return default denial message when no rule provided', () => {
       const mockConfig = {
         getApprovalMode: vi.fn().mockReturnValue(ApprovalMode.DEFAULT),
+        getSessionId: vi.fn().mockReturnValue('test-session-id'),
       } as unknown as Config;
 
       (mockConfig as unknown as { config: Config }).config = mockConfig;
@@ -779,6 +786,7 @@ describe('policy.ts', () => {
     it('should return custom deny message if provided', () => {
       const mockConfig = {
         getApprovalMode: vi.fn().mockReturnValue(ApprovalMode.DEFAULT),
+        getSessionId: vi.fn().mockReturnValue('test-session-id'),
       } as unknown as Config;
 
       (mockConfig as unknown as { config: Config }).config = mockConfig;
@@ -840,7 +848,6 @@ describe('Plan Mode Denial Consistency', () => {
       publish: vi.fn(),
       subscribe: vi.fn(),
     } as unknown as Mocked<MessageBus>;
-
     mockConfig = {
       getPolicyEngine: vi.fn().mockReturnValue(mockPolicyEngine),
       toolRegistry: mockToolRegistry,
@@ -852,6 +859,7 @@ describe('Plan Mode Denial Consistency', () => {
       getApprovalMode: vi.fn().mockReturnValue(ApprovalMode.PLAN), // Key: Plan Mode
       getTelemetryLogPromptsEnabled: vi.fn().mockReturnValue(false),
       setApprovalMode: vi.fn(),
+      getSessionId: vi.fn().mockReturnValue('test-session-id'),
       getUsageStatisticsEnabled: vi.fn().mockReturnValue(false),
     } as unknown as Mocked<Config>;
     (mockConfig as unknown as { config: Config }).config = mockConfig as Config;
@@ -933,6 +941,7 @@ describe('Plan Mode Denial Consistency', () => {
           getApprovalMode: vi.fn().mockReturnValue(currentMode),
           isTrustedFolder: vi.fn().mockReturnValue(false),
           getWorkspacePoliciesDir: vi.fn().mockReturnValue(undefined),
+          getSessionId: vi.fn().mockReturnValue('test-session-id'),
         } as unknown as Mocked<Config>;
 
         const mockMessageBus = {

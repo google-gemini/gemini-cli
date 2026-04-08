@@ -13,14 +13,13 @@ import {
   useMemo,
   useEffect,
 } from 'react';
-
 import type {
   SessionMetrics,
   ModelMetrics,
   RoleMetrics,
   ToolCallStats,
 } from '@google/gemini-cli-core';
-import { uiTelemetryService, sessionId } from '@google/gemini-cli-core';
+import { uiTelemetryService } from '@google/gemini-cli-core';
 
 export enum ToolCallDecision {
   ACCEPT = 'accept',
@@ -183,9 +182,10 @@ const SessionStatsContext = createContext<SessionStatsContextValue | undefined>(
 
 // --- Provider Component ---
 
-export const SessionStatsProvider: React.FC<{ children: React.ReactNode }> = ({
-  children,
-}) => {
+export const SessionStatsProvider: React.FC<{
+  children: React.ReactNode;
+  sessionId: string;
+}> = ({ children, sessionId }) => {
   const [stats, setStats] = useState<SessionStatsState>({
     sessionId,
     sessionStartTime: new Date(),

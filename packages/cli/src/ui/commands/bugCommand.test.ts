@@ -9,7 +9,7 @@ import open from 'open';
 import path from 'node:path';
 import { bugCommand } from './bugCommand.js';
 import { createMockCommandContext } from '../../test-utils/mockCommandContext.js';
-import { getVersion } from '@google/gemini-cli-core';
+import { getVersion, type Config } from '@google/gemini-cli-core';
 import { GIT_COMMIT_INFO } from '../../generated/git-commit.js';
 import { formatBytes } from '../utils/formatters.js';
 
@@ -89,7 +89,8 @@ describe('bugCommand', () => {
             getBugCommand: () => undefined,
             getIdeMode: () => true,
             getContentGeneratorConfig: () => ({ authType: 'oauth-personal' }),
-          },
+            getSessionId: vi.fn().mockReturnValue('test-session-id'),
+          } as unknown as Config,
           geminiClient: {
             getChat: () => ({
               getHistory: () => [],
@@ -137,7 +138,8 @@ describe('bugCommand', () => {
             storage: {
               getProjectTempDir: () => '/tmp/gemini',
             },
-          },
+            getSessionId: vi.fn().mockReturnValue('test-session-id'),
+          } as unknown as Config,
           geminiClient: {
             getChat: () => ({
               getHistory: () => history,
@@ -182,7 +184,8 @@ describe('bugCommand', () => {
             getBugCommand: () => ({ urlTemplate: customTemplate }),
             getIdeMode: () => true,
             getContentGeneratorConfig: () => ({ authType: 'vertex-ai' }),
-          },
+            getSessionId: vi.fn().mockReturnValue('test-session-id'),
+          } as unknown as Config,
           geminiClient: {
             getChat: () => ({
               getHistory: () => [],

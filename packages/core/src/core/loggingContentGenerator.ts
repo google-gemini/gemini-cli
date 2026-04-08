@@ -350,6 +350,7 @@ export class LoggingContentGenerator implements ContentGenerator {
       {
         operation: GeminiCliOperation.LLMCall,
         logPrompts: this.config.getTelemetryLogPromptsEnabled(),
+        sessionId: this.config.getSessionId(),
         attributes: {
           [GEN_AI_REQUEST_MODEL]: req.model,
           [GEN_AI_PROMPT_NAME]: userPromptId,
@@ -440,6 +441,7 @@ export class LoggingContentGenerator implements ContentGenerator {
       {
         operation: GeminiCliOperation.LLMCall,
         logPrompts: this.config.getTelemetryLogPromptsEnabled(),
+        sessionId: this.config.getSessionId(),
         attributes: {
           [GEN_AI_REQUEST_MODEL]: req.model,
           [GEN_AI_PROMPT_NAME]: userPromptId,
@@ -594,6 +596,7 @@ export class LoggingContentGenerator implements ContentGenerator {
       {
         operation: GeminiCliOperation.LLMCall,
         logPrompts: this.config.getTelemetryLogPromptsEnabled(),
+        sessionId: this.config.getSessionId(),
         attributes: {
           [GEN_AI_REQUEST_MODEL]: req.model,
         },

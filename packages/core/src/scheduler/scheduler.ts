@@ -197,6 +197,7 @@ export class Scheduler {
       {
         operation: GeminiCliOperation.ScheduleToolCalls,
         logPrompts: this.context.config.getTelemetryLogPromptsEnabled(),
+        sessionId: this.context.config.getSessionId(),
       },
       async ({ metadata: spanMetadata }) => {
         const requests = Array.isArray(request) ? request : [request];

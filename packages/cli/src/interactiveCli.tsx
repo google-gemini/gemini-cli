@@ -107,7 +107,7 @@ export async function startInteractiveUI(
               <TerminalProvider>
                 <ScrollProvider>
                   <OverflowProvider>
-                    <SessionStatsProvider>
+                    <SessionStatsProvider sessionId={config.getSessionId()}>
                       <VimModeProvider>
                         <AppContainer
                           config={config}
