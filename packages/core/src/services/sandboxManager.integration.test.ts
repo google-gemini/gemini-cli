@@ -335,7 +335,7 @@ describe('SandboxManager Integration', () => {
       fs.mkdirSync(nestedDir, { recursive: true });
       fs.writeFileSync(nestedFile, 'secret');
 
-      const { command, args } = Platform.cat(nestedFile);
+      const { command, args } = Platform.touch(nestedFile);
 
       const sandboxed = await osManager.prepareCommand({
         command,
