@@ -78,12 +78,7 @@ import {
   createTestMergedSettings,
   resetSettingsCacheForTesting,
 } from './settings.js';
-import {
-  FatalConfigError,
-  GEMINI_DIR,
-  Storage,
-  type MCPServerConfig,
-} from '@google/gemini-cli-core';
+import { FatalConfigError, GEMINI_DIR, Storage } from '@google/gemini-cli-core';
 import { updateSettingsFilePreservingFormat } from '../utils/commentJson.js';
 import {
   getSettingsSchema,
@@ -2731,10 +2726,10 @@ describe('Settings Loading and Merging', () => {
 
     it('should un-nest MCP configuration from remote settings', () => {
       const loadedSettings = loadSettings(MOCK_WORKSPACE_DIR);
-      const mcpServers: Record<string, MCPServerConfig> = {
+      const mcpServers = {
         'admin-server': {
           url: 'http://admin-mcp.com',
-          type: 'sse',
+          type: 'sse' as const,
           trust: true,
         },
       };
