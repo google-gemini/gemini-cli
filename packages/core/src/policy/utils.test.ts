@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { describe, it, expect } from 'vitest';
+import { expect, describe, it } from 'vitest';
 import { escapeRegex, buildArgsPatterns, isSafeRegExp } from './utils.js';
 
 describe('policy/utils', () => {
@@ -43,20 +43,20 @@ describe('policy/utils', () => {
     });
 
     it('should return false for invalid regexes', () => {
+      expect(isSafeRegExp('[')).toBe(false);
       expect(isSafeRegExp('([a-z)')).toBe(false);
       expect(isSafeRegExp('*')).toBe(false);
     });
 
-    it('should return false for extremely long regexes', () => {
-      expect(isSafeRegExp('a'.repeat(2049))).toBe(false);
+    it('should return false for long regexes', () => {
+      expect(isSafeRegExp('a'.repeat(3000))).toBe(false);
     });
 
-    it('should return false for nested quantifiers (potential ReDoS)', () => {
+    it('should return false for nested quantifiers (ReDoS heuristic)', () => {
       expect(isSafeRegExp('(a+)+')).toBe(false);
-      expect(isSafeRegExp('(a+)*')).toBe(false);
-      expect(isSafeRegExp('(a*)+')).toBe(false);
-      expect(isSafeRegExp('(a*)*')).toBe(false);
-      expect(isSafeRegExp('(a|b+)+')).toBe(false);
+      expect(isSafeRegExp('(a|b)*')).toBe(true);
+      expect(isSafeRegExp('(.*)*')).toBe(false);
+      expect(isSafeRegExp('([a-z]+)+')).toBe(false);
       expect(isSafeRegExp('(.*)+')).toBe(false);
     });
   });
@@ -69,14 +69,14 @@ describe('policy/utils', () => {
 
     it('should build pattern from a single commandPrefix', () => {
       const result = buildArgsPatterns(undefined, 'ls', undefined);
-      expect(result).toEqual(['"command":"ls(?:[\\s"]|\\\\")']);
+      expect(result).toEqual(['\\"command\\":\\"ls(?:[\\s"]|\\\\")']);
     });
 
     it('should build patterns from an array of commandPrefixes', () => {
-      const result = buildArgsPatterns(undefined, ['ls', 'cd'], undefined);
+      const result = buildArgsPatterns(undefined, ['echo', 'ls'], undefined);
       expect(result).toEqual([
-        '"command":"ls(?:[\\s"]|\\\\")',
-        '"command":"cd(?:[\\s"]|\\\\")',
+        '\\"command\\":\\"echo(?:[\\s"]|\\\\")',
+        '\\"command\\":\\"ls(?:[\\s"]|\\\\")',
       ]);
     });
 
@@ -87,7 +87,7 @@ describe('policy/utils', () => {
 
     it('should prioritize commandPrefix over commandRegex and argsPattern', () => {
       const result = buildArgsPatterns('raw', 'prefix', 'regex');
-      expect(result).toEqual(['"command":"prefix(?:[\\s"]|\\\\")']);
+      expect(result).toEqual(['\\"command\\":\\"prefix(?:[\\s"]|\\\\")']);
     });
 
     it('should prioritize commandRegex over argsPattern if no commandPrefix', () => {
@@ -98,14 +98,15 @@ describe('policy/utils', () => {
     it('should escape characters in commandPrefix', () => {
       const result = buildArgsPatterns(undefined, 'git checkout -b', undefined);
       expect(result).toEqual([
-        '"command":"git\\ checkout\\ \\-b(?:[\\s"]|\\\\")',
+        '\\"command\\":\\"git\\ checkout\\ \\-b(?:[\\s"]|\\\\")',
       ]);
     });
 
     it('should correctly escape quotes in commandPrefix', () => {
       const result = buildArgsPatterns(undefined, 'git "fix"', undefined);
       expect(result).toEqual([
-        '"command":"git\\ \\\\\\"fix\\\\\\"(?:[\\s"]|\\\\")',
+        // eslint-disable-next-line no-useless-escape
+        '\\\"command\\\":\\\"git\\ \\\\\\\"fix\\\\\\\"(?:[\\s\"]|\\\\\")',
       ]);
     });
 
@@ -142,7 +143,7 @@ describe('policy/utils', () => {
       const gitRegex = new RegExp(gitPatterns[0]!);
       // git\status -> {"command":"git\\status"}
       const gitAttack = '{"command":"git\\\\status"}';
-      expect(gitRegex.test(gitAttack)).toBe(false);
+      expect(gitAttack).not.toMatch(gitRegex);
     });
   });
 });

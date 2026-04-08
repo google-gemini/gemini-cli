@@ -275,15 +275,21 @@ export async function initializeTelemetry(
     });
   } else if (useOtlp) {
     if (otlpProtocol === 'http') {
+      const buildUrl = (path: string) => {
+        const url = new URL(parsedEndpoint);
+        // Join the existing pathname with the new path, handling trailing slashes.
+        url.pathname = [url.pathname.replace(/\/$/, ''), path].join('/');
+        return url.href;
+      };
       spanExporter = new OTLPTraceExporterHttp({
-        url: parsedEndpoint,
+        url: buildUrl('v1/traces'),
       });
       logExporter = new OTLPLogExporterHttp({
-        url: parsedEndpoint,
+        url: buildUrl('v1/logs'),
       });
       metricReader = new PeriodicExportingMetricReader({
         exporter: new OTLPMetricExporterHttp({
-          url: parsedEndpoint,
+          url: buildUrl('v1/metrics'),
         }),
         exportIntervalMillis: 10000,
       });
@@ -338,9 +344,9 @@ export async function initializeTelemetry(
     if (config.getDebugMode()) {
       debugLogger.log('OpenTelemetry SDK started successfully.');
     }
-    telemetryInitialized = true;
     activeTelemetryEmail = credentials?.client_email;
     initializeMetrics(config);
+    telemetryInitialized = true;
     void flushTelemetryBuffer();
   } catch (error) {
     debugLogger.error('Error starting OpenTelemetry SDK:', error);

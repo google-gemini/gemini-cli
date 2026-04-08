@@ -285,6 +285,23 @@ describe('github.ts', () => {
         ExtensionUpdateState.NOT_UPDATABLE,
       );
     });
+
+    it('should check migratedTo source if present and return UPDATE_AVAILABLE', async () => {
+      mockGit.getRemotes.mockResolvedValue([
+        { name: 'origin', refs: { fetch: 'new-url' } },
+      ]);
+      mockGit.listRemote.mockResolvedValue('hash\tHEAD');
+      mockGit.revparse.mockResolvedValue('hash');
+
+      const ext = {
+        path: '/path',
+        migratedTo: 'new-url',
+        installMetadata: { type: 'git', source: 'old-url' },
+      } as unknown as GeminiCLIExtension;
+      expect(await checkForExtensionUpdate(ext, mockExtensionManager)).toBe(
+        ExtensionUpdateState.UPDATE_AVAILABLE,
+      );
+    });
   });
 
   describe('downloadFromGitHubRelease', () => {

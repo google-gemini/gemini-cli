@@ -160,6 +160,7 @@ describe('MessageBus', () => {
         { name: 'test-tool', args: {} },
         'test-server',
         annotations,
+        undefined,
       );
     });
 
@@ -257,6 +258,92 @@ describe('MessageBus', () => {
       expect(errorHandler).toHaveBeenCalledWith(
         expect.objectContaining({
           message: 'Policy check failed',
+        }),
+      );
+    });
+  });
+
+  describe('derive', () => {
+    it('should receive responses from parent bus on derived bus', async () => {
+      vi.spyOn(policyEngine, 'check').mockResolvedValue({
+        decision: PolicyDecision.ASK_USER,
+      });
+
+      const subagentName = 'test-subagent';
+      const subagentBus = messageBus.derive(subagentName);
+
+      const request: Omit<ToolConfirmationRequest, 'correlationId'> = {
+        type: MessageBusType.TOOL_CONFIRMATION_REQUEST,
+        toolCall: { name: 'test-tool', args: {} },
+      };
+
+      const requestPromise = subagentBus.request<
+        ToolConfirmationRequest,
+        ToolConfirmationResponse
+      >(request, MessageBusType.TOOL_CONFIRMATION_RESPONSE, 2000);
+
+      // Wait for request on root bus and respond
+      await new Promise<void>((resolve) => {
+        messageBus.subscribe<ToolConfirmationRequest>(
+          MessageBusType.TOOL_CONFIRMATION_REQUEST,
+          (msg) => {
+            if (msg.subagent === subagentName) {
+              void messageBus.publish({
+                type: MessageBusType.TOOL_CONFIRMATION_RESPONSE,
+                correlationId: msg.correlationId,
+                confirmed: true,
+              });
+              resolve();
+            }
+          },
+        );
+      });
+
+      await expect(requestPromise).resolves.toEqual(
+        expect.objectContaining({
+          type: MessageBusType.TOOL_CONFIRMATION_RESPONSE,
+          confirmed: true,
+        }),
+      );
+    });
+
+    it('should correctly chain subagent names for nested subagents', async () => {
+      vi.spyOn(policyEngine, 'check').mockResolvedValue({
+        decision: PolicyDecision.ASK_USER,
+      });
+
+      const subagentBus1 = messageBus.derive('agent1');
+      const subagentBus2 = subagentBus1.derive('agent2');
+
+      const request: Omit<ToolConfirmationRequest, 'correlationId'> = {
+        type: MessageBusType.TOOL_CONFIRMATION_REQUEST,
+        toolCall: { name: 'test-tool', args: {} },
+      };
+
+      const requestPromise = subagentBus2.request<
+        ToolConfirmationRequest,
+        ToolConfirmationResponse
+      >(request, MessageBusType.TOOL_CONFIRMATION_RESPONSE, 2000);
+
+      await new Promise<void>((resolve) => {
+        messageBus.subscribe<ToolConfirmationRequest>(
+          MessageBusType.TOOL_CONFIRMATION_REQUEST,
+          (msg) => {
+            if (msg.subagent === 'agent1/agent2') {
+              void messageBus.publish({
+                type: MessageBusType.TOOL_CONFIRMATION_RESPONSE,
+                correlationId: msg.correlationId,
+                confirmed: true,
+              });
+              resolve();
+            }
+          },
+        );
+      });
+
+      await expect(requestPromise).resolves.toEqual(
+        expect.objectContaining({
+          confirmed: true,
         }),
       );
     });

@@ -31,6 +31,7 @@ import {
 import * as glob from 'glob';
 import { createMockMessageBus } from '../test-utils/mock-message-bus.js';
 import { GEMINI_IGNORE_FILE_NAME } from '../config/constants.js';
+import type { ReadManyFilesResult } from './tools.js';
 
 vi.mock('glob', { spy: true });
 
@@ -63,6 +64,16 @@ vi.mock('mime', () => {
 
 vi.mock('../telemetry/loggers.js', () => ({
   logFileOperation: vi.fn(),
+}));
+
+vi.mock('./jit-context.js', () => ({
+  discoverJitContext: vi.fn().mockResolvedValue(''),
+  appendJitContext: vi.fn().mockImplementation((content, context) => {
+    if (!context) return content;
+    return `${content}\n\n--- Newly Discovered Project Context ---\n${context}\n--- End Project Context ---`;
+  }),
+  JIT_CONTEXT_PREFIX: '\n\n--- Newly Discovered Project Context ---\n',
+  JIT_CONTEXT_SUFFIX: '\n--- End Project Context ---',
 }));
 
 describe('ReadManyFilesTool', () => {
@@ -267,7 +278,7 @@ describe('ReadManyFilesTool', () => {
         `--- ${expectedPath} ---\n\nContent of file1\n\n`,
         `\n--- End of content ---`,
       ]);
-      expect(result.returnDisplay).toContain(
+      expect((result.returnDisplay as ReadManyFilesResult).summary).toContain(
         'Successfully read and concatenated content from **1 file(s)**',
       );
     });
@@ -291,7 +302,7 @@ describe('ReadManyFilesTool', () => {
           c.includes(`--- ${expectedPath2} ---\n\nContent2\n\n`),
         ),
       ).toBe(true);
-      expect(result.returnDisplay).toContain(
+      expect((result.returnDisplay as ReadManyFilesResult).summary).toContain(
         'Successfully read and concatenated content from **2 file(s)**',
       );
     });
@@ -317,7 +328,7 @@ describe('ReadManyFilesTool', () => {
         ),
       ).toBe(true);
       expect(content.find((c) => c.includes('sub/data.json'))).toBeUndefined();
-      expect(result.returnDisplay).toContain(
+      expect((result.returnDisplay as ReadManyFilesResult).summary).toContain(
         'Successfully read and concatenated content from **2 file(s)**',
       );
     });
@@ -337,7 +348,7 @@ describe('ReadManyFilesTool', () => {
       expect(
         content.find((c) => c.includes('src/main.test.ts')),
       ).toBeUndefined();
-      expect(result.returnDisplay).toContain(
+      expect((result.returnDisplay as ReadManyFilesResult).summary).toContain(
         'Successfully read and concatenated content from **1 file(s)**',
       );
     });
@@ -349,7 +360,7 @@ describe('ReadManyFilesTool', () => {
       expect(result.llmContent).toEqual([
         'No files matching the criteria were found or all were skipped.',
       ]);
-      expect(result.returnDisplay).toContain(
+      expect((result.returnDisplay as ReadManyFilesResult).summary).toContain(
         'No files were read and concatenated based on the criteria.',
       );
     });
@@ -369,7 +380,7 @@ describe('ReadManyFilesTool', () => {
       expect(
         content.find((c) => c.includes('node_modules/some-lib/index.js')),
       ).toBeUndefined();
-      expect(result.returnDisplay).toContain(
+      expect((result.returnDisplay as ReadManyFilesResult).summary).toContain(
         'Successfully read and concatenated content from **1 file(s)**',
       );
     });
@@ -396,7 +407,7 @@ describe('ReadManyFilesTool', () => {
           c.includes(`--- ${expectedPath2} ---\n\napp code\n\n`),
         ),
       ).toBe(true);
-      expect(result.returnDisplay).toContain(
+      expect((result.returnDisplay as ReadManyFilesResult).summary).toContain(
         'Successfully read and concatenated content from **2 file(s)**',
       );
     });
@@ -420,7 +431,7 @@ describe('ReadManyFilesTool', () => {
         },
         '\n--- End of content ---',
       ]);
-      expect(result.returnDisplay).toContain(
+      expect((result.returnDisplay as ReadManyFilesResult).summary).toContain(
         'Successfully read and concatenated content from **1 file(s)**',
       );
     });
@@ -461,8 +472,10 @@ describe('ReadManyFilesTool', () => {
             c.includes(`--- ${expectedPath} ---\n\ntext notes\n\n`),
         ),
       ).toBe(true);
-      expect(result.returnDisplay).toContain('**Skipped 1 item(s):**');
-      expect(result.returnDisplay).toContain(
+      expect((result.returnDisplay as ReadManyFilesResult).summary).toContain(
+        '**Skipped 1 item(s):**',
+      );
+      expect((result.returnDisplay as ReadManyFilesResult).summary).toContain(
         '- `document.pdf` (Reason: asset file (image/pdf/audio) was not explicitly requested by name or extension)',
       );
     });
@@ -506,9 +519,15 @@ describe('ReadManyFilesTool', () => {
       const params = { include: ['foo.bar', 'bar.ts', 'foo.quux'] };
       const invocation = tool.build(params);
       const result = await invocation.execute(new AbortController().signal);
-      expect(result.returnDisplay).not.toContain('foo.bar');
-      expect(result.returnDisplay).not.toContain('foo.quux');
-      expect(result.returnDisplay).toContain('bar.ts');
+      expect((result.returnDisplay as ReadManyFilesResult).files).not.toContain(
+        'foo.bar',
+      );
+      expect((result.returnDisplay as ReadManyFilesResult).files).not.toContain(
+        'foo.quux',
+      );
+      expect((result.returnDisplay as ReadManyFilesResult).files).toContain(
+        'bar.ts',
+      );
     });
 
     it('should read files from multiple workspace directories', async () => {
@@ -584,7 +603,7 @@ describe('ReadManyFilesTool', () => {
           c.includes(`--- ${expectedPath2} ---\n\nContent2\n\n`),
         ),
       ).toBe(true);
-      expect(result.returnDisplay).toContain(
+      expect((result.returnDisplay as ReadManyFilesResult).summary).toContain(
         'Successfully read and concatenated content from **2 file(s)**',
       );
 
@@ -636,7 +655,7 @@ Content of receive-detail
 `,
         `\n--- End of content ---`,
       ]);
-      expect(result.returnDisplay).toContain(
+      expect((result.returnDisplay as ReadManyFilesResult).summary).toContain(
         'Successfully read and concatenated content from **1 file(s)**',
       );
     });
@@ -655,7 +674,7 @@ Content of file[1]
 `,
         `\n--- End of content ---`,
       ]);
-      expect(result.returnDisplay).toContain(
+      expect((result.returnDisplay as ReadManyFilesResult).summary).toContain(
         'Successfully read and concatenated content from **1 file(s)**',
       );
     });
@@ -754,7 +773,9 @@ Content of file[1]
 
       // Should successfully process valid files despite one failure
       expect(content.length).toBeGreaterThanOrEqual(3);
-      expect(result.returnDisplay).toContain('Successfully read');
+      expect((result.returnDisplay as ReadManyFilesResult).summary).toContain(
+        'Successfully read',
+      );
 
       // Verify valid files were processed
       const expectedPath1 = path.join(tempRootDir, 'valid1.txt');
@@ -776,7 +797,7 @@ Content of file[1]
 
       // Mock to track concurrent vs sequential execution
       detectFileTypeSpy.mockImplementation(async (filePath: string) => {
-        const fileName = filePath.split('/').pop() || '';
+        const fileName = path.basename(filePath);
         executionOrder.push(`start:${fileName}`);
 
         // Add delay to make timing differences visible
@@ -807,6 +828,105 @@ Content of file[1]
       expect(startsBeforeFirstEnd).toBe(startEvents); // Should PASS with parallel implementation
 
       detectFileTypeSpy.mockRestore();
+    });
+  });
+
+  describe('JIT context discovery', () => {
+    it('should append JIT context to output when enabled and context is found', async () => {
+      const { discoverJitContext } = await import('./jit-context.js');
+      vi.mocked(discoverJitContext).mockResolvedValue('Use the useAuth hook.');
+
+      fs.writeFileSync(
+        path.join(tempRootDir, 'jit-test.ts'),
+        'const x = 1;',
+        'utf8',
+      );
+
+      const invocation = tool.build({ include: ['jit-test.ts'] });
+      const result = await invocation.execute(new AbortController().signal);
+
+      expect(discoverJitContext).toHaveBeenCalled();
+      const llmContent = Array.isArray(result.llmContent)
+        ? result.llmContent.join('')
+        : String(result.llmContent);
+      expect(llmContent).toContain('Newly Discovered Project Context');
+      expect(llmContent).toContain('Use the useAuth hook.');
+    });
+
+    it('should not append JIT context when disabled', async () => {
+      const { discoverJitContext } = await import('./jit-context.js');
+      vi.mocked(discoverJitContext).mockResolvedValue('');
+
+      fs.writeFileSync(
+        path.join(tempRootDir, 'jit-disabled-test.ts'),
+        'const y = 2;',
+        'utf8',
+      );
+
+      const invocation = tool.build({ include: ['jit-disabled-test.ts'] });
+      const result = await invocation.execute(new AbortController().signal);
+
+      const llmContent = Array.isArray(result.llmContent)
+        ? result.llmContent.join('')
+        : String(result.llmContent);
+      expect(llmContent).not.toContain('Newly Discovered Project Context');
+    });
+
+    it('should discover JIT context sequentially to avoid duplicate shared parent context', async () => {
+      const { discoverJitContext } = await import('./jit-context.js');
+
+      // Simulate two subdirectories sharing a parent GEMINI.md.
+      // Sequential execution means the second call sees the parent already
+      // loaded, so it only returns its own leaf context.
+      const callOrder: string[] = [];
+      let firstCallDone = false;
+      vi.mocked(discoverJitContext).mockImplementation(async (_config, dir) => {
+        callOrder.push(dir);
+        if (!firstCallDone) {
+          // First call (whichever dir) loads the shared parent + its own leaf
+          firstCallDone = true;
+          return 'Parent context\nFirst leaf context';
+        }
+        // Second call only returns its own leaf (parent already loaded)
+        return 'Second leaf context';
+      });
+
+      // Create files in two sibling subdirectories
+      fs.mkdirSync(path.join(tempRootDir, 'subA'), { recursive: true });
+      fs.mkdirSync(path.join(tempRootDir, 'subB'), { recursive: true });
+      fs.writeFileSync(
+        path.join(tempRootDir, 'subA', 'a.ts'),
+        'const a = 1;',
+        'utf8',
+      );
+      fs.writeFileSync(
+        path.join(tempRootDir, 'subB', 'b.ts'),
+        'const b = 2;',
+        'utf8',
+      );
+
+      const invocation = tool.build({ include: ['subA/a.ts', 'subB/b.ts'] });
+      const result = await invocation.execute(new AbortController().signal);
+
+      // Verify both directories were discovered (order depends on Set iteration)
+      expect(callOrder).toHaveLength(2);
+      expect(callOrder).toEqual(
+        expect.arrayContaining([
+          expect.stringContaining('subA'),
+          expect.stringContaining('subB'),
+        ]),
+      );
+
+      const llmContent = Array.isArray(result.llmContent)
+        ? result.llmContent.join('')
+        : String(result.llmContent);
+      expect(llmContent).toContain('Parent context');
+      expect(llmContent).toContain('First leaf context');
+      expect(llmContent).toContain('Second leaf context');
+
+      // Parent context should appear only once (from the first call), not duplicated
+      const parentMatches = llmContent.match(/Parent context/g);
+      expect(parentMatches).toHaveLength(1);
     });
   });
 });
