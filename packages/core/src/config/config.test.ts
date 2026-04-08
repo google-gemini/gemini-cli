@@ -3423,8 +3423,8 @@ describe('Plans Directory Initialization', () => {
 
   it('should log a warning if the plan directory path is blocked by an existing file (EEXIST) in PLAN mode', async () => {
     const writeSpy = vi
-      .spyOn(process.stderr, 'write')
-      .mockImplementation(() => true);
+      .spyOn(debugLogger, 'error')
+      .mockImplementation(() => {});
     vi.spyOn(fs, 'mkdirSync').mockImplementation(() => {
       const err = new Error('File exists') as NodeJS.ErrnoException;
       err.code = 'EEXIST';
@@ -3449,8 +3449,8 @@ describe('Plans Directory Initialization', () => {
 
   it('should log a warning if mkdirSync fails during getPlansDir (e.g. EACCES) in PLAN mode', async () => {
     const writeSpy = vi
-      .spyOn(process.stderr, 'write')
-      .mockImplementation(() => true);
+      .spyOn(debugLogger, 'error')
+      .mockImplementation(() => {});
     vi.spyOn(fs, 'mkdirSync').mockImplementation(() => {
       const err = new Error('Permission denied') as NodeJS.ErrnoException;
       err.code = 'EACCES';

@@ -18,6 +18,7 @@ import {
 } from '../utils/paths.js';
 import { ProjectRegistry } from './projectRegistry.js';
 import { StorageMigration } from './storageMigration.js';
+import { isNodeError } from '../utils/errors.js';
 
 export const OAUTH_FILE = 'oauth_creds.json';
 const TMP_DIR_NAME = 'tmp';
@@ -330,14 +331,7 @@ export class Storage {
       try {
         realResolvedPath = resolveToRealPath(resolvedPath);
       } catch (e: unknown) {
-        if (
-          !(
-            e &&
-            typeof e === 'object' &&
-            'code' in e &&
-            (e.code === 'ENOENT' || e.code === 'EISDIR')
-          )
-        ) {
+        if (!(isNodeError(e) && (e.code === 'ENOENT' || e.code === 'EISDIR'))) {
           throw e;
         }
         // Construct the fallback path safely against the real project root
