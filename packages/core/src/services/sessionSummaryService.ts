@@ -111,48 +111,16 @@ export class SessionSummaryService {
     } = options;
 
     try {
-      // Filter to user/gemini messages only (exclude system messages)
-      const filteredMessages = messages.filter((msg) => {
-        // Skip system messages (info, error, warning)
-        if (msg.type !== 'user' && msg.type !== 'gemini') {
-          return false;
-        }
-        const content = partListUnionToString(msg.content);
-        return content.trim().length > 0;
-      });
+      const conversationText = this.formatConversation(
+        messages,
+        maxMessages,
+        MAX_MESSAGE_LENGTH,
+      );
 
-      // Apply sliding window selection: first N + last N messages
-      let relevantMessages: MessageRecord[];
-      if (filteredMessages.length <= maxMessages) {
-        // If fewer messages than max, include all
-        relevantMessages = filteredMessages;
-      } else {
-        // Sliding window: take the first and last messages.
-        const firstWindowSize = Math.ceil(maxMessages / 2);
-        const lastWindowSize = Math.floor(maxMessages / 2);
-        const firstMessages = filteredMessages.slice(0, firstWindowSize);
-        const lastMessages = filteredMessages.slice(-lastWindowSize);
-        relevantMessages = firstMessages.concat(lastMessages);
-      }
-
-      if (relevantMessages.length === 0) {
+      if (!conversationText) {
         debugLogger.debug('[SessionSummary] No messages to summarize');
         return null;
       }
-
-      // Format conversation for the prompt
-      const conversationText = relevantMessages
-        .map((msg) => {
-          const role = msg.type === 'user' ? 'User' : 'Assistant';
-          const content = partListUnionToString(msg.content);
-          // Truncate very long messages to avoid token limit
-          const truncated =
-            content.length > MAX_MESSAGE_LENGTH
-              ? content.slice(0, MAX_MESSAGE_LENGTH) + '...'
-              : content;
-          return `${role}: ${truncated}`;
-        })
-        .join('\n\n');
 
       const prompt = SUMMARY_PROMPT.replace('{conversation}', conversationText);
 
@@ -339,9 +307,10 @@ export class SessionSummaryService {
       .map((msg) => {
         const role = msg.type === 'user' ? 'User' : 'Assistant';
         const content = partListUnionToString(msg.content);
+        const characters = Array.from(content);
         const truncated =
-          content.length > maxMessageLength
-            ? content.slice(0, maxMessageLength) + '...'
+          characters.length > maxMessageLength
+            ? characters.slice(0, maxMessageLength).join('') + '...'
             : content;
         return `${role}: ${truncated}`;
       })

@@ -117,12 +117,12 @@ describe('sessionSummaryUtils', () => {
       expect(result).toBeNull();
     });
 
-    it('should return null if most recent session already has memory scratchpad', async () => {
+    it('should return null if most recent session already has summary', async () => {
       vi.mocked(fs.access).mockResolvedValue(undefined);
       mockReaddir.mockResolvedValue(['session-2024-01-01T10-00-abc12345.json']);
       vi.mocked(fs.readFile).mockResolvedValue(
         createSessionWithUserMessages(5, {
-          memoryScratchpad: '# Existing extraction',
+          summary: 'Existing summary',
         }),
       );
 

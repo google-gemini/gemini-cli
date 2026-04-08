@@ -35,10 +35,10 @@ async function generateAndSaveSummary(
   // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
   const conversation: ConversationRecord = JSON.parse(content);
 
-  // Skip if memory extraction already exists (summary is derived from it)
-  if (conversation.memoryScratchpad) {
+  // Skip if summary already exists
+  if (conversation.summary) {
     debugLogger.debug(
-      `[SessionSummary] Memory scratchpad already exists for ${sessionPath}, skipping`,
+      `[SessionSummary] Summary already exists for ${sessionPath}, skipping`,
     );
     return;
   }
@@ -79,7 +79,7 @@ async function generateAndSaveSummary(
     if (summary) {
       await saveSummaryOnly(sessionPath, summary);
       logger?.logMemoryExtractionEvent(
-        new MemoryExtractionEvent(true, durationMs, messageCount, 0, true),
+        new MemoryExtractionEvent(false, durationMs, messageCount, 0, true),
       );
     } else {
       logger?.logMemoryExtractionEvent(
@@ -98,9 +98,9 @@ async function generateAndSaveSummary(
   const freshConversation: ConversationRecord = JSON.parse(freshContent);
 
   // Check if extraction was added by another process
-  if (freshConversation.memoryScratchpad) {
+  if (freshConversation.summary) {
     debugLogger.debug(
-      `[SessionSummary] Memory scratchpad was added by another process for ${sessionPath}`,
+      `[SessionSummary] Summary was added by another process for ${sessionPath}`,
     );
     return;
   }
@@ -137,7 +137,7 @@ async function saveSummaryOnly(
   // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
   const freshConversation: ConversationRecord = JSON.parse(freshContent);
 
-  if (freshConversation.summary) {
+  if (freshConversation.summary || freshConversation.memoryScratchpad) {
     return;
   }
 
@@ -193,8 +193,8 @@ export async function getPreviousSession(
         // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
         const conversation: ConversationRecord = JSON.parse(content);
 
-        // Skip if memory extraction already done
-        if (conversation.memoryScratchpad) {
+        // Skip if summary already exists
+        if (conversation.summary) {
           continue;
         }
 
