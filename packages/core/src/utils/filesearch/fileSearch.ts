@@ -174,15 +174,17 @@ class RecursiveFileSearch implements FileSearch {
           this.ignore &&
           prevState === InitializationState.Initialized
         ) {
+          this.ignore = nextIgnore;
           this.initializationState = InitializationState.Initialized;
-          // optimization: if the file list is referentially equal (from crawl cache)
-          // and we already have ignore rules, skip rebuilding the FZF index.
           return;
         }
 
         const nextResultCache = new ResultCache(nextFiles);
         let nextFzf: AsyncFzf<string[]> | undefined = undefined;
         if (this.options.enableFuzzySearch) {
+          // The v1 algorithm is much faster since it only looks at the first
+          // occurrence of the pattern. We use it for search spaces that have >20k
+          // files, because the v2 algorithm is just too slow in those cases.
           nextFzf = new AsyncFzf(nextFiles, {
             fuzzy: nextFiles.length > 20000 ? 'v1' : 'v2',
             forward: false,

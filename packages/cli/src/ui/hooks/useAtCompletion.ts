@@ -309,10 +309,9 @@ export function useAtCompletion(props: UseAtCompletionProps): void {
 
           initPromises.push(
             searcher.initialize().then(() => {
-              if (initEpoch.current === currentEpoch) {
-                // Ensure we still have the latest version in the map
-                // (though set() above already did it, this handles potential concurrent resets)
-                fileSearchMap.current.set(dir, searcher);
+              if (initEpoch.current !== currentEpoch) {
+                // If the epoch changed, the map was cleared and we shouldn't re-add stale searchers.
+                return;
               }
             }),
           );
