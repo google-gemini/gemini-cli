@@ -181,6 +181,8 @@ export const TOOLS_REQUIRING_NARROWING = new Set([
   SHELL_TOOL_NAME,
 ]);
 
+export const INVESTIGATION_TOOL_NAME = 'investigate';
+
 export const TRACKER_CREATE_TASK_TOOL_NAME = 'tracker_create_task';
 export const TRACKER_UPDATE_TASK_TOOL_NAME = 'tracker_update_task';
 export const TRACKER_GET_TASK_TOOL_NAME = 'tracker_get_task';
