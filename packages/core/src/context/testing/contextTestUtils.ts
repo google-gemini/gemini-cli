@@ -9,6 +9,7 @@ import type { Config } from '../../config/config.js';
 import type { ContextEnvironment } from '../sidecar/environment.js';
 import type { Content } from '@google/genai';
 import { AgentChatHistory } from '../../core/agentChatHistory.js';
+import type { ConcreteNode, ToolExecution } from "../ir/types.js";
 import { ContextManager } from '../contextManager.js';
 import { InMemoryFileSystem } from '../system/InMemoryFileSystem.js';
 import { DeterministicIdGenerator } from '../system/DeterministicIdGenerator.js';
@@ -34,9 +35,64 @@ export function createDummyState(
     maxTokens,
     retainedTokens,
     deficitTokens: deficit,
-    protectedEpisodeIds: protectedIds,
+    protectedLogicalIds: protectedIds,
     isBudgetSatisfied: isSatisfied,
   };
+}
+
+export function createDummyNode(
+  logicalParentId: string,
+  type: 'USER_PROMPT' | 'SYSTEM_EVENT' | 'AGENT_THOUGHT' | 'AGENT_YIELD',
+  tokens = 100,
+  overrides?: Partial<ConcreteNode>,
+  id?: string
+): ConcreteNode {
+  return {
+    id: id || randomUUID(),
+    episodeId: logicalParentId,
+    logicalParentId,
+    type: type as any,
+    timestamp: Date.now(),
+    text: `Dummy ${type}`,
+    name: type === 'SYSTEM_EVENT' ? 'dummy_event' : undefined,
+    payload: type === 'SYSTEM_EVENT' ? {} : undefined,
+    semanticParts: [],
+    metadata: {
+      originalTokens: tokens,
+      currentTokens: tokens,
+      transformations: [],
+    },
+    ...overrides,
+  } as unknown as ConcreteNode;
+}
+
+export function createDummyToolNode(
+  logicalParentId: string,
+  intentTokens = 100,
+  obsTokens = 200,
+  overrides?: Partial<ToolExecution>,
+  id?: string
+): ToolExecution {
+  return {
+    id: id || randomUUID(),
+    episodeId: logicalParentId,
+    logicalParentId,
+    type: 'TOOL_EXECUTION',
+    timestamp: Date.now(),
+    toolName: 'dummy_tool',
+    intent: { action: 'test' },
+    observation: { result: 'ok' },
+    tokens: {
+      intent: intentTokens,
+      observation: obsTokens,
+    },
+    metadata: {
+      originalTokens: intentTokens + obsTokens,
+      currentTokens: intentTokens + obsTokens,
+      transformations: [],
+    },
+    ...overrides,
+  } as unknown as ToolExecution;
 }
 
 export function createDummyEpisode(
@@ -98,7 +154,7 @@ export function createDummyEpisode(
   };
 }
 
-export function createMockEnvironment(): ContextEnvironment {
+export function createMockEnvironment(overrides?: Partial<ContextEnvironment>): ContextEnvironment {
   return {
     // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
     llmClient: vi.fn().mockReturnValue({
@@ -116,7 +172,8 @@ export function createMockEnvironment(): ContextEnvironment {
     tokenCalculator: new ContextTokenCalculator(1),
     fileSystem: new InMemoryFileSystem(),
     idGenerator: new DeterministicIdGenerator('mock-uuid-'),
-  };
+    ...overrides,
+  } as ContextEnvironment;
 }
 
 /**

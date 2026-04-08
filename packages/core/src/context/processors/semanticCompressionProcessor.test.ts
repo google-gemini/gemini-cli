@@ -1,164 +1,157 @@
-/**
- * @license
- * Copyright 2026 Google LLC
- * SPDX-License-Identifier: Apache-2.0
- */
-
+import { describe, it, expect, vi } from 'vitest';
+import { SemanticCompressionProcessor } from './semanticCompressionProcessor.js';
 import {
   createMockEnvironment,
   createDummyState,
-  createDummyEpisode,
+  createDummyNode,
+  createDummyToolNode,
 } from '../testing/contextTestUtils.js';
-import { describe, it, expect, beforeEach, vi } from 'vitest';
-import { SemanticCompressionProcessor } from './semanticCompressionProcessor.js';
-import { EpisodeEditor } from '../ir/episodeEditor.js';
-import type { UserPrompt, ToolExecution, AgentThought } from '../ir/types.js';
-import { randomUUID } from 'node:crypto';
-import type { BaseLlmClient } from 'src/core/baseLlmClient.js';
+import type { UserPrompt, AgentThought, ToolExecution } from '../ir/types.js';
+import { ContextTokenCalculator } from '../utils/contextTokenCalculator.js';
 
 describe('SemanticCompressionProcessor', () => {
-  let processor: SemanticCompressionProcessor;
-  let generateContentMock: ReturnType<typeof vi.fn>;
+  it('should trigger summarization via LLM for long text parts', async () => {
+    const mockLlmClient = {
+      generateContent: vi.fn().mockResolvedValue({
+        candidates: [{ content: { parts: [{ text: 'Mocked Summary!' }] } }],
+      }),
+    };
 
-  beforeEach(() => {
-    generateContentMock = vi.fn().mockResolvedValue({
-      candidates: [{ content: { parts: [{ text: 'Mocked Summary!' }] } }],
+    const mockTokenCalculator = new ContextTokenCalculator(1) as any;
+    mockTokenCalculator.tokensToChars = vi.fn().mockReturnValue(10);
+    mockTokenCalculator.estimateTokensForParts = vi.fn((parts: any) => {
+       if (parts[0]?.text === 'Mocked Summary!') return 5;
+       if (parts[0]?.functionResponse?.response?.summary === 'Mocked Summary!') return 10;
+       return 5000;
     });
 
-    const env = createMockEnvironment();
-    // Re-mock llmClient properly
-    vi.spyOn(env, 'llmClient', 'get').mockReturnValue({
-      generateContent: generateContentMock,
-    } as unknown as BaseLlmClient);
-
-    processor = new SemanticCompressionProcessor(env, {
-      nodeThresholdTokens: 2000,
+    const env = createMockEnvironment({
+        llmClient: mockLlmClient as any,
+        tokenCalculator: mockTokenCalculator
     });
+
+    const processor = SemanticCompressionProcessor.create(env, {
+      nodeThresholdTokens: 10,
+    });
+
+    const state = createDummyState(false, 15000); // We need to save tons of tokens
+
+    const prompt = createDummyNode('ep1', 'USER_PROMPT', 3800, {
+      semanticParts: [
+        { type: 'text', text: 'This text is way longer than 10 characters and needs compression' }
+      ],
+    }, 'prompt-id') as UserPrompt;
+
+    const thought = createDummyNode('ep1', 'AGENT_THOUGHT', 1500, {
+      text: 'The model is thinking something incredibly long and verbose that exceeds 10 chars',
+      metadata: { currentTokens: 5000, originalTokens: 5000, transformations: [] }
+    }, 'thought-id') as AgentThought;
+
+    const tool = createDummyToolNode('ep1', 50, 1000, {
+      observation: { result: 'Massive tool JSON observation payload' },
+      tokens: { intent: 50, observation: 1000 }
+    }, 'tool-id');
+
+    const targets = [prompt, thought, tool];
+
+    const result = await processor.process({
+      buffer: {} as any,
+      ship: [],
+      targets,
+      state,
+      inbox: {} as any,
+    });
+
+    expect(result.length).toBe(3);
+
+    // 1. User Prompt
+    const compressedPrompt = result[0] as UserPrompt;
+    expect(compressedPrompt.id).toBe('mock-uuid-1');
+    expect(compressedPrompt.id).not.toBe(prompt.id);
+    expect(compressedPrompt.semanticParts[0].type).toBe('text');
+    expect((compressedPrompt.semanticParts[0] as any).text).toBe('Mocked Summary!');
+    expect(compressedPrompt.metadata.transformations.length).toBe(1);
+    expect(compressedPrompt.metadata.transformations[0].action).toBe('SUMMARIZED');
+
+    // 2. Agent Thought
+    const compressedThought = result[1] as AgentThought;
+    expect(compressedThought.id).toBe('mock-uuid-2');
+    expect(compressedThought.id).not.toBe(thought.id);
+    expect(compressedThought.text).toBe('Mocked Summary!');
+    expect(compressedThought.metadata.transformations.length).toBe(1);
+
+    // 3. Tool Execution
+    const compressedTool = result[2] as ToolExecution;
+    expect(compressedTool.id).toBe('mock-uuid-3');
+    expect(compressedTool.id).not.toBe(tool.id);
+    expect(compressedTool.observation).toEqual({ summary: 'Mocked Summary!' });
+    expect(compressedTool.metadata.transformations.length).toBe(1);
+
+    // Verify LLM was called 3 times
+    expect(mockLlmClient.generateContent).toHaveBeenCalledTimes(3);
   });
 
-  const createEpisodeWithThoughtsAndTools = (
-    id: string,
-    userText: string,
-    thoughtText: string,
-    toolObs: string,
-  ) => {
-    const ep = createDummyEpisode(id, 'USER_PROMPT', [
-      { type: 'text', text: userText },
-    ]);
-    // We override metadata for threshold triggering
-    ep.trigger.metadata.currentTokens = 3800;
+  it('should stop summarizing once the deficit is cleared', async () => {
+    const mockLlmClient = {
+      generateContent: vi.fn().mockResolvedValue({
+        candidates: [{ content: { parts: [{ text: 'Mocked Summary!' }] } }],
+      }),
+    };
 
-    ep.steps = [
-      {
-        id: randomUUID(),
-        type: 'AGENT_THOUGHT',
-        text: thoughtText,
-        metadata: {
-          originalTokens: 3800,
-          currentTokens: 3800,
-          transformations: [],
-        },
-      },
-      {
-        id: randomUUID(),
-        type: 'TOOL_EXECUTION',
-        toolName: 'test',
-        intent: {},
-        observation: toolObs,
-        tokens: { intent: 10, observation: 3800 },
-        metadata: {
-          originalTokens: 3810,
-          currentTokens: 3810,
-          transformations: [],
-        },
-      },
-    ];
-    return ep;
-  };
+    const mockTokenCalculator = new ContextTokenCalculator(1) as any;
+    mockTokenCalculator.tokensToChars = vi.fn().mockReturnValue(10);
+    // Returning 0 tokens for the summary to maximize savings
+    mockTokenCalculator.estimateTokensForParts = vi.fn((parts: any) => {
+       if (parts[0]?.text === 'Mocked Summary!') return 0;
+       return 5000;
+    });
 
-  it('bypasses processing if budget is satisfied', async () => {
-    const episodes = [
-      createEpisodeWithThoughtsAndTools('1', 'short', 'short', 'short'),
-    ];
-    const state = createDummyState(true);
+    const env = createMockEnvironment({
+       llmClient: mockLlmClient as any,
+       tokenCalculator: mockTokenCalculator
+    });
 
-    const editor = new EpisodeEditor(episodes);
-    await processor.process(editor, state);
+    const processor = SemanticCompressionProcessor.create(env, {
+      nodeThresholdTokens: 10,
+    });
 
-    expect(generateContentMock).not.toHaveBeenCalled();
-  });
+    // Deficit is only 10 tokens! The first summarization will save 5000 tokens, clearing it instantly.
+    const state = createDummyState(false, 10); 
 
-  it('skips protected episodes even if over budget', async () => {
-    const massiveStr = 'M'.repeat(15000);
-    const episodes = [
-      createEpisodeWithThoughtsAndTools(
-        'ep-1',
-        massiveStr,
-        massiveStr,
-        massiveStr,
-      ),
-    ];
-    const state = createDummyState(false, 1000, new Set(['ep-1']));
+    const prompt = createDummyNode('ep1', 'USER_PROMPT', 3800, {
+      semanticParts: [
+        { type: 'text', text: 'This text is way longer than 10 characters and needs compression' }
+      ],
+    }, 'prompt-id') as UserPrompt;
 
-    const editor = new EpisodeEditor(episodes);
-    await processor.process(editor, state);
+    const thought = createDummyNode('ep1', 'AGENT_THOUGHT', 1500, {
+      text: 'The model is thinking something incredibly long and verbose that exceeds 10 chars',
+      metadata: { currentTokens: 5000, originalTokens: 5000, transformations: [] }
+    }, 'thought-id') as AgentThought;
 
-    expect(generateContentMock).not.toHaveBeenCalled();
-  });
+    const targets = [prompt, thought];
 
-  it('summarizes unprotected UserPrompts, Thoughts, and Tool observations until deficit is met', async () => {
-    const massiveStr = 'M'.repeat(15000);
-    const episodes = [
-      createEpisodeWithThoughtsAndTools(
-        'ep-1',
-        massiveStr,
-        massiveStr,
-        massiveStr,
-      ),
-    ];
-    const state = createDummyState(false, 50000); // Massive deficit, forces all 3 to summarize
+    const result = await processor.process({
+      buffer: {} as any,
+      ship: [],
+      targets,
+      state,
+      inbox: {} as any,
+    });
 
-    const editor = new EpisodeEditor(episodes);
-    await processor.process(editor, state);
+    expect(result.length).toBe(2);
 
-    expect(generateContentMock).toHaveBeenCalledTimes(3);
+    // 1. User Prompt (was summarized because deficit was > 0)
+    const compressedPrompt = result[0] as UserPrompt;
+    expect(compressedPrompt.id).toBe('mock-uuid-1');
+    expect(compressedPrompt.id).not.toBe(prompt.id);
 
-    // Verify presentation layers were injected
-    const result = editor.getFinalEpisodes();
-    const userPart = (result[0].trigger as UserPrompt).semanticParts[0];
-    const thoughtPart = result[0].steps[0] as AgentThought;
-    const toolPart = result[0].steps[1] as ToolExecution;
+    // 2. Agent Thought (was NOT summarized because deficit hit 0)
+    const untouchedThought = result[1] as AgentThought;
+    expect(untouchedThought.id).toBe(thought.id); // Reference equality!
+    expect(untouchedThought.text).toBe(thought.text);
 
-    expect(userPart.presentation).toBeDefined();
-    expect(userPart.presentation!.text).toContain('Mocked Summary!');
-
-    expect(thoughtPart.presentation).toBeDefined();
-    expect(thoughtPart.presentation!.text).toContain('Mocked Summary!');
-
-    expect(toolPart.presentation).toBeDefined();
-    expect(
-      (toolPart.presentation!.observation as Record<string, string>)['summary'],
-    ).toContain('Mocked Summary!');
-  });
-
-  it('stops calling LLM when deficit hits zero', async () => {
-    const massiveStr = 'M'.repeat(15000);
-    const episodes = [
-      createEpisodeWithThoughtsAndTools(
-        'ep-1',
-        massiveStr,
-        massiveStr,
-        massiveStr,
-      ),
-    ];
-
-    // Set deficit low enough that ONE summary solves the problem
-    const state = createDummyState(false, 5);
-
-    const editor = new EpisodeEditor(episodes);
-    await processor.process(editor, state);
-
-    // It should only compress the UserPrompt and then stop
-    expect(generateContentMock).toHaveBeenCalledTimes(1);
+    // LLM should only have been called once
+    expect(mockLlmClient.generateContent).toHaveBeenCalledTimes(1);
   });
 });

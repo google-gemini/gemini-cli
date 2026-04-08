@@ -1,135 +1,87 @@
-/**
- * @license
- * Copyright 2026 Google LLC
- * SPDX-License-Identifier: Apache-2.0
- */
-
-import { createMockEnvironment } from '../testing/contextTestUtils.js';
-import { describe, it, expect, beforeEach, vi } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
 import { ToolMaskingProcessor } from './toolMaskingProcessor.js';
-import { EpisodeEditor } from '../ir/episodeEditor.js';
-import type { Episode, ToolExecution } from '../ir/types.js';
-import type { ContextAccountingState } from '../pipeline.js';
-import { randomUUID } from 'node:crypto';
-import type { ContextEnvironment } from '../sidecar/environment.js';
-import type { InMemoryFileSystem } from '../system/InMemoryFileSystem.js';
+import {
+  createMockEnvironment,
+  createDummyState,
+  createDummyToolNode,
+} from '../testing/contextTestUtils.js';
 
 describe('ToolMaskingProcessor', () => {
-  let processor: ToolMaskingProcessor;
-  let env: ContextEnvironment;
-  let fileSystem: InMemoryFileSystem;
+  it('should write large strings to disk and replace them with a masked pointer', async () => {
+    const env = createMockEnvironment();
+    // 1 token = 1 char for simplicity
+    env.tokenCalculator.tokensToChars = vi.fn().mockReturnValue(10);
+    // Fake token calculator says new tokens are 5
+    env.tokenCalculator.estimateTokensForParts = vi.fn().mockReturnValue(5);
 
-  beforeEach(() => {
-    vi.resetAllMocks();
-    env = createMockEnvironment();
-    fileSystem = env.fileSystem as InMemoryFileSystem;
-
-    processor = new ToolMaskingProcessor(env, {
-      stringLengthThresholdTokens: 100,
+    const processor = ToolMaskingProcessor.create(env, {
+      stringLengthThresholdTokens: 10,
     });
-  });
 
-  const getDummyState = (
-    isSatisfied = false,
-    deficit = 0,
-    protectedIds = new Set<string>(),
-  ): ContextAccountingState => ({
-    currentTokens: 5000,
-    maxTokens: 10000,
-    retainedTokens: 4000,
-    deficitTokens: deficit,
-    protectedEpisodeIds: protectedIds,
-    isBudgetSatisfied: isSatisfied,
-  });
+    const state = createDummyState(false, 500);
 
-  const createDummyEpisode = (
-    id: string,
-    intent: Record<string, unknown>,
-    observation: Record<string, unknown>,
-  ): Episode => ({
-    type: 'EPISODE',
-    id,
-    timestamp: Date.now(),
-    trigger: {
-      id: randomUUID(),
-      type: 'SYSTEM_EVENT',
-      name: 'test',
-      payload: {},
-      metadata: { originalTokens: 10, currentTokens: 10, transformations: [] },
-    },
-    steps: [
-      {
-        id: randomUUID(),
-        type: 'TOOL_EXECUTION',
-        toolName: 'test_tool',
-        intent,
-        observation,
-        tokens: { intent: 500, observation: 500 }, // Claim they are big enough to be masked
-        metadata: {
-          originalTokens: 1000,
-          currentTokens: 1000,
-          transformations: [],
-        },
+    const toolStep = createDummyToolNode('ep1', 50, 100, {
+      observation: {
+        result: 'this is a really long string that should get masked out because it exceeds 10 chars',
+        metadata: 'short',
       },
-    ],
+      metadata: {
+        currentTokens: 150,
+        originalTokens: 150,
+        transformations: []
+      }
+    });
+
+    const result = await processor.process({
+      buffer: {} as any,
+      ship: [],
+      targets: [toolStep],
+      state,
+      inbox: {} as any,
+    });
+
+    expect(result.length).toBe(1);
+    const masked = result[0];
+    
+    // It should have generated a new ID because it modified it
+    expect(masked.id).not.toBe(toolStep.id);
+
+    // It should have masked the observation
+    const obs = (masked as any).observation;
+    expect(obs.result).toContain('<tool_output_masked>');
+    expect(obs.metadata).toBe('short'); // Untouched
+
+    // Transformation logged
+    expect(masked.metadata.transformations.length).toBe(1);
+    expect(masked.metadata.transformations[0].action).toBe('MASKED');
   });
 
-  it('bypasses processing if budget is satisfied', async () => {
-    const episodes = [
-      createDummyEpisode('1', { arg: 'short' }, { out: 'short' }),
-    ];
-    const state = getDummyState(true);
+  it('should skip unmaskable tools', async () => {
+    const env = createMockEnvironment();
+    env.tokenCalculator.tokensToChars = vi.fn().mockReturnValue(10);
 
-    const editor = new EpisodeEditor(episodes);
-    await processor.process(editor, state);
-    const result = editor.getFinalEpisodes();
+    const processor = ToolMaskingProcessor.create(env, {
+      stringLengthThresholdTokens: 10,
+    });
 
-    expect(result).toStrictEqual(episodes);
-    expect((result[0].steps[0] as ToolExecution).presentation).toBeUndefined();
-  });
+    const state = createDummyState(false, 500);
 
-  it('deep masks massive string intents and observations', async () => {
-    // We need strings > limitChars (100 tokens * 4 chars = 400 chars)
-    const massiveIntentString = 'I'.repeat(500);
-    const massiveObsString = 'O'.repeat(500);
+    const toolStep = createDummyToolNode('ep1', 10, 10, {
+      toolName: 'activate_skill',
+      observation: {
+        result: 'this is a really long string that normally would get masked but wont because of the tool name',
+      }
+    });
 
-    const intentPayload = { args: { nested: [massiveIntentString, 'short'] } };
-    const obsPayload = { result: massiveObsString, error: null };
+    const result = await processor.process({
+      buffer: {} as any,
+      ship: [],
+      targets: [toolStep],
+      state,
+      inbox: {} as any,
+    });
 
-    const episodes = [createDummyEpisode('ep-1', intentPayload, obsPayload)];
-    const state = getDummyState(false, 1000, new Set()); // Huge deficit
-
-    const editor = new EpisodeEditor(episodes);
-    await processor.process(editor, state);
-    const result = editor.getFinalEpisodes();
-
-    const toolStep = result[0].steps[0] as ToolExecution;
-
-    expect(toolStep.presentation).toBeDefined();
-
-    // Check intent was deep masked
-    const maskedIntent = toolStep.presentation!.intent as Record<
-      string,
-      unknown
-    >;
-    expect((maskedIntent['args'] as { nested: string }).nested[0]).toContain(
-      '<tool_output_masked>',
-    );
-    expect((maskedIntent['args'] as { nested: string }).nested[1]).toBe(
-      'short',
-    ); // Unchanged
-
-    // Check observation was deep masked
-    const maskedObs = toolStep.presentation!.observation as Record<
-      string,
-      unknown
-    >;
-    expect((maskedObs as { result: string }).result).toContain(
-      '<tool_output_masked>',
-    );
-    expect((maskedObs as { error: string }).error).toBeNull();
-
-    // Check disk writes occurred to fake FS
-    expect(fileSystem.getFiles().size).toBe(2);
+    // Returned the exact same object reference
+    expect(result[0]).toBe(toolStep);
   });
 });

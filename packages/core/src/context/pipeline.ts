@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import type { ConcreteNode, Snapshot, RollingSummary, IrMetadata } from './ir/types.js';
+import type { ConcreteNode, Snapshot, RollingSummary } from './ir/types.js';
 
 export type InboxMessage = 
   | { type: 'SNAPSHOT_READY'; snapshot: Snapshot; abstractsIds: string[] }
@@ -17,13 +17,13 @@ export interface ContextInbox {
 
 export interface ContextWorkingBuffer {
   /** The current active (projected) flat list of ConcreteNodes. */
-  readonly nodes: ReadonlyArray<ConcreteNode>;
+  readonly nodes: readonly ConcreteNode[];
   
   /** Retrieves the historical, pristine version of a node (before any masks/summaries). */
   getPristineNode(id: string): ConcreteNode | undefined;
   
   /** Retrieves the full audit lineage of a specific node ID. */
-  getLineage(id: string): ReadonlyArray<ConcreteNode>;
+  getLineage(id: string): readonly ConcreteNode[];
 }
 
 /**
@@ -54,35 +54,19 @@ export interface ContextAccountingState {
  * A declarative instruction from a processor on how to modify the Ship.
  * Applied sequentially by the Orchestrator (Reducer).
  */
-export interface ContextPatch {
-  /** The IDs of the Concrete Nodes to remove from the Ship. */
-  readonly removedIds: ReadonlyArray<string>;
-  
-  /** 
-   * The new synthetic Concrete Nodes (e.g., MaskedTool, Snapshot) to insert.
-   * If omitted or empty, this patch acts as a pure deletion.
-   */
-  readonly insertedNodes?: ReadonlyArray<ConcreteNode>;
-
-  /** The index at which to insert the new nodes. If omitted, they replace the first removedId. */
-  readonly insertionIndex?: number;
-  
-  /** Audit metadata explaining who made this patch, when, and why. */
-  readonly metadata: IrMetadata;
-}
-
 export interface ProcessArgs {
   /** The rich buffer containing current nodes and their history. */
   readonly buffer: ContextWorkingBuffer;
 
-  /** The flat, sequential array of current renderable nodes (The Ship). */
-  readonly ship: ReadonlyArray<ConcreteNode>;
+  /** The full, read-only view of the ship. */
+  readonly ship: readonly ConcreteNode[];
   
   /** 
-   * The specific subset of Concrete Node IDs that triggered this execution.
-   * For 'new_message', these are the new nodes. For 'retained_exceeded', the aged-out nodes.
+   * The unprotected, mutable subset of nodes targeted by this trigger.
+   * The Orchestrator strictly filters out ANY protected nodes (like active tasks) before calling.
+   * Processors can assume all targets passed here are legally theirs to mutate or drop.
    */
-  readonly triggerTargets: ReadonlySet<string>;
+  readonly targets: ConcreteNode[];
   
   /** The token budget and accounting state. */
   readonly state: ContextAccountingState;
@@ -93,7 +77,7 @@ export interface ProcessArgs {
 
 /**
  * Interface for all context degradation strategies.
- * Processors are pure functions that return ContextPatches.
+ * Processors are pure functional map/filter operations over the targets.
  */
 export interface ContextProcessor {
   /** Unique ID for registry mapping. */
@@ -101,8 +85,13 @@ export interface ContextProcessor {
   /** Unique name for telemetry and logging. */
   readonly name: string;
 
-  /** Returns an array of declarative patches applied at this specific temporal phase. */
-  process(args: ProcessArgs): Promise<ContextPatch[]>;
+  /** 
+   * A pure function. Returns the new state of the `targets`. 
+   * If an ID from `targets` is missing in the return array, the Orchestrator deletes it.
+   * If a new synthetic node is in the return array, the Orchestrator inserts it.
+   * The Orchestrator automatically appends audit `IrMetadata` to any changes.
+   */
+  process(args: ProcessArgs): Promise<readonly ConcreteNode[]>;
 }
 
 /**

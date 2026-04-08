@@ -1,14 +1,7 @@
-/**
- * @license
- * Copyright 2026 Google LLC
- * SPDX-License-Identifier: Apache-2.0
- */
-
-import type { ContextAccountingState, ContextProcessor } from '../pipeline.js';
+import type { ProcessArgs, ContextProcessor } from '../pipeline.js';
+import type { ConcreteNode, UserPrompt } from '../ir/types.js';
 import type { ContextEnvironment } from '../sidecar/environment.js';
 import { sanitizeFilenamePart } from '../../utils/fileUtils.js';
-import type { EpisodeEditor } from '../ir/episodeEditor.js';
-import { isUserPrompt } from '../ir/graphUtils.js';
 
 export type BlobDegradationProcessorOptions = Record<string, never>;
 
@@ -29,12 +22,9 @@ export class BlobDegradationProcessor implements ContextProcessor {
     this.env = env;
   }
 
-  async process(
-    editor: EpisodeEditor,
-    state: ContextAccountingState,
-  ): Promise<void> {
+  async process({ targets, state }: ProcessArgs): Promise<ReadonlyArray<ConcreteNode>> {
     if (state.isBudgetSatisfied) {
-      return;
+      return targets;
     }
 
     let currentDeficit = state.deficitTokens;
@@ -59,88 +49,100 @@ export class BlobDegradationProcessor implements ContextProcessor {
       }
     };
 
+    const returnedNodes: ConcreteNode[] = [];
+
     // Forward scan, looking for bloated non-text parts to degrade
-    for (const target of editor.targets) {
-      const ep = target.episode;
-      if (target.node !== ep.trigger) continue;
-      
-      if (currentDeficit <= 0) break;
-      if (state.protectedEpisodeIds.has(ep.id)) continue;
+    for (const node of targets) {
+      if (currentDeficit <= 0 || node.type !== 'USER_PROMPT') {
+        returnedNodes.push(node);
+        continue;
+      }
 
-      if (isUserPrompt(ep.trigger)) {
-        for (let j = 0; j < ep.trigger.semanticParts.length; j++) {
-          const part = ep.trigger.semanticParts[j];
-          if (currentDeficit <= 0) break;
-          // We only target non-text parts that haven't already been masked
-          if (part.type === 'text' || part.presentation) continue;
+      const prompt = node as UserPrompt;
+      let modified = false;
+      const newParts = [...prompt.semanticParts];
 
-          let newText = '';
-          let tokensSaved = 0;
+      for (let j = 0; j < prompt.semanticParts.length; j++) {
+        const part = prompt.semanticParts[j];
+        if (currentDeficit <= 0) break;
+        // We only target non-text parts that haven't already been masked
+        if (part.type === 'text') continue;
 
-          if (part.type === 'inline_data') {
-            await ensureDir();
-            const ext = part.mimeType.split('/')[1] || 'bin';
-            const fileName = `blob_${Date.now()}_${this.env.idGenerator.generateId()}.${ext}`;
-            const filePath = this.env.fileSystem.join(blobOutputsDir, fileName);
+        let newText = '';
+        let tokensSaved = 0;
 
-            // Base64 to buffer
-            const buffer = Buffer.from(part.data, 'base64');
-            await this.env.fileSystem.writeFile(filePath, buffer);
+        if (part.type === 'inline_data') {
+          await ensureDir();
+          const ext = part.mimeType.split('/')[1] || 'bin';
+          const fileName = `blob_${Date.now()}_${this.env.idGenerator.generateId()}.${ext}`;
+          const filePath = this.env.fileSystem.join(blobOutputsDir, fileName);
 
-            const mb = (buffer.byteLength / 1024 / 1024).toFixed(2);
-            newText = `[Multi-Modal Blob (${part.mimeType}, ${mb}MB) degraded to text to preserve context window. Saved to: ${filePath}]`;
+          // Base64 to buffer
+          const buffer = Buffer.from(part.data, 'base64');
+          await this.env.fileSystem.writeFile(filePath, buffer);
 
-            // Re-calculate tokens. Images are expensive (~258 tokens). The text is cheap (~20 tokens).
-            const oldTokens = this.env.tokenCalculator.estimateTokensForParts([
-              { inlineData: { mimeType: part.mimeType, data: part.data } },
-            ]);
-            const newTokens = this.env.tokenCalculator.estimateTokensForParts([
-              { text: newText },
-            ]);
-            tokensSaved = oldTokens - newTokens;
-          } else if (part.type === 'file_data') {
-            newText = `[File Reference (${part.mimeType}) degraded to text to preserve context window. Original URI: ${part.fileUri}]`;
-            const oldTokens = this.env.tokenCalculator.estimateTokensForParts([
-              { fileData: { mimeType: part.mimeType, fileUri: part.fileUri } },
-            ]);
-            const newTokens = this.env.tokenCalculator.estimateTokensForParts([
-              { text: newText },
-            ]);
-            tokensSaved = oldTokens - newTokens;
-          } else if (part.type === 'raw_part') {
-            newText = `[Unknown Part degraded to text to preserve context window.]`;
-            const oldTokens = this.env.tokenCalculator.estimateTokensForParts([
-              part.part,
-            ]);
-            const newTokens = this.env.tokenCalculator.estimateTokensForParts([
-              { text: newText },
-            ]);
-            tokensSaved = oldTokens - newTokens;
-          }
+          const mb = (buffer.byteLength / 1024 / 1024).toFixed(2);
+          newText = `[Multi-Modal Blob (${part.mimeType}, ${mb}MB) degraded to text to preserve context window. Saved to: ${filePath}]`;
 
-          if (newText && tokensSaved > 0) {
-            const newTokens = this.env.tokenCalculator.estimateTokensForParts([
-              { text: newText },
-            ]);
+          const oldTokens = this.env.tokenCalculator.estimateTokensForParts([
+            { inlineData: { mimeType: part.mimeType, data: part.data } },
+          ]);
+          const newTokens = this.env.tokenCalculator.estimateTokensForParts([
+            { text: newText },
+          ]);
+          tokensSaved = oldTokens - newTokens;
+        } else if (part.type === 'file_data') {
+          newText = `[File Reference (${part.mimeType}) degraded to text to preserve context window. Original URI: ${part.fileUri}]`;
+          const oldTokens = this.env.tokenCalculator.estimateTokensForParts([
+            { fileData: { mimeType: part.mimeType, fileUri: part.fileUri } },
+          ]);
+          const newTokens = this.env.tokenCalculator.estimateTokensForParts([
+            { text: newText },
+          ]);
+          tokensSaved = oldTokens - newTokens;
+        } else if (part.type === 'raw_part') {
+          newText = `[Unknown Part degraded to text to preserve context window.]`;
+          const oldTokens = this.env.tokenCalculator.estimateTokensForParts([
+            part.part,
+          ]);
+          const newTokens = this.env.tokenCalculator.estimateTokensForParts([
+            { text: newText },
+          ]);
+          tokensSaved = oldTokens - newTokens;
+        }
 
-            editor.editEpisode(ep.id, 'DEGRADE_BLOB', (draft) => {
-              if (isUserPrompt(draft.trigger)) {
-                draft.trigger.semanticParts[j].presentation = {
-                  text: newText,
-                  tokens: newTokens,
-                };
-                draft.trigger.metadata.transformations.push({
-                  processorName: this.name,
-                  action: 'DEGRADED',
-                  timestamp: Date.now(),
-                });
-              }
-            });
-
-            currentDeficit -= tokensSaved;
-          }
+        if (newText && tokensSaved > 0) {
+          // Replace the part with a synthetic text part
+          newParts[j] = { type: 'text', text: newText };
+          currentDeficit -= tokensSaved;
+          modified = true;
         }
       }
+
+      if (modified) {
+        // Return a fresh synthetic node representing the degraded state
+        const degradedNode: UserPrompt = {
+           ...prompt,
+           id: this.env.idGenerator.generateId(), // Issue a new ID because it was modified
+           semanticParts: newParts,
+           metadata: {
+             ...prompt.metadata,
+             transformations: [
+               ...prompt.metadata.transformations,
+               {
+                 processorName: this.name,
+                 action: 'DEGRADED',
+                 timestamp: Date.now(),
+               }
+             ]
+           }
+        };
+        returnedNodes.push(degradedNode);
+      } else {
+        returnedNodes.push(node);
+      }
     }
+
+    return returnedNodes;
   }
 }

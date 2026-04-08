@@ -10,13 +10,12 @@ import { ProcessorRegistry } from './registry.js';
 import {
   createMockEnvironment,
   createDummyState,
-  createDummyEpisode,
+  createDummyNode,
 } from '../testing/contextTestUtils.js';
 import type { ContextEnvironment } from './environment.js';
 import type { ContextAccountingState, ContextProcessor } from '../pipeline.js';
 import type { PipelineDef, ProcessorConfig, SidecarConfig } from './types.js';
 import type { ContextEventBus } from '../eventBus.js';
-import type { EpisodeEditor } from '../ir/episodeEditor.js';
 
 // Create a Dummy Processor for testing Orchestration routing
 class DummySyncProcessor implements ContextProcessor {
@@ -27,16 +26,7 @@ class DummySyncProcessor implements ContextProcessor {
   readonly name = 'DummySync';
   readonly id = 'DummySync';
   readonly options = {};
-  async process(editor: EpisodeEditor, _state: ContextAccountingState) {
-    if (editor.targets.length === 0) return;
-    editor.editEpisode(
-      editor.targets[0].episode.id,
-      'DUMMY_EDIT',
-      (draft: unknown) => {
-        (draft as Record<string, unknown>)['dummyModified'] = true;
-      },
-    );
-  }
+  async process() { return []; }
 }
 
 class DummyAsyncProcessor implements ContextProcessor {
@@ -47,16 +37,7 @@ class DummyAsyncProcessor implements ContextProcessor {
   readonly name = 'DummyAsync';
   readonly id = 'DummyAsync';
   readonly options = {};
-  async process(editor: EpisodeEditor, _state: ContextAccountingState) {
-    if (editor.targets.length === 0) return;
-    editor.editEpisode(
-      editor.targets[0].episode.id,
-      'DUMMY_EDIT',
-      (draft: unknown) => {
-        (draft as Record<string, unknown>)['dummyAsyncModified'] = true;
-      },
-    );
-  }
+  async process() { return []; }
 }
 
 class ThrowingProcessor implements ContextProcessor {
@@ -67,10 +48,7 @@ class ThrowingProcessor implements ContextProcessor {
   readonly name = 'Throwing';
   readonly id = 'Throwing';
   readonly options = {};
-  async process(
-    _editor: EpisodeEditor,
-    _state: ContextAccountingState,
-  ): Promise<void> {
+  async process(): Promise<any> {
     throw new Error('Processor failed intentionally');
   }
 }
@@ -176,12 +154,13 @@ describe('PipelineOrchestrator (Component)', () => {
       registry,
     );
 
-    const episodes = [createDummyEpisode('1', 'USER_PROMPT', [])];
+    const episodes = [createDummyNode('1', 'USER_PROMPT')];
     const state = createDummyState(false);
 
-    const result = await orchestrator.executePipeline(
-      'SyncPipe',
+    const result = await orchestrator.executeTriggerSync(
+      'new_message',
       episodes,
+      new Set(episodes.map(e => e.id)),
       state,
     );
 
@@ -210,13 +189,14 @@ describe('PipelineOrchestrator (Component)', () => {
       registry,
     );
 
-    const episodes = [createDummyEpisode('1', 'USER_PROMPT', [])];
+    const episodes = [createDummyNode('1', 'USER_PROMPT')];
     const state = createDummyState(false);
 
     // This should resolve immediately with the UNMODIFIED array because execution is background
-    const result = await orchestrator.executePipeline(
-      'AsyncPipe',
+    const result = await orchestrator.executeTriggerSync(
+      'new_message',
       episodes,
+      new Set(episodes.map(e => e.id)),
       state,
     );
 
@@ -248,13 +228,14 @@ describe('PipelineOrchestrator (Component)', () => {
       registry,
     );
 
-    const episodes = [createDummyEpisode('1', 'USER_PROMPT', [])];
+    const episodes = [createDummyNode('1', 'USER_PROMPT')];
     const state = createDummyState(false);
 
     // It should not throw! It should swallow the error and return the unmodified array.
-    const result = await orchestrator.executePipeline(
-      'ThrowingPipe',
+    const result = await orchestrator.executeTriggerSync(
+      'new_message',
       episodes,
+      new Set(episodes.map(e => e.id)),
       state,
     );
 
@@ -283,7 +264,7 @@ describe('PipelineOrchestrator (Component)', () => {
 
     new PipelineOrchestrator(config, env, eventBus, env.tracer, registry);
 
-    const episodes = [createDummyEpisode('1', 'USER_PROMPT', [])];
+    const episodes = [createDummyNode('1', 'USER_PROMPT')];
 
     // Emit the trigger
     eventBus.emitConsolidationNeeded({ episodes, targetDeficit: 100, targetNodeIds: new Set() });

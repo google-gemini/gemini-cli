@@ -36,7 +36,7 @@ This is a strictly-typed messaging system. A worker dispatches a `SNAPSHOT_READY
 
 ## 4. The Processor Contract
 
-Processors are pure functions that evaluate unprotected targets and return an array of `ContextPatch`es based on their phase in the lifecycle.
+Processors are purely functional map/filter operations. They evaluate a list of unprotected targets and return the exact list of nodes they intend to substitute. They do **not** generate manual `ContextPatch` objects or manage `IrMetadata`.
 
 ```typescript
 export type InboxMessage = 
@@ -65,7 +65,8 @@ export interface ProcessArgs {
   
   /** 
    * The specific unprotected, mutable nodes the pipeline is allowed to operate on.
-   * The Orchestrator filters out protected nodes (like active tasks) before calling.
+   * The Orchestrator strictly filters out ANY protected nodes (like active tasks) before calling.
+   * Processors can assume all targets passed here are legally theirs to mutate or drop.
    */
   readonly targets: ReadonlyArray<ConcreteNode>;
   
@@ -76,26 +77,17 @@ export interface ProcessArgs {
   readonly inbox: ContextInbox;
 }
 
-export interface ContextPatch {
-  /** The IDs of the Concrete Nodes to remove from the Ship. */
-  removedIds: string[];
-
-  /** The new synthetic Concrete Nodes to insert. */
-  insertedNodes?: ConcreteNode[];
-
-  /** The index at which to insert the new nodes. If omitted, they replace the first removedId. */
-  insertionIndex?: number;
-
-  /** Audit metadata explaining who made this patch, when, and why. */
-  metadata: IrMetadata;
-}
-
 export interface ContextProcessor {
   readonly id: string;
   readonly name: string;
   
-  /** Returns an array of declarative patches applied at this specific temporal phase. */
-  process(args: ProcessArgs): Promise<ContextPatch[]>;
+  /** 
+   * A pure function. Returns the new state of the `targets`. 
+   * If an ID from `targets` is missing in the return array, the Orchestrator deletes it.
+   * If a new synthetic node is in the return array, the Orchestrator inserts it.
+   * The Orchestrator automatically appends audit `IrMetadata` to any changes.
+   */
+  process(args: ProcessArgs): Promise<ReadonlyArray<ConcreteNode>>;
 }
 ```
 

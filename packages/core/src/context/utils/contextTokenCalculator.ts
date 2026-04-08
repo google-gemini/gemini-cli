@@ -6,13 +6,14 @@
 
 import type { Part } from '@google/genai';
 import { estimateTokenCountSync as baseEstimate } from '../../utils/tokenCalculation.js';
-import { BASE_MULTIMODAL_TOKEN_COST } from '../ir/types.js';
+
 
 /**
+import type { ConcreteNode } from "../ir/types.js";
  * The flat token cost assigned to a single multi-modal asset (like an image tile)
  * by the Gemini API. We use this as a baseline heuristic for inlineData/fileData.
  */
-import type { ConcreteNode } from '../ir/types.js';
+
 
 export class ContextTokenCalculator {
   constructor(private readonly charsPerToken: number) {}
@@ -54,7 +55,7 @@ export class ContextTokenCalculator {
       if (typeof part.text === 'string') {
         totalTokens += Math.ceil(part.text.length / this.charsPerToken);
       } else if (part.inlineData !== undefined || part.fileData !== undefined) {
-        totalTokens += BASE_MULTIMODAL_TOKEN_COST;
+        totalTokens += 258;
       } else {
         totalTokens += Math.ceil(
           JSON.stringify(part).length / this.charsPerToken,

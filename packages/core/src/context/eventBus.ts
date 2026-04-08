@@ -5,28 +5,28 @@
  */
 
 import { EventEmitter } from 'node:events';
-import type { Episode, Variant } from './ir/types.js';
+import type { ConcreteNode } from './ir/types.js';
 
 export interface PristineHistoryUpdatedEvent {
-  episodes: Episode[];
+  ship: ReadonlyArray<ConcreteNode>;
   newNodes: Set<string>;
 }
 
 export interface ContextConsolidationEvent {
-  episodes: Episode[];
+  ship: ReadonlyArray<ConcreteNode>;
   targetDeficit: number;
   targetNodeIds: Set<string>;
 }
 
 export interface IrChunkReceivedEvent {
-  episodes: Episode[];
+  ship: ReadonlyArray<ConcreteNode>;
   targetNodeIds: Set<string>;
 }
 
 export interface VariantReadyEvent {
   targetId: string; // The Episode or Step ID this variant attaches to
   variantId: string; // A unique ID for the variant itself
-  variant: Variant;
+  variant: ConcreteNode; // In V2, variants are synthetic concrete nodes
 }
 
 export class ContextEventBus extends EventEmitter {

@@ -189,7 +189,7 @@ export interface Episode extends IrNode {
   readonly type: 'EPISODE';
   readonly timestamp: number;
   /** References to the Concrete Node IDs that conceptually belong to this Episode. */
-  readonly concreteNodeIds: ReadonlyArray<string>;
+  concreteNodeIds: ReadonlyArray<string>;
 }
 
 export interface Task extends IrNode {

@@ -39,8 +39,8 @@ function isCompleteEpisode(ep: Partial<Episode>): ep is Episode {
   return (
     typeof ep.id === 'string' &&
     typeof ep.timestamp === 'number' &&
-    Array.isArray(ep.children) &&
-    ep.children.length > 0
+    Array.isArray(ep.concreteNodeIds) &&
+    ep.concreteNodeIds.length > 0
   );
 }
 
@@ -120,14 +120,7 @@ function parseToolResponses(
     currentEpisode = {
       id: getStableId(msg),
       timestamp: Date.now(),
-      children: [{
-        id: getStableId(msg.parts![0] || msg),
-        type: 'SYSTEM_EVENT',
-        name: 'history_resume',
-        payload: {},
-        metadata: createMetadata([]),
-      },
-      ],
+      concreteNodeIds: [getStableId(msg.parts![0] || msg)],
     };
   }
 
@@ -161,11 +154,11 @@ function parseToolResponses(
           transformations: [],
         },
       };
-      currentEpisode.children!.push(step);
+      currentEpisode.concreteNodeIds = [...(currentEpisode.concreteNodeIds || []), step.id];
       if (callId) pendingCallParts.delete(callId);
     }
   }
-  return currentEpisode;
+  return currentEpisode as Partial<Episode>;
 }
 
 function parseUserParts(
@@ -200,11 +193,9 @@ function parseUserParts(
   };
 
   return {
-    type: 'EPISODE',
     id: getStableId(msg),
     timestamp: Date.now(),
-    children: [trigger],
-  };
+    concreteNodeIds: [trigger.id],  };
 }
 
 function parseModelParts(
@@ -217,14 +208,7 @@ function parseModelParts(
     currentEpisode = {
       id: getStableId(msg),
       timestamp: Date.now(),
-      children: [{
-        id: getStableId(msg.parts![0] || msg),
-        type: 'SYSTEM_EVENT',
-        name: 'model_init',
-        payload: {},
-        metadata: createMetadata([]),
-      },
-      ],
+      concreteNodeIds: [getStableId(msg.parts![0] || msg)],
     };
   }
 
@@ -239,24 +223,25 @@ function parseModelParts(
         text: part.text,
         metadata: createMetadata([part]),
       };
-      currentEpisode.children!.push(thought);
+      currentEpisode.concreteNodeIds = [...(currentEpisode.concreteNodeIds || []), thought.id];
     }
   }
-  return currentEpisode;
+  return currentEpisode as Partial<Episode>;
 }
 
 function finalizeYield(currentEpisode: Partial<Episode>) {
-  if (currentEpisode.children && currentEpisode.children.length > 0) {
-    const lastStep = currentEpisode.children[currentEpisode.children.length - 1];
-    if (isAgentThought(lastStep)) {
+  if (currentEpisode.concreteNodeIds && currentEpisode.concreteNodeIds.length > 0) {
       const yieldNode: AgentYield = {
-        id: lastStep.id,
+        id: randomUUID(),
         type: 'AGENT_YIELD',
-        text: lastStep.text,
-        metadata: lastStep.metadata,
+        text: 'Yield', // Synthesized yield since we don't have the original concrete node
+        metadata: {
+           originalTokens: 1,
+           currentTokens: 1,
+           transformations: []
+        },
       };
-      currentEpisode.children.pop();
-      currentEpisode.children.push(yieldNode);
-    }
+      const existingNodes = currentEpisode.concreteNodeIds as string[];
+      currentEpisode.concreteNodeIds = [...existingNodes.slice(0, -1), yieldNode.id];
   }
 }

@@ -1,14 +1,7 @@
-/**
- * @license
- * Copyright 2026 Google LLC
- * SPDX-License-Identifier: Apache-2.0
- */
-
-import type { ContextAccountingState, ContextProcessor } from '../pipeline.js';
+import type { ContextProcessor, ProcessArgs } from '../pipeline.js';
 import type { ContextEnvironment } from '../sidecar/environment.js';
 import { truncateProportionally } from '../truncation.js';
-import type { EpisodeEditor } from '../ir/episodeEditor.js';
-import { isAgentThought, isUserPrompt } from '../ir/graphUtils.js';
+import type { ConcreteNode, UserPrompt, AgentThought, AgentYield } from '../ir/types.js';
 
 export interface HistorySquashingProcessorOptions {
   maxTokensPerNode: number;
@@ -27,8 +20,7 @@ export class HistorySquashingProcessor implements ContextProcessor {
     properties: {
       maxTokensPerNode: {
         type: 'number',
-        description:
-          'The maximum tokens a node can have before being truncated.',
+        description: 'The maximum tokens a node can have before being truncated.',
       },
     },
     required: ['maxTokensPerNode'],
@@ -37,11 +29,13 @@ export class HistorySquashingProcessor implements ContextProcessor {
   readonly id = 'HistorySquashingProcessor';
   readonly name = 'HistorySquashingProcessor';
   readonly options: HistorySquashingProcessorOptions;
+  private env: ContextEnvironment;
 
   constructor(
     env: ContextEnvironment,
     options: HistorySquashingProcessorOptions,
   ) {
+    this.env = env;
     this.options = options;
   }
 
@@ -49,12 +43,10 @@ export class HistorySquashingProcessor implements ContextProcessor {
     text: string,
     limitChars: number,
     currentDeficit: number,
-    setPresentation: (p: { text: string; tokens: number }) => void,
-    recordAudit: () => void,
-  ): number {
-    if (currentDeficit <= 0) return 0;
+  ): { text: string; newTokens: number; oldTokens: number; tokensSaved: number } | null {
+    if (currentDeficit <= 0) return null;
     const originalLength = text.length;
-    if (originalLength <= limitChars) return 0;
+    if (originalLength <= limitChars) return null;
 
     const newText = truncateProportionally(
       text,
@@ -63,127 +55,130 @@ export class HistorySquashingProcessor implements ContextProcessor {
     );
 
     if (newText !== text) {
-      const newTokens = Math.floor(newText.length / 4);
-      const oldTokens = Math.floor(originalLength / 4);
+      // Using accurate TokenCalculator instead of simple math
+      const newTokens = this.env.tokenCalculator.estimateTokensForString(newText);
+      const oldTokens = this.env.tokenCalculator.estimateTokensForString(text);
       const tokensSaved = oldTokens - newTokens;
 
-      setPresentation({ text: newText, tokens: newTokens });
-      recordAudit();
-      return tokensSaved;
+      if (tokensSaved > 0) {
+        return { text: newText, newTokens, oldTokens, tokensSaved };
+      }
     }
-    return 0;
+    return null;
   }
 
-  async process(
-    editor: EpisodeEditor,
-    state: ContextAccountingState,
-  ): Promise<void> {
+  async process({ targets, state }: ProcessArgs): Promise<ReadonlyArray<ConcreteNode>> {
     if (state.isBudgetSatisfied) {
-      return;
+      return targets;
     }
 
     const { maxTokensPerNode } = this.options;
-    // We estimate 4 chars per token for truncation logic
-    const limitChars = maxTokensPerNode * 4;
+    const limitChars = this.env.tokenCalculator.tokensToChars(maxTokensPerNode);
 
-    // We track how many tokens we still need to cut. If we hit 0, we can stop early!
     let currentDeficit = state.deficitTokens;
+    const returnedNodes: ConcreteNode[] = [];
 
-    for (const target of editor.targets) {
-      const ep = target.episode;
-      if (currentDeficit <= 0) break;
-      if (state.protectedEpisodeIds.has(ep.id)) continue;
+    for (const node of targets) {
+      if (currentDeficit <= 0) {
+        returnedNodes.push(node);
+        continue;
+      }
 
       // 1. Squash User Prompts
-      if (target.node === ep.trigger && isUserPrompt(ep.trigger)) {
-        for (let j = 0; j < ep.trigger.semanticParts.length; j++) {
-          const part = ep.trigger.semanticParts[j];
+      if (node.type === 'USER_PROMPT') {
+        const prompt = node as UserPrompt;
+        let modified = false;
+        const newParts = [...prompt.semanticParts];
+
+        for (let j = 0; j < prompt.semanticParts.length; j++) {
+          const part = prompt.semanticParts[j];
+          if (currentDeficit <= 0) break;
           if (part.type === 'text') {
-            const saved = this.tryApplySquash(
-              part.text,
-              limitChars,
-              currentDeficit,
-              (p) => {
-                editor.editEpisode(ep.id, 'SQUASH_PROMPT', (draft) => {
-                  if (isUserPrompt(draft.trigger)) {
-                    draft.trigger.semanticParts[j].presentation = p;
-                  }
-                });
-              },
-              () => {
-                editor.editEpisode(ep.id, 'SQUASH_PROMPT', (draft) => {
-                  draft.trigger.metadata.transformations.push({
-                    processorName: this.name,
-                    action: 'TRUNCATED',
-                    timestamp: Date.now(),
-                  });
-                });
-              },
-            );
-            currentDeficit -= saved;
+            const squashResult = this.tryApplySquash(part.text, limitChars, currentDeficit);
+            if (squashResult) {
+              newParts[j] = { type: 'text', text: squashResult.text };
+              currentDeficit -= squashResult.tokensSaved;
+              modified = true;
+            }
           }
         }
+
+        if (modified) {
+          const newTokens = this.env.tokenCalculator.estimateTokensForParts(newParts as any);
+          returnedNodes.push({
+            ...prompt,
+            id: this.env.idGenerator.generateId(),
+            semanticParts: newParts,
+            metadata: {
+              ...prompt.metadata,
+              currentTokens: newTokens,
+              transformations: [
+                ...prompt.metadata.transformations,
+                { processorName: this.name, action: 'TRUNCATED', timestamp: Date.now() }
+              ]
+            }
+          });
+        } else {
+          returnedNodes.push(node);
+        }
+        continue;
       }
 
       // 2. Squash Model Thoughts
-      if (isAgentThought(target.node)) {
-        const step = target.node;
-        const j = ep.steps.findIndex(s => s.id === step.id);
-        if (j !== -1 && currentDeficit > 0) {
-            const saved = this.tryApplySquash(
-              step.text,
-              limitChars,
-              currentDeficit,
-              (p) => {
-                editor.editEpisode(ep.id, 'SQUASH_THOUGHT', (draft) => {
-                  const draftStep = draft.steps[j];
-                  if (isAgentThought(draftStep)) {
-                    draftStep.presentation = p;
-                  }
-                });
-              },
-              () => {
-                editor.editEpisode(ep.id, 'SQUASH_THOUGHT', (draft) => {
-                  const draftStep = draft.steps[j];
-                  if (isAgentThought(draftStep)) {
-                    draftStep.metadata.transformations.push({
-                      processorName: this.name,
-                      action: 'TRUNCATED',
-                      timestamp: Date.now(),
-                    });
-                  }
-                });
-              },
-            );
-            currentDeficit -= saved;
+      if (node.type === 'AGENT_THOUGHT') {
+        const thought = node as AgentThought;
+        const squashResult = this.tryApplySquash(thought.text, limitChars, currentDeficit);
+        
+        if (squashResult) {
+          currentDeficit -= squashResult.tokensSaved;
+          returnedNodes.push({
+            ...thought,
+            id: this.env.idGenerator.generateId(),
+            text: squashResult.text,
+            metadata: {
+              ...thought.metadata,
+              currentTokens: squashResult.newTokens,
+              transformations: [
+                ...thought.metadata.transformations,
+                { processorName: this.name, action: 'TRUNCATED', timestamp: Date.now() }
+              ]
+            }
+          });
+        } else {
+          returnedNodes.push(node);
         }
+        continue;
       }
 
       // 3. Squash Agent Yields
-      if (currentDeficit > 0 && target.node === ep.yield && ep.yield) {
-        const saved = this.tryApplySquash(
-          ep.yield.text,
-          limitChars,
-          currentDeficit,
-          (p) => {
-            editor.editEpisode(ep.id, 'SQUASH_YIELD', (draft) => {
-              if (draft.yield) draft.yield.presentation = p;
-            });
-          },
-          () => {
-            editor.editEpisode(ep.id, 'SQUASH_YIELD', (draft) => {
-              if (draft.yield) {
-                draft.yield.metadata.transformations.push({
-                  processorName: this.name,
-                  action: 'TRUNCATED',
-                  timestamp: Date.now(),
-                });
-              }
-            });
-          },
-        );
-        currentDeficit -= saved;
+      if (node.type === 'AGENT_YIELD') {
+        const agentYield = node as AgentYield;
+        const squashResult = this.tryApplySquash(agentYield.text, limitChars, currentDeficit);
+
+        if (squashResult) {
+          currentDeficit -= squashResult.tokensSaved;
+          returnedNodes.push({
+            ...agentYield,
+            id: this.env.idGenerator.generateId(),
+            text: squashResult.text,
+            metadata: {
+              ...agentYield.metadata,
+              currentTokens: squashResult.newTokens,
+              transformations: [
+                ...agentYield.metadata.transformations,
+                { processorName: this.name, action: 'TRUNCATED', timestamp: Date.now() }
+              ]
+            }
+          });
+        } else {
+          returnedNodes.push(node);
+        }
+        continue;
       }
+
+      returnedNodes.push(node);
     }
+
+    return returnedNodes;
   }
 }

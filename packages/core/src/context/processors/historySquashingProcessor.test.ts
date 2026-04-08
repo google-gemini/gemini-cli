@@ -1,157 +1,133 @@
-/**
- * @license
- * Copyright 2026 Google LLC
- * SPDX-License-Identifier: Apache-2.0
- */
-
+import { describe, it, expect, vi } from 'vitest';
+import { HistorySquashingProcessor } from './historySquashingProcessor.js';
 import {
   createMockEnvironment,
   createDummyState,
-  createDummyEpisode,
+  createDummyNode,
 } from '../testing/contextTestUtils.js';
-import { describe, it, expect, beforeEach } from 'vitest';
-import { HistorySquashingProcessor } from './historySquashingProcessor.js';
-import { EpisodeEditor } from '../ir/episodeEditor.js';
 import type { UserPrompt, AgentThought, AgentYield } from '../ir/types.js';
-import { randomUUID } from 'node:crypto';
+import { ContextTokenCalculator } from '../utils/contextTokenCalculator.js';
 
 describe('HistorySquashingProcessor', () => {
-  let processor: HistorySquashingProcessor;
+  it('should truncate nodes that exceed maxTokensPerNode', async () => {
+    const mockTokenCalculator = new ContextTokenCalculator(1) as any;
+    mockTokenCalculator.tokensToChars = vi.fn().mockReturnValue(10); // Limit is 10 chars
 
-  beforeEach(() => {
-    processor = new HistorySquashingProcessor(createMockEnvironment(), {
-      maxTokensPerNode: 100,
+    mockTokenCalculator.estimateTokensForString = vi.fn((text: string) => {
+        if (text.includes('OMITTED')) return 1; // Summary size
+        return 100; // Original size
     });
+    mockTokenCalculator.estimateTokensForParts = vi.fn(() => 1);
+
+    const env = createMockEnvironment({
+        tokenCalculator: mockTokenCalculator
+    });
+
+    const processor = HistorySquashingProcessor.create(env, {
+      maxTokensPerNode: 1, // Will equal 10 chars limit
+    });
+
+    const state = createDummyState(false, 500); // 500 token deficit
+
+    const prompt = createDummyNode('ep1', 'USER_PROMPT', 100, {
+      semanticParts: [
+        { type: 'text', text: 'This text is way longer than 10 characters and needs truncation' }
+      ],
+    }, 'prompt-id') as UserPrompt;
+
+    const thought = createDummyNode('ep1', 'AGENT_THOUGHT', 100, {
+      text: 'The model is thinking something incredibly long and verbose that exceeds 10 chars',
+    }, 'thought-id') as AgentThought;
+
+    const yieldNode = createDummyNode('ep1', 'AGENT_YIELD', 100, {
+      text: 'Final output yield that is also extremely long',
+    }, 'yield-id') as AgentYield;
+
+    const targets = [prompt, thought, yieldNode];
+
+    const result = await processor.process({
+      buffer: {} as any,
+      ship: [],
+      targets,
+      state,
+      inbox: {} as any,
+    });
+
+    expect(result.length).toBe(3);
+
+    // 1. User Prompt
+    const squashedPrompt = result[0] as UserPrompt;
+    expect(squashedPrompt.id).toBe('mock-uuid-1');
+    expect(squashedPrompt.id).not.toBe(prompt.id);
+    expect(squashedPrompt.semanticParts[0].type).toBe('text');
+    expect((squashedPrompt.semanticParts[0] as any).text).toContain('[... OMITTED');
+    expect(squashedPrompt.metadata.transformations.length).toBe(1);
+    expect(squashedPrompt.metadata.transformations[0].action).toBe('TRUNCATED');
+
+    // 2. Agent Thought
+    const squashedThought = result[1] as AgentThought;
+    expect(squashedThought.id).toBe('mock-uuid-2');
+    expect(squashedThought.id).not.toBe(thought.id);
+    expect(squashedThought.text).toContain('[... OMITTED');
+
+    // 3. Agent Yield
+    const squashedYield = result[2] as AgentYield;
+    expect(squashedYield.id).toBe('mock-uuid-3');
+    expect(squashedYield.id).not.toBe(yieldNode.id);
+    expect(squashedYield.text).toContain('[... OMITTED');
   });
 
-  const createThoughtEpisode = (
-    id: string,
-    userText: string,
-    modelThought: string,
-  ) => {
-    const ep = createDummyEpisode(id, 'USER_PROMPT', [
-      { type: 'text', text: userText },
-    ]);
-    // Replace the tool steps with a thought step for this test
-    ep.steps = [
-      {
-        id: randomUUID(),
-        type: 'AGENT_THOUGHT',
-        text: modelThought,
-        metadata: {
-          originalTokens: 1000,
-          currentTokens: 1000,
-          transformations: [],
-        },
-      },
-    ];
-    return ep;
-  };
+  it('should stop truncating once the deficit is cleared', async () => {
+    const mockTokenCalculator = new ContextTokenCalculator(1) as any;
+    mockTokenCalculator.tokensToChars = vi.fn().mockReturnValue(10); 
+    mockTokenCalculator.estimateTokensForString = vi.fn((text: string) => {
+        if (text.includes('OMITTED')) return 0; // Huge savings
+        return 500; 
+    });
+    mockTokenCalculator.estimateTokensForParts = vi.fn(() => 0);
 
-  it('bypasses processing if budget is satisfied', async () => {
-    const episodes = [createThoughtEpisode('1', 'short text', 'short thought')];
-    const state = createDummyState(true);
+    const env = createMockEnvironment({
+        tokenCalculator: mockTokenCalculator
+    });
 
-    const editor = new EpisodeEditor(episodes);
-    await processor.process(editor, state);
-    const result = editor.getFinalEpisodes();
+    const processor = HistorySquashingProcessor.create(env, {
+      maxTokensPerNode: 1,
+    });
 
-    expect(result).toStrictEqual(episodes);
-    expect(
-      (result[0].trigger as UserPrompt).semanticParts[0].presentation,
-    ).toBeUndefined();
-  });
+    // Deficit is only 10 tokens. First truncation saves 500.
+    const state = createDummyState(false, 10);
 
-  it('skips protected episodes', async () => {
-    // 500 chars = ~125 tokens. Limit is 100 tokens, so it WOULD truncate if not protected.
-    const longText = 'A'.repeat(500);
-    const episodes = [createThoughtEpisode('ep-1', longText, 'short thought')];
-    const state = createDummyState(false, 100, new Set(['ep-1']));
+    const prompt = createDummyNode('ep1', 'USER_PROMPT', 500, {
+      semanticParts: [
+        { type: 'text', text: 'This text is way longer than 10 characters and needs truncation' }
+      ],
+    }, 'prompt-id') as UserPrompt;
 
-    const editor = new EpisodeEditor(episodes);
-    await processor.process(editor, state);
-    const result = editor.getFinalEpisodes();
+    const thought = createDummyNode('ep1', 'AGENT_THOUGHT', 500, {
+      text: 'The model is thinking something incredibly long and verbose that exceeds 10 chars',
+    }, 'thought-id') as AgentThought;
 
-    expect(
-      (result[0].trigger as UserPrompt).semanticParts[0].presentation,
-    ).toBeUndefined();
-  });
+    const targets = [prompt, thought];
 
-  it('truncates both UserPrompts and AgentThoughts', async () => {
-    const longUser = 'U'.repeat(1000); // ~250 tokens
-    const longModel = 'M'.repeat(1000); // ~250 tokens
-    const episodes = [createThoughtEpisode('ep-2', longUser, longModel)];
-    const state = createDummyState(false, 500); // High deficit, force truncation
+    const result = await processor.process({
+      buffer: {} as any,
+      ship: [],
+      targets,
+      state,
+      inbox: {} as any,
+    });
 
-    const editor = new EpisodeEditor(episodes);
-    await processor.process(editor, state);
-    const result = editor.getFinalEpisodes();
+    expect(result.length).toBe(2);
 
-    const userPart = (result[0].trigger as UserPrompt).semanticParts[0];
-    const thoughtPart = result[0].steps[0] as AgentThought;
+    // 1. User Prompt (truncated because deficit > 0)
+    const squashedPrompt = result[0] as UserPrompt;
+    expect(squashedPrompt.id).toBe('mock-uuid-1');
+    expect(squashedPrompt.id).not.toBe(prompt.id);
+    expect((squashedPrompt.semanticParts[0] as any).text).toContain('[... OMITTED');
 
-    expect(userPart.presentation).toBeDefined();
-    expect(userPart.presentation!.text).toContain(
-      '[... OMITTED 600 chars ...]',
-    );
-
-    expect(thoughtPart.presentation).toBeDefined();
-    expect(thoughtPart.presentation!.text).toContain(
-      '[... OMITTED 600 chars ...]',
-    );
-
-    // Check audit trails
-    expect(result[0].trigger.metadata.transformations.length).toBe(1);
-    expect(thoughtPart.metadata.transformations.length).toBe(1);
-  });
-
-  it('stops processing once deficit is resolved', async () => {
-    const longUser1 = 'A'.repeat(1000);
-    const longUser2 = 'B'.repeat(1000);
-    const episodes = [
-      createThoughtEpisode('ep-3', longUser1, 'short'),
-      createThoughtEpisode('ep-4', longUser2, 'short'),
-    ];
-
-    // Set deficit to exactly what ONE truncation will save
-    // Original = ~250 tokens. Limit = 100. Truncation saves ~150 tokens.
-    const state = createDummyState(false, 150);
-
-    const editor = new EpisodeEditor(episodes);
-    await processor.process(editor, state);
-    const result = editor.getFinalEpisodes();
-
-    // First episode should be truncated
-    const ep1Part = (result[0].trigger as UserPrompt).semanticParts[0];
-    expect(ep1Part.presentation).toBeDefined();
-
-    // Second episode should be untouched because the deficit hit 0
-    const ep2Part = (result[1].trigger as UserPrompt).semanticParts[0];
-    expect(ep2Part.presentation).toBeUndefined();
-  });
-
-  it('truncates IrNodes', async () => {
-    const longYield = 'Y'.repeat(1000); // ~250 tokens
-    const ep = createThoughtEpisode('ep-5', 'short', 'short');
-    ep.yield = {
-      id: randomUUID(),
-      type: 'AGENT_YIELD',
-      text: longYield,
-      metadata: {
-        originalTokens: 250,
-        currentTokens: 250,
-        transformations: [],
-      },
-    };
-
-    const state = createDummyState(false, 500);
-    const editor = new EpisodeEditor([ep]);
-    await processor.process(editor, state);
-    const result = editor.getFinalEpisodes();
-
-    const yieldPart = result[0].yield as AgentYield;
-    const yieldPresentation = yieldPart.presentation as { text: string };
-    expect(yieldPresentation).toBeDefined();
-    expect(yieldPresentation.text).toContain('[... OMITTED 600 chars ...]');
+    // 2. Agent Thought (untouched because deficit is now < 0)
+    const untouchedThought = result[1] as AgentThought;
+    expect(untouchedThought.id).toBe(thought.id);
+    expect(untouchedThought.text).not.toContain('[... OMITTED');
   });
 });

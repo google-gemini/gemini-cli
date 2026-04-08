@@ -7,26 +7,24 @@
 import type { Content } from '@google/genai';
 import type { AgentChatHistory } from '../core/agentChatHistory.js';
 import { debugLogger } from '../utils/debugLogger.js';
-import type { Episode } from './ir/types.js';
+import type { ConcreteNode } from './ir/types.js';
 import type { ContextEventBus } from './eventBus.js';
 import type { ContextTracer } from './tracer.js';
 import type { ContextEnvironment } from './sidecar/environment.js';
 import type { SidecarConfig } from './sidecar/types.js';
 import { PipelineOrchestrator } from './sidecar/orchestrator.js';
 import { HistoryObserver } from './historyObserver.js';
-import { generateWorkingBufferView } from './ir/graphUtils.js';
 import { IrProjector } from './ir/projector.js';
 import { registerBuiltInProcessors } from './sidecar/builtins.js';
 import { ProcessorRegistry } from './sidecar/registry.js';
 
 export class ContextManager {
-  // The stateful, pristine Episodic Intermediate Representation graph.
-  // This allows the agent to remember and summarize continuously without losing data across turns.
-  private pristineEpisodes: Episode[] = [];
+  // The stateful, pristine flat graph.
+  private pristineShip: ReadonlyArray<ConcreteNode> = [];
+  private currentShip: ReadonlyArray<ConcreteNode> = [];
   private readonly eventBus: ContextEventBus;
 
   // Internal sub-components
-  // Synchronous processors are instantiated but effectively used as singletons within this class
   private orchestrator: PipelineOrchestrator;
   private historyObserver?: HistoryObserver;
 
@@ -58,28 +56,31 @@ export class ContextManager {
     this.orchestrator = orchestrator;
 
     this.eventBus.onPristineHistoryUpdated((event) => {
-      this.pristineEpisodes = event.episodes;
+      this.pristineShip = event.ship;
+      // In V2, we assume currentShip updates sequentially via Orchestrator patches.
+      // But if pristine changes, we must ensure our current view incorporates new nodes.
+      // For now, simple fallback: if the current ship doesn't have the new nodes, append them.
+      // A more robust implementation would diff the ship, but for now we'll just track.
+      const existingIds = new Set(this.currentShip.map((n) => n.id));
+      const addedNodes = event.ship.filter((n) => !existingIds.has(n.id));
+      if (addedNodes.length > 0) {
+         this.currentShip = [...this.currentShip, ...addedNodes];
+      }
+
       this.evaluateTriggers(event.newNodes);
     });
 
     this.eventBus.onVariantReady((event) => {
-      // Find the target episode in the pristine graph
-      const targetEp = this.pristineEpisodes.find(
-        (ep) => ep.id === event.targetId,
+      // In V2, async workers write back patches. 
+      // The old variant dict logic is replaced by the orchestrator applying patches directly.
+      // For now we log it.
+      this.tracer.logEvent(
+        'ContextManager',
+        `Received async variant [${event.variantId}] for Node ${event.targetId}`,
       );
-      if (targetEp) {
-        if (!targetEp.variants) {
-          targetEp.variants = {};
-        }
-        targetEp.variants[event.variantId] = event.variant;
-        this.tracer.logEvent(
-          'ContextManager',
-          `Received async variant [${event.variantId}] for Episode ${event.targetId}`,
-        );
-        debugLogger.log(
-          `ContextManager: Received async variant [${event.variantId}] for Episode ${event.targetId}.`,
-        );
-      }
+      debugLogger.log(
+        `ContextManager: Received async variant [${event.variantId}] for Node ${event.targetId}.`,
+      );
     });
   }
 
@@ -100,56 +101,39 @@ export class ContextManager {
   private evaluateTriggers(newNodes: Set<string>) {
     if (!this.sidecar.budget) return;
 
-    const workingBuffer = this.getWorkingBufferView();
-    const currentTokens =
-      this.env.tokenCalculator.calculateEpisodeListTokens(workingBuffer);
-
-    this.tracer.logEvent('ContextManager', 'Evaluated triggers', {
-      currentTokens,
-      retainedTokens: this.sidecar.budget.retainedTokens,
-    });
-
-    // 1. Eager Compute Trigger (on_turn)
     if (newNodes.size > 0) {
-      this.eventBus.emitChunkReceived({ episodes: this.pristineEpisodes, targetNodeIds: newNodes });
+       this.eventBus.emitChunkReceived({
+           ship: this.currentShip,
+           targetNodeIds: newNodes
+       });
     }
 
-    // 2. Budget Crossed Trigger
+    const currentTokens = this.env.tokenCalculator.calculateConcreteListTokens(this.currentShip);
+
     if (currentTokens > this.sidecar.budget.retainedTokens) {
-      const deficit = currentTokens - this.sidecar.budget.retainedTokens;
-      
-      // Calculate exactly which nodes aged out of the retainedTokens budget to form our target delta
       const agedOutNodes = new Set<string>();
       let rollingTokens = 0;
-      // Start from newest and count backwards
-      for (let i = workingBuffer.length - 1; i >= 0; i--) {
-        const ep = workingBuffer[i];
-        const epTokens = this.env.tokenCalculator.calculateEpisodeListTokens([ep]);
-        rollingTokens += epTokens;
+      // Walk backwards finding nodes that fall out of the retained budget
+      for (let i = this.currentShip.length - 1; i >= 0; i--) {
+        const node = this.currentShip[i];
+        rollingTokens += node.metadata.currentTokens;
         if (rollingTokens > this.sidecar.budget.retainedTokens) {
-          agedOutNodes.add(ep.id);
-          agedOutNodes.add(ep.trigger.id);
-          for (const step of ep.steps) agedOutNodes.add(step.id);
-          if (ep.yield) agedOutNodes.add(ep.yield.id);
+          agedOutNodes.add(node.id);
         }
       }
 
-      this.tracer.logEvent(
-        'ContextManager',
-        'Budget crossed. Emitting ConsolidationNeeded',
-        { deficit, agedOutCount: agedOutNodes.size },
-      );
-      this.eventBus.emitConsolidationNeeded({
-        episodes: workingBuffer,
-        targetDeficit: deficit,
-        targetNodeIds: agedOutNodes,
-      });
+      if (agedOutNodes.size > 0) {
+        this.eventBus.emitConsolidationNeeded({
+          ship: this.currentShip,
+          targetDeficit: currentTokens - this.sidecar.budget.retainedTokens,
+          targetNodeIds: agedOutNodes,
+        });
+      }
     }
   }
 
   /**
-   * Subscribes to the core AgentChatHistory to natively track all message events,
-   * converting them seamlessly into pristine Episodes.
+   * Starts tracking the raw agent history and translating it to Episodic IR.
    */
   subscribeToHistory(chatHistory: AgentChatHistory) {
     if (this.historyObserver) {
@@ -166,39 +150,47 @@ export class ContextManager {
   }
 
   /**
-   * Generates a computed view of the pristine log.
-   * Sweeps backwards (newest to oldest), tracking rolling tokens.
-   * When rollingTokens > retainedTokens, it injects the "best" available ready variant
-   * (snapshot > summary > masked) instead of the raw text.
-   * Handles N-to-1 variant skipping automatically.
+   * Retrieves the raw, uncompressed Episodic IR graph.
+   * Useful for internal tool rendering (like the trace viewer).
+   * Note: This is an expensive, deep clone operation.
    */
-  getWorkingBufferView(): Episode[] {
-    return generateWorkingBufferView(
-      this.pristineEpisodes,
-      this.sidecar.budget.retainedTokens,
-      this.tracer,
-      this.env,
-    );
+  getPristineGraph(): ReadonlyArray<ConcreteNode> {
+    return [...this.pristineShip];
   }
 
   /**
-   * Returns a temporary, compressed Content[] array to be used exclusively for the LLM request.
-   * This does NOT mutate the pristine episodic graph.
+   * Generates a virtual view of the pristine graph, substituting in variants
+   * up to the configured token budget.
+   * This is the view that will eventually be projected back to the LLM.
    */
-  async projectCompressedHistory(): Promise<Content[]> {
-    this.tracer.logEvent('ContextManager', 'Projection requested.');
-    const protectedIds = new Set<string>();
-    if (this.pristineEpisodes.length > 0) {
-      protectedIds.add(this.pristineEpisodes[0].id); // Structural invariant
-    }
+  getShip(): ReadonlyArray<ConcreteNode> {
+    return [...this.currentShip];
+  }
 
-    return IrProjector.project(
-      this.getWorkingBufferView(),
+  /**
+   * Executes the final 'gc_backstop' pipeline if necessary, enforcing the token budget,
+   * and maps the Episodic IR back into a raw Gemini Content[] array for transmission.
+   * This is the primary method called by the agent framework before sending a request.
+   */
+  async projectCompressedHistory(
+    activeTaskIds: Set<string> = new Set(),
+  ): Promise<Content[]> {
+    this.tracer.logEvent(
+      'ContextManager',
+      'Starting projection to LLM context',
+    );
+    // Apply final GC Backstop pressure barrier synchronously before mapping
+    const finalHistory = await IrProjector.project(
+      this.currentShip,
       this.orchestrator,
       this.sidecar,
       this.tracer,
       this.env,
-      protectedIds,
+      activeTaskIds,
     );
+
+    this.tracer.logEvent('ContextManager', 'Finished projection');
+
+    return finalHistory;
   }
 }

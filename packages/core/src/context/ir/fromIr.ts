@@ -102,7 +102,7 @@ function serializeToolExecution(
       functionResponse: {
         id: tool.id,
         name: tool.toolName,
-        response: typeof tool.observation === 'string' ? { message: tool.observation } : tool.observation as object,
+        response: typeof tool.observation === "string" ? { message: tool.observation } : tool.observation as Record<string, unknown>,
       },
     },
   };

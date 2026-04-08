@@ -87,45 +87,62 @@ export class PipelineOrchestrator {
   }
 
   /**
-   * Applies an array of ContextPatches to the Ship, returning a new immutable Ship array.
+   * Evaluates the subset returned by the processor against the original targets,
+   * deducing the removed and inserted nodes, and updating the Ship accordingly.
    */
-  reduceShip(
+  applyProcessorDiff(
     ship: ReadonlyArray<ConcreteNode>,
-    patches: ContextPatch[]
+    targets: ReadonlyArray<ConcreteNode>,
+    returnedNodes: ReadonlyArray<ConcreteNode>,
   ): ReadonlyArray<ConcreteNode> {
-    if (patches.length === 0) return ship;
-
     const mutableShip = [...ship];
-    
-    for (const patch of patches) {
-      const { removedIds, insertedNodes = [], insertionIndex } = patch;
-      
-      let targetIdx = insertionIndex ?? -1;
-      
-      if (targetIdx === -1 && removedIds.length > 0) {
-        targetIdx = mutableShip.findIndex(n => n.id === removedIds[0]);
-      }
-      
-      if (targetIdx === -1) {
-         targetIdx = mutableShip.length;
-      }
+    const targetSet = new Set(targets.map(n => n.id));
+    const returnedMap = new Map(returnedNodes.map(n => [n.id, n]));
 
-      if (removedIds.length > 0) {
-        const removeSet = new Set(removedIds);
-        let i = 0;
-        while (i < mutableShip.length) {
-          if (removeSet.has(mutableShip[i].id)) {
-            mutableShip.splice(i, 1);
-            if (i < targetIdx) targetIdx--;
-          } else {
-            i++;
-          }
-        }
-      }
+    const removedIds = new Set<string>();
+    const newNodes: ConcreteNode[] = [];
 
-      if (insertedNodes.length > 0) {
-         mutableShip.splice(targetIdx, 0, ...insertedNodes);
+    // 1. Identify Removals & Modifications
+    // If a target is missing from returnedMap -> Removed
+    // If a target is in returnedMap but !== object ref -> Modified (Remove old, Insert new)
+    for (const t of targets) {
+      const returnedNode = returnedMap.get(t.id);
+      if (!returnedNode) {
+        removedIds.add(t.id);
+      } else if (returnedNode !== t) {
+        removedIds.add(t.id);
+        newNodes.push(returnedNode);
       }
+    }
+
+    // 2. Identify pure Additions (New synthetic nodes)
+    for (const r of returnedNodes) {
+      if (!targetSet.has(r.id)) {
+        newNodes.push(r);
+      }
+    }
+
+    if (removedIds.size === 0 && newNodes.length === 0) {
+       return ship; // No changes
+    }
+
+    // Find the earliest index in the ship where a removal occurred so we know where to insert
+    let earliestRemovalIdx = mutableShip.length;
+    let i = 0;
+    while (i < mutableShip.length) {
+      if (removedIds.has(mutableShip[i].id)) {
+        if (i < earliestRemovalIdx) earliestRemovalIdx = i;
+        mutableShip.splice(i, 1);
+      } else {
+        i++;
+      }
+    }
+
+    // Insert new nodes exactly where the old nodes were removed
+    if (newNodes.length > 0) {
+      // NOTE: Metadata appending (who, what, when) should ideally happen here
+      // But for V1, processors still construct the new nodes with metadata inside.
+      mutableShip.splice(earliestRemovalIdx, 0, ...newNodes);
     }
 
     return mutableShip;
@@ -150,16 +167,22 @@ export class PipelineOrchestrator {
             'Orchestrator',
             `Executing processor synchronously: ${procDef.processorId}`,
           );
+
+          // 1. Filter out protected nodes
+          const allowedTargets = currentShip.filter(n => 
+             triggerTargets.has(n.id) && 
+             (!n.logicalParentId || !state.protectedLogicalIds.has(n.logicalParentId))
+          );
           
-          const patches = await processor.process({
+          const returnedNodes = await processor.process({
             ship: currentShip,
-            triggerTargets,
+            targets: allowedTargets,
             state,
             buffer: {} as any, // TODO: Implement ContextWorkingBuffer fully
             inbox: {} as any, // TODO: Implement ContextInbox fully
           });
           
-          currentShip = this.reduceShip(currentShip, patches);
+          currentShip = this.applyProcessorDiff(currentShip, allowedTargets, returnedNodes);
           
         } catch (error) {
           debugLogger.error(
@@ -197,14 +220,21 @@ export class PipelineOrchestrator {
           `Executing processor: ${procDef.processorId} (async)`,
         );
 
-        const patches = await processor.process({
+        // 1. Filter out protected nodes
+        const allowedTargets = currentShip.filter(n => 
+            triggerTargets.has(n.id) && 
+            (!n.logicalParentId || !state.protectedLogicalIds.has(n.logicalParentId))
+        );
+
+        const returnedNodes = await processor.process({
             ship: currentShip,
-            triggerTargets,
+            targets: allowedTargets,
             state,
             buffer: {} as any, // TODO: Implement ContextWorkingBuffer fully
             inbox: {} as any, // TODO: Implement ContextInbox fully
         });
-        currentShip = this.reduceShip(currentShip, patches);
+
+        currentShip = this.applyProcessorDiff(currentShip, allowedTargets, returnedNodes);
 
       } catch (error) {
         debugLogger.error(

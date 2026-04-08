@@ -38,41 +38,38 @@ export class HistoryObserver {
     this.unsubscribeHistory = this.chatHistory.subscribe(
       (_event: HistoryEvent) => {
         // Rebuild the pristine IR graph from the full source history on every change.
+        // Wait, toIr still returns an Episode[]. 
+        // We actually need to map the Episode[] to a flat ConcreteNode[] here to form the 'ship'.
         const pristineEpisodes = IrMapper.toIr(
           this.chatHistory.get(),
           this.tokenCalculator,
         );
         
-        const newNodes = new Set<string>();
+        const ship: import('./ir/types.js').ConcreteNode[] = [];
         for (const ep of pristineEpisodes) {
-          if (!this.seenNodeIds.has(ep.id)) {
-            newNodes.add(ep.id);
-            this.seenNodeIds.add(ep.id);
-          }
-          if (!this.seenNodeIds.has(ep.trigger.id)) {
-            newNodes.add(ep.trigger.id);
-            this.seenNodeIds.add(ep.trigger.id);
-          }
-          for (const step of ep.steps) {
-            if (!this.seenNodeIds.has(step.id)) {
-               newNodes.add(step.id);
-               this.seenNodeIds.add(step.id);
-            }
-          }
-          if (ep.yield && !this.seenNodeIds.has(ep.yield.id)) {
-             newNodes.add(ep.yield.id);
-             this.seenNodeIds.add(ep.yield.id);
+           if (ep.concreteNodeIds) {
+             for (const child of ep.concreteNodeIds) {
+               ship.push(child as unknown as import('./ir/types.js').ConcreteNode);
+             }
+           }
+        }
+        
+        const newNodes = new Set<string>();
+        for (const node of ship) {
+          if (!this.seenNodeIds.has(node.id)) {
+            newNodes.add(node.id);
+            this.seenNodeIds.add(node.id);
           }
         }
 
         this.tracer.logEvent(
           'HistoryObserver',
           'Rebuilt pristine graph from chat history update',
-          { episodeCount: pristineEpisodes.length, newNodesCount: newNodes.size },
+          { shipSize: ship.length, newNodesCount: newNodes.size },
         );
 
         this.eventBus.emitPristineHistoryUpdated({
-          episodes: pristineEpisodes,
+          ship,
           newNodes,
         });
       },
