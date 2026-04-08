@@ -13,15 +13,22 @@ import { useState, useCallback, useRef, useEffect } from 'react';
 export function useTimedMessage<T>(durationMs: number) {
   const [message, setMessage] = useState<T | null>(null);
   const timeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const currentMessageRef = useRef<T | null>(null);
 
   const showMessage = useCallback(
     (msg: T | null) => {
-      setMessage(msg);
+      if (currentMessageRef.current !== msg) {
+        currentMessageRef.current = msg;
+        setMessage(msg);
+      }
+
       if (timeoutRef.current) {
         clearTimeout(timeoutRef.current);
       }
+
       if (msg !== null) {
         timeoutRef.current = setTimeout(() => {
+          currentMessageRef.current = null;
           setMessage(null);
         }, durationMs);
       }
