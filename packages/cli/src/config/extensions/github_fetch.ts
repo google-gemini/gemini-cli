@@ -13,12 +13,19 @@ export function getGitHubToken(): string | undefined {
 export async function fetchJson<T>(
   url: string,
   redirectCount: number = 0,
+  trustedHostname?: string,
 ): Promise<T> {
+  const currentHostname = new URL(url).hostname;
+  // On first call, pin the trusted hostname from the initial URL.
+  // On subsequent (redirect) calls the caller passes it down so we can
+  // compare and strip the Authorization header for cross-origin redirects.
+  const trusted = trustedHostname ?? currentHostname;
+
   const headers: { 'User-Agent': string; Authorization?: string } = {
     'User-Agent': 'gemini-cli',
   };
   const token = getGitHubToken();
-  if (token) {
+  if (token && currentHostname === trusted) {
     headers.Authorization = `token ${token}`;
   }
   return new Promise((resolve, reject) => {
@@ -31,7 +38,7 @@ export async function fetchJson<T>(
           if (!res.headers.location) {
             return reject(new Error('No location header in redirect response'));
           }
-          fetchJson<T>(res.headers.location, redirectCount + 1)
+          fetchJson<T>(res.headers.location, redirectCount + 1, trusted)
             .then(resolve)
             .catch(reject);
           return;

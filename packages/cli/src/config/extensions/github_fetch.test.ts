@@ -104,6 +104,42 @@ describe('fetchJson', () => {
     ).resolves.toEqual({ permanent: true });
   });
 
+  it('should not include Authorization header when redirected to a different host', async () => {
+    process.env['GITHUB_TOKEN'] = 'secret-token';
+
+    // First request to github.com redirects to an external host
+    getMock.mockImplementationOnce((_url, options, callback) => {
+      expect((options.headers as Record<string, string>)['Authorization']).toBe(
+        'token secret-token',
+      );
+      const res = new EventEmitter() as IncomingMessage;
+      res.statusCode = 302;
+      res.headers = { location: 'https://external-host.com/data' };
+      (callback as (res: IncomingMessage) => void)(res);
+      res.emit('end');
+      return new EventEmitter() as ClientRequest;
+    });
+
+    // Second request to the external host must NOT include Authorization
+    getMock.mockImplementationOnce((_url, options, callback) => {
+      expect(
+        (options.headers as Record<string, string>)['Authorization'],
+      ).toBeUndefined();
+      const res = new EventEmitter() as IncomingMessage;
+      res.statusCode = 200;
+      (callback as (res: IncomingMessage) => void)(res);
+      res.emit('data', Buffer.from('{"safe": true}'));
+      res.emit('end');
+      return new EventEmitter() as ClientRequest;
+    });
+
+    await expect(
+      fetchJson('https://api.github.com/repos/foo/bar'),
+    ).resolves.toEqual({ safe: true });
+
+    delete process.env['GITHUB_TOKEN'];
+  });
+
   it('should reject with "Too many redirects" after 10 redirects', async () => {
     // Each call returns a redirect to the same URL, simulating an infinite loop
     for (let i = 0; i <= 10; i++) {
