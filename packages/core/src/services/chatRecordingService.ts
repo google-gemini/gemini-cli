@@ -208,7 +208,11 @@ export async function loadConversationRecord(
   filePath: string,
   options?: LoadConversationOptions,
 ): Promise<
-  | (ConversationRecord & { messageCount?: number; firstUserMessage?: string })
+  | (ConversationRecord & {
+      messageCount?: number;
+      firstUserMessage?: string;
+      hasUserOrAssistantMessage?: boolean;
+    })
   | null
 > {
   if (!fs.existsSync(filePath)) {
@@ -226,6 +230,7 @@ export async function loadConversationRecord(
     const messagesMap = new Map<string, MessageRecord>();
     const messageIds: string[] = [];
     let firstUserMessageStr: string | undefined;
+    let hasUserOrAssistant = false;
 
     for await (const line of rl) {
       if (!line.trim()) continue;
@@ -240,6 +245,9 @@ export async function loadConversationRecord(
             } else {
               messageIds.length = 0;
             }
+            // For metadataOnly we can't perfectly un-track hasUserOrAssistant if it was rewinded,
+            // but we can assume false if messageIds is empty.
+            if (messageIds.length === 0) hasUserOrAssistant = false;
           } else {
             let found = false;
             const idsToDelete: string[] = [];
@@ -257,6 +265,12 @@ export async function loadConversationRecord(
           }
         } else if (isMessageRecord(record)) {
           const id = record.id;
+          if (
+            hasProperty(record, 'type') &&
+            (record.type === 'user' || record.type === 'gemini')
+          ) {
+            hasUserOrAssistant = true;
+          }
           // Track message count and first user message
           if (options?.metadataOnly) {
             messageIds.push(id);
@@ -305,6 +319,53 @@ export async function loadConversationRecord(
     }
 
     if (!metadata.sessionId || !metadata.projectHash) {
+      // Fallback for legacy monolithic JSON files
+      try {
+        const fileContent = await fs.promises.readFile(filePath, 'utf8');
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
+        const legacyRecord = JSON.parse(fileContent) as ConversationRecord;
+        if (
+          legacyRecord &&
+          typeof legacyRecord === 'object' &&
+          legacyRecord.sessionId
+        ) {
+          if (options?.metadataOnly) {
+            let fallbackFirstUserMessageStr: string | undefined;
+            const firstUserMessage = legacyRecord.messages?.find(
+              (m) => m.type === 'user',
+            );
+            if (firstUserMessage) {
+              const rawContent = firstUserMessage.content;
+              if (Array.isArray(rawContent)) {
+                fallbackFirstUserMessageStr = rawContent
+                  .map((p: unknown) => (isTextPart(p) ? p.text : ''))
+                  .join('');
+              } else if (typeof rawContent === 'string') {
+                fallbackFirstUserMessageStr = rawContent;
+              }
+            }
+            return {
+              ...legacyRecord,
+              messages: [],
+              messageCount: legacyRecord.messages?.length || 0,
+              firstUserMessage: fallbackFirstUserMessageStr,
+              hasUserOrAssistantMessage:
+                legacyRecord.messages?.some(
+                  (m) => m.type === 'user' || m.type === 'gemini',
+                ) || false,
+            };
+          }
+          return {
+            ...legacyRecord,
+            hasUserOrAssistantMessage:
+              legacyRecord.messages?.some(
+                (m) => m.type === 'user' || m.type === 'gemini',
+              ) || false,
+          };
+        }
+      } catch {
+        // ignore legacy fallback parse error
+      }
       return null;
     }
 
@@ -321,6 +382,11 @@ export async function loadConversationRecord(
         ? messageIds.length
         : messagesMap.size,
       firstUserMessage: firstUserMessageStr,
+      hasUserOrAssistantMessage: options?.metadataOnly
+        ? hasUserOrAssistant
+        : Array.from(messagesMap.values()).some(
+            (m) => m.type === 'user' || m.type === 'gemini',
+          ),
     };
   } catch (error) {
     debugLogger.error('Error loading conversation record from JSONL:', error);

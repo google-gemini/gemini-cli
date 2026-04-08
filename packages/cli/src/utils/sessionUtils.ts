@@ -280,7 +280,7 @@ export const getAllSessionFiles = async (
           }
 
           // Skip sessions that only contain system messages (info, error, warning)
-          if (!hasUserOrAssistantMessage(content.messages)) {
+          if (!content.hasUserOrAssistantMessage) {
             return { fileName: file, sessionInfo: null };
           }
 
