@@ -100,12 +100,8 @@ export class MacOsSandboxManager implements SandboxManager {
 
     const isYolo = this.options.modeConfig?.yolo ?? false;
     const workspaceWrite = !isReadonlyMode || isApproved || isYolo;
-
     const defaultNetwork =
       this.options.modeConfig?.network || req.policy?.networkAccess || isYolo;
-
-    const { allowed: allowedPaths, forbidden: forbiddenPaths } =
-      await resolveSandboxPaths(this.options, req);
 
     // Fetch persistent approvals for this command
     const commandName = await getFullCommandName(currentReq);
@@ -131,6 +127,11 @@ export class MacOsSandboxManager implements SandboxManager {
         false,
     };
 
+    const resolvedPaths = await resolveSandboxPaths(
+      this.options,
+      req,
+      mergedAdditional,
+    );
     const { command: finalCommand, args: finalArgs } = handleReadWriteCommands(
       req,
       mergedAdditional,
@@ -141,10 +142,10 @@ export class MacOsSandboxManager implements SandboxManager {
     const sandboxArgs = buildSeatbeltProfile({
       workspace: this.options.workspace,
       allowedPaths: [
-        ...allowedPaths,
+        ...resolvedPaths.policyAllowed,
         ...(this.options.includeDirectories || []),
       ],
-      forbiddenPaths,
+      forbiddenPaths: resolvedPaths.forbidden,
       networkAccess: mergedAdditional.network,
       workspaceWrite,
       additionalPermissions: mergedAdditional,

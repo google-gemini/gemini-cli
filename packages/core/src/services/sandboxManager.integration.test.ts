@@ -276,7 +276,7 @@ describe('SandboxManager Integration', () => {
       expect(fs.existsSync(testFile)).toBe(true);
     });
 
-    it('blocks access to forbidden paths within the workspace', async () => {
+    it('blocks write access to forbidden paths within the workspace', async () => {
       const tempWorkspace = createTempDir('workspace-');
       const forbiddenDir = path.join(tempWorkspace, 'forbidden');
       const testFile = path.join(forbiddenDir, 'test.txt');
@@ -301,6 +301,40 @@ describe('SandboxManager Integration', () => {
       const result = await runCommand(sandboxed);
       assertResult(result, sandboxed, 'failure');
     });
+
+    // Windows icacls does not reliably block read-up access for Low Integrity
+    // processes, so we skip read-specific assertions on Windows. The internal
+    // tool architecture prevents read bypasses via the C# wrapper and __read.
+    it.skipIf(Platform.isWindows)(
+      'blocks read access to forbidden paths within the workspace',
+      async () => {
+        const tempWorkspace = createTempDir('workspace-');
+        const forbiddenDir = path.join(tempWorkspace, 'forbidden');
+        const testFile = path.join(forbiddenDir, 'test.txt');
+        fs.mkdirSync(forbiddenDir);
+        fs.writeFileSync(testFile, 'secret data');
+
+        const osManager = createSandboxManager(
+          { enabled: true },
+          {
+            workspace: tempWorkspace,
+            forbiddenPaths: async () => [forbiddenDir],
+          },
+        );
+
+        const { command, args } = Platform.cat(testFile);
+
+        const sandboxed = await osManager.prepareCommand({
+          command,
+          args,
+          cwd: tempWorkspace,
+          env: process.env,
+        });
+
+        const result = await runCommand(sandboxed);
+        assertResult(result, sandboxed, 'failure');
+      },
+    );
 
     it('blocks access to files inside forbidden directories recursively', async () => {
       const tempWorkspace = createTempDir('workspace-');
@@ -400,85 +434,77 @@ describe('SandboxManager Integration', () => {
       expect(result.stdout.trim()).toBe('survived');
     });
 
-    // Windows icacls cannot explicitly protect paths that have not yet been created.
-    it.skipIf(Platform.isWindows)(
-      'prevents creation of non-existent forbidden paths',
-      async () => {
-        const tempWorkspace = createTempDir('workspace-');
-        const nonExistentFile = path.join(tempWorkspace, 'never-created.txt');
+    it('prevents creation of non-existent forbidden paths', async () => {
+      const tempWorkspace = createTempDir('workspace-');
+      const nonExistentFile = path.join(tempWorkspace, 'never-created.txt');
 
-        const osManager = createSandboxManager(
-          { enabled: true },
-          {
-            workspace: tempWorkspace,
-            forbiddenPaths: async () => [nonExistentFile],
-          },
-        );
+      const osManager = createSandboxManager(
+        { enabled: true },
+        {
+          workspace: tempWorkspace,
+          forbiddenPaths: async () => [nonExistentFile],
+        },
+      );
 
-        // We use touch to attempt creation of the file
-        const { command: cmdTouch, args: argsTouch } =
-          Platform.touch(nonExistentFile);
+      // We use touch to attempt creation of the file
+      const { command: cmdTouch, args: argsTouch } =
+        Platform.touch(nonExistentFile);
 
-        const sandboxedCmd = await osManager.prepareCommand({
-          command: cmdTouch,
-          args: argsTouch,
-          cwd: tempWorkspace,
-          env: process.env,
-        });
+      const sandboxedCmd = await osManager.prepareCommand({
+        command: cmdTouch,
+        args: argsTouch,
+        cwd: tempWorkspace,
+        env: process.env,
+      });
 
-        // Execute the command, we expect it to fail (permission denied or read-only file system)
-        const result = await runCommand(sandboxedCmd);
+      // Execute the command, we expect it to fail (permission denied or read-only file system)
+      const result = await runCommand(sandboxedCmd);
 
-        assertResult(result, sandboxedCmd, 'failure');
-        expect(fs.existsSync(nonExistentFile)).toBe(false);
-      },
-    );
+      assertResult(result, sandboxedCmd, 'failure');
+      expect(fs.existsSync(nonExistentFile)).toBe(false);
+    });
 
-    // Windows requires Administrator privileges or Developer Mode to create symlinks.
-    it.skipIf(Platform.isWindows)(
-      'blocks access to both a symlink and its target when the symlink is forbidden',
-      async () => {
-        const tempWorkspace = createTempDir('workspace-');
-        const targetFile = path.join(tempWorkspace, 'target.txt');
-        const symlinkFile = path.join(tempWorkspace, 'link.txt');
+    it('blocks access to both a symlink and its target when the symlink is forbidden', async () => {
+      const tempWorkspace = createTempDir('workspace-');
+      const targetFile = path.join(tempWorkspace, 'target.txt');
+      const symlinkFile = path.join(tempWorkspace, 'link.txt');
 
-        fs.writeFileSync(targetFile, 'secret data');
-        fs.symlinkSync(targetFile, symlinkFile);
+      fs.writeFileSync(targetFile, 'secret data');
+      fs.symlinkSync(targetFile, symlinkFile);
 
-        const osManager = createSandboxManager(
-          { enabled: true },
-          {
-            workspace: tempWorkspace,
-            forbiddenPaths: async () => [symlinkFile],
-          },
-        );
+      const osManager = createSandboxManager(
+        { enabled: true },
+        {
+          workspace: tempWorkspace,
+          forbiddenPaths: async () => [symlinkFile],
+        },
+      );
 
-        // Attempt to read the target file directly
-        const { command: cmdTarget, args: argsTarget } =
-          Platform.cat(targetFile);
-        const commandTarget = await osManager.prepareCommand({
-          command: cmdTarget,
-          args: argsTarget,
-          cwd: tempWorkspace,
-          env: process.env,
-        });
+      // Attempt to write to the target file directly
+      const { command: cmdTarget, args: argsTarget } =
+        Platform.touch(targetFile);
+      const commandTarget = await osManager.prepareCommand({
+        command: cmdTarget,
+        args: argsTarget,
+        cwd: tempWorkspace,
+        env: process.env,
+      });
 
-        const resultTarget = await runCommand(commandTarget);
-        assertResult(resultTarget, commandTarget, 'failure');
+      const resultTarget = await runCommand(commandTarget);
+      assertResult(resultTarget, commandTarget, 'failure');
 
-        // Attempt to read via the symlink
-        const { command: cmdLink, args: argsLink } = Platform.cat(symlinkFile);
-        const commandLink = await osManager.prepareCommand({
-          command: cmdLink,
-          args: argsLink,
-          cwd: tempWorkspace,
-          env: process.env,
-        });
+      // Attempt to write via the symlink
+      const { command: cmdLink, args: argsLink } = Platform.touch(symlinkFile);
+      const commandLink = await osManager.prepareCommand({
+        command: cmdLink,
+        args: argsLink,
+        cwd: tempWorkspace,
+        env: process.env,
+      });
 
-        const resultLink = await runCommand(commandLink);
-        assertResult(resultLink, commandLink, 'failure');
-      },
-    );
+      const resultLink = await runCommand(commandLink);
+      assertResult(resultLink, commandLink, 'failure');
+    });
   });
 
   describe('Network Access', () => {
