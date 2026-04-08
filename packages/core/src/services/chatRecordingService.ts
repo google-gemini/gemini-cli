@@ -36,6 +36,14 @@ const ENOSPC_WARNING_MESSAGE =
   'Free up disk space and restart to enable recording.';
 
 /**
+ * Warning message shown when recording is disabled due to conversation exceeding
+ * the maximum serializable size.
+ */
+const RANGE_WARNING_MESSAGE =
+  'Chat recording disabled: Conversation exceeded maximum serializable size. ' +
+  'The conversation will continue but will not be saved to disk.';
+
+/**
  * Token usage summary for a message or conversation.
  */
 export interface TokensSummary {
@@ -561,6 +569,13 @@ export class ChatRecordingService {
         this.conversationFile = null;
         this.cachedConversation = null;
         debugLogger.warn(ENOSPC_WARNING_MESSAGE);
+        return; // Don't throw - allow the conversation to continue
+      }
+      // Handle conversation too large to serialize (V8 max string length exceeded)
+      if (error instanceof RangeError) {
+        this.conversationFile = null;
+        this.cachedConversation = null;
+        debugLogger.warn(RANGE_WARNING_MESSAGE);
         return; // Don't throw - allow the conversation to continue
       }
       debugLogger.error('Error writing conversation file.', error);

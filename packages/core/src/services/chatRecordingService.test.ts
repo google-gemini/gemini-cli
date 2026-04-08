@@ -894,6 +894,89 @@ describe('ChatRecordingService', () => {
     });
   });
 
+  describe('RangeError (conversation too large) graceful degradation - issue #24902', () => {
+    it('should disable recording and not throw when RangeError occurs during writeConversation', () => {
+      chatRecordingService.initialize();
+
+      const rangeError = new RangeError('Invalid string length');
+
+      const writeFileSyncSpy = vi
+        .spyOn(fs, 'writeFileSync')
+        .mockImplementation(() => {
+          throw rangeError;
+        });
+
+      // Should not throw when recording a message
+      expect(() =>
+        chatRecordingService.recordMessage({
+          type: 'user',
+          content: 'Hello',
+          model: 'gemini-pro',
+        }),
+      ).not.toThrow();
+
+      // Recording should be disabled (conversationFile set to null)
+      expect(chatRecordingService.getConversationFilePath()).toBeNull();
+      writeFileSyncSpy.mockRestore();
+    });
+
+    it('should skip recording operations after RangeError disables recording', () => {
+      chatRecordingService.initialize();
+
+      const rangeError = new RangeError('Invalid string length');
+
+      const writeFileSyncSpy = vi
+        .spyOn(fs, 'writeFileSync')
+        .mockImplementationOnce(() => {
+          throw rangeError;
+        });
+
+      chatRecordingService.recordMessage({
+        type: 'user',
+        content: 'First message',
+        model: 'gemini-pro',
+      });
+
+      // Reset mock to track subsequent calls
+      writeFileSyncSpy.mockClear();
+
+      // Subsequent calls should be no-ops (not call writeFileSync)
+      chatRecordingService.recordMessage({
+        type: 'user',
+        content: 'Second message',
+        model: 'gemini-pro',
+      });
+
+      // writeFileSync should not have been called after recording was disabled
+      expect(writeFileSyncSpy).not.toHaveBeenCalled();
+      writeFileSyncSpy.mockRestore();
+    });
+
+    it('should return null from getConversation when disabled by RangeError', () => {
+      chatRecordingService.initialize();
+
+      const rangeError = new RangeError('Invalid string length');
+
+      const writeFileSyncSpy = vi
+        .spyOn(fs, 'writeFileSync')
+        .mockImplementation(() => {
+          throw rangeError;
+        });
+
+      // Trigger RangeError
+      chatRecordingService.recordMessage({
+        type: 'user',
+        content: 'Hello',
+        model: 'gemini-pro',
+      });
+
+      // getConversation should return null when disabled
+      expect(chatRecordingService.getConversation()).toBeNull();
+      expect(chatRecordingService.getConversationFilePath()).toBeNull();
+      writeFileSyncSpy.mockRestore();
+    });
+  });
+
   describe('updateMessagesFromHistory', () => {
     beforeEach(() => {
       chatRecordingService.initialize();
