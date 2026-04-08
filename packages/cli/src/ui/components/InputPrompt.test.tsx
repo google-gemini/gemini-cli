@@ -2319,6 +2319,11 @@ describe('InputPrompt', () => {
           visualCursor: [0, 0],
         },
         {
+          name: 'on a full-width line with no whitespace',
+          text: 'x'.repeat(94),
+          visualCursor: [0, 94],
+        },
+        {
           name: 'on a space between words',
           text: 'hello world',
           visualCursor: [0, 5],
