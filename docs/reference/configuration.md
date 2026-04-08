@@ -2305,7 +2305,7 @@ for that specific session.
   - Path to a file with fake model responses for testing.
 - **`--help`** (or **`-h`**):
   - Displays help information about command-line arguments.
-- **`--include-directories <dir1,dir2,...>`**:
+- **`--include-directories <dir1,dir2,...>`** (Aliases: `--workspace`, `-W`):
   - Includes additional directories in the workspace for multi-directory
     support.
   - Can be specified multiple times or as comma-separated values.
