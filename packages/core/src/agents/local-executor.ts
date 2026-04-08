@@ -8,12 +8,10 @@ import { type AgentLoopContext } from '../config/agent-loop-context.js';
 import { reportError } from '../utils/errorReporting.js';
 import { GeminiChat, StreamEventType } from '../core/geminiChat.js';
 import {
-  Type,
   type Content,
   type Part,
   type FunctionCall,
   type FunctionDeclaration,
-  type Schema,
 } from '@google/genai';
 import { ToolRegistry } from '../tools/tool-registry.js';
 import { PromptRegistry } from '../prompts/prompt-registry.js';
@@ -30,9 +28,9 @@ import {
 } from '../tools/mcp-tool.js';
 import { CompressionStatus } from '../core/turn.js';
 import { type ToolCallRequestInfo } from '../scheduler/types.js';
-import { ChatCompressionService } from '../services/chatCompressionService.js';
+import { ChatCompressionService } from '../context/chatCompressionService.js';
 import { getDirectoryContextString } from '../utils/environmentContext.js';
-import { renderUserMemory } from '../prompts/snippets.js';
+import { renderUserMemory, renderAgentSkills } from '../prompts/snippets.js';
 import { promptIdContext } from '../utils/promptIdContext.js';
 import {
   logAgentStart,
@@ -64,7 +62,6 @@ import { DEFAULT_GEMINI_MODEL, isAutoModel } from '../config/models.js';
 import type { RoutingContext } from '../routing/routingStrategy.js';
 import { parseThought } from '../utils/thoughtUtils.js';
 import { type z } from 'zod';
-import { zodToJsonSchema } from 'zod-to-json-schema';
 import { debugLogger } from '../utils/debugLogger.js';
 import { getModelConfigAlias } from './registry.js';
 import { getVersion } from '../utils/version.js';
@@ -76,11 +73,19 @@ import {
   formatBackgroundCompletionForModel,
 } from '../utils/fastAckHelper.js';
 import type { InjectionSource } from '../config/injectionService.js';
+import {
+  createScopedWorkspaceContext,
+  runWithScopedWorkspaceContext,
+} from '../config/scoped-config.js';
+import { CompleteTaskTool } from '../tools/complete-task.js';
+import {
+  COMPLETE_TASK_TOOL_NAME,
+  ACTIVATE_SKILL_TOOL_NAME,
+} from '../tools/definitions/base-declarations.js';
 
 /** A callback function to report on agent activity. */
 export type ActivityCallback = (activity: SubagentActivityEvent) => void;
 
-const TASK_COMPLETE_TOOL_NAME = 'complete_task';
 const GRACE_PERIOD_MS = 60 * 1000; // 1 min
 
 /** The possible outcomes of a single agent turn. */
@@ -121,7 +126,8 @@ export class LocalAgentExecutor<TOutput extends z.ZodTypeAny> {
   private get executionContext(): AgentLoopContext {
     return {
       config: this.context.config,
-      promptId: this.context.promptId,
+      promptId: this.agentId,
+      parentSessionId: this.context.parentSessionId || this.context.promptId, // Always preserve the main agent session ID
       geminiClient: this.context.geminiClient,
       sandboxManager: this.context.sandboxManager,
       toolRegistry: this.toolRegistry,
@@ -255,8 +261,14 @@ export class LocalAgentExecutor<TOutput extends z.ZodTypeAny> {
 
     agentToolRegistry.sortTools();
 
-    // Get the parent prompt ID from context
-    const parentPromptId = context.promptId;
+    // Register the mandatory completion tool for this agent.
+    agentToolRegistry.registerTool(
+      new CompleteTaskTool(
+        subagentMessageBus,
+        definition.outputConfig,
+        definition.processOutput,
+      ),
+    );
 
     // Get the parent tool call ID from context
     const toolContext = getToolCallContext();
@@ -265,7 +277,6 @@ export class LocalAgentExecutor<TOutput extends z.ZodTypeAny> {
     return new LocalAgentExecutor(
       definition,
       context,
-      parentPromptId,
       agentToolRegistry,
       agentPromptRegistry,
       agentResourceRegistry,
@@ -283,7 +294,6 @@ export class LocalAgentExecutor<TOutput extends z.ZodTypeAny> {
   private constructor(
     definition: LocalAgentDefinition<TOutput>,
     context: AgentLoopContext,
-    parentPromptId: string | undefined,
     toolRegistry: ToolRegistry,
     promptRegistry: PromptRegistry,
     resourceRegistry: ResourceRegistry,
@@ -299,11 +309,7 @@ export class LocalAgentExecutor<TOutput extends z.ZodTypeAny> {
     this.compressionService = new ChatCompressionService();
     this.parentCallId = parentCallId;
 
-    const randomIdPart = Math.random().toString(36).slice(2, 8);
-    // parentPromptId will be undefined if this agent is invoked directly
-    // (top-level), rather than as a sub-agent.
-    const parentPrefix = parentPromptId ? `${parentPromptId}-` : '';
-    this.agentId = `${parentPrefix}${this.definition.name}-${randomIdPart}`;
+    this.agentId = Math.random().toString(36).slice(2, 8);
   }
 
   /**
@@ -323,10 +329,16 @@ export class LocalAgentExecutor<TOutput extends z.ZodTypeAny> {
   ): Promise<AgentTurnResult> {
     const promptId = `${this.agentId}#${turnCounter}`;
 
-    await this.tryCompressChat(chat, promptId);
+    await this.tryCompressChat(chat, promptId, combinedSignal);
 
-    const { functionCalls } = await promptIdContext.run(promptId, async () =>
-      this.callModel(chat, currentMessage, combinedSignal, promptId),
+    // Allow the agent definition to modify history before the model call
+    // (e.g., superseding stale tool outputs to reclaim context tokens).
+    await this.definition.onBeforeTurn?.(chat, combinedSignal);
+
+    const { functionCalls, modelToUse } = await promptIdContext.run(
+      promptId,
+      async () =>
+        this.callModel(chat, currentMessage, combinedSignal, promptId),
     );
 
     if (combinedSignal.aborted) {
@@ -343,7 +355,7 @@ export class LocalAgentExecutor<TOutput extends z.ZodTypeAny> {
     // If the model stops calling tools without calling complete_task, it's an error.
     if (functionCalls.length === 0) {
       this.emitActivity('ERROR', {
-        error: `Agent stopped calling tools but did not call '${TASK_COMPLETE_TOOL_NAME}' to finalize the session.`,
+        error: `Agent stopped calling tools but did not call '${COMPLETE_TASK_TOOL_NAME}' to finalize the session.`,
         context: 'protocol_violation',
         errorType: SubagentActivityErrorType.GENERIC,
       });
@@ -356,6 +368,8 @@ export class LocalAgentExecutor<TOutput extends z.ZodTypeAny> {
 
     const { nextMessage, submittedOutput, taskCompleted, aborted } =
       await this.processFunctionCalls(
+        chat,
+        modelToUse,
         functionCalls,
         combinedSignal,
         promptId,
@@ -409,7 +423,7 @@ export class LocalAgentExecutor<TOutput extends z.ZodTypeAny> {
       default:
         throw new Error(`Unknown terminate reason: ${reason}`);
     }
-    return `${explanation} You have one final chance to complete the task with a short grace period. You MUST call \`${TASK_COMPLETE_TOOL_NAME}\` immediately with your best answer and explain that your investigation was interrupted. Do not call any other tools.`;
+    return `${explanation} You have one final chance to complete the task with a short grace period. You MUST call \`${COMPLETE_TASK_TOOL_NAME}\` immediately with your best answer and explain that your investigation was interrupted. Do not call any other tools.`;
   }
 
   /**
@@ -514,6 +528,27 @@ export class LocalAgentExecutor<TOutput extends z.ZodTypeAny> {
    * @returns A promise that resolves to the agent's final output.
    */
   async run(inputs: AgentInputs, signal: AbortSignal): Promise<OutputObject> {
+    // If the agent definition declares additional workspace directories,
+    // wrap execution in a scoped workspace context. All calls to
+    // Config.getWorkspaceContext() within this scope will see the extended
+    // directories, without mutating the shared Config.
+    const dirs = this.definition.workspaceDirectories;
+    if (dirs && dirs.length > 0) {
+      const scopedCtx = createScopedWorkspaceContext(
+        this.context.config.getWorkspaceContext(),
+        dirs,
+      );
+      return runWithScopedWorkspaceContext(scopedCtx, () =>
+        this.runInternal(inputs, signal),
+      );
+    }
+    return this.runInternal(inputs, signal);
+  }
+
+  private async runInternal(
+    inputs: AgentInputs,
+    signal: AbortSignal,
+  ): Promise<OutputObject> {
     const startTime = Date.now();
     let turnCounter = 0;
     let terminateReason: AgentTerminateMode = AgentTerminateMode.ERROR;
@@ -720,7 +755,7 @@ export class LocalAgentExecutor<TOutput extends z.ZodTypeAny> {
             // The finalResult was already set by executeTurn, but we re-emit just in case.
             finalResult =
               finalResult ||
-              `Agent stopped calling tools but did not call '${TASK_COMPLETE_TOOL_NAME}'.`;
+              `Agent stopped calling tools but did not call '${COMPLETE_TASK_TOOL_NAME}'.`;
             this.emitActivity('ERROR', {
               error: finalResult,
               context: 'protocol_violation',
@@ -730,8 +765,17 @@ export class LocalAgentExecutor<TOutput extends z.ZodTypeAny> {
         }
       }
 
-      // === FINAL RETURN LOGIC ===
       if (terminateReason === AgentTerminateMode.GOAL) {
+        // Save the session summary upon completion
+        if (finalResult && chat) {
+          try {
+            const summary = this.getTruncatedSummary(finalResult);
+            chat.getChatRecordingService()?.saveSummary(summary);
+          } catch (error) {
+            debugLogger.warn('Failed to save subagent session summary.', error);
+          }
+        }
+
         return {
           result: finalResult || 'Task completed.',
           terminate_reason: terminateReason,
@@ -767,6 +811,18 @@ export class LocalAgentExecutor<TOutput extends z.ZodTypeAny> {
             // Recovery Succeeded
             terminateReason = AgentTerminateMode.GOAL;
             finalResult = recoveryResult;
+
+            // Save the session summary upon successful recovery
+            try {
+              const summary = this.getTruncatedSummary(finalResult);
+              chat.getChatRecordingService()?.saveSummary(summary);
+            } catch (summaryError) {
+              debugLogger.warn(
+                'Failed to save subagent session summary during recovery.',
+                summaryError,
+              );
+            }
+
             return {
               result: finalResult,
               terminate_reason: terminateReason,
@@ -810,6 +866,7 @@ export class LocalAgentExecutor<TOutput extends z.ZodTypeAny> {
   private async tryCompressChat(
     chat: GeminiChat,
     prompt_id: string,
+    abortSignal?: AbortSignal,
   ): Promise<void> {
     const model = this.definition.modelConfig.model ?? DEFAULT_GEMINI_MODEL;
 
@@ -820,6 +877,7 @@ export class LocalAgentExecutor<TOutput extends z.ZodTypeAny> {
       model,
       this.context.config,
       this.hasFailedCompressionAttempt,
+      abortSignal,
     );
 
     if (
@@ -852,7 +910,11 @@ export class LocalAgentExecutor<TOutput extends z.ZodTypeAny> {
     message: Content,
     signal: AbortSignal,
     promptId: string,
-  ): Promise<{ functionCalls: FunctionCall[]; textResponse: string }> {
+  ): Promise<{
+    functionCalls: FunctionCall[];
+    textResponse: string;
+    modelToUse: string;
+  }> {
     const modelConfigAlias = getModelConfigAlias(this.definition);
 
     // Resolve the model config early to get the concrete model string (which may be `auto`).
@@ -937,7 +999,7 @@ export class LocalAgentExecutor<TOutput extends z.ZodTypeAny> {
       }
     }
 
-    return { functionCalls, textResponse };
+    return { functionCalls, textResponse, modelToUse };
   }
 
   /** Initializes a `GeminiChat` instance for the agent run. */
@@ -991,6 +1053,8 @@ export class LocalAgentExecutor<TOutput extends z.ZodTypeAny> {
    * @returns A new `Content` object for history, any submitted output, and completion status.
    */
   private async processFunctionCalls(
+    chat: GeminiChat,
+    model: string,
     functionCalls: FunctionCall[],
     signal: AbortSignal,
     promptId: string,
@@ -1002,23 +1066,42 @@ export class LocalAgentExecutor<TOutput extends z.ZodTypeAny> {
     aborted: boolean;
   }> {
     const allowedToolNames = new Set(this.toolRegistry.getAllToolNames());
-    // Always allow the completion tool
-    allowedToolNames.add(TASK_COMPLETE_TOOL_NAME);
 
     let submittedOutput: string | null = null;
     let taskCompleted = false;
     let aborted = false;
 
-    // We'll separate complete_task from other tools
     const toolRequests: ToolCallRequestInfo[] = [];
     // Map to keep track of tool name by callId for activity emission
     const toolNameMap = new Map<string, string>();
-    // Synchronous results (like complete_task or unauthorized calls)
+    // Synchronous results (like unauthorized calls)
     const syncResults = new Map<string, Part>();
 
     for (const [index, functionCall] of functionCalls.entries()) {
       const callId = functionCall.id ?? `${promptId}-${index}`;
-      const args = functionCall.args ?? {};
+      const { args, error: parseError } = this.parseToolArguments(functionCall);
+
+      if (parseError) {
+        debugLogger.warn(`[LocalAgentExecutor] ${parseError}`);
+
+        syncResults.set(callId, {
+          functionResponse: {
+            name: functionCall.name,
+            id: callId,
+            response: { error: parseError },
+          },
+        });
+
+        this.emitActivity('ERROR', {
+          context: 'tool_call',
+          name: functionCall.name,
+          callId,
+          error: parseError,
+          errorType: SubagentActivityErrorType.GENERIC,
+        });
+        continue;
+      }
+
       // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
       const toolName = functionCall.name as string;
 
@@ -1044,144 +1127,7 @@ export class LocalAgentExecutor<TOutput extends z.ZodTypeAny> {
         callId,
       });
 
-      if (toolName === TASK_COMPLETE_TOOL_NAME) {
-        if (taskCompleted) {
-          const error =
-            'Task already marked complete in this turn. Ignoring duplicate call.';
-          syncResults.set(callId, {
-            functionResponse: {
-              name: TASK_COMPLETE_TOOL_NAME,
-              response: { error },
-              id: callId,
-            },
-          });
-          this.emitActivity('ERROR', {
-            context: 'tool_call',
-            name: toolName,
-            error,
-            errorType: SubagentActivityErrorType.GENERIC,
-          });
-          continue;
-        }
-
-        const { outputConfig } = this.definition;
-        taskCompleted = true; // Signal completion regardless of output presence
-
-        if (outputConfig) {
-          const outputName = outputConfig.outputName;
-          if (args[outputName] !== undefined) {
-            const outputValue = args[outputName];
-            const validationResult = outputConfig.schema.safeParse(outputValue);
-
-            if (!validationResult.success) {
-              taskCompleted = false; // Validation failed, revoke completion
-              const error = `Output validation failed: ${JSON.stringify(validationResult.error.flatten())}`;
-              syncResults.set(callId, {
-                functionResponse: {
-                  name: TASK_COMPLETE_TOOL_NAME,
-                  response: { error },
-                  id: callId,
-                },
-              });
-              this.emitActivity('ERROR', {
-                context: 'tool_call',
-                name: toolName,
-                error,
-                errorType: SubagentActivityErrorType.GENERIC,
-              });
-              continue;
-            }
-
-            // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
-            const validatedOutput = validationResult.data;
-            if (this.definition.processOutput) {
-              submittedOutput = this.definition.processOutput(validatedOutput);
-            } else {
-              submittedOutput =
-                typeof outputValue === 'string'
-                  ? outputValue
-                  : JSON.stringify(outputValue, null, 2);
-            }
-            syncResults.set(callId, {
-              functionResponse: {
-                name: TASK_COMPLETE_TOOL_NAME,
-                response: { result: 'Output submitted and task completed.' },
-                id: callId,
-              },
-            });
-            this.emitActivity('TOOL_CALL_END', {
-              name: toolName,
-              id: callId,
-              output: 'Output submitted and task completed.',
-            });
-          } else {
-            // Failed to provide required output.
-            taskCompleted = false; // Revoke completion status
-            const error = `Missing required argument '${outputName}' for completion.`;
-            syncResults.set(callId, {
-              functionResponse: {
-                name: TASK_COMPLETE_TOOL_NAME,
-                response: { error },
-                id: callId,
-              },
-            });
-            this.emitActivity('ERROR', {
-              context: 'tool_call',
-              name: toolName,
-              callId,
-              error,
-              errorType: SubagentActivityErrorType.GENERIC,
-            });
-          }
-        } else {
-          // No outputConfig - use default 'result' parameter
-          const resultArg = args['result'];
-          if (
-            resultArg !== undefined &&
-            resultArg !== null &&
-            resultArg !== ''
-          ) {
-            submittedOutput =
-              typeof resultArg === 'string'
-                ? resultArg
-                : JSON.stringify(resultArg, null, 2);
-            syncResults.set(callId, {
-              functionResponse: {
-                name: TASK_COMPLETE_TOOL_NAME,
-                response: { status: 'Result submitted and task completed.' },
-                id: callId,
-              },
-            });
-            this.emitActivity('TOOL_CALL_END', {
-              name: toolName,
-              id: callId,
-              output: 'Result submitted and task completed.',
-            });
-          } else {
-            // No result provided - this is an error for agents expected to return results
-            taskCompleted = false; // Revoke completion
-            const error =
-              'Missing required "result" argument. You must provide your findings when calling complete_task.';
-            syncResults.set(callId, {
-              functionResponse: {
-                name: TASK_COMPLETE_TOOL_NAME,
-                response: { error },
-                id: callId,
-              },
-            });
-            this.emitActivity('ERROR', {
-              context: 'tool_call',
-              name: toolName,
-              callId,
-              error,
-              errorType: SubagentActivityErrorType.GENERIC,
-            });
-          }
-        }
-        continue;
-      }
-
-      // Handle standard tools
+      // Handle unauthorized tools
       if (!allowedToolNames.has(toolName)) {
         const error = createUnauthorizedToolError(toolName);
         debugLogger.warn(`[LocalAgentExecutor] Blocked call: ${error}`);
@@ -1232,6 +1178,9 @@ export class LocalAgentExecutor<TOutput extends z.ZodTypeAny> {
         },
       );
 
+      // Record completed tool calls for persistent chat history
+      chat.recordCompletedToolCalls(model, completedCalls);
+
       for (const call of completedCalls) {
         const toolName =
           toolNameMap.get(call.request.callId) || call.request.name;
@@ -1240,7 +1189,24 @@ export class LocalAgentExecutor<TOutput extends z.ZodTypeAny> {
             name: toolName,
             id: call.request.callId,
             output: call.response.resultDisplay,
+            data: call.response.data,
           });
+
+          // Check if this was a completion tool call
+          const isCompletionTool =
+            call.request.name === COMPLETE_TASK_TOOL_NAME;
+          const data = call.response.data;
+          if (
+            isCompletionTool &&
+            !taskCompleted &&
+            data?.['taskCompleted'] === true
+          ) {
+            taskCompleted = true;
+            const output = data['submittedOutput'];
+            if (typeof output === 'string') {
+              submittedOutput = output;
+            }
+          }
         } else if (call.status === 'error') {
           this.emitActivity('ERROR', {
             context: 'tool_call',
@@ -1254,7 +1220,7 @@ export class LocalAgentExecutor<TOutput extends z.ZodTypeAny> {
             call.outcome === ToolConfirmationOutcome.Cancel;
 
           if (isSoftRejection) {
-            const error = `${SUBAGENT_REJECTED_ERROR_PREFIX} Please acknowledge this, rethink your strategy, and try a different approach. If you cannot proceed without the rejected operation, summarize the issue and use \`${TASK_COMPLETE_TOOL_NAME}\` to report your findings and the blocker.`;
+            const error = `${SUBAGENT_REJECTED_ERROR_PREFIX} Please acknowledge this, rethink your strategy, and try a different approach. If you cannot proceed without the rejected operation, summarize the issue and use \`${COMPLETE_TASK_TOOL_NAME}\` to report your findings and the blocker.`;
             this.emitActivity('ERROR', {
               context: 'tool_call',
               name: toolName,
@@ -1325,7 +1291,7 @@ export class LocalAgentExecutor<TOutput extends z.ZodTypeAny> {
    */
   private prepareToolsList(): FunctionDeclaration[] {
     const toolsList: FunctionDeclaration[] = [];
-    const { toolConfig, outputConfig } = this.definition;
+    const { toolConfig } = this.definition;
 
     if (toolConfig) {
       for (const toolRef of toolConfig.tools) {
@@ -1334,46 +1300,13 @@ export class LocalAgentExecutor<TOutput extends z.ZodTypeAny> {
           toolsList.push(toolRef);
         }
       }
-      // Add schemas from tools that were explicitly registered by name, wildcard, or instance.
-      toolsList.push(...this.toolRegistry.getFunctionDeclarations());
     }
-
-    // Always inject complete_task.
-    // Configure its schema based on whether output is expected.
-    const completeTool: FunctionDeclaration = {
-      name: TASK_COMPLETE_TOOL_NAME,
-      description: outputConfig
-        ? 'Call this tool to submit your final answer and complete the task. This is the ONLY way to finish.'
-        : 'Call this tool to submit your final findings and complete the task. This is the ONLY way to finish.',
-      parameters: {
-        type: Type.OBJECT,
-        properties: {},
-        required: [],
-      },
-    };
-
-    if (outputConfig) {
-      const jsonSchema = zodToJsonSchema(outputConfig.schema);
-      const {
-        $schema: _$schema,
-        definitions: _definitions,
-        ...schema
-      } = jsonSchema;
-      completeTool.parameters!.properties![outputConfig.outputName] =
-        // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
-        schema as Schema;
-      completeTool.parameters!.required!.push(outputConfig.outputName);
-    } else {
-      completeTool.parameters!.properties!['result'] = {
-        type: Type.STRING,
-        description:
-          'Your final results or findings to return to the orchestrator. ' +
-          'Ensure this is comprehensive and follows any formatting requested in your instructions.',
-      };
-      completeTool.parameters!.required!.push('result');
-    }
-
-    toolsList.push(completeTool);
+    // Add schemas from tools that were explicitly registered by name, wildcard, or instance.
+    toolsList.push(
+      ...this.toolRegistry.getFunctionDeclarations(
+        this.definition.modelConfig.model,
+      ),
+    );
 
     return toolsList;
   }
@@ -1387,6 +1320,21 @@ export class LocalAgentExecutor<TOutput extends z.ZodTypeAny> {
 
     // Inject user inputs into the prompt template.
     let finalPrompt = templateString(promptConfig.systemPrompt, inputs);
+
+    // Inject skill SI if ACTIVATE_SKILL_TOOL_NAME is available to this agent.
+    if (this.toolRegistry.getTool(ACTIVATE_SKILL_TOOL_NAME) !== undefined) {
+      const skills = this.context.config.getSkillManager().getSkills();
+      if (skills.length > 0) {
+        const skillsPrompt = renderAgentSkills(
+          skills.map((s) => ({
+            name: s.name,
+            description: s.description,
+            location: s.location,
+          })),
+        );
+        finalPrompt += `\n\n${skillsPrompt}`;
+      }
+    }
 
     // Append memory context if available.
     const systemMemory = this.context.config.getSystemInstructionMemory();
@@ -1408,15 +1356,15 @@ Important Rules:
 
     if (this.definition.outputConfig) {
       finalPrompt += `
-* When you have completed your task, you MUST call the \`${TASK_COMPLETE_TOOL_NAME}\` tool with your structured output.
-* Do not call any other tools in the same turn as \`${TASK_COMPLETE_TOOL_NAME}\`.
+* When you have completed your task, you MUST call the \`${COMPLETE_TASK_TOOL_NAME}\` tool with your structured output.
+* Do not call any other tools in the same turn as \`${COMPLETE_TASK_TOOL_NAME}\`.
 * This is the ONLY way to complete your mission. If you stop calling tools without calling this, you have failed.`;
     } else {
       finalPrompt += `
-* When you have completed your task, you MUST call the \`${TASK_COMPLETE_TOOL_NAME}\` tool.
+* When you have completed your task, you MUST call the \`${COMPLETE_TASK_TOOL_NAME}\` tool.
 * You MUST include your final findings in the "result" parameter. This is how you return the necessary results for the task to be marked complete.
 * Ensure your findings are comprehensive and follow any specific formatting requirements provided in your instructions.
-* Do not call any other tools in the same turn as \`${TASK_COMPLETE_TOOL_NAME}\`.
+* Do not call any other tools in the same turn as \`${COMPLETE_TASK_TOOL_NAME}\`.
 * This is the ONLY way to complete your mission. If you stop calling tools without calling this, you have failed.`;
     }
 
@@ -1475,5 +1423,43 @@ Important Rules:
       };
       this.onActivity(event);
     }
+  }
+
+  /**
+   * Truncates a string to 200 characters in a Unicode-safe way for session summaries.
+   */
+  private getTruncatedSummary(text: string): string {
+    const chars = Array.from(text);
+    if (chars.length <= 200) {
+      return text;
+    }
+    return chars.slice(0, 197).join('') + '...';
+  }
+
+  /**
+   * Parses the arguments for a tool call, handling both JSON strings and objects.
+   */
+  private parseToolArguments(functionCall: FunctionCall): {
+    args: Record<string, unknown>;
+    error?: string;
+  } {
+    const args: Record<string, unknown> = {};
+    if (typeof functionCall.args === 'string') {
+      try {
+        const parsed: unknown = JSON.parse(functionCall.args);
+        if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) {
+          Object.assign(args, parsed);
+        }
+        return { args };
+      } catch {
+        return {
+          args: {},
+          error: `Failed to parse JSON arguments for tool "${functionCall.name}": ${functionCall.args}. Ensure you provide a valid JSON object.`,
+        };
+      }
+    } else if (functionCall.args) {
+      return { args: functionCall.args };
+    }
+    return { args: {} };
   }
 }

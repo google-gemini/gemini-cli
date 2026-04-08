@@ -25,14 +25,10 @@ import {
   getRetryErrorType,
 } from '../utils/retry.js';
 import type { ValidationRequiredError } from '../utils/googleQuotaErrors.js';
-import {
-  resolveModel,
-  isGemini2Model,
-  supportsModernFeatures,
-} from '../config/models.js';
+import { resolveModel, supportsModernFeatures } from '../config/models.js';
 import { hasCycleInSchema } from '../tools/tools.js';
 import type { StructuredError } from './turn.js';
-import type { CompletedToolCall } from './coreToolScheduler.js';
+import type { CompletedToolCall } from '../scheduler/types.js';
 import {
   logContentRetry,
   logContentRetryFailure,
@@ -423,10 +419,7 @@ export class GeminiChat {
               ? error.type
               : getRetryErrorType(error);
 
-            if (
-              (isContentError && isGemini2Model(model)) ||
-              (isRetryable && !signal.aborted)
-            ) {
+            if (isContentError || (isRetryable && !signal.aborted)) {
               // The issue requests exactly 3 retries (4 attempts) for API errors during stream iteration.
               // Regardless of the global maxAttempts (e.g. 10), we only want to retry these mid-stream API errors
               // up to 3 times before finally throwing the error to the user.
@@ -524,12 +517,18 @@ export class GeminiChat {
     const apiCall = async () => {
       const useGemini3_1 =
         (await this.context.config.getGemini31Launched?.()) ?? false;
+      const useGemini3_1FlashLite =
+        (await this.context.config.getGemini31FlashLiteLaunched?.()) ?? false;
+      const hasAccessToPreview =
+        this.context.config.getHasAccessToPreviewModel?.() ?? true;
+
       // Default to the last used model (which respects arguments/availability selection)
       let modelToUse = resolveModel(
         lastModelToUse,
         useGemini3_1,
+        useGemini3_1FlashLite,
         false,
-        this.context.config.getHasAccessToPreviewModel?.() ?? true,
+        hasAccessToPreview,
         this.context.config,
       );
 
@@ -539,8 +538,9 @@ export class GeminiChat {
         modelToUse = resolveModel(
           this.context.config.getActiveModel(),
           useGemini3_1,
+          useGemini3_1FlashLite,
           false,
-          this.context.config.getHasAccessToPreviewModel?.() ?? true,
+          hasAccessToPreview,
           this.context.config,
         );
       }
@@ -597,6 +597,21 @@ export class GeminiChat {
           );
         }
 
+        if (beforeModelResult.modifiedModel) {
+          modelToUse = resolveModel(
+            beforeModelResult.modifiedModel,
+            useGemini3_1,
+            useGemini3_1FlashLite,
+            false,
+            hasAccessToPreview,
+            this.context.config,
+          );
+          lastModelToUse = modelToUse;
+          // Re-evaluate contentsToUse based on the new model's feature support
+          contentsToUse = supportsModernFeatures(modelToUse)
+            ? [...contentsForPreviewModel]
+            : [...requestContents];
+        }
         if (beforeModelResult.modifiedConfig) {
           Object.assign(config, beforeModelResult.modifiedConfig);
         }
@@ -1025,8 +1040,8 @@ export class GeminiChat {
 
       return {
         id: call.request.callId,
-        name: call.request.name,
-        args: call.request.args,
+        name: call.request.originalRequestName ?? call.request.name,
+        args: call.request.originalRequestArgs ?? call.request.args,
         result: call.response?.responseParts || null,
         status: call.status,
         timestamp: new Date().toISOString(),

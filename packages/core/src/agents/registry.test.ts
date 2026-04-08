@@ -596,7 +596,7 @@ describe('AgentRegistry', () => {
       });
       expect(loadAgentSpy).toHaveBeenCalledWith(
         'RemoteAgentWithAuth',
-        'https://example.com/card',
+        { type: 'url', url: 'https://example.com/card' },
         mockHandler,
       );
       expect(registry.getDefinition('RemoteAgentWithAuth')).toEqual(
@@ -1206,6 +1206,32 @@ describe('AgentRegistry', () => {
   });
 
   describe('inheritance and refresh', () => {
+    it('should skip remote agents when refreshing on model change', async () => {
+      const remoteAgent: AgentDefinition = {
+        kind: 'remote',
+        name: 'RemoteAgent',
+        description: 'A remote agent',
+        agentCardUrl: 'https://example.com/card',
+        inputConfig: { inputSchema: { type: 'object' } },
+      };
+
+      const loadAgentSpy = vi.fn().mockResolvedValue({ name: 'RemoteAgent' });
+      vi.spyOn(mockConfig, 'getA2AClientManager').mockReturnValue({
+        loadAgent: loadAgentSpy,
+        clearCache: vi.fn(),
+      } as unknown as A2AClientManager);
+
+      await registry.testRegisterAgent(remoteAgent);
+
+      expect(loadAgentSpy).toHaveBeenCalledTimes(1);
+
+      coreEvents.emitModelChanged('new-model');
+
+      await new Promise((resolve) => setTimeout(resolve, 0));
+
+      expect(loadAgentSpy).toHaveBeenCalledTimes(1);
+    });
+
     it('should resolve "inherit" to the current model from configuration', async () => {
       const config = makeMockedConfig({ model: 'current-model' });
       const registry = new TestableAgentRegistry(config);
@@ -1506,6 +1532,89 @@ describe('AgentRegistry', () => {
       expect(getterCalled).toBe(false); // Getter should not have been called yet
       expect(registeredDef.toolConfig?.tools).toEqual(['lazy-tool']);
       expect(getterCalled).toBe(true); // Getter should have been called now
+    });
+  });
+
+  describe('browser agent sandbox registration', () => {
+    afterEach(() => {
+      vi.unstubAllEnvs();
+    });
+
+    it('should NOT register browser agent in container sandbox without existing mode', async () => {
+      vi.stubEnv('SANDBOX', 'docker-container-0');
+      const feedbackSpy = vi
+        .spyOn(coreEvents, 'emitFeedback')
+        .mockImplementation(() => {});
+
+      const config = makeMockedConfig({
+        agents: {
+          overrides: {
+            browser_agent: { enabled: true },
+          },
+          browser: {
+            sessionMode: 'persistent',
+          },
+        },
+      });
+      const registry = new TestableAgentRegistry(config);
+      await registry.initialize();
+
+      expect(registry.getDefinition('browser_agent')).toBeUndefined();
+      expect(feedbackSpy).toHaveBeenCalledWith(
+        'info',
+        expect.stringContaining('Browser agent disabled in container sandbox'),
+      );
+    });
+
+    it('should register browser agent in container sandbox with existing mode', async () => {
+      vi.stubEnv('SANDBOX', 'docker-container-0');
+
+      const config = makeMockedConfig({
+        agents: {
+          overrides: {
+            browser_agent: { enabled: true },
+          },
+          browser: {
+            sessionMode: 'existing',
+          },
+        },
+      });
+      const registry = new TestableAgentRegistry(config);
+      await registry.initialize();
+
+      expect(registry.getDefinition('browser_agent')).toBeDefined();
+    });
+
+    it('should register browser agent normally in seatbelt sandbox', async () => {
+      vi.stubEnv('SANDBOX', 'sandbox-exec');
+
+      const config = makeMockedConfig({
+        agents: {
+          overrides: {
+            browser_agent: { enabled: true },
+          },
+        },
+      });
+      const registry = new TestableAgentRegistry(config);
+      await registry.initialize();
+
+      expect(registry.getDefinition('browser_agent')).toBeDefined();
+    });
+
+    it('should register browser agent normally when not in sandbox', async () => {
+      vi.stubEnv('SANDBOX', '');
+
+      const config = makeMockedConfig({
+        agents: {
+          overrides: {
+            browser_agent: { enabled: true },
+          },
+        },
+      });
+      const registry = new TestableAgentRegistry(config);
+      await registry.initialize();
+
+      expect(registry.getDefinition('browser_agent')).toBeDefined();
     });
   });
 });

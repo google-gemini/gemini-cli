@@ -33,7 +33,7 @@ jobs:
 
     steps:
       - name: 'Checkout'
-        uses: 'actions/checkout@v4'
+        uses: 'actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5' # ratchet:actions/checkout@v4
 
       - name: 'Optimize Windows Performance'
         if: "matrix.os == 'windows-latest'"
@@ -46,7 +46,7 @@ jobs:
         shell: 'powershell'
 
       - name: 'Set up Node.js'
-        uses: 'actions/setup-node@v4'
+        uses: 'actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020' # ratchet:actions/setup-node@v4
         with:
           node-version-file: '.nvmrc'
           architecture: '${{ matrix.arch }}'
@@ -63,7 +63,7 @@ jobs:
 
       - name: 'Setup Windows SDK (Windows)'
         if: "matrix.os == 'windows-latest'"
-        uses: 'microsoft/setup-msbuild@v2'
+        uses: 'microsoft/setup-msbuild@6fb02220983dee41ce7ae257b6f4d8f9bf5ed4ce' # ratchet:microsoft/setup-msbuild@v2
 
       - name: 'Add Signtool to Path (Windows)'
         if: "matrix.os == 'windows-latest'"
@@ -153,7 +153,7 @@ jobs:
           npm run test:integration:sandbox:none -- --testTimeout=600000
 
       - name: 'Upload Artifact'
-        uses: 'actions/upload-artifact@v4'
+        uses: 'actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02' # ratchet:actions/upload-artifact@v4
         with:
           name: 'gemini-cli-${{ matrix.platform_name }}'
           path: 'dist/${{ matrix.platform_name }}/'

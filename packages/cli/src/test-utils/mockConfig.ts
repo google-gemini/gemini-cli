@@ -38,12 +38,14 @@ export const createMockConfig = (overrides: Partial<Config> = {}): Config =>
       fireSessionEndEvent: vi.fn().mockResolvedValue(undefined),
       fireSessionStartEvent: vi.fn().mockResolvedValue(undefined),
     })),
+    isMemoryManagerEnabled: vi.fn(() => false),
     getListExtensions: vi.fn(() => false),
     getExtensions: vi.fn(() => []),
     getListSessions: vi.fn(() => false),
     getDeleteSession: vi.fn(() => undefined),
     setSessionId: vi.fn(),
     getSessionId: vi.fn().mockReturnValue('mock-session-id'),
+    getWorktreeSettings: vi.fn(() => undefined),
     getContentGeneratorConfig: vi.fn(() => ({ authType: 'google' })),
     getAcpMode: vi.fn(() => false),
     isBrowserLaunchSuppressed: vi.fn(() => false),
@@ -134,6 +136,7 @@ export const createMockConfig = (overrides: Partial<Config> = {}): Config =>
     getRetryFetchErrors: vi.fn().mockReturnValue(true),
     getEnableShellOutputEfficiency: vi.fn().mockReturnValue(true),
     getShellToolInactivityTimeout: vi.fn().mockReturnValue(300000),
+    getRequestTimeoutMs: vi.fn().mockReturnValue(undefined),
     getShellExecutionConfig: vi.fn().mockReturnValue({
       sandboxManager: new NoopSandboxManager(),
       sanitizationConfig: {
@@ -162,6 +165,7 @@ export const createMockConfig = (overrides: Partial<Config> = {}): Config =>
     getAdminSkillsEnabled: vi.fn().mockReturnValue(false),
     getDisabledSkills: vi.fn().mockReturnValue([]),
     getExperimentalJitContext: vi.fn().mockReturnValue(false),
+    getMemoryBoundaryMarkers: vi.fn().mockReturnValue(['.git']),
     getTerminalBackground: vi.fn().mockReturnValue(undefined),
     getEmbeddingModel: vi.fn().mockReturnValue('embedding-model'),
     getQuotaErrorOccurred: vi.fn().mockReturnValue(false),
@@ -173,6 +177,8 @@ export const createMockConfig = (overrides: Partial<Config> = {}): Config =>
     getHasAccessToPreviewModel: vi.fn().mockReturnValue(false),
     validatePathAccess: vi.fn().mockReturnValue(null),
     getUseAlternateBuffer: vi.fn().mockReturnValue(false),
+    getUseTerminalBuffer: vi.fn().mockReturnValue(false),
+    getUseRenderProcess: vi.fn().mockReturnValue(false),
     ...overrides,
   }) as unknown as Config;
 
@@ -192,6 +198,17 @@ export function createMockSettings(
     user: { settings: {} },
     workspace: { settings: {} },
     errors: [],
+    subscribe: vi.fn().mockReturnValue(() => {}),
+    getSnapshot: vi.fn().mockReturnValue({
+      system: { settings: {} },
+      systemDefaults: { settings: {} },
+      user: { settings: {} },
+      workspace: { settings: {} },
+      isTrusted: true,
+      errors: [],
+      merged,
+    }),
+    setValue: vi.fn(),
     ...overrides,
     merged,
   } as unknown as LoadedSettings;

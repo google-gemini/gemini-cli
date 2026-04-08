@@ -91,14 +91,13 @@ describe('RewindViewer', () => {
       const conversation = createConversation([
         { type: 'user', content: 'Hello', id: '1', timestamp: '1' },
       ]);
-      const { lastFrame, waitUntilReady, unmount } = await renderWithProviders(
+      const { lastFrame, unmount } = await renderWithProviders(
         <RewindViewer
           conversation={conversation}
           onExit={vi.fn()}
           onRewind={vi.fn()}
         />,
       );
-      await waitUntilReady();
       expect(lastFrame()).toContain('Rewind');
       expect(lastFrame()).toContain('Hello');
       unmount();
@@ -130,14 +129,13 @@ describe('RewindViewer', () => {
       const conversation = createConversation(messages as MessageRecord[]);
       const onExit = vi.fn();
       const onRewind = vi.fn();
-      const { lastFrame, waitUntilReady, unmount } = await renderWithProviders(
+      const { lastFrame, unmount } = await renderWithProviders(
         <RewindViewer
           conversation={conversation}
           onExit={onExit}
           onRewind={onRewind}
         />,
       );
-      await waitUntilReady();
       expect(lastFrame()).toMatchSnapshot();
       unmount();
     });
@@ -162,7 +160,6 @@ describe('RewindViewer', () => {
           onRewind={onRewind}
         />,
       );
-    await waitUntilReady();
 
     // Initial state
     expect(lastFrame()).toMatchSnapshot('initial-state');
@@ -197,7 +194,6 @@ describe('RewindViewer', () => {
             onRewind={vi.fn()}
           />,
         );
-      await waitUntilReady();
 
       act(() => {
         stdin.write(sequence);
@@ -230,7 +226,6 @@ describe('RewindViewer', () => {
             onRewind={vi.fn()}
           />,
         );
-      await waitUntilReady();
 
       // Up from first -> Last
       act(() => {
@@ -308,7 +303,6 @@ describe('RewindViewer', () => {
             onRewind={onRewind}
           />,
         );
-      await waitUntilReady();
 
       // Select
       await act(async () => {
@@ -366,7 +360,6 @@ describe('RewindViewer', () => {
             onRewind={onRewind}
           />,
         );
-      await waitUntilReady();
 
       expect(lastFrame()).toMatchSnapshot();
 
@@ -403,14 +396,13 @@ describe('RewindViewer', () => {
     const onExit = vi.fn();
     const onRewind = vi.fn();
 
-    const { lastFrame, waitUntilReady, unmount } = await renderWithProviders(
+    const { lastFrame, unmount } = await renderWithProviders(
       <RewindViewer
         conversation={conversation}
         onExit={onExit}
         onRewind={onRewind}
       />,
     );
-    await waitUntilReady();
 
     expect(lastFrame()).toMatchSnapshot('initial');
 
@@ -422,18 +414,14 @@ describe('RewindViewer', () => {
     ];
     conversation = createConversation(newMessages);
 
-    const {
-      lastFrame: lastFrame2,
-      waitUntilReady: waitUntilReady2,
-      unmount: unmount2,
-    } = await renderWithProviders(
-      <RewindViewer
-        conversation={conversation}
-        onExit={onExit}
-        onRewind={onRewind}
-      />,
-    );
-    await waitUntilReady2();
+    const { lastFrame: lastFrame2, unmount: unmount2 } =
+      await renderWithProviders(
+        <RewindViewer
+          conversation={conversation}
+          onExit={onExit}
+          onRewind={onRewind}
+        />,
+      );
 
     expect(lastFrame2()).toMatchSnapshot('after-update');
     unmount2();
@@ -451,15 +439,13 @@ it('renders accessible screen reader view when screen reader is enabled', async 
   const onExit = vi.fn();
   const onRewind = vi.fn();
 
-  const { lastFrame, waitUntilReady, unmount } = await renderWithProviders(
+  const { lastFrame, unmount } = await renderWithProviders(
     <RewindViewer
       conversation={conversation}
       onExit={onExit}
       onRewind={onRewind}
     />,
   );
-  await waitUntilReady();
-
   const frame = lastFrame();
   expect(frame).toContain('Rewind - Select a conversation point:');
   expect(frame).toContain('Stay at current position');

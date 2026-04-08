@@ -10,6 +10,7 @@ import { waitFor } from '../../../test-utils/async.js';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { ExtensionDetails } from './ExtensionDetails.js';
 import { type RegistryExtension } from '../../../config/extensionRegistryClient.js';
+import { ExtensionUpdateState } from '../../state/extensions.js';
 
 const mockExtension: RegistryExtension = {
   id: 'ext1',
@@ -32,22 +33,36 @@ const mockExtension: RegistryExtension = {
   licenseKey: 'Apache-2.0',
 };
 
+const linkableExtension: RegistryExtension = {
+  ...mockExtension,
+  url: '/local/path/to/extension',
+};
+
 describe('ExtensionDetails', () => {
   let mockOnBack: ReturnType<typeof vi.fn>;
   let mockOnInstall: ReturnType<typeof vi.fn>;
+  let mockOnLink: ReturnType<typeof vi.fn>;
 
   beforeEach(() => {
     mockOnBack = vi.fn();
     mockOnInstall = vi.fn();
+    mockOnLink = vi.fn();
   });
 
-  const renderDetails = async (isInstalled = false) =>
+  const renderDetails = async (
+    isInstalled = false,
+    updateState?: ExtensionUpdateState,
+    onUpdate = vi.fn(),
+  ) =>
     renderWithProviders(
       <ExtensionDetails
         extension={mockExtension}
         onBack={mockOnBack}
         onInstall={mockOnInstall}
+        onLink={mockOnLink}
         isInstalled={isInstalled}
+        updateState={updateState}
+        onUpdate={onUpdate}
       />,
     );
 
@@ -116,5 +131,81 @@ describe('ExtensionDetails', () => {
     });
     expect(mockOnInstall).not.toHaveBeenCalled();
     vi.useRealTimers();
+  });
+
+  it('should call onLink when "l" is pressed and is linkable', async () => {
+    const { stdin } = await renderWithProviders(
+      <ExtensionDetails
+        extension={linkableExtension}
+        onBack={mockOnBack}
+        onInstall={mockOnInstall}
+        onLink={mockOnLink}
+        isInstalled={false}
+      />,
+    );
+    await React.act(async () => {
+      stdin.write('l');
+    });
+    await waitFor(() => {
+      expect(mockOnLink).toHaveBeenCalled();
+    });
+  });
+
+  it('should NOT show "Link" button for GitHub extensions', async () => {
+    const { lastFrame } = await renderDetails(true);
+    await waitFor(() => {
+      expect(lastFrame()).not.toContain('[L] Link');
+    });
+  });
+
+  it('should show "Link" button for local extensions', async () => {
+    const { lastFrame } = await renderWithProviders(
+      <ExtensionDetails
+        extension={linkableExtension}
+        onBack={mockOnBack}
+        onInstall={mockOnInstall}
+        onLink={mockOnLink}
+        isInstalled={false}
+      />,
+    );
+    await waitFor(() => {
+      expect(lastFrame()).toContain('[L] Link');
+    });
+  });
+
+  it('should show update button when update is available', async () => {
+    const { lastFrame } = await renderDetails(
+      true,
+      ExtensionUpdateState.UPDATE_AVAILABLE,
+    );
+    await waitFor(() => {
+      expect(lastFrame()).toContain('[I] Update');
+    });
+  });
+
+  it('should call onUpdate when "i" is pressed', async () => {
+    const mockOnUpdate = vi.fn();
+    const { stdin } = await renderDetails(
+      true,
+      ExtensionUpdateState.UPDATE_AVAILABLE,
+      mockOnUpdate,
+    );
+    await React.act(async () => {
+      stdin.write('i');
+    });
+    await waitFor(() => {
+      expect(mockOnUpdate).toHaveBeenCalled();
+    });
+  });
+
+  it('should show [Updating...] and hide "Already Installed" when update is in progress', async () => {
+    const { lastFrame } = await renderDetails(
+      true,
+      ExtensionUpdateState.UPDATING,
+    );
+    await waitFor(() => {
+      expect(lastFrame()).toContain('[Updating...]');
+      expect(lastFrame()).not.toContain('Already Installed');
+    });
   });
 });

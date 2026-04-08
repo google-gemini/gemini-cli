@@ -128,6 +128,7 @@ const mockProcessKill = vi
   .mockImplementation(() => true);
 
 const shellExecutionConfig: ShellExecutionConfig = {
+  sessionId: 'default',
   terminalWidth: 80,
   terminalHeight: 24,
   pager: 'cat',
@@ -154,6 +155,7 @@ const createMockSerializeTerminalToObjectReturnValue = (
       underline: false,
       dim: false,
       inverse: false,
+      isUninitialized: false,
       fg: '#ffffff',
       bg: '#000000',
     },
@@ -172,6 +174,7 @@ const createExpectedAnsiOutput = (text: string | string[]): AnsiOutput => {
       underline: false,
       dim: false,
       inverse: false,
+      isUninitialized: false,
       fg: '',
       bg: '',
     } as AnsiToken,
@@ -483,6 +486,7 @@ describe('ShellExecutionService', () => {
           ptyProcess: mockPtyProcess as any,
           // eslint-disable-next-line @typescript-eslint/no-explicit-any
           headlessTerminal: mockHeadlessTerminal as any,
+          command: 'some-command',
         });
     });
 
@@ -753,6 +757,8 @@ describe('ShellExecutionService', () => {
       (ShellExecutionService as any).activePtys.clear();
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       (ShellExecutionService as any).activeChildProcesses.clear();
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      (ShellExecutionService as any).backgroundProcessHistory.clear();
     });
 
     afterEach(() => {
@@ -783,7 +789,11 @@ describe('ShellExecutionService', () => {
       ]);
 
       // Background the process
-      ShellExecutionService.background(handle.pid!);
+      ShellExecutionService.background(
+        handle.pid!,
+        'default',
+        'long-running-pty',
+      );
 
       const result = await handle.result;
       expect(result.backgrounded).toBe(true);
@@ -791,7 +801,7 @@ describe('ShellExecutionService', () => {
 
       expect(mockMkdirSync).toHaveBeenCalledWith(
         expect.stringContaining('background-processes'),
-        { recursive: true },
+        { recursive: true, mode: 0o700 },
       );
 
       // Verify initial output was written
@@ -822,7 +832,11 @@ describe('ShellExecutionService', () => {
       mockBgChildProcess.stdout?.emit('data', Buffer.from('initial cp output'));
       await new Promise((resolve) => process.nextTick(resolve));
 
-      ShellExecutionService.background(handle.pid!);
+      ShellExecutionService.background(
+        handle.pid!,
+        'default',
+        'long-running-child',
+      );
 
       const result = await handle.result;
       expect(result.backgrounded).toBe(true);
@@ -861,7 +875,11 @@ describe('ShellExecutionService', () => {
       });
 
       // Background the process
-      ShellExecutionService.background(handle.pid!);
+      ShellExecutionService.background(
+        handle.pid!,
+        'default',
+        'failing-log-setup',
+      );
 
       const result = await handle.result;
       expect(result.backgrounded).toBe(true);
@@ -872,6 +890,89 @@ describe('ShellExecutionService', () => {
 
       await ShellExecutionService.kill(handle.pid!);
     });
+
+    it('should track background process history', async () => {
+      await simulateExecution(
+        'history-test-cmd',
+        async (pty) => {
+          ShellExecutionService.background(
+            pty.pid,
+            'default',
+            'history-test-cmd',
+          );
+
+          const history =
+            ShellExecutionService.listBackgroundProcesses('default');
+          expect(history).toHaveLength(1);
+          expect(history[0]).toEqual(
+            expect.objectContaining({
+              pid: pty.pid,
+              command: 'history-test-cmd',
+              status: 'running',
+            }),
+          );
+
+          // Simulate exit
+          pty.onExit.mock.calls[0][0]({ exitCode: 0, signal: null });
+        },
+        { ...shellExecutionConfig, originalCommand: 'history-test-cmd' },
+      );
+
+      const history = ShellExecutionService.listBackgroundProcesses('default');
+      expect(history[0]).toEqual(
+        expect.objectContaining({
+          pid: mockPtyProcess.pid,
+          command: 'history-test-cmd',
+          status: 'exited',
+          exitCode: 0,
+        }),
+      );
+    });
+
+    it('should evict oldest process history when exceeding max size', () => {
+      const MAX = 100;
+      const history = new Map();
+      for (let i = 1; i <= MAX; i++) {
+        history.set(i, {
+          command: `cmd-${i}`,
+          status: 'running',
+          startTime: Date.now(),
+        });
+      }
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      (ShellExecutionService as any).backgroundProcessHistory.set(
+        'default',
+        history,
+      );
+
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      (ShellExecutionService as any).activeChildProcesses.set(101, {
+        process: {},
+        state: { output: '' },
+        command: 'cmd-101',
+        sessionId: 'default',
+      });
+
+      ShellExecutionService.background(101, 'default', 'cmd-101');
+
+      const processes =
+        ShellExecutionService.listBackgroundProcesses('default');
+      expect(processes).toHaveLength(MAX);
+      expect(processes.some((p) => p.pid === 1)).toBe(false);
+    });
+
+    it('should throw error if sessionId is missing for background operations', () => {
+      expect(() => ShellExecutionService.background(102)).toThrow(
+        'Session ID is required for background operations',
+      );
+    });
+
+    it('should throw error if sessionId is missing for listBackgroundProcesses', () => {
+      expect(() =>
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        ShellExecutionService.listBackgroundProcesses(undefined as any),
+      ).toThrow('Session ID is required');
+    });
   });
 
   describe('Binary Output', () => {
@@ -880,15 +981,12 @@ describe('ShellExecutionService', () => {
       const binaryChunk1 = Buffer.from([0x89, 0x50, 0x4e, 0x47]);
       const binaryChunk2 = Buffer.from([0x0d, 0x0a, 0x1a, 0x0a]);
 
-      const { result } = await simulateExecution('cat image.png', (pty) => {
+      await simulateExecution('cat image.png', (pty) => {
         pty.onData.mock.calls[0][0](binaryChunk1);
         pty.onData.mock.calls[0][0](binaryChunk2);
         pty.onExit.mock.calls[0][0]({ exitCode: 0, signal: null });
       });
 
-      expect(result.rawOutput).toEqual(
-        Buffer.concat([binaryChunk1, binaryChunk2]),
-      );
       expect(onOutputEventMock).toHaveBeenCalledTimes(4);
       expect(onOutputEventMock.mock.calls[0][0]).toEqual({
         type: 'binary_detected',
@@ -1464,15 +1562,12 @@ describe('ShellExecutionService child_process fallback', () => {
       const binaryChunk1 = Buffer.from([0x89, 0x50, 0x4e, 0x47]);
       const binaryChunk2 = Buffer.from([0x0d, 0x0a, 0x1a, 0x0a]);
 
-      const { result } = await simulateExecution('cat image.png', (cp) => {
+      await simulateExecution('cat image.png', (cp) => {
         cp.stdout?.emit('data', binaryChunk1);
         cp.stdout?.emit('data', binaryChunk2);
         cp.emit('exit', 0, null);
       });
 
-      expect(result.rawOutput).toEqual(
-        Buffer.concat([binaryChunk1, binaryChunk2]),
-      );
       expect(onOutputEventMock).toHaveBeenCalledTimes(4);
       expect(onOutputEventMock.mock.calls[0][0]).toEqual({
         type: 'binary_detected',
@@ -1918,6 +2013,11 @@ describe('ShellExecutionService environment variables', () => {
         args: ['-c', 'ls'],
         env: { SANDBOXED: 'true' },
       }),
+      isKnownSafeCommand: vi.fn().mockReturnValue(false),
+      isDangerousCommand: vi.fn().mockReturnValue(false),
+      parseDenials: vi.fn().mockReturnValue(undefined),
+      getWorkspace: vi.fn().mockReturnValue('/workspace'),
+      getOptions: vi.fn().mockReturnValue(undefined),
     };
 
     const configWithSandbox: ShellExecutionConfig = {

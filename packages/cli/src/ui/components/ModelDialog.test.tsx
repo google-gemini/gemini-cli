@@ -21,7 +21,6 @@ import {
   PREVIEW_GEMINI_FLASH_MODEL,
   PREVIEW_GEMINI_3_1_FLASH_LITE_MODEL,
   AuthType,
-  UserTierId,
 } from '@google/gemini-cli-core';
 import type { Config, ModelSlashCommandEvent } from '@google/gemini-cli-core';
 
@@ -53,9 +52,9 @@ describe('<ModelDialog />', () => {
   const mockOnClose = vi.fn();
   const mockGetHasAccessToPreviewModel = vi.fn();
   const mockGetGemini31LaunchedSync = vi.fn();
+  const mockGetGemini31FlashLiteLaunchedSync = vi.fn();
   const mockGetProModelNoAccess = vi.fn();
   const mockGetProModelNoAccessSync = vi.fn();
-  const mockGetUserTier = vi.fn();
 
   interface MockConfig extends Partial<Config> {
     setModel: (model: string, isTemporary?: boolean) => void;
@@ -63,9 +62,18 @@ describe('<ModelDialog />', () => {
     getHasAccessToPreviewModel: () => boolean;
     getIdeMode: () => boolean;
     getGemini31LaunchedSync: () => boolean;
+    getGemini31FlashLiteLaunchedSync: () => boolean;
     getProModelNoAccess: () => Promise<boolean>;
     getProModelNoAccessSync: () => boolean;
-    getUserTier: () => UserTierId | undefined;
+    getLastRetrievedQuota: () =>
+      | {
+          buckets: Array<{
+            modelId?: string;
+            remainingFraction?: number;
+            resetTime?: string;
+          }>;
+        }
+      | undefined;
   }
 
   const mockConfig: MockConfig = {
@@ -74,9 +82,10 @@ describe('<ModelDialog />', () => {
     getHasAccessToPreviewModel: mockGetHasAccessToPreviewModel,
     getIdeMode: () => false,
     getGemini31LaunchedSync: mockGetGemini31LaunchedSync,
+    getGemini31FlashLiteLaunchedSync: mockGetGemini31FlashLiteLaunchedSync,
     getProModelNoAccess: mockGetProModelNoAccess,
     getProModelNoAccessSync: mockGetProModelNoAccessSync,
-    getUserTier: mockGetUserTier,
+    getLastRetrievedQuota: () => ({ buckets: [] }),
   };
 
   beforeEach(() => {
@@ -84,9 +93,9 @@ describe('<ModelDialog />', () => {
     mockGetModel.mockReturnValue(DEFAULT_GEMINI_MODEL_AUTO);
     mockGetHasAccessToPreviewModel.mockReturnValue(false);
     mockGetGemini31LaunchedSync.mockReturnValue(false);
+    mockGetGemini31FlashLiteLaunchedSync.mockReturnValue(false);
     mockGetProModelNoAccess.mockResolvedValue(false);
     mockGetProModelNoAccessSync.mockReturnValue(false);
-    mockGetUserTier.mockReturnValue(UserTierId.STANDARD);
 
     // Default implementation for getDisplayString
     mockGetDisplayString.mockImplementation((val: string) => {
@@ -115,7 +124,6 @@ describe('<ModelDialog />', () => {
         settings,
       },
     );
-    await result.waitUntilReady();
     return result;
   };
 
@@ -132,7 +140,7 @@ describe('<ModelDialog />', () => {
     mockGetProModelNoAccessSync.mockReturnValue(true);
     mockGetProModelNoAccess.mockResolvedValue(true);
     mockGetHasAccessToPreviewModel.mockReturnValue(true);
-    mockGetUserTier.mockReturnValue(UserTierId.FREE);
+    mockGetGemini31FlashLiteLaunchedSync.mockReturnValue(true);
     mockGetDisplayString.mockImplementation((val: string) => val);
 
     const { lastFrame, unmount } = await renderComponent();
@@ -438,33 +446,11 @@ describe('<ModelDialog />', () => {
       unmount();
     });
 
-    it('hides Flash Lite Preview model for users with pro access', async () => {
+    it('shows Flash Lite Preview model regardless of tier when flag is enabled', async () => {
       mockGetProModelNoAccessSync.mockReturnValue(false);
       mockGetProModelNoAccess.mockResolvedValue(false);
       mockGetHasAccessToPreviewModel.mockReturnValue(true);
-      const { lastFrame, stdin, waitUntilReady, unmount } =
-        await renderComponent();
-
-      // Go to manual view
-      await act(async () => {
-        stdin.write('\u001B[B'); // Manual
-      });
-      await waitUntilReady();
-      await act(async () => {
-        stdin.write('\r');
-      });
-      await waitUntilReady();
-
-      const output = lastFrame();
-      expect(output).not.toContain(PREVIEW_GEMINI_3_1_FLASH_LITE_MODEL);
-      unmount();
-    });
-
-    it('shows Flash Lite Preview model for free tier users', async () => {
-      mockGetProModelNoAccessSync.mockReturnValue(false);
-      mockGetProModelNoAccess.mockResolvedValue(false);
-      mockGetHasAccessToPreviewModel.mockReturnValue(true);
-      mockGetUserTier.mockReturnValue(UserTierId.FREE);
+      mockGetGemini31FlashLiteLaunchedSync.mockReturnValue(true);
       const { lastFrame, stdin, waitUntilReady, unmount } =
         await renderComponent();
 
