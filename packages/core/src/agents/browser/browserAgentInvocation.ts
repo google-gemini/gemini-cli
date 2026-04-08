@@ -440,6 +440,8 @@ ${output.result}`;
           }
         } catch {
           // Ignore errors for removing the overlays.
+        } finally {
+          browserManager.release();
         }
       }
     }
