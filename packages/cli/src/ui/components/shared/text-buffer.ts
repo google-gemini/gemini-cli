@@ -2795,11 +2795,23 @@ export function textBufferReducer(
         newExpandedPaste = { ...newExpandedPaste, startLine: newStartLine };
       }
     }
+    let newSelectionAnchor = newState.selectionAnchor;
+    if (newSelectionAnchor) {
+      const newAnchorRow = newSelectionAnchor[0] - excess;
+      if (newAnchorRow < 0) {
+        newSelectionAnchor = null;
+      } else {
+        newSelectionAnchor = [newAnchorRow, newSelectionAnchor[1]];
+      }
+    }
     newState = {
       ...newState,
       lines: newLines,
       cursorRow: newCursorRow,
       expandedPaste: newExpandedPaste,
+      selectionAnchor: newSelectionAnchor,
+      undoStack: [],
+      redoStack: [],
     };
   }
 
