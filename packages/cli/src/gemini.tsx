@@ -111,6 +111,8 @@ export function validateDnsResolutionOrder(
   return defaultValue;
 }
 
+const DEFAULT_EPT_SIZE = (256 * 1024 * 1024).toString();
+
 export function getNodeMemoryArgs(isDebugMode: boolean): string[] {
   const totalMemoryMB = os.totalmem() / (1024 * 1024);
   const heapStats = v8.getHeapStatistics();
@@ -130,16 +132,35 @@ export function getNodeMemoryArgs(isDebugMode: boolean): string[] {
     return [];
   }
 
+  const args: string[] = [];
+
+  // Automatically expand the V8 External Pointer Table to 256MB to prevent
+  // out-of-memory crashes during high native-handle concurrency.
+  // Note: Only supported in specific Node.js versions compiled with V8 Sandbox enabled.
+  const eptFlag = `--max-external-pointer-table-size=${DEFAULT_EPT_SIZE}`;
+  const isV8SandboxEnabled =
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-type-assertion
+    (process.config?.variables as any)?.v8_enable_sandbox === 1;
+
+  if (
+    isV8SandboxEnabled &&
+    !process.execArgv.some((arg) =>
+      arg.startsWith('--max-external-pointer-table-size'),
+    )
+  ) {
+    args.push(eptFlag);
+  }
+
   if (targetMaxOldSpaceSizeInMB > currentMaxOldSpaceSizeMb) {
     if (isDebugMode) {
       debugLogger.debug(
         `Need to relaunch with more memory: ${targetMaxOldSpaceSizeInMB.toFixed(2)} MB`,
       );
     }
-    return [`--max-old-space-size=${targetMaxOldSpaceSizeInMB}`];
+    args.push(`--max-old-space-size=${targetMaxOldSpaceSizeInMB}`);
   }
 
-  return [];
+  return args;
 }
 
 export function setupUnhandledRejectionHandler() {
