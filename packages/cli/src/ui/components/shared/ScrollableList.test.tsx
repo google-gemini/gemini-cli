@@ -5,20 +5,11 @@
  */
 
 import { useState, useEffect, useRef, act } from 'react';
-import { render } from '../../../test-utils/render.js';
+import { renderWithProviders } from '../../../test-utils/render.js';
 import { Box, Text } from 'ink';
 import { ScrollableList, type ScrollableListRef } from './ScrollableList.js';
-import { ScrollProvider } from '../../contexts/ScrollProvider.js';
-import { KeypressProvider } from '../../contexts/KeypressContext.js';
-import { MouseProvider } from '../../contexts/MouseContext.js';
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { waitFor } from '../../../test-utils/async.js';
-
-vi.mock('../../contexts/UIStateContext.js', () => ({
-  useUIState: vi.fn(() => ({
-    copyModeEnabled: false,
-  })),
-}));
 
 // Mock useStdout to provide a fixed size for testing
 vi.mock('ink', async (importOriginal) => {
@@ -85,51 +76,45 @@ const TestComponent = ({
   }, [onRef]);
 
   return (
-    <MouseProvider mouseEventsEnabled={false}>
-      <KeypressProvider>
-        <ScrollProvider>
-          <Box flexDirection="column" width={80} height={24} padding={1}>
-            <Box flexGrow={1} borderStyle="round" borderColor="cyan">
-              <ScrollableList
-                ref={listRef}
-                data={items}
-                renderItem={({ item, index }) => (
-                  <Box flexDirection="column" paddingBottom={2}>
+    <Box flexDirection="column" width={80} height={24} padding={1}>
+      <Box flexGrow={1} borderStyle="round" borderColor="cyan">
+        <ScrollableList
+          ref={listRef}
+          data={items}
+          renderItem={({ item, index }) => (
+            <Box flexDirection="column" paddingBottom={2}>
+              <Box
+                sticky
+                flexDirection="column"
+                width={78}
+                opaque
+                stickyChildren={
+                  <Box flexDirection="column" width={78} opaque>
+                    <Text>{item.title}</Text>
                     <Box
-                      sticky
-                      flexDirection="column"
-                      width={78}
-                      opaque
-                      stickyChildren={
-                        <Box flexDirection="column" width={78} opaque>
-                          <Text>{item.title}</Text>
-                          <Box
-                            borderStyle="single"
-                            borderTop={true}
-                            borderBottom={false}
-                            borderLeft={false}
-                            borderRight={false}
-                            borderColor="gray"
-                          />
-                        </Box>
-                      }
-                    >
-                      <Text>{item.title}</Text>
-                    </Box>
-                    <Text color="gray">{getLorem(index)}</Text>
+                      borderStyle="single"
+                      borderTop={true}
+                      borderBottom={false}
+                      borderLeft={false}
+                      borderRight={false}
+                      borderColor="gray"
+                    />
                   </Box>
-                )}
-                estimatedItemHeight={() => 14}
-                keyExtractor={(item) => item.id}
-                hasFocus={true}
-                initialScrollIndex={Number.MAX_SAFE_INTEGER}
-              />
+                }
+              >
+                <Text>{item.title}</Text>
+              </Box>
+              <Text color="gray">{getLorem(index)}</Text>
             </Box>
-            <Text>Count: {items.length}</Text>
-          </Box>
-        </ScrollProvider>
-      </KeypressProvider>
-    </MouseProvider>
+          )}
+          estimatedItemHeight={() => 14}
+          keyExtractor={(item) => item.id}
+          hasFocus={true}
+          initialScrollIndex={Number.MAX_SAFE_INTEGER}
+        />
+      </Box>
+      <Text>Count: {items.length}</Text>
+    </Box>
   );
 };
 describe('ScrollableList Demo Behavior', () => {
@@ -147,10 +132,10 @@ describe('ScrollableList Demo Behavior', () => {
     let lastFrame: (options?: { allowEmpty?: boolean }) => string | undefined;
     let waitUntilReady: () => Promise<void>;
 
-    let result: ReturnType<typeof render>;
+    let result: Awaited<ReturnType<typeof renderWithProviders>>;
 
     await act(async () => {
-      result = render(
+      result = await renderWithProviders(
         <TestComponent
           onAddItem={(add) => {
             addItem = add;
@@ -230,45 +215,39 @@ describe('ScrollableList Demo Behavior', () => {
       }, []);
 
       return (
-        <MouseProvider mouseEventsEnabled={false}>
-          <KeypressProvider>
-            <ScrollProvider>
-              <Box flexDirection="column" width={80} height={10}>
-                <ScrollableList
-                  ref={ref}
-                  data={items}
-                  renderItem={({ item, index }) => (
-                    <Box flexDirection="column" height={3}>
-                      {index === 0 ? (
-                        <Box
-                          sticky
-                          stickyChildren={<Text>[STICKY] {item.title}</Text>}
-                        >
-                          <Text>[Normal] {item.title}</Text>
-                        </Box>
-                      ) : (
-                        <Text>[Normal] {item.title}</Text>
-                      )}
-                      <Text>Content for {item.title}</Text>
-                      <Text>More content for {item.title}</Text>
-                    </Box>
-                  )}
-                  estimatedItemHeight={() => 3}
-                  keyExtractor={(item) => item.id}
-                  hasFocus={true}
-                />
+        <Box flexDirection="column" width={80} height={10}>
+          <ScrollableList
+            ref={ref}
+            data={items}
+            renderItem={({ item, index }) => (
+              <Box flexDirection="column" height={3}>
+                {index === 0 ? (
+                  <Box
+                    sticky
+                    stickyChildren={<Text>[STICKY] {item.title}</Text>}
+                  >
+                    <Text>[Normal] {item.title}</Text>
+                  </Box>
+                ) : (
+                  <Text>[Normal] {item.title}</Text>
+                )}
+                <Text>Content for {item.title}</Text>
+                <Text>More content for {item.title}</Text>
               </Box>
-            </ScrollProvider>
-          </KeypressProvider>
-        </MouseProvider>
+            )}
+            estimatedItemHeight={() => 3}
+            keyExtractor={(item) => item.id}
+            hasFocus={true}
+          />
+        </Box>
       );
     };
 
     let lastFrame: () => string | undefined;
     let waitUntilReady: () => Promise<void>;
-    let result: ReturnType<typeof render>;
+    let result: Awaited<ReturnType<typeof renderWithProviders>>;
     await act(async () => {
-      result = render(<StickyTestComponent />);
+      result = await renderWithProviders(<StickyTestComponent />);
       lastFrame = result.lastFrame;
       waitUntilReady = result.waitUntilReady;
     });
@@ -334,27 +313,21 @@ describe('ScrollableList Demo Behavior', () => {
         title: `Item ${i}`,
       }));
 
-      let result: ReturnType<typeof render>;
+      let result: Awaited<ReturnType<typeof renderWithProviders>>;
       await act(async () => {
-        result = render(
-          <MouseProvider mouseEventsEnabled={false}>
-            <KeypressProvider>
-              <ScrollProvider>
-                <Box flexDirection="column" width={80} height={10}>
-                  <ScrollableList
-                    ref={(ref) => {
-                      listRef = ref;
-                    }}
-                    data={items}
-                    renderItem={({ item }) => <Text>{item.title}</Text>}
-                    estimatedItemHeight={() => 1}
-                    keyExtractor={(item) => item.id}
-                    hasFocus={true}
-                  />
-                </Box>
-              </ScrollProvider>
-            </KeypressProvider>
-          </MouseProvider>,
+        result = await renderWithProviders(
+          <Box flexDirection="column" width={80} height={10}>
+            <ScrollableList
+              ref={(ref) => {
+                listRef = ref;
+              }}
+              data={items}
+              renderItem={({ item }) => <Text>{item.title}</Text>}
+              estimatedItemHeight={() => 1}
+              keyExtractor={(item) => item.id}
+              hasFocus={true}
+            />
+          </Box>,
         );
         lastFrame = result.lastFrame;
         stdin = result.stdin;
@@ -444,25 +417,19 @@ describe('ScrollableList Demo Behavior', () => {
       let lastFrame: (options?: { allowEmpty?: boolean }) => string | undefined;
       let waitUntilReady: () => Promise<void>;
 
-      let result: ReturnType<typeof render>;
+      let result: Awaited<ReturnType<typeof renderWithProviders>>;
       await act(async () => {
-        result = render(
-          <MouseProvider mouseEventsEnabled={false}>
-            <KeypressProvider>
-              <ScrollProvider>
-                <Box width={100} height={20}>
-                  <ScrollableList
-                    data={items}
-                    renderItem={({ item }) => <Text>{item.title}</Text>}
-                    estimatedItemHeight={() => 1}
-                    keyExtractor={(item) => item.id}
-                    hasFocus={true}
-                    width={50}
-                  />
-                </Box>
-              </ScrollProvider>
-            </KeypressProvider>
-          </MouseProvider>,
+        result = await renderWithProviders(
+          <Box width={100} height={20}>
+            <ScrollableList
+              data={items}
+              renderItem={({ item }) => <Text>{item.title}</Text>}
+              estimatedItemHeight={() => 1}
+              keyExtractor={(item) => item.id}
+              hasFocus={true}
+              width={50}
+            />
+          </Box>,
         );
         lastFrame = result.lastFrame;
         waitUntilReady = result.waitUntilReady;
@@ -497,31 +464,25 @@ describe('ScrollableList Demo Behavior', () => {
       }, []);
 
       return (
-        <MouseProvider mouseEventsEnabled={false}>
-          <KeypressProvider>
-            <ScrollProvider>
-              <Box flexDirection="column" width={80} height={5}>
-                <ScrollableList
-                  ref={(ref) => {
-                    listRef = ref;
-                  }}
-                  data={items}
-                  renderItem={({ item }) => <Text>{item.title}</Text>}
-                  estimatedItemHeight={() => 1}
-                  keyExtractor={(item) => item.id}
-                  hasFocus={true}
-                  initialScrollIndex={Number.MAX_SAFE_INTEGER}
-                />
-              </Box>
-            </ScrollProvider>
-          </KeypressProvider>
-        </MouseProvider>
+        <Box flexDirection="column" width={80} height={5}>
+          <ScrollableList
+            ref={(ref) => {
+              listRef = ref;
+            }}
+            data={items}
+            renderItem={({ item }) => <Text>{item.title}</Text>}
+            estimatedItemHeight={() => 1}
+            keyExtractor={(item) => item.id}
+            hasFocus={true}
+            initialScrollIndex={Number.MAX_SAFE_INTEGER}
+          />
+        </Box>
       );
     };
 
-    let result: ReturnType<typeof render>;
+    let result: Awaited<ReturnType<typeof renderWithProviders>>;
     await act(async () => {
-      result = render(<TestComp />);
+      result = await renderWithProviders(<TestComp />);
     });
 
     await result!.waitUntilReady();
@@ -622,33 +583,27 @@ describe('ScrollableList Demo Behavior', () => {
       );
 
       return (
-        <MouseProvider mouseEventsEnabled={false}>
-          <KeypressProvider>
-            <ScrollProvider>
-              <Box flexDirection="column" width={80} height={4}>
-                <ScrollableList
-                  ref={(ref) => {
-                    listRef = ref;
-                  }}
-                  data={items}
-                  renderItem={({ item, index }) => (
-                    <ItemWithState item={item} isLast={index === 4} />
-                  )}
-                  estimatedItemHeight={() => 1}
-                  keyExtractor={(item) => item.id}
-                  hasFocus={true}
-                  initialScrollIndex={Number.MAX_SAFE_INTEGER}
-                />
-              </Box>
-            </ScrollProvider>
-          </KeypressProvider>
-        </MouseProvider>
+        <Box flexDirection="column" width={80} height={4}>
+          <ScrollableList
+            ref={(ref) => {
+              listRef = ref;
+            }}
+            data={items}
+            renderItem={({ item, index }) => (
+              <ItemWithState item={item} isLast={index === 4} />
+            )}
+            estimatedItemHeight={() => 1}
+            keyExtractor={(item) => item.id}
+            hasFocus={true}
+            initialScrollIndex={Number.MAX_SAFE_INTEGER}
+          />
+        </Box>
       );
     };
 
-    let result: ReturnType<typeof render>;
+    let result: Awaited<ReturnType<typeof renderWithProviders>>;
     await act(async () => {
-      result = render(<TestComp />);
+      result = await renderWithProviders(<TestComp />);
     });
 
     await result!.waitUntilReady();
@@ -696,35 +651,29 @@ describe('ScrollableList Demo Behavior', () => {
       }, []);
 
       return (
-        <MouseProvider mouseEventsEnabled={false}>
-          <KeypressProvider>
-            <ScrollProvider>
-              <Box flexDirection="column" width={80} height={10}>
-                <ScrollableList
-                  ref={(ref) => {
-                    listRef = ref;
-                  }}
-                  data={items}
-                  renderItem={({ item }) => (
-                    <Box height={item.id === '1' ? 10 : 2}>
-                      <Text>{item.title}</Text>
-                    </Box>
-                  )}
-                  estimatedItemHeight={() => 2}
-                  keyExtractor={(item) => item.id}
-                  hasFocus={true}
-                  initialScrollIndex={Number.MAX_SAFE_INTEGER}
-                />
+        <Box flexDirection="column" width={80} height={10}>
+          <ScrollableList
+            ref={(ref) => {
+              listRef = ref;
+            }}
+            data={items}
+            renderItem={({ item }) => (
+              <Box height={item.id === '1' ? 10 : 2}>
+                <Text>{item.title}</Text>
               </Box>
-            </ScrollProvider>
-          </KeypressProvider>
-        </MouseProvider>
+            )}
+            estimatedItemHeight={() => 2}
+            keyExtractor={(item) => item.id}
+            hasFocus={true}
+            initialScrollIndex={Number.MAX_SAFE_INTEGER}
+          />
+        </Box>
       );
     };
 
-    let result: ReturnType<typeof render>;
+    let result: Awaited<ReturnType<typeof renderWithProviders>>;
     await act(async () => {
-      result = render(<TestComp />);
+      result = await renderWithProviders(<TestComp />);
     });
 
     await result!.waitUntilReady();

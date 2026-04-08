@@ -4,20 +4,60 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+import { updateGlobalFetchTimeouts } from './fetch.js';
 import { describe, it, expect, vi, beforeEach, afterAll } from 'vitest';
-import { isPrivateIp, isAddressPrivate, fetchWithTimeout } from './fetch.js';
+import * as dnsPromises from 'node:dns/promises';
+import type { LookupAddress, LookupAllOptions } from 'node:dns';
+import ipaddr from 'ipaddr.js';
+
+const { setGlobalDispatcher, Agent, ProxyAgent } = vi.hoisted(() => ({
+  setGlobalDispatcher: vi.fn(),
+  Agent: vi.fn(),
+  ProxyAgent: vi.fn(),
+}));
+
+vi.mock('undici', () => ({
+  setGlobalDispatcher,
+  Agent,
+  ProxyAgent,
+}));
 
 vi.mock('node:dns/promises', () => ({
   lookup: vi.fn(),
 }));
 
+// Import after mocks are established
+const {
+  isPrivateIp,
+  isPrivateIpAsync,
+  isAddressPrivate,
+  fetchWithTimeout,
+  setGlobalProxy,
+} = await import('./fetch.js');
+
 // Mock global fetch
 const originalFetch = global.fetch;
 global.fetch = vi.fn();
 
+interface ErrorWithCode extends Error {
+  code?: string;
+}
+
 describe('fetch utils', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    // Default DNS lookup to return a public IP, or the IP itself if valid
+    vi.mocked(
+      dnsPromises.lookup as (
+        hostname: string,
+        options: LookupAllOptions,
+      ) => Promise<LookupAddress[]>,
+    ).mockImplementation(async (hostname: string) => {
+      if (ipaddr.isValid(hostname)) {
+        return [{ address: hostname, family: hostname.includes(':') ? 6 : 4 }];
+      }
+      return [{ address: '93.184.216.34', family: 4 }];
+    });
   });
 
   afterAll(() => {
@@ -99,6 +139,43 @@ describe('fetch utils', () => {
     });
   });
 
+  describe('isPrivateIpAsync', () => {
+    it('should identify private IPs directly', async () => {
+      expect(await isPrivateIpAsync('http://10.0.0.1/')).toBe(true);
+    });
+
+    it('should identify domains resolving to private IPs', async () => {
+      vi.mocked(
+        dnsPromises.lookup as (
+          hostname: string,
+          options: LookupAllOptions,
+        ) => Promise<LookupAddress[]>,
+      ).mockImplementation(async () => [{ address: '10.0.0.1', family: 4 }]);
+      expect(await isPrivateIpAsync('http://malicious.com/')).toBe(true);
+    });
+
+    it('should identify domains resolving to public IPs as non-private', async () => {
+      vi.mocked(
+        dnsPromises.lookup as (
+          hostname: string,
+          options: LookupAllOptions,
+        ) => Promise<LookupAddress[]>,
+      ).mockImplementation(async () => [{ address: '8.8.8.8', family: 4 }]);
+      expect(await isPrivateIpAsync('http://google.com/')).toBe(false);
+    });
+
+    it('should throw error if DNS resolution fails (fail closed)', async () => {
+      vi.mocked(dnsPromises.lookup).mockRejectedValue(new Error('DNS Error'));
+      await expect(isPrivateIpAsync('http://unreachable.com/')).rejects.toThrow(
+        'Failed to verify if URL resolves to private IP',
+      );
+    });
+
+    it('should return false for invalid URLs instead of throwing verification error', async () => {
+      expect(await isPrivateIpAsync('not-a-url')).toBe(false);
+    });
+  });
+
   describe('fetchWithTimeout', () => {
     it('should handle timeouts', async () => {
       vi.mocked(global.fetch).mockImplementation(
@@ -106,9 +183,10 @@ describe('fetch utils', () => {
           new Promise((_resolve, reject) => {
             if (init?.signal) {
               init.signal.addEventListener('abort', () => {
-                const error = new Error('The operation was aborted');
+                const error = new Error(
+                  'The operation was aborted',
+                ) as ErrorWithCode;
                 error.name = 'AbortError';
-                // @ts-expect-error - for mocking purposes
                 error.code = 'ABORT_ERR';
                 reject(error);
               });
@@ -119,6 +197,21 @@ describe('fetch utils', () => {
       await expect(fetchWithTimeout('http://example.com', 50)).rejects.toThrow(
         'Request timed out after 50ms',
       );
+    });
+  });
+
+  describe('setGlobalProxy', () => {
+    it('should configure ProxyAgent with experiment flag timeout', () => {
+      const proxyUrl = 'http://proxy.example.com';
+      updateGlobalFetchTimeouts(45773134);
+      setGlobalProxy(proxyUrl);
+
+      expect(ProxyAgent).toHaveBeenCalledWith({
+        uri: proxyUrl,
+        headersTimeout: 45773134,
+        bodyTimeout: 45773134,
+      });
+      expect(setGlobalDispatcher).toHaveBeenCalled();
     });
   });
 });

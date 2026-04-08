@@ -8,9 +8,7 @@ import { getErrorMessage, isNodeError } from './errors.js';
 import { URL } from 'node:url';
 import { Agent, ProxyAgent, setGlobalDispatcher } from 'undici';
 import ipaddr from 'ipaddr.js';
-
-const DEFAULT_HEADERS_TIMEOUT = 300000; // 5 minutes
-const DEFAULT_BODY_TIMEOUT = 300000; // 5 minutes
+import { lookup } from 'node:dns/promises';
 
 export class FetchError extends Error {
   constructor(
@@ -23,13 +21,42 @@ export class FetchError extends Error {
   }
 }
 
+export class PrivateIpError extends Error {
+  constructor(message = 'Access to private network is blocked') {
+    super(message);
+    this.name = 'PrivateIpError';
+  }
+}
+
+let defaultTimeout = 300000; // 5 minutes
+let currentProxy: string | undefined = undefined;
+
 // Configure default global dispatcher with higher timeouts
 setGlobalDispatcher(
   new Agent({
-    headersTimeout: DEFAULT_HEADERS_TIMEOUT,
-    bodyTimeout: DEFAULT_BODY_TIMEOUT,
+    headersTimeout: defaultTimeout,
+    bodyTimeout: defaultTimeout,
   }),
 );
+
+export function updateGlobalFetchTimeouts(timeoutMs: number) {
+  if (!Number.isFinite(timeoutMs) || timeoutMs <= 0) {
+    throw new RangeError(
+      `Invalid timeout value: ${timeoutMs}. Must be a positive finite number.`,
+    );
+  }
+  defaultTimeout = timeoutMs;
+  if (currentProxy) {
+    setGlobalProxy(currentProxy);
+  } else {
+    setGlobalDispatcher(
+      new Agent({
+        headersTimeout: defaultTimeout,
+        bodyTimeout: defaultTimeout,
+      }),
+    );
+  }
+}
 
 /**
  * Sanitizes a hostname by stripping IPv6 brackets if present.
@@ -116,6 +143,30 @@ export function isAddressPrivate(address: string): boolean {
 }
 
 /**
+ * Checks if a URL resolves to a private IP address.
+ */
+export async function isPrivateIpAsync(url: string): Promise<boolean> {
+  try {
+    const parsedUrl = new URL(url);
+    const hostname = parsedUrl.hostname;
+
+    if (isLoopbackHost(hostname)) {
+      return false;
+    }
+
+    const addresses = await lookup(hostname, { all: true });
+    return addresses.some((addr) => isAddressPrivate(addr.address));
+  } catch (error) {
+    if (error instanceof TypeError) {
+      return false;
+    }
+    throw new Error('Failed to verify if URL resolves to private IP', {
+      cause: error,
+    });
+  }
+}
+
+/**
  * Creates an undici ProxyAgent that incorporates safe DNS lookup.
  */
 export function createSafeProxyAgent(proxyUrl: string): ProxyAgent {
@@ -159,11 +210,12 @@ export async function fetchWithTimeout(
 }
 
 export function setGlobalProxy(proxy: string) {
+  currentProxy = proxy;
   setGlobalDispatcher(
     new ProxyAgent({
       uri: proxy,
-      headersTimeout: DEFAULT_HEADERS_TIMEOUT,
-      bodyTimeout: DEFAULT_BODY_TIMEOUT,
+      headersTimeout: defaultTimeout,
+      bodyTimeout: defaultTimeout,
     }),
   );
 }
