@@ -44,6 +44,8 @@ powerful tool for developers.
 - **Test Commands:**
   - **Unit (All):** `npm run test`
   - **Integration (E2E):** `npm run test:e2e`
+  - **Memory (Nightly):** `npm run test:memory` (Runs memory regression tests
+    against baselines. Excluded from `preflight`, run nightly.)
   - **Workspace-Specific:** `npm test -w <pkg> -- <path>` (Note: `<path>` must
     be relative to the workspace root, e.g.,
     `-w @google/gemini-cli-core -- src/routing/modelRouterService.test.ts`)
