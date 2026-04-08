@@ -117,6 +117,46 @@ npm run test:integration:sandbox:docker
 npm run test:integration:sandbox:podman
 ```
 
+## Memory regression tests
+
+Memory regression tests are designed to detect heap growth and leaks across key
+CLI scenarios. They are located in the `memory-tests` directory.
+
+These tests are distinct from standard integration tests because they measure
+memory usage and compare it against committed baselines.
+
+### Running memory tests
+
+Memory tests are not run as part of the default `npm run test` or
+`npm run test:e2e` commands. They are run nightly in CI but can be run manually:
+
+```bash
+npm run test:memory
+```
+
+### Updating baselines
+
+If you intentionally change behavior that affects memory usage, you may need to
+update the baselines. Set the `UPDATE_MEMORY_BASELINES` environment variable to
+`true`:
+
+```bash
+UPDATE_MEMORY_BASELINES=true npm run test:memory
+```
+
+This will run the tests, take median snapshots, and overwrite
+`memory-tests/baselines.json`. You should review the changes and commit the
+updated baseline file.
+
+### How it works
+
+The harness (`MemoryTestHarness` in `packages/test-utils`):
+
+- Forces garbage collection multiple times to reduce noise.
+- Takes median snapshots to filter spikes.
+- Compares against baselines with a 10% tolerance.
+- Can analyze sustained leaks across 3 snapshots using `analyzeSnapshots()`.
+
 ## Diagnostics
 
 The integration test runner provides several options for diagnostics to help
