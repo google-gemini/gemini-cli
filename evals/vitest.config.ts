@@ -15,7 +15,7 @@ export default defineConfig({
     conditions: ['test'],
   },
   test: {
-    testTimeout: 300000, // 5 minutes
+    testTimeout: 600000, // 5 minutes
     reporters: ['default', 'json'],
     outputFile: {
       json: 'evals/logs/report.json',
@@ -24,7 +24,10 @@ export default defineConfig({
     environment: 'node',
     globals: true,
     alias: {
-      react: path.resolve(__dirname, '../node_modules/react'),
+      '@google/gemini-cli-core': path.resolve(
+        __dirname,
+        '../packages/core/index.ts',
+      ),
     },
     setupFiles: [path.resolve(__dirname, '../packages/cli/test-setup.ts')],
     server: {

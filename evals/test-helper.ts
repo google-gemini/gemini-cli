@@ -16,9 +16,17 @@ import {
   Storage,
   getProjectHash,
   SESSION_FILE_PREFIX,
+  PREVIEW_GEMINI_FLASH_MODEL,
 } from '@google/gemini-cli-core';
 
 export * from '@google/gemini-cli-test-utils';
+
+/**
+ * The default model used for all evaluations.
+ * Can be overridden by setting the GEMINI_MODEL environment variable.
+ */
+export const EVAL_MODEL =
+  process.env.GEMINI_MODEL || PREVIEW_GEMINI_FLASH_MODEL;
 
 // Indicates the consistency expectation for this test.
 // - ALWAYS_PASSES - Means that the test is expected to pass 100% of the time. These
@@ -47,11 +55,47 @@ export function evalTest(policy: EvalPolicy, evalCase: EvalCase) {
   );
 }
 
-export async function internalEvalTest(evalCase: EvalCase) {
+export async function withEvalRetries(
+  name: string,
+  attemptFn: (attempt: number) => Promise<void>,
+) {
   const maxRetries = 3;
   let attempt = 0;
 
   while (attempt <= maxRetries) {
+    try {
+      await attemptFn(attempt);
+      return; // Success! Exit the retry loop.
+    } catch (error: unknown) {
+      const errorMessage =
+        error instanceof Error ? error.message : String(error);
+      const errorCode = getApiErrorCode(errorMessage);
+
+      if (errorCode) {
+        const status = attempt < maxRetries ? 'RETRY' : 'SKIP';
+        logReliabilityEvent(name, attempt, status, errorCode, errorMessage);
+
+        if (attempt < maxRetries) {
+          attempt++;
+          console.warn(
+            `[Eval] Attempt ${attempt} failed with ${errorCode} Error. Retrying...`,
+          );
+          continue; // Retry
+        }
+
+        console.warn(
+          `[Eval] '${name}' failed after ${maxRetries} retries due to persistent API errors. Skipping failure to avoid blocking PR.`,
+        );
+        return; // Gracefully exit without failing the test
+      }
+
+      throw error; // Real failure
+    }
+  }
+}
+
+export async function internalEvalTest(evalCase: EvalCase) {
+  await withEvalRetries(evalCase.name, async () => {
     const rig = new TestRig();
     const { logDir, sanitizedName } = await prepareLogDir(evalCase.name);
     const activityLogFile = path.join(logDir, `${sanitizedName}.jsonl`);
@@ -59,14 +103,21 @@ export async function internalEvalTest(evalCase: EvalCase) {
     let isSuccess = false;
 
     try {
-      rig.setup(evalCase.name, evalCase.params);
+      const setupOptions = {
+        ...evalCase.params,
+        settings: {
+          model: { name: EVAL_MODEL },
+          ...evalCase.params?.settings,
+        },
+      };
+      rig.setup(evalCase.name, setupOptions);
 
       if (evalCase.setup) {
         await evalCase.setup(rig);
       }
 
       if (evalCase.files) {
-        await setupTestFiles(rig, evalCase.files);
+        await prepareWorkspace(rig.testDir!, rig.homeDir!, evalCase.files);
       }
 
       symlinkNodeModules(rig.testDir || '');
@@ -139,37 +190,6 @@ export async function internalEvalTest(evalCase: EvalCase) {
 
       await evalCase.assert(rig, result);
       isSuccess = true;
-      return; // Success! Exit the retry loop.
-    } catch (error: unknown) {
-      const errorMessage =
-        error instanceof Error ? error.message : String(error);
-      const errorCode = getApiErrorCode(errorMessage);
-
-      if (errorCode) {
-        const status = attempt < maxRetries ? 'RETRY' : 'SKIP';
-        logReliabilityEvent(
-          evalCase.name,
-          attempt,
-          status,
-          errorCode,
-          errorMessage,
-        );
-
-        if (attempt < maxRetries) {
-          attempt++;
-          console.warn(
-            `[Eval] Attempt ${attempt} failed with ${errorCode} Error. Retrying...`,
-          );
-          continue; // Retry
-        }
-
-        console.warn(
-          `[Eval] '${evalCase.name}' failed after ${maxRetries} retries due to persistent API errors. Skipping failure to avoid blocking PR.`,
-        );
-        return; // Gracefully exit without failing the test
-      }
-
-      throw error; // Real failure
     } finally {
       if (isSuccess) {
         await fs.promises.unlink(activityLogFile).catch((err) => {
@@ -188,7 +208,7 @@ export async function internalEvalTest(evalCase: EvalCase) {
       );
       await rig.cleanup();
     }
-  }
+  });
 }
 
 function getApiErrorCode(message: string): '500' | '503' | undefined {
@@ -252,9 +272,13 @@ function logReliabilityEvent(
  * intentionally uses synchronous filesystem and child_process operations
  * for simplicity and to ensure sequential environment preparation.
  */
-async function setupTestFiles(rig: TestRig, files: Record<string, string>) {
+export async function prepareWorkspace(
+  testDir: string,
+  homeDir: string,
+  files: Record<string, string>,
+) {
   const acknowledgedAgents: Record<string, Record<string, string>> = {};
-  const projectRoot = fs.realpathSync(rig.testDir!);
+  const projectRoot = fs.realpathSync(testDir);
 
   for (const [filePath, content] of Object.entries(files)) {
     if (filePath.includes('..') || path.isAbsolute(filePath)) {
@@ -290,7 +314,7 @@ async function setupTestFiles(rig: TestRig, files: Record<string, string>) {
 
   if (Object.keys(acknowledgedAgents).length > 0) {
     const ackPath = path.join(
-      rig.homeDir!,
+      homeDir,
       '.gemini',
       'acknowledgments',
       'agents.json',
@@ -299,7 +323,7 @@ async function setupTestFiles(rig: TestRig, files: Record<string, string>) {
     fs.writeFileSync(ackPath, JSON.stringify(acknowledgedAgents, null, 2));
   }
 
-  const execOptions = { cwd: rig.testDir!, stdio: 'inherit' as const };
+  const execOptions = { cwd: testDir, stdio: 'ignore' as const };
   execSync('git init --initial-branch=main', execOptions);
   execSync('git config user.email "test@example.com"', execOptions);
   execSync('git config user.name "Test User"', execOptions);
@@ -366,15 +390,18 @@ interface ForbiddenToolSettings {
   };
 }
 
-export interface EvalCase {
+export interface BaseEvalCase {
   name: string;
+  timeout?: number;
+  files?: Record<string, string>;
+}
+
+export interface EvalCase extends BaseEvalCase {
   params?: {
     settings?: ForbiddenToolSettings & Record<string, unknown>;
     [key: string]: unknown;
   };
   prompt: string;
-  timeout?: number;
-  files?: Record<string, string>;
   setup?: (rig: TestRig) => Promise<void> | void;
   /** Conversation history to pre-load via --resume. Each entry is a message object with type, content, etc. */
   messages?: Record<string, unknown>[];
