@@ -303,7 +303,7 @@ export interface Usage {
   outputTokens?: number;
   cachedTokens?: number;
   /** Whether this usage report is for a continued response. */
-  is_continuation?: boolean;
+  isContinuation?: boolean;
   cost?: { amount: number; currency?: string };
 }
 

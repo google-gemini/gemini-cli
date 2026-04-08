@@ -320,42 +320,12 @@ export class Scheduler {
           schedulerId: this.schedulerId,
           parentCallId: this.parentCallId,
         };
-        let tool = toolRegistry.getTool(request.name);
 
-        if (!tool) {
-          // Attempt normalization: kebab-case to snake_case
-          const normalizedName = normalizeToolName(request.name);
-          if (normalizedName !== request.name) {
-            tool = toolRegistry.getTool(normalizedName);
-            if (tool) {
-              debugLogger.log(
-                `Repaired tool name: ${request.name} -> ${normalizedName} (via normalization)`,
-              );
-              enrichedRequest.name = normalizedName;
-              enrichedRequest.originalRequestName =
-                enrichedRequest.originalRequestName || request.name;
-            }
-          }
-        }
-
-        if (!tool) {
-          // Attempt fuzzy matching: Levenshtein distance <= 2
-          const fuzzyResult = getClosestMatch(
-            request.name,
-            toolRegistry.getAllToolNames(),
-            2,
-          );
-          if (fuzzyResult.repairedName && !fuzzyResult.isAmbiguous) {
-            tool = toolRegistry.getTool(fuzzyResult.repairedName);
-            if (tool) {
-              debugLogger.log(
-                `Repaired tool name: ${request.name} -> ${fuzzyResult.repairedName} (via fuzzy matching, distance: ${fuzzyResult.distance})`,
-              );
-              enrichedRequest.name = fuzzyResult.repairedName;
-              enrichedRequest.originalRequestName =
-                enrichedRequest.originalRequestName || request.name;
-            }
-          }
+        const { tool, repairedName } = this._tryRepairToolName(request.name);
+        if (repairedName) {
+          enrichedRequest.name = repairedName;
+          enrichedRequest.originalRequestName =
+            enrichedRequest.originalRequestName || request.name;
         }
 
         if (!tool) {
@@ -383,6 +353,49 @@ export class Scheduler {
       this.state.clearBatch();
       this._processNextInRequestQueue();
     }
+  }
+
+  private _tryRepairToolName(originalName: string): {
+    tool?: AnyDeclarativeTool;
+    repairedName?: string;
+  } {
+    const { toolRegistry } = this.context;
+    let tool = toolRegistry.getTool(originalName);
+    let repairedName: string | undefined;
+
+    if (!tool) {
+      // Attempt normalization: kebab-case to snake_case
+      const normalizedName = normalizeToolName(originalName);
+      if (normalizedName !== originalName) {
+        tool = toolRegistry.getTool(normalizedName);
+        if (tool) {
+          debugLogger.log(
+            `Repaired tool name: ${originalName} -> ${normalizedName} (via normalization)`,
+          );
+          repairedName = normalizedName;
+        }
+      }
+    }
+
+    if (!tool) {
+      // Attempt fuzzy matching: Levenshtein distance <= 2
+      const fuzzyResult = getClosestMatch(
+        originalName,
+        toolRegistry.getAllToolNames(),
+        2,
+      );
+      if (fuzzyResult.repairedName && !fuzzyResult.isAmbiguous) {
+        tool = toolRegistry.getTool(fuzzyResult.repairedName);
+        if (tool) {
+          debugLogger.log(
+            `Repaired tool name: ${originalName} -> ${fuzzyResult.repairedName} (via fuzzy matching, distance: ${fuzzyResult.distance})`,
+          );
+          repairedName = fuzzyResult.repairedName;
+        }
+      }
+    }
+
+    return { tool, repairedName };
   }
 
   private _createToolNotFoundErroredToolCall(
@@ -805,44 +818,12 @@ export class Scheduler {
       const originalRequestName =
         result.request.originalRequestName || result.request.name;
 
-      let newTool = this.context.toolRegistry.getTool(tailRequest.name);
-      let repairedTailName = tailRequest.name;
-
-      if (!newTool) {
-        // Attempt normalization: kebab-case to snake_case
-        const normalizedName = normalizeToolName(tailRequest.name);
-        if (normalizedName !== tailRequest.name) {
-          newTool = this.context.toolRegistry.getTool(normalizedName);
-          if (newTool) {
-            debugLogger.log(
-              `Repaired tail tool name: ${tailRequest.name} -> ${normalizedName} (via normalization)`,
-            );
-            repairedTailName = normalizedName;
-          }
-        }
-      }
-
-      if (!newTool) {
-        // Attempt fuzzy matching: Levenshtein distance <= 2
-        const fuzzyResult = getClosestMatch(
-          tailRequest.name,
-          this.context.toolRegistry.getAllToolNames(),
-          2,
-        );
-        if (fuzzyResult.repairedName && !fuzzyResult.isAmbiguous) {
-          newTool = this.context.toolRegistry.getTool(fuzzyResult.repairedName);
-          if (newTool) {
-            debugLogger.log(
-              `Repaired tail tool name: ${tailRequest.name} -> ${fuzzyResult.repairedName} (via fuzzy matching, distance: ${fuzzyResult.distance})`,
-            );
-            repairedTailName = fuzzyResult.repairedName;
-          }
-        }
-      }
+      const { tool: newTool, repairedName: repairedTailName } =
+        this._tryRepairToolName(tailRequest.name);
 
       const newRequest: ToolCallRequestInfo = {
         callId: originalCallId,
-        name: repairedTailName,
+        name: repairedTailName || tailRequest.name,
         args: tailRequest.args,
         originalRequestName,
         originalRequestArgs:
