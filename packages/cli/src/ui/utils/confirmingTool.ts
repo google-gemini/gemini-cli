@@ -4,7 +4,11 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { CoreToolCallStatus } from '@google/gemini-cli-core';
+import {
+  CoreToolCallStatus,
+  UPDATE_TOPIC_TOOL_NAME,
+  UPDATE_TOPIC_DISPLAY_NAME,
+} from '@google/gemini-cli-core';
 import {
   type HistoryItemWithoutId,
   type IndividualToolCallDisplay,
@@ -33,14 +37,20 @@ export function getConfirmingToolState(
     return null;
   }
 
+  const filteredPendingTools = allPendingTools.filter(
+    (tool) =>
+      tool.name !== UPDATE_TOPIC_TOOL_NAME &&
+      tool.name !== UPDATE_TOPIC_DISPLAY_NAME,
+  );
+
   const head = confirmingTools[0];
-  const headIndexInFullList = allPendingTools.findIndex(
+  const headIndexInFullList = filteredPendingTools.findIndex(
     (tool) => tool.callId === head.callId,
   );
 
   return {
     tool: head,
     index: headIndexInFullList + 1,
-    total: allPendingTools.length,
+    total: filteredPendingTools.length,
   };
 }
