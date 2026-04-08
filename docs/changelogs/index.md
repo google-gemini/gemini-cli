@@ -18,6 +18,27 @@ on GitHub.
 | [Preview](preview.md) | Experimental features ready for early feedback. |
 | [Stable](latest.md)   | Stable, recommended for general use.            |
 
+## Announcements: v0.37.0 - 2026-04-08
+
+- **Dynamic Sandbox Expansion:** Implemented dynamic sandbox expansion and
+  worktree support for Linux and Windows, improving developer workflows in
+  isolated environments
+  ([#23692](https://github.com/google-gemini/gemini-cli/pull/23692) by @galz10,
+  [#23691](https://github.com/google-gemini/gemini-cli/pull/23691) by
+  @scidomino).
+- **Chapters Narrative Flow:** Introduced tool-based topic grouping ("Chapters")
+  to provide better session structure and narrative continuity
+  ([#23150](https://github.com/google-gemini/gemini-cli/pull/23150) by
+  @Abhijit-2592,
+  [#24079](https://github.com/google-gemini/gemini-cli/pull/24079) by
+  @gundermanc).
+- **Advanced Browser Capabilities:** Enhanced the browser agent with persistent
+  sessions and dynamic tool discovery
+  ([#21306](https://github.com/google-gemini/gemini-cli/pull/21306) by
+  @kunal-10-cloud,
+  [#23805](https://github.com/google-gemini/gemini-cli/pull/23805) by
+  @cynthialong0-0).
+
 ## Announcements: v0.36.0 - 2026-04-01
 
 - **Multi-Registry Architecture and Sandboxing:** Introduced a multi-registry
