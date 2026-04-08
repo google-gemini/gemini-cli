@@ -229,6 +229,51 @@ describe.skipIf(!chromeAvailable)('browser-agent', () => {
     assertModelHasOutput(result);
   });
 
+  it('should keep browser open across multiple browser_agent invocations', async () => {
+    rig.setup('browser-persistent-session', {
+      fakeResponsesPath: join(
+        __dirname,
+        'browser-agent.persistent-session.responses',
+      ),
+      settings: {
+        agents: {
+          overrides: {
+            browser_agent: {
+              enabled: true,
+            },
+          },
+          browser: {
+            headless: true,
+            sessionMode: 'isolated',
+          },
+        },
+      },
+    });
+
+    const result = await rig.run({
+      args: 'Browse to example.com twice: first get the page title, then check for links.',
+    });
+
+    const toolLogs = rig.readToolLogs();
+    const browserCalls = toolLogs.filter(
+      (t) => t.toolRequest.name === 'browser_agent',
+    );
+
+    // Both browser_agent invocations must succeed — if the browser was
+    // incorrectly closed after the first call (regression #24210),
+    // the second call would fail.
+    expect(
+      browserCalls.length,
+      'Expected browser_agent to be called twice',
+    ).toBe(2);
+    expect(
+      browserCalls.every((c) => c.toolRequest.success),
+      'Both browser_agent calls should succeed',
+    ).toBe(true);
+
+    assertModelHasOutput(result);
+  });
+
   it('should handle tool confirmation for write_file without crashing', async () => {
     rig.setup('tool-confirmation', {
       fakeResponsesPath: join(
@@ -261,5 +306,49 @@ describe.skipIf(!chromeAvailable)('browser-agent', () => {
     await run.type('\r');
 
     await run.expectText('successfully written', 15000);
+  });
+
+  it('should handle concurrent browser agents with isolated session mode', async () => {
+    rig.setup('browser-concurrent', {
+      fakeResponsesPath: join(__dirname, 'browser-agent.concurrent.responses'),
+      settings: {
+        agents: {
+          overrides: {
+            browser_agent: {
+              enabled: true,
+            },
+          },
+          browser: {
+            headless: true,
+            // Isolated mode supports concurrent browser agents.
+            // Persistent/existing modes reject concurrent calls to prevent
+            // Chrome profile lock conflicts.
+            sessionMode: 'isolated',
+          },
+        },
+      },
+    });
+
+    const result = await rig.run({
+      args: 'Launch two browser agents concurrently to check example.com',
+    });
+
+    assertModelHasOutput(result);
+
+    const toolLogs = rig.readToolLogs();
+    const browserCalls = toolLogs.filter(
+      (t) => t.toolRequest.name === 'browser_agent',
+    );
+
+    // Both browser_agent invocations should have been called
+    expect(browserCalls.length).toBe(2);
+
+    // Both should complete successfully (no errors)
+    for (const call of browserCalls) {
+      expect(
+        call.toolRequest.success,
+        `browser_agent call failed: ${JSON.stringify(call.toolRequest)}`,
+      ).toBe(true);
+    }
   });
 });

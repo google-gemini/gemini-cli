@@ -267,7 +267,7 @@ their corresponding top-level category object in your `settings.json` file.
 - **`ui.compactToolOutput`** (boolean):
   - **Description:** Display tool outputs (like directory listings and file
     reads) in a compact, structured format.
-  - **Default:** `false`
+  - **Default:** `true`
 
 - **`ui.hideBanner`** (boolean):
   - **Description:** Hide the application banner
@@ -346,7 +346,7 @@ their corresponding top-level category object in your `settings.json` file.
 
 - **`ui.terminalBuffer`** (boolean):
   - **Description:** Use the new terminal buffer architecture for rendering.
-  - **Default:** `true`
+  - **Default:** `false`
   - **Requires restart:** Yes
 
 - **`ui.useBackgroundColor`** (boolean):
@@ -1404,7 +1404,7 @@ their corresponding top-level category object in your `settings.json` file.
 
 - **`tools.shell.showColor`** (boolean):
   - **Description:** Show color in shell output.
-  - **Default:** `false`
+  - **Default:** `true`
 
 - **`tools.shell.inactivityTimeout`** (number):
   - **Description:** The maximum time in seconds allowed without output from the
@@ -1492,9 +1492,10 @@ their corresponding top-level category object in your `settings.json` file.
 #### `security`
 
 - **`security.toolSandboxing`** (boolean):
-  - **Description:** Experimental tool-level sandboxing (implementation in
-    progress).
+  - **Description:** Tool-level sandboxing. Isolates individual tools instead of
+    the entire CLI process.
   - **Default:** `false`
+  - **Requires restart:** Yes
 
 - **`security.disableYoloMode`** (boolean):
   - **Description:** Disable YOLO mode, even if enabled by a flag.

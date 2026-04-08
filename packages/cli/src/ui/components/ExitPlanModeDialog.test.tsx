@@ -169,6 +169,11 @@ Implement a comprehensive authentication system with multiple providers.
           getUseTerminalBuffer: () => false,
         } as unknown as import('@google/gemini-cli-core').Config,
         settings: createMockSettings({ ui: { useAlternateBuffer } }),
+        inputState: {
+          buffer: { text: '' } as never,
+          showEscapePrompt: false,
+          shellModeActive: false,
+        },
       },
     );
   };
@@ -472,6 +477,11 @@ Implement a comprehensive authentication system with multiple providers.
               settings: createMockSettings({
                 ui: { useAlternateBuffer: useAlternateBuffer ?? true },
               }),
+              inputState: {
+                buffer: { text: '' } as never,
+                showEscapePrompt: false,
+                shellModeActive: false,
+              },
             },
           ),
         );
@@ -577,7 +587,7 @@ Implement a comprehensive authentication system with multiple providers.
         expect(onFeedback).not.toHaveBeenCalled();
       });
 
-      it('automatically submits feedback when Ctrl+X is used to edit the plan', async () => {
+      it('automatically submits feedback when Ctrl+G is used to edit the plan', async () => {
         const { stdin, lastFrame } = await act(async () =>
           renderDialog({ useAlternateBuffer }),
         );
@@ -590,9 +600,9 @@ Implement a comprehensive authentication system with multiple providers.
           expect(lastFrame()).toContain('Add user authentication');
         });
 
-        // Press Ctrl+X
+        // Press Ctrl+G
         await act(async () => {
-          writeKey(stdin, '\x18'); // Ctrl+X
+          writeKey(stdin, '\x07'); // Ctrl+G
         });
 
         await waitFor(() => {

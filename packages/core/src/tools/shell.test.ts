@@ -154,7 +154,11 @@ describe('ShellTool', () => {
         return mockSandboxManager;
       },
       sandboxPolicyManager: {
-        getCommandPermissions: vi.fn().mockReturnValue(undefined),
+        getCommandPermissions: vi.fn().mockReturnValue({
+          fileSystem: { read: [], write: [] },
+          network: false,
+        }),
+
         getModeConfig: vi.fn().mockReturnValue({ readonly: false }),
         addPersistentApproval: vi.fn(),
         addSessionApproval: vi.fn(),
@@ -708,6 +712,39 @@ describe('ShellTool', () => {
     it('should throw an error if validation fails', () => {
       expect(() => shellTool.build({ command: '' })).toThrow();
     });
+
+    it('should NOT return a sandbox expansion prompt for npm install when sandboxing is disabled', async () => {
+      const bus = (shellTool as unknown as { messageBus: MessageBus })
+        .messageBus;
+      const mockBus = getMockMessageBusInstance(
+        bus,
+      ) as unknown as TestableMockMessageBus;
+      mockBus.defaultToolDecision = 'allow';
+
+      vi.mocked(mockConfig.getSandboxEnabled).mockReturnValue(false);
+      const params = { command: 'npm install' };
+      const invocation = shellTool.build(params);
+
+      const confirmation = await invocation.shouldConfirmExecute(
+        new AbortController().signal,
+      );
+
+      // Should be false because standard confirm mode is 'allow'
+      expect(confirmation).toBe(false);
+    });
+
+    it('should return a sandbox expansion prompt for npm install when sandboxing is enabled', async () => {
+      vi.mocked(mockConfig.getSandboxEnabled).mockReturnValue(true);
+      const params = { command: 'npm install' };
+      const invocation = shellTool.build(params);
+
+      const confirmation = await invocation.shouldConfirmExecute(
+        new AbortController().signal,
+      );
+
+      expect(confirmation).not.toBe(false);
+      expect(confirmation && confirmation.type).toBe('sandbox_expansion');
+    });
   });
 
   describe('getDescription', () => {
@@ -763,6 +800,32 @@ describe('ShellTool', () => {
       expect(invocation.getExplanation?.()).toBe(
         `[current working directory ${process.cwd()}]`,
       );
+    });
+  });
+
+  describe('invocation getDescription', () => {
+    it('should return the description if it is present and not empty whitespace', () => {
+      const invocation = shellTool.build({
+        command: 'echo hello',
+        description: 'prints hello',
+      });
+      expect(invocation.getDescription()).toBe('prints hello');
+    });
+
+    it('should return the raw command if description is an empty string', () => {
+      const invocation = shellTool.build({
+        command: 'echo hello',
+        description: '',
+      });
+      expect(invocation.getDescription()).toBe('echo hello');
+    });
+
+    it('should return the raw command if description is just whitespace', () => {
+      const invocation = shellTool.build({
+        command: 'echo hello',
+        description: '   ',
+      });
+      expect(invocation.getDescription()).toBe('echo hello');
     });
   });
 
@@ -949,6 +1012,10 @@ describe('ShellTool', () => {
 
   describe('sandbox heuristics', () => {
     const mockAbortSignal = new AbortController().signal;
+
+    beforeEach(() => {
+      vi.mocked(mockConfig.getSandboxEnabled).mockReturnValue(true);
+    });
 
     it('should suggest proactive permissions for npm commands', async () => {
       const homeDir = path.join(tempRootDir, 'home');
