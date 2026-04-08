@@ -661,10 +661,6 @@ export const useExecutionLifecycle = (
     (s: BackgroundTask) => s.status === 'running',
   ).length;
 
-  const showBackgroundShell = useCallback(() => {
-    dispatch({ type: 'SET_VISIBILITY', visible: true });
-  }, [dispatch]);
-
   return {
     handleShellCommand,
     activeShellPtyId: state.activeShellPtyId,
@@ -672,7 +668,6 @@ export const useExecutionLifecycle = (
     backgroundTaskCount,
     isBackgroundTaskVisible: state.isBackgroundTaskVisible,
     toggleBackgroundTasks,
-    showBackgroundShell,
     backgroundCurrentExecution,
     registerBackgroundTask,
     dismissBackgroundTask,
