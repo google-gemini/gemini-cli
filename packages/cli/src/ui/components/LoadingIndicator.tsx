@@ -31,6 +31,7 @@ interface LoadingIndicatorProps {
   forceRealStatusOnly?: boolean;
   spinnerIcon?: string;
   isHookActive?: boolean;
+  suppressText?: boolean;
 }
 
 export const LoadingIndicator: React.FC<LoadingIndicatorProps> = ({
@@ -46,6 +47,7 @@ export const LoadingIndicator: React.FC<LoadingIndicatorProps> = ({
   forceRealStatusOnly = false,
   spinnerIcon,
   isHookActive = false,
+  suppressText = false,
 }) => {
   const streamingState = useStreamingContext();
   const { columns: terminalWidth } = useTerminalSize();
@@ -61,15 +63,19 @@ export const LoadingIndicator: React.FC<LoadingIndicatorProps> = ({
 
   // Prioritize the interactive shell waiting phrase over the thought subject
   // because it conveys an actionable state for the user (waiting for input).
+  // Model thoughts are real progress info and should always be shown,
+  // even when suppressText is true. Only suppress random loading phrases/tips.
   const primaryText =
     currentLoadingPhrase === INTERACTIVE_SHELL_WAITING_PHRASE
       ? currentLoadingPhrase
       : thought?.subject
         ? (thoughtLabel ?? thought.subject)
-        : currentLoadingPhrase ||
-          (streamingState === StreamingState.Responding
-            ? 'Thinking...'
-            : undefined);
+        : suppressText
+          ? undefined
+          : currentLoadingPhrase ||
+            (streamingState === StreamingState.Responding
+              ? 'Thinking...'
+              : undefined);
 
   const cancelAndTimerContent =
     showCancelAndTimer && streamingState === StreamingState.Responding
