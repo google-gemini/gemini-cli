@@ -685,6 +685,24 @@ describe('parseArguments', () => {
     expect(argv.extensions).toEqual(['ext1', 'ext2']);
   });
 
+  it('should support comma-separated values for --include-directories', async () => {
+    process.argv = ['node', 'script.js', '--include-directories', 'dir1,dir2'];
+    const argv = await parseArguments(createTestMergedSettings());
+    expect(argv.includeDirectories).toEqual(['dir1', 'dir2']);
+  });
+
+  it('should support --workspace as an alias for --include-directories', async () => {
+    process.argv = ['node', 'script.js', '--workspace', 'dir1,dir2'];
+    const argv = await parseArguments(createTestMergedSettings());
+    expect(argv.includeDirectories).toEqual(['dir1', 'dir2']);
+  });
+
+  it('should support -W as an alias for --include-directories', async () => {
+    process.argv = ['node', 'script.js', '-W', 'dir1,dir2'];
+    const argv = await parseArguments(createTestMergedSettings());
+    expect(argv.includeDirectories).toEqual(['dir1', 'dir2']);
+  });
+
   it('should correctly parse positional arguments when flags with arguments are present', async () => {
     process.argv = [
       'node',

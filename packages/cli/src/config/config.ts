@@ -407,6 +407,7 @@ export async function parseArguments(
             'Delete a session by index number (use --list-sessions to see available sessions).',
         })
         .option('include-directories', {
+          alias: ['workspace', 'W'],
           type: 'array',
           string: true,
           nargs: 1,
