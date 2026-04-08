@@ -23,7 +23,14 @@ Check if ANY of the following conditions are met:
 If there is a cross-referenced PR in `cross_references` where `is_pr` is `true` and `is_merged` is `false` (and its state is `closed` or it has an automated closure comment):
 1. Use `gh pr view <pr_url> --json author,comments,state,title,body` to analyze the PR.
 2. Check the comments to see if it was closed by an automated bot (e.g., `gemini-cli` bot closing it automatically due to missing labels like 'help wanted' after 14 days).
-3. Analyze the PR's title, body, and comments to determine if it implements a valid and useful feature/fix and is worth resuming.
+3. Analyze the PR's title, body, and comments to determine if it implements a valid and useful feature/fix and is worth resuming. Critically evaluate the PR's approach for correctness and safety. Ensure it does not introduce breaking changes, make false assumptions (e.g., making an optional configuration mandatory for all users), or negatively impact other workflows.
+- If the PR's approach is flawed or introduces breaking changes:
+  a. Do NOT reopen the PR.
+  b. Determine if the issue itself should be **Maintainer-only** or **Help-wanted** (using the criteria below).
+  c. If **Maintainer-only**, run `gh issue edit <issue_url> --remove-label "status/need-triage" --add-label "🔒 maintainer only"`.
+  d. If **Help-wanted**, run `gh issue edit <issue_url> --remove-label "status/need-triage" --add-label "help wanted"`.
+  e. Execute `gh issue comment <issue_url> --body "### Triage Summary\n\nWhile this issue is valid, the proposed fix in PR <pr_url> introduces potential breaking changes or relies on incorrect assumptions (e.g., <brief explanation of the flaw>). Therefore, we will not reopen that PR, but we still welcome a different approach to fix this issue!"`
+  f. **STOP EXECUTION**.
 - If it is worth resuming AND was closed by a bot:
   a. Determine if the issue should be **Maintainer-only** (epic, core architecture, sensitive fixes, internal tasks, issues requiring deep investigation, changes to key UI/UX that affect all users, or modifications to core internal data structures and IPC mechanisms) or **Help-wanted** (small well-defined features, easy-to-fix bugs, good for community, or tasks ready for external help).
   b. If it should be **Maintainer-only**:
