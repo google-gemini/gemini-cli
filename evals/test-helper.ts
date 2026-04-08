@@ -48,12 +48,7 @@ export const EVAL_MODEL =
 export type EvalPolicy = 'ALWAYS_PASSES' | 'USUALLY_PASSES';
 
 export function evalTest(policy: EvalPolicy, evalCase: EvalCase) {
-  runEval(
-    policy,
-    evalCase.name,
-    () => internalEvalTest(evalCase),
-    evalCase.timeout,
-  );
+  runEval(policy, evalCase, () => internalEvalTest(evalCase));
 }
 
 export async function withEvalRetries(
@@ -344,14 +339,30 @@ export async function prepareWorkspace(
  */
 export function runEval(
   policy: EvalPolicy,
-  name: string,
+  evalCase: BaseEvalCase,
   fn: () => Promise<void>,
-  timeout?: number,
+  timeoutOverride?: number,
 ) {
-  if (policy === 'USUALLY_PASSES' && !process.env['RUN_EVALS']) {
-    it.skip(name, fn);
+  const { name, timeout, suiteName, suiteType } = evalCase;
+  const targetSuiteType = process.env['EVAL_SUITE_TYPE'];
+  const targetSuiteName = process.env['EVAL_SUITE_NAME'];
+
+  const meta = { suiteType, suiteName };
+
+  const skipBySuiteType =
+    targetSuiteType && suiteType && suiteType !== targetSuiteType;
+  const skipBySuiteName =
+    targetSuiteName && suiteName && suiteName !== targetSuiteName;
+
+  const options = { timeout: timeoutOverride ?? timeout, meta };
+  if (
+    (policy === 'USUALLY_PASSES' && !process.env['RUN_EVALS']) ||
+    skipBySuiteType ||
+    skipBySuiteName
+  ) {
+    it.skip(name, options, fn);
   } else {
-    it(name, fn, timeout);
+    it(name, options, fn);
   }
 }
 
@@ -391,6 +402,8 @@ interface ForbiddenToolSettings {
 }
 
 export interface BaseEvalCase {
+  suiteName: string;
+  suiteType: 'behavioral' | 'component-level' | 'hero-scenario';
   name: string;
   timeout?: number;
   files?: Record<string, string>;

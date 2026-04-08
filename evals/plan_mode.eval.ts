@@ -31,6 +31,8 @@ describe('plan_mode', () => {
       .filter(Boolean);
 
   evalTest('ALWAYS_PASSES', {
+    suiteName: 'default',
+    suiteType: 'behavioral',
     name: 'should refuse file modification when in plan mode',
     approvalMode: ApprovalMode.PLAN,
     params: {
@@ -66,6 +68,8 @@ describe('plan_mode', () => {
   });
 
   evalTest('ALWAYS_PASSES', {
+    suiteName: 'default',
+    suiteType: 'behavioral',
     name: 'should refuse saving new documentation to the repo when in plan mode',
     approvalMode: ApprovalMode.PLAN,
     params: {
@@ -103,6 +107,8 @@ describe('plan_mode', () => {
   });
 
   evalTest('USUALLY_PASSES', {
+    suiteName: 'default',
+    suiteType: 'behavioral',
     name: 'should enter plan mode when asked to create a plan',
     approvalMode: ApprovalMode.DEFAULT,
     params: {
@@ -120,6 +126,8 @@ describe('plan_mode', () => {
   });
 
   evalTest('USUALLY_PASSES', {
+    suiteName: 'default',
+    suiteType: 'behavioral',
     name: 'should exit plan mode when plan is complete and implementation is requested',
     approvalMode: ApprovalMode.PLAN,
     params: {
@@ -167,6 +175,8 @@ describe('plan_mode', () => {
   });
 
   evalTest('USUALLY_PASSES', {
+    suiteName: 'default',
+    suiteType: 'behavioral',
     name: 'should allow file modification in plans directory when in plan mode',
     approvalMode: ApprovalMode.PLAN,
     params: {
@@ -198,6 +208,8 @@ describe('plan_mode', () => {
   });
 
   evalTest('USUALLY_PASSES', {
+    suiteName: 'default',
+    suiteType: 'behavioral',
     name: 'should create a plan in plan mode and implement it for a refactoring task',
     params: {
       settings,

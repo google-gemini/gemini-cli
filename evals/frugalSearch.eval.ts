@@ -33,6 +33,8 @@ describe('Frugal Search', () => {
    * ranged reads.
    */
   evalTest('USUALLY_PASSES', {
+    suiteName: 'default',
+    suiteType: 'behavioral',
     name: 'should use grep or ranged read for large files',
     prompt: 'What year was legacy_processor.ts written?',
     files: {

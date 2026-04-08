@@ -12,6 +12,8 @@ describe('Hierarchical Memory', () => {
   const conflictResolutionTest =
     'Agent follows hierarchy for contradictory instructions';
   evalTest('ALWAYS_PASSES', {
+    suiteName: 'default',
+    suiteType: 'behavioral',
     name: conflictResolutionTest,
     params: {
       settings: {
@@ -48,6 +50,8 @@ What is my favorite fruit? Tell me just the name of the fruit.`,
 
   const provenanceAwarenessTest = 'Agent is aware of memory provenance';
   evalTest('USUALLY_PASSES', {
+    suiteName: 'default',
+    suiteType: 'behavioral',
     name: provenanceAwarenessTest,
     params: {
       settings: {
@@ -87,6 +91,8 @@ Provide the answer as an XML block like this:
 
   const extensionVsGlobalTest = 'Extension memory wins over Global memory';
   evalTest('ALWAYS_PASSES', {
+    suiteName: 'default',
+    suiteType: 'behavioral',
     name: extensionVsGlobalTest,
     params: {
       settings: {

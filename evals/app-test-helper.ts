@@ -98,5 +98,5 @@ export function appEvalTest(policy: EvalPolicy, evalCase: AppEvalCase) {
     });
   };
 
-  runEval(policy, evalCase.name, fn, (evalCase.timeout ?? 60000) + 10000);
+  runEval(policy, evalCase, fn, (evalCase.timeout ?? 60000) + 10000);
 }

@@ -5,8 +5,8 @@
  */
 
 import { describe, expect } from 'vitest';
-import { appEvalTest, AppEvalCase } from './app-test-helper.js';
-import { EvalPolicy } from './test-helper.js';
+import { appEvalTest, type AppEvalCase } from './app-test-helper.js';
+import { type EvalPolicy } from './test-helper.js';
 
 function askUserEvalTest(policy: EvalPolicy, evalCase: AppEvalCase) {
   return appEvalTest(policy, {
@@ -28,6 +28,8 @@ function askUserEvalTest(policy: EvalPolicy, evalCase: AppEvalCase) {
 
 describe('ask_user', () => {
   askUserEvalTest('USUALLY_PASSES', {
+    suiteName: 'default',
+    suiteType: 'behavioral',
     name: 'Agent uses AskUser tool to present multiple choice options',
     prompt: `Use the ask_user tool to ask me what my favorite color is. Provide 3 options: red, green, or blue.`,
     setup: async (rig) => {
@@ -43,6 +45,8 @@ describe('ask_user', () => {
   });
 
   askUserEvalTest('USUALLY_PASSES', {
+    suiteName: 'default',
+    suiteType: 'behavioral',
     name: 'Agent uses AskUser tool to clarify ambiguous requirements',
     files: {
       'package.json': JSON.stringify({ name: 'my-app', version: '1.0.0' }),
@@ -61,6 +65,8 @@ describe('ask_user', () => {
   });
 
   askUserEvalTest('USUALLY_PASSES', {
+    suiteName: 'default',
+    suiteType: 'behavioral',
     name: 'Agent uses AskUser tool before performing significant ambiguous rework',
     files: {
       'packages/core/src/index.ts': '// index\nexport const version = "1.0.0";',
@@ -101,6 +107,8 @@ describe('ask_user', () => {
   // updates to clarify that shell command confirmation is handled by the UI.
   // See fix: https://github.com/google-gemini/gemini-cli/pull/20504
   askUserEvalTest('USUALLY_PASSES', {
+    suiteName: 'default',
+    suiteType: 'behavioral',
     name: 'Agent does NOT use AskUser to confirm shell commands',
     files: {
       'package.json': JSON.stringify({
