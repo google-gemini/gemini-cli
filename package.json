@@ -51,6 +51,8 @@
     "test:integration:all": "npm run test:integration:sandbox:none && npm run test:integration:sandbox:docker && npm run test:integration:sandbox:podman",
     "test:integration:flaky": "cross-env RUN_FLAKY_INTEGRATION=1 npm run test:integration:sandbox:none",
     "test:integration:sandbox:none": "cross-env GEMINI_SANDBOX=false vitest run --root ./integration-tests",
+    "test:memory": "vitest run --root ./memory-tests",
+    "test:memory:update-baselines": "cross-env UPDATE_MEMORY_BASELINES=true vitest run --root ./memory-tests",
     "test:integration:sandbox:docker": "cross-env GEMINI_SANDBOX=docker npm run build:sandbox && cross-env GEMINI_SANDBOX=docker vitest run --root ./integration-tests",
     "test:integration:sandbox:podman": "cross-env GEMINI_SANDBOX=podman vitest run --root ./integration-tests",
     "lint": "cross-env NODE_OPTIONS=\"--max-old-space-size=8192\" eslint . --cache --max-warnings 0",
