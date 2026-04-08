@@ -98,9 +98,9 @@ export const ToolConfirmationQueue: React.FC<ToolConfirmationQueueProps> = ({
           <Box flexDirection="row" flexShrink={1} overflow="hidden">
             <Text color={theme.status.warning} bold>
               ? {toolLabel}
-              {!isEdit && !!tool.description && '  '}
+              {!!tool.description && '  '}
             </Text>
-            {!isEdit && !!tool.description && (
+            {!!tool.description && (
               <Box flexShrink={1} overflow="hidden">
                 <Text color={theme.text.primary} wrap="truncate-end">
                   {tool.description}
