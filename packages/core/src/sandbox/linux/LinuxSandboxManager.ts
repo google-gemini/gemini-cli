@@ -5,20 +5,40 @@
  */
 
 import fs from 'node:fs';
-import { join, dirname, normalize } from 'node:path';
+import { join, dirname } from 'node:path';
 import os from 'node:os';
 import {
   type SandboxManager,
   type GlobalSandboxOptions,
   type SandboxRequest,
   type SandboxedCommand,
+  type SandboxPermissions,
   GOVERNANCE_FILES,
-  sanitizePaths,
+  type ParsedSandboxDenial,
+  resolveSandboxPaths,
 } from '../../services/sandboxManager.js';
+import type { ShellExecutionResult } from '../../services/shellExecutionService.js';
 import {
   sanitizeEnvironment,
   getSecureSanitizationConfig,
 } from '../../services/environmentSanitization.js';
+import {
+  isStrictlyApproved,
+  verifySandboxOverrides,
+  getCommandName,
+} from '../utils/commandUtils.js';
+import { assertValidPathString } from '../../utils/paths.js';
+import {
+  isKnownSafeCommand,
+  isDangerousCommand,
+} from '../utils/commandSafety.js';
+import {
+  parsePosixSandboxDenials,
+  createSandboxDenialCache,
+  type SandboxDenialCache,
+} from '../utils/sandboxDenialUtils.js';
+import { handleReadWriteCommands } from '../utils/sandboxReadWriteUtils.js';
+import { buildBwrapArgs } from './bwrapArgsBuilder.js';
 
 let cachedBpfPath: string | undefined;
 
@@ -72,9 +92,20 @@ function getSeccompBpfPath(): string {
     buf.writeUInt32LE(inst.k, offset + 4);
   }
 
-  const bpfPath = join(os.tmpdir(), `gemini-cli-seccomp-${process.pid}.bpf`);
+  const tempDir = fs.mkdtempSync(join(os.tmpdir(), 'gemini-cli-seccomp-'));
+  const bpfPath = join(tempDir, 'seccomp.bpf');
   fs.writeFileSync(bpfPath, buf);
   cachedBpfPath = bpfPath;
+
+  // Cleanup on exit
+  process.on('exit', () => {
+    try {
+      fs.rmSync(tempDir, { recursive: true, force: true });
+    } catch {
+      // Ignore errors
+    }
+  });
+
   return bpfPath;
 }
 
@@ -82,6 +113,7 @@ function getSeccompBpfPath(): string {
  * Ensures a file or directory exists.
  */
 function touch(filePath: string, isDirectory: boolean) {
+  assertValidPathString(filePath);
   try {
     // If it exists (even as a broken symlink), do nothing
     if (fs.lstatSync(filePath)) return;
@@ -100,81 +132,181 @@ function touch(filePath: string, isDirectory: boolean) {
 /**
  * A SandboxManager implementation for Linux that uses Bubblewrap (bwrap).
  */
+
 export class LinuxSandboxManager implements SandboxManager {
+  private static maskFilePath: string | undefined;
+  private readonly denialCache: SandboxDenialCache = createSandboxDenialCache();
+
   constructor(private readonly options: GlobalSandboxOptions) {}
 
+  isKnownSafeCommand(args: string[]): boolean {
+    return isKnownSafeCommand(args);
+  }
+
+  isDangerousCommand(args: string[]): boolean {
+    return isDangerousCommand(args);
+  }
+
+  parseDenials(result: ShellExecutionResult): ParsedSandboxDenial | undefined {
+    return parsePosixSandboxDenials(result, this.denialCache);
+  }
+
+  getWorkspace(): string {
+    return this.options.workspace;
+  }
+
+  getOptions(): GlobalSandboxOptions {
+    return this.options;
+  }
+
+  private getMaskFilePath(): string {
+    if (
+      LinuxSandboxManager.maskFilePath &&
+      fs.existsSync(LinuxSandboxManager.maskFilePath)
+    ) {
+      return LinuxSandboxManager.maskFilePath;
+    }
+    const tempDir = fs.mkdtempSync(join(os.tmpdir(), 'gemini-cli-mask-file-'));
+    const maskPath = join(tempDir, 'mask');
+    fs.writeFileSync(maskPath, '');
+    fs.chmodSync(maskPath, 0);
+    LinuxSandboxManager.maskFilePath = maskPath;
+
+    // Cleanup on exit
+    process.on('exit', () => {
+      try {
+        fs.rmSync(tempDir, { recursive: true, force: true });
+      } catch {
+        // Ignore errors
+      }
+    });
+
+    return maskPath;
+  }
+
   async prepareCommand(req: SandboxRequest): Promise<SandboxedCommand> {
+    const isReadonlyMode = this.options.modeConfig?.readonly ?? true;
+    const allowOverrides = this.options.modeConfig?.allowOverrides ?? true;
+
+    verifySandboxOverrides(allowOverrides, req.policy);
+
+    let command = req.command;
+    let args = req.args;
+
+    // Translate virtual commands for sandboxed file system access
+    if (command === '__read') {
+      command = 'cat';
+    } else if (command === '__write') {
+      command = 'sh';
+      args = ['-c', 'cat > "$1"', '_', ...args];
+    }
+
+    const commandName = await getCommandName({ ...req, command, args });
+    const isApproved = allowOverrides
+      ? await isStrictlyApproved(
+          { ...req, command, args },
+          this.options.modeConfig?.approvedTools,
+        )
+      : false;
+    const isYolo = this.options.modeConfig?.yolo ?? false;
+    const workspaceWrite = !isReadonlyMode || isApproved || isYolo;
+
+    const networkAccess =
+      this.options.modeConfig?.network || req.policy?.networkAccess || isYolo;
+
+    const persistentPermissions = allowOverrides
+      ? this.options.policyManager?.getCommandPermissions(commandName)
+      : undefined;
+
+    const mergedAdditional: SandboxPermissions = {
+      fileSystem: {
+        read: [
+          ...(persistentPermissions?.fileSystem?.read ?? []),
+          ...(req.policy?.additionalPermissions?.fileSystem?.read ?? []),
+        ],
+        write: [
+          ...(persistentPermissions?.fileSystem?.write ?? []),
+          ...(req.policy?.additionalPermissions?.fileSystem?.write ?? []),
+        ],
+      },
+      network:
+        networkAccess ||
+        persistentPermissions?.network ||
+        req.policy?.additionalPermissions?.network ||
+        false,
+    };
+
+    const { command: finalCommand, args: finalArgs } = handleReadWriteCommands(
+      req,
+      mergedAdditional,
+      this.options.workspace,
+      req.policy?.allowedPaths,
+    );
+
     const sanitizationConfig = getSecureSanitizationConfig(
       req.policy?.sanitizationConfig,
     );
 
     const sanitizedEnv = sanitizeEnvironment(req.env, sanitizationConfig);
 
-    const bwrapArgs: string[] = [
-      '--unshare-all',
-      '--new-session', // Isolate session
-      '--die-with-parent', // Prevent orphaned runaway processes
-      '--ro-bind',
-      '/',
-      '/',
-      '--dev', // Creates a safe, minimal /dev (replaces --dev-bind)
-      '/dev',
-      '--proc', // Creates a fresh procfs for the unshared PID namespace
-      '/proc',
-      '--tmpfs', // Provides an isolated, writable /tmp directory
-      '/tmp',
-      // Note: --dev /dev sets up /dev/pts automatically
-      '--bind',
-      this.options.workspace,
-      this.options.workspace,
-    ];
+    const { allowed: allowedPaths, forbidden: forbiddenPaths } =
+      await resolveSandboxPaths(this.options, req);
 
-    // Protected governance files are bind-mounted as read-only, even if the workspace is RW.
-    // We ensure they exist on the host and resolve real paths to prevent symlink bypasses.
-    // In bwrap, later binds override earlier ones for the same path.
     for (const file of GOVERNANCE_FILES) {
       const filePath = join(this.options.workspace, file.path);
       touch(filePath, file.isDirectory);
-
-      const realPath = fs.realpathSync(filePath);
-
-      bwrapArgs.push('--ro-bind', filePath, filePath);
-      if (realPath !== filePath) {
-        bwrapArgs.push('--ro-bind', realPath, realPath);
-      }
     }
 
-    const allowedPaths = sanitizePaths(req.policy?.allowedPaths) || [];
-    const normalizedWorkspace = normalize(this.options.workspace).replace(
-      /\/$/,
-      '',
-    );
-    for (const allowedPath of allowedPaths) {
-      const normalizedAllowedPath = normalize(allowedPath).replace(/\/$/, '');
-      if (normalizedAllowedPath !== normalizedWorkspace) {
-        bwrapArgs.push('--bind-try', allowedPath, allowedPath);
-      }
-    }
-
-    // TODO: handle forbidden paths
+    const bwrapArgs = await buildBwrapArgs({
+      workspace: this.options.workspace,
+      workspaceWrite,
+      networkAccess,
+      allowedPaths,
+      forbiddenPaths,
+      additionalPermissions: mergedAdditional,
+      includeDirectories: this.options.includeDirectories || [],
+      maskFilePath: this.getMaskFilePath(),
+      isWriteCommand: req.command === '__write',
+    });
 
     const bpfPath = getSeccompBpfPath();
-
     bwrapArgs.push('--seccomp', '9');
-    bwrapArgs.push('--', req.command, ...req.args);
+
+    const argsPath = this.writeArgsToTempFile(bwrapArgs);
 
     const shArgs = [
       '-c',
-      'bpf_path="$1"; shift; exec bwrap "$@" 9< "$bpf_path"',
+      'bpf_path="$1"; args_path="$2"; shift 2; exec bwrap --args 8 "$@" 8< "$args_path" 9< "$bpf_path"',
       '_',
       bpfPath,
-      ...bwrapArgs,
+      argsPath,
+      '--',
+      finalCommand,
+      ...finalArgs,
     ];
 
     return {
       program: 'sh',
       args: shArgs,
       env: sanitizedEnv,
+      cwd: req.cwd,
+      cleanup: () => {
+        try {
+          fs.unlinkSync(argsPath);
+        } catch {
+          // Ignore cleanup errors
+        }
+      },
     };
+  }
+
+  private writeArgsToTempFile(args: string[]): string {
+    const tempFile = join(
+      os.tmpdir(),
+      `gemini-cli-bwrap-args-${Date.now()}-${Math.random().toString(36).slice(2)}.args`,
+    );
+    const content = Buffer.from(args.join('\0') + '\0');
+    fs.writeFileSync(tempFile, content, { mode: 0o600 });
+    return tempFile;
   }
 }

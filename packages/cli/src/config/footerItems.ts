@@ -48,6 +48,11 @@ export const ALL_ITEMS = [
     description: 'Unique identifier for the current session',
   },
   {
+    id: 'auth',
+    header: '/auth',
+    description: 'Current authentication info',
+  },
+  {
     id: 'code-changes',
     header: 'diff',
     description: 'Lines added/removed in the session (not shown when zero)',
@@ -70,6 +75,7 @@ export const DEFAULT_ORDER = [
   'quota',
   'memory-usage',
   'session-id',
+  'auth',
   'code-changes',
   'token-count',
 ];
@@ -121,10 +127,19 @@ export function resolveFooterState(settings: MergedSettings): {
   orderedIds: string[];
   selectedIds: Set<string>;
 } {
+  const showUserIdentity = settings.ui?.showUserIdentity !== false;
+  const filteredValidIds = showUserIdentity
+    ? VALID_IDS
+    : new Set([...VALID_IDS].filter((id) => id !== 'auth'));
+
   const source = (
     settings.ui?.footer?.items ?? deriveItemsFromLegacySettings(settings)
-  ).filter((id: string) => VALID_IDS.has(id));
-  const others = DEFAULT_ORDER.filter((id) => !source.includes(id));
+  ).filter((id: string) => filteredValidIds.has(id));
+
+  const others = DEFAULT_ORDER.filter(
+    (id) => !source.includes(id) && filteredValidIds.has(id),
+  );
+
   return {
     orderedIds: [...source, ...others],
     selectedIds: new Set(source),

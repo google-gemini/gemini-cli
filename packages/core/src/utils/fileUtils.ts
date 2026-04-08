@@ -576,7 +576,7 @@ export async function fileExists(filePath: string): Promise<boolean> {
   try {
     await fsPromises.access(filePath, fs.constants.F_OK);
     return true;
-  } catch (_: unknown) {
+  } catch {
     return false;
   }
 }

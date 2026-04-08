@@ -28,7 +28,7 @@ import {
   debugLogger,
   ReadManyFilesTool,
   REFERENCE_CONTENT_START,
-  resolveModel,
+  type RoutingContext,
   createWorkingStdio,
   startupProfiler,
   Kind,
@@ -42,12 +42,16 @@ import {
   DEFAULT_GEMINI_FLASH_LITE_MODEL,
   PREVIEW_GEMINI_MODEL,
   PREVIEW_GEMINI_3_1_MODEL,
+  PREVIEW_GEMINI_3_1_FLASH_LITE_MODEL,
   PREVIEW_GEMINI_3_1_CUSTOM_TOOLS_MODEL,
   PREVIEW_GEMINI_FLASH_MODEL,
   DEFAULT_GEMINI_MODEL_AUTO,
   PREVIEW_GEMINI_MODEL_AUTO,
   getDisplayString,
+  processSingleFileContent,
+  InvalidStreamError,
   type AgentLoopContext,
+  updatePolicy,
 } from '@google/gemini-cli-core';
 import * as acp from '@agentclientprotocol/sdk';
 import { AcpFileSystemService } from './fileSystemService.js';
@@ -63,6 +67,7 @@ import {
   loadSettings,
   type LoadedSettings,
 } from '../config/settings.js';
+import { createPolicyUpdater } from '../config/policy.js';
 import * as fs from 'node:fs/promises';
 import * as path from 'node:path';
 import { z } from 'zod';
@@ -73,6 +78,17 @@ import { runExitCleanup } from '../utils/cleanup.js';
 import { SessionSelector } from '../utils/sessionUtils.js';
 
 import { CommandHandler } from './commandHandler.js';
+
+const RequestPermissionResponseSchema = z.object({
+  outcome: z.discriminatedUnion('outcome', [
+    z.object({ outcome: z.literal('cancelled') }),
+    z.object({
+      outcome: z.literal('selected'),
+      optionId: z.string(),
+    }),
+  ]),
+});
+
 export async function runAcpClient(
   config: Config,
   settings: LoadedSettings,
@@ -121,6 +137,7 @@ export class GeminiAgent {
     args: acp.InitializeRequest,
   ): Promise<acp.InitializeResponse> {
     this.clientCapabilities = args.clientCapabilities;
+
     const authMethods = [
       {
         id: AuthType.LOGIN_WITH_GOOGLE,
@@ -310,6 +327,7 @@ export class GeminiAgent {
 
     const geminiClient = config.getGeminiClient();
     const chat = await geminiClient.startChat();
+
     const session = new Session(
       sessionId,
       chat,
@@ -499,6 +517,12 @@ export class GeminiAgent {
     };
 
     const config = await loadCliConfig(settings, sessionId, this.argv, { cwd });
+
+    createPolicyUpdater(
+      config.getPolicyEngine(),
+      config.messageBus,
+      config.storage,
+    );
 
     return config;
   }
@@ -735,10 +759,15 @@ export class Session {
       const functionCalls: FunctionCall[] = [];
 
       try {
-        const model = resolveModel(
-          this.context.config.getModel(),
-          (await this.context.config.getGemini31Launched?.()) ?? false,
-        );
+        const routingContext: RoutingContext = {
+          history: chat.getHistory(/*curated=*/ true),
+          request: nextMessage?.parts ?? [],
+          signal: pendingSend.signal,
+          requestedModel: this.context.config.getModel(),
+        };
+
+        const router = this.context.config.getModelRouterService();
+        const { model } = await router.route(routingContext);
         const responseStream = await chat.sendMessageStream(
           { model },
           nextMessage?.parts ?? [],
@@ -827,6 +856,40 @@ export class Session {
           (error instanceof Error && error.name === 'AbortError')
         ) {
           return { stopReason: CoreToolCallStatus.Cancelled };
+        }
+
+        if (
+          error instanceof InvalidStreamError ||
+          (error &&
+            typeof error === 'object' &&
+            'type' in error &&
+            (error.type === 'NO_RESPONSE_TEXT' ||
+              error.type === 'NO_FINISH_REASON' ||
+              error.type === 'MALFORMED_FUNCTION_CALL' ||
+              error.type === 'UNEXPECTED_TOOL_CALL'))
+        ) {
+          // The stream ended with an empty response or malformed tool call.
+          // Treat this as a graceful end to the model's turn rather than a crash.
+          return {
+            stopReason: 'end_turn',
+            _meta: {
+              quota: {
+                token_count: {
+                  input_tokens: totalInputTokens,
+                  output_tokens: totalOutputTokens,
+                },
+                model_usage: Array.from(modelUsageMap.entries()).map(
+                  ([modelName, counts]) => ({
+                    model: modelName,
+                    token_count: {
+                      input_tokens: counts.input,
+                      output_tokens: counts.output,
+                    },
+                  }),
+                ),
+              },
+            },
+          };
         }
 
         throw new acp.RequestError(
@@ -1000,6 +1063,7 @@ export class Session {
           options: toPermissionOptions(
             confirmationDetails,
             this.context.config,
+            this.settings.merged.security.enablePermanentToolApproval,
           ),
           toolCall: {
             toolCallId: callId,
@@ -1011,16 +1075,28 @@ export class Session {
           },
         };
 
-        // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
-        const output = await this.connection.requestPermission(params);
+        const output = RequestPermissionResponseSchema.parse(
+          await this.connection.requestPermission(params),
+        );
+
         const outcome =
-          output.outcome.outcome === CoreToolCallStatus.Cancelled
+          output.outcome.outcome === 'cancelled'
             ? ToolConfirmationOutcome.Cancel
             : z
                 .nativeEnum(ToolConfirmationOutcome)
                 .parse(output.outcome.optionId);
 
         await confirmationDetails.onConfirm(outcome);
+
+        // Update policy to enable Always Allow persistence
+        await updatePolicy(
+          tool,
+          outcome,
+          confirmationDetails,
+          this.context,
+          this.context.messageBus,
+          invocation,
+        );
 
         switch (outcome) {
           case ToolConfirmationOutcome.Cancel:
@@ -1225,6 +1301,11 @@ export class Session {
     const pathSpecsToRead: string[] = [];
     const contentLabelsForDisplay: string[] = [];
     const ignoredPaths: string[] = [];
+    const directContents: Array<{
+      spec: string;
+      content?: string;
+      part?: Part;
+    }> = [];
 
     const toolRegistry = this.context.toolRegistry;
     const readManyFilesTool = new ReadManyFilesTool(
@@ -1247,28 +1328,197 @@ export class Session {
       }
       let currentPathSpec = pathName;
       let resolvedSuccessfully = false;
+      let readDirectly = false;
       try {
         const absolutePath = path.resolve(
           this.context.config.getTargetDir(),
           pathName,
         );
-        if (isWithinRoot(absolutePath, this.context.config.getTargetDir())) {
-          const stats = await fs.stat(absolutePath);
-          if (stats.isDirectory()) {
-            currentPathSpec = pathName.endsWith('/')
-              ? `${pathName}**`
-              : `${pathName}/**`;
+
+        let validationError = this.context.config.validatePathAccess(
+          absolutePath,
+          'read',
+        );
+
+        // We ask the user for explicit permission to read them if outside sandboxed workspace boundaries (and not already authorized).
+        if (
+          validationError &&
+          !isWithinRoot(absolutePath, this.context.config.getTargetDir())
+        ) {
+          try {
+            const stats = await fs.stat(absolutePath);
+            if (stats.isFile()) {
+              const syntheticCallId = `resolve-prompt-${pathName}-${randomUUID()}`;
+              const params = {
+                sessionId: this.id,
+                options: [
+                  {
+                    optionId: ToolConfirmationOutcome.ProceedOnce,
+                    name: 'Allow once',
+                    kind: 'allow_once',
+                  },
+                  {
+                    optionId: ToolConfirmationOutcome.Cancel,
+                    name: 'Deny',
+                    kind: 'reject_once',
+                  },
+                ] as acp.PermissionOption[],
+                toolCall: {
+                  toolCallId: syntheticCallId,
+                  status: 'pending',
+                  title: `Allow access to absolute path: ${pathName}`,
+                  content: [
+                    {
+                      type: 'content',
+                      content: {
+                        type: 'text',
+                        text: `The Agent needs access to read an attached file outside your workspace: ${pathName}`,
+                      },
+                    },
+                  ],
+                  locations: [],
+                  kind: 'read',
+                },
+              };
+
+              const output = RequestPermissionResponseSchema.parse(
+                await this.connection.requestPermission(params),
+              );
+
+              const outcome =
+                output.outcome.outcome === 'cancelled'
+                  ? ToolConfirmationOutcome.Cancel
+                  : z
+                      .nativeEnum(ToolConfirmationOutcome)
+                      .parse(output.outcome.optionId);
+
+              if (outcome === ToolConfirmationOutcome.ProceedOnce) {
+                this.context.config
+                  .getWorkspaceContext()
+                  .addReadOnlyPath(absolutePath);
+                validationError = null;
+              } else {
+                this.debug(
+                  `Direct read authorization denied for absolute path ${pathName}`,
+                );
+                directContents.push({
+                  spec: pathName,
+                  content: `[Warning: Access to absolute path \`${pathName}\` denied by user.]`,
+                });
+                continue;
+              }
+            }
+          } catch (error) {
             this.debug(
-              `Path ${pathName} resolved to directory, using glob: ${currentPathSpec}`,
+              `Failed to request permission for absolute attachment ${pathName}: ${getErrorMessage(error)}`,
             );
-          } else {
-            this.debug(`Path ${pathName} resolved to file: ${currentPathSpec}`);
+            await this.sendUpdate({
+              sessionUpdate: 'agent_thought_chunk',
+              content: {
+                type: 'text',
+                text: `Warning: Failed to display permission dialog for \`${absolutePath}\`. Error: ${getErrorMessage(error)}`,
+              },
+            });
           }
-          resolvedSuccessfully = true;
+        }
+
+        if (!validationError) {
+          // If it's an absolute path that is authorized (e.g. added via readOnlyPaths),
+          // read it directly to avoid ReadManyFilesTool absolute path resolution issues.
+          if (
+            (path.isAbsolute(pathName) ||
+              !isWithinRoot(
+                absolutePath,
+                this.context.config.getTargetDir(),
+              )) &&
+            !readDirectly
+          ) {
+            try {
+              const stats = await fs.stat(absolutePath);
+              if (stats.isFile()) {
+                const fileReadResult = await processSingleFileContent(
+                  absolutePath,
+                  this.context.config.getTargetDir(),
+                  this.context.config.getFileSystemService(),
+                );
+
+                if (!fileReadResult.error) {
+                  if (
+                    typeof fileReadResult.llmContent === 'object' &&
+                    'inlineData' in fileReadResult.llmContent
+                  ) {
+                    directContents.push({
+                      spec: pathName,
+                      part: fileReadResult.llmContent,
+                    });
+                  } else if (typeof fileReadResult.llmContent === 'string') {
+                    let contentToPush = fileReadResult.llmContent;
+                    if (fileReadResult.isTruncated) {
+                      contentToPush = `[WARNING: This file was truncated]\n\n${contentToPush}`;
+                    }
+                    directContents.push({
+                      spec: pathName,
+                      content: contentToPush,
+                    });
+                  }
+                  readDirectly = true;
+                  resolvedSuccessfully = true;
+                } else {
+                  this.debug(
+                    `Direct read failed for absolute path ${pathName}: ${fileReadResult.error}`,
+                  );
+                  await this.sendUpdate({
+                    sessionUpdate: 'agent_thought_chunk',
+                    content: {
+                      type: 'text',
+                      text: `Warning: file read failed for \`${pathName}\`. Reason: ${fileReadResult.error}`,
+                    },
+                  });
+                  continue;
+                }
+              }
+            } catch (error) {
+              this.debug(
+                `File stat/access error for absolute path ${pathName}: ${getErrorMessage(error)}`,
+              );
+              await this.sendUpdate({
+                sessionUpdate: 'agent_thought_chunk',
+                content: {
+                  type: 'text',
+                  text: `Warning: file access failed for \`${pathName}\`. Reason: ${getErrorMessage(error)}`,
+                },
+              });
+              continue;
+            }
+          }
+
+          if (!readDirectly) {
+            const stats = await fs.stat(absolutePath);
+            if (stats.isDirectory()) {
+              currentPathSpec = pathName.endsWith('/')
+                ? `${pathName}**`
+                : `${pathName}/**`;
+              this.debug(
+                `Path ${pathName} resolved to directory, using glob: ${currentPathSpec}`,
+              );
+            } else {
+              this.debug(
+                `Path ${pathName} resolved to file: ${currentPathSpec}`,
+              );
+            }
+            resolvedSuccessfully = true;
+          }
         } else {
           this.debug(
-            `Path ${pathName} is outside the project directory. Skipping.`,
+            `Path ${pathName} access disallowed: ${validationError}. Skipping.`,
           );
+          await this.sendUpdate({
+            sessionUpdate: 'agent_thought_chunk',
+            content: {
+              type: 'text',
+              text: `Warning: skipping access to \`${pathName}\`. Reason: ${validationError}`,
+            },
+          });
         }
       } catch (error) {
         if (isNodeError(error) && error.code === 'ENOENT') {
@@ -1328,7 +1578,9 @@ export class Session {
         }
       }
       if (resolvedSuccessfully) {
-        pathSpecsToRead.push(currentPathSpec);
+        if (!readDirectly) {
+          pathSpecsToRead.push(currentPathSpec);
+        }
         atPathToResolvedSpecMap.set(pathName, currentPathSpec);
         contentLabelsForDisplay.push(pathName);
       }
@@ -1389,7 +1641,11 @@ export class Session {
 
     const processedQueryParts: Part[] = [{ text: initialQueryText }];
 
-    if (pathSpecsToRead.length === 0 && embeddedContext.length === 0) {
+    if (
+      pathSpecsToRead.length === 0 &&
+      embeddedContext.length === 0 &&
+      directContents.length === 0
+    ) {
       // Fallback for lone "@" or completely invalid @-commands resulting in empty initialQueryText
       debugLogger.warn('No valid file paths found in @ commands to read.');
       return [{ text: initialQueryText }];
@@ -1481,6 +1737,30 @@ export class Session {
       }
     }
 
+    if (directContents.length > 0) {
+      const hasReferenceStart = processedQueryParts.some(
+        (p) =>
+          'text' in p &&
+          typeof p.text === 'string' &&
+          p.text.includes(REFERENCE_CONTENT_START),
+      );
+      if (!hasReferenceStart) {
+        processedQueryParts.push({
+          text: `\n${REFERENCE_CONTENT_START}`,
+        });
+      }
+      for (const item of directContents) {
+        processedQueryParts.push({
+          text: `\nContent from @${item.spec}:\n`,
+        });
+        if (item.content) {
+          processedQueryParts.push({ text: item.content });
+        } else if (item.part) {
+          processedQueryParts.push(item.part);
+        }
+      }
+    }
+
     if (embeddedContext.length > 0) {
       processedQueryParts.push({
         text: '\n--- Content from referenced context ---',
@@ -1567,6 +1847,7 @@ const basicPermissionOptions = [
 function toPermissionOptions(
   confirmation: ToolCallConfirmationDetails,
   config: Config,
+  enablePermanentToolApproval: boolean = false,
 ): acp.PermissionOption[] {
   const disableAlwaysAllow = config.getDisableAlwaysAllow();
   const options: acp.PermissionOption[] = [];
@@ -1576,37 +1857,65 @@ function toPermissionOptions(
       case 'edit':
         options.push({
           optionId: ToolConfirmationOutcome.ProceedAlways,
-          name: 'Allow All Edits',
+          name: 'Allow for this session',
           kind: 'allow_always',
         });
+        if (enablePermanentToolApproval) {
+          options.push({
+            optionId: ToolConfirmationOutcome.ProceedAlwaysAndSave,
+            name: 'Allow for this file in all future sessions',
+            kind: 'allow_always',
+          });
+        }
         break;
       case 'exec':
         options.push({
           optionId: ToolConfirmationOutcome.ProceedAlways,
-          name: `Always Allow ${confirmation.rootCommand}`,
+          name: 'Allow for this session',
           kind: 'allow_always',
         });
+        if (enablePermanentToolApproval) {
+          options.push({
+            optionId: ToolConfirmationOutcome.ProceedAlwaysAndSave,
+            name: 'Allow this command for all future sessions',
+            kind: 'allow_always',
+          });
+        }
         break;
       case 'mcp':
         options.push(
           {
             optionId: ToolConfirmationOutcome.ProceedAlwaysServer,
-            name: `Always Allow ${confirmation.serverName}`,
+            name: 'Allow all server tools for this session',
             kind: 'allow_always',
           },
           {
             optionId: ToolConfirmationOutcome.ProceedAlwaysTool,
-            name: `Always Allow ${confirmation.toolName}`,
+            name: 'Allow tool for this session',
             kind: 'allow_always',
           },
         );
+        if (enablePermanentToolApproval) {
+          options.push({
+            optionId: ToolConfirmationOutcome.ProceedAlwaysAndSave,
+            name: 'Allow tool for all future sessions',
+            kind: 'allow_always',
+          });
+        }
         break;
       case 'info':
         options.push({
           optionId: ToolConfirmationOutcome.ProceedAlways,
-          name: `Always Allow`,
+          name: 'Allow for this session',
           kind: 'allow_always',
         });
+        if (enablePermanentToolApproval) {
+          options.push({
+            optionId: ToolConfirmationOutcome.ProceedAlwaysAndSave,
+            name: 'Allow for all future sessions',
+            kind: 'allow_always',
+          });
+        }
         break;
       case 'ask_user':
       case 'exit_plan_mode':
@@ -1709,10 +2018,31 @@ function buildAvailableModels(
   const preferredModel = config.getModel() || DEFAULT_GEMINI_MODEL_AUTO;
   const shouldShowPreviewModels = config.getHasAccessToPreviewModel();
   const useGemini31 = config.getGemini31LaunchedSync?.() ?? false;
+  const useGemini31FlashLite =
+    config.getGemini31FlashLiteLaunchedSync?.() ?? false;
   const selectedAuthType = settings.merged.security.auth.selectedType;
   const useCustomToolModel =
     useGemini31 && selectedAuthType === AuthType.USE_GEMINI;
 
+  // --- DYNAMIC PATH ---
+  if (
+    config.getExperimentalDynamicModelConfiguration?.() === true &&
+    config.getModelConfigService
+  ) {
+    const options = config.getModelConfigService().getAvailableModelOptions({
+      useGemini3_1: useGemini31,
+      useGemini3_1FlashLite: useGemini31FlashLite,
+      useCustomTools: useCustomToolModel,
+      hasAccessToPreview: shouldShowPreviewModels,
+    });
+
+    return {
+      availableModels: options,
+      currentModelId: preferredModel,
+    };
+  }
+
+  // --- LEGACY PATH ---
   const mainOptions = [
     {
       value: DEFAULT_GEMINI_MODEL_AUTO,
@@ -1756,7 +2086,7 @@ function buildAvailableModels(
       ? PREVIEW_GEMINI_3_1_CUSTOM_TOOLS_MODEL
       : previewProModel;
 
-    manualOptions.unshift(
+    const previewOptions = [
       {
         value: previewProValue,
         title: getDisplayString(previewProModel),
@@ -1765,7 +2095,16 @@ function buildAvailableModels(
         value: PREVIEW_GEMINI_FLASH_MODEL,
         title: getDisplayString(PREVIEW_GEMINI_FLASH_MODEL),
       },
-    );
+    ];
+
+    if (useGemini31FlashLite) {
+      previewOptions.push({
+        value: PREVIEW_GEMINI_3_1_FLASH_LITE_MODEL,
+        title: getDisplayString(PREVIEW_GEMINI_3_1_FLASH_LITE_MODEL),
+      });
+    }
+
+    manualOptions.unshift(...previewOptions);
   }
 
   const scaleOptions = (

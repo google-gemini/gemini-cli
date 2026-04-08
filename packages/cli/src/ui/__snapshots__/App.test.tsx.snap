@@ -37,9 +37,8 @@ Tips for getting started:
 
 
 
-
-
 Notifications
+
 Composer
 "
 `;
@@ -103,9 +102,8 @@ exports[`App > Snapshots > renders with dialogs visible 1`] = `
 
 
 
-
-
 Notifications
+
 DialogManager
 "
 `;
@@ -132,13 +130,14 @@ HistoryItemDisplay
 │                                                                                                  │
 │ ?  ls list directory                                                                             │
 │                                                                                                  │
-│ ls                                                                                               │
-│ Allow execution of: 'ls'?                                                                        │
+│ ╭──────────────────────────────────────────────────────────────────────────────────────────────╮ │
+│ │ ls                                                                                           │ │
+│ ╰──────────────────────────────────────────────────────────────────────────────────────────────╯ │
+│ Allow execution of [ls]?                                                                         │
 │                                                                                                  │
 │ ● 1. Allow once                                                                                  │
 │   2. Allow for this session                                                                      │
 │   3. No, suggest changes (esc)                                                                   │
-│                                                                                                  │
 ╰──────────────────────────────────────────────────────────────────────────────────────────────────╯
 
 
@@ -146,10 +145,8 @@ HistoryItemDisplay
 
 
 
-
-
-
 Notifications
+
 Composer
 "
 `;

@@ -5,6 +5,7 @@
  */
 
 import type { SafetyCheckInput } from '../safety/protocol.js';
+import type { SandboxManager } from '../services/sandboxManager.js';
 
 export enum PolicyDecision {
   ALLOW = 'allow',
@@ -50,6 +51,18 @@ export enum ApprovalMode {
   YOLO = 'yolo',
   PLAN = 'plan',
 }
+
+/**
+ * The order of permissiveness for approval modes.
+ * Tools allowed in a less permissive mode should also be allowed
+ * in more permissive modes.
+ */
+export const MODES_BY_PERMISSIVENESS = [
+  ApprovalMode.PLAN,
+  ApprovalMode.DEFAULT,
+  ApprovalMode.AUTO_EDIT,
+  ApprovalMode.YOLO,
+];
 
 /**
  * Configuration for the built-in allowed-path checker.
@@ -311,13 +324,9 @@ export interface PolicyEngineConfig {
   approvalMode?: ApprovalMode;
 
   /**
-   * Whether tool sandboxing is enabled.
+   * The sandbox manager instance.
    */
-  toolSandboxEnabled?: boolean;
-  /**
-   * List of tools approved by the sandbox policy for the current mode.
-   */
-  sandboxApprovedTools?: string[];
+  sandboxManager?: SandboxManager;
 }
 
 export interface PolicySettings {
@@ -345,9 +354,11 @@ export interface CheckResult {
 
 /**
  * Priority for subagent tools (registered dynamically).
- * Effective priority matching Tier 1 (Default) read-only tools.
+ * Effective priority matching Tier 1 (Default) at priority 30.
+ * This ensures they are blocked by Plan Mode (priority 40) while
+ * remaining above directive write tools (priority 10).
  */
-export const PRIORITY_SUBAGENT_TOOL = 1.05;
+export const PRIORITY_SUBAGENT_TOOL = 1.03;
 
 /**
  * The fractional priority of "Always allow" rules (e.g., 950/1000).
