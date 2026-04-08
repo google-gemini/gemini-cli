@@ -6,23 +6,25 @@
 
 import fs from 'node:fs';
 import path from 'node:path';
+import { assertValidPathString } from '../../utils/paths.js';
 
 export function isErrnoException(e: unknown): e is NodeJS.ErrnoException {
   return e instanceof Error && 'code' in e;
 }
 
 export function tryRealpath(p: string): string {
+  assertValidPathString(p);
   try {
     return fs.realpathSync(p);
-  } catch (_e) {
-    if (isErrnoException(_e) && _e.code === 'ENOENT') {
+  } catch (e) {
+    if (isErrnoException(e) && e.code === 'ENOENT') {
       const parentDir = path.dirname(p);
       if (parentDir === p) {
         return p;
       }
       return path.join(tryRealpath(parentDir), path.basename(p));
     }
-    throw _e;
+    throw e;
   }
 }
 
@@ -52,7 +54,7 @@ export function resolveGitWorktreePaths(workspacePath: string): {
           if (tryRealpath(backlink) === tryRealpath(gitPath)) {
             isValid = true;
           }
-        } catch (_e) {
+        } catch {
           // Fallback for submodules: check core.worktree in config
           try {
             const configPath = path.join(resolvedWorktreeGitDir, 'config');
@@ -67,7 +69,7 @@ export function resolveGitWorktreePaths(workspacePath: string): {
                 isValid = true;
               }
             }
-          } catch (_e2) {
+          } catch {
             // Ignore
           }
         }
@@ -85,7 +87,7 @@ export function resolveGitWorktreePaths(workspacePath: string): {
         };
       }
     }
-  } catch (_e) {
+  } catch {
     // Ignore if .git doesn't exist, isn't readable, etc.
   }
   return {};

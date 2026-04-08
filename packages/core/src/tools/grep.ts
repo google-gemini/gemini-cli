@@ -30,7 +30,7 @@ import { isGitRepository } from '../utils/gitUtils.js';
 import type { Config } from '../config/config.js';
 import type { FileExclusions } from '../utils/ignorePatterns.js';
 import { ToolErrorType } from './tool-error.js';
-import { GREP_TOOL_NAME } from './tool-names.js';
+import { GREP_TOOL_NAME, GREP_DISPLAY_NAME } from './tool-names.js';
 import { buildPatternArgsPattern } from '../policy/utils.js';
 import { debugLogger } from '../utils/debugLogger.js';
 import { GREP_DEFINITION } from './definitions/coreTools.js';
@@ -326,6 +326,7 @@ class GrepToolInvocation extends BaseToolInvocation<
       let finalCommand = checkCommand;
       let finalArgs = checkArgs;
       let finalEnv = process.env;
+      let cleanup: (() => void) | undefined;
 
       if (sandboxManager) {
         try {
@@ -338,6 +339,7 @@ class GrepToolInvocation extends BaseToolInvocation<
           finalCommand = prepared.program;
           finalArgs = prepared.args;
           finalEnv = prepared.env;
+          cleanup = prepared.cleanup;
         } catch (err) {
           debugLogger.debug(
             `[GrepTool] Sandbox preparation failed for '${command}':`,
@@ -346,21 +348,27 @@ class GrepToolInvocation extends BaseToolInvocation<
         }
       }
 
-      return await new Promise((resolve) => {
-        const child = spawn(finalCommand, finalArgs, {
-          stdio: 'ignore',
-          shell: true,
-          env: finalEnv,
+      try {
+        return await new Promise((resolve) => {
+          const child = spawn(finalCommand, finalArgs, {
+            stdio: 'ignore',
+            shell: true,
+            env: finalEnv,
+          });
+          child.on('close', (code) => {
+            resolve(code === 0);
+          });
+          child.on('error', (err) => {
+            debugLogger.debug(
+              `[GrepTool] Failed to start process for '${command}':`,
+              err.message,
+            );
+            resolve(false);
+          });
         });
-        child.on('close', (code) => resolve(code === 0));
-        child.on('error', (err) => {
-          debugLogger.debug(
-            `[GrepTool] Failed to start process for '${command}':`,
-            err.message,
-          );
-          resolve(false);
-        });
-      });
+      } finally {
+        cleanup?.();
+      }
     } catch {
       return false;
     }
@@ -653,7 +661,7 @@ export class GrepTool extends BaseDeclarativeTool<GrepToolParams, ToolResult> {
   ) {
     super(
       GrepTool.Name,
-      'SearchText',
+      GREP_DISPLAY_NAME,
       GREP_DEFINITION.base.description!,
       Kind.Search,
       GREP_DEFINITION.base.parametersJsonSchema,

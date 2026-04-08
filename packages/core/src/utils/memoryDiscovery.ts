@@ -15,7 +15,7 @@ import {
   DEFAULT_MEMORY_FILE_FILTERING_OPTIONS,
   type FileFilteringOptions,
 } from '../config/constants.js';
-import { GEMINI_DIR, homedir, normalizePath } from './paths.js';
+import { GEMINI_DIR, homedir, normalizePath, isSubpath } from './paths.js';
 import type { ExtensionLoader } from './extensionLoader.js';
 import { debugLogger } from './debugLogger.js';
 import type { Config } from '../config/config.js';
@@ -485,6 +485,30 @@ export async function getGlobalMemoryPaths(): Promise<string[]> {
   );
 }
 
+export async function getUserProjectMemoryPaths(
+  projectMemoryDir: string,
+): Promise<string[]> {
+  const geminiMdFilenames = getAllGeminiMdFilenames();
+
+  const accessChecks = geminiMdFilenames.map(async (filename) => {
+    const memoryPath = normalizePath(path.join(projectMemoryDir, filename));
+    try {
+      await fs.access(memoryPath, fsSync.constants.R_OK);
+      debugLogger.debug(
+        '[DEBUG] [MemoryDiscovery] Found user project memory file:',
+        memoryPath,
+      );
+      return memoryPath;
+    } catch {
+      return null;
+    }
+  });
+
+  return (await Promise.all(accessChecks)).filter(
+    (p): p is string => p !== null,
+  );
+}
+
 export function getExtensionMemoryPaths(
   extensionLoader: ExtensionLoader,
 ): string[] {
@@ -526,7 +550,12 @@ export async function getEnvironmentMemoryPaths(
 }
 
 export function categorizeAndConcatenate(
-  paths: { global: string[]; extension: string[]; project: string[] },
+  paths: {
+    global: string[];
+    extension: string[];
+    project: string[];
+    userProjectMemory?: string[];
+  },
   contentsMap: Map<string, GeminiFileContent>,
 ): HierarchicalMemory {
   const getConcatenated = (pList: string[]) =>
@@ -540,6 +569,7 @@ export function categorizeAndConcatenate(
     global: getConcatenated(paths.global),
     extension: getConcatenated(paths.extension),
     project: getConcatenated(paths.project),
+    userProjectMemory: getConcatenated(paths.userProjectMemory ?? []),
   };
 }
 
@@ -761,15 +791,8 @@ export async function loadJitSubdirectoryMemory(
 
   // Find the deepest trusted root that contains the target path
   for (const root of trustedRoots) {
-    const resolvedRoot = normalizePath(root);
-    const resolvedRootWithTrailing = resolvedRoot.endsWith(path.sep)
-      ? resolvedRoot
-      : resolvedRoot + path.sep;
-
-    if (
-      resolvedTarget === resolvedRoot ||
-      resolvedTarget.startsWith(resolvedRootWithTrailing)
-    ) {
+    if (isSubpath(root, targetPath)) {
+      const resolvedRoot = normalizePath(root);
       if (!bestRoot || resolvedRoot.length > bestRoot.length) {
         bestRoot = resolvedRoot;
       }

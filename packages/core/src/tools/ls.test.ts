@@ -131,7 +131,10 @@ describe('LSTool', () => {
 
       expect(result.llmContent).toContain('[DIR] subdir');
       expect(result.llmContent).toContain('file1.txt');
-      expect(result.returnDisplay).toBe('Listed 2 item(s).');
+      expect(result.returnDisplay).toEqual({
+        summary: 'Listed 2 item(s).',
+        files: ['[DIR] subdir', 'file1.txt'],
+      });
     });
 
     it('should list files from secondary workspace directory', async () => {
@@ -146,7 +149,10 @@ describe('LSTool', () => {
       const result = await invocation.execute(abortSignal);
 
       expect(result.llmContent).toContain('secondary-file.txt');
-      expect(result.returnDisplay).toBe('Listed 1 item(s).');
+      expect(result.returnDisplay).toEqual({
+        summary: 'Listed 1 item(s).',
+        files: expect.any(Array),
+      });
     });
 
     it('should handle empty directories', async () => {
@@ -171,7 +177,10 @@ describe('LSTool', () => {
 
       expect(result.llmContent).toContain('file1.txt');
       expect(result.llmContent).not.toContain('file2.log');
-      expect(result.returnDisplay).toBe('Listed 1 item(s).');
+      expect(result.returnDisplay).toEqual({
+        summary: 'Listed 1 item(s).',
+        files: expect.any(Array),
+      });
     });
 
     it('should respect gitignore patterns', async () => {
@@ -185,7 +194,9 @@ describe('LSTool', () => {
       expect(result.llmContent).toContain('file1.txt');
       expect(result.llmContent).not.toContain('file2.log');
       // .git is always ignored by default.
-      expect(result.returnDisplay).toBe('Listed 2 item(s). (2 ignored)');
+      expect(result.returnDisplay).toEqual(
+        expect.objectContaining({ summary: 'Listed 2 item(s). (2 ignored)' }),
+      );
     });
 
     it('should respect geminiignore patterns', async () => {
@@ -200,7 +211,9 @@ describe('LSTool', () => {
 
       expect(result.llmContent).toContain('file1.txt');
       expect(result.llmContent).not.toContain('file2.log');
-      expect(result.returnDisplay).toBe('Listed 2 item(s). (1 ignored)');
+      expect(result.returnDisplay).toEqual(
+        expect.objectContaining({ summary: 'Listed 2 item(s). (1 ignored)' }),
+      );
     });
 
     it('should handle non-directory paths', async () => {
@@ -287,7 +300,10 @@ describe('LSTool', () => {
       // Should still list the other files
       expect(result.llmContent).toContain('file1.txt');
       expect(result.llmContent).not.toContain('problematic.txt');
-      expect(result.returnDisplay).toBe('Listed 1 item(s).');
+      expect(result.returnDisplay).toEqual({
+        summary: 'Listed 1 item(s).',
+        files: expect.any(Array),
+      });
 
       statSpy.mockRestore();
     });
@@ -347,7 +363,10 @@ describe('LSTool', () => {
       const result = await invocation.execute(abortSignal);
 
       expect(result.llmContent).toContain('secondary-file.txt');
-      expect(result.returnDisplay).toBe('Listed 1 item(s).');
+      expect(result.returnDisplay).toEqual({
+        summary: 'Listed 1 item(s).',
+        files: expect.any(Array),
+      });
     });
   });
 

@@ -901,7 +901,7 @@ export class Scheduler {
           } as ScheduledToolCall,
           signal,
         );
-      } catch (_e) {
+      } catch {
         // Fallback to normal error handling if parsing/looping fails
       }
     }
