@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { useEffect, useReducer, useRef } from 'react';
+import { useEffect, useReducer, useRef, useCallback } from 'react';
 import { setTimeout as setTimeoutPromise } from 'node:timers/promises';
 import * as path from 'node:path';
 import {
@@ -224,15 +224,15 @@ export function useAtCompletion(props: UseAtCompletionProps): void {
     setIsLoadingSuggestions(state.isLoading);
   }, [state.isLoading, setIsLoadingSuggestions]);
 
-  const resetFileSearchState = () => {
+  const resetFileSearchState = useCallback(() => {
     fileSearchMap.current.clear();
     initEpoch.current += 1;
     dispatch({ type: 'RESET' });
-  };
+  }, []);
 
   useEffect(() => {
     resetFileSearchState();
-  }, [cwd, config]);
+  }, [cwd, config, resetFileSearchState]);
 
   useEffect(() => {
     const workspaceContext = config?.getWorkspaceContext?.();
@@ -242,7 +242,7 @@ export function useAtCompletion(props: UseAtCompletionProps): void {
       workspaceContext.onDirectoriesChanged(resetFileSearchState);
 
     return unsubscribe;
-  }, [config]);
+  }, [config, resetFileSearchState]);
 
   // Reacts to user input (`pattern`) ONLY.
   useEffect(() => {

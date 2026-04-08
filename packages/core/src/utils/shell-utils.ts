@@ -164,7 +164,16 @@ async function loadBashLanguage(): Promise<void> {
 
 export async function initializeShellParsers(): Promise<void> {
   if (!treeSitterInitialization) {
-    treeSitterInitialization = loadBashLanguage().catch((error) => {
+    const timeoutPromise = new Promise<void>((_, reject) => {
+      setTimeout(
+        () => reject(new Error('Tree-sitter initialization timed out')),
+        5000,
+      );
+    });
+    treeSitterInitialization = Promise.race([
+      loadBashLanguage(),
+      timeoutPromise,
+    ]).catch((error) => {
       treeSitterInitialization = null;
       // Log the error but don't throw, allowing the application to fall back to safe defaults (ASK_USER)
       // or regex checks where appropriate.
