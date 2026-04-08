@@ -138,8 +138,9 @@ export function getNodeMemoryArgs(isDebugMode: boolean): string[] {
   // out-of-memory crashes during high native-handle concurrency.
   // Note: Only supported in specific Node.js versions compiled with V8 Sandbox enabled.
   const eptFlag = `--max-external-pointer-table-size=${DEFAULT_EPT_SIZE}`;
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-type-assertion
-  const isV8SandboxEnabled = (process.config?.variables as any)?.v8_enable_sandbox === 1;
+  const isV8SandboxEnabled =
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-type-assertion
+    (process.config?.variables as any)?.v8_enable_sandbox === 1;
 
   if (
     isV8SandboxEnabled &&
