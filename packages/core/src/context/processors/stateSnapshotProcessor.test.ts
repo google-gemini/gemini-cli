@@ -7,7 +7,6 @@ import { describe, it, expect } from 'vitest';
 import { StateSnapshotProcessor } from './stateSnapshotProcessor.js';
 import {
   createMockEnvironment,
-  createDummyState,
   createDummyNode,
 } from '../testing/contextTestUtils.js';
 import { InboxSnapshotImpl } from '../sidecar/inbox.js';
@@ -16,18 +15,16 @@ describe('StateSnapshotProcessor', () => {
   it('should ignore if budget is satisfied', async () => {
     const env = createMockEnvironment();
     const processor = StateSnapshotProcessor.create(env, { target: 'incremental' });
-    const state = createDummyState(true); // satisfied
     const targets = [createDummyNode('ep1', 'USER_PROMPT')];
     const inbox = new InboxSnapshotImpl([]);
 
-    const result = await processor.process({ buffer: {} as unknown as import('../pipeline.js').ContextWorkingBuffer, targets, state, inbox });
+    const result = await processor.process({ buffer: {} as unknown as import('../pipeline.js').ContextWorkingBuffer, targets, inbox });
     expect(result).toBe(targets); // Strict equality
   });
 
   it('should apply a valid snapshot from the Inbox (Fast Path)', async () => {
     const env = createMockEnvironment();
     const processor = StateSnapshotProcessor.create(env, { target: 'incremental' });
-    const state = createDummyState(false, 100);
 
     const nodeA = createDummyNode('ep1', 'USER_PROMPT', 50, {}, 'node-A');
     const nodeB = createDummyNode('ep1', 'AGENT_THOUGHT', 60, {}, 'node-B');
@@ -48,7 +45,7 @@ describe('StateSnapshotProcessor', () => {
       }
     ]);
 
-    const result = await processor.process({ buffer: {} as unknown as import('../pipeline.js').ContextWorkingBuffer, targets, state, inbox });
+    const result = await processor.process({ buffer: {} as unknown as import('../pipeline.js').ContextWorkingBuffer, targets, inbox });
 
     // Should remove A and B, insert Snapshot, keep C
     expect(result.length).toBe(2);
@@ -63,7 +60,6 @@ describe('StateSnapshotProcessor', () => {
     const env = createMockEnvironment();
     const processor = StateSnapshotProcessor.create(env, { target: 'incremental' });
     // Make deficit 0 so we don't fall through to the sync backstop and fail the test that way
-    const state = createDummyState(false, 0); 
 
     // node-A is MISSING (user deleted it)
     const nodeB = createDummyNode('ep1', 'AGENT_THOUGHT', 60, {}, 'node-B');
@@ -81,7 +77,7 @@ describe('StateSnapshotProcessor', () => {
       }
     ]);
 
-    const result = await processor.process({ buffer: {} as unknown as import('../pipeline.js').ContextWorkingBuffer, targets, state, inbox });
+    const result = await processor.process({ buffer: {} as unknown as import('../pipeline.js').ContextWorkingBuffer, targets, inbox });
 
     // Because deficit is 0, and Inbox was rejected, nothing should change
     expect(result.length).toBe(1);
@@ -92,7 +88,6 @@ describe('StateSnapshotProcessor', () => {
   it('should fall back to sync backstop if inbox is empty', async () => {
     const env = createMockEnvironment();
     const processor = StateSnapshotProcessor.create(env, { target: 'max' }); // Summarize all
-    const state = createDummyState(false, 100);
 
     const nodeA = createDummyNode('ep1', 'USER_PROMPT', 50, {}, 'node-A');
     const nodeB = createDummyNode('ep1', 'AGENT_THOUGHT', 60, {}, 'node-B');
@@ -100,7 +95,7 @@ describe('StateSnapshotProcessor', () => {
     const targets = [nodeA, nodeB, nodeC];
     const inbox = new InboxSnapshotImpl([]);
 
-    const result = await processor.process({ buffer: {} as unknown as import('../pipeline.js').ContextWorkingBuffer, targets, state, inbox });
+    const result = await processor.process({ buffer: {} as unknown as import('../pipeline.js').ContextWorkingBuffer, targets, inbox });
 
     // Should synthesize a new snapshot synchronously
     expect(env.llmClient.generateContent).toHaveBeenCalled();

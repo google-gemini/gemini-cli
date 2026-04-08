@@ -79,25 +79,15 @@ export class SemanticCompressionProcessor implements ContextProcessor {
     }
   }
 
-  async process({ targets, state }: ProcessArgs): Promise<readonly ConcreteNode[]> {
-    if (state.isBudgetSatisfied) {
-      return targets;
-    }
-
+  async process({ targets }: ProcessArgs): Promise<readonly ConcreteNode[]> {
     const semanticConfig = this.options;
     const limitTokens = semanticConfig.nodeThresholdTokens;
     const thresholdChars = this.env.tokenCalculator.tokensToChars(limitTokens);
     
-    let currentDeficit = state.deficitTokens;
     const returnedNodes: ConcreteNode[] = [];
 
-    // Scan backwards (oldest to newest would also work, but older is safer to degrade first)
+    // Scan the target working buffer and unconditionally apply the configured hyperparameter threshold
     for (const node of targets) {
-      if (currentDeficit <= 0) {
-        returnedNodes.push(node);
-        continue;
-      }
-
       // 1. Compress User Prompts
       if (node.type === 'USER_PROMPT') {
         const prompt = node;
@@ -106,18 +96,21 @@ export class SemanticCompressionProcessor implements ContextProcessor {
 
         for (let j = 0; j < prompt.semanticParts.length; j++) {
           const part = prompt.semanticParts[j];
-          if (currentDeficit <= 0) break;
           if (part.type !== 'text') continue;
 
           if (part.text.length > thresholdChars) {
             const summary = await this.generateSummary(part.text, 'User Prompt');
             const newTokens = this.env.tokenCalculator.estimateTokensForParts([{ text: summary }]);
             const oldTokens = this.env.tokenCalculator.estimateTokensForParts([{ text: part.text }]);
+            
+            console.log(`SMOKING GUN (User Prompt): text.length=${part.text.length}, threshold=${thresholdChars}, newTokens=${newTokens}, oldTokens=${oldTokens}, summary='${summary}'`);
 
             if (newTokens < oldTokens) {
               newParts[j] = { type: 'text', text: summary };
-              currentDeficit -= (oldTokens - newTokens);
               modified = true;
+              console.log('SMOKING GUN (User Prompt): modified=true');
+            } else {
+              console.log('SMOKING GUN (User Prompt): modified=false');
             }
           }
         }
@@ -143,7 +136,6 @@ export class SemanticCompressionProcessor implements ContextProcessor {
            const oldTokens = this.env.tokenCalculator.getTokenCost(thought);
 
            if (newTokens < oldTokens) {
-             currentDeficit -= (oldTokens - newTokens);
              returnedNodes.push({
                 ...thought,
                 id: this.env.idGenerator.generateId(),
@@ -190,7 +182,6 @@ export class SemanticCompressionProcessor implements ContextProcessor {
             const intentTokens = tool.tokens?.intent ?? 0;
 
             if (newObsTokens < oldObsTokens) {
-               currentDeficit -= (oldObsTokens - newObsTokens);
                returnedNodes.push({
                  ...tool,
                  id: this.env.idGenerator.generateId(),

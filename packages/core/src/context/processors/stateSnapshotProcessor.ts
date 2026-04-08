@@ -51,8 +51,8 @@ export class StateSnapshotProcessor implements ContextProcessor, ContextWorker {
   }
 
   // --- ContextProcessor Interface (Sync Backstop / Cache Application) ---
-  async process({ targets, state, inbox }: ProcessArgs): Promise<readonly ConcreteNode[]> {
-    if (state.isBudgetSatisfied) {
+  async process({ targets, inbox }: ProcessArgs): Promise<readonly ConcreteNode[]> {
+    if (targets.length === 0) {
       return targets;
     }
 
@@ -104,9 +104,9 @@ export class StateSnapshotProcessor implements ContextProcessor, ContextWorker {
     let targetTokensToRemove = 0;
 
     if (strategy === 'incremental') {
-       targetTokensToRemove = state.deficitTokens;
+       targetTokensToRemove = Infinity; // incremental implies removing as much as possible if no state is passed
     } else if (strategy === 'freeNTokens') {
-       targetTokensToRemove = this.options.freeTokensTarget ?? state.deficitTokens;
+       targetTokensToRemove = this.options.freeTokensTarget ?? Infinity;
     } else if (strategy === 'max') {
        targetTokensToRemove = Infinity;
     }

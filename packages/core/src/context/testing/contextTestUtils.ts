@@ -20,30 +20,23 @@ import { registerBuiltInBehaviors } from '../ir/builtinBehaviors.js';
 import { IrMapper } from '../ir/mapper.js';
 import { ProcessorRegistry } from '../sidecar/registry.js';
 import { registerBuiltInProcessors } from '../sidecar/builtins.js';
-import type { ContextAccountingState } from '../pipeline.js';
 import type { ConcreteNode, ToolExecution } from '../ir/types.js';
 import type { ContextEnvironment } from '../sidecar/environment.js';
 import type { Config } from '../../config/config.js';
 import type { BaseLlmClient } from '../../core/baseLlmClient.js';
 import type { Content } from '@google/genai';
 
-export function createDummyState(
-  isSatisfied = false,
-  deficit = 0,
-  protectedIds = new Set<string>(),
-  currentTokens = 5000,
-  maxTokens = 10000,
-  retainedTokens = 4000,
-): ContextAccountingState {
-  return {
-    currentTokens,
-    maxTokens,
-    retainedTokens,
-    deficitTokens: deficit,
-    protectedLogicalIds: protectedIds,
-    isBudgetSatisfied: isSatisfied,
-  };
-}
+import type { GenerateContentResponse } from '@google/genai';
+
+/**
+ * Creates a valid mock GenerateContentResponse with the provided text.
+ * Used to avoid having to manually construct the deeply nested candidate/content/part structure.
+ */
+export const createMockGenerateContentResponse = (text: string): GenerateContentResponse =>
+  ({
+    candidates: [{ content: { role: 'model', parts: [{ text }] }, index: 0 }],
+  }) as GenerateContentResponse;
+
 
 export function createDummyNode(
   logicalParentId: string,
@@ -112,9 +105,7 @@ export function createMockEnvironment(
   return {
     // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
     llmClient: vi.fn().mockReturnValue({
-      generateContent: vi.fn().mockResolvedValue({
-        text: 'Mock LLM summary response',
-      }),
+      generateContent: vi.fn().mockResolvedValue(createMockGenerateContentResponse('Mock LLM summary response')),
     })() as unknown as BaseLlmClient,
     promptId: 'mock-prompt-id',
     sessionId: 'mock-session',

@@ -47,9 +47,7 @@ export class HistorySquashingProcessor implements ContextProcessor {
   private tryApplySquash(
     text: string,
     limitChars: number,
-    currentDeficit: number,
   ): { text: string; newTokens: number; oldTokens: number; tokensSaved: number } | null {
-    if (currentDeficit <= 0) return null;
     const originalLength = text.length;
     if (originalLength <= limitChars) return null;
 
@@ -72,23 +70,17 @@ export class HistorySquashingProcessor implements ContextProcessor {
     return null;
   }
 
-  async process({ targets, state }: ProcessArgs): Promise<readonly ConcreteNode[]> {
-    if (state.isBudgetSatisfied) {
+  async process({ targets }: ProcessArgs): Promise<readonly ConcreteNode[]> {
+    if (targets.length === 0) {
       return targets;
     }
 
     const { maxTokensPerNode } = this.options;
     const limitChars = this.env.tokenCalculator.tokensToChars(maxTokensPerNode);
 
-    let currentDeficit = state.deficitTokens;
     const returnedNodes: ConcreteNode[] = [];
 
     for (const node of targets) {
-      if (currentDeficit <= 0) {
-        returnedNodes.push(node);
-        continue;
-      }
-
       // 1. Squash User Prompts
       if (node.type === 'USER_PROMPT') {
         const prompt = node;
@@ -97,24 +89,16 @@ export class HistorySquashingProcessor implements ContextProcessor {
 
         for (let j = 0; j < prompt.semanticParts.length; j++) {
           const part = prompt.semanticParts[j];
-          if (currentDeficit <= 0) break;
           if (part.type === 'text') {
-            const squashResult = this.tryApplySquash(part.text, limitChars, currentDeficit);
+            const squashResult = this.tryApplySquash(part.text, limitChars);
             if (squashResult) {
               newParts[j] = { type: 'text', text: squashResult.text };
-              currentDeficit -= squashResult.tokensSaved;
               modified = true;
             }
           }
         }
 
         if (modified) {
-             newParts.map(p => {
-               if (p.type === 'text') return { text: p.text };
-               if (p.type === 'inline_data') return { inlineData: { mimeType: p.mimeType, data: p.data } };
-               if (p.type === 'file_data') return { fileData: { mimeType: p.mimeType, fileUri: p.fileUri } };
-               return (p as Extract<import('../ir/types.js').SemanticPart, { type: 'raw_part' }>).part;
-             });
           returnedNodes.push({
             ...prompt,
             id: this.env.idGenerator.generateId(),
@@ -129,10 +113,9 @@ export class HistorySquashingProcessor implements ContextProcessor {
       // 2. Squash Model Thoughts
       if (node.type === 'AGENT_THOUGHT') {
         const thought = node;
-        const squashResult = this.tryApplySquash(thought.text, limitChars, currentDeficit);
-        
+        const squashResult = this.tryApplySquash(thought.text, limitChars);
+
         if (squashResult) {
-          currentDeficit -= squashResult.tokensSaved;
           returnedNodes.push({
             ...thought,
             id: this.env.idGenerator.generateId(),
@@ -147,10 +130,9 @@ export class HistorySquashingProcessor implements ContextProcessor {
       // 3. Squash Agent Yields
       if (node.type === 'AGENT_YIELD') {
         const agentYield = node;
-        const squashResult = this.tryApplySquash(agentYield.text, limitChars, currentDeficit);
+        const squashResult = this.tryApplySquash(agentYield.text, limitChars);
 
         if (squashResult) {
-          currentDeficit -= squashResult.tokensSaved;
           returnedNodes.push({
             ...agentYield,
             id: this.env.idGenerator.generateId(),

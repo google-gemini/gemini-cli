@@ -129,15 +129,8 @@ export class SimulationHarness {
         'gc_backstop',
         currentView,
         new Set(currentView.map(e => e.id)),
-        {
-          currentTokens,
-          maxTokens: this.config.budget.maxTokens,
-          retainedTokens: this.config.budget.retainedTokens,
-          isBudgetSatisfied: false,
-          deficitTokens: currentTokens - this.config.budget.maxTokens,
-          protectedLogicalIds: new Set<string>(),
-        });
-
+        new Set<string>(),
+      );
       // Inject the truncated view back into the graph
       for (let i = 0; i < currentView.length; i++) {
         const ep = currentView[i];

@@ -7,7 +7,6 @@ import { describe, it, expect, vi } from 'vitest';
 import { HistorySquashingProcessor } from './historySquashingProcessor.js';
 import {
   createMockEnvironment,
-  createDummyState,
   createDummyNode,
 } from '../testing/contextTestUtils.js';
 import type { UserPrompt, AgentThought, AgentYield } from '../ir/types.js';
@@ -31,7 +30,6 @@ describe('HistorySquashingProcessor', () => {
       maxTokensPerNode: 1, // Will equal 10 chars limit
     });
 
-    const state = createDummyState(false, 500); // 500 token deficit
 
     const prompt = createDummyNode('ep1', 'USER_PROMPT', 100, {
       semanticParts: [
@@ -52,7 +50,6 @@ describe('HistorySquashingProcessor', () => {
     const result = await processor.process({
       buffer: {} as unknown as import('../pipeline.js').ContextWorkingBuffer,
       targets,
-      state,
       inbox: {} as any,
     });
 
@@ -78,33 +75,32 @@ describe('HistorySquashingProcessor', () => {
     expect(squashedYield.text).toContain('[... OMITTED');
   });
 
-  it('should stop truncating once the deficit is cleared', async () => {
+  it('should ignore nodes that are below maxTokensPerNode', async () => {
     const env = createMockEnvironment();
     const mockTokenCalculator = new ContextTokenCalculator(1, env.behaviorRegistry) as any;
-    mockTokenCalculator.tokensToChars = vi.fn().mockReturnValue(10); 
+    mockTokenCalculator.tokensToChars = vi.fn().mockReturnValue(100); 
+
     mockTokenCalculator.estimateTokensForString = vi.fn((text: string) => {
-        if (text.includes('OMITTED')) return 0; // Huge savings
-        return 500; 
+        return text.length; 
     });
-    mockTokenCalculator.estimateTokensForParts = vi.fn(() => 0);
+    mockTokenCalculator.estimateTokensForParts = vi.fn(() => 5);
+    mockTokenCalculator.getTokenCost = vi.fn(() => 5);
 
     (env as any).tokenCalculator = mockTokenCalculator;
 
     const processor = HistorySquashingProcessor.create(env, {
-      maxTokensPerNode: 1,
+      maxTokensPerNode: 100,
     });
 
-    // Deficit is only 10 tokens. First truncation saves 500.
-    const state = createDummyState(false, 10);
 
-    const prompt = createDummyNode('ep1', 'USER_PROMPT', 500, {
+    const prompt = createDummyNode('ep1', 'USER_PROMPT', 5, {
       semanticParts: [
-        { type: 'text', text: 'This text is way longer than 10 characters and needs truncation' }
+        { type: 'text', text: 'Short text' } // 10 chars
       ],
     }, 'prompt-id') as UserPrompt;
 
-    const thought = createDummyNode('ep1', 'AGENT_THOUGHT', 500, {
-      text: 'The model is thinking something incredibly long and verbose that exceeds 10 chars',
+    const thought = createDummyNode('ep1', 'AGENT_THOUGHT', 5, {
+      text: 'Short thought', // 13 chars
     }, 'thought-id') as AgentThought;
 
     const targets = [prompt, thought];
@@ -112,19 +108,17 @@ describe('HistorySquashingProcessor', () => {
     const result = await processor.process({
       buffer: {} as unknown as import('../pipeline.js').ContextWorkingBuffer,
       targets,
-      state,
       inbox: {} as any,
     });
 
     expect(result.length).toBe(2);
 
-    // 1. User Prompt (truncated because deficit > 0)
+    // 1. User Prompt (untouched)
     const squashedPrompt = result[0] as UserPrompt;
-    expect(squashedPrompt.id).toBe('mock-uuid-1');
-    expect(squashedPrompt.id).not.toBe(prompt.id);
-    expect((squashedPrompt.semanticParts[0] as any).text).toContain('[... OMITTED');
+    expect(squashedPrompt.id).toBe(prompt.id);
+    expect((squashedPrompt.semanticParts[0] as any).text).not.toContain('[... OMITTED');
 
-    // 2. Agent Thought (untouched because deficit is now < 0)
+    // 2. Agent Thought (untouched)
     const untouchedThought = result[1] as AgentThought;
     expect(untouchedThought.id).toBe(thought.id);
     expect(untouchedThought.text).not.toContain('[... OMITTED');

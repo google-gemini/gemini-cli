@@ -7,7 +7,6 @@ import { describe, it, expect, vi } from 'vitest';
 import { BlobDegradationProcessor } from './blobDegradationProcessor.js';
 import {
   createMockEnvironment,
-  createDummyState,
   createDummyNode,
 } from '../testing/contextTestUtils.js';
 import type { UserPrompt, SemanticPart } from '../ir/types.js';
@@ -24,7 +23,6 @@ describe('BlobDegradationProcessor', () => {
     const processor = BlobDegradationProcessor.create(env, {});
 
     // Deficit of 50 means budget is NOT satisfied.
-    const state = createDummyState(false, 50);
 
     const parts: SemanticPart[] = [
       { type: 'text', text: 'Hello' },
@@ -41,7 +39,6 @@ describe('BlobDegradationProcessor', () => {
     const result = await processor.process({
       buffer: {} as unknown as import('../pipeline.js').ContextWorkingBuffer,
       targets,
-      state,
       inbox: {} as unknown as import('../pipeline.js').InboxSnapshot,
     });
 
@@ -65,10 +62,8 @@ describe('BlobDegradationProcessor', () => {
     // The transformation should be logged
   });
 
-  it('should stop degrading once the deficit is cleared', async () => {
+  it('should degrade all blobs unconditionally', async () => {
     const env = createMockEnvironment();
-    // Huge deficit requires one degradation
-    const state = createDummyState(false, 90);
 
     env.tokenCalculator.estimateTokensForParts = vi.fn((parts: import('@google/genai').Part[]) => {
        if (parts[0].text) return 10;
@@ -89,36 +84,26 @@ describe('BlobDegradationProcessor', () => {
     const result = await processor.process({
       buffer: {} as unknown as import('../pipeline.js').ContextWorkingBuffer,
       targets,
-      state,
       inbox: {} as unknown as import('../pipeline.js').InboxSnapshot,
     });
 
     const modifiedPrompt = result[0] as UserPrompt;
     expect(modifiedPrompt.semanticParts.length).toBe(2);
     
-    // First part was degraded
+    // Both parts should be degraded
     expect(modifiedPrompt.semanticParts[0].type).toBe('text');
-    // Second part was untouched because deficit hit 0
-    expect(modifiedPrompt.semanticParts[1].type).toBe('file_data');
+    expect(modifiedPrompt.semanticParts[1].type).toBe('text');
   });
 
-  it('should return exactly the targets array if budget is already satisfied', async () => {
+  it('should return exactly the targets array if targets are empty', async () => {
     const env = createMockEnvironment();
-    const state = createDummyState(true, 0); // Budget satisfied!
 
     const processor = BlobDegradationProcessor.create(env, {});
-    const prompt = createDummyNode('ep1', 'USER_PROMPT', 100, {
-      semanticParts: [
-        { type: 'inline_data', mimeType: 'image/png', data: 'abc' },
-      ]
-    }) as UserPrompt;
-
-    const targets = [prompt];
+    const targets: import("../ir/types.js").ConcreteNode[] = [];
 
     const result = await processor.process({
       buffer: {} as unknown as import('../pipeline.js').ContextWorkingBuffer,
       targets,
-      state,
       inbox: {} as unknown as import('../pipeline.js').InboxSnapshot,
     });
 

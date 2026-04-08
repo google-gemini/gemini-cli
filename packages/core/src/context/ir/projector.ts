@@ -85,14 +85,7 @@ export class IrProjector {
       'gc_backstop',
       ship,
       agedOutNodes,
-      {
-        currentTokens,
-        maxTokens: sidecar.budget.maxTokens,
-        retainedTokens: sidecar.budget.retainedTokens,
-        deficitTokens: Math.max(0, currentTokens - sidecar.budget.maxTokens),
-        protectedLogicalIds: protectedIds,
-        isBudgetSatisfied: currentTokens <= sidecar.budget.maxTokens,
-      },
+      protectedIds,
     );
 
     const finalTokens =

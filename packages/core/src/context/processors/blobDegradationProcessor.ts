@@ -27,12 +27,11 @@ export class BlobDegradationProcessor implements ContextProcessor {
     this.env = env;
   }
 
-  async process({ targets, state }: ProcessArgs): Promise<readonly ConcreteNode[]> {
-    if (state.isBudgetSatisfied) {
+  async process({ targets }: ProcessArgs): Promise<readonly ConcreteNode[]> {
+    if (targets.length === 0) {
       return targets;
     }
 
-    let currentDeficit = state.deficitTokens;
     let directoryCreated = false;
 
     let blobOutputsDir = this.env.fileSystem.join(
@@ -58,7 +57,7 @@ export class BlobDegradationProcessor implements ContextProcessor {
 
     // Forward scan, looking for bloated non-text parts to degrade
     for (const node of targets) {
-      if (currentDeficit <= 0 || node.type !== 'USER_PROMPT') {
+      if (node.type !== 'USER_PROMPT') {
         returnedNodes.push(node);
         continue;
       }
@@ -69,7 +68,6 @@ export class BlobDegradationProcessor implements ContextProcessor {
 
       for (let j = 0; j < prompt.semanticParts.length; j++) {
         const part = prompt.semanticParts[j];
-        if (currentDeficit <= 0) break;
         // We only target non-text parts that haven't already been masked
         if (part.type === 'text') continue;
 
@@ -119,7 +117,6 @@ export class BlobDegradationProcessor implements ContextProcessor {
         if (newText && tokensSaved > 0) {
           // Replace the part with a synthetic text part
           newParts[j] = { type: 'text', text: newText };
-          currentDeficit -= tokensSaved;
           modified = true;
         }
       }

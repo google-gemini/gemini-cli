@@ -96,12 +96,11 @@ export class ToolMaskingProcessor implements ContextProcessor {
     return text.includes('<tool_output_masked>');
   }
 
-  async process({ targets, state }: ProcessArgs): Promise<readonly ConcreteNode[]> {
+  async process({ targets }: ProcessArgs): Promise<readonly ConcreteNode[]> {
     const maskingConfig = this.options;
     if (!maskingConfig) return targets;
-    if (state.isBudgetSatisfied) return targets;
+    if (targets.length === 0) return targets;
 
-    let currentDeficit = state.deficitTokens;
     const limitChars = this.env.tokenCalculator.tokensToChars(
       maskingConfig.stringLengthThresholdTokens,
     );
@@ -148,7 +147,7 @@ export class ToolMaskingProcessor implements ContextProcessor {
     const returnedNodes: ConcreteNode[] = [];
 
     for (const node of targets) {
-      if (currentDeficit <= 0 || node.type !== 'TOOL_EXECUTION') {
+      if (node.type !== 'TOOL_EXECUTION') {
         returnedNodes.push(node);
         continue;
       }
@@ -267,7 +266,6 @@ export class ToolMaskingProcessor implements ContextProcessor {
           };
 
           returnedNodes.push(maskedNode);
-          currentDeficit -= tokensSaved;
         } else {
           returnedNodes.push(node);
         }

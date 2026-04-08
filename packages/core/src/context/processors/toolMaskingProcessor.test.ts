@@ -7,7 +7,6 @@ import { describe, it, expect, vi } from 'vitest';
 import { ToolMaskingProcessor } from './toolMaskingProcessor.js';
 import {
   createMockEnvironment,
-  createDummyState,
   createDummyToolNode,
 } from '../testing/contextTestUtils.js';
 
@@ -23,7 +22,6 @@ describe('ToolMaskingProcessor', () => {
       stringLengthThresholdTokens: 10,
     });
 
-    const state = createDummyState(false, 500);
 
     const toolStep = createDummyToolNode('ep1', 50, 100, {
       observation: {
@@ -35,7 +33,6 @@ describe('ToolMaskingProcessor', () => {
     const result = await processor.process({
       buffer: {} as unknown as import('../pipeline.js').ContextWorkingBuffer,
       targets: [toolStep],
-      state,
       inbox: {} as any,
     });
 
@@ -60,7 +57,6 @@ describe('ToolMaskingProcessor', () => {
       stringLengthThresholdTokens: 10,
     });
 
-    const state = createDummyState(false, 500);
 
     const toolStep = createDummyToolNode('ep1', 10, 10, {
       toolName: 'activate_skill',
@@ -72,7 +68,6 @@ describe('ToolMaskingProcessor', () => {
     const result = await processor.process({
       buffer: {} as unknown as import('../pipeline.js').ContextWorkingBuffer,
       targets: [toolStep],
-      state,
       inbox: {} as any,
     });
 

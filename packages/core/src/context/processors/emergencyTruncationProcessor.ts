@@ -51,15 +51,13 @@ export class EmergencyTruncationProcessor implements ContextProcessor {
 
   async process({
     targets,
-    state,
   }: ProcessArgs): Promise<readonly ConcreteNode[]> {
     // Calculate how many tokens we need to remove based on the configured knob
     let targetTokensToRemove = 0;
     const strategy = this.options.target ?? 'max';
     
     if (strategy === 'incremental') {
-       if (state.currentTokens <= state.maxTokens) return targets;
-       targetTokensToRemove = state.currentTokens - state.maxTokens;
+       targetTokensToRemove = Infinity;
     } else if (strategy === 'freeNTokens') {
        targetTokensToRemove = this.options.freeTokensTarget ?? 0;
        if (targetTokensToRemove <= 0) return targets;

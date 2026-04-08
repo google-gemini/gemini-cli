@@ -7,40 +7,26 @@ import { describe, it, expect, vi } from 'vitest';
 import { SemanticCompressionProcessor } from './semanticCompressionProcessor.js';
 import {
   createMockEnvironment,
-  createDummyState,
   createDummyNode,
   createDummyToolNode,
+  createMockGenerateContentResponse
 } from '../testing/contextTestUtils.js';
 import type { UserPrompt, AgentThought, ToolExecution } from '../ir/types.js';
-import { ContextTokenCalculator } from '../utils/contextTokenCalculator.js';
 
 describe('SemanticCompressionProcessor', () => {
   it('should trigger summarization via LLM for long text parts', async () => {
     const mockLlmClient = {
-      generateContent: vi.fn().mockResolvedValue({
-        text: 'Mocked Summary!',
-      }),
+      generateContent: vi.fn().mockResolvedValue(createMockGenerateContentResponse('Mocked Summary!')), // length = 15
     };
 
     const env = createMockEnvironment({
         llmClient: mockLlmClient as any,
     });
-    const mockTokenCalculator = new ContextTokenCalculator(1, env.behaviorRegistry) as any;
-    mockTokenCalculator.tokensToChars = vi.fn().mockReturnValue(10);
-    mockTokenCalculator.estimateTokensForParts = vi.fn((parts: any) => {
-       if (parts[0]?.text === 'Mocked Summary!') return 5;
-       if (parts[0]?.functionResponse?.response?.summary === 'Mocked Summary!') return 10;
-       return 5000;
-    });
-    mockTokenCalculator.getTokenCost = vi.fn().mockReturnValue(5000);
-
-    (env as any).tokenCalculator = mockTokenCalculator;
 
     const processor = SemanticCompressionProcessor.create(env, {
       nodeThresholdTokens: 10,
     });
 
-    const state = createDummyState(false, 15000); // We need to save tons of tokens
 
     const prompt = createDummyNode('ep1', 'USER_PROMPT', 3800, {
       semanticParts: [
@@ -62,7 +48,6 @@ describe('SemanticCompressionProcessor', () => {
     const result = await processor.process({
       buffer: {} as unknown as import('../pipeline.js').ContextWorkingBuffer,
       targets,
-      state,
       inbox: {} as any,
     });
 
@@ -87,42 +72,28 @@ describe('SemanticCompressionProcessor', () => {
     expect(mockLlmClient.generateContent).toHaveBeenCalledTimes(3);
   });
 
-  it('should stop summarizing once the deficit is cleared', async () => {
+  it('should ignore nodes that are below the threshold', async () => {
     const mockLlmClient = {
-      generateContent: vi.fn().mockResolvedValue({
-        text: 'Mocked Summary!',
-      }),
+      generateContent: vi.fn().mockResolvedValue(createMockGenerateContentResponse('S')), // length = 1
     };
 
     const env = createMockEnvironment({
        llmClient: mockLlmClient as any,
     });
-    const mockTokenCalculator = new ContextTokenCalculator(1, env.behaviorRegistry) as any;
-    mockTokenCalculator.tokensToChars = vi.fn().mockReturnValue(10);
-    // Returning 0 tokens for the summary to maximize savings
-    mockTokenCalculator.estimateTokensForParts = vi.fn((parts: any) => {
-       if (parts[0]?.text === 'Mocked Summary!') return 0;
-       return 5000;
-    });
-    mockTokenCalculator.getTokenCost = vi.fn().mockReturnValue(5000);
-
-    (env as any).tokenCalculator = mockTokenCalculator;
 
     const processor = SemanticCompressionProcessor.create(env, {
-      nodeThresholdTokens: 10,
+      nodeThresholdTokens: 100, // Very high threshold
     });
 
-    // Deficit is only 10 tokens! The first summarization will save 5000 tokens, clearing it instantly.
-    const state = createDummyState(false, 10); 
 
     const prompt = createDummyNode('ep1', 'USER_PROMPT', 3800, {
       semanticParts: [
-        { type: 'text', text: 'This text is way longer than 10 characters and needs compression' }
+        { type: 'text', text: 'Short text' } // Below threshold
       ],
     }, 'prompt-id') as UserPrompt;
 
     const thought = createDummyNode('ep1', 'AGENT_THOUGHT', 1500, {
-      text: 'The model is thinking something incredibly long and verbose that exceeds 10 chars',
+      text: 'Short thought', // Below threshold
     }, 'thought-id') as AgentThought;
 
     const targets = [prompt, thought];
@@ -130,22 +101,20 @@ describe('SemanticCompressionProcessor', () => {
     const result = await processor.process({
       buffer: {} as unknown as import('../pipeline.js').ContextWorkingBuffer,
       targets,
-      state,
       inbox: {} as any,
     });
 
     expect(result.length).toBe(2);
 
-    // 1. User Prompt (was summarized because deficit was > 0)
-    const compressedPrompt = result[0] as UserPrompt;
-    expect(compressedPrompt.id).not.toBe(prompt.id);
+    // 1. User Prompt (NOT compressed)
+    const untouchedPrompt = result[0] as UserPrompt;
+    expect(untouchedPrompt.id).toBe(prompt.id);
 
-    // 2. Agent Thought (was NOT summarized because deficit hit 0)
+    // 2. Agent Thought (NOT compressed)
     const untouchedThought = result[1] as AgentThought;
-    expect(untouchedThought.id).toBe(thought.id); // Reference equality!
-    expect(untouchedThought.text).toBe(thought.text);
+    expect(untouchedThought.id).toBe(thought.id); 
 
-    // LLM should only have been called once
-    expect(mockLlmClient.generateContent).toHaveBeenCalledTimes(1);
+    // LLM should not have been called
+    expect(mockLlmClient.generateContent).toHaveBeenCalledTimes(0);
   });
 });

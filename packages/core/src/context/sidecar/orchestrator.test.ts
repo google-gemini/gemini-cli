@@ -9,7 +9,6 @@ import { PipelineOrchestrator } from './orchestrator.js';
 import { ProcessorRegistry } from './registry.js';
 import {
   createMockEnvironment,
-  createDummyState,
   createDummyNode,
 } from '../testing/contextTestUtils.js';
 import type { ContextEnvironment } from './environment.js';
@@ -167,13 +166,12 @@ describe('PipelineOrchestrator (Component)', () => {
     );
 
     const ship = [createDummyNode('not-protected-ep', 'USER_PROMPT', 100, undefined, 'not-protected-id')];
-    const state = createDummyState(false, 0, new Set());
 
     const result = await orchestrator.executeTriggerSync(
       'new_message',
       ship,
       new Set(ship.map((s) => s.id)),
-      state,
+      new Set(),
     );
 
     expect(result).toHaveLength(1);
@@ -202,14 +200,13 @@ describe('PipelineOrchestrator (Component)', () => {
     );
 
     const ship = [createDummyNode('not-protected-ep', 'USER_PROMPT', 100, undefined, 'not-protected-id')];
-    const state = createDummyState(false, 0, new Set());
 
     // This should resolve immediately with the UNMODIFIED array because execution is background
     const result = await orchestrator.executeTriggerSync(
       'new_message',
       ship,
       new Set(ship.map((s) => s.id)),
-      state,
+      new Set(),
     );
 
     expect(result).toHaveLength(1);
@@ -241,14 +238,13 @@ describe('PipelineOrchestrator (Component)', () => {
     );
 
     const ship = [createDummyNode('not-protected-ep', 'USER_PROMPT', 100, undefined, 'not-protected-id')];
-    const state = createDummyState(false, 0, new Set());
 
     // It should not throw! It should swallow the error and return the unmodified array.
     const result = await orchestrator.executeTriggerSync(
       'new_message',
       ship,
       new Set(ship.map((s) => s.id)),
-      state,
+      new Set(),
     );
 
     expect(result).toHaveLength(1);

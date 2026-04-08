@@ -24,19 +24,9 @@ export interface ContextWorkingBuffer {
   getLineage(id: string): readonly ConcreteNode[];
 }
 
-export interface ContextAccountingState {
-  readonly currentTokens: number;
-  readonly maxTokens: number;
-  readonly retainedTokens: number;
-  readonly deficitTokens: number;
-  readonly protectedLogicalIds: ReadonlySet<string>;
-  readonly isBudgetSatisfied: boolean;
-}
-
 export interface ProcessArgs {
   readonly buffer: ContextWorkingBuffer;
   readonly targets: readonly ConcreteNode[];
-  readonly state: ContextAccountingState;
   readonly inbox: InboxSnapshot;
 }
 
