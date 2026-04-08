@@ -29,7 +29,7 @@ import { SimpleExtensionLoader } from '../utils/extensionLoader.js';
 import type { ToolRegistry } from '../tools/tool-registry.js';
 import { ThinkingLevel } from '@google/genai';
 import type { AcknowledgedAgentsService } from './acknowledgedAgents.js';
-import { PolicyDecision } from '../policy/types.js';
+import { PolicyDecision, MODES_BY_PERMISSIVENESS } from '../policy/types.js';
 import { A2AAuthProviderFactory } from './auth-provider/factory.js';
 import type { A2AAuthProvider } from './auth-provider/types.js';
 
@@ -1076,6 +1076,7 @@ describe('AgentRegistry', () => {
           toolName: 'PolicyTestAgent',
           decision: PolicyDecision.ALLOW,
           priority: 1.05,
+          modes: MODES_BY_PERMISSIVENESS,
         }),
       );
     });
@@ -1103,6 +1104,7 @@ describe('AgentRegistry', () => {
           toolName: 'RemotePolicyAgent',
           decision: PolicyDecision.ASK_USER,
           priority: 1.05,
+          modes: MODES_BY_PERMISSIVENESS,
         }),
       );
     });
@@ -1165,6 +1167,7 @@ describe('AgentRegistry', () => {
         expect.objectContaining({
           toolName: 'OverwrittenAgent',
           decision: PolicyDecision.ASK_USER,
+          modes: MODES_BY_PERMISSIVENESS,
         }),
       );
     });

@@ -9,6 +9,7 @@ import {
   PolicyDecision,
   ApprovalMode,
   PRIORITY_SUBAGENT_TOOL,
+  MODES_BY_PERMISSIVENESS,
 } from './types.js';
 import * as fs from 'node:fs/promises';
 import * as path from 'node:path';
@@ -68,6 +69,7 @@ describe('policy-toml-loader', () => {
 toolName = "glob"
 decision = "allow"
 priority = 100
+modes = ["plan", "default", "autoEdit", "yolo"]
 `);
 
       expect(result.rules).toHaveLength(1);
@@ -76,6 +78,7 @@ priority = 100
         decision: PolicyDecision.ALLOW,
         priority: 1.1, // tier 1 + 100/1000
         source: 'Default: test.toml',
+        modes: MODES_BY_PERMISSIVENESS,
       });
       expect(result.checkers).toHaveLength(0);
       expect(result.errors).toHaveLength(0);
@@ -88,6 +91,7 @@ toolName = "run_shell_command"
 commandPrefix = ["git status", "git log"]
 decision = "allow"
 priority = 100
+modes = ["plan", "default", "autoEdit", "yolo"]
 `);
 
       expect(result.rules).toHaveLength(2);
@@ -109,6 +113,7 @@ toolName = "annotated-tool"
 toolAnnotations = { readOnlyHint = true, custom = "value" }
 decision = "allow"
 priority = 70
+modes = ["plan", "default", "autoEdit", "yolo"]
 `);
 
       expect(result.rules).toHaveLength(1);
@@ -127,6 +132,7 @@ toolName = "*"
 mcpName = "*"
 decision = "ask_user"
 priority = 10
+modes = ["plan", "default", "autoEdit", "yolo"]
 `);
 
       expect(result.rules).toHaveLength(1);
@@ -142,6 +148,7 @@ mcpName = "*"
 toolName = "search"
 decision = "allow"
 priority = 10
+modes = ["plan", "default", "autoEdit", "yolo"]
 `);
 
       expect(result.rules).toHaveLength(1);
@@ -156,6 +163,7 @@ toolName = "run_shell_command"
 commandRegex = "git (status|log).*"
 decision = "allow"
 priority = 100
+modes = ["plan", "default", "autoEdit", "yolo"]
 `);
 
       expect(result.rules).toHaveLength(1);
@@ -178,6 +186,7 @@ toolName = "run_shell_command"
 commandRegex = "^git status"
 decision = "allow"
 priority = 100
+modes = ["plan", "default", "autoEdit", "yolo"]
 `);
 
       expect(result.rules).toHaveLength(1);
@@ -195,6 +204,7 @@ priority = 100
 toolName = ["glob", "grep", "read"]
 decision = "allow"
 priority = 100
+modes = ["plan", "default", "autoEdit", "yolo"]
 `);
 
       expect(result.rules).toHaveLength(3);
@@ -213,6 +223,7 @@ mcpName = "google-workspace"
 toolName = ["calendar.list", "calendar.get"]
 decision = "allow"
 priority = 100
+modes = ["plan", "default", "autoEdit", "yolo"]
 `);
 
       expect(result.rules).toHaveLength(2);
@@ -257,6 +268,7 @@ commandPrefix = "echo"
 decision = "allow"
 priority = 100
 allow_redirection = true
+modes = ["plan", "default", "autoEdit", "yolo"]
 `);
 
       expect(result.rules).toHaveLength(1);
@@ -272,6 +284,7 @@ commandPrefix = "echo"
 decision = "allow"
 priority = 100
 allowRedirection = true
+modes = ["plan", "default", "autoEdit", "yolo"]
 `);
 
       expect(result.rules).toHaveLength(1);
@@ -285,6 +298,7 @@ toolName = "rm"
 decision = "deny"
 priority = 100
 deny_message = "Deletion is permanent"
+modes = ["plan", "default", "autoEdit", "yolo"]
 `);
 
       expect(result.rules).toHaveLength(1);
@@ -300,6 +314,7 @@ toolName = "rm"
 decision = "deny"
 priority = 100
 denyMessage = "Deletion is permanent"
+modes = ["plan", "default", "autoEdit", "yolo"]
 `);
 
       expect(result.rules).toHaveLength(1);
@@ -357,6 +372,7 @@ priority = 100
 [[rule]]
 toolName = "glob"
 priority = 100
+modes = ["default"]
 `);
 
       expect(result.rules).toHaveLength(0);
@@ -372,6 +388,7 @@ toolName = "glob"
 commandPrefix = "git status"
 decision = "allow"
 priority = 100
+modes = ["plan", "default", "autoEdit", "yolo"]
 `);
 
       expect(result.errors).toHaveLength(1);
@@ -387,6 +404,7 @@ commandPrefix = "git status"
 argsPattern = "test"
 decision = "allow"
 priority = 100
+modes = ["plan", "default", "autoEdit", "yolo"]
 `);
 
       expect(result.errors).toHaveLength(1);
@@ -401,6 +419,7 @@ toolName = "run_shell_command"
 commandRegex = "git (status|branch"
 decision = "allow"
 priority = 100
+modes = ["plan", "default", "autoEdit", "yolo"]
 `);
 
       expect(result.rules).toHaveLength(0);
@@ -416,6 +435,7 @@ toolName = "run_shell_command"
 commandPrefix = "git log *.txt"
 decision = "allow"
 priority = 100
+modes = ["plan", "default", "autoEdit", "yolo"]
 `);
 
       expect(result.rules).toHaveLength(1);
@@ -437,6 +457,7 @@ priority = 100
 toolName = "glob"
 decision = "allow"
 priority = 100
+modes = ["plan", "default", "autoEdit", "yolo"]
 `,
       );
 
@@ -447,6 +468,7 @@ priority = 100
 toolName = "grep"
 decision = "allow"
 priority = -1
+modes = ["plan", "default", "autoEdit", "yolo"]
 `,
       );
 
@@ -465,6 +487,7 @@ priority = -1
 [[safety_checker]]
 toolName = "write_file"
 priority = 100
+modes = ["plan", "default", "autoEdit", "yolo"]
 [safety_checker.checker]
 type = "in-process"
 name = "allowed-path"
@@ -477,10 +500,62 @@ name = "allowed-path"
   });
 
   describe('Negative Tests', () => {
+    it('should fail validation if modes field is missing in a rule', async () => {
+      const result = await runLoadPoliciesFromToml(`
+[[rule]]
+toolName = "glob"
+decision = "allow"
+priority = 100
+`);
+
+      const errors = result.errors.filter(
+        (e) => e.errorType === 'schema_validation',
+      );
+      expect(errors).toHaveLength(1);
+      expect(errors[0].message).toBe('Schema validation failed');
+      expect(errors[0].details).toContain('modes');
+      expect(errors[0].details).toContain('Required');
+    });
+
+    it('should fail validation if modes field is missing in a safety checker', async () => {
+      const result = await runLoadPoliciesFromToml(`
+[[safety_checker]]
+toolName = "run_shell_command"
+priority = 100
+checker = { type = "in-process", name = "allowed-path" }
+`);
+
+      const errors = result.errors.filter(
+        (e) => e.errorType === 'schema_validation',
+      );
+      expect(errors).toHaveLength(1);
+      expect(errors[0].message).toBe('Schema validation failed');
+      expect(errors[0].details).toContain('modes');
+      expect(errors[0].details).toContain('Required');
+    });
+
+    it('should not contain hardcoded required fields in the suggestion when validation fails', async () => {
+      const result = await runLoadPoliciesFromToml(`
+[[rule]]
+toolName = "glob"
+# missing decision and priority and modes
+`);
+
+      const errors = result.errors.filter(
+        (e) => e.errorType === 'schema_validation',
+      );
+      expect(errors).toHaveLength(1);
+      expect(errors[0].suggestion).not.toContain('(decision, priority)');
+      expect(errors[0].suggestion).toBe(
+        'Ensure all required fields are present with correct types',
+      );
+    });
+
     it('should return a schema_validation error if toolName is missing in safety_checker', async () => {
       const result = await runLoadPoliciesFromToml(`
 [[safety_checker]]
 priority = 100
+modes = ["default"]
 [safety_checker.checker]
 type = "in-process"
 name = "allowed-path"
@@ -497,6 +572,7 @@ name = "allowed-path"
 [[rule]]
 toolName = "test"
 decision = "allow"
+modes = ["default"]
 `);
       expect(result.errors).toHaveLength(1);
       const error = result.errors[0];
@@ -510,6 +586,7 @@ decision = "allow"
 toolName = "test"
 decision = "allow"
 priority = 1.5
+modes = ["default"]
 `);
       expect(result.errors).toHaveLength(1);
       const error = result.errors[0];
@@ -524,6 +601,7 @@ priority = 1.5
 toolName = "test"
 decision = "allow"
 priority = -1
+modes = ["default"]
 `);
       expect(result.errors).toHaveLength(1);
       const error = result.errors[0];
@@ -538,6 +616,7 @@ priority = -1
 toolName = "test"
 decision = "allow"
 priority = -9999
+modes = ["default"]
 `);
       expect(result.errors).toHaveLength(1);
       const error = result.errors[0];
@@ -552,6 +631,7 @@ priority = -9999
 toolName = "test"
 decision = "allow"
 priority = 1000
+modes = ["default"]
 `);
       expect(result.errors).toHaveLength(1);
       const error = result.errors[0];
@@ -566,6 +646,7 @@ priority = 1000
 toolName = "test"
 decision = "allow"
 priority = 9999
+modes = ["default"]
 `);
       expect(result.errors).toHaveLength(1);
       const error = result.errors[0];
@@ -580,6 +661,7 @@ priority = 9999
 toolName = "test"
 decision = "maybe"
 priority = 100
+modes = ["default"]
 `);
       expect(result.errors).toHaveLength(1);
       const error = result.errors[0];
@@ -592,6 +674,7 @@ priority = 100
 [[rule]]
 decision = "allow"
 priority = 100
+modes = ["default"]
 `);
       expect(result.errors).toHaveLength(1);
       const error = result.errors[0];
@@ -606,6 +689,7 @@ priority = 100
 toolName = 123
 decision = "allow"
 priority = 100
+modes = ["default"]
 `);
       expect(result.errors).toHaveLength(1);
       const error = result.errors[0];
@@ -620,6 +704,7 @@ toolName = "not_shell"
 commandRegex = ".*"
 decision = "allow"
 priority = 100
+modes = ["default"]
 `);
       expect(getErrors(result)).toHaveLength(1);
       const error = getErrors(result)[0];
@@ -635,6 +720,7 @@ commandPrefix = "git"
 commandRegex = ".*"
 decision = "allow"
 priority = 100
+modes = ["default"]
 `);
       expect(result.errors).toHaveLength(1);
       const error = result.errors[0];
@@ -649,6 +735,7 @@ toolName = "test"
 argsPattern = "([a-z)"
 decision = "allow"
 priority = 100
+modes = ["default"]
 `);
       expect(getErrors(result)).toHaveLength(1);
       const error = getErrors(result)[0];
@@ -660,7 +747,7 @@ priority = 100
       const filePath = path.join(tempDir, 'single-rule.toml');
       await fs.writeFile(
         filePath,
-        '[[rule]]\ntoolName = "test-tool"\ndecision = "allow"\npriority = 500\n',
+        '[[rule]]\ntoolName = "test-tool"\ndecision = "allow"\npriority = 500\nmodes = ["default"]\n',
       );
 
       const getPolicyTier = (_dir: string) => 1;
@@ -693,6 +780,7 @@ priority = 100
 toolName = "grob"
 decision = "allow"
 priority = 100
+modes = ["plan", "default", "autoEdit", "yolo"]
 `);
 
       const warnings = getWarnings(result);
@@ -712,11 +800,13 @@ priority = 100
 toolName = "glob"
 decision = "allow"
 priority = 100
+modes = ["plan", "default", "autoEdit", "yolo"]
 
 [[rule]]
 toolName = "read_file"
 decision = "allow"
 priority = 100
+modes = ["plan", "default", "autoEdit", "yolo"]
 `);
 
       expect(getWarnings(result)).toHaveLength(0);
@@ -730,6 +820,7 @@ priority = 100
 toolName = "*"
 decision = "allow"
 priority = 100
+modes = ["plan", "default", "autoEdit", "yolo"]
 `);
 
       expect(getWarnings(result)).toHaveLength(0);
@@ -742,11 +833,13 @@ priority = 100
 toolName = "mcp_my-server_my-tool"
 decision = "allow"
 priority = 100
+modes = ["plan", "default", "autoEdit", "yolo"]
 
 [[rule]]
 toolName = "mcp_my-server_*"
 decision = "allow"
 priority = 100
+modes = ["plan", "default", "autoEdit", "yolo"]
 `);
 
       expect(getWarnings(result)).toHaveLength(0);
@@ -760,6 +853,7 @@ mcpName = "my-server"
 toolName = "nonexistent"
 decision = "allow"
 priority = 100
+modes = ["plan", "default", "autoEdit", "yolo"]
 `);
 
       expect(getWarnings(result)).toHaveLength(0);
@@ -772,6 +866,7 @@ priority = 100
 toolName = "search_file_content"
 decision = "allow"
 priority = 100
+modes = ["plan", "default", "autoEdit", "yolo"]
 `);
 
       expect(getWarnings(result)).toHaveLength(0);
@@ -784,6 +879,7 @@ priority = 100
 toolName = "discovered_tool_my_custom_tool"
 decision = "allow"
 priority = 100
+modes = ["plan", "default", "autoEdit", "yolo"]
 `);
 
       expect(getWarnings(result)).toHaveLength(0);
@@ -796,6 +892,7 @@ priority = 100
 toolName = ["grob", "glob", "replce"]
 decision = "allow"
 priority = 100
+modes = ["plan", "default", "autoEdit", "yolo"]
 `);
 
       const warnings = getWarnings(result);
@@ -812,11 +909,13 @@ priority = 100
 toolName = "delegate_to_agent"
 decision = "allow"
 priority = 100
+modes = ["plan", "default", "autoEdit", "yolo"]
 
 [[rule]]
 toolName = "my_custom_tool"
 decision = "allow"
 priority = 100
+modes = ["plan", "default", "autoEdit", "yolo"]
 `);
 
       expect(getWarnings(result)).toHaveLength(0);
@@ -830,6 +929,7 @@ priority = 100
 toolName = "*"
 decision = "deny"
 priority = 100
+modes = ["plan", "default", "autoEdit", "yolo"]
 `);
 
       expect(getWarnings(result)).toHaveLength(0);
@@ -843,11 +943,13 @@ priority = 100
 toolName = "wrte_file"
 decision = "deny"
 priority = 50
+modes = ["plan", "default", "autoEdit", "yolo"]
 
 [[rule]]
 toolName = "glob"
 decision = "allow"
 priority = 100
+modes = ["plan", "default", "autoEdit", "yolo"]
 `);
 
       expect(getWarnings(result)).toHaveLength(1);
@@ -1000,6 +1102,7 @@ priority = 100
           decision: PolicyDecision.ALLOW,
           priority: PRIORITY_SUBAGENT_TOOL,
           source: 'AgentRegistry (Dynamic)',
+          modes: MODES_BY_PERMISSIVENESS,
         });
 
         // 4. Verify Behavior:

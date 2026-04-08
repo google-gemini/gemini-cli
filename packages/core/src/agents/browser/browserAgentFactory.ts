@@ -41,6 +41,7 @@ import {
   PolicyDecision,
   PRIORITY_SUBAGENT_TOOL,
   type PolicyRule,
+  MODES_BY_PERMISSIVENESS,
 } from '../../policy/types.js';
 
 /**
@@ -151,6 +152,7 @@ export async function createBrowserAgentDefinition(
       toolName: `${MCP_TOOL_PREFIX}${BROWSER_AGENT_NAME}_${toolName}`,
       decision: PolicyDecision.ASK_USER,
       priority: 999,
+      modes: MODES_BY_PERMISSIVENESS,
       source: 'BrowserAgent (Sensitive Actions)',
       mcpName: BROWSER_AGENT_NAME,
     };
@@ -161,6 +163,7 @@ export async function createBrowserAgentDefinition(
       toolName: `${MCP_TOOL_PREFIX}${BROWSER_AGENT_NAME}_${toolName}`,
       decision: PolicyDecision.ALLOW,
       priority: PRIORITY_SUBAGENT_TOOL,
+      modes: MODES_BY_PERMISSIVENESS,
       source: 'BrowserAgent (Read-Only)',
       mcpName: BROWSER_AGENT_NAME,
     };
@@ -172,7 +175,9 @@ export async function createBrowserAgentDefinition(
       rule1.toolName === rule2.toolName &&
       rule1.decision === rule2.decision &&
       rule1.priority === rule2.priority &&
-      rule1.mcpName === rule2.mcpName
+      rule1.mcpName === rule2.mcpName &&
+      rule1.modes.length === rule2.modes.length &&
+      rule1.modes.every((m) => rule2.modes.includes(m))
     );
   }
 

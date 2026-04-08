@@ -75,7 +75,11 @@ vi.mock('../utils/shell-utils.js', async (importOriginal) => {
 });
 
 import { PolicyEngine } from './policy-engine.js';
-import { PolicyDecision, ApprovalMode } from './types.js';
+import {
+  PolicyDecision,
+  ApprovalMode,
+  MODES_BY_PERMISSIVENESS,
+} from './types.js';
 import type { FunctionCall } from '@google/genai';
 import { buildArgsPatterns } from './utils.js';
 
@@ -96,6 +100,7 @@ describe('Shell Safety Policy', () => {
           argsPattern,
           decision: PolicyDecision.ALLOW,
           priority: 1.01,
+          modes: MODES_BY_PERMISSIVENESS,
         },
       ],
       defaultDecision: PolicyDecision.ASK_USER,
@@ -204,12 +209,14 @@ describe('Shell Safety Policy', () => {
           argsPattern: new RegExp(argsPatternsEcho[0]!),
           decision: PolicyDecision.ALLOW,
           priority: 2,
+          modes: MODES_BY_PERMISSIVENESS,
         },
         {
           toolName: 'run_shell_command',
           argsPattern: new RegExp(argsPatternsGit[0]!),
           decision: PolicyDecision.ALLOW,
           priority: 2,
+          modes: MODES_BY_PERMISSIVENESS,
         },
       ],
       defaultDecision: PolicyDecision.ASK_USER,
@@ -290,6 +297,7 @@ describe('Shell Safety Policy', () => {
           argsPattern: new RegExp(argsPatternsEcho[0]!),
           decision: PolicyDecision.ALLOW,
           priority: 2,
+          modes: MODES_BY_PERMISSIVENESS,
         },
         {
           toolName: 'run_shell_command',
@@ -297,6 +305,7 @@ describe('Shell Safety Policy', () => {
           argsPattern: new RegExp(argsPatternsGit[0]!),
           decision: PolicyDecision.ALLOW,
           priority: 2,
+          modes: MODES_BY_PERMISSIVENESS,
         },
       ],
       defaultDecision: PolicyDecision.ASK_USER,
@@ -336,6 +345,7 @@ describe('Shell Safety Policy', () => {
           decision: PolicyDecision.ALLOW,
           priority: 2,
           allowRedirection: true,
+          modes: MODES_BY_PERMISSIVENESS,
         },
       ],
       defaultDecision: PolicyDecision.ASK_USER,
@@ -378,6 +388,7 @@ describe('Shell Safety Policy', () => {
           argsPattern: new RegExp(argsPatternsPush[0]!),
           decision: PolicyDecision.DENY,
           priority: 2,
+          modes: MODES_BY_PERMISSIVENESS,
         },
       ],
       defaultDecision: PolicyDecision.ASK_USER,
@@ -409,7 +420,8 @@ describe('Shell Safety Policy', () => {
           argsPattern: new RegExp(argsPatternsGitStatus[0]!),
           decision: PolicyDecision.ALLOW,
           priority: 2,
-          name: 'allow_git_status_rule', // Give a name to easily identify
+          name: 'allow_git_status_rule', // Give a name to easily identify,
+          modes: MODES_BY_PERMISSIVENESS,
         },
       ],
       defaultDecision: PolicyDecision.ASK_USER,
@@ -447,6 +459,7 @@ describe('Shell Safety Policy', () => {
           decision: PolicyDecision.ASK_USER,
           priority: 2,
           name: 'ask_another_unknown_command_rule',
+          modes: MODES_BY_PERMISSIVENESS,
         },
       ],
       defaultDecision: PolicyDecision.ASK_USER,
@@ -490,6 +503,7 @@ describe('Shell Safety Policy', () => {
           decision: PolicyDecision.ASK_USER,
           priority: 2,
           name: 'ask_rule_1',
+          modes: MODES_BY_PERMISSIVENESS,
         },
         {
           toolName: 'run_shell_command',
@@ -497,6 +511,7 @@ describe('Shell Safety Policy', () => {
           decision: PolicyDecision.ASK_USER,
           priority: 2,
           name: 'ask_rule_2',
+          modes: MODES_BY_PERMISSIVENESS,
         },
       ],
       defaultDecision: PolicyDecision.ALLOW, // Set default to ALLOW to ensure rules are hit

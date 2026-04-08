@@ -329,7 +329,8 @@ describe('createPolicyEngineConfig', () => {
       (r) =>
         r.toolName === 'replace' &&
         r.decision === PolicyDecision.ALLOW &&
-        r.modes?.includes(ApprovalMode.AUTO_EDIT),
+        r.modes?.includes(ApprovalMode.AUTO_EDIT) &&
+        !r.argsPattern,
     );
     expect(rule).toBeDefined();
     expect(rule?.priority).toBeCloseTo(1.015, 5);
@@ -424,7 +425,7 @@ describe('createPolicyEngineConfig', () => {
   it('should handle complex priority scenarios correctly', async () => {
     mockPolicyFile(
       nodePath.join(MOCK_DEFAULT_DIR, 'default.toml'),
-      '[[rule]]\ntoolName = "glob"\ndecision = "allow"\npriority = 50\n',
+      '[[rule]]\ntoolName = "glob"\ndecision = "allow"\npriority = 50\nmodes = ["default", "plan", "autoEdit", "yolo"]\n',
     );
 
     const settings: PolicySettings = {
@@ -546,6 +547,7 @@ describe('createPolicyEngineConfig', () => {
   argsPattern = "\\"command\\":\\"git (status|diff|log)\\""
   decision = "allow"
   priority = 150
+  modes = ["default", "plan", "autoEdit", "yolo"]
   `,
     );
 
@@ -576,10 +578,12 @@ describe('createPolicyEngineConfig', () => {
 toolName = "write_file"
 decision = "allow"
 priority = 10
+modes = ["default", "plan", "autoEdit", "yolo"]
 
 [[safety_checker]]
 toolName = "write_file"
 priority = 10
+modes = ["default", "plan", "autoEdit", "yolo"]
 [safety_checker.checker]
 type = "in-process"
 name = "allowed-path"
@@ -613,10 +617,12 @@ required_context = ["environment"]
 toolName = "write_file"
 decision = "allow"
 priority = 10
+modes = ["default", "plan", "autoEdit", "yolo"]
 
 [[safety_checker]]
 toolName = "write_file"
 priority = 10
+modes = ["default", "plan", "autoEdit", "yolo"]
 [safety_checker.checker]
 type = "in-process"
 name = "invalid-name"
@@ -642,6 +648,7 @@ name = "invalid-name"
   mcpName = "my-server"
   decision = "allow"
   priority = 150
+  modes = ["default", "plan", "autoEdit", "yolo"]
   `,
     );
 

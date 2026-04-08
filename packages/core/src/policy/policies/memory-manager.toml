@@ -7,6 +7,7 @@ subagent = "save_memory"
 toolName = ["read_file", "list_directory", "glob", "grep_search"]
 decision = "allow"
 priority = 100
+modes = ["plan", "default", "autoEdit", "yolo"]
 argsPattern = "(^|.*/)\\.gemini/.*"
 denyMessage = "Memory Manager is only allowed to access the .gemini folder."
 
@@ -16,5 +17,6 @@ subagent = "save_memory"
 toolName = ["write_file", "replace"]
 decision = "allow"
 priority = 100
+modes = ["plan", "default", "autoEdit", "yolo"]
 argsPattern = "(^|.*/)\\.gemini/.*\\.md\""
 denyMessage = "Memory Manager is only allowed to write .md files in the .gemini folder."

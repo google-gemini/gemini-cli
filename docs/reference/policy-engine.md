@@ -32,6 +32,7 @@ To create your first policy:
     commandPrefix = "rm -rf"
     decision = "deny"
     priority = 100
+    modes = ["default"]
     ```
 3.  **Run a command** that triggers the policy (e.g., ask Gemini CLI to
     `rm -rf /`). The tool will now be blocked automatically.
@@ -54,7 +55,7 @@ A rule consists of the following main components:
   win.
 
 For example, this rule will ask for user confirmation before executing any `git`
-command.
+command in the default interactive mode.
 
 ```toml
 [[rule]]
@@ -62,6 +63,7 @@ toolName = "run_shell_command"
 commandPrefix = "git"
 decision = "ask_user"
 priority = 100
+modes = ["default"]
 ```
 
 ### Conditions
@@ -158,10 +160,9 @@ For example:
 ### Approval modes
 
 Approval modes allow the policy engine to apply different sets of rules based on
-the CLI's operational mode. A rule in a TOML policy file can be associated with
-one or more modes (e.g., `yolo`, `autoEdit`, `plan`). The rule will only be
-active if the CLI is running in one of its specified modes. If a rule has no
-modes specified, it is always active.
+the CLI's operational mode. Every rule in a TOML policy file must be associated
+with one or more modes (for example, `yolo`, `autoEdit`, `plan`, `default`). The
+rule will only be active if the CLI is running in one of its specified modes.
 
 - `default`: The standard interactive mode where most write tools require
   confirmation.
@@ -321,8 +322,8 @@ priority = 10
 # useful for explaining *why* it was denied.
 denyMessage = "Deletion is permanent"
 
-# (Optional) An array of approval modes where this rule is active.
-# If omitted or empty, the rule applies to all modes.
+# An array of approval modes where this rule is active.
+# Valid values: "default", "autoEdit", "plan", "yolo".
 modes = ["default", "autoEdit", "yolo"]
 
 # (Optional) A boolean to restrict the rule to interactive (true) or
@@ -353,6 +354,7 @@ This single rule will apply to both the `write_file` and `replace` tools.
 toolName = ["write_file", "replace"]
 decision = "ask_user"
 priority = 10
+modes = ["default", "autoEdit"]
 ```
 
 ### Special syntax for `run_shell_command`
@@ -375,6 +377,7 @@ toolName = "run_shell_command"
 commandPrefix = "git"
 decision = "ask_user"
 priority = 100
+modes = ["default", "autoEdit"]
 ```
 
 ### Special syntax for MCP tools
@@ -406,6 +409,7 @@ mcpName = "my-jira-server"
 toolName = "search"
 decision = "allow"
 priority = 200
+modes = ["default", "autoEdit", "plan"]
 ```
 
 **2. Targeting all tools on a specific server**
@@ -422,6 +426,7 @@ mcpName = "untrusted-server"
 decision = "deny"
 priority = 500
 denyMessage = "This server is not trusted by the admin."
+modes = ["default", "autoEdit", "plan", "yolo"]
 ```
 
 **3. Targeting all MCP servers**
@@ -436,6 +441,7 @@ toolName = "*"
 mcpName = "*"
 decision = "ask_user"
 priority = 10
+modes = ["default", "autoEdit", "plan"]
 ```
 
 ## Default policies

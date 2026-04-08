@@ -6,10 +6,12 @@
 toolName = "discovered_tool_*"
 decision = "ask_user"
 priority = 10
+modes = ["plan", "default", "autoEdit", "yolo"]
 interactive = true
 
 [[rule]]
 toolName = "discovered_tool_*"
 decision = "deny"
 priority = 10
+modes = ["plan", "default", "autoEdit", "yolo"]
 interactive = false

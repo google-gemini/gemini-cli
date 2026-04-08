@@ -89,13 +89,12 @@ function ruleMatches(
   toolAnnotations?: Record<string, unknown>,
   subagent?: string,
 ): boolean {
-  // Check if rule applies to current approval mode
-  if (rule.modes && rule.modes.length > 0) {
-    if (!rule.modes.includes(currentApprovalMode)) {
-      return false;
-    }
+  // Check if rule applies to current approval mode.
+  // Legacy rules or those injected manually in tests might not have the modes field.
+  // If so, we default to matching all modes for backward compatibility.
+  if (rule.modes && !rule.modes.includes(currentApprovalMode)) {
+    return false;
   }
-
   // Check subagent if specified (only for PolicyRule, SafetyCheckerRule doesn't have it)
   if ('subagent' in rule && rule.subagent !== undefined) {
     if (rule.subagent !== subagent) {
@@ -571,7 +570,7 @@ export class PolicyEngine {
 
       if (match) {
         debugLogger.debug(
-          `[PolicyEngine.check] MATCHED rule: toolName=${rule.toolName}, decision=${rule.decision}, priority=${rule.priority}, argsPattern=${rule.argsPattern?.source || 'none'}`,
+          `[PolicyEngine.check] MATCHED rule: toolName=${rule.toolName}, decision=${rule.decision}, priority=${rule.priority}, source=${rule.source}, argsPattern=${rule.argsPattern?.source || 'none'}`,
         );
 
         let ruleDecision = rule.decision;

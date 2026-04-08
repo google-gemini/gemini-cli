@@ -16,6 +16,7 @@ import {
   PRIORITY_SUBAGENT_TOOL,
   ALWAYS_ALLOW_PRIORITY_FRACTION,
   PRIORITY_YOLO_ALLOW_ALL,
+  MODES_BY_PERMISSIVENESS,
 } from './types.js';
 import type { FunctionCall } from '@google/genai';
 import { SafetyCheckDecision } from '../safety/protocol.js';
@@ -123,9 +124,24 @@ describe('PolicyEngine', () => {
 
     it('should sort rules by priority', () => {
       const rules: PolicyRule[] = [
-        { toolName: 'tool1', decision: PolicyDecision.DENY, priority: 1 },
-        { toolName: 'tool2', decision: PolicyDecision.ALLOW, priority: 10 },
-        { toolName: 'tool3', decision: PolicyDecision.ASK_USER, priority: 5 },
+        {
+          toolName: 'tool1',
+          decision: PolicyDecision.DENY,
+          priority: 1,
+          modes: MODES_BY_PERMISSIVENESS,
+        },
+        {
+          toolName: 'tool2',
+          decision: PolicyDecision.ALLOW,
+          priority: 10,
+          modes: MODES_BY_PERMISSIVENESS,
+        },
+        {
+          toolName: 'tool3',
+          decision: PolicyDecision.ASK_USER,
+          priority: 5,
+          modes: MODES_BY_PERMISSIVENESS,
+        },
       ];
 
       engine = new PolicyEngine({ rules });
@@ -140,8 +156,16 @@ describe('PolicyEngine', () => {
   describe('check', () => {
     it('should match tool by name', async () => {
       const rules: PolicyRule[] = [
-        { toolName: 'shell', decision: PolicyDecision.ALLOW },
-        { toolName: 'edit', decision: PolicyDecision.DENY },
+        {
+          toolName: 'shell',
+          decision: PolicyDecision.ALLOW,
+          modes: MODES_BY_PERMISSIVENESS,
+        },
+        {
+          toolName: 'edit',
+          decision: PolicyDecision.DENY,
+          modes: MODES_BY_PERMISSIVENESS,
+        },
       ];
 
       engine = new PolicyEngine({ rules });
@@ -163,6 +187,7 @@ describe('PolicyEngine', () => {
           toolName: 'mcp_my-server_tool',
           mcpName: 'my-server',
           decision: PolicyDecision.ALLOW,
+          modes: MODES_BY_PERMISSIVENESS,
         },
       ];
 
@@ -186,10 +211,12 @@ describe('PolicyEngine', () => {
           toolName: 'shell',
           argsPattern: /rm -rf/,
           decision: PolicyDecision.DENY,
+          modes: MODES_BY_PERMISSIVENESS,
         },
         {
           toolName: 'shell',
           decision: PolicyDecision.ALLOW,
+          modes: MODES_BY_PERMISSIVENESS,
         },
       ];
 
@@ -215,8 +242,18 @@ describe('PolicyEngine', () => {
 
     it('should apply rules by priority', async () => {
       const rules: PolicyRule[] = [
-        { toolName: 'shell', decision: PolicyDecision.DENY, priority: 1 },
-        { toolName: 'shell', decision: PolicyDecision.ALLOW, priority: 10 },
+        {
+          toolName: 'shell',
+          decision: PolicyDecision.DENY,
+          priority: 1,
+          modes: MODES_BY_PERMISSIVENESS,
+        },
+        {
+          toolName: 'shell',
+          decision: PolicyDecision.ALLOW,
+          priority: 10,
+          modes: MODES_BY_PERMISSIVENESS,
+        },
       ];
 
       engine = new PolicyEngine({ rules });
@@ -232,7 +269,11 @@ describe('PolicyEngine', () => {
       const currentName = 'current_test_tool';
 
       const rules: PolicyRule[] = [
-        { toolName: legacyName, decision: PolicyDecision.DENY },
+        {
+          toolName: legacyName,
+          decision: PolicyDecision.DENY,
+          modes: MODES_BY_PERMISSIVENESS,
+        },
       ];
 
       engine = new PolicyEngine({ rules });
@@ -247,7 +288,11 @@ describe('PolicyEngine', () => {
       const currentName = 'current_test_tool';
 
       const rules: PolicyRule[] = [
-        { toolName: currentName, decision: PolicyDecision.ALLOW },
+        {
+          toolName: currentName,
+          decision: PolicyDecision.ALLOW,
+          modes: MODES_BY_PERMISSIVENESS,
+        },
       ];
 
       engine = new PolicyEngine({ rules });
@@ -262,7 +307,11 @@ describe('PolicyEngine', () => {
       const legacyName2 = 'another_legacy_test_tool';
 
       const rules: PolicyRule[] = [
-        { toolName: legacyName2, decision: PolicyDecision.DENY },
+        {
+          toolName: legacyName2,
+          decision: PolicyDecision.DENY,
+          modes: MODES_BY_PERMISSIVENESS,
+        },
       ];
 
       engine = new PolicyEngine({ rules });
@@ -275,8 +324,17 @@ describe('PolicyEngine', () => {
 
     it('should apply wildcard rules (no toolName)', async () => {
       const rules: PolicyRule[] = [
-        { toolName: '*', decision: PolicyDecision.DENY }, // Applies to all tools
-        { toolName: 'safe-tool', decision: PolicyDecision.ALLOW, priority: 10 },
+        {
+          toolName: '*',
+          decision: PolicyDecision.DENY,
+          modes: MODES_BY_PERMISSIVENESS,
+        }, // Applies to all tools
+        {
+          toolName: 'safe-tool',
+          decision: PolicyDecision.ALLOW,
+          priority: 10,
+          modes: MODES_BY_PERMISSIVENESS,
+        },
       ];
 
       engine = new PolicyEngine({ rules });
@@ -297,17 +355,24 @@ describe('PolicyEngine', () => {
             toolName: 'interactive-tool',
             decision: PolicyDecision.ASK_USER,
             interactive: true,
+            modes: MODES_BY_PERMISSIVENESS,
           },
           {
             toolName: 'interactive-tool',
             decision: PolicyDecision.DENY,
             interactive: false,
+            modes: MODES_BY_PERMISSIVENESS,
           },
-          { toolName: 'allowed-tool', decision: PolicyDecision.ALLOW },
+          {
+            toolName: 'allowed-tool',
+            decision: PolicyDecision.ALLOW,
+            modes: MODES_BY_PERMISSIVENESS,
+          },
           {
             toolName: 'ask_user',
             decision: PolicyDecision.DENY,
             interactive: false,
+            modes: MODES_BY_PERMISSIVENESS,
           },
         ],
       };
@@ -334,6 +399,7 @@ describe('PolicyEngine', () => {
           toolName: 'edit',
           decision: PolicyDecision.ASK_USER,
           priority: 10,
+          modes: MODES_BY_PERMISSIVENESS,
         },
         {
           toolName: 'edit',
@@ -401,7 +467,11 @@ describe('PolicyEngine', () => {
 
     it('should NOT override explicit DENY rules in YOLO mode', async () => {
       const rules: PolicyRule[] = [
-        { toolName: 'dangerous-tool', decision: PolicyDecision.DENY },
+        {
+          toolName: 'dangerous-tool',
+          decision: PolicyDecision.DENY,
+          modes: [ApprovalMode.YOLO],
+        },
       ];
       engine = new PolicyEngine({ rules, approvalMode: ApprovalMode.YOLO });
 
@@ -423,8 +493,14 @@ describe('PolicyEngine', () => {
           toolName: 'test-tool',
           decision: PolicyDecision.ASK_USER,
           priority: 10,
+          modes: [ApprovalMode.YOLO],
         },
-        { toolName: 'test-tool', decision: PolicyDecision.DENY, priority: 20 },
+        {
+          toolName: 'test-tool',
+          decision: PolicyDecision.DENY,
+          priority: 20,
+          modes: [ApprovalMode.YOLO],
+        },
       ];
       engine = new PolicyEngine({ rules, approvalMode: ApprovalMode.YOLO });
 
@@ -440,16 +516,19 @@ describe('PolicyEngine', () => {
         toolName: 'tool1',
         decision: PolicyDecision.ALLOW,
         priority: 5,
+        modes: MODES_BY_PERMISSIVENESS,
       });
       engine.addRule({
         toolName: 'tool2',
         decision: PolicyDecision.DENY,
         priority: 10,
+        modes: MODES_BY_PERMISSIVENESS,
       });
       engine.addRule({
         toolName: 'tool3',
         decision: PolicyDecision.ASK_USER,
         priority: 1,
+        modes: MODES_BY_PERMISSIVENESS,
       });
 
       const rules = engine.getRules();
@@ -464,7 +543,11 @@ describe('PolicyEngine', () => {
         (await engine.check({ name: 'new-tool' }, undefined)).decision,
       ).toBe(PolicyDecision.ASK_USER);
 
-      engine.addRule({ toolName: 'new-tool', decision: PolicyDecision.ALLOW });
+      engine.addRule({
+        toolName: 'new-tool',
+        decision: PolicyDecision.ALLOW,
+        modes: MODES_BY_PERMISSIVENESS,
+      });
 
       expect(
         (await engine.check({ name: 'new-tool' }, undefined)).decision,
@@ -474,12 +557,21 @@ describe('PolicyEngine', () => {
 
   describe('removeRulesForTool', () => {
     it('should remove rules for specific tool', () => {
-      engine.addRule({ toolName: 'tool1', decision: PolicyDecision.ALLOW });
-      engine.addRule({ toolName: 'tool2', decision: PolicyDecision.DENY });
+      engine.addRule({
+        toolName: 'tool1',
+        decision: PolicyDecision.ALLOW,
+        modes: MODES_BY_PERMISSIVENESS,
+      });
+      engine.addRule({
+        toolName: 'tool2',
+        decision: PolicyDecision.DENY,
+        modes: MODES_BY_PERMISSIVENESS,
+      });
       engine.addRule({
         toolName: 'tool1',
         decision: PolicyDecision.ASK_USER,
         priority: 10,
+        modes: MODES_BY_PERMISSIVENESS,
       });
 
       expect(engine.getRules()).toHaveLength(3);
@@ -497,16 +589,19 @@ describe('PolicyEngine', () => {
         toolName: 'tool1',
         decision: PolicyDecision.ALLOW,
         source: 'source1',
+        modes: MODES_BY_PERMISSIVENESS,
       });
       engine.addRule({
         toolName: 'tool1',
         decision: PolicyDecision.DENY,
         source: 'source2',
+        modes: MODES_BY_PERMISSIVENESS,
       });
       engine.addRule({
         toolName: 'tool2',
         decision: PolicyDecision.ALLOW,
         source: 'source1',
+        modes: MODES_BY_PERMISSIVENESS,
       });
 
       expect(engine.getRules()).toHaveLength(3);
@@ -527,7 +622,11 @@ describe('PolicyEngine', () => {
     });
 
     it('should handle removing non-existent tool', () => {
-      engine.addRule({ toolName: 'existing', decision: PolicyDecision.ALLOW });
+      engine.addRule({
+        toolName: 'existing',
+        decision: PolicyDecision.ALLOW,
+        modes: MODES_BY_PERMISSIVENESS,
+      });
 
       expect(() => engine.removeRulesForTool('non-existent')).not.toThrow();
       expect(engine.getRules()).toHaveLength(1);
@@ -537,8 +636,16 @@ describe('PolicyEngine', () => {
   describe('getRules', () => {
     it('should return readonly array of rules', () => {
       const rules: PolicyRule[] = [
-        { toolName: 'tool1', decision: PolicyDecision.ALLOW },
-        { toolName: 'tool2', decision: PolicyDecision.DENY },
+        {
+          toolName: 'tool1',
+          decision: PolicyDecision.ALLOW,
+          modes: MODES_BY_PERMISSIVENESS,
+        },
+        {
+          toolName: 'tool2',
+          decision: PolicyDecision.DENY,
+          modes: MODES_BY_PERMISSIVENESS,
+        },
       ];
 
       engine = new PolicyEngine({ rules });
@@ -554,7 +661,12 @@ describe('PolicyEngine', () => {
     it('should match global wildcard (*)', async () => {
       engine = new PolicyEngine({
         rules: [
-          { toolName: '*', decision: PolicyDecision.ALLOW, priority: 10 },
+          {
+            toolName: '*',
+            decision: PolicyDecision.ALLOW,
+            priority: 10,
+            modes: MODES_BY_PERMISSIVENESS,
+          },
         ],
       });
 
@@ -570,7 +682,12 @@ describe('PolicyEngine', () => {
     it('should match any MCP tool when toolName is mcp_*', async () => {
       engine = new PolicyEngine({
         rules: [
-          { toolName: 'mcp_*', decision: PolicyDecision.ALLOW, priority: 10 },
+          {
+            toolName: 'mcp_*',
+            decision: PolicyDecision.ALLOW,
+            priority: 10,
+            modes: MODES_BY_PERMISSIVENESS,
+          },
         ],
         defaultDecision: PolicyDecision.DENY,
       });
@@ -593,12 +710,14 @@ describe('PolicyEngine', () => {
           mcpName: 'my-server',
           decision: PolicyDecision.ALLOW,
           priority: 10,
+          modes: MODES_BY_PERMISSIVENESS,
         },
         {
           toolName: 'mcp_blocked-server_*',
           mcpName: 'blocked-server',
           decision: PolicyDecision.DENY,
           priority: 20,
+          modes: MODES_BY_PERMISSIVENESS,
         },
       ];
 
@@ -656,12 +775,14 @@ describe('PolicyEngine', () => {
           mcpName: 'my-server',
           decision: PolicyDecision.ALLOW,
           priority: 10,
+          modes: MODES_BY_PERMISSIVENESS,
         },
         {
           toolName: 'mcp_my-server_dangerous-tool',
           mcpName: 'my-server',
           decision: PolicyDecision.DENY,
           priority: 20,
+          modes: MODES_BY_PERMISSIVENESS,
         },
       ];
 
@@ -690,6 +811,7 @@ describe('PolicyEngine', () => {
           toolName: 'mcp_safe_server_*',
           mcpName: 'safe_server',
           decision: PolicyDecision.ALLOW,
+          modes: MODES_BY_PERMISSIVENESS,
         },
       ];
       engine = new PolicyEngine({ rules });
@@ -711,6 +833,7 @@ describe('PolicyEngine', () => {
           toolName: 'mcp_safe_server_*',
           mcpName: 'safe_server',
           decision: PolicyDecision.ALLOW,
+          modes: MODES_BY_PERMISSIVENESS,
         },
       ];
       engine = new PolicyEngine({ rules });
@@ -728,6 +851,7 @@ describe('PolicyEngine', () => {
           toolName: 'mcp_safe_server_*',
           mcpName: 'safe_server',
           decision: PolicyDecision.ALLOW,
+          modes: MODES_BY_PERMISSIVENESS,
         },
       ];
       engine = new PolicyEngine({ rules });
@@ -742,13 +866,24 @@ describe('PolicyEngine', () => {
   describe('complex scenarios', () => {
     it('should handle multiple matching rules with different priorities', async () => {
       const rules: PolicyRule[] = [
-        { toolName: '*', decision: PolicyDecision.DENY, priority: 0 }, // Default deny all
-        { toolName: 'shell', decision: PolicyDecision.ASK_USER, priority: 5 },
+        {
+          toolName: '*',
+          decision: PolicyDecision.DENY,
+          priority: 0,
+          modes: MODES_BY_PERMISSIVENESS,
+        }, // Default deny all
+        {
+          toolName: 'shell',
+          decision: PolicyDecision.ASK_USER,
+          priority: 5,
+          modes: MODES_BY_PERMISSIVENESS,
+        },
         {
           toolName: 'shell',
           argsPattern: /"command":"ls/,
           decision: PolicyDecision.ALLOW,
           priority: 10,
+          modes: MODES_BY_PERMISSIVENESS,
         },
       ];
 
@@ -788,6 +923,7 @@ describe('PolicyEngine', () => {
           toolName: 'run_shell_command',
           argsPattern: new RegExp(patterns[0]!),
           decision: PolicyDecision.ALLOW,
+          modes: MODES_BY_PERMISSIVENESS,
         },
       ];
       engine = new PolicyEngine({ rules });
@@ -809,6 +945,7 @@ describe('PolicyEngine', () => {
           toolName: 'read',
           argsPattern: /secret/,
           decision: PolicyDecision.DENY,
+          modes: MODES_BY_PERMISSIVENESS,
         },
       ];
 
@@ -847,6 +984,7 @@ describe('PolicyEngine', () => {
           // Pattern matches the stable stringified format
           argsPattern: /"command":"rm[^"]*-rf/,
           decision: PolicyDecision.DENY,
+          modes: MODES_BY_PERMISSIVENESS,
         },
       ];
 
@@ -879,6 +1017,7 @@ describe('PolicyEngine', () => {
           toolName: 'api',
           argsPattern: /"sensitive":true/,
           decision: PolicyDecision.DENY,
+          modes: MODES_BY_PERMISSIVENESS,
         },
       ];
 
@@ -908,6 +1047,7 @@ describe('PolicyEngine', () => {
           toolName: 'test',
           argsPattern: /\[Circular\]/,
           decision: PolicyDecision.DENY,
+          modes: MODES_BY_PERMISSIVENESS,
         },
       ];
 
@@ -950,6 +1090,7 @@ describe('PolicyEngine', () => {
           toolName: 'deep',
           argsPattern: /\[Circular\]/,
           decision: PolicyDecision.DENY,
+          modes: MODES_BY_PERMISSIVENESS,
         },
       ];
 
@@ -992,12 +1133,14 @@ describe('PolicyEngine', () => {
           toolName: 'test',
           argsPattern: /\[Circular\]/,
           decision: PolicyDecision.DENY,
+          modes: MODES_BY_PERMISSIVENESS,
         },
         {
           toolName: 'test',
           argsPattern: /"value":"shared"/,
           decision: PolicyDecision.ALLOW,
           priority: 10,
+          modes: MODES_BY_PERMISSIVENESS,
         },
       ];
 
@@ -1023,6 +1166,7 @@ describe('PolicyEngine', () => {
           toolName: 'test',
           argsPattern: /"definedValue":"test"/,
           decision: PolicyDecision.ALLOW,
+          modes: MODES_BY_PERMISSIVENESS,
         },
       ];
 
@@ -1046,6 +1190,7 @@ describe('PolicyEngine', () => {
           toolName: 'test',
           argsPattern: /undefinedValue/,
           decision: PolicyDecision.DENY,
+          modes: MODES_BY_PERMISSIVENESS,
         },
       ];
       engine = new PolicyEngine({ rules: rulesWithUndefined });
@@ -1059,6 +1204,7 @@ describe('PolicyEngine', () => {
           toolName: 'test',
           argsPattern: /functionValue/,
           decision: PolicyDecision.DENY,
+          modes: MODES_BY_PERMISSIVENESS,
         },
       ];
       engine = new PolicyEngine({ rules: rulesWithFunction });
@@ -1073,6 +1219,7 @@ describe('PolicyEngine', () => {
           toolName: 'test',
           argsPattern: /\["value",null,null,null\]/,
           decision: PolicyDecision.ALLOW,
+          modes: MODES_BY_PERMISSIVENESS,
         },
       ];
 
@@ -1114,6 +1261,7 @@ describe('PolicyEngine', () => {
             toolName: 'test',
             argsPattern: /.*/,
             decision: PolicyDecision.ALLOW,
+            modes: MODES_BY_PERMISSIVENESS,
           },
         ];
         engine = new PolicyEngine({ rules });
@@ -1137,11 +1285,13 @@ describe('PolicyEngine', () => {
           toolName: 'test',
           argsPattern: /"sanitized":"safe"/,
           decision: PolicyDecision.ALLOW,
+          modes: MODES_BY_PERMISSIVENESS,
         },
         {
           toolName: 'test',
           argsPattern: /"dangerous":"data"/,
           decision: PolicyDecision.DENY,
+          modes: MODES_BY_PERMISSIVENESS,
         },
       ];
 
@@ -1167,6 +1317,7 @@ describe('PolicyEngine', () => {
           toolName: 'test',
           argsPattern: /"value":"string-value"/,
           decision: PolicyDecision.ALLOW,
+          modes: MODES_BY_PERMISSIVENESS,
         },
       ];
 
@@ -1191,6 +1342,7 @@ describe('PolicyEngine', () => {
           toolName: 'test',
           argsPattern: /"fallback":"value"/,
           decision: PolicyDecision.ALLOW,
+          modes: MODES_BY_PERMISSIVENESS,
         },
       ];
 
@@ -1217,6 +1369,7 @@ describe('PolicyEngine', () => {
           // Matches "echo" prefix
           argsPattern: /"command":"echo/,
           decision: PolicyDecision.ALLOW,
+          modes: MODES_BY_PERMISSIVENESS,
         },
       ];
 
@@ -1254,6 +1407,7 @@ describe('PolicyEngine', () => {
           argsPattern: /"command":"echo/,
           decision: PolicyDecision.ALLOW,
           allowRedirection: true,
+          modes: MODES_BY_PERMISSIVENESS,
         },
       ];
 
@@ -1282,6 +1436,7 @@ describe('PolicyEngine', () => {
           toolName,
           decision: PolicyDecision.ALLOW,
           allowRedirection: true,
+          modes: MODES_BY_PERMISSIVENESS,
         },
       ];
 
@@ -1302,11 +1457,13 @@ describe('PolicyEngine', () => {
           toolName,
           decision: PolicyDecision.ASK_USER,
           interactive: true,
+          modes: MODES_BY_PERMISSIVENESS,
         },
         {
           toolName,
           decision: PolicyDecision.DENY,
           interactive: false,
+          modes: MODES_BY_PERMISSIVENESS,
         },
       ];
 
@@ -1324,6 +1481,7 @@ describe('PolicyEngine', () => {
           toolName: 'run_shell_command',
           argsPattern: /"command":"echo/,
           decision: PolicyDecision.ALLOW,
+          modes: MODES_BY_PERMISSIVENESS,
         },
       ];
 
@@ -1351,12 +1509,14 @@ describe('PolicyEngine', () => {
           // Note: stableStringify sorts keys alphabetically and has no spaces: {"command":"echo hello","dir_path":"/safe/path"}
           argsPattern: /"command":"echo hello".*"dir_path":"\/safe\/path"/,
           decision: PolicyDecision.ALLOW,
+          modes: MODES_BY_PERMISSIVENESS,
         },
         {
           // Catch-all ALLOW for shell but with low priority
           toolName: 'run_shell_command',
           decision: PolicyDecision.ALLOW,
           priority: -100,
+          modes: MODES_BY_PERMISSIVENESS,
         },
       ];
 
@@ -1382,18 +1542,21 @@ describe('PolicyEngine', () => {
           argsPattern: /"command":"git status/,
           decision: PolicyDecision.ALLOW,
           priority: 20,
+          modes: MODES_BY_PERMISSIVENESS,
         },
         {
           toolName: 'run_shell_command',
           argsPattern: /"command":"ls/,
           decision: PolicyDecision.ALLOW,
           priority: 20,
+          modes: MODES_BY_PERMISSIVENESS,
         },
         {
           // Catch-all ASK_USER for shell
           toolName: 'run_shell_command',
           decision: PolicyDecision.ASK_USER,
           priority: 10,
+          modes: MODES_BY_PERMISSIVENESS,
         },
       ];
 
@@ -1420,18 +1583,21 @@ describe('PolicyEngine', () => {
           argsPattern: /"command":"git status && ls"/,
           decision: PolicyDecision.DENY,
           priority: 30,
+          modes: MODES_BY_PERMISSIVENESS,
         },
         {
           toolName: 'run_shell_command',
           argsPattern: /"command":"git status/,
           decision: PolicyDecision.ALLOW,
           priority: 20,
+          modes: MODES_BY_PERMISSIVENESS,
         },
         {
           toolName: 'run_shell_command',
           argsPattern: /"command":"ls/,
           decision: PolicyDecision.ALLOW,
           priority: 20,
+          modes: MODES_BY_PERMISSIVENESS,
         },
       ];
 
@@ -1455,17 +1621,20 @@ describe('PolicyEngine', () => {
           argsPattern: /"command":"rm/,
           decision: PolicyDecision.DENY,
           priority: 20,
+          modes: MODES_BY_PERMISSIVENESS,
         },
         {
           toolName: 'run_shell_command',
           argsPattern: /"command":"echo/,
           decision: PolicyDecision.ALLOW,
           priority: 20,
+          modes: MODES_BY_PERMISSIVENESS,
         },
         {
           toolName: 'run_shell_command',
           decision: PolicyDecision.ASK_USER,
           priority: 10,
+          modes: MODES_BY_PERMISSIVENESS,
         },
       ];
 
@@ -1491,11 +1660,13 @@ describe('PolicyEngine', () => {
             toolName: 'run_shell_command',
             decision: PolicyDecision.ALLOW,
             interactive: true,
+            modes: MODES_BY_PERMISSIVENESS,
           },
           {
             toolName: 'run_shell_command',
             decision: PolicyDecision.DENY,
             interactive: false,
+            modes: MODES_BY_PERMISSIVENESS,
           },
         ],
       };
@@ -1521,6 +1692,7 @@ describe('PolicyEngine', () => {
         {
           toolName: 'run_shell_command',
           decision: PolicyDecision.ASK_USER,
+          modes: MODES_BY_PERMISSIVENESS,
         },
       ];
 
@@ -1549,6 +1721,7 @@ describe('PolicyEngine', () => {
             toolName: 'run_shell_command',
             decision: PolicyDecision.ALLOW,
             allowRedirection: true,
+            modes: MODES_BY_PERMISSIVENESS,
           },
         ],
       };
@@ -1574,6 +1747,7 @@ describe('PolicyEngine', () => {
         {
           toolName: 'run_shell_command',
           decision: PolicyDecision.ALLOW,
+          modes: MODES_BY_PERMISSIVENESS,
         },
       ];
 
@@ -1599,12 +1773,14 @@ describe('PolicyEngine', () => {
           argsPattern: /"command":"mkdir\b/,
           decision: PolicyDecision.ALLOW,
           priority: 20,
+          modes: MODES_BY_PERMISSIVENESS,
         },
         {
           toolName: 'run_shell_command',
           argsPattern: /"command":"echo\b/,
           decision: PolicyDecision.ALLOW,
           priority: 20,
+          modes: MODES_BY_PERMISSIVENESS,
         },
       ];
 
@@ -1631,12 +1807,14 @@ describe('PolicyEngine', () => {
           argsPattern: /"command":"mkdir\b/,
           decision: PolicyDecision.ALLOW,
           priority: 20,
+          modes: MODES_BY_PERMISSIVENESS,
         },
         {
           toolName: 'run_shell_command',
           argsPattern: /"command":"echo\b/,
           decision: PolicyDecision.ALLOW,
           priority: 20,
+          modes: MODES_BY_PERMISSIVENESS,
         },
       ];
 
@@ -1668,6 +1846,7 @@ describe('PolicyEngine', () => {
           argsPattern: /"command":"echo\b/,
           decision: PolicyDecision.ALLOW,
           priority: 20,
+          modes: MODES_BY_PERMISSIVENESS,
         },
       ];
 
@@ -1695,6 +1874,7 @@ describe('PolicyEngine', () => {
           argsPattern: /"command":"echo\b/,
           decision: PolicyDecision.ALLOW,
           priority: 20,
+          modes: MODES_BY_PERMISSIVENESS,
         },
       ];
 
@@ -1728,6 +1908,7 @@ describe('PolicyEngine', () => {
           toolName: 'unknown_subagent',
           decision: PolicyDecision.ALLOW,
           priority: PRIORITY_SUBAGENT_TOOL,
+          modes: MODES_BY_PERMISSIVENESS,
         },
       ];
 
@@ -1759,6 +1940,7 @@ describe('PolicyEngine', () => {
           toolName: 'run_shell_command',
           decision: PolicyDecision.ASK_USER,
           priority: 10,
+          modes: MODES_BY_PERMISSIVENESS,
         },
       ];
 
@@ -1786,7 +1968,8 @@ describe('PolicyEngine', () => {
         {
           toolName: 'run_shell_command',
           decision: PolicyDecision.DENY,
-          priority: 2000, // Very high priority DENY (e.g. Admin)
+          priority: 2000, // Very high priority DENY (e.g. Admin),
+          modes: MODES_BY_PERMISSIVENESS,
         },
         {
           toolName: '*',
@@ -1819,6 +2002,7 @@ describe('PolicyEngine', () => {
           toolName: 'run_shell_command',
           decision: PolicyDecision.ALLOW,
           priority: 20,
+          modes: MODES_BY_PERMISSIVENESS,
         },
       ];
 
@@ -1847,6 +2031,7 @@ describe('PolicyEngine', () => {
         {
           toolName: 'test-tool',
           decision: PolicyDecision.ALLOW,
+          modes: MODES_BY_PERMISSIVENESS,
         },
       ];
       const checkers: SafetyCheckerRule[] = [
@@ -1857,6 +2042,7 @@ describe('PolicyEngine', () => {
             name: 'test-checker',
             config: { content: 'test-content' },
           },
+          modes: MODES_BY_PERMISSIVENESS,
         },
       ];
       engine = new PolicyEngine({ rules, checkers }, mockCheckerRunner);
@@ -1885,6 +2071,7 @@ describe('PolicyEngine', () => {
         {
           toolName: 'test',
           decision: PolicyDecision.ALLOW,
+          modes: MODES_BY_PERMISSIVENESS,
         },
       ];
       const checkers: SafetyCheckerRule[] = [
@@ -1894,6 +2081,7 @@ describe('PolicyEngine', () => {
             type: 'in-process',
             name: InProcessCheckerType.ALLOWED_PATH,
           },
+          modes: MODES_BY_PERMISSIVENESS,
         },
       ];
 
@@ -1912,6 +2100,7 @@ describe('PolicyEngine', () => {
         {
           toolName: 'test-tool',
           decision: PolicyDecision.ALLOW,
+          modes: MODES_BY_PERMISSIVENESS,
         },
       ];
       const checkers: SafetyCheckerRule[] = [
@@ -1922,6 +2111,7 @@ describe('PolicyEngine', () => {
             name: 'test-checker',
             config: { content: 'test-content' },
           },
+          modes: MODES_BY_PERMISSIVENESS,
         },
       ];
       engine = new PolicyEngine({ rules, checkers }, mockCheckerRunner);
@@ -1944,6 +2134,7 @@ describe('PolicyEngine', () => {
         {
           toolName: 'test-tool',
           decision: PolicyDecision.ASK_USER,
+          modes: MODES_BY_PERMISSIVENESS,
         },
       ];
       const checkers: SafetyCheckerRule[] = [
@@ -1954,6 +2145,7 @@ describe('PolicyEngine', () => {
             name: 'test-checker',
             config: { content: 'test-content' },
           },
+          modes: MODES_BY_PERMISSIVENESS,
         },
       ];
       engine = new PolicyEngine({ rules, checkers }, mockCheckerRunner);
@@ -1976,6 +2168,7 @@ describe('PolicyEngine', () => {
         {
           toolName: 'test',
           decision: PolicyDecision.ALLOW,
+          modes: MODES_BY_PERMISSIVENESS,
         },
       ];
       const checkers: SafetyCheckerRule[] = [
@@ -1985,6 +2178,7 @@ describe('PolicyEngine', () => {
             type: 'in-process',
             name: InProcessCheckerType.ALLOWED_PATH,
           },
+          modes: MODES_BY_PERMISSIVENESS,
         },
       ];
 
@@ -2004,6 +2198,7 @@ describe('PolicyEngine', () => {
         {
           toolName: 'test-tool',
           decision: PolicyDecision.ALLOW,
+          modes: MODES_BY_PERMISSIVENESS,
         },
       ];
       engine = new PolicyEngine({ rules }, mockCheckerRunner);
@@ -2037,6 +2232,7 @@ describe('PolicyEngine', () => {
         {
           toolName: 'test',
           decision: PolicyDecision.ALLOW,
+          modes: MODES_BY_PERMISSIVENESS,
         },
       ];
       const checkers: SafetyCheckerRule[] = [
@@ -2044,11 +2240,13 @@ describe('PolicyEngine', () => {
           toolName: 'test',
           priority: 10,
           checker: { type: 'external', name: 'checker1' },
+          modes: MODES_BY_PERMISSIVENESS,
         },
         {
           toolName: 'test',
           priority: 20, // Should run first
           checker: { type: 'external', name: 'checker2' },
+          modes: MODES_BY_PERMISSIVENESS,
         },
       ];
 
@@ -2086,11 +2284,13 @@ describe('PolicyEngine', () => {
         toolName: '*',
         checker: { type: 'external', name: 'checker1' },
         priority: 5,
+        modes: MODES_BY_PERMISSIVENESS,
       };
       const checker2: SafetyCheckerRule = {
         toolName: '*',
         checker: { type: 'external', name: 'checker2' },
         priority: 10,
+        modes: MODES_BY_PERMISSIVENESS,
       };
 
       engine.addChecker(checker1);
@@ -2108,16 +2308,22 @@ describe('PolicyEngine', () => {
   describe('checker matching logic', () => {
     it('should match checkers using toolName and argsPattern', async () => {
       const rules: PolicyRule[] = [
-        { toolName: 'tool', decision: PolicyDecision.ALLOW },
+        {
+          toolName: 'tool',
+          decision: PolicyDecision.ALLOW,
+          modes: MODES_BY_PERMISSIVENESS,
+        },
       ];
       const matchingChecker: SafetyCheckerRule = {
         checker: { type: 'external', name: 'matching' },
         toolName: 'tool',
         argsPattern: /"safe":true/,
+        modes: MODES_BY_PERMISSIVENESS,
       };
       const nonMatchingChecker: SafetyCheckerRule = {
         checker: { type: 'external', name: 'non-matching' },
         toolName: 'other',
+        modes: MODES_BY_PERMISSIVENESS,
       };
 
       engine = new PolicyEngine(
@@ -2143,11 +2349,16 @@ describe('PolicyEngine', () => {
 
     it('should match global wildcard (*) for checkers', async () => {
       const rules: PolicyRule[] = [
-        { toolName: '*', decision: PolicyDecision.ALLOW },
+        {
+          toolName: '*',
+          decision: PolicyDecision.ALLOW,
+          modes: MODES_BY_PERMISSIVENESS,
+        },
       ];
       const globalChecker: SafetyCheckerRule = {
         checker: { type: 'external', name: 'global' },
         toolName: '*',
+        modes: MODES_BY_PERMISSIVENESS,
       };
 
       engine = new PolicyEngine(
@@ -2180,12 +2391,14 @@ describe('PolicyEngine', () => {
           toolName: 'mcp_server_tool',
           mcpName: 'server',
           decision: PolicyDecision.ALLOW,
+          modes: MODES_BY_PERMISSIVENESS,
         },
       ];
       const wildcardChecker: SafetyCheckerRule = {
         checker: { type: 'external', name: 'wildcard' },
         toolName: 'mcp_server_*',
         mcpName: 'server',
+        modes: MODES_BY_PERMISSIVENESS,
       };
 
       engine = new PolicyEngine(
@@ -2206,7 +2419,11 @@ describe('PolicyEngine', () => {
     });
     it('should run safety checkers when decision is ASK_USER and downgrade to DENY on failure', async () => {
       const rules: PolicyRule[] = [
-        { toolName: 'tool', decision: PolicyDecision.ASK_USER },
+        {
+          toolName: 'tool',
+          decision: PolicyDecision.ASK_USER,
+          modes: MODES_BY_PERMISSIVENESS,
+        },
       ];
       const checkers: SafetyCheckerRule[] = [
         {
@@ -2215,6 +2432,7 @@ describe('PolicyEngine', () => {
             type: 'in-process',
             name: InProcessCheckerType.ALLOWED_PATH,
           },
+          modes: MODES_BY_PERMISSIVENESS,
         },
       ];
 
@@ -2232,7 +2450,11 @@ describe('PolicyEngine', () => {
 
     it('should run safety checkers when decision is ASK_USER and keep ASK_USER on success', async () => {
       const rules: PolicyRule[] = [
-        { toolName: 'tool', decision: PolicyDecision.ASK_USER },
+        {
+          toolName: 'tool',
+          decision: PolicyDecision.ASK_USER,
+          modes: MODES_BY_PERMISSIVENESS,
+        },
       ];
       const checkers: SafetyCheckerRule[] = [
         {
@@ -2241,6 +2463,7 @@ describe('PolicyEngine', () => {
             type: 'in-process',
             name: InProcessCheckerType.ALLOWED_PATH,
           },
+          modes: MODES_BY_PERMISSIVENESS,
         },
       ];
 
@@ -2257,7 +2480,11 @@ describe('PolicyEngine', () => {
 
     it('should downgrade ALLOW to ASK_USER if checker returns ASK_USER', async () => {
       const rules: PolicyRule[] = [
-        { toolName: 'tool', decision: PolicyDecision.ALLOW },
+        {
+          toolName: 'tool',
+          decision: PolicyDecision.ALLOW,
+          modes: MODES_BY_PERMISSIVENESS,
+        },
       ];
       const checkers: SafetyCheckerRule[] = [
         {
@@ -2266,6 +2493,7 @@ describe('PolicyEngine', () => {
             type: 'in-process',
             name: InProcessCheckerType.ALLOWED_PATH,
           },
+          modes: MODES_BY_PERMISSIVENESS,
         },
       ];
 
@@ -2301,7 +2529,13 @@ describe('PolicyEngine', () => {
       },
       {
         name: 'should apply rules without explicit modes to all modes',
-        rules: [{ toolName: 'tool1', decision: PolicyDecision.DENY }],
+        rules: [
+          {
+            toolName: 'tool1',
+            decision: PolicyDecision.DENY,
+            modes: MODES_BY_PERMISSIVENESS,
+          },
+        ],
         allToolNames: ['tool1', 'tool2'],
         expected: ['tool1'],
       },
@@ -2313,13 +2547,13 @@ describe('PolicyEngine', () => {
             decision: PolicyDecision.ALLOW,
             argsPattern: /safe/,
             priority: 100,
-            modes: [ApprovalMode.DEFAULT],
+            modes: MODES_BY_PERMISSIVENESS,
           },
           {
             toolName: 'tool1',
             decision: PolicyDecision.DENY,
             priority: 10,
-            modes: [ApprovalMode.DEFAULT],
+            modes: MODES_BY_PERMISSIVENESS,
           },
         ],
         allToolNames: ['tool1'],
@@ -2331,12 +2565,12 @@ describe('PolicyEngine', () => {
           {
             toolName: 'tool1',
             decision: PolicyDecision.DENY,
-            modes: [ApprovalMode.DEFAULT],
+            modes: MODES_BY_PERMISSIVENESS,
           },
           {
             toolName: 'tool2',
             decision: PolicyDecision.ALLOW,
-            modes: [ApprovalMode.DEFAULT],
+            modes: MODES_BY_PERMISSIVENESS,
           },
         ],
         allToolNames: ['tool1', 'tool2', 'tool3'],
@@ -2349,13 +2583,13 @@ describe('PolicyEngine', () => {
             toolName: 'tool1',
             decision: PolicyDecision.DENY,
             priority: 100,
-            modes: [ApprovalMode.DEFAULT],
+            modes: MODES_BY_PERMISSIVENESS,
           },
           {
             toolName: 'tool1',
             decision: PolicyDecision.ALLOW,
             priority: 10,
-            modes: [ApprovalMode.DEFAULT],
+            modes: MODES_BY_PERMISSIVENESS,
           },
         ],
         allToolNames: ['tool1'],
@@ -2368,13 +2602,13 @@ describe('PolicyEngine', () => {
             toolName: 'tool1',
             decision: PolicyDecision.ALLOW,
             priority: 100,
-            modes: [ApprovalMode.DEFAULT],
+            modes: MODES_BY_PERMISSIVENESS,
           },
           {
             toolName: 'tool1',
             decision: PolicyDecision.DENY,
             priority: 10,
-            modes: [ApprovalMode.DEFAULT],
+            modes: MODES_BY_PERMISSIVENESS,
           },
         ],
         allToolNames: ['tool1'],
@@ -2386,13 +2620,13 @@ describe('PolicyEngine', () => {
           {
             toolName: 'tool1',
             decision: PolicyDecision.ASK_USER,
-            modes: [ApprovalMode.DEFAULT],
+            modes: MODES_BY_PERMISSIVENESS,
             interactive: true,
           },
           {
             toolName: 'tool1',
             decision: PolicyDecision.DENY,
-            modes: [ApprovalMode.DEFAULT],
+            modes: MODES_BY_PERMISSIVENESS,
             interactive: false,
           },
         ],
@@ -2407,10 +2641,12 @@ describe('PolicyEngine', () => {
             toolName: 'ask_user',
             decision: PolicyDecision.DENY,
             interactive: false,
+            modes: MODES_BY_PERMISSIVENESS,
           },
           {
             toolName: 'read_file',
             decision: PolicyDecision.ALLOW,
+            modes: MODES_BY_PERMISSIVENESS,
           },
         ],
         nonInteractive: true,
@@ -2424,7 +2660,7 @@ describe('PolicyEngine', () => {
             toolName: 'tool1',
             decision: PolicyDecision.DENY,
             argsPattern: /something/,
-            modes: [ApprovalMode.DEFAULT],
+            modes: MODES_BY_PERMISSIVENESS,
           },
         ],
         allToolNames: ['tool1'],
@@ -2483,7 +2719,7 @@ describe('PolicyEngine', () => {
             toolName: 'mcp_server_*',
             mcpName: 'server',
             decision: PolicyDecision.DENY,
-            modes: [ApprovalMode.DEFAULT],
+            modes: MODES_BY_PERMISSIVENESS,
           },
         ],
         allToolNames: [
@@ -2506,14 +2742,14 @@ describe('PolicyEngine', () => {
             mcpName: 'server',
             decision: PolicyDecision.DENY,
             priority: 100,
-            modes: [ApprovalMode.DEFAULT],
+            modes: MODES_BY_PERMISSIVENESS,
           },
           {
             toolName: 'mcp_server_tool1',
             mcpName: 'server',
             decision: PolicyDecision.DENY, // redundant but tests ordering
             priority: 10,
-            modes: [ApprovalMode.DEFAULT],
+            modes: MODES_BY_PERMISSIVENESS,
           },
         ],
         allToolNames: ['mcp_server_tool1', 'mcp_server_tool2'],
@@ -2547,6 +2783,7 @@ describe('PolicyEngine', () => {
             toolName: 'run_shell_command',
             decision: PolicyDecision.ASK_USER,
             priority: 10,
+            modes: MODES_BY_PERMISSIVENESS,
           },
         ],
         allToolNames: ['write_file', 'run_shell_command', 'read_file'],
@@ -2560,14 +2797,14 @@ describe('PolicyEngine', () => {
             mcpName: 'server',
             decision: PolicyDecision.ALLOW,
             priority: 100,
-            modes: [ApprovalMode.DEFAULT],
+            modes: MODES_BY_PERMISSIVENESS,
           },
           {
             toolName: 'mcp_server_tool1',
             mcpName: 'server',
             decision: PolicyDecision.DENY,
             priority: 10,
-            modes: [ApprovalMode.DEFAULT],
+            modes: MODES_BY_PERMISSIVENESS,
           },
         ],
         allToolNames: ['mcp_server_tool1'],
@@ -2581,6 +2818,7 @@ describe('PolicyEngine', () => {
             toolName: '*',
             decision: PolicyDecision.DENY,
             priority: 10,
+            modes: MODES_BY_PERMISSIVENESS,
           },
         ],
         allToolNames: ['toolA', 'toolB', 'mcp_server_toolC'],
@@ -2593,6 +2831,7 @@ describe('PolicyEngine', () => {
             toolName: 'mcp_*',
             decision: PolicyDecision.DENY,
             priority: 10,
+            modes: MODES_BY_PERMISSIVENESS,
           },
         ],
         allToolNames: ['localTool', 'mcp_myserver_mytool'],
@@ -2608,6 +2847,7 @@ describe('PolicyEngine', () => {
             toolName: 'mcp_server_*',
             decision: PolicyDecision.DENY,
             priority: 10,
+            modes: MODES_BY_PERMISSIVENESS,
           },
         ],
         allToolNames: [
@@ -2652,6 +2892,7 @@ describe('PolicyEngine', () => {
             toolAnnotations: { destructiveHint: true },
             decision: PolicyDecision.DENY,
             priority: 10,
+            modes: MODES_BY_PERMISSIVENESS,
           },
         ],
       });
@@ -2670,6 +2911,7 @@ describe('PolicyEngine', () => {
             toolAnnotations: { destructiveHint: true },
             decision: PolicyDecision.DENY,
             priority: 10,
+            modes: MODES_BY_PERMISSIVENESS,
           },
         ],
       });
@@ -2692,6 +2934,7 @@ describe('PolicyEngine', () => {
             toolAnnotations: { destructiveHint: true },
             decision: PolicyDecision.DENY,
             priority: 10,
+            modes: MODES_BY_PERMISSIVENESS,
           },
         ],
       });
@@ -2714,6 +2957,7 @@ describe('PolicyEngine', () => {
             toolAnnotations: { destructiveHint: true },
             decision: PolicyDecision.DENY,
             priority: 10,
+            modes: MODES_BY_PERMISSIVENESS,
           },
         ],
       });
@@ -2746,11 +2990,13 @@ describe('PolicyEngine', () => {
             toolName: 'glob',
             decision: PolicyDecision.ALLOW,
             priority: 70,
+            modes: MODES_BY_PERMISSIVENESS,
           },
           {
             toolName: 'read_file',
             decision: PolicyDecision.ALLOW,
             priority: 70,
+            modes: MODES_BY_PERMISSIVENESS,
           },
           {
             // Simulates plan.toml: mcpName="*" → toolName="mcp_*"
@@ -2758,11 +3004,13 @@ describe('PolicyEngine', () => {
             toolAnnotations: { readOnlyHint: true },
             decision: PolicyDecision.ASK_USER,
             priority: 70,
+            modes: MODES_BY_PERMISSIVENESS,
           },
           {
             toolName: '*',
             decision: PolicyDecision.DENY,
             priority: 60,
+            modes: MODES_BY_PERMISSIVENESS,
           },
         ],
       });
@@ -2805,11 +3053,13 @@ describe('PolicyEngine', () => {
             toolAnnotations: { readOnlyHint: true },
             decision: PolicyDecision.ASK_USER,
             priority: 70,
+            modes: MODES_BY_PERMISSIVENESS,
           },
           {
             toolName: '*',
             decision: PolicyDecision.DENY,
             priority: 60,
+            modes: MODES_BY_PERMISSIVENESS,
           },
         ],
       });
@@ -2841,16 +3091,19 @@ describe('PolicyEngine', () => {
             toolName: 'glob',
             decision: PolicyDecision.ALLOW,
             priority: 70,
+            modes: MODES_BY_PERMISSIVENESS,
           },
           {
             toolName: 'read_file',
             decision: PolicyDecision.ALLOW,
             priority: 70,
+            modes: MODES_BY_PERMISSIVENESS,
           },
           {
             toolName: '*',
             decision: PolicyDecision.DENY,
             priority: 60,
+            modes: MODES_BY_PERMISSIVENESS,
           },
         ],
       });
@@ -3127,7 +3380,7 @@ describe('PolicyEngine', () => {
           toolName: 'exit_plan_mode',
           decision: PolicyDecision.DENY,
           priority: 10,
-          modes: [ApprovalMode.DEFAULT],
+          modes: MODES_BY_PERMISSIVENESS,
           denyMessage: 'You are not in Plan Mode.',
         },
       ];
@@ -3183,23 +3436,31 @@ describe('PolicyEngine', () => {
         toolName: 'rule1',
         decision: PolicyDecision.ALLOW,
         priority: 1.1,
+        modes: MODES_BY_PERMISSIVENESS,
       });
       engine.addRule({
         toolName: 'rule2',
         decision: PolicyDecision.ALLOW,
         priority: 1.5,
+        modes: MODES_BY_PERMISSIVENESS,
       });
       engine.addRule({
         toolName: 'rule3',
         decision: PolicyDecision.ALLOW,
         priority: 2.1,
+        modes: MODES_BY_PERMISSIVENESS,
       });
       engine.addRule({
         toolName: 'rule4',
         decision: PolicyDecision.ALLOW,
         priority: 0.5,
+        modes: MODES_BY_PERMISSIVENESS,
       });
-      engine.addRule({ toolName: 'rule5', decision: PolicyDecision.ALLOW }); // priority undefined -> 0
+      engine.addRule({
+        toolName: 'rule5',
+        decision: PolicyDecision.ALLOW,
+        modes: MODES_BY_PERMISSIVENESS,
+      }); // priority undefined -> 0
 
       expect(engine.getRules()).toHaveLength(5);
 
@@ -3219,12 +3480,18 @@ describe('PolicyEngine', () => {
         toolName: 'rule1',
         decision: PolicyDecision.ALLOW,
         priority: 0.5,
+        modes: MODES_BY_PERMISSIVENESS,
       });
-      engine.addRule({ toolName: 'rule2', decision: PolicyDecision.ALLOW }); // defaults to 0
+      engine.addRule({
+        toolName: 'rule2',
+        decision: PolicyDecision.ALLOW,
+        modes: MODES_BY_PERMISSIVENESS,
+      }); // defaults to 0
       engine.addRule({
         toolName: 'rule3',
         decision: PolicyDecision.ALLOW,
         priority: 1.5,
+        modes: MODES_BY_PERMISSIVENESS,
       });
 
       expect(engine.getRules()).toHaveLength(3);
@@ -3243,16 +3510,19 @@ describe('PolicyEngine', () => {
         toolName: 'rule1',
         decision: PolicyDecision.ALLOW,
         source: 'source1',
+        modes: MODES_BY_PERMISSIVENESS,
       });
       engine.addRule({
         toolName: 'rule2',
         decision: PolicyDecision.ALLOW,
         source: 'source2',
+        modes: MODES_BY_PERMISSIVENESS,
       });
       engine.addRule({
         toolName: 'rule3',
         decision: PolicyDecision.ALLOW,
         source: 'source1',
+        modes: MODES_BY_PERMISSIVENESS,
       });
 
       expect(engine.getRules()).toHaveLength(3);
@@ -3271,16 +3541,19 @@ describe('PolicyEngine', () => {
         toolName: '*',
         checker: { type: 'external', name: 'c1' },
         priority: 1.1,
+        modes: MODES_BY_PERMISSIVENESS,
       });
       engine.addChecker({
         toolName: '*',
         checker: { type: 'external', name: 'c2' },
         priority: 1.9,
+        modes: MODES_BY_PERMISSIVENESS,
       });
       engine.addChecker({
         toolName: '*',
         checker: { type: 'external', name: 'c3' },
         priority: 2.5,
+        modes: MODES_BY_PERMISSIVENESS,
       });
 
       expect(engine.getCheckers()).toHaveLength(3);
@@ -3299,16 +3572,19 @@ describe('PolicyEngine', () => {
         toolName: '*',
         checker: { type: 'external', name: 'c1' },
         source: 'sourceA',
+        modes: MODES_BY_PERMISSIVENESS,
       });
       engine.addChecker({
         toolName: '*',
         checker: { type: 'external', name: 'c2' },
         source: 'sourceB',
+        modes: MODES_BY_PERMISSIVENESS,
       });
       engine.addChecker({
         toolName: '*',
         checker: { type: 'external', name: 'c3' },
         source: 'sourceA',
+        modes: MODES_BY_PERMISSIVENESS,
       });
 
       expect(engine.getCheckers()).toHaveLength(3);
@@ -3329,6 +3605,7 @@ describe('PolicyEngine', () => {
             toolAnnotations: { readOnlyHint: true },
             decision: PolicyDecision.ALLOW,
             priority: 10,
+            modes: MODES_BY_PERMISSIVENESS,
           },
         ],
         defaultDecision: PolicyDecision.DENY,
@@ -3359,11 +3636,13 @@ describe('PolicyEngine', () => {
             toolAnnotations: { experimental: true },
             decision: PolicyDecision.DENY,
             priority: 20,
+            modes: MODES_BY_PERMISSIVENESS,
           },
           {
             toolName: 'mcp_*',
             decision: PolicyDecision.ALLOW,
             priority: 10,
+            modes: MODES_BY_PERMISSIVENESS,
           },
         ],
       });
@@ -3409,6 +3688,7 @@ describe('PolicyEngine', () => {
         decision: PolicyDecision.ALLOW,
         priority: 3 + ALWAYS_ALLOW_PRIORITY_FRACTION / 1000, // 3.95
         source: 'Dynamic (Confirmed)',
+        modes: MODES_BY_PERMISSIVENESS,
       };
 
       const engine = new PolicyEngine({
@@ -3430,6 +3710,7 @@ describe('PolicyEngine', () => {
         decision: PolicyDecision.ALLOW,
         priority: 3 + ALWAYS_ALLOW_PRIORITY_FRACTION / 1000, // 3.95
         source: 'Dynamic (Confirmed)',
+        modes: MODES_BY_PERMISSIVENESS,
       };
 
       const engine = new PolicyEngine({
@@ -3451,6 +3732,7 @@ describe('PolicyEngine', () => {
         decision: PolicyDecision.ALLOW,
         priority: 1.5, // Not a .950 fraction
         source: 'Normal Rule',
+        modes: MODES_BY_PERMISSIVENESS,
       };
 
       const engine = new PolicyEngine({
@@ -3478,6 +3760,7 @@ describe('PolicyEngine', () => {
         toolName: 'test-tool',
         decision: PolicyDecision.ALLOW,
         priority: 3 + ALWAYS_ALLOW_PRIORITY_FRACTION / 1000,
+        modes: MODES_BY_PERMISSIVENESS,
       };
 
       const engine = new PolicyEngine({
@@ -3498,6 +3781,7 @@ describe('PolicyEngine', () => {
         toolName: 'test-tool',
         decision: PolicyDecision.ALLOW,
         priority: 3 + ALWAYS_ALLOW_PRIORITY_FRACTION / 1000,
+        modes: MODES_BY_PERMISSIVENESS,
       };
 
       const engine = new PolicyEngine({
@@ -3522,6 +3806,7 @@ describe('PolicyEngine', () => {
             toolName: 'my_tool',
             decision: PolicyDecision.ALLOW,
             interactive: true,
+            modes: MODES_BY_PERMISSIVENESS,
           },
         ],
         nonInteractive: true,
@@ -3542,6 +3827,7 @@ describe('PolicyEngine', () => {
             toolName: 'my_tool',
             decision: PolicyDecision.ALLOW,
             interactive: true,
+            modes: MODES_BY_PERMISSIVENESS,
           },
         ],
         nonInteractive: false,
@@ -3562,6 +3848,7 @@ describe('PolicyEngine', () => {
             toolName: 'my_tool',
             decision: PolicyDecision.ALLOW,
             interactive: false,
+            modes: MODES_BY_PERMISSIVENESS,
           },
         ],
         nonInteractive: false,
@@ -3582,6 +3869,7 @@ describe('PolicyEngine', () => {
             toolName: 'my_tool',
             decision: PolicyDecision.ALLOW,
             interactive: false,
+            modes: MODES_BY_PERMISSIVENESS,
           },
         ],
         nonInteractive: true,
@@ -3599,6 +3887,7 @@ describe('PolicyEngine', () => {
       const rule: PolicyRule = {
         toolName: 'my_tool',
         decision: PolicyDecision.ALLOW,
+        modes: MODES_BY_PERMISSIVENESS,
       };
 
       const engineInteractive = new PolicyEngine({

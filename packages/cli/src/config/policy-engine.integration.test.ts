@@ -7,6 +7,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import {
   ApprovalMode,
+  MODES_BY_PERMISSIVENESS,
   PolicyDecision,
   PolicyEngine,
 } from '@google/gemini-cli-core';
@@ -385,6 +386,7 @@ describe('Policy Engine Integration Tests', () => {
         toolAnnotations: { readOnlyHint: true },
         decision: PolicyDecision.ALLOW,
         priority: 10,
+        modes: MODES_BY_PERMISSIVENESS,
       });
 
       const engine = new PolicyEngine(config);

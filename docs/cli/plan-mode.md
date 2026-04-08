@@ -177,9 +177,9 @@ but you can customize these rules by creating your own policies in your
 #### Global vs. mode-specific rules
 
 As described in the
-[policy engine documentation](../reference/policy-engine.md#approval-modes), any
-rule that does not explicitly specify `modes` is considered "always active" and
-will apply to Plan Mode as well.
+[policy engine documentation](../reference/policy-engine.md#approval-modes),
+every rule in a TOML policy file must explicitly specify the `modes` it applies
+to.
 
 To maintain the integrity of Plan Mode as a safe research environment,
 persistent tool approvals are context-aware. Approvals granted in modes like
