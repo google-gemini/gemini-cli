@@ -125,7 +125,11 @@ export class A2AResultReassembler {
   private pushMessage(message: Message | undefined) {
     if (!message) return;
     const text = extractPartsText(message.parts, '');
-    if (text && this.messageLog[this.messageLog.length - 1] !== text) {
+    if (
+      text &&
+      (this.messageLog.length === 0 ||
+        this.messageLog[this.messageLog.length - 1] !== text)
+    ) {
       this.messageLog.push(text);
     }
   }
