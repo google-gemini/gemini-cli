@@ -98,7 +98,7 @@ export class PipelineOrchestrator {
        // Fire all workers that care about new nodes
        for (const worker of this.instantiatedWorkers.values()) {
           if (worker.triggers.onNodesAdded) {
-             const inboxSnapshot = new InboxSnapshotImpl(this.env.inbox.getMessages());
+             const inboxSnapshot = new InboxSnapshotImpl(this.env.inbox.getMessages() || []);
              // Fire and forget
              worker.execute({ targets: [], inbox: inboxSnapshot }).catch(e => {
                 debugLogger.error(`Worker ${worker.name} failed onNodesAdded:`, e);
@@ -177,7 +177,7 @@ export class PipelineOrchestrator {
     const pipelines = this.config.pipelines.filter((p) => p.triggers.includes(trigger));
     
     // Freeze the inbox for this pipeline run
-    const inboxSnapshot = new InboxSnapshotImpl(this.env.inbox.getMessages());
+    const inboxSnapshot = new InboxSnapshotImpl(this.env.inbox.getMessages() || []);
 
     for (const pipeline of pipelines) {
       for (const procDef of pipeline.processors) {
@@ -232,7 +232,7 @@ export class PipelineOrchestrator {
     if (!ship || ship.length === 0) return;
 
     let currentShip = ship;
-    const inboxSnapshot = new InboxSnapshotImpl(this.env.inbox.getMessages());
+    const inboxSnapshot = new InboxSnapshotImpl(this.env.inbox.getMessages() || []);
 
     for (const procDef of pipeline.processors) {
       const processor = this.instantiatedProcessors.get(procDef.processorId);
