@@ -33,6 +33,7 @@ import {
   type AdminControlsSettings,
   debugLogger,
   isHeadlessMode,
+  startGlobalMemoryMonitoring,
 } from '@google/gemini-cli-core';
 
 import { loadCliConfig, parseArguments } from './config/config.js';
@@ -495,6 +496,9 @@ export async function main() {
     // Register config for telemetry shutdown
     // This ensures telemetry (including SessionEnd hooks) is properly flushed on exit
     registerTelemetryConfig(config);
+
+    // Start memory monitoring for reactive diagnostic triggering
+    startGlobalMemoryMonitoring(config); // defaults to 10 seconds
 
     const policyEngine = config.getPolicyEngine();
     const messageBus = config.getMessageBus();

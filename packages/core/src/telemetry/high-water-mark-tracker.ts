@@ -12,12 +12,21 @@ export class HighWaterMarkTracker {
   private waterMarks: Map<string, number> = new Map();
   private lastUpdateTimes: Map<string, number> = new Map();
   private readonly growthThresholdPercent: number;
+  private diagnosticCallback?: (metricType: string, currentValue: number, previousWaterMark: number) => void;
 
   constructor(growthThresholdPercent: number = 5) {
     if (growthThresholdPercent < 0) {
       throw new Error('growthThresholdPercent must be non-negative.');
     }
     this.growthThresholdPercent = growthThresholdPercent;
+  }
+
+  /**
+   * Sets a callback that will be invoked whenever a metric triggers a recording,
+   * providing the opportunity to start an investigation *before* the watermark is updated.
+   */
+  setDiagnosticCallback(cb: (metricType: string, currentValue: number, previousWaterMark: number) => void): void {
+    this.diagnosticCallback = cb;
   }
 
   /**
@@ -45,6 +54,15 @@ export class HighWaterMarkTracker {
       currentWaterMark * (1 + this.growthThresholdPercent / 100);
 
     if (currentValue > thresholdValue) {
+      if (this.diagnosticCallback) {
+        // Run asynchronously to avoid blocking the fast memory tracking loop
+        setImmediate(() => {
+          if (this.diagnosticCallback) {
+            this.diagnosticCallback(metricType, currentValue, currentWaterMark);
+          }
+        });
+      }
+      
       // Update high-water mark
       this.waterMarks.set(metricType, currentValue);
       this.lastUpdateTimes.set(metricType, now);
