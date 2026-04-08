@@ -14,6 +14,7 @@ import { join, dirname, extname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { canUseRipgrep } from '../packages/core/src/tools/ripGrep.js';
 import { disableMouseTracking } from '@google/gemini-cli-core';
+import { isolateTestEnv } from '../packages/test-utils/src/env-setup.js';
 import { createServer, type Server } from 'node:http';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -88,15 +89,8 @@ export async function setup() {
   runDir = join(integrationTestsDir, `${Date.now()}`);
   await mkdir(runDir, { recursive: true });
 
-  // Set the home directory to the test run directory to avoid conflicts
-  // with the user's local config.
-  process.env['HOME'] = runDir;
-  if (process.platform === 'win32') {
-    process.env['USERPROFILE'] = runDir;
-  }
-  // We also need to set the config dir explicitly, since the code might
-  // construct the path before the HOME env var is set.
-  process.env['GEMINI_CONFIG_DIR'] = join(runDir, '.gemini');
+  // Isolate environment variables
+  isolateTestEnv(runDir);
 
   // Download ripgrep to avoid race conditions in parallel tests
   const available = await canUseRipgrep();
@@ -127,10 +121,6 @@ export async function setup() {
   }
 
   process.env['INTEGRATION_TEST_FILE_DIR'] = runDir;
-  process.env['GEMINI_CLI_INTEGRATION_TEST'] = 'true';
-  // Force file storage to avoid keychain prompts/hangs in CI, especially on macOS
-  process.env['GEMINI_FORCE_FILE_STORAGE'] = 'true';
-  process.env['TELEMETRY_LOG_FILE'] = join(runDir, 'telemetry.log');
 
   if (process.env['KEEP_OUTPUT']) {
     console.log(`Keeping output for test run in: ${runDir}`);
