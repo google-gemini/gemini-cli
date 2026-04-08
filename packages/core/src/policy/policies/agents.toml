@@ -7,3 +7,4 @@ name = "Allow invoke_agent"
 toolName = "invoke_agent"
 decision = "allow"
 priority = 50
+modes = ["default", "autoEdit", "yolo"]
