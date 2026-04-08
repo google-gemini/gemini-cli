@@ -90,7 +90,7 @@ export interface CommandContext {
      */
     setConfirmationRequest: (value: ConfirmationRequest) => void;
     removeComponent: () => void;
-    toggleBackgroundShell: () => void;
+    toggleBackgroundTasks: () => void;
     toggleShortcutsHelp: () => void;
   };
   // Session-specific data
@@ -239,6 +239,15 @@ export interface SlashCommand {
    * Defaults to true. Set to false for fast completions to avoid flicker.
    */
   showCompletionLoading?: boolean;
+
+  /**
+   * Whether the command expects arguments.
+   * If false, and the command is a subcommand, the command parser may treat
+   * any following text as arguments for the parent command instead of this subcommand,
+   * provided the parent command has an action.
+   * Defaults to true.
+   */
+  takesArgs?: boolean;
 
   subCommands?: SlashCommand[];
 }

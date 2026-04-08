@@ -13,7 +13,7 @@ import type {
   HistoryItemToolGroup,
   IndividualToolCallDisplay,
 } from '../types.js';
-import type { BackgroundShell } from '../hooks/shellReducer.js';
+import type { BackgroundTask } from '../hooks/shellReducer.js';
 import type { TrackedToolCall } from '../hooks/useToolScheduler.js';
 
 function isTrackedToolCall(
@@ -33,7 +33,7 @@ export function getToolGroupBorderAppearance(
   activeShellPtyId: number | null | undefined,
   embeddedShellFocused: boolean | undefined,
   allPendingItems: HistoryItemWithoutId[] = [],
-  backgroundShells: Map<number, BackgroundShell> = new Map(),
+  backgroundTasks: Map<number, BackgroundTask> = new Map(),
 ): { borderColor: string; borderDimColor: boolean } {
   if (item.type !== 'tool_group') {
     return { borderColor: '', borderDimColor: false };
@@ -100,7 +100,7 @@ export function getToolGroupBorderAppearance(
   // If we have an active PTY that isn't a background shell, then the current
   // pending batch is definitely a shell batch.
   const isCurrentlyInShellTurn =
-    !!activeShellPtyId && !backgroundShells.has(activeShellPtyId);
+    !!activeShellPtyId && !backgroundTasks.has(activeShellPtyId);
 
   const isShell =
     isShellCommand || (item.tools.length === 0 && isCurrentlyInShellTurn);

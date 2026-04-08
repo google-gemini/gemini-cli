@@ -14,10 +14,11 @@ import type { Part } from '@google/genai';
 import type { GeminiClient } from '../core/client.js';
 import type { Config } from '../config/config.js';
 import type { ToolCallRequestInfo } from '../scheduler/types.js';
-import type { Scheduler } from '../scheduler/scheduler.js';
+import { Scheduler } from '../scheduler/scheduler.js';
 import { recordToolCallInteractions } from '../code_assist/telemetry.js';
 import { ToolErrorType, isFatalToolError } from '../tools/tool-error.js';
 import { debugLogger } from '../utils/debugLogger.js';
+import type { EditorType } from '../utils/editor.js';
 import {
   buildToolResponseData,
   contentPartsToGeminiParts,
@@ -45,14 +46,17 @@ function isAbortLikeError(err: unknown): boolean {
 }
 
 export interface LegacyAgentSessionDeps {
-  client: GeminiClient;
-  scheduler: Scheduler;
   config: Config;
-  promptId: string;
+  client?: GeminiClient;
+  scheduler?: Scheduler;
+  promptId?: string;
   streamId?: string;
+  getPreferredEditor?: () => EditorType | undefined;
 }
 
-class LegacyAgentProtocol implements AgentProtocol {
+const schedulerMap = new WeakMap<Config, Scheduler>();
+
+export class LegacyAgentProtocol implements AgentProtocol {
   private _events: AgentEvent[] = [];
   private _subscribers = new Set<(event: AgentEvent) => void>();
   private _translationState: TranslationState;
@@ -69,10 +73,26 @@ class LegacyAgentProtocol implements AgentProtocol {
   constructor(deps: LegacyAgentSessionDeps) {
     this._translationState = createTranslationState(deps.streamId);
     this._nextStreamIdOverride = deps.streamId;
-    this._client = deps.client;
-    this._scheduler = deps.scheduler;
     this._config = deps.config;
-    this._promptId = deps.promptId;
+    this._client = deps.client ?? deps.config.getGeminiClient();
+    this._promptId = deps.promptId ?? deps.config.promptId ?? '';
+
+    if (deps.scheduler) {
+      this._scheduler = deps.scheduler;
+    } else {
+      let scheduler = schedulerMap.get(deps.config);
+      if (!scheduler) {
+        const sessionId = deps.config.getSessionId();
+        const schedulerId = `legacy-agent-scheduler-${sessionId}`;
+        scheduler = new Scheduler({
+          context: deps.config,
+          schedulerId,
+          getPreferredEditor: deps.getPreferredEditor ?? (() => undefined),
+        });
+        schedulerMap.set(deps.config, scheduler);
+      }
+      this._scheduler = scheduler;
+    }
   }
 
   get events(): readonly AgentEvent[] {
@@ -105,12 +125,16 @@ class LegacyAgentProtocol implements AgentProtocol {
 
     this._beginNewStream();
     const streamId = this._translationState.streamId;
-    const parts = contentPartsToGeminiParts(message);
-    const userMessage = this._makeUserMessageEvent(message, payload._meta);
+    const parts = contentPartsToGeminiParts(message.content);
+    const userMessage = this._makeUserMessageEvent(
+      message.content,
+      message.displayContent,
+      payload._meta,
+    );
 
     this._emit([userMessage]);
 
-    this._scheduleRunLoop(parts);
+    this._scheduleRunLoop(parts, message.displayContent);
 
     return { streamId };
   }
@@ -119,18 +143,24 @@ class LegacyAgentProtocol implements AgentProtocol {
     this._abortController.abort();
   }
 
-  private _scheduleRunLoop(initialParts: Part[]): void {
+  private _scheduleRunLoop(
+    initialParts: Part[],
+    displayContent?: string,
+  ): void {
     // Use a macrotask so send() resolves with the streamId before agent_start
     // is emitted and consumers can attach to the stream without racing startup.
     setTimeout(() => {
-      void this._runLoopInBackground(initialParts);
+      void this._runLoopInBackground(initialParts, displayContent);
     }, 0);
   }
 
-  private async _runLoopInBackground(initialParts: Part[]): Promise<void> {
+  private async _runLoopInBackground(
+    initialParts: Part[],
+    displayContent?: string,
+  ): Promise<void> {
     this._ensureAgentStart();
     try {
-      await this._runLoop(initialParts);
+      await this._runLoop(initialParts, displayContent);
     } catch (err: unknown) {
       if (this._abortController.signal.aborted || isAbortLikeError(err)) {
         this._ensureAgentEnd('aborted');
@@ -141,8 +171,12 @@ class LegacyAgentProtocol implements AgentProtocol {
     }
   }
 
-  private async _runLoop(initialParts: Part[]): Promise<void> {
+  private async _runLoop(
+    initialParts: Part[],
+    initialDisplayContent?: string,
+  ): Promise<void> {
     let currentParts: Part[] = initialParts;
+    let currentDisplayContent = initialDisplayContent;
     let turnCount = 0;
     const maxTurns = this._config.getMaxSessionTurns();
 
@@ -162,7 +196,11 @@ class LegacyAgentProtocol implements AgentProtocol {
         currentParts,
         this._abortController.signal,
         this._promptId,
+        undefined,
+        false,
+        currentDisplayContent,
       );
+      currentDisplayContent = undefined;
 
       for await (const event of responseStream) {
         if (this._abortController.signal.aborted) {
@@ -383,13 +421,17 @@ class LegacyAgentProtocol implements AgentProtocol {
 
   private _makeUserMessageEvent(
     content: ContentPart[],
+    displayContent?: string,
     meta?: Record<string, unknown>,
   ): AgentEvent<'message'> {
+    const eventContent: ContentPart[] = displayContent
+      ? [{ type: 'text', text: displayContent }]
+      : content;
     const event = {
       ...this._nextEventFields(),
       type: 'message',
       role: 'user',
-      content,
+      content: eventContent,
       ...(meta ? { _meta: meta } : {}),
     } satisfies AgentEvent<'message'>;
     return event;
