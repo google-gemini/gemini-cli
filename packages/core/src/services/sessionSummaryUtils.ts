@@ -185,7 +185,7 @@ export async function getPreviousSession(
     // Iterate through sessions to find the first eligible one.
     // The most recent file is typically the current active session (few messages),
     // so we skip past ineligible sessions.
-    for (const file of sessionFiles) {
+    for (const file of sessionFiles.slice(0, 20)) {
       const filePath = path.join(chatsDir, file);
 
       try {
