@@ -298,6 +298,13 @@ export type HistoryItemSubagent = HistoryItemBase & {
   history: SubagentActivityItem[];
 };
 
+export type HistoryItemBtw = HistoryItemBase & {
+  type: 'btw';
+  prompt: string;
+  text: string;
+  errorText?: string;
+};
+
 export interface ToolDefinition {
   name: string;
   displayName: string;
@@ -404,7 +411,8 @@ export type HistoryItemWithoutId =
   | HistoryItemChatList
   | HistoryItemThinking
   | HistoryItemHint
-  | HistoryItemSubagent;
+  | HistoryItemSubagent
+  | HistoryItemBtw;
 
 export type HistoryItem = HistoryItemWithoutId & { id: number };
 

@@ -156,6 +156,7 @@ import { useInputHistoryStore } from './hooks/useInputHistoryStore.js';
 import { useBanner } from './hooks/useBanner.js';
 import { useTerminalSetupPrompt } from './utils/terminalSetup.js';
 import { useHookDisplayState } from './hooks/useHookDisplayState.js';
+import { useBtwSessions } from './hooks/useBtwSessions.js';
 import { useBackgroundTaskManager } from './hooks/useBackgroundTaskManager.js';
 import {
   WARNING_PROMPT_DURATION_MS,
@@ -942,6 +943,8 @@ Logging in with Google... Restarting Gemini CLI to continue.
     toggleCleanUiDetailsVisible,
     revealCleanUiDetailsTemporarily,
   } = useVisibilityToggle();
+  const { pendingHistoryItems: pendingBtwHistoryItems, startBtwSession } =
+    useBtwSessions(config, historyManager.addItem);
 
   const slashCommandActions = useMemo(
     () => ({
@@ -978,6 +981,7 @@ Logging in with Google... Restarting Gemini CLI to continue.
         }
       },
       toggleShortcutsHelp: () => setShortcutsHelpVisible((visible) => !visible),
+      startBtwSession,
       setText: stableSetText,
     }),
     [
@@ -997,6 +1001,7 @@ Logging in with Google... Restarting Gemini CLI to continue.
       addConfirmUpdateExtensionRequest,
       toggleDebugProfiler,
       setShortcutsHelpVisible,
+      startBtwSession,
       stableSetText,
     ],
   );
@@ -1200,8 +1205,16 @@ Logging in with Google... Restarting Gemini CLI to continue.
   );
 
   const pendingHistoryItems = useMemo(
-    () => [...pendingSlashCommandHistoryItems, ...pendingGeminiHistoryItems],
-    [pendingSlashCommandHistoryItems, pendingGeminiHistoryItems],
+    () => [
+      ...pendingSlashCommandHistoryItems,
+      ...pendingBtwHistoryItems,
+      ...pendingGeminiHistoryItems,
+    ],
+    [
+      pendingSlashCommandHistoryItems,
+      pendingBtwHistoryItems,
+      pendingGeminiHistoryItems,
+    ],
   );
 
   toggleBackgroundTasksRef.current = toggleBackgroundTasks;

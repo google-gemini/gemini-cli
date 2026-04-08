@@ -162,6 +162,7 @@ describe('useSlashCommandProcessor', () => {
       mcpCommands?: SlashCommand[];
       setIsProcessing?: (isProcessing: boolean) => void;
       refreshStatic?: () => void;
+      startBtwSession?: (prompt: string) => Promise<void>;
       openAgentConfigDialog?: (
         name: string,
         displayName: string,
@@ -175,6 +176,7 @@ describe('useSlashCommandProcessor', () => {
       mcpCommands = [],
       setIsProcessing = vi.fn(),
       refreshStatic = vi.fn(),
+      startBtwSession = vi.fn().mockResolvedValue(undefined),
       openAgentConfigDialog = vi.fn(),
     } = options;
 
@@ -215,6 +217,7 @@ describe('useSlashCommandProcessor', () => {
             addConfirmUpdateExtensionRequest: vi.fn(),
             toggleBackgroundTasks: vi.fn(),
             toggleShortcutsHelp: vi.fn(),
+            startBtwSession,
             setText: vi.fn(),
           },
           new Map(), // extensionsUpdateState
@@ -644,6 +647,34 @@ describe('useSlashCommandProcessor', () => {
 
       expect(mockSetQuittingMessages).toHaveBeenCalledWith(['bye']);
     });
+
+    it('should handle a "btw" action', async () => {
+      const mockStartBtwSession = vi.fn().mockResolvedValue(undefined);
+      const command = createTestCommand({
+        name: 'btwcmd',
+        shouldAddToHistory: false,
+        action: vi.fn().mockResolvedValue({
+          type: 'btw',
+          prompt: 'Explain the failure',
+        }),
+      });
+
+      const result = await setupProcessorHook({
+        builtinCommands: [command],
+        startBtwSession: mockStartBtwSession,
+      });
+
+      await act(async () => {
+        await result.current.handleSlashCommand('/btwcmd');
+      });
+
+      expect(mockStartBtwSession).toHaveBeenCalledWith('Explain the failure');
+      expect(mockAddItem).not.toHaveBeenCalledWith(
+        { type: MessageType.USER, text: '/btwcmd' },
+        expect.any(Number),
+      );
+    });
+
     it('should handle "submit_prompt" action returned from a file-based command', async () => {
       const fileCommand = createTestCommand(
         {

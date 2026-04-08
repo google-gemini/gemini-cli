@@ -36,6 +36,7 @@ import { ChatList } from './views/ChatList.js';
 import { ModelMessage } from './messages/ModelMessage.js';
 import { ThinkingMessage } from './messages/ThinkingMessage.js';
 import { HintMessage } from './messages/HintMessage.js';
+import { BtwMessage } from './messages/BtwMessage.js';
 import { getInlineThinkingMode } from '../utils/inlineThinkingMode.js';
 import { useSettings } from '../contexts/SettingsContext.js';
 
@@ -211,6 +212,14 @@ export const HistoryItemDisplay: React.FC<HistoryItemDisplayProps> = ({
         <SubagentHistoryMessage
           item={itemForDisplay}
           terminalWidth={terminalWidth}
+        />
+      )}
+      {itemForDisplay.type === 'btw' && (
+        <BtwMessage
+          prompt={itemForDisplay.prompt}
+          text={itemForDisplay.text}
+          errorText={itemForDisplay.errorText}
+          isPending={isPending}
         />
       )}
       {itemForDisplay.type === 'compression' && (

@@ -86,6 +86,7 @@ interface SlashCommandProcessorActions {
   addConfirmUpdateExtensionRequest: (request: ConfirmationRequest) => void;
   toggleBackgroundTasks: () => void;
   toggleShortcutsHelp: () => void;
+  startBtwSession: (prompt: string) => Promise<void>;
   setText: (text: string) => void;
 }
 
@@ -244,6 +245,7 @@ export const useSlashCommandProcessor = (
         removeComponent: () => setCustomDialog(null),
         toggleBackgroundTasks: actions.toggleBackgroundTasks,
         toggleShortcutsHelp: actions.toggleShortcutsHelp,
+        startBtwSession: actions.startBtwSession,
       },
       session: {
         stats: session.stats,
@@ -396,7 +398,7 @@ export const useSlashCommandProcessor = (
 
       setIsProcessing(true);
 
-      if (addToHistory) {
+      if (addToHistory && commandToExecute.shouldAddToHistory !== false) {
         const userMessageTimestamp = Date.now();
         addItem(
           { type: MessageType.USER, text: trimmed },
@@ -556,6 +558,9 @@ export const useSlashCommandProcessor = (
                     type: 'submit_prompt',
                     content: result.content,
                   };
+                case 'btw':
+                  await actions.startBtwSession(result.prompt);
+                  return { type: 'handled' };
                 case 'confirm_shell_commands': {
                   const callId = `expansion-${Date.now()}`;
                   const { outcome, approvedCommands } = await new Promise<{

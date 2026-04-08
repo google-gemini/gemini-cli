@@ -49,6 +49,18 @@ Slash commands provide meta-level control over the CLI itself.
   behavior can be modified using the `advanced.bugCommand` setting in your
   `.gemini/settings.json` files.
 
+### `/btw`
+
+- **Description:** Ask an isolated side question without changing the main chat
+  history.
+- **Behavior:**
+  - Runs as a separate side session that inherits the current conversation
+    context.
+  - Streams its own answer in a distinct BTW message card.
+  - Does not add the raw `/btw ...` command to the main history.
+  - Rejects any tool calls made by the side session.
+- **Usage:** `/btw <side question>`
+
 ### `/chat`
 
 - **Description:** Alias for `/resume`. Both commands now expose the same

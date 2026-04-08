@@ -190,6 +190,7 @@ export * from './agents/agent-scheduler.js';
 export { resetBrowserSession } from './agents/browser/browserAgentFactory.js';
 // Export agent session interface
 export * from './agent/agent-session.js';
+export * from './agent/btw-agent-session.js';
 export * from './agent/legacy-agent-session.js';
 export * from './agent/event-translator.js';
 export * from './agent/content-utils.js';

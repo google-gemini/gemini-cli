@@ -92,6 +92,7 @@ export interface CommandContext {
     removeComponent: () => void;
     toggleBackgroundTasks: () => void;
     toggleShortcutsHelp: () => void;
+    startBtwSession: (prompt: string) => Promise<void>;
   };
   // Session-specific data
   session: {
@@ -158,6 +159,11 @@ export interface OpenCustomDialogActionReturn {
   component: ReactNode;
 }
 
+export interface StartBtwActionReturn {
+  type: 'btw';
+  prompt: string;
+}
+
 /**
  * The return type for a command action that specifically handles logout logic,
  * signaling the application to explicitly transition to an unauthenticated state.
@@ -173,6 +179,7 @@ export type SlashCommandActionReturn =
   | ConfirmShellCommandsActionReturn
   | ConfirmActionReturn
   | OpenCustomDialogActionReturn
+  | StartBtwActionReturn
   | LogoutActionReturn;
 
 export enum CommandKind {
@@ -211,6 +218,12 @@ export interface SlashCommand {
    * Whether this command can be safely executed while the agent is busy (e.g. streaming a response).
    */
   isSafeConcurrent?: boolean;
+
+  /**
+   * Whether invoking the slash command should add the raw slash command to the
+   * main history stream. Defaults to true.
+   */
+  shouldAddToHistory?: boolean;
 
   // Optional metadata for extension commands
   extensionName?: string;

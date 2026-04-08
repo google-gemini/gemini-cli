@@ -59,6 +59,21 @@ describe('<HistoryItemDisplay />', () => {
     unmount();
   });
 
+  it('renders BtwMessage for "btw" type', async () => {
+    const item: HistoryItem = {
+      ...baseItem,
+      type: 'btw',
+      prompt: 'What changed?',
+      text: 'Side answer',
+    };
+    const { lastFrame, unmount } = await renderWithProviders(
+      <HistoryItemDisplay {...baseItem} item={item} />,
+    );
+    expect(lastFrame()).toContain('BTW: What changed?');
+    expect(lastFrame()).toContain('Side answer');
+    unmount();
+  });
+
   it('renders UserMessage for "user" type with slash command', async () => {
     const item: HistoryItem = {
       ...baseItem,
