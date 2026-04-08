@@ -4,13 +4,11 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 import { waitFor } from '../../../test-utils/async.js';
-import { render } from '../../../test-utils/render.js';
+import { renderWithProviders } from '../../../test-utils/render.js';
 import { SubagentGroupDisplay } from './SubagentGroupDisplay.js';
 import { Kind, CoreToolCallStatus } from '@google/gemini-cli-core';
 import type { IndividualToolCallDisplay } from '../../types.js';
-import { KeypressProvider } from '../../contexts/KeypressContext.js';
-import { OverflowProvider } from '../../contexts/OverflowContext.js';
-import { vi } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
 import { Text } from 'ink';
 
 vi.mock('../../utils/MarkdownDisplay.js', () => ({
@@ -66,38 +64,33 @@ describe('<SubagentGroupDisplay />', () => {
     },
   ];
 
-  const renderSubagentGroup = (
+  const renderSubagentGroup = async (
     toolCallsToRender: IndividualToolCallDisplay[],
     height?: number,
-  ) => (
-    <OverflowProvider>
-      <KeypressProvider>
-        <SubagentGroupDisplay
-          toolCalls={toolCallsToRender}
-          terminalWidth={80}
-          availableTerminalHeight={height}
-          isExpandable={true}
-        />
-      </KeypressProvider>
-    </OverflowProvider>
-  );
+  ) =>
+    renderWithProviders(
+      <SubagentGroupDisplay
+        toolCalls={toolCallsToRender}
+        terminalWidth={80}
+        availableTerminalHeight={height}
+        isExpandable={true}
+      />,
+    );
 
   it('renders nothing if there are no agent tool calls', async () => {
-    const { lastFrame } = render(renderSubagentGroup([], 40));
+    const { lastFrame } = await renderSubagentGroup([], 40);
     expect(lastFrame({ allowEmpty: true })).toBe('');
   });
 
   it('renders collapsed view by default with correct agent counts and states', async () => {
-    const { lastFrame, waitUntilReady } = render(
-      renderSubagentGroup(mockToolCalls, 40),
-    );
-    await waitUntilReady();
+    const { lastFrame } = await renderSubagentGroup(mockToolCalls, 40);
     expect(lastFrame()).toMatchSnapshot();
   });
 
   it('expands when availableTerminalHeight is undefined', async () => {
-    const { lastFrame, rerender } = render(
-      renderSubagentGroup(mockToolCalls, 40),
+    const { lastFrame, rerender } = await renderSubagentGroup(
+      mockToolCalls,
+      40,
     );
 
     // Default collapsed view
@@ -106,13 +99,27 @@ describe('<SubagentGroupDisplay />', () => {
     });
 
     // Expand view
-    rerender(renderSubagentGroup(mockToolCalls, undefined));
+    rerender(
+      <SubagentGroupDisplay
+        toolCalls={mockToolCalls}
+        terminalWidth={80}
+        availableTerminalHeight={undefined}
+        isExpandable={true}
+      />,
+    );
     await waitFor(() => {
       expect(lastFrame()).toContain('(ctrl+o to collapse)');
     });
 
     // Collapse view
-    rerender(renderSubagentGroup(mockToolCalls, 40));
+    rerender(
+      <SubagentGroupDisplay
+        toolCalls={mockToolCalls}
+        terminalWidth={80}
+        availableTerminalHeight={40}
+        isExpandable={true}
+      />,
+    );
     await waitFor(() => {
       expect(lastFrame()).toContain('(ctrl+o to expand)');
     });

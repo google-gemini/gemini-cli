@@ -12,7 +12,9 @@
 import {
   DEFAULT_TRUNCATE_TOOL_OUTPUT_THRESHOLD,
   DEFAULT_MODEL_CONFIGS,
+  AuthProviderType,
   type MCPServerConfig,
+  type RequiredMcpServerConfig,
   type BugCommandSettings,
   type TelemetrySettings,
   type AuthType,
@@ -259,7 +261,7 @@ const SETTINGS_SCHEMA = {
         requiresRestart: false,
         default: false,
         description:
-          'Enable run-event notifications for action-required prompts and session completion. Currently macOS only.',
+          'Enable run-event notifications for action-required prompts and session completion.',
         showInDialog: true,
       },
       checkpointing: {
@@ -291,6 +293,16 @@ const SETTINGS_SCHEMA = {
         description: 'Planning features configuration.',
         showInDialog: false,
         properties: {
+          enabled: {
+            type: 'boolean',
+            label: 'Enable Plan Mode',
+            category: 'General',
+            requiresRestart: true,
+            default: true,
+            description:
+              'Enable Plan Mode for read-only safety during planning.',
+            showInDialog: true,
+          },
           directory: {
             type: 'string',
             label: 'Plan Directory',
@@ -298,7 +310,7 @@ const SETTINGS_SCHEMA = {
             requiresRestart: true,
             default: undefined as string | undefined,
             description:
-              'The directory where planning artifacts are stored. If not specified, defaults to the system temporary directory.',
+              'The directory where planning artifacts are stored. If not specified, defaults to the system temporary directory. A custom directory requires a policy to allow write access in Plan Mode.',
             showInDialog: true,
           },
           modelRouting: {
@@ -559,6 +571,16 @@ const SETTINGS_SCHEMA = {
         description: 'Show the "? for shortcuts" hint above the input.',
         showInDialog: true,
       },
+      compactToolOutput: {
+        type: 'boolean',
+        label: 'Compact Tool Output',
+        category: 'UI',
+        requiresRestart: false,
+        default: true,
+        description:
+          'Display tool outputs (like directory listings and file reads) in a compact, structured format.',
+        showInDialog: true,
+      },
       hideBanner: {
         type: 'boolean',
         label: 'Hide Banner',
@@ -655,6 +677,16 @@ const SETTINGS_SCHEMA = {
         description: 'Hide the footer from the UI',
         showInDialog: true,
       },
+      collapseDrawerDuringApproval: {
+        type: 'boolean',
+        label: 'Collapse Drawer During Approval',
+        category: 'UI',
+        requiresRestart: false,
+        default: true,
+        description:
+          'Whether to collapse the UI drawer when a tool is awaiting confirmation.',
+        showInDialog: false,
+      },
       showMemoryUsage: {
         type: 'boolean',
         label: 'Show Memory Usage',
@@ -711,6 +743,24 @@ const SETTINGS_SCHEMA = {
           'Use an alternate screen buffer for the UI, preserving shell history.',
         showInDialog: true,
       },
+      renderProcess: {
+        type: 'boolean',
+        label: 'Render Process',
+        category: 'UI',
+        requiresRestart: true,
+        default: true,
+        description: 'Enable Ink render process for the UI.',
+        showInDialog: true,
+      },
+      terminalBuffer: {
+        type: 'boolean',
+        label: 'Terminal Buffer',
+        category: 'UI',
+        requiresRestart: true,
+        default: false,
+        description: 'Use the new terminal buffer architecture for rendering.',
+        showInDialog: true,
+      },
       useBackgroundColor: {
         type: 'boolean',
         label: 'Use Background Color',
@@ -744,9 +794,9 @@ const SETTINGS_SCHEMA = {
         label: 'Loading Phrases',
         category: 'UI',
         requiresRestart: false,
-        default: 'tips',
+        default: 'off',
         description:
-          'What to show while the model is working: tips, witty comments, both, or nothing.',
+          'What to show while the model is working: tips, witty comments, all, or off.',
         showInDialog: true,
         options: [
           { value: 'tips', label: 'Tips' },
@@ -1081,6 +1131,20 @@ const SETTINGS_SCHEMA = {
           ref: 'ModelResolution',
         },
       },
+      modelChains: {
+        type: 'object',
+        label: 'Model Chains',
+        category: 'Model',
+        requiresRestart: true,
+        default: DEFAULT_MODEL_CONFIGS.modelChains,
+        description:
+          'Availability policy chains defining fallback behavior for models.',
+        showInDialog: false,
+        additionalProperties: {
+          type: 'array',
+          ref: 'ModelPolicyChain',
+        },
+      },
     },
   },
 
@@ -1156,7 +1220,8 @@ const SETTINGS_SCHEMA = {
             category: 'Advanced',
             requiresRestart: true,
             default: undefined as string | undefined,
-            description: 'Model override for the visual agent.',
+            description:
+              "Model for the visual agent's analyze_screenshot tool. When set, enables the tool.",
             showInDialog: false,
           },
           allowedDomains: {
@@ -1181,6 +1246,36 @@ const SETTINGS_SCHEMA = {
             description:
               'Disable user input on browser window during automation.',
             showInDialog: false,
+          },
+          maxActionsPerTask: {
+            type: 'number',
+            label: 'Max Actions Per Task',
+            category: 'Advanced',
+            requiresRestart: false,
+            default: 100,
+            description:
+              'The maximum number of tool calls allowed per browser task. Enforcement is hard: the agent will be terminated when the limit is reached.',
+            showInDialog: false,
+          },
+          confirmSensitiveActions: {
+            type: 'boolean',
+            label: 'Confirm Sensitive Actions',
+            category: 'Advanced',
+            requiresRestart: true,
+            default: false,
+            description:
+              'Require manual confirmation for sensitive browser actions (e.g., fill_form, evaluate_script).',
+            showInDialog: true,
+          },
+          blockFileUploads: {
+            type: 'boolean',
+            label: 'Block File Uploads',
+            category: 'Advanced',
+            requiresRestart: true,
+            default: false,
+            description:
+              'Hard-block file upload requests from the browser agent.',
+            showInDialog: true,
           },
         },
       },
@@ -1234,6 +1329,19 @@ const SETTINGS_SCHEMA = {
         default: 200,
         description: 'Maximum number of directories to search for memory.',
         showInDialog: true,
+      },
+      memoryBoundaryMarkers: {
+        type: 'array',
+        label: 'Memory Boundary Markers',
+        category: 'Context',
+        requiresRestart: true,
+        default: ['.git'] as string[],
+        description:
+          'File or directory names that mark the boundary for GEMINI.md discovery. ' +
+          'The upward traversal stops at the first directory containing any of these markers. ' +
+          'An empty array disables parent traversal.',
+        showInDialog: false,
+        items: { type: 'string' },
       },
       includeDirectories: {
         type: 'array',
@@ -1344,9 +1452,29 @@ const SETTINGS_SCHEMA = {
         description: oneLine`
           Legacy full-process sandbox execution environment.
           Set to a boolean to enable or disable the sandbox, provide a string path to a sandbox profile,
-          or specify an explicit sandbox command (e.g., "docker", "podman", "lxc").
+          or specify an explicit sandbox command (e.g., "docker", "podman", "lxc", "windows-native").
         `,
         showInDialog: false,
+      },
+      sandboxAllowedPaths: {
+        type: 'array',
+        label: 'Sandbox Allowed Paths',
+        category: 'Tools',
+        requiresRestart: true,
+        default: [] as string[],
+        description:
+          'List of additional paths that the sandbox is allowed to access.',
+        showInDialog: true,
+        items: { type: 'string' },
+      },
+      sandboxNetworkAccess: {
+        type: 'boolean',
+        label: 'Sandbox Network Access',
+        category: 'Tools',
+        requiresRestart: true,
+        default: false,
+        description: 'Whether the sandbox is allowed to access the network.',
+        showInDialog: true,
       },
       shell: {
         type: 'object',
@@ -1369,6 +1497,21 @@ const SETTINGS_SCHEMA = {
             `,
             showInDialog: true,
           },
+          backgroundCompletionBehavior: {
+            type: 'enum',
+            label: 'Background Completion Behavior',
+            category: 'Tools',
+            requiresRestart: false,
+            default: 'silent',
+            description:
+              "Controls what happens when a background shell command finishes. 'silent' (default): quietly exits in background. 'inject': automatically returns output to agent. 'notify': shows brief message in chat.",
+            showInDialog: false,
+            options: [
+              { label: 'Silent', value: 'silent' },
+              { label: 'Inject', value: 'inject' },
+              { label: 'Notify', value: 'notify' },
+            ],
+          },
           pager: {
             type: 'string',
             label: 'Pager',
@@ -1384,7 +1527,7 @@ const SETTINGS_SCHEMA = {
             label: 'Show Color',
             category: 'Tools',
             requiresRestart: false,
-            default: false,
+            default: true,
             description: 'Show color in shell output.',
             showInDialog: true,
           },
@@ -1568,10 +1711,10 @@ const SETTINGS_SCHEMA = {
         type: 'boolean',
         label: 'Tool Sandboxing',
         category: 'Security',
-        requiresRestart: false,
+        requiresRestart: true,
         default: false,
         description:
-          'Experimental tool-level sandboxing (implementation in progress).',
+          'Tool-level sandboxing. Isolates individual tools instead of the entire CLI process.',
         showInDialog: true,
       },
       disableYoloMode: {
@@ -1763,7 +1906,7 @@ const SETTINGS_SCHEMA = {
         label: 'Auto Configure Max Old Space Size',
         category: 'Advanced',
         requiresRestart: true,
-        default: false,
+        default: true,
         description: 'Automatically configure Node.js memory limits',
         showInDialog: true,
       },
@@ -1809,54 +1952,32 @@ const SETTINGS_SCHEMA = {
     description: 'Setting to enable experimental features',
     showInDialog: false,
     properties: {
-      toolOutputMasking: {
+      adk: {
         type: 'object',
-        label: 'Tool Output Masking',
+        label: 'ADK',
         category: 'Experimental',
         requiresRestart: true,
-        ignoreInDocs: false,
         default: {},
-        description:
-          'Advanced settings for tool output masking to manage context window efficiency.',
+        description: 'Settings for the Agent Development Kit (ADK).',
         showInDialog: false,
         properties: {
-          enabled: {
+          agentSessionNoninteractiveEnabled: {
             type: 'boolean',
-            label: 'Enable Tool Output Masking',
+            label: 'Agent Session Non-interactive Enabled',
             category: 'Experimental',
             requiresRestart: true,
-            default: true,
-            description: 'Enables tool output masking to save tokens.',
-            showInDialog: true,
-          },
-          toolProtectionThreshold: {
-            type: 'number',
-            label: 'Tool Protection Threshold',
-            category: 'Experimental',
-            requiresRestart: true,
-            default: 50000,
-            description:
-              'Minimum number of tokens to protect from masking (most recent tool outputs).',
+            default: false,
+            description: 'Enable non-interactive agent sessions.',
             showInDialog: false,
           },
-          minPrunableTokensThreshold: {
-            type: 'number',
-            label: 'Min Prunable Tokens Threshold',
-            category: 'Experimental',
-            requiresRestart: true,
-            default: 30000,
-            description:
-              'Minimum prunable tokens required to trigger a masking pass.',
-            showInDialog: false,
-          },
-          protectLatestTurn: {
+          agentSessionInteractiveEnabled: {
             type: 'boolean',
-            label: 'Protect Latest Turn',
+            label: 'Interactive Agent Session Enabled',
             category: 'Experimental',
             requiresRestart: true,
-            default: true,
+            default: false,
             description:
-              'Ensures the absolute latest turn is never masked, regardless of token count.',
+              'Enable the agent session implementation for the interactive CLI.',
             showInDialog: false,
           },
         },
@@ -1869,6 +1990,16 @@ const SETTINGS_SCHEMA = {
         default: true,
         description: 'Enable local and remote subagents.',
         showInDialog: false,
+      },
+      worktrees: {
+        type: 'boolean',
+        label: 'Enable Git Worktrees',
+        category: 'Experimental',
+        requiresRestart: true,
+        default: false,
+        description:
+          'Enable automated Git worktree management for parallel work.',
+        showInDialog: true,
       },
       extensionManagement: {
         type: 'boolean',
@@ -1922,7 +2053,7 @@ const SETTINGS_SCHEMA = {
         label: 'JIT Context Loading',
         category: 'Experimental',
         requiresRestart: true,
-        default: true,
+        default: false,
         description: 'Enable Just-In-Time (JIT) context loading.',
         showInDialog: false,
       },
@@ -1944,15 +2075,6 @@ const SETTINGS_SCHEMA = {
         default: false,
         description:
           'Use OSC 52 for copying. This may be more robust than the default system when using remote terminal sessions (if your terminal is configured to allow it).',
-        showInDialog: true,
-      },
-      plan: {
-        type: 'boolean',
-        label: 'Plan',
-        category: 'Experimental',
-        requiresRestart: true,
-        default: true,
-        description: 'Enable Plan Mode.',
         showInDialog: true,
       },
       taskTracker: {
@@ -2044,6 +2166,35 @@ const SETTINGS_SCHEMA = {
             },
           },
         },
+      },
+      memoryManager: {
+        type: 'boolean',
+        label: 'Memory Manager Agent',
+        category: 'Experimental',
+        requiresRestart: true,
+        default: false,
+        description:
+          'Replace the built-in save_memory tool with a memory manager subagent that supports adding, removing, de-duplicating, and organizing memories.',
+        showInDialog: true,
+      },
+      generalistProfile: {
+        type: 'boolean',
+        label: 'Use the generalist profile to manage agent contexts.',
+        category: 'Experimental',
+        requiresRestart: true,
+        default: false,
+        description:
+          'Suitable for general coding and software development tasks.',
+        showInDialog: true,
+      },
+      contextManagement: {
+        type: 'boolean',
+        label: 'Enable Context Management',
+        category: 'Experimental',
+        requiresRestart: true,
+        default: false,
+        description: 'Enable logic for context management.',
+        showInDialog: true,
       },
       topicUpdateNarration: {
         type: 'boolean',
@@ -2321,6 +2472,171 @@ const SETTINGS_SCHEMA = {
     },
   },
 
+  contextManagement: {
+    type: 'object',
+    label: 'Context Management',
+    category: 'Experimental',
+    requiresRestart: true,
+    default: {},
+    description:
+      'Settings for agent history and tool distillation context management.',
+    showInDialog: false,
+    properties: {
+      historyWindow: {
+        type: 'object',
+        label: 'History Window Settings',
+        category: 'Context Management',
+        requiresRestart: true,
+        default: {},
+        showInDialog: false,
+        properties: {
+          maxTokens: {
+            type: 'number',
+            label: 'Max Tokens',
+            category: 'Context Management',
+            requiresRestart: true,
+            default: 150_000,
+            description:
+              'The number of tokens to allow before triggering compression.',
+            showInDialog: false,
+          },
+          retainedTokens: {
+            type: 'number',
+            label: 'Retained Tokens',
+            category: 'Context Management',
+            requiresRestart: true,
+            default: 40_000,
+            description: 'The number of tokens to always retain.',
+            showInDialog: false,
+          },
+        },
+      },
+      messageLimits: {
+        type: 'object',
+        label: 'Message Limits',
+        category: 'Context Management',
+        requiresRestart: true,
+        default: {},
+        showInDialog: false,
+        properties: {
+          normalMaxTokens: {
+            type: 'number',
+            label: 'Normal Maximum Tokens',
+            category: 'Context Management',
+            requiresRestart: true,
+            default: 2500,
+            description:
+              'The target number of tokens to budget for a normal conversation turn.',
+            showInDialog: false,
+          },
+          retainedMaxTokens: {
+            type: 'number',
+            label: 'Retained Maximum Tokens',
+            category: 'Context Management',
+            requiresRestart: true,
+            default: 12000,
+            description:
+              'The maximum number of tokens a single conversation turn can consume before truncation.',
+            showInDialog: false,
+          },
+          normalizationHeadRatio: {
+            type: 'number',
+            label: 'Normalization Head Ratio',
+            category: 'Context Management',
+            requiresRestart: true,
+            default: 0.25,
+            description:
+              'The ratio of tokens to retain from the beginning of a truncated message (0.0 to 1.0).',
+            showInDialog: false,
+          },
+        },
+      },
+      tools: {
+        type: 'object',
+        label: 'Context Management Tools',
+        category: 'Context Management',
+        requiresRestart: true,
+        default: {},
+        showInDialog: false,
+        properties: {
+          distillation: {
+            type: 'object',
+            label: 'Tool Distillation',
+            category: 'Context Management',
+            requiresRestart: true,
+            default: {},
+            showInDialog: false,
+            properties: {
+              maxOutputTokens: {
+                type: 'number',
+                label: 'Max Output Tokens',
+                category: 'Context Management',
+                requiresRestart: true,
+                default: 10_000,
+                description:
+                  'Maximum tokens to show to the model when truncating large tool outputs.',
+                showInDialog: false,
+              },
+              summarizationThresholdTokens: {
+                type: 'number',
+                label: 'Tool Summarization Threshold',
+                category: 'Context Management',
+                requiresRestart: true,
+                default: 20_000,
+                description:
+                  'Threshold above which truncated tool outputs will be summarized by an LLM.',
+                showInDialog: false,
+              },
+            },
+          },
+          outputMasking: {
+            type: 'object',
+            label: 'Tool Output Masking',
+            category: 'Context Management',
+            requiresRestart: true,
+            ignoreInDocs: false,
+            default: {},
+            description:
+              'Advanced settings for tool output masking to manage context window efficiency.',
+            showInDialog: false,
+            properties: {
+              protectionThresholdTokens: {
+                type: 'number',
+                label: 'Tool Protection Threshold (Tokens)',
+                category: 'Context Management',
+                requiresRestart: true,
+                default: 50_000,
+                description:
+                  'Minimum number of tokens to protect from masking (most recent tool outputs).',
+                showInDialog: false,
+              },
+              minPrunableThresholdTokens: {
+                type: 'number',
+                label: 'Min Prunable Tokens Threshold',
+                category: 'Context Management',
+                requiresRestart: true,
+                default: 30_000,
+                description:
+                  'Minimum prunable tokens required to trigger a masking pass.',
+                showInDialog: false,
+              },
+              protectLatestTurn: {
+                type: 'boolean',
+                label: 'Protect Latest Turn',
+                category: 'Context Management',
+                requiresRestart: true,
+                default: true,
+                description:
+                  'Ensures the absolute latest turn is never masked, regardless of token count.',
+                showInDialog: false,
+              },
+            },
+          },
+        },
+      },
+    },
+  },
+
   admin: {
     type: 'object',
     label: 'Admin',
@@ -2391,12 +2707,26 @@ const SETTINGS_SCHEMA = {
             category: 'Admin',
             requiresRestart: false,
             default: {} as Record<string, MCPServerConfig>,
-            description: 'Admin-configured MCP servers.',
+            description: 'Admin-configured MCP servers (allowlist).',
             showInDialog: false,
             mergeStrategy: MergeStrategy.REPLACE,
             additionalProperties: {
               type: 'object',
               ref: 'MCPServerConfig',
+            },
+          },
+          requiredConfig: {
+            type: 'object',
+            label: 'Required MCP Config',
+            category: 'Admin',
+            requiresRestart: false,
+            default: {} as Record<string, RequiredMcpServerConfig>,
+            description: 'Admin-required MCP servers that are always injected.',
+            showInDialog: false,
+            mergeStrategy: MergeStrategy.REPLACE,
+            additionalProperties: {
+              type: 'object',
+              ref: 'RequiredMcpServerConfig',
             },
           },
         },
@@ -2523,11 +2853,72 @@ export const SETTINGS_SCHEMA_DEFINITIONS: Record<
         type: 'string',
         description:
           'Authentication provider used for acquiring credentials (for example `dynamic_discovery`).',
-        enum: [
-          'dynamic_discovery',
-          'google_credentials',
-          'service_account_impersonation',
-        ],
+        enum: Object.values(AuthProviderType),
+      },
+      targetAudience: {
+        type: 'string',
+        description:
+          'OAuth target audience (CLIENT_ID.apps.googleusercontent.com).',
+      },
+      targetServiceAccount: {
+        type: 'string',
+        description:
+          'Service account email to impersonate (name@project.iam.gserviceaccount.com).',
+      },
+    },
+  },
+  RequiredMcpServerConfig: {
+    type: 'object',
+    description:
+      'Admin-required MCP server configuration (remote transports only).',
+    additionalProperties: false,
+    properties: {
+      url: {
+        type: 'string',
+        description: 'URL for the required MCP server.',
+      },
+      type: {
+        type: 'string',
+        description: 'Transport type for the required server.',
+        enum: ['sse', 'http'],
+      },
+      headers: {
+        type: 'object',
+        description: 'Additional HTTP headers sent to the server.',
+        additionalProperties: { type: 'string' },
+      },
+      timeout: {
+        type: 'number',
+        description: 'Timeout in milliseconds for MCP requests.',
+      },
+      trust: {
+        type: 'boolean',
+        description:
+          'Marks the server as trusted. Defaults to true for admin-required servers.',
+      },
+      description: {
+        type: 'string',
+        description: 'Human-readable description of the server.',
+      },
+      includeTools: {
+        type: 'array',
+        description: 'Subset of tools enabled for this server.',
+        items: { type: 'string' },
+      },
+      excludeTools: {
+        type: 'array',
+        description: 'Tools disabled for this server.',
+        items: { type: 'string' },
+      },
+      oauth: {
+        type: 'object',
+        description: 'OAuth configuration for authenticating with the server.',
+        additionalProperties: true,
+      },
+      authProviderType: {
+        type: 'string',
+        description: 'Authentication provider used for acquiring credentials.',
+        enum: Object.values(AuthProviderType),
       },
       targetAudience: {
         type: 'string',
@@ -2853,6 +3244,7 @@ export const SETTINGS_SCHEMA_DEFINITIONS: Record<
               type: 'object',
               properties: {
                 useGemini3_1: { type: 'boolean' },
+                useGemini3_1FlashLite: { type: 'boolean' },
                 useCustomTools: { type: 'boolean' },
                 hasAccessToPreview: { type: 'boolean' },
                 requestedModels: {
@@ -2866,6 +3258,42 @@ export const SETTINGS_SCHEMA_DEFINITIONS: Record<
         },
       },
     },
+  },
+  ModelPolicyChain: {
+    type: 'array',
+    description: 'A chain of model policies for fallback behavior.',
+    items: {
+      type: 'object',
+      ref: 'ModelPolicy',
+    },
+  },
+  ModelPolicy: {
+    type: 'object',
+    description:
+      'Defines the policy for a single model in the availability chain.',
+    properties: {
+      model: { type: 'string' },
+      isLastResort: { type: 'boolean' },
+      actions: {
+        type: 'object',
+        properties: {
+          terminal: { type: 'string', enum: ['silent', 'prompt'] },
+          transient: { type: 'string', enum: ['silent', 'prompt'] },
+          not_found: { type: 'string', enum: ['silent', 'prompt'] },
+          unknown: { type: 'string', enum: ['silent', 'prompt'] },
+        },
+      },
+      stateTransitions: {
+        type: 'object',
+        properties: {
+          terminal: { type: 'string', enum: ['terminal', 'sticky_retry'] },
+          transient: { type: 'string', enum: ['terminal', 'sticky_retry'] },
+          not_found: { type: 'string', enum: ['terminal', 'sticky_retry'] },
+          unknown: { type: 'string', enum: ['terminal', 'sticky_retry'] },
+        },
+      },
+    },
+    required: ['model'],
   },
 };
 

@@ -88,7 +88,7 @@ exports[`coreTools snapshots for specific models > Model: gemini-2.5-pro > snaps
               "type": "boolean",
             },
             "options": {
-              "description": "The selectable choices for 'choice' type questions. Provide 2-4 options. An 'Other' option is automatically added. Not needed for 'text' or 'yesno' types.",
+              "description": "The selectable choices for 'choice' type questions. Provide 2-4 options. An 'Other' option is automatically added for 'choice' and 'yesno' types. Not needed for 'text' or 'yesno'.",
               "items": {
                 "properties": {
                   "description": {
@@ -109,7 +109,7 @@ exports[`coreTools snapshots for specific models > Model: gemini-2.5-pro > snaps
               "type": "array",
             },
             "placeholder": {
-              "description": "Hint text shown in the input field. For type='text', shown in the main input. For type='choice', shown in the 'Other' custom input.",
+              "description": "Hint text shown in the input field. For type='text', shown in the main input. For type='choice' and 'yesno', shown in the 'Other' custom input.",
               "type": "string",
             },
             "question": {
@@ -118,7 +118,7 @@ exports[`coreTools snapshots for specific models > Model: gemini-2.5-pro > snaps
             },
             "type": {
               "default": "choice",
-              "description": "Question type: 'choice' (default) for multiple-choice with options, 'text' for free-form input, 'yesno' for Yes/No confirmation.",
+              "description": "Question type: 'choice' (default) for multiple-choice with options, 'text' for free-form input, 'yesno' for Yes/No confirmation with optional 'Other' feedback.",
               "enum": [
                 "choice",
                 "text",
@@ -165,17 +165,17 @@ exports[`coreTools snapshots for specific models > Model: gemini-2.5-pro > snaps
 
 exports[`coreTools snapshots for specific models > Model: gemini-2.5-pro > snapshot for tool: exit_plan_mode 1`] = `
 {
-  "description": "Finalizes the planning phase and transitions to implementation by presenting the plan for user approval. This tool MUST be used to exit Plan Mode before any source code edits can be performed. Call this whenever a plan is ready or the user requests implementation.",
+  "description": "Finalizes the planning phase and transitions to implementation by presenting the plan for formal user approval. You MUST reach an informal agreement with the user in the chat regarding the proposed strategy BEFORE calling this tool. This tool MUST be used to exit Plan Mode before any source code edits can be performed.",
   "name": "exit_plan_mode",
   "parametersJsonSchema": {
     "properties": {
-      "plan_path": {
-        "description": "The file path to the finalized plan (e.g., "/mock/plans/feature-x.md"). This path MUST be within the designated plans directory: /mock/plans/",
+      "plan_filename": {
+        "description": "The filename of the finalized plan (e.g., "feature-x.md"). Do not provide an absolute path.",
         "type": "string",
       },
     },
     "required": [
-      "plan_path",
+      "plan_filename",
     ],
     "type": "object",
   },
@@ -583,9 +583,42 @@ exports[`coreTools snapshots for specific models > Model: gemini-2.5-pro > snaps
   "name": "run_shell_command",
   "parametersJsonSchema": {
     "properties": {
+      "additional_permissions": {
+        "description": "Sandbox permissions for the command. Use this to request additional sandboxed filesystem or network permissions if a previous command failed with "Operation not permitted".",
+        "properties": {
+          "fileSystem": {
+            "properties": {
+              "read": {
+                "description": "List of additional absolute paths to allow reading.",
+                "items": {
+                  "type": "string",
+                },
+                "type": "array",
+              },
+              "write": {
+                "description": "List of additional absolute paths to allow writing.",
+                "items": {
+                  "type": "string",
+                },
+                "type": "array",
+              },
+            },
+            "type": "object",
+          },
+          "network": {
+            "description": "Set to true to enable network access for this command.",
+            "type": "boolean",
+          },
+        },
+        "type": "object",
+      },
       "command": {
         "description": "Exact bash command to execute as \`bash -c <command>\`",
         "type": "string",
+      },
+      "delay_ms": {
+        "description": "Optional. Delay in milliseconds to wait after starting the process in the background. Useful to allow the process to start and generate initial output before returning.",
+        "type": "integer",
       },
       "description": {
         "description": "Brief description of the command for the user. Be specific and concise. Ideally a single sentence. Can be up to 3 sentences for clarity. No line breaks.",
@@ -611,19 +644,27 @@ exports[`coreTools snapshots for specific models > Model: gemini-2.5-pro > snaps
 exports[`coreTools snapshots for specific models > Model: gemini-2.5-pro > snapshot for tool: save_memory 1`] = `
 {
   "description": "
-Saves concise global user context (preferences, facts) for use across ALL workspaces.
+Saves concise user context (preferences, facts) for use across future sessions.
 
-### CRITICAL: GLOBAL CONTEXT ONLY
-NEVER save workspace-specific context, local paths, or commands (e.g. "The entry point is src/index.js", "The test command is npm test"). These are local to the current workspace and must NOT be saved globally. EXCLUSIVELY for context relevant across ALL workspaces.
+Supports two scopes:
+- **global** (default): Cross-project preferences loaded in every workspace. Use for "Remember X" or clear personal facts.
+- **project**: Facts specific to the current workspace, private to the user (not committed to the repo). Use for local dev setup notes, project-specific workflows, or personal reminders about this codebase.
 
-- Use for "Remember X" or clear personal facts.
-- Do NOT use for session context.",
+Do NOT use for session-specific context or temporary data.",
   "name": "save_memory",
   "parametersJsonSchema": {
     "additionalProperties": false,
     "properties": {
       "fact": {
         "description": "The specific fact or piece of information to remember. Should be a clear, self-contained statement.",
+        "type": "string",
+      },
+      "scope": {
+        "description": "Where to save the memory. 'global' (default) saves to a file loaded in every workspace. 'project' saves to a project-specific file private to the user, not committed to the repo.",
+        "enum": [
+          "global",
+          "project",
+        ],
         "type": "string",
       },
     },
@@ -877,7 +918,7 @@ exports[`coreTools snapshots for specific models > Model: gemini-3-pro-preview >
               "type": "boolean",
             },
             "options": {
-              "description": "The selectable choices for 'choice' type questions. Provide 2-4 options. An 'Other' option is automatically added. Not needed for 'text' or 'yesno' types.",
+              "description": "The selectable choices for 'choice' type questions. Provide 2-4 options. An 'Other' option is automatically added for 'choice' and 'yesno' types. Not needed for 'text' or 'yesno'.",
               "items": {
                 "properties": {
                   "description": {
@@ -898,7 +939,7 @@ exports[`coreTools snapshots for specific models > Model: gemini-3-pro-preview >
               "type": "array",
             },
             "placeholder": {
-              "description": "Hint text shown in the input field. For type='text', shown in the main input. For type='choice', shown in the 'Other' custom input.",
+              "description": "Hint text shown in the input field. For type='text', shown in the main input. For type='choice' and 'yesno', shown in the 'Other' custom input.",
               "type": "string",
             },
             "question": {
@@ -907,7 +948,7 @@ exports[`coreTools snapshots for specific models > Model: gemini-3-pro-preview >
             },
             "type": {
               "default": "choice",
-              "description": "Question type: 'choice' (default) for multiple-choice with options, 'text' for free-form input, 'yesno' for Yes/No confirmation.",
+              "description": "Question type: 'choice' (default) for multiple-choice with options, 'text' for free-form input, 'yesno' for Yes/No confirmation with optional 'Other' feedback.",
               "enum": [
                 "choice",
                 "text",
@@ -954,17 +995,17 @@ exports[`coreTools snapshots for specific models > Model: gemini-3-pro-preview >
 
 exports[`coreTools snapshots for specific models > Model: gemini-3-pro-preview > snapshot for tool: exit_plan_mode 1`] = `
 {
-  "description": "Finalizes the planning phase and transitions to implementation by presenting the plan for user approval. This tool MUST be used to exit Plan Mode before any source code edits can be performed. Call this whenever a plan is ready or the user requests implementation.",
+  "description": "Finalizes the planning phase and transitions to implementation by presenting the plan for formal user approval. You MUST reach an informal agreement with the user in the chat regarding the proposed strategy BEFORE calling this tool. This tool MUST be used to exit Plan Mode before any source code edits can be performed.",
   "name": "exit_plan_mode",
   "parametersJsonSchema": {
     "properties": {
-      "plan_path": {
-        "description": "The file path to the finalized plan (e.g., "/mock/plans/feature-x.md"). This path MUST be within the designated plans directory: /mock/plans/",
+      "plan_filename": {
+        "description": "The filename of the finalized plan (e.g., "feature-x.md"). Do not provide an absolute path.",
         "type": "string",
       },
     },
     "required": [
-      "plan_path",
+      "plan_filename",
     ],
     "type": "object",
   },
@@ -1348,9 +1389,42 @@ exports[`coreTools snapshots for specific models > Model: gemini-3-pro-preview >
   "name": "run_shell_command",
   "parametersJsonSchema": {
     "properties": {
+      "additional_permissions": {
+        "description": "Sandbox permissions for the command. Use this to request additional sandboxed filesystem or network permissions if a previous command failed with "Operation not permitted".",
+        "properties": {
+          "fileSystem": {
+            "properties": {
+              "read": {
+                "description": "List of additional absolute paths to allow reading.",
+                "items": {
+                  "type": "string",
+                },
+                "type": "array",
+              },
+              "write": {
+                "description": "List of additional absolute paths to allow writing.",
+                "items": {
+                  "type": "string",
+                },
+                "type": "array",
+              },
+            },
+            "type": "object",
+          },
+          "network": {
+            "description": "Set to true to enable network access for this command.",
+            "type": "boolean",
+          },
+        },
+        "type": "object",
+      },
       "command": {
         "description": "Exact bash command to execute as \`bash -c <command>\`",
         "type": "string",
+      },
+      "delay_ms": {
+        "description": "Optional. Delay in milliseconds to wait after starting the process in the background. Useful to allow the process to start and generate initial output before returning.",
+        "type": "integer",
       },
       "description": {
         "description": "Brief description of the command for the user. Be specific and concise. Ideally a single sentence. Can be up to 3 sentences for clarity. No line breaks.",
@@ -1375,13 +1449,21 @@ exports[`coreTools snapshots for specific models > Model: gemini-3-pro-preview >
 
 exports[`coreTools snapshots for specific models > Model: gemini-3-pro-preview > snapshot for tool: save_memory 1`] = `
 {
-  "description": "Persists global preferences or facts across ALL future sessions. Use this for recurring instructions like coding styles or tool aliases. Unlike 'write_file', which is for project-specific files, this appends to a global memory file loaded in every workspace. If you are unsure whether a fact should be remembered globally, ask the user first. CRITICAL: Do not use for session-specific context or temporary data.",
+  "description": "Persists preferences or facts across ALL future sessions. Supports two scopes: 'global' (default) for cross-project preferences loaded in every workspace, and 'project' for facts specific to the current workspace that are private to the user (not committed to the repo). Use 'project' scope for things like local dev setup notes, project-specific workflows, or personal reminders about this codebase. CRITICAL: Do not use for session-specific context or temporary data.",
   "name": "save_memory",
   "parametersJsonSchema": {
     "additionalProperties": false,
     "properties": {
       "fact": {
-        "description": "A concise, global fact or preference (e.g., 'I prefer using tabs'). Do not include local paths or project-specific names.",
+        "description": "A concise fact or preference to remember. Should be a clear, self-contained statement.",
+        "type": "string",
+      },
+      "scope": {
+        "description": "Where to save the memory. 'global' (default) saves to a file loaded in every workspace. 'project' saves to a project-specific file private to the user, not committed to the repo.",
+        "enum": [
+          "global",
+          "project",
+        ],
         "type": "string",
       },
     },

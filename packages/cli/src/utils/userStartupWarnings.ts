@@ -52,7 +52,7 @@ const homeDirectoryCheck: WarningCheck = {
         return 'Warning you are running Gemini CLI in your home directory.\nThis warning can be disabled in /settings';
       }
       return null;
-    } catch (_err: unknown) {
+    } catch {
       return 'Could not verify the current directory due to a file system error.';
     }
   },
@@ -73,7 +73,7 @@ const rootDirectoryCheck: WarningCheck = {
       }
 
       return null;
-    } catch (_err: unknown) {
+    } catch {
       return 'Could not verify the current directory due to a file system error.';
     }
   },
