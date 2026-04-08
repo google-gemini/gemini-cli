@@ -28,6 +28,7 @@ This skill guides the agent in conducting professional and thorough code reviews
     npm run preflight
     ```
 3.  **Context**: Read the PR description and any existing comments to understand the goal and history.
+4.  **Local Verification**: If reviewing a fix or feature for the Gemini CLI itself, activate the `debug-cli` skill to build and interactively test the changes locally using `tmux`.
 
 #### For Local Changes:
 1.  **Identify Changes**:
@@ -45,6 +46,7 @@ Analyze the code changes based on the following pillars:
 *   **Security**: Are there any potential security vulnerabilities or insecure coding practices?
 *   **Edge Cases and Error Handling**: Does the code appropriately handle edge cases and potential errors?
 *   **Testability**: Is the new or modified code adequately covered by tests (even if preflight checks pass)? Suggest additional test cases that would improve coverage or robustness.
+*   **Interactive Verification**: If the changes affect the Gemini CLI behavior or TUI, use the `debug-cli` skill to manually verify the UI/UX or behavioral changes.
 
 ### 4. Provide Feedback
 
