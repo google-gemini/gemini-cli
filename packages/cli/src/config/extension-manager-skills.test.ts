@@ -15,6 +15,10 @@ import { createExtension } from '../test-utils/createExtension.js';
 import { EXTENSIONS_DIRECTORY_NAME } from './extensions/variables.js';
 
 const mockHomedir = vi.hoisted(() => vi.fn(() => '/tmp/mock-home'));
+const mockIntegrityManager = vi.hoisted(() => ({
+  verify: vi.fn().mockResolvedValue('verified'),
+  store: vi.fn().mockResolvedValue(undefined),
+}));
 
 vi.mock('node:os', async (importOriginal) => {
   const actual = await importOriginal<typeof import('node:os')>();
@@ -31,6 +35,9 @@ vi.mock('@google/gemini-cli-core', async (importOriginal) => {
   return {
     ...actual,
     homedir: mockHomedir,
+    ExtensionIntegrityManager: vi
+      .fn()
+      .mockImplementation(() => mockIntegrityManager),
     loadAgentsFromDirectory: vi
       .fn()
       .mockImplementation(async () => ({ agents: [], errors: [] })),
@@ -64,6 +71,7 @@ describe('ExtensionManager skills validation', () => {
       requestConsent: vi.fn().mockResolvedValue(true),
       requestSetting: vi.fn(),
       workspaceDir: tempDir,
+      integrityManager: mockIntegrityManager,
     });
   });
 
@@ -139,6 +147,7 @@ describe('ExtensionManager skills validation', () => {
       requestConsent: vi.fn().mockResolvedValue(true),
       requestSetting: vi.fn(),
       workspaceDir: tempDir,
+      integrityManager: mockIntegrityManager,
     });
 
     // 4. Load extensions

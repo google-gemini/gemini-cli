@@ -27,6 +27,8 @@ export interface SkillDefinition {
   disabled?: boolean;
   /** Whether the skill is a built-in skill. */
   isBuiltin?: boolean;
+  /** The name of the extension that provided this skill, if any. */
+  extensionName?: string;
 }
 
 export const FRONTMATTER_REGEX =
@@ -36,7 +38,7 @@ export const FRONTMATTER_REGEX =
  * Parses frontmatter content using YAML with a fallback to simple key-value parsing.
  * This handles cases where description contains colons that would break YAML parsing.
  */
-function parseFrontmatter(
+export function parseFrontmatter(
   content: string,
 ): { name: string; description: string } | null {
   try {

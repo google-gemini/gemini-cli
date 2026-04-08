@@ -161,14 +161,16 @@ describe('extensionsCommand', () => {
 
     mockContext = createMockCommandContext({
       services: {
-        config: {
-          getExtensions: mockGetExtensions,
-          getExtensionLoader: vi.fn().mockReturnValue(mockExtensionLoader),
-          getWorkingDir: () => '/test/dir',
-          reloadSkills: mockReloadSkills,
-          getAgentRegistry: vi.fn().mockReturnValue({
-            reload: mockReloadAgents,
-          }),
+        agentContext: {
+          config: {
+            getExtensions: mockGetExtensions,
+            getExtensionLoader: vi.fn().mockReturnValue(mockExtensionLoader),
+            getWorkingDir: () => '/test/dir',
+            reloadSkills: mockReloadSkills,
+            getAgentRegistry: vi.fn().mockReturnValue({
+              reload: mockReloadAgents,
+            }),
+          },
         },
       },
       ui: {
@@ -708,10 +710,14 @@ describe('extensionsCommand', () => {
         size: 100,
       } as Stats);
       await linkAction!(mockContext, packageName);
-      expect(mockInstallExtension).toHaveBeenCalledWith({
-        source: packageName,
-        type: 'link',
-      });
+      expect(mockInstallExtension).toHaveBeenCalledWith(
+        {
+          source: packageName,
+          type: 'link',
+        },
+        undefined,
+        undefined,
+      );
       expect(mockContext.ui.addItem).toHaveBeenCalledWith({
         type: MessageType.INFO,
         text: `Linking extension from "${packageName}"...`,
@@ -731,10 +737,14 @@ describe('extensionsCommand', () => {
       } as Stats);
 
       await linkAction!(mockContext, packageName);
-      expect(mockInstallExtension).toHaveBeenCalledWith({
-        source: packageName,
-        type: 'link',
-      });
+      expect(mockInstallExtension).toHaveBeenCalledWith(
+        {
+          source: packageName,
+          type: 'link',
+        },
+        undefined,
+        undefined,
+      );
       expect(mockContext.ui.addItem).toHaveBeenCalledWith({
         type: MessageType.ERROR,
         text: `Failed to link extension from "${packageName}": ${errorMessage}`,
@@ -917,7 +927,7 @@ describe('extensionsCommand', () => {
       expect(restartAction).not.toBeNull();
 
       mockRestartExtension = vi.fn();
-      mockContext.services.config!.getExtensionLoader = vi
+      mockContext.services.agentContext!.config.getExtensionLoader = vi
         .fn()
         .mockImplementation(() => ({
           getExtensions: mockGetExtensions,
@@ -927,7 +937,7 @@ describe('extensionsCommand', () => {
     });
 
     it('should show a message if no extensions are installed', async () => {
-      mockContext.services.config!.getExtensionLoader = vi
+      mockContext.services.agentContext!.config.getExtensionLoader = vi
         .fn()
         .mockImplementation(() => ({
           getExtensions: () => [],
@@ -1017,7 +1027,7 @@ describe('extensionsCommand', () => {
     });
 
     it('shows an error if no extension loader is available', async () => {
-      mockContext.services.config!.getExtensionLoader = vi.fn();
+      mockContext.services.agentContext!.config.getExtensionLoader = vi.fn();
 
       await restartAction!(mockContext, '--all');
 
