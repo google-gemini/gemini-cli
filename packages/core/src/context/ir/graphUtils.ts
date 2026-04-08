@@ -4,33 +4,49 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import type { Episode, IrNode, AgentThought, ToolExecution, UserPrompt, AgentYield, SystemEvent } from './types.js';
+import type { Episode, Task, IrNode, AgentThought, ToolExecution, MaskedTool, UserPrompt, AgentYield, SystemEvent, Snapshot, RollingSummary } from './types.js';
 import type { ContextTracer } from '../tracer.js';
 import { debugLogger } from '../../utils/debugLogger.js';
 import type { ContextEnvironment } from '../sidecar/environment.js';
 
-export function isEpisode(node: IrNode | Episode): node is Episode {
+export function isEpisode(node: IrNode): node is Episode {
   return node.type === 'EPISODE';
 }
 
-export function isAgentThought(node: IrNode | Episode): node is AgentThought {
+export function isTask(node: IrNode): node is Task {
+  return node.type === 'TASK';
+}
+
+export function isAgentThought(node: IrNode): node is AgentThought {
   return node.type === 'AGENT_THOUGHT';
 }
 
-export function isToolExecution(node: IrNode | Episode): node is ToolExecution {
+export function isToolExecution(node: IrNode): node is ToolExecution {
   return node.type === 'TOOL_EXECUTION';
 }
 
-export function isUserPrompt(node: IrNode | Episode): node is UserPrompt {
+export function isMaskedTool(node: IrNode): node is MaskedTool {
+  return node.type === 'MASKED_TOOL';
+}
+
+export function isUserPrompt(node: IrNode): node is UserPrompt {
   return node.type === 'USER_PROMPT';
 }
 
-export function isAgentYield(node: IrNode | Episode): node is AgentYield {
+export function isAgentYield(node: IrNode): node is AgentYield {
   return node.type === 'AGENT_YIELD';
 }
 
-export function isSystemEvent(node: IrNode | Episode): node is SystemEvent {
+export function isSystemEvent(node: IrNode): node is SystemEvent {
   return node.type === 'SYSTEM_EVENT';
+}
+
+export function isSnapshot(node: IrNode): node is Snapshot {
+  return node.type === 'SNAPSHOT';
+}
+
+export function isRollingSummary(node: IrNode): node is RollingSummary {
+  return node.type === 'ROLLING_SUMMARY';
 }
 
 /**
@@ -41,7 +57,7 @@ export function isSystemEvent(node: IrNode | Episode): node is SystemEvent {
  * Handles N-to-1 variant skipping automatically.
  */
 
-export function generateWorkingBufferView(
+export function generateWorkingBufferView_OLD(
   pristineEpisodes: Episode[],
   retainedTokens: number,
   tracer: ContextTracer,

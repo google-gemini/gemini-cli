@@ -4,7 +4,27 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import type { ConcreteNode, IrMetadata } from './ir/types.js';
+import type { ConcreteNode, Snapshot, RollingSummary, IrMetadata } from './ir/types.js';
+
+export type InboxMessage = 
+  | { type: 'SNAPSHOT_READY'; snapshot: Snapshot; abstractsIds: string[] }
+  | { type: 'BACKGROUND_SUMMARY'; summary: RollingSummary; targetId: string };
+
+export interface ContextInbox {
+  dispatch(message: InboxMessage): void;
+  peek<T extends InboxMessage['type']>(type: T): Extract<InboxMessage, { type: T }> | undefined;
+}
+
+export interface ContextWorkingBuffer {
+  /** The current active (projected) flat list of ConcreteNodes. */
+  readonly nodes: ReadonlyArray<ConcreteNode>;
+  
+  /** Retrieves the historical, pristine version of a node (before any masks/summaries). */
+  getPristineNode(id: string): ConcreteNode | undefined;
+  
+  /** Retrieves the full audit lineage of a specific node ID. */
+  getLineage(id: string): ReadonlyArray<ConcreteNode>;
+}
 
 /**
  * State object passed through the processing pipeline.
@@ -52,6 +72,9 @@ export interface ContextPatch {
 }
 
 export interface ProcessArgs {
+  /** The rich buffer containing current nodes and their history. */
+  readonly buffer: ContextWorkingBuffer;
+
   /** The flat, sequential array of current renderable nodes (The Ship). */
   readonly ship: ReadonlyArray<ConcreteNode>;
   
@@ -64,11 +87,8 @@ export interface ProcessArgs {
   /** The token budget and accounting state. */
   readonly state: ContextAccountingState;
   
-  /** 
-   * An escape hatch allowing the processor to query the original, uncompressed
-   * state of a node from the Pristine Graph.
-   */
-  readonly getPristineNode: (id: string) => ConcreteNode | undefined;
+  /** Type-safe messaging system for async/sync coordination. */
+  readonly inbox: ContextInbox;
 }
 
 /**
@@ -81,7 +101,7 @@ export interface ContextProcessor {
   /** Unique name for telemetry and logging. */
   readonly name: string;
 
-  /** Returns an array of declarative patches to apply to the Ship. */
+  /** Returns an array of declarative patches applied at this specific temporal phase. */
   process(args: ProcessArgs): Promise<ContextPatch[]>;
 }
 

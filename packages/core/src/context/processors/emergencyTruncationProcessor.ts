@@ -6,11 +6,11 @@
 
 import type {
   ContextProcessor,
-  ContextAccountingState,
   BackstopTargetOptions,
+  ProcessArgs,
+  ContextPatch,
 } from '../pipeline.js';
 import type { ContextEnvironment } from '../sidecar/environment.js';
-import type { EpisodeEditor } from '../ir/episodeEditor.js';
 
 export type EmergencyTruncationProcessorOptions = BackstopTargetOptions;
 
@@ -47,10 +47,11 @@ export class EmergencyTruncationProcessor implements ContextProcessor {
     this.options = options;
   }
 
-  async process(
-    editor: EpisodeEditor,
-    state: ContextAccountingState,
-  ): Promise<void> {
+  async process({
+    ship,
+    triggerTargets,
+    state,
+  }: ProcessArgs): Promise<ContextPatch[]> {
     const toRemove: string[] = [];
 
     // Calculate how many tokens we need to remove based on the configured knob
@@ -58,11 +59,11 @@ export class EmergencyTruncationProcessor implements ContextProcessor {
     const strategy = this.options.target ?? 'max';
     
     if (strategy === 'incremental') {
-       if (state.currentTokens <= state.maxTokens) return;
+       if (state.currentTokens <= state.maxTokens) return [];
        targetTokensToRemove = state.currentTokens - state.maxTokens;
     } else if (strategy === 'freeNTokens') {
        targetTokensToRemove = this.options.freeTokensTarget ?? 0;
-       if (targetTokensToRemove <= 0) return;
+       if (targetTokensToRemove <= 0) return [];
     } else if (strategy === 'max') {
        // 'max' means we remove all targets without stopping early
        targetTokensToRemove = Infinity;
@@ -70,28 +71,33 @@ export class EmergencyTruncationProcessor implements ContextProcessor {
 
     let removedTokens = 0;
 
-    // Iterate specifically over targets (which represent the aged-out delta).
-    // The editor returns targets from oldest to newest based on the working order.
-    // For truncation, we want to cut the oldest first.
-    for (const target of editor.targets) {
-      const ep = target.episode;
-      // We only truncate entire episodes here for safety and structural integrity
-      if (target.node !== ep) continue;
+    // The ship is sequentially ordered from oldest to newest.
+    // We want to delete the oldest targeted nodes first.
+    for (const node of ship) {
+      // Is this node part of the targeted delta (e.g. aged out of the budget)?
+      if (!triggerTargets.has(node.id)) continue;
+      // Is this node explicitly protected (e.g. part of an active Task)?
+      if (node.logicalParentId && state.protectedLogicalIds.has(node.logicalParentId)) continue;
       
       if (removedTokens >= targetTokensToRemove) break;
 
-      const epTokens = this._env.tokenCalculator.calculateEpisodeListTokens([
-        ep,
-      ]);
+      removedTokens += node.metadata.currentTokens;
+      toRemove.push(node.id);
+    }
 
-      if (!state.protectedEpisodeIds.has(ep.id) && !toRemove.includes(ep.id)) {
-        removedTokens += epTokens;
-        toRemove.push(ep.id);
+    if (toRemove.length === 0) return [];
+
+    return [{
+      removedIds: toRemove,
+      metadata: {
+        originalTokens: removedTokens,
+        currentTokens: 0,
+        transformations: [{
+          processorName: this.name,
+          action: 'TRUNCATED',
+          timestamp: Date.now(),
+        }],
       }
-    }
-
-    if (toRemove.length > 0) {
-      editor.removeEpisodes(toRemove, 'TRUNCATED');
-    }
+    }];
   }
 }

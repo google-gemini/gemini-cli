@@ -155,7 +155,8 @@ export class PipelineOrchestrator {
             ship: currentShip,
             triggerTargets,
             state,
-            getPristineNode: () => undefined,
+            buffer: {} as any, // TODO: Implement ContextWorkingBuffer fully
+            inbox: {} as any, // TODO: Implement ContextInbox fully
           });
           
           currentShip = this.reduceShip(currentShip, patches);
@@ -200,7 +201,8 @@ export class PipelineOrchestrator {
             ship: currentShip,
             triggerTargets,
             state,
-            getPristineNode: () => undefined,
+            buffer: {} as any, // TODO: Implement ContextWorkingBuffer fully
+            inbox: {} as any, // TODO: Implement ContextInbox fully
         });
         currentShip = this.reduceShip(currentShip, patches);
 
