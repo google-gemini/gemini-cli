@@ -424,6 +424,7 @@ async function authWithUserCode(client: OAuth2Client): Promise<boolean> {
         '\n\n',
     );
 
+    let authTimeoutId: NodeJS.Timeout | undefined;
     const code = await new Promise<string>((resolve, reject) => {
       const rl = readline.createInterface({
         input: process.stdin,
@@ -431,7 +432,7 @@ async function authWithUserCode(client: OAuth2Client): Promise<boolean> {
         terminal: true,
       });
 
-      const timeout = setTimeout(() => {
+      authTimeoutId = setTimeout(() => {
         rl.close();
         reject(
           new FatalAuthenticationError(
@@ -441,10 +442,11 @@ async function authWithUserCode(client: OAuth2Client): Promise<boolean> {
       }, 300000); // 5 minute timeout
 
       rl.question('Enter the authorization code: ', (code) => {
-        clearTimeout(timeout);
         rl.close();
         resolve(code.trim());
       });
+    }).finally(() => {
+      if (authTimeoutId) clearTimeout(authTimeoutId);
     });
 
     if (!code) {
