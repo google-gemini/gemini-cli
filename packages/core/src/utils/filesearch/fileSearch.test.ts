@@ -5,11 +5,13 @@
  */
 
 import { describe, it, expect, afterEach, vi } from 'vitest';
+import path from 'node:path';
 import { FileSearchFactory, AbortError, filter } from './fileSearch.js';
 import { createTmpDir, cleanupTmpDir } from '@google/gemini-cli-test-utils';
 import * as crawler from './crawler.js';
 import { GEMINI_IGNORE_FILE_NAME } from '../../config/constants.js';
 import { FileDiscoveryService } from '../../services/fileDiscoveryService.js';
+import { escapePath } from '../paths.js';
 
 describe('FileSearch', () => {
   let tmpDir: string;
@@ -421,6 +423,47 @@ describe('FileSearch', () => {
     );
   });
 
+  it('should prioritize filenames closer to the end of the path and shorter paths', async () => {
+    tmpDir = await createTmpDir({
+      src: {
+        'hooks.ts': '',
+        hooks: {
+          'index.ts': '',
+        },
+        utils: {
+          'hooks.tsx': '',
+        },
+        'hooks-dev': {
+          'test.ts': '',
+        },
+      },
+    });
+
+    const fileSearch = FileSearchFactory.create({
+      projectRoot: tmpDir,
+      fileDiscoveryService: new FileDiscoveryService(tmpDir, {
+        respectGitIgnore: false,
+        respectGeminiIgnore: false,
+      }),
+      ignoreDirs: [],
+      cache: false,
+      cacheTtl: 0,
+      enableRecursiveFileSearch: true,
+      enableFuzzySearch: true,
+    });
+
+    await fileSearch.initialize();
+    const results = await fileSearch.search('hooks');
+
+    // The order should prioritize matches closer to the end and shorter strings.
+    // FZF matches right-to-left.
+    expect(results[0]).toBe('src/hooks/');
+    expect(results[1]).toBe('src/hooks.ts');
+    expect(results[2]).toBe('src/utils/hooks.tsx');
+    expect(results[3]).toBe('src/hooks-dev/');
+    expect(results[4]).toBe('src/hooks/index.ts');
+    expect(results[5]).toBe('src/hooks-dev/test.ts');
+  });
   it('should return empty array when no matches are found', async () => {
     tmpDir = await createTmpDir({
       src: ['file1.js'],
@@ -748,11 +791,12 @@ describe('FileSearch', () => {
 
     // Search for the file using a pattern that contains special characters.
     // The `unescapePath` function should handle the escaped path correctly.
-    const results = await fileSearch.search(
-      'src/file with \\(special\\) chars.txt',
-    );
+    const searchPattern = escapePath('src/file with (special) chars.txt');
+    const results = await fileSearch.search(searchPattern);
 
-    expect(results).toEqual(['src/file with (special) chars.txt']);
+    expect(results.map((r) => path.normalize(r))).toEqual([
+      path.normalize('src/file with (special) chars.txt'),
+    ]);
   });
 
   describe('DirectoryFileSearch', () => {

@@ -63,7 +63,18 @@ export function partToString(
       return `[Function Response: ${part.functionResponse.name}]`;
     }
     if (part.inlineData !== undefined) {
-      return `<${part.inlineData.mimeType}>`;
+      const mimeType = part.inlineData.mimeType ?? 'unknown';
+      const data = part.inlineData.data ?? '';
+      const bytes = Math.ceil((data.length * 3) / 4);
+      const kb = (bytes / 1024).toFixed(1);
+      const category = mimeType.startsWith('audio/')
+        ? 'Audio'
+        : mimeType.startsWith('video/')
+          ? 'Video'
+          : mimeType.startsWith('image/')
+            ? 'Image'
+            : 'Media';
+      return `[${category}: ${mimeType}, ${kb} KB]`;
     }
   }
 

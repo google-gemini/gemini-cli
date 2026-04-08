@@ -35,10 +35,7 @@ describe('colorizeCode', () => {
       hideLineNumbers: true,
     });
 
-    const { lastFrame, waitUntilReady, unmount } = renderWithProviders(
-      <>{result}</>,
-    );
-    await waitUntilReady();
+    const { lastFrame, unmount } = await renderWithProviders(<>{result}</>);
     // We expect the output to preserve the empty line.
     // If the bug exists, it might look like "line 1\nline 3"
     // If fixed, it should look like "line 1\n \nline 3" (if we use space) or just have the newline.
@@ -49,5 +46,61 @@ describe('colorizeCode', () => {
 
     expect(lastFrame()).toMatch(/line 1\s*\n\s*\n\s*line 3/);
     unmount();
+  });
+
+  it('does not let colors from ansi escape codes leak into colorized code', async () => {
+    const code = 'line 1\n\x1b[41mline 2 with red background\x1b[0m\nline 3';
+    const settings = new LoadedSettings(
+      { path: '', settings: {}, originalSettings: {} },
+      { path: '', settings: {}, originalSettings: {} },
+      {
+        path: '',
+        settings: { ui: { useAlternateBuffer: true, showLineNumbers: false } },
+        originalSettings: {
+          ui: { useAlternateBuffer: true, showLineNumbers: false },
+        },
+      },
+      { path: '', settings: {}, originalSettings: {} },
+      true,
+      [],
+    );
+
+    const result = colorizeCode({
+      code,
+      language: 'javascript',
+      maxWidth: 80,
+      settings,
+      hideLineNumbers: true,
+    });
+
+    const renderResult = await renderWithProviders(<>{result}</>);
+    await renderResult.waitUntilReady();
+
+    await expect(renderResult).toMatchSvgSnapshot();
+    renderResult.unmount();
+  });
+
+  it('returns an array of lines when returnLines is true', () => {
+    const code = 'line 1\nline 2\nline 3';
+    const settings = new LoadedSettings(
+      { path: '', settings: {}, originalSettings: {} },
+      { path: '', settings: {}, originalSettings: {} },
+      { path: '', settings: {}, originalSettings: {} },
+      { path: '', settings: {}, originalSettings: {} },
+      true,
+      [],
+    );
+
+    const result = colorizeCode({
+      code,
+      language: 'javascript',
+      maxWidth: 80,
+      settings,
+      hideLineNumbers: true,
+      returnLines: true,
+    });
+
+    expect(Array.isArray(result)).toBe(true);
+    expect(result).toHaveLength(3);
   });
 });

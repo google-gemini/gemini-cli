@@ -117,11 +117,13 @@ exports[`<StatsDisplay /> > Conditional Rendering Tests > hides Efficiency secti
 │    » API Time:               100ms (100.0%)                                                      │
 │    » Tool Time:              0s (0.0%)                                                           │
 │                                                                                                  │
-│  Model Usage                                                                                     │
-│  Model                       Reqs   Input Tokens   Cache Reads  Output Tokens                    │
-│  ────────────────────────────────────────────────────────────────────────────                    │
-│  gemini-2.5-pro                 1            100             0            100                    │
 │                                                                                                  │
+│  Model Usage                                                                                     │
+│  Use /model to view model quota information                                                      │
+│                                                                                                  │
+│  Model                           Reqs  Input Tokens   Cache Reads Output Tokens                  │
+│  ──────────────────────────────────────────────────────────────────────────────────────────────  │
+│  gemini-2.5-pro                     1           100             0           100                  │
 ╰──────────────────────────────────────────────────────────────────────────────────────────────────╯
 "
 `;
@@ -141,87 +143,6 @@ exports[`<StatsDisplay /> > Conditional Rendering Tests > hides User Agreement w
 │  Agent Active:               123ms                                                               │
 │    » API Time:               0s (0.0%)                                                           │
 │    » Tool Time:              123ms (100.0%)                                                      │
-│                                                                                                  │
-╰──────────────────────────────────────────────────────────────────────────────────────────────────╯
-"
-`;
-
-exports[`<StatsDisplay /> > Quota Display > renders pooled quota information for auto mode 1`] = `
-"╭──────────────────────────────────────────────────────────────────────────────────────────────────╮
-│                                                                                                  │
-│  Session Stats                                                                                   │
-│                                                                                                  │
-│  Interaction Summary                                                                             │
-│  Session ID:                 test-session-id                                                     │
-│  Tool Calls:                 0 ( ✓ 0 x 0 )                                                       │
-│  Success Rate:               0.0%                                                                │
-│                                                                                                  │
-│  Performance                                                                                     │
-│  Wall Time:                  1s                                                                  │
-│  Agent Active:               0s                                                                  │
-│    » API Time:               0s (0.0%)                                                           │
-│    » Tool Time:              0s (0.0%)                                                           │
-│                                                                                                  │
-│  auto Usage                                                                                      │
-│  65% usage remaining                                                                             │
-│  Usage limit: 1,100                                                                              │
-│  Usage limits span all sessions and reset daily.                                                 │
-│  For a full token breakdown, run \`/stats model\`.                                                 │
-│                                                                                                  │
-│  Model                       Reqs             Usage remaining                                    │
-│  ────────────────────────────────────────────────────────────                                    │
-│  gemini-2.5-pro                 -                                                                │
-│  gemini-2.5-flash               -                                                                │
-│                                                                                                  │
-╰──────────────────────────────────────────────────────────────────────────────────────────────────╯
-"
-`;
-
-exports[`<StatsDisplay /> > Quota Display > renders quota information for unused models 1`] = `
-"╭──────────────────────────────────────────────────────────────────────────────────────────────────╮
-│                                                                                                  │
-│  Session Stats                                                                                   │
-│                                                                                                  │
-│  Interaction Summary                                                                             │
-│  Session ID:                 test-session-id                                                     │
-│  Tool Calls:                 0 ( ✓ 0 x 0 )                                                       │
-│  Success Rate:               0.0%                                                                │
-│                                                                                                  │
-│  Performance                                                                                     │
-│  Wall Time:                  1s                                                                  │
-│  Agent Active:               0s                                                                  │
-│    » API Time:               0s (0.0%)                                                           │
-│    » Tool Time:              0s (0.0%)                                                           │
-│                                                                                                  │
-│  Model Usage                                                                                     │
-│  Model                       Reqs             Usage remaining                                    │
-│  ────────────────────────────────────────────────────────────                                    │
-│  gemini-2.5-flash               -          50.0% resets in 2h                                    │
-│                                                                                                  │
-╰──────────────────────────────────────────────────────────────────────────────────────────────────╯
-"
-`;
-
-exports[`<StatsDisplay /> > Quota Display > renders quota information when quotas are provided 1`] = `
-"╭──────────────────────────────────────────────────────────────────────────────────────────────────╮
-│                                                                                                  │
-│  Session Stats                                                                                   │
-│                                                                                                  │
-│  Interaction Summary                                                                             │
-│  Session ID:                 test-session-id                                                     │
-│  Tool Calls:                 0 ( ✓ 0 x 0 )                                                       │
-│  Success Rate:               0.0%                                                                │
-│                                                                                                  │
-│  Performance                                                                                     │
-│  Wall Time:                  1s                                                                  │
-│  Agent Active:               100ms                                                               │
-│    » API Time:               100ms (100.0%)                                                      │
-│    » Tool Time:              0s (0.0%)                                                           │
-│                                                                                                  │
-│  Model Usage                                                                                     │
-│  Model                       Reqs             Usage remaining                                    │
-│  ────────────────────────────────────────────────────────────                                    │
-│  gemini-2.5-pro                 1      75.0% resets in 1h 30m                                    │
 │                                                                                                  │
 ╰──────────────────────────────────────────────────────────────────────────────────────────────────╯
 "
@@ -283,14 +204,14 @@ exports[`<StatsDisplay /> > renders a table with two models correctly 1`] = `
 │    » API Time:               19.5s (100.0%)                                                      │
 │    » Tool Time:              0s (0.0%)                                                           │
 │                                                                                                  │
+│                                                                                                  │
 │  Model Usage                                                                                     │
-│  Model                       Reqs   Input Tokens   Cache Reads  Output Tokens                    │
-│  ────────────────────────────────────────────────────────────────────────────                    │
-│  gemini-2.5-pro                 3            500           500          2,000                    │
-│  gemini-2.5-flash               5         15,000        10,000         15,000                    │
+│  Use /model to view model quota information                                                      │
 │                                                                                                  │
-│  Savings Highlight: 10,500 (40.4%) of input tokens were served from the cache, reducing costs.   │
-│                                                                                                  │
+│  Model                           Reqs  Input Tokens   Cache Reads Output Tokens                  │
+│  ──────────────────────────────────────────────────────────────────────────────────────────────  │
+│  gemini-2.5-pro                     3         1,000           500         2,000                  │
+│  gemini-2.5-flash                   5        25,000        10,000        15,000                  │
 ╰──────────────────────────────────────────────────────────────────────────────────────────────────╯
 "
 `;
@@ -312,13 +233,13 @@ exports[`<StatsDisplay /> > renders all sections when all data is present 1`] = 
 │    » API Time:               100ms (44.8%)                                                       │
 │    » Tool Time:              123ms (55.2%)                                                       │
 │                                                                                                  │
+│                                                                                                  │
 │  Model Usage                                                                                     │
-│  Model                       Reqs   Input Tokens   Cache Reads  Output Tokens                    │
-│  ────────────────────────────────────────────────────────────────────────────                    │
-│  gemini-2.5-pro                 1             50            50            100                    │
+│  Use /model to view model quota information                                                      │
 │                                                                                                  │
-│  Savings Highlight: 50 (50.0%) of input tokens were served from the cache, reducing costs.       │
-│                                                                                                  │
+│  Model                           Reqs  Input Tokens   Cache Reads Output Tokens                  │
+│  ──────────────────────────────────────────────────────────────────────────────────────────────  │
+│  gemini-2.5-pro                     1           100            50           100                  │
 ╰──────────────────────────────────────────────────────────────────────────────────────────────────╯
 "
 `;
@@ -339,6 +260,35 @@ exports[`<StatsDisplay /> > renders only the Performance section in its zero sta
 │    » API Time:               0s (0.0%)                                                           │
 │    » Tool Time:              0s (0.0%)                                                           │
 │                                                                                                  │
+╰──────────────────────────────────────────────────────────────────────────────────────────────────╯
+"
+`;
+
+exports[`<StatsDisplay /> > renders role breakdown correctly under models 1`] = `
+"╭──────────────────────────────────────────────────────────────────────────────────────────────────╮
+│                                                                                                  │
+│  Session Stats                                                                                   │
+│                                                                                                  │
+│  Interaction Summary                                                                             │
+│  Session ID:                 test-session-id                                                     │
+│  Tool Calls:                 0 ( ✓ 0 x 0 )                                                       │
+│  Success Rate:               0.0%                                                                │
+│                                                                                                  │
+│  Performance                                                                                     │
+│  Wall Time:                  1s                                                                  │
+│  Agent Active:               10.0s                                                               │
+│    » API Time:               10.0s (100.0%)                                                      │
+│    » Tool Time:              0s (0.0%)                                                           │
+│                                                                                                  │
+│                                                                                                  │
+│  Model Usage                                                                                     │
+│  Use /model to view model quota information                                                      │
+│                                                                                                  │
+│  Model                           Reqs  Input Tokens   Cache Reads Output Tokens                  │
+│  ──────────────────────────────────────────────────────────────────────────────────────────────  │
+│  gemini-2.5-flash                  10         1,200           200         2,000                  │
+│    ↳ main                           7           900           100         1,500                  │
+│    ↳ utility_tool                   3           300           100           500                  │
 ╰──────────────────────────────────────────────────────────────────────────────────────────────────╯
 "
 `;

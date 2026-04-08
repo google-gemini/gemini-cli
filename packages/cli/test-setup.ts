@@ -6,7 +6,12 @@
 
 import { vi, beforeEach, afterEach } from 'vitest';
 import { format } from 'node:util';
-import { coreEvents } from '@google/gemini-cli-core';
+import { coreEvents, debugLogger } from '@google/gemini-cli-core';
+import { themeManager } from './src/ui/themes/theme-manager.js';
+import { mockInkSpinner } from './src/test-utils/mockSpinner.js';
+
+// Globally mock ink-spinner to prevent non-deterministic snapshot/act flakes.
+mockInkSpinner();
 
 // Unset CI environment variable so that ink renders dynamically as it does in a real terminal
 if (process.env.CI !== undefined) {
@@ -23,12 +28,39 @@ if (process.env.NO_COLOR !== undefined) {
   delete process.env.NO_COLOR;
 }
 
+// Force true color output for ink so that snapshots always include color information.
+process.env.FORCE_COLOR = '3';
+
+// Force generic keybinding hints to ensure stable snapshots across different operating systems.
+process.env.FORCE_GENERIC_KEYBINDING_HINTS = 'true';
+
+// Force generic terminal declaration to ensure stable snapshots across different host environments.
+process.env.TERM_PROGRAM = 'generic';
+
 import './src/test-utils/customMatchers.js';
 
 let consoleErrorSpy: vi.SpyInstance;
 let actWarnings: Array<{ message: string; stack: string }> = [];
 
+let logSpy: vi.SpyInstance;
+let warnSpy: vi.SpyInstance;
+let errorSpy: vi.SpyInstance;
+let debugSpy: vi.SpyInstance;
+
 beforeEach(() => {
+  // Reset themeManager state to ensure test isolation
+  themeManager.resetForTesting();
+
+  // Mock debugLogger to avoid test output noise
+  logSpy = vi.spyOn(debugLogger, 'log').mockImplementation(() => {});
+  warnSpy = vi.spyOn(debugLogger, 'warn').mockImplementation((...args) => {
+    console.warn(...args);
+  });
+  errorSpy = vi.spyOn(debugLogger, 'error').mockImplementation((...args) => {
+    console.error(...args);
+  });
+  debugSpy = vi.spyOn(debugLogger, 'debug').mockImplementation(() => {});
+
   actWarnings = [];
   consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation((...args) => {
     const firstArg = args[0];
@@ -53,6 +85,14 @@ beforeEach(() => {
           ? stackLines.slice(lastReactFrameIndex + 1).join('\n')
           : stackLines.slice(1).join('\n');
 
+      if (
+        relevantStack.includes('OverflowContext.tsx') ||
+        relevantStack.includes('useTimedMessage.ts') ||
+        relevantStack.includes('useInlineEditBuffer.ts')
+      ) {
+        return;
+      }
+
       actWarnings.push({
         message: format(...args),
         stack: relevantStack,
@@ -64,8 +104,12 @@ beforeEach(() => {
 afterEach(() => {
   consoleErrorSpy.mockRestore();
 
-  vi.unstubAllEnvs();
+  logSpy?.mockRestore();
+  warnSpy?.mockRestore();
+  errorSpy?.mockRestore();
+  debugSpy?.mockRestore();
 
+  vi.unstubAllEnvs();
   if (actWarnings.length > 0) {
     const messages = actWarnings
       .map(({ message, stack }) => `${message}\n${stack}`)

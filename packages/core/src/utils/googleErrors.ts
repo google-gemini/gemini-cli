@@ -10,14 +10,34 @@
  */
 
 /**
+ * Sanitize a JSON string before parsing to handle known SSE stream corruption.
+ * SSE stream parsing can inject stray commas — the observed pattern is a comma
+ * at the end of one line followed by a stray comma on the next line, e.g.:
+ *   `"domain": "cloudcode-pa.googleapis.com",\n ,       "metadata": {`
+ * This collapses duplicate commas (possibly separated by whitespace/newlines)
+ * into a single comma, preserving the whitespace.
+ */
+function sanitizeJsonString(jsonStr: string): string {
+  // Match a comma, optional whitespace/newlines, then another comma.
+  // Replace with just a comma + the captured whitespace.
+  // Loop to handle cases like `,,,` which would otherwise become `,,` on a single pass.
+  let prev: string;
+  do {
+    prev = jsonStr;
+    jsonStr = jsonStr.replace(/,(\s*),/g, ',$1');
+  } while (jsonStr !== prev);
+  return jsonStr;
+}
+
+/**
  * Based on google/rpc/error_details.proto
  */
 
 export interface ErrorInfo {
   '@type': 'type.googleapis.com/google.rpc.ErrorInfo';
   reason: string;
-  domain: string;
-  metadata: { [key: string]: string };
+  domain?: string;
+  metadata?: { [key: string]: string };
 }
 
 export interface RetryInfo {
@@ -138,8 +158,8 @@ export function parseGoogleApiError(error: unknown): GoogleApiError | null {
   // If error is a string, try to parse it.
   if (typeof errorObj === 'string') {
     try {
-      errorObj = JSON.parse(errorObj);
-    } catch (_) {
+      errorObj = JSON.parse(sanitizeJsonString(errorObj));
+    } catch {
       // Not a JSON string, can't parse.
       return null;
     }
@@ -168,7 +188,9 @@ export function parseGoogleApiError(error: unknown): GoogleApiError | null {
     try {
       // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
       const parsedMessage = JSON.parse(
-        currentError.message.replace(/\u00A0/g, '').replace(/\n/g, ' '),
+        sanitizeJsonString(
+          currentError.message.replace(/\u00A0/g, '').replace(/\n/g, ' '),
+        ),
       );
       if (parsedMessage.error) {
         // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
@@ -178,7 +200,7 @@ export function parseGoogleApiError(error: unknown): GoogleApiError | null {
         // The message is a JSON string, but not a nested error object.
         break;
       }
-    } catch (_error) {
+    } catch {
       // It wasn't a JSON string, so we've drilled down as far as we can.
       break;
     }
@@ -207,9 +229,14 @@ export function parseGoogleApiError(error: unknown): GoogleApiError | null {
               detailObj['@type'] = detailObj[typeKey];
               delete detailObj[typeKey];
             }
-            // We can just cast it; the consumer will have to switch on @type
-            // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
-            details.push(detailObj as unknown as GoogleApiErrorDetail);
+            // Basic structural check before casting.
+            // Since the proto definitions are loose, we primarily rely on @type presence.
+            // eslint-disable-next-line no-restricted-syntax
+            if (typeof detailObj['@type'] === 'string') {
+              // We can just cast it; the consumer will have to switch on @type
+              // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
+              details.push(detailObj as unknown as GoogleApiErrorDetail);
+            }
           }
         }
       }
@@ -223,6 +250,16 @@ export function parseGoogleApiError(error: unknown): GoogleApiError | null {
   }
 
   return null;
+}
+
+function isErrorShape(obj: unknown): obj is ErrorShape {
+  return (
+    typeof obj === 'object' &&
+    obj !== null &&
+    (('message' in obj &&
+      typeof (obj as { message: unknown }).message === 'string') ||
+      ('code' in obj && typeof (obj as { code: unknown }).code === 'number'))
+  );
 }
 
 function fromGaxiosError(errorObj: object): ErrorShape | undefined {
@@ -246,8 +283,8 @@ function fromGaxiosError(errorObj: object): ErrorShape | undefined {
     if (typeof data === 'string') {
       try {
         // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
-        data = JSON.parse(data);
-      } catch (_) {
+        data = JSON.parse(sanitizeJsonString(data));
+      } catch {
         // Not a JSON string, can't parse.
       }
     }
@@ -260,7 +297,10 @@ function fromGaxiosError(errorObj: object): ErrorShape | undefined {
     if (typeof data === 'object' && data !== null) {
       if ('error' in data) {
         // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
-        outerError = (data as { error: ErrorShape }).error;
+        const potentialError = (data as { error: unknown }).error;
+        if (isErrorShape(potentialError)) {
+          outerError = potentialError;
+        }
       }
     }
   }
@@ -293,8 +333,8 @@ function fromApiError(errorObj: object): ErrorShape | undefined {
     if (typeof data === 'string') {
       try {
         // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
-        data = JSON.parse(data);
-      } catch (_) {
+        data = JSON.parse(sanitizeJsonString(data));
+      } catch {
         // Not a JSON string, can't parse.
         // Try one more fallback: look for the first '{' and last '}'
         if (typeof data === 'string') {
@@ -303,8 +343,10 @@ function fromApiError(errorObj: object): ErrorShape | undefined {
           if (firstBrace !== -1 && lastBrace !== -1 && lastBrace > firstBrace) {
             try {
               // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
-              data = JSON.parse(data.substring(firstBrace, lastBrace + 1));
-            } catch (__) {
+              data = JSON.parse(
+                sanitizeJsonString(data.substring(firstBrace, lastBrace + 1)),
+              );
+            } catch {
               // Still failed
             }
           }
@@ -320,7 +362,10 @@ function fromApiError(errorObj: object): ErrorShape | undefined {
     if (typeof data === 'object' && data !== null) {
       if ('error' in data) {
         // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
-        outerError = (data as { error: ErrorShape }).error;
+        const potentialError = (data as { error: unknown }).error;
+        if (isErrorShape(potentialError)) {
+          outerError = potentialError;
+        }
       }
     }
   }

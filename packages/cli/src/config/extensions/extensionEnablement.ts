@@ -179,6 +179,7 @@ export class ExtensionEnablementManager {
   readConfig(): AllExtensionsEnablementConfig {
     try {
       const content = fs.readFileSync(this.configFilePath, 'utf-8');
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-return
       return JSON.parse(content);
     } catch (error) {
       if (

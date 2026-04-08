@@ -53,6 +53,12 @@ export const Colors: ColorsTheme = {
   get DarkGray() {
     return themeManager.getColors().DarkGray;
   },
+  get InputBackground() {
+    return themeManager.getColors().InputBackground;
+  },
+  get MessageBackground() {
+    return themeManager.getColors().MessageBackground;
+  },
   get GradientColors() {
     return themeManager.getActiveTheme().colors.GradientColors;
   },

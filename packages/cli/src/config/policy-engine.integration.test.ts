@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { describe, it, expect, vi } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import {
   ApprovalMode,
   PolicyDecision,
@@ -29,6 +29,10 @@ vi.mock('@google/gemini-cli-core', async (importOriginal) => {
 });
 
 describe('Policy Engine Integration Tests', () => {
+  beforeEach(() => vi.stubEnv('GEMINI_SYSTEM_MD', ''));
+
+  afterEach(() => vi.unstubAllEnvs());
+
   describe('Policy configuration produces valid PolicyEngine config', () => {
     it('should create a working PolicyEngine from basic settings', async () => {
       const settings: Settings = {
@@ -89,13 +93,13 @@ describe('Policy Engine Integration Tests', () => {
       // Tools from allowed server should be allowed
       // Tools from allowed server should be allowed
       expect(
-        (await engine.check({ name: 'allowed-server__tool1' }, undefined))
+        (await engine.check({ name: 'mcp_allowed-server_tool1' }, undefined))
           .decision,
       ).toBe(PolicyDecision.ALLOW);
       expect(
         (
           await engine.check(
-            { name: 'allowed-server__another_tool' },
+            { name: 'mcp_allowed-server_another_tool' },
             undefined,
           )
         ).decision,
@@ -103,13 +107,13 @@ describe('Policy Engine Integration Tests', () => {
 
       // Tools from trusted server should be allowed
       expect(
-        (await engine.check({ name: 'trusted-server__tool1' }, undefined))
+        (await engine.check({ name: 'mcp_trusted-server_tool1' }, undefined))
           .decision,
       ).toBe(PolicyDecision.ALLOW);
       expect(
         (
           await engine.check(
-            { name: 'trusted-server__special_tool' },
+            { name: 'mcp_trusted-server_special_tool' },
             undefined,
           )
         ).decision,
@@ -117,28 +121,25 @@ describe('Policy Engine Integration Tests', () => {
 
       // Tools from blocked server should be denied
       expect(
-        (await engine.check({ name: 'blocked-server__tool1' }, undefined))
+        (await engine.check({ name: 'mcp_blocked-server_tool1' }, undefined))
           .decision,
       ).toBe(PolicyDecision.DENY);
       expect(
-        (await engine.check({ name: 'blocked-server__any_tool' }, undefined))
+        (await engine.check({ name: 'mcp_blocked-server_any_tool' }, undefined))
           .decision,
       ).toBe(PolicyDecision.DENY);
 
       // Tools from unknown servers should use default
       expect(
-        (await engine.check({ name: 'unknown-server__tool' }, undefined))
+        (await engine.check({ name: 'mcp_unknown-server_tool' }, undefined))
           .decision,
       ).toBe(PolicyDecision.ASK_USER);
     });
 
-    it('should correctly prioritize specific tool excludes over MCP server wildcards', async () => {
+    it('should handle global MCP wildcard (*) in settings', async () => {
       const settings: Settings = {
         mcp: {
-          allowed: ['my-server'],
-        },
-        tools: {
-          exclude: ['my-server__dangerous-tool'],
+          allowed: ['*'],
         },
       };
 
@@ -148,23 +149,63 @@ describe('Policy Engine Integration Tests', () => {
       );
       const engine = new PolicyEngine(config);
 
-      // MCP server allowed (priority 3.1) provides general allow for server
-      // MCP server allowed (priority 3.1) provides general allow for server
+      // ANY tool with a server name should be allowed
       expect(
-        (await engine.check({ name: 'my-server__safe-tool' }, undefined))
+        (await engine.check({ name: 'mcp_mcp-server_tool' }, 'mcp-server'))
           .decision,
       ).toBe(PolicyDecision.ALLOW);
-      // But specific tool exclude (priority 3.4) wins over server allow
       expect(
-        (await engine.check({ name: 'my-server__dangerous-tool' }, undefined))
+        (
+          await engine.check(
+            { name: 'mcp_another-server_tool' },
+            'another-server',
+          )
+        ).decision,
+      ).toBe(PolicyDecision.ALLOW);
+
+      // Built-in tools should NOT be allowed by the MCP wildcard
+      expect(
+        (await engine.check({ name: 'run_shell_command' }, undefined)).decision,
+      ).toBe(PolicyDecision.ASK_USER);
+    });
+
+    it('should correctly prioritize specific tool excludes over MCP server wildcards', async () => {
+      const settings: Settings = {
+        mcp: {
+          allowed: ['my-server'],
+        },
+        tools: {
+          exclude: ['mcp_my-server_dangerous-tool'],
+        },
+      };
+
+      const config = await createPolicyEngineConfig(
+        settings,
+        ApprovalMode.DEFAULT,
+      );
+      const engine = new PolicyEngine(config);
+
+      // MCP server allowed (priority 4.1) provides general allow for server
+      // MCP server allowed (priority 4.1) provides general allow for server
+      expect(
+        (await engine.check({ name: 'mcp_my-server_safe-tool' }, undefined))
           .decision,
+      ).toBe(PolicyDecision.ALLOW);
+      // But specific tool exclude (priority 4.4) wins over server allow
+      expect(
+        (
+          await engine.check(
+            { name: 'mcp_my-server_dangerous-tool' },
+            undefined,
+          )
+        ).decision,
       ).toBe(PolicyDecision.DENY);
     });
 
     it('should handle complex mixed configurations', async () => {
       const settings: Settings = {
         tools: {
-          allowed: ['custom-tool', 'my-server__special-tool'],
+          allowed: ['custom-tool', 'mcp_my-server_special-tool'],
           exclude: ['glob', 'dangerous-tool'],
         },
         mcp: {
@@ -209,21 +250,21 @@ describe('Policy Engine Integration Tests', () => {
         (await engine.check({ name: 'custom-tool' }, undefined)).decision,
       ).toBe(PolicyDecision.ALLOW);
       expect(
-        (await engine.check({ name: 'my-server__special-tool' }, undefined))
+        (await engine.check({ name: 'mcp_my-server_special-tool' }, undefined))
           .decision,
       ).toBe(PolicyDecision.ALLOW);
 
       // MCP server tools
       expect(
-        (await engine.check({ name: 'allowed-server__tool' }, undefined))
+        (await engine.check({ name: 'mcp_allowed-server_tool' }, undefined))
           .decision,
       ).toBe(PolicyDecision.ALLOW);
       expect(
-        (await engine.check({ name: 'trusted-server__tool' }, undefined))
+        (await engine.check({ name: 'mcp_trusted-server_tool' }, undefined))
           .decision,
       ).toBe(PolicyDecision.ALLOW);
       expect(
-        (await engine.check({ name: 'blocked-server__tool' }, undefined))
+        (await engine.check({ name: 'mcp_blocked-server_tool' }, undefined))
           .decision,
       ).toBe(PolicyDecision.DENY);
 
@@ -305,6 +346,12 @@ describe('Policy Engine Integration Tests', () => {
       expect(
         (await engine.check({ name: 'list_directory' }, undefined)).decision,
       ).toBe(PolicyDecision.ALLOW);
+      expect(
+        (await engine.check({ name: 'get_internal_docs' }, undefined)).decision,
+      ).toBe(PolicyDecision.ALLOW);
+      expect(
+        (await engine.check({ name: 'cli_help' }, undefined)).decision,
+      ).toBe(PolicyDecision.ALLOW);
 
       // Other tools should be denied via catch all
       expect(
@@ -323,6 +370,39 @@ describe('Policy Engine Integration Tests', () => {
       ).toBe(PolicyDecision.DENY);
     });
 
+    it('should correctly match tool annotations', async () => {
+      const settings: Settings = {};
+
+      const config = await createPolicyEngineConfig(
+        settings,
+        ApprovalMode.DEFAULT,
+      );
+
+      // Add a manual rule with annotations to the config
+      config.rules = config.rules || [];
+      config.rules.push({
+        toolName: '*',
+        toolAnnotations: { readOnlyHint: true },
+        decision: PolicyDecision.ALLOW,
+        priority: 10,
+      });
+
+      const engine = new PolicyEngine(config);
+
+      // A tool with readOnlyHint=true should be ALLOWED
+      const roCall = { name: 'some_tool', args: {} };
+      const roMeta = { readOnlyHint: true };
+      expect((await engine.check(roCall, undefined, roMeta)).decision).toBe(
+        PolicyDecision.ALLOW,
+      );
+
+      // A tool without the hint (or with false) should follow default decision (ASK_USER)
+      const rwMeta = { readOnlyHint: false };
+      expect((await engine.check(roCall, undefined, rwMeta)).decision).toBe(
+        PolicyDecision.ASK_USER,
+      );
+    });
+
     describe.each(['write_file', 'replace'])(
       'Plan Mode policy for %s',
       (toolName) => {
@@ -339,6 +419,8 @@ describe('Policy Engine Integration Tests', () => {
             '/home/user/.gemini/tmp/a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2/session-1/plans/my-plan.md',
             '/home/user/.gemini/tmp/a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2/session-1/plans/feature_auth.md',
             '/home/user/.gemini/tmp/new-temp_dir_123/session-1/plans/plan.md', // new style of temp directory
+            'C:\\Users\\user\\.gemini\\tmp\\project-id\\session-id\\plans\\plan.md',
+            'D:\\gemini-cli\\.gemini\\tmp\\project-id\\session-1\\plans\\plan.md', // no session ID
           ];
 
           for (const file_path of validPaths) {
@@ -364,7 +446,8 @@ describe('Policy Engine Integration Tests', () => {
           const invalidPaths = [
             '/project/src/file.ts', // Workspace
             '/home/user/.gemini/tmp/a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2/plans/script.js', // Wrong extension
-            '/home/user/.gemini/tmp/a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2/plans/../../../etc/passwd.md', // Path traversal
+            '/home/user/.gemini/tmp/a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2/plans/../../../etc/passwd.md', // Path traversal (Unix)
+            'C:\\Users\\user\\.gemini\\tmp\\id\\session\\plans\\..\\..\\..\\Windows\\System32\\config\\SAM', // Path traversal (Windows)
             '/home/user/.gemini/non-tmp/new-temp_dir_123/plans/plan.md', // outside of temp dir
           ];
 
@@ -412,47 +495,52 @@ describe('Policy Engine Integration Tests', () => {
 
       // Find rules and verify their priorities
       const blockedToolRule = rules.find((r) => r.toolName === 'blocked-tool');
-      expect(blockedToolRule?.priority).toBe(3.4); // Command line exclude
+      expect(blockedToolRule?.priority).toBe(4.4); // Command line exclude
 
       const blockedServerRule = rules.find(
-        (r) => r.toolName === 'blocked-server__*',
+        (r) => r.toolName === 'mcp_blocked-server_*',
       );
-      expect(blockedServerRule?.priority).toBe(3.9); // MCP server exclude
+      expect(blockedServerRule?.priority).toBe(4.9); // MCP server exclude
 
       const specificToolRule = rules.find(
         (r) => r.toolName === 'specific-tool',
       );
-      expect(specificToolRule?.priority).toBe(3.3); // Command line allow
+      expect(specificToolRule?.priority).toBe(4.3); // Command line allow
 
       const trustedServerRule = rules.find(
-        (r) => r.toolName === 'trusted-server__*',
+        (r) => r.toolName === 'mcp_trusted-server_*',
       );
-      expect(trustedServerRule?.priority).toBe(3.2); // MCP trusted server
+      expect(trustedServerRule?.priority).toBe(4.2); // MCP trusted server
 
-      const mcpServerRule = rules.find((r) => r.toolName === 'mcp-server__*');
-      expect(mcpServerRule?.priority).toBe(3.1); // MCP allowed server
+      const mcpServerRule = rules.find(
+        (r) => r.toolName === 'mcp_mcp-server_*',
+      );
+      expect(mcpServerRule?.priority).toBe(4.1); // MCP allowed server
 
-      const readOnlyToolRule = rules.find((r) => r.toolName === 'glob');
-      // Priority 70 in default tier → 1.07 (Overriding Plan Mode Deny)
-      expect(readOnlyToolRule?.priority).toBeCloseTo(1.07, 5);
+      const readOnlyToolRule = rules.find(
+        (r) => r.toolName === 'glob' && !r.subagent,
+      );
+      // Priority 50 in default tier → 1.05 (Overriding Plan Mode Deny)
+      expect(readOnlyToolRule?.priority).toBeCloseTo(1.05, 5);
 
       // Verify the engine applies these priorities correctly
       expect(
         (await engine.check({ name: 'blocked-tool' }, undefined)).decision,
       ).toBe(PolicyDecision.DENY);
       expect(
-        (await engine.check({ name: 'blocked-server__any' }, undefined))
+        (await engine.check({ name: 'mcp_blocked-server_any' }, undefined))
           .decision,
       ).toBe(PolicyDecision.DENY);
       expect(
         (await engine.check({ name: 'specific-tool' }, undefined)).decision,
       ).toBe(PolicyDecision.ALLOW);
       expect(
-        (await engine.check({ name: 'trusted-server__any' }, undefined))
+        (await engine.check({ name: 'mcp_trusted-server_any' }, undefined))
           .decision,
       ).toBe(PolicyDecision.ALLOW);
       expect(
-        (await engine.check({ name: 'mcp-server__any' }, undefined)).decision,
+        (await engine.check({ name: 'mcp_mcp-server_any' }, undefined))
+          .decision,
       ).toBe(PolicyDecision.ALLOW);
       expect((await engine.check({ name: 'glob' }, undefined)).decision).toBe(
         PolicyDecision.ALLOW,
@@ -481,7 +569,7 @@ describe('Policy Engine Integration Tests', () => {
 
       // Exclusion (195) should win over trust (90)
       expect(
-        (await engine.check({ name: 'conflicted-server__tool' }, undefined))
+        (await engine.check({ name: 'mcp_conflicted-server_tool' }, undefined))
           .decision,
       ).toBe(PolicyDecision.DENY);
     });
@@ -492,7 +580,7 @@ describe('Policy Engine Integration Tests', () => {
           excluded: ['my-server'], // Priority 195 - DENY
         },
         tools: {
-          allowed: ['my-server__special-tool'], // Priority 100 - ALLOW
+          allowed: ['mcp_my-server_special-tool'], // Priority 100 - ALLOW
         },
       };
 
@@ -505,11 +593,11 @@ describe('Policy Engine Integration Tests', () => {
       // Server exclusion (195) wins over specific tool allow (100)
       // This might be counterintuitive but follows the priority system
       expect(
-        (await engine.check({ name: 'my-server__special-tool' }, undefined))
+        (await engine.check({ name: 'mcp_my-server_special-tool' }, undefined))
           .decision,
       ).toBe(PolicyDecision.DENY);
       expect(
-        (await engine.check({ name: 'my-server__other-tool' }, undefined))
+        (await engine.check({ name: 'mcp_my-server_other-tool' }, undefined))
           .decision,
       ).toBe(PolicyDecision.DENY);
     });
@@ -517,12 +605,12 @@ describe('Policy Engine Integration Tests', () => {
     it('should verify non-interactive mode transformation', async () => {
       const settings: Settings = {};
 
-      const config = await createPolicyEngineConfig(
+      const engineConfig = await createPolicyEngineConfig(
         settings,
         ApprovalMode.DEFAULT,
+        undefined,
+        false,
       );
-      // Enable non-interactive mode
-      const engineConfig = { ...config, nonInteractive: true };
       const engine = new PolicyEngine(engineConfig);
 
       // ASK_USER should become DENY in non-interactive mode
@@ -577,20 +665,20 @@ describe('Policy Engine Integration Tests', () => {
 
       // Verify each rule has the expected priority
       const tool3Rule = rules.find((r) => r.toolName === 'tool3');
-      expect(tool3Rule?.priority).toBe(3.4); // Excluded tools (user tier)
+      expect(tool3Rule?.priority).toBe(4.4); // Excluded tools (user tier)
 
-      const server2Rule = rules.find((r) => r.toolName === 'server2__*');
-      expect(server2Rule?.priority).toBe(3.9); // Excluded servers (user tier)
+      const server2Rule = rules.find((r) => r.toolName === 'mcp_server2_*');
+      expect(server2Rule?.priority).toBe(4.9); // Excluded servers (user tier)
 
       const tool1Rule = rules.find((r) => r.toolName === 'tool1');
-      expect(tool1Rule?.priority).toBe(3.3); // Allowed tools (user tier)
+      expect(tool1Rule?.priority).toBe(4.3); // Allowed tools (user tier)
 
-      const server1Rule = rules.find((r) => r.toolName === 'server1__*');
-      expect(server1Rule?.priority).toBe(3.1); // Allowed servers (user tier)
+      const server1Rule = rules.find((r) => r.toolName === 'mcp_server1_*');
+      expect(server1Rule?.priority).toBe(4.1); // Allowed servers (user tier)
 
-      const globRule = rules.find((r) => r.toolName === 'glob');
-      // Priority 70 in default tier → 1.07
-      expect(globRule?.priority).toBeCloseTo(1.07, 5); // Auto-accept read-only
+      const globRule = rules.find((r) => r.toolName === 'glob' && !r.subagent);
+      // Priority 50 in default tier → 1.05
+      expect(globRule?.priority).toBeCloseTo(1.05, 5); // Auto-accept read-only
 
       // The PolicyEngine will sort these by priority when it's created
       const engine = new PolicyEngine(config);

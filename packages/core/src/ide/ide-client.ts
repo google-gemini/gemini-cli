@@ -348,12 +348,13 @@ export class IdeClient {
           // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
           const parsedJson = JSON.parse(textPart.text);
           if (parsedJson && typeof parsedJson.content === 'string') {
+            // eslint-disable-next-line @typescript-eslint/no-unsafe-return
             return parsedJson.content;
           }
           if (parsedJson && parsedJson.content === null) {
             return undefined;
           }
-        } catch (_e) {
+        } catch {
           logger.debug(
             `Invalid JSON in closeDiff response for ${filePath}:`,
             textPart.text,
@@ -601,7 +602,7 @@ export class IdeClient {
       await this.discoverTools();
       this.setState(IDEConnectionStatus.Connected);
       return true;
-    } catch (_error) {
+    } catch {
       if (transport) {
         try {
           await transport.close();
@@ -635,7 +636,7 @@ export class IdeClient {
       await this.discoverTools();
       this.setState(IDEConnectionStatus.Connected);
       return true;
-    } catch (_error) {
+    } catch {
       if (transport) {
         try {
           await transport.close();

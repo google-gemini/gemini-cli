@@ -8,8 +8,7 @@ import { type Config } from '@google/gemini-cli-core';
 import { Box, Text } from 'ink';
 import { theme } from '../semantic-colors.js';
 import { useKeypress } from '../hooks/useKeypress.js';
-import { runExitCleanup } from '../../utils/cleanup.js';
-import { RELAUNCH_EXIT_CODE } from '../../utils/processUtils.js';
+import { relaunchApp } from '../../utils/processUtils.js';
 
 interface LoginWithGoogleRestartDialogProps {
   onDismiss: () => void;
@@ -36,8 +35,7 @@ export const LoginWithGoogleRestartDialog = ({
               });
             }
           }
-          await runExitCleanup();
-          process.exit(RELAUNCH_EXIT_CODE);
+          await relaunchApp();
         }, 100);
         return true;
       }
@@ -47,13 +45,13 @@ export const LoginWithGoogleRestartDialog = ({
   );
 
   const message =
-    'You have successfully logged in with Google. Gemini CLI needs to be restarted.';
+    "You've successfully signed in with Google. Gemini CLI needs to be restarted.";
 
   return (
     <Box borderStyle="round" borderColor={theme.status.warning} paddingX={1}>
       <Text color={theme.status.warning}>
-        {message} Press &apos;r&apos; to restart, or &apos;escape&apos; to
-        choose a different auth method.
+        {message} Press R to restart, or Esc to choose a different
+        authentication method.
       </Text>
     </Box>
   );

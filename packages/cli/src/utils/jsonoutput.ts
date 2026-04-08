@@ -40,8 +40,9 @@ export function tryParseJSON(input: string): object | null {
 
     if (!Array.isArray(parsed) && Object.keys(parsed).length === 0) return null;
 
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-return
     return parsed;
-  } catch (_err) {
+  } catch {
     return null;
   }
 }

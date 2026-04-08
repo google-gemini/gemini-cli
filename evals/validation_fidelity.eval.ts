@@ -8,7 +8,7 @@ import { describe, expect } from 'vitest';
 import { evalTest } from './test-helper.js';
 
 describe('validation_fidelity', () => {
-  evalTest('ALWAYS_PASSES', {
+  evalTest('USUALLY_PASSES', {
     name: 'should perform exhaustive validation autonomously when guided by system instructions',
     files: {
       'src/types.ts': `

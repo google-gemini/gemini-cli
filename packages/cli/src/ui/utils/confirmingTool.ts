@@ -6,10 +6,10 @@
 
 import { CoreToolCallStatus } from '@google/gemini-cli-core';
 import {
-  type HistoryItemToolGroup,
   type HistoryItemWithoutId,
   type IndividualToolCallDisplay,
 } from '../types.js';
+import { getAllToolCalls } from './historyUtils.js';
 
 export interface ConfirmingToolState {
   tool: IndividualToolCallDisplay;
@@ -23,9 +23,7 @@ export interface ConfirmingToolState {
 export function getConfirmingToolState(
   pendingHistoryItems: HistoryItemWithoutId[],
 ): ConfirmingToolState | null {
-  const allPendingTools = pendingHistoryItems
-    .filter((item): item is HistoryItemToolGroup => item.type === 'tool_group')
-    .flatMap((group) => group.tools);
+  const allPendingTools = getAllToolCalls(pendingHistoryItems);
 
   const confirmingTools = allPendingTools.filter(
     (tool) => tool.status === CoreToolCallStatus.AwaitingApproval,

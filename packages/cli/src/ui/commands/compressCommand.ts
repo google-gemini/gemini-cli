@@ -4,14 +4,12 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import type { HistoryItemCompression } from '../types.js';
-import { MessageType } from '../types.js';
-import type { SlashCommand } from './types.js';
-import { CommandKind } from './types.js';
+import { MessageType, type HistoryItemCompression } from '../types.js';
+import { CommandKind, type SlashCommand } from './types.js';
 
 export const compressCommand: SlashCommand = {
   name: 'compress',
-  altNames: ['summarize'],
+  altNames: ['summarize', 'compact'],
   description: 'Compresses the context by replacing it with a summary',
   kind: CommandKind.BUILT_IN,
   autoExecute: true,
@@ -41,9 +39,11 @@ export const compressCommand: SlashCommand = {
     try {
       ui.setPendingItem(pendingMessage);
       const promptId = `compress-${Date.now()}`;
-      const compressed = await context.services.config
-        ?.getGeminiClient()
-        ?.tryCompressChat(promptId, true);
+      const compressed =
+        await context.services.agentContext?.geminiClient?.tryCompressChat(
+          promptId,
+          true,
+        );
       if (compressed) {
         ui.addItem(
           {
