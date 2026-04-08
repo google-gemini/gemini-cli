@@ -71,6 +71,7 @@ vi.mock('@google/gemini-cli-core', async (importOriginal) => {
     Scheduler: class {
       schedule = mockSchedulerSchedule;
       cancelAll = vi.fn();
+      dispose = vi.fn();
     },
     isTelemetrySdkInitialized: vi.fn().mockReturnValue(true),
     ChatRecordingService: MockChatRecordingService,

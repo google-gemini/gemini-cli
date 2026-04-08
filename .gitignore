@@ -64,3 +64,6 @@ gemini-debug.log
 evals/logs/
 
 temp_agents/
+
+# conductor extension and planning directories
+conductor/

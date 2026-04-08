@@ -447,6 +447,7 @@ export class HookRunner {
 
         // Parse output
         let output: HookOutput | undefined;
+        let outputFormat: 'json' | 'text' | undefined;
 
         const textToParse = stdout.trim() || stderr.trim();
         if (textToParse) {
@@ -460,6 +461,7 @@ export class HookRunner {
             if (parsed && typeof parsed === 'object') {
               // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
               output = parsed as HookOutput;
+              outputFormat = 'json';
             }
           } catch {
             // Not JSON, convert plain text to structured output
@@ -467,6 +469,7 @@ export class HookRunner {
               textToParse,
               exitCode || EXIT_CODE_SUCCESS,
             );
+            outputFormat = 'text';
           }
         }
 
@@ -475,6 +478,7 @@ export class HookRunner {
           eventName,
           success: exitCode === EXIT_CODE_SUCCESS,
           output,
+          outputFormat,
           stdout,
           stderr,
           exitCode: exitCode || EXIT_CODE_SUCCESS,
@@ -523,7 +527,7 @@ export class HookRunner {
     exitCode: number,
   ): HookOutput {
     if (exitCode === EXIT_CODE_SUCCESS) {
-      // Success - treat as system message or additional context
+      // Success
       return {
         decision: 'allow',
         systemMessage: text,
