@@ -17,7 +17,8 @@ import {
   DEFAULT_MAX_TIME_MINUTES,
 } from './types.js';
 import type { A2AAuthConfig } from './auth-provider/types.js';
-import { MCPServerConfig } from '../config/config.js';
+import { MCPServerConfig, AuthProviderType } from '../config/config.js';
+import type { MCPOAuthConfig } from '../mcp/oauth-provider.js';
 import { isValidToolName } from '../tools/tool-names.js';
 import { FRONTMATTER_REGEX } from '../skills/skillLoader.js';
 import { getErrorMessage } from '../utils/errors.js';
@@ -62,6 +63,7 @@ const mcpServerSchema = z.object({
   description: z.string().optional(),
   include_tools: z.array(z.string()).optional(),
   exclude_tools: z.array(z.string()).optional(),
+  auth: z.lazy(() => authConfigSchema).optional(),
 });
 
 const localAgentSchema = z
@@ -510,22 +512,57 @@ export function markdownToAgentDefinition(
 
   const mcpServers: Record<string, MCPServerConfig> = {};
   if (markdown.mcp_servers) {
-    for (const [name, config] of Object.entries(markdown.mcp_servers)) {
+    for (const [name, serverConfig] of Object.entries(markdown.mcp_servers)) {
+      // Determine auth provider and oauth config from auth block if present
+      let authProviderType: AuthProviderType | undefined;
+      let oauthConfig: MCPOAuthConfig | undefined;
+
+      if (serverConfig.auth) {
+        switch (serverConfig.auth.type) {
+          case 'google-credentials':
+            authProviderType = AuthProviderType.GOOGLE_CREDENTIALS;
+            if (serverConfig.auth.scopes) {
+              oauthConfig = { scopes: serverConfig.auth.scopes };
+            } else {
+              oauthConfig = {};
+            }
+            break;
+          case 'oauth':
+            // For generic OAuth2, populate oauth fields directly
+            oauthConfig = {
+              clientId: serverConfig.auth.client_id,
+              clientSecret: serverConfig.auth.client_secret,
+              scopes: serverConfig.auth.scopes,
+              authorizationUrl: serverConfig.auth.authorization_url,
+              tokenUrl: serverConfig.auth.token_url,
+            };
+            break;
+          // Other auth types (apiKey, http) can be handled via direct fields like headers
+        }
+      }
+
+      // Build MCPServerConfig with auth support
+      // The constructor order: ..., excludeTools, extension?, oauth?, authProviderType?, targetAudience?, targetServiceAccount?
       mcpServers[name] = new MCPServerConfig(
-        config.command,
-        config.args,
-        config.env,
-        config.cwd,
-        config.url,
-        config.http_url,
-        config.headers,
-        config.tcp,
-        config.type,
-        config.timeout,
-        config.trust,
-        config.description,
-        config.include_tools,
-        config.exclude_tools,
+        serverConfig.command,
+        serverConfig.args,
+        serverConfig.env,
+        serverConfig.cwd,
+        serverConfig.url,
+        serverConfig.http_url,
+        serverConfig.headers,
+        serverConfig.tcp,
+        serverConfig.type,
+        serverConfig.timeout,
+        serverConfig.trust,
+        serverConfig.description,
+        serverConfig.include_tools,
+        serverConfig.exclude_tools,
+        undefined, // extension
+        oauthConfig,
+        authProviderType,
+        undefined, // targetAudience
+        undefined, // targetServiceAccount
       );
     }
   }
