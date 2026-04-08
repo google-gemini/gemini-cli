@@ -49,6 +49,7 @@ import { hashValue, ExtensionManager } from './extension-manager.js';
 import { ExtensionStorage } from './extensions/storage.js';
 import { INSTALL_WARNING_MESSAGE } from './extensions/consent.js';
 import type { ExtensionSetting } from './extensions/extensionSettings.js';
+import { loadInstallMetadata } from './extension.js';
 
 const mockGit = {
   clone: vi.fn(),
@@ -1222,6 +1223,61 @@ name = "yolo-checker"
       ).rejects.toThrow(`Failed to load extension config from ${configPath}`);
     });
 
+    it('should reject invalid extension field types in gemini-extension.json', async () => {
+      const sourceExtDir = getRealPath(
+        createExtension({
+          extensionsDir: tempHomeDir,
+          name: 'invalid-context-file-ext',
+          version: '1.0.0',
+        }),
+      );
+      const configPath = path.join(sourceExtDir, EXTENSIONS_CONFIG_FILENAME);
+      fs.writeFileSync(
+        configPath,
+        JSON.stringify({
+          name: 'invalid-context-file-ext',
+          version: '1.0.0',
+          contextFileName: ['valid.md', 123],
+        }),
+      );
+
+      await expect(
+        extensionManager.loadExtensionConfig(sourceExtDir),
+      ).rejects.toThrow(`Failed to load extension config from ${configPath}`);
+    });
+
+    it('should accept mcp server type "stdio" in gemini-extension.json', async () => {
+      const sourceExtDir = getRealPath(
+        path.join(tempHomeDir, 'stdio-type-ext'),
+      );
+      fs.mkdirSync(sourceExtDir, { recursive: true });
+      const configPath = path.join(sourceExtDir, EXTENSIONS_CONFIG_FILENAME);
+      fs.writeFileSync(
+        configPath,
+        JSON.stringify({
+          name: 'stdio-type-ext',
+          version: '1.0.0',
+          mcpServers: {
+            local: {
+              command: 'node',
+              args: ['server.js'],
+              type: 'stdio',
+            },
+          },
+        }),
+      );
+
+      await expect(
+        extensionManager.loadExtensionConfig(sourceExtDir),
+      ).resolves.toMatchObject({
+        mcpServers: {
+          local: {
+            type: 'stdio',
+          },
+        },
+      });
+    });
+
     it('should throw an error for missing name in gemini-extension.json', async () => {
       const sourceExtDir = getRealPath(
         createExtension({
@@ -1242,6 +1298,20 @@ name = "yolo-checker"
       ).rejects.toThrow(
         `Invalid configuration in ${configPath}: missing "name"`,
       );
+    });
+
+    it('should return undefined for invalid install metadata', () => {
+      const extensionDir = getRealPath(path.join(tempHomeDir, 'invalid-meta'));
+      fs.mkdirSync(extensionDir, { recursive: true });
+      fs.writeFileSync(
+        path.join(extensionDir, INSTALL_METADATA_FILENAME),
+        JSON.stringify({
+          source: 'https://example.com/repo.git',
+          type: 'not-a-valid-type',
+        }),
+      );
+
+      expect(loadInstallMetadata(extensionDir)).toBeUndefined();
     });
 
     it('should install an extension from a git URL', async () => {
