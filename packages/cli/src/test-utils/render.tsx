@@ -504,6 +504,8 @@ const baseMockUiState = {
   history: [],
   renderMarkdown: true,
   streamingState: StreamingState.Idle,
+  isConfigInitialized: true,
+  isAuthenticating: false,
   terminalWidth: 100,
   terminalHeight: 40,
   currentModel: 'gemini-pro',
