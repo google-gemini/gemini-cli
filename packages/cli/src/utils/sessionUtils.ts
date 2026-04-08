@@ -290,7 +290,9 @@ export const getAllSessionFiles = async (
             return { fileName: file, sessionInfo: null };
           }
 
-          const firstUserMessage = extractFirstUserMessage(content.messages);
+          const firstUserMessage = content.firstUserMessage
+            ? cleanMessage(content.firstUserMessage)
+            : extractFirstUserMessage(content.messages);
           const isCurrentSession = currentSessionId
             ? file.includes(currentSessionId.slice(0, 8))
             : false;
