@@ -13,18 +13,6 @@ import { evalTest } from './test-helper.js';
  * This ensures the agent doesn't flood the context window with unnecessary search results.
  */
 describe('Frugal Search', () => {
-  const getGrepParams = (call: any): any => {
-    let args = call.toolRequest.args;
-    if (typeof args === 'string') {
-      try {
-        args = JSON.parse(args);
-      } catch (e) {
-        // Ignore parse errors
-      }
-    }
-    return args;
-  };
-
   /**
    * Ensure that the agent makes use of either grep or ranged reads in fulfilling this task.
    * The task is specifically phrased to not evoke "view" or "search" specifically because

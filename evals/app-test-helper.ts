@@ -12,7 +12,7 @@ import {
   symlinkNodeModules,
   withEvalRetries,
   prepareWorkspace,
-  BaseEvalCase,
+  type BaseEvalCase,
   EVAL_MODEL,
 } from './test-helper.js';
 import fs from 'node:fs';
@@ -32,6 +32,7 @@ interface EvalConfigOverrides {
   allowedTools?: never;
   /** Restricting tools via mainAgentTools in evals is forbidden. */
   mainAgentTools?: never;
+
   [key: string]: unknown;
 }
 
