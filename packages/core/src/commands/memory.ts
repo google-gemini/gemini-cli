@@ -166,6 +166,16 @@ export async function listInboxSkills(config: Config): Promise<InboxSkill[]> {
 
 export type InboxSkillDestination = 'global' | 'project';
 
+function isValidInboxSkillDirName(dirName: string): boolean {
+  return (
+    dirName.length > 0 &&
+    dirName !== '.' &&
+    dirName !== '..' &&
+    !dirName.includes('/') &&
+    !dirName.includes('\\')
+  );
+}
+
 async function getSkillNameForConflictCheck(
   skillDir: string,
   fallbackName: string,
@@ -182,6 +192,13 @@ export async function moveInboxSkill(
   dirName: string,
   destination: InboxSkillDestination,
 ): Promise<{ success: boolean; message: string }> {
+  if (!isValidInboxSkillDirName(dirName)) {
+    return {
+      success: false,
+      message: 'Invalid skill name.',
+    };
+  }
+
   const skillsDir = config.storage.getProjectSkillsMemoryDir();
   const sourcePath = path.join(skillsDir, dirName);
 
@@ -240,6 +257,13 @@ export async function dismissInboxSkill(
   config: Config,
   dirName: string,
 ): Promise<{ success: boolean; message: string }> {
+  if (!isValidInboxSkillDirName(dirName)) {
+    return {
+      success: false,
+      message: 'Invalid skill name.',
+    };
+  }
+
   const skillsDir = config.storage.getProjectSkillsMemoryDir();
   const sourcePath = path.join(skillsDir, dirName);
 

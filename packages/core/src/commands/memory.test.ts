@@ -402,6 +402,13 @@ describe('memory commands', () => {
       expect(result.message).toBe('Skill "nonexistent" not found in inbox.');
     });
 
+    it('should reject invalid skill directory names', async () => {
+      const result = await moveInboxSkill(moveConfig, '../escape', 'global');
+
+      expect(result.success).toBe(false);
+      expect(result.message).toBe('Invalid skill name.');
+    });
+
     it('should return an error when the target already exists', async () => {
       await writeSkillMd('my-skill', 'my-skill', 'A test skill');
 
@@ -512,6 +519,13 @@ describe('memory commands', () => {
 
       expect(result.success).toBe(false);
       expect(result.message).toBe('Skill "nonexistent" not found in inbox.');
+    });
+
+    it('should reject invalid skill directory names', async () => {
+      const result = await dismissInboxSkill(dismissConfig, 'nested\\skill');
+
+      expect(result.success).toBe(false);
+      expect(result.message).toBe('Invalid skill name.');
     });
   });
 });
