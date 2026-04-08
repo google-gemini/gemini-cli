@@ -17,6 +17,7 @@ import {
   getProjectHash,
   SESSION_FILE_PREFIX,
   PREVIEW_GEMINI_FLASH_MODEL,
+  getErrorMessage,
 } from '@google/gemini-cli-core';
 
 export * from '@google/gemini-cli-test-utils';
@@ -26,7 +27,7 @@ export * from '@google/gemini-cli-test-utils';
  * Can be overridden by setting the GEMINI_MODEL environment variable.
  */
 export const EVAL_MODEL =
-  process.env.GEMINI_MODEL || PREVIEW_GEMINI_FLASH_MODEL;
+  process.env['GEMINI_MODEL'] || PREVIEW_GEMINI_FLASH_MODEL;
 
 // Indicates the consistency expectation for this test.
 // - ALWAYS_PASSES - Means that the test is expected to pass 100% of the time. These
@@ -67,8 +68,7 @@ export async function withEvalRetries(
       await attemptFn(attempt);
       return; // Success! Exit the retry loop.
     } catch (error: unknown) {
-      const errorMessage =
-        error instanceof Error ? error.message : String(error);
+      const errorMessage = getErrorMessage(error);
       const errorCode = getApiErrorCode(errorMessage);
 
       if (errorCode) {
@@ -246,7 +246,7 @@ function logReliabilityEvent(
   const reliabilityLog = {
     timestamp: new Date().toISOString(),
     testName,
-    model: process.env.GEMINI_MODEL || 'unknown',
+    model: process.env['GEMINI_MODEL'] || 'unknown',
     attempt,
     status,
     errorCode,

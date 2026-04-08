@@ -15,7 +15,7 @@ export default defineConfig({
     conditions: ['test'],
   },
   test: {
-    testTimeout: 600000, // 5 minutes
+    testTimeout: 300000, // 5 minutes
     reporters: ['default', 'json'],
     outputFile: {
       json: 'evals/logs/report.json',

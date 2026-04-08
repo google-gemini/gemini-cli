@@ -25,17 +25,21 @@ import {
   ExtensionLoader,
   IntegrityDataStatus,
   makeFakeConfig,
+  type GeminiCLIExtension,
 } from '@google/gemini-cli-core';
 import { createMockSettings } from '../packages/cli/src/test-utils/settings.js';
 
 // A minimal mock ExtensionManager to bypass integrity checks
 class MockExtensionManager extends ExtensionLoader {
-  getExtensions = () => [];
-  setRequestConsent = () => {};
-  setRequestSetting = () => {};
+  override getExtensions(): GeminiCLIExtension[] {
+    return [];
+  }
+  setRequestConsent = (): void => {};
+  setRequestSetting = (): void => {};
   integrityManager = {
-    verifyExtensionIntegrity: async () => IntegrityDataStatus.VERIFIED,
-    storeExtensionIntegrity: async () => undefined,
+    verifyExtensionIntegrity: async (): Promise<IntegrityDataStatus> =>
+      IntegrityDataStatus.VERIFIED,
+    storeExtensionIntegrity: async (): Promise<void> => undefined,
   };
 }
 
@@ -77,7 +81,7 @@ export class ComponentRig {
       approvalMode: ApprovalMode.DEFAULT,
       policyEngineConfig,
       enableEventDrivenScheduler: false, // Don't need scheduler for direct component tests
-      extensionLoader: new MockExtensionManager() as any,
+      extensionLoader: new MockExtensionManager(),
       useAlternateBuffer: false,
       ...this.options.configOverrides,
     };
@@ -108,8 +112,7 @@ export function componentEvalTest(
         configOverrides: evalCase.configOverrides,
       });
 
-      const { logDir, sanitizedName } = await prepareLogDir(evalCase.name);
-      const logFile = path.join(logDir, `${sanitizedName}-component.log`);
+      await prepareLogDir(evalCase.name);
 
       try {
         await rig.initialize();
