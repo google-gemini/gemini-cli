@@ -204,7 +204,7 @@ describe('SandboxManager', () => {
 
       const result = await resolveSandboxPaths(options, req as SandboxRequest);
 
-      expect(result.allowed).toEqual([allowed]);
+      expect(result.policyAllowed).toEqual([allowed]);
       expect(result.forbidden).toEqual([forbidden]);
     });
 
@@ -226,7 +226,7 @@ describe('SandboxManager', () => {
 
       const result = await resolveSandboxPaths(options, req as SandboxRequest);
 
-      expect(result.allowed).toEqual([other]);
+      expect(result.policyAllowed).toEqual([other]);
     });
 
     it('should prioritize forbidden paths over allowed paths', async () => {
@@ -249,7 +249,7 @@ describe('SandboxManager', () => {
 
       const result = await resolveSandboxPaths(options, req as SandboxRequest);
 
-      expect(result.allowed).toEqual([normal]);
+      expect(result.policyAllowed).toEqual([normal]);
       expect(result.forbidden).toEqual([secret]);
     });
 
@@ -274,7 +274,7 @@ describe('SandboxManager', () => {
 
       const result = await resolveSandboxPaths(options, req as SandboxRequest);
 
-      expect(result.allowed).toEqual([]);
+      expect(result.policyAllowed).toEqual([]);
       expect(result.forbidden).toEqual([secretUpper]);
     });
   });
