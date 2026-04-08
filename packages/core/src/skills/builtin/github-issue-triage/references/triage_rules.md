@@ -33,7 +33,7 @@ If there is a cross-referenced PR in `cross_references` where `is_pr` is `true` 
   f. Comment on the PR: `gh pr comment <pr_url> --body "@<author_username>, thank you for your contribution! We've reviewed the approach in this PR and decided to keep it closed because <brief explanation of the flaw>. We still welcome improvements here using a different approach! Feel free to open a new PR if you're interested."`
   g. **STOP EXECUTION**.
 - If it is worth resuming AND was closed by a bot:
-  a. Determine if the issue should be **Maintainer-only** (epic, core architecture, sensitive fixes, internal tasks, issues requiring deep investigation, changes to key UI/UX that affect all users, or modifications to core internal data structures and IPC mechanisms) or **Help-wanted** (small well-defined features, easy-to-fix bugs, good for community, or tasks ready for external help).
+  a. Determine if the issue should be **Maintainer-only** (epic, core architecture, sensitive fixes, internal tasks, issues requiring deep investigation, changes to key UI/UX that affect all users, modifications to core internal data structures and IPC mechanisms, or changes to key model functionalities) or **Help-wanted** (small well-defined features, easy-to-fix bugs, good for community, or tasks ready for external help).
   b. If it should be **Maintainer-only**:
      - Execute `gh issue edit <issue_url> --remove-label "status/need-triage" --add-label "🔒 maintainer only"`
      - **STOP EXECUTION**. (Do not reopen the PR).
