@@ -44,6 +44,11 @@ export function parseAndFormatApiError(
     if (error.status === 429) {
       text += getRateLimitMessage(authType, fallbackModel);
     }
+    // Provide guidance for authentication errors (e.g., API key expired/invalid)
+    if (error.status === 401 || error.status === 403) {
+      text +=
+        '\nYour API key appears to be invalid or expired. Please run `gemini auth` to re-authenticate or set a new API key via `gemini config --api-key`.';
+    }
     return text;
   }
 
@@ -72,6 +77,18 @@ export function parseAndFormatApiError(
         let text = `[API Error: ${finalMessage} (Status: ${parsedError.error.status})]`;
         if (parsedError.error.code === 429) {
           text += getRateLimitMessage(authType, fallbackModel);
+        }
+        // Check for authentication errors
+        const isAuthError =
+          parsedError.error.status === 401 ||
+          parsedError.error.status === 403 ||
+          (finalMessage.toLowerCase().includes('api key') &&
+            (finalMessage.toLowerCase().includes('expired') ||
+              finalMessage.toLowerCase().includes('invalid') ||
+              finalMessage.toLowerCase().includes('not valid')));
+        if (isAuthError) {
+          text +=
+            '\nYour API key appears to be invalid or expired. Please run `gemini auth` to re-authenticate or set a new API key via `gemini config --api-key`.';
         }
         return text;
       }
