@@ -104,6 +104,24 @@ describe('fetchJson', () => {
     ).resolves.toEqual({ permanent: true });
   });
 
+  it('should reject with "Too many redirects" after 10 redirects', async () => {
+    // Each call returns a redirect to the same URL, simulating an infinite loop
+    for (let i = 0; i <= 10; i++) {
+      getMock.mockImplementationOnce((_url, _options, callback) => {
+        const res = new EventEmitter() as IncomingMessage;
+        res.statusCode = 302;
+        res.headers = { location: 'https://example.com/loop' };
+        (callback as (res: IncomingMessage) => void)(res);
+        res.emit('end');
+        return new EventEmitter() as ClientRequest;
+      });
+    }
+
+    await expect(fetchJson('https://example.com/loop')).rejects.toThrow(
+      'Too many redirects',
+    );
+  });
+
   it('should reject on non-200/30x status code', async () => {
     getMock.mockImplementationOnce((_url, _options, callback) => {
       const res = new EventEmitter() as IncomingMessage;
