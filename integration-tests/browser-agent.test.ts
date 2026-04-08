@@ -348,7 +348,9 @@ describe.skipIf(!chromeAvailable)('browser-agent', () => {
 
     const toolLogs = rig.readToolLogs();
     const browserCalls = toolLogs.filter(
-      (t) => t.toolRequest.name === 'browser_agent',
+      (t) =>
+        t.toolRequest.name === 'invoke_agent' &&
+        JSON.parse(t.toolRequest.args).agent_name === 'browser_agent',
     );
 
     // Both browser_agent invocations should have been called

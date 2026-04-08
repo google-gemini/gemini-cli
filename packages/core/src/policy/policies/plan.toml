@@ -105,7 +105,6 @@ priority = 50
 modes = ["plan"]
 interactive = false
 
-[[rule]]
 # Allow specific subagents in Plan mode.
 # We use argsPattern to match the agent_name argument for invoke_agent.
 [[rule]]
