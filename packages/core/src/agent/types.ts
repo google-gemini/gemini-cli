@@ -4,27 +4,32 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+import type { Kind } from '../tools/tools.js';
+
 export type WithMeta = { _meta?: Record<string, unknown> };
 
-export interface AgentSession extends Trajectory {
+export type Unsubscribe = () => void;
+
+export interface AgentProtocol extends Trajectory {
   /**
    * Send data to the agent. Promise resolves when action is acknowledged.
-   * Returns the `streamId` of the stream the message was correlated to -- this may
-   * be a new stream if idle or an existing stream.
-   */
-  send(payload: AgentSend): Promise<{ streamId: string }>;
-  /**
-   * Begin listening to actively streaming data. Stream must have the following
-   * properties:
+   * Returns the agent-activity `streamId` affected by the send. This may be a
+   * new stream if idle, an existing stream, or null if the send was
+   * acknowledged without starting agent activity. Emitted events should still
+   * remain correlated to a stream via their `streamId`.
    *
-   * - If no arguments are provided, streams events from an active stream.
-   * - If a {streamId} is provided, streams ALL events from that stream.
-   * - If an {eventId} is provided, streams all events AFTER that event.
+   * When a new stream is created by a send, the streamId MUST be returned
+   * before the `agent_start` event is emitted for the stream.
    */
-  stream(options?: {
-    streamId?: string;
-    eventId?: string;
-  }): AsyncIterableIterator<AgentEvent>;
+  send(payload: AgentSend): Promise<{ streamId: string | null }>;
+
+  /**
+   * Subscribes the provided callback to all future events emitted by this
+   * session. Returns an unsubscribe function.
+   *
+   * @param callback The callback function to listen to events.
+   */
+  subscribe(callback: (event: AgentEvent) => void): Unsubscribe;
 
   /**
    * Aborts an active stream of agent activity.
@@ -32,9 +37,9 @@ export interface AgentSession extends Trajectory {
   abort(): Promise<void>;
 
   /**
-   * AgentSession implements the Trajectory interface and can retrieve existing events.
+   * AgentProtocol implements the Trajectory interface and can retrieve existing events.
    */
-  readonly events: AgentEvent[];
+  readonly events: readonly AgentEvent[];
 }
 
 type RequireExactlyOne<T> = {
@@ -43,7 +48,10 @@ type RequireExactlyOne<T> = {
 }[keyof T];
 
 interface AgentSendPayloads {
-  message: ContentPart[];
+  message: {
+    content: ContentPart[];
+    displayContent?: string;
+  };
   elicitations: ElicitationResponse[];
   update: { title?: string; model?: string; config?: Record<string, unknown> };
   action: { type: string; data: unknown };
@@ -52,7 +60,7 @@ interface AgentSendPayloads {
 export type AgentSend = RequireExactlyOne<AgentSendPayloads> & WithMeta;
 
 export interface Trajectory {
-  readonly events: AgentEvent[];
+  readonly events: readonly AgentEvent[];
 }
 
 export interface AgentEventCommon {
@@ -60,8 +68,8 @@ export interface AgentEventCommon {
   id: string;
   /** Identifies the subagent thread, omitted for "main thread" events. */
   threadId?: string;
-  /** Identifies a particular stream of a particular thread. */
-  streamId?: string;
+  /** Identifies the stream this event belongs to. */
+  streamId: string;
   /** ISO Timestamp for the time at which the event occurred. */
   timestamp: string;
   /** The concrete type of the event. */
@@ -79,9 +87,18 @@ export type AgentEventData<
   EventType extends keyof AgentEvents = keyof AgentEvents,
 > = AgentEvents[EventType] & { type: EventType };
 
+/**
+ * Mapped type that produces a proper discriminated union when `EventType` is
+ * the default (all keys), enabling `switch (event.type)` narrowing.
+ * When a specific EventType is provided, resolves to a single variant.
+ */
 export type AgentEvent<
   EventType extends keyof AgentEvents = keyof AgentEvents,
-> = AgentEventCommon & AgentEventData<EventType>;
+> = {
+  [K in EventType]: AgentEventCommon & AgentEvents[K] & { type: K };
+}[EventType];
+
+export type AgentEventType = keyof AgentEvents;
 
 export interface AgentEvents {
   /** MUST be the first event emitted in a session. */
@@ -90,10 +107,10 @@ export interface AgentEvents {
   session_update: SessionUpdate;
   /** Message content provided by user, agent, or developer. */
   message: Message;
-  /** Event indicating the start of a new stream. */
-  stream_start: StreamStart;
-  /** Event indicating the end of a running stream. */
-  stream_end: StreamEnd;
+  /** Event indicating the start of agent activity on a stream. */
+  agent_start: AgentStart;
+  /** Event indicating the end of agent activity on a stream. */
+  agent_end: AgentEnd;
   /** Tool request issued by the agent. */
   tool_request: ToolRequest;
   /** Tool update issued by the agent. */
@@ -165,6 +182,16 @@ export interface ToolRequest {
   name: string;
   /** The arguments for the tool. */
   args: Record<string, unknown>;
+  /** UI specific metadata */
+  _meta?: {
+    legacyState?: {
+      displayName?: string;
+      isOutputMarkdown?: boolean;
+      description?: string;
+      kind?: Kind;
+    };
+    [key: string]: unknown;
+  };
 }
 
 /**
@@ -177,6 +204,18 @@ export interface ToolUpdate {
   displayContent?: ContentPart[];
   content?: ContentPart[];
   data?: Record<string, unknown>;
+  /** UI specific metadata */
+  _meta?: {
+    legacyState?: {
+      status?: string;
+      progressMessage?: string;
+      progress?: number;
+      progressTotal?: number;
+      pid?: number;
+      description?: string;
+    };
+    [key: string]: unknown;
+  };
 }
 
 export interface ToolResponse {
@@ -190,6 +229,13 @@ export interface ToolResponse {
   data?: Record<string, unknown>;
   /** When true, the tool call encountered an error that will be sent to the model. */
   isError?: boolean;
+  /** UI specific metadata */
+  _meta?: {
+    legacyState?: {
+      outputFile?: string;
+    };
+    [key: string]: unknown;
+  };
 }
 
 export type ElicitationRequest = {
@@ -257,11 +303,11 @@ export interface Usage {
   cost?: { amount: number; currency?: string };
 }
 
-export interface StreamStart {
+export interface AgentStart {
   streamId: string;
 }
 
-type StreamEndReason =
+export type StreamEndReason =
   | 'completed'
   | 'failed'
   | 'aborted'
@@ -272,7 +318,7 @@ type StreamEndReason =
   | 'elicitation'
   | (string & {});
 
-export interface StreamEnd {
+export interface AgentEnd {
   streamId: string;
   reason: StreamEndReason;
   elicitationIds?: string[];

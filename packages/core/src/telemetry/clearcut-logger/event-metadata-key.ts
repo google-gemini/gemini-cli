@@ -7,7 +7,7 @@
 // Defines valid event metadata keys for Clearcut logging.
 export enum EventMetadataKey {
   // Deleted enums: 24
-  // Next ID: 191
+  // Next ID: 203
 
   GEMINI_CLI_KEY_UNKNOWN = 0,
 
@@ -452,6 +452,9 @@ export enum EventMetadataKey {
   // Logs the name of extensions as a comma-separated string
   GEMINI_CLI_START_SESSION_EXTENSION_IDS = 120,
 
+  // Logs whether the session is running in a Git worktree.
+  GEMINI_CLI_START_SESSION_WORKTREE_ACTIVE = 191,
+
   // Logs the setting scope for an extension enablement.
   GEMINI_CLI_EXTENSION_ENABLE_SETTING_SCOPE = 102,
 
@@ -709,4 +712,45 @@ export enum EventMetadataKey {
 
   // Logs the source of a credit purchase click (e.g. overage_menu, empty_wallet_menu, manage).
   GEMINI_CLI_BILLING_PURCHASE_SOURCE = 190,
+
+  // ==========================================================================
+  // Gemini Enterprise (GE) Event Keys
+  // ==========================================================================
+
+  // Logs the start of the onboarding process.
+  GEMINI_CLI_ONBOARDING_START = 192,
+
+  // Logs the user tier for onboarding success events.
+  GEMINI_CLI_ONBOARDING_USER_TIER = 193,
+
+  // Logs the duration of the onboarding process in milliseconds.
+  GEMINI_CLI_ONBOARDING_DURATION_MS = 194,
+
+  // ==========================================================================
+  // Browser Agent Event Keys
+  // ==========================================================================
+
+  // Logs the browser agent session mode (persistent, isolated, existing).
+  GEMINI_CLI_BROWSER_AGENT_SESSION_MODE = 195,
+
+  // Logs whether the browser agent ran in headless mode.
+  GEMINI_CLI_BROWSER_AGENT_HEADLESS = 196,
+
+  // Logs whether the browser agent operation was successful.
+  GEMINI_CLI_BROWSER_AGENT_SUCCESS = 197,
+
+  // Logs the error type for a browser agent connection failure.
+  GEMINI_CLI_BROWSER_AGENT_ERROR_TYPE = 198,
+
+  // Logs the duration in milliseconds for a browser agent operation.
+  GEMINI_CLI_BROWSER_AGENT_DURATION_MS = 199,
+
+  // Logs whether vision mode was enabled for the browser agent.
+  GEMINI_CLI_BROWSER_AGENT_VISION_ENABLED = 200,
+
+  // Logs the reason vision mode was disabled for the browser agent.
+  GEMINI_CLI_BROWSER_AGENT_VISION_DISABLED_REASON = 201,
+
+  // Logs the number of tools discovered from the MCP server.
+  GEMINI_CLI_BROWSER_AGENT_TOOL_COUNT = 202,
 }

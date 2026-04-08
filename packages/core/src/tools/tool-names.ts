@@ -73,8 +73,15 @@ import {
   ASK_USER_OPTION_PARAM_LABEL,
   ASK_USER_OPTION_PARAM_DESCRIPTION,
   PLAN_MODE_PARAM_REASON,
-  EXIT_PLAN_PARAM_PLAN_PATH,
+  EXIT_PLAN_PARAM_PLAN_FILENAME,
   SKILL_PARAM_NAME,
+  UPDATE_TOPIC_TOOL_NAME,
+  UPDATE_TOPIC_DISPLAY_NAME,
+  COMPLETE_TASK_TOOL_NAME,
+  COMPLETE_TASK_DISPLAY_NAME,
+  TOPIC_PARAM_TITLE,
+  TOPIC_PARAM_SUMMARY,
+  TOPIC_PARAM_STRATEGIC_INTENT,
 } from './definitions/coreTools.js';
 
 export {
@@ -95,6 +102,10 @@ export {
   ASK_USER_TOOL_NAME,
   EXIT_PLAN_MODE_TOOL_NAME,
   ENTER_PLAN_MODE_TOOL_NAME,
+  UPDATE_TOPIC_TOOL_NAME,
+  UPDATE_TOPIC_DISPLAY_NAME,
+  COMPLETE_TASK_TOOL_NAME,
+  COMPLETE_TASK_DISPLAY_NAME,
   // Shared parameter names
   PARAM_FILE_PATH,
   PARAM_DIR_PATH,
@@ -146,23 +157,23 @@ export {
   ASK_USER_OPTION_PARAM_LABEL,
   ASK_USER_OPTION_PARAM_DESCRIPTION,
   PLAN_MODE_PARAM_REASON,
-  EXIT_PLAN_PARAM_PLAN_PATH,
+  EXIT_PLAN_PARAM_PLAN_FILENAME,
   SKILL_PARAM_NAME,
+  TOPIC_PARAM_TITLE,
+  TOPIC_PARAM_SUMMARY,
+  TOPIC_PARAM_STRATEGIC_INTENT,
 };
-
-export const LS_TOOL_NAME_LEGACY = 'list_directory'; // Just to be safe if anything used the old exported name directly
 
 export const EDIT_TOOL_NAMES = new Set([EDIT_TOOL_NAME, WRITE_FILE_TOOL_NAME]);
 
 /**
- * Tools that can access local files or remote resources and should be
- * treated with extra caution when updating policies.
+ * Tools that require mandatory argument narrowing (e.g., file paths, command prefixes)
+ * when granting persistent or session-wide approval.
  */
-export const SENSITIVE_TOOLS = new Set([
+export const TOOLS_REQUIRING_NARROWING = new Set([
   GLOB_TOOL_NAME,
   GREP_TOOL_NAME,
   READ_MANY_FILES_TOOL_NAME,
-  WEB_FETCH_TOOL_NAME,
   READ_FILE_TOOL_NAME,
   LS_TOOL_NAME,
   WRITE_FILE_TOOL_NAME,
@@ -183,6 +194,11 @@ export const EDIT_DISPLAY_NAME = 'Edit';
 export const ASK_USER_DISPLAY_NAME = 'Ask User';
 export const READ_FILE_DISPLAY_NAME = 'ReadFile';
 export const GLOB_DISPLAY_NAME = 'FindFiles';
+export const LS_DISPLAY_NAME = 'ReadFolder';
+export const GREP_DISPLAY_NAME = 'SearchText';
+export const WEB_SEARCH_DISPLAY_NAME = 'GoogleSearch';
+export const WEB_FETCH_DISPLAY_NAME = 'WebFetch';
+export const READ_MANY_FILES_DISPLAY_NAME = 'ReadManyFiles';
 
 /**
  * Mapping of legacy tool names to their current names.
@@ -251,6 +267,8 @@ export const ALL_BUILTIN_TOOL_NAMES = [
   GET_INTERNAL_DOCS_TOOL_NAME,
   ENTER_PLAN_MODE_TOOL_NAME,
   EXIT_PLAN_MODE_TOOL_NAME,
+  UPDATE_TOPIC_TOOL_NAME,
+  COMPLETE_TASK_TOOL_NAME,
 ] as const;
 
 /**
@@ -267,6 +285,7 @@ export const PLAN_MODE_TOOLS = [
   ASK_USER_TOOL_NAME,
   ACTIVATE_SKILL_TOOL_NAME,
   GET_INTERNAL_DOCS_TOOL_NAME,
+  UPDATE_TOPIC_TOOL_NAME,
   'codebase_investigator',
   'cli_help',
 ] as const;

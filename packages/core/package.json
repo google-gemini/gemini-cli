@@ -1,6 +1,6 @@
 {
   "name": "@google/gemini-cli-core",
-  "version": "0.35.0-nightly.20260313.bb060d7a9",
+  "version": "0.39.0-nightly.20260408.e77b22e63",
   "description": "Gemini CLI Core",
   "license": "Apache-2.0",
   "repository": {
@@ -16,6 +16,7 @@
     "format": "prettier --write .",
     "test": "vitest run",
     "test:ci": "vitest run",
+    "posttest": "npm run build",
     "typecheck": "tsc --noEmit"
   },
   "files": [
