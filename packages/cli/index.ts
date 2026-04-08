@@ -88,6 +88,12 @@ async function run() {
     const RELAUNCH_EXIT_CODE = 199;
     let latestAdminSettings: unknown = undefined;
 
+    // Prevent the parent process from exiting prematurely on signals.
+    // The child process will receive the same signals and handle its own cleanup.
+    for (const sig of ['SIGINT', 'SIGTERM', 'SIGHUP']) {
+      process.on(sig as NodeJS.Signals, () => {});
+    }
+
     const runner = () => {
       process.stdin.pause();
 
