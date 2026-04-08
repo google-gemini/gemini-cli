@@ -23,8 +23,10 @@
 #
 # TOML policy priorities (before transformation):
 #   10: Write tools default to ASK_USER (becomes 1.010 in default tier)
-#   60: Plan mode catch-all DENY override (becomes 1.060 in default tier)
-#   70: Plan mode explicit ALLOW override (becomes 1.070 in default tier)
+#   30: Unknown subagents (blocked by Plan Mode's 40)
+#   40: Plan mode catch-all DENY override (becomes 1.040 in default tier)
+#   50: Read-only tools / Plan mode explicit ALLOW (becomes 1.050 in default tier)
+#   70: Mode transition overrides (into/out of Plan Mode)
 #   999: YOLO mode allow-all (becomes 1.999 in default tier)
 
 # Mode Transitions (into/out of Plan Mode)
@@ -59,6 +61,7 @@ interactive = true
 toolName = "exit_plan_mode"
 decision = "allow"
 priority = 70
+modes = ["plan"]
 interactive = false
 
 [[rule]]
@@ -73,18 +76,23 @@ denyMessage = "You are not currently in Plan Mode. Use enter_plan_mode first to 
 [[rule]]
 toolName = "*"
 decision = "deny"
-priority = 60
+priority = 40
 modes = ["plan"]
 denyMessage = "You are in Plan Mode with access to read-only tools. Execution of scripts (including those from skills) is blocked."
 
 # Explicitly Allow Read-Only Tools in Plan mode.
+[[rule]]
+toolName = ["activate_skill"]
+decision = "allow"
+priority = 50
+modes = ["plan"]
 
 [[rule]]
 toolName = "*"
 mcpName = "*"
 toolAnnotations = { readOnlyHint = true }
 decision = "ask_user"
-priority = 70
+priority = 50
 modes = ["plan"]
 interactive = true
 
@@ -93,44 +101,21 @@ toolName = "*"
 mcpName = "*"
 toolAnnotations = { readOnlyHint = true }
 decision = "deny"
-priority = 70
+priority = 50
 modes = ["plan"]
 interactive = false
 
 [[rule]]
-toolName = [
-  "glob",
-  "grep_search",
-  "list_directory",
-  "read_file",
-  "google_web_search",
-  "activate_skill",
-  "codebase_investigator",
-  "cli_help",
-  "get_internal_docs"
-]
-decision = "allow"
-priority = 70
-modes = ["plan"]
-
-# Topic grouping tool is innocuous and used for UI organization.
-[[rule]]
-toolName = "update_topic"
-decision = "allow"
-priority = 70
-modes = ["plan"]
-
-[[rule]]
 toolName = ["ask_user", "save_memory", "web_fetch"]
 decision = "ask_user"
-priority = 70
+priority = 50
 modes = ["plan"]
 interactive = true
 
 [[rule]]
 toolName = ["ask_user", "save_memory", "web_fetch"]
 decision = "deny"
-priority = 70
+priority = 50
 modes = ["plan"]
 interactive = false
 
