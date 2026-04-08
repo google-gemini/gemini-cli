@@ -25,14 +25,19 @@ If there is a cross-referenced PR in `cross_references` where `is_pr` is `true` 
 2. Check the comments to see if it was closed by an automated bot (e.g., `gemini-cli` bot closing it automatically due to missing labels like 'help wanted' after 14 days).
 3. Analyze the PR's title, body, and comments to determine if it implements a valid and useful feature/fix and is worth resuming.
 - If it is worth resuming AND was closed by a bot:
-  a. Reopen the PR: `gh pr reopen <pr_url>`
-  b. Assign the PR to the author: `gh pr edit <pr_url> --add-assignee <author_username>`
-  c. Assign the issue to the author: `gh issue edit <issue_url> --add-assignee <author_username>`
-  d. Add the help wanted label to the issue to prevent the bot from closing the PR again: `gh issue edit <issue_url> --add-label "help wanted"`
-  e. Comment on the issue: `gh issue comment <issue_url> --body "@<author_username>, apologies! It looks like your PR <pr_url> was incorrectly closed by our bot. I have reopened it and assigned this issue to you. Would you like to continue working on it?"`
-  f. Comment on the PR: `gh pr comment <pr_url> --body "@<author_username>, apologies for the bot closing this PR! We have reopened it. Please sync your branch to the latest \`main\` and we will have someone review it shortly."`
-  g. Execute `gh issue edit <issue_url> --remove-label "status/need-triage"`
-  h. **STOP EXECUTION**.
+  a. Determine if the issue should be **Maintainer-only** (epic, core architecture, sensitive fixes, internal tasks, or issues requiring deep investigation) or **Help-wanted** (good for community, general bugs, features, or tasks ready for external help).
+  b. If it should be **Maintainer-only**:
+     - Execute `gh issue edit <issue_url> --remove-label "status/need-triage" --add-label "🔒 maintainer only"`
+     - **STOP EXECUTION**. (Do not reopen the PR).
+  c. If it should be **Help-wanted**:
+     - Reopen the PR: `gh pr reopen <pr_url>`
+     - Assign the PR to the author: `gh pr edit <pr_url> --add-assignee <author_username>`
+     - Assign the issue to the author: `gh issue edit <issue_url> --add-assignee <author_username>`
+     - Add the help wanted label to the issue to prevent the bot from closing the PR again: `gh issue edit <issue_url> --add-label "help wanted"`
+     - Comment on the issue: `gh issue comment <issue_url> --body "@<author_username>, apologies! It looks like your PR <pr_url> was incorrectly closed by our bot. I have reopened it and assigned this issue to you. Would you like to continue working on it?"`
+     - Comment on the PR: `gh pr comment <pr_url> --body "@<author_username>, apologies for the bot closing this PR! We have reopened it. Please sync your branch to the latest \`main\` and we will have someone review it shortly."`
+     - Execute `gh issue edit <issue_url> --remove-label "status/need-triage"`
+     - **STOP EXECUTION**.
 - If NOT met: Proceed to Step 1.5.
 
 ## Step 1.5: Pending Response Check
