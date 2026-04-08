@@ -1224,7 +1224,7 @@ export class Config implements McpContext, AgentLoopContext {
     this.useRipgrep = params.useRipgrep ?? true;
     this.useBackgroundColor = params.useBackgroundColor ?? true;
     this.useAlternateBuffer = params.useAlternateBuffer ?? false;
-    this.useTerminalBuffer = params.useTerminalBuffer ?? true;
+    this.useTerminalBuffer = params.useTerminalBuffer ?? false;
     this.useRenderProcess = params.useRenderProcess ?? true;
     this.enableInteractiveShell = params.enableInteractiveShell ?? false;
 

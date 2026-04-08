@@ -10,6 +10,7 @@ import { DiffRenderer } from './DiffRenderer.js';
 import { MarkdownDisplay } from '../../utils/MarkdownDisplay.js';
 import { AnsiOutputText, AnsiLineText } from '../AnsiOutput.js';
 import { SlicingMaxSizedBox } from '../shared/SlicingMaxSizedBox.js';
+import { MaxSizedBox } from '../shared/MaxSizedBox.js';
 import { theme } from '../../semantic-colors.js';
 import {
   type AnsiOutput,
@@ -51,7 +52,7 @@ export const ToolResultDisplay: React.FC<ToolResultDisplayProps> = ({
   hasFocus = false,
   overflowDirection = 'top',
 }) => {
-  const { renderMarkdown } = useUIState();
+  const { renderMarkdown, constrainHeight } = useUIState();
   const isAlternateBuffer = useAlternateBuffer();
 
   const availableHeight = calculateToolContentMaxLines({
@@ -209,30 +210,73 @@ export const ToolResultDisplay: React.FC<ToolResultDisplayProps> = ({
 
   if (Array.isArray(resultDisplay)) {
     const limit = maxLines ?? availableHeight ?? ACTIVE_SHELL_MAX_LINES;
-    const listHeight = Math.min(
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
-      (resultDisplay as AnsiOutput).length,
-      limit,
-    );
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
+    const data = resultDisplay as AnsiOutput;
 
-    const initialScrollIndex =
-      overflowDirection === 'bottom' ? 0 : SCROLL_TO_ITEM_END;
+    // Calculate list height: if not constrained, use full data length.
+    // If constrained (e.g. alternate buffer), limit to available height
+    // to ensure virtualization works and fits within the viewport.
+    const listHeight = !constrainHeight
+      ? data.length
+      : Math.min(data.length, limit);
 
-    return (
-      <Box width={childWidth} flexDirection="column" maxHeight={listHeight}>
-        <ScrollableList
-          width={childWidth}
-          // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
-          data={resultDisplay as AnsiOutput}
-          renderItem={renderVirtualizedAnsiLine}
-          estimatedItemHeight={() => 1}
-          keyExtractor={keyExtractor}
-          initialScrollIndex={initialScrollIndex}
-          hasFocus={hasFocus}
-          fixedItemHeight={true}
-        />
-      </Box>
-    );
+    if (isAlternateBuffer) {
+      const initialScrollIndex =
+        overflowDirection === 'bottom' ? 0 : SCROLL_TO_ITEM_END;
+
+      return (
+        <Box width={childWidth} flexDirection="column" maxHeight={listHeight}>
+          <ScrollableList
+            width={childWidth}
+            containerHeight={listHeight}
+            data={data}
+            renderItem={renderVirtualizedAnsiLine}
+            estimatedItemHeight={() => 1}
+            fixedItemHeight={true}
+            keyExtractor={keyExtractor}
+            initialScrollIndex={initialScrollIndex}
+            hasFocus={hasFocus}
+          />
+        </Box>
+      );
+    } else {
+      let displayData = data;
+      let hiddenLines = 0;
+
+      if (constrainHeight && data.length > listHeight) {
+        hiddenLines = data.length - listHeight;
+        if (overflowDirection === 'top') {
+          displayData = data.slice(hiddenLines);
+        } else {
+          displayData = data.slice(0, listHeight);
+        }
+      }
+
+      return (
+        <Box width={childWidth} flexDirection="column">
+          <MaxSizedBox
+            maxHeight={constrainHeight ? listHeight : undefined}
+            maxWidth={childWidth}
+            overflowDirection={overflowDirection}
+            additionalHiddenLinesCount={hiddenLines}
+          >
+            {displayData.map((item, index) => {
+              const actualIndex =
+                (overflowDirection === 'top' ? hiddenLines : 0) + index;
+              return (
+                <Box
+                  key={keyExtractor(item, actualIndex)}
+                  height={1}
+                  overflow="hidden"
+                >
+                  <AnsiLineText line={item} />
+                </Box>
+              );
+            })}
+          </MaxSizedBox>
+        </Box>
+      );
+    }
   }
 
   // ASB Mode Handling (Interactive/Fullscreen)

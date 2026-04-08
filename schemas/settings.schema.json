@@ -465,8 +465,8 @@
         "terminalBuffer": {
           "title": "Terminal Buffer",
           "description": "Use the new terminal buffer architecture for rendering.",
-          "markdownDescription": "Use the new terminal buffer architecture for rendering.\n\n- Category: `UI`\n- Requires restart: `yes`\n- Default: `true`",
-          "default": true,
+          "markdownDescription": "Use the new terminal buffer architecture for rendering.\n\n- Category: `UI`\n- Requires restart: `yes`\n- Default: `false`",
+          "default": false,
           "type": "boolean"
         },
         "useBackgroundColor": {

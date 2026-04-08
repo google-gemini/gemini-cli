@@ -156,8 +156,9 @@ export async function startInteractiveUI(
         useAlternateBuffer || config.getUseTerminalBuffer(),
       patchConsole: false,
       alternateBuffer: useAlternateBuffer,
-      renderProcess: config.getUseRenderProcess(),
       terminalBuffer: config.getUseTerminalBuffer(),
+      renderProcess:
+        config.getUseRenderProcess() && config.getUseTerminalBuffer(),
       incrementalRendering:
         settings.merged.ui.incrementalRendering !== false &&
         useAlternateBuffer &&

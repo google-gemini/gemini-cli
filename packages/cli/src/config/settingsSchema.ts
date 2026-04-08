@@ -757,7 +757,7 @@ const SETTINGS_SCHEMA = {
         label: 'Terminal Buffer',
         category: 'UI',
         requiresRestart: true,
-        default: true,
+        default: false,
         description: 'Use the new terminal buffer architecture for rendering.',
         showInDialog: true,
       },
