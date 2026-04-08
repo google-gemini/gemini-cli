@@ -87,7 +87,7 @@ describe('SettingsSchema', () => {
       const definition = getSettingsSchema().ui?.properties?.loadingPhrases;
       expect(definition).toBeDefined();
       expect(definition?.type).toBe('enum');
-      expect(definition?.default).toBe('off');
+      expect(definition?.default).toBe('all');
       expect(definition?.options?.map((o) => o.value)).toEqual([
         'tips',
         'witty',

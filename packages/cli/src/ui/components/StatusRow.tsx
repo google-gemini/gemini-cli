@@ -63,6 +63,7 @@ export const StatusNode: React.FC<{
   activeHooks: ActiveHook[];
   showLoadingIndicator: boolean;
   errorVerbosity: 'low' | 'full' | undefined;
+  suppressText?: boolean;
   onResize?: (width: number) => void;
 }> = ({
   showTips,
@@ -73,6 +74,7 @@ export const StatusNode: React.FC<{
   activeHooks,
   showLoadingIndicator,
   errorVerbosity,
+  suppressText,
   onResize,
 }) => {
   const observerRef = useRef<ResizeObserver | null>(null);
@@ -148,6 +150,7 @@ export const StatusNode: React.FC<{
         elapsedTime={elapsedTime}
         forceRealStatusOnly={false}
         wittyPhrase={currentWittyPhrase}
+        suppressText={suppressText}
       />
     </Box>
   );
@@ -269,6 +272,7 @@ export const StatusRow: React.FC<StatusRowProps> = ({
       errorVerbosity={
         settings.merged.ui.errorVerbosity as 'low' | 'full' | undefined
       }
+      suppressText={settings.merged.ui.loadingPhrases === 'off'}
       onResize={onStatusResize}
     />
   );
