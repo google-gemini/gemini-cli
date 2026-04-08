@@ -14,10 +14,11 @@ import type { Part } from '@google/genai';
 import type { GeminiClient } from '../core/client.js';
 import type { Config } from '../config/config.js';
 import type { ToolCallRequestInfo } from '../scheduler/types.js';
-import type { Scheduler } from '../scheduler/scheduler.js';
+import { Scheduler } from '../scheduler/scheduler.js';
 import { recordToolCallInteractions } from '../code_assist/telemetry.js';
 import { ToolErrorType, isFatalToolError } from '../tools/tool-error.js';
 import { debugLogger } from '../utils/debugLogger.js';
+import type { EditorType } from '../utils/editor.js';
 import {
   buildToolResponseData,
   contentPartsToGeminiParts,
@@ -45,14 +46,17 @@ function isAbortLikeError(err: unknown): boolean {
 }
 
 export interface LegacyAgentSessionDeps {
-  client: GeminiClient;
-  scheduler: Scheduler;
   config: Config;
-  promptId: string;
+  client?: GeminiClient;
+  scheduler?: Scheduler;
+  promptId?: string;
   streamId?: string;
+  getPreferredEditor?: () => EditorType | undefined;
 }
 
-class LegacyAgentProtocol implements AgentProtocol {
+const schedulerMap = new WeakMap<Config, Scheduler>();
+
+export class LegacyAgentProtocol implements AgentProtocol {
   private _events: AgentEvent[] = [];
   private _subscribers = new Set<(event: AgentEvent) => void>();
   private _translationState: TranslationState;
@@ -69,10 +73,26 @@ class LegacyAgentProtocol implements AgentProtocol {
   constructor(deps: LegacyAgentSessionDeps) {
     this._translationState = createTranslationState(deps.streamId);
     this._nextStreamIdOverride = deps.streamId;
-    this._client = deps.client;
-    this._scheduler = deps.scheduler;
     this._config = deps.config;
-    this._promptId = deps.promptId;
+    this._client = deps.client ?? deps.config.getGeminiClient();
+    this._promptId = deps.promptId ?? deps.config.promptId ?? '';
+
+    if (deps.scheduler) {
+      this._scheduler = deps.scheduler;
+    } else {
+      let scheduler = schedulerMap.get(deps.config);
+      if (!scheduler) {
+        const sessionId = deps.config.getSessionId();
+        const schedulerId = `legacy-agent-scheduler-${sessionId}`;
+        scheduler = new Scheduler({
+          context: deps.config,
+          schedulerId,
+          getPreferredEditor: deps.getPreferredEditor ?? (() => undefined),
+        });
+        schedulerMap.set(deps.config, scheduler);
+      }
+      this._scheduler = scheduler;
+    }
   }
 
   get events(): readonly AgentEvent[] {

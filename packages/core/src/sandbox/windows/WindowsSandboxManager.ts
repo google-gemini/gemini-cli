@@ -35,7 +35,15 @@ import {
 } from './commandSafety.js';
 import { verifySandboxOverrides } from '../utils/commandUtils.js';
 import { parseWindowsSandboxDenials } from './windowsSandboxDenialUtils.js';
-import { isSubpath, resolveToRealPath } from '../../utils/paths.js';
+import {
+  isSubpath,
+  resolveToRealPath,
+  assertValidPathString,
+} from '../../utils/paths.js';
+import {
+  type SandboxDenialCache,
+  createSandboxDenialCache,
+} from '../utils/sandboxDenialUtils.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -54,6 +62,7 @@ export class WindowsSandboxManager implements SandboxManager {
   private initialized = false;
   private readonly allowedCache = new Set<string>();
   private readonly deniedCache = new Set<string>();
+  private readonly denialCache: SandboxDenialCache = createSandboxDenialCache();
 
   constructor(private readonly options: GlobalSandboxOptions) {
     this.helperPath = path.resolve(__dirname, WindowsSandboxManager.HELPER_EXE);
@@ -73,7 +82,7 @@ export class WindowsSandboxManager implements SandboxManager {
   }
 
   parseDenials(result: ShellExecutionResult): ParsedSandboxDenial | undefined {
-    return parseWindowsSandboxDenials(result);
+    return parseWindowsSandboxDenials(result, this.denialCache);
   }
 
   getWorkspace(): string {
@@ -88,6 +97,7 @@ export class WindowsSandboxManager implements SandboxManager {
    * Ensures a file or directory exists.
    */
   private touch(filePath: string, isDirectory: boolean): void {
+    assertValidPathString(filePath);
     try {
       // If it exists (even as a broken symlink), do nothing
       if (fs.lstatSync(filePath)) return;

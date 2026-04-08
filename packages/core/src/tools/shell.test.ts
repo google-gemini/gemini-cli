@@ -803,6 +803,32 @@ describe('ShellTool', () => {
     });
   });
 
+  describe('invocation getDescription', () => {
+    it('should return the description if it is present and not empty whitespace', () => {
+      const invocation = shellTool.build({
+        command: 'echo hello',
+        description: 'prints hello',
+      });
+      expect(invocation.getDescription()).toBe('prints hello');
+    });
+
+    it('should return the raw command if description is an empty string', () => {
+      const invocation = shellTool.build({
+        command: 'echo hello',
+        description: '',
+      });
+      expect(invocation.getDescription()).toBe('echo hello');
+    });
+
+    it('should return the raw command if description is just whitespace', () => {
+      const invocation = shellTool.build({
+        command: 'echo hello',
+        description: '   ',
+      });
+      expect(invocation.getDescription()).toBe('echo hello');
+    });
+  });
+
   describe('llmContent output format', () => {
     const mockAbortSignal = new AbortController().signal;
 

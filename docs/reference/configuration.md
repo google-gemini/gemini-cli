@@ -346,7 +346,7 @@ their corresponding top-level category object in your `settings.json` file.
 
 - **`ui.terminalBuffer`** (boolean):
   - **Description:** Use the new terminal buffer architecture for rendering.
-  - **Default:** `true`
+  - **Default:** `false`
   - **Requires restart:** Yes
 
 - **`ui.useBackgroundColor`** (boolean):
@@ -1603,6 +1603,12 @@ their corresponding top-level category object in your `settings.json` file.
 
 - **`experimental.adk.agentSessionNoninteractiveEnabled`** (boolean):
   - **Description:** Enable non-interactive agent sessions.
+  - **Default:** `false`
+  - **Requires restart:** Yes
+
+- **`experimental.adk.agentSessionInteractiveEnabled`** (boolean):
+  - **Description:** Enable the agent session implementation for the interactive
+    CLI.
   - **Default:** `false`
   - **Requires restart:** Yes
 
