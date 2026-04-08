@@ -59,6 +59,7 @@ import {
   READ_MANY_PARAM_RECURSIVE,
   READ_MANY_PARAM_USE_DEFAULT_EXCLUDES,
   MEMORY_PARAM_FACT,
+  MEMORY_PARAM_SCOPE,
   TODOS_PARAM_TODOS,
   TODOS_ITEM_PARAM_DESCRIPTION,
   TODOS_ITEM_PARAM_STATUS,
@@ -78,6 +79,7 @@ import {
   getShellDeclaration,
   getExitPlanModeDeclaration,
   getActivateSkillDeclaration,
+  getUpdateTopicDeclaration,
 } from '../dynamic-declaration-helpers.js';
 import {
   DEFAULT_MAX_LINES_TEXT_FILE,
@@ -338,8 +340,16 @@ export const GEMINI_3_SET: CoreToolSet = {
     },
   },
 
-  run_shell_command: (enableInteractiveShell, enableEfficiency) =>
-    getShellDeclaration(enableInteractiveShell, enableEfficiency),
+  run_shell_command: (
+    enableInteractiveShell,
+    enableEfficiency,
+    enableToolSandboxing,
+  ) =>
+    getShellDeclaration(
+      enableInteractiveShell,
+      enableEfficiency,
+      enableToolSandboxing,
+    ),
 
   replace: {
     name: EDIT_TOOL_NAME,
@@ -486,14 +496,20 @@ Use this tool when the user's query implies needing the content of several files
 
   save_memory: {
     name: MEMORY_TOOL_NAME,
-    description: `Persists global preferences or facts across ALL future sessions. Use this for recurring instructions like coding styles or tool aliases. Unlike '${WRITE_FILE_TOOL_NAME}', which is for project-specific files, this appends to a global memory file loaded in every workspace. If you are unsure whether a fact should be remembered globally, ask the user first. CRITICAL: Do not use for session-specific context or temporary data.`,
+    description: `Persists preferences or facts across ALL future sessions. Supports two scopes: 'global' (default) for cross-project preferences loaded in every workspace, and 'project' for facts specific to the current workspace that are private to the user (not committed to the repo). Use 'project' scope for things like local dev setup notes, project-specific workflows, or personal reminders about this codebase. CRITICAL: Do not use for session-specific context or temporary data.`,
     parametersJsonSchema: {
       type: 'object',
       properties: {
         [MEMORY_PARAM_FACT]: {
           type: 'string',
           description:
-            "A concise, global fact or preference (e.g., 'I prefer using tabs'). Do not include local paths or project-specific names.",
+            'A concise fact or preference to remember. Should be a clear, self-contained statement.',
+        },
+        [MEMORY_PARAM_SCOPE]: {
+          type: 'string',
+          enum: ['global', 'project'],
+          description:
+            "Where to save the memory. 'global' (default) saves to a file loaded in every workspace. 'project' saves to a project-specific file private to the user, not committed to the repo.",
         },
       },
       required: [MEMORY_PARAM_FACT],
@@ -655,12 +671,12 @@ The agent did not use the todo list because this task could be completed by a ti
                 enum: ['choice', 'text', 'yesno'],
                 default: 'choice',
                 description:
-                  "Question type: 'choice' (default) for multiple-choice with options, 'text' for free-form input, 'yesno' for Yes/No confirmation.",
+                  "Question type: 'choice' (default) for multiple-choice with options, 'text' for free-form input, 'yesno' for Yes/No confirmation with optional 'Other' feedback.",
               },
               [ASK_USER_QUESTION_PARAM_OPTIONS]: {
                 type: 'array',
                 description:
-                  "The selectable choices for 'choice' type questions. Provide 2-4 options. An 'Other' option is automatically added. Not needed for 'text' or 'yesno' types.",
+                  "The selectable choices for 'choice' type questions. Provide 2-4 options. An 'Other' option is automatically added for 'choice' and 'yesno' types. Not needed for 'text' or 'yesno'.",
                 items: {
                   type: 'object',
                   required: [
@@ -689,7 +705,7 @@ The agent did not use the todo list because this task could be completed by a ti
               [ASK_USER_QUESTION_PARAM_PLACEHOLDER]: {
                 type: 'string',
                 description:
-                  "Hint text shown in the input field. For type='text', shown in the main input. For type='choice', shown in the 'Other' custom input.",
+                  "Hint text shown in the input field. For type='text', shown in the main input. For type='choice' and 'yesno', shown in the 'Other' custom input.",
               },
             },
           },
@@ -714,6 +730,7 @@ The agent did not use the todo list because this task could be completed by a ti
     },
   },
 
-  exit_plan_mode: (plansDir) => getExitPlanModeDeclaration(plansDir),
+  exit_plan_mode: () => getExitPlanModeDeclaration(),
   activate_skill: (skillNames) => getActivateSkillDeclaration(skillNames),
+  update_topic: getUpdateTopicDeclaration(),
 };

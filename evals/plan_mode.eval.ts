@@ -15,7 +15,9 @@ import {
 describe('plan_mode', () => {
   const TEST_PREFIX = 'Plan Mode: ';
   const settings = {
-    experimental: { plan: true },
+    general: {
+      plan: { enabled: true },
+    },
   };
 
   const getWriteTargets = (logs: any[]) =>
@@ -136,6 +138,32 @@ describe('plan_mode', () => {
       expect(wasToolCalled, 'Expected exit_plan_mode tool to be called').toBe(
         true,
       );
+
+      const toolLogs = rig.readToolLogs();
+      const exitPlanCall = toolLogs.find(
+        (log) => log.toolRequest.name === 'exit_plan_mode',
+      );
+      expect(
+        exitPlanCall,
+        'Expected to find exit_plan_mode in tool logs',
+      ).toBeDefined();
+
+      const args = JSON.parse(exitPlanCall!.toolRequest.args);
+      expect(args.plan_filename, 'plan_filename should be a string').toBeTypeOf(
+        'string',
+      );
+      expect(args.plan_filename, 'plan_filename should end with .md').toMatch(
+        /\.md$/,
+      );
+      expect(
+        args.plan_filename,
+        'plan_filename should not be a path',
+      ).not.toContain('/');
+      expect(
+        args.plan_filename,
+        'plan_filename should not be a path',
+      ).not.toContain('\\');
+
       assertModelHasOutput(result);
     },
   });
@@ -146,7 +174,8 @@ describe('plan_mode', () => {
     params: {
       settings,
     },
-    prompt: 'Create a plan for a new login feature.',
+    prompt:
+      'I agree with the strategy to use a JWT-based login. Create a plan for a new login feature.',
     assert: async (rig, result) => {
       await rig.waitForTelemetryReady();
       const toolLogs = rig.readToolLogs();
@@ -183,7 +212,7 @@ describe('plan_mode', () => {
         'import { sum } from "./mathUtils";\nconsole.log(sum(1, 2));',
     },
     prompt:
-      'I want to refactor our math utilities. Move the `sum` function from `src/mathUtils.ts` to a new file `src/basicMath.ts` and update `src/main.ts` to use the new file. Please create a detailed implementation plan first, then execute it.',
+      'I want to refactor our math utilities. I agree with the strategy to move the `sum` function from `src/mathUtils.ts` to a new file `src/basicMath.ts` and update `src/main.ts`. Please create a detailed implementation plan first, then execute it.',
     assert: async (rig, result) => {
       const enterPlanCalled = await rig.waitForToolCall('enter_plan_mode');
       expect(
@@ -198,6 +227,30 @@ describe('plan_mode', () => {
 
       await rig.waitForTelemetryReady();
       const toolLogs = rig.readToolLogs();
+
+      const exitPlanCall = toolLogs.find(
+        (log) => log.toolRequest.name === 'exit_plan_mode',
+      );
+      expect(
+        exitPlanCall,
+        'Expected to find exit_plan_mode in tool logs',
+      ).toBeDefined();
+
+      const args = JSON.parse(exitPlanCall!.toolRequest.args);
+      expect(args.plan_filename, 'plan_filename should be a string').toBeTypeOf(
+        'string',
+      );
+      expect(args.plan_filename, 'plan_filename should end with .md').toMatch(
+        /\.md$/,
+      );
+      expect(
+        args.plan_filename,
+        'plan_filename should not be a path',
+      ).not.toContain('/');
+      expect(
+        args.plan_filename,
+        'plan_filename should not be a path',
+      ).not.toContain('\\');
 
       // Check if plan was written
       const planWrite = toolLogs.find(
@@ -227,6 +280,82 @@ describe('plan_mode', () => {
           log.toolRequest.args.includes('src/main.ts'),
       );
       expect(mainUpdate, 'Expected src/main.ts to be updated').toBeDefined();
+
+      assertModelHasOutput(result);
+    },
+  });
+
+  evalTest('ALWAYS_PASSES', {
+    name: 'should transition from plan mode to normal execution and create a plan file from scratch',
+    params: {
+      settings,
+    },
+    prompt:
+      'Enter plan mode and plan to create a new module called foo. The plan should be saved as foo-plan.md. Then, exit plan mode.',
+    assert: async (rig, result) => {
+      const enterPlanCalled = await rig.waitForToolCall('enter_plan_mode');
+      expect(
+        enterPlanCalled,
+        'Expected enter_plan_mode tool to be called',
+      ).toBe(true);
+
+      const exitPlanCalled = await rig.waitForToolCall('exit_plan_mode');
+      expect(exitPlanCalled, 'Expected exit_plan_mode tool to be called').toBe(
+        true,
+      );
+
+      await rig.waitForTelemetryReady();
+      const toolLogs = rig.readToolLogs();
+
+      // Check if the plan file was written successfully
+      const planWrite = toolLogs.find(
+        (log) =>
+          log.toolRequest.name === 'write_file' &&
+          log.toolRequest.args.includes('foo-plan.md'),
+      );
+
+      expect(
+        planWrite,
+        'Expected write_file to be called for foo-plan.md',
+      ).toBeDefined();
+
+      expect(
+        planWrite?.toolRequest.success,
+        `Expected write_file to succeed, but got error: ${planWrite?.toolRequest.error}`,
+      ).toBe(true);
+
+      assertModelHasOutput(result);
+    },
+  });
+
+  evalTest('USUALLY_PASSES', {
+    name: 'should not exit plan mode or draft before informal agreement',
+    approvalMode: ApprovalMode.PLAN,
+    params: {
+      settings,
+    },
+    prompt: 'I need to build a new login feature. Please plan it.',
+    assert: async (rig, result) => {
+      await rig.waitForTelemetryReady();
+      const toolLogs = rig.readToolLogs();
+
+      const exitPlanCall = toolLogs.find(
+        (log) => log.toolRequest.name === 'exit_plan_mode',
+      );
+      expect(
+        exitPlanCall,
+        'Should NOT call exit_plan_mode before informal agreement',
+      ).toBeUndefined();
+
+      const planWrite = toolLogs.find(
+        (log) =>
+          log.toolRequest.name === 'write_file' &&
+          log.toolRequest.args.includes('/plans/'),
+      );
+      expect(
+        planWrite,
+        'Should NOT draft the plan file before informal agreement',
+      ).toBeUndefined();
 
       assertModelHasOutput(result);
     },

@@ -34,7 +34,7 @@ describe('MockAgentProtocol', () => {
     const streamPromise = waitForStreamEnd(session);
 
     const { streamId } = await session.send({
-      message: [{ type: 'text', text: 'hi' }],
+      message: { content: [{ type: 'text', text: 'hi' }] },
     });
     expect(streamId).toBeDefined();
 
@@ -235,7 +235,7 @@ describe('MockAgentProtocol', () => {
     expect(streamId).toBeNull();
     expect(session.events).toHaveLength(1);
     expect(session.events[0].type).toBe('session_update');
-    expect(session.events[0].streamId).toBeNull();
+    expect(session.events[0].streamId).toEqual(expect.any(String));
   });
 
   it('should throw on action', async () => {

@@ -311,6 +311,11 @@ describe('keyMatchers', () => {
     // External tools
     {
       command: Command.OPEN_EXTERNAL_EDITOR,
+      positive: [createKey('g', { ctrl: true })],
+      negative: [createKey('g'), createKey('c', { ctrl: true })],
+    },
+    {
+      command: Command.DEPRECATED_OPEN_EXTERNAL_EDITOR,
       positive: [createKey('x', { ctrl: true })],
       negative: [createKey('x'), createKey('c', { ctrl: true })],
     },
@@ -336,8 +341,8 @@ describe('keyMatchers', () => {
     },
     {
       command: Command.SHOW_IDE_CONTEXT_DETAIL,
-      positive: [createKey('g', { ctrl: true })],
-      negative: [createKey('g'), createKey('t', { ctrl: true })],
+      positive: [createKey('f4')],
+      negative: [createKey('f5'), createKey('t', { ctrl: true })],
     },
     {
       command: Command.TOGGLE_MARKDOWN,
@@ -346,6 +351,11 @@ describe('keyMatchers', () => {
     },
     {
       command: Command.TOGGLE_COPY_MODE,
+      positive: [createKey('f9')],
+      negative: [createKey('f8'), createKey('f10')],
+    },
+    {
+      command: Command.TOGGLE_MOUSE_MODE,
       positive: [createKey('s', { ctrl: true })],
       negative: [createKey('s'), createKey('s', { alt: true })],
     },
