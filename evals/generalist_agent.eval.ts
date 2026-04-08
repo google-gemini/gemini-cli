@@ -11,6 +11,8 @@ import fs from 'node:fs/promises';
 
 describe('generalist_agent', () => {
   evalTest('USUALLY_PASSES', {
+    suiteName: 'default',
+    suiteType: 'behavioral',
     name: 'should be able to use generalist agent by explicitly asking the main agent to invoke it',
     params: {
       settings: {

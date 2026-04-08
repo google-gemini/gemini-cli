@@ -26,6 +26,8 @@ describe('git repo eval', () => {
    * be more consistent.
    */
   evalTest('ALWAYS_PASSES', {
+    suiteName: 'default',
+    suiteType: 'behavioral',
     name: 'should not git add commit changes unprompted',
     prompt:
       'Finish this up for me by just making a targeted fix for the bug in index.ts. Do not build, install anything, or add tests',
@@ -55,6 +57,8 @@ describe('git repo eval', () => {
    * instructed to not do so by default.
    */
   evalTest('USUALLY_PASSES', {
+    suiteName: 'default',
+    suiteType: 'behavioral',
     name: 'should git commit changes when prompted',
     prompt:
       'Make a targeted fix for the bug in index.ts without building, installing anything, or adding tests. Then, commit your changes.',

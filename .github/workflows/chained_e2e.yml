@@ -335,6 +335,8 @@ jobs:
         env:
           GEMINI_API_KEY: '${{ secrets.GEMINI_API_KEY }}'
           GEMINI_MODEL: 'gemini-3-pro-preview'
+          # Only run always passes behavioral tests.
+          EVAL_SUITE_TYPE: 'behavioral'
           # Disable Vitest internal retries to avoid double-retrying;
           # custom retry logic is handled in evals/test-helper.ts
           VITEST_RETRY: 0
