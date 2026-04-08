@@ -173,10 +173,23 @@ export class ChatRecordingService {
         this.sessionId = resumedSessionData.conversation.sessionId;
         this.kind = resumedSessionData.conversation.kind;
 
-        // Update the session ID in the existing file
-        this.updateConversation((conversation) => {
-          conversation.sessionId = this.sessionId;
-        });
+        // Update the session ID in the existing file.
+        // A RangeError here means the existing session file already exceeds
+        // V8's string length limit; disable recording gracefully instead of
+        // crashing.
+        try {
+          this.updateConversation((conversation) => {
+            conversation.sessionId = this.sessionId;
+          });
+        } catch (rangeError) {
+          if (rangeError instanceof RangeError) {
+            this.conversationFile = null;
+            this.cachedConversation = null;
+            debugLogger.warn(RANGE_WARNING_MESSAGE);
+            return;
+          }
+          throw rangeError;
+        }
 
         // Clear any cached data to force fresh reads
         this.cachedLastConvData = null;
@@ -508,6 +521,21 @@ export class ChatRecordingService {
       }
       return this.cachedConversation;
     } catch (error) {
+      // Handle session file too large to read/parse (V8 max string length exceeded)
+      if (error instanceof RangeError) {
+        this.conversationFile = null;
+        this.cachedConversation = null;
+        debugLogger.warn(RANGE_WARNING_MESSAGE);
+        // Return a placeholder so callers don't crash; recording is now disabled.
+        return {
+          sessionId: this.sessionId,
+          projectHash: this.projectHash,
+          startTime: new Date().toISOString(),
+          lastUpdated: new Date().toISOString(),
+          messages: [],
+          kind: this.kind,
+        };
+      }
       // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
       if ((error as NodeJS.ErrnoException).code !== 'ENOENT') {
         debugLogger.error('Error reading conversation file.', error);
@@ -546,14 +574,14 @@ export class ChatRecordingService {
       // Don't write the file yet until there's at least one message.
       if (conversation.messages.length === 0 && !allowEmpty) return;
 
-      const newContent = JSON.stringify(conversation, null, 2);
+      const newContent = JSON.stringify(conversation);
       // Skip the disk write if nothing actually changed (e.g.
       // updateMessagesFromHistory found no matching tool calls to update).
       // Compare before updating lastUpdated so the timestamp doesn't
       // cause a false diff.
       if (this.cachedLastConvData === newContent) return;
       conversation.lastUpdated = new Date().toISOString();
-      const contentToWrite = JSON.stringify(conversation, null, 2);
+      const contentToWrite = JSON.stringify(conversation);
       this.cachedLastConvData = contentToWrite;
       // Ensure directory exists before writing (handles cases where temp dir was cleaned)
       fs.mkdirSync(path.dirname(this.conversationFile), { recursive: true });
