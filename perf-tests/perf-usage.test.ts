@@ -150,4 +150,34 @@ describe('CPU Performance Tests', () => {
       harness.assertWithinBaseline(result);
     }
   });
+
+  it('high-volume-shell-output: handles large output efficiently', async () => {
+    const result = await harness.runScenario(
+      'high-volume-shell-output',
+      async () => {
+        const rig = new TestRig();
+        try {
+          rig.setup('perf-high-volume-output', {
+            fakeResponsesPath: join(__dirname, 'perf.high-volume.responses'),
+          });
+
+          return await harness.measure('high-volume-output', async () => {
+            await rig.run({
+              args: ['Generate 1M lines of output'],
+              timeout: 120000,
+              env: { GEMINI_API_KEY: 'fake-perf-test-key' },
+            });
+          });
+        } finally {
+          await rig.cleanup();
+        }
+      },
+    );
+
+    if (UPDATE_BASELINES) {
+      harness.updateScenarioBaseline(result);
+    } else {
+      harness.assertWithinBaseline(result);
+    }
+  });
 });

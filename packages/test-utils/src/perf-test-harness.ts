@@ -50,6 +50,7 @@ export interface PerfSnapshot {
   eventLoopDelayP95Ms: number;
   eventLoopDelayP99Ms: number;
   eventLoopDelayMaxMs: number;
+  heapUsed?: number;
 }
 
 /**
@@ -161,6 +162,7 @@ export class PerfTestHarness {
       eventLoopDelayP95Ms: 0,
       eventLoopDelayP99Ms: 0,
       eventLoopDelayMaxMs: 0,
+      heapUsed: process.memoryUsage().heapUsed,
     };
   }
 
@@ -374,6 +376,11 @@ export class PerfTestHarness {
       lines.push(
         `  CPU: ${cpuMs} (user: ${formatUs(result.median.cpuUserUs)}, system: ${formatUs(result.median.cpuSystemUs)})`,
       );
+      if (result.median.heapUsed !== undefined) {
+        lines.push(
+          `  Memory: ${(result.median.heapUsed / (1024 * 1024)).toFixed(1)} MB`,
+        );
+      }
 
       if (result.median.eventLoopDelayP99Ms > 0) {
         lines.push(
