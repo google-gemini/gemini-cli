@@ -15,6 +15,8 @@ describe('grep_search_functionality', () => {
   const TEST_PREFIX = 'Grep Search Functionality: ';
 
   evalTest('USUALLY_PASSES', {
+    suiteName: 'default',
+    suiteType: 'behavioral',
     name: 'should find a simple string in a file',
     files: {
       'test.txt': `hello
@@ -33,6 +35,8 @@ describe('grep_search_functionality', () => {
   });
 
   evalTest('USUALLY_PASSES', {
+    suiteName: 'default',
+    suiteType: 'behavioral',
     name: 'should perform a case-sensitive search',
     files: {
       'test.txt': `Hello
@@ -63,6 +67,8 @@ describe('grep_search_functionality', () => {
   });
 
   evalTest('USUALLY_PASSES', {
+    suiteName: 'default',
+    suiteType: 'behavioral',
     name: 'should return only file names when names_only is used',
     files: {
       'file1.txt': 'match me',
@@ -93,6 +99,8 @@ describe('grep_search_functionality', () => {
   });
 
   evalTest('USUALLY_PASSES', {
+    suiteName: 'default',
+    suiteType: 'behavioral',
     name: 'should search only within the specified include_pattern glob',
     files: {
       'file.js': 'my_function();',
@@ -123,6 +131,8 @@ describe('grep_search_functionality', () => {
   });
 
   evalTest('USUALLY_PASSES', {
+    suiteName: 'default',
+    suiteType: 'behavioral',
     name: 'should search within a specific subdirectory',
     files: {
       'src/main.js': 'unique_string_1',
@@ -153,6 +163,8 @@ describe('grep_search_functionality', () => {
   });
 
   evalTest('USUALLY_PASSES', {
+    suiteName: 'default',
+    suiteType: 'behavioral',
     name: 'should report no matches correctly',
     files: {
       'file.txt': 'nothing to see here',

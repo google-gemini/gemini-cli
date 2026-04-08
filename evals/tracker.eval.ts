@@ -25,6 +25,8 @@ const FILES = {
 
 describe('tracker_mode', () => {
   evalTest('USUALLY_PASSES', {
+    suiteName: 'default',
+    suiteType: 'behavioral',
     name: 'should manage tasks in the tracker when explicitly requested during a bug fix',
     params: {
       settings: { experimental: { taskTracker: true } },
@@ -78,6 +80,8 @@ describe('tracker_mode', () => {
   });
 
   evalTest('USUALLY_PASSES', {
+    suiteName: 'default',
+    suiteType: 'behavioral',
     name: 'should implicitly create tasks when asked to build a feature plan',
     params: {
       settings: { experimental: { taskTracker: true } },

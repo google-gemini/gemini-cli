@@ -31,6 +31,8 @@ describe('Tool Output Masking Behavioral Evals', () => {
    * It should recognize the <tool_output_masked> tag and use a tool to read the file.
    */
   evalTest('USUALLY_PASSES', {
+    suiteName: 'default',
+    suiteType: 'behavioral',
     name: 'should attempt to read the redirected full output file when information is masked',
     params: {
       security: {
@@ -167,6 +169,8 @@ Output too large. Full output available at: ${outputFilePath}
    * Scenario: Information is in the preview.
    */
   evalTest('USUALLY_PASSES', {
+    suiteName: 'default',
+    suiteType: 'behavioral',
     name: 'should NOT read the full output file when the information is already in the preview',
     params: {
       security: {

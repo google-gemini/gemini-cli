@@ -3,6 +3,8 @@ import { evalTest } from './test-helper.js';
 
 describe('CliHelpAgent Delegation', () => {
   evalTest('USUALLY_PASSES', {
+    suiteName: 'default',
+    suiteType: 'behavioral',
     name: 'should delegate to cli_help agent for subagent creation questions',
     params: {
       settings: {
