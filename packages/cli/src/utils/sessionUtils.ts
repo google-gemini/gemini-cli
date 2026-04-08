@@ -319,7 +319,7 @@ export const getAllSessionFiles = async (
             fileName: file,
             startTime: content.startTime,
             lastUpdated: content.lastUpdated,
-            messageCount: content.messages.length,
+            messageCount: content.messageCount ?? content.messages.length,
             displayName: content.summary
               ? stripUnsafeCharacters(content.summary)
               : firstUserMessage,
