@@ -34,7 +34,7 @@ If there is a cross-referenced PR in `cross_references` where `is_pr` is `true` 
      - Assign the PR to the author: `gh pr edit <pr_url> --add-assignee <author_username>`
      - Assign the issue to the author: `gh issue edit <issue_url> --add-assignee <author_username>`
      - Add the help wanted label to the issue to prevent the bot from closing the PR again: `gh issue edit <issue_url> --add-label "help wanted"`
-     - Comment on the issue: `gh issue comment <issue_url> --body "@<author_username>, apologies! It looks like your PR <pr_url> was incorrectly closed by our bot. I have reopened it and assigned this issue to you. Would you like to continue working on it?"`
+     - Comment on the issue: `gh issue comment <issue_url> --body "### Triage Summary\n\n<brief explanation of why this is a help-wanted task>\n\n@<author_username>, apologies! It looks like your PR <pr_url> was incorrectly closed by our bot. I have reopened it and assigned this issue to you. Would you like to continue working on it?"`
      - Comment on the PR: `gh pr comment <pr_url> --body "@<author_username>, apologies for the bot closing this PR! We have reopened it. Please sync your branch to the latest \`main\` and we will have someone review it shortly."`
      - Execute `gh issue edit <issue_url> --remove-label "status/need-triage"`
      - **STOP EXECUTION**.
@@ -104,4 +104,6 @@ Review the issue comments to see if a community member has already identified th
 - If you categorized the issue as **Help-wanted**, also run `gh issue edit <issue_url> --remove-label "status/need-triage" --add-label "help wanted"`. 
 - If you categorized the issue as **Maintainer-only**, also run `gh issue edit <issue_url> --remove-label "status/need-triage" --add-label "🔒 maintainer only"`.
 - Action: `gh issue comment <issue_url> --body "### Triage Summary\n\n<your summary>"`
+- **STOP EXECUTION**.
+ --body "### Triage Summary\n\n<your summary>"`
 - **STOP EXECUTION**.
