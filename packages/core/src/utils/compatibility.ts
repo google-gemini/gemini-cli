@@ -145,15 +145,6 @@ export function getCompatibilityWarnings(options?: {
     });
   }
 
-  if (isTmux() && options?.isAlternateBuffer) {
-    warnings.push({
-      id: 'tmux-alternate-buffer',
-      message:
-        'Warning: tmux detected — alternate buffer mode may cause unexpected scrollback loss and flickering. If you experience issues, disable it in /settings → "Use Alternate Screen Buffer".\n    Tip: Use Ctrl-b [ to access tmux copy mode for scrolling history.',
-      priority: WarningPriority.High,
-    });
-  }
-
   if (isLowColorTmux()) {
     warnings.push({
       id: 'low-color-tmux',

@@ -43,9 +43,9 @@ import { KeypressProvider } from './ui/contexts/KeypressContext.js';
 import { useKittyKeyboardProtocol } from './ui/hooks/useKittyKeyboardProtocol.js';
 import { ScrollProvider } from './ui/contexts/ScrollProvider.js';
 import { TerminalProvider } from './ui/contexts/TerminalContext.js';
-import { isAlternateBufferEnabled } from './ui/hooks/useAlternateBuffer.js';
 import { OverflowProvider } from './ui/contexts/OverflowContext.js';
 import { profiler } from './ui/components/DebugProfiler.js';
+import { initializeConsoleStore } from './ui/hooks/useConsoleMessages.js';
 
 const SLOW_RENDER_MS = 200;
 
@@ -57,12 +57,13 @@ export async function startInteractiveUI(
   resumedSessionData: ResumedSessionData | undefined,
   initializationResult: InitializationResult,
 ) {
+  initializeConsoleStore();
   // Never enter Ink alternate buffer mode when screen reader mode is enabled
   // as there is no benefit of alternate buffer mode when using a screen reader
   // and the Ink alternate buffer mode requires line wrapping harmful to
   // screen readers.
   const useAlternateBuffer = shouldEnterAlternateScreen(
-    isAlternateBufferEnabled(config),
+    config.getUseAlternateBuffer(),
     config.getScreenReader(),
   );
   const mouseEventsEnabled = useAlternateBuffer;
@@ -131,7 +132,6 @@ export async function startInteractiveUI(
     // Wait a moment for shpool to stabilize terminal size and state.
     await new Promise((resolve) => setTimeout(resolve, 100));
   }
-
   const instance = render(
     process.env['DEBUG'] ? (
       <React.StrictMode>
@@ -152,8 +152,13 @@ export async function startInteractiveUI(
         }
         profiler.reportFrameRendered();
       },
+      standardReactLayoutTiming:
+        useAlternateBuffer || config.getUseTerminalBuffer(),
       patchConsole: false,
       alternateBuffer: useAlternateBuffer,
+      terminalBuffer: config.getUseTerminalBuffer(),
+      renderProcess:
+        config.getUseRenderProcess() && config.getUseTerminalBuffer(),
       incrementalRendering:
         settings.merged.ui.incrementalRendering !== false &&
         useAlternateBuffer &&

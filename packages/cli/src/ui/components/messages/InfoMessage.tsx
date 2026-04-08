@@ -12,6 +12,7 @@ import { RenderInline } from '../../utils/InlineMarkdownRenderer.js';
 interface InfoMessageProps {
   text: string;
   secondaryText?: string;
+  source?: string;
   icon?: string;
   color?: string;
   marginBottom?: number;
@@ -20,6 +21,7 @@ interface InfoMessageProps {
 export const InfoMessage: React.FC<InfoMessageProps> = ({
   text,
   secondaryText,
+  source,
   icon,
   color,
   marginBottom,
@@ -39,6 +41,7 @@ export const InfoMessage: React.FC<InfoMessageProps> = ({
           {secondaryText && (
             <Text color={theme.text.secondary}> {secondaryText}</Text>
           )}
+          {source && <Text color={theme.text.secondary}> [{source}]</Text>}
         </Text>
       </Box>
     </Box>

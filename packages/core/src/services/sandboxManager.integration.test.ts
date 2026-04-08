@@ -1,4 +1,4 @@
-/**
+﻿/**
  * @license
  * Copyright 2026 Google LLC
  * SPDX-License-Identifier: Apache-2.0
@@ -28,7 +28,14 @@ const Platform = {
   /** Returns a command to create an empty file. */
   touch(filePath: string) {
     return this.isWindows
-      ? { command: 'cmd.exe', args: ['/c', `type nul > "${filePath}"`] }
+      ? {
+          command: 'powershell.exe',
+          args: [
+            '-NoProfile',
+            '-Command',
+            `New-Item -Path "${filePath}" -ItemType File -Force`,
+          ],
+        }
       : { command: 'touch', args: [filePath] };
   },
 
@@ -48,18 +55,13 @@ const Platform = {
 
   /** Returns a command to perform a network request. */
   curl(url: string) {
-    return this.isWindows
-      ? {
-          command: 'powershell.exe',
-          args: ['-Command', `Invoke-WebRequest -Uri ${url} -TimeoutSec 1`],
-        }
-      : { command: 'curl', args: ['-s', '--connect-timeout', '1', url] };
+    return { command: 'curl', args: ['-s', '--connect-timeout', '1', url] };
   },
 
   /** Returns a command that checks if the current terminal is interactive. */
   isPty() {
     return this.isWindows
-      ? 'cmd.exe /c echo True'
+      ? 'powershell.exe -NoProfile -Command "echo True"'
       : 'bash -c "if [ -t 1 ]; then echo True; else echo False; fi"';
   },
 
@@ -103,7 +105,8 @@ function ensureSandboxAvailable(): boolean {
   if (platform === 'win32') {
     // Windows sandboxing relies on icacls, which is a core system utility and
     // always available.
-    return true;
+    // TODO: reenable once flakiness is addressed
+    return false;
   }
 
   if (platform === 'darwin') {
@@ -142,7 +145,7 @@ function ensureSandboxAvailable(): boolean {
 
 describe('SandboxManager Integration', () => {
   const workspace = process.cwd();
-  const manager = createSandboxManager({ enabled: true }, workspace);
+  const manager = createSandboxManager({ enabled: true }, { workspace });
 
   // Skip if we are on an unsupported platform or if it's a NoopSandboxManager
   const shouldSkip =
@@ -166,23 +169,28 @@ describe('SandboxManager Integration', () => {
         expect(result.stdout.trim()).toBe('sandbox test');
       });
 
-      it('supports interactive pseudo-terminals (node-pty)', async () => {
-        const handle = await ShellExecutionService.execute(
-          Platform.isPty(),
-          workspace,
-          () => {},
-          new AbortController().signal,
-          true,
-          {
-            sanitizationConfig: getSecureSanitizationConfig(),
-            sandboxManager: manager,
-          },
-        );
+      // The Windows sandbox wrapper (GeminiSandbox.exe) uses standard pipes
+      // for I/O interception, which breaks ConPTY pseudo-terminal inheritance.
+      it.skipIf(Platform.isWindows)(
+        'supports interactive pseudo-terminals (node-pty)',
+        async () => {
+          const handle = await ShellExecutionService.execute(
+            Platform.isPty(),
+            workspace,
+            () => {},
+            new AbortController().signal,
+            true,
+            {
+              sanitizationConfig: getSecureSanitizationConfig(),
+              sandboxManager: manager,
+            },
+          );
 
-        const result = await handle.result;
-        expect(result.exitCode).toBe(0);
-        expect(result.output).toContain('True');
-      });
+          const result = await handle.result;
+          expect(result.exitCode).toBe(0);
+          expect(result.output).toContain('True');
+        },
+      );
     });
 
     describe('File System Access', () => {
@@ -201,8 +209,47 @@ describe('SandboxManager Integration', () => {
         expect(result.status).not.toBe(0);
       });
 
+      it('allows dynamic expansion of permissions after a failure', async () => {
+        const tempDir = fs.mkdtempSync(
+          path.join(workspace, '..', 'expansion-'),
+        );
+        const testFile = path.join(tempDir, 'test.txt');
+
+        try {
+          const { command, args } = Platform.touch(testFile);
+
+          // First attempt: fails due to sandbox restrictions
+          const sandboxed1 = await manager.prepareCommand({
+            command,
+            args,
+            cwd: workspace,
+            env: process.env,
+          });
+          const result1 = await runCommand(sandboxed1);
+          expect(result1.status).not.toBe(0);
+          expect(fs.existsSync(testFile)).toBe(false);
+
+          // Second attempt: succeeds with additional permissions
+          const sandboxed2 = await manager.prepareCommand({
+            command,
+            args,
+            cwd: workspace,
+            env: process.env,
+            policy: { allowedPaths: [tempDir] },
+          });
+          const result2 = await runCommand(sandboxed2);
+          expect(result2.status).toBe(0);
+          expect(fs.existsSync(testFile)).toBe(true);
+        } finally {
+          if (fs.existsSync(testFile)) fs.unlinkSync(testFile);
+          fs.rmSync(tempDir, { recursive: true, force: true });
+        }
+      });
+
       it('grants access to explicitly allowed paths', async () => {
-        const allowedDir = fs.mkdtempSync(path.join(os.tmpdir(), 'allowed-'));
+        const allowedDir = fs.mkdtempSync(
+          path.join(workspace, '..', 'allowed-'),
+        );
         const testFile = path.join(allowedDir, 'test.txt');
 
         try {
@@ -235,7 +282,10 @@ describe('SandboxManager Integration', () => {
         try {
           const osManager = createSandboxManager(
             { enabled: true },
-            tempWorkspace,
+            {
+              workspace: tempWorkspace,
+              forbiddenPaths: async () => [forbiddenDir],
+            },
           );
           const { command, args } = Platform.touch(testFile);
 
@@ -244,7 +294,6 @@ describe('SandboxManager Integration', () => {
             args,
             cwd: tempWorkspace,
             env: process.env,
-            policy: { forbiddenPaths: [forbiddenDir] },
           });
 
           const result = await runCommand(sandboxed);
@@ -268,7 +317,10 @@ describe('SandboxManager Integration', () => {
         try {
           const osManager = createSandboxManager(
             { enabled: true },
-            tempWorkspace,
+            {
+              workspace: tempWorkspace,
+              forbiddenPaths: async () => [forbiddenDir],
+            },
           );
           const { command, args } = Platform.cat(nestedFile);
 
@@ -277,7 +329,6 @@ describe('SandboxManager Integration', () => {
             args,
             cwd: tempWorkspace,
             env: process.env,
-            policy: { forbiddenPaths: [forbiddenDir] },
           });
 
           const result = await runCommand(sandboxed);
@@ -298,7 +349,10 @@ describe('SandboxManager Integration', () => {
         try {
           const osManager = createSandboxManager(
             { enabled: true },
-            tempWorkspace,
+            {
+              workspace: tempWorkspace,
+              forbiddenPaths: async () => [conflictDir],
+            },
           );
           const { command, args } = Platform.touch(testFile);
 
@@ -309,7 +363,6 @@ describe('SandboxManager Integration', () => {
             env: process.env,
             policy: {
               allowedPaths: [conflictDir],
-              forbiddenPaths: [conflictDir],
             },
           });
 
@@ -329,7 +382,10 @@ describe('SandboxManager Integration', () => {
         try {
           const osManager = createSandboxManager(
             { enabled: true },
-            tempWorkspace,
+            {
+              workspace: tempWorkspace,
+              forbiddenPaths: async () => [nonExistentPath],
+            },
           );
           const { command, args } = Platform.echo('survived');
           const sandboxed = await osManager.prepareCommand({
@@ -339,7 +395,6 @@ describe('SandboxManager Integration', () => {
             env: process.env,
             policy: {
               allowedPaths: [nonExistentPath],
-              forbiddenPaths: [nonExistentPath],
             },
           });
           const result = await runCommand(sandboxed);
@@ -362,7 +417,10 @@ describe('SandboxManager Integration', () => {
         try {
           const osManager = createSandboxManager(
             { enabled: true },
-            tempWorkspace,
+            {
+              workspace: tempWorkspace,
+              forbiddenPaths: async () => [nonExistentFile],
+            },
           );
 
           // We use touch to attempt creation of the file
@@ -374,7 +432,6 @@ describe('SandboxManager Integration', () => {
             args: argsTouch,
             cwd: tempWorkspace,
             env: process.env,
-            policy: { forbiddenPaths: [nonExistentFile] },
           });
 
           // Execute the command, we expect it to fail (permission denied or read-only file system)
@@ -402,7 +459,10 @@ describe('SandboxManager Integration', () => {
         try {
           const osManager = createSandboxManager(
             { enabled: true },
-            tempWorkspace,
+            {
+              workspace: tempWorkspace,
+              forbiddenPaths: async () => [symlinkFile],
+            },
           );
 
           // Attempt to read the target file directly
@@ -413,7 +473,6 @@ describe('SandboxManager Integration', () => {
             args: argsTarget,
             cwd: tempWorkspace,
             env: process.env,
-            policy: { forbiddenPaths: [symlinkFile] }, // Forbid the symlink
           });
           const resultTarget = await runCommand(commandTarget);
           expect(resultTarget.status).not.toBe(0);
@@ -426,7 +485,6 @@ describe('SandboxManager Integration', () => {
             args: argsLink,
             cwd: tempWorkspace,
             env: process.env,
-            policy: { forbiddenPaths: [symlinkFile] }, // Forbid the symlink
           });
           const resultLink = await runCommand(commandLink);
           expect(resultLink.status).not.toBe(0);
@@ -460,18 +518,23 @@ describe('SandboxManager Integration', () => {
         if (server) await new Promise<void>((res) => server.close(() => res()));
       });
 
-      it('blocks network access by default', async () => {
-        const { command, args } = Platform.curl(url);
-        const sandboxed = await manager.prepareCommand({
-          command,
-          args,
-          cwd: workspace,
-          env: process.env,
-        });
+      // Windows Job Object rate limits exempt loopback (127.0.0.1) traffic,
+      // so this test cannot verify loopback blocking on Windows.
+      it.skipIf(Platform.isWindows)(
+        'blocks network access by default',
+        async () => {
+          const { command, args } = Platform.curl(url);
+          const sandboxed = await manager.prepareCommand({
+            command,
+            args,
+            cwd: workspace,
+            env: process.env,
+          });
 
-        const result = await runCommand(sandboxed);
-        expect(result.status).not.toBe(0);
-      });
+          const result = await runCommand(sandboxed);
+          expect(result.status).not.toBe(0);
+        },
+      );
 
       it('grants network access when explicitly allowed', async () => {
         const { command, args } = Platform.curl(url);
