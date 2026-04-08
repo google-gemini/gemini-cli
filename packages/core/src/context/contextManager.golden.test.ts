@@ -26,6 +26,7 @@ import type { SidecarConfig } from './sidecar/types.js';
 import { ProcessorRegistry } from './sidecar/registry.js';
 import { registerBuiltInProcessors } from './sidecar/builtins.js';
 import { IrMapper } from './ir/mapper.js';
+import { createMockContextConfig, setupContextComponentTest } from './testing/contextTestUtils.js';
 
 expect.addSnapshotSerializer({
   test: (val) =>
@@ -147,43 +148,18 @@ describe('ContextManager Golden Tests', () => {
 
   it('should not modify history when under budget', async () => {
     const history = createLargeHistory();
-    (
-      contextManager as unknown as { pristineEpisodes: Episode[] }
-    ).pristineEpisodes = IrMapper.toIr(history, new ContextTokenCalculator(4));
-    // In Golden Tests, we just want to ensure the logic doesn't throw or alter unprotected history in weird ways.
-    // Since we're skipping processors due to being under budget, it should equal history.
-    const tracer2 = new ContextTracer({
-      targetDir: '/tmp',
-      sessionId: 'test2',
-    });
-    const eventBus2 = new ContextEventBus();
-    const env2 = new ContextEnvironmentImpl(
-      {
-        generateContent: async () => ({}),
-        generateJson: async () => ({}),
-      } as unknown as BaseLlmClient,
-      'test-prompt-id',
-      'test',
-      '/tmp',
-      '/tmp',
-      tracer2,
-      4,
-      eventBus2,
-    );
-    contextManager = ContextManager.create(
-      {
+
+    const config = createMockContextConfig();
+    const { chatHistory, contextManager: localManager } = setupContextComponentTest(config, {
         budget: { retainedTokens: 100000, maxTokens: 150000 },
         pipelines: [],
-      } as unknown as SidecarConfig,
-      env2,
-      tracer2,
-    );
+    } as unknown as SidecarConfig);
 
-    (
-      contextManager as unknown as { pristineEpisodes: Episode[] }
-    ).pristineEpisodes = IrMapper.toIr(history, new ContextTokenCalculator(4));
-    const result = await contextManager.projectCompressedHistory();
+    chatHistory.set(history);
 
-    expect(result.length).toEqual(history.length);
+    const result = await localManager.projectCompressedHistory();
+
+    // V2 adds an AgentYield node to the end of the history array
+    expect(result.length).toEqual(history.length + 1);
   });
 });

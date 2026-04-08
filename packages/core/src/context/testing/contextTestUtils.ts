@@ -47,7 +47,7 @@ export function createDummyNode(
   type: 'USER_PROMPT' | 'SYSTEM_EVENT' | 'AGENT_THOUGHT' | 'AGENT_YIELD',
   tokens = 100,
   overrides?: Partial<ConcreteNode>,
-  id?: string
+  id?: string,
 ): ConcreteNode {
   // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
   return {
@@ -74,7 +74,7 @@ export function createDummyToolNode(
   intentTokens = 100,
   obsTokens = 200,
   overrides?: Partial<ToolExecution>,
-  id?: string
+  id?: string,
 ): ToolExecution {
   // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
   return {
@@ -99,9 +99,9 @@ export function createDummyToolNode(
   } as unknown as ToolExecution;
 }
 
-
-
-export function createMockEnvironment(overrides?: Partial<ContextEnvironment>): ContextEnvironment {
+export function createMockEnvironment(
+  overrides?: Partial<ContextEnvironment>,
+): ContextEnvironment {
   return {
     // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
     llmClient: vi.fn().mockReturnValue({
@@ -181,11 +181,14 @@ export function createMockContextConfig(
  * Wires up a full ContextManager component with an AgentChatHistory and active background workers.
  */
 
-export function setupContextComponentTest(config: Config) {
+export function setupContextComponentTest(
+  config: Config,
+  sidecarOverride?: import('../sidecar/types.js').SidecarConfig,
+) {
   const chatHistory = new AgentChatHistory();
   const registry = new ProcessorRegistry();
   registerBuiltInProcessors(registry);
-  const sidecar = SidecarLoader.fromConfig(config, registry);
+  const sidecar = sidecarOverride || SidecarLoader.fromConfig(config, registry);
   const tracer = new ContextTracer({
     targetDir: '/tmp',
     sessionId: 'test-session',

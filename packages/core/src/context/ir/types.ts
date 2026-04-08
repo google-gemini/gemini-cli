@@ -39,7 +39,7 @@ export type IrNodeType =
   | 'AGENT_THOUGHT'
   | 'TOOL_EXECUTION'
   | 'AGENT_YIELD'
-  
+
   // Synthetic Concrete Nodes
   | 'SNAPSHOT'
   | 'ROLLING_SUMMARY'
@@ -56,17 +56,17 @@ export interface IrNode {
   readonly metadata: IrMetadata;
 }
 
-/** 
+/**
  * Concrete Nodes: The atomic, renderable pieces of data.
  * These are the actual "planks" of the Ship of Theseus.
  */
 export interface BaseConcreteNode extends IrNode {
   /** The ID of the Logical Node (e.g., Episode) that structurally owns this node */
   readonly logicalParentId?: string;
-  
+
   /** If this node replaced a single node 1:1 (e.g., masking), this points to the original */
   readonly replacesId?: string;
-  
+
   /** If this node is a synthetic summary of N nodes, this points to the original IDs */
   readonly abstractsIds?: readonly string[];
 }
@@ -171,14 +171,14 @@ export interface RollingSummary extends BaseConcreteNode {
 
 export type SyntheticLeaf = Snapshot | RollingSummary;
 
-export type ConcreteNode = 
-  | UserPrompt 
-  | SystemEvent 
-  | AgentThought 
-  | ToolExecution 
-  | MaskedTool 
-  | AgentYield 
-  | Snapshot 
+export type ConcreteNode =
+  | UserPrompt
+  | SystemEvent
+  | AgentThought
+  | ToolExecution
+  | MaskedTool
+  | AgentYield
+  | Snapshot
   | RollingSummary;
 
 /**
@@ -189,7 +189,7 @@ export interface Episode extends IrNode {
   readonly type: 'EPISODE';
   readonly timestamp: number;
   /** References to the Concrete Node IDs that conceptually belong to this Episode. */
-  concreteNodeIds: readonly string[];
+  concreteNodes: readonly ConcreteNode[];
 }
 
 export interface Task extends IrNode {

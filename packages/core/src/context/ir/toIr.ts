@@ -37,8 +37,8 @@ function isCompleteEpisode(ep: Partial<Episode>): ep is Episode {
   return (
     typeof ep.id === 'string' &&
     typeof ep.timestamp === 'number' &&
-    Array.isArray(ep.concreteNodeIds) &&
-    ep.concreteNodeIds.length > 0
+    Array.isArray(ep.concreteNodes) &&
+    ep.concreteNodes.length > 0
   );
 }
 
@@ -118,7 +118,7 @@ function parseToolResponses(
     currentEpisode = {
       id: getStableId(msg),
       timestamp: Date.now(),
-      concreteNodeIds: [getStableId(msg.parts![0] || msg)],
+      concreteNodes: [],
     };
   }
 
@@ -152,7 +152,10 @@ function parseToolResponses(
           transformations: [],
         },
       };
-      currentEpisode.concreteNodeIds = [...(currentEpisode.concreteNodeIds || []), step.id];
+      currentEpisode.concreteNodes = [
+        ...(currentEpisode.concreteNodes || []),
+        step,
+      ];
       if (callId) pendingCallParts.delete(callId);
     }
   }
@@ -193,7 +196,8 @@ function parseUserParts(
   return {
     id: getStableId(msg),
     timestamp: Date.now(),
-    concreteNodeIds: [trigger.id],  };
+    concreteNodes: [trigger],
+  };
 }
 
 function parseModelParts(
@@ -206,7 +210,7 @@ function parseModelParts(
     currentEpisode = {
       id: getStableId(msg),
       timestamp: Date.now(),
-      concreteNodeIds: [getStableId(msg.parts![0] || msg)],
+      concreteNodes: [],
     };
   }
 
@@ -221,25 +225,29 @@ function parseModelParts(
         text: part.text,
         metadata: createMetadata([part]),
       };
-      currentEpisode.concreteNodeIds = [...(currentEpisode.concreteNodeIds || []), thought.id];
+      currentEpisode.concreteNodes = [
+        ...(currentEpisode.concreteNodes || []),
+        thought,
+      ];
     }
   }
   return currentEpisode as Partial<Episode>;
 }
 
 function finalizeYield(currentEpisode: Partial<Episode>) {
-  if (currentEpisode.concreteNodeIds && currentEpisode.concreteNodeIds.length > 0) {
-      const yieldNode: AgentYield = {
-        id: randomUUID(),
-        type: 'AGENT_YIELD',
-        text: 'Yield', // Synthesized yield since we don't have the original concrete node
-        metadata: {
-           originalTokens: 1,
-           currentTokens: 1,
-           transformations: []
-        },
-      };
-      const existingNodes = currentEpisode.concreteNodeIds as string[];
-      currentEpisode.concreteNodeIds = [...existingNodes.slice(0, -1), yieldNode.id];
+  if (currentEpisode.concreteNodes && currentEpisode.concreteNodes.length > 0) {
+    const yieldNode: AgentYield = {
+      id: randomUUID(),
+      type: 'AGENT_YIELD',
+      text: 'Yield', // Synthesized yield since we don't have the original concrete node
+      metadata: {
+        originalTokens: 1,
+        currentTokens: 1,
+        transformations: [],
+      },
+    };
+    const existingNodes =
+      currentEpisode.concreteNodes as import('./types.js').ConcreteNode[];
+    currentEpisode.concreteNodes = [...existingNodes, yieldNode];
   }
 }

@@ -38,22 +38,22 @@ export class HistoryObserver {
     this.unsubscribeHistory = this.chatHistory.subscribe(
       (_event: HistoryEvent) => {
         // Rebuild the pristine IR graph from the full source history on every change.
-        // Wait, toIr still returns an Episode[]. 
+        // Wait, toIr still returns an Episode[].
         // We actually need to map the Episode[] to a flat ConcreteNode[] here to form the 'ship'.
         const pristineEpisodes = IrMapper.toIr(
           this.chatHistory.get(),
           this.tokenCalculator,
         );
-        
+
         const ship: import('./ir/types.js').ConcreteNode[] = [];
         for (const ep of pristineEpisodes) {
-           if (ep.concreteNodeIds) {
-             for (const child of ep.concreteNodeIds) {
-               ship.push(child as unknown as import('./ir/types.js').ConcreteNode);
-             }
-           }
+          if (ep.concreteNodes) {
+            for (const child of ep.concreteNodes) {
+              ship.push(child);
+            }
+          }
         }
-        
+
         const newNodes = new Set<string>();
         for (const node of ship) {
           if (!this.seenNodeIds.has(node.id)) {

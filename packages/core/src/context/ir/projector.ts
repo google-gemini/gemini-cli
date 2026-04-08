@@ -37,8 +37,17 @@ export class IrProjector {
     }
 
     const maxTokens = sidecar.budget.maxTokens;
-    const currentTokens =
-      env.tokenCalculator.calculateConcreteListTokens(ship);
+    const currentTokens = env.tokenCalculator.calculateConcreteListTokens(ship);
+
+    // V0: Always protect the first node (System Prompt) and the last turn
+    if (ship.length > 0) {
+      protectedIds.add(ship[0].id);
+      if (ship[0].logicalParentId) protectedIds.add(ship[0].logicalParentId);
+
+      const lastNode = ship[ship.length - 1];
+      protectedIds.add(lastNode.id);
+      if (lastNode.logicalParentId) protectedIds.add(lastNode.logicalParentId);
+    }
 
     if (currentTokens <= maxTokens) {
       tracer.logEvent(
@@ -101,11 +110,11 @@ export class IrProjector {
     const skipList = new Set<string>();
     for (const node of processedShip) {
       if (node.abstractsIds) {
-         for (const id of node.abstractsIds) skipList.add(id);
+        for (const id of node.abstractsIds) skipList.add(id);
       }
     }
 
-    const visibleShip = processedShip.filter(n => !skipList.has(n.id));
+    const visibleShip = processedShip.filter((n) => !skipList.has(n.id));
 
     const contents = IrMapper.fromIr(visibleShip);
     tracer.logEvent('IrProjector', 'Projected Sanitized Context to LLM', {

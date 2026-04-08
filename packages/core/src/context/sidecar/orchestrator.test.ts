@@ -26,7 +26,13 @@ class DummySyncProcessor implements ContextProcessor {
   readonly name = 'DummySync';
   readonly id = 'DummySync';
   readonly options = {};
-  async process() { return []; }
+  async process(args: any) {
+    const newTargets = [...args.targets];
+    if (newTargets.length > 0) {
+      newTargets[0] = { ...newTargets[0], dummyModified: true };
+    }
+    return newTargets;
+  }
 }
 
 class DummyAsyncProcessor implements ContextProcessor {
@@ -37,7 +43,13 @@ class DummyAsyncProcessor implements ContextProcessor {
   readonly name = 'DummyAsync';
   readonly id = 'DummyAsync';
   readonly options = {};
-  async process() { return []; }
+  async process(args: any) {
+    const newTargets = [...args.targets];
+    if (newTargets.length > 0) {
+      newTargets[0] = { ...newTargets[0], dummyModified: true };
+    }
+    return newTargets;
+  }
 }
 
 class ThrowingProcessor implements ContextProcessor {
@@ -95,9 +107,9 @@ describe('PipelineOrchestrator (Component)', () => {
   it('instantiates processors from the registry on initialization', () => {
     const config = createConfig([
       {
-        name: 'Sync',
+        name: 'ThrowPipe',
         execution: 'blocking',
-        triggers: [],
+        triggers: ['new_message'],
         processors: [
           { processorId: 'DummySyncProcessor' } as unknown as ProcessorConfig,
         ],
@@ -120,9 +132,9 @@ describe('PipelineOrchestrator (Component)', () => {
   it('throws an error if a config requests an unknown processor', () => {
     const config = createConfig([
       {
-        name: 'Bad',
+        name: 'ThrowPipe',
         execution: 'blocking',
-        triggers: [],
+        triggers: ['new_message'],
         processors: [
           { processorId: 'DoesNotExist' } as unknown as ProcessorConfig,
         ],
@@ -140,7 +152,7 @@ describe('PipelineOrchestrator (Component)', () => {
       {
         name: 'SyncPipe',
         execution: 'blocking',
-        triggers: [],
+        triggers: ['new_message'],
         processors: [
           { processorId: 'DummySyncProcessor' } as unknown as ProcessorConfig,
         ],
@@ -154,19 +166,19 @@ describe('PipelineOrchestrator (Component)', () => {
       registry,
     );
 
-    const ship = [createDummyNode('1', 'USER_PROMPT')];
-    const state = createDummyState(false);
+    const ship = [createDummyNode('not-protected-ep', 'USER_PROMPT', 100, undefined, 'not-protected-id')];
+    const state = createDummyState(false, 0, new Set());
 
     const result = await orchestrator.executeTriggerSync(
       'new_message',
       ship,
-      new Set(ship.map(s => s.id)),
+      new Set(ship.map((s) => s.id)),
       state,
     );
 
     expect(result).toHaveLength(1);
     expect(
-      (result[0] as unknown as { dummyModified: boolean }).dummyModified,
+      (result[0] as unknown as { dummyModified?: boolean }).dummyModified,
     ).toBe(true);
   });
 
@@ -175,7 +187,7 @@ describe('PipelineOrchestrator (Component)', () => {
       {
         name: 'AsyncPipe',
         execution: 'background',
-        triggers: [],
+        triggers: ['new_message'],
         processors: [
           { processorId: 'DummyAsyncProcessor' } as unknown as ProcessorConfig,
         ],
@@ -189,14 +201,14 @@ describe('PipelineOrchestrator (Component)', () => {
       registry,
     );
 
-    const ship = [createDummyNode('1', 'USER_PROMPT')];
-    const state = createDummyState(false);
+    const ship = [createDummyNode('not-protected-ep', 'USER_PROMPT', 100, undefined, 'not-protected-id')];
+    const state = createDummyState(false, 0, new Set());
 
     // This should resolve immediately with the UNMODIFIED array because execution is background
     const result = await orchestrator.executeTriggerSync(
       'new_message',
       ship,
-      new Set(ship.map(s => s.id)),
+      new Set(ship.map((s) => s.id)),
       state,
     );
 
@@ -212,9 +224,9 @@ describe('PipelineOrchestrator (Component)', () => {
   it('gracefully handles and swallows processor errors in synchronous pipelines', async () => {
     const config = createConfig([
       {
-        name: 'ThrowingPipe',
+        name: 'ThrowPipe',
         execution: 'blocking',
-        triggers: [],
+        triggers: ['new_message'],
         processors: [
           { processorId: 'ThrowingProcessor' } as unknown as ProcessorConfig,
         ],
@@ -228,14 +240,14 @@ describe('PipelineOrchestrator (Component)', () => {
       registry,
     );
 
-    const ship = [createDummyNode('1', 'USER_PROMPT')];
-    const state = createDummyState(false);
+    const ship = [createDummyNode('not-protected-ep', 'USER_PROMPT', 100, undefined, 'not-protected-id')];
+    const state = createDummyState(false, 0, new Set());
 
     // It should not throw! It should swallow the error and return the unmodified array.
     const result = await orchestrator.executeTriggerSync(
       'new_message',
       ship,
-      new Set(ship.map(s => s.id)),
+      new Set(ship.map((s) => s.id)),
       state,
     );
 
@@ -267,7 +279,11 @@ describe('PipelineOrchestrator (Component)', () => {
     const ship = [createDummyNode('1', 'USER_PROMPT')];
 
     // Emit the trigger
-    eventBus.emitConsolidationNeeded({ ship, targetDeficit: 100, targetNodeIds: new Set() });
+    eventBus.emitConsolidationNeeded({
+      ship,
+      targetDeficit: 100,
+      targetNodeIds: new Set(),
+    });
 
     expect(executeSpy).toHaveBeenCalled();
   });
