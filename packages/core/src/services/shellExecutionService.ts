@@ -510,21 +510,24 @@ export class ShellExecutionService {
     shellExecutionConfig: ShellExecutionConfig,
     isInteractive: boolean,
   ): Promise<ShellExecutionHandle> {
+    let cmdCleanup: (() => void) | undefined;
     try {
       const isWindows = os.platform() === 'win32';
+
+      const prepared = await this.prepareExecution(
+        commandToExecute,
+        cwd,
+        shellExecutionConfig,
+        isInteractive,
+      );
+      cmdCleanup = prepared.cleanup;
 
       const {
         program: finalExecutable,
         args: finalArgs,
         env: finalEnv,
         cwd: finalCwd,
-        cleanup: cmdCleanup,
-      } = await this.prepareExecution(
-        commandToExecute,
-        cwd,
-        shellExecutionConfig,
-        isInteractive,
-      );
+      } = prepared;
 
       const child = cpSpawn(finalExecutable, finalArgs, {
         cwd: finalCwd,
@@ -811,6 +814,7 @@ export class ShellExecutionService {
     } catch (e) {
       // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
       const error = e as Error;
+      cmdCleanup?.();
       return {
         pid: undefined,
         result: Promise.resolve({
@@ -826,7 +830,6 @@ export class ShellExecutionService {
       };
     }
   }
-
   private static async executeWithPty(
     commandToExecute: string,
     cwd: string,
@@ -840,23 +843,26 @@ export class ShellExecutionService {
       throw new Error('PTY implementation not found');
     }
     let spawnedPty: IPty | undefined;
+    let cmdCleanup: (() => void) | undefined;
 
     try {
       const cols = shellExecutionConfig.terminalWidth ?? 80;
       const rows = shellExecutionConfig.terminalHeight ?? 30;
+
+      const prepared = await this.prepareExecution(
+        commandToExecute,
+        cwd,
+        shellExecutionConfig,
+        true,
+      );
+      cmdCleanup = prepared.cleanup;
 
       const {
         program: finalExecutable,
         args: finalArgs,
         env: finalEnv,
         cwd: finalCwd,
-        cleanup: cmdCleanup,
-      } = await this.prepareExecution(
-        commandToExecute,
-        cwd,
-        shellExecutionConfig,
-        true,
-      );
+      } = prepared;
 
       // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
       const ptyProcess = ptyInfo.module.spawn(finalExecutable, finalArgs, {
@@ -1237,6 +1243,7 @@ export class ShellExecutionService {
     } catch (e) {
       // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
       const error = e as Error;
+      cmdCleanup?.();
 
       if (spawnedPty) {
         try {
@@ -1270,7 +1277,6 @@ export class ShellExecutionService {
       }
     }
   }
-
   /**
    * Writes a string to the pseudo-terminal (PTY) of a running process.
    *
