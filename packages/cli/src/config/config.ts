@@ -243,6 +243,23 @@ export async function parseArguments(
       if (argv['yolo'] && argv['approvalMode']) {
         return 'Cannot use both --yolo (-y) and --approval-mode together. Use --approval-mode=yolo instead.';
       }
+      if (argv['sessionId'] && argv['resume']) {
+        return 'Cannot use both --session-id and --resume together';
+      }
+
+      const providedSessionId = argv['sessionId'];
+      if (typeof providedSessionId === 'string') {
+        const trimmedSessionId = providedSessionId.trim();
+
+        if (!trimmedSessionId) {
+          return 'The --session-id flag requires a non-empty value';
+        }
+
+        if (trimmedSessionId === '.' || trimmedSessionId === '..') {
+          return 'Invalid --session-id value. "." and ".." are not allowed.';
+        }
+        argv['sessionId'] = trimmedSessionId;
+      }
 
       const outputFormat = argv['outputFormat'];
       if (
