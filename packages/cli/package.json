@@ -1,6 +1,6 @@
 {
   "name": "@google/gemini-cli",
-  "version": "0.36.0-nightly.20260317.2f90b4653",
+  "version": "0.39.0-nightly.20260408.e77b22e63",
   "description": "Gemini CLI",
   "license": "Apache-2.0",
   "repository": {
@@ -27,7 +27,7 @@
     "dist"
   ],
   "config": {
-    "sandboxImageUri": "us-docker.pkg.dev/gemini-code-dev/gemini-cli/sandbox:0.36.0-nightly.20260317.2f90b4653"
+    "sandboxImageUri": "us-docker.pkg.dev/gemini-code-dev/gemini-cli/sandbox:0.39.0-nightly.20260408.e77b22e63"
   },
   "dependencies": {
     "@agentclientprotocol/sdk": "^0.16.1",
@@ -49,7 +49,7 @@
     "fzf": "^0.5.2",
     "glob": "^12.0.0",
     "highlight.js": "^11.11.1",
-    "ink": "npm:@jrichman/ink@6.6.7",
+    "ink": "npm:@jrichman/ink@6.6.8",
     "ink-gradient": "^3.0.0",
     "ink-spinner": "^5.0.0",
     "latest-version": "^9.0.0",
