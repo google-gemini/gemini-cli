@@ -351,6 +351,12 @@ describe('sea-launch', () => {
     });
 
     it('recreates runtime if existing has wrong permissions', () => {
+      const originalPlatform = process.platform;
+      Object.defineProperty(process, 'platform', {
+        value: 'linux',
+        configurable: true,
+      });
+
       const deps = {
         fs: {
           existsSync: vi.fn().mockReturnValueOnce(true).mockReturnValue(false),
@@ -401,6 +407,11 @@ describe('sea-launch', () => {
         expect.stringContaining('gemini-runtime'),
         expect.anything(),
       );
+
+      Object.defineProperty(process, 'platform', {
+        value: originalPlatform,
+        configurable: true,
+      });
     });
 
     it('creates new runtime if existing is invalid (integrity check)', () => {
