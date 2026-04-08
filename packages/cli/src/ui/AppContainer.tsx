@@ -2605,7 +2605,6 @@ Logging in with Google... Restarting Gemini CLI to continue.
       authState,
       isAwaitingLoginRestart,
       loginRestartMessage,
-      copyModeEnabled,
       transientMessage,
       bannerData,
       bannerVisible,
