@@ -108,9 +108,7 @@ function isWorkerConfig(value: unknown): value is WorkerConfig {
  */
 async function runConsolidation(): Promise<void> {
   if (isMainThread) {
-    throw new Error(
-      'memoryConsolidationWorker must be run in a worker thread',
-    );
+    throw new Error('memoryConsolidationWorker must be run in a worker thread');
   }
 
   const config: unknown = workerData;

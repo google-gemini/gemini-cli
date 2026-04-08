@@ -87,13 +87,22 @@ async function generateAndSaveSummary(
   await fs.writeFile(sessionPath, JSON.stringify(freshConversation, null, 2));
 
   // Determine prompt from conversation
-  const lastUserMessage = freshConversation.messages.filter((m) => m.type === 'user').pop();
+  const lastUserMessage = freshConversation.messages
+    .filter((m) => m.type === 'user')
+    .pop();
   let prompt = 'Unknown Prompt';
   if (lastUserMessage?.content) {
     if (typeof lastUserMessage.content === 'string') {
       prompt = lastUserMessage.content;
     } else if (Array.isArray(lastUserMessage.content)) {
-      prompt = lastUserMessage.content.map((p: any) => p.text || '').join('');
+      prompt = lastUserMessage.content
+        .map((p) => {
+          if (typeof p === 'object' && p !== null && 'text' in p) {
+            return String(p.text || '');
+          }
+          return '';
+        })
+        .join('');
     }
   }
 
@@ -107,33 +116,59 @@ async function generateAndSaveSummary(
     prompt,
     summary,
     freshConversation.directories || [], // Using directories as proxy for now
-    durationMs > 0 ? durationMs : 0
+    durationMs > 0 ? durationMs : 0,
   );
 
   // 2. Spawn Consolidation Worker (Phase 1)
   try {
-    const workerScript = path.join(__dirname, 'memoryConsolidationWorker.js');
+    // Use import.meta.url for ESM compatibility
+    const { fileURLToPath } = await import('node:url');
+    const currentDir = path.dirname(fileURLToPath(import.meta.url));
+    const workerScript = path.join(currentDir, 'memoryConsolidationWorker.js');
     const { Worker } = await import('node:worker_threads');
-    
-    // We only spawn if we have an API key right now 
+
+    // We only spawn if we have an API key right now
     const apiKey = config.getContentGeneratorConfig()?.apiKey;
     if (apiKey) {
-      new Worker(workerScript, {
+      const worker = new Worker(workerScript, {
         workerData: {
           projectRoot: config.getProjectRoot(),
           logDir: config.storage.getSessionLogDir(),
           geminiMdPath: path.join(config.getProjectRoot(), 'GEMINI.md'),
           apiKey,
           model: 'gemini-2.5-flash',
-          lookbackDays: 7
-        }
+          lookbackDays: 7,
+        },
       });
-      debugLogger.debug(`[SessionSummary] Spawned background memory consolidation worker`);
+
+      // Handle worker errors to prevent unhandled rejections
+      worker.on('error', (error: Error) => {
+        debugLogger.warn(
+          `[SessionSummary] Memory consolidation worker error:`,
+          error.message,
+        );
+      });
+
+      worker.on('message', (message: unknown) => {
+        debugLogger.debug(
+          `[SessionSummary] Memory consolidation worker result:`,
+          message,
+        );
+      });
+
+      debugLogger.debug(
+        `[SessionSummary] Spawned background memory consolidation worker`,
+      );
     } else {
-      debugLogger.debug(`[SessionSummary] Skipping memory consolidation worker (no raw API key)`);
+      debugLogger.debug(
+        `[SessionSummary] Skipping memory consolidation worker (no raw API key)`,
+      );
     }
   } catch (err) {
-    debugLogger.warn(`[SessionSummary] Failed to spawn memory consolidation worker`, err);
+    debugLogger.warn(
+      `[SessionSummary] Failed to spawn memory consolidation worker`,
+      err,
+    );
   }
 
   debugLogger.debug(

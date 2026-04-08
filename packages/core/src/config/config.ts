@@ -1393,7 +1393,9 @@ export class Config implements McpContext, AgentLoopContext {
 
   getSessionLogger(): SessionLogger {
     if (!this._sessionLogger) {
-      this._sessionLogger = SessionLogger.create(this.storage.getSessionLogDir());
+      this._sessionLogger = SessionLogger.create(
+        this.storage.getSessionLogDir(),
+      );
     }
     return this._sessionLogger;
   }

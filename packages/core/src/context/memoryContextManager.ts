@@ -50,7 +50,9 @@ export class MemoryContextManager {
   private async discoverMemoryPaths() {
     const isTrusted = this.config.isTrustedFolder();
     if (isTrusted) {
-      const directories = [...this.config.getWorkspaceContext().getDirectories()];
+      const directories = [
+        ...this.config.getWorkspaceContext().getDirectories(),
+      ];
       if (directories.length > 0) {
         await ensureGeminiMd(directories[0]);
       }

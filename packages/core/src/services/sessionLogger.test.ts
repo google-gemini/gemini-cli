@@ -79,12 +79,8 @@ describe('SessionLogger', () => {
   });
 
   it('groups entries by date into separate files', async () => {
-    logger.logEntry(
-      makeEntry({ timestamp: '2026-01-15T10:00:00Z' }),
-    );
-    logger.logEntry(
-      makeEntry({ timestamp: '2026-01-16T10:00:00Z' }),
-    );
+    logger.logEntry(makeEntry({ timestamp: '2026-01-15T10:00:00Z' }));
+    logger.logEntry(makeEntry({ timestamp: '2026-01-16T10:00:00Z' }));
     await logger.flush();
 
     const files = (await fs.readdir(tmpDir)).sort();
@@ -122,14 +118,8 @@ describe('SessionLogger', () => {
   describe('rotateOldLogs', () => {
     it('deletes log files older than retention period', async () => {
       // Create old and new log files
-      await fs.writeFile(
-        path.join(tmpDir, '2025-01-01.jsonl'),
-        '{}',
-      );
-      await fs.writeFile(
-        path.join(tmpDir, '2026-12-31.jsonl'),
-        '{}',
-      );
+      await fs.writeFile(path.join(tmpDir, '2025-01-01.jsonl'), '{}');
+      await fs.writeFile(path.join(tmpDir, '2026-12-31.jsonl'), '{}');
 
       const deleted = await logger.rotateOldLogs();
 
@@ -168,14 +158,8 @@ describe('SessionLogger', () => {
       const today = new Date().toISOString().slice(0, 10);
       const entry = makeEntry();
       const content =
-        'not valid json\n' +
-        JSON.stringify(entry) +
-        '\n' +
-        '{}\n';
-      await fs.writeFile(
-        path.join(tmpDir, `${today}.jsonl`),
-        content,
-      );
+        'not valid json\n' + JSON.stringify(entry) + '\n' + '{}\n';
+      await fs.writeFile(path.join(tmpDir, `${today}.jsonl`), content);
 
       const entries = await logger.readRecentEntries(1);
       expect(entries).toHaveLength(1);

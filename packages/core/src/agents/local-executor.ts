@@ -771,14 +771,17 @@ export class LocalAgentExecutor<TOutput extends z.ZodTypeAny> {
           try {
             const summary = this.getTruncatedSummary(finalResult);
             chat.getChatRecordingService()?.saveSummary(summary);
-            
+
             // Persist turn to JSONL logger (Phase 1)
+            const queryVal = inputs['query'];
+            const taskPrompt =
+              typeof queryVal === 'string' ? queryVal : 'Unknown task';
             this.context.config.getSessionLogger().log(
-              this.promptId,
-              query || inputs.query || 'Unknown task',
+              this.agentId,
+              taskPrompt,
               summary,
               [], // Subagent files modified tracker can be added later
-              Date.now() - startTime
+              Date.now() - startTime,
             );
           } catch (error) {
             debugLogger.warn('Failed to save subagent session summary.', error);

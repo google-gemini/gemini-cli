@@ -99,10 +99,11 @@ Not a bullet
 
 describe('deduplicateInsights', () => {
   it('removes insights with high overlap to existing content', () => {
-    const existing = '- The auth module uses OAuth 2.0 tokens for authentication';
+    const existing =
+      '- The auth module uses OAuth 2.0 tokens for authentication';
     const newInsights = [
-      'The auth module uses OAuth tokens for authentication flow',  // Duplicate
-      'Database migrations run on PostgreSQL 15',                    // New
+      'The auth module uses OAuth tokens for authentication flow', // Duplicate
+      'Database migrations run on PostgreSQL 15', // New
     ];
 
     const result = deduplicateInsights(newInsights, existing);
@@ -112,10 +113,7 @@ describe('deduplicateInsights', () => {
 
   it('keeps all insights when no overlap exists', () => {
     const existing = '- Completely different content about CSS styling';
-    const newInsights = [
-      'Backend uses Express.js',
-      'Frontend uses React 18',
-    ];
+    const newInsights = ['Backend uses Express.js', 'Frontend uses React 18'];
 
     const result = deduplicateInsights(newInsights, existing);
     expect(result).toHaveLength(2);
@@ -132,9 +130,7 @@ describe('MemoryConsolidator', () => {
   let geminiMdPath: string;
 
   beforeEach(async () => {
-    tmpDir = await fs.mkdtemp(
-      path.join(os.tmpdir(), 'consolidator-test-'),
-    );
+    tmpDir = await fs.mkdtemp(path.join(os.tmpdir(), 'consolidator-test-'));
     geminiMdPath = path.join(tmpDir, 'GEMINI.md');
   });
 
@@ -160,9 +156,7 @@ ${GEMINI_SECTION_MARKER}
     );
     const consolidator = new MemoryConsolidator(client);
 
-    const result = await consolidator.consolidate(geminiMdPath, [
-      makeEntry(),
-    ]);
+    const result = await consolidator.consolidate(geminiMdPath, [makeEntry()]);
 
     expect(result.modified).toBe(true);
     expect(result.insightsCount).toBe(2);
@@ -207,9 +201,7 @@ Critical architecture decisions documented here.`;
     const client = mockLlmClient('NO_NEW_INSIGHTS');
     const consolidator = new MemoryConsolidator(client);
 
-    const result = await consolidator.consolidate(geminiMdPath, [
-      makeEntry(),
-    ]);
+    const result = await consolidator.consolidate(geminiMdPath, [makeEntry()]);
 
     expect(result.modified).toBe(false);
     expect(result.insightsCount).toBe(0);

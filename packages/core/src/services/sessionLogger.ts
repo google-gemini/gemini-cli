@@ -132,12 +132,11 @@ export class SessionLogger {
       }
 
       // Write each date group to its corresponding file
-      const writePromises: Promise<void>[] = [];
+      const writePromises: Array<Promise<void>> = [];
       for (const [dateKey, dateEntries] of grouped) {
         const filePath = path.join(this.logDir, `${dateKey}.jsonl`);
-        const lines = dateEntries
-          .map((e) => JSON.stringify(e))
-          .join('\n') + '\n';
+        const lines =
+          dateEntries.map((e) => JSON.stringify(e)).join('\n') + '\n';
         writePromises.push(
           fs.appendFile(filePath, lines, { encoding: 'utf-8' }),
         );
@@ -184,7 +183,7 @@ export class SessionLogger {
       cutoffDate.setDate(cutoffDate.getDate() - this.retentionDays);
       const cutoffStr = formatDateKey(cutoffDate);
 
-      const deletePromises: Promise<void>[] = [];
+      const deletePromises: Array<Promise<void>> = [];
       for (const file of files) {
         if (!LOG_FILE_PATTERN.test(file)) continue;
 
@@ -211,6 +210,7 @@ export class SessionLogger {
         !(
           error instanceof Error &&
           'code' in error &&
+          // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
           (error as NodeJS.ErrnoException).code === 'ENOENT'
         )
       ) {
@@ -273,13 +273,21 @@ export class SessionLogger {
 /** Type guard for SessionLogEntry. */
 function isSessionLogEntry(value: unknown): value is SessionLogEntry {
   if (typeof value !== 'object' || value === null) return false;
-  const obj = value as Record<string, unknown>;
+  // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
+  const v = value as {
+    timestamp: unknown;
+    sessionId: unknown;
+    prompt: unknown;
+    summary: unknown;
+    filesModified: unknown;
+    durationMs: unknown;
+  };
   return (
-    typeof obj['timestamp'] === 'string' &&
-    typeof obj['sessionId'] === 'string' &&
-    typeof obj['prompt'] === 'string' &&
-    typeof obj['summary'] === 'string' &&
-    Array.isArray(obj['filesModified']) &&
-    typeof obj['durationMs'] === 'number'
+    typeof v.timestamp === 'string' &&
+    typeof v.sessionId === 'string' &&
+    typeof v.prompt === 'string' &&
+    typeof v.summary === 'string' &&
+    Array.isArray(v.filesModified) &&
+    typeof v.durationMs === 'number'
   );
 }

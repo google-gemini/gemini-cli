@@ -86,8 +86,7 @@ export class MemoryConsolidator {
       }
 
       // 2. Extract the Gemini-managed section
-      const { userSection, geminiSection } =
-        splitSections(currentContent);
+      const { userSection, geminiSection } = splitSections(currentContent);
 
       // 3. Prepare session context (truncated for token budget)
       const sessionContext = prepareSessionContext(recentEntries);
@@ -113,14 +112,8 @@ export class MemoryConsolidator {
       }
 
       // 7. Merge and write back
-      const updatedGeminiSection = mergeInsights(
-        geminiSection,
-        deduplicated,
-      );
-      const updatedContent = rebuildContent(
-        userSection,
-        updatedGeminiSection,
-      );
+      const updatedGeminiSection = mergeInsights(geminiSection, deduplicated);
+      const updatedContent = rebuildContent(userSection, updatedGeminiSection);
 
       await fs.writeFile(geminiMdPath, updatedContent, 'utf-8');
 
@@ -151,14 +144,36 @@ export function splitSections(content: string): {
   }
 
   const userSection = content.slice(0, markerIndex).trimEnd();
-  const afterMarker = content.slice(
-    markerIndex + GEMINI_SECTION_MARKER.length,
-  );
-  // Skip the comment line immediately after the marker
-  const commentEnd = afterMarker.indexOf('\n');
-  const geminiSection =
-    commentEnd === -1 ? '' : afterMarker.slice(commentEnd + 1).trim();
+  const afterMarker = content.slice(markerIndex + GEMINI_SECTION_MARKER.length);
 
+  // Skip the leading newline(s) and any HTML comment on the first line
+  let startIndex = 0;
+
+  // Skip leading whitespace/newlines
+  while (
+    startIndex < afterMarker.length &&
+    /[\s\n]/.test(afterMarker[startIndex])
+  ) {
+    startIndex++;
+  }
+
+  // Skip if the first non-whitespace content is an HTML comment
+  const remaining = afterMarker.slice(startIndex);
+  if (remaining.startsWith('<!--')) {
+    const commentEndIndex = remaining.indexOf('-->');
+    if (commentEndIndex !== -1) {
+      // Skip past the comment and any trailing newline
+      startIndex += commentEndIndex + 3;
+      while (
+        startIndex < afterMarker.length &&
+        /[\s\n]/.test(afterMarker[startIndex])
+      ) {
+        startIndex++;
+      }
+    }
+  }
+
+  const geminiSection = afterMarker.slice(startIndex).trim();
   return { userSection, geminiSection };
 }
 
@@ -260,10 +275,7 @@ export function deduplicateInsights(
 /**
  * Appends new insights to the existing Gemini section.
  */
-function mergeInsights(
-  existingSection: string,
-  newInsights: string[],
-): string {
+function mergeInsights(existingSection: string, newInsights: string[]): string {
   const newLines = newInsights.map((i) => `- ${i}`).join('\n');
   if (existingSection.trim()) {
     return `${existingSection.trimEnd()}\n${newLines}`;
@@ -274,10 +286,7 @@ function mergeInsights(
 /**
  * Rebuilds the full GEMINI.md content from its sections.
  */
-function rebuildContent(
-  userSection: string,
-  geminiSection: string,
-): string {
+function rebuildContent(userSection: string, geminiSection: string): string {
   return `${userSection}
 
 ${GEMINI_SECTION_MARKER}

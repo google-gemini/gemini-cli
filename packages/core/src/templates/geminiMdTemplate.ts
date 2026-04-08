@@ -31,7 +31,10 @@ const MANIFEST_MAP: ReadonlyArray<{
     detect: (content) => {
       const parsed = safeParse(content);
       const name = getString(parsed, 'name') || 'unknown';
-      const deps = { ...getObj(parsed, 'dependencies'), ...getObj(parsed, 'devDependencies') };
+      const deps = {
+        ...getObj(parsed, 'dependencies'),
+        ...getObj(parsed, 'devDependencies'),
+      };
       let framework: string | undefined;
       if ('next' in deps) framework = 'Next.js';
       else if ('react' in deps) framework = 'React';
@@ -93,10 +96,7 @@ export async function detectProjectType(
 ): Promise<ProjectSignature | null> {
   for (const { file, detect } of MANIFEST_MAP) {
     try {
-      const content = await fs.readFile(
-        path.join(projectRoot, file),
-        'utf-8',
-      );
+      const content = await fs.readFile(path.join(projectRoot, file), 'utf-8');
       return detect(content);
     } catch {
       // File not found — try next
@@ -119,9 +119,7 @@ export function generateTemplate(
   const projectName =
     signature?.name || path.basename(projectRoot) || 'Project';
   const lang = signature?.language || 'Unknown';
-  const framework = signature?.framework
-    ? ` (${signature.framework})`
-    : '';
+  const framework = signature?.framework ? ` (${signature.framework})` : '';
 
   return `# ${projectName}
 
@@ -184,6 +182,7 @@ function safeParse(content: string): Record<string, unknown> {
   try {
     const result: unknown = JSON.parse(content);
     if (typeof result === 'object' && result !== null) {
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
       return result as Record<string, unknown>;
     }
   } catch {
@@ -203,6 +202,7 @@ function getObj(
 ): Record<string, unknown> {
   const val = obj[key];
   return typeof val === 'object' && val !== null
-    ? (val as Record<string, unknown>)
+    ? // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
+      (val as Record<string, unknown>)
     : {};
 }
