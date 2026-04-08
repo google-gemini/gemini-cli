@@ -5102,7 +5102,7 @@ describe('InputPrompt', () => {
     it('dismisses Btw on ESC key press', async () => {
       const dismissBtw = vi.fn();
       const { stdin, unmount } = await renderWithProviders(
-        <InputPrompt {...props} />,
+        <TestInputPrompt {...props} />,
         {
           uiState: {
             btwState: {
@@ -5130,7 +5130,7 @@ describe('InputPrompt', () => {
     it('dismisses Btw on Enter key press', async () => {
       const dismissBtw = vi.fn();
       const { stdin, unmount } = await renderWithProviders(
-        <InputPrompt {...props} />,
+        <TestInputPrompt {...props} />,
         {
           uiState: {
             btwState: {
@@ -5158,7 +5158,7 @@ describe('InputPrompt', () => {
     it('dismisses Btw on Space key press when buffer is empty', async () => {
       const dismissBtw = vi.fn();
       const { stdin, unmount } = await renderWithProviders(
-        <InputPrompt {...props} />,
+        <TestInputPrompt {...props} />,
         {
           uiState: {
             btwState: {
@@ -5186,7 +5186,7 @@ describe('InputPrompt', () => {
     it('dismisses Btw and accepts input on typing when not streaming', async () => {
       const dismissBtw = vi.fn();
       const { stdin, stdout, unmount } = await renderWithProviders(
-        <InputPrompt {...props} />,
+        <TestInputPrompt {...props} />,
         {
           uiState: {
             btwState: {
@@ -5215,7 +5215,7 @@ describe('InputPrompt', () => {
     it('blocks typing when Btw is streaming', async () => {
       const dismissBtw = vi.fn();
       const { stdin, stdout, unmount } = await renderWithProviders(
-        <InputPrompt {...props} />,
+        <TestInputPrompt {...props} />,
         {
           uiState: {
             btwState: {

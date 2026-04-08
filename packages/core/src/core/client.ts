@@ -72,10 +72,7 @@ import {
   applyModelSelection,
   createAvailabilityContextProvider,
 } from '../availability/policyHelpers.js';
-import {
-  getDisplayString,
-  resolveModel,
-} from '../config/models.js';
+import { getDisplayString, resolveModel } from '../config/models.js';
 import { getResponseText, partToString } from '../utils/partUtils.js';
 import { parseThought } from '../utils/thoughtUtils.js';
 import { coreEvents, CoreEvent } from '../utils/events.js';
