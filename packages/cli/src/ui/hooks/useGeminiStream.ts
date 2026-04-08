@@ -238,6 +238,8 @@ export const useGeminiStream = (
     null,
   );
   const isLowErrorVerbosity = settings.merged.ui?.errorVerbosity !== 'full';
+  const topicUpdateNarrationEnabled =
+    settings.merged.experimental?.topicUpdateNarration === true;
   const suppressedToolErrorCountRef = useRef(0);
   const suppressedToolErrorNoteShownRef = useRef(false);
   const lowVerbosityFailureNoteShownRef = useRef(false);
@@ -1082,9 +1084,24 @@ export const useGeminiStream = (
         if (pendingHistoryItemRef.current) {
           addItem(pendingHistoryItemRef.current, userMessageTimestamp);
         }
+
+        // When narration is enabled, we block all text updates during the turn.
+        // The text is accumulated and only shown at the end of the turn if
+        // no tool calls were made.
+        if (topicUpdateNarrationEnabled) {
+          setPendingHistoryItem(null);
+          return newGeminiMessageBuffer;
+        }
+
         setPendingHistoryItem({ type: 'gemini', text: '' });
         newGeminiMessageBuffer = eventValue;
       }
+
+      // When narration is enabled, skip updating the UI with incremental text.
+      if (topicUpdateNarrationEnabled) {
+        return newGeminiMessageBuffer;
+      }
+
       // Split large messages for better rendering performance. Ideally,
       // we should maximize the amount of output sent to <Static />.
       const splitPoint = findLastSafeSplitPoint(newGeminiMessageBuffer);
@@ -1123,21 +1140,31 @@ export const useGeminiStream = (
       }
       return newGeminiMessageBuffer;
     },
-    [addItem, pendingHistoryItemRef, setPendingHistoryItem],
+    [
+      addItem,
+      pendingHistoryItemRef,
+      setPendingHistoryItem,
+      topicUpdateNarrationEnabled,
+    ],
   );
 
   const handleThoughtEvent = useCallback(
     (eventValue: ThoughtSummary, _userMessageTimestamp: number) => {
       setThought(eventValue);
 
-      if (getInlineThinkingMode(settings) === 'full') {
+      // Block thinking history items when narration is enabled to avoid
+      // UI flickering and provide a cleaner experience.
+      if (
+        !topicUpdateNarrationEnabled &&
+        getInlineThinkingMode(settings) === 'full'
+      ) {
         addItem({
           type: 'thinking',
           thought: eventValue,
         } as HistoryItemThinking);
       }
     },
-    [addItem, settings, setThought],
+    [addItem, settings, setThought, topicUpdateNarrationEnabled],
   );
 
   const handleUserCancelledEvent = useCallback(
@@ -1545,6 +1572,14 @@ export const useGeminiStream = (
           setPendingHistoryItem(null);
         }
         await scheduleToolCalls(toolCallRequests, signal);
+      } else if (
+        topicUpdateNarrationEnabled &&
+        geminiMessageBuffer.length > 0
+      ) {
+        // When narration is enabled, we only show the final text response
+        // if no tools were called in the current turn. This hides intermediate
+        // narration during multi-turn orchestration.
+        setPendingHistoryItem({ type: 'gemini', text: geminiMessageBuffer });
       }
       return StreamProcessingStatus.Completed;
     },
@@ -1567,6 +1602,7 @@ export const useGeminiStream = (
       pendingHistoryItemRef,
       setPendingHistoryItem,
       setThought,
+      topicUpdateNarrationEnabled,
     ],
   );
   const submitQuery = useCallback(

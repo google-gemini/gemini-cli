@@ -66,6 +66,7 @@ import { MessageType, StreamingState } from '../types.js';
 import type { LoadedSettings } from '../../config/settings.js';
 import { findLastSafeSplitPoint } from '../utils/markdownUtilities.js';
 import { theme } from '../semantic-colors.js';
+import { createMockSettings } from '../../test-utils/mockConfig.js';
 
 // --- MOCKS ---
 const mockSendMessageStream = vi
@@ -4239,5 +4240,101 @@ describe('useGeminiStream', () => {
       await userPromptCall![1]({ metadata: spanMetadata });
     });
     expect(spanMetadata.input).toBe('telemetry test query');
+  });
+
+  describe('topicUpdateNarration blocking', () => {
+    it('should block text updates while streaming and show them at the end if no tools are called', async () => {
+      const settings = createMockSettings({
+        merged: {
+          experimental: { topicUpdateNarration: true },
+          ui: { compactToolOutput: true },
+        },
+      });
+
+      mockSendMessageStream.mockReturnValue(
+        (async function* () {
+          yield { type: ServerGeminiEventType.Content, value: 'Hello ' };
+          yield { type: ServerGeminiEventType.Content, value: 'world!' };
+        })(),
+      );
+
+      const { result } = await renderTestHook([], undefined, settings);
+
+      await act(async () => {
+        await result.current.submitQuery('Hi');
+      });
+
+      // During streaming, addItem should NOT have been called with 'gemini' type.
+      // However, it IS called at the end of the turn because there are no tool calls.
+      expect(mockAddItem).toHaveBeenCalledWith(
+        expect.objectContaining({ type: 'gemini', text: 'Hello world!' }),
+        expect.any(Number),
+      );
+    });
+
+    it('should discard text updates if tool calls are present in the turn', async () => {
+      const settings = createMockSettings({
+        merged: {
+          experimental: { topicUpdateNarration: true },
+          ui: { compactToolOutput: true },
+        },
+      });
+
+      mockSendMessageStream.mockReturnValue(
+        (async function* () {
+          yield {
+            type: ServerGeminiEventType.Content,
+            value: 'I will call a tool.',
+          };
+          yield {
+            type: ServerGeminiEventType.ToolCallRequest,
+            value: { callId: '1', name: 'some_tool', args: {} },
+          };
+        })(),
+      );
+
+      const { result } = await renderTestHook([], undefined, settings);
+
+      await act(async () => {
+        await result.current.submitQuery('Hi');
+      });
+
+      // addItem should NOT have been called with 'gemini' type because there was a tool call.
+      expect(mockAddItem).not.toHaveBeenCalledWith(
+        expect.objectContaining({ type: 'gemini' }),
+        expect.any(Number),
+      );
+    });
+
+    it('should block thinking history items when narration is enabled', async () => {
+      const settings = createMockSettings({
+        merged: {
+          experimental: { topicUpdateNarration: true },
+          ui: { inlineThinkingMode: 'full' },
+        },
+      });
+
+      mockSendMessageStream.mockReturnValue(
+        (async function* () {
+          yield {
+            type: ServerGeminiEventType.Thought,
+            value: { thought: 'I am thinking...' },
+          };
+          yield { type: ServerGeminiEventType.Content, value: 'Final answer' };
+        })(),
+      );
+
+      const { result } = await renderTestHook([], undefined, settings);
+
+      await act(async () => {
+        await result.current.submitQuery('Hi');
+      });
+
+      // addItem should NOT have been called with 'thinking' type.
+      expect(mockAddItem).not.toHaveBeenCalledWith(
+        expect.objectContaining({ type: 'thinking' }),
+        expect.any(Number),
+      );
+    });
   });
 });
