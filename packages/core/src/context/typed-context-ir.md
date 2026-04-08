@@ -1,105 +1,110 @@
 # Context Manager: The Pure Functional "Ship of Theseus" IR
 
-This document outlines the architectural transition from the V0 Mutating Editor
-pattern to the V1 Pure Functional, Immutable Episodic IR.
+This document outlines the architectural transition from the V0 Mutating Editor pattern to the V1 Pure Functional, Immutable Episodic IR, designed to scale into a multi-agent, async state transformation system.
 
 ## 1. Core Philosophy: The Ship of Theseus
 
-The primary constraint of deep immutable trees is the cascading cost of cloning
-parent nodes when a leaf node changes. To solve this, we decouple the structural
-hierarchy of the context from the actual data sent to the LLM.
+The primary constraint of deep immutable trees is the cascading cost of cloning parent nodes when a leaf node changes. To solve this, we decouple the structural hierarchy of the context from the actual data sent to the LLM.
 
 The IR is divided into two distinct domains:
+1.  **Logical Nodes:** Structural boundaries that define the hierarchy (e.g., `Task`, `Episode`). These nodes **do not render** to the LLM. They exist to group related interactions and provide semantic meaning.
+2.  **Concrete Nodes:** The atomic, renderable pieces of data (e.g., `UserPrompt`, `ToolExecution`, `Snapshot`, `RollingSummary`). These are the actual "planks" of the ship.
 
-1.  **Logical Nodes:** Structural boundaries that define the hierarchy (e.g.,
-    `Task`, `Episode`). These nodes **do not render** to the LLM. They exist to
-    group related interactions and provide semantic meaning.
-2.  **Concrete Nodes:** The atomic, renderable pieces of data (e.g.,
-    `UserPrompt`, `ToolExecution`, `Snapshot`, `RollingSummary`). These are the
-    actual "planks" of the ship.
+Because Concrete Nodes carry a reference to their Logical Parent (e.g., `episodeId`), they can be stored and processed as a **Flat List**.
 
-Because Concrete Nodes carry a reference to their Logical Parent (e.g.,
-`episodeId`), they can be stored and processed as a **Flat List**.
+## 2. The Autonomous `ContextWorkingBuffer`
 
-## 2. The Pristine Graph vs. The Ship
+The "Ship" is no longer a dumb array; it is encapsulated in a rich `ContextWorkingBuffer` entity.
 
-### The Pristine Graph (The Blueprint)
+### Encapsulation of History
+The Buffer manages its own audit trail and lineage. If a processor needs the pristine, unaltered data of a deeply compressed node (e.g., a Snapshotter summarizing masked tools), it queries the Buffer directly:
+`buffer.getPristineNode(id)`
 
-Owned exclusively by the `ContextManager`. It is an append-only, immutable graph
-containing both Logical Nodes and the original, unaltered Concrete Nodes. It
-serves as the absolute ground-truth and historical audit log.
+### The Variant Voting System (The "Patch Market")
+Processors no longer blindly mutate the context. They act as "Advisors" generating **Proposals** (`ProcessorProposal`). 
 
-### The Ship (The Working Buffer)
+*   **Background Processors** continually propose highly semantic summaries or masks (low destruction priority).
+*   **Emergency Processors** propose brutal truncation (high destruction priority).
 
-When a pipeline triggers, the `PipelineOrchestrator` constructs "The Ship": a
-flat, sequential `ReadonlyArray<ConcreteNode>` representing the current
-best-effort view of the context.
+When a budget threshold is breached (e.g., `gc_backstop`), the Buffer evaluates all accumulated proposals. It accepts the proposals with the lowest destruction priority that resolve the token deficit, leaving the rest of the pristine graph untouched.
 
-Processors do **not** receive an `EpisodeEditor`. They receive the Ship. They
-iterate over this flat array (an O(N) operation with no recursive tree
-traversal) to find nodes that violate the budget.
+## 3. Type-Safe Async Coordination (The `ContextInbox`)
 
-## 3. Pure Functional Processors and Context Patches
+To solve the async/sync barrier (where a slow background worker generates a summary that a fast synchronous emergency backstop needs instantly), we introduce the `ContextInbox`.
 
-Processors are pure functions. They do not mutate the Ship. Instead, they return
-a `ContextPatch` representing how the Ship should be modified.
+This is a strictly-typed messaging system. A worker dispatches a `SNAPSHOT_READY` message to the Inbox. The backstop peeks at the Inbox, instantly retrieving the pre-computed summary and proposing it to the Buffer.
+
+## 4. The Processor Contract
+
+Processors are pure functions that evaluate unprotected targets and return an array of `ProcessorProposal`s.
 
 ```typescript
-export interface ContextPatch {
-  /** The IDs of the Concrete Nodes to remove from the Ship. */
-  removedIds: string[];
+export type InboxMessage = 
+  | { type: 'SNAPSHOT_READY'; snapshot: Snapshot; abstractsIds: string[] }
+  | { type: 'BACKGROUND_SUMMARY'; summary: RollingSummary; targetId: string };
 
-  /** The new synthetic Concrete Nodes (e.g., MaskedTool, Snapshot) to insert. */
-  insertedNodes?: ConcreteNode[];
-
-  /** The index at which to insert the new nodes. If omitted, they replace the first removedId. */
-  insertionIndex?: number;
-
-  /** Audit metadata explaining who made this patch, when, and why. */
-  metadata: IrMetadata;
+export interface ContextInbox {
+  dispatch(message: InboxMessage): void;
+  peek<T extends InboxMessage['type']>(type: T): Extract<InboxMessage, { type: T }> | undefined;
 }
-```
 
-The Orchestrator acts as a reducer. It takes the `ContextPatch` returned by
-Processor A, applies it to the Ship to create a new immutable flat array, and
-passes the updated Ship to Processor B.
+export interface ContextWorkingBuffer {
+  /** The current active (projected) flat list of ConcreteNodes. */
+  readonly nodes: ReadonlyArray<ConcreteNode>;
+  
+  /** Retrieves the historical, pristine version of a node (before any masks/summaries). */
+  getPristineNode(id: string): ConcreteNode | undefined;
+  
+  /** Retrieves the full audit lineage of a specific node ID. */
+  getLineage(id: string): ReadonlyArray<ConcreteNode>;
+}
 
-## 4. The Processor Signature
-
-```typescript
 export interface ProcessArgs {
-  /** The flat, sequential array of current renderable nodes (The Ship). */
-  ship: ReadonlyArray<ConcreteNode>;
-
-  /**
-   * The specific subset of Concrete Node IDs that triggered this execution.
-   * For 'new_message', these are the new nodes. For 'retained_exceeded', the aged-out nodes.
+  /** The rich buffer containing current nodes and their history. */
+  readonly buffer: ContextWorkingBuffer;
+  
+  /** 
+   * The specific unprotected, mutable nodes the pipeline is allowed to operate on.
+   * The Orchestrator filters out protected nodes (like active tasks) before calling.
    */
-  triggerTargets: ReadonlySet<string>;
-
+  readonly targets: ReadonlyArray<ConcreteNode>;
+  
   /** The token budget and accounting state. */
-  state: ContextAccountingState;
+  readonly state: ContextAccountingState;
+  
+  /** Type-safe messaging system for async/sync coordination. */
+  readonly inbox: ContextInbox;
+}
 
-  /**
-   * An escape hatch allowing the processor to query the original, uncompressed
-   * state of a node from the Pristine Graph.
+export interface ProcessorProposal {
+  /** The specific Concrete Nodes this proposal intends to replace or remove. */
+  readonly targetIds: ReadonlyArray<string>;
+  
+  /** The new synthetic Concrete Nodes to insert in their place. */
+  readonly proposedNodes: ReadonlyArray<ConcreteNode>;
+  
+  /** 
+   * Priority/Destruction score. 
+   * 1 = Ideal (Semantic Masking), 10 = Brutal (Emergency Truncation).
+   * The Buffer votes based on this and the token deficit.
    */
-  getPristineNode: (id: string) => ConcreteNode | undefined;
+  readonly priority: number; 
+  
+  readonly metadata: IrMetadata;
 }
 
 export interface ContextProcessor {
   readonly id: string;
   readonly name: string;
-
-  /** Returns an array of declarative patches to apply to the Ship. */
-  process(args: ProcessArgs): Promise<ContextPatch[]>;
+  
+  /** Returns an array of declarative proposals for the Buffer to evaluate. */
+  process(args: ProcessArgs): Promise<ProcessorProposal[]>;
 }
 ```
 
 ## 5. The Node Taxonomy (`IrNodeType`)
 
-The `IrNodeType` union explicitly defines all valid nodes. Synthetic nodes (like
-`Snapshot`) are first-class citizens.
+The `IrNodeType` union explicitly defines all valid nodes. Synthetic nodes (like `Snapshot`) are first-class citizens.
 
 ```typescript
 export type IrNodeType =
@@ -113,7 +118,7 @@ export type IrNodeType =
   | 'AGENT_THOUGHT'
   | 'TOOL_EXECUTION'
   | 'AGENT_YIELD'
-
+  
   // Synthetic Concrete Nodes
   | 'SNAPSHOT'
   | 'ROLLING_SUMMARY'
