@@ -71,6 +71,7 @@ vi.mock('../../utils/authConsent.js', () => ({
 vi.mock('../../utils/events.js', () => ({
   coreEvents: {
     emitFeedback: vi.fn(),
+    emitOauthDisplayMessage: vi.fn(),
   },
 }));
 
@@ -95,6 +96,10 @@ const {
   buildAuthorizationUrl,
 } = await import('../../utils/oauth-flow.js');
 const { getConsentForOauth } = await import('../../utils/authConsent.js');
+const { coreEvents } = await import('../../utils/events.js');
+const { createOauthBrowserDisplayMessage } = await import(
+  '../../utils/oauthDisplay.js'
+);
 
 function createConfig(
   overrides: Partial<OAuth2AuthConfig> = {},
@@ -359,6 +364,11 @@ describe('OAuth2AuthProvider', () => {
       expect(vi.mocked(generatePKCEParams)).toHaveBeenCalled();
       expect(vi.mocked(startCallbackServer)).toHaveBeenCalled();
       expect(vi.mocked(exchangeCodeForToken)).toHaveBeenCalled();
+      expect(coreEvents.emitOauthDisplayMessage).toHaveBeenCalledWith(
+        createOauthBrowserDisplayMessage(
+          'https://auth.example.com/authorize?foo=bar',
+        ),
+      );
       expect(storage.saveToken).toHaveBeenCalledWith(
         'test-agent',
         expect.objectContaining({ accessToken: 'new-access-token' }),

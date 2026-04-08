@@ -92,6 +92,29 @@ describe('<HistoryItemDisplay />', () => {
     },
   );
 
+  it('renders AuthUrlMessage for "auth_url" type', async () => {
+    const url =
+      'https://accounts.google.com/o/oauth2/v2/auth?response_type=code&scope=openid%20email&state=state-1234567890';
+    const item: HistoryItem = {
+      ...baseItem,
+      type: MessageType.AUTH_URL,
+      heading: 'Opening your browser for OAuth sign-in...',
+      url,
+      footerLines: [
+        'TIP: Triple-click to select the entire URL, then copy and paste it into your browser.',
+      ],
+    };
+    const { lastFrame, unmount } = await renderWithProviders(
+      <HistoryItemDisplay {...baseItem} item={item} />,
+    );
+    const output = lastFrame();
+
+    expect(output).toContain('Opening your browser for OAuth sign-in...');
+    expect(output).toContain('TIP: Triple-click to select the entire URL');
+    expect(output.replace(/\n/g, '')).toContain(url);
+    unmount();
+  });
+
   it('renders AgentsStatus for "agents_list" type', async () => {
     const item: HistoryItem = {
       ...baseItem,

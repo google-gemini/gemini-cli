@@ -53,6 +53,7 @@ import {
   type UserTierId,
   type GeminiUserTier,
   type UserFeedbackPayload,
+  type OauthDisplayMessagePayload,
   type HookSystemMessagePayload,
   type AgentDefinition,
   type ApprovalMode,
@@ -2114,6 +2115,18 @@ Logging in with Google... Restarting Gemini CLI to continue.
       }
     };
 
+    const handleOauthDisplayMessage = (payload: OauthDisplayMessagePayload) => {
+      historyManager.addItem(
+        {
+          type: MessageType.AUTH_URL,
+          heading: payload.heading,
+          url: payload.url,
+          footerLines: payload.footerLines,
+        },
+        Date.now(),
+      );
+    };
+
     const handleHookSystemMessage = (payload: HookSystemMessagePayload) => {
       historyManager.addItem(
         {
@@ -2126,6 +2139,7 @@ Logging in with Google... Restarting Gemini CLI to continue.
     };
 
     coreEvents.on(CoreEvent.UserFeedback, handleUserFeedback);
+    coreEvents.on(CoreEvent.OauthDisplayMessage, handleOauthDisplayMessage);
     coreEvents.on(CoreEvent.HookSystemMessage, handleHookSystemMessage);
 
     // Flush any messages that happened during startup before this component
@@ -2134,6 +2148,7 @@ Logging in with Google... Restarting Gemini CLI to continue.
 
     return () => {
       coreEvents.off(CoreEvent.UserFeedback, handleUserFeedback);
+      coreEvents.off(CoreEvent.OauthDisplayMessage, handleOauthDisplayMessage);
       coreEvents.off(CoreEvent.HookSystemMessage, handleHookSystemMessage);
     };
   }, [historyManager]);

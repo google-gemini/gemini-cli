@@ -8,7 +8,7 @@ import { describe, it, expect } from 'vitest';
 import { act } from 'react';
 import { renderHook } from '../../test-utils/render.js';
 import { useHistory } from './useHistoryManager.js';
-import type { HistoryItem } from '../types.js';
+import type { HistoryItem, HistoryItemWithoutId } from '../types.js';
 
 describe('useHistoryManager', () => {
   it('should initialize with an empty history', async () => {
@@ -19,7 +19,7 @@ describe('useHistoryManager', () => {
   it('should add an item to history with a unique ID', async () => {
     const { result } = await renderHook(() => useHistory());
     const timestamp = Date.now();
-    const itemData: Omit<HistoryItem, 'id'> = {
+    const itemData: HistoryItemWithoutId = {
       type: 'user', // Replaced HistoryItemType.User
       text: 'Hello',
     };
@@ -42,7 +42,7 @@ describe('useHistoryManager', () => {
   it('should generate strictly increasing IDs even if baseTimestamp goes backwards', async () => {
     const { result } = await renderHook(() => useHistory());
     const timestamp = 1000000;
-    const itemData: Omit<HistoryItem, 'id'> = { type: 'info', text: 'First' };
+    const itemData: HistoryItemWithoutId = { type: 'info', text: 'First' };
 
     let id1!: number;
     let id2!: number;
@@ -92,11 +92,11 @@ describe('useHistoryManager', () => {
   it('should generate unique IDs for items added with the same base timestamp', async () => {
     const { result } = await renderHook(() => useHistory());
     const timestamp = Date.now();
-    const itemData1: Omit<HistoryItem, 'id'> = {
+    const itemData1: HistoryItemWithoutId = {
       type: 'user', // Replaced HistoryItemType.User
       text: 'First',
     };
-    const itemData2: Omit<HistoryItem, 'id'> = {
+    const itemData2: HistoryItemWithoutId = {
       type: 'gemini', // Replaced HistoryItemType.Gemini
       text: 'Second',
     };
@@ -120,7 +120,7 @@ describe('useHistoryManager', () => {
   it('should update an existing history item', async () => {
     const { result } = await renderHook(() => useHistory());
     const timestamp = Date.now();
-    const initialItem: Omit<HistoryItem, 'id'> = {
+    const initialItem: HistoryItemWithoutId = {
       type: 'gemini', // Replaced HistoryItemType.Gemini
       text: 'Initial content',
     };
@@ -146,7 +146,7 @@ describe('useHistoryManager', () => {
   it('should not change history if updateHistoryItem is called with a nonexistent ID', async () => {
     const { result } = await renderHook(() => useHistory());
     const timestamp = Date.now();
-    const itemData: Omit<HistoryItem, 'id'> = {
+    const itemData: HistoryItemWithoutId = {
       type: 'user', // Replaced HistoryItemType.User
       text: 'Hello',
     };
@@ -167,11 +167,11 @@ describe('useHistoryManager', () => {
   it('should clear the history', async () => {
     const { result } = await renderHook(() => useHistory());
     const timestamp = Date.now();
-    const itemData1: Omit<HistoryItem, 'id'> = {
+    const itemData1: HistoryItemWithoutId = {
       type: 'user', // Replaced HistoryItemType.User
       text: 'First',
     };
-    const itemData2: Omit<HistoryItem, 'id'> = {
+    const itemData2: HistoryItemWithoutId = {
       type: 'gemini', // Replaced HistoryItemType.Gemini
       text: 'Second',
     };
@@ -193,19 +193,19 @@ describe('useHistoryManager', () => {
   it('should not add consecutive duplicate user messages', async () => {
     const { result } = await renderHook(() => useHistory());
     const timestamp = Date.now();
-    const itemData1: Omit<HistoryItem, 'id'> = {
+    const itemData1: HistoryItemWithoutId = {
       type: 'user', // Replaced HistoryItemType.User
       text: 'Duplicate message',
     };
-    const itemData2: Omit<HistoryItem, 'id'> = {
+    const itemData2: HistoryItemWithoutId = {
       type: 'user', // Replaced HistoryItemType.User
       text: 'Duplicate message',
     };
-    const itemData3: Omit<HistoryItem, 'id'> = {
+    const itemData3: HistoryItemWithoutId = {
       type: 'gemini', // Replaced HistoryItemType.Gemini
       text: 'Gemini response',
     };
-    const itemData4: Omit<HistoryItem, 'id'> = {
+    const itemData4: HistoryItemWithoutId = {
       type: 'user', // Replaced HistoryItemType.User
       text: 'Another user message',
     };
@@ -226,15 +226,15 @@ describe('useHistoryManager', () => {
   it('should add duplicate user messages if they are not consecutive', async () => {
     const { result } = await renderHook(() => useHistory());
     const timestamp = Date.now();
-    const itemData1: Omit<HistoryItem, 'id'> = {
+    const itemData1: HistoryItemWithoutId = {
       type: 'user', // Replaced HistoryItemType.User
       text: 'Message 1',
     };
-    const itemData2: Omit<HistoryItem, 'id'> = {
+    const itemData2: HistoryItemWithoutId = {
       type: 'gemini', // Replaced HistoryItemType.Gemini
       text: 'Gemini response',
     };
-    const itemData3: Omit<HistoryItem, 'id'> = {
+    const itemData3: HistoryItemWithoutId = {
       type: 'user', // Replaced HistoryItemType.User
       text: 'Message 1', // Duplicate text, but not consecutive
     };
@@ -254,7 +254,7 @@ describe('useHistoryManager', () => {
   it('should use Date.now() as default baseTimestamp if not provided', async () => {
     const { result } = await renderHook(() => useHistory());
     const before = Date.now();
-    const itemData: Omit<HistoryItem, 'id'> = {
+    const itemData: HistoryItemWithoutId = {
       type: 'user',
       text: 'Default timestamp test',
     };

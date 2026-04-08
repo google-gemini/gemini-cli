@@ -14,12 +14,12 @@ import {
 } from '@google/gemini-cli-core';
 import { MultiFolderTrustDialog } from '../components/MultiFolderTrustDialog.js';
 import type { UseHistoryManagerReturn } from './useHistoryManager.js';
-import { MessageType, type HistoryItem } from '../types.js';
+import { MessageType, type HistoryItemWithoutId } from '../types.js';
 
 async function finishAddingDirectories(
   config: Config,
   addItem: (
-    itemData: Omit<HistoryItem, 'id'>,
+    itemData: HistoryItemWithoutId,
     baseTimestamp?: number,
   ) => number,
   added: string[],

@@ -13,6 +13,7 @@ import {
   type OutputPayload,
   type ConsoleLogPayload,
   type UserFeedbackPayload,
+  type OauthDisplayMessagePayload,
   sessionId,
   logUserPrompt,
   AuthType,
@@ -57,6 +58,7 @@ import { getStartupWarnings } from './utils/startupWarnings.js';
 import { getUserStartupWarnings } from './utils/userStartupWarnings.js';
 import { ConsolePatcher } from './ui/utils/ConsolePatcher.js';
 import { runNonInteractive } from './nonInteractiveCli.js';
+import { formatOauthDisplayMessage } from './utils/oauthDisplay.js';
 import {
   cleanupCheckpoints,
   registerCleanup,
@@ -769,6 +771,15 @@ export function initializeOutputListenersAndFlush() {
           writeToStdout(payload.message);
         }
       });
+    }
+
+    if (coreEvents.listenerCount(CoreEvent.OauthDisplayMessage) === 0) {
+      coreEvents.on(
+        CoreEvent.OauthDisplayMessage,
+        (payload: OauthDisplayMessagePayload) => {
+          writeToStdout(formatOauthDisplayMessage(payload));
+        },
+      );
     }
   }
   coreEvents.drainBacklogs();

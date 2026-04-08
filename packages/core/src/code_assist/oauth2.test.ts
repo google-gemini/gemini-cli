@@ -47,6 +47,7 @@ import {
 import process from 'node:process';
 import { coreEvents } from '../utils/events.js';
 import { isHeadlessMode } from '../utils/headless.js';
+import { createOauthBrowserDisplayMessage } from '../utils/oauthDisplay.js';
 
 vi.mock('node:os', async (importOriginal) => {
   const actual = await importOriginal<typeof import('node:os')>();
@@ -163,6 +164,10 @@ describe('oauth2', () => {
       const mockGetAccessToken = vi
         .fn()
         .mockResolvedValue({ token: 'mock-access-token' });
+      const emitOauthDisplayMessageSpy = vi.spyOn(
+        coreEvents,
+        'emitOauthDisplayMessage',
+      );
       let tokensListener: ((tokens: Credentials) => void) | undefined;
       const mockOAuth2Client = {
         generateAuthUrl: mockGenerateAuthUrl,
@@ -248,6 +253,9 @@ describe('oauth2', () => {
       expect(client).toBe(mockOAuth2Client);
 
       expect(open).toHaveBeenCalledWith(mockAuthUrl);
+      expect(emitOauthDisplayMessageSpy).toHaveBeenCalledWith(
+        createOauthBrowserDisplayMessage(mockAuthUrl),
+      );
       expect(mockGetToken).toHaveBeenCalledWith({
         code: mockCode,
         redirect_uri: `http://127.0.0.1:${capturedPort}/oauth2callback`,
