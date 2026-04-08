@@ -20,8 +20,6 @@ import {
   beforeEach,
   afterEach,
 } from 'vitest';
-import type { Key } from './KeypressContext.js';
-import { vi, afterAll, beforeAll, type Mock } from 'vitest';
 import {
   useKeypressContext,
   ESC_TIMEOUT,
@@ -450,7 +448,7 @@ describe('KeypressContext', () => {
 
     it('should NOT treat \\b as ctrl when WT_SESSION is NOT present', async () => {
       vi.stubEnv('WT_SESSION', '');
-      const { keyHandler } = setupKeypressTest();
+      const { keyHandler } = await setupKeypressTest();
 
       act(() => {
         stdin.write('\b');
@@ -466,7 +464,7 @@ describe('KeypressContext', () => {
 
     it('should treat \\b as ctrl when WT_SESSION IS present', async () => {
       vi.stubEnv('WT_SESSION', 'some-id');
-      const { keyHandler } = setupKeypressTest();
+      const { keyHandler } = await setupKeypressTest();
 
       act(() => {
         stdin.write('\b');
@@ -482,7 +480,7 @@ describe('KeypressContext', () => {
 
     it('should treat \\x7f as regular backspace regardless of WT_SESSION', async () => {
       vi.stubEnv('WT_SESSION', 'some-id');
-      const { keyHandler } = setupKeypressTest();
+      const { keyHandler } = await setupKeypressTest();
 
       act(() => {
         stdin.write('\x7f');
