@@ -12,8 +12,6 @@ import {
   geminiPartsToContentParts,
   parseThought,
   CoreToolCallStatus,
-} from '@google/gemini-cli-core';
-import {
   type ApprovalMode,
   Kind,
   type ThoughtSummary,
@@ -21,6 +19,7 @@ import {
   type AgentEvent,
   type AgentProtocol,
   type Logger,
+  type Part,
 } from '@google/gemini-cli-core';
 import type {
   HistoryItemWithoutId,
@@ -296,15 +295,13 @@ export const useAgentStream = ({
   );
 
   useEffect(() => {
-    if (agent) {
-      return agent.subscribe(handleEvent);
-    }
-    return undefined;
+    const unsubscribe = agent?.subscribe(handleEvent);
+    return () => unsubscribe?.();
   }, [agent, handleEvent]);
 
   const submitQuery = useCallback(
     async (
-      query: Array<import('@google/gemini-cli-core').Part> | string,
+      query: Part[] | string,
       options?: { isContinuation: boolean },
       _prompt_id?: string,
     ) => {
