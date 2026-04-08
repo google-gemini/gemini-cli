@@ -185,7 +185,7 @@ asking: "fetch posts".
 
 ## Step 5: Add a custom command
 
-Custom commands create shortcuts for complex prompts.
+Custom commands create shortcuts for complex prompts.  These must be located within a `.gemini` configuration directory (either in your project root or your home directory).
 
 1.  Create a `commands` directory and a subdirectory for your command group:
 
