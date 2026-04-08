@@ -55,6 +55,7 @@ describe('ToolConfirmationQueue', () => {
     getFileSystemService: () => ({
       readFile: vi.fn().mockResolvedValue('Plan content'),
     }),
+    getSessionId: () => 'test-session-id',
     storage: {
       getPlansDir: () => '/mock/temp/plans',
     },
