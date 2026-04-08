@@ -9,7 +9,7 @@ import { StateSnapshotProcessor, type StateSnapshotProcessorOptions } from '../p
 export function registerBuiltInProcessors(registry: ProcessorRegistry) {
   registry.register<Record<string, never>>({
     id: 'BlobDegradationProcessor',
-    schema: BlobDegradationProcessor.schema,
+    schema: { type: 'object', properties: {} },
     create: (env) => new BlobDegradationProcessor(env),
   });
 
