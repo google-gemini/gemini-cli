@@ -16,7 +16,7 @@ describe('BlobDegradationProcessor', () => {
   it('should ignore text parts and only target inline_data and file_data', async () => {
     const env = createMockEnvironment();
     // Simulate each part costing 100 tokens, but text costing 10 tokens
-    env.tokenCalculator.estimateTokensForParts = vi.fn((parts: any[]) => {
+    env.tokenCalculator.estimateTokensForParts = vi.fn((parts: import('@google/genai').Part[]) => {
        if (parts[0].text) return 10;
        return 100;
     });
@@ -39,10 +39,10 @@ describe('BlobDegradationProcessor', () => {
     const targets = [prompt];
 
     const result = await processor.process({
-      buffer: {} as any,
+      buffer: {} as unknown as import('../pipeline.js').ContextWorkingBuffer,
       targets,
       state,
-      inbox: {} as any,
+      inbox: {} as unknown as import('../pipeline.js').InboxSnapshot,
     });
 
     // We modified it, so the ID should change and it should have new metadata
@@ -72,7 +72,7 @@ describe('BlobDegradationProcessor', () => {
     // Huge deficit requires one degradation
     const state = createDummyState(false, 90);
 
-    env.tokenCalculator.estimateTokensForParts = vi.fn((parts: any[]) => {
+    env.tokenCalculator.estimateTokensForParts = vi.fn((parts: import('@google/genai').Part[]) => {
        if (parts[0].text) return 10;
        return 100; // saving 90 tokens per degradation
     });
@@ -89,10 +89,10 @@ describe('BlobDegradationProcessor', () => {
     const targets = [prompt];
 
     const result = await processor.process({
-      buffer: {} as any,
+      buffer: {} as unknown as import('../pipeline.js').ContextWorkingBuffer,
       targets,
       state,
-      inbox: {} as any,
+      inbox: {} as unknown as import('../pipeline.js').InboxSnapshot,
     });
 
     const modifiedPrompt = result[0] as UserPrompt;
@@ -118,10 +118,10 @@ describe('BlobDegradationProcessor', () => {
     const targets = [prompt];
 
     const result = await processor.process({
-      buffer: {} as any,
+      buffer: {} as unknown as import('../pipeline.js').ContextWorkingBuffer,
       targets,
       state,
-      inbox: {} as any,
+      inbox: {} as unknown as import('../pipeline.js').InboxSnapshot,
     });
 
     // Should return the exact array ref

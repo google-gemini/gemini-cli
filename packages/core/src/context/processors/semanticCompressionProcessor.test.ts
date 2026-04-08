@@ -60,7 +60,7 @@ describe('SemanticCompressionProcessor', () => {
     const targets = [prompt, thought, tool];
 
     const result = await processor.process({
-      buffer: {} as any,
+      buffer: {} as unknown as import('../pipeline.js').ContextWorkingBuffer,
       targets,
       state,
       inbox: {} as any,
@@ -136,7 +136,7 @@ describe('SemanticCompressionProcessor', () => {
     const targets = [prompt, thought];
 
     const result = await processor.process({
-      buffer: {} as any,
+      buffer: {} as unknown as import('../pipeline.js').ContextWorkingBuffer,
       targets,
       state,
       inbox: {} as any,

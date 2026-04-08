@@ -38,7 +38,7 @@ describe('ToolMaskingProcessor', () => {
     });
 
     const result = await processor.process({
-      buffer: {} as any,
+      buffer: {} as unknown as import('../pipeline.js').ContextWorkingBuffer,
       targets: [toolStep],
       state,
       inbox: {} as any,
@@ -78,7 +78,7 @@ describe('ToolMaskingProcessor', () => {
     });
 
     const result = await processor.process({
-      buffer: {} as any,
+      buffer: {} as unknown as import('../pipeline.js').ContextWorkingBuffer,
       targets: [toolStep],
       state,
       inbox: {} as any,

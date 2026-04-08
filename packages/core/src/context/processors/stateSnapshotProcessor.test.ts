@@ -20,7 +20,7 @@ describe('StateSnapshotProcessor', () => {
     const targets = [createDummyNode('ep1', 'USER_PROMPT')];
     const inbox = new InboxSnapshotImpl([]);
 
-    const result = await processor.process({ buffer: {} as any, targets, state, inbox });
+    const result = await processor.process({ buffer: {} as unknown as import('../pipeline.js').ContextWorkingBuffer, targets, state, inbox });
     expect(result).toBe(targets); // Strict equality
   });
 
@@ -48,12 +48,12 @@ describe('StateSnapshotProcessor', () => {
       }
     ]);
 
-    const result = await processor.process({ buffer: {} as any, targets, state, inbox });
+    const result = await processor.process({ buffer: {} as unknown as import('../pipeline.js').ContextWorkingBuffer, targets, state, inbox });
 
     // Should remove A and B, insert Snapshot, keep C
     expect(result.length).toBe(2);
     expect(result[0].type).toBe('SNAPSHOT');
-    expect((result[0] as any).text).toBe('<compressed A and B>');
+    expect((result[0] as Snapshot).text).toBe('<compressed A and B>');
     expect(result[1].id).toBe('node-C');
 
     // Should consume the message
@@ -82,7 +82,7 @@ describe('StateSnapshotProcessor', () => {
       }
     ]);
 
-    const result = await processor.process({ buffer: {} as any, targets, state, inbox });
+    const result = await processor.process({ buffer: {} as unknown as import('../pipeline.js').ContextWorkingBuffer, targets, state, inbox });
 
     // Because deficit is 0, and Inbox was rejected, nothing should change
     expect(result.length).toBe(1);
@@ -101,12 +101,12 @@ describe('StateSnapshotProcessor', () => {
     const targets = [nodeA, nodeB, nodeC];
     const inbox = new InboxSnapshotImpl([]);
 
-    const result = await processor.process({ buffer: {} as any, targets, state, inbox });
+    const result = await processor.process({ buffer: {} as unknown as import('../pipeline.js').ContextWorkingBuffer, targets, state, inbox });
 
     // Should synthesize a new snapshot synchronously
     expect(env.llmClient.generateContent).toHaveBeenCalled();
     expect(result.length).toBe(2); // nodeA is skipped as "system prompt", snapshot + nodeA
     expect(result[1].type).toBe('SNAPSHOT');
-    expect((result[1] as any).text).toBe('Mock LLM summary response');
+    expect((result[1] as Snapshot).text).toBe('Mock LLM summary response');
   });
 });

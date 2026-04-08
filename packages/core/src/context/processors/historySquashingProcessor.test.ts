@@ -51,7 +51,7 @@ describe('HistorySquashingProcessor', () => {
     const targets = [prompt, thought, yieldNode];
 
     const result = await processor.process({
-      buffer: {} as any,
+      buffer: {} as unknown as import('../pipeline.js').ContextWorkingBuffer,
       targets,
       state,
       inbox: {} as any,
@@ -114,7 +114,7 @@ describe('HistorySquashingProcessor', () => {
     const targets = [prompt, thought];
 
     const result = await processor.process({
-      buffer: {} as any,
+      buffer: {} as unknown as import('../pipeline.js').ContextWorkingBuffer,
       targets,
       state,
       inbox: {} as any,

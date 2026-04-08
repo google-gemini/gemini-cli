@@ -4,10 +4,10 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 import type { ContextProcessor, ProcessArgs } from '../pipeline.js';
+import type { ConcreteNode } from '../ir/types.js';
 import type { ContextEnvironment } from '../sidecar/environment.js';
 import { debugLogger } from '../../utils/debugLogger.js';
 import { getResponseText } from '../../utils/partUtils.js';
-import type { ConcreteNode, UserPrompt, AgentThought, ToolExecution } from '../ir/types.js';
 
 export interface SemanticCompressionProcessorOptions {
   nodeThresholdTokens: number;
@@ -52,13 +52,13 @@ export class SemanticCompressionProcessor implements ContextProcessor {
     try {
       const response = await this.env.llmClient.generateContent(
         {
-          role: 'user' as any,
-          modelConfigKey: 'default' as any,
+          role: 'utility_compressor' as import('../../telemetry/llmRole.js').LlmRole,
+          modelConfigKey: { model: 'default' },
           promptId: this.env.promptId,
           abortSignal: new AbortController().signal,
           contents: [
             {
-              role: 'user' as any,
+              role: 'user',
               parts: [{ text }],
             },
           ],
@@ -123,7 +123,14 @@ export class SemanticCompressionProcessor implements ContextProcessor {
         }
 
         if (modified) {
-           const newTokens = this.env.tokenCalculator.estimateTokensForParts(newParts as any);
+           const newTokens = this.env.tokenCalculator.estimateTokensForParts(
+             newParts.map(p => {
+               if (p.type === 'text') return { text: p.text };
+               if (p.type === 'inline_data') return { inlineData: { mimeType: p.mimeType, data: p.data } };
+               if (p.type === 'file_data') return { fileData: { mimeType: p.mimeType, fileUri: p.fileUri } };
+               return (p as Extract<import('../ir/types.js').SemanticPart, { type: 'raw_part' }>).part;
+             })
+           );
            returnedNodes.push({
              ...prompt,
              id: this.env.idGenerator.generateId(),
@@ -150,7 +157,6 @@ export class SemanticCompressionProcessor implements ContextProcessor {
            const summary = await this.generateSummary(thought.text, 'Agent Thought');
            const newTokens = this.env.tokenCalculator.estimateTokensForParts([{ text: summary }]);
            const oldTokens = thought.metadata.currentTokens;
-           console.log(`Agent Thought compression: newTokens=${newTokens}, oldTokens=${oldTokens}`);
 
            if (newTokens < oldTokens) {
              currentDeficit -= (oldTokens - newTokens);

@@ -37,7 +37,7 @@ export class StateSnapshotProcessor implements ContextProcessor, ContextWorker {
   }
 
   // --- ContextWorker Interface (Proactive Accumulation) ---
-  async execute({ targets, inbox }: { targets: readonly ConcreteNode[]; inbox: import('../pipeline.js').InboxSnapshot }): Promise<void> {
+  async execute({ targets: _targets, inbox: _inbox }: { targets: readonly ConcreteNode[]; inbox: import('../pipeline.js').InboxSnapshot }): Promise<void> {
     
     // We only care about nodes that have aged out past retainedTokens
     // To calculate this precisely, we'd need the ContextAccountingState, but for V0
@@ -187,13 +187,22 @@ Output ONLY the raw factual snapshot, formatted compactly. Do not include markdo
 
     let userPromptText = 'TRANSCRIPT TO SNAPSHOT:\n\n';
     for (const node of nodes) {
-        userPromptText += `[${node.type}]: ${(node as any).text || JSON.stringify((node as any).semanticParts)}\n`;
+        let nodeContent = '';
+        if ('text' in node && typeof node.text === 'string') {
+            nodeContent = node.text;
+        } else if ('semanticParts' in node) {
+            nodeContent = JSON.stringify(node.semanticParts);
+        } else if ('observation' in node) {
+            nodeContent = typeof node.observation === 'string' ? node.observation : JSON.stringify(node.observation);
+        }
+        
+        userPromptText += `[${node.type}]: ${nodeContent}\n`;
     }
 
     const response = await this.env.llmClient.generateContent({
-        role: 'user' as any,
-        modelConfigKey: 'default' as any,
-        contents: [{ role: 'user' as any, parts: [{ text: userPromptText }] }],
+        role: 'utility_state_snapshot_processr' as import('../../telemetry/llmRole.js').LlmRole,
+        modelConfigKey: { model: 'default' },
+        contents: [{ role: 'user', parts: [{ text: userPromptText }] }],
         systemInstruction: { role: 'system', parts: [{ text: systemPrompt }] },
         promptId: this.env.promptId,
         abortSignal: new AbortController().signal,

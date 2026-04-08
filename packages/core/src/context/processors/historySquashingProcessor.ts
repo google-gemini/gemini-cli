@@ -6,7 +6,7 @@
 import type { ContextProcessor, ProcessArgs } from '../pipeline.js';
 import type { ContextEnvironment } from '../sidecar/environment.js';
 import { truncateProportionally } from '../truncation.js';
-import type { ConcreteNode, UserPrompt, AgentThought, AgentYield } from '../ir/types.js';
+import type { ConcreteNode } from '../ir/types.js';
 
 export interface HistorySquashingProcessorOptions {
   maxTokensPerNode: number;
@@ -109,7 +109,14 @@ export class HistorySquashingProcessor implements ContextProcessor {
         }
 
         if (modified) {
-          const newTokens = this.env.tokenCalculator.estimateTokensForParts(newParts as any);
+          const newTokens = this.env.tokenCalculator.estimateTokensForParts(
+             newParts.map(p => {
+               if (p.type === 'text') return { text: p.text };
+               if (p.type === 'inline_data') return { inlineData: { mimeType: p.mimeType, data: p.data } };
+               if (p.type === 'file_data') return { fileData: { mimeType: p.mimeType, fileUri: p.fileUri } };
+               return (p as Extract<import('../ir/types.js').SemanticPart, { type: 'raw_part' }>).part;
+             })
+          );
           returnedNodes.push({
             ...prompt,
             id: this.env.idGenerator.generateId(),

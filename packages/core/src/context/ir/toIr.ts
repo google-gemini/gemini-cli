@@ -112,7 +112,7 @@ function parseToolResponses(
   currentEpisode: Partial<Episode> | null,
   pendingCallParts: Map<string, Part>,
   tokenCalculator: ContextTokenCalculator,
-  createMetadata: (parts: Part[]) => IrMetadata,
+  _createMetadata: (parts: Part[]) => IrMetadata,
 ): Partial<Episode> {
   if (!currentEpisode) {
     currentEpisode = {
@@ -164,7 +164,7 @@ function parseToolResponses(
 
 function parseUserParts(
   msg: Content,
-  createMetadata: (parts: Part[]) => IrMetadata,
+  _createMetadata: (parts: Part[]) => IrMetadata,
 ): Partial<Episode> {
   const semanticParts: SemanticPart[] = [];
   for (const p of msg.parts!) {
@@ -190,7 +190,7 @@ function parseUserParts(
     id: getStableId(msg.parts![0] || msg),
     type: 'USER_PROMPT',
     semanticParts,
-    metadata: createMetadata(msg.parts!.filter((p) => !p.functionResponse)),
+    metadata: _createMetadata(msg.parts!.filter((p) => !p.functionResponse)),
   };
 
   return {
@@ -204,7 +204,7 @@ function parseModelParts(
   msg: Content,
   currentEpisode: Partial<Episode> | null,
   pendingCallParts: Map<string, Part>,
-  createMetadata: (parts: Part[]) => IrMetadata,
+  _createMetadata: (parts: Part[]) => IrMetadata,
 ): Partial<Episode> {
   if (!currentEpisode) {
     currentEpisode = {
@@ -223,7 +223,7 @@ function parseModelParts(
         id: getStableId(part),
         type: 'AGENT_THOUGHT',
         text: part.text,
-        metadata: createMetadata([part]),
+        metadata: _createMetadata([part]),
       };
       currentEpisode.concreteNodes = [
         ...(currentEpisode.concreteNodes || []),
@@ -246,8 +246,7 @@ function finalizeYield(currentEpisode: Partial<Episode>) {
         transformations: [],
       },
     };
-    const existingNodes =
-      currentEpisode.concreteNodes as Array<import('./types.js').ConcreteNode>;
+    const existingNodes = currentEpisode.concreteNodes || [];
     currentEpisode.concreteNodes = [...existingNodes, yieldNode];
   }
 }
