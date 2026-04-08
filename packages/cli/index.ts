@@ -113,7 +113,12 @@ async function run() {
       });
 
       return new Promise<number>((resolve) => {
-        child.on('error', () => resolve(1));
+        child.on('error', (err) => {
+          process.stderr.write(
+            'Error: Failed to start child process: ' + err.message + '\n',
+          );
+          resolve(1);
+        });
         child.on('close', (code) => {
           process.stdin.resume();
           resolve(code ?? 1);
