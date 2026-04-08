@@ -305,6 +305,53 @@ describe('Server Config (config.ts)', () => {
       });
       expect(config.getMaxAttempts()).toBe(DEFAULT_MAX_ATTEMPTS);
     });
+
+    it('should use experiment flag if present and valid', () => {
+      const config = new Config({
+        ...baseParams,
+        experiments: {
+          flags: {
+            [ExperimentFlags.MAX_ATTEMPTS]: {
+              intValue: '15',
+            },
+          },
+          experimentIds: [],
+        },
+      });
+      expect(config.getMaxAttempts()).toBe(15);
+    });
+
+    it('should fallback to maxAttempts if experiment flag is invalid', () => {
+      const config = new Config({
+        ...baseParams,
+        maxAttempts: 5,
+        experiments: {
+          flags: {
+            [ExperimentFlags.MAX_ATTEMPTS]: {
+              intValue: 'abc',
+            },
+          },
+          experimentIds: [],
+        },
+      });
+      expect(config.getMaxAttempts()).toBe(5);
+    });
+
+    it('should fallback to maxAttempts if experiment flag is non-positive', () => {
+      const config = new Config({
+        ...baseParams,
+        maxAttempts: 5,
+        experiments: {
+          flags: {
+            [ExperimentFlags.MAX_ATTEMPTS]: {
+              intValue: '0',
+            },
+          },
+          experimentIds: [],
+        },
+      });
+      expect(config.getMaxAttempts()).toBe(5);
+    });
   });
 
   beforeEach(() => {

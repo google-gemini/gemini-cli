@@ -3318,6 +3318,14 @@ export class Config implements McpContext, AgentLoopContext {
   }
 
   getMaxAttempts(): number {
+    const flagVal =
+      this.experiments?.flags?.[ExperimentFlags.MAX_ATTEMPTS]?.intValue;
+    if (flagVal !== undefined) {
+      const parsed = parseInt(flagVal, 10);
+      if (!isNaN(parsed) && parsed > 0) {
+        return parsed;
+      }
+    }
     return this.maxAttempts;
   }
 

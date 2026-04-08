@@ -36,8 +36,6 @@ import {
   createAvailabilityContextProvider,
 } from '../availability/policyHelpers.js';
 
-const DEFAULT_MAX_ATTEMPTS = 5;
-
 /**
  * Options for the generateJson utility function.
  */
@@ -328,7 +326,9 @@ export class BaseLlmClient {
       return await retryWithBackoff(apiCall, {
         shouldRetryOnContent,
         maxAttempts:
-          availabilityMaxAttempts ?? maxAttempts ?? DEFAULT_MAX_ATTEMPTS,
+          availabilityMaxAttempts ??
+          maxAttempts ??
+          this.config.getMaxAttempts(),
         getAvailabilityContext,
         onPersistent429: this.config.isInteractive()
           ? (authType, error) =>
@@ -339,7 +339,9 @@ export class BaseLlmClient {
         retryFetchErrors: this.config.getRetryFetchErrors(),
         onRetry: (attempt, error, delayMs) => {
           const actualMaxAttempts =
-            availabilityMaxAttempts ?? maxAttempts ?? DEFAULT_MAX_ATTEMPTS;
+            availabilityMaxAttempts ??
+            maxAttempts ??
+            this.config.getMaxAttempts();
           const modelName = getDisplayString(currentModel);
           const errorType = getRetryErrorType(error);
 
