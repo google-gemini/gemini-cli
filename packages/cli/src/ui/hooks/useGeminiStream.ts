@@ -390,7 +390,6 @@ export const useGeminiStream = (
     backgroundTaskCount,
     isBackgroundTaskVisible,
     toggleBackgroundTasks,
-    showBackgroundShell,
     backgroundCurrentExecution,
     registerBackgroundTask,
     dismissBackgroundTask,
@@ -1918,7 +1917,6 @@ export const useGeminiStream = (
             backgroundedTool.command,
             backgroundedTool.initialOutput,
           );
-          showBackgroundShell();
         }
       }
 
@@ -2058,7 +2056,6 @@ export const useGeminiStream = (
       modelSwitchedFromQuotaError,
       addItem,
       registerBackgroundTask,
-      showBackgroundShell,
       consumeUserHint,
       isLowErrorVerbosity,
       maybeAddSuppressedToolErrorNote,

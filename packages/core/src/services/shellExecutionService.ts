@@ -105,7 +105,6 @@ export interface ShellExecutionConfig {
   backgroundCompletionBehavior?: 'inject' | 'notify' | 'silent';
   originalCommand?: string;
   sessionId?: string;
-  autoPromoteTimeoutMs?: number;
 }
 
 /**
@@ -890,21 +889,6 @@ export class ShellExecutionService {
         sessionId: shellExecutionConfig.sessionId,
       });
 
-      let autoPromoteTimer: NodeJS.Timeout | undefined;
-      const resetAutoPromoteTimer = () => {
-        if (shellExecutionConfig.autoPromoteTimeoutMs !== undefined) {
-          if (autoPromoteTimer) clearTimeout(autoPromoteTimer);
-          autoPromoteTimer = setTimeout(() => {
-            ShellExecutionService.background(
-              ptyPid,
-              shellExecutionConfig.sessionId,
-            );
-          }, shellExecutionConfig.autoPromoteTimeoutMs);
-        }
-      };
-
-      resetAutoPromoteTimer();
-
       const result = ExecutionLifecycleService.attachExecution(ptyPid, {
         executionMethod: ptyInfo?.name ?? 'node-pty',
         writeInput: (input) => {
@@ -1082,7 +1066,6 @@ export class ShellExecutionService {
       });
 
       const handleOutput = (data: Buffer) => {
-        resetAutoPromoteTimer();
         processingChain = processingChain.then(
           () =>
             new Promise<void>((resolveChunk) => {
@@ -1152,7 +1135,6 @@ export class ShellExecutionService {
 
       ptyProcess.onExit(
         ({ exitCode, signal }: { exitCode: number; signal?: number }) => {
-          if (autoPromoteTimer) clearTimeout(autoPromoteTimer);
           exited = true;
           abortSignal.removeEventListener('abort', abortHandler);
           // Attempt to destroy the PTY to ensure FD is closed
@@ -1238,7 +1220,6 @@ export class ShellExecutionService {
       );
 
       const abortHandler = async () => {
-        if (autoPromoteTimer) clearTimeout(autoPromoteTimer);
         if (ptyProcess.pid && !exited) {
           await killProcessGroup({
             pid: ptyPid,
@@ -1415,28 +1396,6 @@ export class ShellExecutionService {
     listener: (event: ShellOutputEvent) => void,
   ): () => void {
     return ExecutionLifecycleService.subscribe(pid, listener);
-  }
-
-  /**
-   * Reads the current rendered screen state of a running process.
-   * Returns the full terminal buffer text for PTY processes,
-   * or the accumulated output for child processes.
-   *
-   * @param pid The process ID of the target process.
-   * @returns The screen text, or null if the process is not found.
-   */
-  static readScreen(pid: number): string | null {
-    const activePty = this.activePtys.get(pid);
-    if (activePty) {
-      return getFullBufferText(activePty.headlessTerminal);
-    }
-
-    const activeChild = this.activeChildProcesses.get(pid);
-    if (activeChild) {
-      return activeChild.state.output;
-    }
-
-    return null;
   }
 
   /**

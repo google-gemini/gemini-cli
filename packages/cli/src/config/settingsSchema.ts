@@ -1512,26 +1512,6 @@ const SETTINGS_SCHEMA = {
               { label: 'Notify', value: 'notify' },
             ],
           },
-          interactiveShellMode: {
-            type: 'enum',
-            label: 'Interactive Shell Mode',
-            category: 'Tools',
-            requiresRestart: true,
-            default: undefined as 'human' | 'ai' | 'off' | undefined,
-            description: oneLine`
-              Controls who can interact with backgrounded shell processes.
-              "human": user can Tab-focus and type into shells (default).
-              "ai": model gets write_to_shell/read_shell tools for TUI interaction.
-              "off": no interactive shell.
-              When set, overrides enableInteractiveShell.
-            `,
-            showInDialog: true,
-            options: [
-              { value: 'human', label: 'Human (Tab to focus)' },
-              { value: 'ai', label: 'AI (model-driven tools)' },
-              { value: 'off', label: 'Off' },
-            ],
-          },
           pager: {
             type: 'string',
             label: 'Pager',

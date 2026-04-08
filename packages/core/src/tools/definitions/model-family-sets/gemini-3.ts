@@ -344,13 +344,11 @@ export const GEMINI_3_SET: CoreToolSet = {
     enableInteractiveShell,
     enableEfficiency,
     enableToolSandboxing,
-    interactiveShellMode,
   ) =>
     getShellDeclaration(
       enableInteractiveShell,
       enableEfficiency,
       enableToolSandboxing,
-      interactiveShellMode,
     ),
 
   replace: {
