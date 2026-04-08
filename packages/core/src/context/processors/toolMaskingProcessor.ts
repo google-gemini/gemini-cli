@@ -1,3 +1,8 @@
+/**
+ * @license
+ * Copyright 2026 Google LLC
+ * SPDX-License-Identifier: Apache-2.0
+ */
 import type { ContextProcessor, ProcessArgs } from '../pipeline.js';
 import type { ConcreteNode, ToolExecution } from '../ir/types.js';
 import type { ContextEnvironment } from '../sidecar/environment.js';
@@ -91,7 +96,7 @@ export class ToolMaskingProcessor implements ContextProcessor {
     return text.includes('<tool_output_masked>');
   }
 
-  async process({ targets, state }: ProcessArgs): Promise<ReadonlyArray<ConcreteNode>> {
+  async process({ targets, state }: ProcessArgs): Promise<readonly ConcreteNode[]> {
     const maskingConfig = this.options;
     if (!maskingConfig) return targets;
     if (state.isBudgetSatisfied) return targets;
@@ -148,7 +153,7 @@ export class ToolMaskingProcessor implements ContextProcessor {
         continue;
       }
 
-      const step = node as ToolExecution;
+      const step = node;
       const toolName = step.toolName;
       if (toolName && UNMASKABLE_TOOLS.has(toolName)) {
         returnedNodes.push(node);

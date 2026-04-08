@@ -1,3 +1,8 @@
+/**
+ * @license
+ * Copyright 2026 Google LLC
+ * SPDX-License-Identifier: Apache-2.0
+ */
 import type { InboxMessage, InboxSnapshot } from '../pipeline.js';
 
 export class LiveInbox {
@@ -12,7 +17,7 @@ export class LiveInbox {
     });
   }
 
-  getMessages(): ReadonlyArray<InboxMessage> {
+  getMessages(): readonly InboxMessage[] {
     return [...this.messages];
   }
 
@@ -22,10 +27,10 @@ export class LiveInbox {
 }
 
 export class InboxSnapshotImpl implements InboxSnapshot {
-  private messages: ReadonlyArray<InboxMessage>;
+  private messages: readonly InboxMessage[];
   private consumedIds = new Set<string>();
 
-  constructor(messages: ReadonlyArray<InboxMessage>) {
+  constructor(messages: readonly InboxMessage[]) {
     this.messages = messages;
   }
 

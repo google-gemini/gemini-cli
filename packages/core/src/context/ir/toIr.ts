@@ -159,7 +159,7 @@ function parseToolResponses(
       if (callId) pendingCallParts.delete(callId);
     }
   }
-  return currentEpisode as Partial<Episode>;
+  return currentEpisode;
 }
 
 function parseUserParts(
@@ -231,7 +231,7 @@ function parseModelParts(
       ];
     }
   }
-  return currentEpisode as Partial<Episode>;
+  return currentEpisode;
 }
 
 function finalizeYield(currentEpisode: Partial<Episode>) {
@@ -247,7 +247,7 @@ function finalizeYield(currentEpisode: Partial<Episode>) {
       },
     };
     const existingNodes =
-      currentEpisode.concreteNodes as import('./types.js').ConcreteNode[];
+      currentEpisode.concreteNodes as Array<import('./types.js').ConcreteNode>;
     currentEpisode.concreteNodes = [...existingNodes, yieldNode];
   }
 }

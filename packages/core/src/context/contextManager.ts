@@ -20,8 +20,8 @@ import { ProcessorRegistry } from './sidecar/registry.js';
 
 export class ContextManager {
   // The stateful, pristine flat graph.
-  private pristineShip: ReadonlyArray<ConcreteNode> = [];
-  private currentShip: ReadonlyArray<ConcreteNode> = [];
+  private pristineShip: readonly ConcreteNode[] = [];
+  private currentShip: readonly ConcreteNode[] = [];
   private readonly eventBus: ContextEventBus;
 
   // Internal sub-components
@@ -154,7 +154,7 @@ export class ContextManager {
    * Useful for internal tool rendering (like the trace viewer).
    * Note: This is an expensive, deep clone operation.
    */
-  getPristineGraph(): ReadonlyArray<ConcreteNode> {
+  getPristineGraph(): readonly ConcreteNode[] {
     return [...this.pristineShip];
   }
 
@@ -163,7 +163,7 @@ export class ContextManager {
    * up to the configured token budget.
    * This is the view that will eventually be projected back to the LLM.
    */
-  getShip(): ReadonlyArray<ConcreteNode> {
+  getShip(): readonly ConcreteNode[] {
     return [...this.currentShip];
   }
 

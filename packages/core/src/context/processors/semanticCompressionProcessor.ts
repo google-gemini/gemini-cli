@@ -1,3 +1,8 @@
+/**
+ * @license
+ * Copyright 2026 Google LLC
+ * SPDX-License-Identifier: Apache-2.0
+ */
 import type { ContextProcessor, ProcessArgs } from '../pipeline.js';
 import type { ContextEnvironment } from '../sidecar/environment.js';
 import { debugLogger } from '../../utils/debugLogger.js';
@@ -74,7 +79,7 @@ export class SemanticCompressionProcessor implements ContextProcessor {
     }
   }
 
-  async process({ targets, state }: ProcessArgs): Promise<ReadonlyArray<ConcreteNode>> {
+  async process({ targets, state }: ProcessArgs): Promise<readonly ConcreteNode[]> {
     if (state.isBudgetSatisfied) {
       return targets;
     }
@@ -95,7 +100,7 @@ export class SemanticCompressionProcessor implements ContextProcessor {
 
       // 1. Compress User Prompts
       if (node.type === 'USER_PROMPT') {
-        const prompt = node as UserPrompt;
+        const prompt = node;
         let modified = false;
         const newParts = [...prompt.semanticParts];
 
@@ -140,7 +145,7 @@ export class SemanticCompressionProcessor implements ContextProcessor {
 
       // 2. Compress Model Thoughts
       if (node.type === 'AGENT_THOUGHT') {
-        const thought = node as AgentThought;
+        const thought = node;
         if (thought.text.length > thresholdChars) {
            const summary = await this.generateSummary(thought.text, 'Agent Thought');
            const newTokens = this.env.tokenCalculator.estimateTokensForParts([{ text: summary }]);
@@ -171,7 +176,7 @@ export class SemanticCompressionProcessor implements ContextProcessor {
 
       // 3. Compress Tool Observations
       if (node.type === 'TOOL_EXECUTION') {
-         const tool = node as ToolExecution;
+         const tool = node;
          const rawObs = tool.observation;
 
          let stringifiedObs = '';

@@ -1,3 +1,8 @@
+/**
+ * @license
+ * Copyright 2026 Google LLC
+ * SPDX-License-Identifier: Apache-2.0
+ */
 import { describe, it, expect, vi } from 'vitest';
 import { ToolMaskingProcessor } from './toolMaskingProcessor.js';
 import {

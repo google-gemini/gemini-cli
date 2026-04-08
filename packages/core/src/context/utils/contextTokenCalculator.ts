@@ -36,7 +36,7 @@ export class ContextTokenCalculator {
    * Calculates the total token count for a flat array of ConcreteNodes (The Ship).
    * This is fast because it relies on pre-computed metadata where available.
    */
-  calculateConcreteListTokens(ship: ReadonlyArray<ConcreteNode>): number {
+  calculateConcreteListTokens(ship: readonly ConcreteNode[]): number {
     let tokens = 0;
     for (const node of ship) {
        tokens += node.metadata.currentTokens;

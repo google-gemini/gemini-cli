@@ -1,3 +1,8 @@
+/**
+ * @license
+ * Copyright 2026 Google LLC
+ * SPDX-License-Identifier: Apache-2.0
+ */
 import type { ProcessArgs, ContextProcessor } from '../pipeline.js';
 import type { ConcreteNode, UserPrompt } from '../ir/types.js';
 import type { ContextEnvironment } from '../sidecar/environment.js';
@@ -22,7 +27,7 @@ export class BlobDegradationProcessor implements ContextProcessor {
     this.env = env;
   }
 
-  async process({ targets, state }: ProcessArgs): Promise<ReadonlyArray<ConcreteNode>> {
+  async process({ targets, state }: ProcessArgs): Promise<readonly ConcreteNode[]> {
     if (state.isBudgetSatisfied) {
       return targets;
     }
@@ -58,7 +63,7 @@ export class BlobDegradationProcessor implements ContextProcessor {
         continue;
       }
 
-      const prompt = node as UserPrompt;
+      const prompt = node;
       let modified = false;
       const newParts = [...prompt.semanticParts];
 

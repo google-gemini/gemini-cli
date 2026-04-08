@@ -1,3 +1,8 @@
+/**
+ * @license
+ * Copyright 2026 Google LLC
+ * SPDX-License-Identifier: Apache-2.0
+ */
 import type { ContextProcessor, ProcessArgs, BackstopTargetOptions, ContextWorker } from '../pipeline.js';
 import type { ContextEnvironment } from '../sidecar/environment.js';
 import type { ConcreteNode, Snapshot } from '../ir/types.js';
@@ -32,7 +37,7 @@ export class StateSnapshotProcessor implements ContextProcessor, ContextWorker {
   }
 
   // --- ContextWorker Interface (Proactive Accumulation) ---
-  async execute({ targets, inbox }: { targets: ReadonlyArray<ConcreteNode>; inbox: import('../pipeline.js').InboxSnapshot }): Promise<void> {
+  async execute({ targets, inbox }: { targets: readonly ConcreteNode[]; inbox: import('../pipeline.js').InboxSnapshot }): Promise<void> {
     
     // We only care about nodes that have aged out past retainedTokens
     // To calculate this precisely, we'd need the ContextAccountingState, but for V0
@@ -46,7 +51,7 @@ export class StateSnapshotProcessor implements ContextProcessor, ContextWorker {
   }
 
   // --- ContextProcessor Interface (Sync Backstop / Cache Application) ---
-  async process({ targets, state, inbox }: ProcessArgs): Promise<ReadonlyArray<ConcreteNode>> {
+  async process({ targets, state, inbox }: ProcessArgs): Promise<readonly ConcreteNode[]> {
     if (state.isBudgetSatisfied) {
       return targets;
     }

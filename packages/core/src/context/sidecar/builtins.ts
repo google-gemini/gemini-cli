@@ -1,4 +1,9 @@
-import { ProcessorRegistry } from './registry.js';
+/**
+ * @license
+ * Copyright 2026 Google LLC
+ * SPDX-License-Identifier: Apache-2.0
+ */
+import type { ProcessorRegistry } from './registry.js';
 import { EmergencyTruncationProcessor, type EmergencyTruncationProcessorOptions } from '../processors/emergencyTruncationProcessor.js';
 import { BlobDegradationProcessor } from '../processors/blobDegradationProcessor.js';
 import { HistorySquashingProcessor, type HistorySquashingProcessorOptions } from '../processors/historySquashingProcessor.js';

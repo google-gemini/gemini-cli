@@ -58,7 +58,7 @@ export class PipelineOrchestrator {
           const instance = factory.create(
             this.env,
             procDef.options || {},
-          ) as ContextProcessor;
+          );
           this.instantiatedProcessors.set(procDef.processorId, instance);
         }
       }
@@ -153,10 +153,10 @@ export class PipelineOrchestrator {
   }
 
   applyProcessorDiff(
-    ship: ReadonlyArray<ConcreteNode>,
-    targets: ReadonlyArray<ConcreteNode>,
-    returnedNodes: ReadonlyArray<ConcreteNode>,
-  ): ReadonlyArray<ConcreteNode> {
+    ship: readonly ConcreteNode[],
+    targets: readonly ConcreteNode[],
+    returnedNodes: readonly ConcreteNode[],
+  ): readonly ConcreteNode[] {
     const mutableShip = [...ship];
     const targetSet = new Set(targets.map((n) => n.id));
     const returnedMap = new Map(returnedNodes.map((n) => [n.id, n]));
@@ -204,10 +204,10 @@ export class PipelineOrchestrator {
 
   async executeTriggerSync(
     trigger: PipelineTrigger,
-    ship: ReadonlyArray<ConcreteNode>,
+    ship: readonly ConcreteNode[],
     triggerTargets: ReadonlySet<string>,
     state: ContextAccountingState,
-  ): Promise<ReadonlyArray<ConcreteNode>> {
+  ): Promise<readonly ConcreteNode[]> {
     let currentShip = ship;
     const pipelines = this.config.pipelines.filter((p) =>
       p.triggers.includes(trigger),
@@ -262,7 +262,7 @@ export class PipelineOrchestrator {
 
   private async executePipelineAsync(
     pipeline: PipelineDef,
-    ship: ReadonlyArray<ConcreteNode>,
+    ship: readonly ConcreteNode[],
     triggerTargets: Set<string>,
     state: ContextAccountingState,
   ) {

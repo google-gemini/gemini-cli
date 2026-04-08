@@ -1,3 +1,8 @@
+/**
+ * @license
+ * Copyright 2026 Google LLC
+ * SPDX-License-Identifier: Apache-2.0
+ */
 import type { ContextProcessor, ProcessArgs } from '../pipeline.js';
 import type { ContextEnvironment } from '../sidecar/environment.js';
 import { truncateProportionally } from '../truncation.js';
@@ -67,7 +72,7 @@ export class HistorySquashingProcessor implements ContextProcessor {
     return null;
   }
 
-  async process({ targets, state }: ProcessArgs): Promise<ReadonlyArray<ConcreteNode>> {
+  async process({ targets, state }: ProcessArgs): Promise<readonly ConcreteNode[]> {
     if (state.isBudgetSatisfied) {
       return targets;
     }
@@ -86,7 +91,7 @@ export class HistorySquashingProcessor implements ContextProcessor {
 
       // 1. Squash User Prompts
       if (node.type === 'USER_PROMPT') {
-        const prompt = node as UserPrompt;
+        const prompt = node;
         let modified = false;
         const newParts = [...prompt.semanticParts];
 
@@ -126,7 +131,7 @@ export class HistorySquashingProcessor implements ContextProcessor {
 
       // 2. Squash Model Thoughts
       if (node.type === 'AGENT_THOUGHT') {
-        const thought = node as AgentThought;
+        const thought = node;
         const squashResult = this.tryApplySquash(thought.text, limitChars, currentDeficit);
         
         if (squashResult) {
@@ -152,7 +157,7 @@ export class HistorySquashingProcessor implements ContextProcessor {
 
       // 3. Squash Agent Yields
       if (node.type === 'AGENT_YIELD') {
-        const agentYield = node as AgentYield;
+        const agentYield = node;
         const squashResult = this.tryApplySquash(agentYield.text, limitChars, currentDeficit);
 
         if (squashResult) {

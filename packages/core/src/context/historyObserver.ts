@@ -45,7 +45,7 @@ export class HistoryObserver {
           this.tokenCalculator,
         );
 
-        const ship: import('./ir/types.js').ConcreteNode[] = [];
+        const ship: Array<import('./ir/types.js').ConcreteNode> = [];
         for (const ep of pristineEpisodes) {
           if (ep.concreteNodes) {
             for (const child of ep.concreteNodes) {

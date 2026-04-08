@@ -54,7 +54,7 @@ export interface ContextWorker {
     onInboxTopics?: string[];
   };
   execute(args: {
-    targets: ReadonlyArray<ConcreteNode>;
+    targets: readonly ConcreteNode[];
     inbox: InboxSnapshot;
   }): Promise<void>;
 }

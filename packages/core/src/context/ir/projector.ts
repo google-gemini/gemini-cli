@@ -21,7 +21,7 @@ export class IrProjector {
    * applies the Immediate Sanitization pipeline, and enforces token boundaries.
    */
   static async project(
-    ship: ReadonlyArray<ConcreteNode>,
+    ship: readonly ConcreteNode[],
     orchestrator: PipelineOrchestrator,
     sidecar: SidecarConfig,
     tracer: ContextTracer,
