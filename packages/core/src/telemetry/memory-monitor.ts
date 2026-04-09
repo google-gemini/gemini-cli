@@ -6,6 +6,7 @@
 
 import v8 from 'node:v8';
 import process from 'node:process';
+import { monitorEventLoopDelay } from 'node:perf_hooks';
 import type { Config } from '../config/config.js';
 import { bytesToMB } from '../utils/formatters.js';
 import { isUserActive } from './activity-detector.js';
@@ -14,6 +15,7 @@ import {
   recordMemoryUsage,
   MemoryMetricType,
   isPerformanceMonitoringActive,
+  recordEventLoopDelay,
 } from './metrics.js';
 import { RateLimiter } from './rate-limiter.js';
 
@@ -40,6 +42,8 @@ export class MemoryMonitor {
   private monitoringInterval: number = 10000;
   private highWaterMarkTracker: HighWaterMarkTracker;
   private rateLimiter: RateLimiter;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  private eventLoopHistogram: any = null;
   private useEnhancedMonitoring: boolean = true;
   private lastCleanupTimestamp: number = Date.now();
 
@@ -62,6 +66,9 @@ export class MemoryMonitor {
 
     this.monitoringInterval = intervalMs;
     this.isRunning = true;
+
+    this.eventLoopHistogram = monitorEventLoopDelay({ resolution: 10 });
+    this.eventLoopHistogram.enable();
 
     // Take initial snapshot
     this.takeSnapshot('monitoring_start', config);
@@ -149,6 +156,11 @@ export class MemoryMonitor {
       this.intervalId = null;
     }
 
+    if (this.eventLoopHistogram) {
+      this.eventLoopHistogram.disable();
+      this.eventLoopHistogram = null;
+    }
+
     // Take final snapshot if config is provided
     if (config) {
       this.takeSnapshot('monitoring_stop', config);
@@ -191,6 +203,30 @@ export class MemoryMonitor {
         memory_type: MemoryMetricType.RSS,
         component: context,
       });
+
+      if (this.eventLoopHistogram) {
+        const p50 = this.eventLoopHistogram.percentile(50) / 1e6;
+        const p95 = this.eventLoopHistogram.percentile(95) / 1e6;
+        const p99 = this.eventLoopHistogram.percentile(99) / 1e6;
+        const max = this.eventLoopHistogram.max / 1e6;
+
+        recordEventLoopDelay(config, p50, {
+          percentile: 'p50',
+          component: context,
+        });
+        recordEventLoopDelay(config, p95, {
+          percentile: 'p95',
+          component: context,
+        });
+        recordEventLoopDelay(config, p99, {
+          percentile: 'p99',
+          component: context,
+        });
+        recordEventLoopDelay(config, max, {
+          percentile: 'max',
+          component: context,
+        });
+      }
     }
 
     this.lastSnapshot = snapshot;

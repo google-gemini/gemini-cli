@@ -50,6 +50,10 @@ export interface PerfSnapshot {
   eventLoopDelayP95Ms: number;
   eventLoopDelayP99Ms: number;
   eventLoopDelayMaxMs: number;
+  childEventLoopDelayP50Ms?: number;
+  childEventLoopDelayP95Ms?: number;
+  childEventLoopDelayP99Ms?: number;
+  childEventLoopDelayMaxMs?: number;
 }
 
 /**
@@ -377,7 +381,16 @@ export class PerfTestHarness {
 
       if (result.median.eventLoopDelayP99Ms > 0) {
         lines.push(
-          `  Event loop: p50=${result.median.eventLoopDelayP50Ms.toFixed(1)}ms p95=${result.median.eventLoopDelayP95Ms.toFixed(1)}ms p99=${result.median.eventLoopDelayP99Ms.toFixed(1)}ms max=${result.median.eventLoopDelayMaxMs.toFixed(1)}ms`,
+          `  Event loop (runner): p50=${result.median.eventLoopDelayP50Ms.toFixed(1)}ms p95=${result.median.eventLoopDelayP95Ms.toFixed(1)}ms p99=${result.median.eventLoopDelayP99Ms.toFixed(1)}ms max=${result.median.eventLoopDelayMaxMs.toFixed(1)}ms`,
+        );
+      }
+
+      if (
+        result.median.childEventLoopDelayP99Ms !== undefined &&
+        result.median.childEventLoopDelayP99Ms > 0
+      ) {
+        lines.push(
+          `  Event loop (CLI):    p50=${result.median.childEventLoopDelayP50Ms!.toFixed(1)}ms p95=${result.median.childEventLoopDelayP95Ms!.toFixed(1)}ms p99=${result.median.childEventLoopDelayP99Ms!.toFixed(1)}ms max=${result.median.childEventLoopDelayMaxMs!.toFixed(1)}ms`,
         );
       }
 

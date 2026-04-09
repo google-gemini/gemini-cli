@@ -133,6 +133,7 @@ export {
   recordStartupPerformance,
   recordMemoryUsage,
   recordCpuUsage,
+  recordEventLoopDelay,
   recordToolQueueDepth,
   recordToolExecutionBreakdown,
   recordTokenEfficiency,

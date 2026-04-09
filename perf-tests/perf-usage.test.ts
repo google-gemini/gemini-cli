@@ -34,7 +34,7 @@ describe('CPU Performance Tests', () => {
   afterAll(async () => {
     // Generate the summary report after all tests
     await harness.generateReport();
-  });
+  }, 30000);
 
   it('cold-startup-time: startup completes within baseline', async () => {
     const result = await harness.runScenario('cold-startup-time', async () => {
@@ -162,17 +162,20 @@ describe('CPU Performance Tests', () => {
             fakeResponsesPath: join(__dirname, 'perf.high-volume.responses'),
           });
 
-          const snapshot = await harness.measure(
+          const snapshot = await harness.measureWithEventLoop(
             'high-volume-output',
             async () => {
-              await rig.run({
+              const runResult = await rig.run({
                 args: ['Generate 1M lines of output'],
                 timeout: 120000,
                 env: {
                   GEMINI_API_KEY: 'fake-perf-test-key',
                   GEMINI_TELEMETRY_ENABLED: 'true',
+                  GEMINI_MEMORY_MONITOR_INTERVAL: '500',
+                  DEBUG: 'true',
                 },
               });
+              console.log(`  Child Process Output:`, runResult);
             },
           );
 
@@ -195,6 +198,7 @@ describe('CPU Performance Tests', () => {
           const memoryMetric = rig.readMetric('memory.usage');
           const cpuMetric = rig.readMetric('cpu.usage');
           const toolLatencyMetric = rig.readMetric('tool.call.latency');
+          const eventLoopMetric = rig.readMetric('event_loop.delay');
 
           if (memoryMetric) {
             console.log(
@@ -210,6 +214,43 @@ describe('CPU Performance Tests', () => {
               `  CLI Tool Latency Metric found:`,
               JSON.stringify(toolLatencyMetric),
             );
+          }
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          const logs = (rig as any)._readAndParseTelemetryLog();
+          console.log(`  Total telemetry log entries: ${logs.length}`);
+          for (const logData of logs) {
+            if (logData.scopeMetrics) {
+              for (const scopeMetric of logData.scopeMetrics) {
+                for (const metric of scopeMetric.metrics) {
+                  if (metric.descriptor.name.includes('event_loop')) {
+                    console.log(
+                      `  Found event_loop metric in log:`,
+                      metric.descriptor.name,
+                    );
+                  }
+                }
+              }
+            }
+          }
+
+          if (eventLoopMetric) {
+            console.log(
+              `  CLI Event Loop Metric found:`,
+              JSON.stringify(eventLoopMetric),
+            );
+
+            const findValue = (percentile: string) => {
+              const dp = eventLoopMetric.dataPoints.find(
+                // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                (p: any) => p.attributes.percentile === percentile,
+              );
+              return dp ? dp.value.min : undefined;
+            };
+
+            snapshot.childEventLoopDelayP50Ms = findValue('p50');
+            snapshot.childEventLoopDelayP95Ms = findValue('p95');
+            snapshot.childEventLoopDelayP99Ms = findValue('p99');
+            snapshot.childEventLoopDelayMaxMs = findValue('max');
           }
 
           return snapshot;
