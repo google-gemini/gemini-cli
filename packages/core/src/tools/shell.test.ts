@@ -768,6 +768,46 @@ describe('ShellTool', () => {
       const shellTool = new ShellTool(mockConfig, createMockMessageBus());
       expect(shellTool.description).not.toContain('Efficiency Guidelines:');
     });
+
+    it('should return the command if description is not provided', () => {
+      const invocation = shellTool.build({
+        command: 'echo "hello"',
+      });
+      expect(invocation.getDescription()).toBe('echo "hello"');
+    });
+
+    it('should return the command if it is short (<= 150 chars), even if description is provided', () => {
+      const invocation = shellTool.build({
+        command: 'echo "hello"',
+        description: 'Prints a friendly greeting.',
+      });
+      expect(invocation.getDescription()).toBe('echo "hello"');
+    });
+
+    it('should return the description if the command is long (> 150 chars)', () => {
+      const longCommand = 'echo "hello" && '.repeat(15) + 'echo "world"'; // Length > 150
+      const invocation = shellTool.build({
+        command: longCommand,
+        description: 'Prints multiple greetings.',
+      });
+      expect(invocation.getDescription()).toBe('Prints multiple greetings.');
+    });
+
+    it('should return the raw command if description is an empty string', () => {
+      const invocation = shellTool.build({
+        command: 'echo hello',
+        description: '',
+      });
+      expect(invocation.getDescription()).toBe('echo hello');
+    });
+
+    it('should return the raw command if description is just whitespace', () => {
+      const invocation = shellTool.build({
+        command: 'echo hello',
+        description: '   ',
+      });
+      expect(invocation.getDescription()).toBe('echo hello');
+    });
   });
 
   describe('getDisplayTitle and getExplanation', () => {
@@ -800,32 +840,6 @@ describe('ShellTool', () => {
       expect(invocation.getExplanation?.()).toBe(
         `[current working directory ${process.cwd()}]`,
       );
-    });
-  });
-
-  describe('invocation getDescription', () => {
-    it('should return the description if it is present and not empty whitespace', () => {
-      const invocation = shellTool.build({
-        command: 'echo hello',
-        description: 'prints hello',
-      });
-      expect(invocation.getDescription()).toBe('prints hello');
-    });
-
-    it('should return the raw command if description is an empty string', () => {
-      const invocation = shellTool.build({
-        command: 'echo hello',
-        description: '',
-      });
-      expect(invocation.getDescription()).toBe('echo hello');
-    });
-
-    it('should return the raw command if description is just whitespace', () => {
-      const invocation = shellTool.build({
-        command: 'echo hello',
-        description: '   ',
-      });
-      expect(invocation.getDescription()).toBe('echo hello');
     });
   });
 

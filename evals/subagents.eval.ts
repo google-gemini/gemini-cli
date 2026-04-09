@@ -81,6 +81,8 @@ describe('subagent eval test cases', () => {
    * This tests the system prompt's subagent specific clauses.
    */
   evalTest('USUALLY_PASSES', {
+    suiteName: 'default',
+    suiteType: 'behavioral',
     name: 'should delegate to user provided agent with relevant expertise',
     params: {
       settings: {
@@ -105,6 +107,8 @@ describe('subagent eval test cases', () => {
    * subagents are available. This helps catch orchestration overuse.
    */
   evalTest('USUALLY_PASSES', {
+    suiteName: 'default',
+    suiteType: 'behavioral',
     name: 'should avoid delegating trivial direct edit work',
     params: {
       settings: {
@@ -145,6 +149,8 @@ describe('subagent eval test cases', () => {
    * This is meant to codify the "overusing Generalist" failure mode.
    */
   evalTest('USUALLY_PASSES', {
+    suiteName: 'default',
+    suiteType: 'behavioral',
     name: 'should prefer relevant specialist over generalist',
     params: {
       settings: {
@@ -179,6 +185,8 @@ describe('subagent eval test cases', () => {
    * naturally spans docs and tests, so multiple specialists should be used.
    */
   evalTest('USUALLY_PASSES', {
+    suiteName: 'default',
+    suiteType: 'behavioral',
     name: 'should use multiple relevant specialists for multi-surface task',
     params: {
       settings: {
@@ -220,6 +228,8 @@ describe('subagent eval test cases', () => {
    * from a large pool of available subagents (10 total).
    */
   evalTest('USUALLY_PASSES', {
+    suiteName: 'default',
+    suiteType: 'behavioral',
     name: 'should select the correct subagent from a pool of 10 different agents',
     prompt: 'Please add a new SQL table migration for a user profile.',
     files: {
@@ -266,6 +276,8 @@ describe('subagent eval test cases', () => {
    * This test includes stress tests the subagent delegation with ~80 tools.
    */
   evalTest('USUALLY_PASSES', {
+    suiteName: 'default',
+    suiteType: 'behavioral',
     name: 'should select the correct subagent from a pool of 10 different agents with MCP tools present',
     prompt: 'Please add a new SQL table migration for a user profile.',
     setup: async (rig) => {
