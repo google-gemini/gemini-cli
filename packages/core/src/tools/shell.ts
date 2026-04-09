@@ -46,7 +46,7 @@ import {
   stripShellWrapper,
   parseCommandDetails,
   hasRedirection,
-  isNakedSensitiveCommand,
+  isArgumentRestrictedCommand,
   normalizeCommand,
 } from '../utils/shell-utils.js';
 import { buildParamArgsPattern } from '../policy/utils.js';
@@ -238,11 +238,10 @@ export class ShellToolInvocation extends BaseToolInvocation<
       const segments = getCommandSegments(command);
       const allowRedirection = hasRedirection(command) ? true : undefined;
 
-      // Filter out "naked" sensitive commands to prevent over-broad matching
+      // Filter out "naked" restricted commands to prevent over-broad matching
       const safeSegments = segments.filter(
-        (seg) => !isNakedSensitiveCommand(seg),
+        (seg) => !isArgumentRestrictedCommand(seg),
       );
-
       if (safeSegments.length > 0) {
         return { commandPrefix: safeSegments, allowRedirection };
       }

@@ -28,7 +28,7 @@ vi.mock('../utils/shell-utils.js', () => ({
   getCommandSegments: vi.fn(),
   stripShellWrapper: vi.fn(),
   hasRedirection: vi.fn(),
-  isNakedSensitiveCommand: vi.fn(),
+  isArgumentRestrictedCommand: vi.fn(),
 }));
 interface ParsedPolicy {
   rule?: Array<{
@@ -261,7 +261,7 @@ describe('ShellToolInvocation Policy Update', () => {
       (c: string) => c,
     );
     vi.mocked(shellUtils.hasRedirection).mockReturnValue(false);
-    vi.mocked(shellUtils.isNakedSensitiveCommand).mockReturnValue(false);
+    vi.mocked(shellUtils.isArgumentRestrictedCommand).mockReturnValue(false);
   });
 
   it('should extract multiple command segments for chained commands', () => {
