@@ -420,7 +420,7 @@ describe('keyMatchers', () => {
     },
     {
       command: Command.CYCLE_APPROVAL_MODE,
-      positive: [createKey('tab', { shift: true })],
+      positive: [createKey('tab', { shift: true }), createKey('f10')],
       negative: [createKey('tab')],
     },
     {
