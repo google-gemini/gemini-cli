@@ -23,8 +23,6 @@ export interface IrChunkReceivedEvent {
   targetNodeIds: Set<string>;
 }
 
-
-
 export class ContextEventBus extends EventEmitter {
   emitPristineHistoryUpdated(event: PristineHistoryUpdatedEvent) {
     this.emit('PRISTINE_HISTORY_UPDATED', event);

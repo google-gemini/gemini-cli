@@ -132,7 +132,7 @@ export class SimulationHarness {
         new Set(currentView.map((e) => e.id)),
         new Set<string>(),
       );
-      
+
       // In the real system, ContextManager triggers this and retains it.
       // We will emulate that behavior internally in the test loop for token counting.
       currentView = modifiedView;

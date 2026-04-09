@@ -23,10 +23,7 @@ import type { Config } from '../../config/config.js';
 import type { BaseLlmClient } from '../../core/baseLlmClient.js';
 import type { Content, GenerateContentResponse } from '@google/genai';
 import { InboxSnapshotImpl } from '../sidecar/inbox.js';
-import type {
-  InboxMessage,
-  ProcessArgs,
-} from '../pipeline.js';
+import type { InboxMessage, ProcessArgs } from '../pipeline.js';
 
 /**
  * Creates a valid mock GenerateContentResponse with the provided text.
@@ -184,7 +181,9 @@ export function createMockProcessArgs(
 ): ProcessArgs {
   return {
     targets,
-    buffer: ContextWorkingBufferImpl.initialize(bufferNodes.length ? bufferNodes : targets),
+    buffer: ContextWorkingBufferImpl.initialize(
+      bufferNodes.length ? bufferNodes : targets,
+    ),
     inbox: new InboxSnapshotImpl(inboxMessages),
   };
 }

@@ -54,9 +54,7 @@ describe('System Lifecycle Golden Tests', () => {
         ],
       },
     ],
-    workers: [
-      { workerId: 'StateSnapshotWorker' }
-    ]
+    workers: [{ workerId: 'StateSnapshotWorker' }],
   });
 
   const mockLlmClient = createMockLlmClient([
@@ -146,9 +144,9 @@ describe('System Lifecycle Golden Tests', () => {
     const generousConfig: SidecarConfig = {
       budget: { maxTokens: 100000, retainedTokens: 50000 },
       pipelines: [], // No triggers
-      workers: []
+      workers: [],
     };
-    
+
     const harness = await SimulationHarness.create(
       generousConfig,
       mockLlmClient,
@@ -167,7 +165,7 @@ describe('System Lifecycle Golden Tests', () => {
     ]);
 
     const goldenState = await harness.getGoldenState();
-    
+
     // Total tokens should cleanly match character count with no synthetic nodes
     expect(goldenState).toMatchSnapshot();
   });
@@ -177,14 +175,11 @@ describe('System Lifecycle Golden Tests', () => {
       budget: { maxTokens: 200, retainedTokens: 100 },
       pipelines: [], // No standard pipelines
       workers: [
-        { workerId: 'StateSnapshotWorker' } // This should fire on chunk events
-      ]
+        { workerId: 'StateSnapshotWorker' }, // This should fire on chunk events
+      ],
     };
-    
-    const harness = await SimulationHarness.create(
-      gcConfig,
-      mockLlmClient,
-    );
+
+    const harness = await SimulationHarness.create(gcConfig, mockLlmClient);
 
     // Turn 0
     await harness.simulateTurn([
@@ -208,7 +203,7 @@ describe('System Lifecycle Golden Tests', () => {
     ]);
 
     const goldenState = await harness.getGoldenState();
-    
+
     // We should see ROLLING_SUMMARY nodes injected into the graph, proving the worker ran in the background
     expect(goldenState).toMatchSnapshot();
   });

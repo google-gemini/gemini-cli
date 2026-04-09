@@ -5,10 +5,7 @@
  */
 
 import type { ConcreteNode } from '../ir/types.js';
-import type {
-  ContextProcessor,
-  ContextWorker,
-} from '../pipeline.js';
+import type { ContextProcessor, ContextWorker } from '../pipeline.js';
 import type { SidecarConfig, PipelineDef, PipelineTrigger } from './types.js';
 import type {
   ContextEnvironment,

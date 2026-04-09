@@ -43,7 +43,12 @@ class ModifyingProcessor implements ContextProcessor {
           text: newParts[0].text + ' [modified]',
         };
       }
-      newTargets[0] = { ...prompt, id: prompt.id + '-modified', replacesId: prompt.id, semanticParts: newParts };
+      newTargets[0] = {
+        ...prompt,
+        id: prompt.id + '-modified',
+        replacesId: prompt.id,
+        semanticParts: newParts,
+      };
     }
     return newTargets;
   }

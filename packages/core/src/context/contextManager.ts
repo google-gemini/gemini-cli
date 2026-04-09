@@ -18,9 +18,10 @@ import { ContextWorkingBufferImpl } from './sidecar/contextWorkingBuffer.js';
 
 export class ContextManager {
   // The master state containing the pristine graph and current active graph.
-  private buffer: ContextWorkingBufferImpl = ContextWorkingBufferImpl.initialize([]);
+  private buffer: ContextWorkingBufferImpl =
+    ContextWorkingBufferImpl.initialize([]);
   private pristineNodes: readonly ConcreteNode[] = [];
-  
+
   private readonly eventBus: ContextEventBus;
 
   // Internal sub-components
@@ -48,10 +49,10 @@ export class ContextManager {
 
     this.eventBus.onPristineHistoryUpdated((event) => {
       this.pristineNodes = event.nodes;
-      
+
       const existingIds = new Set(this.buffer.nodes.map((n) => n.id));
       const addedNodes = event.nodes.filter((n) => !existingIds.has(n.id));
-      
+
       if (addedNodes.length > 0) {
         this.buffer = this.buffer.appendPristineNodes(addedNodes);
       }

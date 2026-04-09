@@ -10,10 +10,10 @@ import type { ConcreteNode } from '../ir/types.js';
 export class ContextWorkingBufferImpl implements ContextWorkingBuffer {
   // The current active graph
   readonly nodes: readonly ConcreteNode[];
-  
+
   // The AOT pre-calculated provenance index (Current ID -> Pristine IDs)
   private readonly provenanceMap: ReadonlyMap<string, ReadonlySet<string>>;
-  
+
   // The original immutable pristine nodes mapping
   private readonly pristineNodesMap: ReadonlyMap<string, ConcreteNode>;
 
@@ -24,7 +24,7 @@ export class ContextWorkingBufferImpl implements ContextWorkingBuffer {
     nodes: readonly ConcreteNode[],
     pristineNodesMap: ReadonlyMap<string, ConcreteNode>,
     provenanceMap: ReadonlyMap<string, ReadonlySet<string>>,
-    history: readonly GraphMutation[]
+    history: readonly GraphMutation[],
   ) {
     this.nodes = nodes;
     this.pristineNodesMap = pristineNodesMap;
@@ -36,20 +36,22 @@ export class ContextWorkingBufferImpl implements ContextWorkingBuffer {
    * Initializes a brand new ContextWorkingBuffer from a pristine graph.
    * Every node's provenance points to itself.
    */
-  static initialize(pristineNodes: readonly ConcreteNode[]): ContextWorkingBufferImpl {
+  static initialize(
+    pristineNodes: readonly ConcreteNode[],
+  ): ContextWorkingBufferImpl {
     const pristineMap = new Map<string, ConcreteNode>();
     const initialProvenance = new Map<string, ReadonlySet<string>>();
-    
+
     for (const node of pristineNodes) {
       pristineMap.set(node.id, node);
       initialProvenance.set(node.id, new Set([node.id]));
     }
-    
+
     return new ContextWorkingBufferImpl(
       pristineNodes,
       pristineMap,
       initialProvenance,
-      [] // Empty history
+      [], // Empty history
     );
   }
 
@@ -57,12 +59,14 @@ export class ContextWorkingBufferImpl implements ContextWorkingBuffer {
    * Appends newly observed pristine nodes (e.g. from a user message) to the working buffer.
    * Ensures they are tracked in the pristine map and point to themselves in provenance.
    */
-  appendPristineNodes(newNodes: readonly ConcreteNode[]): ContextWorkingBufferImpl {
+  appendPristineNodes(
+    newNodes: readonly ConcreteNode[],
+  ): ContextWorkingBufferImpl {
     if (newNodes.length === 0) return this;
 
     const newPristineMap = new Map<string, ConcreteNode>(this.pristineNodesMap);
     const newProvenanceMap = new Map(this.provenanceMap);
-    
+
     for (const node of newNodes) {
       newPristineMap.set(node.id, node);
       newProvenanceMap.set(node.id, new Set([node.id]));
@@ -72,7 +76,7 @@ export class ContextWorkingBufferImpl implements ContextWorkingBuffer {
       [...this.nodes, ...newNodes],
       newPristineMap,
       newProvenanceMap,
-      [...this.history]
+      [...this.history],
     );
   }
 
@@ -80,17 +84,19 @@ export class ContextWorkingBufferImpl implements ContextWorkingBuffer {
    * Generates an entirely new buffer instance by calculating the delta between the processor's input and output.
    */
   applyProcessorResult(
-    processorId: string, 
-    inputTargets: readonly ConcreteNode[], 
-    outputNodes: readonly ConcreteNode[]
+    processorId: string,
+    inputTargets: readonly ConcreteNode[],
+    outputNodes: readonly ConcreteNode[],
   ): ContextWorkingBufferImpl {
-    const outputIds = new Set(outputNodes.map(n => n.id));
-    const inputIds = new Set(inputTargets.map(n => n.id));
+    const outputIds = new Set(outputNodes.map((n) => n.id));
+    const inputIds = new Set(inputTargets.map((n) => n.id));
 
     // Calculate diffs
-    const removedIds = inputTargets.filter(n => !outputIds.has(n.id)).map(n => n.id);
-    const addedNodes = outputNodes.filter(n => !inputIds.has(n.id));
-    
+    const removedIds = inputTargets
+      .filter((n) => !outputIds.has(n.id))
+      .map((n) => n.id);
+    const addedNodes = outputNodes.filter((n) => !inputIds.has(n.id));
+
     // Create mutation record
     const mutation: GraphMutation = {
       processorId,
@@ -101,17 +107,17 @@ export class ContextWorkingBufferImpl implements ContextWorkingBuffer {
 
     // Calculate new node array
     const removedSet = new Set(removedIds);
-    const retainedNodes = this.nodes.filter(n => !removedSet.has(n.id));
+    const retainedNodes = this.nodes.filter((n) => !removedSet.has(n.id));
     const newGraph = [...retainedNodes];
-    
-    // We append the output nodes in the same general position if possible, 
+
+    // We append the output nodes in the same general position if possible,
     // but in a complex graph we just ensure they exist. V2 graph uses timestamps for order.
     // For simplicity, we just push added nodes to the end of the retained array
     newGraph.push(...addedNodes);
 
     // Calculate new provenance map
     const newProvenanceMap = new Map(this.provenanceMap);
-    
+
     let finalPristineMap = this.pristineNodesMap;
 
     // Map the new synthetic nodes back to their pristine roots
@@ -155,14 +161,16 @@ export class ContextWorkingBufferImpl implements ContextWorkingBuffer {
       newGraph,
       finalPristineMap,
       newProvenanceMap,
-      [...this.history, mutation]
+      [...this.history, mutation],
     );
   }
 
   getPristineNodes(id: string): readonly ConcreteNode[] {
     const pristineIds = this.provenanceMap.get(id);
     if (!pristineIds) return [];
-    return Array.from(pristineIds).map(pid => this.pristineNodesMap.get(pid)!);
+    return Array.from(pristineIds).map(
+      (pid) => this.pristineNodesMap.get(pid)!,
+    );
   }
 
   getAuditLog(): readonly GraphMutation[] {
@@ -171,8 +179,8 @@ export class ContextWorkingBufferImpl implements ContextWorkingBuffer {
 
   getLineage(id: string): readonly ConcreteNode[] {
     const lineage: ConcreteNode[] = [];
-    const currentNodesMap = new Map(this.nodes.map(n => [n.id, n]));
-    
+    const currentNodesMap = new Map(this.nodes.map((n) => [n.id, n]));
+
     let current = currentNodesMap.get(id);
     while (current) {
       lineage.push(current);

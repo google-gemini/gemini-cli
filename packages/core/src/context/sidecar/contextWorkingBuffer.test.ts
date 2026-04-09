@@ -10,29 +10,57 @@ import { createDummyNode } from '../testing/contextTestUtils.js';
 
 describe('ContextWorkingBufferImpl', () => {
   it('should initialize with a pristine graph correctly', () => {
-    const pristine1 = createDummyNode('ep1', 'USER_PROMPT', 10, undefined, 'p1');
-    const pristine2 = createDummyNode('ep1', 'AGENT_THOUGHT', 10, undefined, 'p2');
-    
+    const pristine1 = createDummyNode(
+      'ep1',
+      'USER_PROMPT',
+      10,
+      undefined,
+      'p1',
+    );
+    const pristine2 = createDummyNode(
+      'ep1',
+      'AGENT_THOUGHT',
+      10,
+      undefined,
+      'p2',
+    );
+
     const buffer = ContextWorkingBufferImpl.initialize([pristine1, pristine2]);
-    
+
     expect(buffer.nodes).toHaveLength(2);
     expect(buffer.getAuditLog()).toHaveLength(0);
-    
+
     // Pristine nodes should point to themselves
     expect(buffer.getPristineNodes('p1')).toEqual([pristine1]);
     expect(buffer.getPristineNodes('p2')).toEqual([pristine2]);
   });
 
   it('should track 1:1 replacements (e.g., masking) and append to audit log', () => {
-    const pristine1 = createDummyNode('ep1', 'USER_PROMPT', 10, undefined, 'p1');
+    const pristine1 = createDummyNode(
+      'ep1',
+      'USER_PROMPT',
+      10,
+      undefined,
+      'p1',
+    );
     let buffer = ContextWorkingBufferImpl.initialize([pristine1]);
 
-    const maskedNode = createDummyNode('ep1', 'USER_PROMPT', 5, undefined, 'm1');
+    const maskedNode = createDummyNode(
+      'ep1',
+      'USER_PROMPT',
+      5,
+      undefined,
+      'm1',
+    );
     // Simulate what a processor does
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     (maskedNode as any).replacesId = 'p1';
 
-    buffer = buffer.applyProcessorResult('ToolMasking', [pristine1], [maskedNode]);
+    buffer = buffer.applyProcessorResult(
+      'ToolMasking',
+      [pristine1],
+      [maskedNode],
+    );
 
     expect(buffer.nodes).toHaveLength(1);
     expect(buffer.nodes[0].id).toBe('m1');
@@ -51,17 +79,23 @@ describe('ContextWorkingBufferImpl', () => {
     const p1 = createDummyNode('ep1', 'USER_PROMPT', 10, undefined, 'p1');
     const p2 = createDummyNode('ep1', 'AGENT_THOUGHT', 10, undefined, 'p2');
     const p3 = createDummyNode('ep1', 'USER_PROMPT', 10, undefined, 'p3');
-    
+
     let buffer = ContextWorkingBufferImpl.initialize([p1, p2, p3]);
 
-    const summaryNode = createDummyNode('ep1', 'ROLLING_SUMMARY', 15, undefined, 's1');
+    const summaryNode = createDummyNode(
+      'ep1',
+      'ROLLING_SUMMARY',
+      15,
+      undefined,
+      's1',
+    );
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     (summaryNode as any).abstractsIds = ['p1', 'p2'];
 
     buffer = buffer.applyProcessorResult('Summarizer', [p1, p2], [summaryNode]);
 
     // p1 and p2 are removed, p3 remains, s1 is added
-    expect(buffer.nodes.map(n => n.id)).toEqual(['p3', 's1']);
+    expect(buffer.nodes.map((n) => n.id)).toEqual(['p3', 's1']);
 
     // Provenance lookup: The summary node should resolve to both p1 and p2!
     const roots = buffer.getPristineNodes('s1');
@@ -81,7 +115,13 @@ describe('ContextWorkingBufferImpl', () => {
     buffer = buffer.applyProcessorResult('Masking', [p1], [gen1]);
 
     // Gen 2: Summarized
-    const gen2 = createDummyNode('ep1', 'ROLLING_SUMMARY', 5, undefined, 'gen2');
+    const gen2 = createDummyNode(
+      'ep1',
+      'ROLLING_SUMMARY',
+      5,
+      undefined,
+      'gen2',
+    );
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     (gen2 as any).abstractsIds = ['gen1'];
     buffer = buffer.applyProcessorResult('Summarizer', [gen1], [gen2]);
@@ -103,12 +143,18 @@ describe('ContextWorkingBufferImpl', () => {
     const p1 = createDummyNode('ep1', 'USER_PROMPT', 10, undefined, 'p1');
     let buffer = ContextWorkingBufferImpl.initialize([p1]);
 
-    const injected = createDummyNode('ep1', 'SYSTEM_EVENT', 5, undefined, 'injected1');
+    const injected = createDummyNode(
+      'ep1',
+      'SYSTEM_EVENT',
+      5,
+      undefined,
+      'injected1',
+    );
     // No replacesId or abstractsIds
 
     buffer = buffer.applyProcessorResult('Injector', [], [injected]);
 
-    expect(buffer.nodes.map(n => n.id)).toEqual(['p1', 'injected1']);
+    expect(buffer.nodes.map((n) => n.id)).toEqual(['p1', 'injected1']);
 
     // It should root to itself
     expect(buffer.getPristineNodes('injected1')).toEqual([injected]);
