@@ -145,8 +145,23 @@ export class MessageBus extends EventEmitter {
   subscribe<T extends Message>(
     type: T['type'],
     listener: (message: T) => void,
+    options?: { signal?: AbortSignal },
   ): void {
     this.on(type, listener);
+
+    if (options?.signal) {
+      const signal = options.signal;
+      if (signal.aborted) {
+        this.off(type, listener);
+        return;
+      }
+
+      const abortHandler = () => {
+        this.off(type, listener);
+        signal.removeEventListener('abort', abortHandler);
+      };
+      signal.addEventListener('abort', abortHandler);
+    }
   }
 
   unsubscribe<T extends Message>(

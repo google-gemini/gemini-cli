@@ -93,8 +93,7 @@ const createErrorResponse = (
  * Coordinates execution via state updates and event listening.
  */
 export class Scheduler {
-  // Tracks which MessageBus instances have the legacy listener attached to prevent duplicates.
-  private static subscribedMessageBuses = new WeakSet<MessageBus>();
+  private readonly disposeController = new AbortController();
 
   private readonly state: SchedulerStateManager;
   private readonly executor: ToolExecutor;
@@ -136,6 +135,7 @@ export class Scheduler {
 
   dispose(): void {
     coreEvents.off(CoreEvent.McpProgress, this.handleMcpProgress);
+    this.disposeController.abort();
   }
 
   private readonly handleMcpProgress = (payload: McpProgressPayload) => {
@@ -164,10 +164,6 @@ export class Scheduler {
   };
 
   private setupMessageBusListener(messageBus: MessageBus): void {
-    if (Scheduler.subscribedMessageBuses.has(messageBus)) {
-      return;
-    }
-
     // TODO: Optimize policy checks. Currently, tools check policy via
     // MessageBus even though the Scheduler already checked it.
     messageBus.subscribe(
@@ -180,9 +176,8 @@ export class Scheduler {
           requiresUserConfirmation: true,
         });
       },
+      { signal: this.disposeController.signal },
     );
-
-    Scheduler.subscribedMessageBuses.add(messageBus);
   }
 
   /**
