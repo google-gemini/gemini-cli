@@ -324,7 +324,20 @@ export class WindowsSandboxManager implements SandboxManager {
       writableRoots.push(allowedPath);
     }
 
-    // 4. Additional write paths (e.g. from internal __write command)
+    // 4. Git worktree paths
+    if (resolvedPaths.gitWorktree) {
+      const { worktreeGitDir, mainGitDir } = resolvedPaths.gitWorktree;
+      if (worktreeGitDir) {
+        await this.grantLowIntegrityAccess(worktreeGitDir);
+        writableRoots.push(worktreeGitDir);
+      }
+      if (mainGitDir) {
+        await this.grantLowIntegrityAccess(mainGitDir);
+        writableRoots.push(mainGitDir);
+      }
+    }
+
+    // 5. Additional write paths (e.g. from internal __write command)
     for (const writePath of resolvedPaths.policyWrite) {
       try {
         await fs.promises.access(writePath, fs.constants.F_OK);

@@ -339,4 +339,24 @@ describe.skipIf(os.platform() === 'win32')('buildBwrapArgs', () => {
     const envIndex = args.indexOf(`${includeDir}/.env`);
     expect(args[envIndex - 2]).toBe('--bind');
   });
+
+  it('binds git worktree directories if present', async () => {
+    const worktreeGitDir = '/path/to/worktree/.git';
+    const mainGitDir = '/path/to/main/.git';
+
+    const args = await buildBwrapArgs({
+      ...defaultOptions,
+      resolvedPaths: createResolvedPaths({
+        gitWorktree: {
+          worktreeGitDir,
+          mainGitDir,
+        },
+      }),
+    });
+
+    expect(args).toContain(worktreeGitDir);
+    expect(args).toContain(mainGitDir);
+    expect(args[args.indexOf(worktreeGitDir) - 1]).toBe('--ro-bind-try');
+    expect(args[args.indexOf(mainGitDir) - 1]).toBe('--ro-bind-try');
+  });
 });

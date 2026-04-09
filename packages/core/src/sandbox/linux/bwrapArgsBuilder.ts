@@ -11,7 +11,7 @@ import {
   getSecretFileFindArgs,
   type ResolvedSandboxPaths,
 } from '../../services/sandboxManager.js';
-import { resolveGitWorktreePaths, isErrnoException } from '../utils/fsUtils.js';
+import { isErrnoException } from '../utils/fsUtils.js';
 import { spawnAsync } from '../../utils/shell-utils.js';
 import { debugLogger } from '../../utils/debugLogger.js';
 
@@ -70,14 +70,14 @@ export async function buildBwrapArgs(
     bwrapArgs.push(bindFlag, workspace.resolved, workspace.resolved);
   }
 
-  const { worktreeGitDir, mainGitDir } = resolveGitWorktreePaths(
-    workspace.resolved,
-  );
-  if (worktreeGitDir) {
-    bwrapArgs.push(bindFlag, worktreeGitDir, worktreeGitDir);
-  }
-  if (mainGitDir) {
-    bwrapArgs.push(bindFlag, mainGitDir, mainGitDir);
+  if (resolvedPaths.gitWorktree) {
+    const { worktreeGitDir, mainGitDir } = resolvedPaths.gitWorktree;
+    if (worktreeGitDir) {
+      bwrapArgs.push(bindFlag, worktreeGitDir, worktreeGitDir);
+    }
+    if (mainGitDir) {
+      bwrapArgs.push(bindFlag, mainGitDir, mainGitDir);
+    }
   }
 
   for (const includeDir of resolvedPaths.globalIncludes) {
