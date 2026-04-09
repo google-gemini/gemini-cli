@@ -188,7 +188,7 @@ export class PromptProvider {
           () => ({
             interactive: interactiveMode,
             planModeToolsList,
-            plansDir: context.config.storage.getPlansDir(),
+            plansDir: context.config.getPlansDir(),
             approvedPlanPath: context.config.getApprovedPlanPath(),
           }),
           isPlanMode,

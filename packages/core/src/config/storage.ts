@@ -12,13 +12,11 @@ import {
   GEMINI_DIR,
   homedir,
   GOOGLE_ACCOUNTS_FILENAME,
-  isSubpath,
   resolveToRealPath,
   normalizePath,
 } from '../utils/paths.js';
 import { ProjectRegistry } from './projectRegistry.js';
 import { StorageMigration } from './storageMigration.js';
-
 export const OAUTH_FILE = 'oauth_creds.json';
 const TMP_DIR_NAME = 'tmp';
 const BIN_DIR_NAME = 'bin';
@@ -32,10 +30,16 @@ export class Storage {
   private projectIdentifier: string | undefined;
   private initPromise: Promise<void> | undefined;
   private customPlansDir: string | undefined;
+  private readonly realProjectRoot: string;
 
   constructor(targetDir: string, sessionId?: string) {
     this.targetDir = targetDir;
     this.sessionId = sessionId;
+    this.realProjectRoot = resolveToRealPath(targetDir);
+  }
+
+  getRealProjectRoot(): string {
+    return this.realProjectRoot;
   }
 
   setCustomPlansDir(dir: string | undefined): void {
@@ -320,22 +324,10 @@ export class Storage {
     return path.join(this.getProjectTempDir(), 'tracker');
   }
 
-  getPlansDir(): string {
-    if (this.customPlansDir) {
-      const resolvedPath = path.resolve(
-        this.getProjectRoot(),
-        this.customPlansDir,
-      );
-      const realProjectRoot = resolveToRealPath(this.getProjectRoot());
-      const realResolvedPath = resolveToRealPath(resolvedPath);
-
-      if (!isSubpath(realProjectRoot, realResolvedPath)) {
-        throw new Error(
-          `Custom plans directory '${this.customPlansDir}' resolves to '${realResolvedPath}', which is outside the project root '${realProjectRoot}'.`,
-        );
-      }
-
-      return resolvedPath;
+  getPlansDir(extensionPlanDir?: string): string {
+    const customDir = extensionPlanDir || this.customPlansDir;
+    if (customDir) {
+      return path.resolve(this.getProjectRoot(), customDir);
     }
     return this.getProjectTempPlansDir();
   }

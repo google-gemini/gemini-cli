@@ -6,6 +6,9 @@
 
 import * as fs from 'node:fs';
 import * as path from 'node:path';
+import { LRUCache } from 'mnemonist';
+import { SecurityError } from '../core/errors.js';
+import { isSubpath, resolveToRealPath } from '../utils/paths.js';
 import { SandboxPolicyManager } from '../policy/sandboxPolicyManager.js';
 import { inspect } from 'node:util';
 import process from 'node:process';
@@ -168,7 +171,6 @@ import { SkillManager, type SkillDefinition } from '../skills/skillManager.js';
 import { startupProfiler } from '../telemetry/startupProfiler.js';
 import type { AgentDefinition } from '../agents/types.js';
 import { fetchAdminControls } from '../code_assist/admin/admin_controls.js';
-import { isSubpath, resolveToRealPath } from '../utils/paths.js';
 import { InjectionService } from './injectionService.js';
 import { ExecutionLifecycleService } from '../services/executionLifecycleService.js';
 import { WORKSPACE_POLICY_TIER } from '../policy/config.js';
@@ -711,6 +713,7 @@ export interface ConfigParameters {
   plan?: boolean;
   tracker?: boolean;
   planSettings?: PlanSettings;
+  extensionPlanDirs?: Record<string, string>;
   worktreeSettings?: WorktreeSettings;
   modelSteering?: boolean;
   onModelChange?: (model: string) => void;
@@ -774,6 +777,16 @@ export class Config implements McpContext, AgentLoopContext {
   private readonly extensionsEnabled: boolean;
   private mcpServers: Record<string, MCPServerConfig> | undefined;
   private readonly mcpEnablementCallbacks?: McpEnablementCallbacks;
+  /**
+   * The persistent context used to route tools (e.g. plans, tasks) to the correct
+   * extension directory.
+   * This is a persistent session state (similar to `approvalMode`). It remains active
+   * across multiple LLM turns until explicitly changed by another command.
+   */
+  private activeExtensionContext?: string;
+  private initializedPlanDirs = new Set<string>();
+  private globalGeminiDirCache = new LRUCache<string, string | undefined>(1);
+  private readonly extensionPlanDirs: Record<string, string>;
   private userMemory: string | HierarchicalMemory;
   private geminiMdFileCount: number;
   private geminiMdFilePaths: string[];
@@ -1038,6 +1051,7 @@ export class Config implements McpContext, AgentLoopContext {
     this.mcpServerCommand = params.mcpServerCommand;
     this.mcpServers = params.mcpServers;
     this.mcpEnablementCallbacks = params.mcpEnablementCallbacks;
+    this.extensionPlanDirs = params.extensionPlanDirs ?? {};
     this.mcpEnabled = params.mcpEnabled ?? true;
     this.extensionsEnabled = params.extensionsEnabled ?? true;
     this.allowedMcpServers = params.allowedMcpServers ?? [];
@@ -1407,20 +1421,6 @@ export class Config implements McpContext, AgentLoopContext {
     // Add pending directories to workspace context
     for (const dir of this.pendingIncludeDirectories) {
       this.workspaceContext.addDirectory(dir);
-    }
-
-    // Add plans directory to workspace context for plan file storage
-    if (this.planEnabled) {
-      const plansDir = this.storage.getPlansDir();
-      try {
-        await fs.promises.access(plansDir);
-        this.workspaceContext.addDirectory(plansDir);
-      } catch {
-        // Directory does not exist yet, so we don't add it to the workspace context.
-        // It will be created when the first plan is written. Since custom plan
-        // directories must be within the project root, they are automatically
-        // covered by the project-wide file discovery once created.
-      }
     }
 
     // Initialize centralized FileDiscoveryService
@@ -2250,6 +2250,121 @@ export class Config implements McpContext, AgentLoopContext {
 
   getMcpEnabled(): boolean {
     return this.mcpEnabled;
+  }
+
+  getActiveExtensionContext(): string | undefined {
+    return this.activeExtensionContext;
+  }
+
+  setActiveExtensionContext(context: string | undefined): void {
+    this.activeExtensionContext = context;
+  }
+
+  hasExtensionPlanDir(name: string): boolean {
+    return !!this.extensionPlanDirs[name];
+  }
+
+  getActiveExtensionPlanDir(): string | undefined {
+    const context = this.getActiveExtensionContext();
+    if (context) {
+      return this.extensionPlanDirs[context];
+    }
+    return undefined;
+  }
+
+  getPlansDir(): string {
+    const plansDir = this.storage.getPlansDir(this.getActiveExtensionPlanDir());
+
+    if (this.initializedPlanDirs.has(plansDir)) {
+      return plansDir;
+    }
+
+    const realProjectRoot = this.storage.getRealProjectRoot();
+    let realGlobalGeminiDir = this.globalGeminiDirCache.get('default');
+    if (!this.globalGeminiDirCache.has('default')) {
+      try {
+        realGlobalGeminiDir = resolveToRealPath(Storage.getGlobalGeminiDir());
+      } catch {
+        // If we can't securely resolve the global config dir (e.g. strict EACCES permissions on ~/),
+        // we gracefully degrade by not allowing it as a valid security boundary for plans.
+        realGlobalGeminiDir = undefined;
+      }
+      this.globalGeminiDirCache.set('default', realGlobalGeminiDir);
+    }
+
+    // 1. Lexical security check (before any filesystem mutation or return)
+    // We compare purely unresolved paths here to avoid static analyzer warnings about mixing resolved and unresolved paths.
+    // The physical security check happens AFTER mkdirSync.
+    const unresolvedProjectRoot = path.resolve(this.storage.getProjectRoot());
+    const unresolvedGlobalDir = path.resolve(Storage.getGlobalGeminiDir());
+    const unresolvedPlansDir = path.resolve(plansDir);
+
+    if (
+      !isSubpath(unresolvedProjectRoot, unresolvedPlansDir) &&
+      !isSubpath(unresolvedGlobalDir, unresolvedPlansDir)
+    ) {
+      throw new SecurityError(
+        `Security violation: Plan directory '${unresolvedPlansDir}' is outside both the project root '${unresolvedProjectRoot}' and the global configuration directory.`,
+      );
+    }
+
+    // 2. We only attempt to physically create the directory if plan mode is enabled
+    if (this.planEnabled) {
+      let mkdirError: unknown;
+      try {
+        fs.mkdirSync(plansDir, { recursive: true });
+      } catch (e: unknown) {
+        mkdirError = e;
+      }
+
+      // 3. Physical security check (after creation, to mitigate TOCTOU symlink attacks)
+      let realPlansDir: string;
+      try {
+        realPlansDir = resolveToRealPath(plansDir);
+      } catch (e: unknown) {
+        if (
+          mkdirError &&
+          e instanceof Error &&
+          'code' in e &&
+          e.code === 'ENOENT'
+        ) {
+          const errorMessage =
+            mkdirError instanceof Error
+              ? mkdirError.message
+              : String(mkdirError);
+          process.stderr.write(
+            `Failed to initialize active plan directory at '${plansDir}': ${errorMessage}\n`,
+          );
+          this.initializedPlanDirs.add(plansDir);
+          return plansDir;
+        }
+        throw new SecurityError(
+          `Security violation: Could not securely resolve plan directory '${plansDir}'. System error: ${e instanceof Error ? e.message : String(e)}`,
+        );
+      }
+
+      if (
+        !isSubpath(realProjectRoot, realPlansDir) &&
+        (!realGlobalGeminiDir || !isSubpath(realGlobalGeminiDir, realPlansDir))
+      ) {
+        throw new SecurityError(
+          `Security violation: Resolved plan directory '${realPlansDir}' is outside both the project root '${realProjectRoot}' and the global configuration directory.`,
+        );
+      }
+
+      if (mkdirError) {
+        const errorMessage =
+          mkdirError instanceof Error ? mkdirError.message : String(mkdirError);
+        process.stderr.write(
+          `Failed to initialize active plan directory at '${plansDir}': ${errorMessage}\n`,
+        );
+      } else {
+        this.workspaceContext.addDirectory(realPlansDir);
+      }
+    }
+
+    this.initializedPlanDirs.add(plansDir);
+    return plansDir;
   }
 
   getMcpEnablementCallbacks(): McpEnablementCallbacks | undefined {

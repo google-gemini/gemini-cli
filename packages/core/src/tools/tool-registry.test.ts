@@ -237,6 +237,7 @@ describe('ToolRegistry', () => {
 
   beforeEach(() => {
     vi.mocked(fs.existsSync).mockReturnValue(true);
+    vi.mocked(fs.realpathSync).mockImplementation((p) => p.toString());
     vi.mocked(fs.statSync).mockReturnValue({
       isDirectory: () => true,
     } as fs.Stats);

@@ -993,4 +993,103 @@ describe('useSlashCommandProcessor', () => {
       expect(result.current.slashCommands).toEqual([newCommand]),
     );
   });
+  describe('Active Extension Context Switching', () => {
+    it('sets active extension context when a command with a plan dir is executed', async () => {
+      const extensionCommand = createTestCommand({
+        name: 'conductor:setup',
+        extensionName: 'conductor',
+        action: vi.fn(),
+      });
+
+      const spyHasPlanDir = vi
+        .spyOn(mockConfig, 'hasExtensionPlanDir')
+        .mockReturnValue(true);
+      const spySetContext = vi.spyOn(mockConfig, 'setActiveExtensionContext');
+
+      const hook = await setupProcessorHook({
+        builtinCommands: [extensionCommand],
+      });
+
+      await waitFor(() => expect(hook.current.slashCommands!.length).toBe(1));
+
+      await act(async () => {
+        await hook.current.handleSlashCommand('/conductor:setup');
+      });
+
+      expect(spyHasPlanDir).toHaveBeenCalledWith('conductor');
+      expect(spySetContext).toHaveBeenCalledWith('conductor');
+    });
+
+    it('clears active extension context when a command WITHOUT a plan dir is executed', async () => {
+      const extensionCommand = createTestCommand({
+        name: 'other:cmd',
+        extensionName: 'other',
+        action: vi.fn(),
+      });
+
+      const spyHasPlanDir = vi
+        .spyOn(mockConfig, 'hasExtensionPlanDir')
+        .mockReturnValue(false);
+      const spySetContext = vi.spyOn(mockConfig, 'setActiveExtensionContext');
+
+      const hook = await setupProcessorHook({
+        builtinCommands: [extensionCommand],
+      });
+
+      await waitFor(() => expect(hook.current.slashCommands!.length).toBe(1));
+
+      await act(async () => {
+        await hook.current.handleSlashCommand('/other:cmd');
+      });
+
+      expect(spyHasPlanDir).toHaveBeenCalledWith('other');
+      expect(spySetContext).toHaveBeenCalledWith(undefined);
+    });
+
+    it('handles a sequence of context switches between extensions and default plan mode', async () => {
+      const extA = createTestCommand({
+        name: 'extA',
+        extensionName: 'extA',
+        action: vi.fn(),
+      });
+      const extB = createTestCommand({
+        name: 'extB',
+        extensionName: 'extB',
+        action: vi.fn(),
+      });
+      const planCmd = createTestCommand({
+        name: 'plan',
+        action: vi.fn(),
+      });
+
+      const spySetContext = vi.spyOn(mockConfig, 'setActiveExtensionContext');
+      vi.spyOn(mockConfig, 'hasExtensionPlanDir').mockReturnValue(true);
+
+      const hook = await setupProcessorHook({
+        builtinCommands: [extA, extB, planCmd],
+      });
+
+      await waitFor(() => expect(hook.current.slashCommands!.length).toBe(3));
+
+      // 1. Run Ext A
+      await act(async () => {
+        await hook.current.handleSlashCommand('/extA');
+      });
+      expect(spySetContext).toHaveBeenLastCalledWith('extA');
+
+      // 2. Run Ext B
+      await act(async () => {
+        await hook.current.handleSlashCommand('/extB');
+      });
+      expect(spySetContext).toHaveBeenLastCalledWith('extB');
+
+      // 3. Run /help (Concurrent global command)
+      spySetContext.mockClear();
+      await act(async () => {
+        await hook.current.handleSlashCommand('/help');
+      });
+      // A concurrent command should NOT modify the active extension context
+      expect(spySetContext).not.toHaveBeenCalled();
+    });
+  });
 });

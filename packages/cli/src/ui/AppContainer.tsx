@@ -1350,10 +1350,11 @@ Logging in with Google... Restarting Gemini CLI to continue.
         isToolExecuting(pendingHistoryItems);
 
       if (isSlash && isAgentRunning) {
-        const { commandToExecute } = parseSlashCommand(
+        const parsedCommand = parseSlashCommand(
           submittedValue,
           slashCommands ?? [],
         );
+        const commandToExecute = parsedCommand.commandToExecute;
         if (commandToExecute?.isSafeConcurrent) {
           void handleSlashCommand(submittedValue);
           addInput(submittedValue);

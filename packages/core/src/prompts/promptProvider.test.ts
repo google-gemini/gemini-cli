@@ -61,6 +61,7 @@ describe('PromptProvider', () => {
       topicState: new TopicState(),
       getEnableShellOutputEfficiency: vi.fn().mockReturnValue(true),
       getSandboxEnabled: vi.fn().mockReturnValue(false),
+      getPlansDir: vi.fn().mockReturnValue('/tmp/project-temp/plans'),
       storage: {
         getProjectTempDir: vi.fn().mockReturnValue('/tmp/project-temp'),
         getPlansDir: vi.fn().mockReturnValue('/tmp/project-temp/plans'),

@@ -3195,9 +3195,7 @@ describe('AppContainer State Management', () => {
       );
       unmount();
     });
-  });
 
-  describe('Overflow Hint Handling', () => {
     beforeEach(() => {
       vi.useFakeTimers();
     });

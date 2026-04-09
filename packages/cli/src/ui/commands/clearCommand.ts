@@ -30,8 +30,9 @@ export const clearCommand: SlashCommand = {
       await hookSystem.fireSessionEndEvent(SessionEndReason.Clear);
     }
 
-    // Reset user steering hints
+    // Reset user steering hints and extension context
     config?.injectionService.clear();
+    config?.setActiveExtensionContext(undefined);
 
     // Start a new conversation recording with a new session ID
     // We MUST do this before calling resetChat() so the new ChatRecordingService
