@@ -207,7 +207,6 @@ export class MemoryMonitor {
       if (this.eventLoopHistogram) {
         const p50 = this.eventLoopHistogram.percentile(50) / 1e6;
         const p95 = this.eventLoopHistogram.percentile(95) / 1e6;
-        const p99 = this.eventLoopHistogram.percentile(99) / 1e6;
         const max = this.eventLoopHistogram.max / 1e6;
 
         recordEventLoopDelay(config, p50, {
@@ -216,10 +215,6 @@ export class MemoryMonitor {
         });
         recordEventLoopDelay(config, p95, {
           percentile: 'p95',
-          component: context,
-        });
-        recordEventLoopDelay(config, p99, {
-          percentile: 'p99',
           component: context,
         });
         recordEventLoopDelay(config, max, {

@@ -249,7 +249,6 @@ describe('CPU Performance Tests', () => {
 
             snapshot.childEventLoopDelayP50Ms = findValue('p50');
             snapshot.childEventLoopDelayP95Ms = findValue('p95');
-            snapshot.childEventLoopDelayP99Ms = findValue('p99');
             snapshot.childEventLoopDelayMaxMs = findValue('max');
           }
 
