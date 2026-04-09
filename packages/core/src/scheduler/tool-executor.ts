@@ -222,6 +222,9 @@ export class ToolExecutor {
     content: PartListUnion,
     fullOutputFilePath?: string,
   ): Promise<{ truncatedContent: PartListUnion; outputFile?: string }> {
+    const toolName = call.request.name;
+    const callId = call.request.callId;
+
     if (this.config.isContextManagementEnabled()) {
       const distiller = new ToolOutputDistillationService(
         this.config,
@@ -233,22 +236,46 @@ export class ToolExecutor {
         call.request.callId,
         content,
       );
-      if (fullOutputFilePath && !result.outputFile) {
-        try {
-          await fsPromises.unlink(fullOutputFilePath);
-        } catch (error) {
-          debugLogger.warn(
-            `Failed to delete temporary tool output file: ${fullOutputFilePath}`,
-            error,
-          );
+
+      let finalOutputFile = result.outputFile;
+      if (fullOutputFilePath) {
+        const { outputFile: movedPath } = await moveToolOutputToFile(
+          fullOutputFilePath,
+          toolName,
+          callId,
+          this.config.storage.getProjectTempDir(),
+          this.config.getSessionId(),
+        );
+        finalOutputFile = movedPath;
+        if (result.outputFile) {
+          try {
+            await fsPromises.unlink(result.outputFile);
+          } catch (error) {
+            debugLogger.warn(
+              `Failed to delete distiller's temporary tool output file: ${result.outputFile}`,
+              error,
+            );
+          }
         }
       }
-      return result;
+      return {
+        truncatedContent: result.truncatedContent,
+        outputFile: finalOutputFile,
+      };
     }
 
-    const toolName = call.request.name;
-    const callId = call.request.callId;
     let outputFile: string | undefined;
+
+    if (fullOutputFilePath) {
+      const { outputFile: movedPath } = await moveToolOutputToFile(
+        fullOutputFilePath,
+        toolName,
+        callId,
+        this.config.storage.getProjectTempDir(),
+        this.config.getSessionId(),
+      );
+      outputFile = movedPath;
+    }
 
     if (typeof content === 'string' && toolName === SHELL_TOOL_NAME) {
       const threshold = this.config.getTruncateToolOutputThreshold();
@@ -256,17 +283,7 @@ export class ToolExecutor {
       if (threshold > 0 && content.length > threshold) {
         const originalContentLength = content.length;
 
-        let savedPath: string;
-        if (fullOutputFilePath) {
-          const { outputFile: movedPath } = await moveToolOutputToFile(
-            fullOutputFilePath,
-            toolName,
-            callId,
-            this.config.storage.getProjectTempDir(),
-            this.config.getSessionId(),
-          );
-          savedPath = movedPath;
-        } else {
+        if (!outputFile) {
           const { outputFile: writtenPath } = await saveTruncatedToolOutput(
             content,
             toolName,
@@ -274,10 +291,9 @@ export class ToolExecutor {
             this.config.storage.getProjectTempDir(),
             this.context.promptId,
           );
-          savedPath = writtenPath;
+          outputFile = writtenPath;
         }
 
-        outputFile = savedPath;
         const truncatedContent = formatTruncatedToolOutput(
           content,
           outputFile,
@@ -309,14 +325,16 @@ export class ToolExecutor {
 
         if (threshold > 0 && textContent.length > threshold) {
           const originalContentLength = textContent.length;
-          const { outputFile: savedPath } = await saveTruncatedToolOutput(
-            textContent,
-            toolName,
-            callId,
-            this.config.storage.getProjectTempDir(),
-            this.context.promptId,
-          );
-          outputFile = savedPath;
+          if (!outputFile) {
+            const { outputFile: savedPath } = await saveTruncatedToolOutput(
+              textContent,
+              toolName,
+              callId,
+              this.config.storage.getProjectTempDir(),
+              this.context.promptId,
+            );
+            outputFile = savedPath;
+          }
           const truncatedText = formatTruncatedToolOutput(
             textContent,
             outputFile,
@@ -339,30 +357,8 @@ export class ToolExecutor {
             }),
           );
 
-          if (fullOutputFilePath) {
-            try {
-              await fsPromises.unlink(fullOutputFilePath);
-            } catch (error) {
-              debugLogger.warn(
-                `Failed to delete temporary tool output file: ${fullOutputFilePath}`,
-                error,
-              );
-            }
-          }
-
           return { truncatedContent, outputFile };
         }
-      }
-    }
-
-    if (fullOutputFilePath && !outputFile) {
-      try {
-        await fsPromises.unlink(fullOutputFilePath);
-      } catch (error) {
-        debugLogger.warn(
-          `Failed to delete temporary tool output file: ${fullOutputFilePath}`,
-          error,
-        );
       }
     }
 
