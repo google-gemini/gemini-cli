@@ -1,11 +1,11 @@
 # 🔎 Gemini CLI Triage Dashboard
 
-*Last Synchronized: 2026-04-09 21:44 (UTC)*
+*Last Synchronized: 2026-04-09 21:54 (UTC)*
 
 **Total Issues Tracked: 177** | **Categorized: 177**
 
 ## 🆕 Awaiting Reviewer Pickup (27)
-**Action: Pick up one of these new PRs.**
+**Action: Pick up one of these new PRs.** These have no human reviewers assigned yet, but **all tests are passing and there are no conflicts.**
 
 | Issue | Linked PR | Last Update |
 | :--- | :--- | :--- |
@@ -34,11 +34,11 @@
 | [#17235 Missing JSON schema key intermittently](https://github.com/google-gemini/gemini-cli/issues/17235) | [#21963](https://github.com/google-gemini/gemini-cli/pull/21963) | `2026-04-09` |
 | [#18871 [Feat] Add a command to delete current session upon exit](https://github.com/google-gemini/gemini-cli/issues/18871) | [#19332](https://github.com/google-gemini/gemini-cli/pull/19332) | `2026-04-09` |
 | [#20500 feat(cli): add mention view shortcuts](https://github.com/google-gemini/gemini-cli/issues/20500) | [#25060](https://github.com/google-gemini/gemini-cli/pull/25060) | `2026-04-09` |
-| [#21568 deleteSession() does not clean tool output directories (UUID / filename mismatch)](https://github.com/google-gemini/gemini-cli/issues/21568) | [#25067](https://github.com/google-gemini/gemini-cli/pull/25067) | `2026-04-09` |
 | [#21546 web_fetch: pressing Ctrl+C while a URL is loading causes silent retries instead of immediate cancellation](https://github.com/google-gemini/gemini-cli/issues/21546) | [#24320](https://github.com/google-gemini/gemini-cli/pull/24320) | `2026-03-31` |
 | [#24933 Add `/rewind <user-message-index>` to rewind to a specific message](https://github.com/google-gemini/gemini-cli/issues/24933) | [#25068](https://github.com/google-gemini/gemini-cli/pull/25068) | `2026-04-09` |
+| [#16559 Most /slash command args counts are not validated](https://github.com/google-gemini/gemini-cli/issues/16559) | [#25069](https://github.com/google-gemini/gemini-cli/pull/25069) | `2026-04-09` |
 
-## ⌛ Awaiting Reviewer Follow-up (7)
+## ⌛ Awaiting Reviewer Follow-up (8)
 **Action: Reviewers, please follow up.**
 
 | Issue | Linked PR | Reviewers | Status |
@@ -47,6 +47,7 @@
 | [#19717 Fix unsafe type assertions in VS Code Companion (Phase 4.2)](https://github.com/google-gemini/gemini-cli/issues/19717) | [#19815](https://github.com/google-gemini/gemini-cli/pull/19815) | @Adib234, @mrpmohiburrahman | Review Requested |
 | [#24337 fix(cli): make slash-command IDE status subscription cleanup-safe](https://github.com/google-gemini/gemini-cli/issues/24337) | [#24397](https://github.com/google-gemini/gemini-cli/pull/24397) | @scidomino | Author Updated |
 | [#16122 Feature Request: Add gemini update command](https://github.com/google-gemini/gemini-cli/issues/16122) | [#24080](https://github.com/google-gemini/gemini-cli/pull/24080) | @mrpmohiburrahman | Author Updated |
+| [#22611 bug: Stale 'Thinking...' state persists after response completion](https://github.com/google-gemini/gemini-cli/issues/22611) | [#22619](https://github.com/google-gemini/gemini-cli/pull/22619) | @cocosheng-g | Author Updated |
 | [#22616 bug: Text sanitization inadvertently swallows valid text due to C1 control characters](https://github.com/google-gemini/gemini-cli/issues/22616) | [#22624](https://github.com/google-gemini/gemini-cli/pull/22624) | @cocosheng-g | Author Updated |
 | [#18345 RFC: Standardize "Reload/Refresh" Command Naming Conventions](https://github.com/google-gemini/gemini-cli/issues/18345) | [#19837](https://github.com/google-gemini/gemini-cli/pull/19837) | @mrpmohiburrahman, @skeshive | Author Updated |
 | [#19851 API error messages displayed as raw byte codes instead of decoded text when model capacity is exhausted](https://github.com/google-gemini/gemini-cli/issues/19851) | [#23341](https://github.com/google-gemini/gemini-cli/pull/23341) | @cocosheng-g | Author Updated |
@@ -68,7 +69,7 @@
 | [#22193 Gemini CLI doesn't maintain keyboard focus when VS Code extension closes a diff](https://github.com/google-gemini/gemini-cli/issues/22193) | [#23215](https://github.com/google-gemini/gemini-cli/pull/23215) | @gjuggler, @jackwotherspoon, @kschaab | `2026-04-09` |
 | [#22932 `/extensions update ...` needs meaningful version info.](https://github.com/google-gemini/gemini-cli/issues/22932) | [#23105](https://github.com/google-gemini/gemini-cli/pull/23105) |  | `2026-04-09` |
 
-## 🌱 Available for Pickup (52)
+## 🌱 Available for Pickup (51)
 **Action: Open for new contributors.**
 
 | Issue | Days Idle |
@@ -90,7 +91,7 @@
 | [#22079 extensions install fails to find gemini-extension.json from GitHub URL](https://github.com/google-gemini/gemini-cli/issues/22079) | 1 |
 | [#22452 BUG: CI_* env var scrub not applied in dev mode (`npm run start`) — interactive mode hangs](https://github.com/google-gemini/gemini-cli/issues/22452) | 1 |
 | [#22738 [Windows/WezTerm] Shift+Tab and fallback F10 fail to cycle approval mode (Keystroke logs included)](https://github.com/google-gemini/gemini-cli/issues/22738) | 1 |
-| [#19663 Feature Request: support multiple .env files](https://github.com/google-gemini/gemini-cli/issues/19663) | 0 |
+| [#19663 Feature Request: support multiple .env files](https://github.com/google-gemini/gemini-cli/issues/19663) | 1 |
 | [#20227 feat(cli): Add ability to cycle through models and mark favorites](https://github.com/google-gemini/gemini-cli/issues/20227) | 0 |
 | [#21560 Detected terminal name: iTerm2 3.6.8 │ │ │ │ ℹ Loading extension: nanobanana │ │ ⚠ [STARTUP] Cannot start phase 'load_builtin_commands': phase is already active. Call end() before starting again. (x2) ▄│ │ ⚠ [STARTUP] Phase 'load_builtin_commands' was star](https://github.com/google-gemini/gemini-cli/issues/21560) | 0 |
 | [#21390 Support priority paygo on gemini-cli via vertex](https://github.com/google-gemini/gemini-cli/issues/21390) | 0 |
@@ -118,7 +119,6 @@
 | [#12634 Feature: Extension-Contributed Configuration Settings](https://github.com/google-gemini/gemini-cli/issues/12634) | 0 |
 | [#16282 [Core] Handle EISDIR error when GEMINI.md is a directory during memory discovery](https://github.com/google-gemini/gemini-cli/issues/16282) | 0 |
 | [#17677 Session resume requires at least one human message to work](https://github.com/google-gemini/gemini-cli/issues/17677) | 0 |
-| [#16559 Most /slash command args counts are not validated](https://github.com/google-gemini/gemini-cli/issues/16559) | 0 |
 | [#15430 CLI ignores GOOGLE_GEMINI_BASE_URL and forces Cloud Auth/Endpoints](https://github.com/google-gemini/gemini-cli/issues/15430) | 0 |
 | [#18388 Delete option for MCP](https://github.com/google-gemini/gemini-cli/issues/18388) | 0 |
 | [#16091 Spam loop `Editor is not supported: ${currentPreference}` when the `preferredEditor` is an invalid value](https://github.com/google-gemini/gemini-cli/issues/16091) | 0 |
@@ -169,7 +169,6 @@
 | [#22351 Improve diagnostics and error handling for malformed streaming responses](https://github.com/google-gemini/gemini-cli/issues/22351) | @junaiddshaukat | `2026-04-09` | Active PR (Test Failure) |
 | [#21505 docs(sdk): add JSDoc to exported interfaces in packages/sdk/src/types.ts](https://github.com/google-gemini/gemini-cli/issues/21505) | @Gyanranjan-Priyam | `2026-04-08` | Active PR (Merge Conflict) |
 | [#22565 CLI fails to ignore large binary files (.pak, .rpa), causing 192MB+ context bloat and silent timeouts](https://github.com/google-gemini/gemini-cli/issues/22565) | @elliotllliu | `2026-04-08` | Active PR (Test Failure) |
-| [#22611 bug: Stale 'Thinking...' state persists after response completion](https://github.com/google-gemini/gemini-cli/issues/22611) | @euxaristia | `2026-04-09` | Active PR (Test Failure) |
 | [#16717 Fix F12 Description and Add Missing Alt + M Shortcut in Keyboard Docs](https://github.com/google-gemini/gemini-cli/issues/16717) | @JayadityaGit | `2026-04-08` | Assigned (No PR) |
 | [#20838 CTRL-z removes unfinished open questions in AskUser tool](https://github.com/google-gemini/gemini-cli/issues/20838) | @Aarchi-07 | `2026-03-27` | Active PR (Merge Conflict) |
 | [#18487 A2A Server should support multiple workspace directories](https://github.com/google-gemini/gemini-cli/issues/18487) | @dhakshin-raghav | `2026-03-28` | Active PR (Merge Conflict) |
@@ -189,6 +188,7 @@
 | [#21400 Add an update command](https://github.com/google-gemini/gemini-cli/issues/21400) | @roy-abir05 | `2026-04-09` | Active PR (Merge Conflict) |
 | [#21764 Include available sessions in error when --resume gets invalid ID](https://github.com/google-gemini/gemini-cli/issues/21764) | @Zahed-Riyaz | `2026-04-09` | Assigned (No PR) |
 | [#21527 Failed to check if file is binary: /home/sumeet/korl-webapp-next/skills/typescript-expert EISDIR: illegal operation on a directory, read │ │ ⚠ Failed to check if file is binary: /home/sumeet/korl-webapp-next/skills/web-performance-optimization EISDIR: ille](https://github.com/google-gemini/gemini-cli/issues/21527) | @ProthamD | `2026-04-09` | Assigned (No PR) |
+| [#21568 deleteSession() does not clean tool output directories (UUID / filename mismatch)](https://github.com/google-gemini/gemini-cli/issues/21568) | @krishdef7 | `2026-04-09` | Active PR (Merge Conflict) |
 | [#22185 Copy + pasta](https://github.com/google-gemini/gemini-cli/issues/22185) | @manavmax | `2026-04-09` | Assigned (No PR) |
 | [#22934 test(acp): add missing coverage for extensions command error paths](https://github.com/google-gemini/gemini-cli/issues/22934) | @Br1an67 | `2026-04-09` | Active PR (Test Failure) |
 | [#22920 AgentLoopContext is incompatible with Config type](https://github.com/google-gemini/gemini-cli/issues/22920) | @SupunGeethanjana | `2026-04-09` | Active PR (Merge Conflict) |
