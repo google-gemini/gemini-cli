@@ -161,3 +161,42 @@ If operating in a sibling worktree (e.g., `feature-xyz/`):
 ## Resources
 ### scripts/worktree-manager.sh
 Automated wrapper for Git Worktree operations that handles sibling pathing, semantic PR naming, and metadata links.
+---
+
+## Phase 3: Release Tracking
+
+After your PR is merged, use this protocol to help the user track when their feature is "live."
+
+### 1. The Promotion Lifecycle
+Explain to the user how their code moves through the stability chain:
+- **Main**: The source of truth. All PRs land here first.
+- **Nightly**: Daily automated snapshot (00:00 UTC) for bleeding-edge testing.
+- **Preview**: Weekly staging cut (Tuesdays) from the latest Nightly.
+- **Stable**: The official "Latest" version released every Tuesday.
+
+### 2. Identifying the Feature
+To track a feature, you MUST use the **Merge Commit Hash**, not individual PR commits.
+- **Action**: Instruct the user to find the hash in the PR 'Conversation' tab: "Merged... into main with commit [HASH]".
+
+### 3. Verification Methods
+If a user asks "Is my feature out yet?", perform these checks:
+
+#### Method A: The Branch Check (Staging)
+Check if the commit is in the "waiting room" for the next release:
+```bash
+git branch -a --contains [HASH] | grep 'preview'
+```
+- **Result**: If it appears in a `changelog-v0.XX.X-preview` branch, it is **staged** for the next cut.
+
+#### Method B: The Tag Check (Released)
+Check if the commit is officially part of a versioned release:
+```bash
+git tag --contains [HASH] | grep 'preview'
+```
+- **Result**: If it returns a tag (e.g., `v0.37.0-preview.0`), the code is **live** in that version.
+
+### 4. Key Release Intel
+- **Patching**: If a user needs a fix *immediately* for an already-released version, explain that a release manager must "cherry-pick" the commit from `main` into the current release branch.
+- **Cut-off**: Tuesday ~20:00 UTC. Merges should happen by **Monday** to reliably make the Tuesday Preview cut.
+
+**Note**: If any step fails, do NOT claim completion. Fix the issue and restart from Step 1.
