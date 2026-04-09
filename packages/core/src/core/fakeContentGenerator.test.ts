@@ -9,7 +9,8 @@ import {
   FakeContentGenerator,
   type FakeResponse,
 } from './fakeContentGenerator.js';
-import { promises } from 'node:fs';
+import { createReadStream } from 'node:fs';
+import { Readable } from 'node:stream';
 import {
   GenerateContentResponse,
   type CountTokensResponse,
@@ -24,14 +25,11 @@ vi.mock('node:fs', async (importOriginal) => {
   const actual = await importOriginal<typeof import('node:fs')>();
   return {
     ...actual,
-    promises: {
-      ...actual.promises,
-      readFile: vi.fn(),
-    },
+    createReadStream: vi.fn(),
   };
 });
 
-const mockReadFile = vi.mocked(promises.readFile);
+const mockCreateReadStream = vi.mocked(createReadStream);
 
 describe('FakeContentGenerator', () => {
   const fakeGenerateContentResponse: FakeResponse = {
@@ -174,7 +172,7 @@ describe('FakeContentGenerator', () => {
   describe('fromFile', () => {
     it('should create a generator from a file', async () => {
       const fileContent = JSON.stringify(fakeGenerateContentResponse) + '\n';
-      mockReadFile.mockResolvedValue(fileContent);
+      mockCreateReadStream.mockReturnValue(Readable.from([fileContent]) as any);
 
       const generator = await FakeContentGenerator.fromFile('fake-path.json');
       const response = await generator.generateContent(
