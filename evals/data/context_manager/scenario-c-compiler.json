@@ -1,0 +1,928 @@
+{
+  "scenarioId": "scenario-c-compiler",
+  "description": "A robust 100-turn trajectory building a C compiler, featuring realistic noise, synchronized tool state, high-entropy data, and superseded architectural decisions.",
+  "history": [
+    {
+      "role": "user",
+      "parts": [
+        {
+          "text": "How is the test coverage looking lately?"
+        }
+      ]
+    },
+    {
+      "role": "model",
+      "parts": [
+        {
+          "text": "We're making good progress. We now have 12 unit tests passing across all modules."
+        }
+      ]
+    },
+    {
+      "role": "user",
+      "parts": [
+        {
+          "text": "Let's call this project 'TitanC'. I think it has a strong, industrial feel."
+        }
+      ]
+    },
+    {
+      "role": "model",
+      "parts": [
+        {
+          "text": "'TitanC' sounds excellent. I've initialized the project workspace under that name."
+        }
+      ]
+    },
+    {
+      "role": "user",
+      "parts": [
+        {
+          "text": "Initially, I'd like to target x86-64 assembly for our compiler backend."
+        }
+      ]
+    },
+    {
+      "role": "model",
+      "parts": [
+        {
+          "text": "Got it. We will focus on generating x86-64 assembly instructions."
+        }
+      ]
+    },
+    {
+      "role": "user",
+      "parts": [
+        {
+          "text": "Let's run a full build of TitanC and see if there are any issues."
+        }
+      ]
+    },
+    {
+      "role": "model",
+      "parts": [
+        {
+          "text": "Executing build for TitanC (Target: x86-64)...\n```\n[CC] src/main.ts -> build/main.o\n[CC] src/lexer.ts -> build/lexer.o\n[CC] src/parser.ts -> build/parser.o\n[CC] src/ast.ts -> build/ast.o\n[CC] src/codegen.ts -> build/codegen.o\n[CC] src/utils.ts -> build/utils.o\n[LD] build/compiler\nBuild successful.\n```"
+        }
+      ]
+    },
+    {
+      "role": "user",
+      "parts": [
+        {
+          "text": "I was thinking about the refactoring the visitor pattern for better readability. What's your take?"
+        }
+      ]
+    },
+    {
+      "role": "model",
+      "parts": [
+        {
+          "text": "That's a valid concern. Given our current architecture in TitanC, we could definitely improve that area. I recommend we prioritize correctness first, then profile to see if it's a bottleneck."
+        }
+      ]
+    },
+    {
+      "role": "user",
+      "parts": [
+        {
+          "text": "Wait, we just got a new production deployment key: 'PROD_DEPLOY_KEY_XYZ'. This replaces all previous keys, so make sure to use this one from now on."
+        }
+      ]
+    },
+    {
+      "role": "model",
+      "parts": [
+        {
+          "text": "Updated. The current production deployment key is now PROD_DEPLOY_KEY_XYZ."
+        }
+      ]
+    },
+    {
+      "role": "user",
+      "parts": [
+        {
+          "text": "How is the test coverage looking lately?"
+        }
+      ]
+    },
+    {
+      "role": "model",
+      "parts": [
+        {
+          "text": "We're making good progress. We now have 14 unit tests passing across all modules."
+        }
+      ]
+    },
+    {
+      "role": "user",
+      "parts": [
+        {
+          "text": "The client actually needs ARM64 support for their new server farm, so let's pivot from x86-64. It's more energy-efficient and fits their requirements better."
+        }
+      ]
+    },
+    {
+      "role": "model",
+      "parts": [
+        {
+          "text": "That's a significant change in direction. Switching the backend architecture to ARM64. I'll adjust the register allocation and instruction set templates accordingly."
+        }
+      ]
+    },
+    {
+      "role": "user",
+      "parts": [
+        {
+          "text": "What was the most recent change committed to the repo?"
+        }
+      ]
+    },
+    {
+      "role": "model",
+      "parts": [
+        {
+          "text": "The latest commit is:\n```\ncommit jn759a\nAuthor: Christian <gundermanc@google.com>\nDate: Mon Feb 2 14:00:00 2026 -0800\n\n    docs: add architectural overview\n```"
+        }
+      ]
+    },
+    {
+      "role": "user",
+      "parts": [
+        {
+          "text": "What was the most recent change committed to the repo?"
+        }
+      ]
+    },
+    {
+      "role": "model",
+      "parts": [
+        {
+          "text": "The latest commit is:\n```\ncommit dmp72i\nAuthor: Christian <gundermanc@google.com>\nDate: Mon Feb 2 14:00:00 2026 -0800\n\n    refactor: extract token scanner to separate module\n```"
+        }
+      ]
+    },
+    {
+      "role": "user",
+      "parts": [
+        {
+          "text": "What was the most recent change committed to the repo?"
+        }
+      ]
+    },
+    {
+      "role": "model",
+      "parts": [
+        {
+          "text": "The latest commit is:\n```\ncommit g39v9p\nAuthor: Christian <gundermanc@google.com>\nDate: Mon Feb 2 14:00:00 2026 -0800\n\n    fix: correctly handle escaped characters in strings\n```"
+        }
+      ]
+    },
+    {
+      "role": "user",
+      "parts": [
+        {
+          "text": "For the code generator, let's add a standard header to all generated assembly files. It should say exactly '; Generated by TitanC Compiler v0.1'."
+        }
+      ]
+    },
+    {
+      "role": "model",
+      "parts": [
+        {
+          "text": "Understood. I will prepend '; Generated by TitanC Compiler v0.1' to all output files generated by the backend."
+        }
+      ]
+    },
+    {
+      "role": "user",
+      "parts": [
+        {
+          "text": "I'm reorganizing the project structure. Moving forward, the lexer logic should live in 'src/core/scanner/main.ts' and the parser in 'src/core/parser/main.ts'."
+        }
+      ]
+    },
+    {
+      "role": "model",
+      "parts": [
+        {
+          "text": "Structure updated. I'll refer to 'src/core/scanner/main.ts' for lexer tasks and 'src/core/parser/main.ts' for parser logic."
+        }
+      ]
+    },
+    {
+      "role": "user",
+      "parts": [
+        {
+          "text": "I have a strict requirement for the lexer: we must NOT use any third-party regex libraries. I want it to be a manual character-by-character scanner for maximum performance and to avoid heavy dependencies."
+        }
+      ]
+    },
+    {
+      "role": "model",
+      "parts": [
+        {
+          "text": "Understood. I'll ensure the lexer implementation avoids external regex libraries and uses manual scanning logic."
+        }
+      ]
+    },
+    {
+      "role": "user",
+      "parts": [
+        {
+          "text": "What was the most recent change committed to the repo?"
+        }
+      ]
+    },
+    {
+      "role": "model",
+      "parts": [
+        {
+          "text": "The latest commit is:\n```\ncommit qdyivi\nAuthor: Christian <gundermanc@google.com>\nDate: Mon Feb 2 14:00:00 2026 -0800\n\n    docs: add architectural overview\n```"
+        }
+      ]
+    },
+    {
+      "role": "user",
+      "parts": [
+        {
+          "text": "Can you list the files in the src directory? I want to make sure I haven't missed anything."
+        }
+      ]
+    },
+    {
+      "role": "model",
+      "parts": [
+        {
+          "functionCall": {
+            "name": "ls",
+            "args": {
+              "path": "src/"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "role": "user",
+      "parts": [
+        {
+          "functionResponse": {
+            "name": "ls",
+            "response": {
+              "output": "src/main.ts\nsrc/core/scanner/main.ts\nsrc/core/parser/main.ts\nsrc/ast.ts\nsrc/codegen.ts\nsrc/utils.ts"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "role": "model",
+      "parts": [
+        {
+          "text": "Sure, here are the files in src/:\nsrc/main.ts\nsrc/core/scanner/main.ts\nsrc/core/parser/main.ts\nsrc/ast.ts\nsrc/codegen.ts\nsrc/utils.ts"
+        }
+      ]
+    },
+    {
+      "role": "user",
+      "parts": [
+        {
+          "text": "I was thinking about the performance of our hash map implementation. What's your take?"
+        }
+      ]
+    },
+    {
+      "role": "model",
+      "parts": [
+        {
+          "text": "That's a valid concern. Given our current architecture in TitanC, we could definitely improve that area. I recommend we prioritize correctness first, then profile to see if it's a bottleneck."
+        }
+      ]
+    },
+    {
+      "role": "user",
+      "parts": [
+        {
+          "text": "Can you list the files in the src directory? I want to make sure I haven't missed anything."
+        }
+      ]
+    },
+    {
+      "role": "model",
+      "parts": [
+        {
+          "functionCall": {
+            "name": "ls",
+            "args": {
+              "path": "src/"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "role": "user",
+      "parts": [
+        {
+          "functionResponse": {
+            "name": "ls",
+            "response": {
+              "output": "src/main.ts\nsrc/core/scanner/main.ts\nsrc/core/parser/main.ts\nsrc/ast.ts\nsrc/codegen.ts\nsrc/utils.ts"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "role": "model",
+      "parts": [
+        {
+          "text": "Sure, here are the files in src/:\nsrc/main.ts\nsrc/core/scanner/main.ts\nsrc/core/parser/main.ts\nsrc/ast.ts\nsrc/codegen.ts\nsrc/utils.ts"
+        }
+      ]
+    },
+    {
+      "role": "user",
+      "parts": [
+        {
+          "text": "Let's define the core tokens for our lexer. We'll need an enum with at least INT, KEYWORD, IDENTIFIER, PLUS, MINUS, SEMICOLON, and EOF."
+        }
+      ]
+    },
+    {
+      "role": "model",
+      "parts": [
+        {
+          "text": "Understood. I've defined the TokenType enum as requested:\n```typescript\nenum TokenType {\n  INT,\n  KEYWORD,\n  IDENTIFIER,\n  PLUS,\n  MINUS,\n  SEMICOLON,\n  EOF\n}\n```"
+        }
+      ]
+    },
+    {
+      "role": "user",
+      "parts": [
+        {
+          "text": "Can you define the interface for our AST nodes? Each node should have a 'type' property that can be 'Program', 'Function', 'Return', or 'Constant'."
+        }
+      ]
+    },
+    {
+      "role": "model",
+      "parts": [
+        {
+          "text": "Here is the AST node interface:\n```typescript\ninterface AstNode {\n  type: 'Program' | 'Function' | 'Return' | 'Constant';\n  value?: any;\n  children?: AstNode[];\n}\n```"
+        }
+      ]
+    },
+    {
+      "role": "user",
+      "parts": [
+        {
+          "text": "What was the most recent change committed to the repo?"
+        }
+      ]
+    },
+    {
+      "role": "model",
+      "parts": [
+        {
+          "text": "The latest commit is:\n```\ncommit jgqwe\nAuthor: Christian <gundermanc@google.com>\nDate: Mon Feb 2 14:00:00 2026 -0800\n\n    docs: add architectural overview\n```"
+        }
+      ]
+    },
+    {
+      "role": "user",
+      "parts": [
+        {
+          "text": "Let's run a full build of TitanC and see if there are any issues."
+        }
+      ]
+    },
+    {
+      "role": "model",
+      "parts": [
+        {
+          "text": "Executing build for TitanC (Target: ARM64)...\n```\n[CC] src/main.ts -> build/main.o\n[CC] src/core/scanner/main.ts -> build/core_scanner_main.o\n[CC] src/core/parser/main.ts -> build/core_parser_main.o\n[CC] src/ast.ts -> build/ast.o\nsrc/ast.ts:60:8: warning: unused variable 'temp' [-Wunused-variable]\n[CC] src/codegen.ts -> build/codegen.o\n[CC] src/utils.ts -> build/utils.o\n[LD] build/compiler\nBuild successful.\n```"
+        }
+      ]
+    },
+    {
+      "role": "user",
+      "parts": [
+        {
+          "text": "Let's run a full build of TitanC and see if there are any issues."
+        }
+      ]
+    },
+    {
+      "role": "model",
+      "parts": [
+        {
+          "text": "Executing build for TitanC (Target: ARM64)...\n```\n[CC] src/main.ts -> build/main.o\n[CC] src/core/scanner/main.ts -> build/core_scanner_main.o\nsrc/core/scanner/main.ts:97:8: warning: unused variable 'temp' [-Wunused-variable]\n[CC] src/core/parser/main.ts -> build/core_parser_main.o\n[CC] src/ast.ts -> build/ast.o\nsrc/ast.ts:22:8: warning: unused variable 'temp' [-Wunused-variable]\n[CC] src/codegen.ts -> build/codegen.o\n[CC] src/utils.ts -> build/utils.o\n[LD] build/compiler\nBuild successful.\n```"
+        }
+      ]
+    },
+    {
+      "role": "user",
+      "parts": [
+        {
+          "text": "Can you list the files in the src directory? I want to make sure I haven't missed anything."
+        }
+      ]
+    },
+    {
+      "role": "model",
+      "parts": [
+        {
+          "functionCall": {
+            "name": "ls",
+            "args": {
+              "path": "src/"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "role": "user",
+      "parts": [
+        {
+          "functionResponse": {
+            "name": "ls",
+            "response": {
+              "output": "src/main.ts\nsrc/core/scanner/main.ts\nsrc/core/parser/main.ts\nsrc/ast.ts\nsrc/codegen.ts\nsrc/utils.ts"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "role": "model",
+      "parts": [
+        {
+          "text": "Sure, here are the files in src/:\nsrc/main.ts\nsrc/core/scanner/main.ts\nsrc/core/parser/main.ts\nsrc/ast.ts\nsrc/codegen.ts\nsrc/utils.ts"
+        }
+      ]
+    },
+    {
+      "role": "user",
+      "parts": [
+        {
+          "text": "Can you list the files in the src directory? I want to make sure I haven't missed anything."
+        }
+      ]
+    },
+    {
+      "role": "model",
+      "parts": [
+        {
+          "functionCall": {
+            "name": "ls",
+            "args": {
+              "path": "src/"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "role": "user",
+      "parts": [
+        {
+          "functionResponse": {
+            "name": "ls",
+            "response": {
+              "output": "src/main.ts\nsrc/core/scanner/main.ts\nsrc/core/parser/main.ts\nsrc/ast.ts\nsrc/codegen.ts\nsrc/utils.ts"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "role": "model",
+      "parts": [
+        {
+          "text": "Sure, here are the files in src/:\nsrc/main.ts\nsrc/core/scanner/main.ts\nsrc/core/parser/main.ts\nsrc/ast.ts\nsrc/codegen.ts\nsrc/utils.ts"
+        }
+      ]
+    },
+    {
+      "role": "user",
+      "parts": [
+        {
+          "text": "I just found out there's another project called 'TitanC'. To avoid any legal issues, let's rename our compiler to 'GigaC'. We should update all references immediately."
+        }
+      ]
+    },
+    {
+      "role": "model",
+      "parts": [
+        {
+          "text": "Understood. Safety first. Renaming project from 'TitanC' to 'GigaC'. I'll update all our internal strings and build scripts."
+        }
+      ]
+    },
+    {
+      "role": "user",
+      "parts": [
+        {
+          "text": "Let's run a full build of GigaC and see if there are any issues."
+        }
+      ]
+    },
+    {
+      "role": "model",
+      "parts": [
+        {
+          "text": "Executing build for GigaC (Target: ARM64)...\n```\n[CC] src/main.ts -> build/main.o\n[CC] src/core/scanner/main.ts -> build/core_scanner_main.o\nsrc/core/scanner/main.ts:42:8: warning: unused variable 'temp' [-Wunused-variable]\n[CC] src/core/parser/main.ts -> build/core_parser_main.o\n[CC] src/ast.ts -> build/ast.o\n[CC] src/codegen.ts -> build/codegen.o\n[CC] src/utils.ts -> build/utils.o\n[LD] build/compiler\nBuild successful.\n```"
+        }
+      ]
+    },
+    {
+      "role": "user",
+      "parts": [
+        {
+          "text": "Can you list the files in the src directory? I want to make sure I haven't missed anything."
+        }
+      ]
+    },
+    {
+      "role": "model",
+      "parts": [
+        {
+          "functionCall": {
+            "name": "ls",
+            "args": {
+              "path": "src/"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "role": "user",
+      "parts": [
+        {
+          "functionResponse": {
+            "name": "ls",
+            "response": {
+              "output": "src/main.ts\nsrc/core/scanner/main.ts\nsrc/core/parser/main.ts\nsrc/ast.ts\nsrc/codegen.ts\nsrc/utils.ts"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "role": "model",
+      "parts": [
+        {
+          "text": "Sure, here are the files in src/:\nsrc/main.ts\nsrc/core/scanner/main.ts\nsrc/core/parser/main.ts\nsrc/ast.ts\nsrc/codegen.ts\nsrc/utils.ts"
+        }
+      ]
+    },
+    {
+      "role": "user",
+      "parts": [
+        {
+          "text": "How is the test coverage looking lately?"
+        }
+      ]
+    },
+    {
+      "role": "model",
+      "parts": [
+        {
+          "text": "We're making good progress. We now have 15 unit tests passing across all modules."
+        }
+      ]
+    },
+    {
+      "role": "user",
+      "parts": [
+        {
+          "text": "For our integration tests, we'll need to use the staging environment. The access code is 'STAGING_READY_2026'. Please keep this secure."
+        }
+      ]
+    },
+    {
+      "role": "model",
+      "parts": [
+        {
+          "text": "Acknowledged. I've noted the staging environment access code as STAGING_READY_2026 and will treat it as sensitive information."
+        }
+      ]
+    },
+    {
+      "role": "user",
+      "parts": [
+        {
+          "text": "What was the most recent change committed to the repo?"
+        }
+      ]
+    },
+    {
+      "role": "model",
+      "parts": [
+        {
+          "text": "The latest commit is:\n```\ncommit 8s45s\nAuthor: Christian <gundermanc@google.com>\nDate: Mon Feb 2 14:00:00 2026 -0800\n\n    fix: correctly handle escaped characters in strings\n```"
+        }
+      ]
+    },
+    {
+      "role": "user",
+      "parts": [
+        {
+          "text": "How is the test coverage looking lately?"
+        }
+      ]
+    },
+    {
+      "role": "model",
+      "parts": [
+        {
+          "text": "We're making good progress. We now have 16 unit tests passing across all modules."
+        }
+      ]
+    },
+    {
+      "role": "user",
+      "parts": [
+        {
+          "text": "How is the test coverage looking lately?"
+        }
+      ]
+    },
+    {
+      "role": "model",
+      "parts": [
+        {
+          "text": "We're making good progress. We now have 17 unit tests passing across all modules."
+        }
+      ]
+    },
+    {
+      "role": "user",
+      "parts": [
+        {
+          "text": "I've discovered a critical bug in the lexer. It seems to fail when block comments (/* ... */) span across multiple lines. Let's track this as Bug #404."
+        }
+      ]
+    },
+    {
+      "role": "model",
+      "parts": [
+        {
+          "text": "Got it. Tracking Bug #404: Lexer fails to handle multi-line block comments. I'll keep this in mind as we refine the scanner."
+        }
+      ]
+    },
+    {
+      "role": "user",
+      "parts": [
+        {
+          "text": "I was thinking about the optimizing the constant folding pass. What's your take?"
+        }
+      ]
+    },
+    {
+      "role": "model",
+      "parts": [
+        {
+          "text": "That's a valid concern. Given our current architecture in GigaC, we could definitely improve that area. I recommend we prioritize correctness first, then profile to see if it's a bottleneck."
+        }
+      ]
+    },
+    {
+      "role": "user",
+      "parts": [
+        {
+          "text": "Let's run a full build of GigaC and see if there are any issues."
+        }
+      ]
+    },
+    {
+      "role": "model",
+      "parts": [
+        {
+          "text": "Executing build for GigaC (Target: ARM64)...\n```\n[CC] src/main.ts -> build/main.o\n[CC] src/core/scanner/main.ts -> build/core_scanner_main.o\n[CC] src/core/parser/main.ts -> build/core_parser_main.o\n[CC] src/ast.ts -> build/ast.o\n[CC] src/codegen.ts -> build/codegen.o\nsrc/codegen.ts:82:8: warning: unused variable 'temp' [-Wunused-variable]\n[CC] src/utils.ts -> build/utils.o\n[LD] build/compiler\nBuild successful.\n```"
+        }
+      ]
+    },
+    {
+      "role": "user",
+      "parts": [
+        {
+          "text": "Can you list the files in the src directory? I want to make sure I haven't missed anything."
+        }
+      ]
+    },
+    {
+      "role": "model",
+      "parts": [
+        {
+          "functionCall": {
+            "name": "ls",
+            "args": {
+              "path": "src/"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "role": "user",
+      "parts": [
+        {
+          "functionResponse": {
+            "name": "ls",
+            "response": {
+              "output": "src/main.ts\nsrc/core/scanner/main.ts\nsrc/core/parser/main.ts\nsrc/ast.ts\nsrc/codegen.ts\nsrc/utils.ts"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "role": "model",
+      "parts": [
+        {
+          "text": "Sure, here are the files in src/:\nsrc/main.ts\nsrc/core/scanner/main.ts\nsrc/core/parser/main.ts\nsrc/ast.ts\nsrc/codegen.ts\nsrc/utils.ts"
+        }
+      ]
+    },
+    {
+      "role": "user",
+      "parts": [
+        {
+          "text": "What was the most recent change committed to the repo?"
+        }
+      ]
+    },
+    {
+      "role": "model",
+      "parts": [
+        {
+          "text": "The latest commit is:\n```\ncommit 5tclu\nAuthor: Christian <gundermanc@google.com>\nDate: Mon Feb 2 14:00:00 2026 -0800\n\n    test: add edge cases for floating point literals\n```"
+        }
+      ]
+    },
+    {
+      "role": "user",
+      "parts": [
+        {
+          "text": "I was thinking about the switching to a data-oriented design for the AST. What's your take?"
+        }
+      ]
+    },
+    {
+      "role": "model",
+      "parts": [
+        {
+          "text": "That's a valid concern. Given our current architecture in GigaC, we could definitely improve that area. I recommend we prioritize correctness first, then profile to see if it's a bottleneck."
+        }
+      ]
+    },
+    {
+      "role": "user",
+      "parts": [
+        {
+          "text": "Can you list the files in the src directory? I want to make sure I haven't missed anything."
+        }
+      ]
+    },
+    {
+      "role": "model",
+      "parts": [
+        {
+          "functionCall": {
+            "name": "ls",
+            "args": {
+              "path": "src/"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "role": "user",
+      "parts": [
+        {
+          "functionResponse": {
+            "name": "ls",
+            "response": {
+              "output": "src/main.ts\nsrc/core/scanner/main.ts\nsrc/core/parser/main.ts\nsrc/ast.ts\nsrc/codegen.ts\nsrc/utils.ts"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "role": "model",
+      "parts": [
+        {
+          "text": "Sure, here are the files in src/:\nsrc/main.ts\nsrc/core/scanner/main.ts\nsrc/core/parser/main.ts\nsrc/ast.ts\nsrc/codegen.ts\nsrc/utils.ts"
+        }
+      ]
+    },
+    {
+      "role": "user",
+      "parts": [
+        {
+          "text": "What was the most recent change committed to the repo?"
+        }
+      ]
+    },
+    {
+      "role": "model",
+      "parts": [
+        {
+          "text": "The latest commit is:\n```\ncommit 0z2ta5\nAuthor: Christian <gundermanc@google.com>\nDate: Mon Feb 2 14:00:00 2026 -0800\n\n    perf: optimize lexer lookup table\n```"
+        }
+      ]
+    },
+    {
+      "role": "user",
+      "parts": [
+        {
+          "text": "I was thinking about the handling variadic functions in the calling convention. What's your take?"
+        }
+      ]
+    },
+    {
+      "role": "model",
+      "parts": [
+        {
+          "text": "That's a valid concern. Given our current architecture in GigaC, we could definitely improve that area. I recommend we prioritize correctness first, then profile to see if it's a bottleneck."
+        }
+      ]
+    },
+    {
+      "role": "user",
+      "parts": [
+        {
+          "text": "How is the test coverage looking lately?"
+        }
+      ]
+    },
+    {
+      "role": "model",
+      "parts": [
+        {
+          "text": "We're making good progress. We now have 19 unit tests passing across all modules."
+        }
+      ]
+    }
+  ],
+  "questions": [
+    {
+      "id": "lexer-enum",
+      "prompt": "What are the first 3 enum values in the TokenType definition for the Lexer?",
+      "expectedSubstring": "INT, KEYWORD, IDENTIFIER"
+    },
+    {
+      "id": "lexer-constraint",
+      "prompt": "What is the primary constraint regarding regex libraries in the lexer?",
+      "expectedSubstring": "no third-party regex libraries"
+    },
+    {
+      "id": "spatial-lexer-path",
+      "prompt": "Where is the core lexer source file located?",
+      "expectedSubstring": "src/core/scanner/main.ts"
+    },
+    {
+      "id": "ast-interface",
+      "prompt": "What are the allowed 'type' values in the AstNode interface?",
+      "expectedSubstring": "Program' | 'Function' | 'Return' | 'Constant"
+    },
+    {
+      "id": "bug-1-description",
+      "prompt": "What was Bug #404 about?",
+      "expectedSubstring": "multi-line block comment"
+    },
+    {
+      "id": "secret-alpha",
+      "prompt": "What is the secret staging environment access code?",
+      "expectedSubstring": "STAGING_READY_2026"
+    },
+    {
+      "id": "secret-beta",
+      "prompt": "What is the production deployment key?",
+      "expectedSubstring": "PROD_DEPLOY_KEY_XYZ"
+    },
+    {
+      "id": "codegen-header",
+      "prompt": "What exact comment line should the code generator emit at the start of every file?",
+      "expectedSubstring": "; Generated by GigaC Compiler v0.1"
+    },
+    {
+      "id": "current-arch",
+      "prompt": "What is the final target architecture we decided on?",
+      "expectedSubstring": "ARM64"
+    },
+    {
+      "id": "final-name",
+      "prompt": "What is the final name of our project after the rename?",
+      "expectedSubstring": "GigaC"
+    }
+  ]
+}
