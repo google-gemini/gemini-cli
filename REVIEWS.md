@@ -1,11 +1,11 @@
 # 🔎 Gemini CLI Triage Dashboard
 
-*Last Synchronized: 2026-04-09 23:25 (UTC)*
+*Last Synchronized: 2026-04-09 23:29 (UTC)*
 
 **Total Issues Tracked: 176** | **Categorized: 176**
 
 ## 🚨 Needs Oncaller Attention (16)
-**Action: Specialized approval required.**
+**Action: Specialized approval required.** These PRs are waiting for specific teams (e.g. Prompt Approvers).
 
 | Issue | Linked PR | Required Teams | Human Reviewers |
 | :--- | :--- | :--- | :--- |
@@ -25,6 +25,20 @@
 | [#20755 Shell Tool Trailing Newline Trimming](https://github.com/google-gemini/gemini-cli/issues/20755) | [#23705](https://github.com/google-gemini/gemini-cli/pull/23705) | `gemini-cli-prompt-approvers` | @mrpmohiburrahman |
 | [#21836 [Bug]: ripgrep ENOENT on Termux due to incompatible binary](https://github.com/google-gemini/gemini-cli/issues/21836) | [#25030](https://github.com/google-gemini/gemini-cli/pull/25030) | `gemini-cli-prompt-approvers` | _None_ |
 | [#24838 StreamableHTTPTransport fails when endpoint requires POST (e.g., n8n native MCP)](https://github.com/google-gemini/gemini-cli/issues/24838) | [#24847](https://github.com/google-gemini/gemini-cli/pull/24847) | `gemini-cli-prompt-approvers` | @cocosheng-g |
+
+## 🚩 Stale Assignments (0)
+**Action: Maintainers, please unassign.** Assigned for >14 days with no open Pull Request.
+
+| Issue | Assignee | Days Stale |
+| :--- | :--- | :--- |
+| - | _No stale assignments._ | - |
+
+## 🚧 Blocked & Stale PRs (0)
+**Action: Maintainers, please close.** PRs with conflicts or failures untouched for >14 days. Associated issues will be unassigned.
+
+| Issue | PR | Reason | Author | Days Stale |
+| :--- | :--- | :--- | :--- | :--- |
+| - | _No stale blocked PRs._ | - | - | - |
 
 ## 🆕 Awaiting Reviewer Pickup (18)
 **Action: Pick up one of these new PRs.** All tests passing, no conflicts.
@@ -156,13 +170,13 @@
 | [#22929 False command conflicts when launching from home directory (workspace and user commands resolve to same path)](https://github.com/google-gemini/gemini-cli/issues/22929) | [#23069](https://github.com/google-gemini/gemini-cli/pull/23069) | @Br1an67 | Test Failure | `2026-04-09` |
 | [#23018 ACP: Execute tool call title field contains conversational text.](https://github.com/google-gemini/gemini-cli/issues/23018) | [#23092](https://github.com/google-gemini/gemini-cli/pull/23092) | @jasonmatthewsuhari | Merge Conflict | `2026-04-09` |
 | [#20730 gemini is not able to view files that exist, and I am not able to tag them (despite not being gitignored/geminiignored)](https://github.com/google-gemini/gemini-cli/issues/20730) | [#20738](https://github.com/google-gemini/gemini-cli/pull/20738) | @Aaxhirrr | Merge Conflict | `2026-04-07` |
-| [#21230 feat: visualize tool and /visualize command](https://github.com/google-gemini/gemini-cli/issues/21230) | [#24192](https://github.com/google-gemini/gemini-cli/pull/24192) | @student-ankitpandit | Merge Conflict | `2026-03-30` |
 | [#21340 feat: Add configurable shell executable for run_shell_command on Windows](https://github.com/google-gemini/gemini-cli/issues/21340) | [#22018](https://github.com/google-gemini/gemini-cli/pull/22018) | @benjamindrussell | Merge Conflict | `2026-04-09` |
 | [#19919 "Failed to persist policy" error despite correct permissions](https://github.com/google-gemini/gemini-cli/issues/19919) | [#21541](https://github.com/google-gemini/gemini-cli/pull/21541) | @krishdef7 | Merge Conflict | `2026-04-09` |
 | [#21084 External editor support: unclear error messages, missing editors, incomplete documentation](https://github.com/google-gemini/gemini-cli/issues/21084) | [#21090](https://github.com/google-gemini/gemini-cli/pull/21090) | @alberti42 | Merge Conflict | `2026-04-04` |
 | [#11462 Consider adding visual regression testing for terminal UI components](https://github.com/google-gemini/gemini-cli/issues/11462) | [#20695](https://github.com/google-gemini/gemini-cli/pull/20695) | @Champbreed | Merge Conflict | `2026-04-09` |
 | [#19649 extend /copy to capture output also from slash commands](https://github.com/google-gemini/gemini-cli/issues/19649) | [#19825](https://github.com/google-gemini/gemini-cli/pull/19825) | @Devnil434 | Merge Conflict | `2026-04-09` |
 | [#15503 feat: github colorblind themes](https://github.com/google-gemini/gemini-cli/issues/15503) | [#15504](https://github.com/google-gemini/gemini-cli/pull/15504) | @Z1xus | Test Failure | `2026-04-09` |
+| [#21230 feat: visualize tool and /visualize command](https://github.com/google-gemini/gemini-cli/issues/21230) | [#24192](https://github.com/google-gemini/gemini-cli/pull/24192) | @student-ankitpandit | Merge Conflict | `2026-03-30` |
 
 ## 🌱 Available for Pickup (53)
 **Action: Open for new contributors.**
@@ -222,20 +236,6 @@
 | [#20968 Windows PowerShell Output Encoding Bug](https://github.com/google-gemini/gemini-cli/issues/20968) | 0 |
 | [#22035 Allow wrapping tool descriptions to prevent truncation in the UI](https://github.com/google-gemini/gemini-cli/issues/22035) | 0 |
 | [#21925 Gemini CLI shows the hand icon indicating that Action is required even when it is not required](https://github.com/google-gemini/gemini-cli/issues/21925) | 0 |
-
-## 🚩 Stale Assignments (0)
-**Action: Consider unassigning.** Assigned for >14 days with no PR yet.
-
-| Issue | Assignee | Days Stale |
-| :--- | :--- | :--- |
-| - | _None_ |
-
-## 🚧 Blocked & Stale PRs (0)
-**Action: Needs rebase or test fix.** Blocked items untouched for >14 days.
-
-| Issue | PR | Reason | Author | Days Stale |
-| :--- | :--- | :--- | :--- | :--- |
-| - | _None_ | - | - | - |
 
 ---
 *Dashboard maintained by automated triage script.*

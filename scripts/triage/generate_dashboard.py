@@ -107,6 +107,14 @@ query($repoOwner: String!, $repoName: String!, $prNumber: Int!) {
           }
         }
       }
+      timelineItems(last: 10, itemTypes: [REOPENED_EVENT, READY_FOR_REVIEW_EVENT, CONVERT_TO_DRAFT_EVENT]) {
+        nodes {
+          __typename
+          ... on ReopenedEvent { createdAt }
+          ... on ReadyForReviewEvent { createdAt }
+          ... on ConvertToDraftEvent { createdAt }
+        }
+      }
     }
   }
 }
@@ -129,22 +137,19 @@ def get_reviewer_info(pr):
     human_reviewers = set()
     requested_special_teams = set()
     
-    # 1. Collect from requested reviewers
     for req in pr.get('reviewRequests', {}).get('nodes', []):
         rr = req.get('requestedReviewer')
         if rr:
             if rr['__typename'] == 'User':
-                login = rr.get('login')
+                login = rr['login']
                 if login and login != author and login not in BOT_BLACKLIST:
                     human_reviewers.add(login)
             elif rr['__typename'] == 'Team':
                 slug = rr['slug']
-                # Strip repo name if present in slug
                 simple_slug = slug.split('/')[-1]
                 if simple_slug in ONCALLER_TEAMS:
                     requested_special_teams.add(simple_slug)
                 
-    # 2. Collect from formal reviews
     reviews = pr.get('latestReviews', {}).get('nodes', [])
     for r in reviews:
         login = r.get('author', {}).get('login') if r.get('author') else None
@@ -152,7 +157,6 @@ def get_reviewer_info(pr):
             human_reviewers.add(login)
             latest_reviewer_activity = max(latest_reviewer_activity, r['updatedAt'])
             
-    # 3. Track latest activity from ANYONE who isn't the author
     all_comments = pr.get('comments', {}).get('nodes', [])
     for c in all_comments:
         login = c.get('author', {}).get('login') if c.get('author') else None
@@ -160,14 +164,16 @@ def get_reviewer_info(pr):
             latest_reviewer_activity = max(latest_reviewer_activity, c['publishedAt'])
             
     return sorted(list(human_reviewers)), latest_reviewer_activity, sorted(list(requested_special_teams))
+
 def get_latest_activity(pr):
     latest = pr['commits']['nodes'][0]['commit']['committedDate']
-    # Check all comments
     for c in pr.get('comments', {}).get('nodes', []):
         latest = max(latest, c['publishedAt'])
-    # Check all reviews (including empty ones)
     for r in pr.get('latestReviews', {}).get('nodes', []):
         latest = max(latest, r['updatedAt'])
+    for event in pr.get('timelineItems', {}).get('nodes', []):
+        if 'createdAt' in event:
+            latest = max(latest, event['createdAt'])
     return latest
 
 def main():
@@ -287,13 +293,25 @@ def main():
     md = f"# 🔎 Gemini CLI Triage Dashboard\n\n*Last Synchronized: {ts} (UTC)*\n\n"
     md += f"**Total Issues Tracked: {len(all_issues)}** | **Categorized: {sum_categories}**\n\n"
     
-    md += f"## 🚨 Needs Oncaller Attention ({len(oncaller_attention)})\n**Action: Specialized approval required.**\n\n"
+    md += f"## 🚨 Needs Oncaller Attention ({len(oncaller_attention)})\n**Action: Specialized approval required.** These PRs are waiting for specific teams (e.g. Prompt Approvers).\n\n"
     md += "| Issue | Linked PR | Required Teams | Human Reviewers |\n| :--- | :--- | :--- | :--- |\n"
     for i in oncaller_attention:
         revs = ", ".join([f"@{r}" for r in i['reviewers']]) if i['reviewers'] else "_None_"
         teams = ", ".join([f"`{t}`" for t in i['teams']])
         md += f"| {i['issue_md']} | [#{i['pr_no']}]({i['pr_url']}) | {teams} | {revs} |\n"
     if not oncaller_attention: md += "| - | _None_ | - | - |\n"
+
+    md += f"\n## 🚩 Stale Assignments ({len(stale_assignments)})\n**Action: Maintainers, please unassign.** Assigned for >{STALE_ASSIGNMENT_DAYS} days with no open Pull Request.\n\n"
+    md += "| Issue | Assignee | Days Stale |\n| :--- | :--- | :--- |\n"
+    for i in stale_assignments:
+        md += f"| {i['issue_md']} | @{', @'.join(i['assignees'])} | {i['days_stale']} |\n"
+    if not stale_assignments: md += "| - | _No stale assignments._ | - |\n"
+
+    md += f"\n## 🚧 Blocked & Stale PRs ({len(blocked_stale_prs)})\n**Action: Maintainers, please close.** PRs with conflicts or failures untouched for >{STALE_BLOCKED_PR_DAYS} days. Associated issues will be unassigned.\n\n"
+    md += "| Issue | PR | Reason | Author | Days Stale |\n| :--- | :--- | :--- | :--- | :--- |\n"
+    for i in blocked_stale_prs:
+        md += f"| {i['issue_md']} | [#{i['pr_no']}]({i['pr_url']}) | {i['reason']} | @{i['author']} | {i['days_stale']} |\n"
+    if not blocked_stale_prs: md += "| - | _No stale blocked PRs._ | - | - | - |\n"
 
     md += f"\n## 🆕 Awaiting Reviewer Pickup ({len(initial_pickup)})\n**Action: Pick up one of these new PRs.** All tests passing, no conflicts.\n\n"
     md += "| Issue | Linked PR | Last Update |\n| :--- | :--- | :--- |\n"
@@ -325,19 +343,9 @@ def main():
     for i in available_pickup: md += f"| {i['issue_md']} | {i['days_idle']} |\n"
     if not available_pickup: md += "| - | _None_ |\n"
 
-    md += f"\n## 🚩 Stale Assignments ({len(stale_assignments)})\n**Action: Consider unassigning.** Assigned for >14 days with no PR yet.\n\n"
-    md += "| Issue | Assignee | Days Stale |\n| :--- | :--- | :--- |\n"
-    for i in stale_assignments: md += f"| {i['issue_md']} | @{', @'.join(i['assignees'])} | {i['days_stale']} |\n"
-    if not stale_assignments: md += "| - | _None_ |\n"
-
-    md += f"\n## 🚧 Blocked & Stale PRs ({len(blocked_stale_prs)})\n**Action: Needs rebase or test fix.** Blocked items untouched for >14 days.\n\n"
-    md += "| Issue | PR | Reason | Author | Days Stale |\n| :--- | :--- | :--- | :--- | :--- |\n"
-    for i in blocked_stale_prs: md += f"| {i['issue_md']} | [#{i['pr_no']}]({i['pr_url']}) | {i['reason']} | @{i['author']} | {i['days_stale']} |\n"
-    if not blocked_stale_prs: md += "| - | _None_ | - | - | - |\n"
-
     md += "\n---\n*Dashboard maintained by automated triage script.*"
     with open("REVIEWS.md", "w") as f: f.write(md)
-    print(f"Generated dashboard with sorted oncaller table.")
+    print(f"Generated reorganized dashboard for {len(all_issues)} issues.")
 
 if __name__ == "__main__":
     main()
