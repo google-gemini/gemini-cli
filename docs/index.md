@@ -19,8 +19,6 @@ Jump in to Gemini CLI.
   on your system.
 - **[Authentication](./get-started/authentication.md):** Setup instructions for
   personal and enterprise accounts.
-- **[Examples](./get-started/examples.md):** Practical examples of Gemini CLI in
-  action.
 - **[CLI cheatsheet](./cli/cli-reference.md):** A quick reference for common
   commands and options.
 - **[Gemini 3 on Gemini CLI](./get-started/gemini-3.md):** Learn about Gemini 3
@@ -108,8 +106,8 @@ Deep technical documentation and API specifications.
   processes memory from various sources.
 - **[Policy engine](./reference/policy-engine.md):** Fine-grained execution
   control.
-- **[Tools API](./reference/tools-api.md):** The API for defining and using
-  tools.
+- **[Tools reference](./reference/tools.md):** Information on how tools are
+  defined, registered, and used.
 
 ## Resources
 

@@ -325,7 +325,6 @@ describe('toolMapping', () => {
       const result = mapToDisplay(toolCall);
       expect(result.tools[0].originalRequestName).toBe('original_tool');
     });
-
     it('propagates isClientInitiated from tool request', () => {
       const clientInitiatedTool: ScheduledToolCall = {
         status: CoreToolCallStatus.Scheduled,

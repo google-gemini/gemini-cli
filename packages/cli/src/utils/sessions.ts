@@ -21,7 +21,7 @@ export async function listSessions(config: Config): Promise<void> {
   // Generate summary for most recent session if needed
   await generateSummary(config);
 
-  const sessionSelector = new SessionSelector(config);
+  const sessionSelector = new SessionSelector(config.storage);
   const sessions = await sessionSelector.listSessions();
 
   if (sessions.length === 0) {
@@ -55,7 +55,7 @@ export async function deleteSession(
   config: Config,
   sessionIndex: string,
 ): Promise<void> {
-  const sessionSelector = new SessionSelector(config);
+  const sessionSelector = new SessionSelector(config.storage);
   const sessions = await sessionSelector.listSessions();
 
   if (sessions.length === 0) {
@@ -97,7 +97,7 @@ export async function deleteSession(
   try {
     // Use ChatRecordingService to delete the session
     const chatRecordingService = new ChatRecordingService(config);
-    chatRecordingService.deleteSession(sessionToDelete.file);
+    await chatRecordingService.deleteSession(sessionToDelete.file);
 
     const time = formatRelativeTime(sessionToDelete.lastUpdated);
     writeToStdout(

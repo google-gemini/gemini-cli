@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import React, { useState, useEffect, useCallback, useRef } from 'react';
+import React, { useMemo, useState, useCallback } from 'react';
 import { Box, Text } from 'ink';
 import chalk from 'chalk';
 import { theme } from '../../semantic-colors.js';
@@ -17,14 +17,13 @@ import { getScopeItems } from '../../../utils/dialogScopeUtils.js';
 import { RadioButtonSelect } from './RadioButtonSelect.js';
 import { TextInput } from './TextInput.js';
 import type { TextBuffer } from './text-buffer.js';
-import {
-  cpSlice,
-  cpLen,
-  stripUnsafeCharacters,
-  cpIndexToOffset,
-} from '../../utils/textUtils.js';
+import { cpSlice, cpLen, cpIndexToOffset } from '../../utils/textUtils.js';
 import { useKeypress, type Key } from '../../hooks/useKeypress.js';
-import { keyMatchers, Command } from '../../keyMatchers.js';
+import { Command, type KeyMatchers } from '../../key/keyMatchers.js';
+import { useSettingsNavigation } from '../../hooks/useSettingsNavigation.js';
+import { useInlineEditBuffer } from '../../hooks/useInlineEditBuffer.js';
+import { formatCommand } from '../../key/keybindingUtils.js';
+import { useKeyMatchers } from '../../hooks/useKeyMatchers.js';
 
 /**
  * Represents a single item in the settings dialog.
@@ -59,7 +58,6 @@ export interface BaseSettingsDialogProps {
   title: string;
   /** Optional border color for the dialog */
   borderColor?: string;
-
   // Search (optional feature)
   /** Whether to show the search input. Default: true */
   searchEnabled?: boolean;
@@ -105,9 +103,17 @@ export interface BaseSettingsDialogProps {
     currentItem: SettingsDialogItem | undefined,
   ) => boolean;
 
-  // Optional extra content below help text (for restart prompt, etc.)
-  /** Optional footer content (e.g., restart prompt) */
-  footerContent?: React.ReactNode;
+  /** Optional override for key matchers used for navigation. */
+  keyMatchers?: KeyMatchers;
+
+  /** Available terminal height for dynamic windowing */
+  availableHeight?: number;
+
+  /** Optional footer configuration */
+  footer?: {
+    content: React.ReactNode;
+    height: number;
+  };
 }
 
 /**
@@ -131,68 +137,116 @@ export function BaseSettingsDialog({
   onItemClear,
   onClose,
   onKeyPress,
-  footerContent,
+  keyMatchers: customKeyMatchers,
+  availableHeight,
+  footer,
 }: BaseSettingsDialogProps): React.JSX.Element {
+  const globalKeyMatchers = useKeyMatchers();
+  const keyMatchers = customKeyMatchers ?? globalKeyMatchers;
+  // Calculate effective max items and scope visibility based on terminal height
+  const { effectiveMaxItemsToShow, finalShowScopeSelector } = useMemo(() => {
+    const initialShowScope = showScopeSelector;
+    const initialMaxItems = maxItemsToShow;
+
+    if (!availableHeight) {
+      return {
+        effectiveMaxItemsToShow: initialMaxItems,
+        finalShowScopeSelector: initialShowScope,
+      };
+    }
+
+    // Layout constants based on BaseSettingsDialog structure:
+    const DIALOG_PADDING = 4;
+    const SETTINGS_TITLE_HEIGHT = 1;
+    // Account for the unconditional spacer below search/title section
+    const SEARCH_SECTION_HEIGHT = searchEnabled ? 5 : 1;
+    const SCROLL_ARROWS_HEIGHT = 2;
+    const ITEMS_SPACING_AFTER = 1;
+    const SCOPE_SECTION_HEIGHT = 5;
+    const HELP_TEXT_HEIGHT = 1;
+    const FOOTER_CONTENT_HEIGHT = footer?.height ?? 0;
+    const ITEM_HEIGHT = 3;
+
+    const currentAvailableHeight = availableHeight - DIALOG_PADDING;
+
+    const baseFixedHeight =
+      SETTINGS_TITLE_HEIGHT +
+      SEARCH_SECTION_HEIGHT +
+      SCROLL_ARROWS_HEIGHT +
+      ITEMS_SPACING_AFTER +
+      HELP_TEXT_HEIGHT +
+      FOOTER_CONTENT_HEIGHT;
+
+    // Calculate max items with scope selector
+    const heightWithScope = baseFixedHeight + SCOPE_SECTION_HEIGHT;
+    const availableForItemsWithScope = currentAvailableHeight - heightWithScope;
+    const maxItemsWithScope = Math.max(
+      1,
+      Math.floor(availableForItemsWithScope / ITEM_HEIGHT),
+    );
+
+    // Calculate max items without scope selector
+    const availableForItemsWithoutScope =
+      currentAvailableHeight - baseFixedHeight;
+    const maxItemsWithoutScope = Math.max(
+      1,
+      Math.floor(availableForItemsWithoutScope / ITEM_HEIGHT),
+    );
+
+    // In small terminals, hide scope selector if it would allow more items to show
+    let shouldShowScope = initialShowScope;
+    let maxItems = initialShowScope ? maxItemsWithScope : maxItemsWithoutScope;
+
+    if (initialShowScope && availableHeight < 25) {
+      // Hide scope selector if it gains us more than 1 extra item
+      if (maxItemsWithoutScope > maxItemsWithScope + 1) {
+        shouldShowScope = false;
+        maxItems = maxItemsWithoutScope;
+      }
+    }
+
+    return {
+      effectiveMaxItemsToShow: Math.min(maxItems, items.length),
+      finalShowScopeSelector: shouldShowScope,
+    };
+  }, [
+    availableHeight,
+    maxItemsToShow,
+    items.length,
+    searchEnabled,
+    showScopeSelector,
+    footer,
+  ]);
+
   // Internal state
-  const [activeIndex, setActiveIndex] = useState(0);
-  const [scrollOffset, setScrollOffset] = useState(0);
+  const { activeIndex, windowStart, moveUp, moveDown } = useSettingsNavigation({
+    items,
+    maxItemsToShow: effectiveMaxItemsToShow,
+  });
+
+  const { editState, editDispatch, startEditing, commitEdit, cursorVisible } =
+    useInlineEditBuffer({
+      onCommit: (key, value) => {
+        const itemToCommit = items.find((i) => i.key === key);
+        if (itemToCommit) {
+          onEditCommit(key, value, itemToCommit);
+        }
+      },
+    });
+
+  const {
+    editingKey,
+    buffer: editBuffer,
+    cursorPos: editCursorPos,
+  } = editState;
+
   const [focusSection, setFocusSection] = useState<'settings' | 'scope'>(
     'settings',
   );
-  const [editingKey, setEditingKey] = useState<string | null>(null);
-  const [editBuffer, setEditBuffer] = useState('');
-  const [editCursorPos, setEditCursorPos] = useState(0);
-  const [cursorVisible, setCursorVisible] = useState(true);
-
-  const prevItemsRef = useRef(items);
-
-  // Preserve focus when items change (e.g., search filter)
-  useEffect(() => {
-    const prevItems = prevItemsRef.current;
-    if (prevItems !== items) {
-      const prevActiveItem = prevItems[activeIndex];
-      if (prevActiveItem) {
-        const newIndex = items.findIndex((i) => i.key === prevActiveItem.key);
-        if (newIndex !== -1) {
-          // Item still exists in the filtered list, keep focus on it
-          setActiveIndex(newIndex);
-          // Adjust scroll offset to ensure the item is visible
-          let newScroll = scrollOffset;
-          if (newIndex < scrollOffset) newScroll = newIndex;
-          else if (newIndex >= scrollOffset + maxItemsToShow)
-            newScroll = newIndex - maxItemsToShow + 1;
-
-          const maxScroll = Math.max(0, items.length - maxItemsToShow);
-          setScrollOffset(Math.min(newScroll, maxScroll));
-        } else {
-          // Item was filtered out, reset to the top
-          setActiveIndex(0);
-          setScrollOffset(0);
-        }
-      } else {
-        setActiveIndex(0);
-        setScrollOffset(0);
-      }
-      prevItemsRef.current = items;
-    }
-  }, [items, activeIndex, scrollOffset, maxItemsToShow]);
-
-  // Cursor blink effect
-  useEffect(() => {
-    if (!editingKey) return;
-    setCursorVisible(true);
-    const interval = setInterval(() => {
-      setCursorVisible((v) => !v);
-    }, 500);
-    return () => clearInterval(interval);
-  }, [editingKey]);
-
-  // Ensure focus stays on settings when scope selection is hidden
-  useEffect(() => {
-    if (!showScopeSelector && focusSection === 'scope') {
-      setFocusSection('settings');
-    }
-  }, [showScopeSelector, focusSection]);
+  const effectiveFocusSection =
+    !finalShowScopeSelector && focusSection === 'scope'
+      ? 'settings'
+      : focusSection;
 
   // Scope selector items
   const scopeItems = getScopeItems().map((item) => ({
@@ -201,43 +255,20 @@ export function BaseSettingsDialog({
   }));
 
   // Calculate visible items based on scroll offset
-  const visibleItems = items.slice(scrollOffset, scrollOffset + maxItemsToShow);
+  const visibleItems = items.slice(
+    windowStart,
+    windowStart + effectiveMaxItemsToShow,
+  );
 
   // Show scroll indicators if there are more items than can be displayed
-  const showScrollUp = items.length > maxItemsToShow;
-  const showScrollDown = items.length > maxItemsToShow;
+  const showScrollUp = items.length > effectiveMaxItemsToShow;
+  const showScrollDown = items.length > effectiveMaxItemsToShow;
 
   // Get current item
   const currentItem = items[activeIndex];
 
-  // Start editing a field
-  const startEditing = useCallback((key: string, initialValue: string) => {
-    setEditingKey(key);
-    setEditBuffer(initialValue);
-    setEditCursorPos(cpLen(initialValue));
-    setCursorVisible(true);
-  }, []);
-
-  // Commit edit and exit edit mode
-  const commitEdit = useCallback(() => {
-    if (editingKey && currentItem) {
-      onEditCommit(editingKey, editBuffer, currentItem);
-    }
-    setEditingKey(null);
-    setEditBuffer('');
-    setEditCursorPos(0);
-  }, [editingKey, editBuffer, currentItem, onEditCommit]);
-
-  // Handle scope highlight (for RadioButtonSelect)
-  const handleScopeHighlight = useCallback(
-    (scope: LoadableSettingScope) => {
-      onScopeChange?.(scope);
-    },
-    [onScopeChange],
-  );
-
-  // Handle scope select (for RadioButtonSelect)
-  const handleScopeSelect = useCallback(
+  // Handle scope changes (for RadioButtonSelect)
+  const handleScopeChange = useCallback(
     (scope: LoadableSettingScope) => {
       onScopeChange?.(scope);
     },
@@ -247,8 +278,8 @@ export function BaseSettingsDialog({
   // Keyboard handling
   useKeypress(
     (key: Key) => {
-      // Let parent handle custom keys first
-      if (onKeyPress?.(key, currentItem)) {
+      // Let parent handle custom keys first (only if not editing)
+      if (!editingKey && onKeyPress?.(key, currentItem)) {
         return;
       }
 
@@ -259,44 +290,31 @@ export function BaseSettingsDialog({
 
         // Navigation within edit buffer
         if (keyMatchers[Command.MOVE_LEFT](key)) {
-          setEditCursorPos((p) => Math.max(0, p - 1));
+          editDispatch({ type: 'MOVE_LEFT' });
           return;
         }
         if (keyMatchers[Command.MOVE_RIGHT](key)) {
-          setEditCursorPos((p) => Math.min(cpLen(editBuffer), p + 1));
+          editDispatch({ type: 'MOVE_RIGHT' });
           return;
         }
         if (keyMatchers[Command.HOME](key)) {
-          setEditCursorPos(0);
+          editDispatch({ type: 'HOME' });
           return;
         }
         if (keyMatchers[Command.END](key)) {
-          setEditCursorPos(cpLen(editBuffer));
+          editDispatch({ type: 'END' });
           return;
         }
 
         // Backspace
         if (keyMatchers[Command.DELETE_CHAR_LEFT](key)) {
-          if (editCursorPos > 0) {
-            setEditBuffer((b) => {
-              const before = cpSlice(b, 0, editCursorPos - 1);
-              const after = cpSlice(b, editCursorPos);
-              return before + after;
-            });
-            setEditCursorPos((p) => p - 1);
-          }
+          editDispatch({ type: 'DELETE_LEFT' });
           return;
         }
 
         // Delete
         if (keyMatchers[Command.DELETE_CHAR_RIGHT](key)) {
-          if (editCursorPos < cpLen(editBuffer)) {
-            setEditBuffer((b) => {
-              const before = cpSlice(b, 0, editCursorPos);
-              const after = cpSlice(b, editCursorPos + 1);
-              return before + after;
-            });
-          }
+          editDispatch({ type: 'DELETE_RIGHT' });
           return;
         }
 
@@ -312,73 +330,43 @@ export function BaseSettingsDialog({
           return;
         }
 
-        // Up/Down in edit mode - commit and navigate
-        if (keyMatchers[Command.DIALOG_NAVIGATION_UP](key)) {
+        // Up/Down in edit mode - commit and navigate.
+        // Only trigger on non-insertable keys (arrow keys) so that typing
+        // j/k characters into the edit buffer is not intercepted.
+        if (keyMatchers[Command.DIALOG_NAVIGATION_UP](key) && !key.insertable) {
           commitEdit();
-          const newIndex = activeIndex > 0 ? activeIndex - 1 : items.length - 1;
-          setActiveIndex(newIndex);
-          if (newIndex === items.length - 1) {
-            setScrollOffset(Math.max(0, items.length - maxItemsToShow));
-          } else if (newIndex < scrollOffset) {
-            setScrollOffset(newIndex);
-          }
+          moveUp();
           return;
         }
-        if (keyMatchers[Command.DIALOG_NAVIGATION_DOWN](key)) {
+        if (
+          keyMatchers[Command.DIALOG_NAVIGATION_DOWN](key) &&
+          !key.insertable
+        ) {
           commitEdit();
-          const newIndex = activeIndex < items.length - 1 ? activeIndex + 1 : 0;
-          setActiveIndex(newIndex);
-          if (newIndex === 0) {
-            setScrollOffset(0);
-          } else if (newIndex >= scrollOffset + maxItemsToShow) {
-            setScrollOffset(newIndex - maxItemsToShow + 1);
-          }
+          moveDown();
           return;
         }
 
         // Character input
-        let ch = key.sequence;
-        let isValidChar = false;
-        if (type === 'number') {
-          isValidChar = /[0-9\-+.]/.test(ch);
-        } else {
-          isValidChar = ch.length === 1 && ch.charCodeAt(0) >= 32;
-          // Sanitize string input to prevent unsafe characters
-          ch = stripUnsafeCharacters(ch);
-        }
-
-        if (isValidChar && ch.length > 0) {
-          setEditBuffer((b) => {
-            const before = cpSlice(b, 0, editCursorPos);
-            const after = cpSlice(b, editCursorPos);
-            return before + ch + after;
+        if (key.sequence) {
+          editDispatch({
+            type: 'INSERT_CHAR',
+            char: key.sequence,
+            isNumberType: type === 'number',
           });
-          setEditCursorPos((p) => p + 1);
         }
         return;
       }
 
       // Not in edit mode - handle navigation and actions
-      if (focusSection === 'settings') {
+      if (effectiveFocusSection === 'settings') {
         // Up/Down navigation with wrap-around
         if (keyMatchers[Command.DIALOG_NAVIGATION_UP](key)) {
-          const newIndex = activeIndex > 0 ? activeIndex - 1 : items.length - 1;
-          setActiveIndex(newIndex);
-          if (newIndex === items.length - 1) {
-            setScrollOffset(Math.max(0, items.length - maxItemsToShow));
-          } else if (newIndex < scrollOffset) {
-            setScrollOffset(newIndex);
-          }
+          moveUp();
           return true;
         }
         if (keyMatchers[Command.DIALOG_NAVIGATION_DOWN](key)) {
-          const newIndex = activeIndex < items.length - 1 ? activeIndex + 1 : 0;
-          setActiveIndex(newIndex);
-          if (newIndex === 0) {
-            setScrollOffset(0);
-          } else if (newIndex >= scrollOffset + maxItemsToShow) {
-            setScrollOffset(newIndex - maxItemsToShow + 1);
-          }
+          moveDown();
           return true;
         }
 
@@ -411,7 +399,7 @@ export function BaseSettingsDialog({
       }
 
       // Tab - switch focus section
-      if (key.name === 'tab' && showScopeSelector) {
+      if (key.name === 'tab' && finalShowScopeSelector) {
         setFocusSection((s) => (s === 'settings' ? 'scope' : 'settings'));
         return;
       }
@@ -426,7 +414,7 @@ export function BaseSettingsDialog({
     },
     {
       isActive: true,
-      priority: focusSection === 'settings' && !editingKey,
+      priority: effectiveFocusSection === 'settings',
     },
   );
 
@@ -443,10 +431,10 @@ export function BaseSettingsDialog({
         {/* Title */}
         <Box marginX={1}>
           <Text
-            bold={focusSection === 'settings' && !editingKey}
+            bold={effectiveFocusSection === 'settings' && !editingKey}
             wrap="truncate"
           >
-            {focusSection === 'settings' ? '> ' : '  '}
+            {effectiveFocusSection === 'settings' ? '> ' : '  '}
             {title}{' '}
           </Text>
         </Box>
@@ -458,8 +446,8 @@ export function BaseSettingsDialog({
             borderColor={
               editingKey
                 ? theme.border.default
-                : focusSection === 'settings'
-                  ? theme.border.focused
+                : effectiveFocusSection === 'settings'
+                  ? theme.ui.focus
                   : theme.border.default
             }
             paddingX={1}
@@ -467,7 +455,7 @@ export function BaseSettingsDialog({
             marginTop={1}
           >
             <TextInput
-              focus={focusSection === 'settings' && !editingKey}
+              focus={effectiveFocusSection === 'settings' && !editingKey}
               buffer={searchBuffer}
               placeholder={searchPlaceholder}
             />
@@ -489,9 +477,10 @@ export function BaseSettingsDialog({
               </Box>
             )}
             {visibleItems.map((item, idx) => {
-              const globalIndex = idx + scrollOffset;
+              const globalIndex = idx + windowStart;
               const isActive =
-                focusSection === 'settings' && activeIndex === globalIndex;
+                effectiveFocusSection === 'settings' &&
+                activeIndex === globalIndex;
 
               // Compute display value with edit mode cursor
               let displayValue: string;
@@ -522,12 +511,17 @@ export function BaseSettingsDialog({
 
               return (
                 <React.Fragment key={item.key}>
-                  <Box marginX={1} flexDirection="row" alignItems="flex-start">
+                  <Box
+                    marginX={1}
+                    flexDirection="row"
+                    alignItems="flex-start"
+                    backgroundColor={
+                      isActive ? theme.background.focus : undefined
+                    }
+                  >
                     <Box minWidth={2} flexShrink={0}>
                       <Text
-                        color={
-                          isActive ? theme.status.success : theme.text.secondary
-                        }
+                        color={isActive ? theme.ui.focus : theme.text.secondary}
                       >
                         {isActive ? '●' : ''}
                       </Text>
@@ -544,9 +538,7 @@ export function BaseSettingsDialog({
                         minWidth={0}
                       >
                         <Text
-                          color={
-                            isActive ? theme.status.success : theme.text.primary
-                          }
+                          color={isActive ? theme.ui.focus : theme.text.primary}
                         >
                           {item.label}
                           {item.scopeMessage && (
@@ -565,7 +557,7 @@ export function BaseSettingsDialog({
                         <Text
                           color={
                             isActive
-                              ? theme.status.success
+                              ? theme.ui.focus
                               : item.isGreyedOut
                                 ? theme.text.secondary
                                 : theme.text.primary
@@ -598,21 +590,21 @@ export function BaseSettingsDialog({
         <Box height={1} />
 
         {/* Scope Selection */}
-        {showScopeSelector && (
+        {finalShowScopeSelector && (
           <Box marginX={1} flexDirection="column">
-            <Text bold={focusSection === 'scope'} wrap="truncate">
-              {focusSection === 'scope' ? '> ' : '  '}Apply To
+            <Text bold={effectiveFocusSection === 'scope'} wrap="truncate">
+              {effectiveFocusSection === 'scope' ? '> ' : '  '}Apply To
             </Text>
             <RadioButtonSelect
               items={scopeItems}
               initialIndex={scopeItems.findIndex(
                 (item) => item.value === selectedScope,
               )}
-              onSelect={handleScopeSelect}
-              onHighlight={handleScopeHighlight}
-              isFocused={focusSection === 'scope'}
-              showNumbers={focusSection === 'scope'}
-              priority={focusSection === 'scope'}
+              onSelect={handleScopeChange}
+              onHighlight={handleScopeChange}
+              isFocused={effectiveFocusSection === 'scope'}
+              showNumbers={effectiveFocusSection === 'scope'}
+              priority={effectiveFocusSection === 'scope'}
             />
           </Box>
         )}
@@ -622,13 +614,14 @@ export function BaseSettingsDialog({
         {/* Help text */}
         <Box marginX={1}>
           <Text color={theme.text.secondary}>
-            (Use Enter to select, Ctrl+L to reset
-            {showScopeSelector ? ', Tab to change focus' : ''}, Esc to close)
+            (Use Enter to select, {formatCommand(Command.CLEAR_SCREEN)} to reset
+            {finalShowScopeSelector ? ', Tab to change focus' : ''}, Esc to
+            close)
           </Text>
         </Box>
 
         {/* Footer content (e.g., restart prompt) */}
-        {footerContent && <Box marginX={1}>{footerContent}</Box>}
+        {footer && <Box marginX={1}>{footer.content}</Box>}
       </Box>
     </Box>
   );

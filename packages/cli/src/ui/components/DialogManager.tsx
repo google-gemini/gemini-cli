@@ -21,8 +21,7 @@ import { ProQuotaDialog } from './ProQuotaDialog.js';
 import { ValidationDialog } from './ValidationDialog.js';
 import { OverageMenuDialog } from './OverageMenuDialog.js';
 import { EmptyWalletDialog } from './EmptyWalletDialog.js';
-import { runExitCleanup } from '../../utils/cleanup.js';
-import { RELAUNCH_EXIT_CODE } from '../../utils/processUtils.js';
+import { relaunchApp } from '../../utils/processUtils.js';
 import { SessionBrowser } from './SessionBrowser.js';
 import { PermissionsModifyTrustDialog } from './PermissionsModifyTrustDialog.js';
 import { ModelDialog } from './ModelDialog.js';
@@ -88,6 +87,7 @@ export const DialogManager = ({
           !!uiState.quota.proQuotaRequest.isModelNotFoundError
         }
         authType={uiState.quota.proQuotaRequest.authType}
+        tierName={config?.getUserTierName()}
         onChoice={uiActions.handleProQuotaChoice}
       />
     );
@@ -231,10 +231,7 @@ export const DialogManager = ({
       <Box flexDirection="column">
         <SettingsDialog
           onSelect={() => uiActions.closeSettingsDialog()}
-          onRestartRequest={async () => {
-            await runExitCleanup();
-            process.exit(RELAUNCH_EXIT_CODE);
-          }}
+          onRestartRequest={relaunchApp}
           availableTerminalHeight={terminalHeight - staticExtraHeight}
         />
       </Box>
@@ -256,6 +253,7 @@ export const DialogManager = ({
           displayName={uiState.selectedAgentDisplayName}
           definition={uiState.selectedAgentDefinition}
           settings={settings}
+          availableTerminalHeight={terminalHeight - staticExtraHeight}
           onClose={uiActions.closeAgentConfigDialog}
           onSave={async () => {
             // Reload agent registry to pick up changes

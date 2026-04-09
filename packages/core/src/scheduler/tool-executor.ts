@@ -4,38 +4,38 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import type {
-  ToolCallRequestInfo,
-  ToolCallResponseInfo,
-  ToolResult,
-  Config,
-  ToolResultDisplay,
-  ToolLiveOutput,
-} from '../index.js';
 import {
   ToolErrorType,
   ToolOutputTruncatedEvent,
   logToolOutputTruncated,
   runInDevTraceSpan,
+  type ToolCallRequestInfo,
+  type ToolCallResponseInfo,
+  type ToolResult,
+  type Config,
+  type AgentLoopContext,
+  type ToolLiveOutput,
 } from '../index.js';
+import { isAbortError } from '../utils/errors.js';
 import { SHELL_TOOL_NAME } from '../tools/tool-names.js';
 import { DiscoveredMCPTool } from '../tools/mcp-tool.js';
-import { ShellToolInvocation } from '../tools/shell.js';
+import { ToolOutputDistillationService } from '../context/toolDistillationService.js';
 import { executeToolWithHooks } from '../core/coreToolHookTriggers.js';
 import {
   saveTruncatedToolOutput,
   formatTruncatedToolOutput,
 } from '../utils/fileUtils.js';
 import { convertToFunctionResponse } from '../utils/generateContentResponseUtilities.js';
-import type {
-  CompletedToolCall,
-  ToolCall,
-  ExecutingToolCall,
-  ErroredToolCall,
-  SuccessfulToolCall,
-  CancelledToolCall,
+import {
+  CoreToolCallStatus,
+  type CompletedToolCall,
+  type ToolCall,
+  type ExecutingToolCall,
+  type ErroredToolCall,
+  type SuccessfulToolCall,
+  type CancelledToolCall,
 } from './types.js';
-import { CoreToolCallStatus } from './types.js';
+import type { PartListUnion, Part } from '@google/genai';
 import {
   GeminiCliOperation,
   GEN_AI_TOOL_CALL_ID,
@@ -51,7 +51,11 @@ export interface ToolExecutionContext {
 }
 
 export class ToolExecutor {
-  constructor(private readonly config: Config) {}
+  constructor(private readonly context: AgentLoopContext) {}
+
+  private get config(): Config {
+    return this.context.config;
+  }
 
   async execute(context: ToolExecutionContext): Promise<CompletedToolCall> {
     const { call, signal, outputUpdateHandler, onUpdateToolCall } = context;
@@ -79,6 +83,8 @@ export class ToolExecutor {
     return runInDevTraceSpan(
       {
         operation: GeminiCliOperation.ToolCall,
+        logPrompts: this.config.getTelemetryLogPromptsEnabled(),
+        sessionId: this.config.getSessionId(),
         attributes: {
           [GEN_AI_TOOL_NAME]: toolName,
           [GEN_AI_TOOL_CALL_ID]: callId,
@@ -91,51 +97,51 @@ export class ToolExecutor {
         let completedToolCall: CompletedToolCall;
 
         try {
-          let promise: Promise<ToolResult>;
-          if (invocation instanceof ShellToolInvocation) {
-            const setPidCallback = (pid: number) => {
-              const executingCall: ExecutingToolCall = {
-                ...call,
-                status: CoreToolCallStatus.Executing,
-                tool,
-                invocation,
-                pid,
-                startTime: 'startTime' in call ? call.startTime : undefined,
-              };
-              onUpdateToolCall(executingCall);
+          const setExecutionIdCallback = (executionId: number) => {
+            const executingCall: ExecutingToolCall = {
+              ...call,
+              status: CoreToolCallStatus.Executing,
+              tool,
+              invocation,
+              pid: executionId,
+              startTime: 'startTime' in call ? call.startTime : undefined,
             };
-            promise = executeToolWithHooks(
-              invocation,
-              toolName,
-              signal,
-              tool,
-              liveOutputCallback,
-              shellExecutionConfig,
-              setPidCallback,
-              this.config,
-              request.originalRequestName,
-            );
-          } else {
-            promise = executeToolWithHooks(
-              invocation,
-              toolName,
-              signal,
-              tool,
-              liveOutputCallback,
-              shellExecutionConfig,
-              undefined,
-              this.config,
-              request.originalRequestName,
-            );
-          }
+            onUpdateToolCall(executingCall);
+          };
+
+          const promise = executeToolWithHooks(
+            invocation,
+            toolName,
+            signal,
+            tool,
+            liveOutputCallback,
+            { shellExecutionConfig, setExecutionIdCallback },
+            this.config,
+            request.originalRequestName,
+            true, // skipBeforeHook
+          );
 
           const toolResult: ToolResult = await promise;
 
+          if (call.request.inputModifiedByHook) {
+            const modificationMsg = `\n\n[System] Tool input parameters were modified by a hook before execution.`;
+            if (typeof toolResult.llmContent === 'string') {
+              toolResult.llmContent += modificationMsg;
+            } else if (Array.isArray(toolResult.llmContent)) {
+              toolResult.llmContent.push({ text: modificationMsg });
+            } else if (toolResult.llmContent) {
+              toolResult.llmContent = [
+                toolResult.llmContent,
+                { text: modificationMsg },
+              ];
+            }
+          }
+
           if (signal.aborted) {
-            completedToolCall = this.createCancelledResult(
+            completedToolCall = await this.createCancelledResult(
               call,
               'User cancelled tool execution.',
-              toolResult.returnDisplay,
+              toolResult,
             );
           } else if (toolResult.error === undefined) {
             completedToolCall = await this.createSuccessResult(
@@ -157,15 +163,17 @@ export class ToolExecutor {
           }
         } catch (executionError: unknown) {
           spanMetadata.error = executionError;
-          const isAbortError =
-            executionError instanceof Error &&
-            (executionError.name === 'AbortError' ||
+          const abortedByError =
+            isAbortError(executionError) ||
+            (executionError instanceof Error &&
               executionError.message.includes('Operation cancelled by user'));
 
-          if (signal.aborted || isAbortError) {
-            completedToolCall = this.createCancelledResult(
+          if (signal.aborted || abortedByError) {
+            completedToolCall = await this.createCancelledResult(
               call,
-              'User cancelled tool execution.',
+              isAbortError(executionError)
+                ? 'Operation cancelled.'
+                : 'User cancelled tool execution.',
             );
           } else {
             const error =
@@ -186,56 +194,22 @@ export class ToolExecutor {
     );
   }
 
-  private createCancelledResult(
+  private async truncateOutputIfNeeded(
     call: ToolCall,
-    reason: string,
-    resultDisplay?: ToolResultDisplay,
-  ): CancelledToolCall {
-    const errorMessage = `[Operation Cancelled] ${reason}`;
-    const startTime = 'startTime' in call ? call.startTime : undefined;
-
-    if (!('tool' in call) || !('invocation' in call)) {
-      // This should effectively never happen in execution phase, but we handle
-      // it safely
-      throw new Error('Cancelled tool call missing tool/invocation references');
+    content: PartListUnion,
+  ): Promise<{ truncatedContent: PartListUnion; outputFile?: string }> {
+    if (this.config.isContextManagementEnabled()) {
+      const distiller = new ToolOutputDistillationService(
+        this.config,
+        this.context.geminiClient,
+        this.context.promptId,
+      );
+      return distiller.distill(call.request.name, call.request.callId, content);
     }
 
-    return {
-      status: CoreToolCallStatus.Cancelled,
-      request: call.request,
-      response: {
-        callId: call.request.callId,
-        responseParts: [
-          {
-            functionResponse: {
-              id: call.request.callId,
-              name: call.request.name,
-              response: { error: errorMessage },
-            },
-          },
-        ],
-        resultDisplay,
-        error: undefined,
-        errorType: undefined,
-        contentLength: errorMessage.length,
-      },
-      tool: call.tool,
-      invocation: call.invocation,
-      durationMs: startTime ? Date.now() - startTime : undefined,
-      startTime,
-      endTime: Date.now(),
-      outcome: call.outcome,
-    };
-  }
-
-  private async createSuccessResult(
-    call: ToolCall,
-    toolResult: ToolResult,
-  ): Promise<SuccessfulToolCall> {
-    let content = toolResult.llmContent;
-    let outputFile: string | undefined;
-    const toolName = call.request.originalRequestName || call.request.name;
+    const toolName = call.request.name;
     const callId = call.request.callId;
+    let outputFile: string | undefined;
 
     if (typeof content === 'string' && toolName === SHELL_TOOL_NAME) {
       const threshold = this.config.getTruncateToolOutputThreshold();
@@ -247,20 +221,26 @@ export class ToolExecutor {
           toolName,
           callId,
           this.config.storage.getProjectTempDir(),
-          this.config.getSessionId(),
+          this.context.promptId,
         );
         outputFile = savedPath;
-        content = formatTruncatedToolOutput(content, outputFile, threshold);
+        const truncatedContent = formatTruncatedToolOutput(
+          content,
+          outputFile,
+          threshold,
+        );
 
         logToolOutputTruncated(
           this.config,
           new ToolOutputTruncatedEvent(call.request.prompt_id, {
             toolName,
             originalContentLength,
-            truncatedContentLength: content.length,
+            truncatedContentLength: truncatedContent.length,
             threshold,
           }),
         );
+
+        return { truncatedContent, outputFile };
       }
     } else if (
       Array.isArray(content) &&
@@ -280,7 +260,7 @@ export class ToolExecutor {
             toolName,
             callId,
             this.config.storage.getProjectTempDir(),
-            this.config.getSessionId(),
+            this.context.promptId,
           );
           outputFile = savedPath;
           const truncatedText = formatTruncatedToolOutput(
@@ -288,7 +268,12 @@ export class ToolExecutor {
             outputFile,
             threshold,
           );
-          content[0] = { ...firstPart, text: truncatedText };
+
+          // We need to return a NEW array to avoid mutating the original toolResult if it matters,
+          // though here we are creating the response so it's probably fine to mutate or return new.
+          const truncatedContent: Part[] = [
+            { ...firstPart, text: truncatedText },
+          ];
 
           logToolOutputTruncated(
             this.config,
@@ -299,15 +284,102 @@ export class ToolExecutor {
               threshold,
             }),
           );
+
+          return { truncatedContent, outputFile };
         }
       }
     }
+
+    return { truncatedContent: content, outputFile };
+  }
+
+  private async createCancelledResult(
+    call: ToolCall,
+    reason: string,
+    toolResult?: ToolResult,
+  ): Promise<CancelledToolCall> {
+    const errorMessage = `[Operation Cancelled] ${reason}`;
+    const startTime = 'startTime' in call ? call.startTime : undefined;
+
+    if (!('tool' in call) || !('invocation' in call)) {
+      // This should effectively never happen in execution phase, but we handle
+      // it safely
+      throw new Error('Cancelled tool call missing tool/invocation references');
+    }
+
+    let responseParts: Part[] = [];
+    let outputFile: string | undefined;
+
+    if (toolResult?.llmContent) {
+      // Attempt to truncate and save output if we have content, even in cancellation case
+      // This is to handle cases where the tool may have produced output before cancellation
+      const { truncatedContent: output, outputFile: truncatedOutputFile } =
+        await this.truncateOutputIfNeeded(call, toolResult?.llmContent);
+
+      outputFile = truncatedOutputFile;
+      responseParts = convertToFunctionResponse(
+        call.request.originalRequestName ?? call.request.name,
+        call.request.callId,
+        output,
+        this.config.getActiveModel(),
+        this.config,
+      );
+
+      // Inject the cancellation error into the response object
+      const mainPart = responseParts[0];
+      if (mainPart?.functionResponse?.response) {
+        const respObj = mainPart.functionResponse.response;
+        respObj['error'] = errorMessage;
+      }
+    } else {
+      responseParts = [
+        {
+          functionResponse: {
+            id: call.request.callId,
+            name: call.request.originalRequestName ?? call.request.name,
+            response: { error: errorMessage },
+          },
+        },
+      ];
+    }
+
+    return {
+      status: CoreToolCallStatus.Cancelled,
+      request: call.request,
+      response: {
+        callId: call.request.callId,
+        responseParts,
+        resultDisplay: toolResult?.returnDisplay,
+        error: undefined,
+        errorType: undefined,
+        outputFile,
+        contentLength: JSON.stringify(responseParts).length,
+      },
+      tool: call.tool,
+      invocation: call.invocation,
+      durationMs: startTime ? Date.now() - startTime : undefined,
+      startTime,
+      endTime: Date.now(),
+      outcome: call.outcome,
+    };
+  }
+
+  private async createSuccessResult(
+    call: ToolCall,
+    toolResult: ToolResult,
+  ): Promise<SuccessfulToolCall> {
+    const { truncatedContent: content, outputFile } =
+      await this.truncateOutputIfNeeded(call, toolResult.llmContent);
+
+    const toolName = call.request.originalRequestName || call.request.name;
+    const callId = call.request.callId;
 
     const response = convertToFunctionResponse(
       toolName,
       callId,
       content,
       this.config.getActiveModel(),
+      this.config,
     );
 
     const successResponse: ToolCallResponseInfo = {

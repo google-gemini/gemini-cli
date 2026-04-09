@@ -5,7 +5,7 @@
  */
 
 import { z } from 'zod';
-import type { Config } from '../config/config.js';
+import type { AgentLoopContext } from '../config/agent-loop-context.js';
 import { getCoreSystemPrompt } from '../core/prompts.js';
 import type { LocalAgentDefinition } from './types.js';
 
@@ -18,7 +18,7 @@ const GeneralistAgentSchema = z.object({
  * It uses the same core system prompt as the main agent but in a non-interactive mode.
  */
 export const GeneralistAgent = (
-  config: Config,
+  context: AgentLoopContext,
 ): LocalAgentDefinition<typeof GeneralistAgentSchema> => ({
   kind: 'local',
   name: 'generalist',
@@ -46,7 +46,7 @@ export const GeneralistAgent = (
     model: 'inherit',
   },
   get toolConfig() {
-    const tools = config.getToolRegistry().getAllToolNames();
+    const tools = context.toolRegistry.getAllToolNames();
     return {
       tools,
     };
@@ -54,7 +54,7 @@ export const GeneralistAgent = (
   get promptConfig() {
     return {
       systemPrompt: getCoreSystemPrompt(
-        config,
+        context.config,
         /*useMemory=*/ undefined,
         /*interactiveOverride=*/ false,
       ),

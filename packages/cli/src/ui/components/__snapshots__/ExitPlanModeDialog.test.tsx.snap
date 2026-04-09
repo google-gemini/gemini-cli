@@ -19,11 +19,11 @@ Files to Modify
 
   1.  Yes, automatically accept edits
       Approves plan and allows tools to run automatically
-● 2.  Yes, manually accept edits
-      Approves plan but requires confirmation for each tool
+● 2.  Yes, manually accept edits                                                
+      Approves plan but requires confirmation for each tool                     
   3.  Type your feedback...
 
-Enter to select · ↑/↓ to navigate · Ctrl+X to edit plan · Esc to cancel
+Enter to select · ↑/↓ to navigate · Ctrl+G to edit plan · Esc to cancel
 "
 `;
 
@@ -44,13 +44,13 @@ Files to Modify
  - src/index.ts - Add auth middleware
  - src/config.ts - Add auth configuration options
 
-● 1.  Yes, automatically accept edits
-      Approves plan and allows tools to run automatically
+● 1.  Yes, automatically accept edits                                           
+      Approves plan and allows tools to run automatically                       
   2.  Yes, manually accept edits
       Approves plan but requires confirmation for each tool
   3.  Type your feedback...
 
-Enter to select · ↑/↓ to navigate · Ctrl+X to edit plan · Esc to cancel
+Enter to select · ↑/↓ to navigate · Ctrl+G to edit plan · Esc to cancel
 "
 `;
 
@@ -76,13 +76,13 @@ Implementation Steps
  8. Add multi-factor authentication in src/auth/MFAService.ts
 ... last 22 lines hidden (Ctrl+O to show) ...
 
-● 1.  Yes, automatically accept edits
-      Approves plan and allows tools to run automatically
+● 1.  Yes, automatically accept edits                                           
+      Approves plan and allows tools to run automatically                       
   2.  Yes, manually accept edits
       Approves plan but requires confirmation for each tool
   3.  Type your feedback...
 
-Enter to select · ↑/↓ to navigate · Ctrl+X to edit plan · Esc to cancel
+Enter to select · ↑/↓ to navigate · Ctrl+G to edit plan · Esc to cancel
 "
 `;
 
@@ -103,13 +103,13 @@ Files to Modify
  - src/index.ts - Add auth middleware
  - src/config.ts - Add auth configuration options
 
-● 1.  Yes, automatically accept edits
-      Approves plan and allows tools to run automatically
+● 1.  Yes, automatically accept edits                                           
+      Approves plan and allows tools to run automatically                       
   2.  Yes, manually accept edits
       Approves plan but requires confirmation for each tool
   3.  Type your feedback...
 
-Enter to select · ↑/↓ to navigate · Ctrl+X to edit plan · Esc to cancel
+Enter to select · ↑/↓ to navigate · Ctrl+G to edit plan · Esc to cancel
 "
 `;
 
@@ -132,11 +132,11 @@ Files to Modify
 
   1.  Yes, automatically accept edits
       Approves plan and allows tools to run automatically
-● 2.  Yes, manually accept edits
-      Approves plan but requires confirmation for each tool
+● 2.  Yes, manually accept edits                                                
+      Approves plan but requires confirmation for each tool                     
   3.  Type your feedback...
 
-Enter to select · ↑/↓ to navigate · Ctrl+X to edit plan · Esc to cancel
+Enter to select · ↑/↓ to navigate · Ctrl+G to edit plan · Esc to cancel
 "
 `;
 
@@ -157,13 +157,13 @@ Files to Modify
  - src/index.ts - Add auth middleware
  - src/config.ts - Add auth configuration options
 
-● 1.  Yes, automatically accept edits
-      Approves plan and allows tools to run automatically
+● 1.  Yes, automatically accept edits                                           
+      Approves plan and allows tools to run automatically                       
   2.  Yes, manually accept edits
       Approves plan but requires confirmation for each tool
   3.  Type your feedback...
 
-Enter to select · ↑/↓ to navigate · Ctrl+X to edit plan · Esc to cancel
+Enter to select · ↑/↓ to navigate · Ctrl+G to edit plan · Esc to cancel
 "
 `;
 
@@ -210,13 +210,13 @@ Testing Strategy
  - Security penetration testing
  - Load testing for session management
 
-● 1.  Yes, automatically accept edits
-      Approves plan and allows tools to run automatically
+● 1.  Yes, automatically accept edits                                           
+      Approves plan and allows tools to run automatically                       
   2.  Yes, manually accept edits
       Approves plan but requires confirmation for each tool
   3.  Type your feedback...
 
-Enter to select · ↑/↓ to navigate · Ctrl+X to edit plan · Esc to cancel
+Enter to select · ↑/↓ to navigate · Ctrl+G to edit plan · Esc to cancel
 "
 `;
 
@@ -237,12 +237,12 @@ Files to Modify
  - src/index.ts - Add auth middleware
  - src/config.ts - Add auth configuration options
 
-● 1.  Yes, automatically accept edits
-      Approves plan and allows tools to run automatically
+● 1.  Yes, automatically accept edits                                           
+      Approves plan and allows tools to run automatically                       
   2.  Yes, manually accept edits
       Approves plan but requires confirmation for each tool
   3.  Type your feedback...
 
-Enter to select · ↑/↓ to navigate · Ctrl+X to edit plan · Esc to cancel
+Enter to select · ↑/↓ to navigate · Ctrl+G to edit plan · Esc to cancel
 "
 `;

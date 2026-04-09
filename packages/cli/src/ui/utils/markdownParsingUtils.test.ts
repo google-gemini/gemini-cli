@@ -17,6 +17,9 @@ vi.mock('../semantic-colors.js', () => ({
       accent: 'cyan',
       link: 'blue',
     },
+    ui: {
+      focus: 'green',
+    },
   },
 }));
 

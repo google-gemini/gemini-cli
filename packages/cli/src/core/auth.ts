@@ -10,6 +10,7 @@ import {
   getErrorMessage,
   ValidationRequiredError,
   isAccountSuspendedError,
+  ProjectIdRequiredError,
 } from '@google/gemini-cli-core';
 
 import type { AccountSuspensionInfo } from '../ui/contexts/UIStateContext.js';
@@ -54,8 +55,16 @@ export async function performInitialAuth(
         },
       };
     }
+    if (e instanceof ProjectIdRequiredError) {
+      // OAuth succeeded but account setup requires project ID
+      // Show the error message directly without "Failed to login" prefix
+      return {
+        authError: getErrorMessage(e),
+        accountSuspensionInfo: null,
+      };
+    }
     return {
-      authError: `Failed to login. Message: ${getErrorMessage(e)}`,
+      authError: `Failed to sign in. Message: ${getErrorMessage(e)}`,
       accountSuspensionInfo: null,
     };
   }

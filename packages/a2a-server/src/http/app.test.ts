@@ -65,7 +65,12 @@ vi.mock('../utils/logger.js', () => ({
 }));
 
 let config: Config;
-const getToolRegistrySpy = vi.fn().mockReturnValue(ApprovalMode.DEFAULT);
+const getToolRegistrySpy = vi.fn().mockReturnValue({
+  getTool: vi.fn(),
+  getAllToolNames: vi.fn().mockReturnValue([]),
+  getAllTools: vi.fn().mockReturnValue([]),
+  getToolsByServer: vi.fn().mockReturnValue([]),
+});
 const getApprovalModeSpy = vi.fn();
 const getShellExecutionConfigSpy = vi.fn();
 const getExtensionsSpy = vi.fn();

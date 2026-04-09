@@ -7,7 +7,7 @@ exports[`AuthDialog > Snapshots > renders correctly with auth error 1`] = `
 │                                                                                                  │
 │   How would you like to authenticate for this project?                                           │
 │                                                                                                  │
-│   (selected) Login with Google(not selected) Use Gemini API Key(not selected) Vertex AI          │
+│   (selected) Sign in with Google(not selected) Use Gemini API Key(not selected) Vertex AI        │
 │                                                                                                  │
 │   Something went wrong                                                                           │
 │                                                                                                  │
@@ -28,7 +28,7 @@ exports[`AuthDialog > Snapshots > renders correctly with default props 1`] = `
 │                                                                                                  │
 │   How would you like to authenticate for this project?                                           │
 │                                                                                                  │
-│   (selected) Login with Google(not selected) Use Gemini API Key(not selected) Vertex AI          │
+│   (selected) Sign in with Google(not selected) Use Gemini API Key(not selected) Vertex AI        │
 │                                                                                                  │
 │   (Use Enter to select)                                                                          │
 │                                                                                                  │
