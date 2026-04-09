@@ -14,10 +14,6 @@ import { ContextTracer } from '../tracer.js';
 import { ContextEnvironmentImpl } from '../sidecar/environmentImpl.js';
 import { SidecarLoader } from '../sidecar/SidecarLoader.js';
 import { ContextEventBus } from '../eventBus.js';
-import { ContextTokenCalculator } from '../utils/contextTokenCalculator.js';
-import { IrNodeBehaviorRegistry } from '../ir/behaviorRegistry.js';
-import { registerBuiltInBehaviors } from '../ir/builtinBehaviors.js';
-import { IrMapper } from '../ir/mapper.js';
 import { SidecarRegistry } from '../sidecar/registry.js';
 import { registerBuiltInProcessors } from '../sidecar/builtins.js';
 import { PipelineOrchestrator } from '../sidecar/orchestrator.js';
@@ -99,34 +95,27 @@ export function createDummyToolNode(
 export function createMockEnvironment(
   overrides?: Partial<ContextEnvironment>,
 ): ContextEnvironment {
-  const registry = new IrNodeBehaviorRegistry();
-  registerBuiltInBehaviors(registry);
-  const irMapper = new IrMapper(registry);
+  const llmClient = vi.fn().mockReturnValue({
+    generateContent: vi.fn().mockResolvedValue(createMockGenerateContentResponse('Mock LLM summary response')),
+  })() as unknown as BaseLlmClient;
+  
+  const tracer = new ContextTracer({ targetDir: '/tmp', sessionId: 'mock-session' });
+  const eventBus = new ContextEventBus();
+  
+  const env = new ContextEnvironmentImpl(
+    llmClient,
+    'mock-session',
+    'mock-prompt-id',
+    '/tmp/.gemini/trace',
+    '/tmp/.gemini/tool-outputs',
+    tracer,
+    1,
+    eventBus,
+    new InMemoryFileSystem(),
+    new DeterministicIdGenerator('mock-uuid-')
+  );
 
-  return {
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
-    llmClient: vi.fn().mockReturnValue({
-      generateContent: vi.fn().mockResolvedValue(createMockGenerateContentResponse('Mock LLM summary response')),
-    })() as unknown as BaseLlmClient,
-    promptId: 'mock-prompt-id',
-    sessionId: 'mock-session',
-    traceDir: '/tmp/.gemini/trace',
-    projectTempDir: '/tmp/.gemini/tool-outputs',
-    eventBus: new ContextEventBus(),
-    tracer: new ContextTracer({ targetDir: '/tmp', sessionId: 'mock-session' }),
-    charsPerToken: 1,
-    tokenCalculator: new ContextTokenCalculator(1, registry),
-    fileSystem: new InMemoryFileSystem(),
-    idGenerator: new DeterministicIdGenerator('mock-uuid-'),
-    behaviorRegistry: registry,
-    inbox: {
-      publish: vi.fn(),
-      getMessages: vi.fn().mockReturnValue([]),
-      drainConsumed: vi.fn(),
-    } as any,
-    irMapper,
-    ...overrides,
-  } as ContextEnvironment;
+  return { ...env, ...overrides };
 }
 
 /**

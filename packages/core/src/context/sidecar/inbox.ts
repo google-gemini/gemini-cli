@@ -35,7 +35,7 @@ export class InboxSnapshotImpl implements InboxSnapshot {
   }
 
   getMessages<T = unknown>(topic: string): ReadonlyArray<InboxMessage<T>> {
-    return this.messages.filter((m) => m.topic === topic) as unknown as ReadonlyArray<InboxMessage<T>>;
+    return this.messages.filter((m) => m.topic === topic) as ReadonlyArray<InboxMessage<T>>;
   }
 
   consume(messageId: string): void {
