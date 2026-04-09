@@ -1,15 +1,16 @@
 # 🔎 Gemini CLI Triage Dashboard
 
-*Last Synchronized: 2026-04-09 21:19 (UTC)*
+*Last Synchronized: 2026-04-09 21:22 (UTC)*
 
 ## 🆕 Awaiting Initial Review
-**Action: Pick up one of these new PRs.** These have no feedback or assigned reviewers yet.
+**Action: Pick up one of these new PRs.** These have no human reviewers assigned yet.
 
 | Issue | Linked PR | Last Update |
 | :--- | :--- | :--- |
 | [#18654 Enhanced Copy Workflow via External Editor Integration](https://github.com/google-gemini/gemini-cli/issues/18654) | [#19553](https://github.com/google-gemini/gemini-cli/pull/19553) | `2026-03-11` |
 | [#18895 CLI cannot use fresh token in MCP OAuth](https://github.com/google-gemini/gemini-cli/issues/18895) | [#23493](https://github.com/google-gemini/gemini-cli/pull/23493) | `2026-03-23` |
 | [#19710 Fix unsafe type assertions in Core Utilities (Phase 1.2: JSON & Config)](https://github.com/google-gemini/gemini-cli/issues/19710) | [#23628](https://github.com/google-gemini/gemini-cli/pull/23628) | `2026-03-24` |
+| [#20385 Terminal output flooded with repeated '0c/' string](https://github.com/google-gemini/gemini-cli/issues/20385) | [#24596](https://github.com/google-gemini/gemini-cli/pull/24596) | `2026-04-09` |
 | [#19713 Fix unsafe type assertions in CLI Config (Phase 3.1)](https://github.com/google-gemini/gemini-cli/issues/19713) | [#24905](https://github.com/google-gemini/gemini-cli/pull/24905) | `2026-04-09` |
 
 ## ⌛ Awaiting Reviewer Follow-up
@@ -18,7 +19,6 @@
 | Issue | Linked PR | Reviewers | Status |
 | :--- | :--- | :--- | :--- |
 | [#20755 Shell Tool Trailing Newline Trimming](https://github.com/google-gemini/gemini-cli/issues/20755) | [#23705](https://github.com/google-gemini/gemini-cli/pull/23705) | @mrpmohiburrahman | Author Updated |
-| [#20385 Terminal output flooded with repeated '0c/' string](https://github.com/google-gemini/gemini-cli/issues/20385) | [#24596](https://github.com/google-gemini/gemini-cli/pull/24596) | _None (Team only)_ | Author Updated |
 | [#19717 Fix unsafe type assertions in VS Code Companion (Phase 4.2)](https://github.com/google-gemini/gemini-cli/issues/19717) | [#19815](https://github.com/google-gemini/gemini-cli/pull/19815) | @Adib234, @mrpmohiburrahman | Review Requested |
 | [#24337 fix(cli): make slash-command IDE status subscription cleanup-safe](https://github.com/google-gemini/gemini-cli/issues/24337) | [#24397](https://github.com/google-gemini/gemini-cli/pull/24397) | @scidomino | Author Updated |
 
