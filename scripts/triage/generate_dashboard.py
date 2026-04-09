@@ -115,18 +115,15 @@ def get_reviewer_info(pr):
     latest_reviewer_activity = ""
     official_reviewers = set()
     
-    # 1. Collect from requested reviewers (Users and Teams)
+    # 1. Collect only HUMAN requested reviewers
     for req in pr.get('reviewRequests', {}).get('nodes', []):
         rr = req.get('requestedReviewer')
-        if rr:
-            if rr['__typename'] == 'User':
-                login = rr.get('login')
-                if login and login != author and login not in BOT_BLACKLIST:
-                    official_reviewers.add(login)
-            elif rr['__typename'] == 'Team':
-                official_reviewers.add(f"team:{rr.get('slug')}")
+        if rr and rr.get('__typename') == 'User':
+            login = rr.get('login')
+            if login and login != author and login not in BOT_BLACKLIST:
+                official_reviewers.add(login)
                 
-    # 2. Collect from formal reviews
+    # 2. Collect from formal reviews (these are always humans or bots)
     reviews = pr.get('latestReviews', {}).get('nodes', [])
     for r in reviews:
         login = r.get('author', {}).get('login') if r.get('author') else None
@@ -134,7 +131,7 @@ def get_reviewer_info(pr):
             official_reviewers.add(login)
             latest_reviewer_activity = max(latest_reviewer_activity, r['updatedAt'])
             
-    # 3. Track latest activity from ANYONE who isn't the author
+    # 3. Track latest activity from ANYONE who isn't the author (to determine readiness)
     all_comments = pr.get('comments', {}).get('nodes', [])
     for c in all_comments:
         login = c.get('author', {}).get('login') if c.get('author') else None
