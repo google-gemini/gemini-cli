@@ -35,7 +35,9 @@ export class InboxSnapshotImpl implements InboxSnapshot {
   }
 
   getMessages<T = unknown>(topic: string): ReadonlyArray<InboxMessage<T>> {
-    return this.messages.filter((m) => m.topic === topic) as ReadonlyArray<InboxMessage<T>>;
+    const raw = this.messages.filter((m) => m.topic === topic);
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
+    return raw as ReadonlyArray<InboxMessage<T>>;
   }
 
   consume(messageId: string): void {

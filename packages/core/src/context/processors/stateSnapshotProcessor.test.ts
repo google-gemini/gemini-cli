@@ -18,7 +18,7 @@ describe('StateSnapshotProcessor', () => {
     const targets = [createDummyNode('ep1', 'USER_PROMPT')];
     const inbox = new InboxSnapshotImpl([]);
 
-    const result = await processor.process({ buffer: {} as any, targets, inbox });
+    const result = await processor.process({ buffer: undefined as unknown as import('../pipeline.js').ContextWorkingBuffer, targets, inbox });
     expect(result).toBe(targets); // Strict equality
   });
 
@@ -46,7 +46,7 @@ describe('StateSnapshotProcessor', () => {
       }
     ]);
 
-    const result = await processor.process({ buffer: {} as any, targets, inbox });
+    const result = await processor.process({ buffer: undefined as unknown as import('../pipeline.js').ContextWorkingBuffer, targets, inbox });
 
     // Should remove A and B, insert Snapshot, keep C
     expect(result.length).toBe(2);
@@ -78,7 +78,7 @@ describe('StateSnapshotProcessor', () => {
       }
     ]);
 
-    const result = await processor.process({ buffer: {} as any, targets, inbox });
+    const result = await processor.process({ buffer: undefined as unknown as import('../pipeline.js').ContextWorkingBuffer, targets, inbox });
 
     // Because deficit is 0, and Inbox was rejected, nothing should change
     expect(result.length).toBe(1);
@@ -96,7 +96,7 @@ describe('StateSnapshotProcessor', () => {
     const targets = [nodeA, nodeB, nodeC];
     const inbox = new InboxSnapshotImpl([]);
 
-    const result = await processor.process({ buffer: {} as any, targets, inbox });
+    const result = await processor.process({ buffer: undefined as unknown as import('../pipeline.js').ContextWorkingBuffer, targets, inbox });
 
     // Should synthesize a new snapshot synchronously
     expect(env.llmClient.generateContent).toHaveBeenCalled();

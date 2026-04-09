@@ -150,7 +150,7 @@ describe('ContextManager Golden Tests', () => {
     const history = createLargeHistory();
     (
       contextManager as unknown as { pristineEpisodes: Episode[] }
-    ).pristineEpisodes = (contextManager as any).env.irMapper.toIr(history, (contextManager as any).env.tokenCalculator);
+    ).pristineEpisodes = (contextManager as unknown as import("../pipeline.js").ContextWorkingBuffer).env.irMapper.toIr(history, (contextManager as unknown as import("../pipeline.js").ContextWorkingBuffer).env.tokenCalculator);
     const result = await contextManager.projectCompressedHistory();
     expect(result).toMatchSnapshot();
   });

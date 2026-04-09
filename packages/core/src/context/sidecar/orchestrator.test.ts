@@ -25,10 +25,10 @@ class DummySyncProcessor implements ContextProcessor {
   readonly name = 'DummySync';
   readonly id = 'DummySync';
   readonly options = {};
-  async process(args: any) {
+  async process(args: import('../pipeline.js').ProcessArgs) {
     const newTargets = [...args.targets];
     if (newTargets.length > 0) {
-      newTargets[0] = { ...newTargets[0], dummyModified: true };
+      newTargets[0] = { ...newTargets[0], dummyModified: true } as unknown as import('../ir/types.js').ConcreteNode;
     }
     return newTargets;
   }
@@ -42,10 +42,10 @@ class DummyAsyncProcessor implements ContextProcessor {
   readonly name = 'DummyAsync';
   readonly id = 'DummyAsync';
   readonly options = {};
-  async process(args: any) {
+  async process(args: import('../pipeline.js').ProcessArgs) {
     const newTargets = [...args.targets];
     if (newTargets.length > 0) {
-      newTargets[0] = { ...newTargets[0], dummyModified: true };
+      newTargets[0] = { ...newTargets[0], dummyModified: true } as unknown as import('../ir/types.js').ConcreteNode;
     }
     return newTargets;
   }
@@ -59,7 +59,7 @@ class ThrowingProcessor implements ContextProcessor {
   readonly name = 'Throwing';
   readonly id = 'Throwing';
   readonly options = {};
-  async process(): Promise<any> {
+  async process(): Promise<ReadonlyArray<import('../ir/types.js').ConcreteNode>> {
     throw new Error('Processor failed intentionally');
   }
 }

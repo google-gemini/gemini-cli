@@ -15,7 +15,7 @@ import { ContextTokenCalculator } from '../utils/contextTokenCalculator.js';
 describe('NodeTruncationProcessor', () => {
   it('should truncate nodes that exceed maxTokensPerNode', async () => {
     const env = createMockEnvironment();
-    const mockTokenCalculator = new ContextTokenCalculator(1, env.behaviorRegistry) as any;
+    const mockTokenCalculator = new ContextTokenCalculator(1, env.behaviorRegistry) as unknown as import("../pipeline.js").ContextWorkingBuffer;
     mockTokenCalculator.tokensToChars = vi.fn().mockReturnValue(10); // Limit is 10 chars
 
     mockTokenCalculator.estimateTokensForString = vi.fn((text: string) => {
@@ -24,7 +24,7 @@ describe('NodeTruncationProcessor', () => {
     });
     mockTokenCalculator.estimateTokensForParts = vi.fn(() => 1);
 
-    (env as any).tokenCalculator = mockTokenCalculator;
+    (env as unknown as import("../pipeline.js").ContextWorkingBuffer).tokenCalculator = mockTokenCalculator;
 
     const processor = NodeTruncationProcessor.create(env, {
       maxTokensPerNode: 1, // Will equal 10 chars limit
@@ -48,9 +48,9 @@ describe('NodeTruncationProcessor', () => {
     const targets = [prompt, thought, yieldNode];
 
     const result = await processor.process({
-      buffer: {} as any,
+      buffer: undefined as unknown as import('../pipeline.js').ContextWorkingBuffer,
       targets,
-      inbox: {} as any,
+      inbox: undefined as unknown as import('../pipeline.js').ContextWorkingBuffer,
     });
 
     expect(result.length).toBe(3);
@@ -60,7 +60,7 @@ describe('NodeTruncationProcessor', () => {
     expect(squashedPrompt.id).toBe('mock-uuid-1');
     expect(squashedPrompt.id).not.toBe(prompt.id);
     expect(squashedPrompt.semanticParts[0].type).toBe('text');
-    expect((squashedPrompt.semanticParts[0] as any).text).toContain('[... OMITTED');
+    expect((squashedPrompt.semanticParts[0] as unknown as import("../pipeline.js").ContextWorkingBuffer).text).toContain('[... OMITTED');
 
     // 2. Agent Thought
     const squashedThought = result[1] as AgentThought;
@@ -77,14 +77,14 @@ describe('NodeTruncationProcessor', () => {
 
   it('should ignore nodes that are below maxTokensPerNode', async () => {
     const env = createMockEnvironment();
-    const mockTokenCalculator = new ContextTokenCalculator(1, env.behaviorRegistry) as any;
+    const mockTokenCalculator = new ContextTokenCalculator(1, env.behaviorRegistry) as unknown as import("../pipeline.js").ContextWorkingBuffer;
     mockTokenCalculator.tokensToChars = vi.fn().mockReturnValue(100); 
 
     mockTokenCalculator.estimateTokensForString = vi.fn((text: string) => text.length);
     mockTokenCalculator.estimateTokensForParts = vi.fn(() => 5);
     mockTokenCalculator.getTokenCost = vi.fn(() => 5);
 
-    (env as any).tokenCalculator = mockTokenCalculator;
+    (env as unknown as import("../pipeline.js").ContextWorkingBuffer).tokenCalculator = mockTokenCalculator;
 
     const processor = NodeTruncationProcessor.create(env, {
       maxTokensPerNode: 100,
@@ -104,9 +104,9 @@ describe('NodeTruncationProcessor', () => {
     const targets = [prompt, thought];
 
     const result = await processor.process({
-      buffer: {} as any,
+      buffer: undefined as unknown as import('../pipeline.js').ContextWorkingBuffer,
       targets,
-      inbox: {} as any,
+      inbox: undefined as unknown as import('../pipeline.js').ContextWorkingBuffer,
     });
 
     expect(result.length).toBe(2);
@@ -114,7 +114,7 @@ describe('NodeTruncationProcessor', () => {
     // 1. User Prompt (untouched)
     const squashedPrompt = result[0] as UserPrompt;
     expect(squashedPrompt.id).toBe(prompt.id);
-    expect((squashedPrompt.semanticParts[0] as any).text).not.toContain('[... OMITTED');
+    expect((squashedPrompt.semanticParts[0] as unknown as import("../pipeline.js").ContextWorkingBuffer).text).not.toContain('[... OMITTED');
 
     // 2. Agent Thought (untouched)
     const untouchedThought = result[1] as AgentThought;

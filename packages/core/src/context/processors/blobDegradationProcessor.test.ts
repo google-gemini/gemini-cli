@@ -3,7 +3,7 @@
  * Copyright 2026 Google LLC
  * SPDX-License-Identifier: Apache-2.0
  */
-import { describe, it, expect, vi } from 'vitest';
+import { describe, it, expect } from 'vitest';
 import { BlobDegradationProcessor } from './blobDegradationProcessor.js';
 import {
   createMockEnvironment,
@@ -14,19 +14,17 @@ import type { UserPrompt, SemanticPart } from '../ir/types.js';
 describe('BlobDegradationProcessor', () => {
   it('should ignore text parts and only target inline_data and file_data', async () => {
     const env = createMockEnvironment();
-    // Simulate each part costing 100 tokens, but text costing 10 tokens
-    env.tokenCalculator.estimateTokensForParts = vi.fn((parts: any[]) => {
-       if (parts[0].text) return 10;
-       return 100;
-    });
+    // charsPerToken = 1
+    // We want the degraded text to be cheaper than the original blob.
+    // Degraded text is ~100 chars ("...degraded to text...").
+    // So we make the blob data 200 chars.
+    const fakeData = 'A'.repeat(200);
 
     const processor = BlobDegradationProcessor.create(env, {});
 
-    // Deficit of 50 means budget is NOT satisfied.
-
     const parts: SemanticPart[] = [
       { type: 'text', text: 'Hello' },
-      { type: 'inline_data', mimeType: 'image/png', data: 'fake_base64_data' },
+      { type: 'inline_data', mimeType: 'image/png', data: fakeData },
       { type: 'text', text: 'World' },
     ];
 
@@ -37,16 +35,14 @@ describe('BlobDegradationProcessor', () => {
     const targets = [prompt];
 
     const result = await processor.process({
-      buffer: {} as any,
+      buffer: undefined as unknown as import('../pipeline.js').ContextWorkingBuffer,
       targets,
-      inbox: {} as any,
+      inbox: undefined as unknown as import('../pipeline.js').InboxSnapshot,
     });
 
-    // We modified it, so the ID should change and it should have new metadata
     expect(result.length).toBe(1);
     const modifiedPrompt = result[0] as UserPrompt;
     
-    // Original prompt ID was randomUUID(), new one is from idGenerator
     expect(modifiedPrompt.id).not.toBe(prompt.id);
     expect(modifiedPrompt.semanticParts.length).toBe(3);
     
@@ -55,22 +51,21 @@ describe('BlobDegradationProcessor', () => {
     expect(modifiedPrompt.semanticParts[2]).toEqual(parts[2]);
 
     // The inline_data part should be replaced with text
-    const degradedPart = modifiedPrompt.semanticParts[1];
+    const degradedPart = modifiedPrompt.semanticParts[1] as import('../ir/types.js').TextPart;
     expect(degradedPart.type).toBe('text');
-    expect((degradedPart as any).text).toContain('[Multi-Modal Blob (image/png, 0.00MB) degraded to text');
-
-    // The transformation should be logged
+    expect(degradedPart.text).toContain('[Multi-Modal Blob (image/png, 0.00MB) degraded to text');
   });
 
   it('should degrade all blobs unconditionally', async () => {
     const env = createMockEnvironment();
 
-    env.tokenCalculator.estimateTokensForParts = vi.fn((parts: any[]) => {
-       if (parts[0].text) return 10;
-       return 100; // saving 90 tokens per degradation
-    });
-
     const processor = BlobDegradationProcessor.create(env, {});
+
+    // Tokens for fileData = 258.
+    // Degraded text = "[File Reference (video/mp4) degraded to text to preserve context window. Original URI: gs://test1]"
+    // Degraded text length ~100 characters.
+    // Since charsPerToken=1, degraded text = 100 tokens. 
+    // Tokens saved = 258 - 100 = 158. This is > 0, so it WILL degrade it!
 
     const prompt = createDummyNode('ep1', 'USER_PROMPT', 100, {
       semanticParts: [
@@ -82,9 +77,9 @@ describe('BlobDegradationProcessor', () => {
     const targets = [prompt];
 
     const result = await processor.process({
-      buffer: {} as any,
+      buffer: undefined as unknown as import('../pipeline.js').ContextWorkingBuffer,
       targets,
-      inbox: {} as any,
+      inbox: undefined as unknown as import('../pipeline.js').InboxSnapshot,
     });
 
     const modifiedPrompt = result[0] as UserPrompt;
@@ -99,15 +94,14 @@ describe('BlobDegradationProcessor', () => {
     const env = createMockEnvironment();
 
     const processor = BlobDegradationProcessor.create(env, {});
-    const targets: any[] = [];
+    const targets: Array<import('../ir/types.js').ConcreteNode> = [];
 
     const result = await processor.process({
-      buffer: {} as any,
+      buffer: undefined as unknown as import('../pipeline.js').ContextWorkingBuffer,
       targets,
-      inbox: {} as any,
+      inbox: undefined as unknown as import('../pipeline.js').InboxSnapshot,
     });
 
-    // Should return the exact array ref
     expect(result).toBe(targets);
   });
 });

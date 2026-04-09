@@ -70,7 +70,7 @@ export class BlobDegradationProcessor implements ContextProcessor {
             let newText = '';
             let tokensSaved = 0;
 
-            switch (part.type) {
+        switch (part.type) {
               case 'inline_data': {
                 await ensureDir();
                 const ext = part.mimeType.split('/')[1] || 'bin';
@@ -114,6 +114,8 @@ export class BlobDegradationProcessor implements ContextProcessor {
                 tokensSaved = oldTokens - newTokens;
                 break;
               }
+              default:
+                break;
             }
 
             if (newText && tokensSaved > 0) {

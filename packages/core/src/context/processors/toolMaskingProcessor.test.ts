@@ -31,9 +31,9 @@ describe('ToolMaskingProcessor', () => {
     });
 
     const result = await processor.process({
-      buffer: {} as any,
+      buffer: undefined as unknown as import('../pipeline.js').ContextWorkingBuffer,
       targets: [toolStep],
-      inbox: {} as any,
+      inbox: undefined as unknown as import('../pipeline.js').ContextWorkingBuffer,
     });
 
     expect(result.length).toBe(1);
@@ -43,7 +43,7 @@ describe('ToolMaskingProcessor', () => {
     expect(masked.id).not.toBe(toolStep.id);
 
     // It should have masked the observation
-    const obs = (masked as any).observation;
+    const obs = (masked as unknown as import("../pipeline.js").ContextWorkingBuffer).observation;
     expect(obs.result).toContain('<tool_output_masked>');
     expect(obs.metadata).toBe('short'); // Untouched
 
@@ -66,9 +66,9 @@ describe('ToolMaskingProcessor', () => {
     });
 
     const result = await processor.process({
-      buffer: {} as any,
+      buffer: undefined as unknown as import('../pipeline.js').ContextWorkingBuffer,
       targets: [toolStep],
-      inbox: {} as any,
+      inbox: undefined as unknown as import('../pipeline.js').ContextWorkingBuffer,
     });
 
     // Returned the exact same object reference

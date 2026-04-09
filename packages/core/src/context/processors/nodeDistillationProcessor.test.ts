@@ -20,7 +20,7 @@ describe('NodeDistillationProcessor', () => {
     };
 
     const env = createMockEnvironment({
-        llmClient: mockLlmClient as any,
+        llmClient: mockLlmClient as unknown as import("../pipeline.js").ContextWorkingBuffer,
     });
 
     const processor = NodeDistillationProcessor.create(env, {
@@ -46,9 +46,9 @@ describe('NodeDistillationProcessor', () => {
     const targets = [prompt, thought, tool];
 
     const result = await processor.process({
-      buffer: {} as any,
+      buffer: undefined as unknown as import('../pipeline.js').ContextWorkingBuffer,
       targets,
-      inbox: {} as any,
+      inbox: undefined as unknown as import('../pipeline.js').ContextWorkingBuffer,
     });
 
     expect(result.length).toBe(3);
@@ -57,7 +57,7 @@ describe('NodeDistillationProcessor', () => {
     const compressedPrompt = result[0] as UserPrompt;
     expect(compressedPrompt.id).not.toBe(prompt.id);
     expect(compressedPrompt.semanticParts[0].type).toBe('text');
-    expect((compressedPrompt.semanticParts[0] as any).text).toBe('Mocked Summary!');
+    expect((compressedPrompt.semanticParts[0] as unknown as import("../pipeline.js").ContextWorkingBuffer).text).toBe('Mocked Summary!');
     // 2. Agent Thought
     const compressedThought = result[1] as AgentThought;
     expect(compressedThought.id).toMatch(/^mock-uuid-/);
@@ -78,7 +78,7 @@ describe('NodeDistillationProcessor', () => {
     };
 
     const env = createMockEnvironment({
-       llmClient: mockLlmClient as any,
+       llmClient: mockLlmClient as unknown as import("../pipeline.js").ContextWorkingBuffer,
     });
 
     const processor = NodeDistillationProcessor.create(env, {
@@ -99,9 +99,9 @@ describe('NodeDistillationProcessor', () => {
     const targets = [prompt, thought];
 
     const result = await processor.process({
-      buffer: {} as any,
+      buffer: undefined as unknown as import('../pipeline.js').ContextWorkingBuffer,
       targets,
-      inbox: {} as any,
+      inbox: undefined as unknown as import('../pipeline.js').ContextWorkingBuffer,
     });
 
     expect(result.length).toBe(2);

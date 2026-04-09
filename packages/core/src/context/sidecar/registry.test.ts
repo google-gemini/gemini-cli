@@ -13,7 +13,7 @@ describe('SidecarRegistry', () => {
     const processorDef: ContextProcessorDef = {
       id: 'TestProcessor',
       schema: { type: 'object' },
-      create: () => ({} as any),
+      create: () => ({} as unknown as import('../pipeline.js').ContextProcessor),
     };
 
     registry.registerProcessor(processorDef);
@@ -26,7 +26,7 @@ describe('SidecarRegistry', () => {
     const workerDef: ContextWorkerDef = {
       id: 'TestWorker',
       schema: { type: 'object' },
-      create: () => ({} as any),
+      create: () => ({} as unknown as import('../pipeline.js').ContextProcessor),
     };
 
     registry.registerWorker(workerDef);
@@ -49,15 +49,15 @@ describe('SidecarRegistry', () => {
     registry.registerProcessor({
       id: 'TestProcessor',
       schema: { title: 'processorSchema' },
-      create: () => ({} as any),
+      create: () => ({} as unknown as import('../pipeline.js').ContextProcessor),
     });
     registry.registerWorker({
       id: 'TestWorker',
       schema: { title: 'workerSchema' },
-      create: () => ({} as any),
+      create: () => ({} as unknown as import('../pipeline.js').ContextProcessor),
     });
 
-    const schemas = registry.getSchemas() as any[];
+    const schemas = registry.getSchemas() as unknown as Array<Record<string, unknown>>;
     expect(schemas.length).toBe(2);
     expect(schemas.find(s => s.title === 'processorSchema')).toBeDefined();
     expect(schemas.find(s => s.title === 'workerSchema')).toBeDefined();
@@ -65,8 +65,8 @@ describe('SidecarRegistry', () => {
 
   it('should safely clear the registry', () => {
     const registry = new SidecarRegistry();
-    registry.registerProcessor({ id: 'TestProcessor', schema: {}, create: () => ({} as any) });
-    registry.registerWorker({ id: 'TestWorker', schema: {}, create: () => ({} as any) });
+    registry.registerProcessor({ id: 'TestProcessor', schema: {}, create: () => ({} as unknown as import('../pipeline.js').ContextProcessor) });
+    registry.registerWorker({ id: 'TestWorker', schema: {}, create: () => ({} as unknown as import('../pipeline.js').ContextProcessor) });
 
     registry.clear();
 

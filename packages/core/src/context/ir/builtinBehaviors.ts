@@ -34,6 +34,8 @@ export const UserPromptBehavior: IrNodeBehavior<UserPrompt> = {
         case 'raw_part':
           parts.push(sp.part);
           break;
+        default:
+          break;
       }
     }
     return parts;

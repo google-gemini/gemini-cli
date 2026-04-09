@@ -29,6 +29,7 @@ import type { Content , GenerateContentResponse } from '@google/genai';
  * Used to avoid having to manually construct the deeply nested candidate/content/part structure.
  */
 export const createMockGenerateContentResponse = (text: string): GenerateContentResponse =>
+  // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
   ({
     candidates: [{ content: { role: 'model', parts: [{ text }] }, index: 0 }],
   }) as GenerateContentResponse;
@@ -46,7 +47,7 @@ export function createDummyNode(
     id: id || randomUUID(),
     episodeId: logicalParentId,
     logicalParentId,
-    type: type as any,
+    type,
     timestamp: Date.now(),
     text: `Dummy ${type}`,
     name: type === 'SYSTEM_EVENT' ? 'dummy_event' : undefined,
@@ -94,9 +95,11 @@ export function createDummyToolNode(
 export function createMockEnvironment(
   overrides?: Partial<ContextEnvironment>,
 ): ContextEnvironment {
-  const llmClient = vi.fn().mockReturnValue({
+  const mockClient: Partial<BaseLlmClient> = {
     generateContent: vi.fn().mockResolvedValue(createMockGenerateContentResponse('Mock LLM summary response')),
-  })() as unknown as BaseLlmClient;
+  };
+  // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
+  const llmClient = mockClient as BaseLlmClient;
   
   const tracer = new ContextTracer({ targetDir: '/tmp', sessionId: 'mock-session' });
   const eventBus = new ContextEventBus();
@@ -114,7 +117,10 @@ export function createMockEnvironment(
     new DeterministicIdGenerator('mock-uuid-')
   );
 
-  return { ...env, ...overrides };
+  if (overrides) {
+    Object.assign(env, overrides);
+  }
+  return env;
 }
 
 /**
