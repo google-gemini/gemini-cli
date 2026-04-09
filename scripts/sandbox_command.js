@@ -70,7 +70,11 @@ if (!geminiSandbox) {
   geminiSandbox = process.env.GEMINI_SANDBOX;
 }
 
-geminiSandbox = (geminiSandbox || '').toLowerCase();
+if (typeof geminiSandbox === 'object' && geminiSandbox !== null) {
+  geminiSandbox = geminiSandbox.enabled ? 'true' : 'false';
+}
+
+geminiSandbox = (geminiSandbox || '').toString().toLowerCase();
 
 const commandExists = (cmd) => {
   const checkCommand = os.platform() === 'win32' ? 'where' : 'command -v';
