@@ -112,32 +112,44 @@ def gh_api_graphql(query, variables):
 def get_reviewer_info(pr):
     author = pr.get('author', {}).get('login')
     latest_reviewer_activity = ""
-    official_reviewers = set()
+    human_reviewers = set()
+    
+    # 1. Collect only HUMAN requested reviewers
     for req in pr.get('reviewRequests', {}).get('nodes', []):
         rr = req.get('requestedReviewer')
         if rr and rr.get('__typename') == 'User':
             login = rr.get('login')
             if login and login != author and login not in BOT_BLACKLIST:
-                official_reviewers.add(login)
+                human_reviewers.add(login)
+                
+    # 2. Collect from formal reviews (Even if body is empty)
     reviews = pr.get('latestReviews', {}).get('nodes', [])
     for r in reviews:
         login = r.get('author', {}).get('login') if r.get('author') else None
         if login and login != author and login not in BOT_BLACKLIST:
-            official_reviewers.add(login)
+            human_reviewers.add(login)
+            # Track latest formal review activity
             latest_reviewer_activity = max(latest_reviewer_activity, r['updatedAt'])
+            
+    # 3. Track latest activity from ANYONE who isn't the author
     all_comments = pr.get('comments', {}).get('nodes', [])
     for c in all_comments:
         login = c.get('author', {}).get('login') if c.get('author') else None
         if login and login != author and login not in BOT_BLACKLIST:
             latest_reviewer_activity = max(latest_reviewer_activity, c['publishedAt'])
-    return sorted(list(official_reviewers)), latest_reviewer_activity
+            
+    return sorted(list(human_reviewers)), latest_reviewer_activity
 
 def get_author_activity(pr):
     author = pr.get('author', {}).get('login')
+    # Start with latest commit
     latest = pr['commits']['nodes'][0]['commit']['committedDate']
+    
+    # Check for latest comment from author
     for c in pr.get('comments', {}).get('nodes', []):
         if c.get('author', {}).get('login') == author:
             latest = max(latest, c['publishedAt'])
+            
     return latest
 
 def main():
@@ -183,6 +195,7 @@ def main():
             
             # Categories
             if not latest_reviewer_activity or author_activity > latest_reviewer_activity:
+                # Check for Blockers
                 rollup = pr.get('statusCheckRollup')
                 is_conflicting = pr['mergeable'] == 'CONFLICTING'
                 is_failing = rollup and rollup.get('state') in ['FAILURE', 'ERROR']
@@ -190,7 +203,10 @@ def main():
                 if not is_conflicting and not is_failing:
                     # CONCISE STATUS & ACTION
                     if not latest_reviewer_activity:
-                        status_action = "New PR. **Reviewer Needed.**"
+                        if reviewers:
+                            status_action = "Review Requested. **Waiting for Reviewer.**"
+                        else:
+                            status_action = "New PR. **Reviewer Needed.**"
                     else:
                         status_action = "Updated. **Reviewer Follow-up.**"
                         
@@ -246,7 +262,7 @@ def main():
 
     md += "\n---\n*Dashboard maintained by automated triage script.*"
     with open("REVIEWS.md", "w") as f: f.write(md)
-    print("Generated dashboard with concise status.")
+    print("Generated dashboard with refined reviewer logic.")
 
 if __name__ == "__main__":
     main()
