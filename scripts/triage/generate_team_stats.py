@@ -33,6 +33,7 @@ query($searchQuery: String!, $cursor: String) {
     nodes {
       ... on Issue {
         number
+        url
         timelineItems(itemTypes: CROSS_REFERENCED_EVENT, last: 20) {
           nodes {
             ... on CrossReferencedEvent {
@@ -96,6 +97,7 @@ def main():
     
     for issue in all_issues:
         issue_no = issue['number']
+        issue_url = issue['url']
         events = issue.get('timelineItems', {}).get('nodes', [])
         
         for event in events:
@@ -125,7 +127,8 @@ def main():
                         "url": pr['url'],
                         "state": pr['state'],
                         "updated": pr['updatedAt'][:10],
-                        "issue_no": issue_no
+                        "issue_no": issue_no,
+                        "issue_url": issue_url
                     }
                     if pr['state'] == 'OPEN':
                         stats[reviewer]["open_prs"].append(pr_info)
@@ -158,7 +161,7 @@ def main():
         md += "| :--- | :--- | :--- | :--- | :--- |\n"
         
         for p in data['open_prs']:
-            md += f"| [#{p['number']}]({p['url']}) | #{p['issue_no']} | {p['title']} | `{p['state']}` | `{p['updated']}` |\n"
+            md += f"| [#{p['number']}]({p['url']}) | [#{p['issue_no']}]({p['issue_url']}) | {p['title']} | `{p['state']}` | `{p['updated']}` |\n"
             
         if not data['open_prs']:
             md += "| - | - | _No active reviews._ | - | - |\n"
@@ -167,7 +170,7 @@ def main():
     
     with open("TEAM_STATS.md", "w") as f:
         f.write(md)
-    print("Successfully generated TEAM_STATS.md (Dashboard Consistent).")
+    print("Successfully generated TEAM_STATS.md (Clickable Links).")
 
 if __name__ == "__main__":
     main()
