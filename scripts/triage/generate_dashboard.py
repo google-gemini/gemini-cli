@@ -73,7 +73,6 @@ query($repoOwner: String!, $repoName: String!, $prNumber: Int!) {
           requestedReviewer {
             __typename
             ... on User { login }
-            ... on Team { name slug }
           }
         }
       }
@@ -123,7 +122,7 @@ def get_reviewer_info(pr):
             if login and login != author and login not in BOT_BLACKLIST:
                 official_reviewers.add(login)
                 
-    # 2. Collect from formal reviews (these are always humans or bots)
+    # 2. Collect from formal reviews
     reviews = pr.get('latestReviews', {}).get('nodes', [])
     for r in reviews:
         login = r.get('author', {}).get('login') if r.get('author') else None
@@ -131,7 +130,7 @@ def get_reviewer_info(pr):
             official_reviewers.add(login)
             latest_reviewer_activity = max(latest_reviewer_activity, r['updatedAt'])
             
-    # 3. Track latest activity from ANYONE who isn't the author (to determine readiness)
+    # 3. Track latest activity from ANYONE who isn't the author
     all_comments = pr.get('comments', {}).get('nodes', [])
     for c in all_comments:
         login = c.get('author', {}).get('login') if c.get('author') else None
@@ -157,10 +156,9 @@ def main():
     now = datetime.datetime.now(datetime.timezone.utc)
     owner, name = TARGET_REPO.split('/')
 
-    ready_list = []
+    review_needed_list = []
     stale_assignments = []
     blocked_prs = []
-    waiting_reviewer_list = []
 
     for issue in issues:
         assignees = [a['login'] for a in issue['assignees']['nodes']]
@@ -175,7 +173,7 @@ def main():
         pr_numbers = [e['source']['number'] for e in timeline_nodes if e.get('source') and 'number' in e['source']]
         
         found_open_pr = False
-        valid_pr = None
+        valid_pr_found = False
         
         for pr_no in reversed(pr_numbers):
             pr_data = gh_api_graphql(PR_DETAILS_QUERY, {"repoOwner": owner, "repoName": name, "prNumber": pr_no})
@@ -190,30 +188,29 @@ def main():
             reviewers, latest_reviewer_activity = get_reviewer_info(pr)
             author_activity = get_author_activity(pr)
             
-            # Categories
-            is_ready = (not latest_reviewer_activity or author_activity > latest_reviewer_activity)
-            if is_ready:
-                threads = pr.get('reviewThreads', {}).get('nodes', [])
-                all_resolved = all(thread['isResolved'] for thread in threads)
-                not_conflicting = pr['mergeable'] != 'CONFLICTING'
-                status_ok = pr.get('statusCheckRollup', {}).get('state') not in ['FAILURE', 'ERROR']
-                if all_resolved and not_conflicting and status_ok:
-                    valid_pr = pr
-                    ready_list.append({
+            # Categories:
+            # 1. Action Needed (Author updated AFTER any reviewer/other activity)
+            if not latest_reviewer_activity or author_activity > latest_reviewer_activity:
+                # Check for Blockers (Conflicts or Test Failures)
+                rollup = pr.get('statusCheckRollup')
+                is_conflicting = pr['mergeable'] == 'CONFLICTING'
+                is_failing = rollup and rollup.get('state') in ['FAILURE', 'ERROR']
+                
+                if not is_conflicting and not is_failing:
+                    # It's reviewable!
+                    status = "Ready for initial review" if not latest_reviewer_activity else "Author responded to feedback"
+                    action = "Needs Reviewer" if not latest_reviewer_activity else "Reviewer follow-up"
+                    
+                    review_needed_list.append({
                         "issue_no": issue_no, "title": issue_title, "issue_url": issue_url,
                         "pr_no": pr['number'], "pr_url": pr['url'],
-                        "reviewers": reviewers, "updated_at": issue['updatedAt'][:10]
+                        "reviewers": reviewers, "updated_at": issue['updatedAt'][:10],
+                        "status": status, "action": action
                     })
-                    break
+                    valid_pr_found = True
+                    break # Stop checking older PRs for this issue
             
-            if reviewers and latest_reviewer_activity and author_activity > latest_reviewer_activity:
-                waiting_reviewer_list.append({
-                    "issue_no": issue_no, "title": issue_title, "issue_url": issue_url,
-                    "pr_no": pr['number'], "pr_url": pr['url'],
-                    "author": pr['author']['login'], "reviewers": reviewers,
-                    "author_updated": author_activity[:10]
-                })
-
+            # 2. Blocked & Stale (If we haven't found a "Ready" PR yet)
             pr_updated_at = datetime.datetime.fromisoformat(pr['updatedAt'].replace('Z', '+00:00'))
             if (now - pr_updated_at).days > STALE_BLOCKED_PR_DAYS:
                 reason = ""
@@ -221,11 +218,12 @@ def main():
                 elif pr.get('statusCheckRollup', {}).get('state') == 'FAILURE': reason = "Test Failure"
                 if reason:
                     blocked_prs.append({
-                        "issue_no": issue_no, "title": issue_title, "issue_url": issue_url, "pr_no": pr['number'], "pr_url": pr['url'],
+                        "issue_no": issue_no, "title": issue_title, "issue_url": issue_url,
+                        "pr_no": pr['number'], "pr_url": pr['url'],
                         "reason": reason, "author": pr['author']['login'], "days_stale": (now - pr_updated_at).days
                     })
 
-        if not valid_pr and not found_open_pr and (now - updated_at).days > STALE_ASSIGNMENT_DAYS:
+        if not valid_pr_found and not found_open_pr and (now - updated_at).days > STALE_ASSIGNMENT_DAYS:
             stale_assignments.append({
                 "issue_no": issue_no, "title": issue_title, "url": issue_url,
                 "assignees": assignees, "days_stale": (now - updated_at).days
@@ -235,19 +233,12 @@ def main():
     ts = now.strftime("%Y-%m-%d %H:%M")
     md = f"# 🔎 Gemini CLI Triage Dashboard\n\n*Last Synchronized: {ts} (UTC)*\n\n"
     
-    md += "## ✅ Ready for Review\nAssigned, officially linked, no conflicts, tests passing, and author has responded to all feedback.\n\n"
-    md += "| # | Issue Title | Linked PR | Reviewers | Ready Since |\n| :--- | :--- | :--- | :--- | :--- |\n"
-    for i in ready_list:
+    md += "## ✅ Needs Review\nPull Requests that are passing tests, have no conflicts, and are waiting for reviewer action.\n\n"
+    md += "| # | Issue Title | Linked PR | Reviewers | Status | Action |\n| :--- | :--- | :--- | :--- | :--- | :--- |\n"
+    for i in review_needed_list:
         revs = ", ".join([f"@{r}" for r in i['reviewers']]) if i['reviewers'] else "_None_"
-        md += f"| [#{i['issue_no']}]({i['issue_url']}) | [{i['title']}]({i['issue_url']}) | [#{i['pr_no']}]({i['pr_url']}) | {revs} | `{i['updated_at']}` |\n"
-    if not ready_list: md += "| - | _No issues ready._ | - | - | - |\n"
-
-    md += "\n## ⌛ Waiting for Reviewer Follow-up\nReviewer provided feedback, the author updated the PR, but the reviewer has not responded yet.\n\n"
-    md += "| # | Issue Title | PR | Author | Reviewers | Author Updated |\n| :--- | :--- | :--- | :--- | :--- | :--- |\n"
-    for i in waiting_reviewer_list:
-        revs = ", ".join([f"@{r}" for r in i['reviewers']])
-        md += f"| [#{i['issue_no']}]({i['issue_url']}) | [{i['title']}]({i['issue_url']}) | [#{i['pr_no']}]({i['pr_url']}) | @{i['author']} | {revs} | `{i['author_updated']}` |\n"
-    if not waiting_reviewer_list: md += "| - | _No pending follow-ups._ | - | - | - | - |\n"
+        md += f"| [#{i['issue_no']}]({i['issue_url']}) | [{i['title']}]({i['issue_url']}) | [#{i['pr_no']}]({i['pr_url']}) | {revs} | {i['status']} | **{i['action']}** |\n"
+    if not review_needed_list: md += "| - | _No issues needing review found._ | - | - | - | - |\n"
 
     md += "\n## 🚩 Stale Assignments (No PR)\nAssigned for >{STALE_ASSIGNMENT_DAYS} days with no open Pull Request. Consider unassigning.\n\n"
     md += "| Issue | Title | Assignee | Days Stale |\n| :--- | :--- | :--- | :--- |\n"
@@ -263,7 +254,7 @@ def main():
 
     md += "\n---\n*Dashboard maintained by automated triage script.*"
     with open("REVIEWS.md", "w") as f: f.write(md)
-    print(f"Generated dashboard: {len(ready_list)} ready, {len(waiting_reviewer_list)} waiting reviewers.")
+    print(f"Generated dashboard: {len(review_needed_list)} review-needed, {len(stale_assignments)} stale assignments.")
 
 if __name__ == "__main__":
     main()
