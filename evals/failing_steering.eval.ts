@@ -15,8 +15,8 @@ describe('Related Eval Demonstration', () => {
     },
     prompt: 'What is in test.txt?',
     assert: async (rig: TestRig, result: string) => {
-      // This assertion is designed to fail.
-      expect(result).toContain('THE MODEL WILL NEVER SAY THIS EXACT SENTENCE');
+      // This assertion is GUARANTEED TO FAIL.
+      expect(1).toBe(2);
     },
   });
 });

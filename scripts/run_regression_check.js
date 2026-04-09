@@ -245,12 +245,17 @@ async function processResults(firstPass, pattern, model, files) {
   let totalProcessed = 0;
 
   for (const fileResult of firstPass.testResults) {
+    console.log(`\nDebug: Processing file ${fileResult.name}`);
     for (const assertion of fileResult.assertionResults) {
       if (assertion.status !== 'passed' && assertion.status !== 'failed') {
+        console.log(
+          `  - Skipping test: ${assertion.title} (status: ${assertion.status})`,
+        );
         continue;
       }
 
       const name = assertion.title;
+      console.log(`  - Test: ${name} (status: ${assertion.status})`);
       results[name] = {
         passed: assertion.status === 'passed' ? 1 : 0,
         total: 1,
