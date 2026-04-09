@@ -113,27 +113,23 @@ def get_reviewer_info(pr):
     author = pr.get('author', {}).get('login')
     latest_reviewer_activity = ""
     human_reviewers = set()
-    
     for req in pr.get('reviewRequests', {}).get('nodes', []):
         rr = req.get('requestedReviewer')
         if rr and rr.get('__typename') == 'User':
             login = rr.get('login')
             if login and login != author and login not in BOT_BLACKLIST:
                 human_reviewers.add(login)
-                
     reviews = pr.get('latestReviews', {}).get('nodes', [])
     for r in reviews:
         login = r.get('author', {}).get('login') if r.get('author') else None
         if login and login != author and login not in BOT_BLACKLIST:
             human_reviewers.add(login)
             latest_reviewer_activity = max(latest_reviewer_activity, r['updatedAt'])
-            
     all_comments = pr.get('comments', {}).get('nodes', [])
     for c in all_comments:
         login = c.get('author', {}).get('login') if c.get('author') else None
         if login and login != author and login not in BOT_BLACKLIST:
             latest_reviewer_activity = max(latest_reviewer_activity, c['publishedAt'])
-            
     return sorted(list(human_reviewers)), latest_reviewer_activity
 
 def get_author_activity(pr):
@@ -198,16 +194,12 @@ def main():
                         "pr_no": pr['number'], "pr_url": pr['url'],
                         "reviewers": reviewers, "updated_at": issue['updatedAt'][:10]
                     }
-                    
                     if not latest_reviewer_activity and not reviewers:
                         item["status"] = "New PR"
-                        item["action"] = "Pick up"
                         initial_review_list.append(item)
                     else:
                         item["status"] = "Review Requested" if not latest_reviewer_activity else "Author Updated"
-                        item["action"] = "Follow up"
                         followup_review_list.append(item)
-                    
                     active_pr_assigned = True
                     break
             
@@ -233,26 +225,26 @@ def main():
     ts = now.strftime("%Y-%m-%d %H:%M")
     md = f"# 🔎 Gemini CLI Triage Dashboard\n\n*Last Synchronized: {ts} (UTC)*\n\n"
     
-    md += "## 🆕 Awaiting Initial Review\nNew Pull Requests with no feedback or assigned reviewers yet. Needs a maintainer to pick up.\n\n"
-    md += "| Issue | Linked PR | Status | Action |\n| :--- | :--- | :--- | :--- |\n"
+    md += "## 🆕 Awaiting Initial Review\n**Action: Pick up one of these new PRs.** These have no feedback or assigned reviewers yet.\n\n"
+    md += "| Issue | Linked PR | Status |\n| :--- | :--- | :--- |\n"
     for i in initial_review_list:
-        md += f"| {i['issue_md']} | [#{i['pr_no']}]({i['pr_url']}) | {i['status']} | **{i['action']}** |\n"
-    if not initial_review_list: md += "| - | _No new PRs._ | - | - |\n"
+        md += f"| {i['issue_md']} | [#{i['pr_no']}]({i['pr_url']}) | {i['status']} |\n"
+    if not initial_review_list: md += "| - | _No new PRs._ | - |\n"
 
-    md += "\n## ⌛ Awaiting Reviewer Follow-up\nReviewers have been requested or have acted, and the author has responded to the latest feedback.\n\n"
-    md += "| Issue | Linked PR | Reviewers | Status | Action |\n| :--- | :--- | :--- | :--- | :--- |\n"
+    md += "\n## ⌛ Awaiting Reviewer Follow-up\n**Action: Follow up on your active reviews.** The author has responded to the latest feedback.\n\n"
+    md += "| Issue | Linked PR | Reviewers | Status |\n| :--- | :--- | :--- | :--- |\n"
     for i in followup_review_list:
         revs = ", ".join([f"@{r}" for r in i['reviewers']]) if i['reviewers'] else "_None (Team only)_"
-        md += f"| {i['issue_md']} | [#{i['pr_no']}]({i['pr_url']}) | {revs} | {i['status']} | **{i['action']}** |\n"
-    if not followup_review_list: md += "| - | _No pending follow-ups._ | - | - | - |\n"
+        md += f"| {i['issue_md']} | [#{i['pr_no']}]({i['pr_url']}) | {revs} | {i['status']} |\n"
+    if not followup_review_list: md += "| - | _No pending follow-ups._ | - | - |\n"
 
-    md += "\n## 🚩 Stale Assignments (No PR)\nAssigned for >{STALE_ASSIGNMENT_DAYS} days with no open Pull Request.\n\n"
+    md += "\n## 🚩 Stale Assignments (No PR)\n**Action: Consider unassigning.** Assigned for >{STALE_ASSIGNMENT_DAYS} days with no open Pull Request.\n\n"
     md += "| Issue | Assignee | Days Stale |\n| :--- | :--- | :--- |\n"
     for i in stale_assignments:
         md += f"| {i['issue_md']} | @{', @'.join(i['assignees'])} | {i['days_stale']} |\n"
     if not stale_assignments: md += "| - | _No stale assignments._ | - |\n"
 
-    md += "\n## 🚧 Blocked & Stale PRs\nPRs with conflicts or failures untouched for >{STALE_BLOCKED_PR_DAYS} days.\n\n"
+    md += "\n## 🚧 Blocked & Stale PRs\n**Action: Ping for rebase or test fix.** PRs with conflicts or failures untouched for >{STALE_BLOCKED_PR_DAYS} days.\n\n"
     md += "| Issue | PR | Reason | Author | Days Stale |\n| :--- | :--- | :--- | :--- | :--- |\n"
     for i in blocked_prs:
         md += f"| {i['issue_md']} | [#{i['pr_no']}]({i['pr_url']}) | {i['reason']} | @{i['author']} | {i['days_stale']} |\n"
@@ -260,7 +252,7 @@ def main():
 
     md += "\n---\n*Dashboard maintained by automated triage script.*"
     with open("REVIEWS.md", "w") as f: f.write(md)
-    print("Generated dashboard with split review tables.")
+    print("Generated dashboard with actions in descriptions.")
 
 if __name__ == "__main__":
     main()

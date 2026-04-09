@@ -1,36 +1,36 @@
 # 🔎 Gemini CLI Triage Dashboard
 
-*Last Synchronized: 2026-04-09 21:15 (UTC)*
+*Last Synchronized: 2026-04-09 21:17 (UTC)*
 
 ## 🆕 Awaiting Initial Review
-New Pull Requests with no feedback or assigned reviewers yet. Needs a maintainer to pick up.
+**Action: Pick up one of these new PRs.** These have no feedback or assigned reviewers yet.
 
-| Issue | Linked PR | Status | Action |
-| :--- | :--- | :--- | :--- |
-| [#18654 Enhanced Copy Workflow via External Editor Integration](https://github.com/google-gemini/gemini-cli/issues/18654) | [#19553](https://github.com/google-gemini/gemini-cli/pull/19553) | New PR | **Pick up** |
-| [#18895 CLI cannot use fresh token in MCP OAuth](https://github.com/google-gemini/gemini-cli/issues/18895) | [#23493](https://github.com/google-gemini/gemini-cli/pull/23493) | New PR | **Pick up** |
-| [#19710 Fix unsafe type assertions in Core Utilities (Phase 1.2: JSON & Config)](https://github.com/google-gemini/gemini-cli/issues/19710) | [#23628](https://github.com/google-gemini/gemini-cli/pull/23628) | New PR | **Pick up** |
-| [#19713 Fix unsafe type assertions in CLI Config (Phase 3.1)](https://github.com/google-gemini/gemini-cli/issues/19713) | [#24905](https://github.com/google-gemini/gemini-cli/pull/24905) | New PR | **Pick up** |
+| Issue | Linked PR | Status |
+| :--- | :--- | :--- |
+| [#18654 Enhanced Copy Workflow via External Editor Integration](https://github.com/google-gemini/gemini-cli/issues/18654) | [#19553](https://github.com/google-gemini/gemini-cli/pull/19553) | New PR |
+| [#18895 CLI cannot use fresh token in MCP OAuth](https://github.com/google-gemini/gemini-cli/issues/18895) | [#23493](https://github.com/google-gemini/gemini-cli/pull/23493) | New PR |
+| [#19710 Fix unsafe type assertions in Core Utilities (Phase 1.2: JSON & Config)](https://github.com/google-gemini/gemini-cli/issues/19710) | [#23628](https://github.com/google-gemini/gemini-cli/pull/23628) | New PR |
+| [#19713 Fix unsafe type assertions in CLI Config (Phase 3.1)](https://github.com/google-gemini/gemini-cli/issues/19713) | [#24905](https://github.com/google-gemini/gemini-cli/pull/24905) | New PR |
 
 ## ⌛ Awaiting Reviewer Follow-up
-Reviewers have been requested or have acted, and the author has responded to the latest feedback.
+**Action: Follow up on your active reviews.** The author has responded to the latest feedback.
 
-| Issue | Linked PR | Reviewers | Status | Action |
-| :--- | :--- | :--- | :--- | :--- |
-| [#20755 Shell Tool Trailing Newline Trimming](https://github.com/google-gemini/gemini-cli/issues/20755) | [#23705](https://github.com/google-gemini/gemini-cli/pull/23705) | @mrpmohiburrahman | Author Updated | **Follow up** |
-| [#20385 Terminal output flooded with repeated '0c/' string](https://github.com/google-gemini/gemini-cli/issues/20385) | [#24596](https://github.com/google-gemini/gemini-cli/pull/24596) | _None (Team only)_ | Author Updated | **Follow up** |
-| [#19717 Fix unsafe type assertions in VS Code Companion (Phase 4.2)](https://github.com/google-gemini/gemini-cli/issues/19717) | [#19815](https://github.com/google-gemini/gemini-cli/pull/19815) | @Adib234, @mrpmohiburrahman | Review Requested | **Follow up** |
-| [#24337 fix(cli): make slash-command IDE status subscription cleanup-safe](https://github.com/google-gemini/gemini-cli/issues/24337) | [#24397](https://github.com/google-gemini/gemini-cli/pull/24397) | @scidomino | Author Updated | **Follow up** |
+| Issue | Linked PR | Reviewers | Status |
+| :--- | :--- | :--- | :--- |
+| [#20755 Shell Tool Trailing Newline Trimming](https://github.com/google-gemini/gemini-cli/issues/20755) | [#23705](https://github.com/google-gemini/gemini-cli/pull/23705) | @mrpmohiburrahman | Author Updated |
+| [#20385 Terminal output flooded with repeated '0c/' string](https://github.com/google-gemini/gemini-cli/issues/20385) | [#24596](https://github.com/google-gemini/gemini-cli/pull/24596) | _None (Team only)_ | Author Updated |
+| [#19717 Fix unsafe type assertions in VS Code Companion (Phase 4.2)](https://github.com/google-gemini/gemini-cli/issues/19717) | [#19815](https://github.com/google-gemini/gemini-cli/pull/19815) | @Adib234, @mrpmohiburrahman | Review Requested |
+| [#24337 fix(cli): make slash-command IDE status subscription cleanup-safe](https://github.com/google-gemini/gemini-cli/issues/24337) | [#24397](https://github.com/google-gemini/gemini-cli/pull/24397) | @scidomino | Author Updated |
 
 ## 🚩 Stale Assignments (No PR)
-Assigned for >{STALE_ASSIGNMENT_DAYS} days with no open Pull Request.
+**Action: Consider unassigning.** Assigned for >{STALE_ASSIGNMENT_DAYS} days with no open Pull Request.
 
 | Issue | Assignee | Days Stale |
 | :--- | :--- | :--- |
 | - | _No stale assignments._ | - |
 
 ## 🚧 Blocked & Stale PRs
-PRs with conflicts or failures untouched for >{STALE_BLOCKED_PR_DAYS} days.
+**Action: Ping for rebase or test fix.** PRs with conflicts or failures untouched for >{STALE_BLOCKED_PR_DAYS} days.
 
 | Issue | PR | Reason | Author | Days Stale |
 | :--- | :--- | :--- | :--- | :--- |
