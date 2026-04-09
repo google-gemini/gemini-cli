@@ -25,7 +25,7 @@ import {
   AuthType,
   type ContentGeneratorConfig,
 } from '../../core/contentGenerator.js';
-import type { SuccessfulToolCall } from '../../core/coreToolScheduler.js';
+import type { SuccessfulToolCall } from '../../scheduler/types.js';
 import type { ConfigParameters } from '../../config/config.js';
 import { EventMetadataKey } from './event-metadata-key.js';
 import { makeFakeConfig } from '../../test-utils/config.js';
@@ -41,6 +41,8 @@ import {
   AgentFinishEvent,
   WebFetchFallbackAttemptEvent,
   HookCallEvent,
+  OnboardingStartEvent,
+  OnboardingSuccessEvent,
 } from '../types.js';
 import { HookType } from '../../hooks/types.js';
 import { AgentTerminateMode } from '../../agents/types.js';
@@ -1649,6 +1651,227 @@ describe('ClearcutLogger', () => {
       expect(events[0]).toHaveMetadataValue([
         EventMetadataKey.GEMINI_CLI_BILLING_PURCHASE_SOURCE,
         '"empty_wallet_menu"',
+      ]);
+    });
+  });
+
+  describe('logOnboardingStartEvent', () => {
+    it('logs an event with proper name and start key', () => {
+      const { logger } = setup();
+      const event = new OnboardingStartEvent();
+
+      logger?.logOnboardingStartEvent(event);
+
+      const events = getEvents(logger!);
+      expect(events.length).toBe(1);
+      expect(events[0]).toHaveEventName(EventNames.ONBOARDING_START);
+      expect(events[0]).toHaveMetadataValue([
+        EventMetadataKey.GEMINI_CLI_ONBOARDING_START,
+        'true',
+      ]);
+    });
+  });
+
+  describe('logOnboardingSuccessEvent', () => {
+    it('logs an event with proper name and user tier', () => {
+      const { logger } = setup();
+      const event = new OnboardingSuccessEvent('standard-tier', 100);
+
+      logger?.logOnboardingSuccessEvent(event);
+
+      const events = getEvents(logger!);
+      expect(events.length).toBe(1);
+      expect(events[0]).toHaveEventName(EventNames.ONBOARDING_SUCCESS);
+      expect(events[0]).toHaveMetadataValue([
+        EventMetadataKey.GEMINI_CLI_ONBOARDING_USER_TIER,
+        'standard-tier',
+      ]);
+      expect(events[0]).toHaveMetadataValue([
+        EventMetadataKey.GEMINI_CLI_ONBOARDING_DURATION_MS,
+        '100',
+      ]);
+    });
+  });
+
+  describe('logBrowserAgentConnectionEvent', () => {
+    it('logs a successful connection event', () => {
+      const { logger } = setup();
+      logger?.logBrowserAgentConnectionEvent({
+        session_mode: 'isolated',
+        headless: true,
+        success: true,
+        duration_ms: 1500,
+      });
+
+      const events = getEvents(logger!);
+      expect(events.length).toBe(1);
+      expect(events[0]).toHaveEventName(EventNames.BROWSER_AGENT_CONNECTION);
+      expect(events[0]).toHaveMetadataValue([
+        EventMetadataKey.GEMINI_CLI_BROWSER_AGENT_SESSION_MODE,
+        'isolated',
+      ]);
+      expect(events[0]).toHaveMetadataValue([
+        EventMetadataKey.GEMINI_CLI_BROWSER_AGENT_HEADLESS,
+        'true',
+      ]);
+      expect(events[0]).toHaveMetadataValue([
+        EventMetadataKey.GEMINI_CLI_BROWSER_AGENT_SUCCESS,
+        'true',
+      ]);
+      expect(events[0]).toHaveMetadataValue([
+        EventMetadataKey.GEMINI_CLI_BROWSER_AGENT_DURATION_MS,
+        '1500',
+      ]);
+    });
+
+    it('logs a failed connection event with error_type', () => {
+      const { logger } = setup();
+      logger?.logBrowserAgentConnectionEvent({
+        session_mode: 'persistent',
+        headless: false,
+        success: false,
+        duration_ms: 30000,
+        error_type: 'timeout',
+      });
+
+      const events = getEvents(logger!);
+      expect(events.length).toBe(1);
+      expect(events[0]).toHaveMetadataValue([
+        EventMetadataKey.GEMINI_CLI_BROWSER_AGENT_SUCCESS,
+        'false',
+      ]);
+      expect(events[0]).toHaveMetadataValue([
+        EventMetadataKey.GEMINI_CLI_BROWSER_AGENT_ERROR_TYPE,
+        'timeout',
+      ]);
+    });
+
+    it('logs tool_count when provided', () => {
+      const { logger } = setup();
+      logger?.logBrowserAgentConnectionEvent({
+        session_mode: 'existing',
+        headless: true,
+        success: true,
+        duration_ms: 800,
+        tool_count: 12,
+      });
+
+      const events = getEvents(logger!);
+      expect(events[0]).toHaveMetadataValue([
+        EventMetadataKey.GEMINI_CLI_BROWSER_AGENT_TOOL_COUNT,
+        '12',
+      ]);
+    });
+  });
+
+  describe('logBrowserAgentVisionStatusEvent', () => {
+    it('logs vision enabled', () => {
+      const { logger } = setup();
+      logger?.logBrowserAgentVisionStatusEvent({ enabled: true });
+
+      const events = getEvents(logger!);
+      expect(events.length).toBe(1);
+      expect(events[0]).toHaveEventName(EventNames.BROWSER_AGENT_VISION_STATUS);
+      expect(events[0]).toHaveMetadataValue([
+        EventMetadataKey.GEMINI_CLI_BROWSER_AGENT_VISION_ENABLED,
+        'true',
+      ]);
+    });
+
+    it('logs vision disabled with reason', () => {
+      const { logger } = setup();
+      logger?.logBrowserAgentVisionStatusEvent({
+        enabled: false,
+        disabled_reason: 'no_visual_model',
+      });
+
+      const events = getEvents(logger!);
+      expect(events[0]).toHaveMetadataValue([
+        EventMetadataKey.GEMINI_CLI_BROWSER_AGENT_VISION_ENABLED,
+        'false',
+      ]);
+      expect(events[0]).toHaveMetadataValue([
+        EventMetadataKey.GEMINI_CLI_BROWSER_AGENT_VISION_DISABLED_REASON,
+        'no_visual_model',
+      ]);
+    });
+  });
+
+  describe('logBrowserAgentTaskOutcomeEvent', () => {
+    it('logs a task outcome event with all attributes', () => {
+      const { logger } = setup();
+      logger?.logBrowserAgentTaskOutcomeEvent({
+        success: true,
+        session_mode: 'isolated',
+        vision_enabled: true,
+        headless: true,
+        duration_ms: 5000,
+      });
+
+      const events = getEvents(logger!);
+      expect(events.length).toBe(1);
+      expect(events[0]).toHaveEventName(EventNames.BROWSER_AGENT_TASK_OUTCOME);
+      expect(events[0]).toHaveMetadataValue([
+        EventMetadataKey.GEMINI_CLI_BROWSER_AGENT_SUCCESS,
+        'true',
+      ]);
+      expect(events[0]).toHaveMetadataValue([
+        EventMetadataKey.GEMINI_CLI_BROWSER_AGENT_SESSION_MODE,
+        'isolated',
+      ]);
+      expect(events[0]).toHaveMetadataValue([
+        EventMetadataKey.GEMINI_CLI_BROWSER_AGENT_VISION_ENABLED,
+        'true',
+      ]);
+      expect(events[0]).toHaveMetadataValue([
+        EventMetadataKey.GEMINI_CLI_BROWSER_AGENT_HEADLESS,
+        'true',
+      ]);
+      expect(events[0]).toHaveMetadataValue([
+        EventMetadataKey.GEMINI_CLI_BROWSER_AGENT_DURATION_MS,
+        '5000',
+      ]);
+    });
+  });
+
+  describe('logBrowserAgentCleanupEvent', () => {
+    it('logs a cleanup event with all attributes', () => {
+      const { logger } = setup();
+      logger?.logBrowserAgentCleanupEvent({
+        session_mode: 'isolated',
+        success: true,
+        duration_ms: 200,
+      });
+
+      const events = getEvents(logger!);
+      expect(events.length).toBe(1);
+      expect(events[0]).toHaveEventName(EventNames.BROWSER_AGENT_CLEANUP);
+      expect(events[0]).toHaveMetadataValue([
+        EventMetadataKey.GEMINI_CLI_BROWSER_AGENT_SESSION_MODE,
+        'isolated',
+      ]);
+      expect(events[0]).toHaveMetadataValue([
+        EventMetadataKey.GEMINI_CLI_BROWSER_AGENT_SUCCESS,
+        'true',
+      ]);
+      expect(events[0]).toHaveMetadataValue([
+        EventMetadataKey.GEMINI_CLI_BROWSER_AGENT_DURATION_MS,
+        '200',
+      ]);
+    });
+
+    it('logs a failed cleanup event', () => {
+      const { logger } = setup();
+      logger?.logBrowserAgentCleanupEvent({
+        session_mode: 'persistent',
+        success: false,
+        duration_ms: 5000,
+      });
+
+      const events = getEvents(logger!);
+      expect(events[0]).toHaveMetadataValue([
+        EventMetadataKey.GEMINI_CLI_BROWSER_AGENT_SUCCESS,
+        'false',
       ]);
     });
   });

@@ -16,10 +16,8 @@ import {
 import type { MessageBus } from '../confirmation-bus/message-bus.js';
 import type { HookSystem } from '../hooks/hookSystem.js';
 import type { Config } from '../config/config.js';
-import {
-  type DefaultHookOutput,
-  BeforeToolHookOutput,
-} from '../hooks/types.js';
+import type { DefaultHookOutput } from '../hooks/types.js';
+import { BeforeToolHookOutput } from '../hooks/types.js';
 
 class MockInvocation extends BaseToolInvocation<{ key?: string }, ToolResult> {
   constructor(params: { key?: string }, messageBus: MessageBus) {
@@ -51,10 +49,9 @@ class MockBackgroundableInvocation extends BaseToolInvocation<
   async execute(
     _signal: AbortSignal,
     _updateOutput?: (output: ToolLiveOutput) => void,
-    _shellExecutionConfig?: unknown,
-    setExecutionIdCallback?: (executionId: number) => void,
+    options?: { setExecutionIdCallback?: (executionId: number) => void },
   ) {
-    setExecutionIdCallback?.(4242);
+    options?.setExecutionIdCallback?.(4242);
     return {
       llmContent: 'pid',
       returnDisplay: 'pid',
@@ -111,7 +108,6 @@ describe('executeToolWithHooks', () => {
       mockTool,
       undefined,
       undefined,
-      undefined,
       mockConfig,
     );
 
@@ -136,24 +132,16 @@ describe('executeToolWithHooks', () => {
       mockTool,
       undefined,
       undefined,
-      undefined,
       mockConfig,
     );
 
     expect(result.error?.type).toBe(ToolErrorType.EXECUTION_FAILED);
     expect(result.error?.message).toBe('Execution blocked');
   });
-
   it('should handle continue: false in AfterTool', async () => {
     const invocation = new MockInvocation({}, messageBus);
     const abortSignal = new AbortController().signal;
     const spy = vi.spyOn(invocation, 'execute');
-
-    vi.mocked(mockHookSystem.fireBeforeToolEvent).mockResolvedValue({
-      shouldStopExecution: () => false,
-      getEffectiveReason: () => '',
-      getBlockingError: () => ({ blocked: false, reason: '' }),
-    } as unknown as DefaultHookOutput);
 
     vi.mocked(mockHookSystem.fireAfterToolEvent).mockResolvedValue({
       shouldStopExecution: () => true,
@@ -168,7 +156,6 @@ describe('executeToolWithHooks', () => {
       mockTool,
       undefined,
       undefined,
-      undefined,
       mockConfig,
     );
 
@@ -181,12 +168,6 @@ describe('executeToolWithHooks', () => {
     const invocation = new MockInvocation({}, messageBus);
     const abortSignal = new AbortController().signal;
 
-    vi.mocked(mockHookSystem.fireBeforeToolEvent).mockResolvedValue({
-      shouldStopExecution: () => false,
-      getEffectiveReason: () => '',
-      getBlockingError: () => ({ blocked: false, reason: '' }),
-    } as unknown as DefaultHookOutput);
-
     vi.mocked(mockHookSystem.fireAfterToolEvent).mockResolvedValue({
       shouldStopExecution: () => false,
       getEffectiveReason: () => '',
@@ -198,7 +179,6 @@ describe('executeToolWithHooks', () => {
       'test_tool',
       abortSignal,
       mockTool,
-      undefined,
       undefined,
       undefined,
       mockConfig,
@@ -232,7 +212,6 @@ describe('executeToolWithHooks', () => {
       toolName,
       abortSignal,
       mockTool,
-      undefined,
       undefined,
       undefined,
       mockConfig,
@@ -275,7 +254,6 @@ describe('executeToolWithHooks', () => {
       mockTool,
       undefined,
       undefined,
-      undefined,
       mockConfig,
     );
 
@@ -298,8 +276,7 @@ describe('executeToolWithHooks', () => {
       abortSignal,
       mockTool,
       undefined,
-      undefined,
-      setExecutionIdCallback,
+      { setExecutionIdCallback },
       mockConfig,
     );
 

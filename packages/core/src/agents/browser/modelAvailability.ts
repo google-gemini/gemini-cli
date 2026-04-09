@@ -20,6 +20,20 @@ import { debugLogger } from '../../utils/debugLogger.js';
 export const VISUAL_AGENT_MODEL = 'gemini-2.5-computer-use-preview-10-2025';
 
 /**
+ * Pattern matching the gemini computer-use model family.
+ * These models require a computerUse tool declaration in every request.
+ */
+const COMPUTER_USE_MODEL_PATTERN = /^gemini-.*-computer-use-/;
+
+/**
+ * Returns true if the model name belongs to the computer-use family
+ * (matches gemini-*-computer-use-*).
+ */
+export function isComputerUseModel(model: string): boolean {
+  return COMPUTER_USE_MODEL_PATTERN.test(model);
+}
+
+/**
  * Gets the visual agent model from config, falling back to default.
  *
  * @param config Runtime configuration

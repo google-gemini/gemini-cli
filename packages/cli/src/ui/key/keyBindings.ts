@@ -74,8 +74,10 @@ export enum Command {
 
   // Text Input
   SUBMIT = 'input.submit',
+  QUEUE_MESSAGE = 'input.queueMessage',
   NEWLINE = 'input.newline',
   OPEN_EXTERNAL_EDITOR = 'input.openExternalEditor',
+  DEPRECATED_OPEN_EXTERNAL_EDITOR = 'input.deprecatedOpenExternalEditor',
   PASTE_CLIPBOARD = 'input.paste',
 
   // App Controls
@@ -84,6 +86,7 @@ export enum Command {
   SHOW_IDE_CONTEXT_DETAIL = 'app.showIdeContextDetail',
   TOGGLE_MARKDOWN = 'app.toggleMarkdown',
   TOGGLE_COPY_MODE = 'app.toggleCopyMode',
+  TOGGLE_MOUSE_MODE = 'app.toggleMouseMode',
   TOGGLE_YOLO = 'app.toggleYolo',
   CYCLE_APPROVAL_MODE = 'app.cycleApprovalMode',
   SHOW_MORE_LINES = 'app.showMoreLines',
@@ -104,6 +107,14 @@ export enum Command {
   UNFOCUS_BACKGROUND_SHELL = 'background.unfocus',
   UNFOCUS_BACKGROUND_SHELL_LIST = 'background.unfocusList',
   SHOW_BACKGROUND_SHELL_UNFOCUS_WARNING = 'background.unfocusWarning',
+
+  // Extension Controls
+  UPDATE_EXTENSION = 'extension.update',
+  LINK_EXTENSION = 'extension.link',
+
+  DUMP_FRAME = 'app.dumpFrame',
+  START_RECORDING = 'app.startRecording',
+  STOP_RECORDING = 'app.stopRecording',
 }
 
 /**
@@ -194,6 +205,7 @@ export class KeyBinding {
 
     const key = remains;
 
+    // eslint-disable-next-line @typescript-eslint/no-misused-spread
     const isSingleChar = [...key].length === 1;
 
     if (!isSingleChar && !KeyBinding.VALID_LONG_KEYS.has(key.toLowerCase())) {
@@ -353,6 +365,7 @@ export const defaultKeyBindingConfig: KeyBindingConfig = new Map([
   // Text Input
   // Must also exclude shift to allow shift+enter for newline
   [Command.SUBMIT, [new KeyBinding('enter')]],
+  [Command.QUEUE_MESSAGE, [new KeyBinding('tab')]],
   [
     Command.NEWLINE,
     [
@@ -363,7 +376,8 @@ export const defaultKeyBindingConfig: KeyBindingConfig = new Map([
       new KeyBinding('ctrl+j'),
     ],
   ],
-  [Command.OPEN_EXTERNAL_EDITOR, [new KeyBinding('ctrl+x')]],
+  [Command.OPEN_EXTERNAL_EDITOR, [new KeyBinding('ctrl+g')]],
+  [Command.DEPRECATED_OPEN_EXTERNAL_EDITOR, [new KeyBinding('ctrl+x')]],
   [
     Command.PASTE_CLIPBOARD,
     [
@@ -376,9 +390,10 @@ export const defaultKeyBindingConfig: KeyBindingConfig = new Map([
   // App Controls
   [Command.SHOW_ERROR_DETAILS, [new KeyBinding('f12')]],
   [Command.SHOW_FULL_TODOS, [new KeyBinding('ctrl+t')]],
-  [Command.SHOW_IDE_CONTEXT_DETAIL, [new KeyBinding('ctrl+g')]],
+  [Command.SHOW_IDE_CONTEXT_DETAIL, [new KeyBinding('f4')]],
   [Command.TOGGLE_MARKDOWN, [new KeyBinding('alt+m')]],
-  [Command.TOGGLE_COPY_MODE, [new KeyBinding('ctrl+s')]],
+  [Command.TOGGLE_COPY_MODE, [new KeyBinding('f9')]],
+  [Command.TOGGLE_MOUSE_MODE, [new KeyBinding('ctrl+s')]],
   [Command.TOGGLE_YOLO, [new KeyBinding('ctrl+y')]],
   [Command.CYCLE_APPROVAL_MODE, [new KeyBinding('shift+tab')]],
   [Command.SHOW_MORE_LINES, [new KeyBinding('ctrl+o')]],
@@ -389,6 +404,9 @@ export const defaultKeyBindingConfig: KeyBindingConfig = new Map([
   [Command.RESTART_APP, [new KeyBinding('r'), new KeyBinding('shift+r')]],
   [Command.SUSPEND_APP, [new KeyBinding('ctrl+z')]],
   [Command.SHOW_SHELL_INPUT_UNFOCUS_WARNING, [new KeyBinding('tab')]],
+  [Command.DUMP_FRAME, [new KeyBinding('f8')]],
+  [Command.START_RECORDING, [new KeyBinding('f6')]],
+  [Command.STOP_RECORDING, [new KeyBinding('f7')]],
 
   // Background Shell Controls
   [Command.BACKGROUND_SHELL_ESCAPE, [new KeyBinding('escape')]],
@@ -399,6 +417,10 @@ export const defaultKeyBindingConfig: KeyBindingConfig = new Map([
   [Command.UNFOCUS_BACKGROUND_SHELL, [new KeyBinding('shift+tab')]],
   [Command.UNFOCUS_BACKGROUND_SHELL_LIST, [new KeyBinding('tab')]],
   [Command.SHOW_BACKGROUND_SHELL_UNFOCUS_WARNING, [new KeyBinding('tab')]],
+
+  // Extension Controls
+  [Command.UPDATE_EXTENSION, [new KeyBinding('i')]],
+  [Command.LINK_EXTENSION, [new KeyBinding('l')]],
 ]);
 
 interface CommandCategory {
@@ -487,8 +509,10 @@ export const commandCategories: readonly CommandCategory[] = [
     title: 'Text Input',
     commands: [
       Command.SUBMIT,
+      Command.QUEUE_MESSAGE,
       Command.NEWLINE,
       Command.OPEN_EXTERNAL_EDITOR,
+      Command.DEPRECATED_OPEN_EXTERNAL_EDITOR,
       Command.PASTE_CLIPBOARD,
     ],
   },
@@ -500,6 +524,7 @@ export const commandCategories: readonly CommandCategory[] = [
       Command.SHOW_IDE_CONTEXT_DETAIL,
       Command.TOGGLE_MARKDOWN,
       Command.TOGGLE_COPY_MODE,
+      Command.TOGGLE_MOUSE_MODE,
       Command.TOGGLE_YOLO,
       Command.CYCLE_APPROVAL_MODE,
       Command.SHOW_MORE_LINES,
@@ -523,7 +548,14 @@ export const commandCategories: readonly CommandCategory[] = [
       Command.UNFOCUS_BACKGROUND_SHELL,
       Command.UNFOCUS_BACKGROUND_SHELL_LIST,
       Command.SHOW_BACKGROUND_SHELL_UNFOCUS_WARNING,
+      Command.DUMP_FRAME,
+      Command.START_RECORDING,
+      Command.STOP_RECORDING,
     ],
+  },
+  {
+    title: 'Extension Controls',
+    commands: [Command.UPDATE_EXTENSION, Command.LINK_EXTENSION],
   },
 ];
 
@@ -592,9 +624,13 @@ export const commandDescriptions: Readonly<Record<Command, string>> = {
 
   // Text Input
   [Command.SUBMIT]: 'Submit the current prompt.',
+  [Command.QUEUE_MESSAGE]:
+    'Queue the current prompt to be processed after the current task finishes.',
   [Command.NEWLINE]: 'Insert a newline without submitting.',
   [Command.OPEN_EXTERNAL_EDITOR]:
     'Open the current prompt or the plan in an external editor.',
+  [Command.DEPRECATED_OPEN_EXTERNAL_EDITOR]:
+    'Deprecated command to open external editor.',
   [Command.PASTE_CLIPBOARD]: 'Paste from the clipboard.',
 
   // App Controls
@@ -603,6 +639,7 @@ export const commandDescriptions: Readonly<Record<Command, string>> = {
   [Command.SHOW_IDE_CONTEXT_DETAIL]: 'Show IDE context details.',
   [Command.TOGGLE_MARKDOWN]: 'Toggle Markdown rendering.',
   [Command.TOGGLE_COPY_MODE]: 'Toggle copy mode when in alternate buffer mode.',
+  [Command.TOGGLE_MOUSE_MODE]: 'Toggle mouse mode (scrolling and clicking).',
   [Command.TOGGLE_YOLO]: 'Toggle YOLO (auto-approval) mode for tool calls.',
   [Command.CYCLE_APPROVAL_MODE]:
     'Cycle through approval modes: default (prompt), auto_edit (auto-approve edits), and plan (read-only). Plan mode is skipped when the agent is busy.',
@@ -632,6 +669,14 @@ export const commandDescriptions: Readonly<Record<Command, string>> = {
     'Move focus from background shell list to Gemini.',
   [Command.SHOW_BACKGROUND_SHELL_UNFOCUS_WARNING]:
     'Show warning when trying to move focus away from background shell.',
+
+  // Extension Controls
+  [Command.UPDATE_EXTENSION]: 'Update the current extension if available.',
+  [Command.LINK_EXTENSION]: 'Link the current extension to a local path.',
+
+  [Command.DUMP_FRAME]: 'Dump the current frame as a snapshot.',
+  [Command.START_RECORDING]: 'Start recording the session.',
+  [Command.STOP_RECORDING]: 'Stop recording the session.',
 };
 
 const keybindingsSchema = z.array(
