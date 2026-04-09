@@ -41,7 +41,7 @@ The orchestrator reads the `SidecarConfig`. It manages the lifecycle of the pipe
 
 ### The Workers: `ContextProcessor`s
 Small, highly-focused classes that implement context reduction strategies. They do not mutate the graph directly; instead, they are given an `EpisodeEditor` which provides a safe, scoped API to attach `Variant`s and append metadata.
-*   *Examples:* `ToolMaskingProcessor`, `SemanticCompressionProcessor`, `BlobDegradationProcessor`.
+*   *Examples:* `ToolMaskingProcessor`, `NodeDistillationProcessor`, `BlobDegradationProcessor`.
 
 ### The Glue: `ContextEventBus`
 A Pub/Sub bus that decouples the components. It enables the `HistoryObserver` to notify the system of new messages, and allows background processors to notify the `ContextManager` when a new compressed variant is ready to be used.

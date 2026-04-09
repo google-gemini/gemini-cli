@@ -8,16 +8,16 @@ import type { ContextEnvironment } from '../sidecar/environment.js';
 import { truncateProportionally } from '../truncation.js';
 import type { ConcreteNode } from '../ir/types.js';
 
-export interface HistorySquashingProcessorOptions {
+export interface NodeTruncationProcessorOptions {
   maxTokensPerNode: number;
 }
 
-export class HistorySquashingProcessor implements ContextProcessor {
+export class NodeTruncationProcessor implements ContextProcessor {
   static create(
     env: ContextEnvironment,
-    options: HistorySquashingProcessorOptions,
-  ): HistorySquashingProcessor {
-    return new HistorySquashingProcessor(env, options);
+    options: NodeTruncationProcessorOptions,
+  ): NodeTruncationProcessor {
+    return new NodeTruncationProcessor(env, options);
   }
 
   static readonly schema = {
@@ -31,14 +31,14 @@ export class HistorySquashingProcessor implements ContextProcessor {
     required: ['maxTokensPerNode'],
   };
 
-  readonly id = 'HistorySquashingProcessor';
-  readonly name = 'HistorySquashingProcessor';
-  readonly options: HistorySquashingProcessorOptions;
+  readonly id = 'NodeTruncationProcessor';
+  readonly name = 'NodeTruncationProcessor';
+  readonly options: NodeTruncationProcessorOptions;
   private env: ContextEnvironment;
 
   constructor(
     env: ContextEnvironment,
-    options: HistorySquashingProcessorOptions,
+    options: NodeTruncationProcessorOptions,
   ) {
     this.env = env;
     this.options = options;

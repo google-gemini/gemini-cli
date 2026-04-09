@@ -1,20 +1,20 @@
-# Context Manager: The Pure Functional "Ship of Theseus" IR
+# Context Manager: The Pure Functional "Nodes of Theseus" IR
 
 This document outlines the architectural transition from the V0 Mutating Editor pattern to the V1 Pure Functional, Immutable Episodic IR, designed to scale into a multi-agent, async state transformation system.
 
-## 1. Core Philosophy: The Ship of Theseus
+## 1. Core Philosophy: The Nodes of Theseus
 
 The primary constraint of deep immutable trees is the cascading cost of cloning parent nodes when a leaf node changes. To solve this, we decouple the structural hierarchy of the context from the actual data sent to the LLM.
 
 The IR is divided into two distinct domains:
 1.  **Logical Nodes:** Structural boundaries that define the hierarchy (e.g., `Task`, `Episode`). These nodes **do not render** to the LLM. They exist to group related interactions and provide semantic meaning.
-2.  **Concrete Nodes:** The atomic, renderable pieces of data (e.g., `UserPrompt`, `ToolExecution`, `Snapshot`, `RollingSummary`). These are the actual "planks" of the ship.
+2.  **Concrete Nodes:** The atomic, renderable pieces of data (e.g., `UserPrompt`, `ToolExecution`, `Snapshot`, `RollingSummary`). These are the actual "planks" of the nodes.
 
 Because Concrete Nodes carry a reference to their Logical Parent (e.g., `episodeId`), they can be stored and processed as a **Flat List**.
 
 ## 2. The Autonomous `ContextWorkingBuffer`
 
-The "Ship" is no longer a dumb array; it is encapsulated in a rich `ContextWorkingBuffer` entity.
+The "Nodes" is no longer a dumb array; it is encapsulated in a rich `ContextWorkingBuffer` entity.
 
 ### Encapsulation of History
 The Buffer manages its own audit trail and lineage. If a processor needs the pristine, unaltered data of a deeply compressed node (e.g., a Snapshotter summarizing masked tools), it queries the Buffer directly:

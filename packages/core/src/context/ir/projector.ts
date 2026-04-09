@@ -16,11 +16,11 @@ import type { SidecarConfig } from '../sidecar/types.js';
 
 export class IrProjector {
   /**
-   * Orchestrates the final projection: takes a working buffer view (The Ship),
+   * Orchestrates the final projection: takes a working buffer view (The Nodes),
    * applies the Immediate Sanitization pipeline, and enforces token boundaries.
    */
   static async project(
-    ship: readonly ConcreteNode[],
+    nodes: readonly ConcreteNode[],
     orchestrator: PipelineOrchestrator,
     sidecar: SidecarConfig,
     tracer: ContextTracer,
@@ -28,7 +28,7 @@ export class IrProjector {
     protectedIds: Set<string>,
   ): Promise<Content[]> {
     if (!sidecar.budget) {
-      const contents = env.irMapper.fromIr(ship);
+      const contents = env.irMapper.fromIr(nodes);
       tracer.logEvent('IrProjector', 'Projected Context to LLM (No Budget)', {
         projectedContext: contents,
       });
@@ -36,14 +36,14 @@ export class IrProjector {
     }
 
     const maxTokens = sidecar.budget.maxTokens;
-    const currentTokens = env.tokenCalculator.calculateConcreteListTokens(ship);
+    const currentTokens = env.tokenCalculator.calculateConcreteListTokens(nodes);
 
     // V0: Always protect the first node (System Prompt) and the last turn
-    if (ship.length > 0) {
-      protectedIds.add(ship[0].id);
-      if (ship[0].logicalParentId) protectedIds.add(ship[0].logicalParentId);
+    if (nodes.length > 0) {
+      protectedIds.add(nodes[0].id);
+      if (nodes[0].logicalParentId) protectedIds.add(nodes[0].logicalParentId);
 
-      const lastNode = ship[ship.length - 1];
+      const lastNode = nodes[nodes.length - 1];
       protectedIds.add(lastNode.id);
       if (lastNode.logicalParentId) protectedIds.add(lastNode.logicalParentId);
     }
@@ -53,7 +53,7 @@ export class IrProjector {
         'IrProjector',
         `View is within maxTokens (${currentTokens} <= ${maxTokens}). Returning view.`,
       );
-      const contents = env.irMapper.fromIr(ship);
+      const contents = env.irMapper.fromIr(nodes);
       tracer.logEvent('IrProjector', 'Projected Context to LLM', {
         projectedContext: contents,
       });
@@ -72,8 +72,8 @@ export class IrProjector {
     const agedOutNodes = new Set<string>();
     let rollingTokens = 0;
     // Start from newest and count backwards
-    for (let i = ship.length - 1; i >= 0; i--) {
-      const node = ship[i];
+    for (let i = nodes.length - 1; i >= 0; i--) {
+      const node = nodes[i];
       const nodeTokens = env.tokenCalculator.calculateConcreteListTokens([node]);
       rollingTokens += nodeTokens;
       if (rollingTokens > sidecar.budget.retainedTokens) {
@@ -81,15 +81,15 @@ export class IrProjector {
       }
     }
 
-    const processedShip = await orchestrator.executeTriggerSync(
+    const processedNodes = await orchestrator.executeTriggerSync(
       'gc_backstop',
-      ship,
+      nodes,
       agedOutNodes,
       protectedIds,
     );
 
     const finalTokens =
-      env.tokenCalculator.calculateConcreteListTokens(processedShip);
+      env.tokenCalculator.calculateConcreteListTokens(processedNodes);
     tracer.logEvent(
       'IrProjector',
       `Finished projection. Final token count: ${finalTokens}.`,
@@ -100,15 +100,15 @@ export class IrProjector {
 
     // Apply skipList logic to abstract over summarized nodes
     const skipList = new Set<string>();
-    for (const node of processedShip) {
+    for (const node of processedNodes) {
       if (node.abstractsIds) {
         for (const id of node.abstractsIds) skipList.add(id);
       }
     }
 
-    const visibleShip = processedShip.filter((n) => !skipList.has(n.id));
+    const visibleNodes = processedNodes.filter((n) => !skipList.has(n.id));
 
-    const contents = env.irMapper.fromIr(visibleShip);
+    const contents = env.irMapper.fromIr(visibleNodes);
     tracer.logEvent('IrProjector', 'Projected Sanitized Context to LLM', {
       projectedContextSanitized: contents,
     });

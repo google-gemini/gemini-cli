@@ -165,12 +165,12 @@ describe('PipelineOrchestrator (Component)', () => {
       registry,
     );
 
-    const ship = [createDummyNode('not-protected-ep', 'USER_PROMPT', 100, undefined, 'not-protected-id')];
+    const nodes = [createDummyNode('not-protected-ep', 'USER_PROMPT', 100, undefined, 'not-protected-id')];
 
     const result = await orchestrator.executeTriggerSync(
       'new_message',
-      ship,
-      new Set(ship.map((s) => s.id)),
+      nodes,
+      new Set(nodes.map((s) => s.id)),
       new Set(),
     );
 
@@ -199,13 +199,13 @@ describe('PipelineOrchestrator (Component)', () => {
       registry,
     );
 
-    const ship = [createDummyNode('not-protected-ep', 'USER_PROMPT', 100, undefined, 'not-protected-id')];
+    const nodes = [createDummyNode('not-protected-ep', 'USER_PROMPT', 100, undefined, 'not-protected-id')];
 
     // This should resolve immediately with the UNMODIFIED array because execution is background
     const result = await orchestrator.executeTriggerSync(
       'new_message',
-      ship,
-      new Set(ship.map((s) => s.id)),
+      nodes,
+      new Set(nodes.map((s) => s.id)),
       new Set(),
     );
 
@@ -237,18 +237,18 @@ describe('PipelineOrchestrator (Component)', () => {
       registry,
     );
 
-    const ship = [createDummyNode('not-protected-ep', 'USER_PROMPT', 100, undefined, 'not-protected-id')];
+    const nodes = [createDummyNode('not-protected-ep', 'USER_PROMPT', 100, undefined, 'not-protected-id')];
 
     // It should not throw! It should swallow the error and return the unmodified array.
     const result = await orchestrator.executeTriggerSync(
       'new_message',
-      ship,
-      new Set(ship.map((s) => s.id)),
+      nodes,
+      new Set(nodes.map((s) => s.id)),
       new Set(),
     );
 
     expect(result).toHaveLength(1);
-    expect(result).toStrictEqual(ship);
+    expect(result).toStrictEqual(nodes);
   });
 
   it('automatically binds to retained_exceeded trigger via EventBus', () => {
@@ -272,11 +272,11 @@ describe('PipelineOrchestrator (Component)', () => {
 
     new PipelineOrchestrator(config, env, eventBus, env.tracer, registry);
 
-    const ship = [createDummyNode('1', 'USER_PROMPT')];
+    const nodes = [createDummyNode('1', 'USER_PROMPT')];
 
     // Emit the trigger
     eventBus.emitConsolidationNeeded({
-      ship,
+      nodes,
       targetDeficit: 100,
       targetNodeIds: new Set(),
     });

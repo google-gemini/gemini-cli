@@ -40,23 +40,23 @@ export class HistoryObserver {
       (_event: HistoryEvent) => {
         // Rebuild the pristine IR graph from the full source history on every change.
         // Wait, toIr still returns an Episode[].
-        // We actually need to map the Episode[] to a flat ConcreteNode[] here to form the 'ship'.
+        // We actually need to map the Episode[] to a flat ConcreteNode[] here to form the 'nodes'.
         const pristineEpisodes = this.irMapper.toIr(
           this.chatHistory.get(),
           this.tokenCalculator,
         );
 
-        const ship: Array<import('./ir/types.js').ConcreteNode> = [];
+        const nodes: Array<import('./ir/types.js').ConcreteNode> = [];
         for (const ep of pristineEpisodes) {
           if (ep.concreteNodes) {
             for (const child of ep.concreteNodes) {
-              ship.push(child);
+              nodes.push(child);
             }
           }
         }
 
         const newNodes = new Set<string>();
-        for (const node of ship) {
+        for (const node of nodes) {
           if (!this.seenNodeIds.has(node.id)) {
             newNodes.add(node.id);
             this.seenNodeIds.add(node.id);
@@ -66,11 +66,11 @@ export class HistoryObserver {
         this.tracer.logEvent(
           'HistoryObserver',
           'Rebuilt pristine graph from chat history update',
-          { shipSize: ship.length, newNodesCount: newNodes.size },
+          { nodesSize: nodes.length, newNodesCount: newNodes.size },
         );
 
         this.eventBus.emitPristineHistoryUpdated({
-          ship,
+          nodes,
           newNodes,
         });
       },

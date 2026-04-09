@@ -20,8 +20,8 @@ import { ProcessorRegistry } from './sidecar/registry.js';
 
 export class ContextManager {
   // The stateful, pristine flat graph.
-  private pristineShip: readonly ConcreteNode[] = [];
-  private currentShip: readonly ConcreteNode[] = [];
+  private pristineNodes: readonly ConcreteNode[] = [];
+  private currentNodes: readonly ConcreteNode[] = [];
   private readonly eventBus: ContextEventBus;
 
   // Internal sub-components
@@ -56,15 +56,15 @@ export class ContextManager {
     this.orchestrator = orchestrator;
 
     this.eventBus.onPristineHistoryUpdated((event) => {
-      this.pristineShip = event.ship;
-      // In V2, we assume currentShip updates sequentially via Orchestrator patches.
+      this.pristineNodes = event.nodes;
+      // In V2, we assume currentNodes updates sequentially via Orchestrator patches.
       // But if pristine changes, we must ensure our current view incorporates new nodes.
-      // For now, simple fallback: if the current ship doesn't have the new nodes, append them.
-      // A more robust implementation would diff the ship, but for now we'll just track.
-      const existingIds = new Set(this.currentShip.map((n) => n.id));
-      const addedNodes = event.ship.filter((n) => !existingIds.has(n.id));
+      // For now, simple fallback: if the current nodes doesn't have the new nodes, append them.
+      // A more robust implementation would diff the nodes, but for now we'll just track.
+      const existingIds = new Set(this.currentNodes.map((n) => n.id));
+      const addedNodes = event.nodes.filter((n) => !existingIds.has(n.id));
       if (addedNodes.length > 0) {
-         this.currentShip = [...this.currentShip, ...addedNodes];
+         this.currentNodes = [...this.currentNodes, ...addedNodes];
       }
 
       this.evaluateTriggers(event.newNodes);
@@ -103,19 +103,19 @@ export class ContextManager {
 
     if (newNodes.size > 0) {
        this.eventBus.emitChunkReceived({
-           ship: this.currentShip,
+           nodes: this.currentNodes,
            targetNodeIds: newNodes
        });
     }
 
-    const currentTokens = this.env.tokenCalculator.calculateConcreteListTokens(this.currentShip);
+    const currentTokens = this.env.tokenCalculator.calculateConcreteListTokens(this.currentNodes);
 
     if (currentTokens > this.sidecar.budget.retainedTokens) {
       const agedOutNodes = new Set<string>();
       let rollingTokens = 0;
       // Walk backwards finding nodes that fall out of the retained budget
-      for (let i = this.currentShip.length - 1; i >= 0; i--) {
-        const node = this.currentShip[i];
+      for (let i = this.currentNodes.length - 1; i >= 0; i--) {
+        const node = this.currentNodes[i];
         rollingTokens += this.env.tokenCalculator.calculateConcreteListTokens([node]);
         if (rollingTokens > this.sidecar.budget.retainedTokens) {
           agedOutNodes.add(node.id);
@@ -124,7 +124,7 @@ export class ContextManager {
 
       if (agedOutNodes.size > 0) {
         this.eventBus.emitConsolidationNeeded({
-          ship: this.currentShip,
+          nodes: this.currentNodes,
           targetDeficit: currentTokens - this.sidecar.budget.retainedTokens,
           targetNodeIds: agedOutNodes,
         });
@@ -156,7 +156,7 @@ export class ContextManager {
    * Note: This is an expensive, deep clone operation.
    */
   getPristineGraph(): readonly ConcreteNode[] {
-    return [...this.pristineShip];
+    return [...this.pristineNodes];
   }
 
   /**
@@ -164,8 +164,8 @@ export class ContextManager {
    * up to the configured token budget.
    * This is the view that will eventually be projected back to the LLM.
    */
-  getShip(): readonly ConcreteNode[] {
-    return [...this.currentShip];
+  getNodes(): readonly ConcreteNode[] {
+    return [...this.currentNodes];
   }
 
   /**
@@ -182,7 +182,7 @@ export class ContextManager {
     );
     // Apply final GC Backstop pressure barrier synchronously before mapping
     const finalHistory = await IrProjector.project(
-      this.currentShip,
+      this.currentNodes,
       this.orchestrator,
       this.sidecar,
       this.tracer,

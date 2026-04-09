@@ -4,13 +4,14 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 import type { ProcessorRegistry } from './registry.js';
-import { EmergencyTruncationProcessor, type EmergencyTruncationProcessorOptions } from '../processors/emergencyTruncationProcessor.js';
+import { HistoryTruncationProcessor, type HistoryTruncationProcessorOptions } from '../processors/historyTruncationProcessor.js';
 import { BlobDegradationProcessor } from '../processors/blobDegradationProcessor.js';
-import { HistorySquashingProcessor, type HistorySquashingProcessorOptions } from '../processors/historySquashingProcessor.js';
-import { SemanticCompressionProcessor, type SemanticCompressionProcessorOptions } from '../processors/semanticCompressionProcessor.js';
+import { NodeTruncationProcessor, type NodeTruncationProcessorOptions } from '../processors/nodeTruncationProcessor.js';
+import { NodeDistillationProcessor, type NodeDistillationProcessorOptions } from '../processors/nodeDistillationProcessor.js';
 import { ToolMaskingProcessor, type ToolMaskingProcessorOptions } from '../processors/toolMaskingProcessor.js';
 import { StateSnapshotProcessor, type StateSnapshotProcessorOptions } from '../processors/stateSnapshotProcessor.js';
 import { StateSnapshotWorker, type StateSnapshotWorkerOptions } from '../processors/stateSnapshotWorker.js';
+import { RollingSummaryProcessor, type RollingSummaryProcessorOptions } from '../processors/rollingSummaryProcessor.js';
 
 export function registerBuiltInProcessors(registry: ProcessorRegistry) {
   registry.register<Record<string, never>>({
@@ -19,22 +20,22 @@ export function registerBuiltInProcessors(registry: ProcessorRegistry) {
     create: (env) => new BlobDegradationProcessor(env),
   });
 
-  registry.register<EmergencyTruncationProcessorOptions>({
-    id: 'EmergencyTruncationProcessor',
-    schema: EmergencyTruncationProcessor.schema,
-    create: (env, options) => EmergencyTruncationProcessor.create(env, options),
+  registry.register<HistoryTruncationProcessorOptions>({
+    id: 'HistoryTruncationProcessor',
+    schema: HistoryTruncationProcessor.schema,
+    create: (env, options) => HistoryTruncationProcessor.create(env, options),
   });
 
-  registry.register<HistorySquashingProcessorOptions>({
-    id: 'HistorySquashingProcessor',
-    schema: HistorySquashingProcessor.schema,
-    create: (env, options) => HistorySquashingProcessor.create(env, options),
+  registry.register<NodeTruncationProcessorOptions>({
+    id: 'NodeTruncationProcessor',
+    schema: NodeTruncationProcessor.schema,
+    create: (env, options) => NodeTruncationProcessor.create(env, options),
   });
 
-  registry.register<SemanticCompressionProcessorOptions>({
-    id: 'SemanticCompressionProcessor',
-    schema: SemanticCompressionProcessor.schema,
-    create: (env, options) => SemanticCompressionProcessor.create(env, options),
+  registry.register<NodeDistillationProcessorOptions>({
+    id: 'NodeDistillationProcessor',
+    schema: NodeDistillationProcessor.schema,
+    create: (env, options) => NodeDistillationProcessor.create(env, options),
   });
 
   registry.register<ToolMaskingProcessorOptions>({
@@ -45,13 +46,19 @@ export function registerBuiltInProcessors(registry: ProcessorRegistry) {
 
   registry.register<StateSnapshotProcessorOptions>({
     id: 'StateSnapshotProcessor',
-    schema: {}, // Will be added later
+    schema: StateSnapshotProcessor.schema,
     create: (env, options) => StateSnapshotProcessor.create(env, options),
   });
 
   registry.register<StateSnapshotWorkerOptions>({
     id: 'StateSnapshotWorker',
-    schema: {}, // Will be added later
+    schema: StateSnapshotWorker.schema,
     create: (env, options) => StateSnapshotWorker.create(env, options) as any, // ContextWorker instead of ContextProcessor
+  });
+
+  registry.register<RollingSummaryProcessorOptions>({
+    id: 'RollingSummaryProcessor',
+    schema: RollingSummaryProcessor.schema,
+    create: (env, options) => RollingSummaryProcessor.create(env, options),
   });
 }

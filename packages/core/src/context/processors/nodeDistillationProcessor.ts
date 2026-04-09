@@ -9,16 +9,16 @@ import type { ContextEnvironment } from '../sidecar/environment.js';
 import { debugLogger } from '../../utils/debugLogger.js';
 import { getResponseText } from '../../utils/partUtils.js';
 
-export interface SemanticCompressionProcessorOptions {
+export interface NodeDistillationProcessorOptions {
   nodeThresholdTokens: number;
 }
 
-export class SemanticCompressionProcessor implements ContextProcessor {
+export class NodeDistillationProcessor implements ContextProcessor {
   static create(
     env: ContextEnvironment,
-    options: SemanticCompressionProcessorOptions,
-  ): SemanticCompressionProcessor {
-    return new SemanticCompressionProcessor(env, options);
+    options: NodeDistillationProcessorOptions,
+  ): NodeDistillationProcessor {
+    return new NodeDistillationProcessor(env, options);
   }
 
   static readonly schema = {
@@ -32,14 +32,14 @@ export class SemanticCompressionProcessor implements ContextProcessor {
     required: ['nodeThresholdTokens'],
   };
 
-  readonly id = 'SemanticCompressionProcessor';
-  readonly name = 'SemanticCompressionProcessor';
-  readonly options: SemanticCompressionProcessorOptions;
+  readonly id = 'NodeDistillationProcessor';
+  readonly name = 'NodeDistillationProcessor';
+  readonly options: NodeDistillationProcessorOptions;
   private env: ContextEnvironment;
 
   constructor(
     env: ContextEnvironment,
-    options: SemanticCompressionProcessorOptions,
+    options: NodeDistillationProcessorOptions,
   ) {
     this.env = env;
     this.options = options;
@@ -74,7 +74,7 @@ export class SemanticCompressionProcessor implements ContextProcessor {
       );
       return getResponseText(response) || text;
     } catch (e) {
-      debugLogger.warn(`SemanticCompressionProcessor failed to summarize ${contextInfo}`, e);
+      debugLogger.warn(`NodeDistillationProcessor failed to summarize ${contextInfo}`, e);
       return text; // Fallback to original text on API failure
     }
   }

@@ -62,12 +62,12 @@ export class ContextTokenCalculator {
   }
 
   /**
-   * Fast calculation for a flat array of ConcreteNodes (The Ship).
+   * Fast calculation for a flat array of ConcreteNodes (The Nodes).
    * It relies entirely on the O(1) sidecar token cache.
    */
-  calculateConcreteListTokens(ship: readonly ConcreteNode[]): number {
+  calculateConcreteListTokens(nodes: readonly ConcreteNode[]): number {
     let tokens = 0;
-    for (const node of ship) {
+    for (const node of nodes) {
        tokens += this.getTokenCost(node);
     }
     return tokens;

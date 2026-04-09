@@ -125,7 +125,7 @@ export class PipelineOrchestrator {
           this.eventBus.onConsolidationNeeded((event) => {
             void this.executePipelineAsync(
               pipeline,
-              event.ship,
+              event.nodes,
               event.targetNodeIds,
               new Set(), // protected IDs
             );
@@ -134,7 +134,7 @@ export class PipelineOrchestrator {
           this.eventBus.onChunkReceived((event) => {
             void this.executePipelineAsync(
               pipeline,
-              event.ship,
+              event.nodes,
               event.targetNodeIds,
               new Set(), // protected IDs
             );
@@ -151,7 +151,7 @@ export class PipelineOrchestrator {
           const inboxSnapshot = new InboxSnapshotImpl(
             this.env.inbox?.getMessages() || [],
           );
-          const targets = event.ship.filter(n => event.targetNodeIds.has(n.id));
+          const targets = event.nodes.filter(n => event.targetNodeIds.has(n.id));
           // Fire and forget
           worker.execute({ targets, inbox: inboxSnapshot }).catch((e) => {
             debugLogger.error(`Worker ${worker.name} failed onNodesAdded:`, e);
@@ -167,7 +167,7 @@ export class PipelineOrchestrator {
           const inboxSnapshot = new InboxSnapshotImpl(
             this.env.inbox?.getMessages() || [],
           );
-          const targets = event.ship.filter(n => event.targetNodeIds.has(n.id));
+          const targets = event.nodes.filter(n => event.targetNodeIds.has(n.id));
           // Fire and forget
           worker.execute({ targets, inbox: inboxSnapshot }).catch((e) => {
             debugLogger.error(`Worker ${worker.name} failed onNodesAgedOut:`, e);
@@ -187,11 +187,11 @@ export class PipelineOrchestrator {
   }
 
   applyProcessorDiff(
-    ship: readonly ConcreteNode[],
+    nodes: readonly ConcreteNode[],
     targets: readonly ConcreteNode[],
     returnedNodes: readonly ConcreteNode[],
   ): readonly ConcreteNode[] {
-    const mutableShip = [...ship];
+    const mutableNodes = [...nodes];
     const targetSet = new Set(targets.map((n) => n.id));
     const returnedMap = new Map(returnedNodes.map((n) => [n.id, n]));
 
@@ -215,34 +215,34 @@ export class PipelineOrchestrator {
     }
 
     if (removedIds.size === 0 && newNodes.length === 0) {
-      return ship;
+      return nodes;
     }
 
-    let earliestRemovalIdx = mutableShip.length;
+    let earliestRemovalIdx = mutableNodes.length;
     let i = 0;
-    while (i < mutableShip.length) {
-      if (removedIds.has(mutableShip[i].id)) {
+    while (i < mutableNodes.length) {
+      if (removedIds.has(mutableNodes[i].id)) {
         if (i < earliestRemovalIdx) earliestRemovalIdx = i;
-        mutableShip.splice(i, 1);
+        mutableNodes.splice(i, 1);
       } else {
         i++;
       }
     }
 
     if (newNodes.length > 0) {
-      mutableShip.splice(earliestRemovalIdx, 0, ...newNodes);
+      mutableNodes.splice(earliestRemovalIdx, 0, ...newNodes);
     }
 
-    return mutableShip;
+    return mutableNodes;
   }
 
   async executeTriggerSync(
     trigger: PipelineTrigger,
-    ship: readonly ConcreteNode[],
+    nodes: readonly ConcreteNode[],
     triggerTargets: ReadonlySet<string>,
     protectedLogicalIds: ReadonlySet<string> = new Set(),
   ): Promise<readonly ConcreteNode[]> {
-    let currentShip = ship;
+    let currentNodes = nodes;
     const pipelines = this.config.pipelines.filter((p) =>
       p.triggers.includes(trigger),
     );
@@ -263,18 +263,18 @@ export class PipelineOrchestrator {
             `Executing processor synchronously: ${procDef.processorId}`,
           );
 
-          const allowedTargets = currentShip.filter((n) =>
+          const allowedTargets = currentNodes.filter((n) =>
             this.isNodeAllowed(n, triggerTargets, protectedLogicalIds),
           );
 
           const returnedNodes = await processor.process({
-            buffer: new ContextWorkingBufferImpl(currentShip),
+            buffer: new ContextWorkingBufferImpl(currentNodes),
             targets: allowedTargets,
             inbox: inboxSnapshot,
           });
 
-          currentShip = this.applyProcessorDiff(
-            currentShip,
+          currentNodes = this.applyProcessorDiff(
+            currentNodes,
             allowedTargets,
             returnedNodes,
           );
@@ -290,12 +290,12 @@ export class PipelineOrchestrator {
     // Success! Drain consumed messages
     this.env.inbox?.drainConsumed(inboxSnapshot.getConsumedIds());
 
-    return currentShip;
+    return currentNodes;
   }
 
   private async executePipelineAsync(
     pipeline: PipelineDef,
-    ship: readonly ConcreteNode[],
+    nodes: readonly ConcreteNode[],
     triggerTargets: Set<string>,
     protectedLogicalIds: ReadonlySet<string> = new Set(),
   ) {
@@ -303,9 +303,9 @@ export class PipelineOrchestrator {
       'Orchestrator',
       `Triggering async pipeline: ${pipeline.name}`,
     );
-    if (!ship || ship.length === 0) return;
+    if (!nodes || nodes.length === 0) return;
 
-    let currentShip = ship;
+    let currentNodes = nodes;
     const inboxSnapshot = new InboxSnapshotImpl(
       this.env.inbox?.getMessages() || [],
     );
@@ -320,18 +320,18 @@ export class PipelineOrchestrator {
           `Executing processor: ${procDef.processorId} (async)`,
         );
 
-        const allowedTargets = currentShip.filter((n) =>
+        const allowedTargets = currentNodes.filter((n) =>
           this.isNodeAllowed(n, triggerTargets, protectedLogicalIds),
         );
 
         const returnedNodes = await processor.process({
-          buffer: new ContextWorkingBufferImpl(currentShip),
+          buffer: new ContextWorkingBufferImpl(currentNodes),
           targets: allowedTargets,
           inbox: inboxSnapshot,
         });
 
-        currentShip = this.applyProcessorDiff(
-          currentShip,
+        currentNodes = this.applyProcessorDiff(
+          currentNodes,
           allowedTargets,
           returnedNodes,
         );

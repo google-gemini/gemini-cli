@@ -8,18 +8,18 @@ import { EventEmitter } from 'node:events';
 import type { ConcreteNode } from './ir/types.js';
 
 export interface PristineHistoryUpdatedEvent {
-  ship: readonly ConcreteNode[];
+  nodes: readonly ConcreteNode[];
   newNodes: Set<string>;
 }
 
 export interface ContextConsolidationEvent {
-  ship: readonly ConcreteNode[];
+  nodes: readonly ConcreteNode[];
   targetDeficit: number;
   targetNodeIds: Set<string>;
 }
 
 export interface IrChunkReceivedEvent {
-  ship: readonly ConcreteNode[];
+  nodes: readonly ConcreteNode[];
   targetNodeIds: Set<string>;
 }
 

@@ -15,6 +15,14 @@ export interface StateSnapshotWorkerOptions {
 }
 
 export class StateSnapshotWorker implements ContextWorker {
+  static readonly schema = {
+    type: 'object',
+    properties: {
+      type: { type: 'string', enum: ['accumulate', 'point-in-time'] },
+      systemInstruction: { type: 'string' },
+    },
+  };
+
   static create(
     env: ContextEnvironment,
     options: StateSnapshotWorkerOptions,

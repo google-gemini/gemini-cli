@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 import { describe, it, expect, vi } from 'vitest';
-import { SemanticCompressionProcessor } from './semanticCompressionProcessor.js';
+import { NodeDistillationProcessor } from './nodeDistillationProcessor.js';
 import {
   createMockEnvironment,
   createDummyNode,
@@ -13,7 +13,7 @@ import {
 } from '../testing/contextTestUtils.js';
 import type { UserPrompt, AgentThought, ToolExecution } from '../ir/types.js';
 
-describe('SemanticCompressionProcessor', () => {
+describe('NodeDistillationProcessor', () => {
   it('should trigger summarization via LLM for long text parts', async () => {
     const mockLlmClient = {
       generateContent: vi.fn().mockResolvedValue(createMockGenerateContentResponse('Mocked Summary!')), // length = 15
@@ -23,7 +23,7 @@ describe('SemanticCompressionProcessor', () => {
         llmClient: mockLlmClient as any,
     });
 
-    const processor = SemanticCompressionProcessor.create(env, {
+    const processor = NodeDistillationProcessor.create(env, {
       nodeThresholdTokens: 10,
     });
 
@@ -81,7 +81,7 @@ describe('SemanticCompressionProcessor', () => {
        llmClient: mockLlmClient as any,
     });
 
-    const processor = SemanticCompressionProcessor.create(env, {
+    const processor = NodeDistillationProcessor.create(env, {
       nodeThresholdTokens: 100, // Very high threshold
     });
 

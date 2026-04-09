@@ -42,11 +42,11 @@ export const defaultSidecarProfile: SidecarConfig = {
       execution: 'background',
       processors: [
         {
-          processorId: 'HistorySquashingProcessor',
+          processorId: 'NodeTruncationProcessor',
           options: { maxTokensPerNode: 3000 },
         },
         {
-          processorId: 'SemanticCompressionProcessor',
+          processorId: 'NodeDistillationProcessor',
           options: { nodeThresholdTokens: 5000 },
         },
       ],
@@ -60,7 +60,6 @@ export const defaultSidecarProfile: SidecarConfig = {
           processorId: 'StateSnapshotProcessor', 
           options: { target: 'max' } 
         },
-        { processorId: 'EmergencyTruncationProcessor', options: {} },
       ],
     },
   ],

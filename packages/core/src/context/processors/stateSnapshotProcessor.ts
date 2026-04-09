@@ -15,6 +15,16 @@ export interface StateSnapshotProcessorOptions extends BackstopTargetOptions {
 }
 
 export class StateSnapshotProcessor implements ContextProcessor {
+  static readonly schema = {
+    type: 'object',
+    properties: {
+      target: { type: 'string', enum: ['incremental', 'freeNTokens', 'max'] },
+      freeTokensTarget: { type: 'number' },
+      model: { type: 'string' },
+      systemInstruction: { type: 'string' },
+    },
+  };
+
   static create(
     env: ContextEnvironment,
     options: StateSnapshotProcessorOptions,

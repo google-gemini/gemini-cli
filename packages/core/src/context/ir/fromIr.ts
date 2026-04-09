@@ -33,9 +33,9 @@ class IrSerializer implements IrSerializationWriter {
   }
 }
 
-export function fromIr(ship: readonly ConcreteNode[], registry: IrNodeBehaviorRegistry): Content[] {
+export function fromIr(nodes: readonly ConcreteNode[], registry: IrNodeBehaviorRegistry): Content[] {
   const writer = new IrSerializer();
-  for (const node of ship) {
+  for (const node of nodes) {
     const behavior = registry.get(node.type);
     behavior.serialize(node, writer);
   }

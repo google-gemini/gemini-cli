@@ -17,7 +17,7 @@ export class IrMapper {
     return toIr(history, tokenCalculator, this.nodeIdentityMap);
   }
 
-  fromIr(ship: readonly ConcreteNode[]): Content[] {
-    return fromIr(ship, this.registry);
+  fromIr(nodes: readonly ConcreteNode[]): Content[] {
+    return fromIr(nodes, this.registry);
   }
 }

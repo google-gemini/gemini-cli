@@ -52,7 +52,7 @@ describe('System Lifecycle Golden Tests', () => {
         execution: 'blocking',
         triggers: ['retained_exceeded'],
         processors: [
-          { processorId: 'EmergencyTruncationProcessor', options: {} },
+          { processorId: 'HistoryTruncationProcessor', options: {} },
         ],
       },
     ],

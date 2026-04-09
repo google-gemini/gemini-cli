@@ -31,7 +31,7 @@ export interface IrNode {
 
 /**
  * Concrete Nodes: The atomic, renderable pieces of data.
- * These are the actual "planks" of the Ship of Theseus.
+ * These are the actual "planks" of the Nodes of Theseus.
  */
 export interface BaseConcreteNode extends IrNode {
   /** The ID of the Logical Node (e.g., Episode) that structurally owns this node */

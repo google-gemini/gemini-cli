@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 import { describe, it, expect, vi } from 'vitest';
-import { HistorySquashingProcessor } from './historySquashingProcessor.js';
+import { NodeTruncationProcessor } from './nodeTruncationProcessor.js';
 import {
   createMockEnvironment,
   createDummyNode,
@@ -12,7 +12,7 @@ import {
 import type { UserPrompt, AgentThought, AgentYield } from '../ir/types.js';
 import { ContextTokenCalculator } from '../utils/contextTokenCalculator.js';
 
-describe('HistorySquashingProcessor', () => {
+describe('NodeTruncationProcessor', () => {
   it('should truncate nodes that exceed maxTokensPerNode', async () => {
     const env = createMockEnvironment();
     const mockTokenCalculator = new ContextTokenCalculator(1, env.behaviorRegistry) as any;
@@ -26,7 +26,7 @@ describe('HistorySquashingProcessor', () => {
 
     (env as any).tokenCalculator = mockTokenCalculator;
 
-    const processor = HistorySquashingProcessor.create(env, {
+    const processor = NodeTruncationProcessor.create(env, {
       maxTokensPerNode: 1, // Will equal 10 chars limit
     });
 
@@ -88,7 +88,7 @@ describe('HistorySquashingProcessor', () => {
 
     (env as any).tokenCalculator = mockTokenCalculator;
 
-    const processor = HistorySquashingProcessor.create(env, {
+    const processor = NodeTruncationProcessor.create(env, {
       maxTokensPerNode: 100,
     });
 

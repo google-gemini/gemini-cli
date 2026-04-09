@@ -14,11 +14,11 @@ export type ProcessorConfig =
     }
   | { processorId: 'BlobDegradationProcessor'; options?: object }
   | {
-      processorId: 'SemanticCompressionProcessor';
+      processorId: 'NodeDistillationProcessor';
       options: { nodeThresholdTokens: number };
     }
   | {
-      processorId: 'HistorySquashingProcessor';
+      processorId: 'NodeTruncationProcessor';
       options: { maxTokensPerNode: number };
     }
   | {
@@ -26,7 +26,7 @@ export type ProcessorConfig =
       options?: Record<string, unknown>;
     }
   | {
-      processorId: 'EmergencyTruncationProcessor';
+      processorId: 'HistoryTruncationProcessor';
       options?: Record<string, unknown>;
     };
 

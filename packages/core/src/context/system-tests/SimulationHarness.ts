@@ -106,7 +106,7 @@ export class SimulationHarness {
 
     // 2. Measure tokens immediately after append (Before background processing)
     const tokensBefore = this.env.tokenCalculator.calculateConcreteListTokens(
-      this.contextManager.getShip(),
+      this.contextManager.getNodes(),
     );
     debugLogger.log(
       `[Turn ${this.currentTurnIndex}] Tokens BEFORE: ${tokensBefore}`,
@@ -116,7 +116,7 @@ export class SimulationHarness {
     await new Promise((resolve) => setTimeout(resolve, 50));
 
     // 3.1 Simulate what projectCompressedHistory does with the sync handlers
-    let currentView = this.contextManager.getShip();
+    let currentView = this.contextManager.getNodes();
     const currentTokens =
       this.env.tokenCalculator.calculateConcreteListTokens(currentView);
     if (this.config.budget && currentTokens > this.config.budget.maxTokens) {
@@ -136,7 +136,7 @@ export class SimulationHarness {
         const ep = currentView[i];
         if (
           !this.contextManager
-            .getShip()
+            .getNodes()
             .find((c) => c.id === ep.id)
         ) {
           this.eventBus.emitVariantReady({
@@ -157,7 +157,7 @@ export class SimulationHarness {
 
     // 4. Measure tokens after background processors have (hopefully) emitted variants
     const tokensAfter = this.env.tokenCalculator.calculateConcreteListTokens(
-      this.contextManager.getShip(),
+      this.contextManager.getNodes(),
     );
     debugLogger.log(
       `[Turn ${this.currentTurnIndex}] Tokens AFTER: ${tokensAfter}`,
