@@ -72,6 +72,8 @@ export const clearCommand: SlashCommand = {
     }
 
     uiTelemetryService.clear(newSessionId);
+    // Clear the active checkpoint tag since we're starting a fresh session.
+    context.session.setActiveCheckpointTag(undefined);
     context.ui.clear();
 
     if (result?.systemMessage) {

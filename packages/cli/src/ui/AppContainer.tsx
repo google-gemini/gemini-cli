@@ -791,7 +791,7 @@ export const AppContainer = (props: AppContainerProps) => {
     isSessionBrowserOpen,
     openSessionBrowser,
     closeSessionBrowser,
-    handleResumeSession,
+    handleResumeSession: handleResumeSessionBase,
     handleDeleteSession: handleDeleteSessionSync,
   } = useSessionBrowser(config, loadHistoryForResume);
   // Wrap handleDeleteSession to return a Promise for UIActions interface
@@ -1026,6 +1026,17 @@ Logging in with Google... Restarting Gemini CLI to continue.
     isConfigInitialized,
     setBannerVisible,
     setCustomDialog,
+  );
+
+  // Wrap handleResumeSession to clear the active checkpoint tag when
+  // resuming an auto-saved session from the session browser, since the
+  // user is switching to a different conversation context.
+  const handleResumeSession = useCallback(
+    async (session: SessionInfo) => {
+      commandContext.session.setActiveCheckpointTag(undefined);
+      await handleResumeSessionBase(session);
+    },
+    [handleResumeSessionBase, commandContext],
   );
 
   const [authConsentRequest, setAuthConsentRequest] =

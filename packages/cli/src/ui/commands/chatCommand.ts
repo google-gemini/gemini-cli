@@ -102,7 +102,7 @@ const saveCommand: SlashCommand = {
         type: 'message',
         messageType: 'error',
         content:
-          'Missing tag. Usage: /resume save <tag> (or save/resume a checkpoint first to set a default tag)',
+          'Missing tag. Usage: /resume save [tag] (or save/resume a checkpoint first to set a default tag)',
       };
     }
 
@@ -161,7 +161,7 @@ const saveCommand: SlashCommand = {
   },
 };
 
-const resumeCheckpointCommand: SlashCommand = {
+export const resumeCheckpointCommand: SlashCommand = {
   name: 'resume',
   altNames: ['load'],
   description:
@@ -430,11 +430,26 @@ export const chatCommand: SlashCommand = {
       if (parsed.commandToExecute?.action) {
         return parsed.commandToExecute.action(context, parsed.args);
       }
+      
+      // Fallback: If no subcommand matched but args were provided, 
+      // assume it's a legacy resume command and try to resume the checkpoint
+      if (resumeCheckpointCommand.action) {
+        return resumeCheckpointCommand.action(context, args);
+      }
     }
     return {
       type: 'dialog',
       dialog: 'sessionBrowser',
     };
+  },
+  completion: async (context, partialArg) => {
+    // If the partial arg starts to match a subcommand, don't mix in checkpoints here, 
+    // the command processor handles subcommand completions automatically.
+    // We only want to autocomplete checkpoints here.
+    if (resumeCheckpointCommand.completion) {
+      return resumeCheckpointCommand.completion(context, partialArg);
+    }
+    return [];
   },
   subCommands: chatResumeSubCommands,
 };

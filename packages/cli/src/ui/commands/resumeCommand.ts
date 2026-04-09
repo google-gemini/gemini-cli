@@ -10,7 +10,8 @@ import type {
   SlashCommand,
 } from './types.js';
 import { CommandKind } from './types.js';
-import { chatResumeSubCommands } from './chatCommand.js';
+import { chatResumeSubCommands, resumeCheckpointCommand } from './chatCommand.js';
+import { parseSlashCommand } from '../../utils/commands.js';
 
 export const resumeCommand: SlashCommand = {
   name: 'resume',
@@ -18,11 +19,32 @@ export const resumeCommand: SlashCommand = {
   kind: CommandKind.BUILT_IN,
   autoExecute: true,
   action: async (
-    _context: CommandContext,
-    _args: string,
-  ): Promise<OpenDialogActionReturn> => ({
-    type: 'dialog',
-    dialog: 'sessionBrowser',
-  }),
+    context: CommandContext,
+    args: string,
+  ): Promise<OpenDialogActionReturn | any> => {
+    if (args) {
+      const parsed = parseSlashCommand(`/${args}`, chatResumeSubCommands);
+      if (parsed.commandToExecute?.action) {
+        return parsed.commandToExecute.action(context, parsed.args);
+      }
+      
+      // Fallback: If no subcommand matched but args were provided, 
+      // assume it's a legacy resume command and try to resume the checkpoint
+      if (resumeCheckpointCommand.action) {
+        return resumeCheckpointCommand.action(context, args);
+      }
+    }
+    
+    return {
+      type: 'dialog',
+      dialog: 'sessionBrowser',
+    };
+  },
+  completion: async (context, partialArg) => {
+    if (resumeCheckpointCommand.completion) {
+      return resumeCheckpointCommand.completion(context, partialArg);
+    }
+    return [];
+  },
   subCommands: chatResumeSubCommands,
 };

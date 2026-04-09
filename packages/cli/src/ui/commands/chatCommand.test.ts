@@ -162,7 +162,7 @@ describe('chatCommand', () => {
       expect(result).toEqual({
         type: 'message',
         messageType: 'error',
-        content: 'Missing tag. Usage: /resume save <tag> (or save/resume a checkpoint first to set a default tag)',
+        content: 'Missing tag. Usage: /resume save [tag] (or save/resume a checkpoint first to set a default tag)',
       });
     });
 
