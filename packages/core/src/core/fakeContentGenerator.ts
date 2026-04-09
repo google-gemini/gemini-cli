@@ -12,7 +12,8 @@ import {
   EmbedContentResponse,
   type EmbedContentParameters,
 } from '@google/genai';
-import { promises } from 'node:fs';
+import { createReadStream } from 'node:fs';
+import { createInterface } from 'node:readline';
 import type { ContentGenerator } from './contentGenerator.js';
 import type { UserTierId, GeminiUserTier } from '../code_assist/types.js';
 import { safeJsonStringify } from '../utils/safeJsonStringify.js';
@@ -49,12 +50,19 @@ export class FakeContentGenerator implements ContentGenerator {
   constructor(private readonly responses: FakeResponse[]) {}
 
   static async fromFile(filePath: string): Promise<FakeContentGenerator> {
-    const fileContent = await promises.readFile(filePath, 'utf-8');
-    const responses = fileContent
-      .split('\n')
-      .filter((line) => line.trim() !== '')
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
-      .map((line) => JSON.parse(line) as FakeResponse);
+    const responses: FakeResponse[] = [];
+    const fileStream = createReadStream(filePath);
+    const rl = createInterface({
+      input: fileStream,
+      crlfDelay: Infinity,
+    });
+
+    for await (const line of rl) {
+      if (line.trim() !== '') {
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
+        responses.push(JSON.parse(line) as FakeResponse);
+      }
+    }
     return new FakeContentGenerator(responses);
   }
 
