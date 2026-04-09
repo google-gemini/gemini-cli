@@ -71,7 +71,9 @@ query($repoOwner: String!, $repoName: String!, $prNumber: Int!) {
       reviewRequests(first: 10) {
         nodes {
           requestedReviewer {
+            __typename
             ... on User { login }
+            ... on Team { name slug }
           }
         }
       }
@@ -112,23 +114,33 @@ def get_reviewer_info(pr):
     author = pr.get('author', {}).get('login')
     latest_reviewer_activity = ""
     official_reviewers = set()
+    
+    # 1. Collect from requested reviewers (Users and Teams)
     for req in pr.get('reviewRequests', {}).get('nodes', []):
         rr = req.get('requestedReviewer')
-        if rr and 'login' in rr:
-            login = rr['login']
-            if login and login != author and login not in BOT_BLACKLIST:
-                official_reviewers.add(login)
+        if rr:
+            if rr['__typename'] == 'User':
+                login = rr.get('login')
+                if login and login != author and login not in BOT_BLACKLIST:
+                    official_reviewers.add(login)
+            elif rr['__typename'] == 'Team':
+                official_reviewers.add(f"team:{rr.get('slug')}")
+                
+    # 2. Collect from formal reviews
     reviews = pr.get('latestReviews', {}).get('nodes', [])
     for r in reviews:
         login = r.get('author', {}).get('login') if r.get('author') else None
         if login and login != author and login not in BOT_BLACKLIST:
             official_reviewers.add(login)
             latest_reviewer_activity = max(latest_reviewer_activity, r['updatedAt'])
+            
+    # 3. Track latest activity from ANYONE who isn't the author
     all_comments = pr.get('comments', {}).get('nodes', [])
     for c in all_comments:
         login = c.get('author', {}).get('login') if c.get('author') else None
         if login and login != author and login not in BOT_BLACKLIST:
             latest_reviewer_activity = max(latest_reviewer_activity, c['publishedAt'])
+            
     return sorted(list(official_reviewers)), latest_reviewer_activity
 
 def get_author_activity(pr):
@@ -212,8 +224,7 @@ def main():
                 elif pr.get('statusCheckRollup', {}).get('state') == 'FAILURE': reason = "Test Failure"
                 if reason:
                     blocked_prs.append({
-                        "issue_no": issue_no, "title": issue_title, "issue_url": issue_url,
-                        "pr_no": pr['number'], "pr_url": pr['url'],
+                        "issue_no": issue_no, "title": issue_title, "issue_url": issue_url, "pr_no": pr['number'], "pr_url": pr['url'],
                         "reason": reason, "author": pr['author']['login'], "days_stale": (now - pr_updated_at).days
                     })
 
