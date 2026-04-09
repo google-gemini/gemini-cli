@@ -71,6 +71,7 @@ If there is a cross-referenced PR in `cross_references` where `is_pr` is `true` 
   a. Determine if the issue should be **Help-wanted** (using the Categorization Guide).
   b. If it should NOT be **Help-wanted**:
      - Execute `gh issue edit <issue_url> --remove-label "status/need-triage"`
+     - Execute `gh issue comment <issue_url> --body "$(echo -e "### Triage Summary\n\n<brief explanation of why this issue requires maintainer attention and is not suitable for community contribution>")"`
      - **STOP EXECUTION**. (Do not reopen the PR).
   c. If it should be **Help-wanted**:
      - Reopen the PR: `gh pr reopen <pr_url>`
