@@ -398,16 +398,16 @@ describe('WindowsSandboxManager', () => {
       expect(icaclsArgs).toContainEqual([
         path.resolve(longPath),
         '/grant',
-        '*S-1-16-4096:(OI)(CI)(M)',
+        '*S-1-16-4096:(M)',
         '/setintegritylevel',
-        '(OI)(CI)Low',
+        'Low',
       ]);
       expect(icaclsArgs).toContainEqual([
         path.resolve(devicePath),
         '/grant',
-        '*S-1-16-4096:(OI)(CI)(M)',
+        '*S-1-16-4096:(M)',
         '/setintegritylevel',
-        '(OI)(CI)Low',
+        'Low',
       ]);
     },
   );
