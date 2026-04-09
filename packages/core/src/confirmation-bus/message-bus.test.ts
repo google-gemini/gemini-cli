@@ -390,5 +390,24 @@ describe('MessageBus', () => {
 
       expect(handler).not.toHaveBeenCalled();
     });
+
+    it('should remove abort listener when unsubscribe is called', async () => {
+      const handler = vi.fn();
+      const controller = new AbortController();
+      const signal = controller.signal;
+
+      const removeEventListenerSpy = vi.spyOn(signal, 'removeEventListener');
+
+      messageBus.subscribe(MessageBusType.TOOL_EXECUTION_SUCCESS, handler, {
+        signal,
+      });
+
+      messageBus.unsubscribe(MessageBusType.TOOL_EXECUTION_SUCCESS, handler);
+
+      expect(removeEventListenerSpy).toHaveBeenCalledWith(
+        'abort',
+        expect.any(Function),
+      );
+    });
   });
 });
