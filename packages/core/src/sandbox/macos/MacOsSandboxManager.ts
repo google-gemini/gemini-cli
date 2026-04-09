@@ -133,16 +133,20 @@ export class MacOsSandboxManager implements SandboxManager {
         false,
     };
 
-    const resolvedPaths = await resolveSandboxPaths(
-      this.options,
-      req,
-      mergedAdditional,
-    );
     const { command: finalCommand, args: finalArgs } = handleReadWriteCommands(
       req,
       mergedAdditional,
       this.options.workspace,
-      req.policy?.allowedPaths,
+      [
+        ...(req.policy?.allowedPaths || []),
+        ...(this.options.includeDirectories || []),
+      ],
+    );
+
+    const resolvedPaths = await resolveSandboxPaths(
+      this.options,
+      req,
+      mergedAdditional,
     );
 
     const sandboxArgs = buildSeatbeltProfile({
