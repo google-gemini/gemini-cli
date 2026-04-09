@@ -65,26 +65,14 @@ export async function start_sandbox(
       }
 
       const profile = (process.env['SEATBELT_PROFILE'] ??= 'permissive-open');
-      const trimmedProfile = profile.trim();
-      let profileFile;
-      if (path.isAbsolute(trimmedProfile)) {
-        profileFile = trimmedProfile;
-      } else {
-        if (trimmedProfile.includes('..') || trimmedProfile.includes('\0')) {
-          throw new FatalSandboxError(
-            'Invalid seatbelt profile name: ' + trimmedProfile,
-          );
-        }
-        profileFile = fileURLToPath(
-          new URL(`sandbox-macos-${trimmedProfile}.sb`, import.meta.url),
-        );
-        // if profile name is not recognized, then look for file under project settings directory
-        if (!BUILTIN_SEATBELT_PROFILES.includes(trimmedProfile)) {
-          profileFile = path.join(
-            GEMINI_DIR,
-            `sandbox-macos-${trimmedProfile}.sb`,
-          );
-        }
+      let profileFile = fileURLToPath(
+        new URL(`sandbox-macos-${profile}.sb`, import.meta.url),
+      );
+      // if profile name is not recognized, then look for absolute path or file under project settings directory
+      if (!BUILTIN_SEATBELT_PROFILES.includes(profile)) {
+        profileFile = path.isAbsolute(profile)
+          ? profile
+          : path.join(GEMINI_DIR, `sandbox-macos-${profile}.sb`);
       }
       if (!fs.existsSync(profileFile)) {
         throw new FatalSandboxError(
