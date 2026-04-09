@@ -231,15 +231,6 @@ describe('Memory Usage Tests', () => {
       const result = await harness.runScenario(
         'large-chat',
         async (recordSnapshot) => {
-          // Ensure the history file is linked
-          const targetChatsDir = join(
-            rig.testDir!,
-            'tmp',
-            'test-project-hash',
-            'chats',
-          );
-          mkdirSync(targetChatsDir, { recursive: true });
-
           const prompts = Array.from(
             { length: LARGE_CHAT_MSG_NUM },
             (_, i) => `prompt ${i}`,
