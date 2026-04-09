@@ -6,6 +6,7 @@
 import { describe, it, expect } from 'vitest';
 import { SidecarRegistry } from './registry.js';
 import type { ContextProcessorDef, ContextWorkerDef } from './registry.js';
+import type { ContextProcessor, ContextWorker } from '../pipeline.js';
 
 describe('SidecarRegistry', () => {
   it('should register and retrieve processors correctly', () => {
@@ -13,7 +14,7 @@ describe('SidecarRegistry', () => {
     const processorDef: ContextProcessorDef = {
       id: 'TestProcessor',
       schema: { type: 'object' },
-      create: () => ({} as unknown as import('../pipeline.js').ContextProcessor),
+      create: () => ({} as ContextProcessor),
     };
 
     registry.registerProcessor(processorDef);
@@ -26,7 +27,7 @@ describe('SidecarRegistry', () => {
     const workerDef: ContextWorkerDef = {
       id: 'TestWorker',
       schema: { type: 'object' },
-      create: () => ({} as unknown as import('../pipeline.js').ContextWorker),
+      create: () => ({} as ContextWorker),
     };
 
     registry.registerWorker(workerDef);
@@ -49,15 +50,15 @@ describe('SidecarRegistry', () => {
     registry.registerProcessor({
       id: 'TestProcessor',
       schema: { title: 'processorSchema' },
-      create: () => ({} as unknown as import('../pipeline.js').ContextProcessor),
+      create: () => ({} as ContextProcessor),
     });
     registry.registerWorker({
       id: 'TestWorker',
       schema: { title: 'workerSchema' },
-      create: () => ({} as unknown as import('../pipeline.js').ContextWorker),
+      create: () => ({} as ContextWorker),
     });
 
-    const schemas = registry.getSchemas() as unknown as Array<{title?: string}>;
+    const schemas = registry.getSchemas() as Array<{title?: string}>;
     expect(schemas.length).toBe(2);
     expect(schemas.find(s => s.title === 'processorSchema')).toBeDefined();
     expect(schemas.find(s => s.title === 'workerSchema')).toBeDefined();
@@ -65,8 +66,8 @@ describe('SidecarRegistry', () => {
 
   it('should safely clear the registry', () => {
     const registry = new SidecarRegistry();
-    registry.registerProcessor({ id: 'TestProcessor', schema: {}, create: () => ({} as unknown as import('../pipeline.js').ContextProcessor) });
-    registry.registerWorker({ id: 'TestWorker', schema: {}, create: () => ({} as unknown as import('../pipeline.js').ContextWorker) });
+    registry.registerProcessor({ id: 'TestProcessor', schema: {}, create: () => ({} as ContextProcessor) });
+    registry.registerWorker({ id: 'TestWorker', schema: {}, create: () => ({} as ContextWorker) });
 
     registry.clear();
 
