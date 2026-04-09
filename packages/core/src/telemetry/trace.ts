@@ -11,9 +11,8 @@ import {
   type AttributeValue,
   type SpanOptions,
 } from '@opentelemetry/api';
-import { safeJsonStringify } from '../utils/safeJsonStringify.js';
+import {safeJsonStringify} from '../utils/safeJsonStringify';
 import {
-  type GeminiCliOperation,
   GEN_AI_AGENT_DESCRIPTION,
   GEN_AI_AGENT_NAME,
   GEN_AI_CONVERSATION_ID,
@@ -22,16 +21,39 @@ import {
   GEN_AI_OUTPUT_MESSAGES,
   SERVICE_DESCRIPTION,
   SERVICE_NAME,
-} from './constants.js';
+  type GeminiCliOperation,
+} from './constants';
 
-import { truncateString } from '../utils/textUtils.js';
+import {truncateString} from '../utils/textUtils';
 
 const TRACER_NAME = 'gemini-cli';
 const TRACER_VERSION = 'v1';
 
+/**
+ * Registry used to ensure that spans are properly ended when their associated
+ * async objects are garbage collected.
+ */
+export const spanRegistry = new FinalizationRegistry((endSpan: () => void) => {
+  try {
+    endSpan();
+  } catch (e) {
+    debugLogger.warn(
+      'Error in FinalizationRegistry callback for span cleanup',
+      e,
+    );
+  }
+});
+
+/**
+ * Truncates a value for inclusion in telemetry attributes.
+ *
+ * @param value The value to truncate.
+ * @param maxLength The maximum length of the stringified value.
+ * @returns The truncated value, or undefined if the value type is not supported.
+ */
 export function truncateForTelemetry(
   value: unknown,
-  maxLength: number = 10000,
+  maxLength = 10000,
 ): AttributeValue | undefined {
   if (typeof value === 'string') {
     return truncateString(
@@ -100,9 +122,9 @@ export async function runInDevTraceSpan<R>(
     logPrompts?: boolean;
     sessionId: string;
   },
-  fn: ({ metadata }: { metadata: SpanMetadata }) => Promise<R>,
+  fn: ({metadata}: {metadata: SpanMetadata}) => Promise<R>,
 ): Promise<R> {
-  const { operation, logPrompts, sessionId, ...restOfSpanOpts } = opts;
+  const {operation, logPrompts, sessionId, ...restOfSpanOpts} = opts;
 
   const tracer = trace.getTracer(TRACER_NAME, TRACER_VERSION);
   return tracer.startActiveSpan(operation, restOfSpanOpts, async (span) => {
@@ -115,7 +137,12 @@ export async function runInDevTraceSpan<R>(
         [GEN_AI_CONVERSATION_ID]: sessionId,
       },
     };
+    let spanEnded = false;
     const endSpan = () => {
+      if (spanEnded) {
+        return;
+      }
+      spanEnded = true;
       try {
         if (logPrompts !== false) {
           if (meta.input !== undefined) {
@@ -146,7 +173,7 @@ export async function runInDevTraceSpan<R>(
             span.recordException(meta.error);
           }
         } else {
-          span.setStatus({ code: SpanStatusCode.OK });
+          span.setStatus({code: SpanStatusCode.OK});
         }
       } catch (e) {
         // Log the error but don't rethrow, to ensure span.end() is called.
@@ -162,7 +189,7 @@ export async function runInDevTraceSpan<R>(
 
     let isStream = false;
     try {
-      const result = await fn({ metadata: meta });
+      const result = await fn({metadata: meta});
 
       if (isAsyncIterable(result)) {
         isStream = true;
@@ -177,7 +204,9 @@ export async function runInDevTraceSpan<R>(
           }
         })();
 
-        return Object.assign(streamWrapper, result);
+        const finalResult = Object.assign(streamWrapper, result);
+        spanRegistry.register(finalResult, endSpan);
+        return finalResult;
       }
       return result;
     } catch (e) {
