@@ -48,6 +48,7 @@ import {
   normalizeCommand,
 } from '../utils/shell-utils.js';
 import { SHELL_TOOL_NAME } from './tool-names.js';
+import { ApprovalMode } from '../policy/types.js';
 import { PARAM_ADDITIONAL_PERMISSIONS } from './definitions/base-declarations.js';
 import type { MessageBus } from '../confirmation-bus/message-bus.js';
 import { getShellDefinition } from './definitions/coreTools.js';
@@ -447,6 +448,51 @@ export class ShellToolInvocation extends BaseToolInvocation<
         llmContent: 'Command was cancelled by user before it could start.',
         returnDisplay: 'Command cancelled by user.',
       };
+    }
+
+    const isYoloMode =
+      this.context.config.getApprovalMode() === ApprovalMode.YOLO;
+    const delayMs = this.context.config.getYoloShellDelayMs();
+
+    if (isYoloMode && delayMs > 0 && !this.params.is_background) {
+      let countdownInterval: NodeJS.Timeout | undefined;
+      let countdownMs = delayMs;
+      const updateIntervalMs = 1000;
+
+      try {
+        await new Promise<void>((resolve, reject) => {
+          const onAbort = () => {
+            if (countdownInterval) clearInterval(countdownInterval);
+            reject(new Error('Command cancelled by user during YOLO delay.'));
+          };
+          signal.addEventListener('abort', onAbort, { once: true });
+
+          if (updateOutput) {
+            updateOutput(
+              `[YOLO] Executing in ${Math.ceil(countdownMs / 1000)}s... (Press Ctrl+C to cancel)\n`,
+            );
+          }
+
+          countdownInterval = setInterval(() => {
+            countdownMs -= updateIntervalMs;
+            if (countdownMs <= 0) {
+              clearInterval(countdownInterval);
+              signal.removeEventListener('abort', onAbort);
+              resolve();
+            } else if (updateOutput) {
+              updateOutput(
+                `[YOLO] Executing in ${Math.ceil(countdownMs / 1000)}s... (Press Ctrl+C to cancel)\n`,
+              );
+            }
+          }, updateIntervalMs);
+        });
+      } catch {
+        return {
+          llmContent:
+            'Command was cancelled by user during the YOLO mode delay.',
+          returnDisplay: 'Command cancelled by user.',
+        };
+      }
     }
 
     const isWindows = os.platform() === 'win32';

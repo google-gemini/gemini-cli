@@ -1707,6 +1707,15 @@ const SETTINGS_SCHEMA = {
     description: 'Security-related settings.',
     showInDialog: false,
     properties: {
+      yoloShellDelayMs: {
+        type: 'number',
+        label: 'YOLO Shell Delay (ms)',
+        category: 'Security',
+        requiresRestart: false,
+        default: 0,
+        description:
+          'The delay in milliseconds before automatically executing a shell command in YOLO mode. Set to 0 to disable the delay.',
+      },
       toolSandboxing: {
         type: 'boolean',
         label: 'Tool Sandboxing',

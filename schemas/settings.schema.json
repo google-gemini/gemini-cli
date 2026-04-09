@@ -2572,6 +2572,13 @@
       "default": {},
       "type": "object",
       "properties": {
+        "yoloShellDelayMs": {
+          "title": "YOLO Shell Delay (ms)",
+          "description": "The delay in milliseconds before automatically executing a shell command in YOLO mode. Set to 0 to disable the delay.",
+          "markdownDescription": "The delay in milliseconds before automatically executing a shell command in YOLO mode. Set to 0 to disable the delay.\n\n- Category: `Security`\n- Requires restart: `no`\n- Default: `0`",
+          "default": 0,
+          "type": "number"
+        },
         "toolSandboxing": {
           "title": "Tool Sandboxing",
           "description": "Tool-level sandboxing. Isolates individual tools instead of the entire CLI process.",

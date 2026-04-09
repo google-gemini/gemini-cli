@@ -66,6 +66,7 @@ import {
   type ToolExecuteConfirmationDetails,
 } from './tools.js';
 import { SHELL_TOOL_NAME } from './tool-names.js';
+import { ApprovalMode } from '../policy/types.js';
 import { WorkspaceContext } from '../utils/workspaceContext.js';
 import {
   createMockMessageBus,
@@ -114,6 +115,7 @@ describe('ShellTool', () => {
 
       getAllowedTools: vi.fn().mockReturnValue([]),
       getApprovalMode: vi.fn().mockReturnValue('strict'),
+      getYoloShellDelayMs: vi.fn().mockReturnValue(0),
       getCoreTools: vi.fn().mockReturnValue([]),
       getExcludeTools: vi.fn().mockReturnValue(new Set([])),
       getDebugMode: vi.fn().mockReturnValue(false),
@@ -289,6 +291,68 @@ describe('ShellTool', () => {
       };
       resolveExecutionPromise(fullResult);
     };
+
+    it('should delay execution and output countdown in YOLO mode', async () => {
+      vi.mocked(mockConfig.getApprovalMode).mockReturnValue(ApprovalMode.YOLO);
+      vi.mocked(mockConfig.getYoloShellDelayMs).mockReturnValue(2000);
+
+      vi.useFakeTimers();
+
+      const invocation = shellTool.build({ command: 'echo hello' });
+      const updateOutput = vi.fn();
+
+      const executePromise = invocation.execute(mockAbortSignal, updateOutput);
+
+      // It should output the initial countdown
+      expect(updateOutput).toHaveBeenCalledWith(
+        expect.stringContaining('[YOLO] Executing in 2s...'),
+      );
+
+      // Advance by 1 second
+      await vi.advanceTimersByTimeAsync(1000);
+      expect(updateOutput).toHaveBeenCalledWith(
+        expect.stringContaining('[YOLO] Executing in 1s...'),
+      );
+
+      // Advance by another 1 second to finish the countdown
+      await vi.advanceTimersByTimeAsync(1000);
+
+      resolveShellExecution();
+      await executePromise;
+
+      vi.useRealTimers();
+      vi.mocked(mockConfig.getApprovalMode).mockReturnValue(
+        ApprovalMode.DEFAULT,
+      );
+    });
+
+    it('should allow user cancellation during YOLO mode delay', async () => {
+      vi.mocked(mockConfig.getApprovalMode).mockReturnValue(ApprovalMode.YOLO);
+      vi.mocked(mockConfig.getYoloShellDelayMs).mockReturnValue(2000);
+
+      const abortController = new AbortController();
+      const invocation = shellTool.build({ command: 'echo hello' });
+      const updateOutput = vi.fn();
+
+      const executePromise = invocation.execute(
+        abortController.signal,
+        updateOutput,
+      );
+
+      // Abort during the delay
+      abortController.abort();
+
+      const result = await executePromise;
+      expect(result.returnDisplay).toBe('Command cancelled by user.');
+      expect(result.llmContent).toContain(
+        'Command was cancelled by user during the YOLO mode delay.',
+      );
+      expect(mockShellExecutionService).not.toHaveBeenCalled();
+
+      vi.mocked(mockConfig.getApprovalMode).mockReturnValue(
+        ApprovalMode.DEFAULT,
+      );
+    });
 
     it('should wrap command on linux and parse pgrep output', async () => {
       const invocation = shellTool.build({ command: 'my-command &' });
