@@ -37,7 +37,10 @@ import {
   type ShellOutputEvent,
 } from '../services/shellExecutionService.js';
 import { formatBytes } from '../utils/formatters.js';
-import type { AnsiOutput } from '../utils/terminalSerializer.js';
+import {
+  serializeAnsiOutputToText,
+  type AnsiOutput,
+} from '../utils/terminalSerializer.js';
 import {
   getCommandRoots,
   initializeShellParsers,
@@ -534,7 +537,28 @@ export class ShellToolInvocation extends BaseToolInvocation<
                 break;
               case 'data':
                 if (isBinaryStream) break;
-                cumulativeOutput = event.chunk;
+                if (typeof event.chunk === 'string') {
+                  if (typeof cumulativeOutput === 'string') {
+                    // Accumulate string chunks, capped at 16MB (same as ShellExecutionService)
+                    const MAX_BUFFER = 16 * 1024 * 1024;
+                    if (
+                      cumulativeOutput.length + event.chunk.length >
+                      MAX_BUFFER
+                    ) {
+                      cumulativeOutput = (cumulativeOutput + event.chunk).slice(
+                        -MAX_BUFFER,
+                      );
+                    } else {
+                      cumulativeOutput += event.chunk;
+                    }
+                  } else {
+                    // In case of mode switch (unlikely)
+                    cumulativeOutput = event.chunk;
+                  }
+                } else {
+                  // Snapshots (AnsiOutput) always replace
+                  cumulativeOutput = event.chunk;
+                }
                 if (updateOutput && !this.params.is_background) {
                   updateOutput(cumulativeOutput);
                   lastUpdateTime = Date.now();
@@ -630,9 +654,14 @@ export class ShellToolInvocation extends BaseToolInvocation<
           await new Promise((resolve) => setTimeout(resolve, delay));
 
           if (!completed) {
+            const initialOutputText =
+              typeof cumulativeOutput === 'string'
+                ? cumulativeOutput
+                : serializeAnsiOutputToText(cumulativeOutput);
+
             // Return early with initial output if still running
             return {
-              llmContent: `Command is running in background. PID: ${pid}. Initial output:\n${cumulativeOutput}`,
+              llmContent: `Command is running in background. PID: ${pid}. Initial output:\n${initialOutputText}`,
               returnDisplay: `Background process started with PID ${pid}.`,
             };
           }

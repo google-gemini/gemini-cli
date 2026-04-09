@@ -250,6 +250,12 @@ export function serializeTerminalToObject(
   return result;
 }
 
+export function serializeAnsiOutputToText(output: AnsiOutput): string {
+  return output
+    .map((line) => line.map((segment) => segment.text).join(''))
+    .join('\n');
+}
+
 // ANSI color palette from https://en.wikipedia.org/wiki/ANSI_escape_code#8-bit
 const ANSI_COLORS = [
   '#000000',
