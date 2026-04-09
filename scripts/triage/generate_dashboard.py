@@ -134,12 +134,11 @@ def get_reviewer_info(pr):
         rr = req.get('requestedReviewer')
         if rr:
             if rr['__typename'] == 'User':
-                login = rr['login']
+                login = rr.get('login')
                 if login and login != author and login not in BOT_BLACKLIST:
                     human_reviewers.add(login)
             elif rr['__typename'] == 'Team':
                 slug = rr['slug']
-                # Strip repo name if present in slug
                 simple_slug = slug.split('/')[-1]
                 if simple_slug in ONCALLER_TEAMS:
                     requested_special_teams.add(simple_slug)
@@ -191,7 +190,8 @@ def main():
     followup_needed = []
     waiting_for_author = []
     available_pickup = []
-    active_development = []
+    active_blocked_prs = []
+    recently_assigned_no_pr = []
     stale_assignments = []
     blocked_stale_prs = []
 
@@ -232,7 +232,7 @@ def main():
                 if (now - latest_pr_activity).days >= STALE_BLOCKED_PR_DAYS:
                     blocked_stale_prs.append({"issue_md": f"[#{issue_no} {issue_title}]({issue_url})", "pr_no": pr['number'], "pr_url": pr['url'], "reason": reason, "author": pr['author']['login'], "days_stale": (now - latest_pr_activity).days})
                 else:
-                    active_development.append({"issue_md": f"[#{issue_no} {issue_title}]({issue_url})", "assignees": assignees if assignees else [pr['author']['login']], "last_update": latest_pr_activity_iso[:10], "status": f"Active PR ({reason})"})
+                    active_blocked_prs.append({"issue_md": f"[#{issue_no} {issue_title}]({issue_url})", "pr_no": pr['number'], "pr_url": pr['url'], "reason": reason, "author": pr['author']['login'], "last_update": latest_pr_activity_iso[:10]})
                 categorized = True
                 break
 
@@ -273,15 +273,16 @@ def main():
                 if days_idle >= STALE_ASSIGNMENT_DAYS:
                     stale_assignments.append({"issue_md": f"[#{issue_no} {issue_title}]({issue_url})", "assignees": assignees, "days_stale": days_idle})
                 else:
-                    active_development.append({"issue_md": f"[#{issue_no} {issue_title}]({issue_url})", "assignees": assignees, "last_update": issue['updatedAt'][:10], "status": "Assigned (No PR)"})
+                    recently_assigned_no_pr.append({"issue_md": f"[#{issue_no} {issue_title}]({issue_url})", "assignees": assignees, "last_update": issue['updatedAt'][:10]})
 
-    sum_categories = len(oncaller_attention) + len(initial_pickup) + len(followup_needed) + len(waiting_for_author) + len(available_pickup) + len(active_development) + len(stale_assignments) + len(blocked_stale_prs)
+    sum_categories = len(oncaller_attention) + len(initial_pickup) + len(followup_needed) + len(waiting_for_author) + len(available_pickup) + len(active_blocked_prs) + len(recently_assigned_no_pr) + len(stale_assignments) + len(blocked_stale_prs)
     
+    # Generate Markdown
     ts = now.strftime("%Y-%m-%d %H:%M")
     md = f"# 🔎 Gemini CLI Triage Dashboard\n\n*Last Synchronized: {ts} (UTC)*\n\n"
     md += f"**Total Issues Tracked: {len(all_issues)}** | **Categorized: {sum_categories}**\n\n"
     
-    md += f"## 🚨 Needs Oncaller Attention ({len(oncaller_attention)})\n**Action: Specialized approval required.** These PRs are waiting for specific teams (e.g. Prompt Approvers).\n\n"
+    md += f"## 🚨 Needs Oncaller Attention ({len(oncaller_attention)})\n**Action: Specialized approval required.**\n\n"
     md += "| Issue | Linked PR | Required Teams | Human Reviewers |\n| :--- | :--- | :--- | :--- |\n"
     for i in oncaller_attention:
         revs = ", ".join([f"@{r}" for r in i['reviewers']]) if i['reviewers'] else "_None_"
@@ -304,29 +305,34 @@ def main():
     for i in waiting_for_author: md += f"| {i['issue_md']} | [#{i['pr_no']}]({i['pr_url']}) | {', '.join(['@'+r for r in i['reviewers']])} | `{i['last_action']}` |\n"
     if not waiting_for_author: md += "| - | _None_ | - | - |\n"
 
+    md += f"\n## 🛠️ Active Development: Recently Assigned ({len(recently_assigned_no_pr)})\n**Status: Assigned < 14 days ago, no PR yet.**\n\n"
+    md += "| Issue | Assignee | Last Update |\n| :--- | :--- | :--- |\n"
+    for i in recently_assigned_no_pr: md += f"| {i['issue_md']} | @{', @'.join(i['assignees'])} | `{i['last_update']}` |\n"
+    if not recently_assigned_no_pr: md += "| - | _None_ | - |\n"
+
+    md += f"\n## 🛠️ Active Development: Blocked PRs ({len(active_blocked_prs)})\n**Status: Active work with conflicts or failures (Touched < 14 days ago).**\n\n"
+    md += "| Issue | Linked PR | Author | Reason | Last Update |\n| :--- | :--- | :--- | :--- | :--- |\n"
+    for i in active_blocked_prs: md += f"| {i['issue_md']} | [#{i['pr_no']}]({i['pr_url']}) | @{i['author']} | {i['reason']} | `{i['last_update']}` |\n"
+    if not active_blocked_prs: md += "| - | _None_ | - | - | - |\n"
+
     md += f"\n## 🌱 Available for Pickup ({len(available_pickup)})\n**Action: Open for new contributors.**\n\n"
     md += "| Issue | Days Idle |\n| :--- | :--- |\n"
     for i in available_pickup: md += f"| {i['issue_md']} | {i['days_idle']} |\n"
     if not available_pickup: md += "| - | _None_ |\n"
-
-    md += f"\n## 🛠️ Active Development ({len(active_development)})\n**Status: Recent activity or active blocked PR.**\n\n"
-    md += "| Issue | Assignee | Last Update | Status |\n| :--- | :--- | :--- | :--- |\n"
-    for i in active_development: md += f"| {i['issue_md']} | @{', @'.join(i['assignees'])} | `{i['last_update']}` | {i['status']} |\n"
-    if not active_development: md += "| - | _None_ | - | - |\n"
 
     md += f"\n## 🚩 Stale Assignments ({len(stale_assignments)})\n**Action: Consider unassigning.** Assigned for >14 days with no PR yet.\n\n"
     md += "| Issue | Assignee | Days Stale |\n| :--- | :--- | :--- |\n"
     for i in stale_assignments: md += f"| {i['issue_md']} | @{', @'.join(i['assignees'])} | {i['days_stale']} |\n"
     if not stale_assignments: md += "| - | _None_ |\n"
 
-    md += f"\n## 🚧 Blocked & Stale PRs ({len(blocked_stale_prs)})\n**Action: Needs rebase or test fix.**\n\n"
+    md += f"\n## 🚧 Blocked & Stale PRs ({len(blocked_stale_prs)})\n**Action: Needs rebase or test fix.** Blocked items untouched for >14 days.\n\n"
     md += "| Issue | PR | Reason | Author | Days Stale |\n| :--- | :--- | :--- | :--- | :--- |\n"
     for i in blocked_stale_prs: md += f"| {i['issue_md']} | [#{i['pr_no']}]({i['pr_url']}) | {i['reason']} | @{i['author']} | {i['days_stale']} |\n"
     if not blocked_stale_prs: md += "| - | _None_ | - | - | - |\n"
 
     md += "\n---\n*Dashboard maintained by automated triage script.*"
     with open("REVIEWS.md", "w") as f: f.write(md)
-    print(f"Total: {len(all_issues)}, Sum: {sum_categories}. Dashboard updated.")
+    print(f"Generated granular dashboard for {len(all_issues)} issues.")
 
 if __name__ == "__main__":
     main()
