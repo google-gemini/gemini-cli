@@ -240,7 +240,10 @@ export class LinuxSandboxManager implements SandboxManager {
       req,
       mergedAdditional,
       this.options.workspace,
-      req.policy?.allowedPaths,
+      [
+        ...(req.policy?.allowedPaths || []),
+        ...(this.options.includeDirectories || []),
+      ],
     );
 
     const sanitizationConfig = getSecureSanitizationConfig(
@@ -261,13 +264,9 @@ export class LinuxSandboxManager implements SandboxManager {
     }
 
     const bwrapArgs = await buildBwrapArgs({
-      workspace: this.options.workspace,
+      resolvedPaths,
       workspaceWrite,
-      networkAccess,
-      allowedPaths: resolvedPaths.policyAllowed,
-      forbiddenPaths: resolvedPaths.forbidden,
-      additionalPermissions: mergedAdditional,
-      includeDirectories: this.options.includeDirectories || [],
+      networkAccess: mergedAdditional.network ?? false,
       maskFilePath: this.getMaskFilePath(),
       isWriteCommand: req.command === '__write',
     });
