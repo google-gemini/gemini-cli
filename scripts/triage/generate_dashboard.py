@@ -182,7 +182,6 @@ def main():
             reviewers, latest_reviewer_activity = get_reviewer_info(pr)
             author_activity = get_author_activity(pr)
             
-            # Categories
             if not latest_reviewer_activity or author_activity > latest_reviewer_activity:
                 rollup = pr.get('statusCheckRollup')
                 is_conflicting = pr['mergeable'] == 'CONFLICTING'
@@ -194,7 +193,7 @@ def main():
                         "pr_no": pr['number'], "pr_url": pr['url'],
                         "reviewers": reviewers, "updated_at": pr['updatedAt'][:10]
                     }
-                    if not reviewers:
+                    if not latest_reviewer_activity and not reviewers:
                         initial_review_list.append(item)
                     else:
                         item["status"] = "Review Requested" if not latest_reviewer_activity else "Author Updated"
@@ -214,44 +213,44 @@ def main():
                         "reason": reason, "author": pr['author']['login'], "days_stale": (now - pr_updated_at).days
                     })
 
-        if not active_pr_assigned and not found_open_pr and (now - datetime.datetime.fromisoformat(updated_at_iso.replace('Z', '+00:00'))).days > STALE_ASSIGNMENT_DAYS:
-            stale_assignments.append({
-                "issue_md": f"[#{issue_no} {issue_title}]({issue_url})",
-                "assignees": assignees, "days_stale": (now - datetime.datetime.fromisoformat(updated_at_iso.replace('Z', '+00:00'))).days
-            })
+    if not active_pr_assigned and not found_open_pr and (now - datetime.datetime.fromisoformat(updated_at_iso.replace('Z', '+00:00'))).days > STALE_ASSIGNMENT_DAYS:
+        stale_assignments.append({
+            "issue_md": f"[#{issue_no} {issue_title}]({issue_url})",
+            "assignees": assignees, "days_stale": (now - datetime.datetime.fromisoformat(updated_at_iso.replace('Z', '+00:00'))).days
+        })
 
     # Generate Markdown
     ts = now.strftime("%Y-%m-%d %H:%M")
     md = f"# 🔎 Gemini CLI Triage Dashboard\n\n*Last Synchronized: {ts} (UTC)*\n\n"
     
-    md += "## 🆕 Awaiting Reviewer Pickup\n**Action: Pick up one of these new PRs.** These have no human reviewers assigned yet.\n\n"
-    md += "| # | Issue | Linked PR | Last Update |\n| :--- | :--- | :--- | :--- |\n"
-    for idx, i in enumerate(initial_review_list, 1):
-        md += f"| {idx} | {i['issue_md']} | [#{i['pr_no']}]({i['pr_url']}) | `{i['updated_at']}` |\n"
-    if not initial_review_list: md += "| - | _No new PRs._ | - | - |\n"
+    md += f"## 🆕 Awaiting Reviewer Pickup ({len(initial_review_list)})\n**Action: Pick up one of these new PRs.** These have no human reviewers assigned yet.\n\n"
+    md += "| Issue | Linked PR | Last Update |\n| :--- | :--- | :--- |\n"
+    for i in initial_review_list:
+        md += f"| {i['issue_md']} | [#{i['pr_no']}]({i['pr_url']}) | `{i['updated_at']}` |\n"
+    if not initial_review_list: md += "| - | _No new PRs._ | - |\n"
 
-    md += "\n## ⌛ Awaiting Reviewer Follow-up\n**Action: Follow up on your active reviews.** The author has responded to the latest feedback.\n\n"
-    md += "| # | Issue | Linked PR | Reviewers | Status |\n| :--- | :--- | :--- | :--- | :--- | :--- |\n"
-    for idx, i in enumerate(followup_review_list, 1):
+    md += f"\n## ⌛ Awaiting Reviewer Follow-up ({len(followup_review_list)})\n**Action: Follow up on your active reviews.** The author has responded to the latest feedback.\n\n"
+    md += "| Issue | Linked PR | Reviewers | Status |\n| :--- | :--- | :--- | :--- |\n"
+    for i in followup_review_list:
         revs = ", ".join([f"@{r}" for r in i['reviewers']]) if i['reviewers'] else "_None (Team only)_"
-        md += f"| {idx} | {i['issue_md']} | [#{i['pr_no']}]({i['pr_url']}) | {revs} | {i['status']} |\n"
-    if not followup_review_list: md += "| - | _No pending follow-ups._ | - | - | - | - |\n"
+        md += f"| {i['issue_md']} | [#{i['pr_no']}]({i['pr_url']}) | {revs} | {i['status']} |\n"
+    if not followup_review_list: md += "| - | _No pending follow-ups._ | - | - |\n"
 
-    md += "\n## 🚩 Stale Assignments (No PR)\n**Action: Consider unassigning.** Assigned for >{STALE_ASSIGNMENT_DAYS} days with no open Pull Request.\n\n"
-    md += "| # | Issue | Assignee | Days Stale |\n| :--- | :--- | :--- | :--- |\n"
-    for idx, i in enumerate(stale_assignments, 1):
-        md += f"| {idx} | {i['issue_md']} | @{', @'.join(i['assignees'])} | {i['days_stale']} |\n"
-    if not stale_assignments: md += "| - | _No stale assignments._ | - | - |\n"
+    md += f"\n## 🚩 Stale Assignments ({len(stale_assignments)})\n**Action: Consider unassigning.** Assigned for >{STALE_ASSIGNMENT_DAYS} days with no open Pull Request.\n\n"
+    md += "| Issue | Assignee | Days Stale |\n| :--- | :--- | :--- |\n"
+    for i in stale_assignments:
+        md += f"| {i['issue_md']} | @{', @'.join(i['assignees'])} | {i['days_stale']} |\n"
+    if not stale_assignments: md += "| - | _No stale assignments._ | - |\n"
 
-    md += "\n## 🚧 Blocked & Stale PRs\n**Action: Ping for rebase or test fix.** PRs with conflicts or failures untouched for >{STALE_BLOCKED_PR_DAYS} days.\n\n"
-    md += "| # | Issue | PR | Reason | Author | Days Stale |\n| :--- | :--- | :--- | :--- | :--- | :--- |\n"
-    for idx, i in enumerate(blocked_prs, 1):
-        md += f"| {idx} | {i['issue_md']} | [#{i['pr_no']}]({i['pr_url']}) | {i['reason']} | @{i['author']} | {i['days_stale']} |\n"
-    if not blocked_prs: md += "| - | _No stale blocked PRs._ | - | - | - | - |\n"
+    md += f"\n## 🚧 Blocked & Stale PRs ({len(blocked_prs)})\n**Action: Ping for rebase or test fix.** PRs with conflicts or failures untouched for >{STALE_BLOCKED_PR_DAYS} days.\n\n"
+    md += "| Issue | PR | Reason | Author | Days Stale |\n| :--- | :--- | :--- | :--- | :--- |\n"
+    for i in blocked_prs:
+        md += f"| {i['issue_md']} | [#{i['pr_no']}]({i['pr_url']}) | {i['reason']} | @{i['author']} | {i['days_stale']} |\n"
+    if not blocked_prs: md += "| - | _No stale blocked PRs._ | - | - | - |\n"
 
     md += "\n---\n*Dashboard maintained by automated triage script.*"
     with open("REVIEWS.md", "w") as f: f.write(md)
-    print("Generated dashboard with row numbers.")
+    print("Generated dashboard with item counts in descriptions.")
 
 if __name__ == "__main__":
     main()
