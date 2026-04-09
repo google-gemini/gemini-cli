@@ -31,7 +31,7 @@ describe('ToolMaskingProcessor', () => {
     });
 
     const result = await processor.process({
-      buffer: {} as any as any,
+      buffer: {} as any,
       targets: [toolStep],
       inbox: {} as any,
     });
@@ -66,7 +66,7 @@ describe('ToolMaskingProcessor', () => {
     });
 
     const result = await processor.process({
-      buffer: {} as any as any,
+      buffer: {} as any,
       targets: [toolStep],
       inbox: {} as any,
     });

@@ -8,7 +8,7 @@ import type { ConcreteNode } from '../ir/types.js';
 import type {
   ContextProcessor,
   ContextWorker,
-} from '../pipeline.js';
+ ContextWorkingBuffer } from '../pipeline.js';
 import type { SidecarConfig, PipelineDef, PipelineTrigger } from './types.js';
 import type {
   ContextEnvironment,
@@ -18,13 +18,12 @@ import type {
 import type { SidecarRegistry } from './registry.js';
 import { debugLogger } from '../../utils/debugLogger.js';
 import { InboxSnapshotImpl } from './inbox.js';
-import type { ContextWorkingBuffer } from '../pipeline.js';
 
 class ContextWorkingBufferImpl implements ContextWorkingBuffer {
   private readonly nodesMap: Map<string, ConcreteNode>;
 
   constructor(
-    public readonly nodes: readonly ConcreteNode[],
+    readonly nodes: readonly ConcreteNode[],
   ) {
     this.nodesMap = new Map(nodes.map(n => [n.id, n]));
   }

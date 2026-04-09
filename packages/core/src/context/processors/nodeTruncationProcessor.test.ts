@@ -48,7 +48,7 @@ describe('NodeTruncationProcessor', () => {
     const targets = [prompt, thought, yieldNode];
 
     const result = await processor.process({
-      buffer: {} as any as any,
+      buffer: {} as any,
       targets,
       inbox: {} as any,
     });
@@ -80,9 +80,7 @@ describe('NodeTruncationProcessor', () => {
     const mockTokenCalculator = new ContextTokenCalculator(1, env.behaviorRegistry) as any;
     mockTokenCalculator.tokensToChars = vi.fn().mockReturnValue(100); 
 
-    mockTokenCalculator.estimateTokensForString = vi.fn((text: string) => {
-        return text.length; 
-    });
+    mockTokenCalculator.estimateTokensForString = vi.fn((text: string) => text.length);
     mockTokenCalculator.estimateTokensForParts = vi.fn(() => 5);
     mockTokenCalculator.getTokenCost = vi.fn(() => 5);
 
@@ -106,7 +104,7 @@ describe('NodeTruncationProcessor', () => {
     const targets = [prompt, thought];
 
     const result = await processor.process({
-      buffer: {} as any as any,
+      buffer: {} as any,
       targets,
       inbox: {} as any,
     });

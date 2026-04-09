@@ -1,3 +1,8 @@
+/**
+ * @license
+ * Copyright 2026 Google LLC
+ * SPDX-License-Identifier: Apache-2.0
+ */
 import type { Part } from '@google/genai';
 import type { IrNodeBehavior, IrNodeBehaviorRegistry } from './behaviorRegistry.js';
 import type {

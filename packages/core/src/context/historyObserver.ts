@@ -8,7 +8,7 @@ import type {
   AgentChatHistory,
   HistoryEvent,
 } from '../core/agentChatHistory.js';
-import { IrMapper } from './ir/mapper.js';
+import type { IrMapper } from './ir/mapper.js';
 import type { ContextTokenCalculator } from './utils/contextTokenCalculator.js';
 import type { ContextEventBus } from './eventBus.js';
 import type { ContextTracer } from './tracer.js';
@@ -48,7 +48,7 @@ export class HistoryObserver {
           this.tokenCalculator,
         );
 
-        const nodes: Array<ConcreteNode> = [];
+        const nodes: ConcreteNode[] = [];
         for (const ep of pristineEpisodes) {
           if (ep.concreteNodes) {
             for (const child of ep.concreteNodes) {

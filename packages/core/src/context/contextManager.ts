@@ -12,7 +12,7 @@ import type { ContextEventBus } from './eventBus.js';
 import type { ContextTracer } from './tracer.js';
 import type { ContextEnvironment } from './sidecar/environment.js';
 import type { SidecarConfig } from './sidecar/types.js';
-import { PipelineOrchestrator } from './sidecar/orchestrator.js';
+import type { PipelineOrchestrator } from './sidecar/orchestrator.js';
 import { HistoryObserver } from './historyObserver.js';
 import { IrProjector } from './ir/projector.js';
 

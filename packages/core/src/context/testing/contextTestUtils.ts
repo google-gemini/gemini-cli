@@ -21,9 +21,8 @@ import type { ConcreteNode, ToolExecution } from '../ir/types.js';
 import type { ContextEnvironment } from '../sidecar/environment.js';
 import type { Config } from '../../config/config.js';
 import type { BaseLlmClient } from '../../core/baseLlmClient.js';
-import type { Content } from '@google/genai';
+import type { Content , GenerateContentResponse } from '@google/genai';
 
-import type { GenerateContentResponse } from '@google/genai';
 
 /**
  * Creates a valid mock GenerateContentResponse with the provided text.

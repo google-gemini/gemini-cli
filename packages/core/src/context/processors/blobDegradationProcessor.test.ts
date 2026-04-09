@@ -37,7 +37,7 @@ describe('BlobDegradationProcessor', () => {
     const targets = [prompt];
 
     const result = await processor.process({
-      buffer: {} as any as any,
+      buffer: {} as any,
       targets,
       inbox: {} as any,
     });
@@ -82,7 +82,7 @@ describe('BlobDegradationProcessor', () => {
     const targets = [prompt];
 
     const result = await processor.process({
-      buffer: {} as any as any,
+      buffer: {} as any,
       targets,
       inbox: {} as any,
     });
@@ -102,7 +102,7 @@ describe('BlobDegradationProcessor', () => {
     const targets: any[] = [];
 
     const result = await processor.process({
-      buffer: {} as any as any,
+      buffer: {} as any,
       targets,
       inbox: {} as any,
     });
