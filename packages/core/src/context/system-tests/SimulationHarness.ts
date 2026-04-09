@@ -7,14 +7,12 @@
 import { ContextManager } from '../contextManager.js';
 import { AgentChatHistory } from '../../core/agentChatHistory.js';
 import type { Content } from '@google/genai';
-import type { SidecarConfig } from '../sidecar/types.js';
+import type { ContextProfile } from '../sidecar/profiles.js';
 import { ContextEnvironmentImpl } from '../sidecar/environmentImpl.js';
 import { ContextTracer } from '../tracer.js';
 import { ContextEventBus } from '../eventBus.js';
 import { PipelineOrchestrator } from '../sidecar/orchestrator.js';
-import { registerBuiltInProcessors } from '../sidecar/builtins.js';
 import { debugLogger } from '../../utils/debugLogger.js';
-import { SidecarRegistry } from '../sidecar/registry.js';
 import { DeterministicIdGenerator } from '../system/DeterministicIdGenerator.js';
 import { InMemoryFileSystem } from '../system/InMemoryFileSystem.js';
 import type { BaseLlmClient } from '../../core/baseLlmClient.js';
@@ -31,13 +29,13 @@ export class SimulationHarness {
   env!: ContextEnvironmentImpl;
   orchestrator!: PipelineOrchestrator;
   readonly eventBus: ContextEventBus;
-  config!: SidecarConfig;
+  config!: ContextProfile;
   private tracer!: ContextTracer;
   private currentTurnIndex = 0;
   private tokenTrajectory: TurnSummary[] = [];
 
   static async create(
-    config: SidecarConfig,
+    config: ContextProfile,
     mockLlmClient: BaseLlmClient,
     mockTempDir = '/tmp/sim',
   ): Promise<SimulationHarness> {
@@ -52,14 +50,11 @@ export class SimulationHarness {
   }
 
   private async init(
-    config: SidecarConfig,
+    config: ContextProfile,
     mockLlmClient: BaseLlmClient,
     mockTempDir: string,
   ) {
     this.config = config;
-    const registry = new SidecarRegistry();
-    // Register all standard processors
-    registerBuiltInProcessors(registry);
 
     this.tracer = new ContextTracer({
       targetDir: mockTempDir,
@@ -79,11 +74,11 @@ export class SimulationHarness {
     );
 
     this.orchestrator = new PipelineOrchestrator(
-      config,
+      config.buildPipelines(this.env),
+      config.buildWorkers(this.env),
       this.env,
       this.eventBus,
       this.tracer,
-      registry,
     );
     this.contextManager = new ContextManager(
       config,
@@ -118,9 +113,9 @@ export class SimulationHarness {
     let currentView = this.contextManager.getNodes();
     const currentTokens =
       this.env.tokenCalculator.calculateConcreteListTokens(currentView);
-    if (this.config.budget && currentTokens > this.config.budget.maxTokens) {
+    if (this.config.config.budget && currentTokens > this.config.config.budget.maxTokens) {
       debugLogger.log(
-        `[Turn ${this.currentTurnIndex}] Sync panic triggered! ${currentTokens} > ${this.config.budget.maxTokens}`,
+        `[Turn ${this.currentTurnIndex}] Sync panic triggered! ${currentTokens} > ${this.config.config.budget.maxTokens}`,
       );
       const orchestrator = this.orchestrator;
       // In the V2 simulation, we trigger the 'gc_backstop' to simulate emergency pressure.

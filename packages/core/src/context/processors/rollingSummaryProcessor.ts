@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 import type {
-  ContextProcessor,
+  ContextProcessorFn,
   ProcessArgs,
   BackstopTargetOptions,
 } from '../pipeline.js';
@@ -17,43 +17,17 @@ export interface RollingSummaryProcessorOptions extends BackstopTargetOptions {
   systemInstruction?: string;
 }
 
-export class RollingSummaryProcessor implements ContextProcessor {
-  static readonly schema = {
-    type: 'object',
-    properties: {
-      target: { type: 'string', enum: ['incremental', 'freeNTokens', 'max'] },
-      freeTokensTarget: { type: 'number' },
-      systemInstruction: { type: 'string' },
-    },
-  };
+export function createRollingSummaryProcessor(
+  id: string,
+  env: ContextEnvironment,
+  options: RollingSummaryProcessorOptions,
+): ContextProcessorFn {
+  const generator = new SnapshotGenerator(env);
 
-  static create(
-    env: ContextEnvironment,
-    options: RollingSummaryProcessorOptions,
-  ): RollingSummaryProcessor {
-    return new RollingSummaryProcessor(env, options);
-  }
-
-  readonly componentType = 'processor';
-  readonly id = 'RollingSummaryProcessor';
-  readonly name = 'RollingSummaryProcessor';
-  readonly options: RollingSummaryProcessorOptions;
-  private readonly env: ContextEnvironment;
-  private readonly generator: SnapshotGenerator;
-
-  constructor(
-    env: ContextEnvironment,
-    options: RollingSummaryProcessorOptions,
-  ) {
-    this.env = env;
-    this.options = options;
-    this.generator = new SnapshotGenerator(env);
-  }
-
-  async process({ targets }: ProcessArgs): Promise<readonly ConcreteNode[]> {
+  const processor: any = async ({ targets }: ProcessArgs) => {
     if (targets.length === 0) return targets;
 
-    const strategy = this.options.target ?? 'max';
+    const strategy = options.target ?? 'max';
     let targetTokensToRemove = 0;
 
     if (strategy === 'incremental') {
@@ -62,7 +36,7 @@ export class RollingSummaryProcessor implements ContextProcessor {
       // Ideally, the orchestrator should pass `tokensToRemove` explicitly.
       targetTokensToRemove = 10000;
     } else if (strategy === 'freeNTokens') {
-      targetTokensToRemove = this.options.freeTokensTarget ?? Infinity;
+      targetTokensToRemove = options.freeTokensTarget ?? Infinity;
     } else if (strategy === 'max') {
       targetTokensToRemove = Infinity;
     }
@@ -80,7 +54,7 @@ export class RollingSummaryProcessor implements ContextProcessor {
       }
 
       nodesToSummarize.push(node);
-      deficitAccumulator += this.env.tokenCalculator.getTokenCost(node);
+      deficitAccumulator += env.tokenCalculator.getTokenCost(node);
 
       if (deficitAccumulator >= targetTokensToRemove) break;
     }
@@ -89,11 +63,11 @@ export class RollingSummaryProcessor implements ContextProcessor {
 
     try {
       // Synthesize the rolling summary synchronously
-      const snapshotText = await this.generator.synthesizeSnapshot(
+      const snapshotText = await generator.synthesizeSnapshot(
         nodesToSummarize,
-        this.options.systemInstruction,
+        options.systemInstruction,
       );
-      const newId = this.env.idGenerator.generateId();
+      const newId = env.idGenerator.generateId();
 
       const summaryNode: RollingSummary = {
         id: newId,
@@ -101,6 +75,7 @@ export class RollingSummaryProcessor implements ContextProcessor {
         type: 'ROLLING_SUMMARY',
         timestamp: Date.now(),
         text: snapshotText,
+        abstractsIds: nodesToSummarize.map((n) => n.id),
       };
 
       const consumedIds = nodesToSummarize.map((n) => n.id);
@@ -121,5 +96,10 @@ export class RollingSummaryProcessor implements ContextProcessor {
       debugLogger.error('RollingSummaryProcessor failed sync backstop', e);
       return targets;
     }
-  }
+  };
+
+  processor.id = id;
+  Object.defineProperty(processor, 'name', { value: 'RollingSummaryProcessor' });
+
+  return processor;
 }

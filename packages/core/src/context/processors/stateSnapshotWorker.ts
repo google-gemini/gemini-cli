@@ -14,53 +14,29 @@ export interface StateSnapshotWorkerOptions {
   systemInstruction?: string;
 }
 
-export class StateSnapshotWorker implements ContextWorker {
-  static readonly schema = {
-    type: 'object',
-    properties: {
-      type: { type: 'string', enum: ['accumulate', 'point-in-time'] },
-      systemInstruction: { type: 'string' },
-    },
-  };
+export function createStateSnapshotWorker(
+  id: string,
+  env: ContextEnvironment,
+  options: StateSnapshotWorkerOptions,
+): ContextWorker {
+  const generator = new SnapshotGenerator(env);
 
-  static create(
-    env: ContextEnvironment,
-    options: StateSnapshotWorkerOptions,
-  ): StateSnapshotWorker {
-    return new StateSnapshotWorker(env, options);
-  }
+  let isRunning = false;
 
-  readonly componentType = 'worker';
-  readonly id = 'StateSnapshotWorker';
-  readonly name = 'StateSnapshotWorker';
-  readonly options: StateSnapshotWorkerOptions;
-  private readonly env: ContextEnvironment;
-  private readonly generator: SnapshotGenerator;
-
-  // Triggers when nodes exceed retained threshold (via retained_exceeded in Orchestrator)
-  readonly triggers = {
-    onNodesAgedOut: true,
-  };
-
-  constructor(env: ContextEnvironment, options: StateSnapshotWorkerOptions) {
-    this.env = env;
-    this.options = options;
-    this.generator = new SnapshotGenerator(env);
-  }
-
-  async execute({
+  const execute = async ({
     targets,
     inbox,
   }: {
     targets: readonly ConcreteNode[];
     inbox: InboxSnapshot;
-  }): Promise<void> {
+  }): Promise<void> => {
+    if (!isRunning) return;
     if (targets.length === 0) return;
 
     try {
       let nodesToSummarize = [...targets];
       let previousConsumedIds: string[] = [];
-      const workerType = this.options.type ?? 'point-in-time';
+      const workerType = options.type ?? 'point-in-time';
 
       if (workerType === 'accumulate') {
         // Look for the most recent unconsumed accumulate snapshot in the inbox
@@ -83,13 +59,13 @@ export class StateSnapshotWorker implements ContextWorker {
           inbox.consume(latest.id);
           // And we must persist its consumption back to the live inbox immediately,
           // because we are effectively "taking" it from the shelf to modify.
-          this.env.inbox.drainConsumed(new Set([latest.id]));
+          env.inbox.drainConsumed(new Set([latest.id]));
 
           previousConsumedIds = latest.payload.consumedIds;
 
           // Prepend a synthetic node representing the previous rolling state
           const previousStateNode: ConcreteNode = {
-            id: this.env.idGenerator.generateId(),
+            id: env.idGenerator.generateId(),
             logicalParentId: '',
             type: 'SNAPSHOT',
             timestamp: latest.timestamp,
@@ -100,9 +76,9 @@ export class StateSnapshotWorker implements ContextWorker {
         }
       }
 
-      const snapshotText = await this.generator.synthesizeSnapshot(
+      const snapshotText = await generator.synthesizeSnapshot(
         nodesToSummarize,
-        this.options.systemInstruction,
+        options.systemInstruction,
       );
 
       const newConsumedIds = [
@@ -111,17 +87,32 @@ export class StateSnapshotWorker implements ContextWorker {
       ];
 
       // In V2, workers communicate their work to the inbox, and the processor picks it up.
-      this.env.inbox.publish(
+      env.inbox.publish(
         'PROPOSED_SNAPSHOT',
         {
           newText: snapshotText,
           consumedIds: newConsumedIds,
           type: workerType,
         },
-        this.env.idGenerator,
+        env.idGenerator,
       );
     } catch (e) {
       debugLogger.error('StateSnapshotWorker failed to generate snapshot', e);
     }
-  }
+  };
+
+  return {
+    id,
+    name: 'StateSnapshotWorker',
+    triggers: {
+      onNodesAgedOut: true,
+    },
+    start: () => {
+      isRunning = true;
+    },
+    stop: () => {
+      isRunning = false;
+    },
+    execute,
+  };
 }

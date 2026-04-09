@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 import type {
-  ContextProcessor,
+  ContextProcessorFn,
   ProcessArgs,
   BackstopTargetOptions,
 } from '../pipeline.js';
@@ -18,48 +18,23 @@ export interface StateSnapshotProcessorOptions extends BackstopTargetOptions {
   systemInstruction?: string;
 }
 
-export class StateSnapshotProcessor implements ContextProcessor {
-  static readonly schema = {
-    type: 'object',
-    properties: {
-      target: { type: 'string', enum: ['incremental', 'freeNTokens', 'max'] },
-      freeTokensTarget: { type: 'number' },
-      model: { type: 'string' },
-      systemInstruction: { type: 'string' },
-    },
-  };
+export function createStateSnapshotProcessor(
+  id: string,
+  env: ContextEnvironment,
+  options: StateSnapshotProcessorOptions,
+): ContextProcessorFn {
+  const generator = new SnapshotGenerator(env);
 
-  static create(
-    env: ContextEnvironment,
-    options: StateSnapshotProcessorOptions,
-  ): StateSnapshotProcessor {
-    return new StateSnapshotProcessor(env, options);
-  }
-
-  readonly componentType = 'processor';
-  readonly id = 'StateSnapshotProcessor';
-  readonly name = 'StateSnapshotProcessor';
-  readonly options: StateSnapshotProcessorOptions;
-  private readonly env: ContextEnvironment;
-  private readonly generator: SnapshotGenerator;
-
-  constructor(env: ContextEnvironment, options: StateSnapshotProcessorOptions) {
-    this.env = env;
-    this.options = options;
-    this.generator = new SnapshotGenerator(env);
-  }
-
-  // --- ContextProcessor Interface (Sync Backstop / Cache Application) ---
-  async process({
+  const processor: any = async ({
     targets,
     inbox,
-  }: ProcessArgs): Promise<readonly ConcreteNode[]> {
+  }: ProcessArgs) => {
     if (targets.length === 0) {
       return targets;
     }
 
     // Determine what mode we are looking for: 'incremental' -> 'point-in-time', 'max' -> 'accumulate'
-    const strategy = this.options.target ?? 'max';
+    const strategy = options.target ?? 'max';
     const expectedType =
       strategy === 'incremental' ? 'point-in-time' : 'accumulate';
 
@@ -90,7 +65,7 @@ export class StateSnapshotProcessor implements ContextProcessor {
 
         if (isValid) {
           // If valid, apply it!
-          const newId = this.env.idGenerator.generateId();
+          const newId = env.idGenerator.generateId();
 
           const snapshotNode: Snapshot = {
             id: newId,
@@ -98,6 +73,7 @@ export class StateSnapshotProcessor implements ContextProcessor {
             type: 'SNAPSHOT',
             timestamp: Date.now(),
             text: newText,
+            abstractsIds: consumedIds,
           };
 
           // Remove the consumed nodes and insert the snapshot at the earliest index
@@ -127,7 +103,7 @@ export class StateSnapshotProcessor implements ContextProcessor {
     if (strategy === 'incremental') {
       targetTokensToRemove = Infinity; // incremental implies removing as much as possible if no state is passed
     } else if (strategy === 'freeNTokens') {
-      targetTokensToRemove = this.options.freeTokensTarget ?? Infinity;
+      targetTokensToRemove = options.freeTokensTarget ?? Infinity;
     } else if (strategy === 'max') {
       targetTokensToRemove = Infinity;
     }
@@ -144,7 +120,7 @@ export class StateSnapshotProcessor implements ContextProcessor {
       }
 
       nodesToSummarize.push(node);
-      deficitAccumulator += this.env.tokenCalculator.getTokenCost(node);
+      deficitAccumulator += env.tokenCalculator.getTokenCost(node);
 
       if (deficitAccumulator >= targetTokensToRemove) break;
     }
@@ -152,17 +128,18 @@ export class StateSnapshotProcessor implements ContextProcessor {
     if (nodesToSummarize.length < 2) return targets; // Not enough context
 
     try {
-      const snapshotText = await this.generator.synthesizeSnapshot(
+      const snapshotText = await generator.synthesizeSnapshot(
         nodesToSummarize,
-        this.options.systemInstruction,
+        options.systemInstruction,
       );
-      const newId = this.env.idGenerator.generateId();
+      const newId = env.idGenerator.generateId();
       const snapshotNode: Snapshot = {
         id: newId,
         logicalParentId: newId,
         type: 'SNAPSHOT',
         timestamp: Date.now(),
         text: snapshotText,
+        abstractsIds: nodesToSummarize.map((n) => n.id),
       };
 
       const consumedIds = nodesToSummarize.map((n) => n.id);
@@ -183,5 +160,10 @@ export class StateSnapshotProcessor implements ContextProcessor {
       debugLogger.error('StateSnapshotProcessor failed sync backstop', e);
       return targets;
     }
-  }
+  };
+
+  processor.id = id;
+  Object.defineProperty(processor, 'name', { value: 'StateSnapshotProcessor' });
+
+  return processor;
 }

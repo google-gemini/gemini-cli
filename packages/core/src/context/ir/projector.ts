@@ -12,7 +12,7 @@ import type {
   ContextTracer,
 } from '../sidecar/environment.js';
 import type { PipelineOrchestrator } from '../sidecar/orchestrator.js';
-import type { SidecarConfig } from '../sidecar/types.js';
+import type { ContextProfile } from '../sidecar/profiles.js';
 
 export class IrProjector {
   /**
@@ -22,12 +22,12 @@ export class IrProjector {
   static async project(
     nodes: readonly ConcreteNode[],
     orchestrator: PipelineOrchestrator,
-    sidecar: SidecarConfig,
+    sidecar: ContextProfile,
     tracer: ContextTracer,
     env: ContextEnvironment,
     protectedIds: Set<string>,
   ): Promise<Content[]> {
-    if (!sidecar.budget) {
+    if (!sidecar.config.budget) {
       const contents = env.irMapper.fromIr(nodes);
       tracer.logEvent('IrProjector', 'Projected Context to LLM (No Budget)', {
         projectedContext: contents,
@@ -35,7 +35,7 @@ export class IrProjector {
       return contents;
     }
 
-    const maxTokens = sidecar.budget.maxTokens;
+    const maxTokens = sidecar.config.budget.maxTokens;
     const currentTokens =
       env.tokenCalculator.calculateConcreteListTokens(nodes);
 
@@ -79,7 +79,7 @@ export class IrProjector {
         node,
       ]);
       rollingTokens += nodeTokens;
-      if (rollingTokens > sidecar.budget.retainedTokens) {
+      if (rollingTokens > sidecar.config.budget.retainedTokens) {
         agedOutNodes.add(node.id);
       }
     }

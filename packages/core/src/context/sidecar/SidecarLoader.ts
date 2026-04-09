@@ -6,12 +6,9 @@
 
 import type { Config } from '../../config/config.js';
 import type { SidecarConfig } from './types.js';
-import { defaultSidecarProfile } from './profiles.js';
-import { SchemaValidator } from '../../utils/schemaValidator.js';
-import { getSidecarConfigSchema } from './schema.js';
+import { defaultSidecarProfile, type ContextProfile } from './profiles.js';
 import type { IFileSystem } from '../system/IFileSystem.js';
 import { NodeFileSystem } from '../system/NodeFileSystem.js';
-import type { SidecarRegistry } from './registry.js';
 
 export class SidecarLoader {
   /**
@@ -20,9 +17,8 @@ export class SidecarLoader {
    */
   static loadFromFile(
     sidecarPath: string,
-    registry: SidecarRegistry,
     fileSystem: IFileSystem = new NodeFileSystem(),
-  ): SidecarConfig {
+  ): ContextProfile {
     const fileContent = fileSystem.readFileSync(sidecarPath, 'utf8');
 
     if (!fileContent.trim()) {
@@ -40,24 +36,15 @@ export class SidecarLoader {
       );
     }
 
-    const validationError = SchemaValidator.validate(
-      getSidecarConfigSchema(registry),
-      parsed,
-    );
-    if (validationError) {
-      throw new Error(
-        `Invalid sidecar configuration in ${sidecarPath}. Validation error: ${validationError}`,
-      );
-    }
-
-    // Schema has been validated.
-    const isSidecarConfig = (val: unknown): val is SidecarConfig => true;
-    if (isSidecarConfig(parsed)) {
-      return parsed;
-    }
-    throw new Error(
-      'Unreachable: schema validation passed but type predicate failed.',
-    );
+    const customConfig = parsed as Partial<SidecarConfig>;
+    
+    return {
+      ...defaultSidecarProfile,
+      config: {
+        ...defaultSidecarProfile.config,
+        ...(customConfig.budget ? { budget: customConfig.budget } : {})
+      }
+    };
   }
 
   /**
@@ -66,9 +53,8 @@ export class SidecarLoader {
    */
   static fromConfig(
     config: Config,
-    registry: SidecarRegistry,
     fileSystem: IFileSystem = new NodeFileSystem(),
-  ): SidecarConfig {
+  ): ContextProfile {
     const sidecarPath = config.getExperimentalContextSidecarConfig();
 
     if (sidecarPath && fileSystem.existsSync(sidecarPath)) {
@@ -79,7 +65,7 @@ export class SidecarLoader {
       }
 
       // If the file has content, enforce strict validation and throw on failure.
-      return this.loadFromFile(sidecarPath, registry, fileSystem);
+      return this.loadFromFile(sidecarPath, fileSystem);
     }
 
     return defaultSidecarProfile;

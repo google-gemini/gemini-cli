@@ -3,7 +3,7 @@
  * Copyright 2026 Google LLC
  * SPDX-License-Identifier: Apache-2.0
  */
-import type { ContextProcessor, ProcessArgs } from '../pipeline.js';
+import type { ContextProcessorFn, ProcessArgs } from '../pipeline.js';
 import type { ContextEnvironment } from '../sidecar/environment.js';
 import { truncateProportionally } from '../truncation.js';
 import type { ConcreteNode } from '../ir/types.js';
@@ -12,41 +12,12 @@ export interface NodeTruncationProcessorOptions {
   maxTokensPerNode: number;
 }
 
-export class NodeTruncationProcessor implements ContextProcessor {
-  static create(
-    env: ContextEnvironment,
-    options: NodeTruncationProcessorOptions,
-  ): NodeTruncationProcessor {
-    return new NodeTruncationProcessor(env, options);
-  }
-
-  static readonly schema = {
-    type: 'object',
-    properties: {
-      maxTokensPerNode: {
-        type: 'number',
-        description:
-          'The maximum tokens a node can have before being truncated.',
-      },
-    },
-    required: ['maxTokensPerNode'],
-  };
-
-  readonly componentType = 'processor';
-  readonly id = 'NodeTruncationProcessor';
-  readonly name = 'NodeTruncationProcessor';
-  readonly options: NodeTruncationProcessorOptions;
-  private env: ContextEnvironment;
-
-  constructor(
-    env: ContextEnvironment,
-    options: NodeTruncationProcessorOptions,
-  ) {
-    this.env = env;
-    this.options = options;
-  }
-
-  private tryApplySquash(
+export function createNodeTruncationProcessor(
+  id: string,
+  env: ContextEnvironment,
+  options: NodeTruncationProcessorOptions,
+): ContextProcessorFn {
+  const tryApplySquash = (
     text: string,
     limitChars: number,
   ): {
@@ -54,7 +25,7 @@ export class NodeTruncationProcessor implements ContextProcessor {
     newTokens: number;
     oldTokens: number;
     tokensSaved: number;
-  } | null {
+  } | null => {
     const originalLength = text.length;
     if (originalLength <= limitChars) return null;
 
@@ -67,8 +38,8 @@ export class NodeTruncationProcessor implements ContextProcessor {
     if (newText !== text) {
       // Using accurate TokenCalculator instead of simple math
       const newTokens =
-        this.env.tokenCalculator.estimateTokensForString(newText);
-      const oldTokens = this.env.tokenCalculator.estimateTokensForString(text);
+        env.tokenCalculator.estimateTokensForString(newText);
+      const oldTokens = env.tokenCalculator.estimateTokensForString(text);
       const tokensSaved = oldTokens - newTokens;
 
       if (tokensSaved > 0) {
@@ -76,15 +47,15 @@ export class NodeTruncationProcessor implements ContextProcessor {
       }
     }
     return null;
-  }
+  };
 
-  async process({ targets }: ProcessArgs): Promise<readonly ConcreteNode[]> {
+  const processor: any = async ({ targets }: ProcessArgs) => {
     if (targets.length === 0) {
       return targets;
     }
 
-    const { maxTokensPerNode } = this.options;
-    const limitChars = this.env.tokenCalculator.tokensToChars(maxTokensPerNode);
+    const { maxTokensPerNode } = options;
+    const limitChars = env.tokenCalculator.tokensToChars(maxTokensPerNode);
 
     const returnedNodes: ConcreteNode[] = [];
 
@@ -97,7 +68,7 @@ export class NodeTruncationProcessor implements ContextProcessor {
           for (let j = 0; j < node.semanticParts.length; j++) {
             const part = node.semanticParts[j];
             if (part.type === 'text') {
-              const squashResult = this.tryApplySquash(part.text, limitChars);
+              const squashResult = tryApplySquash(part.text, limitChars);
               if (squashResult) {
                 newParts[j] = { type: 'text', text: squashResult.text };
                 modified = true;
@@ -108,8 +79,9 @@ export class NodeTruncationProcessor implements ContextProcessor {
           if (modified) {
             returnedNodes.push({
               ...node,
-              id: this.env.idGenerator.generateId(),
+              id: env.idGenerator.generateId(),
               semanticParts: newParts,
+              replacesId: node.id,
             });
           } else {
             returnedNodes.push(node);
@@ -118,12 +90,13 @@ export class NodeTruncationProcessor implements ContextProcessor {
         }
 
         case 'AGENT_THOUGHT': {
-          const squashResult = this.tryApplySquash(node.text, limitChars);
+          const squashResult = tryApplySquash(node.text, limitChars);
           if (squashResult) {
             returnedNodes.push({
               ...node,
-              id: this.env.idGenerator.generateId(),
+              id: env.idGenerator.generateId(),
               text: squashResult.text,
+              replacesId: node.id,
             });
           } else {
             returnedNodes.push(node);
@@ -132,12 +105,13 @@ export class NodeTruncationProcessor implements ContextProcessor {
         }
 
         case 'AGENT_YIELD': {
-          const squashResult = this.tryApplySquash(node.text, limitChars);
+          const squashResult = tryApplySquash(node.text, limitChars);
           if (squashResult) {
             returnedNodes.push({
               ...node,
-              id: this.env.idGenerator.generateId(),
+              id: env.idGenerator.generateId(),
               text: squashResult.text,
+              replacesId: node.id,
             });
           } else {
             returnedNodes.push(node);
@@ -152,5 +126,10 @@ export class NodeTruncationProcessor implements ContextProcessor {
     }
 
     return returnedNodes;
-  }
+  };
+
+  processor.id = id;
+  Object.defineProperty(processor, 'name', { value: 'NodeTruncationProcessor' });
+
+  return processor;
 }

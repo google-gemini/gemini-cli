@@ -7,7 +7,12 @@
 import { describe, it, expect, vi, beforeAll, afterAll } from 'vitest';
 import { SimulationHarness } from './SimulationHarness.js';
 import { createMockLlmClient } from '../testing/contextTestUtils.js';
-import type { SidecarConfig } from '../sidecar/types.js';
+import type { ContextProfile } from '../sidecar/profiles.js';
+import { createToolMaskingProcessor } from '../processors/toolMaskingProcessor.js';
+import { createBlobDegradationProcessor } from '../processors/blobDegradationProcessor.js';
+import { createStateSnapshotProcessor } from '../processors/stateSnapshotProcessor.js';
+import { createHistoryTruncationProcessor } from '../processors/historyTruncationProcessor.js';
+import { createStateSnapshotWorker } from '../processors/stateSnapshotWorker.js';
 
 expect.addSnapshotSerializer({
   test: (val) =>
@@ -31,30 +36,29 @@ describe('System Lifecycle Golden Tests', () => {
     vi.restoreAllMocks();
   });
 
-  const getAggressiveConfig = (): SidecarConfig => ({
-    budget: { maxTokens: 1000, retainedTokens: 500 }, // Extremely tight limits
-    pipelines: [
+  const getAggressiveConfig = (): ContextProfile => ({
+    config: {
+      budget: { maxTokens: 1000, retainedTokens: 500 }, // Extremely tight limits
+    },
+    buildPipelines: (env) => [
       {
         name: 'Pressure Relief', // Emits from eventBus 'retained_exceeded'
         triggers: ['retained_exceeded'],
         processors: [
-          { processorId: 'BlobDegradationProcessor' },
-          {
-            processorId: 'ToolMaskingProcessor',
-            options: { stringLengthThresholdTokens: 50 },
-          }, // Mask any tool string > 50 chars
-          { processorId: 'StateSnapshotProcessor', options: {} }, // Squash old history
+          createBlobDegradationProcessor('BlobDegradationProcessor', env),
+          createToolMaskingProcessor('ToolMaskingProcessor', env, { stringLengthThresholdTokens: 50 }),
+          createStateSnapshotProcessor('StateSnapshotProcessor', env, {}),
         ],
       },
       {
         name: 'Immediate Sanitization', // The magic string the projector is hardcoded to use
         triggers: ['retained_exceeded'],
         processors: [
-          { processorId: 'HistoryTruncationProcessor', options: {} },
+          createHistoryTruncationProcessor('HistoryTruncationProcessor', env, {}),
         ],
       },
     ],
-    workers: [{ workerId: 'StateSnapshotWorker' }],
+    buildWorkers: (env) => [createStateSnapshotWorker('StateSnapshotWorker', env, {})],
   });
 
   const mockLlmClient = createMockLlmClient([
@@ -141,10 +145,12 @@ describe('System Lifecycle Golden Tests', () => {
   });
 
   it('Scenario 2: Under Budget (No Modifications)', async () => {
-    const generousConfig: SidecarConfig = {
-      budget: { maxTokens: 100000, retainedTokens: 50000 },
-      pipelines: [], // No triggers
-      workers: [],
+    const generousConfig: ContextProfile = {
+      config: {
+        budget: { maxTokens: 100000, retainedTokens: 50000 },
+      },
+      buildPipelines: () => [],
+      buildWorkers: () => [],
     };
 
     const harness = await SimulationHarness.create(
@@ -171,12 +177,12 @@ describe('System Lifecycle Golden Tests', () => {
   });
 
   it('Scenario 3: Worker-Driven Background GC', async () => {
-    const gcConfig: SidecarConfig = {
-      budget: { maxTokens: 200, retainedTokens: 100 },
-      pipelines: [], // No standard pipelines
-      workers: [
-        { workerId: 'StateSnapshotWorker' }, // This should fire on chunk events
-      ],
+    const gcConfig: ContextProfile = {
+      config: {
+        budget: { maxTokens: 200, retainedTokens: 100 },
+      },
+      buildPipelines: () => [],
+      buildWorkers: (env) => [createStateSnapshotWorker('StateSnapshotWorker', env, {})],
     };
 
     const harness = await SimulationHarness.create(gcConfig, mockLlmClient);

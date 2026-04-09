@@ -3,7 +3,7 @@
  * Copyright 2026 Google LLC
  * SPDX-License-Identifier: Apache-2.0
  */
-import type { ContextProcessor, ProcessArgs } from '../pipeline.js';
+import type { ContextProcessorFn, ProcessArgs } from '../pipeline.js';
 import type { ConcreteNode } from '../ir/types.js';
 import type { ContextEnvironment } from '../sidecar/environment.js';
 import { debugLogger } from '../../utils/debugLogger.js';
@@ -15,48 +15,20 @@ export interface NodeDistillationProcessorOptions {
   nodeThresholdTokens: number;
 }
 
-export class NodeDistillationProcessor implements ContextProcessor {
-  static create(
-    env: ContextEnvironment,
-    options: NodeDistillationProcessorOptions,
-  ): NodeDistillationProcessor {
-    return new NodeDistillationProcessor(env, options);
-  }
-
-  static readonly schema = {
-    type: 'object',
-    properties: {
-      nodeThresholdTokens: {
-        type: 'number',
-        description: 'The token threshold above which nodes are summarized.',
-      },
-    },
-    required: ['nodeThresholdTokens'],
-  };
-
-  readonly componentType = 'processor';
-  readonly id = 'NodeDistillationProcessor';
-  readonly name = 'NodeDistillationProcessor';
-  readonly options: NodeDistillationProcessorOptions;
-  private env: ContextEnvironment;
-
-  constructor(
-    env: ContextEnvironment,
-    options: NodeDistillationProcessorOptions,
-  ) {
-    this.env = env;
-    this.options = options;
-  }
-
-  private async generateSummary(
+export function createNodeDistillationProcessor(
+  id: string,
+  env: ContextEnvironment,
+  options: NodeDistillationProcessorOptions,
+): ContextProcessorFn {
+  const generateSummary = async (
     text: string,
     contextInfo: string,
-  ): Promise<string> {
+  ): Promise<string> => {
     try {
-      const response = await this.env.llmClient.generateContent({
+      const response = await env.llmClient.generateContent({
         role: LlmRole.UTILITY_COMPRESSOR,
         modelConfigKey: { model: 'gemini-3-flash-base' },
-        promptId: this.env.promptId,
+        promptId: env.promptId,
         abortSignal: new AbortController().signal,
         contents: [
           {
@@ -81,12 +53,12 @@ export class NodeDistillationProcessor implements ContextProcessor {
       );
       return text; // Fallback to original text on API failure
     }
-  }
+  };
 
-  async process({ targets }: ProcessArgs): Promise<readonly ConcreteNode[]> {
-    const semanticConfig = this.options;
+  const processor: any = async ({ targets }: ProcessArgs) => {
+    const semanticConfig = options;
     const limitTokens = semanticConfig.nodeThresholdTokens;
-    const thresholdChars = this.env.tokenCalculator.tokensToChars(limitTokens);
+    const thresholdChars = env.tokenCalculator.tokensToChars(limitTokens);
 
     const returnedNodes: ConcreteNode[] = [];
 
@@ -102,14 +74,14 @@ export class NodeDistillationProcessor implements ContextProcessor {
             if (part.type !== 'text') continue;
 
             if (part.text.length > thresholdChars) {
-              const summary = await this.generateSummary(
+              const summary = await generateSummary(
                 part.text,
                 'User Prompt',
               );
-              const newTokens = this.env.tokenCalculator.estimateTokensForParts(
+              const newTokens = env.tokenCalculator.estimateTokensForParts(
                 [{ text: summary }],
               );
-              const oldTokens = this.env.tokenCalculator.estimateTokensForParts(
+              const oldTokens = env.tokenCalculator.estimateTokensForParts(
                 [{ text: part.text }],
               );
 
@@ -123,8 +95,9 @@ export class NodeDistillationProcessor implements ContextProcessor {
           if (modified) {
             returnedNodes.push({
               ...node,
-              id: this.env.idGenerator.generateId(),
+              id: env.idGenerator.generateId(),
               semanticParts: newParts,
+              replacesId: node.id,
             });
           } else {
             returnedNodes.push(node);
@@ -134,20 +107,21 @@ export class NodeDistillationProcessor implements ContextProcessor {
 
         case 'AGENT_THOUGHT': {
           if (node.text.length > thresholdChars) {
-            const summary = await this.generateSummary(
+            const summary = await generateSummary(
               node.text,
               'Agent Thought',
             );
-            const newTokens = this.env.tokenCalculator.estimateTokensForParts([
+            const newTokens = env.tokenCalculator.estimateTokensForParts([
               { text: summary },
             ]);
-            const oldTokens = this.env.tokenCalculator.getTokenCost(node);
+            const oldTokens = env.tokenCalculator.getTokenCost(node);
 
             if (newTokens < oldTokens) {
               returnedNodes.push({
                 ...node,
-                id: this.env.idGenerator.generateId(),
+                id: env.idGenerator.generateId(),
                 text: summary,
+                replacesId: node.id,
               });
               break;
             }
@@ -171,14 +145,14 @@ export class NodeDistillationProcessor implements ContextProcessor {
           }
 
           if (stringifiedObs.length > thresholdChars) {
-            const summary = await this.generateSummary(
+            const summary = await generateSummary(
               stringifiedObs,
               node.toolName || 'unknown',
             );
             const newObsObject = { summary };
 
             const newObsTokens =
-              this.env.tokenCalculator.estimateTokensForParts([
+              env.tokenCalculator.estimateTokensForParts([
                 {
                   functionResponse: {
                     name: node.toolName || 'unknown',
@@ -190,18 +164,19 @@ export class NodeDistillationProcessor implements ContextProcessor {
 
             const oldObsTokens =
               node.tokens?.observation ??
-              this.env.tokenCalculator.getTokenCost(node);
+              env.tokenCalculator.getTokenCost(node);
             const intentTokens = node.tokens?.intent ?? 0;
 
             if (newObsTokens < oldObsTokens) {
               returnedNodes.push({
                 ...node,
-                id: this.env.idGenerator.generateId(),
+                id: env.idGenerator.generateId(),
                 observation: newObsObject as Record<string, unknown>,
                 tokens: {
                   intent: intentTokens,
                   observation: newObsTokens,
                 },
+                replacesId: node.id,
               });
               break;
             }
@@ -217,5 +192,10 @@ export class NodeDistillationProcessor implements ContextProcessor {
     }
 
     return returnedNodes;
-  }
+  };
+
+  processor.id = id;
+  Object.defineProperty(processor, 'name', { value: 'NodeDistillationProcessor' });
+
+  return processor;
 }

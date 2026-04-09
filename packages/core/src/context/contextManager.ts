@@ -10,7 +10,7 @@ import type { ConcreteNode } from './ir/types.js';
 import type { ContextEventBus } from './eventBus.js';
 import type { ContextTracer } from './tracer.js';
 import type { ContextEnvironment } from './sidecar/environment.js';
-import type { SidecarConfig } from './sidecar/types.js';
+import type { ContextProfile } from './sidecar/profiles.js';
 import type { PipelineOrchestrator } from './sidecar/orchestrator.js';
 import { HistoryObserver } from './historyObserver.js';
 import { IrProjector } from './ir/projector.js';
@@ -29,7 +29,7 @@ export class ContextManager {
   private readonly historyObserver: HistoryObserver;
 
   constructor(
-    private readonly sidecar: SidecarConfig,
+    private readonly sidecar: ContextProfile,
     private readonly env: ContextEnvironment,
     private readonly tracer: ContextTracer,
     orchestrator: PipelineOrchestrator,
@@ -74,7 +74,7 @@ export class ContextManager {
    * firing consolidation events if necessary.
    */
   private evaluateTriggers(newNodes: Set<string>) {
-    if (!this.sidecar.budget) return;
+    if (!this.sidecar.config.budget) return;
 
     if (newNodes.size > 0) {
       this.eventBus.emitChunkReceived({
@@ -87,7 +87,7 @@ export class ContextManager {
       this.buffer.nodes,
     );
 
-    if (currentTokens > this.sidecar.budget.retainedTokens) {
+    if (currentTokens > this.sidecar.config.budget.retainedTokens) {
       const agedOutNodes = new Set<string>();
       let rollingTokens = 0;
       // Walk backwards finding nodes that fall out of the retained budget
@@ -96,7 +96,7 @@ export class ContextManager {
         rollingTokens += this.env.tokenCalculator.calculateConcreteListTokens([
           node,
         ]);
-        if (rollingTokens > this.sidecar.budget.retainedTokens) {
+        if (rollingTokens > this.sidecar.config.budget.retainedTokens) {
           agedOutNodes.add(node.id);
         }
       }
@@ -104,7 +104,7 @@ export class ContextManager {
       if (agedOutNodes.size > 0) {
         this.eventBus.emitConsolidationNeeded({
           nodes: this.buffer.nodes,
-          targetDeficit: currentTokens - this.sidecar.budget.retainedTokens,
+          targetDeficit: currentTokens - this.sidecar.config.budget.retainedTokens,
           targetNodeIds: agedOutNodes,
         });
       }

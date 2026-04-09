@@ -38,10 +38,15 @@ export interface ProcessArgs {
   readonly inbox: InboxSnapshot;
 }
 
-export interface ContextProcessor {
+/**
+ * A ContextProcessor is now a pure function that returns a modified subset of nodes
+ * (or the original targets if no changes are needed). 
+ * The Orchestrator will use this to generate a new graph delta.
+ */
+export interface ContextProcessorFn {
   readonly id: string;
   readonly name: string;
-  process(args: ProcessArgs): Promise<readonly ConcreteNode[]>;
+  (args: ProcessArgs): Promise<readonly ConcreteNode[]>;
 }
 
 export interface ContextWorker {
@@ -52,6 +57,8 @@ export interface ContextWorker {
     onNodesAgedOut?: boolean;
     onInboxTopics?: string[];
   };
+  start(): void;
+  stop(): void;
   execute(args: {
     targets: readonly ConcreteNode[];
     inbox: InboxSnapshot;

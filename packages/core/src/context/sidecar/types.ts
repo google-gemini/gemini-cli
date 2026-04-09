@@ -4,36 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-/**
- * Definition of a processor or worker to be instantiated in the graph.
- */
-export type ProcessorConfig =
-  | {
-      processorId: 'ToolMaskingProcessor';
-      options: { stringLengthThresholdTokens: number };
-    }
-  | { processorId: 'BlobDegradationProcessor'; options?: object }
-  | {
-      processorId: 'NodeDistillationProcessor';
-      options: { nodeThresholdTokens: number };
-    }
-  | {
-      processorId: 'NodeTruncationProcessor';
-      options: { maxTokensPerNode: number };
-    }
-  | {
-      processorId: 'StateSnapshotProcessor';
-      options?: Record<string, unknown>;
-    }
-  | {
-      processorId: 'HistoryTruncationProcessor';
-      options?: Record<string, unknown>;
-    };
-
-export interface WorkerConfig {
-  workerId: string;
-  options?: Record<string, unknown>;
-}
+import type { ContextProcessorFn } from '../pipeline.js';
 
 export type PipelineTrigger =
   | 'new_message'
@@ -44,7 +15,7 @@ export type PipelineTrigger =
 export interface PipelineDef {
   name: string;
   triggers: PipelineTrigger[];
-  processors: ProcessorConfig[];
+  processors: ContextProcessorFn[];
 }
 
 /**
@@ -56,10 +27,4 @@ export interface SidecarConfig {
     retainedTokens: number;
     maxTokens: number;
   };
-
-  /** The execution graphs for context manipulation */
-  pipelines: PipelineDef[];
-
-  /** Background actors that generate data for pipelines */
-  workers?: WorkerConfig[];
 }

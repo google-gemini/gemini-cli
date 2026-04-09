@@ -3,7 +3,7 @@
  * Copyright 2026 Google LLC
  * SPDX-License-Identifier: Apache-2.0
  */
-import type { ContextProcessor, ProcessArgs } from '../pipeline.js';
+import type { ContextProcessorFn, ProcessArgs } from '../pipeline.js';
 import type { ConcreteNode, ToolExecution } from '../ir/types.js';
 import type { ContextEnvironment } from '../sidecar/environment.js';
 import { sanitizeFilenamePart } from '../../utils/fileUtils.js';
@@ -63,57 +63,31 @@ function isMaskableRecord(val: unknown): val is Record<string, MaskableValue> {
   );
 }
 
-export class ToolMaskingProcessor implements ContextProcessor {
-  static create(
-    env: ContextEnvironment,
-    options: ToolMaskingProcessorOptions,
-  ): ToolMaskingProcessor {
-    return new ToolMaskingProcessor(env, options);
-  }
-
-  static readonly schema = {
-    type: 'object',
-    properties: {
-      stringLengthThresholdTokens: {
-        type: 'number',
-        description:
-          'The token threshold above which tool intents/observations are masked.',
-      },
-    },
-    required: ['stringLengthThresholdTokens'],
+export function createToolMaskingProcessor(
+  id: string,
+  env: ContextEnvironment,
+  options: ToolMaskingProcessorOptions,
+): ContextProcessorFn {
+  const isAlreadyMasked = (text: string): boolean => {
+    return text.includes('<tool_output_masked>');
   };
 
-  readonly componentType = 'processor';
-  readonly id = 'ToolMaskingProcessor';
-  readonly name = 'ToolMaskingProcessor';
-  readonly options: ToolMaskingProcessorOptions;
-  private env: ContextEnvironment;
-
-  constructor(env: ContextEnvironment, options: ToolMaskingProcessorOptions) {
-    this.env = env;
-    this.options = options;
-  }
-
-  private isAlreadyMasked(text: string): boolean {
-    return text.includes('<tool_output_masked>');
-  }
-
-  async process({ targets }: ProcessArgs): Promise<readonly ConcreteNode[]> {
-    const maskingConfig = this.options;
+  const processor: any = async ({ targets }: ProcessArgs) => {
+    const maskingConfig = options;
     if (!maskingConfig) return targets;
     if (targets.length === 0) return targets;
 
-    const limitChars = this.env.tokenCalculator.tokensToChars(
+    const limitChars = env.tokenCalculator.tokensToChars(
       maskingConfig.stringLengthThresholdTokens,
     );
 
-    let toolOutputsDir = this.env.fileSystem.join(
-      this.env.projectTempDir,
+    let toolOutputsDir = env.fileSystem.join(
+      env.projectTempDir,
       'tool-outputs',
     );
-    const sessionId = this.env.sessionId;
+    const sessionId = env.sessionId;
     if (sessionId) {
-      toolOutputsDir = this.env.fileSystem.join(
+      toolOutputsDir = env.fileSystem.join(
         toolOutputsDir,
         `session-${sanitizeFilenamePart(sessionId)}`,
       );
@@ -128,14 +102,14 @@ export class ToolMaskingProcessor implements ContextProcessor {
       nodeType: string,
     ): Promise<string> => {
       if (!directoryCreated) {
-        await this.env.fileSystem.mkdir(toolOutputsDir, { recursive: true });
+        await env.fileSystem.mkdir(toolOutputsDir, { recursive: true });
         directoryCreated = true;
       }
 
-      const fileName = `${sanitizeFilenamePart(toolName).toLowerCase()}_${sanitizeFilenamePart(callId).toLowerCase()}_${nodeType}_${this.env.idGenerator.generateId()}.txt`;
-      const filePath = this.env.fileSystem.join(toolOutputsDir, fileName);
+      const fileName = `${sanitizeFilenamePart(toolName).toLowerCase()}_${sanitizeFilenamePart(callId).toLowerCase()}_${nodeType}_${env.idGenerator.generateId()}.txt`;
+      const filePath = env.fileSystem.join(toolOutputsDir, fileName);
 
-      await this.env.fileSystem.writeFile(filePath, content);
+      await env.fileSystem.writeFile(filePath, content);
 
       const fileSizeMB = (
         Buffer.byteLength(content, 'utf8') /
@@ -164,7 +138,7 @@ export class ToolMaskingProcessor implements ContextProcessor {
             nodeType: string,
           ): Promise<{ masked: MaskableValue; changed: boolean }> => {
             if (typeof obj === 'string') {
-              if (obj.length > limitChars && !this.isAlreadyMasked(obj)) {
+              if (obj.length > limitChars && !isAlreadyMasked(obj)) {
                 const newString = await handleMasking(
                   obj,
                   toolName || 'unknown',
@@ -222,7 +196,7 @@ export class ToolMaskingProcessor implements ContextProcessor {
                   : undefined;
 
             const newIntentTokens =
-              this.env.tokenCalculator.estimateTokensForParts([
+              env.tokenCalculator.estimateTokensForParts([
                 {
                   functionCall: {
                     name: toolName || 'unknown',
@@ -244,24 +218,25 @@ export class ToolMaskingProcessor implements ContextProcessor {
             }
 
             const newObsTokens =
-              this.env.tokenCalculator.estimateTokensForParts([
+              env.tokenCalculator.estimateTokensForParts([
                 obsPart as Part,
               ]);
 
             const tokensSaved =
-              this.env.tokenCalculator.getTokenCost(node) -
+              env.tokenCalculator.getTokenCost(node) -
               (newIntentTokens + newObsTokens);
 
             if (tokensSaved > 0) {
               const maskedNode: ToolExecution = {
                 ...node,
-                id: this.env.idGenerator.generateId(), // Modified, so generate new ID
+                id: env.idGenerator.generateId(), // Modified, so generate new ID
                 intent: maskedIntent ?? node.intent,
                 observation: maskedObs ?? node.observation,
                 tokens: {
                   intent: newIntentTokens,
                   observation: newObsTokens,
                 },
+                replacesId: node.id,
               };
 
               returnedNodes.push(maskedNode);
@@ -280,5 +255,10 @@ export class ToolMaskingProcessor implements ContextProcessor {
     }
 
     return returnedNodes;
-  }
+  };
+
+  processor.id = id;
+  Object.defineProperty(processor, 'name', { value: 'ToolMaskingProcessor' });
+
+  return processor;
 }

@@ -14,8 +14,6 @@ import { ContextTracer } from '../tracer.js';
 import { ContextEnvironmentImpl } from '../sidecar/environmentImpl.js';
 import { SidecarLoader } from '../sidecar/SidecarLoader.js';
 import { ContextEventBus } from '../eventBus.js';
-import { SidecarRegistry } from '../sidecar/registry.js';
-import { registerBuiltInProcessors } from '../sidecar/builtins.js';
 import { PipelineOrchestrator } from '../sidecar/orchestrator.js';
 import type { ConcreteNode, ToolExecution } from '../ir/types.js';
 import type { ContextEnvironment } from '../sidecar/environment.js';
@@ -24,6 +22,7 @@ import type { BaseLlmClient } from '../../core/baseLlmClient.js';
 import type { Content, GenerateContentResponse } from '@google/genai';
 import { InboxSnapshotImpl } from '../sidecar/inbox.js';
 import type { InboxMessage, ProcessArgs } from '../pipeline.js';
+import type { ContextProfile } from '../sidecar/profiles.js';
 
 /**
  * Creates a valid mock GenerateContentResponse with the provided text.
@@ -95,7 +94,7 @@ export function createDummyToolNode(
 }
 
 import type { Mock } from 'vitest';
-import type { SidecarConfig } from '../sidecar/types.js';
+
 
 export interface MockLlmClient extends BaseLlmClient {
   generateContent: Mock;
@@ -244,12 +243,10 @@ export function createMockContextConfig(
 
 export function setupContextComponentTest(
   config: Config,
-  sidecarOverride?: SidecarConfig,
+  sidecarOverride?: ContextProfile,
 ): { chatHistory: AgentChatHistory; contextManager: ContextManager } {
   const chatHistory = new AgentChatHistory();
-  const registry = new SidecarRegistry();
-  registerBuiltInProcessors(registry);
-  const sidecar = sidecarOverride || SidecarLoader.fromConfig(config, registry);
+  const sidecar = sidecarOverride || SidecarLoader.fromConfig(config);
   const tracer = new ContextTracer({
     targetDir: '/tmp',
     sessionId: 'test-session',
@@ -267,11 +264,11 @@ export function setupContextComponentTest(
   );
 
   const orchestrator = new PipelineOrchestrator(
-    sidecar,
+    sidecar.buildPipelines(env),
+    sidecar.buildWorkers(env),
     env,
     eventBus,
     tracer,
-    registry,
   );
 
   const contextManager = new ContextManager(
