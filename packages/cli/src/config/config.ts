@@ -255,8 +255,8 @@ export async function parseArguments(
           return 'The --session-id flag requires a non-empty value';
         }
 
-        if (trimmedSessionId === '.' || trimmedSessionId === '..') {
-          return 'Invalid --session-id value. "." and ".." are not allowed.';
+        if (!/^[a-zA-Z0-9_-]+$/.test(trimmedSessionId)) {
+          return 'Invalid --session-id value. Only alphanumeric characters, hyphens, and underscores are allowed.';
         }
         argv['sessionId'] = trimmedSessionId;
       }
