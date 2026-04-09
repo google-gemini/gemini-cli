@@ -324,16 +324,6 @@ describe('GeminiClient Watcher Integration', () => {
     // Simulate 11 turns
     for (let i = 1; i <= 11; i++) {
       clientAccess.sessionTurnCount = i - 1; // Will become i inside processTurn
-      // In a real scenario, the subagent would write this file via WRITE_FILE_TOOL.
-      // We simulate this side effect here when the watcher is triggered.
-      if (i % interval === 0) {
-        const projectTempDir = config.storage.getProjectTempDir();
-        const statusFilePath = path.join(projectTempDir, 'watcher_status.md');
-        fs.writeFileSync(
-          statusFilePath,
-          '# Watcher Status Update\nDummy status',
-        );
-      }
 
       const generator = clientAccess.processTurn(
         [{ text: `turn ${i}` }],
@@ -350,11 +340,16 @@ describe('GeminiClient Watcher Integration', () => {
     // With interval 5, it should trigger at turn 1, turn 5 and turn 10
     expect(mockWatcherTool.build).toHaveBeenCalledTimes(3);
 
-    // Verify the status file exists
+    // Verify the status file exists (written by GeminiClient internally)
     const projectTempDir = config.storage.getProjectTempDir();
     const statusFilePath = path.join(projectTempDir, 'watcher_status.md');
     expect(fs.existsSync(statusFilePath)).toBe(true);
     const content = fs.readFileSync(statusFilePath, 'utf-8');
-    expect(content).toContain('Watcher Status Update');
+    expect(content).toContain('# Watcher Memory State');
+    expect(content).toContain('Keep testing');
+
+    // Verify cleanup in dispose
+    client.dispose();
+    expect(fs.existsSync(statusFilePath)).toBe(false);
   });
 });

@@ -123,42 +123,17 @@ Analyze the recent history against the North Star. Actively look for anti-patter
 
 ### Standard Operating Procedure:
 1.  **READ & TRIAGE:** Read the user's prompt, recent history, and the existing memory file at \`${statusFilePath}\`. Determine the state: Standalone Short-Horizon, Active Long-Horizon, or Task Transition.
-2.  **ANALYZE & OVERWRITE:** 
-    *   *If Standalone Short-Horizon (No active macro-task):* Overwrite \`${statusFilePath}\` with a single line: \`EMPTY\`.
+2.  **ANALYZE:** 
+    *   *If Standalone Short-Horizon (No active macro-task):* Note that the status should be empty.
     *   *If Task Transition / Abort:* Purge old data, initialize a fresh state for the new task, or leave empty if no new task is given.
-    *   *If Active Long-Horizon (Even if current turn is a tactical question):* Compare history against the file, update progress, log dead ends, and track trajectory. Overwrite \`${statusFilePath}\` using the exact Markdown format below.
-3.  **REPORT:** Call the \`complete_task\` tool. Formulate sharp, direct feedback to snap the main agent out of loops, or stay silent if things are on track.
-      
+    *   *If Active Long-Horizon (Even if current turn is a tactical question):* Compare history against the file, update progress, log dead ends, and track trajectory.
+3.  **REPORT:** Call the \`complete_task\` tool with the updated state and sharp, direct feedback to snap the main agent out of loops, or stay silent if things are on track.
+
 ---
 
-### Status File Format (Overwrite \`${statusFilePath}\` with this structure):
+### Output JSON Format (Provide this to \`complete_task\`):
 
-*(Note: If this is a Standalone Short-Horizon task with no ongoing goal, just write \`EMPTY\` and omit the rest.)*
-
-\`\`\`md
-# Watcher Memory State
-
-## 1. The North Star (Primary Goal)
-[A concise, 1-2 sentence description of the final desired outcome. Purge and replace ONLY if the user starts a completely new task or aborts.]
-
-## 2. Strategic Updates
-[Bullet points of any major architectural/requirements changes since this specific task started. Ignore debugging steps.]
-
-## 3. Progress Snapshot
-[ Short summary to provide quick context to watcher sub-agent.]
-
-## 4. Failed Strategies & Dead Ends
-*   [Attempted X to solve Y, resulted in Z error. DO NOT RETRY without a substantial change in approach.]
-
-## 5. Current Trajectory Evaluation
-[State: ON TRACK / DEVIATING / STUCK / LOOPING]
-[One sentence justifying the state based on the last few turns.]
-
-\`\`\`
-
-### Output Execution:
-
-When your file update is complete, you MUST call the \`complete_task\` tool with a JSON report.
+*(Note: If this is a Standalone Short-Horizon task with no ongoing goal, just set all fields to "EMPTY" or "N/A" and omit feedback.)*
 
 * \`userDirections\`: Any parsed _strategic_ changes, or note if the user transitioned/aborted tasks.
 * \`progressSummary\`: Brief text of what was achieved, or "N/A" for short-horizon.
@@ -167,7 +142,7 @@ When your file update is complete, you MUST call the \`complete_task\` tool with
     * **If Short-Horizon or ON_TRACK**: Leave empty.
     * **If DEVIATING/STUCK/LOOPING**: Provide a strong, authoritative directive to the main agent. (e.g., _"WARNING: You are in a loop trying to fix test_utils.py. The original goal is to build the API endpoint. Revert your last change, ignore the test warning for now, and return to the API endpoint."_)
 
-`,
+You MUST call \`complete_task\` with a JSON report containing \`userDirections\`, \`progressSummary\`, \`evaluation\`, and optional \`feedback\`.`,
     },
   };
 };

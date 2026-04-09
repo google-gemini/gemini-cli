@@ -12,6 +12,8 @@ import {
   type Tool,
   type GenerateContentResponse,
 } from '@google/genai';
+import * as fs from 'node:fs';
+import * as path from 'node:path';
 import { partListUnionToString } from './geminiRequest.js';
 import {
   getDirectoryContextString,
@@ -320,6 +322,20 @@ export class GeminiClient {
   dispose() {
     coreEvents.off(CoreEvent.ModelChanged, this.handleModelChanged);
     coreEvents.off(CoreEvent.MemoryChanged, this.handleMemoryChanged);
+
+    // Clean up Watcher status file
+    try {
+      const projectTempDir = this.config.storage.getProjectTempDir();
+      const statusFilePath = path.join(projectTempDir, 'watcher_status.md');
+      if (fs.existsSync(statusFilePath)) {
+        fs.unlinkSync(statusFilePath);
+      }
+    } catch (e) {
+      debugLogger.warn(
+        'Failed to clean up watcher status file during dispose',
+        e,
+      );
+    }
   }
 
   async resumeChat(
@@ -1357,6 +1373,27 @@ export class GeminiClient {
         try {
           const contentString = partListUnionToString(result.llmContent);
           const parsed = WatcherReportSchema.parse(JSON.parse(contentString));
+
+          // Internally write the status report to avoid requiring user permission
+          const projectTempDir = this.config.storage.getProjectTempDir();
+          const statusFilePath = path.join(projectTempDir, 'watcher_status.md');
+          const reportLines = [
+            '# Watcher Memory State',
+            '',
+            '## 1. User Directions',
+            parsed.userDirections,
+            '',
+            '## 2. Progress Summary',
+            parsed.progressSummary,
+            '',
+            '## 3. Current Trajectory Evaluation',
+            `State: ${parsed.evaluation}`,
+            '',
+            '## 4. Feedback',
+            parsed.feedback ?? 'N/A',
+          ];
+          fs.writeFileSync(statusFilePath, reportLines.join('\n'), 'utf-8');
+
           return parsed as WatcherProgress;
         } catch (e) {
           debugLogger.warn('Failed to parse watcher output', e);
