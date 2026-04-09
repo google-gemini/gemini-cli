@@ -16,6 +16,7 @@ export default defineConfig({
   },
   test: {
     testTimeout: 300000, // 5 minutes
+    globalSetup: [path.resolve(__dirname, 'global-setup.ts')],
     reporters: ['default', 'json'],
     outputFile: {
       json: 'evals/logs/report.json',

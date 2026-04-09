@@ -17,6 +17,7 @@ import * as pty from '@lydell/node-pty';
 import stripAnsi from 'strip-ansi';
 import * as os from 'node:os';
 import type { TestMcpConfig } from './test-mcp-server.js';
+import { getUsageMetrics, type UsageMetrics } from './usage-metrics-utils.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const BUNDLE_PATH = join(__dirname, '..', '..', '..', 'bundle/gemini.js');
@@ -1514,6 +1515,23 @@ export class TestRig {
     // Wait for the app to be ready
     await run.expectText('  Type your message or @path/to/file', 30000);
     return run;
+  }
+
+  /**
+   * Scans the session recordings and extracts aggregate token usage and turn counts.
+   * This provides an empirical measure of the agent's efficiency and cost.
+   */
+  getUsageMetrics(): UsageMetrics {
+    if (!this.homeDir) {
+      return {
+        turns: 0,
+        input: 0,
+        output: 0,
+        cached: 0,
+        total: 0,
+      };
+    }
+    return getUsageMetrics(this.homeDir);
   }
 
   readHookLogs() {

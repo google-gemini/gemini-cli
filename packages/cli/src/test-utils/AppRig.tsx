@@ -37,6 +37,10 @@ import {
   IntegrityDataStatus,
 } from '@google/gemini-cli-core';
 import {
+  getUsageMetrics,
+  type UsageMetrics,
+} from '@google/gemini-cli-test-utils';
+import {
   type MockShellCommand,
   MockShellExecutionService,
 } from './MockShellExecutionService.js';
@@ -475,6 +479,14 @@ export class AppRig {
 
   getTestDir(): string {
     return this.testDir;
+  }
+
+  /**
+   * Scans the session recordings and extracts aggregate token usage and turn counts.
+   * This provides an empirical measure of the agent's efficiency and cost.
+   */
+  getUsageMetrics(): UsageMetrics {
+    return getUsageMetrics(this.testDir);
   }
 
   getPendingConfirmations() {

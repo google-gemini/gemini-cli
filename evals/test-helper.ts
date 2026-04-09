@@ -185,7 +185,15 @@ export async function internalEvalTest(evalCase: EvalCase) {
 
       await evalCase.assert(rig, result);
       isSuccess = true;
+    } catch (e) {
+      isSuccess = false;
+      throw e;
     } finally {
+      const metrics = rig.getUsageMetrics();
+      if (metrics.turns > 0) {
+        logUsageMetrics(evalCase.name, metrics, isSuccess);
+      }
+
       if (isSuccess) {
         await fs.promises.unlink(activityLogFile).catch((err) => {
           if (err.code !== 'ENOENT') throw err;
@@ -257,6 +265,41 @@ function logReliabilityEvent(
     );
   } catch (logError) {
     console.error('Failed to write reliability log:', logError);
+  }
+}
+
+/**
+ * Log usage metrics for individual eval runs.
+ */
+export function logUsageMetrics(
+  testName: string,
+  metrics: {
+    turns: number;
+    input: number;
+    output: number;
+    cached: number;
+    total: number;
+  },
+  passed: boolean,
+) {
+  const usageLog = {
+    timestamp: new Date().toISOString(),
+    testName,
+    model: EVAL_MODEL,
+    passed,
+    ...metrics,
+  };
+
+  try {
+    const logPath =
+      process.env['GEMINI_EVAL_USAGE_LOG'] ||
+      path.resolve(process.cwd(), 'evals/logs/usage-metrics.jsonl');
+
+    const logDir = path.dirname(logPath);
+    fs.mkdirSync(logDir, { recursive: true });
+    fs.appendFileSync(logPath, JSON.stringify(usageLog) + '\n');
+  } catch (logError) {
+    console.error('Failed to write usage log:', logError);
   }
 }
 
