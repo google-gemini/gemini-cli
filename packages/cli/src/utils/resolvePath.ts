@@ -17,5 +17,11 @@ export function resolvePath(p: string): string {
   } else if (p === '~' || p.startsWith('~/')) {
     expandedPath = homedir() + p.substring(1);
   }
+    // If the path is too long, it's likely a prompt, not a file.
+  // Return it as is to avoid OS path length errors.
+  if (expandedPath.length > 1024) {
+    return expandedPath;
+  }
   return path.normalize(expandedPath);
+  
 }
