@@ -72,7 +72,7 @@ export class SimulationHarness {
       mockTempDir,
       mockTempDir,
       this.tracer,
-      4, // 4 chars per token average
+      1, // 1 char per token average
       this.eventBus,
       new InMemoryFileSystem(),
       new DeterministicIdGenerator(),
