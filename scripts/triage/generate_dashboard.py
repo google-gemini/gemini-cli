@@ -6,7 +6,16 @@ import os
 TARGET_REPO = 'google-gemini/gemini-cli'
 SEARCH_QUERY = f'repo:{TARGET_REPO} is:issue state:open label:area/core,area/extensions,area/site label:"help wanted" sort:updated-asc'
 
-# Step 1: Just get the issues and the cross-referenced PR numbers
+# Common bots to exclude from the reviewer list
+BOT_BLACKLIST = {
+    'gemini-code-assist',
+    'github-actions',
+    'google-allstar',
+    'renovate',
+    'dependabot',
+    'google-gemini-bot'
+}
+
 ISSUES_QUERY = """
 query($searchQuery: String!) {
   search(query: $searchQuery, type: ISSUE, first: 50) {
@@ -34,7 +43,6 @@ query($searchQuery: String!) {
 }
 """
 
-# Step 2: Get detailed info for a specific PR
 PR_DETAILS_QUERY = """
 query($repoOwner: String!, $repoName: String!, $prNumber: Int!) {
   repository(owner: $repoOwner, name: $repoName) {
@@ -53,14 +61,14 @@ query($repoOwner: String!, $repoName: String!, $prNumber: Int!) {
           isResolved
         }
       }
-      latestReviews(last: 10) {
+      latestReviews(last: 20) {
         nodes {
           author { login }
           state
           updatedAt
         }
       }
-      comments(last: 20) {
+      comments(last: 30) {
         nodes {
           author { login }
           publishedAt
@@ -92,6 +100,24 @@ def gh_api_graphql(query, variables):
     except:
         return None
 
+def get_real_reviewers(pr):
+    author = pr.get('author', {}).get('login')
+    reviewers = set()
+    
+    # 1. From comments
+    for c in pr.get('comments', {}).get('nodes', []):
+        login = c.get('author', {}).get('login') if c.get('author') else None
+        if login and login != author and login not in BOT_BLACKLIST:
+            reviewers.add(login)
+            
+    # 2. From formal reviews
+    for r in pr.get('latestReviews', {}).get('nodes', []):
+        login = r.get('author', {}).get('login') if r.get('author') else None
+        if login and login != author and login not in BOT_BLACKLIST:
+            reviewers.add(login)
+            
+    return sorted(list(reviewers))
+
 def is_ready_for_review(pr):
     if not pr: return False
     author = pr.get('author', {}).get('login')
@@ -107,7 +133,7 @@ def is_ready_for_review(pr):
     threads = pr.get('reviewThreads', {}).get('nodes', [])
     if any(not thread['isResolved'] for thread in threads): return False
     
-    # Recency
+    # Recency Check
     latest_author_activity = pr['commits']['nodes'][0]['commit']['committedDate']
     all_comments = pr.get('comments', {}).get('nodes', [])
     author_comments = [c['publishedAt'] for c in all_comments if c['author'] and c['author']['login'] == author]
@@ -147,30 +173,20 @@ def main():
         issue_no = issue['number']
         timeline_nodes = issue.get('timelineItems', {}).get('nodes', [])
         
-        # Collect PR numbers to check
         pr_numbers = []
         for event in timeline_nodes:
             if event.get('source') and 'number' in event['source']:
                 pr_numbers.append(event['source']['number'])
         
-        # Check each PR found in the timeline
         valid_pr = None
-        for pr_no in reversed(pr_numbers): # Check most recent first
-            print(f"  Checking PR #{pr_no} for Issue #{issue_no}...")
+        for pr_no in reversed(pr_numbers):
             pr_data = gh_api_graphql(PR_DETAILS_QUERY, {
-                "repoOwner": owner,
-                "repoName": name,
-                "prNumber": pr_no
+                "repoOwner": owner, "repoName": name, "prNumber": pr_no
             })
             if not pr_data or 'data' not in pr_data: continue
             
             pr = pr_data['data']['repository']['pullRequest']
-            
-            # Verify official link
-            closing_issues = [n['number'] for n in pr['closingIssuesReferences']['nodes']]
-            if issue_no not in closing_issues: continue
-            
-            # Target main repo check
+            if issue_no not in [n['number'] for n in pr['closingIssuesReferences']['nodes']]: continue
             if pr.get('baseRepository', {}).get('nameWithOwner') != TARGET_REPO: continue
             
             if is_ready_for_review(pr):
@@ -184,6 +200,7 @@ def main():
                 "issue_url": issue['url'],
                 "pr_no": valid_pr['number'],
                 "pr_url": valid_pr['url'],
+                "reviewers": get_real_reviewers(valid_pr),
                 "updated_at": issue['updatedAt'][:10]
             })
 
@@ -199,14 +216,15 @@ def main():
     md += "- PR has **all formal review threads resolved**.\n"
     md += "- **Author Activity:** The latest action (commit or comment) is from the **author**, not a reviewer.\n\n"
     
-    md += "| # | Issue Title | Linked PR | Ready Since |\n"
-    md += "| :--- | :--- | :--- | :--- |\n"
+    md += "| # | Issue Title | Linked PR | Reviewers | Ready Since |\n"
+    md += "| :--- | :--- | :--- | :--- | :--- |\n"
     
     for item in ready_list:
-        md += f"| {item['issue_no']} | [{item['title']}]({item['issue_url']}) | [#{item['pr_no']}]({item['pr_url']}) | `{item['updated_at']}` |\n"
+        reviewers_str = ", ".join([f"@{r}" for r in item['reviewers']]) if item['reviewers'] else "_None_"
+        md += f"| {item['issue_no']} | [{item['title']}]({item['issue_url']}) | [#{item['pr_no']}]({item['pr_url']}) | {reviewers_str} | `{item['updated_at']}` |\n"
         
     if not ready_list:
-        md += "| - | _No issues matching criteria found._ | - | - |\n"
+        md += "| - | _No issues matching criteria found._ | - | - | - |\n"
         
     md += "\n---\n*Dashboard maintained by automated triage script.*"
     
