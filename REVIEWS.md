@@ -1,8 +1,8 @@
 # 🔎 Gemini CLI Triage Dashboard
 
-*Last Synchronized: 2026-04-09 21:22 (UTC)*
+*Last Synchronized: 2026-04-09 21:23 (UTC)*
 
-## 🆕 Awaiting Initial Review
+## 🆕 Awaiting Reviewer Pickup
 **Action: Pick up one of these new PRs.** These have no human reviewers assigned yet.
 
 | Issue | Linked PR | Last Update |

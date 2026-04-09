@@ -234,7 +234,7 @@ def main():
     ts = now.strftime("%Y-%m-%d %H:%M")
     md = f"# 🔎 Gemini CLI Triage Dashboard\n\n*Last Synchronized: {ts} (UTC)*\n\n"
     
-    md += "## 🆕 Awaiting Initial Review\n**Action: Pick up one of these new PRs.** These have no human reviewers assigned yet.\n\n"
+    md += "## 🆕 Awaiting Reviewer Pickup\n**Action: Pick up one of these new PRs.** These have no human reviewers assigned yet.\n\n"
     md += "| Issue | Linked PR | Last Update |\n| :--- | :--- | :--- |\n"
     for i in initial_review_list:
         md += f"| {i['issue_md']} | [#{i['pr_no']}]({i['pr_url']}) | `{i['updated_at']}` |\n"
