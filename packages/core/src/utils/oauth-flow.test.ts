@@ -305,6 +305,28 @@ describe('oauth-flow', () => {
         'Invalid value for OAUTH_CALLBACK_PORT',
       );
     });
+
+    it('should settle on timeout without keeping the process alive', async () => {
+      vi.useFakeTimers();
+      try {
+        const server = startCallbackServer('timeout-state');
+        await server.port;
+
+        const responsePromise = server.response.catch((e: Error) => {
+          if (e.message !== 'OAuth callback timeout') throw e;
+          return e;
+        });
+
+        // Advance timers by 5 minutes to trigger the timeout
+        await vi.advanceTimersByTimeAsync(5 * 60 * 1000);
+
+        const error = await responsePromise;
+        expect(error).toBeInstanceOf(Error);
+        expect((error as Error).message).toBe('OAuth callback timeout');
+      } finally {
+        vi.useRealTimers();
+      }
+    });
   });
 
   describe('exchangeCodeForToken', () => {
