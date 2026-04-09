@@ -29,6 +29,18 @@ vi.mock('./browserAgentFactory.js', () => ({
   cleanupBrowserAgent: vi.fn(),
 }));
 
+vi.mock('./inputBlocker.js', () => ({
+  removeInputBlocker: vi.fn(),
+}));
+
+vi.mock('./automationOverlay.js', () => ({
+  removeAutomationOverlay: vi.fn(),
+}));
+
+vi.mock('../../telemetry/metrics.js', () => ({
+  recordBrowserAgentTaskOutcome: vi.fn(),
+}));
+
 vi.mock('../local-executor.js', () => ({
   LocalAgentExecutor: {
     create: vi.fn(),
@@ -39,7 +51,10 @@ import {
   createBrowserAgentDefinition,
   cleanupBrowserAgent,
 } from './browserAgentFactory.js';
+import { removeInputBlocker } from './inputBlocker.js';
+import { removeAutomationOverlay } from './automationOverlay.js';
 import { LocalAgentExecutor } from '../local-executor.js';
+import { recordBrowserAgentTaskOutcome } from '../../telemetry/metrics.js';
 import type { ToolLiveOutput } from '../../tools/tools.js';
 
 describe('BrowserAgentInvocation', () => {
@@ -177,7 +192,12 @@ describe('BrowserAgentInvocation', () => {
           promptConfig: { query: '', systemPrompt: '' },
           toolConfig: { tools: ['analyze_screenshot', 'click'] },
         },
-        browserManager: {} as never,
+        browserManager: {
+          release: vi.fn(),
+          callTool: vi.fn().mockResolvedValue({ content: [] }),
+        } as never,
+        visionEnabled: true,
+        sessionMode: 'persistent',
       });
 
       mockExecutor = {
@@ -190,7 +210,7 @@ describe('BrowserAgentInvocation', () => {
       vi.mocked(LocalAgentExecutor.create).mockResolvedValue(
         mockExecutor as never,
       );
-      vi.mocked(cleanupBrowserAgent).mockClear();
+      vi.mocked(removeInputBlocker).mockClear();
     });
 
     it('should return result text and call cleanup on success', async () => {
@@ -209,7 +229,7 @@ describe('BrowserAgentInvocation', () => {
       expect((result.llmContent as Array<{ text: string }>)[0].text).toContain(
         'Browser agent finished',
       );
-      expect(cleanupBrowserAgent).toHaveBeenCalled();
+      expect(removeInputBlocker).toHaveBeenCalled();
     });
 
     it('should work without updateOutput (fire-and-forget)', async () => {
@@ -239,7 +259,7 @@ describe('BrowserAgentInvocation', () => {
       const result = await invocation.execute(controller.signal);
 
       expect(result.error).toBeDefined();
-      expect(cleanupBrowserAgent).toHaveBeenCalled();
+      expect(removeInputBlocker).toHaveBeenCalled();
     });
 
     // ─── Structured SubagentProgress emission tests ───────────────────────
@@ -343,7 +363,55 @@ describe('BrowserAgentInvocation', () => {
             a.content.includes('Navigating to the page...'),
         ),
       );
+
       expect(thoughtProgress).toBeDefined();
+    });
+
+    it('should overwrite the thought content with new THOUGHT_CHUNK activity', async () => {
+      const { fireActivity } = setupActivityCapture();
+      const updateOutput = vi.fn();
+
+      const invocation = new BrowserAgentInvocation(
+        mockConfig,
+        mockParams,
+        mockMessageBus,
+      );
+
+      const executePromise = invocation.execute(
+        new AbortController().signal,
+        updateOutput,
+      );
+
+      // Allow createBrowserAgentDefinition to resolve and onActivity to be registered
+      await Promise.resolve();
+      await Promise.resolve();
+
+      fireActivity({
+        isSubagentActivityEvent: true,
+        agentName: 'browser_agent',
+        type: 'THOUGHT_CHUNK',
+        data: { text: 'I am thinking.' },
+      });
+      fireActivity({
+        isSubagentActivityEvent: true,
+        agentName: 'browser_agent',
+        type: 'THOUGHT_CHUNK',
+        data: { text: 'Now I will act.' },
+      });
+
+      await executePromise;
+
+      const progressCalls = updateOutput.mock.calls
+        .map((c) => c[0] as SubagentProgress)
+        .filter((p) => p.isSubagentProgress);
+
+      const lastCall = progressCalls[progressCalls.length - 1];
+      expect(lastCall.recentActivity).toContainEqual(
+        expect.objectContaining({
+          type: 'thought',
+          content: 'Now I will act.',
+        }),
+      );
     });
 
     it('should handle TOOL_CALL_START and TOOL_CALL_END with callId tracking', async () => {
@@ -615,17 +683,157 @@ describe('BrowserAgentInvocation', () => {
         .map((c) => c[0] as SubagentProgress)
         .filter((p) => p.isSubagentProgress);
 
-      const allItems = progressCalls.flatMap((p) => p.recentActivity);
-      const toolA = allItems.find(
+      const finalActivity =
+        progressCalls[progressCalls.length - 1].recentActivity;
+      const toolA = finalActivity.find(
         (a) => a.type === 'tool_call' && a.content === 'tool_a',
       );
-      const toolB = allItems.find(
+      const toolB = finalActivity.find(
         (a) => a.type === 'tool_call' && a.content === 'tool_b',
       );
 
       // Both should be error since no callId was specified
       expect(toolA?.status).toBe('error');
       expect(toolB?.status).toBe('error');
+    });
+
+    it('should record successful task outcome metrics', async () => {
+      const invocation = new BrowserAgentInvocation(
+        mockConfig,
+        mockParams,
+        mockMessageBus,
+      );
+      await invocation.execute(new AbortController().signal, vi.fn());
+
+      expect(recordBrowserAgentTaskOutcome).toHaveBeenCalledWith(
+        mockConfig,
+        expect.objectContaining({
+          success: true,
+          session_mode: 'persistent',
+          vision_enabled: true,
+          headless: false,
+          duration_ms: expect.any(Number),
+        }),
+      );
+    });
+
+    it('should record failed task outcome metrics', async () => {
+      vi.mocked(LocalAgentExecutor.create).mockResolvedValue({
+        run: vi.fn().mockResolvedValue({
+          result: JSON.stringify({ success: false, foo: 'bar' }),
+        }),
+      } as never);
+
+      const updateOutput = vi.fn();
+      const invocation = new BrowserAgentInvocation(
+        mockConfig,
+        mockParams,
+        mockMessageBus,
+      );
+
+      await invocation.execute(new AbortController().signal, updateOutput);
+
+      expect(recordBrowserAgentTaskOutcome).toHaveBeenCalledWith(
+        mockConfig,
+        expect.objectContaining({
+          success: false,
+          session_mode: 'persistent',
+          vision_enabled: true,
+          headless: false,
+          duration_ms: expect.any(Number),
+        }),
+      );
+    });
+
+    it('should not call cleanupBrowserAgent (cleanup is handled by BrowserManager.resetAll)', async () => {
+      const invocation = new BrowserAgentInvocation(
+        mockConfig,
+        mockParams,
+        mockMessageBus,
+      );
+      await invocation.execute(new AbortController().signal, vi.fn());
+
+      expect(cleanupBrowserAgent).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('cleanup', () => {
+    it('should clean up all pages on finally', async () => {
+      const mockBrowserManager = {
+        callTool: vi.fn().mockImplementation(async (toolName: string) => {
+          if (toolName === 'list_pages') {
+            return {
+              content: [{ type: 'text', text: '0: Page 1\n1: Page 2\n' }],
+              isError: false,
+            };
+          }
+          return { isError: false };
+        }),
+        release: vi.fn(),
+      };
+
+      vi.mocked(createBrowserAgentDefinition).mockResolvedValue({
+        definition: {
+          name: 'browser_agent',
+          description: 'mock definition',
+          kind: 'local',
+          inputConfig: {} as never,
+          outputConfig: {} as never,
+          processOutput: () => '',
+          modelConfig: { model: 'test' },
+          runConfig: {},
+          promptConfig: { query: '', systemPrompt: '' },
+          toolConfig: { tools: [] },
+        },
+        browserManager: mockBrowserManager as never,
+        visionEnabled: true,
+        sessionMode: 'persistent',
+      });
+
+      const mockExecutor = {
+        run: vi.fn().mockResolvedValue({
+          result: JSON.stringify({ success: true }),
+          terminate_reason: 'GOAL',
+        }),
+      };
+
+      vi.mocked(LocalAgentExecutor.create).mockResolvedValue(
+        mockExecutor as never,
+      );
+
+      const invocation = new BrowserAgentInvocation(
+        mockConfig,
+        { task: 'test' },
+        mockMessageBus,
+      );
+
+      await invocation.execute(new AbortController().signal);
+
+      // Verify list_pages was called
+      expect(mockBrowserManager.callTool).toHaveBeenCalledWith(
+        'list_pages',
+        expect.anything(),
+        expect.anything(),
+        true,
+      );
+
+      // Verify select_page was called for each page
+      expect(mockBrowserManager.callTool).toHaveBeenCalledWith(
+        'select_page',
+        { pageId: 0, bringToFront: false },
+        expect.anything(),
+        true,
+      );
+      expect(mockBrowserManager.callTool).toHaveBeenCalledWith(
+        'select_page',
+        { pageId: 1, bringToFront: false },
+        expect.anything(),
+        true,
+      );
+
+      // Verify removeInputBlocker and removeAutomationOverlay were called for each page + initial cleanup
+      expect(removeInputBlocker).toHaveBeenCalledTimes(3);
+      expect(removeAutomationOverlay).toHaveBeenCalledTimes(3);
     });
   });
 });

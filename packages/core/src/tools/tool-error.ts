@@ -64,6 +64,7 @@ export enum ToolErrorType {
 
   // Shell errors
   SHELL_EXECUTE_ERROR = 'shell_execute_error',
+  SANDBOX_EXPANSION_REQUIRED = 'sandbox_expansion_required',
 
   // DiscoveredTool-specific Errors
   DISCOVERED_TOOL_EXECUTION_ERROR = 'discovered_tool_execution_error',

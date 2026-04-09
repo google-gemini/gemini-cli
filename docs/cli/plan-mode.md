@@ -35,19 +35,19 @@ To launch Gemini CLI in Plan Mode once:
 To start Plan Mode while using Gemini CLI:
 
 - **Keyboard shortcut:** Press `Shift+Tab` to cycle through approval modes
-  (`Default` -> `Auto-Edit` -> `Plan`).
+  (`Default` -> `Auto-Edit` -> `Plan`). Plan Mode is automatically removed from
+  the rotation when Gemini CLI is actively processing or showing confirmation
+  dialogs.
 
-  > **Note:** Plan Mode is automatically removed from the rotation when Gemini
-  > CLI is actively processing or showing confirmation dialogs.
-
-- **Command:** Type `/plan` in the input box.
+- **Command:** Type `/plan [goal]` in the input box. The `[goal]` is optional;
+  for example, `/plan implement authentication` will switch to Plan Mode and
+  immediately submit the prompt to the model.
 
 - **Natural Language:** Ask Gemini CLI to "start a plan for...". Gemini CLI
   calls the
   [`enter_plan_mode`](../tools/planning.md#1-enter_plan_mode-enterplanmode) tool
-  to switch modes.
-  > **Note:** This tool is not available when Gemini CLI is in
-  > [YOLO mode](../reference/configuration.md#command-line-arguments).
+  to switch modes. This tool is not available when Gemini CLI is in
+  [YOLO mode](../reference/configuration.md#command-line-arguments).
 
 ## How to use Plan Mode
 
@@ -56,19 +56,21 @@ Gemini CLI takes action.
 
 1.  **Provide a goal:** Start by describing what you want to achieve. Gemini CLI
     will then enter Plan Mode (if it's not already) to research the task.
-2.  **Review research and provide input:** As Gemini CLI analyzes your codebase,
-    it may ask you questions or present different implementation options using
-    [`ask_user`](../tools/ask-user.md). Provide your preferences to help guide
-    the design.
-3.  **Review the plan:** Once Gemini CLI has a proposed strategy, it creates a
-    detailed implementation plan as a Markdown file in your plans directory.
+2.  **Discuss and agree on strategy:** As Gemini CLI analyzes your codebase, it
+    will discuss its findings and proposed strategy with you to ensure
+    alignment. It may ask you questions or present different implementation
+    options using [`ask_user`](../tools/ask-user.md). **Gemini CLI will stop and
+    wait for your confirmation** before drafting the formal plan. You should
+    reach an informal agreement on the approach before proceeding.
+3.  **Review the plan:** Once you've agreed on the strategy, Gemini CLI creates
+    a detailed implementation plan as a Markdown file in your plans directory.
     - **View:** You can open and read this file to understand the proposed
       changes.
     - **Edit:** Press `Ctrl+X` to open the plan directly in your configured
       external editor.
 
 4.  **Approve or iterate:** Gemini CLI will present the finalized plan for your
-    approval.
+    formal approval.
     - **Approve:** If you're satisfied with the plan, approve it to start the
       implementation immediately: **Yes, automatically accept edits** or **Yes,
       manually accept edits**.
@@ -121,6 +123,7 @@ These are the only allowed tools:
   [`glob`](../tools/file-system.md#4-glob-findfiles)
 - **Search:** [`grep_search`](../tools/file-system.md#5-grep_search-searchtext),
   [`google_web_search`](../tools/web-search.md),
+  [`web_fetch`](../tools/web-fetch.md) (requires explicit confirmation),
   [`get_internal_docs`](../tools/internal-docs.md)
 - **Research Subagents:**
   [`codebase_investigator`](../core/subagents.md#codebase-investigator),
@@ -178,9 +181,16 @@ As described in the
 rule that does not explicitly specify `modes` is considered "always active" and
 will apply to Plan Mode as well.
 
-If you want a rule to apply to other modes but _not_ to Plan Mode, you must
-explicitly specify the target modes. For example, to allow `npm test` in default
-and Auto-Edit modes but not in Plan Mode:
+To maintain the integrity of Plan Mode as a safe research environment,
+persistent tool approvals are context-aware. Approvals granted in modes like
+Default or Auto-Edit do not apply to Plan Mode, ensuring that tools trusted for
+implementation don't automatically execute while you're researching. However,
+approvals granted while in Plan Mode are treated as intentional choices for
+global trust and apply to all modes.
+
+If you want to manually restrict a rule to other modes but _not_ to Plan Mode,
+you must explicitly specify the target modes. For example, to allow `npm test`
+in default and Auto-Edit modes but not in Plan Mode:
 
 ```toml
 [[rule]]
@@ -202,6 +212,7 @@ your specific environment.
 
 ```toml
 [[rule]]
+toolName = "*"
 mcpName = "*"
 toolAnnotations = { readOnlyHint = true }
 decision = "allow"
@@ -407,7 +418,9 @@ To build a custom planning workflow, you can use:
   [custom plan directories](#custom-plan-directory-and-policies) and
   [custom policies](#custom-policies).
 
-> **Note:** Use [Conductor] as a reference when building your own custom
+<!-- prettier-ignore -->
+> [!TIP]
+> Use [Conductor] as a reference when building your own custom
 > planning workflow.
 
 By using Plan Mode as its execution environment, your custom methodology can

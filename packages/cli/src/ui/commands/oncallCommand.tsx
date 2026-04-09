@@ -24,7 +24,8 @@ export const oncallCommand: SlashCommand = {
       kind: CommandKind.BUILT_IN,
       autoExecute: true,
       action: async (context, args): Promise<OpenCustomDialogActionReturn> => {
-        const { config } = context.services;
+        const agentContext = context.services.agentContext;
+        const config = agentContext?.config;
         if (!config) {
           throw new Error('Config not available');
         }
@@ -56,7 +57,8 @@ export const oncallCommand: SlashCommand = {
       kind: CommandKind.BUILT_IN,
       autoExecute: true,
       action: async (context, args): Promise<OpenCustomDialogActionReturn> => {
-        const { config } = context.services;
+        const agentContext = context.services.agentContext;
+        const config = agentContext?.config;
         if (!config) {
           throw new Error('Config not available');
         }

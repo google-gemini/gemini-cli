@@ -24,7 +24,7 @@ enum TerminalKeys {
   LEFT_ARROW = '\u001B[D',
   RIGHT_ARROW = '\u001B[C',
   ESCAPE = '\u001B',
-  BACKSPACE = '\u0008',
+  BACKSPACE = '\x7f',
   CTRL_L = '\u000C',
 }
 
@@ -108,7 +108,7 @@ describe('BaseSettingsDialog', () => {
       ...props,
     };
 
-    const result = renderWithProviders(
+    const result = await renderWithProviders(
       <BaseSettingsDialog {...defaultProps} />,
     );
     await result.waitUntilReady();

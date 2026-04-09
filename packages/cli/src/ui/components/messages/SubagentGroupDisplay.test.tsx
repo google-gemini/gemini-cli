@@ -8,7 +8,7 @@ import { renderWithProviders } from '../../../test-utils/render.js';
 import { SubagentGroupDisplay } from './SubagentGroupDisplay.js';
 import { Kind, CoreToolCallStatus } from '@google/gemini-cli-core';
 import type { IndividualToolCallDisplay } from '../../types.js';
-import { vi } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
 import { Text } from 'ink';
 
 vi.mock('../../utils/MarkdownDisplay.js', () => ({
@@ -64,7 +64,7 @@ describe('<SubagentGroupDisplay />', () => {
     },
   ];
 
-  const renderSubagentGroup = (
+  const renderSubagentGroup = async (
     toolCallsToRender: IndividualToolCallDisplay[],
     height?: number,
   ) =>
@@ -78,21 +78,20 @@ describe('<SubagentGroupDisplay />', () => {
     );
 
   it('renders nothing if there are no agent tool calls', async () => {
-    const { lastFrame } = renderSubagentGroup([], 40);
+    const { lastFrame } = await renderSubagentGroup([], 40);
     expect(lastFrame({ allowEmpty: true })).toBe('');
   });
 
   it('renders collapsed view by default with correct agent counts and states', async () => {
-    const { lastFrame, waitUntilReady } = renderSubagentGroup(
-      mockToolCalls,
-      40,
-    );
-    await waitUntilReady();
+    const { lastFrame } = await renderSubagentGroup(mockToolCalls, 40);
     expect(lastFrame()).toMatchSnapshot();
   });
 
   it('expands when availableTerminalHeight is undefined', async () => {
-    const { lastFrame, rerender } = renderSubagentGroup(mockToolCalls, 40);
+    const { lastFrame, rerender } = await renderSubagentGroup(
+      mockToolCalls,
+      40,
+    );
 
     // Default collapsed view
     await waitFor(() => {
