@@ -110,34 +110,45 @@ def gh_api_graphql(query, variables):
 
 def get_reviewer_info(pr):
     author = pr.get('author', {}).get('login')
-    latest_rev_act = ""
-    reviewers = set()
-    all_comments = pr.get('comments', {}).get('nodes', [])
-    for c in all_comments:
-        login = c.get('author', {}).get('login') if c.get('author') else None
-        if login and login != author and login not in BOT_BLACKLIST:
-            reviewers.add(login)
-            latest_rev_act = max(latest_rev_act, c['publishedAt'])
-    reviews = pr.get('latestReviews', {}).get('nodes', [])
-    for r in reviews:
-        login = r.get('author', {}).get('login') if r.get('author') else None
-        if login and login != author and login not in BOT_BLACKLIST:
-            reviewers.add(login)
-            latest_rev_act = max(latest_rev_act, r['updatedAt'])
+    latest_reviewer_activity = ""
+    official_reviewers = set()
+    
+    # 1. Collect official reviewers from requested reviewers
     for req in pr.get('reviewRequests', {}).get('nodes', []):
         rr = req.get('requestedReviewer')
         if rr and 'login' in rr:
             login = rr['login']
             if login and login != author and login not in BOT_BLACKLIST:
-                reviewers.add(login)
-    return sorted(list(reviewers)), latest_rev_act
+                official_reviewers.add(login)
+                
+    # 2. Collect official reviewers from formal reviews
+    reviews = pr.get('latestReviews', {}).get('nodes', [])
+    for r in reviews:
+        login = r.get('author', {}).get('login') if r.get('author') else None
+        if login and login != author and login not in BOT_BLACKLIST:
+            official_reviewers.add(login)
+            # Track latest formal review activity
+            latest_reviewer_activity = max(latest_reviewer_activity, r['updatedAt'])
+            
+    # 3. Track latest activity from ANYONE who isn't the author (including comments)
+    all_comments = pr.get('comments', {}).get('nodes', [])
+    for c in all_comments:
+        login = c.get('author', {}).get('login') if c.get('author') else None
+        if login and login != author and login not in BOT_BLACKLIST:
+            latest_reviewer_activity = max(latest_reviewer_activity, c['publishedAt'])
+            
+    return sorted(list(official_reviewers)), latest_reviewer_activity
 
 def get_author_activity(pr):
     author = pr.get('author', {}).get('login')
+    # Start with latest commit
     latest = pr['commits']['nodes'][0]['commit']['committedDate']
+    
+    # Check for latest comment from author
     for c in pr.get('comments', {}).get('nodes', []):
         if c.get('author', {}).get('login') == author:
             latest = max(latest, c['publishedAt'])
+            
     return latest
 
 def main():
@@ -181,6 +192,7 @@ def main():
             author_activity = get_author_activity(pr)
             
             # Categories
+            # 1. Ready for Review (Author updated AFTER any reviewer/other activity)
             is_ready = (not latest_reviewer_activity or author_activity > latest_reviewer_activity)
             if is_ready:
                 threads = pr.get('reviewThreads', {}).get('nodes', [])
@@ -196,7 +208,9 @@ def main():
                     })
                     break
             
-            if latest_reviewer_activity and author_activity > latest_reviewer_activity:
+            # 2. Waiting for Reviewer (Reviewer has acted before, author has updated since, but no follow up)
+            # Only track this if there are actually official reviewers
+            if reviewers and latest_reviewer_activity and author_activity > latest_reviewer_activity:
                 waiting_reviewer_list.append({
                     "issue_no": issue_no, "issue_url": issue['url'], "pr_no": pr['number'], "pr_url": pr['url'],
                     "author": pr['author']['login'], "reviewers": reviewers,
