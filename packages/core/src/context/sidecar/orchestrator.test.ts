@@ -136,7 +136,6 @@ describe('PipelineOrchestrator (Component)', () => {
       [
         {
           name: 'SyncPipe',
-          execution: 'blocking',
           triggers: ['new_message'],
           processors: [
             { processorId: 'ModifyingProcessor' } as unknown as ProcessorConfig,
@@ -154,8 +153,8 @@ describe('PipelineOrchestrator (Component)', () => {
       registry,
     );
 
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     expect(
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       (orchestrator as any).instantiatedProcessors.has('ModifyingProcessor'),
     ).toBe(true);
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -168,7 +167,6 @@ describe('PipelineOrchestrator (Component)', () => {
     const config = createConfig([
       {
         name: 'ThrowPipe',
-        execution: 'blocking',
         triggers: ['new_message'],
         processors: [
           { processorId: 'DoesNotExist' } as unknown as ProcessorConfig,
@@ -186,7 +184,6 @@ describe('PipelineOrchestrator (Component)', () => {
     const config = createConfig([
       {
         name: 'SyncPipe',
-        execution: 'blocking',
         triggers: ['new_message'],
         processors: [
           { processorId: 'ModifyingProcessor' } as unknown as ProcessorConfig,
@@ -235,7 +232,6 @@ describe('PipelineOrchestrator (Component)', () => {
     const config = createConfig([
       {
         name: 'ThrowPipe',
-        execution: 'blocking',
         triggers: ['new_message'],
         processors: [
           { processorId: 'ThrowingProcessor' } as unknown as ProcessorConfig,
@@ -270,39 +266,6 @@ describe('PipelineOrchestrator (Component)', () => {
 
     expect(result).toHaveLength(1);
     expect(result).toStrictEqual(nodes);
-  });
-
-  it('automatically triggers background pipelines via EventBus', () => {
-    const config = createConfig([
-      {
-        name: 'PressureRelief',
-        execution: 'background',
-        triggers: ['retained_exceeded'],
-        processors: [
-          { processorId: 'ModifyingProcessor' } as unknown as ProcessorConfig,
-        ],
-      },
-    ]);
-
-    // Spy on the private method to see if the trigger fires it
-    const executeSpy = vi.spyOn(
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      PipelineOrchestrator.prototype as any,
-      'executePipelineAsync',
-    );
-
-    new PipelineOrchestrator(config, env, eventBus, env.tracer, registry);
-
-    const nodes = [createDummyNode('1', 'USER_PROMPT')];
-
-    // Emit the trigger
-    eventBus.emitConsolidationNeeded({
-      nodes,
-      targetDeficit: 100,
-      targetNodeIds: new Set(),
-    });
-
-    expect(executeSpy).toHaveBeenCalled();
   });
 
   it('automatically dispatches workers when matching EventBus events occur', async () => {

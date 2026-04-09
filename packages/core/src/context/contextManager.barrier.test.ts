@@ -5,8 +5,7 @@
  */
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-
-import { testTruncateProfile } from './sidecar/testProfile.js';
+import { testTruncateProfile } from './testing/testProfile.js';
 import {
   createSyntheticHistory,
   createMockContextConfig,

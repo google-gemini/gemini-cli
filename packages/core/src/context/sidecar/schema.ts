@@ -78,10 +78,6 @@ export function getSidecarConfigSchema(registry: SidecarRegistry) {
                 ],
               },
             },
-            execution: {
-              type: 'string',
-              enum: ['blocking', 'background'],
-            },
             processors: {
               type: 'array',
               items: {

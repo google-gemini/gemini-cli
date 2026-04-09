@@ -36,7 +36,6 @@ describe('System Lifecycle Golden Tests', () => {
     pipelines: [
       {
         name: 'Pressure Relief', // Emits from eventBus 'retained_exceeded'
-        execution: 'background',
         triggers: ['retained_exceeded'],
         processors: [
           { processorId: 'BlobDegradationProcessor' },
@@ -49,7 +48,6 @@ describe('System Lifecycle Golden Tests', () => {
       },
       {
         name: 'Immediate Sanitization', // The magic string the projector is hardcoded to use
-        execution: 'blocking',
         triggers: ['retained_exceeded'],
         processors: [
           { processorId: 'HistoryTruncationProcessor', options: {} },

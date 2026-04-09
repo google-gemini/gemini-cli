@@ -9,7 +9,6 @@ import { ContextTracer } from '../tracer.js';
 import { ContextEventBus } from '../eventBus.js';
 import { InMemoryFileSystem } from '../system/InMemoryFileSystem.js';
 import { DeterministicIdGenerator } from '../system/DeterministicIdGenerator.js';
-
 import { createMockLlmClient } from '../testing/contextTestUtils.js';
 
 describe('ContextEnvironmentImpl', () => {

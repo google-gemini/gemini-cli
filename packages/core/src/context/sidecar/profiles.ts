@@ -27,7 +27,6 @@ export const defaultSidecarProfile: SidecarConfig = {
     {
       name: 'Immediate Sanitization',
       triggers: ['new_message'],
-      execution: 'blocking',
       processors: [
         {
           processorId: 'ToolMaskingProcessor',
@@ -37,9 +36,8 @@ export const defaultSidecarProfile: SidecarConfig = {
       ],
     },
     {
-      name: 'Deep Background Compression',
-      triggers: [{ type: 'timer', intervalMs: 5000 }, 'retained_exceeded'],
-      execution: 'background',
+      name: 'Normalization',
+      triggers: ['retained_exceeded'],
       processors: [
         {
           processorId: 'NodeTruncationProcessor',
@@ -54,7 +52,6 @@ export const defaultSidecarProfile: SidecarConfig = {
     {
       name: 'Emergency Backstop',
       triggers: ['gc_backstop'],
-      execution: 'blocking',
       processors: [
         {
           processorId: 'StateSnapshotProcessor',

@@ -49,9 +49,11 @@ export function isUserPrompt(node: IrNode): node is UserPrompt {
 export function isSystemEvent(node: IrNode): node is SystemEvent {
   return node.type === 'SYSTEM_EVENT';
 }
+
 export function isSnapshot(node: IrNode): node is Snapshot {
   return node.type === 'SNAPSHOT';
 }
+
 export function isRollingSummary(node: IrNode): node is RollingSummary {
   return node.type === 'ROLLING_SUMMARY';
 }

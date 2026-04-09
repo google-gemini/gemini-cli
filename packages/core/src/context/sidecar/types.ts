@@ -44,7 +44,6 @@ export type PipelineTrigger =
 export interface PipelineDef {
   name: string;
   triggers: PipelineTrigger[];
-  execution: 'blocking' | 'background';
   processors: ProcessorConfig[];
 }
 

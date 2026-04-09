@@ -13,9 +13,7 @@ import type { IFileSystem } from '../system/IFileSystem.js';
 import { NodeFileSystem } from '../system/NodeFileSystem.js';
 import type { IIdGenerator } from '../system/IIdGenerator.js';
 import { NodeIdGenerator } from '../system/NodeIdGenerator.js';
-
 import { LiveInbox } from './inbox.js';
-
 import { IrNodeBehaviorRegistry } from '../ir/behaviorRegistry.js';
 import { registerBuiltInBehaviors } from '../ir/builtinBehaviors.js';
 import { IrMapper } from '../ir/mapper.js';
