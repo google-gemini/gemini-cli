@@ -199,18 +199,34 @@ export async function startInteractiveUI(
   try {
     await instance.waitUntilExit();
   } finally {
-    removeCleanup(cleanupConsolePatcher);
-    cleanupConsolePatcher();
+    try {
+      removeCleanup(cleanupConsolePatcher);
+      cleanupConsolePatcher();
+    } catch (e: unknown) {
+      debugLogger.error('Error cleaning up console patcher:', e);
+    }
 
-    removeCleanup(cleanupUnmount);
-    instance.unmount();
+    try {
+      removeCleanup(cleanupUnmount);
+      instance.unmount();
+    } catch (e: unknown) {
+      debugLogger.error('Error unmounting Ink instance:', e);
+    }
 
-    removeCleanup(cleanupTtyCheck);
-    cleanupTtyCheck();
+    try {
+      removeCleanup(cleanupTtyCheck);
+      cleanupTtyCheck();
+    } catch (e: unknown) {
+      debugLogger.error('Error in TTY cleanup:', e);
+    }
 
     if (cleanupLineWrapping) {
-      removeCleanup(cleanupLineWrapping);
-      cleanupLineWrapping();
+      try {
+        removeCleanup(cleanupLineWrapping);
+        cleanupLineWrapping();
+      } catch (e: unknown) {
+        debugLogger.error('Error restoring line wrapping:', e);
+      }
     }
   }
 }
