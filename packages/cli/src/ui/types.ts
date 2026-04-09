@@ -19,6 +19,7 @@ import {
   type AnsiOutput,
   CoreToolCallStatus,
   checkExhaustive,
+  type SubagentActivityItem,
 } from '@google/gemini-cli-core';
 import type { PartListUnion } from '@google/genai';
 import { type ReactNode } from 'react';
@@ -118,6 +119,7 @@ export interface IndividualToolCallDisplay {
   callId: string;
   parentCallId?: string;
   name: string;
+  args?: Record<string, unknown>;
   description: string;
   resultDisplay: ToolResultDisplay | undefined;
   status: CoreToolCallStatus;
@@ -134,6 +136,7 @@ export interface IndividualToolCallDisplay {
   originalRequestName?: string;
   progress?: number;
   progressTotal?: number;
+  subagentHistory?: SubagentActivityItem[];
 }
 
 export interface CompressionProps {
@@ -171,6 +174,7 @@ export type HistoryItemInfo = HistoryItemBase & {
   type: 'info';
   text: string;
   secondaryText?: string;
+  source?: string;
   icon?: string;
   color?: string;
   marginBottom?: number;
@@ -289,6 +293,12 @@ export type HistoryItemChatList = HistoryItemBase & {
   chats: ChatDetail[];
 };
 
+export type HistoryItemSubagent = HistoryItemBase & {
+  type: 'subagent';
+  agentName: string;
+  history: SubagentActivityItem[];
+};
+
 export interface ToolDefinition {
   name: string;
   displayName: string;
@@ -369,6 +379,7 @@ export type HistoryItemMcpStatus = HistoryItemBase & {
   showSchema: boolean;
 };
 
+// Individually exported types extending HistoryItemBase
 export type HistoryItemWithoutId =
   | HistoryItemUser
   | HistoryItemUserShell
@@ -393,7 +404,8 @@ export type HistoryItemWithoutId =
   | HistoryItemMcpStatus
   | HistoryItemChatList
   | HistoryItemThinking
-  | HistoryItemHint;
+  | HistoryItemHint
+  | HistoryItemSubagent;
 
 export type HistoryItem = HistoryItemWithoutId & { id: number };
 

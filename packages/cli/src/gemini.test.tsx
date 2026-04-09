@@ -379,15 +379,30 @@ describe('initializeOutputListenersAndFlush', () => {
 describe('getNodeMemoryArgs', () => {
   let osTotalMemSpy: MockInstance;
   let v8GetHeapStatisticsSpy: MockInstance;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  let originalConfig: any;
 
   beforeEach(() => {
     osTotalMemSpy = vi.spyOn(os, 'totalmem');
     v8GetHeapStatisticsSpy = vi.spyOn(v8, 'getHeapStatistics');
     delete process.env['GEMINI_CLI_NO_RELAUNCH'];
+
+    originalConfig = process.config;
+    Object.defineProperty(process, 'config', {
+      value: {
+        ...originalConfig,
+        variables: { ...originalConfig?.variables, v8_enable_sandbox: 1 },
+      },
+      configurable: true,
+    });
   });
 
   afterEach(() => {
     vi.restoreAllMocks();
+    Object.defineProperty(process, 'config', {
+      value: originalConfig,
+      configurable: true,
+    });
   });
 
   it('should return empty array if GEMINI_CLI_NO_RELAUNCH is set', () => {
@@ -400,8 +415,10 @@ describe('getNodeMemoryArgs', () => {
     v8GetHeapStatisticsSpy.mockReturnValue({
       heap_size_limit: 8 * 1024 * 1024 * 1024, // 8GB
     });
-    // Target is 50% of 16GB = 8GB. Current is 8GB. No relaunch needed.
-    expect(getNodeMemoryArgs(false)).toEqual([]);
+    // Target is 50% of 16GB = 8GB. Current is 8GB. Relaunch needed for EPT size only.
+    expect(getNodeMemoryArgs(false)).toEqual([
+      '--max-external-pointer-table-size=268435456',
+    ]);
   });
 
   it('should return memory args if current heap limit is insufficient', () => {
@@ -409,8 +426,11 @@ describe('getNodeMemoryArgs', () => {
     v8GetHeapStatisticsSpy.mockReturnValue({
       heap_size_limit: 4 * 1024 * 1024 * 1024, // 4GB
     });
-    // Target is 50% of 16GB = 8GB. Current is 4GB. Relaunch needed.
-    expect(getNodeMemoryArgs(false)).toEqual(['--max-old-space-size=8192']);
+    // Target is 50% of 16GB = 8GB. Current is 4GB. Relaunch needed for both.
+    expect(getNodeMemoryArgs(false)).toEqual([
+      '--max-external-pointer-table-size=268435456',
+      '--max-old-space-size=8192',
+    ]);
   });
 
   it('should log debug info when isDebugMode is true', () => {

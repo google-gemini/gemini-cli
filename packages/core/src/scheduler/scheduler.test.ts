@@ -74,6 +74,7 @@ import {
   type AnyDeclarativeTool,
   type AnyToolInvocation,
 } from '../tools/tools.js';
+import { UPDATE_TOPIC_TOOL_NAME } from '../tools/tool-names.js';
 import {
   CoreToolCallStatus,
   ROOT_SCHEDULER_ID,
@@ -176,6 +177,7 @@ describe('Scheduler (Orchestrator)', () => {
       setApprovalMode: vi.fn(),
       getApprovalMode: vi.fn().mockReturnValue(ApprovalMode.DEFAULT),
       getTelemetryLogPromptsEnabled: vi.fn().mockReturnValue(false),
+      getSessionId: vi.fn().mockReturnValue('test-session-id'),
     } as unknown as Mocked<Config>;
 
     (mockConfig as unknown as { config: Config }).config = mockConfig as Config;
@@ -441,6 +443,44 @@ describe('Scheduler (Orchestrator)', () => {
         ]),
       );
     });
+
+    it('should sort UPDATE_TOPIC_TOOL_NAME to the front of the batch', async () => {
+      const topicReq: ToolCallRequestInfo = {
+        callId: 'call-topic',
+        name: UPDATE_TOPIC_TOOL_NAME,
+        args: { title: 'New Chapter' },
+        prompt_id: 'p1',
+        isClientInitiated: false,
+      };
+      const otherReq: ToolCallRequestInfo = {
+        callId: 'call-other',
+        name: 'test-tool',
+        args: {},
+        prompt_id: 'p1',
+        isClientInitiated: false,
+      };
+
+      // Mock tool registry to return a tool for update_topic
+      vi.mocked(mockToolRegistry.getTool).mockImplementation((name) => {
+        if (name === UPDATE_TOPIC_TOOL_NAME) {
+          return {
+            name: UPDATE_TOPIC_TOOL_NAME,
+            build: vi.fn().mockReturnValue({}),
+          } as unknown as AnyDeclarativeTool;
+        }
+        return mockTool;
+      });
+
+      // Schedule in reverse order (other first, topic second)
+      await scheduler.schedule([otherReq, topicReq], signal);
+
+      // Verify they were enqueued in the correct sorted order (topic first)
+      const enqueueCalls = vi.mocked(mockStateManager.enqueue).mock.calls;
+      const lastCall = enqueueCalls[enqueueCalls.length - 1][0];
+
+      expect(lastCall[0].request.callId).toBe('call-topic');
+      expect(lastCall[1].request.callId).toBe('call-other');
+    });
   });
 
   describe('Phase 2: Queue Management', () => {
@@ -662,6 +702,30 @@ describe('Scheduler (Orchestrator)', () => {
                   error:
                     'Tool execution denied by policy. Custom denial reason',
                 },
+              }),
+            }),
+          ]),
+        }),
+      );
+    });
+
+    it('should use originalRequestName when generating an error response', async () => {
+      const error = new Error('Some error');
+      vi.mocked(checkPolicy).mockRejectedValue(error);
+
+      const tailReq = { ...req1, originalRequestName: 'original-tool-name' };
+      await scheduler.schedule(tailReq, signal);
+
+      expect(mockStateManager.updateStatus).toHaveBeenCalledWith(
+        'call-1',
+        CoreToolCallStatus.Error,
+        expect.objectContaining({
+          errorType: ToolErrorType.UNHANDLED_EXCEPTION,
+          responseParts: expect.arrayContaining([
+            expect.objectContaining({
+              functionResponse: expect.objectContaining({
+                name: 'original-tool-name',
+                response: { error: 'Some error' },
               }),
             }),
           ]),
@@ -1131,6 +1195,7 @@ describe('Scheduler (Orchestrator)', () => {
               name: 'tool-b',
               args: { key: 'value' },
               originalRequestName: 'test-tool', // Preserves original name
+              originalRequestArgs: req1.args, // Preserves original args
             }),
             tool: mockToolB,
           }),
@@ -1359,6 +1424,7 @@ describe('Scheduler MCP Progress', () => {
       setApprovalMode: vi.fn(),
       getApprovalMode: vi.fn().mockReturnValue(ApprovalMode.DEFAULT),
       getTelemetryLogPromptsEnabled: vi.fn().mockReturnValue(false),
+      getSessionId: vi.fn().mockReturnValue('test-session-id'),
     } as unknown as Mocked<Config>;
 
     (mockConfig as unknown as { config: Config }).config = mockConfig as Config;

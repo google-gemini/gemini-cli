@@ -4,46 +4,45 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+import fs from 'node:fs';
+import os from 'node:os';
+import path from 'node:path';
 import {
   type SandboxManager,
   type SandboxRequest,
   type SandboxedCommand,
   type SandboxPermissions,
   type GlobalSandboxOptions,
+  type ParsedSandboxDenial,
+  resolveSandboxPaths,
 } from '../../services/sandboxManager.js';
+import type { ShellExecutionResult } from '../../services/shellExecutionService.js';
 import {
   sanitizeEnvironment,
   getSecureSanitizationConfig,
 } from '../../services/environmentSanitization.js';
-import { buildSeatbeltArgs } from './seatbeltArgsBuilder.js';
-import {
-  initializeShellParsers,
-  getCommandName,
-} from '../../utils/shell-utils.js';
+import { buildSeatbeltProfile } from './seatbeltArgsBuilder.js';
+import { initializeShellParsers } from '../../utils/shell-utils.js';
 import {
   isKnownSafeCommand,
   isDangerousCommand,
+} from '../utils/commandSafety.js';
+import {
+  verifySandboxOverrides,
+  getCommandName as getFullCommandName,
   isStrictlyApproved,
-} from './commandSafety.js';
-import { type SandboxPolicyManager } from '../../policy/sandboxPolicyManager.js';
+} from '../utils/commandUtils.js';
+import {
+  parsePosixSandboxDenials,
+  createSandboxDenialCache,
+  type SandboxDenialCache,
+} from '../utils/sandboxDenialUtils.js';
+import { handleReadWriteCommands } from '../utils/sandboxReadWriteUtils.js';
 
-export interface MacOsSandboxOptions extends GlobalSandboxOptions {
-  /** The current sandbox mode behavior from config. */
-  modeConfig?: {
-    readonly?: boolean;
-    network?: boolean;
-    approvedTools?: string[];
-    allowOverrides?: boolean;
-  };
-  /** The policy manager for persistent approvals. */
-  policyManager?: SandboxPolicyManager;
-}
-
-/**
- * A SandboxManager implementation for macOS that uses Seatbelt.
- */
 export class MacOsSandboxManager implements SandboxManager {
-  constructor(private readonly options: MacOsSandboxOptions) {}
+  private readonly denialCache: SandboxDenialCache = createSandboxDenialCache();
+
+  constructor(private readonly options: GlobalSandboxOptions) {}
 
   isKnownSafeCommand(args: string[]): boolean {
     const toolName = args[0];
@@ -58,6 +57,18 @@ export class MacOsSandboxManager implements SandboxManager {
     return isDangerousCommand(args);
   }
 
+  parseDenials(result: ShellExecutionResult): ParsedSandboxDenial | undefined {
+    return parsePosixSandboxDenials(result, this.denialCache);
+  }
+
+  getWorkspace(): string {
+    return this.options.workspace;
+  }
+
+  getOptions(): GlobalSandboxOptions {
+    return this.options;
+  }
+
   async prepareCommand(req: SandboxRequest): Promise<SandboxedCommand> {
     await initializeShellParsers();
     const sanitizationConfig = getSecureSanitizationConfig(
@@ -70,38 +81,40 @@ export class MacOsSandboxManager implements SandboxManager {
     const allowOverrides = this.options.modeConfig?.allowOverrides ?? true;
 
     // Reject override attempts in plan mode
-    if (!allowOverrides && req.policy?.additionalPermissions) {
-      const perms = req.policy.additionalPermissions;
-      if (
-        perms.network ||
-        (perms.fileSystem?.write && perms.fileSystem.write.length > 0)
-      ) {
-        throw new Error(
-          'Sandbox request rejected: Cannot override readonly/network restrictions in Plan mode.',
-        );
-      }
+    verifySandboxOverrides(allowOverrides, req.policy);
+
+    let command = req.command;
+    let args = req.args;
+
+    // Translate virtual commands for sandboxed file system access
+    if (command === '__read') {
+      command = '/bin/cat';
+    } else if (command === '__write') {
+      command = '/bin/sh';
+      args = ['-c', 'cat > "$1"', '_', ...args];
     }
+
+    const currentReq = { ...req, command, args };
 
     // If not in readonly mode OR it's a strictly approved pipeline, allow workspace writes
     const isApproved = allowOverrides
       ? await isStrictlyApproved(
-          req.command,
-          req.args,
+          currentReq,
           this.options.modeConfig?.approvedTools,
         )
       : false;
 
-    const workspaceWrite = !isReadonlyMode || isApproved;
+    const isYolo = this.options.modeConfig?.yolo ?? false;
+    const workspaceWrite = !isReadonlyMode || isApproved || isYolo;
     const defaultNetwork =
-      this.options.modeConfig?.network ?? req.policy?.networkAccess ?? false;
+      this.options.modeConfig?.network || req.policy?.networkAccess || isYolo;
 
     // Fetch persistent approvals for this command
-    const commandName = await getCommandName(req.command, req.args);
+    const commandName = await getFullCommandName(currentReq);
     const persistentPermissions = allowOverrides
       ? this.options.policyManager?.getCommandPermissions(commandName)
       : undefined;
 
-    // Merge all permissions
     const mergedAdditional: SandboxPermissions = {
       fileSystem: {
         read: [
@@ -120,20 +133,51 @@ export class MacOsSandboxManager implements SandboxManager {
         false,
     };
 
-    const sandboxArgs = await buildSeatbeltArgs({
-      workspace: this.options.workspace,
-      allowedPaths: [...(req.policy?.allowedPaths || [])],
-      forbiddenPaths: req.policy?.forbiddenPaths,
+    const { command: finalCommand, args: finalArgs } = handleReadWriteCommands(
+      req,
+      mergedAdditional,
+      this.options.workspace,
+      [
+        ...(req.policy?.allowedPaths || []),
+        ...(this.options.includeDirectories || []),
+      ],
+    );
+
+    const resolvedPaths = await resolveSandboxPaths(
+      this.options,
+      req,
+      mergedAdditional,
+    );
+
+    const sandboxArgs = buildSeatbeltProfile({
+      resolvedPaths,
       networkAccess: mergedAdditional.network,
       workspaceWrite,
-      additionalPermissions: mergedAdditional,
     });
+
+    const tempFile = this.writeProfileToTempFile(sandboxArgs);
 
     return {
       program: '/usr/bin/sandbox-exec',
-      args: [...sandboxArgs, '--', req.command, ...req.args],
+      args: ['-f', tempFile, '--', finalCommand, ...finalArgs],
       env: sanitizedEnv,
       cwd: req.cwd,
+      cleanup: () => {
+        try {
+          fs.unlinkSync(tempFile);
+        } catch {
+          // Ignore cleanup errors
+        }
+      },
     };
+  }
+
+  private writeProfileToTempFile(profile: string): string {
+    const tempFile = path.join(
+      os.tmpdir(),
+      `gemini-cli-seatbelt-${Date.now()}-${Math.random().toString(36).slice(2)}.sb`,
+    );
+    fs.writeFileSync(tempFile, profile, { mode: 0o600 });
+    return tempFile;
   }
 }
