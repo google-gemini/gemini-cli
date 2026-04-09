@@ -36,7 +36,7 @@ describe('Scheduler waiting callback', () => {
 
     mockTool = new MockTool({ name: 'test_tool' });
     toolRegistry = new ToolRegistry(mockConfig, messageBus);
-    vi.spyOn(mockConfig, 'getToolRegistry').mockReturnValue(toolRegistry);
+    vi.spyOn(mockConfig, 'toolRegistry', 'get').mockReturnValue(toolRegistry);
     toolRegistry.registerTool(mockTool);
 
     vi.mocked(checkPolicy).mockResolvedValue({
@@ -48,7 +48,7 @@ describe('Scheduler waiting callback', () => {
   it('should trigger onWaitingForConfirmation callback', async () => {
     const onWaitingForConfirmation = vi.fn();
     const scheduler = new Scheduler({
-      config: mockConfig,
+      context: mockConfig,
       messageBus,
       getPreferredEditor: () => undefined,
       schedulerId: 'test-scheduler',

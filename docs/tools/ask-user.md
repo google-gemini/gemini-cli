@@ -25,7 +25,8 @@ confirmation.
       - `label` (string, required): Display text (1-5 words).
       - `description` (string, required): Brief explanation.
     - `multiSelect` (boolean, optional): For `'choice'` type, allows selecting
-      multiple options.
+      multiple options. Automatically adds an "All the above" option if there
+      are multiple standard options.
     - `placeholder` (string, optional): Hint text for input fields.
 
 - **Behavior:**

@@ -4,25 +4,14 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import {
-  describe,
-  it,
-  expect,
-  vi,
-  beforeEach,
-  afterEach,
-  type Mock,
-} from 'vitest';
+import { describe, it, expect, vi, beforeEach, type Mock } from 'vitest';
 import { Task } from './task.js';
 import {
   GeminiEventType,
-  ApprovalMode,
-  ToolConfirmationOutcome,
   type Config,
   type ToolCallRequestInfo,
   type GitService,
   type CompletedToolCall,
-  type ToolCall,
 } from '@google/gemini-cli-core';
 import { createMockConfig } from '../utils/testing_utils.js';
 import type { ExecutionEventBus, RequestContext } from '@a2a-js/sdk/server';
@@ -387,188 +376,6 @@ describe('Task', () => {
         expect(setTaskStateSpy).not.toHaveBeenCalled();
       },
     );
-  });
-
-  describe('_schedulerToolCallsUpdate', () => {
-    let task: Task;
-    type SpyInstance = ReturnType<typeof vi.spyOn>;
-    let setTaskStateAndPublishUpdateSpy: SpyInstance;
-    let mockConfig: Config;
-    let mockEventBus: ExecutionEventBus;
-
-    beforeEach(() => {
-      mockConfig = createMockConfig() as Config;
-      mockEventBus = {
-        publish: vi.fn(),
-        on: vi.fn(),
-        off: vi.fn(),
-        once: vi.fn(),
-        removeAllListeners: vi.fn(),
-        finished: vi.fn(),
-      };
-
-      // @ts-expect-error - Calling private constructor
-      task = new Task('task-id', 'context-id', mockConfig, mockEventBus);
-
-      // Spy on the method we want to check calls for
-      setTaskStateAndPublishUpdateSpy = vi.spyOn(
-        task,
-        'setTaskStateAndPublishUpdate',
-      );
-    });
-
-    afterEach(() => {
-      vi.restoreAllMocks();
-    });
-
-    it('should set state to input-required when a tool is awaiting approval and none are executing', () => {
-      const toolCalls = [
-        { request: { callId: '1' }, status: 'awaiting_approval' },
-      ] as ToolCall[];
-
-      // @ts-expect-error - Calling private method
-      task._schedulerToolCallsUpdate(toolCalls);
-
-      // The last call should be the final state update
-      expect(setTaskStateAndPublishUpdateSpy).toHaveBeenLastCalledWith(
-        'input-required',
-        { kind: 'state-change' },
-        undefined,
-        undefined,
-        true, // final: true
-      );
-    });
-
-    it('should NOT set state to input-required if a tool is awaiting approval but another is executing', () => {
-      const toolCalls = [
-        { request: { callId: '1' }, status: 'awaiting_approval' },
-        { request: { callId: '2' }, status: 'executing' },
-      ] as ToolCall[];
-
-      // @ts-expect-error - Calling private method
-      task._schedulerToolCallsUpdate(toolCalls);
-
-      // It will be called for status updates, but not with final: true
-      const finalCall = setTaskStateAndPublishUpdateSpy.mock.calls.find(
-        (call) => call[4] === true,
-      );
-      expect(finalCall).toBeUndefined();
-    });
-
-    it('should set state to input-required once an executing tool finishes, leaving one awaiting approval', () => {
-      const initialToolCalls = [
-        { request: { callId: '1' }, status: 'awaiting_approval' },
-        { request: { callId: '2' }, status: 'executing' },
-      ] as ToolCall[];
-      // @ts-expect-error - Calling private method
-      task._schedulerToolCallsUpdate(initialToolCalls);
-
-      // No final call yet
-      let finalCall = setTaskStateAndPublishUpdateSpy.mock.calls.find(
-        (call) => call[4] === true,
-      );
-      expect(finalCall).toBeUndefined();
-
-      // Now, the executing tool finishes. The scheduler would call _resolveToolCall for it.
-      // @ts-expect-error - Calling private method
-      task._resolveToolCall('2');
-
-      // Then another update comes in for the awaiting tool (e.g., a re-check)
-      const subsequentToolCalls = [
-        { request: { callId: '1' }, status: 'awaiting_approval' },
-      ] as ToolCall[];
-      // @ts-expect-error - Calling private method
-      task._schedulerToolCallsUpdate(subsequentToolCalls);
-
-      // NOW we should get the final call
-      finalCall = setTaskStateAndPublishUpdateSpy.mock.calls.find(
-        (call) => call[4] === true,
-      );
-      expect(finalCall).toBeDefined();
-      expect(finalCall?.[0]).toBe('input-required');
-    });
-
-    it('should NOT set state to input-required if skipFinalTrueAfterInlineEdit is true', () => {
-      task.skipFinalTrueAfterInlineEdit = true;
-      const toolCalls = [
-        { request: { callId: '1' }, status: 'awaiting_approval' },
-      ] as ToolCall[];
-
-      // @ts-expect-error - Calling private method
-      task._schedulerToolCallsUpdate(toolCalls);
-
-      const finalCall = setTaskStateAndPublishUpdateSpy.mock.calls.find(
-        (call) => call[4] === true,
-      );
-      expect(finalCall).toBeUndefined();
-    });
-
-    describe('auto-approval', () => {
-      it('should auto-approve tool calls when autoExecute is true', () => {
-        task.autoExecute = true;
-        const onConfirmSpy = vi.fn();
-        const toolCalls = [
-          {
-            request: { callId: '1' },
-            status: 'awaiting_approval',
-            confirmationDetails: {
-              type: 'edit',
-              onConfirm: onConfirmSpy,
-            },
-          },
-        ] as unknown as ToolCall[];
-
-        // @ts-expect-error - Calling private method
-        task._schedulerToolCallsUpdate(toolCalls);
-
-        expect(onConfirmSpy).toHaveBeenCalledWith(
-          ToolConfirmationOutcome.ProceedOnce,
-        );
-      });
-
-      it('should auto-approve tool calls when approval mode is YOLO', () => {
-        (mockConfig.getApprovalMode as Mock).mockReturnValue(ApprovalMode.YOLO);
-        task.autoExecute = false;
-        const onConfirmSpy = vi.fn();
-        const toolCalls = [
-          {
-            request: { callId: '1' },
-            status: 'awaiting_approval',
-            confirmationDetails: {
-              type: 'edit',
-              onConfirm: onConfirmSpy,
-            },
-          },
-        ] as unknown as ToolCall[];
-
-        // @ts-expect-error - Calling private method
-        task._schedulerToolCallsUpdate(toolCalls);
-
-        expect(onConfirmSpy).toHaveBeenCalledWith(
-          ToolConfirmationOutcome.ProceedOnce,
-        );
-      });
-
-      it('should NOT auto-approve when autoExecute is false and mode is not YOLO', () => {
-        task.autoExecute = false;
-        (mockConfig.getApprovalMode as Mock).mockReturnValue(
-          ApprovalMode.DEFAULT,
-        );
-        const onConfirmSpy = vi.fn();
-        const toolCalls = [
-          {
-            request: { callId: '1' },
-            status: 'awaiting_approval',
-            confirmationDetails: { onConfirm: onConfirmSpy },
-          },
-        ] as unknown as ToolCall[];
-
-        // @ts-expect-error - Calling private method
-        task._schedulerToolCallsUpdate(toolCalls);
-
-        expect(onConfirmSpy).not.toHaveBeenCalled();
-      });
-    });
   });
 
   describe('currentPromptId and promptCount', () => {

@@ -89,9 +89,9 @@ Gemini gives you granular control over the undo process. You can choose to:
 Sometimes you want to try two different approaches to the same problem.
 
 1.  Start a session and get to a decision point.
-2.  Save the current state with `/chat save decision-point`.
+2.  Save the current state with `/resume save decision-point`.
 3.  Try your first approach.
-4.  Later, use `/chat resume decision-point` to fork the conversation back to
+4.  Later, use `/resume resume decision-point` to fork the conversation back to
     that moment and try a different approach.
 
 This creates a new branch of history without losing your original work.
@@ -101,5 +101,5 @@ This creates a new branch of history without losing your original work.
 - Learn about [Checkpointing](../../cli/checkpointing.md) to understand the
   underlying safety mechanism.
 - Explore [Task planning](task-planning.md) to keep complex sessions organized.
-- See the [Command reference](../../reference/commands.md) for all `/chat` and
-  `/resume` options.
+- See the [Command reference](../../reference/commands.md) for `/resume`
+  options, grouped checkpoint menus, and `/chat` compatibility aliases.

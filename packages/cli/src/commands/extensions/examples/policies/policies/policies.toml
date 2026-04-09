@@ -16,7 +16,7 @@ toolName = "grep_search"
 argsPattern = "(\.env|id_rsa|passwd)"
 decision = "deny"
 priority = 200
-deny_message = "Access to sensitive credentials or system files is restricted by the policy-example extension."
+denyMessage = "Access to sensitive credentials or system files is restricted by the policy-example extension."
 
 # Safety Checker: Apply path validation to all write operations.
 [[safety_checker]]
