@@ -157,6 +157,48 @@ The harness (`MemoryTestHarness` in `packages/test-utils`):
 - Compares against baselines with a 10% tolerance.
 - Can analyze sustained leaks across 3 snapshots using `analyzeSnapshots()`.
 
+## Performance regression tests
+
+Performance regression tests are designed to detect wall-clock time, CPU usage,
+and event loop delay regressions across key CLI scenarios. They are located in
+the `perf-tests` directory.
+
+These tests are distinct from standard integration tests because they measure
+performance metrics and compare it against committed baselines.
+
+### Running performance tests
+
+Performance tests are not run as part of the default `npm run test` or
+`npm run test:e2e` commands. They are run nightly in CI but can be run manually:
+
+```bash
+npm run test:perf
+```
+
+### Updating baselines
+
+If you intentionally change behavior that affects performance, you may need to
+update the baselines. Set the `UPDATE_PERF_BASELINES` environment variable to
+`true`:
+
+```bash
+UPDATE_PERF_BASELINES=true npm run test:perf
+```
+
+This will run the tests multiple times (with warmup), apply IQR outlier
+filtering, and overwrite `perf-tests/baselines.json`. You should review the
+changes and commit the updated baseline file.
+
+### How it works
+
+The harness (`PerfTestHarness` in `packages/test-utils`):
+
+- Measures wall-clock time using `performance.now()`.
+- Measures CPU usage using `process.cpuUsage()`.
+- Monitors event loop delay using `perf_hooks.monitorEventLoopDelay()`.
+- Applies IQR (Interquartile Range) filtering to remove outlier samples.
+- Compares against baselines with a 15% tolerance.
+
 ## Diagnostics
 
 The integration test runner provides several options for diagnostics to help
