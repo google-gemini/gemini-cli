@@ -8,7 +8,6 @@ import type { ConcreteNode } from '../ir/types.js';
 import type {
   ContextProcessor,
   ContextWorker,
-  ContextWorkingBuffer,
 } from '../pipeline.js';
 import type { SidecarConfig, PipelineDef, PipelineTrigger } from './types.js';
 import type {
@@ -19,37 +18,7 @@ import type {
 import type { SidecarRegistry } from './registry.js';
 import { debugLogger } from '../../utils/debugLogger.js';
 import { InboxSnapshotImpl } from './inbox.js';
-
-class ContextWorkingBufferImpl implements ContextWorkingBuffer {
-  private readonly nodesMap: Map<string, ConcreteNode>;
-
-  constructor(readonly nodes: readonly ConcreteNode[]) {
-    this.nodesMap = new Map(nodes.map((n) => [n.id, n]));
-  }
-
-  getPristineNode(id: string): ConcreteNode | undefined {
-    // In V2, pristine nodes are accessed via the IrMapper's state tracking or through the history
-    // Since orchestrator doesn't natively hold the original pristine graph, we search current buffer
-    // or rely on the env's capability. For now, since pristine graph is maintained in ContextManager,
-    // we just return the node from the current buffer if we don't have a direct pristine link.
-    // To fully implement pristine lookup, we would need to pass the pristine graph from ContextManager.
-    return this.nodesMap.get(id);
-  }
-
-  getLineage(id: string): readonly ConcreteNode[] {
-    const lineage: ConcreteNode[] = [];
-    let current = this.nodesMap.get(id);
-    while (current) {
-      lineage.push(current);
-      if (current.logicalParentId && current.logicalParentId !== current.id) {
-        current = this.nodesMap.get(current.logicalParentId);
-      } else {
-        break;
-      }
-    }
-    return lineage;
-  }
-}
+import { ContextWorkingBufferImpl } from './contextWorkingBuffer.js';
 
 export class PipelineOrchestrator {
   private activeTimers: NodeJS.Timeout[] = [];
@@ -184,63 +153,13 @@ export class PipelineOrchestrator {
     }
   }
 
-  applyProcessorDiff(
-    nodes: readonly ConcreteNode[],
-    targets: readonly ConcreteNode[],
-    returnedNodes: readonly ConcreteNode[],
-  ): readonly ConcreteNode[] {
-    const mutableNodes = [...nodes];
-    const targetSet = new Set(targets.map((n) => n.id));
-    const returnedMap = new Map(returnedNodes.map((n) => [n.id, n]));
-
-    const removedIds = new Set<string>();
-    const newNodes: ConcreteNode[] = [];
-
-    for (const t of targets) {
-      const returnedNode = returnedMap.get(t.id);
-      if (!returnedNode) {
-        removedIds.add(t.id);
-      } else if (returnedNode !== t) {
-        removedIds.add(t.id);
-        newNodes.push(returnedNode);
-      }
-    }
-
-    for (const r of returnedNodes) {
-      if (!targetSet.has(r.id)) {
-        newNodes.push(r);
-      }
-    }
-
-    if (removedIds.size === 0 && newNodes.length === 0) {
-      return nodes;
-    }
-
-    let earliestRemovalIdx = mutableNodes.length;
-    let i = 0;
-    while (i < mutableNodes.length) {
-      if (removedIds.has(mutableNodes[i].id)) {
-        if (i < earliestRemovalIdx) earliestRemovalIdx = i;
-        mutableNodes.splice(i, 1);
-      } else {
-        i++;
-      }
-    }
-
-    if (newNodes.length > 0) {
-      mutableNodes.splice(earliestRemovalIdx, 0, ...newNodes);
-    }
-
-    return mutableNodes;
-  }
-
   async executeTriggerSync(
     trigger: PipelineTrigger,
     nodes: readonly ConcreteNode[],
     triggerTargets: ReadonlySet<string>,
     protectedLogicalIds: ReadonlySet<string> = new Set(),
   ): Promise<readonly ConcreteNode[]> {
-    let currentNodes = nodes;
+    let currentBuffer = ContextWorkingBufferImpl.initialize(nodes);
     const pipelines = this.config.pipelines.filter((p) =>
       p.triggers.includes(trigger),
     );
@@ -261,18 +180,18 @@ export class PipelineOrchestrator {
             `Executing processor synchronously: ${procDef.processorId}`,
           );
 
-          const allowedTargets = currentNodes.filter((n) =>
+          const allowedTargets = currentBuffer.nodes.filter((n) =>
             this.isNodeAllowed(n, triggerTargets, protectedLogicalIds),
           );
 
           const returnedNodes = await processor.process({
-            buffer: new ContextWorkingBufferImpl(currentNodes),
+            buffer: currentBuffer,
             targets: allowedTargets,
             inbox: inboxSnapshot,
           });
 
-          currentNodes = this.applyProcessorDiff(
-            currentNodes,
+          currentBuffer = currentBuffer.applyProcessorResult(
+            processor.id,
             allowedTargets,
             returnedNodes,
           );
@@ -288,7 +207,7 @@ export class PipelineOrchestrator {
     // Success! Drain consumed messages
     this.env.inbox.drainConsumed(inboxSnapshot.getConsumedIds());
 
-    return currentNodes;
+    return currentBuffer.nodes;
   }
 
   private async executePipelineAsync(
@@ -303,7 +222,7 @@ export class PipelineOrchestrator {
     );
     if (!nodes || nodes.length === 0) return;
 
-    let currentNodes = nodes;
+    let currentBuffer = ContextWorkingBufferImpl.initialize(nodes);
     const inboxSnapshot = new InboxSnapshotImpl(
       this.env.inbox.getMessages() || [],
     );
@@ -318,18 +237,18 @@ export class PipelineOrchestrator {
           `Executing processor: ${procDef.processorId} (async)`,
         );
 
-        const allowedTargets = currentNodes.filter((n) =>
+        const allowedTargets = currentBuffer.nodes.filter((n) =>
           this.isNodeAllowed(n, triggerTargets, protectedLogicalIds),
         );
 
         const returnedNodes = await processor.process({
-          buffer: new ContextWorkingBufferImpl(currentNodes),
+          buffer: currentBuffer,
           targets: allowedTargets,
           inbox: inboxSnapshot,
         });
 
-        currentNodes = this.applyProcessorDiff(
-          currentNodes,
+        currentBuffer = currentBuffer.applyProcessorResult(
+          processor.id,
           allowedTargets,
           returnedNodes,
         );

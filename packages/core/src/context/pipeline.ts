@@ -18,10 +18,18 @@ export interface InboxSnapshot {
   consume(messageId: string): void;
 }
 
+export interface GraphMutation {
+  readonly processorId: string;
+  readonly timestamp: number;
+  readonly removedIds: readonly string[];
+  readonly addedNodes: readonly ConcreteNode[];
+}
+
 export interface ContextWorkingBuffer {
   readonly nodes: readonly ConcreteNode[];
-  getPristineNode(id: string): ConcreteNode | undefined;
+  getPristineNodes(id: string): readonly ConcreteNode[];
   getLineage(id: string): readonly ConcreteNode[];
+  getAuditLog(): readonly GraphMutation[];
 }
 
 export interface ProcessArgs {

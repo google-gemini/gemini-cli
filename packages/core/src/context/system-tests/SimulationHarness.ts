@@ -124,35 +124,21 @@ export class SimulationHarness {
       );
       const orchestrator = this.orchestrator;
       // In the V2 simulation, we trigger the 'gc_backstop' to simulate emergency pressure.
-      currentView = await orchestrator.executeTriggerSync(
+      // Since contextManager owns its buffer natively, the simulation now properly matches reality
+      // where the manager runs the orchestrator and keeps the resulting modified view.
+      const modifiedView = await orchestrator.executeTriggerSync(
         'gc_backstop',
         currentView,
         new Set(currentView.map((e) => e.id)),
         new Set<string>(),
       );
-      // Inject the truncated view back into the graph
-      for (let i = 0; i < currentView.length; i++) {
-        const ep = currentView[i];
-        if (!this.contextManager.getNodes().find((c) => c.id === ep.id)) {
-          this.eventBus.emitVariantReady({
-            targetId: ep.id,
-            variantId: 'v-emergency',
-            variant: {
-              type: 'MASKED_TOOL',
-              id: 'mock-id',
-              tokens: { intent: 0, observation: 0 },
-              intent: {},
-              observation: {},
-              toolName: 'tool',
-            },
-          });
-        }
-      }
-      // Wait for variant propagation
-      await new Promise((resolve) => setTimeout(resolve, 50));
+      
+      // In the real system, ContextManager triggers this and retains it.
+      // We will emulate that behavior internally in the test loop for token counting.
+      currentView = modifiedView;
     }
 
-    // 4. Measure tokens after background processors have (hopefully) emitted variants
+    // 4. Measure tokens after background processors have processed inboxes
     const tokensAfter = this.env.tokenCalculator.calculateConcreteListTokens(
       this.contextManager.getNodes(),
     );

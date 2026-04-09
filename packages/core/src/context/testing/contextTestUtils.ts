@@ -24,7 +24,6 @@ import type { BaseLlmClient } from '../../core/baseLlmClient.js';
 import type { Content, GenerateContentResponse } from '@google/genai';
 import { InboxSnapshotImpl } from '../sidecar/inbox.js';
 import type {
-  ContextWorkingBuffer,
   InboxMessage,
   ProcessArgs,
 } from '../pipeline.js';
@@ -43,7 +42,7 @@ export const createMockGenerateContentResponse = (
 
 export function createDummyNode(
   logicalParentId: string,
-  type: 'USER_PROMPT' | 'SYSTEM_EVENT' | 'AGENT_THOUGHT' | 'AGENT_YIELD',
+  type: ConcreteNode['type'],
   tokens = 100,
   overrides?: Partial<ConcreteNode>,
   id?: string,
@@ -176,32 +175,7 @@ export function createMockEnvironment(
  * Creates a block of synthetic conversation history designed to consume a specific number of tokens.
  * Assumes roughly 4 characters per token for standard English text.
  */
-export class FakeContextWorkingBuffer implements ContextWorkingBuffer {
-  readonly nodes: readonly ConcreteNode[];
-  private readonly nodesById = new Map<string, ConcreteNode>();
-  private readonly nodesByEpisode = new Map<string, ConcreteNode[]>();
-
-  constructor(nodes: readonly ConcreteNode[]) {
-    this.nodes = nodes;
-    for (const node of nodes) {
-      this.nodesById.set(node.id, node);
-      const parentId = node.logicalParentId || 'orphan';
-      const epNodes = this.nodesByEpisode.get(parentId) || [];
-      epNodes.push(node);
-      this.nodesByEpisode.set(parentId, epNodes);
-    }
-  }
-
-  getPristineNode(id: string): ConcreteNode | undefined {
-    return this.nodesById.get(id);
-  }
-
-  getLineage(id: string): readonly ConcreteNode[] {
-    const node = this.nodesById.get(id);
-    if (!node) return [];
-    return this.nodesByEpisode.get(node.logicalParentId || 'orphan') || [];
-  }
-}
+import { ContextWorkingBufferImpl } from '../sidecar/contextWorkingBuffer.js';
 
 export function createMockProcessArgs(
   targets: ConcreteNode[],
@@ -210,9 +184,7 @@ export function createMockProcessArgs(
 ): ProcessArgs {
   return {
     targets,
-    buffer: new FakeContextWorkingBuffer(
-      bufferNodes.length ? bufferNodes : targets,
-    ),
+    buffer: ContextWorkingBufferImpl.initialize(bufferNodes.length ? bufferNodes : targets),
     inbox: new InboxSnapshotImpl(inboxMessages),
   };
 }

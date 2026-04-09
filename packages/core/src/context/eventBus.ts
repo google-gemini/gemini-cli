@@ -23,11 +23,7 @@ export interface IrChunkReceivedEvent {
   targetNodeIds: Set<string>;
 }
 
-export interface VariantReadyEvent {
-  targetId: string; // The Episode or Step ID this variant attaches to
-  variantId: string; // A unique ID for the variant itself
-  variant: ConcreteNode; // In V2, variants are synthetic concrete nodes
-}
+
 
 export class ContextEventBus extends EventEmitter {
   emitPristineHistoryUpdated(event: PristineHistoryUpdatedEvent) {
@@ -54,13 +50,5 @@ export class ContextEventBus extends EventEmitter {
 
   onConsolidationNeeded(listener: (event: ContextConsolidationEvent) => void) {
     this.on('BUDGET_RETAINED_CROSSED', listener);
-  }
-
-  emitVariantReady(event: VariantReadyEvent) {
-    this.emit('VARIANT_READY', event);
-  }
-
-  onVariantReady(listener: (event: VariantReadyEvent) => void) {
-    this.on('VARIANT_READY', listener);
   }
 }

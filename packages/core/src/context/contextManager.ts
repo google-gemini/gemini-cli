@@ -6,7 +6,6 @@
 
 import type { Content } from '@google/genai';
 import type { AgentChatHistory } from '../core/agentChatHistory.js';
-import { debugLogger } from '../utils/debugLogger.js';
 import type { ConcreteNode } from './ir/types.js';
 import type { ContextEventBus } from './eventBus.js';
 import type { ContextTracer } from './tracer.js';
@@ -15,11 +14,13 @@ import type { SidecarConfig } from './sidecar/types.js';
 import type { PipelineOrchestrator } from './sidecar/orchestrator.js';
 import { HistoryObserver } from './historyObserver.js';
 import { IrProjector } from './ir/projector.js';
+import { ContextWorkingBufferImpl } from './sidecar/contextWorkingBuffer.js';
 
 export class ContextManager {
-  // The stateful, pristine flat graph.
+  // The master state containing the pristine graph and current active graph.
+  private buffer: ContextWorkingBufferImpl = ContextWorkingBufferImpl.initialize([]);
   private pristineNodes: readonly ConcreteNode[] = [];
-  private currentNodes: readonly ConcreteNode[] = [];
+  
   private readonly eventBus: ContextEventBus;
 
   // Internal sub-components
@@ -47,30 +48,15 @@ export class ContextManager {
 
     this.eventBus.onPristineHistoryUpdated((event) => {
       this.pristineNodes = event.nodes;
-      // In V2, we assume currentNodes updates sequentially via Orchestrator patches.
-      // But if pristine changes, we must ensure our current view incorporates new nodes.
-      // For now, simple fallback: if the current nodes doesn't have the new nodes, append them.
-      // A more robust implementation would diff the nodes, but for now we'll just track.
-      const existingIds = new Set(this.currentNodes.map((n) => n.id));
+      
+      const existingIds = new Set(this.buffer.nodes.map((n) => n.id));
       const addedNodes = event.nodes.filter((n) => !existingIds.has(n.id));
+      
       if (addedNodes.length > 0) {
-        this.currentNodes = [...this.currentNodes, ...addedNodes];
+        this.buffer = this.buffer.appendPristineNodes(addedNodes);
       }
 
       this.evaluateTriggers(event.newNodes);
-    });
-
-    this.eventBus.onVariantReady((event) => {
-      // In V2, async workers write back patches.
-      // The old variant dict logic is replaced by the orchestrator applying patches directly.
-      // For now we log it.
-      this.tracer.logEvent(
-        'ContextManager',
-        `Received async variant [${event.variantId}] for Node ${event.targetId}`,
-      );
-      debugLogger.log(
-        `ContextManager: Received async variant [${event.variantId}] for Node ${event.targetId}.`,
-      );
     });
   }
 
@@ -91,21 +77,21 @@ export class ContextManager {
 
     if (newNodes.size > 0) {
       this.eventBus.emitChunkReceived({
-        nodes: this.currentNodes,
+        nodes: this.buffer.nodes,
         targetNodeIds: newNodes,
       });
     }
 
     const currentTokens = this.env.tokenCalculator.calculateConcreteListTokens(
-      this.currentNodes,
+      this.buffer.nodes,
     );
 
     if (currentTokens > this.sidecar.budget.retainedTokens) {
       const agedOutNodes = new Set<string>();
       let rollingTokens = 0;
       // Walk backwards finding nodes that fall out of the retained budget
-      for (let i = this.currentNodes.length - 1; i >= 0; i--) {
-        const node = this.currentNodes[i];
+      for (let i = this.buffer.nodes.length - 1; i >= 0; i--) {
+        const node = this.buffer.nodes[i];
         rollingTokens += this.env.tokenCalculator.calculateConcreteListTokens([
           node,
         ]);
@@ -116,7 +102,7 @@ export class ContextManager {
 
       if (agedOutNodes.size > 0) {
         this.eventBus.emitConsolidationNeeded({
-          nodes: this.currentNodes,
+          nodes: this.buffer.nodes,
           targetDeficit: currentTokens - this.sidecar.budget.retainedTokens,
           targetNodeIds: agedOutNodes,
         });
@@ -139,7 +125,7 @@ export class ContextManager {
    * This is the view that will eventually be projected back to the LLM.
    */
   getNodes(): readonly ConcreteNode[] {
-    return [...this.currentNodes];
+    return [...this.buffer.nodes];
   }
 
   /**
@@ -156,7 +142,7 @@ export class ContextManager {
     );
     // Apply final GC Backstop pressure barrier synchronously before mapping
     const finalHistory = await IrProjector.project(
-      this.currentNodes,
+      this.buffer.nodes,
       this.orchestrator,
       this.sidecar,
       this.tracer,
