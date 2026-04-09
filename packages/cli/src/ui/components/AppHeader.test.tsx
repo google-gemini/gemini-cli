@@ -10,15 +10,20 @@ import {
 } from '../../test-utils/render.js';
 import type { LoadedSettings } from '../../config/settings.js';
 import { AppHeader } from './AppHeader.js';
-import { describe, it, expect, vi } from 'vitest';
+import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { makeFakeConfig } from '@google/gemini-cli-core';
 import crypto from 'node:crypto';
+import { _clearSessionBannersForTest } from '../hooks/useBanner.js';
 
 vi.mock('../utils/terminalSetup.js', () => ({
   getTerminalProgram: () => null,
 }));
 
 describe('<AppHeader />', () => {
+  beforeEach(() => {
+    _clearSessionBannersForTest();
+  });
+
   it('should render the banner with default text', async () => {
     const uiState = {
       history: [],

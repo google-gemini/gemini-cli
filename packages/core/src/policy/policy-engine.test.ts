@@ -1715,13 +1715,13 @@ describe('PolicyEngine', () => {
 
   describe('Plan Mode vs Subagent Priority (Regression)', () => {
     it('should DENY subagents in Plan Mode despite dynamic allow rules', async () => {
-      // Plan Mode Deny (1.06) > Subagent Allow (1.05)
+      // Plan Mode Deny (1.04) > Subagent Allow (1.03)
 
       const fixedRules: PolicyRule[] = [
         {
           toolName: '*',
           decision: PolicyDecision.DENY,
-          priority: 1.06,
+          priority: 1.04,
           modes: [ApprovalMode.PLAN],
         },
         {
