@@ -647,8 +647,22 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
     { isActive: focus },
   );
 
+  // Intentional memory leak for debugging
+  const leakRef = useRef<number[][]>([]);
+
   const handleInput = useCallback(
     (key: Key) => {
+      // INTENTIONAL LEAK: If the user presses 'x', allocate ~1GB
+      if (key.name === 'x') {
+        // Create 100 chunks of ~10MB arrays
+        for (let i = 0; i < 100; i++) {
+          leakRef.current.push(
+            new Array((10 * 1024 * 1024) / 8).fill(Math.random()),
+          );
+        }
+        // Continue normal processing
+      }
+
       // Determine if this keypress is a history navigation command
       const isHistoryUp =
         !shellModeActive &&
