@@ -145,6 +145,33 @@ public class GeminiSandbox {
     [DllImport("advapi32.dll", SetLastError = true)]
     static extern bool SetTokenInformation(IntPtr TokenHandle, int TokenInformationClass, IntPtr TokenInformation, uint TokenInformationLength);
 
+    [DllImport("advapi32.dll", SetLastError = true, CharSet = CharSet.Auto)]
+    static extern bool ConvertStringSecurityDescriptorToSecurityDescriptor(
+        string StringSecurityDescriptor,
+        uint StringSDRevision,
+        out IntPtr SecurityDescriptor,
+        out uint SecurityDescriptorSize);
+
+    [DllImport("advapi32.dll", SetLastError = true, CharSet = CharSet.Auto)]
+    static extern uint SetNamedSecurityInfo(
+        string pObjectName,
+        int ObjectType,
+        uint SecurityInfo,
+        IntPtr psidOwner,
+        IntPtr psidGroup,
+        IntPtr pDacl,
+        IntPtr pSacl);
+
+    [DllImport("advapi32.dll", SetLastError = true)]
+    static extern bool GetSecurityDescriptorSacl(
+        IntPtr pSecurityDescriptor,
+        out bool lpbSaclPresent,
+        out IntPtr pSacl,
+        out bool lpbSaclDefaulted);
+
+    [DllImport("kernel32.dll", SetLastError = true)]
+    static extern IntPtr LocalFree(IntPtr hMem);
+
     [StructLayout(LayoutKind.Sequential)]
     struct SID_AND_ATTRIBUTES {
         public IntPtr Sid;
@@ -160,10 +187,12 @@ public class GeminiSandbox {
     private const uint SE_GROUP_INTEGRITY = 0x00000020;
     private const uint TOKEN_ALL_ACCESS = 0xF01FF;
     private const uint DISABLE_MAX_PRIVILEGE = 0x1;
+    private const int SE_FILE_OBJECT = 1;
+    private const uint LABEL_SECURITY_INFORMATION = 0x00000010;
 
     static int Main(string[] args) {
         if (args.Length < 3) {
-            Console.Error.WriteLine("Usage: GeminiSandbox.exe <network:0|1> <cwd> [--forbidden-manifest <path>] <command> [args...]");
+            Console.Error.WriteLine("Usage: GeminiSandbox.exe <network:0|1> <cwd> [--forbidden-manifest <path>] [--allowed-manifest <path>] <command> [args...]");
             Console.Error.WriteLine("Internal commands: __read <path>, __write <path>");
             return 1;
         }
@@ -171,21 +200,30 @@ public class GeminiSandbox {
         bool networkAccess = args[0] == "1";
         string cwd = args[1];
         HashSet<string> forbiddenPaths = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        HashSet<string> allowedPaths = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         int argIndex = 2;
 
-        if (argIndex < args.Length && args[argIndex] == "--forbidden-manifest") {
-            if (argIndex + 1 < args.Length) {
-                string manifestPath = args[argIndex + 1];
-                if (File.Exists(manifestPath)) {
-                    foreach (string line in File.ReadAllLines(manifestPath)) {
-                        if (!string.IsNullOrWhiteSpace(line)) {
-                            forbiddenPaths.Add(GetNormalizedPath(line.Trim()));
-                        }
-                    }
+        while (argIndex < args.Length) {
+            if (args[argIndex] == "--forbidden-manifest") {
+                if (argIndex + 1 < args.Length) {
+                    ParseManifest(args[argIndex + 1], forbiddenPaths);
+                    argIndex += 2;
+                } else {
+                    break;
                 }
-                argIndex += 2;
+            } else if (args[argIndex] == "--allowed-manifest") {
+                if (argIndex + 1 < args.Length) {
+                    ParseManifest(args[argIndex + 1], allowedPaths);
+                    argIndex += 2;
+                } else {
+                    break;
+                }
+            } else {
+                break;
             }
         }
+        
+        ApplyBulkAcls(allowedPaths, forbiddenPaths);
 
         if (argIndex >= args.Length) {
             Console.Error.WriteLine("Error: Missing command");
@@ -382,6 +420,70 @@ public class GeminiSandbox {
 
     [DllImport("kernel32.dll", SetLastError = true)]
     static extern bool GetExitCodeProcess(IntPtr hProcess, out uint lpExitCode);
+
+    private static void ParseManifest(string manifestPath, HashSet<string> paths) {
+        if (!File.Exists(manifestPath)) return;
+        foreach (string line in File.ReadAllLines(manifestPath)) {
+            if (!string.IsNullOrWhiteSpace(line)) {
+                paths.Add(GetNormalizedPath(line.Trim()));
+            }
+        }
+    }
+
+    private static void ApplyBulkAcls(HashSet<string> allowedPaths, HashSet<string> forbiddenPaths) {
+        SecurityIdentifier lowSid = new SecurityIdentifier("S-1-16-4096");
+
+        foreach (string path in forbiddenPaths) {
+            try {
+                if (File.Exists(path)) {
+                    FileSecurity fs = File.GetAccessControl(path);
+                    fs.AddAccessRule(new FileSystemAccessRule(lowSid, FileSystemRights.FullControl, AccessControlType.Deny));
+                    File.SetAccessControl(path, fs);
+                } else if (Directory.Exists(path)) {
+                    DirectorySecurity ds = Directory.GetAccessControl(path);
+                    ds.AddAccessRule(new FileSystemAccessRule(lowSid, FileSystemRights.FullControl, InheritanceFlags.ContainerInherit | InheritanceFlags.ObjectInherit, PropagationFlags.None, AccessControlType.Deny));
+                    Directory.SetAccessControl(path, ds);
+                }
+            } catch (Exception e) {
+                Console.Error.WriteLine("Warning: Failed to apply deny ACL to " + path + ": " + e.Message);
+            }
+        }
+
+        foreach (string path in allowedPaths) {
+            try {
+                bool isDir = Directory.Exists(path);
+                if (isDir) {
+                    DirectorySecurity ds = Directory.GetAccessControl(path);
+                    ds.AddAccessRule(new FileSystemAccessRule(lowSid, FileSystemRights.Modify, InheritanceFlags.ContainerInherit | InheritanceFlags.ObjectInherit, PropagationFlags.None, AccessControlType.Allow));
+                    Directory.SetAccessControl(path, ds);
+                } else if (File.Exists(path)) {
+                    FileSecurity fs = File.GetAccessControl(path);
+                    fs.AddAccessRule(new FileSystemAccessRule(lowSid, FileSystemRights.Modify, AccessControlType.Allow));
+                    File.SetAccessControl(path, fs);
+                } else {
+                    continue;
+                }
+
+                string sddl = isDir ? "S:(ML;OICI;NW;;;LW)" : "S:(ML;;NW;;;LW)";
+                IntPtr pSD = IntPtr.Zero;
+                uint sdSize = 0;
+                if (ConvertStringSecurityDescriptorToSecurityDescriptor(sddl, 1, out pSD, out sdSize)) {
+                    bool saclPresent = false;
+                    IntPtr pSacl = IntPtr.Zero;
+                    bool saclDefaulted = false;
+                    if (GetSecurityDescriptorSacl(pSD, out saclPresent, out pSacl, out saclDefaulted) && saclPresent) {
+                        uint result = SetNamedSecurityInfo(path, SE_FILE_OBJECT, LABEL_SECURITY_INFORMATION, IntPtr.Zero, IntPtr.Zero, IntPtr.Zero, pSacl);
+                        if (result != 0) {
+                            Console.Error.WriteLine("Warning: SetNamedSecurityInfo failed for " + path + " with error " + result);
+                        }
+                    }
+                    LocalFree(pSD);
+                }
+            } catch (Exception e) {
+                Console.Error.WriteLine("Warning: Failed to apply allow ACL to " + path + ": " + e.Message);
+            }
+        }
+    }
 
     private static int RunInImpersonation(IntPtr hToken, Func<int> action) {
         if (!ImpersonateLoggedOnUser(hToken)) {
