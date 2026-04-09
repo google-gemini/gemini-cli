@@ -39,6 +39,7 @@ describe('GeneralistAgent', () => {
       getDirectoryContext: () => 'mock directory context',
       getAllAgentNames: () => ['agent-tool'],
       getAllDefinitions: () => [],
+      getDefinition: () => undefined,
     } as unknown as AgentRegistry);
 
     const agent = GeneralistAgent(config);

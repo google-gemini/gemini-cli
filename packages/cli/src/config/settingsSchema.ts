@@ -576,7 +576,7 @@ const SETTINGS_SCHEMA = {
         label: 'Compact Tool Output',
         category: 'UI',
         requiresRestart: false,
-        default: false,
+        default: true,
         description:
           'Display tool outputs (like directory listings and file reads) in a compact, structured format.',
         showInDialog: true,
@@ -741,6 +741,24 @@ const SETTINGS_SCHEMA = {
         default: false,
         description:
           'Use an alternate screen buffer for the UI, preserving shell history.',
+        showInDialog: true,
+      },
+      renderProcess: {
+        type: 'boolean',
+        label: 'Render Process',
+        category: 'UI',
+        requiresRestart: true,
+        default: true,
+        description: 'Enable Ink render process for the UI.',
+        showInDialog: true,
+      },
+      terminalBuffer: {
+        type: 'boolean',
+        label: 'Terminal Buffer',
+        category: 'UI',
+        requiresRestart: true,
+        default: false,
+        description: 'Use the new terminal buffer architecture for rendering.',
         showInDialog: true,
       },
       useBackgroundColor: {
@@ -1509,7 +1527,7 @@ const SETTINGS_SCHEMA = {
             label: 'Show Color',
             category: 'Tools',
             requiresRestart: false,
-            default: false,
+            default: true,
             description: 'Show color in shell output.',
             showInDialog: true,
           },
@@ -1693,10 +1711,10 @@ const SETTINGS_SCHEMA = {
         type: 'boolean',
         label: 'Tool Sandboxing',
         category: 'Security',
-        requiresRestart: false,
+        requiresRestart: true,
         default: false,
         description:
-          'Experimental tool-level sandboxing (implementation in progress).',
+          'Tool-level sandboxing. Isolates individual tools instead of the entire CLI process.',
         showInDialog: true,
       },
       disableYoloMode: {
@@ -1889,7 +1907,8 @@ const SETTINGS_SCHEMA = {
         category: 'Advanced',
         requiresRestart: true,
         default: true,
-        description: 'Automatically configure Node.js memory limits',
+        description:
+          'Automatically configure Node.js memory limits. Note: Because memory is allocated during the initial process boot, this setting is only read from the global user settings file and ignores workspace-level overrides.',
         showInDialog: true,
       },
       dnsResolutionOrder: {
@@ -1950,6 +1969,16 @@ const SETTINGS_SCHEMA = {
             requiresRestart: true,
             default: false,
             description: 'Enable non-interactive agent sessions.',
+            showInDialog: false,
+          },
+          agentSessionInteractiveEnabled: {
+            type: 'boolean',
+            label: 'Interactive Agent Session Enabled',
+            category: 'Experimental',
+            requiresRestart: true,
+            default: false,
+            description:
+              'Enable the agent session implementation for the interactive CLI.',
             showInDialog: false,
           },
         },
