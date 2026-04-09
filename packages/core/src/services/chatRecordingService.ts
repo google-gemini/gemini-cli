@@ -4,7 +4,6 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { type Status } from '../scheduler/types.js';
 import { type ThoughtSummary } from '../utils/thoughtUtils.js';
 import { getProjectHash } from '../utils/paths.js';
 import path from 'node:path';
@@ -24,12 +23,21 @@ import type {
   GenerateContentResponseUsageMetadata,
 } from '@google/genai';
 import { debugLogger } from '../utils/debugLogger.js';
-import type { ToolResultDisplay } from '../tools/tools.js';
 import type { AgentLoopContext } from '../config/agent-loop-context.js';
-
-export const SESSION_FILE_PREFIX = 'session-';
-const MAX_HISTORY_MESSAGES = 50;
-const MAX_TOOL_OUTPUT_SIZE = 50 * 1024; // 50KB
+import {
+  SESSION_FILE_PREFIX,
+  type TokensSummary,
+  type ToolCallRecord,
+  type ConversationRecordExtra,
+  type MessageRecord,
+  type ConversationRecord,
+  type ResumedSessionData,
+  type LoadConversationOptions,
+  type RewindRecord,
+  type MetadataUpdateRecord,
+  type PartialMetadataRecord,
+} from './chatRecordingTypes.js';
+export * from './chatRecordingTypes.js';
 
 /**
  * Warning message shown when recording is disabled due to disk full.
@@ -38,116 +46,6 @@ const ENOSPC_WARNING_MESSAGE =
   'Chat recording disabled: No space left on device. ' +
   'The conversation will continue but will not be saved to disk. ' +
   'Free up disk space and restart to enable recording.';
-
-/**
- * Token usage summary for a message or conversation.
- */
-export interface TokensSummary {
-  input: number; // promptTokenCount
-  output: number; // candidatesTokenCount
-  cached: number; // cachedContentTokenCount
-  thoughts?: number; // thoughtsTokenCount
-  tool?: number; // toolUsePromptTokenCount
-  total: number; // totalTokenCount
-}
-
-/**
- * Base fields common to all messages.
- */
-export interface BaseMessageRecord {
-  id: string;
-  timestamp: string;
-  content: PartListUnion;
-  displayContent?: PartListUnion;
-}
-
-/**
- * Record of a tool call execution within a conversation.
- */
-export interface ToolCallRecord {
-  id: string;
-  name: string;
-  args: Record<string, unknown>;
-  result?: PartListUnion | null;
-  status: Status;
-  timestamp: string;
-  // UI-specific fields for display purposes
-  displayName?: string;
-  description?: string;
-  resultDisplay?: ToolResultDisplay;
-  renderOutputAsMarkdown?: boolean;
-}
-
-/**
- * Message type and message type-specific fields.
- */
-export type ConversationRecordExtra =
-  | {
-      type: 'user' | 'info' | 'error' | 'warning';
-    }
-  | {
-      type: 'gemini';
-      toolCalls?: ToolCallRecord[];
-      thoughts?: Array<ThoughtSummary & { timestamp: string }>;
-      tokens?: TokensSummary | null;
-      model?: string;
-    };
-
-/**
- * A single message record in a conversation.
- */
-export type MessageRecord = BaseMessageRecord & ConversationRecordExtra;
-
-/**
- * Complete conversation record stored in session files.
- */
-export interface ConversationRecord {
-  sessionId: string;
-  projectHash: string;
-  startTime: string;
-  lastUpdated: string;
-  messages: MessageRecord[];
-  summary?: string;
-  /** Workspace directories added during the session via /dir add */
-  directories?: string[];
-  /** The kind of conversation (main agent or subagent) */
-  kind?: 'main' | 'subagent';
-}
-
-/**
- * Data structure for resuming an existing session.
- */
-export interface ResumedSessionData {
-  conversation: ConversationRecord;
-  filePath: string;
-}
-
-/**
- * Loads a ConversationRecord from a JSONL session file.
- * Returns null if the file is invalid or cannot be read.
- */
-export interface LoadConversationOptions {
-  maxMessages?: number;
-  metadataOnly?: boolean;
-}
-
-interface RewindRecord {
-  $rewindTo: string;
-}
-
-interface MetadataUpdateRecord {
-  $set: Partial<ConversationRecord>;
-}
-
-interface PartialMetadataRecord {
-  sessionId: string;
-  projectHash: string;
-  startTime?: string;
-  lastUpdated?: string;
-  summary?: string;
-  directories?: string[];
-  kind?: 'main' | 'subagent';
-}
 
 function hasProperty<T extends string>(
   obj: unknown,
@@ -320,54 +218,7 @@ export async function loadConversationRecord(
     }
 
     if (!metadata.sessionId || !metadata.projectHash) {
-      // Fallback for legacy monolithic JSON files
-      try {
-        const fileContent = await fs.promises.readFile(filePath, 'utf8');
-        const parsed = JSON.parse(fileContent) as unknown;
-
-        const isLegacyRecord = (val: unknown): val is ConversationRecord =>
-          typeof val === 'object' && val !== null && 'sessionId' in val;
-
-        if (isLegacyRecord(parsed)) {
-          const legacyRecord = parsed;
-          if (options?.metadataOnly) {
-            let fallbackFirstUserMessageStr: string | undefined;
-            const firstUserMessage = legacyRecord.messages?.find(
-              (m) => m.type === 'user',
-            );
-            if (firstUserMessage) {
-              const rawContent = firstUserMessage.content;
-              if (Array.isArray(rawContent)) {
-                fallbackFirstUserMessageStr = rawContent
-                  .map((p: unknown) => (isTextPart(p) ? p.text : ''))
-                  .join('');
-              } else if (typeof rawContent === 'string') {
-                fallbackFirstUserMessageStr = rawContent;
-              }
-            }
-            return {
-              ...legacyRecord,
-              messages: [],
-              messageCount: legacyRecord.messages?.length || 0,
-              firstUserMessage: fallbackFirstUserMessageStr,
-              hasUserOrAssistantMessage:
-                legacyRecord.messages?.some(
-                  (m) => m.type === 'user' || m.type === 'gemini',
-                ) || false,
-            };
-          }
-          return {
-            ...legacyRecord,
-            hasUserOrAssistantMessage:
-              legacyRecord.messages?.some(
-                (m) => m.type === 'user' || m.type === 'gemini',
-              ) || false,
-          };
-        }
-      } catch {
-        // ignore legacy fallback parse error
-      }
-      return null;
+      return await parseLegacyRecordFallback(filePath, options);
     }
 
     return {
@@ -395,42 +246,6 @@ export async function loadConversationRecord(
   }
 }
 
-function truncateLargeToolResults(message: MessageRecord): MessageRecord {
-  if (message.type !== 'gemini' || !message.toolCalls) return message;
-
-  let modified = false;
-  const truncatedCalls = message.toolCalls.map((tc) => {
-    if (!tc.result) return tc;
-    const str = JSON.stringify(tc.result);
-    if (str.length > MAX_TOOL_OUTPUT_SIZE) {
-      modified = true;
-      return {
-        ...tc,
-        result: [
-          {
-            functionResponse: {
-              name: tc.name,
-              response: {
-                result:
-                  '[Output truncated for memory: full content saved to disk]',
-              },
-            },
-          },
-        ],
-      };
-    }
-    return tc;
-  });
-
-  if (modified) {
-    return { ...message, toolCalls: truncatedCalls };
-  }
-  return message;
-}
-
-/**
- * Service for automatically recording chat conversations to disk.
- */
 export class ChatRecordingService {
   private conversationFile: string | null = null;
   private cachedConversation: ConversationRecord | null = null;
@@ -460,18 +275,9 @@ export class ChatRecordingService {
 
         const loadedRecord = await loadConversationRecord(
           this.conversationFile,
-          { maxMessages: MAX_HISTORY_MESSAGES },
         );
         if (loadedRecord) {
-          // Truncate memory messages and keep bounded
-          const boundedMessages = loadedRecord.messages.map(
-            truncateLargeToolResults,
-          );
-
-          this.cachedConversation = {
-            ...loadedRecord,
-            messages: boundedMessages,
-          };
+          this.cachedConversation = loadedRecord;
           this.projectHash = this.cachedConversation.projectHash;
 
           // Update the session ID in the existing file
@@ -587,23 +393,17 @@ export class ChatRecordingService {
   private pushMessage(msg: MessageRecord): void {
     if (!this.cachedConversation) return;
 
-    // We append the full, untruncated message to the log
+    // We append the full message to the log
     this.appendRecord(msg);
 
-    // Now update memory with truncated version
-    const truncatedMsg = truncateLargeToolResults(msg);
+    // Now update memory
     const index = this.cachedConversation.messages.findIndex(
       (m) => m.id === msg.id,
     );
     if (index !== -1) {
-      this.cachedConversation.messages[index] = truncatedMsg;
+      this.cachedConversation.messages[index] = msg;
     } else {
-      this.cachedConversation.messages.push(truncatedMsg);
-    }
-
-    if (this.cachedConversation.messages.length > MAX_HISTORY_MESSAGES) {
-      this.cachedConversation.messages =
-        this.cachedConversation.messages.slice(-MAX_HISTORY_MESSAGES);
+      this.cachedConversation.messages.push(msg);
     }
   }
 
@@ -989,4 +789,64 @@ export class ChatRecordingService {
       throw error;
     }
   }
+}
+
+async function parseLegacyRecordFallback(
+  filePath: string,
+  options?: LoadConversationOptions,
+): Promise<
+  | (ConversationRecord & {
+      messageCount?: number;
+      firstUserMessage?: string;
+      hasUserOrAssistantMessage?: boolean;
+    })
+  | null
+> {
+  try {
+    const fileContent = await fs.promises.readFile(filePath, 'utf8');
+    const parsed = JSON.parse(fileContent) as unknown;
+
+    const isLegacyRecord = (val: unknown): val is ConversationRecord =>
+      typeof val === 'object' && val !== null && 'sessionId' in val;
+
+    if (isLegacyRecord(parsed)) {
+      const legacyRecord = parsed;
+      if (options?.metadataOnly) {
+        let fallbackFirstUserMessageStr: string | undefined;
+        const firstUserMessage = legacyRecord.messages?.find(
+          (m) => m.type === 'user',
+        );
+        if (firstUserMessage) {
+          const rawContent = firstUserMessage.content;
+          if (Array.isArray(rawContent)) {
+            fallbackFirstUserMessageStr = rawContent
+              .map((p: unknown) => (isTextPart(p) ? p['text'] : ''))
+              .join('');
+          } else if (typeof rawContent === 'string') {
+            fallbackFirstUserMessageStr = rawContent;
+          }
+        }
+        return {
+          ...legacyRecord,
+          messages: [],
+          messageCount: legacyRecord.messages?.length || 0,
+          firstUserMessage: fallbackFirstUserMessageStr,
+          hasUserOrAssistantMessage:
+            legacyRecord.messages?.some(
+              (m) => m.type === 'user' || m.type === 'gemini',
+            ) || false,
+        };
+      }
+      return {
+        ...legacyRecord,
+        hasUserOrAssistantMessage:
+          legacyRecord.messages?.some(
+            (m) => m.type === 'user' || m.type === 'gemini',
+          ) || false,
+      };
+    }
+  } catch {
+    // ignore legacy fallback parse error
+  }
+  return null;
 }

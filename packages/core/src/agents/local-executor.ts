@@ -1033,7 +1033,6 @@ export class LocalAgentExecutor<TOutput extends z.ZodTypeAny> {
         startHistory,
         undefined,
         undefined,
-        'subagent',
       );
     } catch (e: unknown) {
       await reportError(
