@@ -150,7 +150,7 @@ export const StatusNode: React.FC<{
         elapsedTime={elapsedTime}
         forceRealStatusOnly={false}
         wittyPhrase={currentWittyPhrase}
-        suppressText={suppressText}
+        suppressText={activeHooks.length > 0 ? false : suppressText}
       />
     </Box>
   );
