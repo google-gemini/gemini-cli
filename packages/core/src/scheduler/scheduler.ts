@@ -163,19 +163,23 @@ export class Scheduler {
     });
   };
 
+  private readonly handleToolConfirmationRequest = async (
+    request: ToolConfirmationRequest,
+  ) => {
+    await this.messageBus.publish({
+      type: MessageBusType.TOOL_CONFIRMATION_RESPONSE,
+      correlationId: request.correlationId,
+      confirmed: false,
+      requiresUserConfirmation: true,
+    });
+  };
+
   private setupMessageBusListener(messageBus: MessageBus): void {
     // TODO: Optimize policy checks. Currently, tools check policy via
     // MessageBus even though the Scheduler already checked it.
     messageBus.subscribe(
       MessageBusType.TOOL_CONFIRMATION_REQUEST,
-      async (request: ToolConfirmationRequest) => {
-        await messageBus.publish({
-          type: MessageBusType.TOOL_CONFIRMATION_RESPONSE,
-          correlationId: request.correlationId,
-          confirmed: false,
-          requiresUserConfirmation: true,
-        });
-      },
+      this.handleToolConfirmationRequest,
       { signal: this.disposeController.signal },
     );
   }

@@ -156,6 +156,8 @@ export class MessageBus extends EventEmitter {
       const signal = options.signal;
       if (signal.aborted) return;
 
+      if (this.listenerToAbortCleanup.get(listener)?.has(type)) return;
+
       const abortHandler = () => {
         this.off(type, listener);
         const typeToCleanup = this.listenerToAbortCleanup.get(listener);
