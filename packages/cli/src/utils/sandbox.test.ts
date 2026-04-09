@@ -171,6 +171,39 @@ describe('sandbox', () => {
       );
     });
 
+    it('should handle absolute path for SEATBELT_PROFILE', async () => {
+      vi.mocked(os.platform).mockReturnValue('darwin');
+      process.env['SEATBELT_PROFILE'] = '/absolute/path/to/profile.sb';
+      const config: SandboxConfig = createMockSandboxConfig({
+        command: 'sandbox-exec',
+        image: 'some-image',
+      });
+
+      interface MockProcess extends EventEmitter {
+        stdout: EventEmitter;
+        stderr: EventEmitter;
+      }
+      const mockSpawnProcess = new EventEmitter() as MockProcess;
+      mockSpawnProcess.stdout = new EventEmitter();
+      mockSpawnProcess.stderr = new EventEmitter();
+      vi.mocked(spawn).mockReturnValue(
+        mockSpawnProcess as unknown as ReturnType<typeof spawn>,
+      );
+
+      const promise = start_sandbox(config);
+
+      setTimeout(() => {
+        mockSpawnProcess.emit('close', 0);
+      }, 10);
+
+      await expect(promise).resolves.toBe(0);
+      expect(spawn).toHaveBeenCalledWith(
+        'sandbox-exec',
+        expect.arrayContaining(['-f', '/absolute/path/to/profile.sb']),
+        expect.objectContaining({ stdio: 'inherit' }),
+      );
+    });
+
     it('should throw FatalSandboxError if seatbelt profile is missing', async () => {
       vi.mocked(os.platform).mockReturnValue('darwin');
       vi.mocked(fs.existsSync).mockReturnValue(false);
