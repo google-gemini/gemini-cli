@@ -197,6 +197,7 @@ export class Scheduler {
       {
         operation: GeminiCliOperation.ScheduleToolCalls,
         logPrompts: this.context.config.getTelemetryLogPromptsEnabled(),
+        sessionId: this.context.config.getSessionId(),
       },
       async ({ metadata: spanMetadata }) => {
         const requests = Array.isArray(request) ? request : [request];
@@ -901,7 +902,7 @@ export class Scheduler {
           } as ScheduledToolCall,
           signal,
         );
-      } catch (_e) {
+      } catch {
         // Fallback to normal error handling if parsing/looping fails
       }
     }

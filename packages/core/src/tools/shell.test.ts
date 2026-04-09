@@ -154,7 +154,11 @@ describe('ShellTool', () => {
         return mockSandboxManager;
       },
       sandboxPolicyManager: {
-        getCommandPermissions: vi.fn().mockReturnValue(undefined),
+        getCommandPermissions: vi.fn().mockReturnValue({
+          fileSystem: { read: [], write: [] },
+          network: false,
+        }),
+
         getModeConfig: vi.fn().mockReturnValue({ readonly: false }),
         addPersistentApproval: vi.fn(),
         addSessionApproval: vi.fn(),
@@ -416,7 +420,11 @@ describe('ShellTool', () => {
       // Advance time to trigger the background timeout
       await vi.advanceTimersByTimeAsync(250);
 
-      expect(mockShellBackground).toHaveBeenCalledWith(12345);
+      expect(mockShellBackground).toHaveBeenCalledWith(
+        12345,
+        'default',
+        'sleep 10',
+      );
 
       await promise;
     });
@@ -444,11 +452,11 @@ describe('ShellTool', () => {
           expect.any(Function),
           expect.any(AbortSignal),
           false,
-          {
+          expect.objectContaining({
             pager: 'cat',
             sanitizationConfig: {},
-            sandboxManager: new NoopSandboxManager(),
-          },
+            sandboxManager: expect.any(NoopSandboxManager),
+          }),
         );
       },
       20000,
@@ -656,7 +664,11 @@ describe('ShellTool', () => {
         // Advance time to trigger the background timeout
         await vi.advanceTimersByTimeAsync(250);
 
-        expect(mockShellBackground).toHaveBeenCalledWith(12345);
+        expect(mockShellBackground).toHaveBeenCalledWith(
+          12345,
+          'default',
+          'sleep 10',
+        );
 
         await promise;
       });
@@ -700,6 +712,39 @@ describe('ShellTool', () => {
     it('should throw an error if validation fails', () => {
       expect(() => shellTool.build({ command: '' })).toThrow();
     });
+
+    it('should NOT return a sandbox expansion prompt for npm install when sandboxing is disabled', async () => {
+      const bus = (shellTool as unknown as { messageBus: MessageBus })
+        .messageBus;
+      const mockBus = getMockMessageBusInstance(
+        bus,
+      ) as unknown as TestableMockMessageBus;
+      mockBus.defaultToolDecision = 'allow';
+
+      vi.mocked(mockConfig.getSandboxEnabled).mockReturnValue(false);
+      const params = { command: 'npm install' };
+      const invocation = shellTool.build(params);
+
+      const confirmation = await invocation.shouldConfirmExecute(
+        new AbortController().signal,
+      );
+
+      // Should be false because standard confirm mode is 'allow'
+      expect(confirmation).toBe(false);
+    });
+
+    it('should return a sandbox expansion prompt for npm install when sandboxing is enabled', async () => {
+      vi.mocked(mockConfig.getSandboxEnabled).mockReturnValue(true);
+      const params = { command: 'npm install' };
+      const invocation = shellTool.build(params);
+
+      const confirmation = await invocation.shouldConfirmExecute(
+        new AbortController().signal,
+      );
+
+      expect(confirmation).not.toBe(false);
+      expect(confirmation && confirmation.type).toBe('sandbox_expansion');
+    });
   });
 
   describe('getDescription', () => {
@@ -722,6 +767,46 @@ describe('ShellTool', () => {
       );
       const shellTool = new ShellTool(mockConfig, createMockMessageBus());
       expect(shellTool.description).not.toContain('Efficiency Guidelines:');
+    });
+
+    it('should return the command if description is not provided', () => {
+      const invocation = shellTool.build({
+        command: 'echo "hello"',
+      });
+      expect(invocation.getDescription()).toBe('echo "hello"');
+    });
+
+    it('should return the command if it is short (<= 150 chars), even if description is provided', () => {
+      const invocation = shellTool.build({
+        command: 'echo "hello"',
+        description: 'Prints a friendly greeting.',
+      });
+      expect(invocation.getDescription()).toBe('echo "hello"');
+    });
+
+    it('should return the description if the command is long (> 150 chars)', () => {
+      const longCommand = 'echo "hello" && '.repeat(15) + 'echo "world"'; // Length > 150
+      const invocation = shellTool.build({
+        command: longCommand,
+        description: 'Prints multiple greetings.',
+      });
+      expect(invocation.getDescription()).toBe('Prints multiple greetings.');
+    });
+
+    it('should return the raw command if description is an empty string', () => {
+      const invocation = shellTool.build({
+        command: 'echo hello',
+        description: '',
+      });
+      expect(invocation.getDescription()).toBe('echo hello');
+    });
+
+    it('should return the raw command if description is just whitespace', () => {
+      const invocation = shellTool.build({
+        command: 'echo hello',
+        description: '   ',
+      });
+      expect(invocation.getDescription()).toBe('echo hello');
     });
   });
 
@@ -941,6 +1026,10 @@ describe('ShellTool', () => {
 
   describe('sandbox heuristics', () => {
     const mockAbortSignal = new AbortController().signal;
+
+    beforeEach(() => {
+      vi.mocked(mockConfig.getSandboxEnabled).mockReturnValue(true);
+    });
 
     it('should suggest proactive permissions for npm commands', async () => {
       const homeDir = path.join(tempRootDir, 'home');

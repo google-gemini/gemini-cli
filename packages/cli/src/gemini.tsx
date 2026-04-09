@@ -13,7 +13,7 @@ import {
   type OutputPayload,
   type ConsoleLogPayload,
   type UserFeedbackPayload,
-  sessionId,
+  createSessionId,
   logUserPrompt,
   AuthType,
   UserPromptEvent,
@@ -33,6 +33,7 @@ import {
   type AdminControlsSettings,
   debugLogger,
   isHeadlessMode,
+  Storage,
 } from '@google/gemini-cli-core';
 
 import { loadCliConfig, parseArguments } from './config/config.js';
@@ -111,6 +112,8 @@ export function validateDnsResolutionOrder(
   return defaultValue;
 }
 
+const DEFAULT_EPT_SIZE = (256 * 1024 * 1024).toString();
+
 export function getNodeMemoryArgs(isDebugMode: boolean): string[] {
   const totalMemoryMB = os.totalmem() / (1024 * 1024);
   const heapStats = v8.getHeapStatistics();
@@ -130,16 +133,35 @@ export function getNodeMemoryArgs(isDebugMode: boolean): string[] {
     return [];
   }
 
+  const args: string[] = [];
+
+  // Automatically expand the V8 External Pointer Table to 256MB to prevent
+  // out-of-memory crashes during high native-handle concurrency.
+  // Note: Only supported in specific Node.js versions compiled with V8 Sandbox enabled.
+  const eptFlag = `--max-external-pointer-table-size=${DEFAULT_EPT_SIZE}`;
+  const isV8SandboxEnabled =
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-type-assertion
+    (process.config?.variables as any)?.v8_enable_sandbox === 1;
+
+  if (
+    isV8SandboxEnabled &&
+    !process.execArgv.some((arg) =>
+      arg.startsWith('--max-external-pointer-table-size'),
+    )
+  ) {
+    args.push(eptFlag);
+  }
+
   if (targetMaxOldSpaceSizeInMB > currentMaxOldSpaceSizeMb) {
     if (isDebugMode) {
       debugLogger.debug(
         `Need to relaunch with more memory: ${targetMaxOldSpaceSizeInMB.toFixed(2)} MB`,
       );
     }
-    return [`--max-old-space-size=${targetMaxOldSpaceSizeInMB}`];
+    args.push(`--max-old-space-size=${targetMaxOldSpaceSizeInMB}`);
   }
 
-  return [];
+  return args;
 }
 
 export function setupUnhandledRejectionHandler() {
@@ -162,6 +184,39 @@ ${reason.stack}`
       appEvents.emit(AppEvent.OpenDebugConsole);
     }
   });
+}
+
+export async function resolveSessionId(resumeArg: string | undefined): Promise<{
+  sessionId: string;
+  resumedSessionData?: ResumedSessionData;
+}> {
+  if (!resumeArg) {
+    return { sessionId: createSessionId() };
+  }
+
+  const storage = new Storage(process.cwd());
+  await storage.initialize();
+
+  try {
+    const { sessionData, sessionPath } = await new SessionSelector(
+      storage,
+    ).resolveSession(resumeArg);
+    return {
+      sessionId: sessionData.sessionId,
+      resumedSessionData: { conversation: sessionData, filePath: sessionPath },
+    };
+  } catch (error) {
+    if (error instanceof SessionError && error.code === 'NO_SESSIONS_FOUND') {
+      coreEvents.emitFeedback('warning', error.message);
+      return { sessionId: createSessionId() };
+    }
+    coreEvents.emitFeedback(
+      'error',
+      `Error resuming session: ${error instanceof Error ? error.message : 'Unknown error'}`,
+    );
+    await runExitCleanup();
+    process.exit(ExitCodes.FATAL_INPUT_ERROR);
+  }
 }
 
 export async function startInteractiveUI(
@@ -258,6 +313,8 @@ export async function main() {
   });
 
   const argv = await argvPromise;
+
+  const { sessionId, resumedSessionData } = await resolveSessionId(argv.resume);
 
   if (
     (argv.allowedTools && argv.allowedTools.length > 0) ||
@@ -577,40 +634,6 @@ export async function main() {
         isAlternateBuffer: useAlternateBuffer,
       })),
     ];
-
-    // Handle --resume flag
-    let resumedSessionData: ResumedSessionData | undefined = undefined;
-    if (argv.resume) {
-      const sessionSelector = new SessionSelector(config);
-      try {
-        const result = await sessionSelector.resolveSession(argv.resume);
-        resumedSessionData = {
-          conversation: result.sessionData,
-          filePath: result.sessionPath,
-        };
-        // Use the existing session ID to continue recording to the same session
-        config.setSessionId(resumedSessionData.conversation.sessionId);
-      } catch (error) {
-        if (
-          error instanceof SessionError &&
-          error.code === 'NO_SESSIONS_FOUND'
-        ) {
-          // No sessions to resume — start a fresh session with a warning
-          startupWarnings.push({
-            id: 'resume-no-sessions',
-            message: error.message,
-            priority: WarningPriority.High,
-          });
-        } else {
-          coreEvents.emitFeedback(
-            'error',
-            `Error resuming session: ${error instanceof Error ? error.message : 'Unknown error'}`,
-          );
-          await runExitCleanup();
-          process.exit(ExitCodes.FATAL_INPUT_ERROR);
-        }
-      }
-    }
 
     cliStartupHandle?.end();
 

@@ -221,8 +221,8 @@ vi.mock('../utils/fetch.js', () => ({
   setGlobalProxy: mockSetGlobalProxy,
 }));
 
-vi.mock('../context/contextManager.js', () => ({
-  ContextManager: vi.fn().mockImplementation(() => ({
+vi.mock('../context/memoryContextManager.js', () => ({
+  MemoryContextManager: vi.fn().mockImplementation(() => ({
     refresh: vi.fn(),
     getGlobalMemory: vi.fn().mockReturnValue(''),
     getExtensionMemory: vi.fn().mockReturnValue(''),
@@ -237,7 +237,7 @@ import { tokenLimit } from '../core/tokenLimits.js';
 import { getCodeAssistServer } from '../code_assist/codeAssist.js';
 import { getExperiments } from '../code_assist/experiments/experiments.js';
 import type { CodeAssistServer } from '../code_assist/server.js';
-import { ContextManager } from '../context/contextManager.js';
+import { MemoryContextManager } from '../context/memoryContextManager.js';
 import { UserTierId } from '../code_assist/types.js';
 import type {
   ModelConfigService,
@@ -643,6 +643,58 @@ describe('Server Config (config.ts)', () => {
           expect(config.getGemini31FlashLiteLaunchedSync()).toBe(true);
         },
       );
+    });
+
+    describe('getRequestTimeoutMs', () => {
+      it('should return undefined if the flag is not set', () => {
+        const config = new Config(baseParams);
+        expect(config.getRequestTimeoutMs()).toBeUndefined();
+      });
+
+      it('should return timeout in milliseconds if flag is set', () => {
+        const config = new Config({
+          ...baseParams,
+          experiments: {
+            flags: {
+              [ExperimentFlags.DEFAULT_REQUEST_TIMEOUT]: {
+                intValue: '30',
+              },
+            },
+            experimentIds: [],
+          },
+        } as unknown as ConfigParameters);
+        expect(config.getRequestTimeoutMs()).toBe(30000);
+      });
+
+      it('should return undefined if intValue is not a valid integer', () => {
+        const config = new Config({
+          ...baseParams,
+          experiments: {
+            flags: {
+              [ExperimentFlags.DEFAULT_REQUEST_TIMEOUT]: {
+                intValue: 'abc',
+              },
+            },
+            experimentIds: [],
+          },
+        } as unknown as ConfigParameters);
+        expect(config.getRequestTimeoutMs()).toBeUndefined();
+      });
+
+      it('should return undefined if intValue is negative', () => {
+        const config = new Config({
+          ...baseParams,
+          experiments: {
+            flags: {
+              [ExperimentFlags.DEFAULT_REQUEST_TIMEOUT]: {
+                intValue: '-10',
+              },
+            },
+            experimentIds: [],
+          },
+        } as unknown as ConfigParameters);
+        expect(config.getRequestTimeoutMs()).toBeUndefined();
+      });
     });
   });
 
@@ -1579,7 +1631,9 @@ describe('Server Config (config.ts)', () => {
       });
 
       expect(config.getSandboxEnabled()).toBe(false);
-      expect(config.getSandboxAllowedPaths()).toEqual([]);
+      expect(config.getSandboxAllowedPaths()).toEqual([
+        Storage.getGlobalTempDir(),
+      ]);
       expect(config.getSandboxNetworkAccess()).toBe(false);
     });
 
@@ -1597,7 +1651,11 @@ describe('Server Config (config.ts)', () => {
       });
 
       expect(config.getSandboxEnabled()).toBe(true);
-      expect(config.getSandboxAllowedPaths()).toEqual(['/tmp/foo', '/var/bar']);
+      expect(config.getSandboxAllowedPaths()).toEqual([
+        '/tmp/foo',
+        '/var/bar',
+        Storage.getGlobalTempDir(),
+      ]);
       expect(config.getSandboxNetworkAccess()).toBe(true);
       expect(config.getSandbox()?.command).toBe('docker');
       expect(config.getSandbox()?.image).toBe('my-image');
@@ -1614,7 +1672,10 @@ describe('Server Config (config.ts)', () => {
       });
 
       expect(config.getSandboxEnabled()).toBe(true);
-      expect(config.getSandboxAllowedPaths()).toEqual(['/only/this']);
+      expect(config.getSandboxAllowedPaths()).toEqual([
+        '/only/this',
+        Storage.getGlobalTempDir(),
+      ]);
       expect(config.getSandboxNetworkAccess()).toBe(false);
     });
 
@@ -2069,8 +2130,18 @@ describe('BaseLlmClient Lifecycle', () => {
     usageStatisticsEnabled: false,
   };
 
+  it('should throw an error if getBaseLlmClient is called before experiments have been fetched', () => {
+    const config = new Config(baseParams);
+    // By default on a new Config instance, experiments are undefined
+    expect(() => config.getBaseLlmClient()).toThrow(
+      'BaseLlmClient not initialized. Ensure experiments have been fetched and configuration is ready.',
+    );
+  });
+
   it('should throw an error if getBaseLlmClient is called before refreshAuth', () => {
     const config = new Config(baseParams);
+    // Explicitly set experiments to avoid triggering the new missing-experiments error
+    config.setExperiments({ flags: {}, experimentIds: [] });
     expect(() => config.getBaseLlmClient()).toThrow(
       'BaseLlmClient not initialized. Ensure authentication has occurred and ContentGenerator is ready.',
     );
@@ -3022,11 +3093,11 @@ describe('Config Quota & Preview Model Access', () => {
 
 describe('Config JIT Initialization', () => {
   let config: Config;
-  let mockContextManager: ContextManager;
+  let mockMemoryContextManager: MemoryContextManager;
 
   beforeEach(() => {
     vi.clearAllMocks();
-    mockContextManager = {
+    mockMemoryContextManager = {
       refresh: vi.fn(),
       getGlobalMemory: vi.fn().mockReturnValue('Global Memory'),
       getExtensionMemory: vi.fn().mockReturnValue('Extension Memory'),
@@ -3035,13 +3106,13 @@ describe('Config JIT Initialization', () => {
         .mockReturnValue('Environment Memory\n\nMCP Instructions'),
       getUserProjectMemory: vi.fn().mockReturnValue(''),
       getLoadedPaths: vi.fn().mockReturnValue(new Set(['/path/to/GEMINI.md'])),
-    } as unknown as ContextManager;
-    (ContextManager as unknown as Mock).mockImplementation(
-      () => mockContextManager,
+    } as unknown as MemoryContextManager;
+    (MemoryContextManager as unknown as Mock).mockImplementation(
+      () => mockMemoryContextManager,
     );
   });
 
-  it('should initialize ContextManager, load memory, and delegate to it when experimentalJitContext is enabled', async () => {
+  it('should initialize MemoryContextManager, load memory, and delegate to it when experimentalJitContext is enabled', async () => {
     const params: ConfigParameters = {
       sessionId: 'test-session',
       targetDir: '/tmp/test',
@@ -3055,8 +3126,8 @@ describe('Config JIT Initialization', () => {
     config = new Config(params);
     await config.initialize();
 
-    expect(ContextManager).toHaveBeenCalledWith(config);
-    expect(mockContextManager.refresh).toHaveBeenCalled();
+    expect(MemoryContextManager).toHaveBeenCalledWith(config);
+    expect(mockMemoryContextManager.refresh).toHaveBeenCalled();
     expect(config.getUserMemory()).toEqual({
       global: 'Global Memory',
       extension: 'Extension Memory',
@@ -3079,12 +3150,12 @@ describe('Config JIT Initialization', () => {
     expect(sessionMemory).toContain('</project_context>');
     expect(sessionMemory).toContain('</loaded_context>');
 
-    // Verify state update (delegated to ContextManager)
+    // Verify state update (delegated to MemoryContextManager)
     expect(config.getGeminiMdFileCount()).toBe(1);
     expect(config.getGeminiMdFilePaths()).toEqual(['/path/to/GEMINI.md']);
   });
 
-  it('should NOT initialize ContextManager when experimentalJitContext is disabled', async () => {
+  it('should NOT initialize MemoryContextManager when experimentalJitContext is disabled', async () => {
     const params: ConfigParameters = {
       sessionId: 'test-session',
       targetDir: '/tmp/test',
@@ -3098,7 +3169,7 @@ describe('Config JIT Initialization', () => {
     config = new Config(params);
     await config.initialize();
 
-    expect(ContextManager).not.toHaveBeenCalled();
+    expect(MemoryContextManager).not.toHaveBeenCalled();
     expect(config.getUserMemory()).toBe('Initial Memory');
   });
 

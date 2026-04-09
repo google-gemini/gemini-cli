@@ -233,7 +233,10 @@ describe('MacOsSandboxManager', () => {
 
         expect(seatbeltArgsBuilder.buildSeatbeltProfile).toHaveBeenCalledWith(
           expect.objectContaining({
-            allowedPaths: ['/tmp/allowed1', '/tmp/allowed2'],
+            allowedPaths: expect.arrayContaining([
+              '/tmp/allowed1',
+              '/tmp/allowed2',
+            ]),
           }),
         );
       });
@@ -255,7 +258,7 @@ describe('MacOsSandboxManager', () => {
 
         expect(seatbeltArgsBuilder.buildSeatbeltProfile).toHaveBeenCalledWith(
           expect.objectContaining({
-            forbiddenPaths: ['/tmp/forbidden1'],
+            forbiddenPaths: expect.arrayContaining(['/tmp/forbidden1']),
           }),
         );
       });
@@ -275,7 +278,7 @@ describe('MacOsSandboxManager', () => {
 
         expect(seatbeltArgsBuilder.buildSeatbeltProfile).toHaveBeenCalledWith(
           expect.objectContaining({
-            forbiddenPaths: ['/tmp/does-not-exist'],
+            forbiddenPaths: expect.arrayContaining(['/tmp/does-not-exist']),
           }),
         );
       });
@@ -299,7 +302,7 @@ describe('MacOsSandboxManager', () => {
         expect(seatbeltArgsBuilder.buildSeatbeltProfile).toHaveBeenCalledWith(
           expect.objectContaining({
             allowedPaths: [],
-            forbiddenPaths: ['/tmp/conflict'],
+            forbiddenPaths: expect.arrayContaining(['/tmp/conflict']),
           }),
         );
       });

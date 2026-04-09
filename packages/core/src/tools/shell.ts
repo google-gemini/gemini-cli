@@ -10,7 +10,10 @@ import path from 'node:path';
 import os from 'node:os';
 import crypto from 'node:crypto';
 import { debugLogger } from '../index.js';
-import type { SandboxPermissions } from '../services/sandboxManager.js';
+import {
+  type SandboxPermissions,
+  getPathIdentity,
+} from '../services/sandboxManager.js';
 import { ToolErrorType } from './tool-error.js';
 import {
   BaseDeclarativeTool,
@@ -42,6 +45,7 @@ import {
   stripShellWrapper,
   parseCommandDetails,
   hasRedirection,
+  normalizeCommand,
 } from '../utils/shell-utils.js';
 import { SHELL_TOOL_NAME } from './tool-names.js';
 import { PARAM_ADDITIONAL_PERMISSIONS } from './definitions/base-declarations.js';
@@ -49,7 +53,7 @@ import type { MessageBus } from '../confirmation-bus/message-bus.js';
 import { getShellDefinition } from './definitions/coreTools.js';
 import { resolveToolDeclaration } from './definitions/resolver.js';
 import type { AgentLoopContext } from '../config/agent-loop-context.js';
-import { isSubpath } from '../utils/paths.js';
+import { isSubpath, resolveToRealPath } from '../utils/paths.js';
 import {
   getProactiveToolSuggestions,
   isNetworkReliantCommand,
@@ -59,12 +63,14 @@ export const OUTPUT_UPDATE_INTERVAL_MS = 1000;
 
 // Delay so user does not see the output of the process before the process is moved to the background.
 const BACKGROUND_DELAY_MS = 200;
+const SHOW_NL_DESCRIPTION_THRESHOLD = 150;
 
 export interface ShellToolParams {
   command: string;
   description?: string;
   dir_path?: string;
   is_background?: boolean;
+  delay_ms?: number;
   [PARAM_ADDITIONAL_PERMISSIONS]?: SandboxPermissions;
 }
 
@@ -131,7 +137,12 @@ export class ShellToolInvocation extends BaseToolInvocation<
   }
 
   getDescription(): string {
-    return `${this.params.command} ${this.getContextualDetails()}`;
+    const descStr = this.params.description?.trim();
+    const commandStr = this.params.command;
+    return Array.from(commandStr).length <= SHOW_NL_DESCRIPTION_THRESHOLD ||
+      !descStr
+      ? commandStr
+      : descStr;
   }
 
   private simplifyPaths(paths: Set<string>): string[] {
@@ -246,77 +257,103 @@ export class ShellToolInvocation extends BaseToolInvocation<
       return this.getConfirmationDetails(abortSignal);
     }
 
-    // Proactively suggest expansion for known network-heavy Node.js ecosystem tools
-    // (npm install, etc.) to avoid hangs when network is restricted by default.
-    // We do this even if the command is "allowed" by policy because the DEFAULT
-    // permissions are usually insufficient for these commands.
-    const command = stripShellWrapper(this.params.command);
-    const rootCommands = getCommandRoots(command);
-    const rootCommand = rootCommands[0];
+    if (this.context.config.getSandboxEnabled()) {
+      const command = stripShellWrapper(this.params.command);
+      const rootCommands = getCommandRoots(command);
+      const rawRootCommand = rootCommands[0];
 
-    if (rootCommand) {
-      const proactive = await getProactiveToolSuggestions(rootCommand);
-      if (proactive) {
-        const approved =
-          this.context.config.sandboxPolicyManager.getCommandPermissions(
-            rootCommand,
-          );
-        const missingNetwork = !!proactive.network && !approved?.network;
-
-        // Detect commands or sub-commands that definitely need network
-        const parsed = parseCommandDetails(command);
-        const subCommand = parsed?.details[0]?.args?.[0];
-        const needsNetwork = isNetworkReliantCommand(rootCommand, subCommand);
-
-        if (needsNetwork) {
-          // Add write permission to the current directory if we are in readonly mode
+      if (rawRootCommand) {
+        const rootCommand = normalizeCommand(rawRootCommand);
+        const proactive = await getProactiveToolSuggestions(rootCommand);
+        if (proactive) {
           const mode = this.context.config.getApprovalMode();
-          const isReadonlyMode =
-            this.context.config.sandboxPolicyManager.getModeConfig(mode)
-              ?.readonly ?? false;
+          const modeConfig =
+            this.context.config.sandboxPolicyManager.getModeConfig(mode);
+          const approved =
+            this.context.config.sandboxPolicyManager.getCommandPermissions(
+              rootCommand,
+            );
 
-          if (isReadonlyMode) {
-            const cwd =
-              this.params.dir_path || this.context.config.getTargetDir();
-            proactive.fileSystem = proactive.fileSystem || {
-              read: [],
-              write: [],
-            };
-            proactive.fileSystem.write = proactive.fileSystem.write || [];
-            if (!proactive.fileSystem.write.includes(cwd)) {
-              proactive.fileSystem.write.push(cwd);
-              proactive.fileSystem.read = proactive.fileSystem.read || [];
-              if (!proactive.fileSystem.read.includes(cwd)) {
-                proactive.fileSystem.read.push(cwd);
+          const hasNetwork = modeConfig.network || approved.network;
+          const missingNetwork = !!proactive.network && !hasNetwork;
+
+          // Detect commands or sub-commands that definitely need network
+          const parsed = parseCommandDetails(command);
+          const subCommand = parsed?.details[0]?.args?.[0];
+          const needsNetwork = isNetworkReliantCommand(rootCommand, subCommand);
+
+          if (needsNetwork) {
+            // Add write permission to the current directory if we are in readonly mode
+            const isReadonlyMode = modeConfig.readonly ?? false;
+
+            if (isReadonlyMode) {
+              const cwd =
+                this.params.dir_path || this.context.config.getTargetDir();
+              proactive.fileSystem = proactive.fileSystem || {
+                read: [],
+                write: [],
+              };
+              proactive.fileSystem.write = proactive.fileSystem.write || [];
+              if (!proactive.fileSystem.write.includes(cwd)) {
+                proactive.fileSystem.write.push(cwd);
+                proactive.fileSystem.read = proactive.fileSystem.read || [];
+                if (!proactive.fileSystem.read.includes(cwd)) {
+                  proactive.fileSystem.read.push(cwd);
+                }
               }
             }
-          }
 
-          const missingRead = (proactive.fileSystem?.read || []).filter(
-            (p) => !approved?.fileSystem?.read?.includes(p),
-          );
-          const missingWrite = (proactive.fileSystem?.write || []).filter(
-            (p) => !approved?.fileSystem?.write?.includes(p),
-          );
+            const isApproved = (
+              requestedPath: string,
+              approvedPaths?: string[],
+            ): boolean => {
+              if (!approvedPaths || approvedPaths.length === 0) return false;
+              const requestedRealIdentity = getPathIdentity(
+                resolveToRealPath(requestedPath),
+              );
 
-          const needsExpansion =
-            missingRead.length > 0 || missingWrite.length > 0 || missingNetwork;
+              // Identity check is fast, subpath check is slower
+              return approvedPaths.some((p) => {
+                const approvedRealIdentity = getPathIdentity(
+                  resolveToRealPath(p),
+                );
+                return (
+                  requestedRealIdentity === approvedRealIdentity ||
+                  isSubpath(approvedRealIdentity, requestedRealIdentity)
+                );
+              });
+            };
 
-          if (needsExpansion) {
-            const details = await this.getConfirmationDetails(
-              abortSignal,
-              proactive,
+            const missingRead = (proactive.fileSystem?.read || []).filter(
+              (p) => !isApproved(p, approved.fileSystem?.read),
             );
-            if (details && details.type === 'sandbox_expansion') {
-              const originalOnConfirm = details.onConfirm;
-              details.onConfirm = async (outcome: ToolConfirmationOutcome) => {
-                await originalOnConfirm(outcome);
-                if (outcome !== ToolConfirmationOutcome.Cancel) {
-                  this.proactivePermissionsConfirmed = proactive;
-                }
-              };
+            const missingWrite = (proactive.fileSystem?.write || []).filter(
+              (p) => !isApproved(p, approved.fileSystem?.write),
+            );
+
+            const needsExpansion =
+              missingRead.length > 0 ||
+              missingWrite.length > 0 ||
+              missingNetwork;
+
+            if (needsExpansion) {
+              const details = await this.getConfirmationDetails(
+                abortSignal,
+                proactive,
+              );
+              if (details && details.type === 'sandbox_expansion') {
+                const originalOnConfirm = details.onConfirm;
+                details.onConfirm = async (
+                  outcome: ToolConfirmationOutcome,
+                ) => {
+                  await originalOnConfirm(outcome);
+                  if (outcome !== ToolConfirmationOutcome.Cancel) {
+                    this.proactivePermissionsConfirmed = proactive;
+                  }
+                };
+              }
+              return details;
             }
-            return details;
           }
         }
       }
@@ -521,6 +558,7 @@ export class ShellToolInvocation extends BaseToolInvocation<
           this.context.config.getEnableInteractiveShell(),
           {
             ...shellExecutionConfig,
+            sessionId: this.context.config?.getSessionId?.() ?? 'default',
             pager: 'cat',
             sanitizationConfig:
               shellExecutionConfig?.sanitizationConfig ??
@@ -547,6 +585,7 @@ export class ShellToolInvocation extends BaseToolInvocation<
             },
             backgroundCompletionBehavior:
               this.context.config.getShellBackgroundCompletionBehavior(),
+            originalCommand: strippedCommand,
           },
         );
 
@@ -556,10 +595,32 @@ export class ShellToolInvocation extends BaseToolInvocation<
         }
 
         // If the model requested to run in the background, do so after a short delay.
+        let completed = false;
         if (this.params.is_background) {
+          resultPromise
+            .then(() => {
+              completed = true;
+            })
+            .catch(() => {
+              completed = true; // Also mark completed if it failed
+            });
+
+          const sessionId = this.context.config?.getSessionId?.() ?? 'default';
+          const delay = this.params.delay_ms ?? BACKGROUND_DELAY_MS;
           setTimeout(() => {
-            ShellExecutionService.background(pid);
-          }, BACKGROUND_DELAY_MS);
+            ShellExecutionService.background(pid, sessionId, strippedCommand);
+          }, delay);
+
+          // Wait for the delay amount to see if command returns quickly
+          await new Promise((resolve) => setTimeout(resolve, delay));
+
+          if (!completed) {
+            // Return early with initial output if still running
+            return {
+              llmContent: `Command is running in background. PID: ${pid}. Initial output:\n${cumulativeOutput}`,
+              returnDisplay: `Background process started with PID ${pid}.`,
+            };
+          }
         }
       }
 
@@ -661,33 +722,34 @@ export class ShellToolInvocation extends BaseToolInvocation<
         llmContent = llmContentParts.join('\n');
       }
 
-      let returnDisplayMessage = '';
+      let returnDisplay: string | AnsiOutput = '';
       if (this.context.config.getDebugMode()) {
-        returnDisplayMessage = llmContent;
+        returnDisplay = llmContent;
       } else {
         if (this.params.is_background || result.backgrounded) {
-          returnDisplayMessage = `Command moved to background (PID: ${result.pid}). Output hidden. Press Ctrl+B to view.`;
+          returnDisplay = `Command moved to background (PID: ${result.pid}). Output hidden. Press Ctrl+B to view.`;
         } else if (result.aborted) {
           const cancelMsg = timeoutMessage || 'Command cancelled by user.';
           if (result.output.trim()) {
-            returnDisplayMessage = `${cancelMsg}\n\nOutput before cancellation:\n${result.output}`;
+            returnDisplay = `${cancelMsg}\n\nOutput before cancellation:\n${result.output}`;
           } else {
-            returnDisplayMessage = cancelMsg;
+            returnDisplay = cancelMsg;
           }
-        } else if (result.output.trim()) {
-          returnDisplayMessage = result.output;
+        } else if (result.output.trim() || result.ansiOutput) {
+          returnDisplay =
+            result.ansiOutput && result.ansiOutput.length > 0
+              ? result.ansiOutput
+              : result.output;
         } else {
           if (result.signal) {
-            returnDisplayMessage = `Command terminated by signal: ${result.signal}`;
+            returnDisplay = `Command terminated by signal: ${result.signal}`;
           } else if (result.error) {
-            returnDisplayMessage = `Command failed: ${getErrorMessage(
-              result.error,
-            )}`;
+            returnDisplay = `Command failed: ${getErrorMessage(result.error)}`;
           } else if (result.exitCode !== null && result.exitCode !== 0) {
-            returnDisplayMessage = `Command exited with code: ${result.exitCode}`;
+            returnDisplay = `Command exited with code: ${result.exitCode}`;
           }
           // If output is empty and command succeeded (code 0, no error/signal/abort),
-          // returnDisplayMessage will remain empty, which is fine.
+          // returnDisplay will remain empty, which is fine.
         }
       }
 
@@ -716,20 +778,22 @@ export class ShellToolInvocation extends BaseToolInvocation<
           );
 
           // Proactive permission suggestions for Node ecosystem tools
-          const proactive =
-            await getProactiveToolSuggestions(rootCommandDisplay);
-          if (proactive) {
-            if (proactive.network) {
-              sandboxDenial.network = true;
-            }
-            if (proactive.fileSystem?.read) {
-              for (const p of proactive.fileSystem.read) {
-                readPaths.add(p);
+          if (this.context.config.getSandboxEnabled()) {
+            const proactive =
+              await getProactiveToolSuggestions(rootCommandDisplay);
+            if (proactive) {
+              if (proactive.network) {
+                sandboxDenial.network = true;
               }
-            }
-            if (proactive.fileSystem?.write) {
-              for (const p of proactive.fileSystem.write) {
-                writePaths.add(p);
+              if (proactive.fileSystem?.read) {
+                for (const p of proactive.fileSystem.read) {
+                  readPaths.add(p);
+                }
+              }
+              if (proactive.fileSystem?.write) {
+                for (const p of proactive.fileSystem.write) {
+                  writePaths.add(p);
+                }
               }
             }
           }
@@ -749,7 +813,7 @@ export class ShellToolInvocation extends BaseToolInvocation<
                   ) {
                     currentPath = path.dirname(currentPath);
                   }
-                } catch (_e) {
+                } catch {
                   /* ignore */
                 }
                 while (currentPath.length > 1) {
@@ -770,7 +834,7 @@ export class ShellToolInvocation extends BaseToolInvocation<
                   }
                   currentPath = path.dirname(currentPath);
                 }
-              } catch (_e) {
+              } catch {
                 // ignore
               }
             }
@@ -824,7 +888,7 @@ export class ShellToolInvocation extends BaseToolInvocation<
 
             return {
               llmContent: 'Sandbox expansion required',
-              returnDisplay: returnDisplayMessage,
+              returnDisplay,
               error: {
                 type: ToolErrorType.SANDBOX_EXPANSION_REQUIRED,
                 message: JSON.stringify(confirmationDetails),
@@ -856,14 +920,14 @@ export class ShellToolInvocation extends BaseToolInvocation<
         );
         return {
           llmContent: summary,
-          returnDisplay: returnDisplayMessage,
+          returnDisplay,
           ...executionError,
         };
       }
 
       return {
         llmContent,
-        returnDisplay: returnDisplayMessage,
+        returnDisplay,
         data,
         ...executionError,
       };

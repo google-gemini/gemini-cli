@@ -576,7 +576,7 @@ const SETTINGS_SCHEMA = {
         label: 'Compact Tool Output',
         category: 'UI',
         requiresRestart: false,
-        default: false,
+        default: true,
         description:
           'Display tool outputs (like directory listings and file reads) in a compact, structured format.',
         showInDialog: true,
@@ -741,6 +741,24 @@ const SETTINGS_SCHEMA = {
         default: false,
         description:
           'Use an alternate screen buffer for the UI, preserving shell history.',
+        showInDialog: true,
+      },
+      renderProcess: {
+        type: 'boolean',
+        label: 'Render Process',
+        category: 'UI',
+        requiresRestart: true,
+        default: true,
+        description: 'Enable Ink render process for the UI.',
+        showInDialog: true,
+      },
+      terminalBuffer: {
+        type: 'boolean',
+        label: 'Terminal Buffer',
+        category: 'UI',
+        requiresRestart: true,
+        default: false,
+        description: 'Use the new terminal buffer architecture for rendering.',
         showInDialog: true,
       },
       useBackgroundColor: {
@@ -1202,7 +1220,8 @@ const SETTINGS_SCHEMA = {
             category: 'Advanced',
             requiresRestart: true,
             default: undefined as string | undefined,
-            description: 'Model override for the visual agent.',
+            description:
+              "Model for the visual agent's analyze_screenshot tool. When set, enables the tool.",
             showInDialog: false,
           },
           allowedDomains: {
@@ -1508,7 +1527,7 @@ const SETTINGS_SCHEMA = {
             label: 'Show Color',
             category: 'Tools',
             requiresRestart: false,
-            default: false,
+            default: true,
             description: 'Show color in shell output.',
             showInDialog: true,
           },
@@ -1692,10 +1711,10 @@ const SETTINGS_SCHEMA = {
         type: 'boolean',
         label: 'Tool Sandboxing',
         category: 'Security',
-        requiresRestart: false,
+        requiresRestart: true,
         default: false,
         description:
-          'Experimental tool-level sandboxing (implementation in progress).',
+          'Tool-level sandboxing. Isolates individual tools instead of the entire CLI process.',
         showInDialog: true,
       },
       disableYoloMode: {
@@ -1887,7 +1906,7 @@ const SETTINGS_SCHEMA = {
         label: 'Auto Configure Max Old Space Size',
         category: 'Advanced',
         requiresRestart: true,
-        default: false,
+        default: true,
         description: 'Automatically configure Node.js memory limits',
         showInDialog: true,
       },
@@ -1949,6 +1968,16 @@ const SETTINGS_SCHEMA = {
             requiresRestart: true,
             default: false,
             description: 'Enable non-interactive agent sessions.',
+            showInDialog: false,
+          },
+          agentSessionInteractiveEnabled: {
+            type: 'boolean',
+            label: 'Interactive Agent Session Enabled',
+            category: 'Experimental',
+            requiresRestart: true,
+            default: false,
+            description:
+              'Enable the agent session implementation for the interactive CLI.',
             showInDialog: false,
           },
         },
@@ -2146,6 +2175,16 @@ const SETTINGS_SCHEMA = {
         default: false,
         description:
           'Replace the built-in save_memory tool with a memory manager subagent that supports adding, removing, de-duplicating, and organizing memories.',
+        showInDialog: true,
+      },
+      generalistProfile: {
+        type: 'boolean',
+        label: 'Use the generalist profile to manage agent contexts.',
+        category: 'Experimental',
+        requiresRestart: true,
+        default: false,
+        description:
+          'Suitable for general coding and software development tasks.',
         showInDialog: true,
       },
       contextManagement: {

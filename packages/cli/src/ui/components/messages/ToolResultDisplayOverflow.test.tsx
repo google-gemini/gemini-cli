@@ -23,7 +23,7 @@ describe('ToolResultDisplay Overflow', () => {
       {
         config: makeFakeConfig({ useAlternateBuffer: false }),
         settings: createMockSettings({ ui: { useAlternateBuffer: false } }),
-        uiState: { constrainHeight: true },
+        uiState: { constrainHeight: true, terminalHeight: 50 },
       },
     );
     await waitUntilReady();
@@ -31,7 +31,7 @@ describe('ToolResultDisplay Overflow', () => {
 
     expect(output).toContain('Line 1');
     expect(output).toContain('Line 2');
-    expect(output).not.toContain('Line 3'); // Line 3 is replaced by the "hidden" label
+    expect(output).not.toContain('Line 3');
     expect(output).not.toContain('Line 4');
     expect(output).not.toContain('Line 5');
     expect(output).toContain('hidden');
@@ -50,7 +50,7 @@ describe('ToolResultDisplay Overflow', () => {
       {
         config: makeFakeConfig({ useAlternateBuffer: false }),
         settings: createMockSettings({ ui: { useAlternateBuffer: false } }),
-        uiState: { constrainHeight: true },
+        uiState: { constrainHeight: true, terminalHeight: 50 },
       },
     );
     await waitUntilReady();
@@ -76,6 +76,7 @@ describe('ToolResultDisplay Overflow', () => {
         underline: false,
         dim: false,
         inverse: false,
+        isUninitialized: false,
       },
     ]);
     const { lastFrame, waitUntilReady, unmount } = await renderWithProviders(
@@ -88,7 +89,7 @@ describe('ToolResultDisplay Overflow', () => {
       {
         config: makeFakeConfig({ useAlternateBuffer: false }),
         settings: createMockSettings({ ui: { useAlternateBuffer: false } }),
-        uiState: { constrainHeight: true },
+        uiState: { constrainHeight: true, terminalHeight: 50 },
       },
     );
     await waitUntilReady();
