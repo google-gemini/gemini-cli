@@ -1452,6 +1452,67 @@ describe('oauth2', () => {
         stdinRemoveListenerSpy.mockRestore();
       });
 
+      it('should NOT cancel when 0x03 is embedded in a multi-byte escape sequence (Ghostty/VS Code WSL false-positive)', async () => {
+        // Only a lone 0x03 byte is Ctrl+C; a multi-byte escape sequence that
+        // merely contains 0x03 (e.g. from Ghostty on init/resize) must not cancel.
+        const stdinOnSpy = vi
+          .spyOn(process.stdin, 'on')
+          .mockImplementation(() => process.stdin);
+        vi.spyOn(process.stdin, 'removeListener').mockImplementation(
+          () => process.stdin,
+        );
+
+        const mockHttpServer = {
+          listen: vi.fn(),
+          close: vi.fn(),
+          on: vi.fn(),
+          address: () => ({ port: 3000 }),
+        };
+        (http.createServer as Mock).mockImplementation(
+          () => mockHttpServer as unknown as http.Server,
+        );
+        vi.mocked(OAuth2Client).mockImplementation(
+          () =>
+            ({
+              generateAuthUrl: vi.fn().mockReturnValue('https://example.com'),
+              on: vi.fn(),
+            }) as unknown as OAuth2Client,
+        );
+        vi.mocked(open).mockImplementation(
+          async () => ({ on: vi.fn() }) as never,
+        );
+
+        const clientPromise = getOauthClient(
+          AuthType.LOGIN_WITH_GOOGLE,
+          mockConfig,
+        );
+
+        // Grab the registered stdin data handler
+        let dataHandler: ((data: Buffer) => void) | undefined;
+        await vi.waitFor(() => {
+          dataHandler = stdinOnSpy.mock.calls.find(
+            (c: [string | symbol, ...unknown[]]) => c[0] === 'data',
+          )?.[1] as (data: Buffer) => void;
+          if (!dataHandler) throw new Error('handler not registered');
+        });
+
+        // Fire an escape sequence embedding 0x03 — must NOT cancel.
+        dataHandler!(Buffer.from([0x1b, 0x5b, 0x03, 0x4d])); // ESC [ 0x03 M
+
+        // Promise must still be pending (not rejected).
+        const result = await Promise.race([
+          clientPromise.then(
+            () => 'resolved',
+            () => 'rejected',
+          ),
+          new Promise<string>((r) => setTimeout(() => r('pending'), 50)),
+        ]);
+        expect(result).toBe('pending');
+
+        stdinOnSpy.mockRestore();
+        vi.spyOn(process.stdin, 'removeListener').mockRestore();
+      });
+
       it('should throw FatalCancellationError when consent is denied', async () => {
         vi.spyOn(coreEvents, 'emitConsentRequest').mockImplementation(
           (payload) => {
