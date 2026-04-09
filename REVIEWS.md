@@ -1,6 +1,6 @@
 # 🔎 Gemini CLI Triage Dashboard
 
-*Last Synchronized: 2026-04-09 23:07 (UTC)*
+*Last Synchronized: 2026-04-09 23:25 (UTC)*
 
 **Total Issues Tracked: 176** | **Categorized: 176**
 
@@ -122,7 +122,7 @@
 | [#17834 Website landing and extensions page flash when theme is set to light](https://github.com/google-gemini/gemini-cli/issues/17834) | @PrafulVRaj | `2026-04-09` |
 | [#15945 System-wide PTY exhaustion due to file descriptor leak](https://github.com/google-gemini/gemini-cli/issues/15945) | @spencer426 | `2026-04-09` |
 
-## 🛠️ Active Development: Blocked PRs (33)
+## 🛠️ Active Development: Blocked PRs (36)
 **Status: Active work with conflicts or failures (Touched < 14 days ago).**
 
 | Issue | Linked PR | Author | Reason | Last Update |
@@ -158,10 +158,13 @@
 | [#20730 gemini is not able to view files that exist, and I am not able to tag them (despite not being gitignored/geminiignored)](https://github.com/google-gemini/gemini-cli/issues/20730) | [#20738](https://github.com/google-gemini/gemini-cli/pull/20738) | @Aaxhirrr | Merge Conflict | `2026-04-07` |
 | [#21230 feat: visualize tool and /visualize command](https://github.com/google-gemini/gemini-cli/issues/21230) | [#24192](https://github.com/google-gemini/gemini-cli/pull/24192) | @student-ankitpandit | Merge Conflict | `2026-03-30` |
 | [#21340 feat: Add configurable shell executable for run_shell_command on Windows](https://github.com/google-gemini/gemini-cli/issues/21340) | [#22018](https://github.com/google-gemini/gemini-cli/pull/22018) | @benjamindrussell | Merge Conflict | `2026-04-09` |
+| [#19919 "Failed to persist policy" error despite correct permissions](https://github.com/google-gemini/gemini-cli/issues/19919) | [#21541](https://github.com/google-gemini/gemini-cli/pull/21541) | @krishdef7 | Merge Conflict | `2026-04-09` |
+| [#21084 External editor support: unclear error messages, missing editors, incomplete documentation](https://github.com/google-gemini/gemini-cli/issues/21084) | [#21090](https://github.com/google-gemini/gemini-cli/pull/21090) | @alberti42 | Merge Conflict | `2026-04-04` |
 | [#11462 Consider adding visual regression testing for terminal UI components](https://github.com/google-gemini/gemini-cli/issues/11462) | [#20695](https://github.com/google-gemini/gemini-cli/pull/20695) | @Champbreed | Merge Conflict | `2026-04-09` |
 | [#19649 extend /copy to capture output also from slash commands](https://github.com/google-gemini/gemini-cli/issues/19649) | [#19825](https://github.com/google-gemini/gemini-cli/pull/19825) | @Devnil434 | Merge Conflict | `2026-04-09` |
+| [#15503 feat: github colorblind themes](https://github.com/google-gemini/gemini-cli/issues/15503) | [#15504](https://github.com/google-gemini/gemini-cli/pull/15504) | @Z1xus | Test Failure | `2026-04-09` |
 
-## 🌱 Available for Pickup (52)
+## 🌱 Available for Pickup (53)
 **Action: Open for new contributors.**
 
 | Issue | Days Idle |
@@ -216,24 +219,23 @@
 | [#18388 Delete option for MCP](https://github.com/google-gemini/gemini-cli/issues/18388) | 0 |
 | [#16091 Spam loop `Editor is not supported: ${currentPreference}` when the `preferredEditor` is an invalid value](https://github.com/google-gemini/gemini-cli/issues/16091) | 0 |
 | [#19583 feat(policy): support granular skill activation permissions](https://github.com/google-gemini/gemini-cli/issues/19583) | 0 |
-| [#21925 Gemini CLI shows the hand icon indicating that Action is required even when it is not required](https://github.com/google-gemini/gemini-cli/issues/21925) | 0 |
+| [#20968 Windows PowerShell Output Encoding Bug](https://github.com/google-gemini/gemini-cli/issues/20968) | 0 |
 | [#22035 Allow wrapping tool descriptions to prevent truncation in the UI](https://github.com/google-gemini/gemini-cli/issues/22035) | 0 |
+| [#21925 Gemini CLI shows the hand icon indicating that Action is required even when it is not required](https://github.com/google-gemini/gemini-cli/issues/21925) | 0 |
 
-## 🚩 Stale Assignments (1)
+## 🚩 Stale Assignments (0)
 **Action: Consider unassigning.** Assigned for >14 days with no PR yet.
 
 | Issue | Assignee | Days Stale |
 | :--- | :--- | :--- |
-| [#15503 feat: github colorblind themes](https://github.com/google-gemini/gemini-cli/issues/15503) | @jyyhuang | 28 |
+| - | _None_ |
 
-## 🚧 Blocked & Stale PRs (3)
+## 🚧 Blocked & Stale PRs (0)
 **Action: Needs rebase or test fix.** Blocked items untouched for >14 days.
 
 | Issue | PR | Reason | Author | Days Stale |
 | :--- | :--- | :--- | :--- | :--- |
-| [#19919 "Failed to persist policy" error despite correct permissions](https://github.com/google-gemini/gemini-cli/issues/19919) | [#21541](https://github.com/google-gemini/gemini-cli/pull/21541) | Merge Conflict | @krishdef7 | 19 |
-| [#20968 Windows PowerShell Output Encoding Bug](https://github.com/google-gemini/gemini-cli/issues/20968) | [#20971](https://github.com/google-gemini/gemini-cli/pull/20971) | Merge Conflict | @PrasannaPal21 | 35 |
-| [#21084 External editor support: unclear error messages, missing editors, incomplete documentation](https://github.com/google-gemini/gemini-cli/issues/21084) | [#21377](https://github.com/google-gemini/gemini-cli/pull/21377) | Merge Conflict | @AnanthKini1 | 29 |
+| - | _None_ | - | - | - |
 
 ---
 *Dashboard maintained by automated triage script.*
