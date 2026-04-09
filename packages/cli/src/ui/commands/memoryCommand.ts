@@ -31,6 +31,7 @@ export const memoryCommand: SlashCommand = {
       description: 'Show the current memory contents',
       kind: CommandKind.BUILT_IN,
       autoExecute: true,
+      argsSpec: { max: 0 },
       action: async (context) => {
         const config = context.services.agentContext?.config;
         if (!config) return;
@@ -50,6 +51,7 @@ export const memoryCommand: SlashCommand = {
       description: 'Add content to the memory',
       kind: CommandKind.BUILT_IN,
       autoExecute: false,
+      argsSpec: { min: 1 },
       action: (context, args): SlashCommandActionReturn | void => {
         const result = addMemory(args);
 
@@ -74,6 +76,7 @@ export const memoryCommand: SlashCommand = {
       description: 'Reload the memory from the source',
       kind: CommandKind.BUILT_IN,
       autoExecute: true,
+      argsSpec: { max: 0 },
       action: async (context) => {
         context.ui.addItem(
           {
@@ -113,6 +116,7 @@ export const memoryCommand: SlashCommand = {
       description: 'Lists the paths of the GEMINI.md files in use',
       kind: CommandKind.BUILT_IN,
       autoExecute: true,
+      argsSpec: { max: 0 },
       action: async (context) => {
         const config = context.services.agentContext?.config;
         if (!config) return;

@@ -12,6 +12,7 @@ export const tasksCommand: SlashCommand = {
   kind: CommandKind.BUILT_IN,
   description: 'Toggle background tasks view',
   autoExecute: true,
+  argsSpec: { max: 0 },
   action: async (context) => {
     context.ui.toggleBackgroundTasks();
   },

@@ -52,6 +52,7 @@ export const planCommand: SlashCommand = {
   description: 'Switch to Plan Mode and view current plan',
   kind: CommandKind.BUILT_IN,
   autoExecute: false,
+  argsSpec: { max: 0 },
   action: async (context) => {
     const config = context.services.agentContext?.config;
     if (!config) {
@@ -109,7 +110,7 @@ export const planCommand: SlashCommand = {
       description: 'Copy the currently approved plan to your clipboard',
       kind: CommandKind.BUILT_IN,
       autoExecute: true,
-      takesArgs: false,
+      argsSpec: { max: 0 },
       action: copyAction,
     },
   ],

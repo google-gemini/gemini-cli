@@ -789,7 +789,7 @@ const listExtensionsCommand: SlashCommand = {
   description: 'List active extensions',
   kind: CommandKind.BUILT_IN,
   autoExecute: true,
-  takesArgs: false,
+  argsSpec: { max: 0 },
   action: listAction,
 };
 
@@ -798,6 +798,7 @@ const updateExtensionsCommand: SlashCommand = {
   description: 'Update extensions. Usage: update <extension-names>|--all',
   kind: CommandKind.BUILT_IN,
   autoExecute: false,
+  argsSpec: { min: 1 },
   action: updateAction,
   completion: completeExtensions,
 };
@@ -807,6 +808,7 @@ const disableCommand: SlashCommand = {
   description: 'Disable an extension',
   kind: CommandKind.BUILT_IN,
   autoExecute: false,
+  argsSpec: { min: 1 },
   action: disableAction,
   completion: completeExtensionsAndScopes,
 };
@@ -816,6 +818,7 @@ const enableCommand: SlashCommand = {
   description: 'Enable an extension',
   kind: CommandKind.BUILT_IN,
   autoExecute: false,
+  argsSpec: { min: 1 },
   action: enableAction,
   completion: completeExtensionsAndScopes,
 };
@@ -825,6 +828,7 @@ const installCommand: SlashCommand = {
   description: 'Install an extension from a git repo or local path',
   kind: CommandKind.BUILT_IN,
   autoExecute: false,
+  argsSpec: { min: 1 },
   action: installAction,
 };
 
@@ -833,6 +837,7 @@ const linkCommand: SlashCommand = {
   description: 'Link an extension from a local path',
   kind: CommandKind.BUILT_IN,
   autoExecute: false,
+  argsSpec: { min: 1 },
   action: linkAction,
 };
 
@@ -841,6 +846,7 @@ const uninstallCommand: SlashCommand = {
   description: 'Uninstall an extension',
   kind: CommandKind.BUILT_IN,
   autoExecute: false,
+  argsSpec: { min: 1 },
   action: uninstallAction,
   completion: completeExtensions,
 };
@@ -850,16 +856,18 @@ const exploreExtensionsCommand: SlashCommand = {
   description: 'Open extensions page in your browser',
   kind: CommandKind.BUILT_IN,
   autoExecute: true,
-  takesArgs: false,
+  argsSpec: { max: 0 },
   action: exploreAction,
 };
 
 const reloadCommand: SlashCommand = {
   name: 'reload',
   altNames: ['restart'],
-  description: 'Reload all extensions',
+  description:
+    'Reload specified extensions. Usage: /extensions reload <name|--all>',
   kind: CommandKind.BUILT_IN,
   autoExecute: false,
+  argsSpec: { min: 1 },
   action: restartAction,
   completion: completeExtensions,
 };
@@ -869,6 +877,7 @@ const configCommand: SlashCommand = {
   description: 'Configure extension settings',
   kind: CommandKind.BUILT_IN,
   autoExecute: false,
+  argsSpec: { min: 1 },
   action: configAction,
 };
 

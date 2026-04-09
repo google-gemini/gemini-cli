@@ -38,6 +38,7 @@ const authCommand: SlashCommand = {
   description: 'Authenticate with an OAuth-enabled MCP server',
   kind: CommandKind.BUILT_IN,
   autoExecute: true,
+  argsSpec: { min: 1, max: 1 },
   action: async (
     context: CommandContext,
     args: string,
@@ -322,6 +323,7 @@ const listCommand: SlashCommand = {
   description: 'List configured MCP servers and tools',
   kind: CommandKind.BUILT_IN,
   autoExecute: true,
+  argsSpec: { max: 1 },
   action: (context, args) => listAction(context, false, false, args),
 };
 
@@ -331,6 +333,7 @@ const descCommand: SlashCommand = {
   description: 'List configured MCP servers and tools with descriptions',
   kind: CommandKind.BUILT_IN,
   autoExecute: true,
+  argsSpec: { max: 1 },
   action: (context, args) => listAction(context, true, false, args),
 };
 
@@ -340,6 +343,7 @@ const schemaCommand: SlashCommand = {
     'List configured MCP servers and tools with descriptions and schemas',
   kind: CommandKind.BUILT_IN,
   autoExecute: true,
+  argsSpec: { max: 1 },
   action: (context, args) => listAction(context, true, true, args),
 };
 
@@ -349,7 +353,7 @@ const reloadCommand: SlashCommand = {
   description: 'Reloads MCP servers',
   kind: CommandKind.BUILT_IN,
   autoExecute: true,
-  takesArgs: false,
+  argsSpec: { max: 0 },
   action: async (
     context: CommandContext,
   ): Promise<void | SlashCommandActionReturn> => {
@@ -520,6 +524,7 @@ const enableCommand: SlashCommand = {
   description: 'Enable a disabled MCP server',
   kind: CommandKind.BUILT_IN,
   autoExecute: true,
+  argsSpec: { min: 1, max: 1 },
   action: (ctx, args) => handleEnableDisable(ctx, args, true),
   completion: (ctx, arg) => getEnablementCompletion(ctx, arg, false),
 };
@@ -529,6 +534,7 @@ const disableCommand: SlashCommand = {
   description: 'Disable an MCP server',
   kind: CommandKind.BUILT_IN,
   autoExecute: true,
+  argsSpec: { min: 1, max: 1 },
   action: (ctx, args) => handleEnableDisable(ctx, args, false),
   completion: (ctx, arg) => getEnablementCompletion(ctx, arg, true),
 };

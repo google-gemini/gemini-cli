@@ -74,6 +74,7 @@ export const commandsCommand: SlashCommand = {
         'Reload custom command definitions from .toml files. Usage: /commands reload',
       kind: CommandKind.BUILT_IN,
       autoExecute: true,
+      argsSpec: { max: 0 },
       action: reloadAction,
     },
   ],

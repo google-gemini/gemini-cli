@@ -75,7 +75,7 @@ const listCommand: SlashCommand = {
   description: 'List saved manual conversation checkpoints',
   kind: CommandKind.BUILT_IN,
   autoExecute: true,
-  takesArgs: false,
+  argsSpec: { max: 0 },
   action: async (context): Promise<void> => {
     const chatDetails = await getSavedChatTags(context, false);
 
@@ -94,6 +94,7 @@ const saveCommand: SlashCommand = {
     'Save the current conversation as a checkpoint. Usage: /resume save <tag>',
   kind: CommandKind.BUILT_IN,
   autoExecute: false,
+  argsSpec: { min: 1, max: 1 },
   action: async (context, args): Promise<SlashCommandActionReturn | void> => {
     const tag = args.trim();
     if (!tag) {
@@ -164,6 +165,7 @@ const resumeCheckpointCommand: SlashCommand = {
     'Resume a conversation from a checkpoint. Usage: /resume resume <tag>',
   kind: CommandKind.BUILT_IN,
   autoExecute: true,
+  argsSpec: { min: 1, max: 1 },
   action: async (context, args) => {
     const tag = args.trim();
     if (!tag) {
@@ -243,6 +245,7 @@ const deleteCommand: SlashCommand = {
   description: 'Delete a conversation checkpoint. Usage: /resume delete <tag>',
   kind: CommandKind.BUILT_IN,
   autoExecute: true,
+  argsSpec: { min: 1, max: 1 },
   action: async (context, args): Promise<MessageActionReturn> => {
     const tag = args.trim();
     if (!tag) {
@@ -285,6 +288,7 @@ const shareCommand: SlashCommand = {
     'Share the current conversation to a markdown or json file. Usage: /resume share <file>',
   kind: CommandKind.BUILT_IN,
   autoExecute: false,
+  argsSpec: { max: 1 },
   action: async (context, args): Promise<MessageActionReturn> => {
     let filePathArg = args.trim();
     if (!filePathArg) {
@@ -346,6 +350,7 @@ export const debugCommand: SlashCommand = {
   description: 'Export the most recent API request as a JSON payload',
   kind: CommandKind.BUILT_IN,
   autoExecute: true,
+  argsSpec: { max: 0 },
   action: async (context): Promise<MessageActionReturn> => {
     const req = context.services.agentContext?.config.getLatestApiRequest();
     if (!req) {

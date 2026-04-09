@@ -5,7 +5,7 @@
  */
 
 import { describe, it, expect } from 'vitest';
-import { parseSlashCommand } from './commands.js';
+import { parseSlashCommand, countArgs, validateArgs } from './commands.js';
 import { CommandKind, type SlashCommand } from '../ui/commands/types.js';
 
 // Mock command structure for testing
@@ -237,5 +237,76 @@ describe('parseSlashCommand', () => {
       expect(result.args).toBe('notakes some prompt');
       expect(result.canonicalPath).toEqual(['parent']);
     });
+  });
+});
+
+describe('countArgs', () => {
+  it('should return 0 for empty string', () => {
+    expect(countArgs('')).toBe(0);
+  });
+  it('should return 0 for whitespace-only string', () => {
+    expect(countArgs('   ')).toBe(0);
+  });
+  it('should return 1 for a single argument', () => {
+    expect(countArgs('foo')).toBe(1);
+  });
+  it('should return 2 for two arguments', () => {
+    expect(countArgs('foo bar')).toBe(2);
+  });
+  it('should handle multiple spaces between arguments', () => {
+    expect(countArgs('foo   bar   baz')).toBe(3);
+  });
+});
+
+describe('validateArgs', () => {
+  it('should return undefined when argsSpec is undefined', () => {
+    expect(validateArgs('foo', undefined, ['test'])).toBeUndefined();
+  });
+  it('should return undefined when args count is within range', () => {
+    expect(validateArgs('', { max: 0 }, ['test'])).toBeUndefined();
+    expect(validateArgs('foo', { min: 1, max: 1 }, ['test'])).toBeUndefined();
+    expect(
+      validateArgs('foo bar', { min: 1, max: 3 }, ['test']),
+    ).toBeUndefined();
+  });
+  it('should error when no args given but min is 1', () => {
+    expect(validateArgs('', { min: 1 }, ['test'])).toBe(
+      '/test requires at least 1 argument.',
+    );
+  });
+  it('should error when args below minimum', () => {
+    expect(validateArgs('foo', { min: 3 }, ['test'])).toBe(
+      '/test requires at least 3 arguments, but got 1.',
+    );
+  });
+  it('should error when args exceed max of 0', () => {
+    expect(validateArgs('foo', { max: 0 }, ['agents', 'list'])).toBe(
+      '/agents list does not accept any arguments.',
+    );
+  });
+  it('should error when args exceed max of 1', () => {
+    expect(validateArgs('foo bar', { max: 1 }, ['test'])).toBe(
+      '/test accepts at most 1 argument, but got 2.',
+    );
+  });
+  it('should error when args exceed max (plural)', () => {
+    expect(validateArgs('a b c d', { max: 2 }, ['test'])).toBe(
+      '/test accepts at most 2 arguments, but got 4.',
+    );
+  });
+  it('should append usage hint from description when present', () => {
+    expect(
+      validateArgs(
+        '',
+        { min: 1 },
+        ['chat', 'save'],
+        'Save a checkpoint. Usage: /chat save <tag>',
+      ),
+    ).toBe('/chat save requires at least 1 argument. Usage: /chat save <tag>');
+  });
+  it('should not append usage hint when description has no Usage:', () => {
+    expect(validateArgs('', { min: 1 }, ['test'], 'Some description')).toBe(
+      '/test requires at least 1 argument.',
+    );
   });
 });

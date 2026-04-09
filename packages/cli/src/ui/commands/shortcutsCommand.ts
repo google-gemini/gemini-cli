@@ -12,6 +12,7 @@ export const shortcutsCommand: SlashCommand = {
   kind: CommandKind.BUILT_IN,
   description: 'Toggle the shortcuts panel above the input',
   autoExecute: true,
+  argsSpec: { max: 0 },
   action: (context) => {
     context.ui.toggleShortcutsHelp();
   },

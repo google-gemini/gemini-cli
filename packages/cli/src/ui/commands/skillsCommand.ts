@@ -373,6 +373,7 @@ export const skillsCommand: SlashCommand = {
       description:
         'List available agent skills. Usage: /skills list [nodesc] [all]',
       kind: CommandKind.BUILT_IN,
+      argsSpec: { max: 2 },
       action: listAction,
     },
     {
@@ -380,12 +381,14 @@ export const skillsCommand: SlashCommand = {
       description:
         'Link an agent skill from a local path. Usage: /skills link <path> [--scope user|workspace]',
       kind: CommandKind.BUILT_IN,
+      argsSpec: { min: 1 },
       action: linkAction,
     },
     {
       name: 'disable',
       description: 'Disable a skill by name. Usage: /skills disable <name>',
       kind: CommandKind.BUILT_IN,
+      argsSpec: { min: 1, max: 1 },
       action: disableAction,
       completion: disableCompletion,
     },
@@ -394,6 +397,7 @@ export const skillsCommand: SlashCommand = {
       description:
         'Enable a disabled skill by name. Usage: /skills enable <name>',
       kind: CommandKind.BUILT_IN,
+      argsSpec: { min: 1, max: 1 },
       action: enableAction,
       completion: enableCompletion,
     },
@@ -403,6 +407,7 @@ export const skillsCommand: SlashCommand = {
       description:
         'Reload the list of discovered skills. Usage: /skills reload',
       kind: CommandKind.BUILT_IN,
+      argsSpec: { max: 0 },
       action: reloadAction,
     },
   ],

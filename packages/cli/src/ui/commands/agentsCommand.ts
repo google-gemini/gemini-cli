@@ -20,6 +20,7 @@ const agentsListCommand: SlashCommand = {
   description: 'List available local and remote agents',
   kind: CommandKind.BUILT_IN,
   autoExecute: true,
+  argsSpec: { max: 0 },
   action: async (context: CommandContext) => {
     const config = context.services.agentContext?.config;
     if (!config) {
@@ -303,6 +304,7 @@ const enableCommand: SlashCommand = {
   description: 'Enable a disabled agent',
   kind: CommandKind.BUILT_IN,
   autoExecute: false,
+  argsSpec: { min: 1, max: 1 },
   action: enableAction,
   completion: completeAgentsToEnable,
 };
@@ -312,6 +314,7 @@ const disableCommand: SlashCommand = {
   description: 'Disable an enabled agent',
   kind: CommandKind.BUILT_IN,
   autoExecute: false,
+  argsSpec: { min: 1, max: 1 },
   action: disableAction,
   completion: completeAgentsToDisable,
 };
@@ -321,6 +324,7 @@ const configCommand: SlashCommand = {
   description: 'Configure an agent',
   kind: CommandKind.BUILT_IN,
   autoExecute: false,
+  argsSpec: { min: 1, max: 1 },
   action: configAction,
   completion: completeAllAgents,
 };
@@ -330,6 +334,7 @@ const agentsReloadCommand: SlashCommand = {
   altNames: ['refresh'],
   description: 'Reload the agent registry',
   kind: CommandKind.BUILT_IN,
+  argsSpec: { max: 0 },
   action: async (context: CommandContext) => {
     const config = context.services.agentContext?.config;
     const agentRegistry = config?.getAgentRegistry();

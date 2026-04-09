@@ -50,6 +50,7 @@ const listPoliciesCommand: SlashCommand = {
   description: 'List all active policies grouped by mode',
   kind: CommandKind.BUILT_IN,
   autoExecute: true,
+  argsSpec: { max: 0 },
   action: async (context) => {
     const agentContext = context.services.agentContext;
     const config = agentContext?.config;
