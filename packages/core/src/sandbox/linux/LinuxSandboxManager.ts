@@ -249,8 +249,11 @@ export class LinuxSandboxManager implements SandboxManager {
 
     const sanitizedEnv = sanitizeEnvironment(req.env, sanitizationConfig);
 
-    const { allowed: allowedPaths, forbidden: forbiddenPaths } =
-      await resolveSandboxPaths(this.options, req);
+    const resolvedPaths = await resolveSandboxPaths(
+      this.options,
+      req,
+      mergedAdditional,
+    );
 
     for (const file of GOVERNANCE_FILES) {
       const filePath = join(this.options.workspace, file.path);
@@ -261,8 +264,8 @@ export class LinuxSandboxManager implements SandboxManager {
       workspace: this.options.workspace,
       workspaceWrite,
       networkAccess,
-      allowedPaths,
-      forbiddenPaths,
+      allowedPaths: resolvedPaths.policyAllowed,
+      forbiddenPaths: resolvedPaths.forbidden,
       additionalPermissions: mergedAdditional,
       includeDirectories: this.options.includeDirectories || [],
       maskFilePath: this.getMaskFilePath(),
