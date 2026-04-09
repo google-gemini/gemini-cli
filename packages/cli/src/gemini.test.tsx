@@ -625,6 +625,67 @@ describe('gemini.tsx main function kitty protocol', () => {
     resumeSpy.mockRestore();
   });
 
+  it('should pass provided --session-id to loadCliConfig', async () => {
+    vi.mocked(loadCliConfig).mockResolvedValue(
+      createMockConfig({
+        isInteractive: () => true,
+        getQuestion: () => '',
+        getSandbox: () => undefined,
+      }),
+    );
+    vi.mocked(loadSettings).mockReturnValue(
+      createMockSettings({
+        merged: {
+          advanced: {},
+          security: { auth: {} },
+          ui: {},
+        },
+      }),
+    );
+    vi.mocked(parseArguments).mockResolvedValue({
+      model: undefined,
+      sandbox: undefined,
+      debug: undefined,
+      prompt: undefined,
+      promptInteractive: undefined,
+      query: undefined,
+      yolo: undefined,
+      approvalMode: undefined,
+      policy: undefined,
+      adminPolicy: undefined,
+      allowedMcpServerNames: undefined,
+      allowedTools: undefined,
+      experimentalAcp: undefined,
+      extensions: undefined,
+      listExtensions: undefined,
+      includeDirectories: undefined,
+      screenReader: undefined,
+      useWriteTodos: undefined,
+      resume: undefined,
+      sessionId: 'fixed-session-id',
+      listSessions: undefined,
+      deleteSession: undefined,
+      outputFormat: undefined,
+      fakeResponses: undefined,
+      recordResponses: undefined,
+      rawOutput: undefined,
+      acceptRawOutputRisk: undefined,
+      isCommand: undefined,
+    });
+
+    await act(async () => {
+      await main();
+    });
+
+    const sessionIdsPassedToConfig = vi
+      .mocked(loadCliConfig)
+      .mock.calls.map((call) => call[1]);
+    expect(sessionIdsPassedToConfig.length).toBeGreaterThan(0);
+    expect(
+      sessionIdsPassedToConfig.every((id) => id === 'fixed-session-id'),
+    ).toBe(true);
+  });
+
   it.each([
     { flag: 'listExtensions' },
     { flag: 'listSessions' },

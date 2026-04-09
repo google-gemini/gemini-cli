@@ -657,6 +657,76 @@ describe('parseArguments', () => {
     }
   });
 
+  it('should parse --session-id', async () => {
+    process.argv = ['node', 'script.js', '--session-id', 'my-session-123'];
+
+    const argv = await parseArguments(createTestMergedSettings());
+    expect(argv.sessionId).toBe('my-session-123');
+  });
+
+  it('should trim --session-id value', async () => {
+    process.argv = ['node', 'script.js', '--session-id', '  my-session-123  '];
+
+    const argv = await parseArguments(createTestMergedSettings());
+    expect(argv.sessionId).toBe('my-session-123');
+  });
+
+  it('should throw an error when using --session-id with --resume', async () => {
+    process.argv = [
+      'node',
+      'script.js',
+      '--session-id',
+      'my-session-123',
+      '--resume',
+      'latest',
+    ];
+
+    const mockExit = vi.spyOn(process, 'exit').mockImplementation(() => {
+      throw new Error('process.exit called');
+    });
+
+    const mockConsoleError = vi
+      .spyOn(console, 'error')
+      .mockImplementation(() => {});
+
+    await expect(parseArguments(createTestMergedSettings())).rejects.toThrow(
+      'process.exit called',
+    );
+
+    expect(mockConsoleError).toHaveBeenCalledWith(
+      expect.stringContaining(
+        'Cannot use both --session-id and --resume together',
+      ),
+    );
+
+    mockExit.mockRestore();
+    mockConsoleError.mockRestore();
+  });
+
+  it.each(['.', '..', '   '])(
+    'should reject invalid --session-id value "%s"',
+    async (badSessionId) => {
+      process.argv = ['node', 'script.js', '--session-id', badSessionId];
+
+      const mockExit = vi.spyOn(process, 'exit').mockImplementation(() => {
+        throw new Error('process.exit called');
+      });
+
+      const mockConsoleError = vi
+        .spyOn(console, 'error')
+        .mockImplementation(() => {});
+
+      await expect(parseArguments(createTestMergedSettings())).rejects.toThrow(
+        'process.exit called',
+      );
+
+      expect(mockConsoleError).toHaveBeenCalled();
+
+      mockExit.mockRestore();
+      mockConsoleError.mockRestore();
+    },
+  );
+
   it('should support comma-separated values for --allowed-tools', async () => {
     process.argv = [
       'node',
