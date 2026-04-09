@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "updatedAt": "2026-04-08T22:28:27.448Z",
+  "updatedAt": "2026-04-09T02:30:22.000Z",
   "scenarios": {
     "cold-startup-time": {
       "wallClockMs": 927.553249999999,
@@ -21,10 +21,10 @@
       "timestamp": "2026-04-08T22:28:23.290Z"
     },
     "high-volume-shell-output": {
-      "wallClockMs": 936.6500410000008,
-      "cpuTotalUs": 1352,
+      "wallClockMs": 1119.9,
+      "cpuTotalUs": 2100,
       "eventLoopDelayP99Ms": 0,
-      "timestamp": "2026-04-08T22:28:27.448Z"
+      "timestamp": "2026-04-09T02:30:22.000Z"
     }
   }
 }

@@ -8,6 +8,7 @@ import { describe, it, beforeAll, afterAll } from 'vitest';
 import { TestRig, PerfTestHarness } from '@google/gemini-cli-test-utils';
 import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { existsSync, readFileSync } from 'node:fs';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const BASELINES_PATH = join(__dirname, 'baselines.json');
@@ -161,13 +162,57 @@ describe('CPU Performance Tests', () => {
             fakeResponsesPath: join(__dirname, 'perf.high-volume.responses'),
           });
 
-          return await harness.measure('high-volume-output', async () => {
-            await rig.run({
-              args: ['Generate 1M lines of output'],
-              timeout: 120000,
-              env: { GEMINI_API_KEY: 'fake-perf-test-key' },
-            });
-          });
+          const snapshot = await harness.measure(
+            'high-volume-output',
+            async () => {
+              await rig.run({
+                args: ['Generate 1M lines of output'],
+                timeout: 120000,
+                env: {
+                  GEMINI_API_KEY: 'fake-perf-test-key',
+                  GEMINI_TELEMETRY_ENABLED: 'true',
+                },
+              });
+            },
+          );
+
+          // Query CLI's own performance metrics from telemetry logs
+          await rig.waitForTelemetryReady();
+
+          // Debug: Read and log the telemetry file content
+          try {
+            const logFilePath = join(rig.homeDir!, 'telemetry.log');
+            if (existsSync(logFilePath)) {
+              const content = readFileSync(logFilePath, 'utf-8');
+              console.log(`  Telemetry Log Content:\n`, content);
+            } else {
+              console.log(`  Telemetry log file not found at: ${logFilePath}`);
+            }
+          } catch (e) {
+            console.error(`  Failed to read telemetry log:`, e);
+          }
+
+          const memoryMetric = rig.readMetric('memory.usage');
+          const cpuMetric = rig.readMetric('cpu.usage');
+          const toolLatencyMetric = rig.readMetric('tool.call.latency');
+
+          if (memoryMetric) {
+            console.log(
+              `  CLI Memory Metric found:`,
+              JSON.stringify(memoryMetric),
+            );
+          }
+          if (cpuMetric) {
+            console.log(`  CLI CPU Metric found:`, JSON.stringify(cpuMetric));
+          }
+          if (toolLatencyMetric) {
+            console.log(
+              `  CLI Tool Latency Metric found:`,
+              JSON.stringify(toolLatencyMetric),
+            );
+          }
+
+          return snapshot;
         } finally {
           await rig.cleanup();
         }
