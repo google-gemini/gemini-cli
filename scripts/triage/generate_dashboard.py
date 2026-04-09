@@ -110,45 +110,34 @@ def gh_api_graphql(query, variables):
 
 def get_reviewer_info(pr):
     author = pr.get('author', {}).get('login')
-    
-    # Get latest reviewer activity
     latest_rev_act = ""
     reviewers = set()
-    
     all_comments = pr.get('comments', {}).get('nodes', [])
     for c in all_comments:
         login = c.get('author', {}).get('login') if c.get('author') else None
         if login and login != author and login not in BOT_BLACKLIST:
             reviewers.add(login)
             latest_rev_act = max(latest_rev_act, c['publishedAt'])
-            
     reviews = pr.get('latestReviews', {}).get('nodes', [])
     for r in reviews:
         login = r.get('author', {}).get('login') if r.get('author') else None
         if login and login != author and login not in BOT_BLACKLIST:
             reviewers.add(login)
             latest_rev_act = max(latest_rev_act, r['updatedAt'])
-            
-    # Add explicitly requested reviewers
     for req in pr.get('reviewRequests', {}).get('nodes', []):
         rr = req.get('requestedReviewer')
         if rr and 'login' in rr:
             login = rr['login']
             if login and login != author and login not in BOT_BLACKLIST:
                 reviewers.add(login)
-                
     return sorted(list(reviewers)), latest_rev_act
 
 def get_author_activity(pr):
     author = pr.get('author', {}).get('login')
-    # Start with latest commit
     latest = pr['commits']['nodes'][0]['commit']['committedDate']
-    
-    # Check for latest comment from author
     for c in pr.get('comments', {}).get('nodes', []):
         if c.get('author', {}).get('login') == author:
             latest = max(latest, c['publishedAt'])
-            
     return latest
 
 def main():
@@ -191,17 +180,13 @@ def main():
             reviewers, latest_reviewer_activity = get_reviewer_info(pr)
             author_activity = get_author_activity(pr)
             
-            # Categories:
-            # 1. Ready for Review (Author activity > Reviewer activity AND all tests/threads clear)
+            # Categories
             is_ready = (not latest_reviewer_activity or author_activity > latest_reviewer_activity)
-            
             if is_ready:
-                # Check blockers
                 threads = pr.get('reviewThreads', {}).get('nodes', [])
                 all_resolved = all(thread['isResolved'] for thread in threads)
                 not_conflicting = pr['mergeable'] != 'CONFLICTING'
                 status_ok = pr.get('statusCheckRollup', {}).get('state') not in ['FAILURE', 'ERROR']
-                
                 if all_resolved and not_conflicting and status_ok:
                     valid_pr = pr
                     ready_list.append({
@@ -211,16 +196,13 @@ def main():
                     })
                     break
             
-            # 2. Waiting for Reviewer (Reviewer has acted before, author has updated since, but no follow up)
             if latest_reviewer_activity and author_activity > latest_reviewer_activity:
                 waiting_reviewer_list.append({
-                    "issue_no": issue_no, "pr_no": pr['number'], "pr_url": pr['url'],
+                    "issue_no": issue_no, "issue_url": issue['url'], "pr_no": pr['number'], "pr_url": pr['url'],
                     "author": pr['author']['login'], "reviewers": reviewers,
                     "author_updated": author_activity[:10]
                 })
-                # Note: don't break, check if it fits other categories (though we process reversed timeline)
 
-            # 3. Blocked & Stale
             pr_updated_at = datetime.datetime.fromisoformat(pr['updatedAt'].replace('Z', '+00:00'))
             if (now - pr_updated_at).days > STALE_BLOCKED_PR_DAYS:
                 reason = ""
@@ -228,8 +210,8 @@ def main():
                 elif pr.get('statusCheckRollup', {}).get('state') == 'FAILURE': reason = "Test Failure"
                 if reason:
                     blocked_prs.append({
-                        "issue_no": issue_no, "pr_no": pr['number'], "reason": reason,
-                        "author": pr['author']['login'], "days_stale": (now - pr_updated_at).days
+                        "issue_no": issue_no, "issue_url": issue['url'], "pr_no": pr['number'], "pr_url": pr['url'],
+                        "reason": reason, "author": pr['author']['login'], "days_stale": (now - pr_updated_at).days
                     })
 
         if not valid_pr and not found_open_pr and (now - updated_at).days > STALE_ASSIGNMENT_DAYS:
@@ -246,14 +228,14 @@ def main():
     md += "| # | Issue Title | Linked PR | Reviewers | Ready Since |\n| :--- | :--- | :--- | :--- | :--- |\n"
     for i in ready_list:
         revs = ", ".join([f"@{r}" for r in i['reviewers']]) if i['reviewers'] else "_None_"
-        md += f"| {i['issue_no']} | [{i['title']}]({i['issue_url']}) | [#{i['pr_no']}]({i['pr_url']}) | {revs} | `{i['updated_at']}` |\n"
+        md += f"| [#{i['issue_no']}]({i['issue_url']}) | [{i['title']}]({i['issue_url']}) | [#{i['pr_no']}]({i['pr_url']}) | {revs} | `{i['updated_at']}` |\n"
     if not ready_list: md += "| - | _No issues ready._ | - | - | - |\n"
 
     md += "\n## ⌛ Waiting for Reviewer Follow-up\nReviewer provided feedback, the author updated the PR, but the reviewer has not responded yet.\n\n"
     md += "| Issue | PR | Author | Reviewers | Author Updated |\n| :--- | :--- | :--- | :--- | :--- |\n"
     for i in waiting_reviewer_list:
         revs = ", ".join([f"@{r}" for r in i['reviewers']])
-        md += f"| #{i['issue_no']} | [#{i['pr_no']}]({i['pr_url']}) | @{i['author']} | {revs} | `{i['author_updated']}` |\n"
+        md += f"| [#{i['issue_no']}]({i['issue_url']}) | [#{i['pr_no']}]({i['pr_url']}) | @{i['author']} | {revs} | `{i['author_updated']}` |\n"
     if not waiting_reviewer_list: md += "| - | _No pending follow-ups._ | - | - | - |\n"
 
     md += "\n## 🚩 Stale Assignments (No PR)\nAssigned for >{STALE_ASSIGNMENT_DAYS} days with no open Pull Request. Consider unassigning.\n\n"
@@ -265,7 +247,7 @@ def main():
     md += "\n## 🚧 Blocked & Stale PRs\nPRs with conflicts or failures untouched for >{STALE_BLOCKED_PR_DAYS} days.\n\n"
     md += "| Issue | PR | Reason | Author | Days Stale |\n| :--- | :--- | :--- | :--- | :--- |\n"
     for i in blocked_prs:
-        md += f"| #{i['issue_no']} | #{i['pr_no']} | {i['reason']} | @{i['author']} | {i['days_stale']} |\n"
+        md += f"| [#{i['issue_no']}]({i['issue_url']}) | [#{i['pr_no']}]({i['pr_url']}) | {i['reason']} | @{i['author']} | {i['days_stale']} |\n"
     if not blocked_prs: md += "| - | _No stale blocked PRs._ | - | - | - |\n"
 
     md += "\n---\n*Dashboard maintained by automated triage script.*"
