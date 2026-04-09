@@ -255,10 +255,9 @@ export class ToolOutputDistillationService {
     stringifiedContent: string,
     maxPreviewLen: number,
   ): Promise<string | undefined> {
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 15000); // 15s timeout
     try {
-      const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 15000); // 15s timeout
-
       const promptText = `The following output from the tool '${toolName}' is large and has been truncated. Extract the most critical factual information from this output so the main agent doesn't lose context.
 
 Focus strictly on concrete data points:
@@ -278,8 +277,6 @@ ${stringifiedContent.slice(0, maxPreviewLen)}...`;
         LlmRole.UTILITY_COMPRESSOR,
       );
 
-      clearTimeout(timeoutId);
-
       return summaryResponse.candidates?.[0]?.content?.parts?.[0]?.text;
     } catch (e) {
       // Fail gracefully, summarization is a progressive enhancement
@@ -288,6 +285,8 @@ ${stringifiedContent.slice(0, maxPreviewLen)}...`;
         e instanceof Error ? e.message : String(e),
       );
       return undefined;
+    } finally {
+      clearTimeout(timeoutId);
     }
   }
 }

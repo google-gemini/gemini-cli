@@ -102,4 +102,26 @@ describe('ToolOutputDistillationService', () => {
     expect(mockGeminiClient.generateContent).not.toHaveBeenCalled();
     expect(result.truncatedContent).not.toContain('Mock Intent Summary');
   });
+
+  it('should clear timeout when generateContent throws', async () => {
+    const clearTimeoutSpy = vi.spyOn(global, 'clearTimeout');
+
+    vi.mocked(mockGeminiClient.generateContent).mockRejectedValueOnce(
+      new Error('API error'),
+    );
+
+    const largeContent = 'A'.repeat(500);
+    const result = await service.distill('test-tool', 'call-err', largeContent);
+
+    expect(clearTimeoutSpy).toHaveBeenCalled();
+
+    // Should still return truncated content, just without intent summary
+    const text =
+      typeof result.truncatedContent === 'string'
+        ? result.truncatedContent
+        : (result.truncatedContent as Array<{ text: string }>)[0].text;
+    expect(text).not.toContain('Strategic Significance');
+
+    clearTimeoutSpy.mockRestore();
+  });
 });
