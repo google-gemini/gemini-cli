@@ -4,6 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+import process from 'node:process';
 import { monitorEventLoopDelay } from 'node:perf_hooks';
 import type { Config } from '../config/config.js';
 import {
@@ -18,7 +19,9 @@ export class EventLoopMonitor {
   private isRunning = false;
 
   start(config: Config, intervalMs: number = 10000): void {
-    if (!isPerformanceMonitoringActive() || this.isRunning) {
+    const isEnabled =
+      process.env['GEMINI_EVENT_LOOP_MONITOR_ENABLED'] === 'true';
+    if (!isEnabled || !isPerformanceMonitoringActive() || this.isRunning) {
       return;
     }
 

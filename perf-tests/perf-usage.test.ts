@@ -172,6 +172,7 @@ describe('CPU Performance Tests', () => {
                   GEMINI_API_KEY: 'fake-perf-test-key',
                   GEMINI_TELEMETRY_ENABLED: 'true',
                   GEMINI_MEMORY_MONITOR_INTERVAL: '500',
+                  GEMINI_EVENT_LOOP_MONITOR_ENABLED: 'true',
                   DEBUG: 'true',
                 },
               });
