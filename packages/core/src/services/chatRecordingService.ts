@@ -280,6 +280,25 @@ export class ChatRecordingService {
           this.cachedConversation = loadedRecord;
           this.projectHash = this.cachedConversation.projectHash;
 
+          if (this.conversationFile.endsWith('.json')) {
+            this.conversationFile = this.conversationFile + 'l'; // e.g. session-foo.jsonl
+
+            // Migrate the entire legacy record to the new file
+            const initialMetadata = {
+              sessionId: this.sessionId,
+              projectHash: this.projectHash,
+              startTime: this.cachedConversation.startTime,
+              lastUpdated: this.cachedConversation.lastUpdated,
+              kind: this.cachedConversation.kind,
+              directories: this.cachedConversation.directories,
+              summary: this.cachedConversation.summary,
+            };
+            this.appendRecord(initialMetadata);
+            for (const msg of this.cachedConversation.messages) {
+              this.appendRecord(msg);
+            }
+          }
+
           // Update the session ID in the existing file
           this.updateMetadata({ sessionId: this.sessionId });
         } else {
