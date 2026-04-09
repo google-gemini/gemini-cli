@@ -118,6 +118,11 @@ export function createMockEnvironment(
     fileSystem: new InMemoryFileSystem(),
     idGenerator: new DeterministicIdGenerator('mock-uuid-'),
     behaviorRegistry: registry,
+    inbox: {
+      publish: vi.fn(),
+      getMessages: vi.fn().mockReturnValue([]),
+      drainConsumed: vi.fn(),
+    } as any,
     irMapper,
     ...overrides,
   } as ContextEnvironment;

@@ -41,6 +41,7 @@ describe('StateSnapshotProcessor', () => {
         payload: {
           consumedIds: ['node-A', 'node-B'],
           newText: '<compressed A and B>',
+          type: 'point-in-time',
         }
       }
     ]);

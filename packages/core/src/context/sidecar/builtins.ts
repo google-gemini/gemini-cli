@@ -10,6 +10,7 @@ import { HistorySquashingProcessor, type HistorySquashingProcessorOptions } from
 import { SemanticCompressionProcessor, type SemanticCompressionProcessorOptions } from '../processors/semanticCompressionProcessor.js';
 import { ToolMaskingProcessor, type ToolMaskingProcessorOptions } from '../processors/toolMaskingProcessor.js';
 import { StateSnapshotProcessor, type StateSnapshotProcessorOptions } from '../processors/stateSnapshotProcessor.js';
+import { StateSnapshotWorker, type StateSnapshotWorkerOptions } from '../processors/stateSnapshotWorker.js';
 
 export function registerBuiltInProcessors(registry: ProcessorRegistry) {
   registry.register<Record<string, never>>({
@@ -46,5 +47,11 @@ export function registerBuiltInProcessors(registry: ProcessorRegistry) {
     id: 'StateSnapshotProcessor',
     schema: {}, // Will be added later
     create: (env, options) => StateSnapshotProcessor.create(env, options),
+  });
+
+  registry.register<StateSnapshotWorkerOptions>({
+    id: 'StateSnapshotWorker',
+    schema: {}, // Will be added later
+    create: (env, options) => StateSnapshotWorker.create(env, options) as any, // ContextWorker instead of ContextProcessor
   });
 }
