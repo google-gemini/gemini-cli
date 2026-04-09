@@ -61,10 +61,9 @@ export const LoadingIndicator: React.FC<LoadingIndicatorProps> = ({
     return null;
   }
 
-  // Prioritize the interactive shell waiting phrase over the thought subject
-  // because it conveys an actionable state for the user (waiting for input).
-  // Model thoughts are real progress info and should always be shown,
-  // even when suppressText is true. Only suppress random loading phrases/tips.
+  // Prioritize the interactive shell waiting phrase and model thoughts over
+  // suppressText because they convey real progress or actionable state.
+  // Only suppress random loading phrases/tips.
   const primaryText =
     currentLoadingPhrase === INTERACTIVE_SHELL_WAITING_PHRASE
       ? currentLoadingPhrase
