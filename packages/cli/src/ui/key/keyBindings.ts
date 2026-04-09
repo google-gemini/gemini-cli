@@ -376,7 +376,10 @@ export const defaultKeyBindingConfig: KeyBindingConfig = new Map([
       new KeyBinding('ctrl+j'),
     ],
   ],
-  [Command.OPEN_EXTERNAL_EDITOR, [new KeyBinding('ctrl+g')]],
+  [
+    Command.OPEN_EXTERNAL_EDITOR,
+    [new KeyBinding('ctrl+g'), new KeyBinding('ctrl+shift+g')],
+  ],
   [Command.DEPRECATED_OPEN_EXTERNAL_EDITOR, [new KeyBinding('ctrl+x')]],
   [
     Command.PASTE_CLIPBOARD,
