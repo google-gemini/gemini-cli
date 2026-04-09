@@ -1380,7 +1380,7 @@ export class ShellExecutionService {
             cmdCleanup?.();
 
             const activePty = ShellExecutionService.activePtys.get(ptyPid);
-            if (activePty) {
+            if (activePty && isStreamingRawContent) {
               emitPendingLines(activePty, ptyPid, onOutputEvent, true);
             }
 

@@ -604,12 +604,15 @@ describe('ToolExecutor', () => {
     }
   });
 
-  it('should delete temporary file when fullOutputFilePath is provided but output is not truncated', async () => {
+  it('should preserve temporary file when fullOutputFilePath is provided but output is not truncated', async () => {
     // 1. Setup Config for Truncation
     vi.spyOn(config, 'getTruncateToolOutputThreshold').mockReturnValue(100);
     const unlinkSpy = vi
       .spyOn(fsPromises, 'unlink')
       .mockResolvedValue(undefined);
+    vi.spyOn(fileUtils, 'moveToolOutputToFile').mockResolvedValue({
+      outputFile: '/tmp/moved_output_short.txt',
+    });
 
     const mockTool = new MockTool({ name: SHELL_TOOL_NAME });
     const invocation = mockTool.build({});
@@ -643,19 +646,27 @@ describe('ToolExecutor', () => {
       onUpdateToolCall: vi.fn(),
     });
 
-    // 4. Verify file deletion
-    expect(unlinkSpy).toHaveBeenCalledWith('/tmp/temp_full_output_short.txt');
+    // 4. Verify file preservation
+    expect(fileUtils.moveToolOutputToFile).toHaveBeenCalledWith(
+      '/tmp/temp_full_output_short.txt',
+      SHELL_TOOL_NAME,
+      'call-short-full',
+      expect.any(String),
+      expect.any(String),
+    );
+    expect(unlinkSpy).not.toHaveBeenCalled();
     expect(fileUtils.formatTruncatedToolOutput).not.toHaveBeenCalled();
 
-    // We should not save it since it was not truncated
+    // We should save it since fullOutputFilePath was provided
     expect(result.status).toBe(CoreToolCallStatus.Success);
     if (result.status === CoreToolCallStatus.Success) {
       const response = result.response.responseParts[0]?.functionResponse
         ?.response as Record<string, unknown>;
       expect(response).toEqual({
         output: 'Short',
+        outputFile: '/tmp/moved_output_short.txt',
       });
-      expect(result.response.outputFile).toBeUndefined();
+      expect(result.response.outputFile).toBe('/tmp/moved_output_short.txt');
     }
 
     unlinkSpy.mockRestore();
