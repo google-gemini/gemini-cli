@@ -6,7 +6,7 @@ workflows, and task-specific resources. Based on the
 self-contained directory that packages instructions and assets into a
 discoverable capability.
 
-Unlike general context files ([`GEMINI.md`](../gemini-md.md)), which provide
+Unlike general context files ([GEMINI.md](./gemini-md.md)), which provide
 persistent workspace-wide background, Skills represent **on-demand expertise**.
 This lets Gemini CLI maintain a vast library of specialized capabilities—such as
 security auditing, cloud deployments, or codebase migrations—without cluttering
