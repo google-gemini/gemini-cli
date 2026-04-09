@@ -1,7 +1,7 @@
 ---
 name: docs-writer
 description:
-  Always use this skill when the task involves writing, reviewing, or editing 
+  Always use this skill when the task involves writing, reviewing, or editing
   files in the `/docs` directory or any `.md` files in the repository.
 ---
 
@@ -24,7 +24,7 @@ approach.
 
 - **Perspective and tense:** Address the reader as "you." Use active voice and
   present tense (e.g., "The API returns...").
-- **Tone:** Professional, friendly, and direct. 
+- **Tone:** Professional, friendly, and direct.
 - **Clarity:** Use simple vocabulary. Avoid jargon, slang, and marketing hype.
 - **Global Audience:** Write in standard US English. Avoid idioms and cultural
   references.
@@ -47,8 +47,8 @@ Write precisely to ensure your instructions are unambiguous.
   "foo" or "bar."
 - **Quota and limit terminology:** For any content involving resource capacity
   or using the word "quota" or "limit", strictly adhere to the guidelines in
-  the `quota-limit-style-guide.md` resource file. Generally, Use "quota" for the
-  administrative bucket and "limit" for the numerical ceiling.
+  the `quota-limit-style-guide.md` resource file. Generally, Use "quota" for
+  the administrative bucket and "limit" for the numerical ceiling.
 
 ### Formatting and syntax
 Apply consistent formatting to make documentation visually organized and
@@ -65,8 +65,6 @@ accessible.
 - **UI and code:** Use **bold** for UI elements and `code font` for filenames,
   snippets, commands, and API elements. Focus on the task when discussing
   interaction.
-- **Links:** Use descriptive anchor text; avoid "click here." Ensure the link
-  makes sense out of context.
 - **Accessibility:** Use semantic HTML elements correctly (headings, lists, 
   tables).
 - **Media:** Use lowercase hyphenated filenames. Provide descriptive alt text
@@ -100,6 +98,18 @@ accessible.
 > This is an example of a multi-line note that will be preserved
 > by Prettier.
 
+### Links
+- **Accessibility:** Use descriptive anchor text; avoid "click here." Ensure the
+  link makes sense out of context, such as when being read by a screen reader.
+- **Use relative links in docs:** Use relative links in documentation (`/docs/`)
+  to ensure portability. Use paths relative to the current file's directory
+  (for example, `../tools/` from `docs/cli/`). Do not include the `/docs/`
+  section of a path, but do verify that the resulting relative link exists. This
+  does not apply to meta files such as README.MD and CONTRIBUTING.MD.
+- **When changing headings, check for deep links:** If a user is changing a
+  heading, check for deep links to that heading in other pages and update
+  accordingly.
+
 ### Structure
 - **BLUF:** Start with an introduction explaining what to expect.
 - **Experimental features:** If a feature is clearly noted as experimental,
@@ -110,7 +120,7 @@ accessible.
 > This is an experimental feature currently under active development.
 
 - **Headings:** Use hierarchical headings to support the user journey.
-- **Procedures:** 
+- **Procedures:**
   - Introduce lists of steps with a complete sentence.
   - Start each step with an imperative verb.
   - Number sequential steps; use bullets for non-sequential lists.
@@ -124,7 +134,7 @@ accessible.
 
 ## Phase 2: Preparation
 Before modifying any documentation, thoroughly investigate the request and the
-surrounding context. 
+surrounding context.
 
 1.  **Clarify:** Understand the core request. Differentiate between writing new
     content and editing existing content. If the request is ambiguous (e.g.,
@@ -135,6 +145,8 @@ surrounding context.
 4.  **Connect:** Identify all referencing pages if changing behavior. Check if
     `docs/sidebar.json` needs updates.
 5.  **Plan:** Create a step-by-step plan before making changes.
+6.  **Audit Docset:** If asked to audit the documentation, follow the procedural
+    guide in [docs-auditing.md](./references/docs-auditing.md).
 
 ## Phase 3: Execution
 Implement your plan by either updating existing files or creating new ones
@@ -147,7 +159,7 @@ documentation.
 
 - **Gaps:** Identify areas where the documentation is incomplete or no longer
   reflects existing code.
-- **Structure:** Apply "Structure (New Docs)" rules (BLUF, headings, etc.) when 
+- **Structure:** Apply "Structure (New Docs)" rules (BLUF, headings, etc.) when
   adding new sections to existing pages.
 - **Headers**: If you change a header, you must check for links that lead to
   that header and update them.
@@ -157,17 +169,17 @@ documentation.
 - **Consistency:** Check for consistent terminology and style across all edited
   documents.
 
-
 ## Phase 4: Verification and finalization
-Perform a final quality check to ensure that all changes are correctly formatted
-and that all links are functional.
+Perform a final quality check to ensure that all changes are correctly
+formatted and that all links are functional.
 
 1.  **Accuracy:** Ensure content accurately reflects the implementation and
   technical behavior.
 2.  **Self-review:** Re-read changes for formatting, correctness, and flow.
-3.  **Link check:** Verify all new and existing links leading to or from modified
-    pages. If you changed a header, ensure that any links that lead to it are
-    updated.
-4.  **Format:** Once all changes are complete, ask to execute `npm run format`
-    to ensure consistent formatting across the project. If the user confirms,
-    execute the command.
+3.  **Link check:** Verify all new and existing links leading to or from
+    modified pages. If you changed a header, ensure that any links that lead to
+    it are updated.
+4.  **Format:** If `npm run format` fails, it may be necessary to run `npm
+    install` first to ensure all formatting dependencies are available. Once all
+    changes are complete, ask to execute `npm run format` to ensure consistent
+    formatting across the project. If the user confirms, execute the command.

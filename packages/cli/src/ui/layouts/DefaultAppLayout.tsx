@@ -15,11 +15,13 @@ import { useUIState } from '../contexts/UIStateContext.js';
 import { useFlickerDetector } from '../hooks/useFlickerDetector.js';
 import { useAlternateBuffer } from '../hooks/useAlternateBuffer.js';
 import { CopyModeWarning } from '../components/CopyModeWarning.js';
-import { BackgroundShellDisplay } from '../components/BackgroundShellDisplay.js';
+import { BackgroundTaskDisplay } from '../components/BackgroundTaskDisplay.js';
 import { StreamingState } from '../types.js';
+import { useInputState } from '../contexts/InputContext.js';
 
 export const DefaultAppLayout: React.FC = () => {
   const uiState = useUIState();
+  const { copyModeEnabled } = useInputState();
   const isAlternateBuffer = useAlternateBuffer();
 
   const { rootUiRef, terminalHeight } = uiState;
@@ -31,31 +33,28 @@ export const DefaultAppLayout: React.FC = () => {
       flexDirection="column"
       width={uiState.terminalWidth}
       height={isAlternateBuffer ? terminalHeight : undefined}
-      paddingBottom={
-        isAlternateBuffer && !uiState.copyModeEnabled ? 1 : undefined
-      }
+      paddingBottom={isAlternateBuffer ? 1 : undefined}
       flexShrink={0}
       flexGrow={0}
-      overflow="hidden"
       ref={uiState.rootUiRef}
     >
       <MainContent />
 
-      {uiState.isBackgroundShellVisible &&
-        uiState.backgroundShells.size > 0 &&
-        uiState.activeBackgroundShellPid &&
-        uiState.backgroundShellHeight > 0 &&
+      {uiState.isBackgroundTaskVisible &&
+        uiState.backgroundTasks.size > 0 &&
+        uiState.activeBackgroundTaskPid &&
+        uiState.backgroundTaskHeight > 0 &&
         uiState.streamingState !== StreamingState.WaitingForConfirmation && (
-          <Box height={uiState.backgroundShellHeight} flexShrink={0}>
-            <BackgroundShellDisplay
-              shells={uiState.backgroundShells}
-              activePid={uiState.activeBackgroundShellPid}
+          <Box height={uiState.backgroundTaskHeight} flexShrink={0}>
+            <BackgroundTaskDisplay
+              shells={uiState.backgroundTasks}
+              activePid={uiState.activeBackgroundTaskPid}
               width={uiState.terminalWidth}
-              height={uiState.backgroundShellHeight}
+              height={uiState.backgroundTaskHeight}
               isFocused={
                 uiState.embeddedShellFocused && !uiState.dialogsVisible
               }
-              isListOpenProp={uiState.isBackgroundShellListOpen}
+              isListOpenProp={uiState.isBackgroundTaskListOpen}
             />
           </Box>
         )}
@@ -65,6 +64,7 @@ export const DefaultAppLayout: React.FC = () => {
         flexShrink={0}
         flexGrow={0}
         width={uiState.terminalWidth}
+        height={copyModeEnabled ? uiState.stableControlsHeight : undefined}
       >
         <Notifications />
         <CopyModeWarning />

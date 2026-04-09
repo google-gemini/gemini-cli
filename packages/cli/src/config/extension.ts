@@ -63,7 +63,7 @@ export function loadInstallMetadata(
     // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
     const metadata = JSON.parse(configContent) as ExtensionInstallMetadata;
     return metadata;
-  } catch (_e) {
+  } catch {
     return undefined;
   }
 }

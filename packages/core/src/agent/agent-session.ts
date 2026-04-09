@@ -34,7 +34,7 @@ export class AgentSession implements AgentProtocol {
     return this._protocol.abort();
   }
 
-  get events(): AgentEvent[] {
+  get events(): readonly AgentEvent[] {
     return this._protocol.events;
   }
 
@@ -77,6 +77,30 @@ export class AgentSession implements AgentProtocol {
     let done = false;
     let trackedStreamId = options.streamId;
     let started = false;
+    let agentActivityStarted = false;
+
+    const queueVisibleEvent = (event: AgentEvent): void => {
+      if (trackedStreamId && event.streamId !== trackedStreamId) {
+        return;
+      }
+
+      if (!agentActivityStarted) {
+        if (event.type !== 'agent_start') {
+          return;
+        }
+        trackedStreamId = event.streamId;
+        agentActivityStarted = true;
+      }
+
+      if (!trackedStreamId) {
+        return;
+      }
+
+      eventQueue.push(event);
+      if (event.type === 'agent_end' && event.streamId === trackedStreamId) {
+        done = true;
+      }
+    };
 
     // 1. Subscribe early to avoid missing any events that occur during replay setup
     const unsubscribe = this._protocol.subscribe((event) => {
@@ -87,23 +111,7 @@ export class AgentSession implements AgentProtocol {
         return;
       }
 
-      if (trackedStreamId && event.streamId !== trackedStreamId) return;
-
-      // If we don't have a tracked stream yet, the first agent_start we see becomes it.
-      if (!trackedStreamId && event.type === 'agent_start') {
-        trackedStreamId = event.streamId ?? undefined;
-      }
-
-      // If we still don't have a tracked stream and we aren't replaying everything (eventId), ignore.
-      if (!trackedStreamId && !options.eventId) return;
-
-      eventQueue.push(event);
-      if (
-        event.type === 'agent_end' &&
-        event.streamId === (trackedStreamId ?? null)
-      ) {
-        done = true;
-      }
+      queueVisibleEvent(event);
 
       const currentResolve = resolve;
       next = new Promise<void>((r) => {
@@ -118,8 +126,42 @@ export class AgentSession implements AgentProtocol {
 
       if (options.eventId) {
         const index = currentEvents.findIndex((e) => e.id === options.eventId);
-        if (index !== -1) {
+        if (index === -1) {
+          throw new Error(`Unknown eventId: ${options.eventId}`);
+        }
+
+        const resumeEvent = currentEvents[index];
+        trackedStreamId = resumeEvent.streamId;
+        const firstAgentStartIndex = currentEvents.findIndex(
+          (event) =>
+            event.type === 'agent_start' && event.streamId === trackedStreamId,
+        );
+
+        if (resumeEvent.type === 'agent_end') {
           replayStartIndex = index + 1;
+          agentActivityStarted = true;
+          done = true;
+        } else if (
+          firstAgentStartIndex !== -1 &&
+          firstAgentStartIndex <= index
+        ) {
+          replayStartIndex = index + 1;
+          agentActivityStarted = true;
+        } else if (firstAgentStartIndex !== -1) {
+          // A pre-agent_start cursor can be resumed once the corresponding
+          // agent activity is already present in history. Because stream()
+          // yields only agent_start -> agent_end, replay begins at agent_start
+          // rather than at the original pre-start event.
+          replayStartIndex = firstAgentStartIndex;
+        } else {
+          // Consumers can only resume by eventId once the corresponding stream
+          // has entered the agent_start -> agent_end lifecycle in history.
+          // Without a recorded agent_start, this wrapper cannot distinguish
+          // "agent activity may start later" from "this send was acknowledged
+          // without agent activity" without risking an infinite wait.
+          throw new Error(
+            `Cannot resume from eventId ${options.eventId} before agent_start for stream ${trackedStreamId}`,
+          );
         }
       } else if (options.streamId) {
         const index = currentEvents.findIndex(
@@ -128,29 +170,7 @@ export class AgentSession implements AgentProtocol {
         if (index !== -1) {
           replayStartIndex = index;
         }
-      }
-
-      if (replayStartIndex !== -1) {
-        for (let i = replayStartIndex; i < currentEvents.length; i++) {
-          const event = currentEvents[i];
-          if (options.streamId && event.streamId !== options.streamId) continue;
-
-          eventQueue.push(event);
-          if (event.type === 'agent_start' && !trackedStreamId) {
-            trackedStreamId = event.streamId ?? undefined;
-          }
-          if (
-            event.type === 'agent_end' &&
-            event.streamId === (trackedStreamId ?? null)
-          ) {
-            done = true;
-            break;
-          }
-        }
-      }
-
-      if (!done && !trackedStreamId) {
-        // Find active stream in history
+      } else {
         const activeStarts = currentEvents.filter(
           (e) => e.type === 'agent_start',
         );
@@ -161,36 +181,28 @@ export class AgentSession implements AgentProtocol {
               (e) => e.type === 'agent_end' && e.streamId === start.streamId,
             )
           ) {
-            trackedStreamId = start.streamId ?? undefined;
+            trackedStreamId = start.streamId;
+            replayStartIndex = currentEvents.findIndex(
+              (e) => e.id === start.id,
+            );
             break;
           }
         }
       }
 
-      // If we replayed to the end and no stream is active, and we were specifically
-      // replaying from an eventId (or we've already finished the stream we were looking for), we are done.
-      if (!done && !trackedStreamId && options.eventId) {
-        done = true;
+      if (replayStartIndex !== -1) {
+        for (let i = replayStartIndex; i < currentEvents.length; i++) {
+          const event = currentEvents[i];
+          queueVisibleEvent(event);
+          if (done) break;
+        }
       }
-
       started = true;
 
       // Process events that arrived while we were replaying
       for (const event of earlyEvents) {
         if (done) break;
-        if (trackedStreamId && event.streamId !== trackedStreamId) continue;
-        if (!trackedStreamId && event.type === 'agent_start') {
-          trackedStreamId = event.streamId ?? undefined;
-        }
-        if (!trackedStreamId && !options.eventId) continue;
-
-        eventQueue.push(event);
-        if (
-          event.type === 'agent_end' &&
-          event.streamId === (trackedStreamId ?? null)
-        ) {
-          done = true;
-        }
+        queueVisibleEvent(event);
       }
 
       while (true) {
@@ -200,6 +212,7 @@ export class AgentSession implements AgentProtocol {
           for (const event of eventsToYield) {
             yield event;
           }
+          continue;
         }
 
         if (done) break;
