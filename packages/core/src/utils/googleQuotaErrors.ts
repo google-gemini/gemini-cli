@@ -235,24 +235,11 @@ export function classifyGoogleError(error: unknown): unknown {
     }
   }
 
-  // Check for 503 Service Unavailable errors
-  if (status === 503) {
-    const errorMessage =
-      googleApiError?.message ||
-      (error instanceof Error ? error.message : String(error));
-    return new RetryableQuotaError(
-      errorMessage,
-      googleApiError ?? {
-        code: 503,
-        message: errorMessage,
-        details: [],
-      },
-    );
-  }
-
   if (
     !googleApiError ||
-    (googleApiError.code !== 429 && googleApiError.code !== 499) ||
+    (googleApiError.code !== 429 &&
+      googleApiError.code !== 499 &&
+      googleApiError.code !== 503) ||
     googleApiError.details.length === 0
   ) {
     // Fallback: try to parse the error message for a retry delay
@@ -273,9 +260,9 @@ export function classifyGoogleError(error: unknown): unknown {
         }
         return new RetryableQuotaError(errorMessage, cause, retryDelaySeconds);
       }
-    } else if (status === 429 || status === 499) {
-      // Fallback: If it is a 429 or 499 but doesn't have a specific "retry in" message,
-      // assume it is a temporary rate limit and retry after 5 sec (same as DEFAULT_RETRY_OPTIONS).
+    } else if (status === 429 || status === 499 || status === 503) {
+      // Fallback: If it is a 429, 499, or 503 but doesn't have a specific "retry in" message,
+      // assume it is a temporary rate limit and retry.
       return new RetryableQuotaError(
         errorMessage,
         googleApiError ?? {
@@ -405,7 +392,7 @@ export function classifyGoogleError(error: unknown): unknown {
     }
   }
 
-  // If we reached this point, the status is 429 or 499 and we have details,
+  // If we reached this point, the status is 429, 499, or 503 and we have details,
   // but no specific violation was matched. We return a generic retryable error.
   const errorMessage =
     googleApiError.message ||
