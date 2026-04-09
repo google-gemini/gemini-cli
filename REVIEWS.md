@@ -1,16 +1,16 @@
 # 🔎 Gemini CLI Triage Dashboard
 
-*Last Synchronized: 2026-04-09 21:17 (UTC)*
+*Last Synchronized: 2026-04-09 21:19 (UTC)*
 
 ## 🆕 Awaiting Initial Review
 **Action: Pick up one of these new PRs.** These have no feedback or assigned reviewers yet.
 
-| Issue | Linked PR | Status |
+| Issue | Linked PR | Last Update |
 | :--- | :--- | :--- |
-| [#18654 Enhanced Copy Workflow via External Editor Integration](https://github.com/google-gemini/gemini-cli/issues/18654) | [#19553](https://github.com/google-gemini/gemini-cli/pull/19553) | New PR |
-| [#18895 CLI cannot use fresh token in MCP OAuth](https://github.com/google-gemini/gemini-cli/issues/18895) | [#23493](https://github.com/google-gemini/gemini-cli/pull/23493) | New PR |
-| [#19710 Fix unsafe type assertions in Core Utilities (Phase 1.2: JSON & Config)](https://github.com/google-gemini/gemini-cli/issues/19710) | [#23628](https://github.com/google-gemini/gemini-cli/pull/23628) | New PR |
-| [#19713 Fix unsafe type assertions in CLI Config (Phase 3.1)](https://github.com/google-gemini/gemini-cli/issues/19713) | [#24905](https://github.com/google-gemini/gemini-cli/pull/24905) | New PR |
+| [#18654 Enhanced Copy Workflow via External Editor Integration](https://github.com/google-gemini/gemini-cli/issues/18654) | [#19553](https://github.com/google-gemini/gemini-cli/pull/19553) | `2026-03-11` |
+| [#18895 CLI cannot use fresh token in MCP OAuth](https://github.com/google-gemini/gemini-cli/issues/18895) | [#23493](https://github.com/google-gemini/gemini-cli/pull/23493) | `2026-03-23` |
+| [#19710 Fix unsafe type assertions in Core Utilities (Phase 1.2: JSON & Config)](https://github.com/google-gemini/gemini-cli/issues/19710) | [#23628](https://github.com/google-gemini/gemini-cli/pull/23628) | `2026-03-24` |
+| [#19713 Fix unsafe type assertions in CLI Config (Phase 3.1)](https://github.com/google-gemini/gemini-cli/issues/19713) | [#24905](https://github.com/google-gemini/gemini-cli/pull/24905) | `2026-04-09` |
 
 ## ⌛ Awaiting Reviewer Follow-up
 **Action: Follow up on your active reviews.** The author has responded to the latest feedback.

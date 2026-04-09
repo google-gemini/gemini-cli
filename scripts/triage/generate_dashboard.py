@@ -192,10 +192,9 @@ def main():
                     item = {
                         "issue_md": f"[#{issue_no} {issue_title}]({issue_url})",
                         "pr_no": pr['number'], "pr_url": pr['url'],
-                        "reviewers": reviewers, "updated_at": issue['updatedAt'][:10]
+                        "reviewers": reviewers, "updated_at": pr['updatedAt'][:10]
                     }
                     if not latest_reviewer_activity and not reviewers:
-                        item["status"] = "New PR"
                         initial_review_list.append(item)
                     else:
                         item["status"] = "Review Requested" if not latest_reviewer_activity else "Author Updated"
@@ -226,9 +225,9 @@ def main():
     md = f"# 🔎 Gemini CLI Triage Dashboard\n\n*Last Synchronized: {ts} (UTC)*\n\n"
     
     md += "## 🆕 Awaiting Initial Review\n**Action: Pick up one of these new PRs.** These have no feedback or assigned reviewers yet.\n\n"
-    md += "| Issue | Linked PR | Status |\n| :--- | :--- | :--- |\n"
+    md += "| Issue | Linked PR | Last Update |\n| :--- | :--- | :--- |\n"
     for i in initial_review_list:
-        md += f"| {i['issue_md']} | [#{i['pr_no']}]({i['pr_url']}) | {i['status']} |\n"
+        md += f"| {i['issue_md']} | [#{i['pr_no']}]({i['pr_url']}) | `{i['updated_at']}` |\n"
     if not initial_review_list: md += "| - | _No new PRs._ | - |\n"
 
     md += "\n## ⌛ Awaiting Reviewer Follow-up\n**Action: Follow up on your active reviews.** The author has responded to the latest feedback.\n\n"
@@ -252,7 +251,7 @@ def main():
 
     md += "\n---\n*Dashboard maintained by automated triage script.*"
     with open("REVIEWS.md", "w") as f: f.write(md)
-    print("Generated dashboard with actions in descriptions.")
+    print("Generated dashboard with updated initial-review table.")
 
 if __name__ == "__main__":
     main()
