@@ -137,7 +137,8 @@ Is the issue fundamentally missing context AND no one has asked for more informa
 - If still valid: Proceed to Step 5.
 
 ## Step 5: Duplicates
-Search for duplicates using `gh issue list --search "<keywords>" --repo <owner/repo> --state all`.
+Search for duplicates using `gh issue list --search "<keywords>" --repo <owner/repo> --state all`. 
+- **CRITICAL**: Pay special attention to newer issues that might already have active pull requests or more detailed context. If a duplicate exists that already has an active PR or more maintainer engagement, close the *current* issue you are triaging in favor of the active one.
 - If found: `gh issue close <issue_url> --reason "not planned" --comment "Closing as duplicate of #<duplicate_number>."` and **STOP EXECUTION**.
 - If no duplicates: Proceed to Step 6.
 
