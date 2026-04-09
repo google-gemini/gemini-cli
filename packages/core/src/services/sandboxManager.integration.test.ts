@@ -1,4 +1,4 @@
-﻿/**
+/**
  * @license
  * Copyright 2026 Google LLC
  * SPDX-License-Identifier: Apache-2.0
@@ -9,6 +9,7 @@ import { ShellExecutionService } from './shellExecutionService.js';
 import { getSecureSanitizationConfig } from './environmentSanitization.js';
 import {
   type SandboxedCommand,
+  type SandboxManager,
   NoopSandboxManager,
   LocalSandboxManager,
 } from './sandboxManager.js';
@@ -143,16 +144,27 @@ function ensureSandboxAvailable(): boolean {
 }
 
 describe('SandboxManager Integration', () => {
-  const workspace = process.cwd();
-  const manager = createSandboxManager({ enabled: true }, { workspace });
+  let workspace: string;
+  let manager: SandboxManager;
+
+  beforeAll(() => {
+    workspace = fs.mkdtempSync(path.join(os.tmpdir(), 'sandbox-integration-'));
+    manager = createSandboxManager({ enabled: true }, { workspace });
+  });
+
+  afterAll(() => {
+    if (workspace && fs.existsSync(workspace)) {
+      fs.rmSync(workspace, { recursive: true, force: true });
+    }
+  });
 
   // Skip if we are on an unsupported platform or if it's a NoopSandboxManager
-  const shouldSkip =
+  const shouldSkip = () =>
     manager instanceof NoopSandboxManager ||
     manager instanceof LocalSandboxManager ||
     !ensureSandboxAvailable();
 
-  describe.skipIf(shouldSkip)('Cross-platform Sandbox Behavior', () => {
+  describe.skipIf(shouldSkip())('Cross-platform Sandbox Behavior', () => {
     describe('Basic Execution', () => {
       it('executes commands within the workspace', async () => {
         const { command, args } = Platform.echo('sandbox test');
