@@ -326,6 +326,7 @@ class GrepToolInvocation extends BaseToolInvocation<
       let finalCommand = checkCommand;
       let finalArgs = checkArgs;
       let finalEnv = process.env;
+      let cleanup: (() => void) | undefined;
 
       if (sandboxManager) {
         try {
@@ -338,6 +339,7 @@ class GrepToolInvocation extends BaseToolInvocation<
           finalCommand = prepared.program;
           finalArgs = prepared.args;
           finalEnv = prepared.env;
+          cleanup = prepared.cleanup;
         } catch (err) {
           debugLogger.debug(
             `[GrepTool] Sandbox preparation failed for '${command}':`,
@@ -346,21 +348,27 @@ class GrepToolInvocation extends BaseToolInvocation<
         }
       }
 
-      return await new Promise((resolve) => {
-        const child = spawn(finalCommand, finalArgs, {
-          stdio: 'ignore',
-          shell: true,
-          env: finalEnv,
+      try {
+        return await new Promise((resolve) => {
+          const child = spawn(finalCommand, finalArgs, {
+            stdio: 'ignore',
+            shell: true,
+            env: finalEnv,
+          });
+          child.on('close', (code) => {
+            resolve(code === 0);
+          });
+          child.on('error', (err) => {
+            debugLogger.debug(
+              `[GrepTool] Failed to start process for '${command}':`,
+              err.message,
+            );
+            resolve(false);
+          });
         });
-        child.on('close', (code) => resolve(code === 0));
-        child.on('error', (err) => {
-          debugLogger.debug(
-            `[GrepTool] Failed to start process for '${command}':`,
-            err.message,
-          );
-          resolve(false);
-        });
-      });
+      } finally {
+        cleanup?.();
+      }
     } catch {
       return false;
     }
