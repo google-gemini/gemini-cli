@@ -16,7 +16,6 @@ import { GIT_COMMIT_INFO } from '../../generated/git-commit.js';
 import { formatBytes } from '../utils/formatters.js';
 import {
   IdeClient,
-  sessionId,
   getVersion,
   INITIAL_HISTORY_LENGTH,
   debugLogger,
@@ -59,7 +58,7 @@ export const bugCommand: SlashCommand = {
     let info = `
 * **CLI Version:** ${cliVersion}
 * **Git Commit:** ${GIT_COMMIT_INFO}
-* **Session ID:** ${sessionId}
+* **Session ID:** ${config?.getSessionId() || 'Unknown'}
 * **Operating System:** ${osVersion}
 * **Sandbox Environment:** ${sandboxEnv}
 * **Model Version:** ${modelVersion}

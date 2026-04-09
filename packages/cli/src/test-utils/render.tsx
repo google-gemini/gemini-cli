@@ -731,7 +731,7 @@ export const renderWithProviders = async (
             <UIStateContext.Provider value={finalUiState}>
               <VimModeProvider>
                 <ShellFocusContext.Provider value={shellFocus}>
-                  <SessionStatsProvider>
+                  <SessionStatsProvider sessionId={config.getSessionId()}>
                     <StreamingContext.Provider
                       value={finalUiState.streamingState}
                     >
