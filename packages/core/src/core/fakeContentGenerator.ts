@@ -59,7 +59,7 @@ export class FakeContentGenerator implements ContentGenerator {
 
     for await (const line of rl) {
       if (line.trim() !== '') {
-        responses.push(JSON.parse(line) as FakeResponse);
+        responses.push(JSON.parse(line) as unknown as FakeResponse);
       }
     }
     return new FakeContentGenerator(responses);

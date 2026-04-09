@@ -197,7 +197,7 @@ describe('Memory Usage Tests', () => {
 
   describe('Large Chat Scenarios', () => {
     let sharedResumeResponsesPath: string;
-    let sharedGrowthResponsesPath: string;
+    let sharedActiveResponsesPath: string;
     let sharedHistoryPath: string;
     let tempDir: string;
 
@@ -205,9 +205,9 @@ describe('Memory Usage Tests', () => {
       tempDir = join(__dirname, `large-chat-tmp-${randomUUID()}`);
       mkdirSync(tempDir, { recursive: true });
 
-      const { resumeResponsesPath, growthResponsesPath, historyPath } =
+      const { resumeResponsesPath, activeResponsesPath, historyPath } =
         await generateSharedLargeChatData(tempDir);
-      sharedGrowthResponsesPath = growthResponsesPath;
+      sharedActiveResponsesPath = activeResponsesPath;
       sharedResumeResponsesPath = resumeResponsesPath;
       sharedHistoryPath = historyPath;
     }, 60000);
@@ -225,7 +225,7 @@ describe('Memory Usage Tests', () => {
     it('large-chat: memory usage within baseline', async () => {
       rig = new TestRig();
       rig.setup('memory-large-chat', {
-        fakeResponsesPath: sharedGrowthResponsesPath,
+        fakeResponsesPath: sharedActiveResponsesPath,
       });
 
       const result = await harness.runScenario(
@@ -362,15 +362,15 @@ describe('Memory Usage Tests', () => {
 
 async function generateSharedLargeChatData(tempDir: string) {
   const resumeResponsesPath = join(tempDir, 'large-chat-resume-chat.responses');
-  const growthResponsesPath = join(tempDir, 'large-chat-growth-chat.responses');
+  const activeResponsesPath = join(tempDir, 'large-chat-active-chat.responses');
   const historyPath = join(tempDir, 'large-chat-history.json');
 
   if (
     existsSync(resumeResponsesPath) &&
-    existsSync(growthResponsesPath) &&
+    existsSync(activeResponsesPath) &&
     existsSync(historyPath)
   ) {
-    return { resumeResponsesPath, growthResponsesPath, historyPath };
+    return { resumeResponsesPath, activeResponsesPath, historyPath };
   }
 
   const baseString = randomBytes(Math.ceil(MSG_PAYLOAD_SIZE * 0.75))
@@ -378,7 +378,7 @@ async function generateSharedLargeChatData(tempDir: string) {
     .slice(0, MSG_PAYLOAD_SIZE);
 
   const resumeResponsesStream = createWriteStream(resumeResponsesPath);
-  const growthResponsesStream = createWriteStream(growthResponsesPath);
+  const activeResponsesStream = createWriteStream(activeResponsesPath);
   const historyStream = createWriteStream(historyPath);
 
   historyStream.write(`{
@@ -414,18 +414,18 @@ async function generateSharedLargeChatData(tempDir: string) {
       }) + '\n',
     );
 
-    growthResponsesStream.write(
+    historyStream.write(`  ]\n}\n`);
+
+    activeResponsesStream.write(
       `{"method":"generateContent","response":{"candidates":[{"content":{"parts":[{"text":"{\\"complexity_reasoning\\":\\"simple\\",\\"complexity_score\\":1}"}],"role":"model"},"finishReason":"STOP","index":0}]}}\n`,
     );
-    growthResponsesStream.write(
+    activeResponsesStream.write(
       `{"method":"generateContentStream","response":[{"candidates":[{"content":{"parts":[{"text":"${response}"}],"role":"model"},"finishReason":"STOP","index":0}],"usageMetadata":{"promptTokenCount":5,"candidatesTokenCount":10,"totalTokenCount":15,"promptTokensDetails":[{"modality":"TEXT","tokenCount":5}]}}]}\n`,
     );
-    growthResponsesStream.write(
+    activeResponsesStream.write(
       `{"method":"generateContent","response":{"candidates":[{"content":{"parts":[{"text":"{\\"originalSummary\\":\\"large chat summary\\",\\"events\\":[]}"}],"role":"model"},"finishReason":"STOP","index":0}]}}\n`,
     );
   }
-
-  historyStream.write(`  ]\n}\n`);
 
   // Generate a few short responses for the resume tests
   resumeResponsesStream.write(
@@ -439,11 +439,11 @@ async function generateSharedLargeChatData(tempDir: string) {
   );
 
   resumeResponsesStream.end();
-  growthResponsesStream.end();
+  activeResponsesStream.end();
   historyStream.end();
 
   await Promise.all(
-    [resumeResponsesStream, growthResponsesStream, historyStream].map(
+    [resumeResponsesStream, activeResponsesStream, historyStream].map(
       (stream) =>
         new Promise((resolve, reject) => {
           stream.on('finish', resolve);
@@ -452,5 +452,5 @@ async function generateSharedLargeChatData(tempDir: string) {
     ),
   );
 
-  return { resumeResponsesPath, growthResponsesPath, historyPath };
+  return { resumeResponsesPath, activeResponsesPath, historyPath };
 }
