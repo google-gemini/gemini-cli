@@ -22,13 +22,13 @@ export interface IrNodeBehavior<T extends ConcreteNode = ConcreteNode> {
 }
 
 export class IrNodeBehaviorRegistry {
-  private readonly behaviors = new Map<string, IrNodeBehavior<any>>();
+  private readonly behaviors = new Map<string, IrNodeBehavior<ConcreteNode>>();
 
   register<T extends ConcreteNode>(behavior: IrNodeBehavior<T>) {
-    this.behaviors.set(behavior.type, behavior);
+    this.behaviors.set(behavior.type, behavior as IrNodeBehavior<ConcreteNode>);
   }
 
-  get(type: string): IrNodeBehavior<any> {
+  get(type: string): IrNodeBehavior<ConcreteNode> {
     const behavior = this.behaviors.get(type);
     if (!behavior) {
       throw new Error(`Unregistered IrNode type: ${type}`);

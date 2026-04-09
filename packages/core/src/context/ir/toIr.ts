@@ -113,7 +113,8 @@ function parseToolResponses(
     };
   }
 
-  for (const part of msg.parts!) {
+  const parts = msg.parts || [];
+  for (const part of parts) {
     if (part.functionResponse) {
       const callId = part.functionResponse.id || '';
       const matchingCall = pendingCallParts.get(callId);
@@ -153,7 +154,8 @@ function parseUserParts(
   nodeIdentityMap: WeakMap<object, string>
 ): Partial<Episode> {
   const semanticParts: SemanticPart[] = [];
-  for (const p of msg.parts!) {
+  const parts = msg.parts || [];
+  for (const p of parts) {
     if (p.text !== undefined)
       semanticParts.push({ type: 'text', text: p.text });
     else if (p.inlineData)
@@ -172,8 +174,9 @@ function parseUserParts(
       semanticParts.push({ type: 'raw_part', part: p }); // Preserve unknowns
   }
 
+  const baseObj = parts.length > 0 ? parts[0] : msg;
   const trigger: UserPrompt = {
-    id: getStableId(msg.parts![0] || msg, nodeIdentityMap),
+    id: getStableId(baseObj, nodeIdentityMap),
     type: 'USER_PROMPT',
     semanticParts,
   };
@@ -198,7 +201,8 @@ function parseModelParts(
     };
   }
 
-  for (const part of msg.parts!) {
+  const parts = msg.parts || [];
+  for (const part of parts) {
     if (part.functionCall) {
       const callId = part.functionCall.id || '';
       if (callId) pendingCallParts.set(callId, part);

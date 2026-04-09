@@ -15,8 +15,6 @@ import type { SidecarConfig } from './sidecar/types.js';
 import { PipelineOrchestrator } from './sidecar/orchestrator.js';
 import { HistoryObserver } from './historyObserver.js';
 import { IrProjector } from './ir/projector.js';
-import { registerBuiltInProcessors } from './sidecar/builtins.js';
-import { SidecarRegistry } from './sidecar/registry.js';
 
 export class ContextManager {
   // The stateful, pristine flat graph.
@@ -25,35 +23,27 @@ export class ContextManager {
   private readonly eventBus: ContextEventBus;
 
   // Internal sub-components
-  private orchestrator: PipelineOrchestrator;
-  private historyObserver?: HistoryObserver;
+  private readonly orchestrator: PipelineOrchestrator;
+  private readonly historyObserver: HistoryObserver;
 
-  static create(
-    sidecar: SidecarConfig,
-    env: ContextEnvironment,
-    tracer: ContextTracer,
-    orchestrator?: PipelineOrchestrator,
-    registry?: SidecarRegistry,
-  ): ContextManager {
-    if (!registry) {
-      registry = new SidecarRegistry();
-      registerBuiltInProcessors(registry);
-    }
-    const orch =
-      orchestrator ||
-      new PipelineOrchestrator(sidecar, env, env.eventBus, tracer, registry);
-    return new ContextManager(sidecar, env, tracer, orch);
-  }
-
-  // Use ContextManager.create() instead
-  private constructor(
-    private sidecar: SidecarConfig,
-    private env: ContextEnvironment,
+  constructor(
+    private readonly sidecar: SidecarConfig,
+    private readonly env: ContextEnvironment,
     private readonly tracer: ContextTracer,
     orchestrator: PipelineOrchestrator,
+    chatHistory: AgentChatHistory,
   ) {
     this.eventBus = env.eventBus;
     this.orchestrator = orchestrator;
+
+    this.historyObserver = new HistoryObserver(
+      chatHistory,
+      this.env.eventBus,
+      this.tracer,
+      this.env.tokenCalculator,
+      this.env.irMapper,
+    );
+    this.historyObserver.start();
 
     this.eventBus.onPristineHistoryUpdated((event) => {
       this.pristineNodes = event.nodes;
@@ -89,9 +79,7 @@ export class ContextManager {
    */
   shutdown() {
     this.orchestrator.shutdown();
-    if (this.historyObserver) {
-      this.historyObserver.stop();
-    }
+    this.historyObserver.stop();
   }
 
   /**
@@ -130,24 +118,6 @@ export class ContextManager {
         });
       }
     }
-  }
-
-  /**
-   * Starts tracking the raw agent history and translating it to Episodic IR.
-   */
-  subscribeToHistory(chatHistory: AgentChatHistory) {
-    if (this.historyObserver) {
-      this.historyObserver.stop();
-    }
-
-    this.historyObserver = new HistoryObserver(
-      chatHistory,
-      this.env.eventBus,
-      this.tracer,
-      this.env.tokenCalculator,
-      this.env.irMapper,
-    );
-    this.historyObserver.start();
   }
 
   /**

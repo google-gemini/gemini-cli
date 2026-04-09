@@ -13,6 +13,8 @@ import type { ContextTokenCalculator } from './utils/contextTokenCalculator.js';
 import type { ContextEventBus } from './eventBus.js';
 import type { ContextTracer } from './tracer.js';
 
+import type { ConcreteNode } from './ir/types.js';
+
 /**
  * Connects the raw AgentChatHistory to the ContextManager.
  * It maps raw messages into Episodic Intermediate Representation (IR)
@@ -46,7 +48,7 @@ export class HistoryObserver {
           this.tokenCalculator,
         );
 
-        const nodes: Array<import('./ir/types.js').ConcreteNode> = [];
+        const nodes: Array<ConcreteNode> = [];
         for (const ep of pristineEpisodes) {
           if (ep.concreteNodes) {
             for (const child of ep.concreteNodes) {

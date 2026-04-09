@@ -20,6 +20,7 @@ import { registerBuiltInBehaviors } from '../ir/builtinBehaviors.js';
 import { IrMapper } from '../ir/mapper.js';
 import { SidecarRegistry } from '../sidecar/registry.js';
 import { registerBuiltInProcessors } from '../sidecar/builtins.js';
+import { PipelineOrchestrator } from '../sidecar/orchestrator.js';
 import type { ConcreteNode, ToolExecution } from '../ir/types.js';
 import type { ContextEnvironment } from '../sidecar/environment.js';
 import type { Config } from '../../config/config.js';
@@ -209,18 +210,24 @@ export function setupContextComponentTest(
     1,
     eventBus,
   );
-  const contextManager = ContextManager.create(
+  
+  const orchestrator = new PipelineOrchestrator(
+    sidecar,
+    env,
+    eventBus,
+    tracer,
+    registry
+  );
+
+  const contextManager = new ContextManager(
     sidecar,
     env,
     tracer,
-    undefined,
-    registry,
+    orchestrator,
+    chatHistory
   );
 
   // The async worker is now internally managed by ContextManager
-
-  // Subscribe to history to enable the Eager/Opportunistic triggers
-  contextManager.subscribeToHistory(chatHistory);
 
   return { chatHistory, contextManager };
 }

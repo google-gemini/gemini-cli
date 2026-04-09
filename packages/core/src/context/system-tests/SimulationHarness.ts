@@ -85,14 +85,13 @@ export class SimulationHarness {
       this.tracer,
       registry,
     );
-    this.contextManager = ContextManager.create(
+    this.contextManager = new ContextManager(
       config,
       this.env,
       this.tracer,
       this.orchestrator,
-      registry,
+      this.chatHistory
     );
-    this.contextManager.subscribeToHistory(this.chatHistory);
   }
 
   /**

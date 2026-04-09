@@ -18,6 +18,8 @@ import { ContextEnvironmentImpl } from './sidecar/environmentImpl.js';
 import { SidecarLoader } from './sidecar/SidecarLoader.js';
 import { ContextTracer } from './tracer.js';
 import { ContextEventBus } from './eventBus.js';
+import { PipelineOrchestrator } from './sidecar/orchestrator.js';
+import { AgentChatHistory } from '../core/agentChatHistory.js';
 import type { Content } from '@google/genai';
 import type { BaseLlmClient } from '../core/baseLlmClient.js';
 import type { Episode } from './ir/types.js';
@@ -96,12 +98,21 @@ describe('ContextManager Golden Tests', () => {
       4,
       eventBus,
     );
-    contextManager = ContextManager.create(
+    const chatHistory = new AgentChatHistory();
+    const orchestrator = new PipelineOrchestrator(
+      sidecar,
+      env,
+      eventBus,
+      tracer,
+      registry
+    );
+
+    contextManager = new ContextManager(
       sidecar,
       env,
       tracer,
-      undefined,
-      registry,
+      orchestrator,
+      chatHistory
     );
   });
 

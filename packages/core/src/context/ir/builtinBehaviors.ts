@@ -8,6 +8,7 @@ import type {
   AgentYield,
   Snapshot,
   RollingSummary,
+  SystemEvent,
 } from './types.js';
 
 export const UserPromptBehavior: IrNodeBehavior<UserPrompt> = {
@@ -15,10 +16,20 @@ export const UserPromptBehavior: IrNodeBehavior<UserPrompt> = {
   getEstimatableParts(prompt) {
     const parts: Part[] = [];
     for (const sp of prompt.semanticParts) {
-      if (sp.type === 'text') parts.push({ text: sp.text });
-      else if (sp.type === 'inline_data') parts.push({ inlineData: { mimeType: sp.mimeType, data: sp.data } });
-      else if (sp.type === 'file_data') parts.push({ fileData: { mimeType: sp.mimeType, fileUri: sp.fileUri } });
-      else if (sp.type === 'raw_part') parts.push(sp.part);
+      switch (sp.type) {
+        case 'text':
+          parts.push({ text: sp.text });
+          break;
+        case 'inline_data':
+          parts.push({ inlineData: { mimeType: sp.mimeType, data: sp.data } });
+          break;
+        case 'file_data':
+          parts.push({ fileData: { mimeType: sp.mimeType, fileUri: sp.fileUri } });
+          break;
+        case 'raw_part':
+          parts.push(sp.part);
+          break;
+      }
     }
     return parts;
   },
@@ -84,7 +95,7 @@ export const AgentYieldBehavior: IrNodeBehavior<AgentYield> = {
   }
 };
 
-export const SystemEventBehavior: IrNodeBehavior<any> = {
+export const SystemEventBehavior: IrNodeBehavior<SystemEvent> = {
   type: 'SYSTEM_EVENT',
   getEstimatableParts() { return []; },
   serialize(node, writer) {
