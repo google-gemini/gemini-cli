@@ -80,13 +80,6 @@ priority = 40
 modes = ["plan"]
 denyMessage = "You are in Plan Mode with access to read-only tools. Execution of scripts (including those from skills) is blocked."
 
-# Explicitly Allow Read-Only Tools in Plan mode.
-[[rule]]
-toolName = ["activate_skill"]
-decision = "allow"
-priority = 50
-modes = ["plan"]
-
 [[rule]]
 toolName = "*"
 mcpName = "*"
@@ -106,14 +99,14 @@ modes = ["plan"]
 interactive = false
 
 [[rule]]
-toolName = ["ask_user", "save_memory", "web_fetch"]
+toolName = ["ask_user", "save_memory", "web_fetch", "activate_skill"]
 decision = "ask_user"
 priority = 50
 modes = ["plan"]
 interactive = true
 
 [[rule]]
-toolName = ["ask_user", "save_memory", "web_fetch"]
+toolName = ["ask_user", "save_memory", "web_fetch", "activate_skill"]
 decision = "deny"
 priority = 50
 modes = ["plan"]

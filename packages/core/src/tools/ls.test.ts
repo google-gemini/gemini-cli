@@ -132,7 +132,7 @@ describe('LSTool', () => {
       expect(result.llmContent).toContain('[DIR] subdir');
       expect(result.llmContent).toContain('file1.txt');
       expect(result.returnDisplay).toEqual({
-        summary: 'Listed 2 item(s).',
+        summary: 'Found 2 item(s).',
         files: ['[DIR] subdir', 'file1.txt'],
       });
     });
@@ -150,7 +150,7 @@ describe('LSTool', () => {
 
       expect(result.llmContent).toContain('secondary-file.txt');
       expect(result.returnDisplay).toEqual({
-        summary: 'Listed 1 item(s).',
+        summary: 'Found 1 item(s).',
         files: expect.any(Array),
       });
     });
@@ -178,7 +178,7 @@ describe('LSTool', () => {
       expect(result.llmContent).toContain('file1.txt');
       expect(result.llmContent).not.toContain('file2.log');
       expect(result.returnDisplay).toEqual({
-        summary: 'Listed 1 item(s).',
+        summary: 'Found 1 item(s).',
         files: expect.any(Array),
       });
     });
@@ -195,7 +195,7 @@ describe('LSTool', () => {
       expect(result.llmContent).not.toContain('file2.log');
       // .git is always ignored by default.
       expect(result.returnDisplay).toEqual(
-        expect.objectContaining({ summary: 'Listed 2 item(s). (2 ignored)' }),
+        expect.objectContaining({ summary: 'Found 2 item(s). (2 ignored)' }),
       );
     });
 
@@ -212,7 +212,7 @@ describe('LSTool', () => {
       expect(result.llmContent).toContain('file1.txt');
       expect(result.llmContent).not.toContain('file2.log');
       expect(result.returnDisplay).toEqual(
-        expect.objectContaining({ summary: 'Listed 2 item(s). (1 ignored)' }),
+        expect.objectContaining({ summary: 'Found 2 item(s). (1 ignored)' }),
       );
     });
 
@@ -301,7 +301,7 @@ describe('LSTool', () => {
       expect(result.llmContent).toContain('file1.txt');
       expect(result.llmContent).not.toContain('problematic.txt');
       expect(result.returnDisplay).toEqual({
-        summary: 'Listed 1 item(s).',
+        summary: 'Found 1 item(s).',
         files: expect.any(Array),
       });
 
@@ -364,7 +364,7 @@ describe('LSTool', () => {
 
       expect(result.llmContent).toContain('secondary-file.txt');
       expect(result.returnDisplay).toEqual({
-        summary: 'Listed 1 item(s).',
+        summary: 'Found 1 item(s).',
         files: expect.any(Array),
       });
     });
