@@ -339,4 +339,61 @@ describe.skipIf(os.platform() === 'win32')('buildBwrapArgs', () => {
     const envIndex = args.indexOf(`${includeDir}/.env`);
     expect(args[envIndex - 2]).toBe('--bind');
   });
+
+  it('binds git worktree directories if present', async () => {
+    const worktreeGitDir = '/path/to/worktree/.git';
+    const mainGitDir = '/path/to/main/.git';
+
+    const args = await buildBwrapArgs({
+      ...defaultOptions,
+      resolvedPaths: createResolvedPaths({
+        gitWorktree: {
+          worktreeGitDir,
+          mainGitDir,
+        },
+      }),
+    });
+
+    expect(args).toContain(worktreeGitDir);
+    expect(args).toContain(mainGitDir);
+    expect(args[args.indexOf(worktreeGitDir) - 1]).toBe('--ro-bind-try');
+    expect(args[args.indexOf(mainGitDir) - 1]).toBe('--ro-bind-try');
+  });
+
+  it('enforces read-only binding for git worktrees even if workspaceWrite is true', async () => {
+    const worktreeGitDir = '/path/to/worktree/.git';
+
+    const args = await buildBwrapArgs({
+      ...defaultOptions,
+      workspaceWrite: true,
+      resolvedPaths: createResolvedPaths({
+        gitWorktree: {
+          worktreeGitDir,
+        },
+      }),
+    });
+
+    expect(args[args.indexOf(worktreeGitDir) - 1]).toBe('--ro-bind-try');
+  });
+
+  it('git worktree read-only bindings should override previous policyWrite bindings', async () => {
+    const worktreeGitDir = '/custom/worktree/.git';
+
+    const args = await buildBwrapArgs({
+      ...defaultOptions,
+      resolvedPaths: createResolvedPaths({
+        policyWrite: ['/custom/worktree'],
+        gitWorktree: {
+          worktreeGitDir,
+        },
+      }),
+    });
+
+    const writeBindIndex = args.indexOf('/custom/worktree');
+    const worktreeBindIndex = args.lastIndexOf(worktreeGitDir);
+
+    expect(writeBindIndex).toBeGreaterThan(-1);
+    expect(worktreeBindIndex).toBeGreaterThan(-1);
+    expect(worktreeBindIndex).toBeGreaterThan(writeBindIndex);
+  });
 });
