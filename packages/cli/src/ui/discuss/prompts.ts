@@ -37,6 +37,15 @@ const FALLBACK_TEMPLATES: Record<PromptTemplateName, string> = {
 
 const cache = new Map<PromptTemplateName, string>();
 
+/**
+ * Mitigates prompt-injection when untrusted text (user chime-ins, pasted thread
+ * content, model-produced fields) is embedded in discuss prompts: angle brackets
+ * cannot mimic tags or nested instructions.
+ */
+function sanitizeDiscussPromptText(text: string): string {
+  return text.replaceAll('<', '\u003c').replaceAll('>', '\u003e');
+}
+
 async function readTemplate(name: PromptTemplateName): Promise<string> {
   const cached = cache.get(name);
   if (cached) {
@@ -61,11 +70,12 @@ async function readTemplate(name: PromptTemplateName): Promise<string> {
 function formatRecentMessages(state: DiscussionSessionState): string {
   return state.messages
     .slice(-28)
-    .map((m) =>
-      m.kind
-        ? `[${m.id}] ${m.role}:${m.kind} ${m.text}`
-        : `[${m.id}] ${m.role} ${m.text}`,
-    )
+    .map((m) => {
+      const safeText = sanitizeDiscussPromptText(m.text);
+      return m.kind
+        ? `[${m.id}] ${m.role}:${m.kind} ${safeText}`
+        : `[${m.id}] ${m.role} ${safeText}`;
+    })
     .join('\n');
 }
 
@@ -96,7 +106,7 @@ ${agentTemplate}
 ${formatSessionState(state)}
 
 Latest user chime-in:
-${latestUserMessage}
+${sanitizeDiscussPromptText(latestUserMessage)}
 
 Recent thread (newest near end):
 ${formatRecentMessages(state)}
@@ -117,12 +127,12 @@ export async function buildModeratorPrompt(
 
   const unmetSection =
     state.unmetRequirements.length > 0
-      ? `\nPreviously flagged unmet requirements:\n${state.unmetRequirements.map((r) => `- ${r}`).join('\n')}`
+      ? `\nPreviously flagged unmet requirements:\n${state.unmetRequirements.map((r) => `- ${sanitizeDiscussPromptText(r)}`).join('\n')}`
       : '';
 
   const cyclicSection =
     state.cyclicTopics.length > 0
-      ? `\nPreviously flagged cyclic topics:\n${state.cyclicTopics.map((t) => `- ${t}`).join('\n')}`
+      ? `\nPreviously flagged cyclic topics:\n${state.cyclicTopics.map((t) => `- ${sanitizeDiscussPromptText(t)}`).join('\n')}`
       : '';
 
   return `${system}
@@ -135,10 +145,10 @@ ${unmetSection}
 ${cyclicSection}
 
 Original topic (check all requirements against this):
-${state.topic}
+${sanitizeDiscussPromptText(state.topic)}
 
 Latest user chime-in:
-${latestUserMessage}
+${sanitizeDiscussPromptText(latestUserMessage)}
 
 Recent thread (newest near end):
 ${formatRecentMessages(state)}

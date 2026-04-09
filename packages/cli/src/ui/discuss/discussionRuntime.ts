@@ -11,6 +11,7 @@ import {
   type Config,
   getErrorMessage,
   promptIdContext,
+  resolveToRealPath,
 } from '@google/gemini-cli-core';
 import { MessageType, type HistoryItemWithoutId } from '../types.js';
 import type { UseHistoryManagerReturn } from '../hooks/useHistoryManager.js';
@@ -36,6 +37,12 @@ const PANELISTS: PanelistId[] = ['builder', 'skeptic', 'explorer'];
 const MAX_AUTO_FOLLOW_UP_ROUNDS = 2;
 const turnQueues = new Map<string, Promise<void>>();
 const turnAbortControllers = new Map<string, AbortController>();
+
+type PanelistReplyOutcome = {
+  agent: PanelistId;
+  reply: CandidateReply | null;
+  error: Error | null;
+};
 
 function addMessage(
   addItem: UseHistoryManagerReturn['addItem'],
@@ -64,10 +71,29 @@ async function expandMarkdownReference(
 
   const projectRoot = config.getProjectRoot();
   const rawPath = match[1].trim();
-  const fullPath = path.resolve(projectRoot, rawPath);
+  if (rawPath.includes('\0')) {
+    return text;
+  }
+  // Only allow project-relative paths; reject absolute user input.
+  if (path.isAbsolute(rawPath)) {
+    return text;
+  }
+
+  const resolvedPath = path.resolve(projectRoot, rawPath);
+
+  let realFile: string;
+  try {
+    realFile = resolveToRealPath(resolvedPath);
+  } catch {
+    return text;
+  }
+
+  if (!config.getWorkspaceContext().isPathWithinWorkspace(realFile)) {
+    return text;
+  }
 
   try {
-    const content = await fs.readFile(fullPath, 'utf8');
+    const content = await fs.readFile(realFile, 'utf8');
     return content;
   } catch {
     // If the file can't be read, fall back to original text so we don't silently drop input.
@@ -96,6 +122,24 @@ function classifyKind(agent: AgentId, text: string): CandidateReply['kind'] {
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null;
+}
+
+function isLikelyAbortError(error: Error | null | undefined): boolean {
+  if (!error) {
+    return false;
+  }
+  if (error.name === 'AbortError') {
+    return true;
+  }
+  const asUnknown: unknown = error;
+  if (!isRecord(asUnknown)) {
+    return false;
+  }
+  const code = asUnknown['code'];
+  return (
+    typeof code === 'string' &&
+    (code === 'ABORT_ERR' || code === 'ERR_CANCELED')
+  );
 }
 
 function getStringProperty(
@@ -256,33 +300,44 @@ async function runAgentsInParallel(
     return;
   }
 
-  const promises = PANELISTS.map((agent) =>
-    generateAgentReply(config, agent, state, latestUserMessage, abortSignal)
-      .then((reply) => ({ agent, reply, error: null as Error | null }))
-      .catch((error: unknown) => ({
-        agent,
-        reply: null,
-        error:
-          error instanceof Error ? error : new Error(getErrorMessage(error)),
-      })),
-  );
+  const pendingByAgent = new Map<PanelistId, Promise<PanelistReplyOutcome>>();
+  for (const agent of PANELISTS) {
+    const promise = generateAgentReply(
+      config,
+      agent,
+      state,
+      latestUserMessage,
+      abortSignal,
+    )
+      .then((reply): PanelistReplyOutcome => ({ agent, reply, error: null }))
+      .catch(
+        (error: unknown): PanelistReplyOutcome => ({
+          agent,
+          reply: null,
+          error:
+            error instanceof Error ? error : new Error(getErrorMessage(error)),
+        }),
+      );
+    pendingByAgent.set(agent, promise);
+  }
 
-  const pending = new Set(promises);
-
-  while (pending.size > 0 && remainingBudget() > 0) {
+  while (pendingByAgent.size > 0 && remainingBudget() > 0) {
     if (abortSignal.aborted) {
       return;
     }
-    const completed = await Promise.race(pending);
-    pending.delete(
-      promises.find((p) => p === promises[PANELISTS.indexOf(completed.agent)])!,
-    );
+    const completed = await Promise.race(pendingByAgent.values());
+    pendingByAgent.delete(completed.agent);
 
     if (completed.error || !completed.reply) {
-      addMessage(addItem, {
-        type: MessageType.ERROR,
-        text: `[${completed.agent}] failed: ${completed.error?.message ?? 'unknown error'}`,
-      });
+      if (
+        !abortSignal.aborted &&
+        !isLikelyAbortError(completed.error ?? undefined)
+      ) {
+        addMessage(addItem, {
+          type: MessageType.ERROR,
+          text: `[${completed.agent}] failed: ${completed.error?.message ?? 'unknown error'}`,
+        });
+      }
       continue;
     }
 
@@ -311,11 +366,6 @@ async function runModeratorTurn(
   if (remainingBudget <= 0) {
     return { requestFollowUpRound: false, followUpPrompt: null };
   }
-
-  addMessage(addItem, {
-    type: 'discuss_thinking',
-    agent: 'moderator',
-  });
 
   try {
     const reply = await generateAgentReply(
@@ -368,7 +418,10 @@ async function runModeratorTurn(
       followUpPrompt: reply.followUpPrompt || reply.text,
     };
   } catch (error) {
-    if (abortSignal.aborted) {
+    if (
+      abortSignal.aborted ||
+      isLikelyAbortError(error instanceof Error ? error : null)
+    ) {
       return { requestFollowUpRound: false, followUpPrompt: null };
     }
     addMessage(addItem, {
@@ -545,7 +598,9 @@ export async function handleDiscussionUserMessage(
         }
       }
 
-      await saveDiscussionState(config, latest);
+      if (!abortController.signal.aborted) {
+        await saveDiscussionState(config, latest);
+      }
     } catch (error) {
       if (abortController.signal.aborted) {
         setPendingItem(null);
