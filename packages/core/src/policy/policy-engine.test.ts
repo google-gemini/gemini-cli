@@ -273,6 +273,22 @@ describe('PolicyEngine', () => {
       expect(decision).toBe(PolicyDecision.DENY);
     });
 
+    it('should match subagent name as alias for invoke_agent', async () => {
+      const rules: PolicyRule[] = [
+        { toolName: 'codebase_investigator', decision: PolicyDecision.DENY },
+      ];
+
+      engine = new PolicyEngine({ rules });
+
+      const toolCall: FunctionCall = {
+        name: 'invoke_agent',
+        args: { agent_name: 'codebase_investigator', prompt: 'Hello' },
+      };
+
+      const { decision } = await engine.check(toolCall, undefined);
+      expect(decision).toBe(PolicyDecision.DENY);
+    });
+
     it('should apply wildcard rules (no toolName)', async () => {
       const rules: PolicyRule[] = [
         { toolName: '*', decision: PolicyDecision.DENY }, // Applies to all tools
