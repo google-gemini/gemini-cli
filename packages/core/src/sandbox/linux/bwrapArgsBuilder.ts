@@ -5,18 +5,13 @@
  */
 
 import fs from 'node:fs';
-import { join, dirname, normalize } from 'node:path';
+import { join, dirname } from 'node:path';
 import {
-  type SandboxPermissions,
   GOVERNANCE_FILES,
   getSecretFileFindArgs,
-  sanitizePaths,
+  type ResolvedSandboxPaths,
 } from '../../services/sandboxManager.js';
-import {
-  tryRealpath,
-  resolveGitWorktreePaths,
-  isErrnoException,
-} from '../utils/fsUtils.js';
+import { resolveGitWorktreePaths, isErrnoException } from '../utils/fsUtils.js';
 import { spawnAsync } from '../../utils/shell-utils.js';
 import { debugLogger } from '../../utils/debugLogger.js';
 
@@ -24,13 +19,9 @@ import { debugLogger } from '../../utils/debugLogger.js';
  * Options for building bubblewrap (bwrap) arguments.
  */
 export interface BwrapArgsOptions {
-  workspace: string;
+  resolvedPaths: ResolvedSandboxPaths;
   workspaceWrite: boolean;
   networkAccess: boolean;
-  allowedPaths: string[];
-  forbiddenPaths: string[];
-  additionalPermissions: SandboxPermissions;
-  includeDirectories: string[];
   maskFilePath: string;
   isWriteCommand: boolean;
 }
@@ -41,13 +32,22 @@ export interface BwrapArgsOptions {
 export async function buildBwrapArgs(
   options: BwrapArgsOptions,
 ): Promise<string[]> {
+  const {
+    resolvedPaths,
+    workspaceWrite,
+    networkAccess,
+    maskFilePath,
+    isWriteCommand,
+  } = options;
+  const { workspace } = resolvedPaths;
+
   const bwrapArgs: string[] = [
     '--unshare-all',
     '--new-session', // Isolate session
     '--die-with-parent', // Prevent orphaned runaway processes
   ];
 
-  if (options.networkAccess || options.additionalPermissions.network) {
+  if (networkAccess) {
     bwrapArgs.push('--share-net');
   }
 
@@ -63,23 +63,16 @@ export async function buildBwrapArgs(
     '/tmp',
   );
 
-  const workspacePath = tryRealpath(options.workspace);
+  const bindFlag = workspaceWrite ? '--bind-try' : '--ro-bind-try';
 
-  const bindFlag = options.workspaceWrite ? '--bind-try' : '--ro-bind-try';
-
-  if (options.workspaceWrite) {
-    bwrapArgs.push('--bind-try', options.workspace, options.workspace);
-    if (workspacePath !== options.workspace) {
-      bwrapArgs.push('--bind-try', workspacePath, workspacePath);
-    }
-  } else {
-    bwrapArgs.push('--ro-bind-try', options.workspace, options.workspace);
-    if (workspacePath !== options.workspace) {
-      bwrapArgs.push('--ro-bind-try', workspacePath, workspacePath);
-    }
+  bwrapArgs.push(bindFlag, workspace.original, workspace.original);
+  if (workspace.resolved !== workspace.original) {
+    bwrapArgs.push(bindFlag, workspace.resolved, workspace.resolved);
   }
 
-  const { worktreeGitDir, mainGitDir } = resolveGitWorktreePaths(workspacePath);
+  const { worktreeGitDir, mainGitDir } = resolveGitWorktreePaths(
+    workspace.resolved,
+  );
   if (worktreeGitDir) {
     bwrapArgs.push(bindFlag, worktreeGitDir, worktreeGitDir);
   }
@@ -87,110 +80,62 @@ export async function buildBwrapArgs(
     bwrapArgs.push(bindFlag, mainGitDir, mainGitDir);
   }
 
-  const includeDirs = sanitizePaths(options.includeDirectories);
-  for (const includeDir of includeDirs) {
-    try {
-      const resolved = tryRealpath(includeDir);
-      bwrapArgs.push('--ro-bind-try', resolved, resolved);
-    } catch {
-      // Ignore
-    }
+  for (const includeDir of resolvedPaths.globalIncludes) {
+    bwrapArgs.push('--ro-bind-try', includeDir, includeDir);
   }
 
-  const normalizedWorkspace = normalize(workspacePath).replace(/\/$/, '');
-  for (const allowedPath of options.allowedPaths) {
-    const resolved = tryRealpath(allowedPath);
-    if (!fs.existsSync(resolved)) {
+  for (const allowedPath of resolvedPaths.policyAllowed) {
+    if (fs.existsSync(allowedPath)) {
+      bwrapArgs.push('--bind-try', allowedPath, allowedPath);
+    } else {
       // If the path doesn't exist, we still want to allow access to its parent
-      // if it's explicitly allowed, to enable creating it.
-      try {
-        const resolvedParent = tryRealpath(dirname(resolved));
-        bwrapArgs.push(
-          options.isWriteCommand ? '--bind-try' : bindFlag,
-          resolvedParent,
-          resolvedParent,
-        );
-      } catch {
-        // Ignore
-      }
-      continue;
-    }
-    const normalizedAllowedPath = normalize(resolved).replace(/\/$/, '');
-    if (normalizedAllowedPath !== normalizedWorkspace) {
-      bwrapArgs.push('--bind-try', resolved, resolved);
+      // to enable creating it. Since allowedPath is already resolved by resolveSandboxPaths,
+      // its parent is also correctly resolved.
+      const parent = dirname(allowedPath);
+      bwrapArgs.push(isWriteCommand ? '--bind-try' : bindFlag, parent, parent);
     }
   }
 
-  const additionalReads = sanitizePaths(
-    options.additionalPermissions.fileSystem?.read,
-  );
-  for (const p of additionalReads) {
-    try {
-      const safeResolvedPath = tryRealpath(p);
-      bwrapArgs.push('--ro-bind-try', safeResolvedPath, safeResolvedPath);
-    } catch (e: unknown) {
-      debugLogger.warn(e instanceof Error ? e.message : String(e));
-    }
+  for (const p of resolvedPaths.policyRead) {
+    bwrapArgs.push('--ro-bind-try', p, p);
   }
 
-  const additionalWrites = sanitizePaths(
-    options.additionalPermissions.fileSystem?.write,
-  );
-  for (const p of additionalWrites) {
-    try {
-      const safeResolvedPath = tryRealpath(p);
-      bwrapArgs.push('--bind-try', safeResolvedPath, safeResolvedPath);
-    } catch (e: unknown) {
-      debugLogger.warn(e instanceof Error ? e.message : String(e));
-    }
+  for (const p of resolvedPaths.policyWrite) {
+    bwrapArgs.push('--bind-try', p, p);
   }
 
   for (const file of GOVERNANCE_FILES) {
-    const filePath = join(options.workspace, file.path);
-    const realPath = tryRealpath(filePath);
+    const filePath = join(workspace.original, file.path);
+    const realPath = join(workspace.resolved, file.path);
     bwrapArgs.push('--ro-bind', filePath, filePath);
     if (realPath !== filePath) {
       bwrapArgs.push('--ro-bind', realPath, realPath);
     }
   }
 
-  for (const p of options.forbiddenPaths) {
-    let resolved: string;
+  for (const p of resolvedPaths.forbidden) {
+    if (!fs.existsSync(p)) continue;
     try {
-      resolved = tryRealpath(p); // Forbidden paths should still resolve to block the real path
-      if (!fs.existsSync(resolved)) continue;
-    } catch (e: unknown) {
-      debugLogger.warn(
-        `Failed to resolve forbidden path ${p}: ${e instanceof Error ? e.message : String(e)}`,
-      );
-      bwrapArgs.push('--ro-bind', '/dev/null', p);
-      continue;
-    }
-    try {
-      const stat = fs.statSync(resolved);
+      const stat = fs.statSync(p);
       if (stat.isDirectory()) {
-        bwrapArgs.push('--tmpfs', resolved, '--remount-ro', resolved);
+        bwrapArgs.push('--tmpfs', p, '--remount-ro', p);
       } else {
-        bwrapArgs.push('--ro-bind', '/dev/null', resolved);
+        bwrapArgs.push('--ro-bind', '/dev/null', p);
       }
     } catch (e: unknown) {
       if (isErrnoException(e) && e.code === 'ENOENT') {
-        bwrapArgs.push('--symlink', '/dev/null', resolved);
+        bwrapArgs.push('--symlink', '/dev/null', p);
       } else {
         debugLogger.warn(
-          `Failed to stat forbidden path ${resolved}: ${e instanceof Error ? e.message : String(e)}`,
+          `Failed to secure forbidden path ${p}: ${e instanceof Error ? e.message : String(e)}`,
         );
-        bwrapArgs.push('--ro-bind', '/dev/null', resolved);
+        bwrapArgs.push('--ro-bind', '/dev/null', p);
       }
     }
   }
 
   // Mask secret files (.env, .env.*)
-  const secretArgs = await getSecretFilesArgs(
-    options.workspace,
-    options.allowedPaths,
-    options.maskFilePath,
-  );
+  const secretArgs = await getSecretFilesArgs(resolvedPaths, maskFilePath);
   bwrapArgs.push(...secretArgs);
 
   return bwrapArgs;
@@ -200,12 +145,16 @@ export async function buildBwrapArgs(
  * Generates bubblewrap arguments to mask secret files.
  */
 async function getSecretFilesArgs(
-  workspace: string,
-  allowedPaths: string[],
+  resolvedPaths: ResolvedSandboxPaths,
   maskPath: string,
 ): Promise<string[]> {
   const args: string[] = [];
-  const searchDirs = new Set([workspace, ...allowedPaths]);
+  const searchDirs = new Set([
+    resolvedPaths.workspace.original,
+    resolvedPaths.workspace.resolved,
+    ...resolvedPaths.policyAllowed,
+    ...resolvedPaths.globalIncludes,
+  ]);
   const findPatterns = getSecretFileFindArgs();
 
   for (const dir of searchDirs) {
