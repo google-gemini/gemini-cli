@@ -160,12 +160,12 @@ def get_reviewer_info(pr):
             latest_reviewer_activity = max(latest_reviewer_activity, c['publishedAt'])
             
     return sorted(list(human_reviewers)), latest_reviewer_activity, sorted(list(requested_special_teams))
-
 def get_latest_activity(pr):
-    author = pr.get('author', {}).get('login')
     latest = pr['commits']['nodes'][0]['commit']['committedDate']
+    # Check all comments
     for c in pr.get('comments', {}).get('nodes', []):
         latest = max(latest, c['publishedAt'])
+    # Check all reviews (including empty ones)
     for r in pr.get('latestReviews', {}).get('nodes', []):
         latest = max(latest, r['updatedAt'])
     return latest
