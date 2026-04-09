@@ -757,7 +757,7 @@ const SETTINGS_SCHEMA = {
         label: 'Terminal Buffer',
         category: 'UI',
         requiresRestart: true,
-        default: true,
+        default: false,
         description: 'Use the new terminal buffer architecture for rendering.',
         showInDialog: true,
       },
@@ -1907,7 +1907,8 @@ const SETTINGS_SCHEMA = {
         category: 'Advanced',
         requiresRestart: true,
         default: true,
-        description: 'Automatically configure Node.js memory limits',
+        description:
+          'Automatically configure Node.js memory limits. Note: Because memory is allocated during the initial process boot, this setting is only read from the global user settings file and ignores workspace-level overrides.',
         showInDialog: true,
       },
       dnsResolutionOrder: {
@@ -1968,6 +1969,16 @@ const SETTINGS_SCHEMA = {
             requiresRestart: true,
             default: false,
             description: 'Enable non-interactive agent sessions.',
+            showInDialog: false,
+          },
+          agentSessionInteractiveEnabled: {
+            type: 'boolean',
+            label: 'Interactive Agent Session Enabled',
+            category: 'Experimental',
+            requiresRestart: true,
+            default: false,
+            description:
+              'Enable the agent session implementation for the interactive CLI.',
             showInDialog: false,
           },
         },
