@@ -44,6 +44,13 @@ powerful tool for developers.
 - **Test Commands:**
   - **Unit (All):** `npm run test`
   - **Integration (E2E):** `npm run test:e2e`
+  - > **NOTE**: Please run the memory and perf tests locally **only if** you are
+    > implementing changes related to those test areas. Otherwise skip these
+    > tests locally and rely on CI to run them on nightly builds.
+  - **Memory (Nightly):** `npm run test:memory` (Runs memory regression tests
+    against baselines. Excluded from `preflight`, run nightly.)
+  - **Performance (Nightly):** `npm run test:perf` (Runs CPU performance
+    regression tests against baselines. Excluded from `preflight`, run nightly.)
   - **Workspace-Specific:** `npm test -w <pkg> -- <path>` (Note: `<path>` must
     be relative to the workspace root, e.g.,
     `-w @google/gemini-cli-core -- src/routing/modelRouterService.test.ts`)

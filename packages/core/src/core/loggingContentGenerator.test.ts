@@ -74,6 +74,7 @@ describe('LoggingContentGenerator', () => {
       }),
       getTelemetryLogPromptsEnabled: vi.fn().mockReturnValue(true),
       refreshUserQuotaIfStale: vi.fn().mockResolvedValue(undefined),
+      getSessionId: vi.fn().mockReturnValue('test-session-id'),
     } as unknown as Config;
     loggingContentGenerator = new LoggingContentGenerator(wrapped, config);
     vi.useFakeTimers();

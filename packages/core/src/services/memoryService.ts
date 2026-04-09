@@ -14,6 +14,7 @@ import {
   type ConversationRecord,
 } from './chatRecordingService.js';
 import { debugLogger } from '../utils/debugLogger.js';
+import { coreEvents } from '../utils/events.js';
 import { isNodeError } from '../utils/errors.js';
 import { FRONTMATTER_REGEX, parseFrontmatter } from '../skills/skillLoader.js';
 import { LocalAgentExecutor } from '../agents/local-executor.js';
@@ -639,6 +640,11 @@ export async function startMemoryService(config: Config): Promise<void> {
     if (skillsCreated.length > 0) {
       debugLogger.log(
         `[MemoryService] Completed in ${elapsed}s. Created ${skillsCreated.length} skill(s): ${skillsCreated.join(', ')}`,
+      );
+      const skillList = skillsCreated.join(', ');
+      coreEvents.emitFeedback(
+        'info',
+        `${skillsCreated.length} new skill${skillsCreated.length > 1 ? 's' : ''} extracted from past sessions: ${skillList}. Use /memory inbox to review.`,
       );
     } else {
       debugLogger.log(

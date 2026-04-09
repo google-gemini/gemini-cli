@@ -276,7 +276,7 @@ class LSToolInvocation extends BaseToolInvocation<LSToolParams, ToolResult> {
         resultMessage = appendJitContext(resultMessage, jitContext);
       }
 
-      let displayMessage = `Listed ${entries.length} item(s).`;
+      let displayMessage = `Found ${entries.length} item(s).`;
       if (ignoredCount > 0) {
         displayMessage += ` (${ignoredCount} ignored)`;
       }
