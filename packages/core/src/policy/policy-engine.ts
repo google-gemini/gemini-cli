@@ -26,9 +26,10 @@ import {
 } from './types.js';
 import { stableStringify } from './stable-stringify.js';
 import { debugLogger } from '../utils/debugLogger.js';
+import { isRecord } from '../utils/markdownUtils.js';
 import type { CheckerRunner } from '../safety/checker-runner.js';
 import { SafetyCheckDecision } from '../safety/protocol.js';
-import { getToolAliases } from '../tools/tool-names.js';
+import { getToolAliases, AGENT_TOOL_NAME } from '../tools/tool-names.js';
 import { PARAM_ADDITIONAL_PERMISSIONS } from '../tools/definitions/base-declarations.js';
 import {
   MCP_TOOL_PREFIX,
@@ -545,6 +546,16 @@ export class PolicyEngine {
 
     // We also want to check legacy aliases for the tool name.
     const toolNamesToTry = toolCall.name ? getToolAliases(toolCall.name) : [];
+
+    if (toolCall.name === AGENT_TOOL_NAME) {
+      if (isRecord(toolCall.args)) {
+        const subagentName = toolCall.args['agent_name'];
+        if (typeof subagentName === 'string') {
+          // Inject the subagent name as a virtual tool alias for transparent rule matching
+          toolNamesToTry.push(subagentName);
+        }
+      }
+    }
 
     const toolCallsToTry: FunctionCall[] = [];
     for (const name of toolNamesToTry) {

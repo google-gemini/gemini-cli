@@ -43,6 +43,7 @@ import { WebSearchTool } from '../tools/web-search.js';
 import { AskUserTool } from '../tools/ask-user.js';
 import { UpdateTopicTool } from '../tools/topicTool.js';
 import { TopicState } from './topicState.js';
+import { AgentTool } from '../agents/agent-tool.js';
 import { ExitPlanModeTool } from '../tools/exit-plan-mode.js';
 import { EnterPlanModeTool } from '../tools/enter-plan-mode.js';
 import {
@@ -161,7 +162,6 @@ import {
 import { AgentRegistry } from '../agents/registry.js';
 import { AcknowledgedAgentsService } from '../agents/acknowledgedAgents.js';
 import { setGlobalProxy, updateGlobalFetchTimeouts } from '../utils/fetch.js';
-import { SubagentTool } from '../agents/subagent-tool.js';
 import { ExperimentFlags } from '../code_assist/experiments/flagNames.js';
 import { debugLogger } from '../utils/debugLogger.js';
 import { SkillManager, type SkillDefinition } from '../skills/skillManager.js';
@@ -451,7 +451,6 @@ import { McpClientManager } from '../tools/mcp-client-manager.js';
 import { A2AClientManager } from '../agents/a2a-client-manager.js';
 import { type McpContext } from '../tools/mcp-client.js';
 import type { EnvironmentSanitizationConfig } from '../services/environmentSanitization.js';
-import { getErrorMessage } from '../utils/errors.js';
 
 export type { FileFilteringOptions };
 export {
@@ -3623,57 +3622,14 @@ export class Config implements McpContext, AgentLoopContext {
       );
     }
 
-    // Register Subagents as Tools
-    this.registerSubAgentTools(registry);
+    // Register Subagent Tool
+    maybeRegister(AgentTool, () =>
+      registry.registerTool(new AgentTool(this, this.messageBus)),
+    );
 
     await registry.discoverAllTools();
     registry.sortTools();
     return registry;
-  }
-
-  /**
-   * Registers SubAgentTools for all available agents.
-   */
-  private registerSubAgentTools(registry: ToolRegistry): void {
-    const agentsOverrides = this.getAgentsSettings().overrides ?? {};
-    const discoveredDefinitions =
-      this.agentRegistry.getAllDiscoveredAgentNames();
-
-    // First, unregister any agents that are now disabled
-    for (const agentName of discoveredDefinitions) {
-      if (
-        !this.isAgentsEnabled() ||
-        agentsOverrides[agentName]?.enabled === false
-      ) {
-        const tool = registry.getTool(agentName);
-        if (tool instanceof SubagentTool) {
-          registry.unregisterTool(agentName);
-        }
-      }
-    }
-
-    const discoveredNames = this.agentRegistry.getAllDiscoveredAgentNames();
-    for (const agentName of discoveredNames) {
-      const definition = this.agentRegistry.getDiscoveredDefinition(agentName);
-      if (!definition) {
-        continue;
-      }
-      try {
-        if (
-          !this.isAgentsEnabled() ||
-          agentsOverrides[definition.name]?.enabled === false
-        ) {
-          continue;
-        }
-
-        const tool = new SubagentTool(definition, this, this.messageBus);
-        registry.registerTool(tool);
-      } catch (e: unknown) {
-        debugLogger.warn(
-          `Failed to register tool for agent ${definition.name}: ${getErrorMessage(e)}`,
-        );
-      }
-    }
   }
 
   /**
@@ -3766,9 +3722,8 @@ export class Config implements McpContext, AgentLoopContext {
   }
 
   private onAgentsRefreshed = async () => {
-    if (this._toolRegistry) {
-      this.registerSubAgentTools(this._toolRegistry);
-    }
+    await this.agentRegistry.initialize();
+
     // Propagate updates to the active chat session
     const client = this.geminiClient;
     if (client?.isInitialized()) {

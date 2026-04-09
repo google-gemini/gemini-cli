@@ -98,6 +98,16 @@ priority = 50
 modes = ["plan"]
 interactive = false
 
+# Allow specific subagents in Plan mode.
+# We use argsPattern to match the agent_name argument for invoke_agent.
+[[rule]]
+name = "Allow specific subagents in Plan mode"
+toolName = "invoke_agent"
+argsPattern = "\"agent_name\":\\s*\"(codebase_investigator|cli_help)\""
+decision = "allow"
+priority = 50
+modes = ["plan"]
+
 [[rule]]
 toolName = ["ask_user", "save_memory", "web_fetch", "activate_skill"]
 decision = "ask_user"
