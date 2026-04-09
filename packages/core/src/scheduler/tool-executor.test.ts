@@ -607,6 +607,8 @@ describe('ToolExecutor', () => {
   it('should preserve temporary file when fullOutputFilePath is provided but output is not truncated', async () => {
     // 1. Setup Config for Truncation
     vi.spyOn(config, 'getTruncateToolOutputThreshold').mockReturnValue(100);
+    vi.spyOn(config.storage, 'getProjectTempDir').mockReturnValue('/tmp');
+    vi.spyOn(config, 'getSessionId').mockReturnValue('test-session-id');
     const unlinkSpy = vi
       .spyOn(fsPromises, 'unlink')
       .mockResolvedValue(undefined);
@@ -652,7 +654,7 @@ describe('ToolExecutor', () => {
       SHELL_TOOL_NAME,
       'call-short-full',
       expect.any(String),
-      expect.any(String),
+      'test-session-id',
     );
     expect(unlinkSpy).not.toHaveBeenCalled();
     expect(fileUtils.formatTruncatedToolOutput).not.toHaveBeenCalled();

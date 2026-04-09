@@ -1331,7 +1331,7 @@ describe('ShellExecutionService child_process fallback', () => {
       const { result, handle } = await simulateExecution('ls -l', (cp) => {
         cp.stdout?.emit('data', Buffer.from('file1.txt\n'));
         cp.stderr?.emit('data', Buffer.from('a warning'));
-        cp.emit('exit', 0, null);
+        cp.emit('close', 0, null);
         cp.emit('close', 0, null);
       });
 
@@ -1368,7 +1368,7 @@ describe('ShellExecutionService child_process fallback', () => {
     it('should strip ANSI color codes from output', async () => {
       const { result } = await simulateExecution('ls --color=auto', (cp) => {
         cp.stdout?.emit('data', Buffer.from('a\u001b[31mred\u001b[0mword'));
-        cp.emit('exit', 0, null);
+        cp.emit('close', 0, null);
         cp.emit('close', 0, null);
       });
 
@@ -1389,7 +1389,7 @@ describe('ShellExecutionService child_process fallback', () => {
         const multiByteChar = Buffer.from('你好', 'utf-8');
         cp.stdout?.emit('data', multiByteChar.slice(0, 2));
         cp.stdout?.emit('data', multiByteChar.slice(2));
-        cp.emit('exit', 0, null);
+        cp.emit('close', 0, null);
         cp.emit('close', 0, null);
       });
       expect(result.output.trim()).toBe('你好');
@@ -1397,7 +1397,7 @@ describe('ShellExecutionService child_process fallback', () => {
 
     it('should handle commands with no output', async () => {
       const { result } = await simulateExecution('touch file', (cp) => {
-        cp.emit('exit', 0, null);
+        cp.emit('close', 0, null);
         cp.emit('close', 0, null);
       });
 
@@ -1419,7 +1419,7 @@ describe('ShellExecutionService child_process fallback', () => {
         cp.stdout?.emit('data', Buffer.from(chunk1));
         cp.stdout?.emit('data', Buffer.from(chunk2));
         cp.stdout?.emit('data', Buffer.from(chunk3));
-        cp.emit('exit', 0, null);
+        cp.emit('close', 0, null);
       });
 
       const truncationMessage =
@@ -1444,7 +1444,7 @@ describe('ShellExecutionService child_process fallback', () => {
     it('should capture a non-zero exit code and format output correctly', async () => {
       const { result } = await simulateExecution('a-bad-command', (cp) => {
         cp.stderr?.emit('data', Buffer.from('command not found'));
-        cp.emit('exit', 127, null);
+        cp.emit('close', 127, null);
         cp.emit('close', 127, null);
       });
 
@@ -1455,7 +1455,7 @@ describe('ShellExecutionService child_process fallback', () => {
 
     it('should capture a termination signal', async () => {
       const { result } = await simulateExecution('long-process', (cp) => {
-        cp.emit('exit', null, 'SIGTERM');
+        cp.emit('close', null, 'SIGTERM');
         cp.emit('close', null, 'SIGTERM');
       });
 
@@ -1467,7 +1467,7 @@ describe('ShellExecutionService child_process fallback', () => {
       const spawnError = new Error('spawn EACCES');
       const { result } = await simulateExecution('protected-cmd', (cp) => {
         cp.emit('error', spawnError);
-        cp.emit('exit', 1, null);
+        cp.emit('close', 1, null);
         cp.emit('close', 1, null);
       });
 
@@ -1513,11 +1513,11 @@ describe('ShellExecutionService child_process fallback', () => {
               await new Promise(process.nextTick);
               await new Promise(process.nextTick);
               if (expectedExit.signal) {
-                cp.emit('exit', null, expectedExit.signal);
+                cp.emit('close', null, expectedExit.signal);
                 cp.emit('close', null, expectedExit.signal);
               }
               if (typeof expectedExit.code === 'number') {
-                cp.emit('exit', expectedExit.code, null);
+                cp.emit('close', expectedExit.code, null);
                 cp.emit('close', expectedExit.code, null);
               }
             },
@@ -1586,7 +1586,7 @@ describe('ShellExecutionService child_process fallback', () => {
       );
 
       // Finally, simulate the process exiting and await the result
-      mockChildProcess.emit('exit', null, 'SIGKILL');
+      mockChildProcess.emit('close', null, 'SIGKILL');
       mockChildProcess.emit('close', null, 'SIGKILL');
       const result = await handle.result;
 
@@ -1606,7 +1606,7 @@ describe('ShellExecutionService child_process fallback', () => {
       await simulateExecution('cat image.png', (cp) => {
         cp.stdout?.emit('data', binaryChunk1);
         cp.stdout?.emit('data', binaryChunk2);
-        cp.emit('exit', 0, null);
+        cp.emit('close', 0, null);
       });
 
       // We don't check result here because result is not available in the test body as written
@@ -1636,7 +1636,6 @@ describe('ShellExecutionService child_process fallback', () => {
       await simulateExecution('cat mixed_file', (cp) => {
         cp.stdout?.emit('data', Buffer.from([0x00, 0x01, 0x02]));
         cp.stdout?.emit('data', Buffer.from('more text'));
-        cp.emit('exit', 0, null);
         cp.emit('close', 0, null);
       });
 
@@ -1672,7 +1671,7 @@ describe('ShellExecutionService child_process fallback', () => {
     it('should use powershell.exe on Windows', async () => {
       mockPlatform.mockReturnValue('win32');
       await simulateExecution('dir "foo bar"', (cp) => {
-        cp.emit('exit', 0, null);
+        cp.emit('close', 0, null);
       });
 
       expect(mockCpSpawn).toHaveBeenCalledWith(
@@ -1689,7 +1688,7 @@ describe('ShellExecutionService child_process fallback', () => {
     it('should use bash and detached process group on Linux', async () => {
       mockPlatform.mockReturnValue('linux');
       await simulateExecution('ls "foo bar"', (cp) => {
-        cp.emit('exit', 0, null);
+        cp.emit('close', 0, null);
       });
 
       expect(mockCpSpawn).toHaveBeenCalledWith(
@@ -1803,7 +1802,7 @@ describe('ShellExecutionService execution method selection', () => {
     );
 
     // Simulate exit to allow promise to resolve
-    mockChildProcess.emit('exit', 0, null);
+    mockChildProcess.emit('close', 0, null);
     const result = await handle.result;
 
     expect(mockGetPty).not.toHaveBeenCalled();
@@ -1826,7 +1825,7 @@ describe('ShellExecutionService execution method selection', () => {
     );
 
     // Simulate exit to allow promise to resolve
-    mockChildProcess.emit('exit', 0, null);
+    mockChildProcess.emit('close', 0, null);
     const result = await handle.result;
 
     expect(mockGetPty).toHaveBeenCalled();
@@ -1892,10 +1891,6 @@ describe('ShellExecutionService environment variables', () => {
       // Small delay to allow async ops to complete
       setTimeout(() => mockPtyProcess.emit('exit', { exitCode, signal }), 0);
     });
-    mockChildProcess.on('exit', (code, signal) => {
-      // Small delay to allow async ops to complete
-      setTimeout(() => mockChildProcess.emit('close', code, signal), 0);
-    });
   });
 
   afterEach(() => {
@@ -1958,7 +1953,7 @@ describe('ShellExecutionService environment variables', () => {
     expect(cpEnv).toHaveProperty('GEMINI_CLI_TEST_VAR', 'test-value');
 
     // Ensure child_process exits
-    mockChildProcess.emit('exit', 0, null);
+    mockChildProcess.emit('close', 0, null);
     mockChildProcess.emit('close', 0, null);
     await new Promise(process.nextTick);
   });
@@ -2018,7 +2013,7 @@ describe('ShellExecutionService environment variables', () => {
     expect(cpEnv).toHaveProperty('GEMINI_CLI_TEST_VAR', 'test-value');
 
     // Ensure child_process exits
-    mockChildProcess.emit('exit', 0, null);
+    mockChildProcess.emit('close', 0, null);
     mockChildProcess.emit('close', 0, null);
     await new Promise(process.nextTick);
   });
@@ -2066,7 +2061,7 @@ describe('ShellExecutionService environment variables', () => {
     expect(cpEnv).toHaveProperty('GEMINI_CLI', '1');
 
     // Ensure child_process exits
-    mockChildProcess.emit('exit', 0, null);
+    mockChildProcess.emit('close', 0, null);
     mockChildProcess.emit('close', 0, null);
     await new Promise(process.nextTick);
   });
@@ -2123,7 +2118,7 @@ describe('ShellExecutionService environment variables', () => {
     );
 
     // Clean up
-    mockChild.emit('exit', 0, null);
+    mockChild.emit('close', 0, null);
     mockChild.emit('close', 0, null);
     await handle.result;
   });
@@ -2172,7 +2167,7 @@ describe('ShellExecutionService environment variables', () => {
     expect(cpEnv).toHaveProperty('GIT_CONFIG_VALUE_2', '');
 
     // Ensure child_process exits
-    mockChildProcess.emit('exit', 0, null);
+    mockChildProcess.emit('close', 0, null);
     mockChildProcess.emit('close', 0, null);
     await new Promise(process.nextTick);
 
@@ -2212,7 +2207,7 @@ describe('ShellExecutionService environment variables', () => {
     expect(cpEnv).not.toHaveProperty('GIT_CONFIG_COUNT');
 
     // Ensure child_process exits
-    mockChildProcess.emit('exit', 0, null);
+    mockChildProcess.emit('close', 0, null);
     mockChildProcess.emit('close', 0, null);
     await new Promise(process.nextTick);
 
