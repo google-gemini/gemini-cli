@@ -61,6 +61,7 @@ describe('Core System Prompt Substitution', () => {
       }),
       getApprovedPlanPath: vi.fn().mockReturnValue(undefined),
       isTopicUpdateNarrationEnabled: vi.fn().mockReturnValue(false),
+      isExperimentalWatcherEnabled: vi.fn().mockReturnValue(false),
       isTrackerEnabled: vi.fn().mockReturnValue(false),
       isModelSteeringEnabled: vi.fn().mockReturnValue(false),
       getHasAccessToPreviewModel: vi.fn().mockReturnValue(true),
