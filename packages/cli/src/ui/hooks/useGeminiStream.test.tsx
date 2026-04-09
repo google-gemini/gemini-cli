@@ -3552,7 +3552,7 @@ describe('useGeminiStream', () => {
         })(),
       );
 
-      const { result } = renderHookWithProviders(() =>
+      const { result } = await renderHookWithProviders(() =>
         useGeminiStream(
           new MockedGeminiClientClass(mockConfig),
           [],
