@@ -112,43 +112,31 @@ def get_reviewer_info(pr):
     author = pr.get('author', {}).get('login')
     latest_reviewer_activity = ""
     official_reviewers = set()
-    
-    # 1. Collect official reviewers from requested reviewers
     for req in pr.get('reviewRequests', {}).get('nodes', []):
         rr = req.get('requestedReviewer')
         if rr and 'login' in rr:
             login = rr['login']
             if login and login != author and login not in BOT_BLACKLIST:
                 official_reviewers.add(login)
-                
-    # 2. Collect official reviewers from formal reviews
     reviews = pr.get('latestReviews', {}).get('nodes', [])
     for r in reviews:
         login = r.get('author', {}).get('login') if r.get('author') else None
         if login and login != author and login not in BOT_BLACKLIST:
             official_reviewers.add(login)
-            # Track latest formal review activity
             latest_reviewer_activity = max(latest_reviewer_activity, r['updatedAt'])
-            
-    # 3. Track latest activity from ANYONE who isn't the author (including comments)
     all_comments = pr.get('comments', {}).get('nodes', [])
     for c in all_comments:
         login = c.get('author', {}).get('login') if c.get('author') else None
         if login and login != author and login not in BOT_BLACKLIST:
             latest_reviewer_activity = max(latest_reviewer_activity, c['publishedAt'])
-            
     return sorted(list(official_reviewers)), latest_reviewer_activity
 
 def get_author_activity(pr):
     author = pr.get('author', {}).get('login')
-    # Start with latest commit
     latest = pr['commits']['nodes'][0]['commit']['committedDate']
-    
-    # Check for latest comment from author
     for c in pr.get('comments', {}).get('nodes', []):
         if c.get('author', {}).get('login') == author:
             latest = max(latest, c['publishedAt'])
-            
     return latest
 
 def main():
@@ -170,6 +158,8 @@ def main():
         if not assignees: continue
         
         issue_no = issue['number']
+        issue_title = issue['title']
+        issue_url = issue['url']
         updated_at = datetime.datetime.fromisoformat(issue['updatedAt'].replace('Z', '+00:00'))
         
         timeline_nodes = issue.get('timelineItems', {}).get('nodes', [])
@@ -192,7 +182,6 @@ def main():
             author_activity = get_author_activity(pr)
             
             # Categories
-            # 1. Ready for Review (Author updated AFTER any reviewer/other activity)
             is_ready = (not latest_reviewer_activity or author_activity > latest_reviewer_activity)
             if is_ready:
                 threads = pr.get('reviewThreads', {}).get('nodes', [])
@@ -202,17 +191,16 @@ def main():
                 if all_resolved and not_conflicting and status_ok:
                     valid_pr = pr
                     ready_list.append({
-                        "issue_no": issue_no, "title": issue['title'], "issue_url": issue['url'],
+                        "issue_no": issue_no, "title": issue_title, "issue_url": issue_url,
                         "pr_no": pr['number'], "pr_url": pr['url'],
                         "reviewers": reviewers, "updated_at": issue['updatedAt'][:10]
                     })
                     break
             
-            # 2. Waiting for Reviewer (Reviewer has acted before, author has updated since, but no follow up)
-            # Only track this if there are actually official reviewers
             if reviewers and latest_reviewer_activity and author_activity > latest_reviewer_activity:
                 waiting_reviewer_list.append({
-                    "issue_no": issue_no, "issue_url": issue['url'], "pr_no": pr['number'], "pr_url": pr['url'],
+                    "issue_no": issue_no, "title": issue_title, "issue_url": issue_url,
+                    "pr_no": pr['number'], "pr_url": pr['url'],
                     "author": pr['author']['login'], "reviewers": reviewers,
                     "author_updated": author_activity[:10]
                 })
@@ -224,13 +212,14 @@ def main():
                 elif pr.get('statusCheckRollup', {}).get('state') == 'FAILURE': reason = "Test Failure"
                 if reason:
                     blocked_prs.append({
-                        "issue_no": issue_no, "issue_url": issue['url'], "pr_no": pr['number'], "pr_url": pr['url'],
+                        "issue_no": issue_no, "title": issue_title, "issue_url": issue_url,
+                        "pr_no": pr['number'], "pr_url": pr['url'],
                         "reason": reason, "author": pr['author']['login'], "days_stale": (now - pr_updated_at).days
                     })
 
         if not valid_pr and not found_open_pr and (now - updated_at).days > STALE_ASSIGNMENT_DAYS:
             stale_assignments.append({
-                "issue_no": issue_no, "title": issue['title'], "url": issue['url'],
+                "issue_no": issue_no, "title": issue_title, "url": issue_url,
                 "assignees": assignees, "days_stale": (now - updated_at).days
             })
 
@@ -246,23 +235,23 @@ def main():
     if not ready_list: md += "| - | _No issues ready._ | - | - | - |\n"
 
     md += "\n## ⌛ Waiting for Reviewer Follow-up\nReviewer provided feedback, the author updated the PR, but the reviewer has not responded yet.\n\n"
-    md += "| Issue | PR | Author | Reviewers | Author Updated |\n| :--- | :--- | :--- | :--- | :--- |\n"
+    md += "| # | Issue Title | PR | Author | Reviewers | Author Updated |\n| :--- | :--- | :--- | :--- | :--- | :--- |\n"
     for i in waiting_reviewer_list:
         revs = ", ".join([f"@{r}" for r in i['reviewers']])
-        md += f"| [#{i['issue_no']}]({i['issue_url']}) | [#{i['pr_no']}]({i['pr_url']}) | @{i['author']} | {revs} | `{i['author_updated']}` |\n"
-    if not waiting_reviewer_list: md += "| - | _No pending follow-ups._ | - | - | - |\n"
+        md += f"| [#{i['issue_no']}]({i['issue_url']}) | [{i['title']}]({i['issue_url']}) | [#{i['pr_no']}]({i['pr_url']}) | @{i['author']} | {revs} | `{i['author_updated']}` |\n"
+    if not waiting_reviewer_list: md += "| - | _No pending follow-ups._ | - | - | - | - |\n"
 
     md += "\n## 🚩 Stale Assignments (No PR)\nAssigned for >{STALE_ASSIGNMENT_DAYS} days with no open Pull Request. Consider unassigning.\n\n"
-    md += "| Issue | Assignee | Days Stale |\n| :--- | :--- | :--- |\n"
+    md += "| Issue | Title | Assignee | Days Stale |\n| :--- | :--- | :--- | :--- |\n"
     for i in stale_assignments:
-        md += f"| [#{i['issue_no']} {i['title']}]({i['url']}) | @{', @'.join(i['assignees'])} | {i['days_stale']} |\n"
-    if not stale_assignments: md += "| - | _No stale assignments._ | - |\n"
+        md += f"| [#{i['issue_no']}]({i['url']}) | [{i['title']}]({i['url']}) | @{', @'.join(i['assignees'])} | {i['days_stale']} |\n"
+    if not stale_assignments: md += "| - | _No stale assignments._ | - | - |\n"
 
     md += "\n## 🚧 Blocked & Stale PRs\nPRs with conflicts or failures untouched for >{STALE_BLOCKED_PR_DAYS} days.\n\n"
-    md += "| Issue | PR | Reason | Author | Days Stale |\n| :--- | :--- | :--- | :--- | :--- |\n"
+    md += "| # | Issue Title | PR | Reason | Author | Days Stale |\n| :--- | :--- | :--- | :--- | :--- | :--- |\n"
     for i in blocked_prs:
-        md += f"| [#{i['issue_no']}]({i['issue_url']}) | [#{i['pr_no']}]({i['pr_url']}) | {i['reason']} | @{i['author']} | {i['days_stale']} |\n"
-    if not blocked_prs: md += "| - | _No stale blocked PRs._ | - | - | - |\n"
+        md += f"| [#{i['issue_no']}]({i['issue_url']}) | [{i['title']}]({i['issue_url']}) | [#{i['pr_no']}]({i['pr_url']}) | {i['reason']} | @{i['author']} | {i['days_stale']} |\n"
+    if not blocked_prs: md += "| - | _No stale blocked PRs._ | - | - | - | - |\n"
 
     md += "\n---\n*Dashboard maintained by automated triage script.*"
     with open("REVIEWS.md", "w") as f: f.write(md)
