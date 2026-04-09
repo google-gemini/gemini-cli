@@ -302,4 +302,70 @@ describe('FolderTrustDiscoveryService', () => {
     expect(results.hooks).toContain('project-hook');
     expect(results.hooks).toContain('extension-hook');
   });
+
+  it('should deduplicate hooks discovered from settings and extension manifests', async () => {
+    const geminiDir = path.join(tempDir, GEMINI_DIR);
+    await fs.mkdir(geminiDir, { recursive: true });
+    await fs.writeFile(
+      path.join(geminiDir, 'settings.json'),
+      JSON.stringify({
+        hooks: {
+          BeforeTool: [{ command: 'shared-hook' }],
+        },
+      }),
+    );
+
+    await fs.writeFile(
+      path.join(tempDir, 'gemini-extension.json'),
+      JSON.stringify({
+        name: 'deduped-hooks-extension',
+        version: '1.0.0',
+      }),
+    );
+    const hooksDir = path.join(tempDir, 'hooks');
+    await fs.mkdir(hooksDir, { recursive: true });
+    await fs.writeFile(
+      path.join(hooksDir, 'hooks.json'),
+      JSON.stringify({
+        hooks: {
+          BeforeTool: [
+            {
+              hooks: [
+                {
+                  type: 'command',
+                  command: 'shared-hook',
+                },
+              ],
+            },
+          ],
+        },
+      }),
+    );
+
+    const discoveryService = FolderTrustDiscoveryService as unknown as {
+      [key: string]: unknown;
+    };
+    const originalDiscoverExtensionHooks = (
+      discoveryService['discoverExtensionHooks'] as (
+        ...args: unknown[]
+      ) => Promise<void>
+    ).bind(FolderTrustDiscoveryService);
+
+    Object.defineProperty(discoveryService, 'discoverExtensionHooks', {
+      configurable: true,
+      value: async (...args: unknown[]) => {
+        await new Promise((resolve) => setTimeout(resolve, 10));
+        return originalDiscoverExtensionHooks(...args);
+      },
+    });
+
+    const results = await FolderTrustDiscoveryService.discover(tempDir);
+
+    Object.defineProperty(discoveryService, 'discoverExtensionHooks', {
+      configurable: true,
+      value: originalDiscoverExtensionHooks,
+    });
+
+    expect(results.hooks).toEqual(['shared-hook']);
+  });
 });

@@ -272,9 +272,9 @@ export class FolderTrustDiscoveryService {
       }
 
       if (commands.size > 0) {
-        results.hooks.push(...commands);
+        this.addUniqueItems(results.hooks, Array.from(commands));
       } else {
-        results.hooks.push(path.basename(hooksFilePath));
+        this.addUniqueItems(results.hooks, [path.basename(hooksFilePath)]);
       }
     } catch (e) {
       results.discoveryErrors.push(
