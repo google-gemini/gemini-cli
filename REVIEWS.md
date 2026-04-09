@@ -1,6 +1,6 @@
 # 🔎 Gemini CLI Triage Dashboard
 
-*Last Synchronized: 2026-04-09 20:38 (UTC)*
+*Last Synchronized: 2026-04-09 20:40 (UTC)*
 
 ## ✅ Ready for Review
 Assigned, officially linked, no conflicts, tests passing, and author has responded to all feedback.
@@ -9,7 +9,7 @@ Assigned, officially linked, no conflicts, tests passing, and author has respond
 | :--- | :--- | :--- | :--- | :--- |
 | 18895 | [CLI cannot use fresh token in MCP OAuth](https://github.com/google-gemini/gemini-cli/issues/18895) | [#23493](https://github.com/google-gemini/gemini-cli/pull/23493) | _None_ | `2026-03-21` |
 | 19710 | [Fix unsafe type assertions in Core Utilities (Phase 1.2: JSON & Config)](https://github.com/google-gemini/gemini-cli/issues/19710) | [#23628](https://github.com/google-gemini/gemini-cli/pull/23628) | _None_ | `2026-03-29` |
-| 20385 | [Terminal output flooded with repeated '0c/' string](https://github.com/google-gemini/gemini-cli/issues/20385) | [#24596](https://github.com/google-gemini/gemini-cli/pull/24596) | @cocosheng-g | `2026-04-06` |
+| 20385 | [Terminal output flooded with repeated '0c/' string](https://github.com/google-gemini/gemini-cli/issues/20385) | [#24596](https://github.com/google-gemini/gemini-cli/pull/24596) | _None_ | `2026-04-06` |
 
 ## 🚩 Stale Assignments (No PR)
 Assigned for >14 days with no open Pull Request. Consider unassigning.

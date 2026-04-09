@@ -76,6 +76,13 @@ query($repoOwner: String!, $repoName: String!, $prNumber: Int!) {
           isResolved
         }
       }
+      reviewRequests(first: 10) {
+        nodes {
+          requestedReviewer {
+            ... on User { login }
+          }
+        }
+      }
       latestReviews(last: 10) {
         nodes {
           author { login }
@@ -112,14 +119,21 @@ def gh_api_graphql(query, variables):
 def get_real_reviewers(pr):
     author = pr.get('author', {}).get('login')
     reviewers = set()
-    for c in pr.get('comments', {}).get('nodes', []):
-        login = c.get('author', {}).get('login') if c.get('author') else None
-        if login and login != author and login not in BOT_BLACKLIST:
-            reviewers.add(login)
+    
+    # 1. From formal reviews
     for r in pr.get('latestReviews', {}).get('nodes', []):
         login = r.get('author', {}).get('login') if r.get('author') else None
         if login and login != author and login not in BOT_BLACKLIST:
             reviewers.add(login)
+            
+    # 2. From requested reviewers (Users only, skip Teams)
+    for req in pr.get('reviewRequests', {}).get('nodes', []):
+        rr = req.get('requestedReviewer')
+        if rr and 'login' in rr:
+            login = rr['login']
+            if login and login != author and login not in BOT_BLACKLIST:
+                reviewers.add(login)
+            
     return sorted(list(reviewers))
 
 def is_ready_for_review(pr):
