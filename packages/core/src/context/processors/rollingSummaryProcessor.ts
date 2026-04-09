@@ -3,7 +3,11 @@
  * Copyright 2026 Google LLC
  * SPDX-License-Identifier: Apache-2.0
  */
-import type { ContextProcessor, ProcessArgs, BackstopTargetOptions } from '../pipeline.js';
+import type {
+  ContextProcessor,
+  ProcessArgs,
+  BackstopTargetOptions,
+} from '../pipeline.js';
 import type { ContextEnvironment } from '../sidecar/environment.js';
 import type { ConcreteNode, RollingSummary } from '../ir/types.js';
 import { SnapshotGenerator } from '../utils/snapshotGenerator.js';
@@ -37,7 +41,10 @@ export class RollingSummaryProcessor implements ContextProcessor {
   private readonly env: ContextEnvironment;
   private readonly generator: SnapshotGenerator;
 
-  constructor(env: ContextEnvironment, options: RollingSummaryProcessorOptions) {
+  constructor(
+    env: ContextEnvironment,
+    options: RollingSummaryProcessorOptions,
+  ) {
     this.env = env;
     this.options = options;
     this.generator = new SnapshotGenerator(env);
@@ -50,14 +57,14 @@ export class RollingSummaryProcessor implements ContextProcessor {
     let targetTokensToRemove = 0;
 
     if (strategy === 'incremental') {
-       // A rolling summary should target a small chunk. For now, since state isn't passed,
-       // we'll default to a fixed threshold, like 10000 tokens, to avoid eating the whole history.
-       // Ideally, the orchestrator should pass `tokensToRemove` explicitly.
-       targetTokensToRemove = 10000;
+      // A rolling summary should target a small chunk. For now, since state isn't passed,
+      // we'll default to a fixed threshold, like 10000 tokens, to avoid eating the whole history.
+      // Ideally, the orchestrator should pass `tokensToRemove` explicitly.
+      targetTokensToRemove = 10000;
     } else if (strategy === 'freeNTokens') {
-       targetTokensToRemove = this.options.freeTokensTarget ?? Infinity;
+      targetTokensToRemove = this.options.freeTokensTarget ?? Infinity;
     } else if (strategy === 'max') {
-       targetTokensToRemove = Infinity;
+      targetTokensToRemove = Infinity;
     }
 
     if (targetTokensToRemove <= 0) return targets;
@@ -68,10 +75,10 @@ export class RollingSummaryProcessor implements ContextProcessor {
     // Scan oldest to newest to find the oldest block that exceeds the token requirement
     for (const node of targets) {
       if (node.id === targets[0].id && node.type === 'USER_PROMPT') {
-          // Keep system prompt if it's the very first node
-          continue; 
+        // Keep system prompt if it's the very first node
+        continue;
       }
-      
+
       nodesToSummarize.push(node);
       deficitAccumulator += this.env.tokenCalculator.getTokenCost(node);
 
@@ -81,34 +88,38 @@ export class RollingSummaryProcessor implements ContextProcessor {
     if (nodesToSummarize.length < 2) return targets; // Not enough context to summarize
 
     try {
-       // Synthesize the rolling summary synchronously
-       const snapshotText = await this.generator.synthesizeSnapshot(nodesToSummarize, this.options.systemInstruction);
-       const newId = this.env.idGenerator.generateId();
-       
-       const summaryNode: RollingSummary = {
-            id: newId,
-            logicalParentId: newId,
-            type: 'ROLLING_SUMMARY',
-            timestamp: Date.now(),
-            text: snapshotText,
-       };
+      // Synthesize the rolling summary synchronously
+      const snapshotText = await this.generator.synthesizeSnapshot(
+        nodesToSummarize,
+        this.options.systemInstruction,
+      );
+      const newId = this.env.idGenerator.generateId();
 
-       const consumedIds = nodesToSummarize.map(n => n.id);
-       const returnedNodes = targets.filter(t => !consumedIds.includes(t.id));
-       const firstRemovedIdx = targets.findIndex(t => consumedIds.includes(t.id));
-       
-       if (firstRemovedIdx !== -1) {
-           const idx = Math.max(0, firstRemovedIdx);
-           returnedNodes.splice(idx, 0, summaryNode);
-       } else {
-           returnedNodes.unshift(summaryNode);
-       }
+      const summaryNode: RollingSummary = {
+        id: newId,
+        logicalParentId: newId,
+        type: 'ROLLING_SUMMARY',
+        timestamp: Date.now(),
+        text: snapshotText,
+      };
 
-       return returnedNodes;
+      const consumedIds = nodesToSummarize.map((n) => n.id);
+      const returnedNodes = targets.filter((t) => !consumedIds.includes(t.id));
+      const firstRemovedIdx = targets.findIndex((t) =>
+        consumedIds.includes(t.id),
+      );
 
+      if (firstRemovedIdx !== -1) {
+        const idx = Math.max(0, firstRemovedIdx);
+        returnedNodes.splice(idx, 0, summaryNode);
+      } else {
+        returnedNodes.unshift(summaryNode);
+      }
+
+      return returnedNodes;
     } catch (e) {
-       debugLogger.error('RollingSummaryProcessor failed sync backstop', e);
-       return targets;
+      debugLogger.error('RollingSummaryProcessor failed sync backstop', e);
+      return targets;
     }
   }
 }

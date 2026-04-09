@@ -12,7 +12,7 @@ import {
   createMockEnvironment,
   createDummyNode,
   createDummyToolNode,
-  createMockLlmClient
+  createMockLlmClient,
 } from '../testing/contextTestUtils.js';
 import type { UserPrompt, AgentThought, ToolExecution } from '../ir/types.js';
 
@@ -22,7 +22,7 @@ describe('NodeDistillationProcessor', () => {
 
     // Use charsPerToken=1 naturally.
     const env = createMockEnvironment({
-        llmClient: mockLlmClient,
+      llmClient: mockLlmClient,
     });
 
     const processor = NodeDistillationProcessor.create(env, {
@@ -31,19 +31,35 @@ describe('NodeDistillationProcessor', () => {
 
     const longText = 'A'.repeat(50); // 50 chars
 
-    const prompt = createDummyNode('ep1', 'USER_PROMPT', 50, {
-      semanticParts: [
-        { type: 'text', text: longText }
-      ],
-    }, 'prompt-id') as UserPrompt;
+    const prompt = createDummyNode(
+      'ep1',
+      'USER_PROMPT',
+      50,
+      {
+        semanticParts: [{ type: 'text', text: longText }],
+      },
+      'prompt-id',
+    ) as UserPrompt;
 
-    const thought = createDummyNode('ep1', 'AGENT_THOUGHT', 50, {
-      text: longText,
-    }, 'thought-id') as AgentThought;
+    const thought = createDummyNode(
+      'ep1',
+      'AGENT_THOUGHT',
+      50,
+      {
+        text: longText,
+      },
+      'thought-id',
+    ) as AgentThought;
 
-    const tool = createDummyToolNode('ep1', 5, 500, {
-      observation: { result: 'A'.repeat(500) },
-    }, 'tool-id');
+    const tool = createDummyToolNode(
+      'ep1',
+      5,
+      500,
+      {
+        observation: { result: 'A'.repeat(500) },
+      },
+      'tool-id',
+    );
 
     const targets = [prompt, thought, tool];
 
@@ -57,7 +73,7 @@ describe('NodeDistillationProcessor', () => {
     expect(compressedPrompt.semanticParts[0].type).toBe('text');
     assert(compressedPrompt.semanticParts[0].type === 'text');
     expect(compressedPrompt.semanticParts[0].text).toBe('Mocked Summary!');
-    
+
     // 2. Agent Thought
     const compressedThought = result[1] as AgentThought;
     expect(compressedThought.id).not.toBe(thought.id);
@@ -75,7 +91,7 @@ describe('NodeDistillationProcessor', () => {
     const mockLlmClient = createMockLlmClient(['S']); // length = 1
 
     const env = createMockEnvironment({
-       llmClient: mockLlmClient,
+      llmClient: mockLlmClient,
     });
 
     const processor = NodeDistillationProcessor.create(env, {
@@ -84,15 +100,25 @@ describe('NodeDistillationProcessor', () => {
 
     const shortText = 'Short text'; // 10 chars
 
-    const prompt = createDummyNode('ep1', 'USER_PROMPT', 10, {
-      semanticParts: [
-        { type: 'text', text: shortText }
-      ],
-    }, 'prompt-id') as UserPrompt;
+    const prompt = createDummyNode(
+      'ep1',
+      'USER_PROMPT',
+      10,
+      {
+        semanticParts: [{ type: 'text', text: shortText }],
+      },
+      'prompt-id',
+    ) as UserPrompt;
 
-    const thought = createDummyNode('ep1', 'AGENT_THOUGHT', 13, {
-      text: 'Short thought', 
-    }, 'thought-id') as AgentThought;
+    const thought = createDummyNode(
+      'ep1',
+      'AGENT_THOUGHT',
+      13,
+      {
+        text: 'Short thought',
+      },
+      'thought-id',
+    ) as AgentThought;
 
     const targets = [prompt, thought];
 
@@ -106,7 +132,7 @@ describe('NodeDistillationProcessor', () => {
 
     // 2. Agent Thought (NOT compressed)
     const untouchedThought = result[1] as AgentThought;
-    expect(untouchedThought.id).toBe(thought.id); 
+    expect(untouchedThought.id).toBe(thought.id);
 
     // LLM should not have been called
     expect(mockLlmClient.generateContent).toHaveBeenCalledTimes(0);

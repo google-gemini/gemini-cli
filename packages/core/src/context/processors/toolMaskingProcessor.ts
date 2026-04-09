@@ -214,34 +214,39 @@ export class ToolMaskingProcessor implements ContextProcessor {
               ? (intentRes.masked as Record<string, unknown>)
               : undefined;
             // Handle observation explicitly as string vs object
-            const maskedObs = typeof obsRes.masked === 'string'
-              ? { message: obsRes.masked } as Record<string, unknown>
-              : isMaskableRecord(obsRes.masked) 
-                 ? (obsRes.masked as Record<string, unknown>) 
-                 : undefined;
+            const maskedObs =
+              typeof obsRes.masked === 'string'
+                ? ({ message: obsRes.masked } as Record<string, unknown>)
+                : isMaskableRecord(obsRes.masked)
+                  ? (obsRes.masked as Record<string, unknown>)
+                  : undefined;
 
-            const newIntentTokens = this.env.tokenCalculator.estimateTokensForParts([
-              {
-                functionCall: {
-                  name: toolName || 'unknown',
-                  args: maskedIntent,
-                  id: callId,
+            const newIntentTokens =
+              this.env.tokenCalculator.estimateTokensForParts([
+                {
+                  functionCall: {
+                    name: toolName || 'unknown',
+                    args: maskedIntent,
+                    id: callId,
+                  },
                 },
-              },
-            ]);
-            
+              ]);
+
             let obsPart: Record<string, unknown> = {};
             if (maskedObs) {
-               obsPart = {
-                  functionResponse: {
-                    name: toolName || 'unknown',
-                    response: maskedObs,
-                    id: callId
-                  }
-               };
+              obsPart = {
+                functionResponse: {
+                  name: toolName || 'unknown',
+                  response: maskedObs,
+                  id: callId,
+                },
+              };
             }
-            
-            const newObsTokens = this.env.tokenCalculator.estimateTokensForParts([obsPart as Part]);
+
+            const newObsTokens =
+              this.env.tokenCalculator.estimateTokensForParts([
+                obsPart as Part,
+              ]);
 
             const tokensSaved =
               this.env.tokenCalculator.getTokenCost(node) -

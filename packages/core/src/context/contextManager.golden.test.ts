@@ -17,7 +17,10 @@ import type { ContextManager } from './contextManager.js';
 import type { Content } from '@google/genai';
 import type { Episode } from './ir/types.js';
 import type { SidecarConfig } from './sidecar/types.js';
-import { createMockContextConfig, setupContextComponentTest } from './testing/contextTestUtils.js';
+import {
+  createMockContextConfig,
+  setupContextComponentTest,
+} from './testing/contextTestUtils.js';
 
 expect.addSnapshotSerializer({
   test: (val) =>
@@ -41,7 +44,9 @@ describe('ContextManager Golden Tests', () => {
   let contextManager: ContextManager;
 
   beforeEach(() => {
-    contextManager = setupContextComponentTest(createMockContextConfig()).contextManager;
+    contextManager = setupContextComponentTest(
+      createMockContextConfig(),
+    ).contextManager;
   });
 
   const createLargeHistory = (): Content[] => [
@@ -78,12 +83,18 @@ describe('ContextManager Golden Tests', () => {
     const history = createLargeHistory();
     // Use the actual public methods or carefully type the internal state for testing
     // To seed the manager purely for testing without invoking generateContent, we bypass the pipeline:
-    const managerAsAny = contextManager as unknown as { 
-      pristineEpisodes: Episode[]; 
-      env: { irMapper: { toIr(h: unknown, t: unknown): Episode[] }, tokenCalculator: unknown } 
+    const managerAsAny = contextManager as unknown as {
+      pristineEpisodes: Episode[];
+      env: {
+        irMapper: { toIr(h: unknown, t: unknown): Episode[] };
+        tokenCalculator: unknown;
+      };
     };
-    managerAsAny.pristineEpisodes = managerAsAny.env.irMapper.toIr(history, managerAsAny.env.tokenCalculator);
-    
+    managerAsAny.pristineEpisodes = managerAsAny.env.irMapper.toIr(
+      history,
+      managerAsAny.env.tokenCalculator,
+    );
+
     const result = await contextManager.projectCompressedHistory();
     expect(result).toMatchSnapshot();
   });
@@ -92,10 +103,11 @@ describe('ContextManager Golden Tests', () => {
     const history = createLargeHistory();
 
     const config = createMockContextConfig();
-    const { chatHistory, contextManager: localManager } = setupContextComponentTest(config, {
+    const { chatHistory, contextManager: localManager } =
+      setupContextComponentTest(config, {
         budget: { retainedTokens: 100000, maxTokens: 150000 },
         pipelines: [],
-    } as unknown as SidecarConfig);
+      } as unknown as SidecarConfig);
 
     chatHistory.set(history);
 
@@ -105,4 +117,3 @@ describe('ContextManager Golden Tests', () => {
     expect(result.length).toEqual(history.length + 1);
   });
 });
-

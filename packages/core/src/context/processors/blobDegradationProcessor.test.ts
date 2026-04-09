@@ -32,7 +32,7 @@ describe('BlobDegradationProcessor', () => {
     ];
 
     const prompt = createDummyNode('ep1', 'USER_PROMPT', 100, {
-      semanticParts: parts
+      semanticParts: parts,
     }) as UserPrompt;
 
     const targets = [prompt];
@@ -41,10 +41,10 @@ describe('BlobDegradationProcessor', () => {
 
     expect(result.length).toBe(1);
     const modifiedPrompt = result[0] as UserPrompt;
-    
+
     expect(modifiedPrompt.id).not.toBe(prompt.id);
     expect(modifiedPrompt.semanticParts.length).toBe(3);
-    
+
     // Text parts should be untouched
     expect(modifiedPrompt.semanticParts[0]).toEqual(parts[0]);
     expect(modifiedPrompt.semanticParts[2]).toEqual(parts[2]);
@@ -53,7 +53,9 @@ describe('BlobDegradationProcessor', () => {
     const degradedPart = modifiedPrompt.semanticParts[1];
     expect(degradedPart.type).toBe('text');
     assert(degradedPart.type === 'text');
-    expect(degradedPart.text).toContain('[Multi-Modal Blob (image/png, 0.00MB) degraded to text');
+    expect(degradedPart.text).toContain(
+      '[Multi-Modal Blob (image/png, 0.00MB) degraded to text',
+    );
   });
 
   it('should degrade all blobs unconditionally', async () => {
@@ -64,14 +66,14 @@ describe('BlobDegradationProcessor', () => {
     // Tokens for fileData = 258.
     // Degraded text = "[File Reference (video/mp4) degraded to text to preserve context window. Original URI: gs://test1]"
     // Degraded text length ~100 characters.
-    // Since charsPerToken=1, degraded text = 100 tokens. 
+    // Since charsPerToken=1, degraded text = 100 tokens.
     // Tokens saved = 258 - 100 = 158. This is > 0, so it WILL degrade it!
 
     const prompt = createDummyNode('ep1', 'USER_PROMPT', 100, {
       semanticParts: [
         { type: 'file_data', mimeType: 'video/mp4', fileUri: 'gs://test1' },
         { type: 'file_data', mimeType: 'video/mp4', fileUri: 'gs://test2' },
-      ]
+      ],
     }) as UserPrompt;
 
     const targets = [prompt];
@@ -80,7 +82,7 @@ describe('BlobDegradationProcessor', () => {
 
     const modifiedPrompt = result[0] as UserPrompt;
     expect(modifiedPrompt.semanticParts.length).toBe(2);
-    
+
     // Both parts should be degraded
     expect(modifiedPrompt.semanticParts[0].type).toBe('text');
     expect(modifiedPrompt.semanticParts[1].type).toBe('text');

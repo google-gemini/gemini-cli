@@ -23,19 +23,23 @@ import type { Config } from '../../config/config.js';
 import type { BaseLlmClient } from '../../core/baseLlmClient.js';
 import type { Content, GenerateContentResponse } from '@google/genai';
 import { InboxSnapshotImpl } from '../sidecar/inbox.js';
-import type { ContextWorkingBuffer, InboxMessage, ProcessArgs } from '../pipeline.js';
-
+import type {
+  ContextWorkingBuffer,
+  InboxMessage,
+  ProcessArgs,
+} from '../pipeline.js';
 
 /**
  * Creates a valid mock GenerateContentResponse with the provided text.
  * Used to avoid having to manually construct the deeply nested candidate/content/part structure.
  */
-export const createMockGenerateContentResponse = (text: string): GenerateContentResponse =>
+export const createMockGenerateContentResponse = (
+  text: string,
+): GenerateContentResponse =>
   // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
   ({
     candidates: [{ content: { role: 'model', parts: [{ text }] }, index: 0 }],
   }) as GenerateContentResponse;
-
 
 export function createDummyNode(
   logicalParentId: string,
@@ -101,13 +105,17 @@ export interface MockLlmClient extends BaseLlmClient {
   generateContent: Mock;
 }
 
-export function createMockLlmClient(responses?: Array<string | GenerateContentResponse>): MockLlmClient {
+export function createMockLlmClient(
+  responses?: Array<string | GenerateContentResponse>,
+): MockLlmClient {
   const generateContentMock = vi.fn();
-  
+
   if (responses && responses.length > 0) {
     for (const response of responses) {
       if (typeof response === 'string') {
-        generateContentMock.mockResolvedValueOnce(createMockGenerateContentResponse(response));
+        generateContentMock.mockResolvedValueOnce(
+          createMockGenerateContentResponse(response),
+        );
       } else {
         generateContentMock.mockResolvedValueOnce(response);
       }
@@ -115,13 +123,17 @@ export function createMockLlmClient(responses?: Array<string | GenerateContentRe
     // Fallback to the last response for any subsequent calls
     const lastResponse = responses[responses.length - 1];
     if (typeof lastResponse === 'string') {
-      generateContentMock.mockResolvedValue(createMockGenerateContentResponse(lastResponse));
+      generateContentMock.mockResolvedValue(
+        createMockGenerateContentResponse(lastResponse),
+      );
     } else {
       generateContentMock.mockResolvedValue(lastResponse);
     }
   } else {
     // Default fallback
-    generateContentMock.mockResolvedValue(createMockGenerateContentResponse('Mock LLM response'));
+    generateContentMock.mockResolvedValue(
+      createMockGenerateContentResponse('Mock LLM response'),
+    );
   }
 
   // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
@@ -134,10 +146,13 @@ export function createMockEnvironment(
   overrides?: Partial<ContextEnvironment>,
 ): ContextEnvironment {
   const llmClient = createMockLlmClient(['Mock LLM summary response']);
-  
-  const tracer = new ContextTracer({ targetDir: '/tmp', sessionId: 'mock-session' });
+
+  const tracer = new ContextTracer({
+    targetDir: '/tmp',
+    sessionId: 'mock-session',
+  });
   const eventBus = new ContextEventBus();
-  
+
   const env = new ContextEnvironmentImpl(
     llmClient,
     'mock-session',
@@ -148,7 +163,7 @@ export function createMockEnvironment(
     1,
     eventBus,
     new InMemoryFileSystem(),
-    new DeterministicIdGenerator('mock-uuid-')
+    new DeterministicIdGenerator('mock-uuid-'),
   );
 
   if (overrides) {
@@ -188,10 +203,16 @@ export class FakeContextWorkingBuffer implements ContextWorkingBuffer {
   }
 }
 
-export function createMockProcessArgs(targets: ConcreteNode[], bufferNodes: ConcreteNode[] = [], inboxMessages: InboxMessage[] = []): ProcessArgs {
+export function createMockProcessArgs(
+  targets: ConcreteNode[],
+  bufferNodes: ConcreteNode[] = [],
+  inboxMessages: InboxMessage[] = [],
+): ProcessArgs {
   return {
     targets,
-    buffer: new FakeContextWorkingBuffer(bufferNodes.length ? bufferNodes : targets),
+    buffer: new FakeContextWorkingBuffer(
+      bufferNodes.length ? bufferNodes : targets,
+    ),
     inbox: new InboxSnapshotImpl(inboxMessages),
   };
 }
@@ -253,7 +274,7 @@ export function createMockContextConfig(
 export function setupContextComponentTest(
   config: Config,
   sidecarOverride?: SidecarConfig,
-): {chatHistory: AgentChatHistory, contextManager: ContextManager} {
+): { chatHistory: AgentChatHistory; contextManager: ContextManager } {
   const chatHistory = new AgentChatHistory();
   const registry = new SidecarRegistry();
   registerBuiltInProcessors(registry);
@@ -273,13 +294,13 @@ export function setupContextComponentTest(
     1,
     eventBus,
   );
-  
+
   const orchestrator = new PipelineOrchestrator(
     sidecar,
     env,
     eventBus,
     tracer,
-    registry
+    registry,
   );
 
   const contextManager = new ContextManager(
@@ -287,7 +308,7 @@ export function setupContextComponentTest(
     env,
     tracer,
     orchestrator,
-    chatHistory
+    chatHistory,
   );
 
   // The async worker is now internally managed by ContextManager

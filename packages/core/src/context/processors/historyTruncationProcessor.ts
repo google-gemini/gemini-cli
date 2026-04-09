@@ -50,21 +50,19 @@ export class HistoryTruncationProcessor implements ContextProcessor {
     this.options = options;
   }
 
-  async process({
-    targets,
-  }: ProcessArgs): Promise<readonly ConcreteNode[]> {
+  async process({ targets }: ProcessArgs): Promise<readonly ConcreteNode[]> {
     // Calculate how many tokens we need to remove based on the configured knob
     let targetTokensToRemove = 0;
     const strategy = this.options.target ?? 'max';
-    
+
     if (strategy === 'incremental') {
-       targetTokensToRemove = Infinity;
+      targetTokensToRemove = Infinity;
     } else if (strategy === 'freeNTokens') {
-       targetTokensToRemove = this.options.freeTokensTarget ?? 0;
-       if (targetTokensToRemove <= 0) return targets;
+      targetTokensToRemove = this.options.freeTokensTarget ?? 0;
+      if (targetTokensToRemove <= 0) return targets;
     } else if (strategy === 'max') {
-       // 'max' means we remove all targets without stopping early
-       targetTokensToRemove = Infinity;
+      // 'max' means we remove all targets without stopping early
+      targetTokensToRemove = Infinity;
     }
 
     let removedTokens = 0;

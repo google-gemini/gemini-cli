@@ -70,12 +70,15 @@ export class BlobDegradationProcessor implements ContextProcessor {
             let newText = '';
             let tokensSaved = 0;
 
-        switch (part.type) {
+            switch (part.type) {
               case 'inline_data': {
                 await ensureDir();
                 const ext = part.mimeType.split('/')[1] || 'bin';
                 const fileName = `blob_${Date.now()}_${this.env.idGenerator.generateId()}.${ext}`;
-                const filePath = this.env.fileSystem.join(blobOutputsDir, fileName);
+                const filePath = this.env.fileSystem.join(
+                  blobOutputsDir,
+                  fileName,
+                );
 
                 const buffer = Buffer.from(part.data, 'base64');
                 await this.env.fileSystem.writeFile(filePath, buffer);
@@ -83,34 +86,45 @@ export class BlobDegradationProcessor implements ContextProcessor {
                 const mb = (buffer.byteLength / 1024 / 1024).toFixed(2);
                 newText = `[Multi-Modal Blob (${part.mimeType}, ${mb}MB) degraded to text to preserve context window. Saved to: ${filePath}]`;
 
-                const oldTokens = this.env.tokenCalculator.estimateTokensForParts([
-                  { inlineData: { mimeType: part.mimeType, data: part.data } },
-                ]);
-                const newTokens = this.env.tokenCalculator.estimateTokensForParts([
-                  { text: newText },
-                ]);
+                const oldTokens =
+                  this.env.tokenCalculator.estimateTokensForParts([
+                    {
+                      inlineData: { mimeType: part.mimeType, data: part.data },
+                    },
+                  ]);
+                const newTokens =
+                  this.env.tokenCalculator.estimateTokensForParts([
+                    { text: newText },
+                  ]);
                 tokensSaved = oldTokens - newTokens;
                 break;
               }
               case 'file_data': {
                 newText = `[File Reference (${part.mimeType}) degraded to text to preserve context window. Original URI: ${part.fileUri}]`;
-                const oldTokens = this.env.tokenCalculator.estimateTokensForParts([
-                  { fileData: { mimeType: part.mimeType, fileUri: part.fileUri } },
-                ]);
-                const newTokens = this.env.tokenCalculator.estimateTokensForParts([
-                  { text: newText },
-                ]);
+                const oldTokens =
+                  this.env.tokenCalculator.estimateTokensForParts([
+                    {
+                      fileData: {
+                        mimeType: part.mimeType,
+                        fileUri: part.fileUri,
+                      },
+                    },
+                  ]);
+                const newTokens =
+                  this.env.tokenCalculator.estimateTokensForParts([
+                    { text: newText },
+                  ]);
                 tokensSaved = oldTokens - newTokens;
                 break;
               }
               case 'raw_part': {
                 newText = `[Unknown Part degraded to text to preserve context window.]`;
-                const oldTokens = this.env.tokenCalculator.estimateTokensForParts([
-                  part.part,
-                ]);
-                const newTokens = this.env.tokenCalculator.estimateTokensForParts([
-                  { text: newText },
-                ]);
+                const oldTokens =
+                  this.env.tokenCalculator.estimateTokensForParts([part.part]);
+                const newTokens =
+                  this.env.tokenCalculator.estimateTokensForParts([
+                    { text: newText },
+                  ]);
                 tokensSaved = oldTokens - newTokens;
                 break;
               }

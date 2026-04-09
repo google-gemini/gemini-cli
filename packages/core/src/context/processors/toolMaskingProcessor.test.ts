@@ -35,12 +35,12 @@ describe('ToolMaskingProcessor', () => {
 
     expect(result.length).toBe(1);
     const masked = result[0] as ToolExecution;
-    
+
     // It should have generated a new ID because it modified it
     expect(masked.id).not.toBe(toolStep.id);
 
     // It should have masked the observation
-    const obs = masked.observation as { result: string, metadata: string };
+    const obs = masked.observation as { result: string; metadata: string };
     expect(obs.result).toContain('<tool_output_masked>');
     expect(obs.metadata).toBe('short'); // Untouched
   });
@@ -55,8 +55,9 @@ describe('ToolMaskingProcessor', () => {
     const toolStep = createDummyToolNode('ep1', 10, 10, {
       toolName: 'activate_skill',
       observation: {
-        result: 'this is a really long string that normally would get masked but wont because of the tool name',
-      }
+        result:
+          'this is a really long string that normally would get masked but wont because of the tool name',
+      },
     });
 
     const result = await processor.process(createMockProcessArgs([toolStep]));

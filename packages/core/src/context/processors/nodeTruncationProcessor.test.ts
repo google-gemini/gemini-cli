@@ -25,17 +25,35 @@ describe('NodeTruncationProcessor', () => {
 
     const longText = 'A'.repeat(50); // 50 tokens
 
-    const prompt = createDummyNode('ep1', 'USER_PROMPT', 50, {
-      semanticParts: [{ type: 'text', text: longText }]
-    }, 'prompt-id') as UserPrompt;
+    const prompt = createDummyNode(
+      'ep1',
+      'USER_PROMPT',
+      50,
+      {
+        semanticParts: [{ type: 'text', text: longText }],
+      },
+      'prompt-id',
+    ) as UserPrompt;
 
-    const thought = createDummyNode('ep1', 'AGENT_THOUGHT', 50, {
-      text: longText,
-    }, 'thought-id') as AgentThought;
+    const thought = createDummyNode(
+      'ep1',
+      'AGENT_THOUGHT',
+      50,
+      {
+        text: longText,
+      },
+      'thought-id',
+    ) as AgentThought;
 
-    const yieldNode = createDummyNode('ep1', 'AGENT_YIELD', 50, {
-      text: longText,
-    }, 'yield-id') as AgentYield;
+    const yieldNode = createDummyNode(
+      'ep1',
+      'AGENT_YIELD',
+      50,
+      {
+        text: longText,
+      },
+      'yield-id',
+    ) as AgentYield;
 
     const targets = [prompt, thought, yieldNode];
 
@@ -70,13 +88,25 @@ describe('NodeTruncationProcessor', () => {
 
     const shortText = 'Short text'; // 10 chars
 
-    const prompt = createDummyNode('ep1', 'USER_PROMPT', 10, {
-      semanticParts: [{ type: 'text', text: shortText }]
-    }, 'prompt-id') as UserPrompt;
+    const prompt = createDummyNode(
+      'ep1',
+      'USER_PROMPT',
+      10,
+      {
+        semanticParts: [{ type: 'text', text: shortText }],
+      },
+      'prompt-id',
+    ) as UserPrompt;
 
-    const thought = createDummyNode('ep1', 'AGENT_THOUGHT', 13, {
-      text: 'Short thought', // 13 chars
-    }, 'thought-id') as AgentThought;
+    const thought = createDummyNode(
+      'ep1',
+      'AGENT_THOUGHT',
+      13,
+      {
+        text: 'Short thought', // 13 chars
+      },
+      'thought-id',
+    ) as AgentThought;
 
     const targets = [prompt, thought];
 

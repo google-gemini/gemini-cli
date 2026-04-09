@@ -48,7 +48,13 @@ export class StateSnapshotWorker implements ContextWorker {
     this.generator = new SnapshotGenerator(env);
   }
 
-  async execute({ targets, inbox }: { targets: readonly ConcreteNode[]; inbox: InboxSnapshot }): Promise<void> {
+  async execute({
+    targets,
+    inbox,
+  }: {
+    targets: readonly ConcreteNode[];
+    inbox: InboxSnapshot;
+  }): Promise<void> {
     if (targets.length === 0) return;
 
     try {
@@ -58,16 +64,24 @@ export class StateSnapshotWorker implements ContextWorker {
 
       if (workerType === 'accumulate') {
         // Look for the most recent unconsumed accumulate snapshot in the inbox
-        const proposedSnapshots = inbox.getMessages<{ newText: string; consumedIds: string[]; type: string }>('PROPOSED_SNAPSHOT');
-        const accumulateSnapshots = proposedSnapshots.filter(s => s.payload.type === 'accumulate');
-        
+        const proposedSnapshots = inbox.getMessages<{
+          newText: string;
+          consumedIds: string[];
+          type: string;
+        }>('PROPOSED_SNAPSHOT');
+        const accumulateSnapshots = proposedSnapshots.filter(
+          (s) => s.payload.type === 'accumulate',
+        );
+
         if (accumulateSnapshots.length > 0) {
           // Sort to find the most recent
-          const latest = [...accumulateSnapshots].sort((a, b) => b.timestamp - a.timestamp)[0];
-          
+          const latest = [...accumulateSnapshots].sort(
+            (a, b) => b.timestamp - a.timestamp,
+          )[0];
+
           // Consume the old draft so the inbox doesn't fill up with stale drafts
           inbox.consume(latest.id);
-          // And we must persist its consumption back to the live inbox immediately, 
+          // And we must persist its consumption back to the live inbox immediately,
           // because we are effectively "taking" it from the shelf to modify.
           this.env.inbox.drainConsumed(new Set([latest.id]));
 
@@ -91,15 +105,21 @@ export class StateSnapshotWorker implements ContextWorker {
         this.options.systemInstruction,
       );
 
-      const newConsumedIds = [...previousConsumedIds, ...targets.map((t) => t.id)];
+      const newConsumedIds = [
+        ...previousConsumedIds,
+        ...targets.map((t) => t.id),
+      ];
 
       // In V2, workers communicate their work to the inbox, and the processor picks it up.
-      this.env.inbox.publish('PROPOSED_SNAPSHOT', {
-        newText: snapshotText,
-        consumedIds: newConsumedIds,
-        type: workerType,
-      }, this.env.idGenerator);
-
+      this.env.inbox.publish(
+        'PROPOSED_SNAPSHOT',
+        {
+          newText: snapshotText,
+          consumedIds: newConsumedIds,
+          type: workerType,
+        },
+        this.env.idGenerator,
+      );
     } catch (e) {
       debugLogger.error('StateSnapshotWorker failed to generate snapshot', e);
     }

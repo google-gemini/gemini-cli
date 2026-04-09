@@ -9,7 +9,6 @@ import { SimulationHarness } from './SimulationHarness.js';
 import { createMockLlmClient } from '../testing/contextTestUtils.js';
 import type { SidecarConfig } from '../sidecar/types.js';
 
-
 expect.addSnapshotSerializer({
   test: (val) =>
     typeof val === 'string' &&
@@ -59,7 +58,9 @@ describe('System Lifecycle Golden Tests', () => {
     ],
   });
 
-  const mockLlmClient = createMockLlmClient(['<MOCKED_STATE_SNAPSHOT_SUMMARY>']);
+  const mockLlmClient = createMockLlmClient([
+    '<MOCKED_STATE_SNAPSHOT_SUMMARY>',
+  ]);
 
   it('Scenario 1: Organic Growth with Huge Tool Output & Images', async () => {
     const harness = await SimulationHarness.create(

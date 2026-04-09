@@ -3,7 +3,11 @@
  * Copyright 2026 Google LLC
  * SPDX-License-Identifier: Apache-2.0
  */
-import type { ContextProcessor, ProcessArgs, BackstopTargetOptions } from '../pipeline.js';
+import type {
+  ContextProcessor,
+  ProcessArgs,
+  BackstopTargetOptions,
+} from '../pipeline.js';
 import type { ContextEnvironment } from '../sidecar/environment.js';
 import type { ConcreteNode, Snapshot } from '../ir/types.js';
 import { SnapshotGenerator } from '../utils/snapshotGenerator.js';
@@ -46,36 +50,48 @@ export class StateSnapshotProcessor implements ContextProcessor {
   }
 
   // --- ContextProcessor Interface (Sync Backstop / Cache Application) ---
-  async process({ targets, inbox }: ProcessArgs): Promise<readonly ConcreteNode[]> {
+  async process({
+    targets,
+    inbox,
+  }: ProcessArgs): Promise<readonly ConcreteNode[]> {
     if (targets.length === 0) {
       return targets;
     }
 
     // Determine what mode we are looking for: 'incremental' -> 'point-in-time', 'max' -> 'accumulate'
     const strategy = this.options.target ?? 'max';
-    const expectedType = strategy === 'incremental' ? 'point-in-time' : 'accumulate';
+    const expectedType =
+      strategy === 'incremental' ? 'point-in-time' : 'accumulate';
 
     // 1. Check Inbox for a completed Snapshot (The Fast Path)
-    const proposedSnapshots = inbox.getMessages<{ newText: string; consumedIds: string[]; type: string }>('PROPOSED_SNAPSHOT');
-    
+    const proposedSnapshots = inbox.getMessages<{
+      newText: string;
+      consumedIds: string[];
+      type: string;
+    }>('PROPOSED_SNAPSHOT');
+
     if (proposedSnapshots.length > 0) {
       // Filter for the snapshot type that matches our processor mode
-      const matchingSnapshots = proposedSnapshots.filter(s => s.payload.type === expectedType);
+      const matchingSnapshots = proposedSnapshots.filter(
+        (s) => s.payload.type === expectedType,
+      );
 
       // Sort by newest timestamp first (we want the most accumulated snapshot)
-      const sorted = [...matchingSnapshots].sort((a, b) => b.timestamp - a.timestamp);
-      
+      const sorted = [...matchingSnapshots].sort(
+        (a, b) => b.timestamp - a.timestamp,
+      );
+
       for (const proposed of sorted) {
         const { consumedIds, newText } = proposed.payload;
-        
+
         // Verify all consumed IDs still exist sequentially in targets
-        const targetIds = new Set(targets.map(t => t.id));
-        const isValid = consumedIds.every(id => targetIds.has(id));
-        
+        const targetIds = new Set(targets.map((t) => t.id));
+        const isValid = consumedIds.every((id) => targetIds.has(id));
+
         if (isValid) {
           // If valid, apply it!
           const newId = this.env.idGenerator.generateId();
-          
+
           const snapshotNode: Snapshot = {
             id: newId,
             logicalParentId: newId,
@@ -85,14 +101,18 @@ export class StateSnapshotProcessor implements ContextProcessor {
           };
 
           // Remove the consumed nodes and insert the snapshot at the earliest index
-          const returnedNodes = targets.filter(t => !consumedIds.includes(t.id));
-          const firstRemovedIdx = targets.findIndex(t => consumedIds.includes(t.id));
-          
+          const returnedNodes = targets.filter(
+            (t) => !consumedIds.includes(t.id),
+          );
+          const firstRemovedIdx = targets.findIndex((t) =>
+            consumedIds.includes(t.id),
+          );
+
           if (firstRemovedIdx !== -1) {
-             const idx = Math.max(0, firstRemovedIdx);
-             returnedNodes.splice(idx, 0, snapshotNode);
+            const idx = Math.max(0, firstRemovedIdx);
+            returnedNodes.splice(idx, 0, snapshotNode);
           } else {
-             returnedNodes.unshift(snapshotNode);
+            returnedNodes.unshift(snapshotNode);
           }
 
           inbox.consume(proposed.id);
@@ -105,11 +125,11 @@ export class StateSnapshotProcessor implements ContextProcessor {
     let targetTokensToRemove = 0;
 
     if (strategy === 'incremental') {
-       targetTokensToRemove = Infinity; // incremental implies removing as much as possible if no state is passed
+      targetTokensToRemove = Infinity; // incremental implies removing as much as possible if no state is passed
     } else if (strategy === 'freeNTokens') {
-       targetTokensToRemove = this.options.freeTokensTarget ?? Infinity;
+      targetTokensToRemove = this.options.freeTokensTarget ?? Infinity;
     } else if (strategy === 'max') {
-       targetTokensToRemove = Infinity;
+      targetTokensToRemove = Infinity;
     }
 
     let deficitAccumulator = 0;
@@ -118,11 +138,11 @@ export class StateSnapshotProcessor implements ContextProcessor {
     // Scan oldest to newest
     for (const node of targets) {
       if (node.id === targets[0].id && node.type === 'USER_PROMPT') {
-          // Keep system prompt if it's the very first node
-          // In a real system, system prompt is protected, but we double check
-          continue; 
+        // Keep system prompt if it's the very first node
+        // In a real system, system prompt is protected, but we double check
+        continue;
       }
-      
+
       nodesToSummarize.push(node);
       deficitAccumulator += this.env.tokenCalculator.getTokenCost(node);
 
@@ -132,32 +152,36 @@ export class StateSnapshotProcessor implements ContextProcessor {
     if (nodesToSummarize.length < 2) return targets; // Not enough context
 
     try {
-       const snapshotText = await this.generator.synthesizeSnapshot(nodesToSummarize, this.options.systemInstruction);
-       const newId = this.env.idGenerator.generateId();
-       const snapshotNode: Snapshot = {
-            id: newId,
-            logicalParentId: newId,
-            type: 'SNAPSHOT',
-            timestamp: Date.now(),
-            text: snapshotText,
-       };
+      const snapshotText = await this.generator.synthesizeSnapshot(
+        nodesToSummarize,
+        this.options.systemInstruction,
+      );
+      const newId = this.env.idGenerator.generateId();
+      const snapshotNode: Snapshot = {
+        id: newId,
+        logicalParentId: newId,
+        type: 'SNAPSHOT',
+        timestamp: Date.now(),
+        text: snapshotText,
+      };
 
-       const consumedIds = nodesToSummarize.map(n => n.id);
-       const returnedNodes = targets.filter(t => !consumedIds.includes(t.id));
-       const firstRemovedIdx = targets.findIndex(t => consumedIds.includes(t.id));
-       
-       if (firstRemovedIdx !== -1) {
-           const idx = Math.max(0, firstRemovedIdx);
-           returnedNodes.splice(idx, 0, snapshotNode);
-       } else {
-           returnedNodes.unshift(snapshotNode);
-       }
+      const consumedIds = nodesToSummarize.map((n) => n.id);
+      const returnedNodes = targets.filter((t) => !consumedIds.includes(t.id));
+      const firstRemovedIdx = targets.findIndex((t) =>
+        consumedIds.includes(t.id),
+      );
 
-       return returnedNodes;
+      if (firstRemovedIdx !== -1) {
+        const idx = Math.max(0, firstRemovedIdx);
+        returnedNodes.splice(idx, 0, snapshotNode);
+      } else {
+        returnedNodes.unshift(snapshotNode);
+      }
 
+      return returnedNodes;
     } catch (e) {
-       debugLogger.error('StateSnapshotProcessor failed sync backstop', e);
-       return targets;
+      debugLogger.error('StateSnapshotProcessor failed sync backstop', e);
+      return targets;
     }
   }
 }

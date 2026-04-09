@@ -4,7 +4,10 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 import type { Part } from '@google/genai';
-import type { IrNodeBehavior, IrNodeBehaviorRegistry } from './behaviorRegistry.js';
+import type {
+  IrNodeBehavior,
+  IrNodeBehaviorRegistry,
+} from './behaviorRegistry.js';
 import type {
   UserPrompt,
   AgentThought,
@@ -29,7 +32,9 @@ export const UserPromptBehavior: IrNodeBehavior<UserPrompt> = {
           parts.push({ inlineData: { mimeType: sp.mimeType, data: sp.data } });
           break;
         case 'file_data':
-          parts.push({ fileData: { mimeType: sp.mimeType, fileUri: sp.fileUri } });
+          parts.push({
+            fileData: { mimeType: sp.mimeType, fileUri: sp.fileUri },
+          });
           break;
         case 'raw_part':
           parts.push(sp.part);
@@ -46,7 +51,7 @@ export const UserPromptBehavior: IrNodeBehavior<UserPrompt> = {
       writer.flushModelParts();
       writer.appendContent({ role: 'user', parts });
     }
-  }
+  },
 };
 
 export const AgentThoughtBehavior: IrNodeBehavior<AgentThought> = {
@@ -56,7 +61,7 @@ export const AgentThoughtBehavior: IrNodeBehavior<AgentThought> = {
   },
   serialize(thought, writer) {
     writer.appendModelPart({ text: thought.text });
-  }
+  },
 };
 
 export const ToolExecutionBehavior: IrNodeBehavior<ToolExecution> = {
@@ -64,7 +69,16 @@ export const ToolExecutionBehavior: IrNodeBehavior<ToolExecution> = {
   getEstimatableParts(tool) {
     return [
       { functionCall: { id: tool.id, name: tool.toolName, args: tool.intent } },
-      { functionResponse: { id: tool.id, name: tool.toolName, response: typeof tool.observation === 'string' ? { message: tool.observation } : tool.observation } }
+      {
+        functionResponse: {
+          id: tool.id,
+          name: tool.toolName,
+          response:
+            typeof tool.observation === 'string'
+              ? { message: tool.observation }
+              : tool.observation,
+        },
+      },
     ];
   },
   serialize(tool, writer) {
@@ -72,15 +86,30 @@ export const ToolExecutionBehavior: IrNodeBehavior<ToolExecution> = {
     writer.appendModelPart(parts[0]);
     writer.flushModelParts();
     writer.appendUserPart(parts[1]);
-  }
+  },
 };
 
 export const MaskedToolBehavior: IrNodeBehavior<MaskedTool> = {
   type: 'MASKED_TOOL',
   getEstimatableParts(tool) {
     return [
-      { functionCall: { id: tool.id, name: tool.toolName, args: tool.intent ?? {} } },
-      { functionResponse: { id: tool.id, name: tool.toolName, response: typeof tool.observation === 'string' ? { message: tool.observation } : (tool.observation ?? {}) } }
+      {
+        functionCall: {
+          id: tool.id,
+          name: tool.toolName,
+          args: tool.intent ?? {},
+        },
+      },
+      {
+        functionResponse: {
+          id: tool.id,
+          name: tool.toolName,
+          response:
+            typeof tool.observation === 'string'
+              ? { message: tool.observation }
+              : (tool.observation ?? {}),
+        },
+      },
     ];
   },
   serialize(tool, writer) {
@@ -88,7 +117,7 @@ export const MaskedToolBehavior: IrNodeBehavior<MaskedTool> = {
     writer.appendModelPart(parts[0]);
     writer.flushModelParts();
     writer.appendUserPart(parts[1]);
-  }
+  },
 };
 
 export const AgentYieldBehavior: IrNodeBehavior<AgentYield> = {
@@ -99,33 +128,39 @@ export const AgentYieldBehavior: IrNodeBehavior<AgentYield> = {
   serialize(yieldNode, writer) {
     writer.appendModelPart({ text: yieldNode.text });
     writer.flushModelParts();
-  }
+  },
 };
 
 export const SystemEventBehavior: IrNodeBehavior<SystemEvent> = {
   type: 'SYSTEM_EVENT',
-  getEstimatableParts() { return []; },
+  getEstimatableParts() {
+    return [];
+  },
   serialize(node, writer) {
     writer.flushModelParts();
-  }
+  },
 };
 
 export const SnapshotBehavior: IrNodeBehavior<Snapshot> = {
   type: 'SNAPSHOT',
-  getEstimatableParts(node) { return [{ text: node.text }]; },
+  getEstimatableParts(node) {
+    return [{ text: node.text }];
+  },
   serialize(node, writer) {
     writer.flushModelParts();
     writer.appendUserPart({ text: node.text });
-  }
+  },
 };
 
 export const RollingSummaryBehavior: IrNodeBehavior<RollingSummary> = {
   type: 'ROLLING_SUMMARY',
-  getEstimatableParts(node) { return [{ text: node.text }]; },
+  getEstimatableParts(node) {
+    return [{ text: node.text }];
+  },
   serialize(node, writer) {
     writer.flushModelParts();
     writer.appendUserPart({ text: node.text });
-  }
+  },
 };
 
 export function registerBuiltInBehaviors(registry: IrNodeBehaviorRegistry) {

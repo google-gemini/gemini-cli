@@ -14,7 +14,7 @@ describe('SidecarRegistry', () => {
     const processorDef: ContextProcessorDef = {
       id: 'TestProcessor',
       schema: { type: 'object' },
-      create: () => ({} as ContextProcessor),
+      create: () => ({}) as ContextProcessor,
     };
 
     registry.registerProcessor(processorDef);
@@ -27,7 +27,7 @@ describe('SidecarRegistry', () => {
     const workerDef: ContextWorkerDef = {
       id: 'TestWorker',
       schema: { type: 'object' },
-      create: () => ({} as ContextWorker),
+      create: () => ({}) as ContextWorker,
     };
 
     registry.registerWorker(workerDef);
@@ -37,12 +37,16 @@ describe('SidecarRegistry', () => {
 
   it('should throw an error when retrieving unregistered processors', () => {
     const registry = new SidecarRegistry();
-    expect(() => registry.getProcessor('Unknown')).toThrow('Context Processor [Unknown] is not registered.');
+    expect(() => registry.getProcessor('Unknown')).toThrow(
+      'Context Processor [Unknown] is not registered.',
+    );
   });
 
   it('should throw an error when retrieving unregistered workers', () => {
     const registry = new SidecarRegistry();
-    expect(() => registry.getWorker('Unknown')).toThrow('Context Worker [Unknown] is not registered.');
+    expect(() => registry.getWorker('Unknown')).toThrow(
+      'Context Worker [Unknown] is not registered.',
+    );
   });
 
   it('should return combined schemas', () => {
@@ -50,24 +54,32 @@ describe('SidecarRegistry', () => {
     registry.registerProcessor({
       id: 'TestProcessor',
       schema: { title: 'processorSchema' },
-      create: () => ({} as ContextProcessor),
+      create: () => ({}) as ContextProcessor,
     });
     registry.registerWorker({
       id: 'TestWorker',
       schema: { title: 'workerSchema' },
-      create: () => ({} as ContextWorker),
+      create: () => ({}) as ContextWorker,
     });
 
-    const schemas = registry.getSchemas() as Array<{title?: string}>;
+    const schemas = registry.getSchemas() as Array<{ title?: string }>;
     expect(schemas.length).toBe(2);
-    expect(schemas.find(s => s.title === 'processorSchema')).toBeDefined();
-    expect(schemas.find(s => s.title === 'workerSchema')).toBeDefined();
+    expect(schemas.find((s) => s.title === 'processorSchema')).toBeDefined();
+    expect(schemas.find((s) => s.title === 'workerSchema')).toBeDefined();
   });
 
   it('should safely clear the registry', () => {
     const registry = new SidecarRegistry();
-    registry.registerProcessor({ id: 'TestProcessor', schema: {}, create: () => ({} as ContextProcessor) });
-    registry.registerWorker({ id: 'TestWorker', schema: {}, create: () => ({} as ContextWorker) });
+    registry.registerProcessor({
+      id: 'TestProcessor',
+      schema: {},
+      create: () => ({}) as ContextProcessor,
+    });
+    registry.registerWorker({
+      id: 'TestWorker',
+      schema: {},
+      create: () => ({}) as ContextWorker,
+    });
 
     registry.clear();
 

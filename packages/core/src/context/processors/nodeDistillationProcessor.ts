@@ -53,31 +53,32 @@ export class NodeDistillationProcessor implements ContextProcessor {
     contextInfo: string,
   ): Promise<string> {
     try {
-      const response = await this.env.llmClient.generateContent(
-        {
-          role: LlmRole.UTILITY_COMPRESSOR,
-          modelConfigKey: { model: 'default' },
-          promptId: this.env.promptId,
-          abortSignal: new AbortController().signal,
-          contents: [
+      const response = await this.env.llmClient.generateContent({
+        role: LlmRole.UTILITY_COMPRESSOR,
+        modelConfigKey: { model: 'default' },
+        promptId: this.env.promptId,
+        abortSignal: new AbortController().signal,
+        contents: [
+          {
+            role: 'user',
+            parts: [{ text }],
+          },
+        ],
+        systemInstruction: {
+          role: 'system',
+          parts: [
             {
-              role: 'user',
-              parts: [{ text }],
+              text: `You are an expert context compressor. Your job is to drastically shorten the following ${contextInfo} while preserving the absolute core semantic meaning, facts, and intent. Omit all conversational filler, pleasantries, or redundant information. Return ONLY the compressed summary.`,
             },
           ],
-          systemInstruction: {
-            role: 'system',
-            parts: [
-              {
-                text: `You are an expert context compressor. Your job is to drastically shorten the following ${contextInfo} while preserving the absolute core semantic meaning, facts, and intent. Omit all conversational filler, pleasantries, or redundant information. Return ONLY the compressed summary.`,
-              },
-            ],
-          },
-        }
-      );
+        },
+      });
       return getResponseText(response) || text;
     } catch (e) {
-      debugLogger.warn(`NodeDistillationProcessor failed to summarize ${contextInfo}`, e);
+      debugLogger.warn(
+        `NodeDistillationProcessor failed to summarize ${contextInfo}`,
+        e,
+      );
       return text; // Fallback to original text on API failure
     }
   }
@@ -86,7 +87,7 @@ export class NodeDistillationProcessor implements ContextProcessor {
     const semanticConfig = this.options;
     const limitTokens = semanticConfig.nodeThresholdTokens;
     const thresholdChars = this.env.tokenCalculator.tokensToChars(limitTokens);
-    
+
     const returnedNodes: ConcreteNode[] = [];
 
     // Scan the target working buffer and unconditionally apply the configured hyperparameter threshold
@@ -101,9 +102,16 @@ export class NodeDistillationProcessor implements ContextProcessor {
             if (part.type !== 'text') continue;
 
             if (part.text.length > thresholdChars) {
-              const summary = await this.generateSummary(part.text, 'User Prompt');
-              const newTokens = this.env.tokenCalculator.estimateTokensForParts([{ text: summary }]);
-              const oldTokens = this.env.tokenCalculator.estimateTokensForParts([{ text: part.text }]);
+              const summary = await this.generateSummary(
+                part.text,
+                'User Prompt',
+              );
+              const newTokens = this.env.tokenCalculator.estimateTokensForParts(
+                [{ text: summary }],
+              );
+              const oldTokens = this.env.tokenCalculator.estimateTokensForParts(
+                [{ text: part.text }],
+              );
 
               if (newTokens < oldTokens) {
                 newParts[j] = { type: 'text', text: summary };
@@ -126,8 +134,13 @@ export class NodeDistillationProcessor implements ContextProcessor {
 
         case 'AGENT_THOUGHT': {
           if (node.text.length > thresholdChars) {
-            const summary = await this.generateSummary(node.text, 'Agent Thought');
-            const newTokens = this.env.tokenCalculator.estimateTokensForParts([{ text: summary }]);
+            const summary = await this.generateSummary(
+              node.text,
+              'Agent Thought',
+            );
+            const newTokens = this.env.tokenCalculator.estimateTokensForParts([
+              { text: summary },
+            ]);
             const oldTokens = this.env.tokenCalculator.getTokenCost(node);
 
             if (newTokens < oldTokens) {
@@ -158,20 +171,26 @@ export class NodeDistillationProcessor implements ContextProcessor {
           }
 
           if (stringifiedObs.length > thresholdChars) {
-            const summary = await this.generateSummary(stringifiedObs, node.toolName || 'unknown');
+            const summary = await this.generateSummary(
+              stringifiedObs,
+              node.toolName || 'unknown',
+            );
             const newObsObject = { summary };
 
-            const newObsTokens = this.env.tokenCalculator.estimateTokensForParts([
-              {
-                functionResponse: {
-                  name: node.toolName || 'unknown',
-                  response: newObsObject,
-                  id: node.id,
+            const newObsTokens =
+              this.env.tokenCalculator.estimateTokensForParts([
+                {
+                  functionResponse: {
+                    name: node.toolName || 'unknown',
+                    response: newObsObject,
+                    id: node.id,
+                  },
                 },
-              },
-            ]);
+              ]);
 
-            const oldObsTokens = node.tokens?.observation ?? this.env.tokenCalculator.getTokenCost(node);
+            const oldObsTokens =
+              node.tokens?.observation ??
+              this.env.tokenCalculator.getTokenCost(node);
             const intentTokens = node.tokens?.intent ?? 0;
 
             if (newObsTokens < oldObsTokens) {

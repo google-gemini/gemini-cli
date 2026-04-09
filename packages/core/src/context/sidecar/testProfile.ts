@@ -15,9 +15,7 @@ export const testTruncateProfile: SidecarConfig = {
       name: 'Emergency Backstop (Truncate Only)',
       triggers: ['gc_backstop', 'retained_exceeded'],
       execution: 'blocking',
-      processors: [
-        { processorId: 'HistoryTruncationProcessor', options: {} },
-      ],
+      processors: [{ processorId: 'HistoryTruncationProcessor', options: {} }],
     },
   ],
 };

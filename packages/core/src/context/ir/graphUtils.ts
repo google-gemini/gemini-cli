@@ -4,7 +4,19 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import type { Episode, Task, IrNode, AgentThought, ToolExecution, MaskedTool, UserPrompt, AgentYield, SystemEvent, Snapshot, RollingSummary } from './types.js';
+import type {
+  Episode,
+  Task,
+  IrNode,
+  AgentThought,
+  ToolExecution,
+  MaskedTool,
+  UserPrompt,
+  AgentYield,
+  SystemEvent,
+  Snapshot,
+  RollingSummary,
+} from './types.js';
 
 export function isEpisode(node: IrNode): node is Episode {
   return node.type === 'EPISODE';

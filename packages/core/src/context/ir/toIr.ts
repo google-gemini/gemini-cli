@@ -17,7 +17,10 @@ import type {
 import type { ContextTokenCalculator } from '../utils/contextTokenCalculator.js';
 
 // We remove the global nodeIdentityMap and instead rely on one passed from IrMapper
-export function getStableId(obj: object, nodeIdentityMap: WeakMap<object, string>): string {
+export function getStableId(
+  obj: object,
+  nodeIdentityMap: WeakMap<object, string>,
+): string {
   let id = nodeIdentityMap.get(obj);
   if (!id) {
     id = randomUUID();
@@ -42,13 +45,11 @@ function isCompleteEpisode(ep: Partial<Episode>): ep is Episode {
 export function toIr(
   history: readonly Content[],
   tokenCalculator: ContextTokenCalculator,
-  nodeIdentityMap: WeakMap<object, string>
+  nodeIdentityMap: WeakMap<object, string>,
 ): Episode[] {
   const episodes: Episode[] = [];
   let currentEpisode: Partial<Episode> | null = null;
   const pendingCallParts: Map<string, Part> = new Map();
-
-
 
   const finalizeEpisode = () => {
     if (currentEpisode && isCompleteEpisode(currentEpisode)) {
@@ -72,7 +73,7 @@ export function toIr(
           currentEpisode,
           pendingCallParts,
           tokenCalculator,
-          nodeIdentityMap
+          nodeIdentityMap,
         );
       }
 
@@ -85,8 +86,8 @@ export function toIr(
         msg,
         currentEpisode,
         pendingCallParts,
-        nodeIdentityMap
-        );
+        nodeIdentityMap,
+      );
     }
   }
 
@@ -103,7 +104,7 @@ function parseToolResponses(
   currentEpisode: Partial<Episode> | null,
   pendingCallParts: Map<string, Part>,
   tokenCalculator: ContextTokenCalculator,
-  nodeIdentityMap: WeakMap<object, string>
+  nodeIdentityMap: WeakMap<object, string>,
 ): Partial<Episode> {
   if (!currentEpisode) {
     currentEpisode = {
@@ -151,7 +152,7 @@ function parseToolResponses(
 
 function parseUserParts(
   msg: Content,
-  nodeIdentityMap: WeakMap<object, string>
+  nodeIdentityMap: WeakMap<object, string>,
 ): Partial<Episode> {
   const semanticParts: SemanticPart[] = [];
   const parts = msg.parts || [];
@@ -191,7 +192,7 @@ function parseModelParts(
   msg: Content,
   currentEpisode: Partial<Episode> | null,
   pendingCallParts: Map<string, Part>,
-  nodeIdentityMap: WeakMap<object, string>
+  nodeIdentityMap: WeakMap<object, string>,
 ): Partial<Episode> {
   if (!currentEpisode) {
     currentEpisode = {

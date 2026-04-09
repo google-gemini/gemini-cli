@@ -42,7 +42,10 @@ export class ContextEnvironmentImpl implements ContextEnvironment {
   ) {
     this.behaviorRegistry = new IrNodeBehaviorRegistry();
     registerBuiltInBehaviors(this.behaviorRegistry);
-    this.tokenCalculator = new ContextTokenCalculator(this.charsPerToken, this.behaviorRegistry);
+    this.tokenCalculator = new ContextTokenCalculator(
+      this.charsPerToken,
+      this.behaviorRegistry,
+    );
     this.fileSystem = fileSystem || new NodeFileSystem();
     this.idGenerator = idGenerator || new NodeIdGenerator();
     this.inbox = new LiveInbox();

@@ -90,7 +90,7 @@ export class SimulationHarness {
       this.env,
       this.tracer,
       this.orchestrator,
-      this.chatHistory
+      this.chatHistory,
     );
   }
 
@@ -127,17 +127,13 @@ export class SimulationHarness {
       currentView = await orchestrator.executeTriggerSync(
         'gc_backstop',
         currentView,
-        new Set(currentView.map(e => e.id)),
+        new Set(currentView.map((e) => e.id)),
         new Set<string>(),
       );
       // Inject the truncated view back into the graph
       for (let i = 0; i < currentView.length; i++) {
         const ep = currentView[i];
-        if (
-          !this.contextManager
-            .getNodes()
-            .find((c) => c.id === ep.id)
-        ) {
+        if (!this.contextManager.getNodes().find((c) => c.id === ep.id)) {
           this.eventBus.emitVariantReady({
             targetId: ep.id,
             variantId: 'v-emergency',
@@ -145,7 +141,9 @@ export class SimulationHarness {
               type: 'MASKED_TOOL',
               id: 'mock-id',
               tokens: { intent: 0, observation: 0 },
-              intent: {}, observation: {}, toolName: 'tool',
+              intent: {},
+              observation: {},
+              toolName: 'tool',
             },
           });
         }

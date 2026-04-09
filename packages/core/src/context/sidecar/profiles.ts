@@ -56,9 +56,9 @@ export const defaultSidecarProfile: SidecarConfig = {
       triggers: ['gc_backstop'],
       execution: 'blocking',
       processors: [
-        { 
-          processorId: 'StateSnapshotProcessor', 
-          options: { target: 'max' } 
+        {
+          processorId: 'StateSnapshotProcessor',
+          options: { target: 'max' },
         },
       ],
     },

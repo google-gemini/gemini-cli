@@ -8,7 +8,11 @@ import type { InboxMessage, InboxSnapshot } from '../pipeline.js';
 export class LiveInbox {
   private messages: InboxMessage[] = [];
 
-  publish<T>(topic: string, payload: T, idGenerator: { generateId(): string }): void {
+  publish<T>(
+    topic: string,
+    payload: T,
+    idGenerator: { generateId(): string },
+  ): void {
     this.messages.push({
       id: idGenerator.generateId(),
       topic,

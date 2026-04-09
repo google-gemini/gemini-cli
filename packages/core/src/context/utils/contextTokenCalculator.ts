@@ -14,13 +14,12 @@ import type { IrNodeBehaviorRegistry } from '../ir/behaviorRegistry.js';
  * by the Gemini API. We use this as a baseline heuristic for inlineData/fileData.
  */
 
-
 export class ContextTokenCalculator {
   private readonly tokenCache = new Map<string, number>();
 
   constructor(
     private readonly charsPerToken: number,
-    private readonly registry: IrNodeBehaviorRegistry
+    private readonly registry: IrNodeBehaviorRegistry,
   ) {}
 
   /**
@@ -68,7 +67,7 @@ export class ContextTokenCalculator {
   calculateConcreteListTokens(nodes: readonly ConcreteNode[]): number {
     let tokens = 0;
     for (const node of nodes) {
-       tokens += this.getTokenCost(node);
+      tokens += this.getTokenCost(node);
     }
     return tokens;
   }

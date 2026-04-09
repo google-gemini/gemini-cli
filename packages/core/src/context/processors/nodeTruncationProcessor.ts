@@ -25,7 +25,8 @@ export class NodeTruncationProcessor implements ContextProcessor {
     properties: {
       maxTokensPerNode: {
         type: 'number',
-        description: 'The maximum tokens a node can have before being truncated.',
+        description:
+          'The maximum tokens a node can have before being truncated.',
       },
     },
     required: ['maxTokensPerNode'],
@@ -48,7 +49,12 @@ export class NodeTruncationProcessor implements ContextProcessor {
   private tryApplySquash(
     text: string,
     limitChars: number,
-  ): { text: string; newTokens: number; oldTokens: number; tokensSaved: number } | null {
+  ): {
+    text: string;
+    newTokens: number;
+    oldTokens: number;
+    tokensSaved: number;
+  } | null {
     const originalLength = text.length;
     if (originalLength <= limitChars) return null;
 
@@ -60,7 +66,8 @@ export class NodeTruncationProcessor implements ContextProcessor {
 
     if (newText !== text) {
       // Using accurate TokenCalculator instead of simple math
-      const newTokens = this.env.tokenCalculator.estimateTokensForString(newText);
+      const newTokens =
+        this.env.tokenCalculator.estimateTokensForString(newText);
       const oldTokens = this.env.tokenCalculator.estimateTokensForString(text);
       const tokensSaved = oldTokens - newTokens;
 

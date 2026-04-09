@@ -21,7 +21,7 @@ describe('StateSnapshotWorker', () => {
 
     const nodeA = createDummyNode('ep1', 'USER_PROMPT', 50, {}, 'node-A');
     const nodeB = createDummyNode('ep1', 'AGENT_THOUGHT', 60, {}, 'node-B');
-    
+
     const targets = [nodeA, nodeB];
     const inbox = new InboxSnapshotImpl([]);
 
@@ -38,7 +38,7 @@ describe('StateSnapshotWorker', () => {
         consumedIds: ['node-A', 'node-B'],
         type: 'point-in-time',
       }),
-      env.idGenerator
+      env.idGenerator,
     );
   });
 
@@ -62,8 +62,8 @@ describe('StateSnapshotWorker', () => {
           consumedIds: ['node-A', 'node-B'],
           newText: '<old snapshot>',
           type: 'accumulate',
-        }
-      }
+        },
+      },
     ]);
 
     await worker.execute({ targets, inbox });
@@ -80,7 +80,7 @@ describe('StateSnapshotWorker', () => {
         consumedIds: ['node-A', 'node-B', 'node-C'], // Aggregated!
         type: 'accumulate',
       }),
-      env.idGenerator
+      env.idGenerator,
     );
 
     // Verify the LLM was called with the old snapshot prepended
@@ -91,11 +91,11 @@ describe('StateSnapshotWorker', () => {
             parts: expect.arrayContaining([
               expect.objectContaining({
                 text: expect.stringContaining('<old snapshot>'),
-              })
-            ])
-          })
-        ])
-      })
+              }),
+            ]),
+          }),
+        ]),
+      }),
     );
   });
 

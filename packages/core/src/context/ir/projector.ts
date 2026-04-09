@@ -36,7 +36,8 @@ export class IrProjector {
     }
 
     const maxTokens = sidecar.budget.maxTokens;
-    const currentTokens = env.tokenCalculator.calculateConcreteListTokens(nodes);
+    const currentTokens =
+      env.tokenCalculator.calculateConcreteListTokens(nodes);
 
     // V0: Always protect the first node (System Prompt) and the last turn
     if (nodes.length > 0) {
@@ -74,7 +75,9 @@ export class IrProjector {
     // Start from newest and count backwards
     for (let i = nodes.length - 1; i >= 0; i--) {
       const node = nodes[i];
-      const nodeTokens = env.tokenCalculator.calculateConcreteListTokens([node]);
+      const nodeTokens = env.tokenCalculator.calculateConcreteListTokens([
+        node,
+      ]);
       rollingTokens += nodeTokens;
       if (rollingTokens > sidecar.budget.retainedTokens) {
         agedOutNodes.add(node.id);

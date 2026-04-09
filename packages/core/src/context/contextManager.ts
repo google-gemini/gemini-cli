@@ -54,14 +54,14 @@ export class ContextManager {
       const existingIds = new Set(this.currentNodes.map((n) => n.id));
       const addedNodes = event.nodes.filter((n) => !existingIds.has(n.id));
       if (addedNodes.length > 0) {
-         this.currentNodes = [...this.currentNodes, ...addedNodes];
+        this.currentNodes = [...this.currentNodes, ...addedNodes];
       }
 
       this.evaluateTriggers(event.newNodes);
     });
 
     this.eventBus.onVariantReady((event) => {
-      // In V2, async workers write back patches. 
+      // In V2, async workers write back patches.
       // The old variant dict logic is replaced by the orchestrator applying patches directly.
       // For now we log it.
       this.tracer.logEvent(
@@ -90,13 +90,15 @@ export class ContextManager {
     if (!this.sidecar.budget) return;
 
     if (newNodes.size > 0) {
-       this.eventBus.emitChunkReceived({
-           nodes: this.currentNodes,
-           targetNodeIds: newNodes
-       });
+      this.eventBus.emitChunkReceived({
+        nodes: this.currentNodes,
+        targetNodeIds: newNodes,
+      });
     }
 
-    const currentTokens = this.env.tokenCalculator.calculateConcreteListTokens(this.currentNodes);
+    const currentTokens = this.env.tokenCalculator.calculateConcreteListTokens(
+      this.currentNodes,
+    );
 
     if (currentTokens > this.sidecar.budget.retainedTokens) {
       const agedOutNodes = new Set<string>();
@@ -104,7 +106,9 @@ export class ContextManager {
       // Walk backwards finding nodes that fall out of the retained budget
       for (let i = this.currentNodes.length - 1; i >= 0; i--) {
         const node = this.currentNodes[i];
-        rollingTokens += this.env.tokenCalculator.calculateConcreteListTokens([node]);
+        rollingTokens += this.env.tokenCalculator.calculateConcreteListTokens([
+          node,
+        ]);
         if (rollingTokens > this.sidecar.budget.retainedTokens) {
           agedOutNodes.add(node.id);
         }

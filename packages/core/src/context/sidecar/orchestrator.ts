@@ -8,7 +8,8 @@ import type { ConcreteNode } from '../ir/types.js';
 import type {
   ContextProcessor,
   ContextWorker,
- ContextWorkingBuffer } from '../pipeline.js';
+  ContextWorkingBuffer,
+} from '../pipeline.js';
 import type { SidecarConfig, PipelineDef, PipelineTrigger } from './types.js';
 import type {
   ContextEnvironment,
@@ -22,10 +23,8 @@ import { InboxSnapshotImpl } from './inbox.js';
 class ContextWorkingBufferImpl implements ContextWorkingBuffer {
   private readonly nodesMap: Map<string, ConcreteNode>;
 
-  constructor(
-    readonly nodes: readonly ConcreteNode[],
-  ) {
-    this.nodesMap = new Map(nodes.map(n => [n.id, n]));
+  constructor(readonly nodes: readonly ConcreteNode[]) {
+    this.nodesMap = new Map(nodes.map((n) => [n.id, n]));
   }
 
   getPristineNode(id: string): ConcreteNode | undefined {
@@ -77,8 +76,7 @@ export class PipelineOrchestrator {
     return (
       triggerTargets.has(node.id) &&
       !protectedLogicalIds.has(node.id) &&
-      (!node.logicalParentId ||
-        !protectedLogicalIds.has(node.logicalParentId))
+      (!node.logicalParentId || !protectedLogicalIds.has(node.logicalParentId))
     );
   }
 
@@ -87,10 +85,7 @@ export class PipelineOrchestrator {
       for (const procDef of pipeline.processors) {
         if (!this.instantiatedProcessors.has(procDef.processorId)) {
           const factory = this.registry.getProcessor(procDef.processorId);
-          const instance = factory.create(
-            this.env,
-            procDef.options || {},
-          );
+          const instance = factory.create(this.env, procDef.options || {});
           this.instantiatedProcessors.set(procDef.processorId, instance);
         }
       }
@@ -102,10 +97,7 @@ export class PipelineOrchestrator {
     for (const workerDef of this.config.workers) {
       if (!this.instantiatedWorkers.has(workerDef.workerId)) {
         const factory = this.registry.getWorker(workerDef.workerId);
-        const instance = factory.create(
-          this.env,
-          workerDef.options || {},
-        );
+        const instance = factory.create(this.env, workerDef.options || {});
         this.instantiatedWorkers.set(workerDef.workerId, instance);
       }
     }
@@ -150,7 +142,9 @@ export class PipelineOrchestrator {
           const inboxSnapshot = new InboxSnapshotImpl(
             this.env.inbox.getMessages() || [],
           );
-          const targets = event.nodes.filter(n => event.targetNodeIds.has(n.id));
+          const targets = event.nodes.filter((n) =>
+            event.targetNodeIds.has(n.id),
+          );
           // Fire and forget
           worker.execute({ targets, inbox: inboxSnapshot }).catch((e) => {
             debugLogger.error(`Worker ${worker.name} failed onNodesAdded:`, e);
@@ -166,10 +160,15 @@ export class PipelineOrchestrator {
           const inboxSnapshot = new InboxSnapshotImpl(
             this.env.inbox.getMessages() || [],
           );
-          const targets = event.nodes.filter(n => event.targetNodeIds.has(n.id));
+          const targets = event.nodes.filter((n) =>
+            event.targetNodeIds.has(n.id),
+          );
           // Fire and forget
           worker.execute({ targets, inbox: inboxSnapshot }).catch((e) => {
-            debugLogger.error(`Worker ${worker.name} failed onNodesAgedOut:`, e);
+            debugLogger.error(
+              `Worker ${worker.name} failed onNodesAgedOut:`,
+              e,
+            );
           });
         }
       }
