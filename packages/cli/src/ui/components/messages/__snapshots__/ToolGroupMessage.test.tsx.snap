@@ -80,7 +80,7 @@ exports[`<ToolGroupMessage /> > Golden Snapshots > renders mixed tool calls incl
 "
   Testing Topic: This is the description
 
-╭──────────────────────────────────────────────────────────────────────────╮
+│                                                                          │
 │ ✓  read_file Read a file                                                 │
 │                                                                          │
 │ Test result                                                              │
@@ -145,6 +145,8 @@ exports[`<ToolGroupMessage /> > Golden Snapshots > renders two tool groups where
 exports[`<ToolGroupMessage /> > Golden Snapshots > renders update_topic tool call using TopicMessage > update_topic_tool 1`] = `
 "
   Testing Topic: This is the description
+
+╰──────────────────────────────────────────────────────────────────────────╯
 "
 `;
 
