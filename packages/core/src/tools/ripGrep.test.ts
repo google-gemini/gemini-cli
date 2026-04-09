@@ -32,10 +32,17 @@ import { spawn, type ChildProcess } from 'node:child_process';
 import { PassThrough, Readable } from 'node:stream';
 import EventEmitter from 'node:events';
 import { downloadRipGrep } from '@joshua.litt/get-ripgrep';
+import which from 'which';
 import { createMockMessageBus } from '../test-utils/mock-message-bus.js';
 // Mock dependencies for canUseRipgrep
 vi.mock('@joshua.litt/get-ripgrep', () => ({
   downloadRipGrep: vi.fn(),
+}));
+
+vi.mock('which', () => ({
+  default: {
+    sync: vi.fn(),
+  },
 }));
 
 // Mock child_process for ripgrep calls
@@ -45,6 +52,7 @@ vi.mock('child_process', () => ({
 
 const mockSpawn = vi.mocked(spawn);
 const downloadRipGrepMock = vi.mocked(downloadRipGrep);
+const whichSyncMock = vi.mocked(which.sync);
 const originalGetGlobalBinDir = Storage.getGlobalBinDir.bind(Storage);
 const storageSpy = vi.spyOn(Storage, 'getGlobalBinDir');
 
@@ -59,6 +67,7 @@ describe('canUseRipgrep', () => {
   beforeEach(async () => {
     downloadRipGrepMock.mockReset();
     downloadRipGrepMock.mockResolvedValue(undefined);
+    whichSyncMock.mockReset();
     tempRootDir = await fs.mkdtemp(path.join(os.tmpdir(), 'ripgrep-bin-'));
     binDir = path.join(tempRootDir, 'bin');
     await fs.mkdir(binDir, { recursive: true });
@@ -76,6 +85,16 @@ describe('canUseRipgrep', () => {
 
     const result = await canUseRipgrep();
     expect(result).toBe(true);
+    expect(downloadRipGrepMock).not.toHaveBeenCalled();
+  });
+
+  it('should return true using system rg when managed binary is missing', async () => {
+    whichSyncMock.mockReturnValue('/usr/bin/rg');
+
+    const result = await canUseRipgrep();
+
+    expect(result).toBe(true);
+    expect(whichSyncMock).toHaveBeenCalledWith('rg', { nothrow: true });
     expect(downloadRipGrepMock).not.toHaveBeenCalled();
   });
 
@@ -141,6 +160,7 @@ describe('ensureRgPath', () => {
   beforeEach(async () => {
     downloadRipGrepMock.mockReset();
     downloadRipGrepMock.mockResolvedValue(undefined);
+    whichSyncMock.mockReset();
     tempRootDir = await fs.mkdtemp(path.join(os.tmpdir(), 'ripgrep-bin-'));
     binDir = path.join(tempRootDir, 'bin');
     await fs.mkdir(binDir, { recursive: true });
@@ -158,6 +178,17 @@ describe('ensureRgPath', () => {
 
     const rgPath = await ensureRgPath();
     expect(rgPath).toBe(existingPath);
+    expect(downloadRipGrep).not.toHaveBeenCalled();
+  });
+
+  it('should return system rg path when managed binary is missing', async () => {
+    const systemRgPath = '/usr/bin/rg';
+    whichSyncMock.mockReturnValue(systemRgPath);
+
+    const rgPath = await ensureRgPath();
+
+    expect(rgPath).toBe(systemRgPath);
+    expect(whichSyncMock).toHaveBeenCalledWith('rg', { nothrow: true });
     expect(downloadRipGrep).not.toHaveBeenCalled();
   });
 
@@ -268,6 +299,7 @@ describe('RipGrepTool', () => {
   beforeEach(async () => {
     downloadRipGrepMock.mockReset();
     downloadRipGrepMock.mockResolvedValue(undefined);
+    whichSyncMock.mockReset();
     mockSpawn.mockReset();
     mockSpawn.mockImplementation(createMockSpawn());
     tempBinRoot = await fs.mkdtemp(path.join(os.tmpdir(), 'ripgrep-bin-'));

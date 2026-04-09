@@ -37,6 +37,7 @@ import {
 import { RIP_GREP_DEFINITION } from './definitions/coreTools.js';
 import { resolveToolDeclaration } from './definitions/resolver.js';
 import { type GrepMatch, formatGrepResults } from './grep-utils.js';
+import which from 'which';
 
 function getRgCandidateFilenames(): readonly string[] {
   return process.platform === 'win32' ? ['rg.exe', 'rg'] : ['rg'];
@@ -50,6 +51,11 @@ async function resolveExistingRgPath(): Promise<string | null> {
       return candidatePath;
     }
   }
+
+  // Fallback: managed binary unavailable or incompatible (e.g. Termux/non-FHS)
+  const systemRg = which.sync('rg', { nothrow: true });
+  if (systemRg) return systemRg;
+
   return null;
 }
 
