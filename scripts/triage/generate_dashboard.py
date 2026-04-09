@@ -139,6 +139,7 @@ def get_reviewer_info(pr):
                     human_reviewers.add(login)
             elif rr['__typename'] == 'Team':
                 slug = rr['slug']
+                # Strip repo name if present in slug
                 simple_slug = slug.split('/')[-1]
                 if simple_slug in ONCALLER_TEAMS:
                     requested_special_teams.add(simple_slug)
@@ -241,7 +242,8 @@ def main():
                 oncaller_attention.append({
                     "issue_md": f"[#{issue_no} {issue_title}]({issue_url})",
                     "pr_no": pr['number'], "pr_url": pr['url'],
-                    "teams": special_teams, "reviewers": reviewers, "last_update": latest_pr_activity_iso[:10]
+                    "teams": special_teams, "reviewers": reviewers, "last_update": latest_pr_activity_iso[:10],
+                    "issue_no": issue_no
                 })
                 categorized = True
                 break
@@ -274,6 +276,9 @@ def main():
                     stale_assignments.append({"issue_md": f"[#{issue_no} {issue_title}]({issue_url})", "assignees": assignees, "days_stale": days_idle})
                 else:
                     recently_assigned_no_pr.append({"issue_md": f"[#{issue_no} {issue_title}]({issue_url})", "assignees": assignees, "last_update": issue['updatedAt'][:10]})
+
+    # Sorting
+    oncaller_attention.sort(key=lambda x: (", ".join(x['teams']), x['issue_no']))
 
     sum_categories = len(oncaller_attention) + len(initial_pickup) + len(followup_needed) + len(waiting_for_author) + len(available_pickup) + len(active_blocked_prs) + len(recently_assigned_no_pr) + len(stale_assignments) + len(blocked_stale_prs)
     
@@ -332,7 +337,7 @@ def main():
 
     md += "\n---\n*Dashboard maintained by automated triage script.*"
     with open("REVIEWS.md", "w") as f: f.write(md)
-    print(f"Generated granular dashboard for {len(all_issues)} issues.")
+    print(f"Generated dashboard with sorted oncaller table.")
 
 if __name__ == "__main__":
     main()
