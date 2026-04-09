@@ -9,11 +9,22 @@ import { act } from 'react';
 import { renderHookWithProviders } from '../../test-utils/render.js';
 import { createMockSettings } from '../../test-utils/settings.js';
 import { waitFor } from '../../test-utils/async.js';
-import { vi, afterAll, beforeAll, type Mock } from 'vitest';
+import type { Mock } from 'vitest';
+import {
+  vi,
+  afterAll,
+  beforeAll,
+  describe,
+  it,
+  expect,
+  beforeEach,
+  afterEach,
+} from 'vitest';
 import {
   useKeypressContext,
   ESC_TIMEOUT,
   FAST_RETURN_TIMEOUT,
+  KeypressPriority,
   type Key,
 } from './KeypressContext.js';
 import { terminalCapabilityManager } from '../utils/terminalCapabilityManager.js';
@@ -259,6 +270,48 @@ describe('KeypressContext', () => {
       );
     });
 
+    it('should stop propagation when a higher priority handler returns true', async () => {
+      const higherPriorityHandler = vi.fn(() => true);
+      const lowerPriorityHandler = vi.fn();
+      const { result } = await renderHookWithProviders(() =>
+        useKeypressContext(),
+      );
+
+      act(() => {
+        result.current.subscribe(higherPriorityHandler, KeypressPriority.High);
+        result.current.subscribe(lowerPriorityHandler, KeypressPriority.Normal);
+      });
+
+      act(() => stdin.write('\x1b[27u'));
+
+      expect(higherPriorityHandler).toHaveBeenCalledWith(
+        expect.objectContaining({ name: 'escape' }),
+      );
+      expect(lowerPriorityHandler).not.toHaveBeenCalled();
+    });
+
+    it('should continue propagation when a higher priority handler does not consume the event', async () => {
+      const higherPriorityHandler = vi.fn(() => false);
+      const lowerPriorityHandler = vi.fn();
+      const { result } = await renderHookWithProviders(() =>
+        useKeypressContext(),
+      );
+
+      act(() => {
+        result.current.subscribe(higherPriorityHandler, KeypressPriority.High);
+        result.current.subscribe(lowerPriorityHandler, KeypressPriority.Normal);
+      });
+
+      act(() => stdin.write('\x1b[27u'));
+
+      expect(higherPriorityHandler).toHaveBeenCalledWith(
+        expect.objectContaining({ name: 'escape' }),
+      );
+      expect(lowerPriorityHandler).toHaveBeenCalledWith(
+        expect.objectContaining({ name: 'escape' }),
+      );
+    });
+
     it('should handle double Escape', async () => {
       const keyHandler = vi.fn();
       const { result } = await renderHookWithProviders(() =>
@@ -386,6 +439,80 @@ describe('KeypressContext', () => {
         );
       },
     );
+  });
+
+  describe('Windows Terminal Backspace handling', () => {
+    afterEach(() => {
+      vi.unstubAllEnvs();
+    });
+
+    it('should NOT treat \\b as ctrl when WT_SESSION is NOT present and OS is not Windows_NT', async () => {
+      vi.stubEnv('WT_SESSION', '');
+      vi.stubEnv('OS', 'Linux');
+      const { keyHandler } = await setupKeypressTest();
+
+      act(() => {
+        stdin.write('\b');
+      });
+
+      expect(keyHandler).toHaveBeenCalledWith(
+        expect.objectContaining({
+          name: 'backspace',
+          ctrl: false,
+        }),
+      );
+    });
+
+    it('should treat \\b as ctrl when WT_SESSION IS present (even if not Windows_NT)', async () => {
+      vi.stubEnv('WT_SESSION', 'some-id');
+      vi.stubEnv('OS', 'Linux');
+      const { keyHandler } = await setupKeypressTest();
+
+      act(() => {
+        stdin.write('\b');
+      });
+
+      expect(keyHandler).toHaveBeenCalledWith(
+        expect.objectContaining({
+          name: 'backspace',
+          ctrl: true,
+        }),
+      );
+    });
+
+    it('should treat \\b as ctrl when OS is Windows_NT', async () => {
+      vi.stubEnv('WT_SESSION', '');
+      vi.stubEnv('OS', 'Windows_NT');
+      const { keyHandler } = await setupKeypressTest();
+
+      act(() => {
+        stdin.write('\b');
+      });
+
+      expect(keyHandler).toHaveBeenCalledWith(
+        expect.objectContaining({
+          name: 'backspace',
+          ctrl: true,
+        }),
+      );
+    });
+
+    it('should treat \\x7f as regular backspace regardless of WT_SESSION or OS', async () => {
+      vi.stubEnv('WT_SESSION', 'some-id');
+      vi.stubEnv('OS', 'Windows_NT');
+      const { keyHandler } = await setupKeypressTest();
+
+      act(() => {
+        stdin.write('\x7f');
+      });
+
+      expect(keyHandler).toHaveBeenCalledWith(
+        expect.objectContaining({
+          name: 'backspace',
+          ctrl: false,
+        }),
+      );
+    });
   });
 
   describe('paste mode', () => {

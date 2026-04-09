@@ -92,6 +92,7 @@ vi.mock('../tools/tool-registry', () => {
   ToolRegistryMock.prototype.sortTools = vi.fn();
   ToolRegistryMock.prototype.getAllTools = vi.fn(() => []); // Mock methods if needed
   ToolRegistryMock.prototype.getTool = vi.fn();
+  ToolRegistryMock.prototype.getAllToolNames = vi.fn(() => []);
   ToolRegistryMock.prototype.getFunctionDeclarations = vi.fn(() => []);
   return { ToolRegistry: ToolRegistryMock };
 });
@@ -185,6 +186,7 @@ vi.mock('../agents/registry.js', () => {
   const AgentRegistryMock = vi.fn();
   AgentRegistryMock.prototype.initialize = vi.fn();
   AgentRegistryMock.prototype.getAllDefinitions = vi.fn(() => []);
+  AgentRegistryMock.prototype.getAllDiscoveredAgentNames = vi.fn(() => []);
   AgentRegistryMock.prototype.getDefinition = vi.fn();
   return { AgentRegistry: AgentRegistryMock };
 });
@@ -219,12 +221,13 @@ vi.mock('../utils/fetch.js', () => ({
   setGlobalProxy: mockSetGlobalProxy,
 }));
 
-vi.mock('../services/contextManager.js', () => ({
-  ContextManager: vi.fn().mockImplementation(() => ({
+vi.mock('../context/memoryContextManager.js', () => ({
+  MemoryContextManager: vi.fn().mockImplementation(() => ({
     refresh: vi.fn(),
     getGlobalMemory: vi.fn().mockReturnValue(''),
     getExtensionMemory: vi.fn().mockReturnValue(''),
     getEnvironmentMemory: vi.fn().mockReturnValue(''),
+    getUserProjectMemory: vi.fn().mockReturnValue(''),
     getLoadedPaths: vi.fn().mockReturnValue(new Set()),
   })),
 }));
@@ -234,7 +237,7 @@ import { tokenLimit } from '../core/tokenLimits.js';
 import { getCodeAssistServer } from '../code_assist/codeAssist.js';
 import { getExperiments } from '../code_assist/experiments/experiments.js';
 import type { CodeAssistServer } from '../code_assist/server.js';
-import { ContextManager } from '../services/contextManager.js';
+import { MemoryContextManager } from '../context/memoryContextManager.js';
 import { UserTierId } from '../code_assist/types.js';
 import type {
   ModelConfigService,
@@ -249,6 +252,10 @@ vi.mock('../core/tokenLimits.js', () => ({
 }));
 vi.mock('../code_assist/codeAssist.js');
 vi.mock('../code_assist/experiments/experiments.js');
+
+afterEach(() => {
+  vi.clearAllMocks();
+});
 
 describe('Server Config (config.ts)', () => {
   const MODEL = DEFAULT_GEMINI_MODEL;
@@ -586,6 +593,107 @@ describe('Server Config (config.ts)', () => {
           },
         } as unknown as ConfigParameters);
         expect(await config.getResolvedClassifierThreshold()).toBe(90);
+      });
+    });
+
+    describe('getGemini31LaunchedSync', () => {
+      it.each([AuthType.USE_GEMINI, AuthType.USE_VERTEX_AI, AuthType.GATEWAY])(
+        'should return true for %s',
+        async (authType) => {
+          const config = new Config(baseParams);
+          vi.mocked(createContentGeneratorConfig).mockResolvedValue({
+            authType,
+          });
+          await config.refreshAuth(authType);
+          expect(config.getGemini31LaunchedSync()).toBe(true);
+        },
+      );
+
+      it('should fallback to experiments for other auth types', async () => {
+        vi.mocked(getExperiments).mockResolvedValue({
+          experimentIds: [],
+          flags: {
+            [ExperimentFlags.GEMINI_3_1_PRO_LAUNCHED]: {
+              flagId: ExperimentFlags.GEMINI_3_1_PRO_LAUNCHED,
+              boolValue: true,
+            },
+          },
+        });
+
+        const config = new Config(baseParams);
+
+        vi.mocked(createContentGeneratorConfig).mockResolvedValue({
+          authType: AuthType.LOGIN_WITH_GOOGLE,
+        });
+
+        await config.refreshAuth(AuthType.LOGIN_WITH_GOOGLE);
+        expect(config.getGemini31LaunchedSync()).toBe(true);
+      });
+    });
+
+    describe('getGemini31FlashLiteLaunchedSync', () => {
+      it.each([AuthType.USE_GEMINI, AuthType.USE_VERTEX_AI, AuthType.GATEWAY])(
+        'should return true for %s',
+        async (authType) => {
+          const config = new Config(baseParams);
+          vi.mocked(createContentGeneratorConfig).mockResolvedValue({
+            authType,
+          });
+          await config.refreshAuth(authType);
+          expect(config.getGemini31FlashLiteLaunchedSync()).toBe(true);
+        },
+      );
+    });
+
+    describe('getRequestTimeoutMs', () => {
+      it('should return undefined if the flag is not set', () => {
+        const config = new Config(baseParams);
+        expect(config.getRequestTimeoutMs()).toBeUndefined();
+      });
+
+      it('should return timeout in milliseconds if flag is set', () => {
+        const config = new Config({
+          ...baseParams,
+          experiments: {
+            flags: {
+              [ExperimentFlags.DEFAULT_REQUEST_TIMEOUT]: {
+                intValue: '30',
+              },
+            },
+            experimentIds: [],
+          },
+        } as unknown as ConfigParameters);
+        expect(config.getRequestTimeoutMs()).toBe(30000);
+      });
+
+      it('should return undefined if intValue is not a valid integer', () => {
+        const config = new Config({
+          ...baseParams,
+          experiments: {
+            flags: {
+              [ExperimentFlags.DEFAULT_REQUEST_TIMEOUT]: {
+                intValue: 'abc',
+              },
+            },
+            experimentIds: [],
+          },
+        } as unknown as ConfigParameters);
+        expect(config.getRequestTimeoutMs()).toBeUndefined();
+      });
+
+      it('should return undefined if intValue is negative', () => {
+        const config = new Config({
+          ...baseParams,
+          experiments: {
+            flags: {
+              [ExperimentFlags.DEFAULT_REQUEST_TIMEOUT]: {
+                intValue: '-10',
+              },
+            },
+            experimentIds: [],
+          },
+        } as unknown as ConfigParameters);
+        expect(config.getRequestTimeoutMs()).toBeUndefined();
       });
     });
   });
@@ -1237,124 +1345,6 @@ describe('Server Config (config.ts)', () => {
       expect(wasReadFileToolRegistered).toBe(false);
     });
 
-    it('should register subagents as tools when agents.overrides.codebase_investigator.enabled is true', async () => {
-      const params: ConfigParameters = {
-        ...baseParams,
-        agents: {
-          overrides: {
-            codebase_investigator: { enabled: true },
-          },
-        },
-      };
-      const config = new Config(params);
-
-      const mockAgentDefinition = {
-        name: 'codebase_investigator',
-        description: 'Agent 1',
-        instructions: 'Inst 1',
-      };
-
-      const AgentRegistryMock = (
-        (await vi.importMock('../agents/registry.js')) as {
-          AgentRegistry: Mock;
-        }
-      ).AgentRegistry;
-      AgentRegistryMock.prototype.getDefinition.mockReturnValue(
-        mockAgentDefinition,
-      );
-      AgentRegistryMock.prototype.getAllDefinitions.mockReturnValue([
-        mockAgentDefinition,
-      ]);
-
-      const SubAgentToolMock = (
-        (await vi.importMock('../agents/subagent-tool.js')) as {
-          SubagentTool: Mock;
-        }
-      ).SubagentTool;
-
-      await config.initialize();
-
-      const registerToolMock = (
-        (await vi.importMock('../tools/tool-registry')) as {
-          ToolRegistry: { prototype: { registerTool: Mock } };
-        }
-      ).ToolRegistry.prototype.registerTool;
-
-      expect(SubAgentToolMock).toHaveBeenCalledTimes(1);
-      expect(SubAgentToolMock).toHaveBeenCalledWith(
-        expect.anything(), // AgentRegistry
-        config,
-        expect.anything(), // MessageBus
-      );
-
-      const calls = registerToolMock.mock.calls;
-      const registeredWrappers = calls.filter(
-        (call) => call[0] instanceof SubAgentToolMock,
-      );
-      expect(registeredWrappers).toHaveLength(1);
-    });
-
-    it('should register subagents as tools even when they are not in allowedTools', async () => {
-      const params: ConfigParameters = {
-        ...baseParams,
-        allowedTools: ['read_file'], // codebase_investigator is NOT here
-        agents: {
-          overrides: {
-            codebase_investigator: { enabled: true },
-          },
-        },
-      };
-      const config = new Config(params);
-
-      const mockAgentDefinition = {
-        name: 'codebase_investigator',
-        description: 'Agent 1',
-        instructions: 'Inst 1',
-      };
-
-      const AgentRegistryMock = (
-        (await vi.importMock('../agents/registry.js')) as {
-          AgentRegistry: Mock;
-        }
-      ).AgentRegistry;
-      AgentRegistryMock.prototype.getAllDefinitions.mockReturnValue([
-        mockAgentDefinition,
-      ]);
-
-      const SubAgentToolMock = (
-        (await vi.importMock('../agents/subagent-tool.js')) as {
-          SubagentTool: Mock;
-        }
-      ).SubagentTool;
-
-      await config.initialize();
-
-      expect(SubAgentToolMock).toHaveBeenCalled();
-    });
-
-    it('should not register subagents as tools when agents are disabled', async () => {
-      const params: ConfigParameters = {
-        ...baseParams,
-        agents: {
-          overrides: {
-            codebase_investigator: { enabled: false },
-            cli_help: { enabled: false },
-          },
-        },
-      };
-      const config = new Config(params);
-
-      const SubAgentToolMock = (
-        (await vi.importMock('../agents/subagent-tool.js')) as {
-          SubagentTool: Mock;
-        }
-      ).SubagentTool;
-
-      await config.initialize();
-
-      expect(SubAgentToolMock).not.toHaveBeenCalled();
-    });
-
     it('should register EnterPlanModeTool and ExitPlanModeTool when plan is enabled', async () => {
       const params: ConfigParameters = {
         ...baseParams,
@@ -1591,6 +1581,22 @@ describe('Server Config (config.ts)', () => {
       expect(browserConfig.customConfig.visualModel).toBe(
         'custom-visual-model',
       );
+      expect(browserConfig.customConfig.maxActionsPerTask).toBe(100); // default
+    });
+
+    it('should return custom maxActionsPerTask', () => {
+      const params: ConfigParameters = {
+        ...baseParams,
+        agents: {
+          browser: {
+            maxActionsPerTask: 50,
+          },
+        },
+      };
+      const config = new Config(params);
+      const browserConfig = config.getBrowserAgentConfig();
+
+      expect(browserConfig.customConfig.maxActionsPerTask).toBe(50);
     });
 
     it('should apply defaults for partial custom config', () => {
@@ -1625,7 +1631,9 @@ describe('Server Config (config.ts)', () => {
       });
 
       expect(config.getSandboxEnabled()).toBe(false);
-      expect(config.getSandboxAllowedPaths()).toEqual([]);
+      expect(config.getSandboxAllowedPaths()).toEqual([
+        Storage.getGlobalTempDir(),
+      ]);
       expect(config.getSandboxNetworkAccess()).toBe(false);
     });
 
@@ -1643,7 +1651,11 @@ describe('Server Config (config.ts)', () => {
       });
 
       expect(config.getSandboxEnabled()).toBe(true);
-      expect(config.getSandboxAllowedPaths()).toEqual(['/tmp/foo', '/var/bar']);
+      expect(config.getSandboxAllowedPaths()).toEqual([
+        '/tmp/foo',
+        '/var/bar',
+        Storage.getGlobalTempDir(),
+      ]);
       expect(config.getSandboxNetworkAccess()).toBe(true);
       expect(config.getSandbox()?.command).toBe('docker');
       expect(config.getSandbox()?.image).toBe('my-image');
@@ -1660,9 +1672,48 @@ describe('Server Config (config.ts)', () => {
       });
 
       expect(config.getSandboxEnabled()).toBe(true);
-      expect(config.getSandboxAllowedPaths()).toEqual(['/only/this']);
+      expect(config.getSandboxAllowedPaths()).toEqual([
+        '/only/this',
+        Storage.getGlobalTempDir(),
+      ]);
       expect(config.getSandboxNetworkAccess()).toBe(false);
     });
+
+    it('lazily resolves forbidden paths when first accessed', async () => {
+      const config = new Config({
+        ...baseParams,
+        sandbox: { enabled: true, command: 'docker' },
+      });
+
+      const fileService = config.getFileService();
+      vi.spyOn(fileService, 'getIgnoredPaths').mockResolvedValue([
+        '/tmp/forbidden',
+      ]);
+
+      await config.initialize();
+      expect(fileService.getIgnoredPaths).not.toHaveBeenCalled();
+
+      // Access resolved paths via the internal resolver
+      const resolved = await (
+        config as unknown as {
+          getSandboxForbiddenPaths: () => Promise<string[]>;
+        }
+      ).getSandboxForbiddenPaths();
+
+      expect(fileService.getIgnoredPaths).toHaveBeenCalled();
+      expect(resolved).toEqual(['/tmp/forbidden']);
+    });
+  });
+
+  it('should have independent TopicState across instances', () => {
+    const config1 = new Config(baseParams);
+    const config2 = new Config(baseParams);
+
+    config1.topicState.setTopic('Topic 1');
+    config2.topicState.setTopic('Topic 2');
+
+    expect(config1.topicState.getTopic()).toBe('Topic 1');
+    expect(config2.topicState.getTopic()).toBe('Topic 2');
   });
 });
 
@@ -1768,6 +1819,12 @@ describe('setApprovalMode with folder trust', () => {
     const config = new Config(baseParams);
     vi.spyOn(config, 'isTrustedFolder').mockReturnValue(false);
     expect(() => config.setApprovalMode(ApprovalMode.DEFAULT)).not.toThrow();
+  });
+
+  it('should NOT throw an error when setting PLAN mode in an untrusted folder', () => {
+    const config = new Config(baseParams);
+    vi.spyOn(config, 'isTrustedFolder').mockReturnValue(false);
+    expect(() => config.setApprovalMode(ApprovalMode.PLAN)).not.toThrow();
   });
 
   it('should NOT throw an error when setting any mode in a trusted folder', () => {
@@ -2073,8 +2130,18 @@ describe('BaseLlmClient Lifecycle', () => {
     usageStatisticsEnabled: false,
   };
 
+  it('should throw an error if getBaseLlmClient is called before experiments have been fetched', () => {
+    const config = new Config(baseParams);
+    // By default on a new Config instance, experiments are undefined
+    expect(() => config.getBaseLlmClient()).toThrow(
+      'BaseLlmClient not initialized. Ensure experiments have been fetched and configuration is ready.',
+    );
+  });
+
   it('should throw an error if getBaseLlmClient is called before refreshAuth', () => {
     const config = new Config(baseParams);
+    // Explicitly set experiments to avoid triggering the new missing-experiments error
+    config.setExperiments({ flags: {}, experimentIds: [] });
     expect(() => config.getBaseLlmClient()).toThrow(
       'BaseLlmClient not initialized. Ensure authentication has occurred and ContentGenerator is ready.',
     );
@@ -3026,25 +3093,26 @@ describe('Config Quota & Preview Model Access', () => {
 
 describe('Config JIT Initialization', () => {
   let config: Config;
-  let mockContextManager: ContextManager;
+  let mockMemoryContextManager: MemoryContextManager;
 
   beforeEach(() => {
     vi.clearAllMocks();
-    mockContextManager = {
+    mockMemoryContextManager = {
       refresh: vi.fn(),
       getGlobalMemory: vi.fn().mockReturnValue('Global Memory'),
       getExtensionMemory: vi.fn().mockReturnValue('Extension Memory'),
       getEnvironmentMemory: vi
         .fn()
         .mockReturnValue('Environment Memory\n\nMCP Instructions'),
+      getUserProjectMemory: vi.fn().mockReturnValue(''),
       getLoadedPaths: vi.fn().mockReturnValue(new Set(['/path/to/GEMINI.md'])),
-    } as unknown as ContextManager;
-    (ContextManager as unknown as Mock).mockImplementation(
-      () => mockContextManager,
+    } as unknown as MemoryContextManager;
+    (MemoryContextManager as unknown as Mock).mockImplementation(
+      () => mockMemoryContextManager,
     );
   });
 
-  it('should initialize ContextManager, load memory, and delegate to it when experimentalJitContext is enabled', async () => {
+  it('should initialize MemoryContextManager, load memory, and delegate to it when experimentalJitContext is enabled', async () => {
     const params: ConfigParameters = {
       sessionId: 'test-session',
       targetDir: '/tmp/test',
@@ -3058,12 +3126,13 @@ describe('Config JIT Initialization', () => {
     config = new Config(params);
     await config.initialize();
 
-    expect(ContextManager).toHaveBeenCalledWith(config);
-    expect(mockContextManager.refresh).toHaveBeenCalled();
+    expect(MemoryContextManager).toHaveBeenCalledWith(config);
+    expect(mockMemoryContextManager.refresh).toHaveBeenCalled();
     expect(config.getUserMemory()).toEqual({
       global: 'Global Memory',
       extension: 'Extension Memory',
       project: 'Environment Memory\n\nMCP Instructions',
+      userProjectMemory: '',
     });
 
     // Tier 1: system instruction gets only global memory
@@ -3081,12 +3150,12 @@ describe('Config JIT Initialization', () => {
     expect(sessionMemory).toContain('</project_context>');
     expect(sessionMemory).toContain('</loaded_context>');
 
-    // Verify state update (delegated to ContextManager)
+    // Verify state update (delegated to MemoryContextManager)
     expect(config.getGeminiMdFileCount()).toBe(1);
     expect(config.getGeminiMdFilePaths()).toEqual(['/path/to/GEMINI.md']);
   });
 
-  it('should NOT initialize ContextManager when experimentalJitContext is disabled', async () => {
+  it('should NOT initialize MemoryContextManager when experimentalJitContext is disabled', async () => {
     const params: ConfigParameters = {
       sessionId: 'test-session',
       targetDir: '/tmp/test',
@@ -3100,7 +3169,7 @@ describe('Config JIT Initialization', () => {
     config = new Config(params);
     await config.initialize();
 
-    expect(ContextManager).not.toHaveBeenCalled();
+    expect(MemoryContextManager).not.toHaveBeenCalled();
     expect(config.getUserMemory()).toBe('Initial Memory');
   });
 
@@ -3445,5 +3514,31 @@ describe('ConfigSchema validation', () => {
       expect(result.data.sandbox?.allowedPaths).toEqual([]);
       expect(result.data.sandbox?.networkAccess).toBe(false);
     }
+  });
+});
+
+describe('ADKSettings', () => {
+  const baseParams: ConfigParameters = {
+    sessionId: 'test',
+    targetDir: '.',
+    debugMode: false,
+    model: 'test-model',
+    cwd: '.',
+  };
+
+  it('should default agentSessionNoninteractiveEnabled to false', () => {
+    const config = new Config(baseParams);
+    expect(config.getAgentSessionNoninteractiveEnabled()).toBe(false);
+  });
+
+  it('should return provided agentSessionNoninteractiveEnabled', () => {
+    const params: ConfigParameters = {
+      ...baseParams,
+      adk: {
+        agentSessionNoninteractiveEnabled: true,
+      },
+    };
+    const config = new Config(params);
+    expect(config.getAgentSessionNoninteractiveEnabled()).toBe(true);
   });
 });

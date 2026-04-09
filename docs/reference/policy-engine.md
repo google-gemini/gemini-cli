@@ -29,13 +29,12 @@ To create your first policy:
     ```toml
     [[rule]]
     toolName = "run_shell_command"
-    commandPrefix = "git status"
-    decision = "allow"
+    commandPrefix = "rm -rf"
+    decision = "deny"
     priority = 100
     ```
 3.  **Run a command** that triggers the policy (e.g., ask Gemini CLI to
-    `git status`). The tool will now execute automatically without prompting for
-    confirmation.
+    `rm -rf /`). The tool will now be blocked automatically.
 
 ## Core concepts
 
@@ -143,25 +142,26 @@ engine transforms this into a final priority using the following formula:
 
 This system guarantees that:
 
-- Admin policies always override User, Workspace, and Default policies.
+- Admin policies always override User, Workspace, and Default policies (defined
+  in policy TOML files).
 - User policies override Workspace and Default policies.
 - Workspace policies override Default policies.
 - You can still order rules within a single tier with fine-grained control.
 
 For example:
 
-- A `priority: 50` rule in a Default policy file becomes `1.050`.
-- A `priority: 10` rule in a Workspace policy policy file becomes `2.010`.
-- A `priority: 100` rule in a User policy file becomes `3.100`.
-- A `priority: 20` rule in an Admin policy file becomes `4.020`.
+- A `priority: 50` rule in a Default policy TOML becomes `1.050`.
+- A `priority: 10` rule in a Workspace policy TOML becomes `2.010`.
+- A `priority: 100` rule in a User policy TOML becomes `3.100`.
+- A `priority: 20` rule in an Admin policy TOML becomes `4.020`.
 
 ### Approval modes
 
 Approval modes allow the policy engine to apply different sets of rules based on
-the CLI's operational mode. A rule can be associated with one or more modes
-(e.g., `yolo`, `autoEdit`, `plan`). The rule will only be active if the CLI is
-running in one of its specified modes. If a rule has no modes specified, it is
-always active.
+the CLI's operational mode. A rule in a TOML policy file can be associated with
+one or more modes (e.g., `yolo`, `autoEdit`, `plan`). The rule will only be
+active if the CLI is running in one of its specified modes. If a rule has no
+modes specified, it is always active.
 
 - `default`: The standard interactive mode where most write tools require
   confirmation.
@@ -171,6 +171,24 @@ always active.
   [Customizing Plan Mode Policies](../cli/plan-mode.md#customizing-policies).
 - `yolo`: A mode where all tools are auto-approved (use with extreme caution).
 
+To maintain the integrity of Plan Mode as a safe research environment,
+persistent tool approvals are context-aware. When you select **"Allow for all
+future sessions"**, the policy engine explicitly includes the current mode and
+all more permissive modes in the hierarchy (`plan` < `default` < `autoEdit` <
+`yolo`).
+
+- **Approvals in `plan` mode**: These represent an intentional choice to trust a
+  tool globally. The resulting rule explicitly includes all modes (`plan`,
+  `default`, `autoEdit`, and `yolo`).
+- **Approvals in other modes**: These only apply to the current mode and those
+  more permissive. For example:
+  - An approval granted in **`default`** mode applies to `default`, `autoEdit`,
+    and `yolo`.
+  - An approval granted in **`autoEdit`** mode applies to `autoEdit` and `yolo`.
+  - An approval granted in **`yolo`** mode applies only to `yolo`. This ensures
+    that trust flows correctly to more permissive environments while maintaining
+    the safety of more restricted modes like `plan`.
+
 ## Rule matching
 
 When a tool call is made, the engine checks it against all active rules,
@@ -179,8 +197,8 @@ outcome.
 
 A rule matches a tool call if all of its conditions are met:
 
-1.  **Tool name**: The `toolName` in the rule must match the name of the tool
-    being called.
+1.  **Tool name**: The `toolName` in the TOML rule must match the name of the
+    tool being called.
     - **Wildcards**: You can use wildcards like `*`, `mcp_server_*`, or
       `mcp_*_toolName` to match multiple tools. See [Tool Name](#tool-name) for
       details.
@@ -264,7 +282,7 @@ toolName = "run_shell_command"
 
 # (Optional) The name of a subagent. If provided, the rule only applies to tool
 # calls made by this specific subagent.
-subagent = "generalist"
+subagent = "codebase_investigator"
 
 # (Optional) The name of an MCP server. Can be combined with toolName
 # to form a composite FQN internally like "mcp_mcpName_toolName".
@@ -301,15 +319,24 @@ priority = 10
 # (Optional) A custom message to display when a tool call is denied by this
 # rule. This message is returned to the model and user,
 # useful for explaining *why* it was denied.
-deny_message = "Deletion is permanent"
+denyMessage = "Deletion is permanent"
 
 # (Optional) An array of approval modes where this rule is active.
-modes = ["autoEdit"]
+# If omitted or empty, the rule applies to all modes.
+modes = ["default", "autoEdit", "yolo"]
 
 # (Optional) A boolean to restrict the rule to interactive (true) or
 # non-interactive (false) environments.
 # If omitted, the rule applies to both.
 interactive = true
+
+# (Optional) If true, lets shell commands use redirection operators
+# (>, >>, <, <<, <<<). By default, the policy engine asks for confirmation
+# when redirection is detected, even if a rule matches the command.
+# This permission is granular; it only applies to the specific rule it's
+# defined in. In chained commands (e.g., cmd1 > file && cmd2), each
+# individual command rule must permit redirection if it's used.
+allowRedirection = true
 ```
 
 ### Using arrays (lists)
@@ -394,7 +421,7 @@ server.
 mcpName = "untrusted-server"
 decision = "deny"
 priority = 500
-deny_message = "This server is not trusted by the admin."
+denyMessage = "This server is not trusted by the admin."
 ```
 
 **3. Targeting all MCP servers**
@@ -405,23 +432,10 @@ registered MCP server. This is useful for setting category-wide defaults.
 ```toml
 # Ask user for any tool call from any MCP server
 [[rule]]
+toolName = "*"
 mcpName = "*"
 decision = "ask_user"
 priority = 10
-```
-
-**4. Targeting a tool name across all servers**
-
-Use `mcpName = "*"` with a specific `toolName` to target that operation
-regardless of which server provides it.
-
-```toml
-# Allow the `search` tool across all connected MCP servers
-[[rule]]
-mcpName = "*"
-toolName = "search"
-decision = "allow"
-priority = 50
 ```
 
 ## Default policies

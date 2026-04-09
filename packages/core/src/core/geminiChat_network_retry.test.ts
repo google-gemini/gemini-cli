@@ -83,6 +83,7 @@ describe('GeminiChat Network Retries', () => {
     const testMessageBus = { publish: vi.fn(), subscribe: vi.fn() };
 
     mockConfig = {
+      getRequestTimeoutMs: vi.fn().mockReturnValue(undefined),
       get config() {
         return this;
       },
