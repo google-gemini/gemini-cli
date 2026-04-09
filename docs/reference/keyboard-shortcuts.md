@@ -76,24 +76,26 @@ available combinations.
 
 #### Suggestions & Completions
 
-| Command                 | Action                                  | Keys                 |
-| ----------------------- | --------------------------------------- | -------------------- |
-| `suggest.accept`        | Accept the inline suggestion.           | `Tab`<br />`Enter`   |
-| `suggest.focusPrevious` | Move to the previous completion option. | `Up`<br />`Ctrl+P`   |
-| `suggest.focusNext`     | Move to the next completion option.     | `Down`<br />`Ctrl+N` |
-| `suggest.expand`        | Expand an inline suggestion.            | `Right`              |
-| `suggest.collapse`      | Collapse an inline suggestion.          | `Left`               |
+| Command                               | Action                                                                                                 | Keys                 |
+| ------------------------------------- | ------------------------------------------------------------------------------------------------------ | -------------------- |
+| `suggest.accept`                      | Accept the inline suggestion.                                                                          | `Tab`<br />`Enter`   |
+| `suggest.focusPrevious`               | Move to the previous completion option.                                                                | `Up`<br />`Ctrl+P`   |
+| `suggest.focusNext`                   | Move to the next completion option.                                                                    | `Down`<br />`Ctrl+N` |
+| `suggest.expand`                      | Expand an inline suggestion.                                                                           | `Right`              |
+| `suggest.collapse`                    | Collapse an inline suggestion.                                                                         | `Left`               |
+| `suggest.openSelectedMention`         | Open the selected `@` mention target. When the target is a folder, open that folder.                   | `Ctrl+X`             |
+| `suggest.openSelectedMentionLocation` | Open the directory for the selected `@` mention target. When the target is a folder, open that folder. | `Ctrl+Shift+X`       |
 
 #### Text Input
 
-| Command                              | Action                                                                    | Keys                                                                                |
-| ------------------------------------ | ------------------------------------------------------------------------- | ----------------------------------------------------------------------------------- |
-| `input.submit`                       | Submit the current prompt.                                                | `Enter`                                                                             |
-| `input.queueMessage`                 | Queue the current prompt to be processed after the current task finishes. | `Tab`                                                                               |
-| `input.newline`                      | Insert a newline without submitting.                                      | `Ctrl+Enter`<br />`Cmd/Win+Enter`<br />`Alt+Enter`<br />`Shift+Enter`<br />`Ctrl+J` |
-| `input.openExternalEditor`           | Open the current prompt or the plan in an external editor.                | `Ctrl+G`<br />`Ctrl+Shift+G`                                                        |
-| `input.deprecatedOpenExternalEditor` | Deprecated command to open external editor.                               | `Ctrl+X`                                                                            |
-| `input.paste`                        | Paste from the clipboard.                                                 | `Ctrl+V`<br />`Cmd/Win+V`<br />`Alt+V`                                              |
+| Command                              | Action                                                                                                                   | Keys                                                                                |
+| ------------------------------------ | ------------------------------------------------------------------------------------------------------------------------ | ----------------------------------------------------------------------------------- |
+| `input.submit`                       | Submit the current prompt.                                                                                               | `Enter`                                                                             |
+| `input.queueMessage`                 | Queue the current prompt to be processed after the current task finishes.                                                | `Tab`                                                                               |
+| `input.newline`                      | Insert a newline without submitting.                                                                                     | `Ctrl+Enter`<br />`Cmd/Win+Enter`<br />`Alt+Enter`<br />`Shift+Enter`<br />`Ctrl+J` |
+| `input.openExternalEditor`           | Open the current prompt or the plan in an external editor.                                                               | `Ctrl+G`<br />`Ctrl+Shift+G`                                                        |
+| `input.deprecatedOpenExternalEditor` | Legacy alias for opening the current prompt or the plan in an external editor when `@` mention completion is not active. | `Ctrl+X`                                                                            |
+| `input.paste`                        | Paste from the clipboard.                                                                                                | `Ctrl+V`<br />`Cmd/Win+V`<br />`Alt+V`                                              |
 
 #### App Controls
 

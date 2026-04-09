@@ -5,6 +5,7 @@
  */
 
 import * as fs from 'node:fs/promises';
+import * as path from 'node:path';
 import { z } from 'zod';
 import { parse as parseIgnoringComments } from 'comment-json';
 import { isNodeError, Storage } from '@google/gemini-cli-core';
@@ -71,6 +72,8 @@ export enum Command {
   COMPLETION_DOWN = 'suggest.focusNext',
   EXPAND_SUGGESTION = 'suggest.expand',
   COLLAPSE_SUGGESTION = 'suggest.collapse',
+  OPEN_SELECTED_MENTION = 'suggest.openSelectedMention',
+  OPEN_SELECTED_MENTION_LOCATION = 'suggest.openSelectedMentionLocation',
 
   // Text Input
   SUBMIT = 'input.submit',
@@ -361,6 +364,8 @@ export const defaultKeyBindingConfig: KeyBindingConfig = new Map([
   [Command.COMPLETION_DOWN, [new KeyBinding('down'), new KeyBinding('ctrl+n')]],
   [Command.EXPAND_SUGGESTION, [new KeyBinding('right')]],
   [Command.COLLAPSE_SUGGESTION, [new KeyBinding('left')]],
+  [Command.OPEN_SELECTED_MENTION, [new KeyBinding('ctrl+x')]],
+  [Command.OPEN_SELECTED_MENTION_LOCATION, [new KeyBinding('ctrl+shift+x')]],
 
   // Text Input
   // Must also exclude shift to allow shift+enter for newline
@@ -506,6 +511,8 @@ export const commandCategories: readonly CommandCategory[] = [
       Command.COMPLETION_DOWN,
       Command.EXPAND_SUGGESTION,
       Command.COLLAPSE_SUGGESTION,
+      Command.OPEN_SELECTED_MENTION,
+      Command.OPEN_SELECTED_MENTION_LOCATION,
     ],
   },
   {
@@ -624,6 +631,10 @@ export const commandDescriptions: Readonly<Record<Command, string>> = {
   [Command.COMPLETION_DOWN]: 'Move to the next completion option.',
   [Command.EXPAND_SUGGESTION]: 'Expand an inline suggestion.',
   [Command.COLLAPSE_SUGGESTION]: 'Collapse an inline suggestion.',
+  [Command.OPEN_SELECTED_MENTION]:
+    'Open the selected @ mention target. When the target is a folder, open that folder.',
+  [Command.OPEN_SELECTED_MENTION_LOCATION]:
+    'Open the directory for the selected @ mention target. When the target is a folder, open that folder.',
 
   // Text Input
   [Command.SUBMIT]: 'Submit the current prompt.',
@@ -633,7 +644,7 @@ export const commandDescriptions: Readonly<Record<Command, string>> = {
   [Command.OPEN_EXTERNAL_EDITOR]:
     'Open the current prompt or the plan in an external editor.',
   [Command.DEPRECATED_OPEN_EXTERNAL_EDITOR]:
-    'Deprecated command to open external editor.',
+    'Legacy alias for opening the current prompt or the plan in an external editor when @ mention completion is not active.',
   [Command.PASTE_CLIPBOARD]: 'Paste from the clipboard.',
 
   // App Controls
@@ -722,7 +733,10 @@ export async function loadCustomKeybindings(): Promise<{
   const errors: string[] = [];
   let config = defaultKeyBindingConfig;
 
-  const userKeybindingsPath = Storage.getUserKeybindingsPath();
+  const userKeybindingsPath = path.join(
+    Storage.getGlobalGeminiDir(),
+    'keybindings.json',
+  );
 
   try {
     const content = await fs.readFile(userKeybindingsPath, 'utf8');

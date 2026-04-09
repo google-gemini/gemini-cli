@@ -149,6 +149,21 @@ describe('useAtCompletion', () => {
         'dir/',
         'file.txt',
       ]);
+
+      expect(result.current.suggestions).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({
+            value: 'dir/',
+            mentionTargetKind: 'directory',
+            mentionTargetPath: path.join(testRootDir, 'dir'),
+          }),
+          expect.objectContaining({
+            value: 'file.txt',
+            mentionTargetKind: 'file',
+            mentionTargetPath: path.join(testRootDir, 'file.txt'),
+          }),
+        ]),
+      );
     });
 
     it('should perform a case-insensitive search by lowercasing the pattern', async () => {
@@ -693,6 +708,19 @@ describe('useAtCompletion', () => {
           escapePath(path.join(addedDir, 'added-file.txt')),
         );
       });
+
+      expect(result.current.suggestions).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({
+            value: 'main.txt',
+            mentionTargetPath: path.join(cwdDir, 'main.txt'),
+          }),
+          expect.objectContaining({
+            value: escapePath(path.join(addedDir, 'added-file.txt')),
+            mentionTargetPath: path.join(addedDir, 'added-file.txt'),
+          }),
+        ]),
+      );
     });
 
     it('should pick up newly added directories via onDirectoriesChanged', async () => {

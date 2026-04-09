@@ -25,11 +25,6 @@ import { useKeypress } from '../hooks/useKeypress.js';
 import { Command } from '../key/keyMatchers.js';
 import { formatCommand } from '../key/keybindingUtils.js';
 import { useKeyMatchers } from '../hooks/useKeyMatchers.js';
-import {
-  appEvents,
-  AppEvent,
-  TransientMessageType,
-} from '../../utils/events.js';
 
 export interface ExitPlanModeDialogProps {
   planPath: string;
@@ -179,11 +174,7 @@ export const ExitPlanModeDialog: React.FC<ExitPlanModeDialogProps> = ({
         return true;
       }
       if (keyMatchers[Command.DEPRECATED_OPEN_EXTERNAL_EDITOR](key)) {
-        const cmdKey = formatCommand(Command.OPEN_EXTERNAL_EDITOR);
-        appEvents.emit(AppEvent.TransientMessage, {
-          message: `Use ${cmdKey} to open the external editor.`,
-          type: TransientMessageType.Hint,
-        });
+        void handleOpenEditor();
         return true;
       }
       return false;
