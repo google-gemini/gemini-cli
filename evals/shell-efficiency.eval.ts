@@ -21,6 +21,8 @@ describe('Shell Efficiency', () => {
   };
 
   evalTest('USUALLY_PASSES', {
+    suiteName: 'default',
+    suiteType: 'behavioral',
     name: 'should use --silent/--quiet flags when installing packages',
     prompt: 'Install the "lodash" package using npm.',
     assert: async (rig) => {
@@ -50,6 +52,8 @@ describe('Shell Efficiency', () => {
   });
 
   evalTest('USUALLY_PASSES', {
+    suiteName: 'default',
+    suiteType: 'behavioral',
     name: 'should use --no-pager with git commands',
     prompt: 'Show the git log.',
     assert: async (rig) => {
@@ -72,7 +76,9 @@ describe('Shell Efficiency', () => {
     },
   });
 
-  evalTest('USUALLY_PASSES', {
+  evalTest('ALWAYS_PASSES', {
+    suiteName: 'default',
+    suiteType: 'behavioral',
     name: 'should NOT use efficiency flags when enableShellOutputEfficiency is disabled',
     params: {
       settings: {

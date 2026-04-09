@@ -11,31 +11,28 @@ import os from 'node:os';
 import * as Diff from 'diff';
 import { WRITE_FILE_TOOL_NAME, WRITE_FILE_DISPLAY_NAME } from './tool-names.js';
 import type { Config } from '../config/config.js';
-import { ApprovalMode } from '../policy/types.js';
 
-import type {
-  FileDiff,
-  ToolCallConfirmationDetails,
-  ToolEditConfirmationDetails,
-  ToolInvocation,
-  ToolLocation,
-  ToolResult,
-} from './tools.js';
 import {
   BaseDeclarativeTool,
   BaseToolInvocation,
   Kind,
-  ToolConfirmationOutcome,
+  type FileDiff,
+  type ToolCallConfirmationDetails,
+  type ToolEditConfirmationDetails,
+  type ToolInvocation,
+  type ToolLocation,
+  type ToolResult,
+  type ToolConfirmationOutcome,
+  type PolicyUpdateOptions,
 } from './tools.js';
+import { buildFilePathArgsPattern } from '../policy/utils.js';
 import { ToolErrorType } from './tool-error.js';
 import { makeRelative, shortenPath } from '../utils/paths.js';
 import { getErrorMessage, isNodeError } from '../utils/errors.js';
-import {
-  ensureCorrectEdit,
-  ensureCorrectFileContent,
-} from '../utils/editCorrector.js';
+import { ensureCorrectFileContent } from '../utils/editCorrector.js';
 import { detectLineEnding } from '../utils/textUtils.js';
 import { DEFAULT_DIFF_OPTIONS, getDiffStat } from './diffOptions.js';
+import { getDiffContextSnippet } from './diff-utils.js';
 import type {
   ModifiableDeclarativeTool,
   ModifyContext,
@@ -50,6 +47,9 @@ import type { MessageBus } from '../confirmation-bus/message-bus.js';
 import { debugLogger } from '../utils/debugLogger.js';
 import { WRITE_FILE_DEFINITION } from './definitions/coreTools.js';
 import { resolveToolDeclaration } from './definitions/resolver.js';
+import { detectOmissionPlaceholders } from './omissionPlaceholderDetector.js';
+import { isGemini3Model } from '../config/models.js';
+import { discoverJitContext, appendJitContext } from './jit-context.js';
 
 /**
  * Parameters for the WriteFile tool
@@ -74,6 +74,20 @@ export interface WriteFileToolParams {
    * Initially proposed content.
    */
   ai_proposed_content?: string;
+}
+
+export function isWriteFileToolParams(
+  args: unknown,
+): args is WriteFileToolParams {
+  if (typeof args !== 'object' || args === null) {
+    return false;
+  }
+  return (
+    'file_path' in args &&
+    typeof args.file_path === 'string' &&
+    'content' in args &&
+    typeof args.content === 'string'
+  );
 }
 
 interface GetCorrectedFileContentResult {
@@ -115,35 +129,16 @@ export async function getCorrectedFileContent(
     }
   }
 
-  // If readError is set, we have returned.
-  // So, file was either read successfully (fileExists=true, originalContent set)
-  // or it was ENOENT (fileExists=false, originalContent='').
+  const aggressiveUnescape = !isGemini3Model(config.getActiveModel());
 
-  if (fileExists) {
-    // This implies originalContent is available
-    const { params: correctedParams } = await ensureCorrectEdit(
-      filePath,
-      originalContent,
-      {
-        old_string: originalContent, // Treat entire current content as old_string
-        new_string: proposedContent,
-        file_path: filePath,
-      },
-      config.getGeminiClient(),
-      config.getBaseLlmClient(),
-      abortSignal,
-      config.getDisableLLMCorrection(),
-    );
-    correctedContent = correctedParams.new_string;
-  } else {
-    // This implies new file (ENOENT)
-    correctedContent = await ensureCorrectFileContent(
-      proposedContent,
-      config.getBaseLlmClient(),
-      abortSignal,
-      config.getDisableLLMCorrection(),
-    );
-  }
+  correctedContent = await ensureCorrectFileContent(
+    proposedContent,
+    config.getBaseLlmClient(),
+    abortSignal,
+    config.getDisableLLMCorrection(),
+    aggressiveUnescape,
+  );
+
   return { originalContent, correctedContent, fileExists };
 }
 
@@ -160,15 +155,41 @@ class WriteFileToolInvocation extends BaseToolInvocation<
     toolName?: string,
     displayName?: string,
   ) {
-    super(params, messageBus, toolName, displayName);
-    this.resolvedPath = path.resolve(
-      this.config.getTargetDir(),
-      this.params.file_path,
+    super(
+      params,
+      messageBus,
+      toolName,
+      displayName,
+      undefined,
+      undefined,
+      true,
+      () => this.config.getApprovalMode(),
     );
+
+    if (this.config.isPlanMode()) {
+      const safeFilename = path.basename(this.params.file_path);
+      this.resolvedPath = path.join(
+        this.config.storage.getPlansDir(),
+        safeFilename,
+      );
+    } else {
+      this.resolvedPath = path.resolve(
+        this.config.getTargetDir(),
+        this.params.file_path,
+      );
+    }
   }
 
   override toolLocations(): ToolLocation[] {
     return [{ path: this.resolvedPath }];
+  }
+
+  override getPolicyUpdateOptions(
+    _outcome: ToolConfirmationOutcome,
+  ): PolicyUpdateOptions | undefined {
+    return {
+      argsPattern: buildFilePathArgsPattern(this.params.file_path),
+    };
   }
 
   override getDescription(): string {
@@ -182,10 +203,6 @@ class WriteFileToolInvocation extends BaseToolInvocation<
   protected override async getConfirmationDetails(
     abortSignal: AbortSignal,
   ): Promise<ToolCallConfirmationDetails | false> {
-    if (this.config.getApprovalMode() === ApprovalMode.AUTO_EDIT) {
-      return false;
-    }
-
     const correctedContentResult = await getCorrectedFileContent(
       this.config,
       this.resolvedPath,
@@ -228,14 +245,9 @@ class WriteFileToolInvocation extends BaseToolInvocation<
       fileDiff,
       originalContent,
       newContent: correctedContent,
-      onConfirm: async (outcome: ToolConfirmationOutcome) => {
-        if (outcome === ToolConfirmationOutcome.ProceedAlways) {
-          // No need to publish a policy update as the default policy for
-          // AUTO_EDIT already reflects always approving write-file.
-          this.config.setApprovalMode(ApprovalMode.AUTO_EDIT);
-        } else {
-          await this.publishPolicyUpdate(outcome);
-        }
+      onConfirm: async (_outcome: ToolConfirmationOutcome) => {
+        // Mode transitions (e.g. AUTO_EDIT) and policy updates are now
+        // handled centrally by the scheduler.
 
         if (ideConfirmation) {
           const result = await ideConfirmation;
@@ -356,6 +368,15 @@ class WriteFileToolInvocation extends BaseToolInvocation<
         );
       }
 
+      // Return a diff of the file before and after the write so that the agent
+      // can avoid the need to spend a turn doing a verification read.
+      const snippet = getDiffContextSnippet(
+        isNewFile ? '' : originalContent,
+        finalContent,
+        5,
+      );
+      llmSuccessMessageParts.push(`Here is the updated code:\n${snippet}`);
+
       // Log file operation for telemetry (without diff_stat to avoid double-counting)
       const mimetype = getSpecificMimeType(this.resolvedPath);
       const programmingLanguage = getLanguageFromFilePath(this.resolvedPath);
@@ -384,8 +405,18 @@ class WriteFileToolInvocation extends BaseToolInvocation<
         isNewFile,
       };
 
+      // Discover JIT subdirectory context for the written file path
+      const jitContext = await discoverJitContext(
+        this.config,
+        this.resolvedPath,
+      );
+      let llmContent = llmSuccessMessageParts.join(' ');
+      if (jitContext) {
+        llmContent = appendJitContext(llmContent, jitContext);
+      }
+
       return {
-        llmContent: llmSuccessMessageParts.join(' '),
+        llmContent,
         returnDisplay: displayResult,
       };
     } catch (error) {
@@ -483,6 +514,11 @@ export class WriteFileTool
       return `Error accessing path properties for validation: ${resolvedPath}. Reason: ${
         statError instanceof Error ? statError.message : String(statError)
       }`;
+    }
+
+    const omissionPlaceholders = detectOmissionPlaceholders(params.content);
+    if (omissionPlaceholders.length > 0) {
+      return "`content` contains an omission placeholder (for example 'rest of methods ...'). Provide complete file content.";
     }
 
     return null;

@@ -12,9 +12,53 @@ import {
   type SpanOptions,
 } from '@opentelemetry/api';
 import { safeJsonStringify } from '../utils/safeJsonStringify.js';
+import {
+  type GeminiCliOperation,
+  GEN_AI_AGENT_DESCRIPTION,
+  GEN_AI_AGENT_NAME,
+  GEN_AI_CONVERSATION_ID,
+  GEN_AI_INPUT_MESSAGES,
+  GEN_AI_OPERATION_NAME,
+  GEN_AI_OUTPUT_MESSAGES,
+  SERVICE_DESCRIPTION,
+  SERVICE_NAME,
+} from './constants.js';
+
+import { truncateString } from '../utils/textUtils.js';
 
 const TRACER_NAME = 'gemini-cli';
 const TRACER_VERSION = 'v1';
+
+export function truncateForTelemetry(
+  value: unknown,
+  maxLength: number = 10000,
+): AttributeValue | undefined {
+  if (typeof value === 'string') {
+    return truncateString(
+      value,
+      maxLength,
+      `...[TRUNCATED: original length ${value.length}]`,
+    );
+  }
+  if (typeof value === 'object' && value !== null) {
+    const stringified = safeJsonStringify(value);
+    return truncateString(
+      stringified,
+      maxLength,
+      `...[TRUNCATED: original length ${stringified.length}]`,
+    );
+  }
+  if (typeof value === 'number' || typeof value === 'boolean') {
+    return value;
+  }
+  return undefined;
+}
+
+function isAsyncIterable<T>(value: T): value is T & AsyncIterable<unknown> {
+  return (
+    typeof value === 'object' && value !== null && Symbol.asyncIterator in value
+  );
+}
 
 /**
  * Metadata for a span.
@@ -51,44 +95,47 @@ export interface SpanMetadata {
  * @returns The result of the function.
  */
 export async function runInDevTraceSpan<R>(
-  opts: SpanOptions & { name: string; noAutoEnd?: boolean },
-  fn: ({
-    metadata,
-  }: {
-    metadata: SpanMetadata;
-    endSpan: () => void;
-  }) => Promise<R>,
+  opts: SpanOptions & {
+    operation: GeminiCliOperation;
+    logPrompts?: boolean;
+    sessionId: string;
+  },
+  fn: ({ metadata }: { metadata: SpanMetadata }) => Promise<R>,
 ): Promise<R> {
-  const { name: spanName, noAutoEnd, ...restOfSpanOpts } = opts;
-  if (process.env['GEMINI_DEV_TRACING'] !== 'true') {
-    // If GEMINI_DEV_TRACING env var not set, we do not trace.
-    return fn({
-      metadata: {
-        name: spanName,
-        attributes: {},
-      },
-      endSpan: () => {
-        // noop
-      },
-    });
-  }
+  const { operation, logPrompts, sessionId, ...restOfSpanOpts } = opts;
 
   const tracer = trace.getTracer(TRACER_NAME, TRACER_VERSION);
-  return tracer.startActiveSpan(opts.name, restOfSpanOpts, async (span) => {
+  return tracer.startActiveSpan(operation, restOfSpanOpts, async (span) => {
     const meta: SpanMetadata = {
-      name: spanName,
-      attributes: {},
+      name: operation,
+      attributes: {
+        [GEN_AI_OPERATION_NAME]: operation,
+        [GEN_AI_AGENT_NAME]: SERVICE_NAME,
+        [GEN_AI_AGENT_DESCRIPTION]: SERVICE_DESCRIPTION,
+        [GEN_AI_CONVERSATION_ID]: sessionId,
+      },
     };
     const endSpan = () => {
       try {
-        if (meta.input !== undefined) {
-          span.setAttribute('input-json', safeJsonStringify(meta.input));
-        }
-        if (meta.output !== undefined) {
-          span.setAttribute('output-json', safeJsonStringify(meta.output));
+        if (logPrompts !== false) {
+          if (meta.input !== undefined) {
+            const truncated = truncateForTelemetry(meta.input);
+            if (truncated !== undefined) {
+              span.setAttribute(GEN_AI_INPUT_MESSAGES, truncated);
+            }
+          }
+          if (meta.output !== undefined) {
+            const truncated = truncateForTelemetry(meta.output);
+            if (truncated !== undefined) {
+              span.setAttribute(GEN_AI_OUTPUT_MESSAGES, truncated);
+            }
+          }
         }
         for (const [key, value] of Object.entries(meta.attributes)) {
-          span.setAttribute(key, value);
+          const truncated = truncateForTelemetry(value);
+          if (truncated !== undefined) {
+            span.setAttribute(key, truncated);
+          }
         }
         if (meta.error) {
           span.setStatus({
@@ -112,20 +159,32 @@ export async function runInDevTraceSpan<R>(
         span.end();
       }
     };
+
+    let isStream = false;
     try {
-      return await fn({ metadata: meta, endSpan });
+      const result = await fn({ metadata: meta });
+
+      if (isAsyncIterable(result)) {
+        isStream = true;
+        const streamWrapper = (async function* () {
+          try {
+            yield* result;
+          } catch (e) {
+            meta.error = e;
+            throw e;
+          } finally {
+            endSpan();
+          }
+        })();
+
+        return Object.assign(streamWrapper, result);
+      }
+      return result;
     } catch (e) {
       meta.error = e;
-      if (noAutoEnd) {
-        // For streaming operations, the delegated endSpan call will not be reached
-        // on an exception, so we must end the span here to prevent a leak.
-        endSpan();
-      }
       throw e;
     } finally {
-      if (!noAutoEnd) {
-        // For non-streaming operations, this ensures the span is always closed,
-        // and if an error occurred, it will be recorded correctly by endSpan.
+      if (!isStream) {
         endSpan();
       }
     }

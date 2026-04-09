@@ -5,50 +5,67 @@ and parameters.
 
 ## CLI commands
 
-| Command                            | Description                        | Example                                             |
-| ---------------------------------- | ---------------------------------- | --------------------------------------------------- |
-| `gemini`                           | Start interactive REPL             | `gemini`                                            |
-| `gemini "query"`                   | Query non-interactively, then exit | `gemini "explain this project"`                     |
-| `cat file \| gemini`               | Process piped content              | `cat logs.txt \| gemini`                            |
-| `gemini -i "query"`                | Execute and continue interactively | `gemini -i "What is the purpose of this project?"`  |
-| `gemini -r "latest"`               | Continue most recent session       | `gemini -r "latest"`                                |
-| `gemini -r "latest" "query"`       | Continue session with a new prompt | `gemini -r "latest" "Check for type errors"`        |
-| `gemini -r "<session-id>" "query"` | Resume session by ID               | `gemini -r "abc123" "Finish this PR"`               |
-| `gemini update`                    | Update to latest version           | `gemini update`                                     |
-| `gemini extensions`                | Manage extensions                  | See [Extensions Management](#extensions-management) |
-| `gemini mcp`                       | Configure MCP servers              | See [MCP Server Management](#mcp-server-management) |
+| Command                            | Description                        | Example                                                      |
+| ---------------------------------- | ---------------------------------- | ------------------------------------------------------------ |
+| `gemini`                           | Start interactive REPL             | `gemini`                                                     |
+| `gemini -p "query"`                | Query non-interactively            | `gemini -p "summarize README.md"`                            |
+| `gemini "query"`                   | Query and continue interactively   | `gemini "explain this project"`                              |
+| `cat file \| gemini`               | Process piped content              | `cat logs.txt \| gemini`<br>`Get-Content logs.txt \| gemini` |
+| `gemini -i "query"`                | Execute and continue interactively | `gemini -i "What is the purpose of this project?"`           |
+| `gemini -r "latest"`               | Continue most recent session       | `gemini -r "latest"`                                         |
+| `gemini -r "latest" "query"`       | Continue session with a new prompt | `gemini -r "latest" "Check for type errors"`                 |
+| `gemini -r "<session-id>" "query"` | Resume session by ID               | `gemini -r "abc123" "Finish this PR"`                        |
+| `gemini update`                    | Update to latest version           | `gemini update`                                              |
+| `gemini extensions`                | Manage extensions                  | See [Extensions Management](#extensions-management)          |
+| `gemini mcp`                       | Configure MCP servers              | See [MCP Server Management](#mcp-server-management)          |
 
 ### Positional arguments
 
-| Argument | Type              | Description                                                                                                        |
-| -------- | ----------------- | ------------------------------------------------------------------------------------------------------------------ |
-| `query`  | string (variadic) | Positional prompt. Defaults to one-shot mode. Use `-i/--prompt-interactive` to execute and continue interactively. |
+| Argument | Type              | Description                                                                                                |
+| -------- | ----------------- | ---------------------------------------------------------------------------------------------------------- |
+| `query`  | string (variadic) | Positional prompt. Defaults to interactive mode in a TTY. Use `-p/--prompt` for non-interactive execution. |
+
+## Interactive commands
+
+These commands are available within the interactive REPL.
+
+| Command              | Description                              |
+| -------------------- | ---------------------------------------- |
+| `/skills reload`     | Reload discovered skills from disk       |
+| `/agents reload`     | Reload the agent registry                |
+| `/commands reload`   | Reload custom slash commands             |
+| `/memory reload`     | Reload context files (e.g., `GEMINI.md`) |
+| `/mcp reload`        | Restart and reload MCP servers           |
+| `/extensions reload` | Reload all active extensions             |
+| `/help`              | Show help for all commands               |
+| `/quit`              | Exit the interactive session             |
 
 ## CLI Options
 
-| Option                           | Alias | Type    | Default   | Description                                                                                                                                                       |
-| -------------------------------- | ----- | ------- | --------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `--debug`                        | `-d`  | boolean | `false`   | Run in debug mode with verbose logging                                                                                                                            |
-| `--version`                      | `-v`  | -       | -         | Show CLI version number and exit                                                                                                                                  |
-| `--help`                         | `-h`  | -       | -         | Show help information                                                                                                                                             |
-| `--model`                        | `-m`  | string  | `auto`    | Model to use. See [Model Selection](#model-selection) for available values.                                                                                       |
-| `--prompt`                       | `-p`  | string  | -         | Prompt text. Appended to stdin input if provided. **Deprecated:** Use positional arguments instead.                                                               |
-| `--prompt-interactive`           | `-i`  | string  | -         | Execute prompt and continue in interactive mode                                                                                                                   |
-| `--sandbox`                      | `-s`  | boolean | `false`   | Run in a sandboxed environment for safer execution                                                                                                                |
-| `--approval-mode`                | -     | string  | `default` | Approval mode for tool execution. Choices: `default`, `auto_edit`, `yolo`                                                                                         |
-| `--yolo`                         | `-y`  | boolean | `false`   | **Deprecated.** Auto-approve all actions. Use `--approval-mode=yolo` instead.                                                                                     |
-| `--experimental-acp`             | -     | boolean | -         | Start in ACP (Agent Code Pilot) mode. **Experimental feature.**                                                                                                   |
-| `--experimental-zed-integration` | -     | boolean | -         | Run in Zed editor integration mode. **Experimental feature.**                                                                                                     |
-| `--allowed-mcp-server-names`     | -     | array   | -         | Allowed MCP server names (comma-separated or multiple flags)                                                                                                      |
-| `--allowed-tools`                | -     | array   | -         | **Deprecated.** Use the [Policy Engine](../core/policy-engine.md) instead. Tools that are allowed to run without confirmation (comma-separated or multiple flags) |
-| `--extensions`                   | `-e`  | array   | -         | List of extensions to use. If not provided, all extensions are enabled (comma-separated or multiple flags)                                                        |
-| `--list-extensions`              | `-l`  | boolean | -         | List all available extensions and exit                                                                                                                            |
-| `--resume`                       | `-r`  | string  | -         | Resume a previous session. Use `"latest"` for most recent or index number (e.g. `--resume 5`)                                                                     |
-| `--list-sessions`                | -     | boolean | -         | List available sessions for the current project and exit                                                                                                          |
-| `--delete-session`               | -     | string  | -         | Delete a session by index number (use `--list-sessions` to see available sessions)                                                                                |
-| `--include-directories`          | -     | array   | -         | Additional directories to include in the workspace (comma-separated or multiple flags)                                                                            |
-| `--screen-reader`                | -     | boolean | -         | Enable screen reader mode for accessibility                                                                                                                       |
-| `--output-format`                | `-o`  | string  | `text`    | The format of the CLI output. Choices: `text`, `json`, `stream-json`                                                                                              |
+| Option                           | Alias | Type    | Default   | Description                                                                                                                                                            |
+| -------------------------------- | ----- | ------- | --------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `--debug`                        | `-d`  | boolean | `false`   | Run in debug mode with verbose logging                                                                                                                                 |
+| `--version`                      | `-v`  | -       | -         | Show CLI version number and exit                                                                                                                                       |
+| `--help`                         | `-h`  | -       | -         | Show help information                                                                                                                                                  |
+| `--model`                        | `-m`  | string  | `auto`    | Model to use. See [Model Selection](#model-selection) for available values.                                                                                            |
+| `--prompt`                       | `-p`  | string  | -         | Prompt text. Appended to stdin input if provided. Forces non-interactive mode.                                                                                         |
+| `--prompt-interactive`           | `-i`  | string  | -         | Execute prompt and continue in interactive mode                                                                                                                        |
+| `--worktree`                     | `-w`  | string  | -         | Start Gemini in a new git worktree. If no name is provided, one is generated automatically. Requires `experimental.worktrees: true` in settings.                       |
+| `--sandbox`                      | `-s`  | boolean | `false`   | Run in a sandboxed environment for safer execution                                                                                                                     |
+| `--approval-mode`                | -     | string  | `default` | Approval mode for tool execution. Choices: `default`, `auto_edit`, `yolo`, `plan`                                                                                      |
+| `--yolo`                         | `-y`  | boolean | `false`   | **Deprecated.** Auto-approve all actions. Use `--approval-mode=yolo` instead.                                                                                          |
+| `--experimental-acp`             | -     | boolean | -         | Start in ACP (Agent Code Pilot) mode. **Experimental feature.**                                                                                                        |
+| `--experimental-zed-integration` | -     | boolean | -         | Run in Zed editor integration mode. **Experimental feature.**                                                                                                          |
+| `--allowed-mcp-server-names`     | -     | array   | -         | Allowed MCP server names (comma-separated or multiple flags)                                                                                                           |
+| `--allowed-tools`                | -     | array   | -         | **Deprecated.** Use the [Policy Engine](../reference/policy-engine.md) instead. Tools that are allowed to run without confirmation (comma-separated or multiple flags) |
+| `--extensions`                   | `-e`  | array   | -         | List of extensions to use. If not provided, all extensions are enabled (comma-separated or multiple flags)                                                             |
+| `--list-extensions`              | `-l`  | boolean | -         | List all available extensions and exit                                                                                                                                 |
+| `--resume`                       | `-r`  | string  | -         | Resume a previous session. Use `"latest"` for most recent or index number (e.g. `--resume 5`)                                                                          |
+| `--list-sessions`                | -     | boolean | -         | List available sessions for the current project and exit                                                                                                               |
+| `--delete-session`               | -     | string  | -         | Delete a session by index number (use `--list-sessions` to see available sessions)                                                                                     |
+| `--include-directories`          | -     | array   | -         | Additional directories to include in the workspace (comma-separated or multiple flags)                                                                                 |
+| `--screen-reader`                | -     | boolean | -         | Enable screen reader mode for accessibility                                                                                                                            |
+| `--output-format`                | `-o`  | string  | `text`    | The format of the CLI output. Choices: `text`, `json`, `stream-json`                                                                                                   |
 
 ## Model selection
 

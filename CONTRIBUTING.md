@@ -60,26 +60,54 @@ All submissions, including submissions by project members, require review. We
 use [GitHub pull requests](https://docs.github.com/articles/about-pull-requests)
 for this purpose.
 
-If your pull request involves changes to `packages/cli` (the frontend), we
-recommend running our automated frontend review tool. **Note: This tool is
-currently experimental.** It helps detect common React anti-patterns, testing
-issues, and other frontend-specific best practices that are easy to miss.
+To assist with the review process, we provide an automated review tool that
+helps detect common anti-patterns, testing issues, and other best practices that
+are easy to miss.
 
-To run the review tool, enter the following command from within Gemini CLI:
+#### Using the automated review tool
 
-```text
-/review-frontend <PR_NUMBER>
-```
+You can run the review tool in two ways:
 
-Replace `<PR_NUMBER>` with your pull request number. Authors are encouraged to
-run this on their own PRs for self-review, and reviewers should use it to
-augment their manual review process.
+1.  **Using the helper script (Recommended):** We provide a script that
+    automatically handles checking out the PR into a separate worktree,
+    installing dependencies, building the project, and launching the review
+    tool.
 
-### Self assigning issues
+    ```bash
+    ./scripts/review.sh <PR_NUMBER> [model]
+    ```
 
-To assign an issue to yourself, simply add a comment with the text `/assign`.
-The comment must contain only that text and nothing else. This command will
-assign the issue to you, provided it is not already assigned.
+    **Warning:** If you run `scripts/review.sh`, you must have first verified
+    that the code for the PR being reviewed is safe to run and does not contain
+    data exfiltration attacks.
+
+    **Authors are strongly encouraged to run this script on their own PRs**
+    immediately after creation. This allows you to catch and fix simple issues
+    locally before a maintainer performs a full review.
+
+    **Note on Models:** By default, the script uses the latest Pro model
+    (`gemini-3.1-pro-preview`). If you do not have enough Pro quota, you can run
+    it with the latest Flash model instead:
+    `./scripts/review.sh <PR_NUMBER> gemini-3-flash-preview`.
+
+2.  **Manually from within Gemini CLI:** If you already have the PR checked out
+    and built, you can run the tool directly from the CLI prompt:
+
+    ```text
+    /review-frontend <PR_NUMBER>
+    ```
+
+Replace `<PR_NUMBER>` with your pull request number. Reviewers should use this
+tool to augment, not replace, their manual review process.
+
+### Self-assigning and unassigning issues
+
+To assign an issue to yourself, simply add a comment with the text `/assign`. To
+unassign yourself from an issue, add a comment with the text `/unassign`.
+
+The comment must contain only that text and nothing else. These commands will
+assign or unassign the issue as requested, provided the conditions are met
+(e.g., an issue must be unassigned to be assigned).
 
 Please note that you can have a maximum of 3 issues assigned to you at any given
 time.
@@ -264,7 +292,8 @@ npm run test:e2e
 ```
 
 For more detailed information on the integration testing framework, please see
-the [Integration Tests documentation](/docs/integration-tests.md).
+the
+[Integration Tests documentation](https://geminicli.com/docs/integration-tests).
 
 ### Linting and preflight checks
 
@@ -294,8 +323,8 @@ fi
 
 #### Formatting
 
-To separately format the code in this project by running the following command
-from the root directory:
+To separately format the code in this project, run the following command from
+the root directory:
 
 ```bash
 npm run format
@@ -324,21 +353,6 @@ npm run lint
   usage.
 - **Imports:** Pay special attention to import paths. The project uses ESLint to
   enforce restrictions on relative imports between packages.
-
-### Project structure
-
-- `packages/`: Contains the individual sub-packages of the project.
-  - `a2a-server`: A2A server implementation for the Gemini CLI. (Experimental)
-  - `cli/`: The command-line interface.
-  - `core/`: The core backend logic for the Gemini CLI.
-  - `test-utils` Utilities for creating and cleaning temporary file systems for
-    testing.
-  - `vscode-ide-companion/`: The Gemini CLI Companion extension pairs with
-    Gemini CLI.
-- `docs/`: Contains all project documentation.
-- `scripts/`: Utility scripts for building, testing, and development tasks.
-
-For more detailed architecture, see `docs/architecture.md`.
 
 ### Debugging
 
@@ -372,8 +386,7 @@ specific debug settings.
 
 ### React DevTools
 
-To debug the CLI's React-based UI, you can use React DevTools. Ink, the library
-used for the CLI's interface, is compatible with React DevTools version 4.x.
+To debug the CLI's React-based UI, you can use React DevTools.
 
 1.  **Start the Gemini CLI in development mode:**
 
@@ -381,20 +394,20 @@ used for the CLI's interface, is compatible with React DevTools version 4.x.
     DEV=true npm start
     ```
 
-2.  **Install and run React DevTools version 4.28.5 (or the latest compatible
-    4.x version):**
+2.  **Install and run React DevTools version 6 (which matches the CLI's
+    `react-devtools-core`):**
 
     You can either install it globally:
 
     ```bash
-    npm install -g react-devtools@4.28.5
+    npm install -g react-devtools@6
     react-devtools
     ```
 
     Or run it directly using npx:
 
     ```bash
-    npx react-devtools@4.28.5
+    npx react-devtools@6
     ```
 
     Your running CLI application should then connect to React DevTools.
@@ -494,8 +507,9 @@ code.
 
 ### Documentation structure
 
-Our documentation is organized using [sidebar.json](/docs/sidebar.json) as the
-table of contents. When adding new documentation:
+Our documentation is organized using
+[sidebar.json](https://github.com/google-gemini/gemini-cli/blob/main/docs/sidebar.json)
+as the table of contents. When adding new documentation:
 
 1. Create your markdown file **in the appropriate directory** under `/docs`.
 2. Add an entry to `sidebar.json` in the relevant section.
@@ -546,7 +560,7 @@ Before submitting your documentation pull request, please:
 
 If you have questions about contributing documentation:
 
-- Check our [FAQ](/docs/faq.md).
+- Check our [FAQ](https://geminicli.com/docs/resources/faq).
 - Review existing documentation for examples.
 - Open [an issue](https://github.com/google-gemini/gemini-cli/issues) to discuss
   your proposed changes.

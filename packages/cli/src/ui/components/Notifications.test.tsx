@@ -4,7 +4,12 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { render, persistentStateMock } from '../../test-utils/render.js';
+import {
+  persistentStateMock,
+  renderWithProviders,
+} from '../../test-utils/render.js';
+import { createMockSettings } from '../../test-utils/settings.js';
+import type { LoadedSettings } from '../../config/settings.js';
 import { waitFor } from '../../test-utils/async.js';
 import { Notifications } from './Notifications.js';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
@@ -13,6 +18,7 @@ import { useUIState, type UIState } from '../contexts/UIStateContext.js';
 import { useIsScreenReaderEnabled } from 'ink';
 import * as fs from 'node:fs/promises';
 import { act } from 'react';
+import { WarningPriority } from '@google/gemini-cli-core';
 
 // Mock dependencies
 vi.mock('../contexts/AppContext.js');
@@ -57,25 +63,25 @@ vi.mock('node:path', async () => {
 vi.mock('@google/gemini-cli-core', async (importOriginal) => {
   const actual =
     await importOriginal<typeof import('@google/gemini-cli-core')>();
+  const MockStorage = vi.fn().mockImplementation(() => ({
+    getExtensionsDir: () => '/mock/home/.gemini/extensions',
+  }));
+  Object.assign(MockStorage, {
+    getGlobalTempDir: () => '/mock/temp',
+    getGlobalSettingsPath: () => '/mock/home/.gemini/settings.json',
+    getGlobalGeminiDir: () => '/mock/home/.gemini',
+  });
   return {
     ...actual,
     GEMINI_DIR: '.gemini',
     homedir: () => '/mock/home',
-    Storage: {
-      ...actual.Storage,
-      getGlobalTempDir: () => '/mock/temp',
+    WarningPriority: {
+      Low: 'low',
+      High: 'high',
     },
+    Storage: MockStorage,
   };
 });
-
-vi.mock('../../config/settings.js', () => ({
-  DEFAULT_MODEL_CONFIGS: {},
-  LoadedSettings: class {
-    constructor() {
-      // this.merged = {};
-    }
-  },
-}));
 
 describe('Notifications', () => {
   const mockUseAppContext = vi.mocked(useAppContext);
@@ -84,9 +90,14 @@ describe('Notifications', () => {
   const mockFsAccess = vi.mocked(fs.access);
   const mockFsUnlink = vi.mocked(fs.unlink);
 
+  let settings: LoadedSettings;
+
   beforeEach(() => {
     vi.clearAllMocks();
     persistentStateMock.reset();
+    settings = createMockSettings({
+      ui: { useAlternateBuffer: true },
+    });
     mockUseAppContext.mockReturnValue({
       startupWarnings: [],
       version: '1.0.0',
@@ -100,61 +111,186 @@ describe('Notifications', () => {
   });
 
   it('renders nothing when no notifications', async () => {
-    const { lastFrame, waitUntilReady, unmount } = render(<Notifications />);
-    await waitUntilReady();
+    const { lastFrame, unmount } = await renderWithProviders(
+      <Notifications />,
+      {
+        settings,
+        width: 100,
+      },
+    );
     expect(lastFrame({ allowEmpty: true })).toBe('');
     unmount();
   });
 
-  it.each([[['Warning 1']], [['Warning 1', 'Warning 2']]])(
-    'renders startup warnings: %s',
-    async (warnings) => {
-      mockUseAppContext.mockReturnValue({
-        startupWarnings: warnings,
-        version: '1.0.0',
-      } as AppState);
-      const { lastFrame, waitUntilReady, unmount } = render(<Notifications />);
-      await waitUntilReady();
-      const output = lastFrame();
-      warnings.forEach((warning) => {
-        expect(output).toContain(warning);
+  it.each([
+    [[{ id: 'w1', message: 'Warning 1', priority: WarningPriority.High }]],
+    [
+      [
+        { id: 'w1', message: 'Warning 1', priority: WarningPriority.High },
+        { id: 'w2', message: 'Warning 2', priority: WarningPriority.High },
+      ],
+    ],
+  ])('renders startup warnings: %s', async (warnings) => {
+    const appState = {
+      startupWarnings: warnings,
+      version: '1.0.0',
+    } as AppState;
+    mockUseAppContext.mockReturnValue(appState);
+    const { lastFrame, unmount } = await renderWithProviders(
+      <Notifications />,
+      {
+        appState,
+        settings,
+        width: 100,
+      },
+    );
+    const output = lastFrame();
+    warnings.forEach((warning) => {
+      expect(output).toContain(warning.message);
+    });
+    unmount();
+  });
+
+  it('increments show count for low priority warnings', async () => {
+    const warnings = [
+      { id: 'low-1', message: 'Low priority 1', priority: WarningPriority.Low },
+    ];
+    const appState = {
+      startupWarnings: warnings,
+      version: '1.0.0',
+    } as AppState;
+    mockUseAppContext.mockReturnValue(appState);
+
+    const { unmount } = await renderWithProviders(<Notifications />, {
+      appState,
+      settings,
+      width: 100,
+    });
+
+    expect(persistentStateMock.set).toHaveBeenCalledWith(
+      'startupWarningCounts',
+      { 'low-1': 1 },
+    );
+    unmount();
+  });
+
+  it('filters out low priority warnings that exceeded max show count', async () => {
+    const warnings = [
+      { id: 'low-1', message: 'Low priority 1', priority: WarningPriority.Low },
+      {
+        id: 'high-1',
+        message: 'High priority 1',
+        priority: WarningPriority.High,
+      },
+    ];
+    const appState = {
+      startupWarnings: warnings,
+      version: '1.0.0',
+    } as AppState;
+    mockUseAppContext.mockReturnValue(appState);
+
+    persistentStateMock.setData({
+      startupWarningCounts: { 'low-1': 3 },
+    });
+
+    const { lastFrame, unmount } = await renderWithProviders(
+      <Notifications />,
+      {
+        appState,
+        settings,
+        width: 100,
+      },
+    );
+    const output = lastFrame();
+    expect(output).not.toContain('Low priority 1');
+    expect(output).toContain('High priority 1');
+    unmount();
+  });
+
+  it('dismisses warnings on keypress', async () => {
+    const warnings = [
+      {
+        id: 'high-1',
+        message: 'High priority 1',
+        priority: WarningPriority.High,
+      },
+    ];
+    const appState = {
+      startupWarnings: warnings,
+      version: '1.0.0',
+    } as AppState;
+    mockUseAppContext.mockReturnValue(appState);
+
+    const { lastFrame, stdin, waitUntilReady, unmount } =
+      await renderWithProviders(<Notifications />, {
+        appState,
+        settings,
+        width: 100,
       });
-      unmount();
-    },
-  );
+    expect(lastFrame()).toContain('High priority 1');
+
+    await act(async () => {
+      stdin.write('a');
+    });
+    await waitUntilReady();
+
+    expect(lastFrame({ allowEmpty: true })).not.toContain('High priority 1');
+    unmount();
+  });
 
   it('renders init error', async () => {
-    mockUseUIState.mockReturnValue({
+    const uiState = {
       initError: 'Something went wrong',
       streamingState: 'idle',
       updateInfo: null,
-    } as unknown as UIState);
-    const { lastFrame, waitUntilReady, unmount } = render(<Notifications />);
-    await waitUntilReady();
+    } as unknown as UIState;
+    mockUseUIState.mockReturnValue(uiState);
+    const { lastFrame, unmount } = await renderWithProviders(
+      <Notifications />,
+      {
+        uiState,
+        settings,
+        width: 100,
+      },
+    );
     expect(lastFrame()).toMatchSnapshot();
     unmount();
   });
 
   it('does not render init error when streaming', async () => {
-    mockUseUIState.mockReturnValue({
+    const uiState = {
       initError: 'Something went wrong',
       streamingState: 'responding',
       updateInfo: null,
-    } as unknown as UIState);
-    const { lastFrame, waitUntilReady, unmount } = render(<Notifications />);
-    await waitUntilReady();
+    } as unknown as UIState;
+    mockUseUIState.mockReturnValue(uiState);
+    const { lastFrame, unmount } = await renderWithProviders(
+      <Notifications />,
+      {
+        uiState,
+        settings,
+        width: 100,
+      },
+    );
     expect(lastFrame({ allowEmpty: true })).toBe('');
     unmount();
   });
 
   it('renders update notification', async () => {
-    mockUseUIState.mockReturnValue({
+    const uiState = {
       initError: null,
       streamingState: 'idle',
       updateInfo: { message: 'Update available' },
-    } as unknown as UIState);
-    const { lastFrame, waitUntilReady, unmount } = render(<Notifications />);
-    await waitUntilReady();
+    } as unknown as UIState;
+    mockUseUIState.mockReturnValue(uiState);
+    const { lastFrame, unmount } = await renderWithProviders(
+      <Notifications />,
+      {
+        uiState,
+        settings,
+        width: 100,
+      },
+    );
     expect(lastFrame()).toMatchSnapshot();
     unmount();
   });
@@ -164,8 +300,13 @@ describe('Notifications', () => {
     persistentStateMock.setData({ hasSeenScreenReaderNudge: false });
     mockFsAccess.mockRejectedValue(new Error('No legacy file'));
 
-    const { lastFrame, waitUntilReady, unmount } = render(<Notifications />);
-    await waitUntilReady();
+    const { lastFrame, unmount } = await renderWithProviders(
+      <Notifications />,
+      {
+        settings,
+        width: 100,
+      },
+    );
 
     expect(lastFrame()).toContain('screen reader-friendly view');
     expect(persistentStateMock.set).toHaveBeenCalledWith(
@@ -182,27 +323,30 @@ describe('Notifications', () => {
     persistentStateMock.setData({ hasSeenScreenReaderNudge: undefined });
     mockFsAccess.mockResolvedValue(undefined);
 
-    const { waitUntilReady, unmount } = render(<Notifications />);
-
     await act(async () => {
-      await waitUntilReady();
-      await waitFor(() => {
-        expect(persistentStateMock.set).toHaveBeenCalledWith(
-          'hasSeenScreenReaderNudge',
-          true,
-        );
-        expect(mockFsUnlink).toHaveBeenCalled();
+      await renderWithProviders(<Notifications />, {
+        settings,
+        width: 100,
       });
     });
-    unmount();
+
+    await waitFor(() => {
+      expect(persistentStateMock.get('hasSeenScreenReaderNudge')).toBe(true);
+    });
+    expect(mockFsUnlink).toHaveBeenCalled();
   });
 
   it('does not render screen reader nudge when already seen in persistent state', async () => {
     mockUseIsScreenReaderEnabled.mockReturnValue(true);
     persistentStateMock.setData({ hasSeenScreenReaderNudge: true });
 
-    const { lastFrame, waitUntilReady, unmount } = render(<Notifications />);
-    await waitUntilReady();
+    const { lastFrame, unmount } = await renderWithProviders(
+      <Notifications />,
+      {
+        settings,
+        width: 100,
+      },
+    );
 
     expect(lastFrame({ allowEmpty: true })).toBe('');
     expect(persistentStateMock.set).not.toHaveBeenCalled();

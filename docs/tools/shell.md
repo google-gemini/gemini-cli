@@ -57,8 +57,8 @@ implementation, which does not support interactive commands.
 ### Showing color in output
 
 To show color in the shell output, you need to set the `tools.shell.showColor`
-setting to `true`. **Note: This setting only applies when
-`tools.shell.enableInteractiveShell` is enabled.**
+setting to `true`. This setting only applies when
+`tools.shell.enableInteractiveShell` is enabled.
 
 **Example `settings.json`:**
 
@@ -75,8 +75,8 @@ setting to `true`. **Note: This setting only applies when
 ### Setting the pager
 
 You can set a custom pager for the shell output by setting the
-`tools.shell.pager` setting. The default pager is `cat`. **Note: This setting
-only applies when `tools.shell.enableInteractiveShell` is enabled.**
+`tools.shell.pager` setting. The default pager is `cat`. This setting only
+applies when `tools.shell.enableInteractiveShell` is enabled.
 
 **Example `settings.json`:**
 
@@ -120,6 +120,14 @@ tools to detect if they are being run from within the Gemini CLI.
 
 ## Command restrictions
 
+<!-- prettier-ignore -->
+> [!WARNING]
+> The `tools.core` setting is an **allowlist for _all_ built-in
+> tools**, not just shell commands. When you set `tools.core` to any value,
+> _only_ the tools explicitly listed will be enabled. This includes all built-in
+> tools like `read_file`, `write_file`, `glob`, `grep_search`, `list_directory`,
+> `replace`, etc.
+
 You can restrict the commands that can be executed by the `run_shell_command`
 tool by using the `tools.core` and `tools.exclude` settings in your
 configuration file.
@@ -131,9 +139,9 @@ configuration file.
   commands. Including the generic `run_shell_command` acts as a wildcard,
   allowing any command not explicitly blocked.
 - `tools.exclude` [DEPRECATED]: To block specific commands, use the
-  [Policy Engine](../core/policy-engine.md). Historically, this setting allowed
-  adding entries to the `exclude` list under the `tools` category in the format
-  `run_shell_command(<command>)`. For example,
+  [Policy Engine](../reference/policy-engine.md). Historically, this setting
+  allowed adding entries to the `exclude` list under the `tools` category in the
+  format `run_shell_command(<command>)`. For example,
   `"tools": {"exclude": ["run_shell_command(rm)"]}` will block `rm` commands.
 
 The validation logic is designed to be secure and flexible:

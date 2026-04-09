@@ -102,7 +102,10 @@ describe('ripgrep-real-direct', () => {
       'console.log("hello");\n',
     );
 
-    const invocation = tool.build({ pattern: 'hello', include: '*.js' });
+    const invocation = tool.build({
+      pattern: 'hello',
+      include_pattern: '*.js',
+    });
     const result = await invocation.execute(new AbortController().signal);
 
     expect(result.llmContent).toContain('Found 1 match');

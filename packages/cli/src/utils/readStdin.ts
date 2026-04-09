@@ -23,6 +23,7 @@ export async function readStdin(): Promise<string> {
 
     const onReadable = () => {
       let chunk;
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
       while ((chunk = process.stdin.read()) !== null) {
         if (pipedInputTimerId) {
           clearTimeout(pipedInputTimerId);
