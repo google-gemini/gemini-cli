@@ -114,6 +114,7 @@ export async function buildBwrapArgs(
   }
 
   for (const p of resolvedPaths.forbidden) {
+    if (!fs.existsSync(p)) continue;
     try {
       const stat = fs.statSync(p);
       if (stat.isDirectory()) {
@@ -149,9 +150,8 @@ async function getSecretFilesArgs(
 ): Promise<string[]> {
   const args: string[] = [];
   const searchDirs = new Set([
-    resolvedPaths.workspace.resolved,
+    resolvedPaths.workspace.original,
     ...resolvedPaths.policyAllowed,
-    ...resolvedPaths.globalIncludes,
   ]);
   const findPatterns = getSecretFileFindArgs();
 
