@@ -22,7 +22,7 @@ This allows for:
 - **Precise Hyperparameter Tuning**: Direct control over `temperature`, `topP`,
   `thinkingBudget`, and other SDK-level parameters.
 - **Environment-Specific Behavior**: Distinct configurations for different
-  operating contexts (for example, testing vs. Production).
+  operating contexts (for example, testing vs. production).
 - **Agent-Scoped Customization**: Applying specific settings only when a
   particular agent is active.
 
