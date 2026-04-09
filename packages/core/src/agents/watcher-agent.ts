@@ -7,10 +7,7 @@
 import { z } from 'zod';
 import type { AgentLoopContext } from '../config/agent-loop-context.js';
 import type { LocalAgentDefinition } from './types.js';
-import {
-  READ_FILE_TOOL_NAME,
-  WRITE_FILE_TOOL_NAME,
-} from '../tools/tool-names.js';
+import { READ_FILE_TOOL_NAME } from '../tools/tool-names.js';
 import { GEMINI_MODEL_ALIAS_FLASH } from '../config/models.js';
 import * as path from 'node:path';
 
@@ -84,7 +81,7 @@ export const WatcherAgent = (
     },
 
     toolConfig: {
-      tools: [READ_FILE_TOOL_NAME, WRITE_FILE_TOOL_NAME],
+      tools: [READ_FILE_TOOL_NAME],
     },
 
     promptConfig: {
