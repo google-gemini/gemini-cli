@@ -153,5 +153,49 @@ describe('footerItems', () => {
       expect(state.orderedIds).toContain('auth');
       expect(state.selectedIds.has('auth')).toBe(true);
     });
+
+    it('includes context-used in selectedIds when hideContextPercentage is false and items is undefined', () => {
+      const settings = createMockSettings({
+        ui: {
+          footer: {
+            hideContextPercentage: false,
+          },
+        },
+      }).merged;
+
+      const state = resolveFooterState(settings);
+      expect(state.selectedIds.has('context-used')).toBe(true);
+      expect(state.orderedIds).toContain('context-used');
+    });
+
+    it('does not include context-used in selectedIds when hideContextPercentage is true (default)', () => {
+      const settings = createMockSettings({
+        ui: {
+          footer: {
+            hideContextPercentage: true,
+          },
+        },
+      }).merged;
+
+      const state = resolveFooterState(settings);
+      expect(state.selectedIds.has('context-used')).toBe(false);
+      // context-used should still be in orderedIds (as unselected)
+      expect(state.orderedIds).toContain('context-used');
+    });
+
+    it('persisted items array takes precedence over hideContextPercentage', () => {
+      const settings = createMockSettings({
+        ui: {
+          footer: {
+            items: ['workspace', 'model-name'],
+            hideContextPercentage: false,
+          },
+        },
+      }).merged;
+
+      const state = resolveFooterState(settings);
+      // items array explicitly omits context-used, so it should not be selected
+      expect(state.selectedIds.has('context-used')).toBe(false);
+    });
   });
 });
