@@ -1,0 +1,24 @@
+{
+  "version": 1,
+  "updatedAt": "2026-04-08T18:51:29.839Z",
+  "scenarios": {
+    "cold-startup-time": {
+      "wallClockMs": 1333.4230420000004,
+      "cpuTotalUs": 1711,
+      "eventLoopDelayP99Ms": 0,
+      "timestamp": "2026-04-08T18:50:58.124Z"
+    },
+    "idle-cpu-usage": {
+      "wallClockMs": 5001.926125,
+      "cpuTotalUs": 128518,
+      "eventLoopDelayP99Ms": 12.705791,
+      "timestamp": "2026-04-08T18:51:23.938Z"
+    },
+    "skill-loading-time": {
+      "wallClockMs": 1372.4463749999995,
+      "cpuTotalUs": 1550,
+      "eventLoopDelayP99Ms": 0,
+      "timestamp": "2026-04-08T18:51:29.839Z"
+    }
+  }
+}

@@ -4,18 +4,13 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+import { act } from 'react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { renderHook } from '../../test-utils/render.js';
-import { waitFor } from '../../test-utils/async.js';
 import { useLogger } from './useLogger.js';
-import {
-  sessionId as globalSessionId,
-  Logger,
-  type Storage,
-  type Config,
-} from '@google/gemini-cli-core';
-import { ConfigContext } from '../contexts/ConfigContext.js';
-import type React from 'react';
+import { Logger, type Storage, type Config } from '@google/gemini-cli-core';
+
+let deferredInit: { resolve: (val?: unknown) => void };
 
 // Mock Logger
 vi.mock('@google/gemini-cli-core', async (importOriginal) => {
@@ -24,7 +19,12 @@ vi.mock('@google/gemini-cli-core', async (importOriginal) => {
   return {
     ...actual,
     Logger: vi.fn().mockImplementation((id: string) => ({
-      initialize: vi.fn().mockResolvedValue(undefined),
+      initialize: vi.fn().mockImplementation(
+        () =>
+          new Promise((resolve) => {
+            deferredInit = { resolve };
+          }),
+      ),
       sessionId: id,
     })),
   };
@@ -34,29 +34,23 @@ describe('useLogger', () => {
   const mockStorage = {} as Storage;
   const mockConfig = {
     getSessionId: vi.fn().mockReturnValue('active-session-id'),
+    storage: mockStorage,
   } as unknown as Config;
 
   beforeEach(() => {
     vi.clearAllMocks();
   });
 
-  it('should initialize with the global sessionId by default', async () => {
-    const { result } = renderHook(() => useLogger(mockStorage));
+  it('should initialize with the sessionId from config', async () => {
+    const { result } = await renderHook(() => useLogger(mockConfig));
 
-    await waitFor(() => expect(result.current).not.toBeNull());
-    expect(Logger).toHaveBeenCalledWith(globalSessionId, mockStorage);
-  });
+    expect(result.current).toBeNull();
 
-  it('should initialize with the active sessionId from ConfigContext when available', async () => {
-    const wrapper = ({ children }: { children: React.ReactNode }) => (
-      <ConfigContext.Provider value={mockConfig}>
-        {children}
-      </ConfigContext.Provider>
-    );
+    await act(async () => {
+      deferredInit.resolve();
+    });
 
-    const { result } = renderHook(() => useLogger(mockStorage), { wrapper });
-
-    await waitFor(() => expect(result.current).not.toBeNull());
+    expect(result.current).not.toBeNull();
     expect(Logger).toHaveBeenCalledWith('active-session-id', mockStorage);
   });
 });

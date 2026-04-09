@@ -36,6 +36,8 @@ vi.mock('node:fs', async (importOriginal) => {
       rm: vi.fn(),
       cp: vi.fn(),
       readFile: vi.fn(),
+      lstat: vi.fn(),
+      chmod: vi.fn(),
     },
   };
 });
@@ -143,6 +145,11 @@ describe('extensionUpdates', () => {
     vi.mocked(fs.promises.rm).mockResolvedValue(undefined);
     vi.mocked(fs.promises.cp).mockResolvedValue(undefined);
     vi.mocked(fs.promises.readdir).mockResolvedValue([]);
+    vi.mocked(fs.promises.lstat).mockResolvedValue({
+      isDirectory: () => true,
+      mode: 0o755,
+    } as unknown as fs.Stats);
+    vi.mocked(fs.promises.chmod).mockResolvedValue(undefined);
     vi.mocked(isWorkspaceTrusted).mockReturnValue({
       isTrusted: true,
       source: 'file',
