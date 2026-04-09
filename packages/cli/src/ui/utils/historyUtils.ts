@@ -4,6 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+import { isRenderedInHistory } from '@google/gemini-cli-core';
 import { CoreToolCallStatus } from '../types.js';
 import type {
   HistoryItem,
@@ -79,5 +80,16 @@ export function getAllToolCalls(
 ): IndividualToolCallDisplay[] {
   return historyItems
     .filter((item): item is HistoryItemToolGroup => item.type === 'tool_group')
-    .flatMap((group) => group.tools);
+    .flatMap((group) => group.tools)
+    .filter((tool) =>
+      isRenderedInHistory({
+        name: tool.name,
+        displayName: tool.name,
+        status: tool.status,
+        approvalMode: tool.approvalMode,
+        hasResult: !!tool.resultDisplay,
+        hasParent: !!tool.parentCallId,
+        isClientInitiated: !!tool.isClientInitiated,
+      }),
+    );
 }

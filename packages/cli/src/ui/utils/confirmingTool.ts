@@ -6,8 +6,7 @@
 
 import {
   CoreToolCallStatus,
-  UPDATE_TOPIC_TOOL_NAME,
-  UPDATE_TOPIC_DISPLAY_NAME,
+  requiresUserConfirmation,
 } from '@google/gemini-cli-core';
 import {
   type HistoryItemWithoutId,
@@ -37,20 +36,26 @@ export function getConfirmingToolState(
     return null;
   }
 
-  const filteredPendingTools = allPendingTools.filter(
-    (tool) =>
-      tool.name !== UPDATE_TOPIC_TOOL_NAME &&
-      tool.name !== UPDATE_TOPIC_DISPLAY_NAME,
+  const actionablePendingTools = allPendingTools.filter((tool) =>
+    requiresUserConfirmation({
+      name: tool.name,
+      displayName: tool.name,
+      status: tool.status,
+      approvalMode: tool.approvalMode,
+      hasResult: !!tool.resultDisplay,
+      hasParent: !!tool.parentCallId,
+      isClientInitiated: !!tool.isClientInitiated,
+    }),
   );
 
   const head = confirmingTools[0];
-  const headIndexInFullList = filteredPendingTools.findIndex(
+  const headIndexInFullList = actionablePendingTools.findIndex(
     (tool) => tool.callId === head.callId,
   );
 
   return {
     tool: head,
     index: headIndexInFullList + 1,
-    total: filteredPendingTools.length,
+    total: actionablePendingTools.length,
   };
 }
