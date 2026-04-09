@@ -661,6 +661,76 @@ describe('ChatRecordingService', () => {
         chatRecordingService.deleteSession('non-existent'),
       ).resolves.not.toThrow();
     });
+
+    it('should use fallbackSessionId to clean up artifacts when session file is corrupted', async () => {
+      const fallbackId = 'fallback-session-uuid';
+      const shortId = 'abcd1234';
+      const chatsDir = path.join(testTempDir, 'chats');
+      const logsDir = path.join(testTempDir, 'logs');
+      const toolOutputsDir = path.join(testTempDir, 'tool-outputs');
+      fs.mkdirSync(chatsDir, { recursive: true });
+      fs.mkdirSync(logsDir, { recursive: true });
+      fs.mkdirSync(toolOutputsDir, { recursive: true });
+      // Write a corrupted (non-JSON) session file
+      const sessionFile = path.join(
+        chatsDir,
+        `session-2023-01-01T00-00-${shortId}.json`,
+      );
+      fs.writeFileSync(sessionFile, 'NOT VALID JSON {{{{');
+      // Create artifacts using the fallback UUID
+      const logFile = path.join(logsDir, `session-${fallbackId}.jsonl`);
+      fs.writeFileSync(logFile, '{}');
+      const toolOutputDir = path.join(toolOutputsDir, `session-${fallbackId}`);
+      fs.mkdirSync(toolOutputDir, { recursive: true });
+      // Pass fallbackSessionId explicitly
+      await chatRecordingService.deleteSession(
+        `session-2023-01-01T00-00-${shortId}`,
+        fallbackId,
+      );
+      expect(fs.existsSync(sessionFile)).toBe(false);
+      expect(fs.existsSync(logFile)).toBe(false);
+      expect(fs.existsSync(toolOutputDir)).toBe(false);
+    });
+    it('should prefer sessionId from file over fallbackSessionId when file is readable', async () => {
+      const fileSessionId = 'file-session-uuid';
+      const fallbackId = 'fallback-session-uuid';
+      const shortId = 'efgh5678';
+      const chatsDir = path.join(testTempDir, 'chats');
+      const logsDir = path.join(testTempDir, 'logs');
+      const toolOutputsDir = path.join(testTempDir, 'tool-outputs');
+      fs.mkdirSync(chatsDir, { recursive: true });
+      fs.mkdirSync(logsDir, { recursive: true });
+      fs.mkdirSync(toolOutputsDir, { recursive: true });
+      // Write a valid session file with its own sessionId
+      const sessionFile = path.join(
+        chatsDir,
+        `session-2023-01-01T00-00-${shortId}.json`,
+      );
+      fs.writeFileSync(
+        sessionFile,
+        JSON.stringify({ sessionId: fileSessionId }),
+      );
+      // Create artifacts under fileSessionId (not fallbackId)
+      const logFile = path.join(logsDir, `session-${fileSessionId}.jsonl`);
+      fs.writeFileSync(logFile, '{}');
+      const toolOutputDir = path.join(
+        toolOutputsDir,
+        `session-${fileSessionId}`,
+      );
+      fs.mkdirSync(toolOutputDir, { recursive: true });
+      // Artifacts under fallbackId should NOT be touched
+      const fallbackLog = path.join(logsDir, `session-${fallbackId}.jsonl`);
+      fs.writeFileSync(fallbackLog, '{}');
+      await chatRecordingService.deleteSession(
+        `session-2023-01-01T00-00-${shortId}`,
+        fallbackId,
+      );
+      expect(fs.existsSync(sessionFile)).toBe(false);
+      expect(fs.existsSync(logFile)).toBe(false);
+      expect(fs.existsSync(toolOutputDir)).toBe(false);
+      // fallback artifacts must be untouched
+      expect(fs.existsSync(fallbackLog)).toBe(true);
+    });
   });
 
   describe('recordDirectories', () => {

@@ -642,7 +642,10 @@ export class ChatRecordingService {
    *
    * @throws {Error} If shortId validation fails.
    */
-  async deleteSession(sessionIdOrBasename: string): Promise<void> {
+  async deleteSession(
+    sessionIdOrBasename: string,
+    fallbackSessionId?: string,
+  ): Promise<void> {
     try {
       const tempDir = this.context.config.storage.getProjectTempDir();
       const chatsDir = path.join(tempDir, 'chats');
@@ -657,7 +660,12 @@ export class ChatRecordingService {
       const matchingFiles = this.getMatchingSessionFiles(chatsDir, shortId);
 
       for (const file of matchingFiles) {
-        await this.deleteSessionAndArtifacts(chatsDir, file, tempDir);
+        await this.deleteSessionAndArtifacts(
+          chatsDir,
+          file,
+          tempDir,
+          fallbackSessionId,
+        );
       }
     } catch (error) {
       debugLogger.error('Error deleting session file.', error);
@@ -705,23 +713,25 @@ export class ChatRecordingService {
     chatsDir: string,
     file: string,
     tempDir: string,
+    fallbackSessionId?: string,
   ): Promise<void> {
     const filePath = path.join(chatsDir, file);
     try {
-      const fileContent = await fs.promises.readFile(filePath, 'utf8');
-      const content = JSON.parse(fileContent) as unknown;
-
-      let fullSessionId: string | undefined;
-      if (content && typeof content === 'object' && 'sessionId' in content) {
-        const id = (content as Record<string, unknown>)['sessionId'];
-        if (typeof id === 'string') {
-          fullSessionId = id;
+      let fullSessionId: string | undefined = fallbackSessionId;
+      try {
+        const fileContent = await fs.promises.readFile(filePath, 'utf8');
+        const content = JSON.parse(fileContent) as unknown;
+        if (content && typeof content === 'object' && 'sessionId' in content) {
+          const id = (content as Record<string, unknown>)['sessionId'];
+          if (typeof id === 'string') {
+            fullSessionId = id;
+          }
         }
+      } catch {
+        // File unreadable or corrupted — fall through using fallbackSessionId
       }
-
-      // Delete the session file
+      // Always delete the session file
       await fs.promises.unlink(filePath);
-
       if (fullSessionId) {
         // Delegate to shared utility!
         await deleteSessionArtifactsAsync(fullSessionId, tempDir);
