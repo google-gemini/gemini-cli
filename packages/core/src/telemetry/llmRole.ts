@@ -16,5 +16,5 @@ export enum LlmRole {
   UTILITY_EDIT_CORRECTOR = 'utility_edit_corrector',
   UTILITY_AUTOCOMPLETE = 'utility_autocomplete',
   UTILITY_FAST_ACK_HELPER = 'utility_fast_ack_helper',
-  UTILITY_STATE_SNAPSHOT_PROCESSOR = 'utility_state_snapshot_processr',
+  UTILITY_STATE_SNAPSHOT_PROCESSOR = 'utility_state_snapshot_processor',
 }

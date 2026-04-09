@@ -55,7 +55,7 @@ export class NodeDistillationProcessor implements ContextProcessor {
     try {
       const response = await this.env.llmClient.generateContent({
         role: LlmRole.UTILITY_COMPRESSOR,
-        modelConfigKey: { model: 'default' },
+        modelConfigKey: { model: 'gemini-3-flash-base' },
         promptId: this.env.promptId,
         abortSignal: new AbortController().signal,
         contents: [

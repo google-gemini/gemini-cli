@@ -40,7 +40,7 @@ Output ONLY the raw factual snapshot, formatted compactly. Do not include markdo
 
     const response = await this.env.llmClient.generateContent({
       role: LlmRole.UTILITY_STATE_SNAPSHOT_PROCESSOR,
-      modelConfigKey: { model: 'default' },
+      modelConfigKey: { model: 'gemini-3-flash-base' },
       contents: [{ role: 'user', parts: [{ text: userPromptText }] }],
       systemInstruction: { role: 'system', parts: [{ text: systemPrompt }] },
       promptId: this.env.promptId,
