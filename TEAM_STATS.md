@@ -1,21 +1,21 @@
 # 📊 Gemini CLI Weekly Team Review Stats
 
-*Report Period: 2026-04-02 to 2026-04-09*
-*Last Updated: 2026-04-09 23:48 (UTC)*
+*Reporting Period: **Monday 2026-04-06** to Today*
+*Last Updated: 2026-04-09 23:49 (UTC)*
 
 ## 📈 Weekly Summary
-Stats for PRs linked to 'Help Wanted' issues.
+Activity recorded since the start of the current week (Monday).
 
-| Maintainer | New Assignments (Week) | Closed/Merged (Week) | Current Open Queue |
+| Maintainer | New Assignments | Closed/Merged | Current Open Queue |
 | :--- | :--- | :--- | :--- |
 | **Coco Sheng** (@cocosheng-g) | 2 | **4** | 6 |
 | **Tommaso Sciortino** (@scidomino) | 1 | **2** | 3 |
-| **Ruomeng Zhang** (@ruomengz) | 0 | **1** | 0 |
 | **A.K.M. Adib** (@Adib234) | 0 | **0** | 3 |
 | **Cynthia Long** (@cynthialong0-0) | 0 | **0** | 0 |
 | **Dev Randalpura** (@devr0306) | 0 | **0** | 1 |
 | **Ivan Port** (@ivanporty) | 0 | **0** | 0 |
 | **Keith Schaab** (@kschaab) | 0 | **0** | 1 |
+| **Ruomeng Zhang** (@ruomengz) | 0 | **0** | 0 |
 | **Spencer Tang** (@spencer426) | 0 | **0** | 1 |
 | **Sri Pasumarthi** (@sripasg) | 0 | **0** | 0 |
 
@@ -41,7 +41,7 @@ Stats for PRs linked to 'Help Wanted' issues.
 | [#22324](https://github.com/google-gemini/gemini-cli/pull/22324) | #22321 | feat(cli): Add 'list' subcommand to '/commands' | `2026-04-09` |
 | [#24847](https://github.com/google-gemini/gemini-cli/pull/24847) | #24838 | fix(mcp): treat GET 404 as 405 in StreamableHTTPClientTransport | `2026-04-09` |
 
-#### 🔴 Recently Closed (This Week)
+#### 🔴 Recently Closed (Since Monday)
 | PR | Issue | Title | Closed Date |
 | :--- | :--- | :--- | :--- |
 | [#22621](https://github.com/google-gemini/gemini-cli/pull/22621) | #22613 | fix(cli): suppress unhandled AbortError logs during request cancellation | `2026-04-09` |
@@ -79,11 +79,6 @@ Stats for PRs linked to 'Help Wanted' issues.
 | :--- | :--- | :--- | :--- |
 | - | - | _No active reviews._ | - |
 
-#### 🔴 Recently Closed (This Week)
-| PR | Issue | Title | Closed Date |
-| :--- | :--- | :--- | :--- |
-| [#24168](https://github.com/google-gemini/gemini-cli/pull/24168) | #19664 | fix(cli): cap shell output at 10 MB to prevent RangeError crash | `2026-04-05` |
-
 ### Spencer Tang (@spencer426)
 #### 🟢 Active Queue
 | PR | Issue | Title | Updated |
@@ -104,7 +99,7 @@ Stats for PRs linked to 'Help Wanted' issues.
 | [#23347](https://github.com/google-gemini/gemini-cli/pull/23347) | #16363 | fix: use synchronous stderr write before exit to prevent silent failures | `2026-04-08` |
 | [#18499](https://github.com/google-gemini/gemini-cli/pull/18499) | #18067 | feat: Add voice input with pluggable backend (Gemini zero-install + Whisper) | `2026-04-04` |
 
-#### 🔴 Recently Closed (This Week)
+#### 🔴 Recently Closed (Since Monday)
 | PR | Issue | Title | Closed Date |
 | :--- | :--- | :--- | :--- |
 | [#19025](https://github.com/google-gemini/gemini-cli/pull/19025) | #18388 | feat(cli): add /mcp remove slash command for interactive server removal | `2026-04-09` |

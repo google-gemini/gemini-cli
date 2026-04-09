@@ -84,7 +84,7 @@ def parse_date(date_str):
     return datetime.datetime.fromisoformat(date_str.replace('Z', '+00:00'))
 
 def main():
-    print("Fetching weekly team review statistics...")
+    print("Fetching weekly team review statistics (Monday to Monday)...")
     all_issues = []
     cursor = None
     while True:
@@ -96,7 +96,9 @@ def main():
         cursor = search_data['pageInfo']['endCursor']
 
     now = datetime.datetime.now(datetime.timezone.utc)
-    one_week_ago = now - datetime.timedelta(days=7)
+    # Calculate most recent Monday
+    days_since_monday = now.weekday() # 0 is Monday
+    report_start = (now - datetime.timedelta(days=days_since_monday)).replace(hour=0, minute=0, second=0, microsecond=0)
 
     # Member data structure
     stats = {login: {
@@ -129,7 +131,6 @@ def main():
                 if reviewer in stats:
                     created_at = parse_date(pr['createdAt'])
                     updated_at = parse_date(pr['updatedAt'])
-                    merged_at = parse_date(pr.get('mergedAt'))
                     
                     pr_info = {
                         "number": pr['number'],
@@ -140,13 +141,13 @@ def main():
                         "issue_no": issue_no
                     }
 
-                    # Weekly Logic
-                    if created_at and created_at >= one_week_ago:
+                    # Monday to Monday Logic
+                    if created_at and created_at >= report_start:
                         stats[reviewer]["weekly_assigned"] += 1
                     
                     if pr['state'] != 'OPEN':
-                        # If closed/merged this week
-                        if updated_at and updated_at >= one_week_ago:
+                        # If closed/merged since this Monday
+                        if updated_at and updated_at >= report_start:
                             stats[reviewer]["weekly_closed"] += 1
                         stats[reviewer]["history"].append(pr_info)
                     else:
@@ -157,12 +158,12 @@ def main():
     # Generate Markdown
     ts = now.strftime("%Y-%m-%d %H:%M")
     md = f"# 📊 Gemini CLI Weekly Team Review Stats\n\n"
-    md += f"*Report Period: {(one_week_ago).strftime('%Y-%m-%d')} to {now.strftime('%Y-%m-%d')}*\n"
+    md += f"*Reporting Period: **Monday {report_start.strftime('%Y-%m-%d')}** to Today*\n"
     md += f"*Last Updated: {ts} (UTC)*\n\n"
     
     md += "## 📈 Weekly Summary\n"
-    md += "Stats for PRs linked to 'Help Wanted' issues.\n\n"
-    md += "| Maintainer | New Assignments (Week) | Closed/Merged (Week) | Current Open Queue |\n"
+    md += "Activity recorded since the start of the current week (Monday).\n\n"
+    md += "| Maintainer | New Assignments | Closed/Merged | Current Open Queue |\n"
     md += "| :--- | :--- | :--- | :--- |\n"
     
     sorted_members = sorted(stats.items(), key=lambda x: x[1]['weekly_closed'], reverse=True)
@@ -181,10 +182,10 @@ def main():
             md += f"| [#{p['number']}]({p['url']}) | #{p['issue_no']} | {p['title']} | `{p['updated']}` |\n"
         if not data['open_queue']: md += "| - | - | _No active reviews._ | - |\n"
 
-        # Show recent history (last 7 days closed)
-        recent_closed = [p for p in data['history'] if parse_date(p['updated']+'T00:00:00Z') >= one_week_ago]
+        # Show history since Monday
+        recent_closed = [p for p in data['history'] if parse_date(p['updated']+'T00:00:00Z') >= report_start]
         if recent_closed:
-            md += "\n#### 🔴 Recently Closed (This Week)\n"
+            md += "\n#### 🔴 Recently Closed (Since Monday)\n"
             md += "| PR | Issue | Title | Closed Date |\n"
             md += "| :--- | :--- | :--- | :--- |\n"
             for p in recent_closed:
@@ -194,7 +195,7 @@ def main():
     
     with open("TEAM_STATS.md", "w") as f:
         f.write(md)
-    print("Successfully generated TEAM_STATS.md (Weekly Stats).")
+    print(f"Successfully generated TEAM_STATS.md (Monday-to-Monday).")
 
 if __name__ == "__main__":
     main()
