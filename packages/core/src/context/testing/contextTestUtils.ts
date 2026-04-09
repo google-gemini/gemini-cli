@@ -21,7 +21,9 @@ import type { ConcreteNode, ToolExecution } from '../ir/types.js';
 import type { ContextEnvironment } from '../sidecar/environment.js';
 import type { Config } from '../../config/config.js';
 import type { BaseLlmClient } from '../../core/baseLlmClient.js';
-import type { Content , GenerateContentResponse } from '@google/genai';
+import type { Content, GenerateContentResponse } from '@google/genai';
+import { InboxSnapshotImpl } from '../sidecar/inbox.js';
+import type { ContextWorkingBuffer, InboxMessage, ProcessArgs } from '../pipeline.js';
 
 
 /**
@@ -92,14 +94,46 @@ export function createDummyToolNode(
   } as unknown as ToolExecution;
 }
 
+import type { Mock } from 'vitest';
+import type { SidecarConfig } from '../sidecar/types.js';
+
+export interface MockLlmClient extends BaseLlmClient {
+  generateContent: Mock;
+}
+
+export function createMockLlmClient(responses?: Array<string | GenerateContentResponse>): MockLlmClient {
+  const generateContentMock = vi.fn();
+  
+  if (responses && responses.length > 0) {
+    for (const response of responses) {
+      if (typeof response === 'string') {
+        generateContentMock.mockResolvedValueOnce(createMockGenerateContentResponse(response));
+      } else {
+        generateContentMock.mockResolvedValueOnce(response);
+      }
+    }
+    // Fallback to the last response for any subsequent calls
+    const lastResponse = responses[responses.length - 1];
+    if (typeof lastResponse === 'string') {
+      generateContentMock.mockResolvedValue(createMockGenerateContentResponse(lastResponse));
+    } else {
+      generateContentMock.mockResolvedValue(lastResponse);
+    }
+  } else {
+    // Default fallback
+    generateContentMock.mockResolvedValue(createMockGenerateContentResponse('Mock LLM response'));
+  }
+
+  // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
+  return {
+    generateContent: generateContentMock,
+  } as unknown as MockLlmClient;
+}
+
 export function createMockEnvironment(
   overrides?: Partial<ContextEnvironment>,
 ): ContextEnvironment {
-  const mockClient: Partial<BaseLlmClient> = {
-    generateContent: vi.fn().mockResolvedValue(createMockGenerateContentResponse('Mock LLM summary response')),
-  };
-  // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
-  const llmClient = mockClient as BaseLlmClient;
+  const llmClient = createMockLlmClient(['Mock LLM summary response']);
   
   const tracer = new ContextTracer({ targetDir: '/tmp', sessionId: 'mock-session' });
   const eventBus = new ContextEventBus();
@@ -127,9 +161,6 @@ export function createMockEnvironment(
  * Creates a block of synthetic conversation history designed to consume a specific number of tokens.
  * Assumes roughly 4 characters per token for standard English text.
  */
-import { InboxSnapshotImpl } from '../sidecar/inbox.js';
-import type { ContextWorkingBuffer, InboxMessage, ProcessArgs } from '../pipeline.js';
-
 export class FakeContextWorkingBuffer implements ContextWorkingBuffer {
   readonly nodes: readonly ConcreteNode[];
   private readonly nodesById = new Map<string, ConcreteNode>();
@@ -221,8 +252,8 @@ export function createMockContextConfig(
 
 export function setupContextComponentTest(
   config: Config,
-  sidecarOverride?: import('../sidecar/types.js').SidecarConfig,
-) {
+  sidecarOverride?: SidecarConfig,
+): {chatHistory: AgentChatHistory, contextManager: ContextManager} {
   const chatHistory = new AgentChatHistory();
   const registry = new SidecarRegistry();
   registerBuiltInProcessors(registry);
@@ -260,6 +291,5 @@ export function setupContextComponentTest(
   );
 
   // The async worker is now internally managed by ContextManager
-
   return { chatHistory, contextManager };
 }

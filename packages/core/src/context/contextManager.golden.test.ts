@@ -13,19 +13,10 @@ import {
   beforeAll,
   afterAll,
 } from 'vitest';
-import { ContextManager } from './contextManager.js';
-import { ContextEnvironmentImpl } from './sidecar/environmentImpl.js';
-import { SidecarLoader } from './sidecar/SidecarLoader.js';
-import { ContextTracer } from './tracer.js';
-import { ContextEventBus } from './eventBus.js';
-import { PipelineOrchestrator } from './sidecar/orchestrator.js';
-import { AgentChatHistory } from '../core/agentChatHistory.js';
+import type { ContextManager } from './contextManager.js';
 import type { Content } from '@google/genai';
-import type { BaseLlmClient } from '../core/baseLlmClient.js';
 import type { Episode } from './ir/types.js';
 import type { SidecarConfig } from './sidecar/types.js';
-import { SidecarRegistry } from './sidecar/registry.js';
-import { registerBuiltInProcessors } from './sidecar/builtins.js';
 import { createMockContextConfig, setupContextComponentTest } from './testing/contextTestUtils.js';
 
 expect.addSnapshotSerializer({
@@ -47,73 +38,10 @@ describe('ContextManager Golden Tests', () => {
     vi.restoreAllMocks();
   });
 
-  let mockConfig: any; // eslint-disable-line @typescript-eslint/no-explicit-any
   let contextManager: ContextManager;
 
   beforeEach(() => {
-    mockConfig = {
-      isContextManagementEnabled: vi.fn().mockReturnValue(true),
-      getExperimentalContextSidecarConfig: vi.fn().mockReturnValue(undefined),
-      getTargetDir: vi.fn().mockReturnValue('/tmp'),
-      getSessionId: vi.fn().mockReturnValue('test-session'),
-      getToolOutputMaskingConfig: vi.fn().mockResolvedValue({
-        enabled: true,
-        minPrunableThresholdTokens: 50,
-        protectLatestTurn: false,
-        protectionThresholdTokens: 100,
-      }),
-      storage: { getProjectTempDir: vi.fn().mockReturnValue('/tmp') },
-      getUsageStatisticsEnabled: vi.fn().mockReturnValue(false),
-      getBaseLlmClient: vi.fn().mockReturnValue({
-        generateJson: vi.fn().mockResolvedValue({
-          'test_file.txt': { level: 'SUMMARY' },
-        }),
-        generateContent: vi.fn().mockResolvedValue({
-          candidates: [
-            { content: { parts: [{ text: 'This is a summary.' }] } },
-          ],
-        }),
-      }),
-    };
-
-    const registry = new SidecarRegistry();
-    registerBuiltInProcessors(registry);
-
-    const sidecar = SidecarLoader.fromConfig(mockConfig, registry);
-    const tracer = new ContextTracer({
-      targetDir: '/tmp',
-      sessionId: 'test-session',
-    });
-    const eventBus = new ContextEventBus();
-    const env = new ContextEnvironmentImpl(
-      {
-        generateContent: async () => ({}),
-        generateJson: async () => ({}),
-      } as unknown as BaseLlmClient,
-      'test-prompt-id',
-      'test',
-      '/tmp',
-      '/tmp',
-      tracer,
-      4,
-      eventBus,
-    );
-    const chatHistory = new AgentChatHistory();
-    const orchestrator = new PipelineOrchestrator(
-      sidecar,
-      env,
-      eventBus,
-      tracer,
-      registry
-    );
-
-    contextManager = new ContextManager(
-      sidecar,
-      env,
-      tracer,
-      orchestrator,
-      chatHistory
-    );
+    contextManager = setupContextComponentTest(createMockContextConfig()).contextManager;
   });
 
   const createLargeHistory = (): Content[] => [
@@ -177,3 +105,4 @@ describe('ContextManager Golden Tests', () => {
     expect(result.length).toEqual(history.length + 1);
   });
 });
+

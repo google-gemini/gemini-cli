@@ -5,23 +5,20 @@
  */
 
 import assert from 'node:assert';
-import { describe, it, expect, vi } from 'vitest';
+import { describe, it, expect } from 'vitest';
 import { NodeDistillationProcessor } from './nodeDistillationProcessor.js';
 import {
   createMockProcessArgs,
   createMockEnvironment,
   createDummyNode,
   createDummyToolNode,
-  createMockGenerateContentResponse
+  createMockLlmClient
 } from '../testing/contextTestUtils.js';
 import type { UserPrompt, AgentThought, ToolExecution } from '../ir/types.js';
-import type { BaseLlmClient } from '../../core/baseLlmClient.js';
 
 describe('NodeDistillationProcessor', () => {
   it('should trigger summarization via LLM for long text parts', async () => {
-    const mockLlmClient = {
-      generateContent: vi.fn().mockResolvedValue(createMockGenerateContentResponse('Mocked Summary!')), // length = 15
-    } as unknown as BaseLlmClient;
+    const mockLlmClient = createMockLlmClient(['Mocked Summary!']);
 
     // Use charsPerToken=1 naturally.
     const env = createMockEnvironment({
@@ -75,9 +72,7 @@ describe('NodeDistillationProcessor', () => {
   });
 
   it('should ignore nodes that are below the threshold', async () => {
-    const mockLlmClient = {
-      generateContent: vi.fn().mockResolvedValue(createMockGenerateContentResponse('S')), // length = 1
-    } as unknown as BaseLlmClient;
+    const mockLlmClient = createMockLlmClient(['S']); // length = 1
 
     const env = createMockEnvironment({
        llmClient: mockLlmClient,

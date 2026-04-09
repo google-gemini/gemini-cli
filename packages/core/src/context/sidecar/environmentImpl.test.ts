@@ -9,13 +9,15 @@ import { ContextTracer } from '../tracer.js';
 import { ContextEventBus } from '../eventBus.js';
 import { InMemoryFileSystem } from '../system/InMemoryFileSystem.js';
 import { DeterministicIdGenerator } from '../system/DeterministicIdGenerator.js';
-import type { BaseLlmClient } from '../../core/baseLlmClient.js';
+
+
+import { createMockLlmClient } from '../testing/contextTestUtils.js';
 
 describe('ContextEnvironmentImpl', () => {
   it('should initialize with defaults correctly', () => {
     const tracer = new ContextTracer({ targetDir: '/tmp', sessionId: 'mock' });
     const eventBus = new ContextEventBus();
-    const mockLlmClient = {} as BaseLlmClient;
+    const mockLlmClient = createMockLlmClient();
 
     const env = new ContextEnvironmentImpl(
       mockLlmClient,
@@ -49,7 +51,7 @@ describe('ContextEnvironmentImpl', () => {
   it('should initialize with provided overrides', () => {
     const tracer = new ContextTracer({ targetDir: '/tmp', sessionId: 'mock' });
     const eventBus = new ContextEventBus();
-    const mockLlmClient = {} as BaseLlmClient;
+    const mockLlmClient = createMockLlmClient();
     const fileSystem = new InMemoryFileSystem();
     const idGenerator = new DeterministicIdGenerator('test-');
 

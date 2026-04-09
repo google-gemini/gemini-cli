@@ -6,8 +6,9 @@
 
 import { describe, it, expect, vi, beforeAll, afterAll } from 'vitest';
 import { SimulationHarness } from './SimulationHarness.js';
+import { createMockLlmClient } from '../testing/contextTestUtils.js';
 import type { SidecarConfig } from '../sidecar/types.js';
-import type { BaseLlmClient } from '../../core/baseLlmClient.js';
+
 
 expect.addSnapshotSerializer({
   test: (val) =>
@@ -58,11 +59,7 @@ describe('System Lifecycle Golden Tests', () => {
     ],
   });
 
-  const mockLlmClient = {
-    generateContent: vi.fn().mockResolvedValue({
-      text: '<MOCKED_STATE_SNAPSHOT_SUMMARY>',
-    }),
-  } as unknown as BaseLlmClient;
+  const mockLlmClient = createMockLlmClient(['<MOCKED_STATE_SNAPSHOT_SUMMARY>']);
 
   it('Scenario 1: Organic Growth with Huge Tool Output & Images', async () => {
     const harness = await SimulationHarness.create(
