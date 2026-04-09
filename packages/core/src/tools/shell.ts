@@ -455,36 +455,37 @@ export class ShellToolInvocation extends BaseToolInvocation<
     const delayMs = this.context.config.getYoloShellDelayMs();
 
     if (isYoloMode && delayMs > 0 && !this.params.is_background) {
-      let countdownInterval: NodeJS.Timeout | undefined;
-      let countdownMs = delayMs;
-      const updateIntervalMs = 1000;
-
       try {
         await new Promise<void>((resolve, reject) => {
+          const endTime = Date.now() + delayMs;
+          let timeout: NodeJS.Timeout;
+
           const onAbort = () => {
-            if (countdownInterval) clearInterval(countdownInterval);
+            clearTimeout(timeout);
             reject(new Error('Command cancelled by user during YOLO delay.'));
           };
           signal.addEventListener('abort', onAbort, { once: true });
 
-          if (updateOutput) {
-            updateOutput(
-              `[YOLO] Executing in ${Math.ceil(countdownMs / 1000)}s... (Press Ctrl+C to cancel)\n`,
-            );
-          }
+          const tick = () => {
+            const remainingMs = Math.max(0, endTime - Date.now());
 
-          countdownInterval = setInterval(() => {
-            countdownMs -= updateIntervalMs;
-            if (countdownMs <= 0) {
-              clearInterval(countdownInterval);
-              signal.removeEventListener('abort', onAbort);
-              resolve();
-            } else if (updateOutput) {
+            if (updateOutput) {
               updateOutput(
-                `[YOLO] Executing in ${Math.ceil(countdownMs / 1000)}s... (Press Ctrl+C to cancel)\n`,
+                `[YOLO] Executing in ${Math.ceil(
+                  remainingMs / 1000,
+                )}s... (Press Ctrl+C to cancel)\n`,
               );
             }
-          }, updateIntervalMs);
+
+            if (remainingMs <= 0) {
+              signal.removeEventListener('abort', onAbort);
+              resolve();
+            } else {
+              timeout = setTimeout(tick, Math.min(remainingMs, 1000));
+            }
+          };
+
+          tick();
         });
       } catch {
         return {
