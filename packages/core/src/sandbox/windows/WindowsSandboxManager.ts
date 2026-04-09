@@ -326,13 +326,7 @@ export class WindowsSandboxManager implements SandboxManager {
       writableRoots.push(allowedPath);
     }
 
-    // Support git worktrees/submodules; read-only to prevent malicious hook/config modification (RCE).
-    // Read access is inherited; skip grantLowIntegrityAccess to ensure write protection.
-    if (resolvedPaths.gitWorktree) {
-      // No-op for read access.
-    }
-
-    // 5. Additional write paths (e.g. from internal __write command)
+    // 4. Additional write paths (e.g. from internal __write command)
     for (const writePath of resolvedPaths.policyWrite) {
       try {
         await fs.promises.access(writePath, fs.constants.F_OK);
@@ -351,6 +345,12 @@ export class WindowsSandboxManager implements SandboxManager {
           );
         }
       }
+    }
+
+    // Support git worktrees/submodules; read-only to prevent malicious hook/config modification (RCE).
+    // Read access is inherited; skip grantLowIntegrityAccess to ensure write protection.
+    if (resolvedPaths.gitWorktree) {
+      // No-op for read access.
     }
 
     // 2. Collect secret files and apply protective ACLs
