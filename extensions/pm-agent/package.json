@@ -1,0 +1,11 @@
+{
+  "name": "pm-agent-mcp-server",
+  "version": "1.0.0",
+  "description": "MCP Server for PM Agent Extension — AI-powered Product Management tools",
+  "type": "module",
+  "main": "mcp-server/server.js",
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.23.0",
+    "zod": "^3.22.4"
+  }
+}

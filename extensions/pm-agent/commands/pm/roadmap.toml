@@ -1,0 +1,43 @@
+description = "Generate or update a product roadmap from project activity"
+
+prompt = """
+Generate a product roadmap based on current project activity.
+
+## Data Sources
+
+Open issues by label: !{gh issue list --state open --limit 100 --json number,title,labels,reactionGroups,comments}
+Recent merged PRs: !{gh pr list --state merged --limit 30 --json number,title,labels,mergedAt}
+Commit velocity: !{git log --oneline --since="3 months ago" | wc -l} commits in 3 months
+Active contributors: !{git log --since="1 month ago" --format="%aN" | sort -u}
+
+## Instructions
+
+1. Group issues into strategic themes (core features, DX, performance, ecosystem, docs)
+2. Estimate effort for each theme based on issue count and complexity
+3. Use commit velocity to calibrate timeline estimates
+4. Produce a Now/Next/Later/Exploring roadmap
+
+## Output Format
+
+### Roadmap — [Project Name]
+Generated: [today's date] | Velocity: [N] commits/month
+
+#### Now (In Progress)
+Items with active PRs or recent commits.
+
+#### Next (1-2 months)
+High-priority items with clear requirements.
+
+#### Later (3-6 months)
+Important but needs more planning or resources.
+
+#### Exploring
+Ideas under discussion, needs community input.
+
+Present each section as a table:
+| Theme | Item | Issue(s) | Effort | Rationale |
+
+End with alignment notes if a ROADMAP.md exists in the project.
+
+{{args}}
+"""

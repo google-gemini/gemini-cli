@@ -1,0 +1,44 @@
+description = "Quick project health check with key metrics"
+
+prompt = """
+Run a project health check and produce a scorecard.
+
+## Data Sources
+
+Issue metrics:
+- Open issues: !{gh issue list --state open --json id --jq length}
+- Closed last 30 days: !{gh issue list --state closed --limit 100 --json closedAt --jq '[.[] | select(.closedAt > (now - 2592000 | strftime("%Y-%m-%dT%H:%M:%SZ")))] | length'}
+- Recent issue activity: !{gh issue list --limit 10 --state open --json number,title,comments,reactionGroups,createdAt}
+
+PR metrics:
+- Open PRs: !{gh pr list --state open --json id --jq length}
+- Merged last 30 days: !{gh pr list --state merged --limit 100 --json mergedAt --jq '[.[] | select(.mergedAt > (now - 2592000 | strftime("%Y-%m-%dT%H:%M:%SZ")))] | length'}
+
+Commit activity:
+- This month: !{git log --oneline --since="1 month ago" | wc -l} commits
+- Last month: !{git log --oneline --since="2 months ago" --until="1 month ago" | wc -l} commits
+- Contributors this month: !{git log --since="1 month ago" --format="%aN" | sort -u | wc -l}
+
+## Output Format
+
+Produce a health scorecard:
+
+### Project Health Scorecard
+
+| Metric | Value | Trend | Status |
+|--------|-------|-------|--------|
+| Open Issues | N | ... | OK/Warning/Critical |
+| Issue Close Rate | N/month | ... | ... |
+| Open PRs | N | ... | ... |
+| PR Merge Rate | N/month | ... | ... |
+| Commit Velocity | N/month | ... | ... |
+| Active Contributors | N | ... | ... |
+
+### Risk Flags
+List any concerns (stale issues, declining velocity, etc.)
+
+### Quick Wins
+3 specific actions that could improve project health immediately.
+
+{{args}}
+"""

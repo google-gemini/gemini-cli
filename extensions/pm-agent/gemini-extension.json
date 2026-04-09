@@ -1,0 +1,11 @@
+{
+  "name": "pm-agent",
+  "version": "1.0.0",
+  "mcpServers": {
+    "pmTools": {
+      "command": "node",
+      "args": ["${extensionPath}${/}mcp-server${/}server.js"],
+      "cwd": "${extensionPath}"
+    }
+  }
+}

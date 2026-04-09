@@ -1,0 +1,35 @@
+description = "Run a full PM analysis of this project"
+
+prompt = """
+Analyze this project from a Product Management perspective.
+
+Use the following data sources:
+1. Recent Issues: !{gh issue list --limit 50 --json number,title,labels,createdAt,comments,reactionGroups --state open}
+2. Recently closed Issues: !{gh issue list --limit 20 --json number,title,labels,closedAt --state closed}
+3. Recent merged PRs: !{gh pr list --limit 30 --state merged --json number,title,labels,mergedAt}
+4. Commit velocity (3 months): !{git log --oneline --since="3 months ago" | wc -l} commits
+5. Commit velocity (1 month): !{git log --oneline --since="1 month ago" | wc -l} commits
+6. Contributors this month: !{git log --since="1 month ago" --format="%aN" | sort -u | wc -l}
+
+Produce a comprehensive PM analysis:
+
+## Executive Summary
+3-5 bullet points on project status.
+
+## SWOT Analysis
+Use the SWOT framework. Present as a 2x2 table.
+
+## Top User Pain Points
+Identify the top 5 pain points from open Issues (by reaction count and comment activity).
+
+## Recommended Priorities (RICE Scored)
+Apply RICE scoring to the top 10 open issues. Present as a ranked table.
+
+## Velocity & Health Trends
+Compare recent vs. prior month activity. Flag any concerns.
+
+## Recommended Next Actions
+Numbered list of specific, actionable recommendations.
+
+{{args}}
+"""

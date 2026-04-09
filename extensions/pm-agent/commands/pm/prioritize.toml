@@ -1,0 +1,42 @@
+description = "Prioritize open issues using RICE scoring framework"
+
+prompt = """
+Prioritize the project's open issues using the RICE scoring framework.
+
+## Data Sources
+
+Open issues: !{gh issue list --state open --limit 50 --json number,title,labels,reactionGroups,comments,createdAt}
+Commit velocity: !{git log --oneline --since="1 month ago" | wc -l} commits this month
+
+## RICE Framework
+
+For each issue, estimate:
+- **Reach**: Users affected per month (use reactions + comments as proxy)
+- **Impact**: Experience improvement (3=massive, 2=high, 1=medium, 0.5=low, 0.25=minimal)
+- **Confidence**: Estimate confidence (100%=high, 80%=medium, 50%=low)
+- **Effort**: Person-months to implement
+
+**Score** = (Reach x Impact x Confidence) / Effort
+
+## Output Format
+
+### RICE Prioritization — [date]
+
+| Rank | Issue | Title | Reach | Impact | Confidence | Effort | RICE Score |
+|------|-------|-------|-------|--------|------------|--------|------------|
+| 1 | #N | ... | ... | ... | ... | ... | ... |
+
+### MoSCoW Classification
+
+Group the scored items into Must/Should/Could/Won't categories.
+
+### Recommended Sprint Focus
+
+Based on velocity of [N] commits/month, recommend 3-5 items for the next sprint with rationale.
+
+### Scoring Notes
+
+Briefly explain the reasoning for the top 5 items' scores.
+
+{{args}}
+"""
