@@ -570,7 +570,17 @@ export const useGeminiStream = (
       }
 
       setPushedToolCallIds(newPushed);
-      setIsFirstToolInGroup(false);
+
+      // If this batch ONLY contains topics, and we were the first in the group,
+      // the NEXT batch is still effectively the first VISIBLE bordered tool in the group.
+      if (
+        isFirstToolInGroupRef.current &&
+        toolsToPush.every((tc) => isTopicTool(tc.request.name))
+      ) {
+        // Keep it true!
+      } else {
+        setIsFirstToolInGroup(false);
+      }
     }
   }, [
     toolCalls,
@@ -600,8 +610,17 @@ export const useGeminiStream = (
     );
 
     if (remainingTools.length > 0) {
-      // Should we draw a top border? Yes if NO previous tools were drawn.
-      const needsTopBorder = pushedToolCallIds.size === 0;
+      // Should we draw a top border? Yes if NO previous tools were drawn,
+      // OR if ALL previously drawn tools were topics (which don't draw top borders).
+      let needsTopBorder = pushedToolCallIds.size === 0;
+      if (!needsTopBorder) {
+        const allPushedWereTopics = toolCalls
+          .filter((tc) => pushedToolCallIds.has(tc.request.callId))
+          .every((tc) => isTopicTool(tc.request.name));
+        if (allPushedWereTopics) {
+          needsTopBorder = true;
+        }
+      }
 
       items.push(
         mapTrackedToolCallsToDisplay(remainingTools, {

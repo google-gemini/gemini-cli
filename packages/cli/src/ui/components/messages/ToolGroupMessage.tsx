@@ -225,16 +225,40 @@ export const ToolGroupMessage: React.FC<ToolGroupMessageProps> = ({
         !Array.isArray(nextGroup) &&
         isCompactTool(nextGroup, isCompactModeEnabled);
 
+      const nextIsTopicToolCall =
+        nextGroup && !Array.isArray(nextGroup) && isTopicTool(nextGroup.name);
+
       const isAgentGroup = Array.isArray(group);
       const isCompact =
         !isAgentGroup && isCompactTool(group, isCompactModeEnabled);
       const isTopicToolCall = !isAgentGroup && isTopicTool(group.name);
 
-      const isFirstProp = !!(i === 0
+      // Align isFirst logic with rendering
+      let isFirst = i === 0;
+      if (!isFirst) {
+        // Check if all previous tools were topics (matches rendering logic exactly)
+        let allPreviousTopics = true;
+        for (let j = 0; j < i; j++) {
+          const prevGroupItem = groupedTools[j];
+          if (
+            Array.isArray(prevGroupItem) ||
+            !isTopicTool(prevGroupItem.name)
+          ) {
+            allPreviousTopics = false;
+            break;
+          }
+        }
+        isFirst = allPreviousTopics;
+      }
+
+      const isFirstProp = !!(isFirst
         ? (borderTopOverride ?? true)
         : prevIsCompact);
 
-      const showClosingBorder = !isCompact && (nextIsCompact || isLast);
+      const showClosingBorder =
+        !isCompact &&
+        !isTopicToolCall &&
+        (nextIsCompact || nextIsTopicToolCall || isLast);
 
       if (isAgentGroup) {
         // Agent Group Spacing Breakdown:
@@ -346,6 +370,20 @@ export const ToolGroupMessage: React.FC<ToolGroupMessageProps> = ({
           />
         )}
       {groupedTools.map((group, index) => {
+        let isFirst = index === 0;
+        if (!isFirst) {
+          // Check if all previous tools were topics
+          let allPreviousWereTopics = true;
+          for (let i = 0; i < index; i++) {
+            const prevGroup = groupedTools[i];
+            if (Array.isArray(prevGroup) || !isTopicTool(prevGroup.name)) {
+              allPreviousWereTopics = false;
+              break;
+            }
+          }
+          isFirst = allPreviousWereTopics;
+        }
+
         const isLast = index === groupedTools.length - 1;
 
         const prevGroup = index > 0 ? groupedTools[index - 1] : null;
@@ -359,17 +397,22 @@ export const ToolGroupMessage: React.FC<ToolGroupMessageProps> = ({
           nextGroup &&
           !Array.isArray(nextGroup) &&
           isCompactTool(nextGroup, isCompactModeEnabled);
+        const nextIsTopicToolCall =
+          nextGroup && !Array.isArray(nextGroup) && isTopicTool(nextGroup.name);
 
         const isAgentGroup = Array.isArray(group);
         const isCompact =
           !isAgentGroup && isCompactTool(group, isCompactModeEnabled);
         const isTopicToolCall = !isAgentGroup && isTopicTool(group.name);
 
-        const isFirstProp = !!(index === 0
+        const isFirstProp = !!(isFirst
           ? (borderTopOverride ?? true)
           : prevIsCompact);
 
-        const showClosingBorder = !isCompact && (nextIsCompact || isLast);
+        const showClosingBorder =
+          !isCompact &&
+          !isTopicToolCall &&
+          (nextIsCompact || nextIsTopicToolCall || isLast);
 
         if (isAgentGroup) {
           return (
