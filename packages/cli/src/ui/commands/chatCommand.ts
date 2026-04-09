@@ -91,16 +91,18 @@ const listCommand: SlashCommand = {
 const saveCommand: SlashCommand = {
   name: 'save',
   description:
-    'Save the current conversation as a checkpoint. Usage: /resume save <tag>',
+    'Save the current conversation as a checkpoint. Usage: /resume save [tag]',
   kind: CommandKind.BUILT_IN,
   autoExecute: false,
   action: async (context, args): Promise<SlashCommandActionReturn | void> => {
-    const tag = args.trim();
+    // Fall back to the active checkpoint tag if no explicit tag is provided.
+    const tag = args.trim() || context.session.activeCheckpointTag;
     if (!tag) {
       return {
         type: 'message',
         messageType: 'error',
-        content: 'Missing tag. Usage: /resume save <tag>',
+        content:
+          'Missing tag. Usage: /resume save <tag> (or save/resume a checkpoint first to set a default tag)',
       };
     }
 
@@ -140,6 +142,8 @@ const saveCommand: SlashCommand = {
     if (history.length > INITIAL_HISTORY_LENGTH) {
       const authType = config?.getContentGeneratorConfig()?.authType;
       await logger.saveCheckpoint({ history, authType }, tag);
+      // Update the active checkpoint tag on successful save.
+      context.session.setActiveCheckpointTag(tag);
       return {
         type: 'message',
         messageType: 'info',
@@ -224,6 +228,8 @@ const resumeCheckpointCommand: SlashCommand = {
         text,
       } as HistoryItemWithoutId);
     }
+    // Set the active checkpoint tag on successful resume.
+    context.session.setActiveCheckpointTag(tag);
     return {
       type: 'load_history',
       history: uiHistory,
@@ -258,6 +264,10 @@ const deleteCommand: SlashCommand = {
     const deleted = await logger.deleteCheckpoint(tag);
 
     if (deleted) {
+      // Clear the active checkpoint tag if the deleted tag was the active one.
+      if (context.session.activeCheckpointTag === tag) {
+        context.session.setActiveCheckpointTag(undefined);
+      }
       return {
         type: 'message',
         messageType: 'info',

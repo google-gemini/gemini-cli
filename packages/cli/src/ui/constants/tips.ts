@@ -123,7 +123,7 @@ export const INFORMATIVE_TIPS = [
   'Change your authentication method with /auth',
   'File a bug report directly with /bug',
   'List your saved chat checkpoints with /resume list',
-  'Save your current conversation with /resume save <tag>',
+  'Save your current conversation with /resume save [tag]',
   'Resume a saved conversation with /resume resume <tag>',
   'Delete a conversation checkpoint with /resume delete <tag>',
   'Share your conversation to a file with /resume share <file>',

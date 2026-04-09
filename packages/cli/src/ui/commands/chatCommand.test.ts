@@ -157,13 +157,35 @@ describe('chatCommand', () => {
       mockContext.services.logger.checkpointExists = mockCheckpointExists;
     });
 
-    it('should return an error if tag is missing', async () => {
+    it('should return an error if tag is missing and no active tag is set', async () => {
       const result = await saveCommand?.action?.(mockContext, '  ');
       expect(result).toEqual({
         type: 'message',
         messageType: 'error',
-        content: 'Missing tag. Usage: /resume save <tag>',
+        content: 'Missing tag. Usage: /resume save <tag> (or save/resume a checkpoint first to set a default tag)',
       });
+    });
+
+    it('should use the active checkpoint tag if no tag is provided', async () => {
+      mockContext.session.activeCheckpointTag = 'active-tag';
+      const history: Content[] = [
+        { role: 'user', parts: [{ text: 'context' }] },
+        { role: 'user', parts: [{ text: 'hello' }] },
+      ];
+      mockGetHistory.mockReturnValue(history);
+
+      const result = await saveCommand?.action?.(mockContext, '  ');
+
+      expect(mockSaveCheckpoint).toHaveBeenCalledWith(
+        { history, authType: AuthType.LOGIN_WITH_GOOGLE },
+        'active-tag',
+      );
+      expect(result).toEqual({
+        type: 'message',
+        messageType: 'info',
+        content: `Conversation checkpoint saved with tag: active-tag.`,
+      });
+      expect(mockContext.session.setActiveCheckpointTag).toHaveBeenCalledWith('active-tag');
     });
 
     it('should inform if conversation history is empty or only contains system context', async () => {
@@ -196,6 +218,9 @@ describe('chatCommand', () => {
         messageType: 'info',
         content: `Conversation checkpoint saved with tag: ${tag}.`,
       });
+      expect(mockContext.session.setActiveCheckpointTag).toHaveBeenCalledWith(
+        tag,
+      );
     });
 
     it('should return confirm_action if checkpoint already exists', async () => {
@@ -293,6 +318,9 @@ describe('chatCommand', () => {
         ] as HistoryItemWithoutId[],
         clientHistory: conversation,
       });
+      expect(mockContext.session.setActiveCheckpointTag).toHaveBeenCalledWith(
+        goodTag,
+      );
     });
 
     it('should block resuming a conversation with mismatched authType', async () => {
@@ -413,6 +441,14 @@ describe('chatCommand', () => {
         messageType: 'info',
         content: `Conversation checkpoint '${tag}' has been deleted.`,
       });
+    });
+
+    it('should clear the active checkpoint tag if the deleted tag matches', async () => {
+      mockContext.session.activeCheckpointTag = tag;
+      await deleteCommand?.action?.(mockContext, tag);
+      expect(mockContext.session.setActiveCheckpointTag).toHaveBeenCalledWith(
+        undefined,
+      );
     });
 
     describe('completion', () => {

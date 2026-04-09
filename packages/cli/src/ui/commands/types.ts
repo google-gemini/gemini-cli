@@ -98,6 +98,10 @@ export interface CommandContext {
     stats: SessionStatsState;
     /** A transient list of shell commands the user has approved for this session. */
     sessionShellAllowlist: Set<string>;
+    /** The most recently used checkpoint tag in this session (set by save/resume). */
+    activeCheckpointTag: string | undefined;
+    /** Sets (or clears) the active checkpoint tag for the current session. */
+    setActiveCheckpointTag: (tag: string | undefined) => void;
   };
   // Flag to indicate if an overwrite has been confirmed
   overwriteConfirmed?: boolean;
