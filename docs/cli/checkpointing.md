@@ -39,7 +39,9 @@ file in your project's temporary directory, typically located at
 The Checkpointing feature is disabled by default. To enable it, you need to edit
 your `settings.json` file.
 
-> **Note:** The `--checkpointing` command-line flag was removed in version
+<!-- prettier-ignore -->
+> [!CAUTION]
+> The `--checkpointing` command-line flag was removed in version
 > 0.11.0. Checkpointing can now only be enabled through the `settings.json`
 > configuration file.
 

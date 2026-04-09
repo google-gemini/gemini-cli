@@ -86,32 +86,35 @@ available combinations.
 
 #### Text Input
 
-| Command                    | Action                                                     | Keys                                                                                |
-| -------------------------- | ---------------------------------------------------------- | ----------------------------------------------------------------------------------- |
-| `input.submit`             | Submit the current prompt.                                 | `Enter`                                                                             |
-| `input.newline`            | Insert a newline without submitting.                       | `Ctrl+Enter`<br />`Cmd/Win+Enter`<br />`Alt+Enter`<br />`Shift+Enter`<br />`Ctrl+J` |
-| `input.openExternalEditor` | Open the current prompt or the plan in an external editor. | `Ctrl+X`                                                                            |
-| `input.paste`              | Paste from the clipboard.                                  | `Ctrl+V`<br />`Cmd/Win+V`<br />`Alt+V`                                              |
+| Command                              | Action                                                                    | Keys                                                                                |
+| ------------------------------------ | ------------------------------------------------------------------------- | ----------------------------------------------------------------------------------- |
+| `input.submit`                       | Submit the current prompt.                                                | `Enter`                                                                             |
+| `input.queueMessage`                 | Queue the current prompt to be processed after the current task finishes. | `Tab`                                                                               |
+| `input.newline`                      | Insert a newline without submitting.                                      | `Ctrl+Enter`<br />`Cmd/Win+Enter`<br />`Alt+Enter`<br />`Shift+Enter`<br />`Ctrl+J` |
+| `input.openExternalEditor`           | Open the current prompt or the plan in an external editor.                | `Ctrl+G`                                                                            |
+| `input.deprecatedOpenExternalEditor` | Deprecated command to open external editor.                               | `Ctrl+X`                                                                            |
+| `input.paste`                        | Paste from the clipboard.                                                 | `Ctrl+V`<br />`Cmd/Win+V`<br />`Alt+V`                                              |
 
 #### App Controls
 
-| Command                       | Action                                                                                                                                             | Keys                   |
-| ----------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------- |
-| `app.showErrorDetails`        | Toggle detailed error information.                                                                                                                 | `F12`                  |
-| `app.showFullTodos`           | Toggle the full TODO list.                                                                                                                         | `Ctrl+T`               |
-| `app.showIdeContextDetail`    | Show IDE context details.                                                                                                                          | `Ctrl+G`               |
-| `app.toggleMarkdown`          | Toggle Markdown rendering.                                                                                                                         | `Alt+M`                |
-| `app.toggleCopyMode`          | Toggle copy mode when in alternate buffer mode.                                                                                                    | `Ctrl+S`               |
-| `app.toggleYolo`              | Toggle YOLO (auto-approval) mode for tool calls.                                                                                                   | `Ctrl+Y`               |
-| `app.cycleApprovalMode`       | Cycle through approval modes: default (prompt), auto_edit (auto-approve edits), and plan (read-only). Plan mode is skipped when the agent is busy. | `Shift+Tab`<br />`F10` |
-| `app.showMoreLines`           | Expand and collapse blocks of content when not in alternate buffer mode.                                                                           | `Ctrl+O`               |
-| `app.expandPaste`             | Expand or collapse a paste placeholder when cursor is over placeholder.                                                                            | `Ctrl+O`               |
-| `app.focusShellInput`         | Move focus from Gemini to the active shell.                                                                                                        | `Tab`                  |
-| `app.unfocusShellInput`       | Move focus from the shell back to Gemini.                                                                                                          | `Shift+Tab`            |
-| `app.clearScreen`             | Clear the terminal screen and redraw the UI.                                                                                                       | `Ctrl+L`               |
-| `app.restart`                 | Restart the application.                                                                                                                           | `R`<br />`Shift+R`     |
-| `app.suspend`                 | Suspend the CLI and move it to the background.                                                                                                     | `Ctrl+Z`               |
-| `app.showShellUnfocusWarning` | Show warning when trying to move focus away from shell input.                                                                                      | `Tab`                  |
+| Command                       | Action                                                                                                                                             | Keys                        |
+| ----------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------- |
+| `app.showErrorDetails`        | Toggle detailed error information.                                                                                                                 | `F12`                       |
+| `app.showFullTodos`           | Toggle the full TODO list.                                                                                                                         | `Ctrl+T`                    |
+| `app.showIdeContextDetail`    | Show IDE context details.                                                                                                                          | `F4`                        |
+| `app.toggleMarkdown`          | Toggle Markdown rendering.                                                                                                                         | `Alt+M`                     |
+| `app.toggleCopyMode`          | Toggle copy mode when in alternate buffer mode.                                                                                                    | `F9`                        |
+| `app.toggleMouseMode`         | Toggle mouse mode (scrolling and clicking).                                                                                                        | `Ctrl+S`                    |
+| `app.toggleYolo`              | Toggle YOLO (auto-approval) mode for tool calls.                                                                                                   | `Ctrl+Y`                    |
+| `app.cycleApprovalMode`       | Cycle through approval modes: default (prompt), auto_edit (auto-approve edits), and plan (read-only). Plan mode is skipped when the agent is busy. | `Shift+Tab`<br />`F10`      |
+| `app.showMoreLines`           | Expand and collapse blocks of content when not in alternate buffer mode.                                                                           | `Ctrl+O`                    |
+| `app.expandPaste`             | Expand or collapse a paste placeholder when cursor is over placeholder.                                                                            | `Ctrl+O`                    |
+| `app.focusShellInput`         | Move focus from Gemini to the active shell.                                                                                                        | `Tab`                       |
+| `app.unfocusShellInput`       | Move focus from the shell back to Gemini.                                                                                                          | `Shift+Tab`                 |
+| `app.clearScreen`             | Clear the terminal screen and redraw the UI.                                                                                                       | `Ctrl+L`                    |
+| `app.restart`                 | Restart the application.                                                                                                                           | `R`<br />`Shift+R`          |
+| `app.suspend`                 | Suspend the CLI and move it to the background.                                                                                                     | `Ctrl+Z`                    |
+| `app.showShellUnfocusWarning` | Show warning when trying to move focus away from shell input.                                                                                      | `Tab`                       |
 
 #### Background Shell Controls
 
@@ -125,6 +128,16 @@ available combinations.
 | `background.unfocus`        | Move focus from background shell to Gemini.                        | `Shift+Tab` |
 | `background.unfocusList`    | Move focus from background shell list to Gemini.                   | `Tab`       |
 | `background.unfocusWarning` | Show warning when trying to move focus away from background shell. | `Tab`       |
+| `app.dumpFrame`             | Dump the current frame as a snapshot.                              | `F8`        |
+| `app.startRecording`        | Start recording the session.                                       | `F6`        |
+| `app.stopRecording`         | Stop recording the session.                                        | `F7`        |
+
+#### Extension Controls
+
+| Command            | Action                                      | Keys |
+| ------------------ | ------------------------------------------- | ---- |
+| `extension.update` | Update the current extension if available.  | `I`  |
+| `extension.link`   | Link the current extension to a local path. | `L`  |
 
 <!-- KEYBINDINGS-AUTOGEN:END -->
 

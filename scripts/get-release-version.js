@@ -195,7 +195,7 @@ function doesVersionExist({ args, version } = {}) {
       console.error(`Version ${version} already exists on NPM.`);
       return true;
     }
-  } catch (_error) {
+  } catch {
     // This is expected if the version doesn't exist.
   }
 
