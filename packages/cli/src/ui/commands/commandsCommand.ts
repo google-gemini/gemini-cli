@@ -41,7 +41,7 @@ async function listSubcommandAction(
   context: CommandContext,
 ): Promise<void | SlashCommandActionReturn> {
   try {
-    const config = context.services.config;
+    const config = context.services.agentContext?.config ?? null;
     const loader = new FileCommandLoader(config);
     const groups = await loader.listAvailableFiles();
 

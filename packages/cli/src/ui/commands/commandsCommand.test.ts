@@ -42,7 +42,7 @@ describe('commandsCommand', () => {
         addItem: vi.fn(),
       },
       services: {
-        config: {
+        agentContext: {
           getProjectRoot: vi.fn().mockReturnValue('/mock/project'),
           getFolderTrust: vi.fn().mockReturnValue(false),
           isTrustedFolder: vi.fn().mockReturnValue(false),
