@@ -137,7 +137,7 @@ describe('GeminiClient Watcher Integration', () => {
       'gemini-pro',
     );
 
-    clientAccess.sessionTurnCount = 1; // Will become 2 inside processTurn
+    clientAccess.sessionTurnCount = 0; // Will become 1 inside processTurn
 
     const promptId = 'test-prompt';
     const signal = new AbortController().signal;
@@ -214,7 +214,7 @@ describe('GeminiClient Watcher Integration', () => {
       'gemini-pro',
     );
 
-    clientAccess.sessionTurnCount = 1; // Will become 2 inside processTurn
+    clientAccess.sessionTurnCount = 0; // Will become 1 inside processTurn
 
     const promptId = 'test-prompt';
     const signal = new AbortController().signal;
@@ -347,8 +347,8 @@ describe('GeminiClient Watcher Integration', () => {
       }
     }
 
-    // With interval 5, it should trigger at turn 5 and turn 10
-    expect(mockWatcherTool.build).toHaveBeenCalledTimes(2);
+    // With interval 5, it should trigger at turn 1, turn 5 and turn 10
+    expect(mockWatcherTool.build).toHaveBeenCalledTimes(3);
 
     // Verify the status file exists
     const projectTempDir = config.storage.getProjectTempDir();

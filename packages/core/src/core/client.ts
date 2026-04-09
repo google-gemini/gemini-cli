@@ -604,10 +604,11 @@ export class GeminiClient {
 
     this.sessionTurnCount++;
 
+    const watcherInterval = this.config.getExperimentalWatcherInterval();
     if (
       this.config.isExperimentalWatcherEnabled() &&
-      this.sessionTurnCount > 0 &&
-      this.sessionTurnCount % this.config.getExperimentalWatcherInterval() === 0
+      (this.sessionTurnCount === 1 ||
+        this.sessionTurnCount % watcherInterval === 0)
     ) {
       const watcherResult = await this.tryRunWatcher(prompt_id, signal);
       if (watcherResult?.feedback) {
