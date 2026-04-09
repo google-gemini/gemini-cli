@@ -542,6 +542,7 @@ export const AppContainer = (props: AppContainerProps) => {
 
     return () => {
       removeCleanup(cleanupFn);
+      void cleanupFn();
     };
     // Disable the dependencies check here. historyManager gets flagged
     // but we don't want to react to changes to it because each new history
