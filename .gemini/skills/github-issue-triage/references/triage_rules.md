@@ -43,8 +43,9 @@ Check if ANY of the following conditions are met:
 ## Step 1.1: Existing Feature Check
 **CRITICAL MISTAKE PREVENTION**: If the issue describes a feature request or enhancement (regardless of whether the JSON `is_feature_request` flag is true or false), you **MUST explicitly search the codebase** to verify if it is already implemented. You cannot skip this step for feature requests.
 1. Use the `grep_search` tool to look for relevant keywords related to the feature in files like `schemas/settings.schema.json`, `packages/cli/src/config/config.ts`, command definitions, or UI components.
-2. If you verify that the requested functionality (e.g., a setting, flag, or command) already exists natively:
-   - Execute `gh issue close <issue_url> --comment "This feature is actually already implemented! <Provide a brief explanation of how to use the feature, such as the command to run, the setting to change, or the flag to pass>.\n\nI'm going to close this issue since the functionality already exists natively. Let us know if you run into any other issues!" --reason "completed"`
+   - **Hotkeys & UI Actions**: If the user asks for a way to expand text, pause output, copy text, or perform a UI action, explicitly check `packages/cli/src/ui/key/keyBindings.ts` and the `Command` enum. Many interactive features (e.g., `Ctrl+O` for expanding truncated tool confirmations or output) already exist natively.
+2. If you verify that the requested functionality (e.g., a setting, flag, hotkey, or command) already exists natively:
+   - Execute `gh issue close <issue_url> --comment "This feature is actually already implemented! <Provide a brief explanation of how to use the feature, such as the command to run, the setting to change, or the hotkey to press>.\n\nI'm going to close this issue since the functionality already exists natively. Let us know if you run into any other issues!" --reason "completed"`
    - **STOP EXECUTION**.
 3. If the feature does NOT exist, proceed to Step 1.2.
 
