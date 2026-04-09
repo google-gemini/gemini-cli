@@ -174,6 +174,7 @@ import { useTimedMessage } from './hooks/useTimedMessage.js';
 import { useIsHelpDismissKey } from './utils/shortcutsHelp.js';
 import { useSuspend } from './hooks/useSuspend.js';
 import { useRunEventNotifications } from './hooks/useRunEventNotifications.js';
+import { useTraceUpdate } from './hooks/useTraceUpdate.js';
 import { isNotificationsEnabled } from '../utils/terminalNotifications.js';
 import {
   getLastTurnToolCallIds,
@@ -218,6 +219,10 @@ export const AppContainer = (props: AppContainerProps) => {
   const settings = useSettings();
   const { reset } = useOverflowActions()!;
   const notificationsEnabled = isNotificationsEnabled(settings);
+
+  useTraceUpdate('AppContainer', {
+    props,
+  });
 
   const { setOptions, dumpCurrentFrame, startRecording, stopRecording } =
     useContext(InkAppContext);
@@ -314,12 +319,14 @@ export const AppContainer = (props: AppContainerProps) => {
   const [queueErrorMessage, setQueueErrorMessage] = useTimedMessage<string>(
     QUEUE_ERROR_DISPLAY_DURATION_MS,
   );
+  useTraceUpdate('AppContainer (queueErrorMessage)', { queueErrorMessage });
 
   const [newAgents, setNewAgents] = useState<AgentDefinition[] | null>(null);
   const [constrainHeight, setConstrainHeight] = useState<boolean>(true);
   const [expandHintTrigger, triggerExpandHint] = useTimedMessage<boolean>(
     EXPAND_HINT_DURATION_MS,
   );
+  useTraceUpdate('AppContainer (expandHintTrigger)', { expandHintTrigger });
   const showIsExpandableHint = Boolean(expandHintTrigger);
   const overflowState = useOverflowState();
   const overflowingIdsSize = overflowState?.overflowingIds.size ?? 0;
@@ -1621,6 +1628,7 @@ Logging in with Google... Restarting Gemini CLI to continue.
     text: string;
     type: TransientMessageType;
   }>(WARNING_PROMPT_DURATION_MS);
+  useTraceUpdate('AppContainer (transientMessage)', { transientMessage });
 
   const {
     isFolderTrustDialogOpen,
