@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { useRef, useEffect, useCallback } from 'react';
+import { useRef, useLayoutEffect, useCallback } from 'react';
 
 /**
  * A hook to manage batched scroll state updates.
@@ -17,7 +17,7 @@ export function useBatchedScroll(currentScrollTop: number) {
   // and not depend on the currentScrollTop value directly in its dependency array.
   const currentScrollTopRef = useRef(currentScrollTop);
 
-  useEffect(() => {
+  useLayoutEffect(() => {
     currentScrollTopRef.current = currentScrollTop;
     pendingScrollTopRef.current = null;
   });

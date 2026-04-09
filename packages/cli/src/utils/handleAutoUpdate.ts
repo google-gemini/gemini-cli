@@ -8,8 +8,7 @@ import type { UpdateObject } from '../ui/utils/updateCheck.js';
 import type { LoadedSettings } from '../config/settings.js';
 import { getInstallationInfo, PackageManager } from './installationInfo.js';
 import { updateEventEmitter } from './updateEventEmitter.js';
-import type { HistoryItem } from '../ui/types.js';
-import { MessageType } from '../ui/types.js';
+import { MessageType, type HistoryItem } from '../ui/types.js';
 import { spawnWrapper } from './spawnWrapper.js';
 import type { spawn } from 'node:child_process';
 import { debugLogger } from '@google/gemini-cli-core';
@@ -88,9 +87,12 @@ export function handleAutoUpdate(
   );
 
   if (
-    [PackageManager.NPX, PackageManager.PNPX, PackageManager.BUNX].includes(
-      installationInfo.packageManager,
-    )
+    [
+      PackageManager.NPX,
+      PackageManager.PNPX,
+      PackageManager.BUNX,
+      PackageManager.BINARY,
+    ].includes(installationInfo.packageManager)
   ) {
     return;
   }
@@ -100,17 +102,22 @@ export function handleAutoUpdate(
     combinedMessage += `\n${installationInfo.updateMessage}`;
   }
 
-  updateEventEmitter.emit('update-received', {
-    message: combinedMessage,
-  });
-
   if (
     !installationInfo.updateCommand ||
     !settings.merged.general.enableAutoUpdate
   ) {
+    updateEventEmitter.emit('update-received', {
+      ...info,
+      message: combinedMessage,
+      isUpdating: false,
+    });
     return;
   }
-
+  updateEventEmitter.emit('update-received', {
+    ...info,
+    message: combinedMessage,
+    isUpdating: true,
+  });
   if (_updateInProgress) {
     return;
   }

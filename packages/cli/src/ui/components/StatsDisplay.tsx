@@ -8,30 +8,23 @@ import type React from 'react';
 import { Box, Text } from 'ink';
 import { ThemedGradient } from './ThemedGradient.js';
 import { theme } from '../semantic-colors.js';
-import { formatDuration, formatResetTime } from '../utils/formatters.js';
-import type { ModelMetrics } from '../contexts/SessionContext.js';
-import { useSessionStats } from '../contexts/SessionContext.js';
+import { formatDuration } from '../utils/formatters.js';
+import {
+  useSessionStats,
+  type ModelMetrics,
+  type RoleMetrics,
+} from '../contexts/SessionContext.js';
 import {
   getStatusColor,
   TOOL_SUCCESS_RATE_HIGH,
   TOOL_SUCCESS_RATE_MEDIUM,
   USER_AGREEMENT_RATE_HIGH,
   USER_AGREEMENT_RATE_MEDIUM,
-  CACHE_EFFICIENCY_HIGH,
-  CACHE_EFFICIENCY_MEDIUM,
 } from '../utils/displayUtils.js';
 import { computeSessionStats } from '../utils/computeStats.js';
-import {
-  type RetrieveUserQuotaResponse,
-  isActiveModel,
-  getDisplayString,
-  isAutoModel,
-  AuthType,
-} from '@google/gemini-cli-core';
 import { useSettings } from '../contexts/SettingsContext.js';
-import { useConfig } from '../contexts/ConfigContext.js';
 import type { QuotaStats } from '../types.js';
-import { QuotaStatsInfo } from './QuotaStatsInfo.js';
+import { LlmRole } from '@google/gemini-cli-core';
 
 // A more flexible and powerful StatRow component
 interface StatRowProps {
@@ -81,306 +74,155 @@ const Section: React.FC<SectionProps> = ({ title, children }) => (
 );
 
 // Logic for building the unified list of table rows
-const buildModelRows = (
-  models: Record<string, ModelMetrics>,
-  quotas?: RetrieveUserQuotaResponse,
-  useGemini3_1 = false,
-  useCustomToolModel = false,
-) => {
-  const getBaseModelName = (name: string) => name.replace('-001', '');
-  const usedModelNames = new Set(
-    Object.keys(models).map(getBaseModelName).map(getDisplayString),
-  );
 
-  // 1. Models with active usage
-  const activeRows = Object.entries(models).map(([name, metrics]) => {
-    const modelName = getBaseModelName(name);
-    const cachedTokens = metrics.tokens.cached;
-    const inputTokens = metrics.tokens.input;
-    return {
-      key: name,
-      modelName: getDisplayString(modelName),
-      requests: metrics.api.totalRequests,
-      cachedTokens: cachedTokens.toLocaleString(),
-      inputTokens: inputTokens.toLocaleString(),
-      outputTokens: metrics.tokens.candidates.toLocaleString(),
-      bucket: quotas?.buckets?.find((b) => b.modelId === modelName),
-      isActive: true,
-    };
-  });
-
-  // 2. Models with quota only
-  const quotaRows =
-    quotas?.buckets
-      ?.filter(
-        (b) =>
-          b.modelId &&
-          isActiveModel(b.modelId, useGemini3_1, useCustomToolModel) &&
-          !usedModelNames.has(getDisplayString(b.modelId)),
-      )
-      .map((bucket) => ({
-        key: bucket.modelId!,
-        modelName: getDisplayString(bucket.modelId!),
-        requests: '-',
-        cachedTokens: '-',
-        inputTokens: '-',
-        outputTokens: '-',
-        bucket,
-        isActive: false,
-      })) || [];
-
-  return [...activeRows, ...quotaRows];
-};
-
-const ModelUsageTable: React.FC<{
+interface ModelUsageTableProps {
   models: Record<string, ModelMetrics>;
-  quotas?: RetrieveUserQuotaResponse;
-  cacheEfficiency: number;
-  totalCachedTokens: number;
-  currentModel?: string;
-  pooledRemaining?: number;
-  pooledLimit?: number;
-  pooledResetTime?: string;
-  useGemini3_1?: boolean;
-  useCustomToolModel?: boolean;
-}> = ({
-  models,
-  quotas,
-  cacheEfficiency,
-  totalCachedTokens,
-  currentModel,
-  pooledRemaining,
-  pooledLimit,
-  pooledResetTime,
-  useGemini3_1,
-  useCustomToolModel,
-}) => {
-  const rows = buildModelRows(models, quotas, useGemini3_1, useCustomToolModel);
+}
 
-  if (rows.length === 0) {
-    return null;
-  }
+interface ModelRow {
+  name: string;
+  displayName: string;
+  requests: number | string;
+  cachedTokens: string;
+  inputTokens: string;
+  outputTokens: string;
+  isSubRow: boolean;
+}
 
-  const showQuotaColumn = !!quotas && rows.some((row) => !!row.bucket);
+const ModelUsageTable: React.FC<ModelUsageTableProps> = ({ models }) => {
+  const nameWidth = 28;
+  const requestsWidth = 8;
+  const inputTokensWidth = 14;
+  const cacheReadsWidth = 14;
+  const outputTokensWidth = 14;
 
-  const nameWidth = 25;
-  const requestsWidth = 7;
-  const uncachedWidth = 15;
-  const cachedWidth = 14;
-  const outputTokensWidth = 15;
-  const usageLimitWidth = showQuotaColumn ? 28 : 0;
+  const rows: ModelRow[] = [];
 
-  const cacheEfficiencyColor = getStatusColor(cacheEfficiency, {
-    green: CACHE_EFFICIENCY_HIGH,
-    yellow: CACHE_EFFICIENCY_MEDIUM,
+  Object.entries(models).forEach(([name, metrics]) => {
+    rows.push({
+      name,
+      displayName: name,
+      requests: metrics.api.totalRequests,
+      cachedTokens: metrics.tokens.cached.toLocaleString(),
+      inputTokens: metrics.tokens.prompt.toLocaleString(),
+      outputTokens: metrics.tokens.candidates.toLocaleString(),
+      isSubRow: false,
+    });
+
+    if (metrics.roles) {
+      const roleEntries = Object.entries(metrics.roles).filter(
+        (entry): entry is [string, RoleMetrics] =>
+          entry[1] !== undefined && entry[1].totalRequests > 0,
+      );
+
+      roleEntries.sort(([a], [b]) => {
+        if (a === b) return 0;
+        if (a === LlmRole.MAIN) return -1;
+        if (b === LlmRole.MAIN) return 1;
+        return a.localeCompare(b);
+      });
+
+      roleEntries.forEach(([role, roleMetrics]) => {
+        rows.push({
+          name: `${name}-${role}`,
+          displayName: `  ↳ ${role}`,
+          requests: roleMetrics.totalRequests,
+          cachedTokens: roleMetrics.tokens.cached.toLocaleString(),
+          inputTokens: roleMetrics.tokens.prompt.toLocaleString(),
+          outputTokens: roleMetrics.tokens.candidates.toLocaleString(),
+          isSubRow: true,
+        });
+      });
+    }
   });
-
-  const totalWidth =
-    nameWidth +
-    requestsWidth +
-    (showQuotaColumn
-      ? usageLimitWidth
-      : uncachedWidth + cachedWidth + outputTokensWidth);
-
-  const isAuto = currentModel && isAutoModel(currentModel);
-  const modelUsageTitle = isAuto
-    ? `${getDisplayString(currentModel)} Usage`
-    : `Model Usage`;
 
   return (
-    <Box flexDirection="column" marginBottom={1}>
+    <Box flexDirection="column" marginTop={1}>
+      <Text bold color={theme.text.primary}>
+        Model Usage
+      </Text>
+      <Text color={theme.text.secondary}>
+        Use /model to view model quota information
+      </Text>
+      <Box height={1} />
+
       {/* Header */}
-      <Box alignItems="flex-end">
-        <Box width={nameWidth}>
-          <Text bold color={theme.text.primary} wrap="truncate-end">
-            {modelUsageTitle}
-          </Text>
-        </Box>
-      </Box>
-
-      {isAuto &&
-        showQuotaColumn &&
-        pooledRemaining !== undefined &&
-        pooledLimit !== undefined &&
-        pooledLimit > 0 && (
-          <Box flexDirection="column" marginTop={0} marginBottom={1}>
-            <QuotaStatsInfo
-              remaining={pooledRemaining}
-              limit={pooledLimit}
-              resetTime={pooledResetTime}
-            />
-            <Text color={theme.text.primary}>
-              For a full token breakdown, run `/stats model`.
-            </Text>
-          </Box>
-        )}
-
-      <Box alignItems="flex-end">
-        <Box width={nameWidth}>
-          <Text bold color={theme.text.primary}>
-            Model
-          </Text>
-        </Box>
-        <Box
-          width={requestsWidth}
-          flexDirection="column"
-          alignItems="flex-end"
-          flexShrink={0}
-        >
-          <Text bold color={theme.text.primary}>
-            Reqs
-          </Text>
-        </Box>
-
-        {!showQuotaColumn && (
-          <>
-            <Box
-              width={uncachedWidth}
-              flexDirection="column"
-              alignItems="flex-end"
-              flexShrink={0}
-            >
-              <Text bold color={theme.text.primary}>
-                Input Tokens
-              </Text>
-            </Box>
-            <Box
-              width={cachedWidth}
-              flexDirection="column"
-              alignItems="flex-end"
-              flexShrink={0}
-            >
-              <Text bold color={theme.text.primary}>
-                Cache Reads
-              </Text>
-            </Box>
-            <Box
-              width={outputTokensWidth}
-              flexDirection="column"
-              alignItems="flex-end"
-              flexShrink={0}
-            >
-              <Text bold color={theme.text.primary}>
-                Output Tokens
-              </Text>
-            </Box>
-          </>
-        )}
-        {showQuotaColumn && (
-          <Box
-            width={usageLimitWidth}
-            flexDirection="column"
-            alignItems="flex-end"
-          >
-            <Text bold color={theme.text.primary}>
-              Usage remaining
-            </Text>
-          </Box>
-        )}
-      </Box>
-
-      {/* Divider */}
       <Box
-        borderStyle="round"
         borderBottom={true}
+        borderStyle="single"
+        borderColor={theme.border.default}
         borderTop={false}
         borderLeft={false}
         borderRight={false}
-        borderColor={theme.border.default}
-        width={totalWidth}
-      ></Box>
+      >
+        <Box width={nameWidth}>
+          <Text bold color={theme.text.secondary}>
+            Model
+          </Text>
+        </Box>
+        <Box width={requestsWidth} justifyContent="flex-end">
+          <Text bold color={theme.text.secondary}>
+            Reqs
+          </Text>
+        </Box>
+        <Box width={inputTokensWidth} justifyContent="flex-end">
+          <Text bold color={theme.text.secondary}>
+            Input Tokens
+          </Text>
+        </Box>
+        <Box width={cacheReadsWidth} justifyContent="flex-end">
+          <Text bold color={theme.text.secondary}>
+            Cache Reads
+          </Text>
+        </Box>
+        <Box width={outputTokensWidth} justifyContent="flex-end">
+          <Text bold color={theme.text.secondary}>
+            Output Tokens
+          </Text>
+        </Box>
+      </Box>
 
+      {/* Rows */}
       {rows.map((row) => (
-        <Box key={row.key}>
+        <Box key={row.name}>
           <Box width={nameWidth}>
             <Text
-              color={row.isActive ? theme.text.primary : theme.text.secondary}
+              color={row.isSubRow ? theme.text.secondary : theme.text.primary}
               wrap="truncate-end"
             >
-              {row.modelName}
+              {row.displayName}
             </Text>
           </Box>
-          <Box
-            width={requestsWidth}
-            flexDirection="column"
-            alignItems="flex-end"
-            flexShrink={0}
-          >
+          <Box width={requestsWidth} justifyContent="flex-end">
             <Text
-              color={row.isActive ? theme.text.primary : theme.text.secondary}
+              color={row.isSubRow ? theme.text.secondary : theme.text.primary}
             >
               {row.requests}
             </Text>
           </Box>
-          {!showQuotaColumn && (
-            <>
-              <Box
-                width={uncachedWidth}
-                flexDirection="column"
-                alignItems="flex-end"
-                flexShrink={0}
-              >
-                <Text
-                  color={
-                    row.isActive ? theme.text.primary : theme.text.secondary
-                  }
-                >
-                  {row.inputTokens}
-                </Text>
-              </Box>
-              <Box
-                width={cachedWidth}
-                flexDirection="column"
-                alignItems="flex-end"
-                flexShrink={0}
-              >
-                <Text color={theme.text.secondary}>{row.cachedTokens}</Text>
-              </Box>
-              <Box
-                width={outputTokensWidth}
-                flexDirection="column"
-                alignItems="flex-end"
-                flexShrink={0}
-              >
-                <Text
-                  color={
-                    row.isActive ? theme.text.primary : theme.text.secondary
-                  }
-                >
-                  {row.outputTokens}
-                </Text>
-              </Box>
-            </>
-          )}
-          <Box
-            width={usageLimitWidth}
-            flexDirection="column"
-            alignItems="flex-end"
-          >
-            {row.bucket &&
-              row.bucket.remainingFraction != null &&
-              row.bucket.resetTime && (
-                <Text color={theme.text.secondary} wrap="truncate-end">
-                  {(row.bucket.remainingFraction * 100).toFixed(1)}%{' '}
-                  {formatResetTime(row.bucket.resetTime)}
-                </Text>
-              )}
+          <Box width={inputTokensWidth} justifyContent="flex-end">
+            <Text
+              color={row.isSubRow ? theme.text.secondary : theme.text.primary}
+            >
+              {row.inputTokens}
+            </Text>
+          </Box>
+          <Box width={cacheReadsWidth} justifyContent="flex-end">
+            <Text
+              color={row.isSubRow ? theme.text.secondary : theme.text.primary}
+            >
+              {row.cachedTokens}
+            </Text>
+          </Box>
+          <Box width={outputTokensWidth} justifyContent="flex-end">
+            <Text
+              color={row.isSubRow ? theme.text.secondary : theme.text.primary}
+            >
+              {row.outputTokens}
+            </Text>
           </Box>
         </Box>
       ))}
-
-      {cacheEfficiency > 0 && !showQuotaColumn && (
-        <Box flexDirection="column" marginTop={1}>
-          <Text color={theme.text.primary}>
-            <Text color={theme.status.success}>Savings Highlight:</Text>{' '}
-            {totalCachedTokens.toLocaleString()} (
-            <Text color={cacheEfficiencyColor}>
-              {cacheEfficiency.toFixed(1)}%
-            </Text>
-            ) of input tokens were served from the cache, reducing costs.
-          </Text>
-        </Box>
-      )}
     </Box>
   );
 };
@@ -388,7 +230,6 @@ const ModelUsageTable: React.FC<{
 interface StatsDisplayProps {
   duration: string;
   title?: string;
-  quotas?: RetrieveUserQuotaResponse;
   footer?: string;
   selectedAuthType?: string;
   userEmail?: string;
@@ -401,28 +242,17 @@ interface StatsDisplayProps {
 export const StatsDisplay: React.FC<StatsDisplayProps> = ({
   duration,
   title,
-  quotas,
   footer,
   selectedAuthType,
   userEmail,
   tier,
-  currentModel,
-  quotaStats,
   creditBalance,
 }) => {
   const { stats } = useSessionStats();
   const { metrics } = stats;
-  const { models, tools, files } = metrics;
+  const { tools, files, models } = metrics;
   const computed = computeSessionStats(metrics);
   const settings = useSettings();
-  const config = useConfig();
-  const useGemini3_1 = config.getGemini31LaunchedSync?.() ?? false;
-  const useCustomToolModel =
-    useGemini3_1 &&
-    config.getContentGeneratorConfig().authType === AuthType.USE_GEMINI;
-  const pooledRemaining = quotaStats?.remaining;
-  const pooledLimit = quotaStats?.limit;
-  const pooledResetTime = quotaStats?.resetTime;
 
   const showUserIdentity = settings.merged.ui.showUserIdentity;
 
@@ -479,8 +309,8 @@ export const StatsDisplay: React.FC<StatsDisplayProps> = ({
             <Text color={theme.text.primary}>
               {selectedAuthType.startsWith('oauth')
                 ? userEmail
-                  ? `Logged in with Google (${userEmail})`
-                  : 'Logged in with Google'
+                  ? `Signed in with Google (${userEmail})`
+                  : 'Signed in with Google'
                 : selectedAuthType}
             </Text>
           </StatRow>
@@ -562,18 +392,9 @@ export const StatsDisplay: React.FC<StatsDisplayProps> = ({
           </Text>
         </SubStatRow>
       </Section>
-      <ModelUsageTable
-        models={models}
-        quotas={quotas}
-        cacheEfficiency={computed.cacheEfficiency}
-        totalCachedTokens={computed.totalCachedTokens}
-        currentModel={currentModel}
-        pooledRemaining={pooledRemaining}
-        pooledLimit={pooledLimit}
-        pooledResetTime={pooledResetTime}
-        useGemini3_1={useGemini3_1}
-        useCustomToolModel={useCustomToolModel}
-      />
+
+      {Object.keys(models).length > 0 && <ModelUsageTable models={models} />}
+
       {renderFooter()}
     </Box>
   );

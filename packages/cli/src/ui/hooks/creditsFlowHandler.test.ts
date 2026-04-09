@@ -15,6 +15,7 @@ import {
   shouldAutoUseCredits,
   shouldShowOverageMenu,
   shouldShowEmptyWalletMenu,
+  shouldLaunchBrowser,
   logBillingEvent,
   G1_CREDIT_TYPE,
   UserTierId,
@@ -32,6 +33,7 @@ vi.mock('@google/gemini-cli-core', async (importOriginal) => {
     shouldShowEmptyWalletMenu: vi.fn(),
     logBillingEvent: vi.fn(),
     openBrowserSecurely: vi.fn(),
+    shouldLaunchBrowser: vi.fn().mockReturnValue(true),
   };
 });
 
@@ -236,5 +238,50 @@ describe('handleCreditsFlow', () => {
 
     expect(isDialogPending.current).toBe(false);
     expect(mockSetEmptyWalletRequest).toHaveBeenCalledWith(null);
+  });
+
+  describe('headless mode (shouldLaunchBrowser=false)', () => {
+    beforeEach(() => {
+      vi.mocked(shouldLaunchBrowser).mockReturnValue(false);
+    });
+
+    it('should show manage URL in history when manage selected in headless mode', async () => {
+      vi.mocked(shouldShowOverageMenu).mockReturnValue(true);
+
+      const flowPromise = handleCreditsFlow(makeArgs());
+      const request = mockSetOverageMenuRequest.mock.calls[0][0];
+      request.resolve('manage');
+      const result = await flowPromise;
+
+      expect(result).toBe('stop');
+      expect(mockHistoryManager.addItem).toHaveBeenCalledWith(
+        expect.objectContaining({
+          type: MessageType.INFO,
+          text: expect.stringContaining('Please open this URL in a browser:'),
+        }),
+        expect.any(Number),
+      );
+    });
+
+    it('should show credits URL in history when get_credits selected in headless mode', async () => {
+      vi.mocked(shouldShowEmptyWalletMenu).mockReturnValue(true);
+
+      const flowPromise = handleCreditsFlow(makeArgs());
+      const request = mockSetEmptyWalletRequest.mock.calls[0][0];
+
+      // Trigger onGetCredits callback and wait for it
+      await request.onGetCredits();
+
+      expect(mockHistoryManager.addItem).toHaveBeenCalledWith(
+        expect.objectContaining({
+          type: MessageType.INFO,
+          text: expect.stringContaining('Please open this URL in a browser:'),
+        }),
+        expect.any(Number),
+      );
+
+      request.resolve('get_credits');
+      await flowPromise;
+    });
   });
 });
