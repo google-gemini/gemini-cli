@@ -35,8 +35,6 @@ import {
   WRITE_FILE_DISPLAY_NAME,
   READ_MANY_FILES_DISPLAY_NAME,
   isFileDiff,
-  isGrepResult,
-  isListResult,
 } from '@google/gemini-cli-core';
 import { useUIState } from '../../contexts/UIStateContext.js';
 import { getToolGroupBorderAppearance } from '../../utils/borderStyles.js';
@@ -81,15 +79,6 @@ export const hasDensePayload = (tool: IndividualToolCallDisplay): boolean => {
   // TODO(24053): Usage of type guards makes this class too aware of internals
   if (isFileDiff(res)) return true;
   if (tool.confirmationDetails?.type === 'edit') return true;
-  if (isGrepResult(res) && res.matches.length > 0) return true;
-
-  // ReadManyFilesResult check (has 'include' and 'files')
-  if (isListResult(res) && 'include' in res) {
-    const includeProp = (res as { include?: unknown }).include;
-    if (Array.isArray(includeProp) && res.files.length > 0) {
-      return true;
-    }
-  }
 
   // Generic summary/payload pattern
   if (
