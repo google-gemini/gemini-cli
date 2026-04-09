@@ -72,11 +72,12 @@ export async function buildBwrapArgs(
 
   if (resolvedPaths.gitWorktree) {
     const { worktreeGitDir, mainGitDir } = resolvedPaths.gitWorktree;
+    // Support git worktrees/submodules; read-only to prevent malicious hook/config modification (RCE).
     if (worktreeGitDir) {
-      bwrapArgs.push(bindFlag, worktreeGitDir, worktreeGitDir);
+      bwrapArgs.push('--ro-bind-try', worktreeGitDir, worktreeGitDir);
     }
     if (mainGitDir) {
-      bwrapArgs.push(bindFlag, mainGitDir, mainGitDir);
+      bwrapArgs.push('--ro-bind-try', mainGitDir, mainGitDir);
     }
   }
 

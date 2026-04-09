@@ -359,4 +359,20 @@ describe.skipIf(os.platform() === 'win32')('buildBwrapArgs', () => {
     expect(args[args.indexOf(worktreeGitDir) - 1]).toBe('--ro-bind-try');
     expect(args[args.indexOf(mainGitDir) - 1]).toBe('--ro-bind-try');
   });
+
+  it('enforces read-only binding for git worktrees even if workspaceWrite is true', async () => {
+    const worktreeGitDir = '/path/to/worktree/.git';
+
+    const args = await buildBwrapArgs({
+      ...defaultOptions,
+      workspaceWrite: true,
+      resolvedPaths: createResolvedPaths({
+        gitWorktree: {
+          worktreeGitDir,
+        },
+      }),
+    });
+
+    expect(args[args.indexOf(worktreeGitDir) - 1]).toBe('--ro-bind-try');
+  });
 });

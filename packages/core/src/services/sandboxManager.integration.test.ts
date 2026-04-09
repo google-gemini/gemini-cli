@@ -557,6 +557,50 @@ describe('SandboxManager Integration', () => {
       assertResult(result, sandboxed, 'success');
       expect(result.stdout.trim()).toBe('git-secret');
     });
+
+    it('blocks write access to git common directory in a worktree', async () => {
+      const mainRepo = createTempDir('main-repo-');
+      const worktreeDir = createTempDir('worktree-');
+
+      const mainGitDir = path.join(mainRepo, '.git');
+      fs.mkdirSync(mainGitDir, { recursive: true });
+
+      const worktreeGitDir = path.join(
+        mainGitDir,
+        'worktrees',
+        'test-worktree',
+      );
+      fs.mkdirSync(worktreeGitDir, { recursive: true });
+
+      fs.writeFileSync(
+        path.join(worktreeDir, '.git'),
+        `gitdir: ${worktreeGitDir}\n`,
+      );
+      fs.writeFileSync(
+        path.join(worktreeGitDir, 'gitdir'),
+        path.join(worktreeDir, '.git'),
+      );
+
+      const targetFile = path.join(worktreeGitDir, 'secret.txt');
+
+      const osManager = createSandboxManager(
+        { enabled: true },
+        // Use YOLO mode to ensure the workspace is fully writable, but git worktrees should still be read-only
+        { workspace: worktreeDir, modeConfig: { yolo: true } },
+      );
+
+      const { command, args } = Platform.touch(targetFile);
+      const sandboxed = await osManager.prepareCommand({
+        command,
+        args,
+        cwd: worktreeDir,
+        env: process.env,
+      });
+
+      const result = await runCommand(sandboxed);
+      assertResult(result, sandboxed, 'failure');
+      expect(fs.existsSync(targetFile)).toBe(false);
+    });
   });
 
   describe('Network Access', () => {

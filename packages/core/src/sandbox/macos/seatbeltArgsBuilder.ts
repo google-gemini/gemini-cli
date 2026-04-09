@@ -55,14 +55,14 @@ export function buildSeatbeltProfile(options: SeatbeltArgsOptions): string {
   const tmpPath = resolveToRealPath(os.tmpdir());
   profile += `(allow file-read* file-write* (subpath "${escapeSchemeString(tmpPath)}"))\n`;
 
-  // Auto-detect and support git worktrees by granting read and write access to the underlying git directory
+  // Support git worktrees/submodules; read-only to prevent malicious hook/config modification (RCE).
   if (resolvedPaths.gitWorktree) {
     const { worktreeGitDir, mainGitDir } = resolvedPaths.gitWorktree;
     if (worktreeGitDir) {
-      profile += `(allow file-read* file-write* (subpath "${escapeSchemeString(worktreeGitDir)}"))\n`;
+      profile += `(allow file-read* (subpath "${escapeSchemeString(worktreeGitDir)}"))\n`;
     }
     if (mainGitDir) {
-      profile += `(allow file-read* file-write* (subpath "${escapeSchemeString(mainGitDir)}"))\n`;
+      profile += `(allow file-read* (subpath "${escapeSchemeString(mainGitDir)}"))\n`;
     }
   }
 

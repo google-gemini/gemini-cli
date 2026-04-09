@@ -298,7 +298,7 @@ describe('WindowsSandboxManager', () => {
     }
   });
 
-  it('should grant Low Integrity access to git worktree paths', async () => {
+  it('should NOT grant Low Integrity access to git worktree paths (enforce read-only)', async () => {
     const worktreeGitDir = createTempDir('worktree-git');
     const mainGitDir = createTempDir('main-git');
 
@@ -330,7 +330,8 @@ describe('WindowsSandboxManager', () => {
         .mock.calls.filter((c) => c[0] === 'icacls')
         .map((c) => c[1]);
 
-      expect(icaclsArgs).toContainEqual([
+      // Verify that no icacls grants were issued for the git directories
+      expect(icaclsArgs).not.toContainEqual([
         worktreeGitDir,
         '/grant',
         '*S-1-16-4096:(OI)(CI)(M)',
@@ -338,7 +339,7 @@ describe('WindowsSandboxManager', () => {
         '(OI)(CI)Low',
       ]);
 
-      expect(icaclsArgs).toContainEqual([
+      expect(icaclsArgs).not.toContainEqual([
         mainGitDir,
         '/grant',
         '*S-1-16-4096:(OI)(CI)(M)',

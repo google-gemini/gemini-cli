@@ -299,7 +299,9 @@ export class WindowsSandboxManager implements SandboxManager {
         )
       : false;
 
-    if (!isReadonlyMode || isApproved) {
+    const workspaceWrite = !isReadonlyMode || isApproved || isYolo;
+
+    if (workspaceWrite) {
       await this.grantLowIntegrityAccess(resolvedPaths.workspace.resolved);
       writableRoots.push(resolvedPaths.workspace.resolved);
     }
@@ -324,17 +326,10 @@ export class WindowsSandboxManager implements SandboxManager {
       writableRoots.push(allowedPath);
     }
 
-    // 4. Git worktree paths
+    // Support git worktrees/submodules; read-only to prevent malicious hook/config modification (RCE).
+    // Read access is inherited; skip grantLowIntegrityAccess to ensure write protection.
     if (resolvedPaths.gitWorktree) {
-      const { worktreeGitDir, mainGitDir } = resolvedPaths.gitWorktree;
-      if (worktreeGitDir) {
-        await this.grantLowIntegrityAccess(worktreeGitDir);
-        writableRoots.push(worktreeGitDir);
-      }
-      if (mainGitDir) {
-        await this.grantLowIntegrityAccess(mainGitDir);
-        writableRoots.push(mainGitDir);
-      }
+      // No-op for read access.
     }
 
     // 5. Additional write paths (e.g. from internal __write command)
