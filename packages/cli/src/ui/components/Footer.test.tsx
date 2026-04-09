@@ -82,6 +82,7 @@ const mockConfigPlain = {
   getExtensionRegistryURI: () => undefined,
   getContentGeneratorConfig: () => ({ authType: undefined }),
   getSandboxEnabled: () => false,
+  getSessionId: () => 'test-session-id',
 };
 
 const mockConfig = mockConfigPlain as unknown as Config;
