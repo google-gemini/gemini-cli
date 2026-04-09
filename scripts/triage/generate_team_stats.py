@@ -20,9 +20,8 @@ MAINTAINERS = {
     "scidomino": "Tommaso Sciortino"
 }
 
-# Broader search to include recently closed issues (to catch merged PRs)
-# We look for issues updated since March 1st, 2026 to keep the history relevant but manageable.
-SEARCH_QUERY = f'repo:{TARGET_REPO} is:issue label:area/core,area/extensions,area/site label:"help wanted" updated:>=2026-03-01 sort:updated-desc'
+# Search for issues updated in the last 30 days to ensure we catch all weekly activity
+SEARCH_QUERY = f'repo:{TARGET_REPO} is:issue label:area/core,area/extensions,area/site label:"help wanted" updated:>=2026-03-10 sort:updated-desc'
 
 ISSUES_QUERY = """
 query($searchQuery: String!, $cursor: String) {
@@ -34,7 +33,6 @@ query($searchQuery: String!, $cursor: String) {
     nodes {
       ... on Issue {
         number
-        url
         timelineItems(itemTypes: CROSS_REFERENCED_EVENT, last: 50) {
           nodes {
             ... on CrossReferencedEvent {
@@ -44,7 +42,9 @@ query($searchQuery: String!, $cursor: String) {
                   title
                   url
                   state
+                  createdAt
                   updatedAt
+                  mergedAt
                   author { login }
                   reviewRequests(first: 10) {
                     nodes {
@@ -57,6 +57,7 @@ query($searchQuery: String!, $cursor: String) {
                     nodes {
                       author { login }
                       state
+                      updatedAt
                     }
                   }
                 }
@@ -76,12 +77,14 @@ def gh_api_graphql(query, variables):
         if v: cmd.extend(['-F', f'{k}={v}'])
     cmd.extend(['-f', f'query={query}'])
     result = subprocess.run(cmd, capture_output=True, text=True)
-    if result.returncode != 0:
-        return None
-    return json.loads(result.stdout)
+    return json.loads(result.stdout) if result.returncode == 0 else None
+
+def parse_date(date_str):
+    if not date_str: return None
+    return datetime.datetime.fromisoformat(date_str.replace('Z', '+00:00'))
 
 def main():
-    print("Fetching expanded team review statistics (including recently merged)...")
+    print("Fetching weekly team review statistics...")
     all_issues = []
     cursor = None
     while True:
@@ -92,98 +95,106 @@ def main():
         if not search_data['pageInfo']['hasNextPage']: break
         cursor = search_data['pageInfo']['endCursor']
 
+    now = datetime.datetime.now(datetime.timezone.utc)
+    one_week_ago = now - datetime.timedelta(days=7)
+
     # Member data structure
-    stats = {login: {"name": name, "all_prs": {}} for login, name in MAINTAINERS.items()}
+    stats = {login: {
+        "name": name, 
+        "weekly_assigned": 0, 
+        "weekly_closed": 0, 
+        "open_queue": [],
+        "history": []
+    } for login, name in MAINTAINERS.items()}
     
-    # Process issues to find official reviewers
+    processed_prs = set()
+    
     for issue in all_issues:
         issue_no = issue['number']
-        issue_url = issue['url']
         events = issue.get('timelineItems', {}).get('nodes', [])
         
         for event in events:
             pr = event.get('source')
-            if not pr or 'number' not in pr: continue
+            if not pr or 'number' not in pr or pr['number'] in processed_prs: continue
             
             # Find official human reviewers
             reviewers = set()
-            
-            # 1. Requested
             for req in pr.get('reviewRequests', {}).get('nodes', []):
                 rr = req.get('requestedReviewer')
-                if rr and 'login' in rr:
-                    reviewers.add(rr['login'])
-            
-            # 2. Formal Reviewers
+                if rr and 'login' in rr: reviewers.add(rr['login'])
             for rev in pr.get('latestReviews', {}).get('nodes', []):
-                if rev.get('author'):
-                    reviewers.add(rev['author']['login'])
+                if rev.get('author'): reviewers.add(rev['author']['login'])
             
-            # Record for each maintainer
             for reviewer in reviewers:
                 if reviewer in stats:
+                    created_at = parse_date(pr['createdAt'])
+                    updated_at = parse_date(pr['updatedAt'])
+                    merged_at = parse_date(pr.get('mergedAt'))
+                    
                     pr_info = {
                         "number": pr['number'],
                         "title": pr['title'],
                         "url": pr['url'],
                         "state": pr['state'],
                         "updated": pr['updatedAt'][:10],
-                        "issue_no": issue_no,
-                        "issue_url": issue_url
+                        "issue_no": issue_no
                     }
-                    # Use a dict keyed by PR number to avoid duplicates from multiple cross-references
-                    stats[reviewer]["all_prs"][pr['number']] = pr_info
+
+                    # Weekly Logic
+                    if created_at and created_at >= one_week_ago:
+                        stats[reviewer]["weekly_assigned"] += 1
+                    
+                    if pr['state'] != 'OPEN':
+                        # If closed/merged this week
+                        if updated_at and updated_at >= one_week_ago:
+                            stats[reviewer]["weekly_closed"] += 1
+                        stats[reviewer]["history"].append(pr_info)
+                    else:
+                        stats[reviewer]["open_queue"].append(pr_info)
+            
+            processed_prs.add(pr['number'])
 
     # Generate Markdown
-    now = datetime.datetime.now(datetime.timezone.utc)
     ts = now.strftime("%Y-%m-%d %H:%M")
-    md = f"# 📊 Gemini CLI Team Review Statistics\n\n"
+    md = f"# 📊 Gemini CLI Weekly Team Review Stats\n\n"
+    md += f"*Report Period: {(one_week_ago).strftime('%Y-%m-%d')} to {now.strftime('%Y-%m-%d')}*\n"
     md += f"*Last Updated: {ts} (UTC)*\n\n"
-    md += f"**Context:** Statistics for Pull Requests linked to 'Help Wanted' issues (updated since 2026-03-01).\n\n"
     
-    md += "## 📈 Summary\n\n"
-    md += "| Maintainer | Open PRs | Closed/Merged PRs | Total |\n"
+    md += "## 📈 Weekly Summary\n"
+    md += "Stats for PRs linked to 'Help Wanted' issues.\n\n"
+    md += "| Maintainer | New Assignments (Week) | Closed/Merged (Week) | Current Open Queue |\n"
     md += "| :--- | :--- | :--- | :--- |\n"
     
-    # Pre-calculate counts for sorting
-    sorted_stats = []
-    for login, data in stats.items():
-        all_prs = list(data['all_prs'].values())
-        opened = len([p for p in all_prs if p['state'] == 'OPEN'])
-        closed = len([p for p in all_prs if p['state'] != 'OPEN'])
-        sorted_stats.append({
-            "login": login, "name": data['name'], "open_count": opened, "closed_count": closed, "total": len(all_prs), "prs": all_prs
-        })
-    
-    # Sort summary by open count descending
-    for s in sorted(sorted_stats, key=lambda x: x['open_count'], reverse=True):
-        md += f"| **{s['name']}** (@{s['login']}) | {s['open_count']} | {s['closed_count']} | {s['total']} |\n"
+    sorted_members = sorted(stats.items(), key=lambda x: x[1]['weekly_closed'], reverse=True)
+    for login, data in sorted_members:
+        md += f"| **{data['name']}** (@{login}) | {data['weekly_assigned']} | **{data['weekly_closed']}** | {len(data['open_queue'])} |\n"
 
     md += "\n---\n"
-    md += "## 👤 Individual Review History\n"
-    md += "*Note: PRs are sorted by status (Open first) and then by update date.*\n"
+    md += "## 👤 Individual Review Queues\n"
     
-    # Sort detailed queues alphabetically by name
-    for s in sorted(sorted_stats, key=lambda x: x['name']):
-        md += f"\n### {s['name']} (@{s['login']})\n"
-        md += "| PR | Associated Issue | Title | Status | Updated |\n"
-        md += "| :--- | :--- | :--- | :--- | :--- |\n"
-        
-        # Sort PRs: Open first, then by date descending
-        sorted_prs = sorted(s['prs'], key=lambda x: (x['state'] != 'OPEN', x['updated']), reverse=False)
-        
-        for p in sorted_prs:
-            status_emoji = "🟢" if p['state'] == 'OPEN' else "🔴"
-            md += f"| {status_emoji} [#{p['number']}]({p['url']}) | [#{p['issue_no']}]({p['issue_url']}) | {p['title']} | `{p['state']}` | `{p['updated']}` |\n"
-            
-        if not s['prs']:
-            md += "| - | - | _No review history found._ | - | - |\n"
+    for login, data in sorted(stats.items(), key=lambda x: x[1]['name']):
+        md += f"\n### {data['name']} (@{login})\n"
+        md += "#### 🟢 Active Queue\n"
+        md += "| PR | Issue | Title | Updated |\n"
+        md += "| :--- | :--- | :--- | :--- |\n"
+        for p in sorted(data['open_queue'], key=lambda x: x['updated'], reverse=True):
+            md += f"| [#{p['number']}]({p['url']}) | #{p['issue_no']} | {p['title']} | `{p['updated']}` |\n"
+        if not data['open_queue']: md += "| - | - | _No active reviews._ | - |\n"
+
+        # Show recent history (last 7 days closed)
+        recent_closed = [p for p in data['history'] if parse_date(p['updated']+'T00:00:00Z') >= one_week_ago]
+        if recent_closed:
+            md += "\n#### 🔴 Recently Closed (This Week)\n"
+            md += "| PR | Issue | Title | Closed Date |\n"
+            md += "| :--- | :--- | :--- | :--- |\n"
+            for p in recent_closed:
+                md += f"| [#{p['number']}]({p['url']}) | #{p['issue_no']} | {p['title']} | `{p['updated']}` |\n"
 
     md += "\n---\n*Report generated by automated triage script.*"
     
     with open("TEAM_STATS.md", "w") as f:
         f.write(md)
-    print("Successfully generated TEAM_STATS.md (Expanded search).")
+    print("Successfully generated TEAM_STATS.md (Weekly Stats).")
 
 if __name__ == "__main__":
     main()
