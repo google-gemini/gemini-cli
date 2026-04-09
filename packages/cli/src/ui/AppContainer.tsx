@@ -134,7 +134,11 @@ import { type IdeIntegrationNudgeResult } from './IdeIntegrationNudge.js';
 import { appEvents, AppEvent, TransientMessageType } from '../utils/events.js';
 import { type UpdateObject } from './utils/updateCheck.js';
 import { setUpdateHandler } from '../utils/handleAutoUpdate.js';
-import { registerCleanup, runExitCleanup } from '../utils/cleanup.js';
+import {
+  registerCleanup,
+  removeCleanup,
+  runExitCleanup,
+} from '../utils/cleanup.js';
 import { relaunchApp } from '../utils/processUtils.js';
 import type { SessionInfo } from '../utils/sessionUtils.js';
 import { useMessageQueue } from './hooks/useMessageQueue.js';
@@ -517,7 +521,7 @@ export const AppContainer = (props: AppContainerProps) => {
         debugLogger.warn('Background summary generation failed:', e);
       });
     })();
-    registerCleanup(async () => {
+    const cleanupFn = async () => {
       // Turn off mouse scroll.
       disableMouseEvents();
 
@@ -533,7 +537,12 @@ export const AppContainer = (props: AppContainerProps) => {
 
       // Fire SessionEnd hook on cleanup (only if hooks are enabled)
       await config?.getHookSystem()?.fireSessionEndEvent(SessionEndReason.Exit);
-    });
+    };
+    registerCleanup(cleanupFn);
+
+    return () => {
+      removeCleanup(cleanupFn);
+    };
     // Disable the dependencies check here. historyManager gets flagged
     // but we don't want to react to changes to it because each new history
     // item, including the ones from the start session hook will cause a
