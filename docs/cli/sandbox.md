@@ -50,7 +50,25 @@ Cross-platform sandboxing with complete process isolation.
 **Note**: Requires building the sandbox image locally or using a published image
 from your organization's registry.
 
-### 3. gVisor / runsc (Linux only)
+### 3. Windows Native Sandbox (Windows only)
+
+... **Troubleshooting and Side Effects:**
+
+The Windows Native sandbox uses the `icacls` command to set a "Low Mandatory
+Level" on files and directories it needs to write to.
+
+- **Persistence**: These integrity level changes are persistent on the
+  filesystem. Even after the sandbox session ends, files created or modified by
+  the sandbox will retain their "Low" integrity level.
+- **Manual Reset**: If you need to reset the integrity level of a file or
+  directory, you can use:
+  ```powershell
+  icacls "C:\path\to\dir" /setintegritylevel Medium
+  ```
+- **System Folders**: The sandbox manager automatically skips setting integrity
+  levels on system folders (like `C:\Windows`) for safety.
+
+### 4. gVisor / runsc (Linux only)
 
 Strongest isolation available: runs containers inside a user-space kernel via
 [gVisor](https://github.com/google/gvisor). gVisor intercepts all container
@@ -74,7 +92,7 @@ To set up runsc:
 2.  Configure the Docker daemon to use the runsc runtime.
 3.  Verify the installation.
 
-### 4. LXC/LXD (Linux only, experimental)
+### 5. LXC/LXD (Linux only, experimental)
 
 Full-system container sandboxing using LXC/LXD. Unlike Docker/Podman, LXC
 containers run a complete Linux system with `systemd`, `snapd`, and other system
@@ -117,6 +135,58 @@ gemini -p "build the snap"
 - The workspace directory is bind-mounted into the container at the same
   absolute path — the path must be writable inside the container.
 - Used with tools like Snapcraft or Rockcraft that require a full system.
+
+## Tool sandboxing
+
+Tool-level sandboxing provides granular isolation for individual tool executions
+(like `shell_exec` and `write_file`) instead of sandboxing the entire Gemini CLI
+process.
+
+This approach offers better integration with your local environment for non-tool
+tasks (like UI rendering and configuration loading) while still providing
+security for tool-driven operations.
+
+### How to turn off tool sandboxing
+
+If you experience issues with tool sandboxing or prefer full-process isolation,
+you can disable it by setting `security.toolSandboxing` to `false` in your
+`settings.json` file.
+
+```json
+{
+  "security": {
+    "toolSandboxing": false
+  }
+}
+```
+
+<!-- prettier-ignore -->
+> [!NOTE]
+> Changing the `security.toolSandboxing` setting requires a restart of Gemini
+> CLI to take effect.
+
+## Sandbox expansion
+
+Sandbox expansion is a dynamic permission system that lets Gemini CLI request
+additional permissions for a command when needed.
+
+When a sandboxed command fails due to permission restrictions (like restricted
+file paths or network access), or when a command is proactively identified as
+requiring extra permissions (like `npm install`), Gemini CLI will present you
+with a "Sandbox Expansion Request."
+
+### How sandbox expansion works
+
+1.  **Detection**: Gemini CLI detects a sandbox denial or proactively identifies
+    a command that requires extra permissions.
+2.  **Request**: A modal dialog is shown, explaining which additional
+    permissions (e.g., specific directories or network access) are required.
+3.  **Approval**: If you approve the expansion, the command is executed with the
+    extended permissions for that specific run.
+
+This mechanism ensures you don't have to manually re-run commands with more
+permissive sandbox settings, while still maintaining control over what the AI
+can access.
 
 ## Quickstart
 
@@ -253,9 +323,11 @@ $env:SANDBOX_SET_UID_GID="false"  # Disable UID/GID mapping
 DEBUG=1 gemini -s -p "debug command"
 ```
 
-**Note:** If you have `DEBUG=true` in a project's `.env` file, it won't affect
-gemini-cli due to automatic exclusion. Use `.gemini/.env` files for gemini-cli
-specific debug settings.
+<!-- prettier-ignore -->
+> [!NOTE]
+> If you have `DEBUG=true` in a project's `.env` file, it won't affect
+> gemini-cli due to automatic exclusion. Use `.gemini/.env` files for
+> gemini-cli specific debug settings.
 
 ### Inspect sandbox
 

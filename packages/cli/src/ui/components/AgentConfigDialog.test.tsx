@@ -4,20 +4,13 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { render } from '../../test-utils/render.js';
+import { renderWithProviders } from '../../test-utils/render.js';
 import { waitFor } from '../../test-utils/async.js';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { act } from 'react';
 import { AgentConfigDialog } from './AgentConfigDialog.js';
 import { LoadedSettings, SettingScope } from '../../config/settings.js';
-import { KeypressProvider } from '../contexts/KeypressContext.js';
 import type { AgentDefinition } from '@google/gemini-cli-core';
-
-vi.mock('../contexts/UIStateContext.js', () => ({
-  useUIState: () => ({
-    mainAreaWidth: 100,
-  }),
-}));
 
 enum TerminalKeys {
   ENTER = '\u000D',
@@ -122,19 +115,17 @@ describe('AgentConfigDialog', () => {
     settings: LoadedSettings,
     definition: AgentDefinition = createMockAgentDefinition(),
   ) => {
-    const result = render(
-      <KeypressProvider>
-        <AgentConfigDialog
-          agentName="test-agent"
-          displayName="Test Agent"
-          definition={definition}
-          settings={settings}
-          onClose={mockOnClose}
-          onSave={mockOnSave}
-        />
-      </KeypressProvider>,
+    const result = await renderWithProviders(
+      <AgentConfigDialog
+        agentName="test-agent"
+        displayName="Test Agent"
+        definition={definition}
+        settings={settings}
+        onClose={mockOnClose}
+        onSave={mockOnSave}
+      />,
+      { settings, uiState: { mainAreaWidth: 100 } },
     );
-    await result.waitUntilReady();
     return result;
   };
 
@@ -325,6 +316,31 @@ describe('AgentConfigDialog', () => {
       // Should show the overridden values
       expect(frame).toContain('custom-model');
       expect(frame).toContain('false');
+      unmount();
+    });
+    it('should respond to availableTerminalHeight and truncate list', async () => {
+      const settings = createMockSettings();
+      // Agent config has about 6 base items + 2 per tool
+      // Render with very small height (20)
+      const { lastFrame, unmount } = await renderWithProviders(
+        <AgentConfigDialog
+          agentName="test-agent"
+          displayName="Test Agent"
+          definition={createMockAgentDefinition()}
+          settings={settings}
+          onClose={mockOnClose}
+          onSave={mockOnSave}
+          availableTerminalHeight={20}
+        />,
+        { settings, uiState: { mainAreaWidth: 100 } },
+      );
+      await waitFor(() =>
+        expect(lastFrame()).toContain('Configure: Test Agent'),
+      );
+
+      const frame = lastFrame();
+      // At height 20, it should be heavily truncated and show '▼'
+      expect(frame).toContain('▼');
       unmount();
     });
   });

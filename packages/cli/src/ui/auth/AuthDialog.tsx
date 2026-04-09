@@ -9,11 +9,11 @@ import { useCallback, useState } from 'react';
 import { Box, Text } from 'ink';
 import { theme } from '../semantic-colors.js';
 import { RadioButtonSelect } from '../components/shared/RadioButtonSelect.js';
-import type {
-  LoadableSettingScope,
-  LoadedSettings,
+import {
+  SettingScope,
+  type LoadableSettingScope,
+  type LoadedSettings,
 } from '../../config/settings.js';
-import { SettingScope } from '../../config/settings.js';
 import {
   AuthType,
   clearCachedCredentialFile,
@@ -44,7 +44,7 @@ export function AuthDialog({
   const [exiting, setExiting] = useState(false);
   let items = [
     {
-      label: 'Login with Google',
+      label: 'Sign in with Google',
       value: AuthType.LOGIN_WITH_GOOGLE,
       key: AuthType.LOGIN_WITH_GOOGLE,
     },
@@ -137,13 +137,11 @@ export function AuthDialog({
         }
 
         if (authType === AuthType.USE_GEMINI) {
-          if (process.env['GEMINI_API_KEY'] !== undefined) {
-            setAuthState(AuthState.Unauthenticated);
-            return;
-          } else {
-            setAuthState(AuthState.AwaitingApiKeyInput);
-            return;
-          }
+          // Always show the API key input dialog so the user can
+          // explicitly enter or confirm their key, regardless of
+          // whether GEMINI_API_KEY env var or a stored key exists.
+          setAuthState(AuthState.AwaitingApiKeyInput);
+          return;
         }
       }
       setAuthState(AuthState.Unauthenticated);

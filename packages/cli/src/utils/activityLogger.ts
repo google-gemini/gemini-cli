@@ -494,9 +494,10 @@ export class ActivityLogger extends EventEmitter {
 
       req.write = function (chunk: string | Uint8Array, ...etc: unknown[]) {
         if (chunk) {
+          const arg0 = etc[0];
           const encoding =
-            typeof etc[0] === 'string' && Buffer.isEncoding(etc[0])
-              ? etc[0]
+            typeof arg0 === 'string' && Buffer.isEncoding(arg0)
+              ? arg0
               : undefined;
           requestChunks.push(
             Buffer.isBuffer(chunk)
@@ -519,9 +520,10 @@ export class ActivityLogger extends EventEmitter {
       ) {
         const chunk = typeof chunkOrCb === 'function' ? undefined : chunkOrCb;
         if (chunk) {
+          const arg0 = etc[0];
           const encoding =
-            typeof etc[0] === 'string' && Buffer.isEncoding(etc[0])
-              ? etc[0]
+            typeof arg0 === 'string' && Buffer.isEncoding(arg0)
+              ? arg0
               : undefined;
           requestChunks.push(
             Buffer.isBuffer(chunk)
@@ -801,7 +803,26 @@ function setupNetworkLogging(
         // Flush buffered logs
         flushBuffer();
         break;
-
+      case 'trigger-debugger': {
+        import('node:inspector')
+          .then((inspector) => {
+            inspector.open();
+            debugLogger.log(
+              'Node debugger attached. Open chrome://inspect in Chrome to start debugging.',
+            );
+            return import('./events.js');
+          })
+          .then(({ appEvents, AppEvent, TransientMessageType }) => {
+            appEvents.emit(AppEvent.TransientMessage, {
+              message: 'Debugger attached from DevTools.',
+              type: TransientMessageType.Hint,
+            });
+          })
+          .catch((err) =>
+            debugLogger.debug('Failed to trigger debugger:', err),
+          );
+        break;
+      }
       case 'ping':
         sendMessage({ type: 'pong', timestamp: Date.now() });
         break;

@@ -16,6 +16,7 @@ import {
   isNightly,
   startupProfiler,
   getAdminErrorMessage,
+  AuthType,
 } from '@google/gemini-cli-core';
 import { aboutCommand } from '../ui/commands/aboutCommand.js';
 import { agentsCommand } from '../ui/commands/agentsCommand.js';
@@ -56,10 +57,11 @@ import { themeCommand } from '../ui/commands/themeCommand.js';
 import { toolsCommand } from '../ui/commands/toolsCommand.js';
 import { skillsCommand } from '../ui/commands/skillsCommand.js';
 import { settingsCommand } from '../ui/commands/settingsCommand.js';
-import { shellsCommand } from '../ui/commands/shellsCommand.js';
+import { tasksCommand } from '../ui/commands/tasksCommand.js';
 import { vimCommand } from '../ui/commands/vimCommand.js';
 import { setupGithubCommand } from '../ui/commands/setupGithubCommand.js';
 import { terminalSetupCommand } from '../ui/commands/terminalSetupCommand.js';
+import { upgradeCommand } from '../ui/commands/upgradeCommand.js';
 
 /**
  * Loads the core, hard-coded slash commands that are an integral part
@@ -79,6 +81,41 @@ export class BuiltinCommandLoader implements ICommandLoader {
     const handle = startupProfiler.start('load_builtin_commands');
 
     const isNightlyBuild = await isNightly(process.cwd());
+    const addDebugToChatResumeSubCommands = (
+      subCommands: SlashCommand[] | undefined,
+    ): SlashCommand[] | undefined => {
+      if (!subCommands) {
+        return subCommands;
+      }
+
+      const withNestedCompatibility = subCommands.map((subCommand) => {
+        if (subCommand.name !== 'checkpoints') {
+          return subCommand;
+        }
+
+        return {
+          ...subCommand,
+          subCommands: addDebugToChatResumeSubCommands(subCommand.subCommands),
+        };
+      });
+
+      if (!isNightlyBuild) {
+        return withNestedCompatibility;
+      }
+
+      return withNestedCompatibility.some(
+        (cmd) => cmd.name === debugCommand.name,
+      )
+        ? withNestedCompatibility
+        : [
+            ...withNestedCompatibility,
+            { ...debugCommand, suggestionGroup: 'checkpoints' },
+          ];
+    };
+
+    const chatResumeSubCommands = addDebugToChatResumeSubCommands(
+      chatCommand.subCommands,
+    );
 
     const allDefinitions: Array<SlashCommand | null> = [
       aboutCommand,
@@ -87,9 +124,7 @@ export class BuiltinCommandLoader implements ICommandLoader {
       bugCommand,
       {
         ...chatCommand,
-        subCommands: isNightlyBuild
-          ? [...(chatCommand.subCommands || []), debugCommand]
-          : chatCommand.subCommands,
+        subCommands: chatResumeSubCommands,
       },
       clearCommand,
       commandsCommand,
@@ -157,7 +192,10 @@ export class BuiltinCommandLoader implements ICommandLoader {
       ...(isDevelopment ? [profileCommand] : []),
       quitCommand,
       restoreCommand(this.config),
-      resumeCommand,
+      {
+        ...resumeCommand,
+        subCommands: addDebugToChatResumeSubCommands(resumeCommand.subCommands),
+      },
       statsCommand,
       themeCommand,
       toolsCommand,
@@ -185,10 +223,14 @@ export class BuiltinCommandLoader implements ICommandLoader {
           : [skillsCommand]
         : []),
       settingsCommand,
-      shellsCommand,
+      tasksCommand,
       vimCommand,
       setupGithubCommand,
       terminalSetupCommand,
+      ...(this.config?.getContentGeneratorConfig()?.authType ===
+      AuthType.LOGIN_WITH_GOOGLE
+        ? [upgradeCommand]
+        : []),
     ];
     handle?.end();
     return allDefinitions.filter((cmd): cmd is SlashCommand => cmd !== null);

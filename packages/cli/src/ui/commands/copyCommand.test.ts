@@ -4,8 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import type { Mock } from 'vitest';
-import { vi, describe, it, expect, beforeEach } from 'vitest';
+import { vi, describe, it, expect, beforeEach, type Mock } from 'vitest';
 import { copyCommand } from './copyCommand.js';
 import { type CommandContext } from './types.js';
 import { createMockCommandContext } from '../../test-utils/mockCommandContext.js';
@@ -30,10 +29,10 @@ describe('copyCommand', () => {
 
     mockContext = createMockCommandContext({
       services: {
-        config: {
-          getGeminiClient: () => ({
+        agentContext: {
+          geminiClient: {
             getChat: mockGetChat,
-          }),
+          },
         },
       },
     });
@@ -302,7 +301,7 @@ describe('copyCommand', () => {
     if (!copyCommand.action) throw new Error('Command has no action');
 
     const nullConfigContext = createMockCommandContext({
-      services: { config: null },
+      services: { agentContext: null },
     });
 
     const result = await copyCommand.action(nullConfigContext, '');

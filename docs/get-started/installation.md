@@ -70,7 +70,7 @@ gemini
 ```
 
 For a list of options and additional commands, see the
-[CLI cheatsheet](/docs/cli/cli-reference.md).
+[CLI cheatsheet](../cli/cli-reference.md).
 
 You can also run Gemini CLI using one of the following advanced methods:
 
@@ -121,6 +121,13 @@ code.
   ```bash
   # From the root of the repository
   npm run start
+  ```
+- **Production mode (React optimizations):** This method runs the CLI with React
+  production mode enabled, which is useful for testing performance without
+  development overhead.
+  ```bash
+  # From the root of the repository
+  npm run start:prod
   ```
 - **Production-like mode (linked package):** This method simulates a global
   installation by linking your local package. It's useful for testing a local
