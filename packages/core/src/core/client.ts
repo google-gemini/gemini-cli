@@ -614,7 +614,7 @@ export class GeminiClient {
         const feedback = watcherResult.feedback;
         const feedbackRequest = [
           {
-            text: `System: Feedback from Watcher (Review of last ${this.config.getExperimentalWatcherInterval()} turns):\n\n${feedback}`,
+            text: `System: Feedback from Watcher Sub Agent based on recent progress (Review of last ${this.config.getExperimentalWatcherInterval()} turns):\n\n${feedback}`,
           },
         ];
         // Inject feedback into the conversation
