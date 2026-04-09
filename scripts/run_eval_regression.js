@@ -28,6 +28,7 @@ async function main() {
   let hasRegression = false;
   let detectionRationale = '';
   let affectedSuitesStr = '';
+  let forceRunFilesStr = '';
 
   console.log(
     `🚀 Starting evaluation orchestration for models: ${models.join(', ')}`,
@@ -44,6 +45,12 @@ async function main() {
 
       if (detection.affectedSuites && detection.affectedSuites.length > 0) {
         affectedSuitesStr = detection.affectedSuites.join(',');
+        if (
+          detection.modifiedTestFiles &&
+          detection.modifiedTestFiles.length > 0
+        ) {
+          forceRunFilesStr = detection.modifiedTestFiles.join(',');
+        }
         detectionRationale = '### 🧪 Related Evaluation Rationale\n\n';
         detection.rationales.forEach((r) => {
           detectionRationale += `- ${r}\n`;
@@ -76,8 +83,11 @@ async function main() {
       const suitesFlag = affectedSuitesStr
         ? `--suites ${affectedSuitesStr}`
         : '';
+      const forceRunFlag = forceRunFilesStr
+        ? `--force-run-files ${forceRunFilesStr}`
+        : '';
       const output = execSync(
-        `node scripts/get_trustworthy_evals.js "${model}" ${suitesFlag}`,
+        `node scripts/get_trustworthy_evals.js "${model}" ${suitesFlag} ${forceRunFlag}`,
         {
           encoding: 'utf-8',
           stdio: ['inherit', 'pipe', 'inherit'], // Capture stdout but pass stdin/stderr

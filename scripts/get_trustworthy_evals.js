@@ -40,9 +40,21 @@ function main() {
       .map((s) => s.trim());
   }
 
+  // Parse --force-run-files argument
+  const forceRunArgIndex = process.argv.indexOf('--force-run-files');
+  let forceRunFiles = [];
+  if (forceRunArgIndex !== -1 && process.argv[forceRunArgIndex + 1]) {
+    forceRunFiles = process.argv[forceRunArgIndex + 1]
+      .split(',')
+      .map((f) => f.trim());
+  }
+
   console.error(`🔍 Identifying trustworthy evals for model: ${targetModel}`);
   if (requestedSuites) {
     console.error(`📂 Filtering by suites: ${requestedSuites.join(', ')}`);
+  }
+  if (forceRunFiles.length > 0) {
+    console.error(`🚀 Force-running tests in: ${forceRunFiles.join(', ')}`);
   }
 
   const history = fetchNightlyHistory(LOOKBACK_COUNT);
@@ -104,17 +116,37 @@ function main() {
   const volatileTests = [];
   const newTests = [];
 
+  // Add tests from force-run files that might not have history yet
+  for (const file of forceRunFiles) {
+    if (fs.existsSync(file)) {
+      const content = fs.readFileSync(file, 'utf-8');
+      const testNameRegex = /name:\s*['"](.*)['"]/g;
+      let match;
+      while ((match = testNameRegex.exec(content)) !== null) {
+        const testName = match[1];
+        if (!trustworthyTests.includes(testName)) {
+          trustworthyTests.push(testName);
+          trustworthyFiles.add(file);
+        }
+      }
+    }
+  }
+
   for (const [testName, info] of Object.entries(testHistories)) {
     const dailyRates = info.dailyRates;
     const aggregateRate = info.totalPassed / info.totalRuns;
+    const isForceRunFile =
+      info.file && forceRunFiles.some((f) => info.file.includes(f));
 
-    // 1. Minimum data points required
-    if (dailyRates.length < MIN_VALID_RUNS) {
-      newTests.push(testName);
+    // 1. Minimum data points required (unless force run)
+    if (dailyRates.length < MIN_VALID_RUNS && !isForceRunFile) {
+      if (!trustworthyTests.includes(testName)) {
+        newTests.push(testName);
+      }
       continue;
     }
 
-    // 2. Trustworthy Criterion:
+    // 2. Trustworthy Criterion (unless force run):
     // - Every single day must be above the floor (e.g. > 60%)
     // - The overall aggregate must be high-signal (e.g. > 80%)
     const isDailyStable = dailyRates.every(
@@ -122,10 +154,10 @@ function main() {
     );
     const isAggregateHighSignal = aggregateRate > AGGREGATE_PASS_RATE_THRESHOLD;
 
-    if (isDailyStable && isAggregateHighSignal) {
+    if ((isDailyStable && isAggregateHighSignal) || isForceRunFile) {
       // Suite filtering logic
       let isFileAllowed = true;
-      if (requestedSuites && !runAllStable) {
+      if (requestedSuites && !runAllStable && !isForceRunFile) {
         if (info.file) {
           const match = info.file.match(/evals\/.*\.eval\.ts/);
           if (match && !allowedFiles.has(match[0])) {
@@ -139,7 +171,9 @@ function main() {
       }
 
       if (isFileAllowed) {
-        trustworthyTests.push(testName);
+        if (!trustworthyTests.includes(testName)) {
+          trustworthyTests.push(testName);
+        }
         if (info.file) {
           const match = info.file.match(/evals\/.*\.eval\.ts/);
           if (match) {

@@ -20,6 +20,7 @@
 
 import { execSync } from 'node:child_process';
 import fs from 'node:fs';
+import { minimatch } from 'minimatch';
 
 const CORE_STEERING_PATHS = [
   'packages/core/src/prompts/',
@@ -35,25 +36,6 @@ const STEERING_SIGNATURES = [
   'inputSchema',
   "kind: 'local'",
 ];
-
-function minimatch(file, pattern) {
-  if (pattern.endsWith('/**')) {
-    const prefix = pattern.slice(0, -3);
-    return file.startsWith(prefix);
-  }
-  if (pattern.includes('*')) {
-    const regex = new RegExp(
-      '^' +
-        pattern
-          .replace(/\./g, '\\.')
-          .replace(/\*\*/g, '.*')
-          .replace(/\*/g, '[^/]*') +
-        '$',
-    );
-    return regex.test(file);
-  }
-  return file === pattern;
-}
 
 function main() {
   const targetBranch = process.env.GITHUB_BASE_REF || 'main';
@@ -122,6 +104,7 @@ function main() {
     const reasons = [];
     const affectedSuites = new Set();
     const rationales = [];
+    const modifiedTestFiles = [];
 
     // Load suites for --related mode
     let suitesConfig = null;
@@ -148,6 +131,7 @@ function main() {
       ) {
         detected = true;
         reasons.push(`Matched test file: ${file}`);
+        modifiedTestFiles.push(file);
       }
 
       // Related suite detection
@@ -157,9 +141,11 @@ function main() {
 
           if (suite.patterns.some((pattern) => minimatch(file, pattern))) {
             affectedSuites.add(suiteName);
-            rationales.push(
-              `Testing **${suiteName}** because **${file}** was modified.`,
-            );
+            const isTestFile = file.endsWith('.eval.ts');
+            const rationale = isTestFile
+              ? `Force-testing all tests in **${file}** (part of **${suiteName}** suite) because the file was modified.`
+              : `Testing **${suiteName}** because **${file}** was modified.`;
+            rationales.push(rationale);
           }
         }
       }
@@ -214,6 +200,7 @@ function main() {
             reasons,
             affectedSuites: Array.from(affectedSuites),
             rationales,
+            modifiedTestFiles,
           },
           null,
           2,
