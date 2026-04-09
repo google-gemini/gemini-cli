@@ -1,0 +1,22 @@
+name: Update Review Dashboard
+on:
+  schedule:
+    - cron: '0 * * * *' # Every hour
+  workflow_dispatch:
+
+jobs:
+  update:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Generate Dashboard
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: python3 scripts/triage/generate_dashboard.py
+      - name: Commit and Push
+        run: |
+          git config user.name "Review Dashboard Bot"
+          git config user.email "bot@google.com"
+          git add REVIEWS.md
+          git commit -m "chore: update review dashboard [skip ci]" || exit 0
+          git push
