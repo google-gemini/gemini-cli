@@ -438,6 +438,33 @@ decision = "ask_user"
 priority = 10
 ```
 
+### Special syntax for subagents
+
+You can secure and govern subagents using standard policy rules by treating the
+subagent's name as the `toolName`.
+
+When the main agent invokes a subagent (e.g., using the unified `invoke_agent`
+tool), the Policy Engine automatically treats the target `agent_name` as a
+virtual tool alias for rule matching.
+
+**Example:**
+
+This rule denies access to the `codebase_investigator` subagent.
+
+```toml
+[[rule]]
+toolName = "codebase_investigator"
+decision = "deny"
+priority = 500
+deny_message = "Deep codebase analysis is restricted for this session."
+```
+
+- **Backward Compatibility**: Any rules written targeting historical 1:1
+  subagent tool names will continue to match transparently.
+- **Context differentiation**: To create rules based on **who** is calling a
+  tool, use the `subagent` field instead. See
+  [TOML rule schema](#toml-rule-schema).
+
 ## Default policies
 
 The Gemini CLI ships with a set of default policies to provide a safe

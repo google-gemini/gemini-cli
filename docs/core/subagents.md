@@ -521,6 +521,24 @@ field.
 }
 ```
 
+#### Safety policies (TOML)
+
+You can restrict access to specific subagents using the CLI's **Policy Engine**.
+Subagents are treated as virtual tool names for policy matching purposes.
+
+To govern access to a subagent, create a `.toml` file in your policy directory
+(e.g., `~/.gemini/policies/`):
+
+```toml
+[[rule]]
+toolName = "codebase_investigator"
+decision = "deny"
+deny_message = "Deep codebase analysis is restricted for this session."
+```
+
+For more information on setting up fine-grained safety guardrails, see the
+[Policy Engine reference](../reference/policy-engine.md#special-syntax-for-subagents).
+
 ### Optimizing your subagent
 
 The main agent's system prompt encourages it to use an expert subagent when one

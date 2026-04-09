@@ -188,6 +188,8 @@ export const TRACKER_LIST_TASKS_TOOL_NAME = 'tracker_list_tasks';
 export const TRACKER_ADD_DEPENDENCY_TOOL_NAME = 'tracker_add_dependency';
 export const TRACKER_VISUALIZE_TOOL_NAME = 'tracker_visualize';
 
+export const AGENT_TOOL_NAME = 'invoke_agent';
+
 // Tool Display Names
 export const WRITE_FILE_DISPLAY_NAME = 'WriteFile';
 export const EDIT_DISPLAY_NAME = 'Edit';
@@ -269,6 +271,7 @@ export const ALL_BUILTIN_TOOL_NAMES = [
   EXIT_PLAN_MODE_TOOL_NAME,
   UPDATE_TOPIC_TOOL_NAME,
   COMPLETE_TASK_TOOL_NAME,
+  AGENT_TOOL_NAME,
 ] as const;
 
 /**

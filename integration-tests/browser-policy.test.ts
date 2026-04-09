@@ -112,7 +112,8 @@ describe.skipIf(!chromeAvailable)('browser-policy', () => {
         `
 [[rule]]
 name = "Force confirm browser_agent"
-toolName = "browser_agent"
+toolName = "invoke_agent"
+argsPattern = "\\"agent_name\\":\\\\s*\\"browser_agent\\""
 decision = "ask_user"
 priority = 200
 `,

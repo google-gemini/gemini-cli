@@ -27,6 +27,7 @@ interface MockToolOptions {
   description?: string;
   canUpdateOutput?: boolean;
   isOutputMarkdown?: boolean;
+  kind?: Kind;
   shouldConfirmExecute?: (
     params: { [key: string]: unknown },
     signal: AbortSignal,
@@ -101,7 +102,7 @@ export class MockTool extends BaseDeclarativeTool<
       options.name,
       options.displayName ?? options.name,
       options.description ?? options.name,
-      Kind.Other,
+      options.kind ?? Kind.Other,
       options.params,
       options.messageBus ?? createMockMessageBus(),
       options.isOutputMarkdown ?? false,

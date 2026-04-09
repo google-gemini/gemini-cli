@@ -78,6 +78,7 @@ describe('PromptProvider', () => {
       getActiveModel: vi.fn().mockReturnValue(PREVIEW_GEMINI_MODEL),
       getAgentRegistry: vi.fn().mockReturnValue({
         getAllDefinitions: vi.fn().mockReturnValue([]),
+        getDefinition: vi.fn().mockReturnValue(undefined),
       }),
       getApprovedPlanPath: vi.fn().mockReturnValue(undefined),
       getApprovalMode: vi.fn(),
