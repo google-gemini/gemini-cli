@@ -41,6 +41,7 @@ export interface ContextWorker {
   readonly name: string;
   readonly triggers: {
     onNodesAdded?: boolean;
+    onNodesAgedOut?: boolean;
     onInboxTopics?: string[];
   };
   execute(args: {

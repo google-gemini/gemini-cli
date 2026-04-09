@@ -125,7 +125,7 @@ export class PipelineOrchestrator {
           this.eventBus.onConsolidationNeeded((event) => {
             void this.executePipelineAsync(
               pipeline,
-              [],
+              event.ship,
               event.targetNodeIds,
               new Set(), // protected IDs
             );
@@ -134,7 +134,7 @@ export class PipelineOrchestrator {
           this.eventBus.onChunkReceived((event) => {
             void this.executePipelineAsync(
               pipeline,
-              [],
+              event.ship,
               event.targetNodeIds,
               new Set(), // protected IDs
             );
@@ -143,7 +143,7 @@ export class PipelineOrchestrator {
       }
     }
 
-    // 2. Worker Triggers (onNodesAdded is roughly onChunkReceived for now)
+    // 2. Worker Triggers (onNodesAdded / onNodesAgedOut)
     this.eventBus.onChunkReceived((event) => {
       // Fire all workers that care about new nodes
       for (const worker of this.instantiatedWorkers.values()) {
@@ -151,9 +151,26 @@ export class PipelineOrchestrator {
           const inboxSnapshot = new InboxSnapshotImpl(
             this.env.inbox?.getMessages() || [],
           );
+          const targets = event.ship.filter(n => event.targetNodeIds.has(n.id));
           // Fire and forget
-          worker.execute({ targets: [], inbox: inboxSnapshot }).catch((e) => {
+          worker.execute({ targets, inbox: inboxSnapshot }).catch((e) => {
             debugLogger.error(`Worker ${worker.name} failed onNodesAdded:`, e);
+          });
+        }
+      }
+    });
+
+    this.eventBus.onConsolidationNeeded((event) => {
+      // Fire all workers that care about aged out nodes
+      for (const worker of this.instantiatedWorkers.values()) {
+        if (worker.triggers.onNodesAgedOut) {
+          const inboxSnapshot = new InboxSnapshotImpl(
+            this.env.inbox?.getMessages() || [],
+          );
+          const targets = event.ship.filter(n => event.targetNodeIds.has(n.id));
+          // Fire and forget
+          worker.execute({ targets, inbox: inboxSnapshot }).catch((e) => {
+            debugLogger.error(`Worker ${worker.name} failed onNodesAgedOut:`, e);
           });
         }
       }

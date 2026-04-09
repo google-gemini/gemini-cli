@@ -30,7 +30,7 @@ export class StateSnapshotWorker implements ContextWorker {
 
   // Triggers when nodes exceed retained threshold (via retained_exceeded in Orchestrator)
   readonly triggers = {
-    onNodesAdded: true,
+    onNodesAgedOut: true,
   };
 
   constructor(env: ContextEnvironment, options: StateSnapshotWorkerOptions) {

@@ -32,6 +32,18 @@ export function getSidecarConfigSchema(registry: ProcessorRegistry) {
           },
         },
       },
+      workers: {
+        type: 'array',
+        description: 'Background workers that proactively accumulate context.',
+        items: {
+          type: 'object',
+          required: ['workerId'],
+          properties: {
+            workerId: { type: 'string' },
+            options: { type: 'object' },
+          },
+        },
+      },
       pipelines: {
         type: 'array',
         description: 'The execution graphs for context manipulation.',

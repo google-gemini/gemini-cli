@@ -15,6 +15,14 @@ export const defaultSidecarProfile: SidecarConfig = {
     retainedTokens: 65000,
     maxTokens: 150000,
   },
+  workers: [
+    {
+      workerId: 'StateSnapshotWorker',
+      options: {
+        type: 'accumulate',
+      },
+    },
+  ],
   pipelines: [
     {
       name: 'Immediate Sanitization',
@@ -41,7 +49,6 @@ export const defaultSidecarProfile: SidecarConfig = {
           processorId: 'SemanticCompressionProcessor',
           options: { nodeThresholdTokens: 5000 },
         },
-        { processorId: 'StateSnapshotProcessor', options: {} },
       ],
     },
     {
@@ -49,7 +56,10 @@ export const defaultSidecarProfile: SidecarConfig = {
       triggers: ['gc_backstop'],
       execution: 'blocking',
       processors: [
-        { processorId: 'StateSnapshotProcessor', options: {} },
+        { 
+          processorId: 'StateSnapshotProcessor', 
+          options: { target: 'max' } 
+        },
         { processorId: 'EmergencyTruncationProcessor', options: {} },
       ],
     },
