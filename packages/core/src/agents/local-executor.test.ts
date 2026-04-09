@@ -140,6 +140,7 @@ vi.mock('../core/geminiChat.js', () => ({
     CHUNK: 'chunk',
   },
   GeminiChat: vi.fn().mockImplementation(() => ({
+    initialize: vi.fn(),
     sendMessageStream: mockSendMessageStream,
     getHistory: vi.fn((_curated?: boolean) => [...mockChatHistory]),
     setHistory: mockSetHistory,
@@ -433,6 +434,7 @@ describe('LocalAgentExecutor', () => {
     MockedGeminiChat.mockImplementation(
       () =>
         ({
+          initialize: vi.fn(),
           sendMessageStream: mockSendMessageStream,
           setSystemInstruction: mockSetSystemInstruction,
           getHistory: vi.fn((_curated?: boolean) => [...mockChatHistory]),
