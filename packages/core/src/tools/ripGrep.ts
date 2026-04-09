@@ -29,7 +29,7 @@ import {
   COMMON_DIRECTORY_EXCLUDES,
 } from '../utils/ignorePatterns.js';
 import { FileDiscoveryService } from '../services/fileDiscoveryService.js';
-import { execStreaming } from '../utils/shell-utils.js';
+import { execStreaming, resolveExecutable } from '../utils/shell-utils.js';
 import {
   DEFAULT_TOTAL_MAX_MATCHES,
   DEFAULT_SEARCH_TIMEOUT_MS,
@@ -37,7 +37,6 @@ import {
 import { RIP_GREP_DEFINITION } from './definitions/coreTools.js';
 import { resolveToolDeclaration } from './definitions/resolver.js';
 import { type GrepMatch, formatGrepResults } from './grep-utils.js';
-import which from 'which';
 
 function getRgCandidateFilenames(): readonly string[] {
   return process.platform === 'win32' ? ['rg.exe', 'rg'] : ['rg'];
@@ -53,7 +52,7 @@ async function resolveExistingRgPath(): Promise<string | null> {
   }
 
   // Fallback: managed binary unavailable or incompatible (e.g. Termux/non-FHS)
-  const systemRg = which.sync('rg', { nothrow: true });
+  const systemRg = await resolveExecutable('rg');
   if (systemRg) return systemRg;
 
   return null;
