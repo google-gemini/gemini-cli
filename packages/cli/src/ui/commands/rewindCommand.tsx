@@ -95,7 +95,7 @@ export const rewindCommand: SlashCommand = {
   name: 'rewind',
   description: 'Jump back to a specific message and restart the conversation',
   kind: CommandKind.BUILT_IN,
-  action: (context) => {
+  action: async (context, args) => {
     const agentContext = context.services.agentContext;
     const config = agentContext?.config;
     if (!config)
@@ -137,6 +137,49 @@ export const rewindCommand: SlashCommand = {
         type: 'message',
         messageType: 'info',
         content: 'Nothing to rewind to.',
+      };
+    }
+
+    // Handle positional argument for stdin-driven rewind
+    const argTrimmed = (args ?? '').trim();
+    if (argTrimmed) {
+      if (!/^-?\d+$/.test(argTrimmed)) {
+        return {
+          type: 'message',
+          messageType: 'error',
+          content:
+            'Invalid argument. Usage: /rewind <index> (0-indexed, supports negative indexing)',
+        };
+      }
+
+      const index = parseInt(argTrimmed, 10);
+      const userMessages = conversation.messages.filter(
+        (msg) => msg.type === 'user',
+      );
+
+      // Python-style negative indexing
+      const resolvedIndex = index < 0 ? userMessages.length + index : index;
+
+      if (resolvedIndex < 0 || resolvedIndex >= userMessages.length) {
+        return {
+          type: 'message',
+          messageType: 'error',
+          content: `Index out of range. Valid range: -${userMessages.length} to ${userMessages.length - 1} (${userMessages.length} user messages).`,
+        };
+      }
+
+      logRewind(config, new RewindEvent(RewindOutcome.RewindOnly));
+      await rewindConversation(
+        context,
+        client,
+        recordingService,
+        userMessages[resolvedIndex].id,
+        '',
+      );
+      return {
+        type: 'message',
+        messageType: 'info',
+        content: `Rewound to before user message ${resolvedIndex}.`,
       };
     }
 

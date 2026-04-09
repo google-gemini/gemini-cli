@@ -281,10 +281,10 @@ describe('rewindCommand', () => {
     });
   });
 
-  it('should fail if config is missing', () => {
+  it('should fail if config is missing', async () => {
     const context = { services: {} } as CommandContext;
 
-    const result = rewindCommand.action!(context, '');
+    const result = await rewindCommand.action!(context, '');
 
     expect(result).toEqual({
       type: 'message',
@@ -293,7 +293,7 @@ describe('rewindCommand', () => {
     });
   });
 
-  it('should fail if client is not initialized', () => {
+  it('should fail if client is not initialized', async () => {
     const context = createMockCommandContext({
       services: {
         agentContext: {
@@ -305,7 +305,7 @@ describe('rewindCommand', () => {
       },
     }) as unknown as CommandContext;
 
-    const result = rewindCommand.action!(context, '');
+    const result = await rewindCommand.action!(context, '');
 
     expect(result).toEqual({
       type: 'message',
@@ -314,7 +314,7 @@ describe('rewindCommand', () => {
     });
   });
 
-  it('should fail if recording service is unavailable', () => {
+  it('should fail if recording service is unavailable', async () => {
     const context = createMockCommandContext({
       services: {
         agentContext: {
@@ -326,7 +326,7 @@ describe('rewindCommand', () => {
       },
     }) as unknown as CommandContext;
 
-    const result = rewindCommand.action!(context, '');
+    const result = await rewindCommand.action!(context, '');
 
     expect(result).toEqual({
       type: 'message',
@@ -335,10 +335,10 @@ describe('rewindCommand', () => {
     });
   });
 
-  it('should return info if no conversation found', () => {
+  it('should return info if no conversation found', async () => {
     mockGetConversation.mockReturnValue(null);
 
-    const result = rewindCommand.action!(mockContext, '');
+    const result = await rewindCommand.action!(mockContext, '');
 
     expect(result).toEqual({
       type: 'message',
@@ -347,18 +347,82 @@ describe('rewindCommand', () => {
     });
   });
 
-  it('should return info if no user interactions found', () => {
+  it('should return info if no user interactions found', async () => {
     mockGetConversation.mockReturnValue({
       messages: [{ id: 'msg-1', type: 'gemini', content: 'hello' }],
       sessionId: 'test-session',
     });
 
-    const result = rewindCommand.action!(mockContext, '');
+    const result = await rewindCommand.action!(mockContext, '');
 
     expect(result).toEqual({
       type: 'message',
       messageType: 'info',
       content: 'Nothing to rewind to.',
+    });
+  });
+
+  describe('positional argument rewind', () => {
+    beforeEach(() => {
+      mockGetConversation.mockReturnValue({
+        messages: [
+          { id: 'user-0', type: 'user', content: 'static docs' },
+          { id: 'gemini-0', type: 'gemini', content: 'response 0' },
+          { id: 'user-1', type: 'user', content: 'review request' },
+          { id: 'gemini-1', type: 'gemini', content: 'response 1' },
+          { id: 'user-2', type: 'user', content: 'follow up' },
+          { id: 'gemini-2', type: 'gemini', content: 'response 2' },
+        ],
+        sessionId: 'test-session',
+      });
+    });
+
+    it('should rewind to positive index', async () => {
+      const result = await rewindCommand.action!(mockContext, '1');
+      expect(mockRewindTo).toHaveBeenCalledWith('user-1');
+      expect(result).toHaveProperty('messageType', 'info');
+    });
+
+    it('should support negative indexing', async () => {
+      const result = await rewindCommand.action!(mockContext, '-1');
+      expect(mockRewindTo).toHaveBeenCalledWith('user-2');
+      expect(result).toHaveProperty('messageType', 'info');
+    });
+
+    it('should rewind to index 0', async () => {
+      const result = await rewindCommand.action!(mockContext, '0');
+      expect(mockRewindTo).toHaveBeenCalledWith('user-0');
+      expect(result).toHaveProperty('messageType', 'info');
+    });
+
+    it('should return error for non-integer argument', async () => {
+      const result = await rewindCommand.action!(mockContext, 'abc');
+      expect(mockRewindTo).not.toHaveBeenCalled();
+      expect(result).toHaveProperty('messageType', 'error');
+    });
+
+    it('should return error for floating point argument', async () => {
+      const result = await rewindCommand.action!(mockContext, '1.5');
+      expect(mockRewindTo).not.toHaveBeenCalled();
+      expect(result).toHaveProperty('messageType', 'error');
+    });
+
+    it('should return error for out-of-range positive index', async () => {
+      const result = await rewindCommand.action!(mockContext, '5');
+      expect(mockRewindTo).not.toHaveBeenCalled();
+      expect(result).toHaveProperty('messageType', 'error');
+    });
+
+    it('should return error for out-of-range negative index', async () => {
+      const result = await rewindCommand.action!(mockContext, '-5');
+      expect(mockRewindTo).not.toHaveBeenCalled();
+      expect(result).toHaveProperty('messageType', 'error');
+    });
+
+    it('should open TUI when no argument is provided', async () => {
+      const result = await rewindCommand.action!(mockContext, '');
+      expect(mockRewindTo).not.toHaveBeenCalled();
+      expect(result).toHaveProperty('type', 'custom_dialog');
     });
   });
 });
