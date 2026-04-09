@@ -1023,31 +1023,35 @@ describe('MCPOAuthProvider', () => {
     });
 
     it('should handle callback timeout', async () => {
-      vi.mocked(http.createServer).mockImplementation(
-        () => mockHttpServer as unknown as http.Server,
-      );
+      vi.useFakeTimers();
+      try {
+        vi.mocked(http.createServer).mockImplementation(
+          () => mockHttpServer as unknown as http.Server,
+        );
 
-      mockHttpServer.listen.mockImplementation((port, callback) => {
-        callback?.();
-        // Don't trigger callback - simulate timeout
-      });
+        mockHttpServer.listen.mockImplementation((port, callback) => {
+          callback?.();
+          // Don't trigger callback - simulate timeout
+        });
 
-      // Mock setTimeout to trigger timeout immediately
-      const originalSetTimeout = global.setTimeout;
-      global.setTimeout = vi.fn((callback, delay) => {
-        if (delay === 5 * 60 * 1000) {
-          // 5 minute timeout
-          callback();
-        }
-        return originalSetTimeout(callback, 0);
-      }) as unknown as typeof setTimeout;
+        const authProvider = new MCPOAuthProvider();
 
-      const authProvider = new MCPOAuthProvider();
-      await expect(
-        authProvider.authenticate('test-server', mockConfig),
-      ).rejects.toThrow('OAuth callback timeout');
+        const authPromise = authProvider
+          .authenticate('test-server', mockConfig)
+          .catch((e: Error) => {
+            if (e.message !== 'OAuth callback timeout') throw e;
+            return e;
+          });
 
-      global.setTimeout = originalSetTimeout;
+        // Advance timers by 5 minutes
+        await vi.advanceTimersByTimeAsync(5 * 60 * 1000);
+
+        const error = await authPromise;
+        expect(error).toBeInstanceOf(Error);
+        expect((error as Error).message).toBe('OAuth callback timeout');
+      } finally {
+        vi.useRealTimers();
+      }
     });
 
     it('should use port from redirectUri if provided', async () => {
