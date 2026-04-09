@@ -59,7 +59,6 @@ export class FakeContentGenerator implements ContentGenerator {
 
     for await (const line of rl) {
       if (line.trim() !== '') {
-        // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
         responses.push(JSON.parse(line) as FakeResponse);
       }
     }
