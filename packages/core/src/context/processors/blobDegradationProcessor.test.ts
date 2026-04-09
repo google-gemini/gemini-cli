@@ -6,6 +6,7 @@
 import { describe, it, expect } from 'vitest';
 import { BlobDegradationProcessor } from './blobDegradationProcessor.js';
 import {
+  createMockProcessArgs,
   createMockEnvironment,
   createDummyNode,
 } from '../testing/contextTestUtils.js';
@@ -34,11 +35,7 @@ describe('BlobDegradationProcessor', () => {
 
     const targets = [prompt];
 
-    const result = await processor.process({
-      buffer: undefined as unknown as import('../pipeline.js').ContextWorkingBuffer,
-      targets,
-      inbox: undefined as unknown as import('../pipeline.js').InboxSnapshot,
-    });
+    const result = await processor.process(createMockProcessArgs(targets));
 
     expect(result.length).toBe(1);
     const modifiedPrompt = result[0] as UserPrompt;
@@ -51,7 +48,7 @@ describe('BlobDegradationProcessor', () => {
     expect(modifiedPrompt.semanticParts[2]).toEqual(parts[2]);
 
     // The inline_data part should be replaced with text
-    const degradedPart = modifiedPrompt.semanticParts[1] as import('../ir/types.js').TextPart;
+    const degradedPart = modifiedPrompt.semanticParts[1] as unknown as { type: string, text: string };
     expect(degradedPart.type).toBe('text');
     expect(degradedPart.text).toContain('[Multi-Modal Blob (image/png, 0.00MB) degraded to text');
   });
@@ -76,11 +73,7 @@ describe('BlobDegradationProcessor', () => {
 
     const targets = [prompt];
 
-    const result = await processor.process({
-      buffer: undefined as unknown as import('../pipeline.js').ContextWorkingBuffer,
-      targets,
-      inbox: undefined as unknown as import('../pipeline.js').InboxSnapshot,
-    });
+    const result = await processor.process(createMockProcessArgs(targets));
 
     const modifiedPrompt = result[0] as UserPrompt;
     expect(modifiedPrompt.semanticParts.length).toBe(2);
@@ -96,11 +89,7 @@ describe('BlobDegradationProcessor', () => {
     const processor = BlobDegradationProcessor.create(env, {});
     const targets: Array<import('../ir/types.js').ConcreteNode> = [];
 
-    const result = await processor.process({
-      buffer: undefined as unknown as import('../pipeline.js').ContextWorkingBuffer,
-      targets,
-      inbox: undefined as unknown as import('../pipeline.js').InboxSnapshot,
-    });
+    const result = await processor.process(createMockProcessArgs(targets));
 
     expect(result).toBe(targets);
   });

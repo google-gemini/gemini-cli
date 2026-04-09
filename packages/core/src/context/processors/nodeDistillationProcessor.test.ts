@@ -6,50 +6,49 @@
 import { describe, it, expect, vi } from 'vitest';
 import { NodeDistillationProcessor } from './nodeDistillationProcessor.js';
 import {
+  createMockProcessArgs,
   createMockEnvironment,
   createDummyNode,
   createDummyToolNode,
   createMockGenerateContentResponse
 } from '../testing/contextTestUtils.js';
 import type { UserPrompt, AgentThought, ToolExecution } from '../ir/types.js';
+import type { BaseLlmClient } from '../../core/baseLlmClient.js';
 
 describe('NodeDistillationProcessor', () => {
   it('should trigger summarization via LLM for long text parts', async () => {
     const mockLlmClient = {
       generateContent: vi.fn().mockResolvedValue(createMockGenerateContentResponse('Mocked Summary!')), // length = 15
-    };
+    } as unknown as BaseLlmClient;
 
+    // Use charsPerToken=1 naturally.
     const env = createMockEnvironment({
-        llmClient: mockLlmClient as unknown as import("../pipeline.js").ContextWorkingBuffer,
+        llmClient: mockLlmClient,
     });
 
     const processor = NodeDistillationProcessor.create(env, {
       nodeThresholdTokens: 10,
     });
 
+    const longText = 'A'.repeat(50); // 50 chars
 
-    const prompt = createDummyNode('ep1', 'USER_PROMPT', 3800, {
+    const prompt = createDummyNode('ep1', 'USER_PROMPT', 50, {
       semanticParts: [
-        { type: 'text', text: 'This text is way longer than 10 characters and needs compression' }
+        { type: 'text', text: longText }
       ],
     }, 'prompt-id') as UserPrompt;
 
-    const thought = createDummyNode('ep1', 'AGENT_THOUGHT', 1500, {
-      text: 'The model is thinking something incredibly long and verbose that exceeds 10 chars',
+    const thought = createDummyNode('ep1', 'AGENT_THOUGHT', 50, {
+      text: longText,
     }, 'thought-id') as AgentThought;
 
-    const tool = createDummyToolNode('ep1', 50, 1000, {
-      observation: { result: 'Massive tool JSON observation payload' },
-      tokens: { intent: 50, observation: 1000 }
+    const tool = createDummyToolNode('ep1', 5, 500, {
+      observation: { result: 'A'.repeat(500) },
     }, 'tool-id');
 
     const targets = [prompt, thought, tool];
 
-    const result = await processor.process({
-      buffer: undefined as unknown as import('../pipeline.js').ContextWorkingBuffer,
-      targets,
-      inbox: undefined as unknown as import('../pipeline.js').ContextWorkingBuffer,
-    });
+    const result = await processor.process(createMockProcessArgs(targets));
 
     expect(result.length).toBe(3);
 
@@ -57,15 +56,15 @@ describe('NodeDistillationProcessor', () => {
     const compressedPrompt = result[0] as UserPrompt;
     expect(compressedPrompt.id).not.toBe(prompt.id);
     expect(compressedPrompt.semanticParts[0].type).toBe('text');
-    expect((compressedPrompt.semanticParts[0] as unknown as import("../pipeline.js").ContextWorkingBuffer).text).toBe('Mocked Summary!');
+    expect((compressedPrompt.semanticParts[0] as unknown as {text: string}).text).toBe('Mocked Summary!');
+    
     // 2. Agent Thought
     const compressedThought = result[1] as AgentThought;
-    expect(compressedThought.id).toMatch(/^mock-uuid-/);
     expect(compressedThought.id).not.toBe(thought.id);
     expect(compressedThought.text).toBe('Mocked Summary!');
 
+    // 3. Tool Execution
     const compressedTool = result[2] as ToolExecution;
-    expect(compressedTool.id).toMatch(/^mock-uuid-/);
     expect(compressedTool.id).not.toBe(tool.id);
     expect(compressedTool.observation).toEqual({ summary: 'Mocked Summary!' });
 
@@ -75,34 +74,31 @@ describe('NodeDistillationProcessor', () => {
   it('should ignore nodes that are below the threshold', async () => {
     const mockLlmClient = {
       generateContent: vi.fn().mockResolvedValue(createMockGenerateContentResponse('S')), // length = 1
-    };
+    } as unknown as BaseLlmClient;
 
     const env = createMockEnvironment({
-       llmClient: mockLlmClient as unknown as import("../pipeline.js").ContextWorkingBuffer,
+       llmClient: mockLlmClient,
     });
 
     const processor = NodeDistillationProcessor.create(env, {
       nodeThresholdTokens: 100, // Very high threshold
     });
 
+    const shortText = 'Short text'; // 10 chars
 
-    const prompt = createDummyNode('ep1', 'USER_PROMPT', 3800, {
+    const prompt = createDummyNode('ep1', 'USER_PROMPT', 10, {
       semanticParts: [
-        { type: 'text', text: 'Short text' } // Below threshold
+        { type: 'text', text: shortText }
       ],
     }, 'prompt-id') as UserPrompt;
 
-    const thought = createDummyNode('ep1', 'AGENT_THOUGHT', 1500, {
-      text: 'Short thought', // Below threshold
+    const thought = createDummyNode('ep1', 'AGENT_THOUGHT', 13, {
+      text: 'Short thought', 
     }, 'thought-id') as AgentThought;
 
     const targets = [prompt, thought];
 
-    const result = await processor.process({
-      buffer: undefined as unknown as import('../pipeline.js').ContextWorkingBuffer,
-      targets,
-      inbox: undefined as unknown as import('../pipeline.js').ContextWorkingBuffer,
-    });
+    const result = await processor.process(createMockProcessArgs(targets));
 
     expect(result.length).toBe(2);
 

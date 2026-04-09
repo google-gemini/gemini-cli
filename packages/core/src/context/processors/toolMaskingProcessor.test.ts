@@ -3,51 +3,46 @@
  * Copyright 2026 Google LLC
  * SPDX-License-Identifier: Apache-2.0
  */
-import { describe, it, expect, vi } from 'vitest';
+import { describe, it, expect } from 'vitest';
 import { ToolMaskingProcessor } from './toolMaskingProcessor.js';
 import {
+  createMockProcessArgs,
   createMockEnvironment,
   createDummyToolNode,
 } from '../testing/contextTestUtils.js';
+import type { ToolExecution } from '../ir/types.js';
 
 describe('ToolMaskingProcessor', () => {
   it('should write large strings to disk and replace them with a masked pointer', async () => {
     const env = createMockEnvironment();
-    // 1 token = 1 char for simplicity
-    // Fake token calculator says new tokens are 5
-    env.tokenCalculator.estimateTokensForParts = vi.fn().mockReturnValue(5);
-    env.tokenCalculator.getTokenCost = vi.fn().mockReturnValue(150);
+    // env uses charsPerToken=1 natively.
+    // original string lengths > stringLengthThresholdTokens (which is 10) will be masked
 
     const processor = ToolMaskingProcessor.create(env, {
       stringLengthThresholdTokens: 10,
     });
 
+    const longString = 'A'.repeat(500); // 500 chars
 
-    const toolStep = createDummyToolNode('ep1', 50, 100, {
+    const toolStep = createDummyToolNode('ep1', 50, 500, {
       observation: {
-        result: 'this is a really long string that should get masked out because it exceeds 10 chars',
-        metadata: 'short',
+        result: longString,
+        metadata: 'short', // 5 chars, will not be masked
       },
     });
 
-    const result = await processor.process({
-      buffer: undefined as unknown as import('../pipeline.js').ContextWorkingBuffer,
-      targets: [toolStep],
-      inbox: undefined as unknown as import('../pipeline.js').ContextWorkingBuffer,
-    });
+    const result = await processor.process(createMockProcessArgs([toolStep]));
 
     expect(result.length).toBe(1);
-    const masked = result[0];
+    const masked = result[0] as ToolExecution;
     
     // It should have generated a new ID because it modified it
     expect(masked.id).not.toBe(toolStep.id);
 
     // It should have masked the observation
-    const obs = (masked as unknown as import("../pipeline.js").ContextWorkingBuffer).observation;
+    const obs = masked.observation as { result: string, metadata: string };
     expect(obs.result).toContain('<tool_output_masked>');
     expect(obs.metadata).toBe('short'); // Untouched
-
-    // Transformation logged
   });
 
   it('should skip unmaskable tools', async () => {
@@ -57,7 +52,6 @@ describe('ToolMaskingProcessor', () => {
       stringLengthThresholdTokens: 10,
     });
 
-
     const toolStep = createDummyToolNode('ep1', 10, 10, {
       toolName: 'activate_skill',
       observation: {
@@ -65,11 +59,7 @@ describe('ToolMaskingProcessor', () => {
       }
     });
 
-    const result = await processor.process({
-      buffer: undefined as unknown as import('../pipeline.js').ContextWorkingBuffer,
-      targets: [toolStep],
-      inbox: undefined as unknown as import('../pipeline.js').ContextWorkingBuffer,
-    });
+    const result = await processor.process(createMockProcessArgs([toolStep]));
 
     // Returned the exact same object reference
     expect(result[0]).toBe(toolStep);

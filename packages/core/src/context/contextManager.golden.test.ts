@@ -148,9 +148,14 @@ describe('ContextManager Golden Tests', () => {
 
   it('should process history and match golden snapshot', async () => {
     const history = createLargeHistory();
-    (
-      contextManager as unknown as { pristineEpisodes: Episode[] }
-    ).pristineEpisodes = (contextManager as unknown as import("../pipeline.js").ContextWorkingBuffer).env.irMapper.toIr(history, (contextManager as unknown as import("../pipeline.js").ContextWorkingBuffer).env.tokenCalculator);
+    // Use the actual public methods or carefully type the internal state for testing
+    // To seed the manager purely for testing without invoking generateContent, we bypass the pipeline:
+    const managerAsAny = contextManager as unknown as { 
+      pristineEpisodes: Episode[]; 
+      env: { irMapper: { toIr(h: unknown, t: unknown): Episode[] }, tokenCalculator: unknown } 
+    };
+    managerAsAny.pristineEpisodes = managerAsAny.env.irMapper.toIr(history, managerAsAny.env.tokenCalculator);
+    
     const result = await contextManager.projectCompressedHistory();
     expect(result).toMatchSnapshot();
   });

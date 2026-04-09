@@ -36,6 +36,16 @@ export class InboxSnapshotImpl implements InboxSnapshot {
 
   getMessages<T = unknown>(topic: string): ReadonlyArray<InboxMessage<T>> {
     const raw = this.messages.filter((m) => m.topic === topic);
+    /*
+     * Architectural Justification for Unchecked Cast:
+     * The Inbox is a heterogeneous event bus designed to support arbitrary, declarative
+     * routing via configuration files (where topics are just strings). Because TypeScript
+     * completely erases generic type information (<T>) at runtime, the central array
+     * can only hold `unknown` payloads. To enforce strict type safety without a central
+     * registry (which would break decoupling) or heavy runtime validation (Zod schemas),
+     * we must assert the type boundary here. The contract relies on the Worker and Processor
+     * agreeing on the payload structure associated with the configured topic string.
+     */
     // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
     return raw as ReadonlyArray<InboxMessage<T>>;
   }

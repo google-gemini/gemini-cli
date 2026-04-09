@@ -5,7 +5,8 @@
  */
 import { describe, it, expect } from 'vitest';
 import { RollingSummaryProcessor } from './rollingSummaryProcessor.js';
-import { createMockEnvironment, createDummyNode } from '../testing/contextTestUtils.js';
+import { createMockProcessArgs,
+  createMockEnvironment, createDummyNode } from '../testing/contextTestUtils.js';
 
 describe('RollingSummaryProcessor', () => {
   it('should initialize with correct default options', () => {
@@ -32,7 +33,7 @@ describe('RollingSummaryProcessor', () => {
       createDummyNode('ep1', 'AGENT_YIELD', 50, { text: text50 }, 'id3'), 
     ];
 
-    const result = await processor.process({ targets, buffer: undefined as unknown as import('../pipeline.js').ContextWorkingBuffer, inbox: undefined as unknown as import('../pipeline.js').ContextWorkingBuffer });
+    const result = await processor.process(createMockProcessArgs(targets));
 
     // 3 nodes at 50 cost each.
     // The first node (id1) is the initial USER_PROMPT and is always skipped by RollingSummaryProcessor.
@@ -58,7 +59,7 @@ describe('RollingSummaryProcessor', () => {
       createDummyNode('ep1', 'AGENT_THOUGHT', 10, { text: text10 }, 'id2'),
     ];
 
-    const result = await processor.process({ targets, buffer: undefined as unknown as import('../pipeline.js').ContextWorkingBuffer, inbox: undefined as unknown as import('../pipeline.js').ContextWorkingBuffer });
+    const result = await processor.process(createMockProcessArgs(targets));
     
     // Deficit accumulator reaches 10. This is < 100 limit, and total summarizable nodes < 2 anyway.
     expect(result.length).toBe(2);

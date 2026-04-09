@@ -26,7 +26,7 @@ describe('SidecarRegistry', () => {
     const workerDef: ContextWorkerDef = {
       id: 'TestWorker',
       schema: { type: 'object' },
-      create: () => ({} as unknown as import('../pipeline.js').ContextProcessor),
+      create: () => ({} as unknown as import('../pipeline.js').ContextWorker),
     };
 
     registry.registerWorker(workerDef);
@@ -54,10 +54,10 @@ describe('SidecarRegistry', () => {
     registry.registerWorker({
       id: 'TestWorker',
       schema: { title: 'workerSchema' },
-      create: () => ({} as unknown as import('../pipeline.js').ContextProcessor),
+      create: () => ({} as unknown as import('../pipeline.js').ContextWorker),
     });
 
-    const schemas = registry.getSchemas() as unknown as Array<Record<string, unknown>>;
+    const schemas = registry.getSchemas() as unknown as Array<{title?: string}>;
     expect(schemas.length).toBe(2);
     expect(schemas.find(s => s.title === 'processorSchema')).toBeDefined();
     expect(schemas.find(s => s.title === 'workerSchema')).toBeDefined();
@@ -66,7 +66,7 @@ describe('SidecarRegistry', () => {
   it('should safely clear the registry', () => {
     const registry = new SidecarRegistry();
     registry.registerProcessor({ id: 'TestProcessor', schema: {}, create: () => ({} as unknown as import('../pipeline.js').ContextProcessor) });
-    registry.registerWorker({ id: 'TestWorker', schema: {}, create: () => ({} as unknown as import('../pipeline.js').ContextProcessor) });
+    registry.registerWorker({ id: 'TestWorker', schema: {}, create: () => ({} as unknown as import('../pipeline.js').ContextWorker) });
 
     registry.clear();
 
