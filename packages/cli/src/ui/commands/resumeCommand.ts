@@ -4,11 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import type {
-  OpenDialogActionReturn,
-  CommandContext,
-  SlashCommand,
-} from './types.js';
+import type { SlashCommand } from './types.js';
 import { CommandKind } from './types.js';
 import { chatResumeSubCommands, resumeCheckpointCommand } from './chatCommand.js';
 import { parseSlashCommand } from '../../utils/commands.js';
@@ -18,10 +14,7 @@ export const resumeCommand: SlashCommand = {
   description: 'Browse auto-saved conversations and manage chat checkpoints',
   kind: CommandKind.BUILT_IN,
   autoExecute: true,
-  action: async (
-    context: CommandContext,
-    args: string,
-  ): Promise<OpenDialogActionReturn | any> => {
+  action: async (context, args) => {
     if (args) {
       const parsed = parseSlashCommand(`/${args}`, chatResumeSubCommands);
       if (parsed.commandToExecute?.action) {
