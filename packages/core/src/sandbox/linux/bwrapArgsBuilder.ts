@@ -151,7 +151,9 @@ async function getSecretFilesArgs(
   const args: string[] = [];
   const searchDirs = new Set([
     resolvedPaths.workspace.original,
+    resolvedPaths.workspace.resolved,
     ...resolvedPaths.policyAllowed,
+    ...resolvedPaths.globalIncludes,
   ]);
   const findPatterns = getSecretFileFindArgs();
 

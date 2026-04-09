@@ -240,7 +240,10 @@ export class LinuxSandboxManager implements SandboxManager {
       req,
       mergedAdditional,
       this.options.workspace,
-      req.policy?.allowedPaths,
+      [
+        ...(req.policy?.allowedPaths || []),
+        ...(this.options.includeDirectories || []),
+      ],
     );
 
     const sanitizationConfig = getSecureSanitizationConfig(

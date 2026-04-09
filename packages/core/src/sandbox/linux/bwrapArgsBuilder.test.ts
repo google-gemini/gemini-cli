@@ -312,4 +312,31 @@ describe.skipIf(os.platform() === 'win32')('buildBwrapArgs', () => {
     expect(args[envIndex - 2]).toBe('--bind');
     expect(args[envIndex - 1]).toBe('/tmp/mask');
   });
+
+  it('scans globalIncludes for secret files', async () => {
+    const includeDir = '/opt/tools';
+    vi.mocked(shellUtils.spawnAsync).mockImplementation((cmd, args) => {
+      if (cmd === 'find' && args?.[0] === includeDir) {
+        return Promise.resolve({
+          status: 0,
+          stdout: Buffer.from(`${includeDir}/.env\0`),
+        } as unknown as ReturnType<typeof shellUtils.spawnAsync>);
+      }
+      return Promise.resolve({
+        status: 0,
+        stdout: Buffer.from(''),
+      } as unknown as ReturnType<typeof shellUtils.spawnAsync>);
+    });
+
+    const args = await buildBwrapArgs({
+      ...defaultOptions,
+      resolvedPaths: createResolvedPaths({
+        globalIncludes: [includeDir],
+      }),
+    });
+
+    expect(args).toContain(`${includeDir}/.env`);
+    const envIndex = args.indexOf(`${includeDir}/.env`);
+    expect(args[envIndex - 2]).toBe('--bind');
+  });
 });
