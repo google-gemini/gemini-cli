@@ -10,6 +10,11 @@ import { MemoryCommand } from './commands/memory.js';
 import { ExtensionsCommand } from './commands/extensions.js';
 import { InitCommand } from './commands/init.js';
 import { RestoreCommand } from './commands/restore.js';
+<<<<<<< HEAD
+=======
+import { AboutCommand } from './commands/about.js';
+import { HelpCommand } from './commands/help.js';
+>>>>>>> 06fcdc231 (feat(acp): add /help command (#24839))
 
 export class CommandHandler {
   private registry: CommandRegistry;
@@ -24,6 +29,11 @@ export class CommandHandler {
     registry.register(new ExtensionsCommand());
     registry.register(new InitCommand());
     registry.register(new RestoreCommand());
+<<<<<<< HEAD
+=======
+    registry.register(new AboutCommand());
+    registry.register(new HelpCommand(registry));
+>>>>>>> 06fcdc231 (feat(acp): add /help command (#24839))
     return registry;
   }
 

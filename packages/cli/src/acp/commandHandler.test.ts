@@ -26,5 +26,14 @@ describe('CommandHandler', () => {
 
     const init = parse('/init');
     expect(init.commandToExecute?.name).toBe('init');
+<<<<<<< HEAD
+=======
+
+    const about = parse('/about');
+    expect(about.commandToExecute?.name).toBe('about');
+
+    const help = parse('/help');
+    expect(help.commandToExecute?.name).toBe('help');
+>>>>>>> 06fcdc231 (feat(acp): add /help command (#24839))
   });
 });
