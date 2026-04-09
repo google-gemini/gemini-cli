@@ -37,6 +37,23 @@ export type FakeResponse =
       response: EmbedContentResponse;
     };
 
+function isFakeResponse(value: unknown): value is FakeResponse {
+  if (typeof value !== 'object' || value === null) {
+    return false;
+  }
+  const candidate = value as Partial<FakeResponse>;
+  return (
+    typeof candidate.method === 'string' &&
+    [
+      'generateContent',
+      'generateContentStream',
+      'countTokens',
+      'embedContent',
+    ].includes(candidate.method) &&
+    'response' in candidate
+  );
+}
+
 // A ContentGenerator that responds with canned responses.
 //
 // Typically these would come from a file, provided by the `--fake-responses`
@@ -59,7 +76,12 @@ export class FakeContentGenerator implements ContentGenerator {
 
     for await (const line of rl) {
       if (line.trim() !== '') {
-        responses.push(JSON.parse(line) as unknown as FakeResponse);
+        const parsed = JSON.parse(line) as unknown;
+        if (isFakeResponse(parsed)) {
+          responses.push(parsed);
+        } else {
+          throw new Error(`Invalid fake response: ${line}`);
+        }
       }
     }
     return new FakeContentGenerator(responses);

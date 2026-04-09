@@ -19,6 +19,7 @@ import {
   type CountTokensParameters,
   type EmbedContentParameters,
 } from '@google/genai';
+import type { ReadStream } from 'node:fs';
 import { LlmRole } from '../telemetry/types.js';
 
 vi.mock('node:fs', async (importOriginal) => {
@@ -172,7 +173,9 @@ describe('FakeContentGenerator', () => {
   describe('fromFile', () => {
     it('should create a generator from a file', async () => {
       const fileContent = JSON.stringify(fakeGenerateContentResponse) + '\n';
-      mockCreateReadStream.mockReturnValue(Readable.from([fileContent]) as any);
+      mockCreateReadStream.mockReturnValue(
+        Readable.from([fileContent]) as unknown as ReadStream,
+      );
 
       const generator = await FakeContentGenerator.fromFile('fake-path.json');
       const response = await generator.generateContent(
