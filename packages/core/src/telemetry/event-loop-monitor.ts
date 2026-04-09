@@ -5,7 +5,7 @@
  */
 
 import process from 'node:process';
-import { monitorEventLoopDelay } from 'node:perf_hooks';
+import { monitorEventLoopDelay, type IntervalHistogram } from 'node:perf_hooks';
 import type { Config } from '../config/config.js';
 import {
   recordEventLoopDelay,
@@ -13,8 +13,7 @@ import {
 } from './metrics.js';
 
 export class EventLoopMonitor {
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  private eventLoopHistogram: any = null;
+  private eventLoopHistogram: IntervalHistogram | null = null;
   private intervalId: NodeJS.Timeout | null = null;
   private isRunning = false;
 
