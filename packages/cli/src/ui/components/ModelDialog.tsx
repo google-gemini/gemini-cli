@@ -7,6 +7,8 @@
 import type React from 'react';
 import { useCallback, useContext, useMemo, useState, useEffect } from 'react';
 import { Box, Text } from 'ink';
+import { ModelQuotaDisplay } from './ModelQuotaDisplay.js';
+import { useUIState } from '../contexts/UIStateContext.js';
 import {
   PREVIEW_GEMINI_MODEL,
   PREVIEW_GEMINI_3_1_MODEL,
@@ -37,6 +39,7 @@ interface ModelDialogProps {
 export function ModelDialog({ onClose }: ModelDialogProps): React.JSX.Element {
   const config = useContext(ConfigContext);
   const settings = useSettings();
+  const { terminalWidth } = useUIState();
   const [hasAccessToProModel, setHasAccessToProModel] = useState<boolean>(
     () => !(config?.getProModelNoAccessSync() ?? false),
   );
@@ -338,20 +341,24 @@ export function ModelDialog({ onClose }: ModelDialogProps): React.JSX.Element {
       </Box>
       <Box marginTop={1} flexDirection="column">
         <Box>
-          <Text color={theme.text.primary}>
+          <Text bold color={theme.text.primary}>
             Remember model for future sessions:{' '}
           </Text>
           <Text color={theme.status.success}>
             {persistMode ? 'true' : 'false'}
           </Text>
+          <Text color={theme.text.secondary}> (Press Tab to toggle)</Text>
         </Box>
-        <Text color={theme.text.secondary}>(Press Tab to toggle)</Text>
       </Box>
-      <Box marginTop={1} flexDirection="column">
+      <Box flexDirection="column">
         <Text color={theme.text.secondary}>
           {'> To use a specific Gemini model on startup, use the --model flag.'}
         </Text>
       </Box>
+      <ModelQuotaDisplay
+        buckets={config?.getLastRetrievedQuota()?.buckets}
+        availableWidth={terminalWidth - 2}
+      />
       <Box marginTop={1} flexDirection="column">
         <Text color={theme.text.secondary}>(Press Esc to close)</Text>
       </Box>

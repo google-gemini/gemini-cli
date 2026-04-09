@@ -31,39 +31,79 @@ style guide violations and technical inaccuracies.
 
 3.  **Retrieve Style Guidelines:**
     - Familiarize yourself with the `docs-writer` skill instructions and the
-      project's [Documentation Style Guide](../style-guide.md).
+      included style guidelines.
 
 4.  **Audit Each Document:**
     - For each documentation file identified in Step 1, read its content.
     - **Review against Style Guide:**
-      - **Voice and Tone:** Check for professionalism, directness, use of "you",
-        active voice, present tense, clarity, and avoidance of jargon or overly
-        informal language.
-      - **Language and Grammar:** Look for conciseness, correct punctuation,
-        unambiguous dates, proper use of abbreviations (e.g., "for example"
-        instead of "e.g."), and adherence to quota/limit terminology if
-        applicable.
-      - **Formatting and Syntax:** Verify overview paragraphs, text wrap (80
-        characters), casing for headings/titles, correct naming (`Gemini CLI`),
-        list formatting, correct use of bold for UI elements and code font for
-        code/filenames, descriptive links, and proper alt text for images.
-      - **Structure:** Ensure BLUF (Bottom Line Up Front), proper use of
-        experimental feature notes, hierarchical headings, clear procedures
-        (imperative verbs, conditions before instructions), appropriate use of
-        elements (notes, warnings), and the absence of a table of contents.
-        Check for a "Next steps" section if applicable.
+      - **Voice and Tone Violations:**
+        - **Unprofessional Tone:** Identify phrasing that is overly casual,
+          defensive, or lacks a professional and friendly demeanor.
+        - **Indirectness or Vagueness:** Identify sentences that are
+          unnecessarily wordy or fail to be concise and direct.
+        - **Incorrect Pronoun:** Identify any use of third-person pronouns
+          (e.g., "we," "they," "the user") when referring to the reader, instead
+          of the second-person pronoun **"you"**.
+        - **Passive Voice:** Identify sentences written in the passive voice.
+        - **Incorrect Tense:** Identify the use of past or future tense verbs,
+          instead of the **present tense**.
+        - **Poor Vocabulary:** Identify the use of jargon, slang, or overly
+          informal language.
+      - **Language and Grammar Violations:**
+        - **Lack of Conciseness:** Identify unnecessarily long phrases or
+          sentences.
+        - **Punctuation Errors:** Identify incorrect or missing punctuation.
+        - **Ambiguous Dates:** Identify dates that could be misinterpreted
+          (e.g., "next Monday" instead of "April 15, 2026").
+        - **Abbreviation Usage:** Identify the use of abbreviations that should
+          be spelled out (e.g., "e.g." instead of "for example").
+        - **Terminology:** Check for incorrect or inconsistent use of
+          product-specific terms (e.g., "quota" vs. "limit").
+      - **Formatting and Syntax Violations:**
+        - **Missing Overview:** Check for the absence of a brief overview
+          paragraph at the start of the document.
+        - **Line Length:** Identify any lines of text that exceed **80
+          characters** (text wrap violation).
+        - **Casing:** Identify incorrect casing for headings, titles, or named
+          entities (e.g., product names like `Gemini CLI`).
+        - **List Formatting:** Identify incorrectly formatted lists (e.g.,
+          inconsistent indentation or numbering).
+        - **Incorrect Emphasis:** Identify incorrect use of bold text (should
+          only be used for UI elements) or code font (should be used for code,
+          file names, or command-line input).
+        - **Link Quality:** Identify links with non-descriptive anchor text
+          (e.g., "click here").
+        - **Image Alt Text:** Identify images with missing or poor-quality
+          (non-descriptive) alt text.
+      - **Structure Violations:**
+        - **Missing BLUF:** Check for the absence of a "Bottom Line Up Front"
+          summary at the start of complex sections or documents.
+        - **Experimental Feature Notes:** Identify experimental features that
+          are not clearly labeled with a standard note.
+        - **Heading Hierarchy:** Check for skipped heading levels (e.g., going
+          from `##` to `####`).
+        - **Procedure Clarity:** Check for procedural steps that do not start
+          with an imperative verb or where a condition is placed _after_ the
+          instruction.
+        - **Element Misuse:** Identify the incorrect or inappropriate use of
+          special elements (e.g., Notes, Warnings, Cautions).
+        - **Table of Contents:** Identify the presence of a dynamically
+          generated or manually included table of contents.
+        - **Missing Next Steps:** Check for procedural documents that lack a
+          "Next steps" section (if applicable).
     - **Verify Code Accuracy (if applicable):**
       - If the document contains code snippets (e.g., shell commands, API calls,
         file paths, Docker image versions), use `grep_search` and `read_file`
         within the `packages/` directory (or other relevant parts of the
         codebase) to ensure the code is still accurate and up-to-date. Pay close
         attention to version numbers, package names, and command syntax.
-    - **Record Findings:** For each violation or inaccuracy found:
+    - **Record Findings:** For each **violation** or inaccuracy found:
       - Note the file path.
       - Describe the violation (e.g., "Violation (Language and Grammar): Uses
         'e.g.'").
-      - Provide a clear and actionable recommendation (e.g., "Recommendation:
-        Replace 'e.g.' with 'for example'.").
+      - Provide a clear and actionable recommendation to correct the issue.
+        (e.g., "Recommendation: Replace 'e.g.' with 'for example'." or
+        "Recommendation: Replace '...' with '...' in active voice.).
       - Append these findings to `audit-results-[YYYY-MM-DD].md`.
 
 ## Phase 2: Software Engineer Audit

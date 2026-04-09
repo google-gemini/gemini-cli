@@ -177,7 +177,7 @@ function runCommand(command, stdio = 'inherit') {
     ].join(sep);
     execSync(command, { stdio, env, shell: true });
     return true;
-  } catch (_e) {
+  } catch {
     return false;
   }
 }
@@ -267,7 +267,7 @@ export function runSensitiveKeywordLinter() {
         .trim()
         .split('\n')
         .filter(Boolean);
-    } catch (_error) {
+    } catch {
       console.error(`Could not get changed files against origin/${baseRef}.`);
       try {
         console.log('Falling back to diff against HEAD~1');
@@ -276,7 +276,7 @@ export function runSensitiveKeywordLinter() {
           .trim()
           .split('\n')
           .filter(Boolean);
-      } catch (_fallbackError) {
+      } catch {
         console.error('Could not get changed files against HEAD~1 either.');
         process.exit(1);
       }

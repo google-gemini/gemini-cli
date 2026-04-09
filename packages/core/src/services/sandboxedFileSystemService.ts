@@ -22,12 +22,29 @@ export class SandboxedFileSystemService implements FileSystemService {
 
   private sanitizeAndValidatePath(filePath: string): string {
     const resolvedPath = resolveToRealPath(filePath);
-    if (!isSubpath(this.cwd, resolvedPath) && this.cwd !== resolvedPath) {
-      throw new Error(
-        `Access denied: Path '${filePath}' is outside the workspace.`,
-      );
+    const workspace = resolveToRealPath(this.sandboxManager.getWorkspace());
+
+    if (isSubpath(workspace, resolvedPath) || workspace === resolvedPath) {
+      return resolvedPath;
     }
-    return resolvedPath;
+
+    // Check if the path is explicitly allowed by the sandbox manager
+    const options = this.sandboxManager.getOptions();
+    const allowedPaths = options?.includeDirectories ?? [];
+
+    for (const allowed of allowedPaths) {
+      const resolvedAllowed = resolveToRealPath(allowed);
+      if (
+        isSubpath(resolvedAllowed, resolvedPath) ||
+        resolvedAllowed === resolvedPath
+      ) {
+        return resolvedPath;
+      }
+    }
+
+    throw new Error(
+      `Access denied: Path '${filePath}' is outside the workspace and not in allowed paths.`,
+    );
   }
 
   async readTextFile(filePath: string): Promise<string> {
@@ -42,52 +59,56 @@ export class SandboxedFileSystemService implements FileSystemService {
       },
     });
 
-    return new Promise((resolve, reject) => {
-      // Direct spawn is necessary here for streaming large file contents.
+    try {
+      return await new Promise((resolve, reject) => {
+        // Direct spawn is necessary here for streaming large file contents.
 
-      const child = spawn(prepared.program, prepared.args, {
-        cwd: this.cwd,
-        env: prepared.env,
-      });
+        const child = spawn(prepared.program, prepared.args, {
+          cwd: this.cwd,
+          env: prepared.env,
+        });
 
-      let output = '';
-      let error = '';
+        let output = '';
+        let error = '';
 
-      child.stdout?.on('data', (data) => {
-        output += data.toString();
-      });
+        child.stdout?.on('data', (data) => {
+          output += data.toString();
+        });
 
-      child.stderr?.on('data', (data) => {
-        error += data.toString();
-      });
+        child.stderr?.on('data', (data) => {
+          error += data.toString();
+        });
 
-      child.on('close', (code) => {
-        if (code === 0) {
-          resolve(output);
-        } else {
-          const isEnoent =
-            error.toLowerCase().includes('no such file or directory') ||
-            error.toLowerCase().includes('enoent') ||
-            error.toLowerCase().includes('could not find file') ||
-            error.toLowerCase().includes('could not find a part of the path');
-          const err = new Error(
-            `Sandbox Error: read_file failed for '${filePath}'. Exit code ${code}. ${error ? 'Details: ' + error : ''}`,
-          );
-          if (isEnoent) {
-            Object.assign(err, { code: 'ENOENT' });
+        child.on('close', (code) => {
+          if (code === 0) {
+            resolve(output);
+          } else {
+            const isEnoent =
+              error.toLowerCase().includes('no such file or directory') ||
+              error.toLowerCase().includes('enoent') ||
+              error.toLowerCase().includes('could not find file') ||
+              error.toLowerCase().includes('could not find a part of the path');
+            const err = new Error(
+              `Sandbox Error: read_file failed for '${filePath}'. Exit code ${code}. ${error ? 'Details: ' + error : ''}`,
+            );
+            if (isEnoent) {
+              Object.assign(err, { code: 'ENOENT' });
+            }
+            reject(err);
           }
-          reject(err);
-        }
-      });
+        });
 
-      child.on('error', (err) => {
-        reject(
-          new Error(
-            `Sandbox Error: Failed to spawn read_file for '${filePath}': ${err.message}`,
-          ),
-        );
+        child.on('error', (err) => {
+          reject(
+            new Error(
+              `Sandbox Error: Failed to spawn read_file for '${filePath}': ${err.message}`,
+            ),
+          );
+        });
       });
-    });
+    } finally {
+      prepared.cleanup?.();
+    }
   }
 
   async writeTextFile(filePath: string, content: string): Promise<void> {
@@ -107,53 +128,57 @@ export class SandboxedFileSystemService implements FileSystemService {
       },
     });
 
-    return new Promise((resolve, reject) => {
-      // Direct spawn is necessary here for streaming large file contents.
+    try {
+      return await new Promise((resolve, reject) => {
+        // Direct spawn is necessary here for streaming large file contents.
 
-      const child = spawn(prepared.program, prepared.args, {
-        cwd: this.cwd,
-        env: prepared.env,
-      });
+        const child = spawn(prepared.program, prepared.args, {
+          cwd: this.cwd,
+          env: prepared.env,
+        });
 
-      child.stdin?.on('error', (err) => {
-        // Silently ignore EPIPE errors on stdin, they will be caught by the process error/close listeners
-        if (isNodeError(err) && err.code === 'EPIPE') {
-          return;
-        }
-        debugLogger.error(
-          `Sandbox Error: stdin error for '${filePath}': ${
-            err instanceof Error ? err.message : String(err)
-          }`,
-        );
-      });
+        child.stdin?.on('error', (err) => {
+          // Silently ignore EPIPE errors on stdin, they will be caught by the process error/close listeners
+          if (isNodeError(err) && err.code === 'EPIPE') {
+            return;
+          }
+          debugLogger.error(
+            `Sandbox Error: stdin error for '${filePath}': ${
+              err instanceof Error ? err.message : String(err)
+            }`,
+          );
+        });
 
-      child.stdin?.write(content);
-      child.stdin?.end();
+        child.stdin?.write(content);
+        child.stdin?.end();
 
-      let error = '';
-      child.stderr?.on('data', (data) => {
-        error += data.toString();
-      });
+        let error = '';
+        child.stderr?.on('data', (data) => {
+          error += data.toString();
+        });
 
-      child.on('close', (code) => {
-        if (code === 0) {
-          resolve();
-        } else {
+        child.on('close', (code) => {
+          if (code === 0) {
+            resolve();
+          } else {
+            reject(
+              new Error(
+                `Sandbox Error: write_file failed for '${filePath}'. Exit code ${code}. ${error ? 'Details: ' + error : ''}`,
+              ),
+            );
+          }
+        });
+
+        child.on('error', (err) => {
           reject(
             new Error(
-              `Sandbox Error: write_file failed for '${filePath}'. Exit code ${code}. ${error ? 'Details: ' + error : ''}`,
+              `Sandbox Error: Failed to spawn write_file for '${filePath}': ${err.message}`,
             ),
           );
-        }
+        });
       });
-
-      child.on('error', (err) => {
-        reject(
-          new Error(
-            `Sandbox Error: Failed to spawn write_file for '${filePath}': ${err.message}`,
-          ),
-        );
-      });
-    });
+    } finally {
+      prepared.cleanup?.();
+    }
   }
 }

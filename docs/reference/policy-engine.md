@@ -171,6 +171,24 @@ modes specified, it is always active.
   [Customizing Plan Mode Policies](../cli/plan-mode.md#customizing-policies).
 - `yolo`: A mode where all tools are auto-approved (use with extreme caution).
 
+To maintain the integrity of Plan Mode as a safe research environment,
+persistent tool approvals are context-aware. When you select **"Allow for all
+future sessions"**, the policy engine explicitly includes the current mode and
+all more permissive modes in the hierarchy (`plan` < `default` < `autoEdit` <
+`yolo`).
+
+- **Approvals in `plan` mode**: These represent an intentional choice to trust a
+  tool globally. The resulting rule explicitly includes all modes (`plan`,
+  `default`, `autoEdit`, and `yolo`).
+- **Approvals in other modes**: These only apply to the current mode and those
+  more permissive. For example:
+  - An approval granted in **`default`** mode applies to `default`, `autoEdit`,
+    and `yolo`.
+  - An approval granted in **`autoEdit`** mode applies to `autoEdit` and `yolo`.
+  - An approval granted in **`yolo`** mode applies only to `yolo`. This ensures
+    that trust flows correctly to more permissive environments while maintaining
+    the safety of more restricted modes like `plan`.
+
 ## Rule matching
 
 When a tool call is made, the engine checks it against all active rules,
@@ -304,7 +322,8 @@ priority = 10
 denyMessage = "Deletion is permanent"
 
 # (Optional) An array of approval modes where this rule is active.
-modes = ["autoEdit"]
+# If omitted or empty, the rule applies to all modes.
+modes = ["default", "autoEdit", "yolo"]
 
 # (Optional) A boolean to restrict the rule to interactive (true) or
 # non-interactive (false) environments.
@@ -419,6 +438,33 @@ mcpName = "*"
 decision = "ask_user"
 priority = 10
 ```
+
+### Special syntax for subagents
+
+You can secure and govern subagents using standard policy rules by treating the
+subagent's name as the `toolName`.
+
+When the main agent invokes a subagent (e.g., using the unified `invoke_agent`
+tool), the Policy Engine automatically treats the target `agent_name` as a
+virtual tool alias for rule matching.
+
+**Example:**
+
+This rule denies access to the `codebase_investigator` subagent.
+
+```toml
+[[rule]]
+toolName = "codebase_investigator"
+decision = "deny"
+priority = 500
+deny_message = "Deep codebase analysis is restricted for this session."
+```
+
+- **Backward Compatibility**: Any rules written targeting historical 1:1
+  subagent tool names will continue to match transparently.
+- **Context differentiation**: To create rules based on **who** is calling a
+  tool, use the `subagent` field instead. See
+  [TOML rule schema](#toml-rule-schema).
 
 ## Default policies
 

@@ -23,7 +23,6 @@ import {
   SERVICE_DESCRIPTION,
   SERVICE_NAME,
 } from './constants.js';
-import { sessionId } from '../utils/session.js';
 
 import { truncateString } from '../utils/textUtils.js';
 
@@ -96,10 +95,14 @@ export interface SpanMetadata {
  * @returns The result of the function.
  */
 export async function runInDevTraceSpan<R>(
-  opts: SpanOptions & { operation: GeminiCliOperation; logPrompts?: boolean },
+  opts: SpanOptions & {
+    operation: GeminiCliOperation;
+    logPrompts?: boolean;
+    sessionId: string;
+  },
   fn: ({ metadata }: { metadata: SpanMetadata }) => Promise<R>,
 ): Promise<R> {
-  const { operation, logPrompts, ...restOfSpanOpts } = opts;
+  const { operation, logPrompts, sessionId, ...restOfSpanOpts } = opts;
 
   const tracer = trace.getTracer(TRACER_NAME, TRACER_VERSION);
   return tracer.startActiveSpan(operation, restOfSpanOpts, async (span) => {
