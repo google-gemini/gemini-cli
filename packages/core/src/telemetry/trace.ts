@@ -29,6 +29,14 @@ import { truncateString } from '../utils/textUtils.js';
 const TRACER_NAME = 'gemini-cli';
 const TRACER_VERSION = 'v1';
 
+export const spanRegistry = new FinalizationRegistry((endSpan: () => void) => {
+  try {
+    endSpan();
+  } catch (e) {
+    diag.error('Error in FinalizationRegistry callback for span cleanup', e);
+  }
+});
+
 export function truncateForTelemetry(
   value: unknown,
   maxLength: number = 10000,
@@ -115,7 +123,12 @@ export async function runInDevTraceSpan<R>(
         [GEN_AI_CONVERSATION_ID]: sessionId,
       },
     };
+    let spanEnded = false;
     const endSpan = () => {
+      if (spanEnded) {
+        return;
+      }
+      spanEnded = true;
       try {
         if (logPrompts !== false) {
           if (meta.input !== undefined) {
@@ -177,7 +190,9 @@ export async function runInDevTraceSpan<R>(
           }
         })();
 
-        return Object.assign(streamWrapper, result);
+        const finalResult = Object.assign(streamWrapper, result);
+        spanRegistry.register(finalResult, endSpan);
+        return finalResult;
       }
       return result;
     } catch (e) {

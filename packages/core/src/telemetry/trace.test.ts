@@ -6,7 +6,7 @@
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { trace, SpanStatusCode, diag, type Tracer } from '@opentelemetry/api';
-import { runInDevTraceSpan, truncateForTelemetry } from './trace.js';
+import { runInDevTraceSpan, truncateForTelemetry, spanRegistry } from './trace.js';
 import {
   GeminiCliOperation,
   GEN_AI_CONVERSATION_ID,
@@ -205,6 +205,44 @@ describe('runInDevTraceSpan', () => {
 
     expect(results).toEqual([1, 2]);
     expect(mockSpan.end).toHaveBeenCalled();
+  });
+
+  it('should register async generators with spanRegistry', async () => {
+    const spy = vi.spyOn(spanRegistry, 'register');
+    async function* testStream() {
+      yield 1;
+    }
+
+    const resultStream = await runInDevTraceSpan(
+      { operation: GeminiCliOperation.LLMCall, sessionId: 'test-session-id' },
+      async () => testStream(),
+    );
+
+    expect(spy).toHaveBeenCalledWith(resultStream, expect.any(Function));
+  });
+
+  it('should be idempotent and call span.end only once', async () => {
+    vi.spyOn(spanRegistry, 'register');
+    async function* testStream() {
+      yield 1;
+    }
+
+    const resultStream = await runInDevTraceSpan(
+      { operation: GeminiCliOperation.LLMCall, sessionId: 'test-session-id' },
+      async () => testStream(),
+    );
+
+    // Simulate completion
+    for await (const _ of resultStream) {
+    }
+    expect(mockSpan.end).toHaveBeenCalledTimes(1);
+
+    // Try to end again (simulating registry or double call)
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
+    const endSpanFn = vi.mocked(spanRegistry.register).mock.calls[0][1] as () => void;
+    endSpanFn();
+
+    expect(mockSpan.end).toHaveBeenCalledTimes(1);
   });
 
   it('should end span automatically on error in async iterators', async () => {
