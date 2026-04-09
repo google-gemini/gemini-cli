@@ -38,13 +38,14 @@ export const initCommand: SlashCommand = {
       const content = await fs.promises.readFile(geminiMdPath, 'utf8');
       fileHasContent = content.trim().length > 0;
     } catch (e) {
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
-      const error = e as NodeJS.ErrnoException;
-      if (error.code !== 'ENOENT') {
+      if (
+        e instanceof Error &&
+        (e as NodeJS.ErrnoException).code !== 'ENOENT'
+      ) {
         return {
           type: 'message',
           messageType: 'error',
-          content: `Failed to read GEMINI.md: ${error.message}`,
+          content: `Failed to read GEMINI.md: ${e.message}`,
         };
       }
     }
