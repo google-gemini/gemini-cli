@@ -285,13 +285,14 @@ export class PolicyEngine {
     if (allowRedirection) return false;
     if (!hasRedirection(command)) return false;
 
-    // Do not downgrade (do not ask user) if sandboxing is enabled and in AUTO_EDIT or YOLO
+    // Do not downgrade (do not ask user) if in YOLO mode
+    if (this.approvalMode === ApprovalMode.YOLO) {
+      return false;
+    }
+
+    // Do not downgrade (do not ask user) if sandboxing is enabled and in AUTO_EDIT
     const sandboxEnabled = !(this.sandboxManager instanceof NoopSandboxManager);
-    if (
-      sandboxEnabled &&
-      (this.approvalMode === ApprovalMode.AUTO_EDIT ||
-        this.approvalMode === ApprovalMode.YOLO)
-    ) {
+    if (sandboxEnabled && this.approvalMode === ApprovalMode.AUTO_EDIT) {
       return false;
     }
 
@@ -579,7 +580,8 @@ export class PolicyEngine {
           isShellCommand &&
           command &&
           !('commandPrefix' in rule) &&
-          !rule.argsPattern
+          !rule.argsPattern &&
+          this.approvalMode !== ApprovalMode.YOLO
         ) {
           ruleDecision = await this.applyShellHeuristics(command, ruleDecision);
         }
