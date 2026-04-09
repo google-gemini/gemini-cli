@@ -167,7 +167,7 @@ export class WriteToShellTool extends BaseDeclarativeTool<
     super(
       WriteToShellTool.Name,
       'WriteToShell',
-      'Sends input to a running background shell process. Use this to interact with TUI applications, REPLs, and interactive commands. After writing, the current screen state is returned. Works with processes that were auto-promoted to background via wait_for_output_seconds or started with is_background=true.',
+      'Sends input to a running background shell process. Use this to interact with TUI applications, REPLs, and interactive commands. After writing, the current screen state is returned. Works with processes that were auto-promoted to background or started with is_background=true.',
       Kind.Execute,
       {
         type: 'object',

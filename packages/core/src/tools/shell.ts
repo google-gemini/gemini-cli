@@ -72,7 +72,6 @@ export interface ShellToolParams {
   is_background?: boolean;
   delay_ms?: number;
   [PARAM_ADDITIONAL_PERMISSIONS]?: SandboxPermissions;
-  wait_for_output_seconds?: number;
 }
 
 export class ShellToolInvocation extends BaseToolInvocation<
@@ -228,8 +227,8 @@ export class ShellToolInvocation extends BaseToolInvocation<
   override getExplanation(): string {
     let explanation = this.getContextualDetails().trim();
     const isAiMode = this.context.config.getInteractiveShellMode() === 'ai';
-    if (this.params.wait_for_output_seconds !== undefined || isAiMode) {
-      explanation += ` [auto-background after ${this.params.wait_for_output_seconds ?? 5}s]`;
+    if (isAiMode) {
+      explanation += ` [auto-background after 3s]`;
     }
     return explanation;
   }
@@ -507,9 +506,8 @@ export class ShellToolInvocation extends BaseToolInvocation<
 
       let currentPid: number | undefined;
       const isAiMode = this.context.config.getInteractiveShellMode() === 'ai';
-      const shouldAutoPromote =
-        this.params.wait_for_output_seconds !== undefined || isAiMode;
-      const waitMs = (this.params.wait_for_output_seconds ?? 5) * 1000;
+      const shouldAutoPromote = isAiMode;
+      const waitMs = isAiMode ? 3000 : 0;
 
       const resetAutoPromoteTimer = () => {
         if (shouldAutoPromote && currentPid) {
@@ -650,7 +648,7 @@ export class ShellToolInvocation extends BaseToolInvocation<
           }
         }
 
-        // In AI mode with wait_for_output_seconds, set up auto-promotion timer.
+        // In AI mode, set up auto-promotion timer.
         // When the timer fires, promote to background instead of cancelling.
         currentPid = pid;
         resetAutoPromoteTimer();

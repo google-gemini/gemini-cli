@@ -22,7 +22,6 @@ import {
   PARAM_DIR_PATH,
   SHELL_PARAM_IS_BACKGROUND,
   EXIT_PLAN_PARAM_PLAN_FILENAME,
-  SHELL_PARAM_WAIT_SECONDS,
   SKILL_PARAM_NAME,
   PARAM_ADDITIONAL_PERMISSIONS,
   UPDATE_TOPIC_TOOL_NAME,
@@ -60,7 +59,7 @@ export function getShellToolDescription(
       Process Group PGID: Only included if available.`;
 
   if (isAiMode) {
-    const autoPromoteInstructions = `Commands that do not complete within \`${SHELL_PARAM_WAIT_SECONDS}\` seconds are automatically promoted to background. Once promoted, use \`write_to_shell\` and \`read_shell\` to interact with the process. Do NOT use \`&\` to background commands.`;
+    const autoPromoteInstructions = `Commands that do not complete within 3 seconds are automatically promoted to background. Once promoted, use \`write_to_shell\` and \`read_shell\` to interact with the process. Do NOT use \`&\` to background commands.`;
     return `This tool executes a given shell command as \`bash -c <command>\`. ${autoPromoteInstructions} Command is executed as a subprocess that leads its own process group. Command process group can be terminated as \`kill -- -PGID\` or signaled as \`kill -s SIGNAL -- -PGID\`.${efficiencyGuidelines}${returnedInfo}`;
   }
 
@@ -98,15 +97,9 @@ export function getShellDeclaration(
 ): FunctionDeclaration {
   const isAiMode = interactiveShellMode === 'ai';
 
-  // In AI mode, use wait_for_output_seconds instead of is_background
+  // In AI mode, auto-promotion is enabled by default, no background param needed
   const backgroundParam = isAiMode
-    ? {
-        [SHELL_PARAM_WAIT_SECONDS]: {
-          type: 'number' as const,
-          description:
-            'Max seconds to wait for command to complete before auto-promoting to background (default: 5). Set low (2-5) for commands likely to prompt for input (npx, installers, REPLs). Set high (60-300) for long builds or installs. Once promoted, use write_to_shell/read_shell to interact.',
-        },
-      }
+    ? {}
     : {
         [SHELL_PARAM_IS_BACKGROUND]: {
           type: 'boolean' as const,

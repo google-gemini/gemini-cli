@@ -806,8 +806,7 @@ function toolUsageInteractive(
 function toolUsageAiShell(options: OperationalGuidelinesOptions): string {
   if (options.interactiveShellMode !== 'ai') return '';
   return `
-- **AI-Driven Interactive Shell:** Commands using \`wait_for_output_seconds\` auto-promote to background when they stall. Once promoted, use ${formatToolName(READ_SHELL_TOOL_NAME)} to see the terminal screen, then ${formatToolName(WRITE_TO_SHELL_TOOL_NAME)} to send text input and/or special keys (arrows, Enter, Ctrl-C, etc.).
-  - Set \`wait_for_output_seconds\` **low (2-5)** for commands that prompt for input (npx, installers, REPLs). Set **high (60+)** for long builds. Omit for instant commands.
+- **AI-Driven Interactive Shell:** Commands auto-promote to background if they stall for 3 seconds. Once promoted, use ${formatToolName(READ_SHELL_TOOL_NAME)} to see the terminal screen, then ${formatToolName(WRITE_TO_SHELL_TOOL_NAME)} to send text input and/or special keys (arrows, Enter, Ctrl-C, etc.).
   - **Always read the screen before writing input.** The screen state tells you what the process is waiting for.
   - When waiting for a command to finish (e.g. npm install), use ${formatToolName(READ_SHELL_TOOL_NAME)} with \`wait_seconds\` to delay before reading. Do NOT poll in a tight loop.
   - **Clean up when done:** when your task is complete, kill background processes with ${formatToolName(WRITE_TO_SHELL_TOOL_NAME)} sending Ctrl-C, or note the PID for the user to clean up.
