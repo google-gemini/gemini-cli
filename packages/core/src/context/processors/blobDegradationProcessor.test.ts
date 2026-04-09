@@ -3,6 +3,8 @@
  * Copyright 2026 Google LLC
  * SPDX-License-Identifier: Apache-2.0
  */
+
+import assert from 'node:assert';
 import { describe, it, expect } from 'vitest';
 import { BlobDegradationProcessor } from './blobDegradationProcessor.js';
 import {
@@ -10,7 +12,7 @@ import {
   createMockEnvironment,
   createDummyNode,
 } from '../testing/contextTestUtils.js';
-import type { UserPrompt, SemanticPart } from '../ir/types.js';
+import type { UserPrompt, SemanticPart, ConcreteNode } from '../ir/types.js';
 
 describe('BlobDegradationProcessor', () => {
   it('should ignore text parts and only target inline_data and file_data', async () => {
@@ -48,8 +50,9 @@ describe('BlobDegradationProcessor', () => {
     expect(modifiedPrompt.semanticParts[2]).toEqual(parts[2]);
 
     // The inline_data part should be replaced with text
-    const degradedPart = modifiedPrompt.semanticParts[1] as unknown as { type: string, text: string };
+    const degradedPart = modifiedPrompt.semanticParts[1];
     expect(degradedPart.type).toBe('text');
+    assert(degradedPart.type === 'text');
     expect(degradedPart.text).toContain('[Multi-Modal Blob (image/png, 0.00MB) degraded to text');
   });
 
@@ -87,7 +90,7 @@ describe('BlobDegradationProcessor', () => {
     const env = createMockEnvironment();
 
     const processor = BlobDegradationProcessor.create(env, {});
-    const targets: Array<import('../ir/types.js').ConcreteNode> = [];
+    const targets: ConcreteNode[] = [];
 
     const result = await processor.process(createMockProcessArgs(targets));
 

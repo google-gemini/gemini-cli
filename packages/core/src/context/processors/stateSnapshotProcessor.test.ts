@@ -8,17 +8,16 @@ import { StateSnapshotProcessor } from './stateSnapshotProcessor.js';
 import {
   createMockEnvironment,
   createDummyNode,
+  createMockProcessArgs,
 } from '../testing/contextTestUtils.js';
-import { InboxSnapshotImpl } from '../sidecar/inbox.js';
+import type { InboxSnapshotImpl } from '../sidecar/inbox.js';
 
 describe('StateSnapshotProcessor', () => {
   it('should ignore if budget is satisfied', async () => {
     const env = createMockEnvironment();
     const processor = StateSnapshotProcessor.create(env, { target: 'incremental' });
     const targets = [createDummyNode('ep1', 'USER_PROMPT')];
-    const inbox = new InboxSnapshotImpl([]);
-
-    const result = await processor.process({ buffer: undefined as unknown as import('../pipeline.js').ContextWorkingBuffer, targets, inbox });
+    const result = await processor.process(createMockProcessArgs(targets));
     expect(result).toBe(targets); // Strict equality
   });
 
@@ -33,7 +32,7 @@ describe('StateSnapshotProcessor', () => {
     const targets = [nodeA, nodeB, nodeC];
 
     // The background worker created a snapshot of A and B
-    const inbox = new InboxSnapshotImpl([
+    const messages = [
       {
         id: 'msg-1',
         topic: 'PROPOSED_SNAPSHOT',
@@ -44,9 +43,10 @@ describe('StateSnapshotProcessor', () => {
           type: 'point-in-time',
         }
       }
-    ]);
+    ];
 
-    const result = await processor.process({ buffer: undefined as unknown as import('../pipeline.js').ContextWorkingBuffer, targets, inbox });
+    const processArgs = createMockProcessArgs(targets, [], messages);
+    const result = await processor.process(processArgs);
 
     // Should remove A and B, insert Snapshot, keep C
     expect(result.length).toBe(2);
@@ -54,7 +54,7 @@ describe('StateSnapshotProcessor', () => {
     expect(result[1].id).toBe('node-C');
 
     // Should consume the message
-    expect(inbox.getConsumedIds().has('msg-1')).toBe(true);
+    expect((processArgs.inbox as InboxSnapshotImpl).getConsumedIds().has('msg-1')).toBe(true);
   });
 
   it('should reject a snapshot if the nodes were modified/deleted (Cache Invalidated)', async () => {
@@ -66,7 +66,7 @@ describe('StateSnapshotProcessor', () => {
     const nodeB = createDummyNode('ep1', 'AGENT_THOUGHT', 60, {}, 'node-B');
     const targets = [nodeB];
 
-    const inbox = new InboxSnapshotImpl([
+    const messages = [
       {
         id: 'msg-1',
         topic: 'PROPOSED_SNAPSHOT',
@@ -76,14 +76,15 @@ describe('StateSnapshotProcessor', () => {
           newText: '<compressed A and B>',
         }
       }
-    ]);
+    ];
 
-    const result = await processor.process({ buffer: undefined as unknown as import('../pipeline.js').ContextWorkingBuffer, targets, inbox });
+    const processArgs = createMockProcessArgs(targets, [], messages);
+    const result = await processor.process(processArgs);
 
     // Because deficit is 0, and Inbox was rejected, nothing should change
     expect(result.length).toBe(1);
     expect(result[0].id).toBe('node-B');
-    expect(inbox.getConsumedIds().has('msg-1')).toBe(false);
+    expect((processArgs.inbox as InboxSnapshotImpl).getConsumedIds().has('msg-1')).toBe(false);
   });
 
   it('should fall back to sync backstop if inbox is empty', async () => {
@@ -94,9 +95,7 @@ describe('StateSnapshotProcessor', () => {
     const nodeB = createDummyNode('ep1', 'AGENT_THOUGHT', 60, {}, 'node-B');
     const nodeC = createDummyNode('ep2', 'USER_PROMPT', 50, {}, 'node-C');
     const targets = [nodeA, nodeB, nodeC];
-    const inbox = new InboxSnapshotImpl([]);
-
-    const result = await processor.process({ buffer: undefined as unknown as import('../pipeline.js').ContextWorkingBuffer, targets, inbox });
+    const result = await processor.process(createMockProcessArgs(targets));
 
     // Should synthesize a new snapshot synchronously
     expect(env.llmClient.generateContent).toHaveBeenCalled();

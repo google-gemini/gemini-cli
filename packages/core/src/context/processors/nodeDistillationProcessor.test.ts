@@ -3,6 +3,8 @@
  * Copyright 2026 Google LLC
  * SPDX-License-Identifier: Apache-2.0
  */
+
+import assert from 'node:assert';
 import { describe, it, expect, vi } from 'vitest';
 import { NodeDistillationProcessor } from './nodeDistillationProcessor.js';
 import {
@@ -56,7 +58,8 @@ describe('NodeDistillationProcessor', () => {
     const compressedPrompt = result[0] as UserPrompt;
     expect(compressedPrompt.id).not.toBe(prompt.id);
     expect(compressedPrompt.semanticParts[0].type).toBe('text');
-    expect((compressedPrompt.semanticParts[0] as unknown as {text: string}).text).toBe('Mocked Summary!');
+    assert(compressedPrompt.semanticParts[0].type === 'text');
+    expect(compressedPrompt.semanticParts[0].text).toBe('Mocked Summary!');
     
     // 2. Agent Thought
     const compressedThought = result[1] as AgentThought;

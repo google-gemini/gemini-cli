@@ -3,6 +3,8 @@
  * Copyright 2026 Google LLC
  * SPDX-License-Identifier: Apache-2.0
  */
+
+import assert from 'node:assert';
 import { describe, it, expect } from 'vitest';
 import { NodeTruncationProcessor } from './nodeTruncationProcessor.js';
 import {
@@ -45,7 +47,8 @@ describe('NodeTruncationProcessor', () => {
     const squashedPrompt = result[0] as UserPrompt;
     expect(squashedPrompt.id).not.toBe(prompt.id);
     expect(squashedPrompt.semanticParts[0].type).toBe('text');
-    expect((squashedPrompt.semanticParts[0] as unknown as { text: string }).text).toContain('[... OMITTED');
+    assert(squashedPrompt.semanticParts[0].type === 'text');
+    expect(squashedPrompt.semanticParts[0].text).toContain('[... OMITTED');
 
     // 2. Agent Thought
     const squashedThought = result[1] as AgentThought;
@@ -84,7 +87,8 @@ describe('NodeTruncationProcessor', () => {
     // 1. User Prompt (untouched)
     const squashedPrompt = result[0] as UserPrompt;
     expect(squashedPrompt.id).toBe(prompt.id);
-    expect((squashedPrompt.semanticParts[0] as unknown as { text: string }).text).not.toContain('[... OMITTED');
+    assert(squashedPrompt.semanticParts[0].type === 'text');
+    expect(squashedPrompt.semanticParts[0].text).not.toContain('[... OMITTED');
 
     // 2. Agent Thought (untouched)
     const untouchedThought = result[1] as AgentThought;
