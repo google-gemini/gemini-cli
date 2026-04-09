@@ -20,8 +20,9 @@ MAINTAINERS = {
     "scidomino": "Tommaso Sciortino"
 }
 
-# The EXACT search query used by the dashboard
-SEARCH_QUERY = f'repo:{TARGET_REPO} is:issue state:open label:area/core,area/extensions,area/site label:"help wanted" sort:updated-asc'
+# Broader search to include recently closed issues (to catch merged PRs)
+# We look for issues updated since March 1st, 2026 to keep the history relevant but manageable.
+SEARCH_QUERY = f'repo:{TARGET_REPO} is:issue label:area/core,area/extensions,area/site label:"help wanted" updated:>=2026-03-01 sort:updated-desc'
 
 ISSUES_QUERY = """
 query($searchQuery: String!, $cursor: String) {
@@ -75,10 +76,12 @@ def gh_api_graphql(query, variables):
         if v: cmd.extend(['-F', f'{k}={v}'])
     cmd.extend(['-f', f'query={query}'])
     result = subprocess.run(cmd, capture_output=True, text=True)
-    return json.loads(result.stdout) if result.returncode == 0 else None
+    if result.returncode != 0:
+        return None
+    return json.loads(result.stdout)
 
 def main():
-    print("Fetching dashboard-consistent team review statistics (including closed)...")
+    print("Fetching expanded team review statistics (including recently merged)...")
     all_issues = []
     cursor = None
     while True:
@@ -90,11 +93,9 @@ def main():
         cursor = search_data['pageInfo']['endCursor']
 
     # Member data structure
-    stats = {login: {"name": name, "all_prs": []} for login, name in MAINTAINERS.items()}
+    stats = {login: {"name": name, "all_prs": {}} for login, name in MAINTAINERS.items()}
     
     # Process issues to find official reviewers
-    processed_prs = set()
-    
     for issue in all_issues:
         issue_no = issue['number']
         issue_url = issue['url']
@@ -102,7 +103,7 @@ def main():
         
         for event in events:
             pr = event.get('source')
-            if not pr or 'number' not in pr or pr['number'] in processed_prs: continue
+            if not pr or 'number' not in pr: continue
             
             # Find official human reviewers
             reviewers = set()
@@ -130,51 +131,59 @@ def main():
                         "issue_no": issue_no,
                         "issue_url": issue_url
                     }
-                    stats[reviewer]["all_prs"].append(pr_info)
-            
-            processed_prs.add(pr['number'])
+                    # Use a dict keyed by PR number to avoid duplicates from multiple cross-references
+                    stats[reviewer]["all_prs"][pr['number']] = pr_info
 
     # Generate Markdown
     now = datetime.datetime.now(datetime.timezone.utc)
     ts = now.strftime("%Y-%m-%d %H:%M")
     md = f"# 📊 Gemini CLI Team Review Statistics\n\n"
     md += f"*Last Updated: {ts} (UTC)*\n\n"
-    md += f"**Context:** Statistics for all Pull Requests (Open and Closed) linked to the {len(all_issues)} 'Help Wanted' issues.\n\n"
+    md += f"**Context:** Statistics for Pull Requests linked to 'Help Wanted' issues (updated since 2026-03-01).\n\n"
     
     md += "## 📈 Summary\n\n"
     md += "| Maintainer | Open PRs | Closed/Merged PRs | Total |\n"
     md += "| :--- | :--- | :--- | :--- |\n"
     
-    sorted_members = sorted(stats.items(), key=lambda x: len([p for p in x[1]['all_prs'] if p['state'] == 'OPEN']), reverse=True)
-    for login, data in sorted_members:
-        opened = len([p for p in data['all_prs'] if p['state'] == 'OPEN'])
-        closed = len([p for p in data['all_prs'] if p['state'] != 'OPEN'])
-        md += f"| **{data['name']}** (@{login}) | {opened} | {closed} | {len(data['all_prs'])} |\n"
+    # Pre-calculate counts for sorting
+    sorted_stats = []
+    for login, data in stats.items():
+        all_prs = list(data['all_prs'].values())
+        opened = len([p for p in all_prs if p['state'] == 'OPEN'])
+        closed = len([p for p in all_prs if p['state'] != 'OPEN'])
+        sorted_stats.append({
+            "login": login, "name": data['name'], "open_count": opened, "closed_count": closed, "total": len(all_prs), "prs": all_prs
+        })
+    
+    # Sort summary by open count descending
+    for s in sorted(sorted_stats, key=lambda x: x['open_count'], reverse=True):
+        md += f"| **{s['name']}** (@{s['login']}) | {s['open_count']} | {s['closed_count']} | {s['total']} |\n"
 
     md += "\n---\n"
     md += "## 👤 Individual Review History\n"
     md += "*Note: PRs are sorted by status (Open first) and then by update date.*\n"
     
-    for login, data in sorted(stats.items(), key=lambda x: x[1]['name']):
-        md += f"\n### {data['name']} (@{login})\n"
+    # Sort detailed queues alphabetically by name
+    for s in sorted(sorted_stats, key=lambda x: x['name']):
+        md += f"\n### {s['name']} (@{s['login']})\n"
         md += "| PR | Associated Issue | Title | Status | Updated |\n"
         md += "| :--- | :--- | :--- | :--- | :--- |\n"
         
         # Sort PRs: Open first, then by date descending
-        sorted_prs = sorted(data['all_prs'], key=lambda x: (x['state'] != 'OPEN', x['updated']), reverse=False)
+        sorted_prs = sorted(s['prs'], key=lambda x: (x['state'] != 'OPEN', x['updated']), reverse=False)
         
         for p in sorted_prs:
             status_emoji = "🟢" if p['state'] == 'OPEN' else "🔴"
             md += f"| {status_emoji} [#{p['number']}]({p['url']}) | [#{p['issue_no']}]({p['issue_url']}) | {p['title']} | `{p['state']}` | `{p['updated']}` |\n"
             
-        if not data['all_prs']:
+        if not s['prs']:
             md += "| - | - | _No review history found._ | - | - |\n"
 
     md += "\n---\n*Report generated by automated triage script.*"
     
     with open("TEAM_STATS.md", "w") as f:
         f.write(md)
-    print("Successfully generated TEAM_STATS.md (All PRs included).")
+    print("Successfully generated TEAM_STATS.md (Expanded search).")
 
 if __name__ == "__main__":
     main()
