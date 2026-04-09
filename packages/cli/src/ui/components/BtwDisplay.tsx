@@ -9,7 +9,7 @@ import { Box, Text } from 'ink';
 import { theme } from '../semantic-colors.js';
 import { MarkdownDisplay } from '../utils/MarkdownDisplay.js';
 import { useUIState } from '../contexts/UIStateContext.js';
-import { GeminiRespondingSpinner } from './GeminiRespondingSpinner.js';
+import { CliSpinner } from './CliSpinner.js';
 
 interface BtwDisplayProps {
   query: string;
@@ -74,7 +74,9 @@ export const BtwDisplay: React.FC<BtwDisplayProps> = ({
 
       {isStreaming && (
         <Box marginTop={1}>
-          <GeminiRespondingSpinner />
+          <Text color={theme.text.accent}>
+            <CliSpinner type="dots" /> Answering...
+          </Text>
         </Box>
       )}
     </Box>

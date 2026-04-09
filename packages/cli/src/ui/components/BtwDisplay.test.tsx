@@ -7,14 +7,7 @@
 import { describe, it, expect } from 'vitest';
 import { renderWithProviders } from '../../test-utils/render.js';
 import { BtwDisplay } from './BtwDisplay.js';
-import { StreamingState } from '../types.js';
 import type { UIState } from '../contexts/UIStateContext.js';
-
-import { Text } from 'ink';
-
-vi.mock('./GeminiRespondingSpinner.js', () => ({
-  GeminiRespondingSpinner: () => <Text>⠋</Text>,
-}));
 
 describe('BtwDisplay', () => {
   const defaultMockUiState = {
@@ -71,7 +64,7 @@ describe('BtwDisplay', () => {
     unmount();
   });
 
-  it('renders a spinner when streaming', async () => {
+  it('renders a spinner and "Answering..." when streaming', async () => {
     const { lastFrame, unmount } = await renderWithProviders(
       <BtwDisplay
         query="What is life?"
@@ -81,14 +74,11 @@ describe('BtwDisplay', () => {
         terminalWidth={100}
       />,
       {
-        uiState: {
-          ...defaultMockUiState,
-          streamingState: StreamingState.Responding,
-        },
+        uiState: defaultMockUiState,
       },
     );
     const frame = lastFrame();
-    expect(frame).toContain('⠋'); // Assuming standard spinner frame
+    expect(frame).toContain('Answering...');
     unmount();
   });
 });
