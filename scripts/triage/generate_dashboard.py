@@ -114,7 +114,6 @@ def get_reviewer_info(pr):
     latest_reviewer_activity = ""
     human_reviewers = set()
     
-    # 1. Collect only HUMAN requested reviewers
     for req in pr.get('reviewRequests', {}).get('nodes', []):
         rr = req.get('requestedReviewer')
         if rr and rr.get('__typename') == 'User':
@@ -122,16 +121,13 @@ def get_reviewer_info(pr):
             if login and login != author and login not in BOT_BLACKLIST:
                 human_reviewers.add(login)
                 
-    # 2. Collect from formal reviews (Even if body is empty)
     reviews = pr.get('latestReviews', {}).get('nodes', [])
     for r in reviews:
         login = r.get('author', {}).get('login') if r.get('author') else None
         if login and login != author and login not in BOT_BLACKLIST:
             human_reviewers.add(login)
-            # Track latest formal review activity
             latest_reviewer_activity = max(latest_reviewer_activity, r['updatedAt'])
             
-    # 3. Track latest activity from ANYONE who isn't the author
     all_comments = pr.get('comments', {}).get('nodes', [])
     for c in all_comments:
         login = c.get('author', {}).get('login') if c.get('author') else None
@@ -142,14 +138,10 @@ def get_reviewer_info(pr):
 
 def get_author_activity(pr):
     author = pr.get('author', {}).get('login')
-    # Start with latest commit
     latest = pr['commits']['nodes'][0]['commit']['committedDate']
-    
-    # Check for latest comment from author
     for c in pr.get('comments', {}).get('nodes', []):
         if c.get('author', {}).get('login') == author:
             latest = max(latest, c['publishedAt'])
-            
     return latest
 
 def main():
@@ -161,7 +153,8 @@ def main():
     now = datetime.datetime.now(datetime.timezone.utc)
     owner, name = TARGET_REPO.split('/')
 
-    review_needed_list = []
+    initial_review_list = []
+    followup_review_list = []
     stale_assignments = []
     blocked_prs = []
 
@@ -172,13 +165,13 @@ def main():
         issue_no = issue['number']
         issue_title = issue['title']
         issue_url = issue['url']
-        updated_at = datetime.datetime.fromisoformat(issue['updatedAt'].replace('Z', '+00:00'))
+        updated_at_iso = issue['updatedAt']
         
         timeline_nodes = issue.get('timelineItems', {}).get('nodes', [])
         pr_numbers = [e['source']['number'] for e in timeline_nodes if e.get('source') and 'number' in e['source']]
         
         found_open_pr = False
-        valid_pr_found = False
+        active_pr_assigned = False
         
         for pr_no in reversed(pr_numbers):
             pr_data = gh_api_graphql(PR_DETAILS_QUERY, {"repoOwner": owner, "repoName": name, "prNumber": pr_no})
@@ -195,28 +188,27 @@ def main():
             
             # Categories
             if not latest_reviewer_activity or author_activity > latest_reviewer_activity:
-                # Check for Blockers
                 rollup = pr.get('statusCheckRollup')
                 is_conflicting = pr['mergeable'] == 'CONFLICTING'
                 is_failing = rollup and rollup.get('state') in ['FAILURE', 'ERROR']
                 
                 if not is_conflicting and not is_failing:
-                    # CONCISE STATUS & ACTION
-                    if not latest_reviewer_activity:
-                        if reviewers:
-                            status_action = "Review Requested. **Waiting for Reviewer.**"
-                        else:
-                            status_action = "New PR. **Reviewer Needed.**"
-                    else:
-                        status_action = "Updated. **Reviewer Follow-up.**"
-                        
-                    review_needed_list.append({
+                    item = {
                         "issue_md": f"[#{issue_no} {issue_title}]({issue_url})",
                         "pr_no": pr['number'], "pr_url": pr['url'],
-                        "reviewers": reviewers, "updated_at": issue['updatedAt'][:10],
-                        "status_action": status_action
-                    })
-                    valid_pr_found = True
+                        "reviewers": reviewers, "updated_at": issue['updatedAt'][:10]
+                    }
+                    
+                    if not latest_reviewer_activity and not reviewers:
+                        item["status"] = "New PR"
+                        item["action"] = "Pick up"
+                        initial_review_list.append(item)
+                    else:
+                        item["status"] = "Review Requested" if not latest_reviewer_activity else "Author Updated"
+                        item["action"] = "Follow up"
+                        followup_review_list.append(item)
+                    
+                    active_pr_assigned = True
                     break
             
             pr_updated_at = datetime.datetime.fromisoformat(pr['updatedAt'].replace('Z', '+00:00'))
@@ -231,22 +223,28 @@ def main():
                         "reason": reason, "author": pr['author']['login'], "days_stale": (now - pr_updated_at).days
                     })
 
-    if not valid_pr_found and not found_open_pr and (now - updated_at).days > STALE_ASSIGNMENT_DAYS:
-        stale_assignments.append({
-            "issue_md": f"[#{issue_no} {issue_title}]({issue_url})",
-            "assignees": assignees, "days_stale": (now - updated_at).days
-        })
+        if not active_pr_assigned and not found_open_pr and (now - datetime.datetime.fromisoformat(updated_at_iso.replace('Z', '+00:00'))).days > STALE_ASSIGNMENT_DAYS:
+            stale_assignments.append({
+                "issue_md": f"[#{issue_no} {issue_title}]({issue_url})",
+                "assignees": assignees, "days_stale": (now - datetime.datetime.fromisoformat(updated_at_iso.replace('Z', '+00:00'))).days
+            })
 
     # Generate Markdown
     ts = now.strftime("%Y-%m-%d %H:%M")
     md = f"# 🔎 Gemini CLI Triage Dashboard\n\n*Last Synchronized: {ts} (UTC)*\n\n"
     
-    md += "## ✅ Needs Review\nPull Requests that are passing tests, have no conflicts, and are waiting for reviewer action.\n\n"
-    md += "| Issue | Linked PR | Reviewers | Status & Action |\n| :--- | :--- | :--- | :--- |\n"
-    for i in review_needed_list:
-        revs = ", ".join([f"@{r}" for r in i['reviewers']]) if i['reviewers'] else "_None_"
-        md += f"| {i['issue_md']} | [#{i['pr_no']}]({i['pr_url']}) | {revs} | {i['status_action']} |\n"
-    if not review_needed_list: md += "| - | _No issues needing review found._ | - | - |\n"
+    md += "## 🆕 Awaiting Initial Review\nNew Pull Requests with no feedback or assigned reviewers yet. Needs a maintainer to pick up.\n\n"
+    md += "| Issue | Linked PR | Status | Action |\n| :--- | :--- | :--- | :--- |\n"
+    for i in initial_review_list:
+        md += f"| {i['issue_md']} | [#{i['pr_no']}]({i['pr_url']}) | {i['status']} | **{i['action']}** |\n"
+    if not initial_review_list: md += "| - | _No new PRs._ | - | - |\n"
+
+    md += "\n## ⌛ Awaiting Reviewer Follow-up\nReviewers have been requested or have acted, and the author has responded to the latest feedback.\n\n"
+    md += "| Issue | Linked PR | Reviewers | Status | Action |\n| :--- | :--- | :--- | :--- | :--- |\n"
+    for i in followup_review_list:
+        revs = ", ".join([f"@{r}" for r in i['reviewers']]) if i['reviewers'] else "_None (Team only)_"
+        md += f"| {i['issue_md']} | [#{i['pr_no']}]({i['pr_url']}) | {revs} | {i['status']} | **{i['action']}** |\n"
+    if not followup_review_list: md += "| - | _No pending follow-ups._ | - | - | - |\n"
 
     md += "\n## 🚩 Stale Assignments (No PR)\nAssigned for >{STALE_ASSIGNMENT_DAYS} days with no open Pull Request.\n\n"
     md += "| Issue | Assignee | Days Stale |\n| :--- | :--- | :--- |\n"
@@ -262,7 +260,7 @@ def main():
 
     md += "\n---\n*Dashboard maintained by automated triage script.*"
     with open("REVIEWS.md", "w") as f: f.write(md)
-    print("Generated dashboard with refined reviewer logic.")
+    print("Generated dashboard with split review tables.")
 
 if __name__ == "__main__":
     main()
