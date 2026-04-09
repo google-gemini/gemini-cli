@@ -56,6 +56,7 @@ import {
   startGlobalMemoryMonitoring,
   getMemoryMonitor,
 } from './memory-monitor.js';
+import { startGlobalEventLoopMonitoring } from './event-loop-monitor.js';
 import { authEvents } from '../code_assist/oauth2.js';
 import { coreEvents, CoreEvent } from '../utils/events.js';
 import {
@@ -360,6 +361,7 @@ export async function initializeTelemetry(
       const intervalMs = parseInt(monitorInterval, 10);
       if (!isNaN(intervalMs) && intervalMs > 0) {
         startGlobalMemoryMonitoring(config, intervalMs);
+        startGlobalEventLoopMonitoring(config, intervalMs);
         // Disable enhanced monitoring (rate limiting/high water mark) in tests
         // to ensure we get regular snapshots regardless of growth.
         const monitor = getMemoryMonitor();
