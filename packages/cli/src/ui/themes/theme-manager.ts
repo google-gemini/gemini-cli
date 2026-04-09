@@ -20,6 +20,7 @@ import { ShadesOfPurple } from './builtin/dark/shades-of-purple-dark.js';
 import { SolarizedDark } from './builtin/dark/solarized-dark.js';
 import { SolarizedLight } from './builtin/light/solarized-light.js';
 import { XCode } from './builtin/light/xcode-light.js';
+import { TokyoNight } from './builtin/dark/tokyonight-dark.js';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 import type { Theme, ThemeType, ColorsTheme, CustomTheme } from './theme.js';
@@ -88,6 +89,7 @@ class ThemeManager {
       SolarizedDark,
       SolarizedLight,
       XCode,
+      TokyoNight,
       ANSI,
       ANSILight,
     ];

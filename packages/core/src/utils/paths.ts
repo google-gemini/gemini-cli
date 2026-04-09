@@ -325,9 +325,14 @@ export function getProjectHash(projectRoot: string): string {
  * - On Windows, converts to lowercase for case-insensitivity.
  */
 export function normalizePath(p: string): string {
-  const resolved = path.resolve(p);
+  const platform = process.platform;
+  const isWindows = platform === 'win32';
+  const pathModule = isWindows ? path.win32 : path;
+
+  const resolved = pathModule.resolve(p);
   const normalized = resolved.replace(/\\/g, '/');
-  return process.platform === 'win32' ? normalized.toLowerCase() : normalized;
+  const isCaseInsensitive = isWindows || platform === 'darwin';
+  return isCaseInsensitive ? normalized.toLowerCase() : normalized;
 }
 
 /**
@@ -337,17 +342,47 @@ export function normalizePath(p: string): string {
  * @returns True if childPath is a subpath of parentPath, false otherwise.
  */
 export function isSubpath(parentPath: string, childPath: string): boolean {
-  const isWindows = process.platform === 'win32';
+  const platform = process.platform;
+  const isWindows = platform === 'win32';
+  const isDarwin = platform === 'darwin';
   const pathModule = isWindows ? path.win32 : path;
 
-  // On Windows, path.relative is case-insensitive. On POSIX, it's case-sensitive.
-  const relative = pathModule.relative(parentPath, childPath);
+  // Resolve both paths to absolute to ensure consistent comparison,
+  // especially when mixing relative and absolute paths or when casing differs.
+  let p = pathModule.resolve(parentPath);
+  let c = pathModule.resolve(childPath);
+
+  // On Windows, path.relative is case-insensitive.
+  // On POSIX (including Darwin), path.relative is case-sensitive.
+  // We want it to be case-insensitive on Darwin to match user expectation and sandbox policy.
+  if (isDarwin) {
+    p = p.toLowerCase();
+    c = c.toLowerCase();
+  }
+
+  const relative = pathModule.relative(p, c);
 
   return (
     !relative.startsWith(`..${pathModule.sep}`) &&
     relative !== '..' &&
     !pathModule.isAbsolute(relative)
   );
+}
+
+/**
+ * Type guard to verify a value is a string and does not contain null bytes.
+ */
+export function isValidPathString(p: unknown): p is string {
+  return typeof p === 'string' && !p.includes('\0');
+}
+
+/**
+ * Asserts that a value is a valid path string, throwing an Error otherwise.
+ */
+export function assertValidPathString(p: unknown): asserts p is string {
+  if (!isValidPathString(p)) {
+    throw new Error(`Invalid path: ${String(p)}`);
+  }
 }
 
 /**
@@ -360,6 +395,7 @@ export function isSubpath(parentPath: string, childPath: string): boolean {
  * @returns The resolved real path.
  */
 export function resolveToRealPath(pathStr: string): string {
+  assertValidPathString(pathStr);
   let resolvedPath = pathStr;
 
   try {
@@ -368,7 +404,7 @@ export function resolveToRealPath(pathStr: string): string {
     }
 
     resolvedPath = decodeURIComponent(resolvedPath);
-  } catch (_e) {
+  } catch {
     // Ignore error (e.g. malformed URI), keep path from previous step
   }
 

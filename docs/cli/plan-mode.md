@@ -35,19 +35,19 @@ To launch Gemini CLI in Plan Mode once:
 To start Plan Mode while using Gemini CLI:
 
 - **Keyboard shortcut:** Press `Shift+Tab` to cycle through approval modes
-  (`Default` -> `Auto-Edit` -> `Plan`).
+  (`Default` -> `Auto-Edit` -> `Plan`). Plan Mode is automatically removed from
+  the rotation when Gemini CLI is actively processing or showing confirmation
+  dialogs.
 
-  > **Note:** Plan Mode is automatically removed from the rotation when Gemini
-  > CLI is actively processing or showing confirmation dialogs.
-
-- **Command:** Type `/plan` in the input box.
+- **Command:** Type `/plan [goal]` in the input box. The `[goal]` is optional;
+  for example, `/plan implement authentication` will switch to Plan Mode and
+  immediately submit the prompt to the model.
 
 - **Natural Language:** Ask Gemini CLI to "start a plan for...". Gemini CLI
   calls the
   [`enter_plan_mode`](../tools/planning.md#1-enter_plan_mode-enterplanmode) tool
-  to switch modes.
-  > **Note:** This tool is not available when Gemini CLI is in
-  > [YOLO mode](../reference/configuration.md#command-line-arguments).
+  to switch modes. This tool is not available when Gemini CLI is in
+  [YOLO mode](../reference/configuration.md#command-line-arguments).
 
 ## How to use Plan Mode
 
@@ -56,19 +56,21 @@ Gemini CLI takes action.
 
 1.  **Provide a goal:** Start by describing what you want to achieve. Gemini CLI
     will then enter Plan Mode (if it's not already) to research the task.
-2.  **Review research and provide input:** As Gemini CLI analyzes your codebase,
-    it may ask you questions or present different implementation options using
-    [`ask_user`](../tools/ask-user.md). Provide your preferences to help guide
-    the design.
-3.  **Review the plan:** Once Gemini CLI has a proposed strategy, it creates a
-    detailed implementation plan as a Markdown file in your plans directory.
+2.  **Discuss and agree on strategy:** As Gemini CLI analyzes your codebase, it
+    will discuss its findings and proposed strategy with you to ensure
+    alignment. It may ask you questions or present different implementation
+    options using [`ask_user`](../tools/ask-user.md). **Gemini CLI will stop and
+    wait for your confirmation** before drafting the formal plan. You should
+    reach an informal agreement on the approach before proceeding.
+3.  **Review the plan:** Once you've agreed on the strategy, Gemini CLI creates
+    a detailed implementation plan as a Markdown file in your plans directory.
     - **View:** You can open and read this file to understand the proposed
       changes.
     - **Edit:** Press `Ctrl+X` to open the plan directly in your configured
       external editor.
 
 4.  **Approve or iterate:** Gemini CLI will present the finalized plan for your
-    approval.
+    formal approval.
     - **Approve:** If you're satisfied with the plan, approve it to start the
       implementation immediately: **Yes, automatically accept edits** or **Yes,
       manually accept edits**.
@@ -109,16 +111,6 @@ switch back to another mode.
 - **Keyboard shortcut:** Press `Shift+Tab` to cycle to the desired mode.
 - **Natural language:** Ask Gemini CLI to "exit plan mode" or "stop planning."
 
-## Customization and best practices
-
-Plan Mode is secure by default, but you can adapt it to fit your specific
-workflows. You can customize how Gemini CLI plans by using skills, adjusting
-safety policies, or changing where plans are stored.
-
-## Commands
-
-- **`/plan copy`**: Copy the currently approved plan to your clipboard.
-
 ## Tool Restrictions
 
 Plan Mode enforces strict safety policies to prevent accidental changes.
@@ -130,7 +122,9 @@ These are the only allowed tools:
   [`list_directory`](../tools/file-system.md#1-list_directory-readfolder),
   [`glob`](../tools/file-system.md#4-glob-findfiles)
 - **Search:** [`grep_search`](../tools/file-system.md#5-grep_search-searchtext),
-  [`google_web_search`](../tools/web-search.md)
+  [`google_web_search`](../tools/web-search.md),
+  [`web_fetch`](../tools/web-fetch.md) (requires explicit confirmation),
+  [`get_internal_docs`](../tools/internal-docs.md)
 - **Research Subagents:**
   [`codebase_investigator`](../core/subagents.md#codebase-investigator),
   [`cli_help`](../core/subagents.md#cli-help-agent)
@@ -145,6 +139,12 @@ These are the only allowed tools:
 - **Memory:** [`save_memory`](../tools/memory.md)
 - **Skills:** [`activate_skill`](../cli/skills.md) (allows loading specialized
   instructions and resources in a read-only manner)
+
+## Customization and best practices
+
+Plan Mode is secure by default, but you can adapt it to fit your specific
+workflows. You can customize how Gemini CLI plans by using skills, adjusting
+safety policies, changing where plans are stored, or adding hooks.
 
 ### Custom planning with skills
 
@@ -181,9 +181,16 @@ As described in the
 rule that does not explicitly specify `modes` is considered "always active" and
 will apply to Plan Mode as well.
 
-If you want a rule to apply to other modes but _not_ to Plan Mode, you must
-explicitly specify the target modes. For example, to allow `npm test` in default
-and Auto-Edit modes but not in Plan Mode:
+To maintain the integrity of Plan Mode as a safe research environment,
+persistent tool approvals are context-aware. Approvals granted in modes like
+Default or Auto-Edit do not apply to Plan Mode, ensuring that tools trusted for
+implementation don't automatically execute while you're researching. However,
+approvals granted while in Plan Mode are treated as intentional choices for
+global trust and apply to all modes.
+
+If you want to manually restrict a rule to other modes but _not_ to Plan Mode,
+you must explicitly specify the target modes. For example, to allow `npm test`
+in default and Auto-Edit modes but not in Plan Mode:
 
 ```toml
 [[rule]]
@@ -205,6 +212,7 @@ your specific environment.
 
 ```toml
 [[rule]]
+toolName = "*"
 mcpName = "*"
 toolAnnotations = { readOnlyHint = true }
 decision = "allow"
@@ -294,6 +302,71 @@ modes = ["plan"]
 argsPattern = "\"file_path\":\"[^\"]+[\\\\/]+\\.gemini[\\\\/]+plans[\\\\/]+[\\w-]+\\.md\""
 ```
 
+### Using hooks with Plan Mode
+
+You can use the [hook system](../hooks/writing-hooks.md) to automate parts of
+the planning workflow or enforce additional checks when Gemini CLI transitions
+into or out of Plan Mode.
+
+Hooks such as `BeforeTool` or `AfterTool` can be configured to intercept the
+`enter_plan_mode` and `exit_plan_mode` tool calls.
+
+> [!WARNING] When hooks are triggered by **tool executions**, they do **not**
+> run when you manually toggle Plan Mode using the `/plan` command or the
+> `Shift+Tab` keyboard shortcut. If you need hooks to execute on mode changes,
+> ensure the transition is initiated by the agent (e.g., by asking "start a plan
+> for...").
+
+#### Example: Archive approved plans to GCS (`AfterTool`)
+
+If your organizational policy requires a record of all execution plans, you can
+use an `AfterTool` hook to securely copy the plan artifact to Google Cloud
+Storage whenever Gemini CLI exits Plan Mode to start the implementation.
+
+**`.gemini/hooks/archive-plan.sh`:**
+
+```bash
+#!/usr/bin/env bash
+# Extract the plan path from the tool input JSON
+plan_path=$(jq -r '.tool_input.plan_path // empty')
+
+if [ -f "$plan_path" ]; then
+  # Generate a unique filename using a timestamp
+  filename="$(date +%s)_$(basename "$plan_path")"
+
+  # Upload the plan to GCS in the background so it doesn't block the CLI
+  gsutil cp "$plan_path" "gs://my-audit-bucket/gemini-plans/$filename" > /dev/null 2>&1 &
+fi
+
+# AfterTool hooks should generally allow the flow to continue
+echo '{"decision": "allow"}'
+```
+
+To register this `AfterTool` hook, add it to your `settings.json`:
+
+```json
+{
+  "hooks": {
+    "AfterTool": [
+      {
+        "matcher": "exit_plan_mode",
+        "hooks": [
+          {
+            "name": "archive-plan",
+            "type": "command",
+            "command": "./.gemini/hooks/archive-plan.sh"
+          }
+        ]
+      }
+    ]
+  }
+}
+```
+
+## Commands
+
+- **`/plan copy`**: Copy the currently approved plan to your clipboard.
+
 ## Planning workflows
 
 Plan Mode provides building blocks for structured research and design. These are
@@ -345,7 +418,9 @@ To build a custom planning workflow, you can use:
   [custom plan directories](#custom-plan-directory-and-policies) and
   [custom policies](#custom-policies).
 
-> **Note:** Use [Conductor] as a reference when building your own custom
+<!-- prettier-ignore -->
+> [!TIP]
+> Use [Conductor] as a reference when building your own custom
 > planning workflow.
 
 By using Plan Mode as its execution environment, your custom methodology can
@@ -397,6 +472,26 @@ Manual deletion also removes all associated artifacts:
 
 If you use a [custom plans directory](#custom-plan-directory-and-policies),
 those files are not automatically deleted and must be managed manually.
+
+## Non-interactive execution
+
+When running Gemini CLI in non-interactive environments (such as headless
+scripts or CI/CD pipelines), Plan Mode optimizes for automated workflows:
+
+- **Automatic transitions:** The policy engine automatically approves the
+  `enter_plan_mode` and `exit_plan_mode` tools without prompting for user
+  confirmation.
+- **Automated implementation:** When exiting Plan Mode to execute the plan,
+  Gemini CLI automatically switches to
+  [YOLO mode](../reference/policy-engine.md#approval-modes) instead of the
+  standard Default mode. This allows the CLI to execute the implementation steps
+  automatically without hanging on interactive tool approvals.
+
+**Example:**
+
+```bash
+gemini --approval-mode plan -p "Analyze telemetry and suggest improvements"
+```
 
 [`plan.toml`]:
   https://github.com/google-gemini/gemini-cli/blob/main/packages/core/src/policy/policies/plan.toml

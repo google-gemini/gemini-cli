@@ -208,6 +208,7 @@ describe('CodeAssistServer', () => {
               traceId: 'test-trace-id',
               status: ActionStatus.ACTION_STATUS_NO_ERROR,
               initiationMethod: InitiationMethod.COMMAND,
+              trajectoryId: 'test-session',
               streamingLatency: expect.objectContaining({
                 totalLatency: expect.stringMatching(/\d+s/),
                 firstMessageLatency: expect.stringMatching(/\d+s/),
@@ -277,6 +278,7 @@ describe('CodeAssistServer', () => {
             conversationOffered: expect.objectContaining({
               traceId: 'stream-trace-id',
               initiationMethod: InitiationMethod.COMMAND,
+              trajectoryId: 'test-session',
             }),
             timestamp: expect.stringMatching(
               /\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}.\d{3}Z/,

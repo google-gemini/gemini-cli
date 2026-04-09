@@ -187,5 +187,7 @@ guide_, consider searching the Gemini CLI
 If you can't find an issue similar to yours, consider creating a new GitHub
 Issue with a detailed description. Pull requests are also welcome!
 
-> **Note:** Issues tagged as "🔒Maintainers only" are reserved for project
+<!-- prettier-ignore -->
+> [!NOTE]
+> Issues tagged as "🔒Maintainers only" are reserved for project
 > maintainers. We will not accept pull requests related to these issues.

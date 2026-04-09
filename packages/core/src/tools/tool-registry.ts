@@ -30,6 +30,9 @@ import {
   getToolAliases,
   WRITE_FILE_TOOL_NAME,
   EDIT_TOOL_NAME,
+  UPDATE_TOPIC_TOOL_NAME,
+  ENTER_PLAN_MODE_TOOL_NAME,
+  EXIT_PLAN_MODE_TOOL_NAME,
 } from './tool-names.js';
 
 type ToolParams = Record<string, unknown>;
@@ -57,9 +60,26 @@ class DiscoveredToolInvocation extends BaseToolInvocation<
     _updateOutput?: (output: string) => void,
   ): Promise<ToolResult> {
     const callCommand = this.config.getToolCallCommand()!;
-    const child = spawn(callCommand, [this.originalToolName]);
-    child.stdin.write(JSON.stringify(this.params));
-    child.stdin.end();
+    const args = [this.originalToolName];
+
+    let finalCommand = callCommand;
+    let finalArgs = args;
+    let finalEnv = process.env;
+    let cleanupFunc: (() => void) | undefined;
+
+    const sandboxManager = this.config.sandboxManager;
+    if (sandboxManager) {
+      const prepared = await sandboxManager.prepareCommand({
+        command: callCommand,
+        args,
+        cwd: process.cwd(),
+        env: process.env,
+      });
+      finalCommand = prepared.program;
+      finalArgs = prepared.args;
+      finalEnv = prepared.env;
+      cleanupFunc = prepared.cleanup;
+    }
 
     let stdout = '';
     let stderr = '';
@@ -67,44 +87,54 @@ class DiscoveredToolInvocation extends BaseToolInvocation<
     let code: number | null = null;
     let signal: NodeJS.Signals | null = null;
 
-    await new Promise<void>((resolve) => {
-      const onStdout = (data: Buffer) => {
-        stdout += data?.toString();
-      };
+    try {
+      const child = spawn(finalCommand, finalArgs, {
+        env: finalEnv,
+      });
+      child.stdin.write(JSON.stringify(this.params));
+      child.stdin.end();
 
-      const onStderr = (data: Buffer) => {
-        stderr += data?.toString();
-      };
+      await new Promise<void>((resolve) => {
+        const onStdout = (data: Buffer) => {
+          stdout += data?.toString();
+        };
 
-      const onError = (err: Error) => {
-        error = err;
-      };
+        const onStderr = (data: Buffer) => {
+          stderr += data?.toString();
+        };
 
-      const onClose = (
-        _code: number | null,
-        _signal: NodeJS.Signals | null,
-      ) => {
-        code = _code;
-        signal = _signal;
-        cleanup();
-        resolve();
-      };
+        const onError = (err: Error) => {
+          error = err;
+        };
 
-      const cleanup = () => {
-        child.stdout.removeListener('data', onStdout);
-        child.stderr.removeListener('data', onStderr);
-        child.removeListener('error', onError);
-        child.removeListener('close', onClose);
-        if (child.connected) {
-          child.disconnect();
-        }
-      };
+        const onClose = (
+          _code: number | null,
+          _signal: NodeJS.Signals | null,
+        ) => {
+          code = _code;
+          signal = _signal;
+          cleanup();
+          resolve();
+        };
 
-      child.stdout.on('data', onStdout);
-      child.stderr.on('data', onStderr);
-      child.on('error', onError);
-      child.on('close', onClose);
-    });
+        const cleanup = () => {
+          child.stdout.removeListener('data', onStdout);
+          child.stderr.removeListener('data', onStderr);
+          child.removeListener('error', onError);
+          child.removeListener('close', onClose);
+          if (child.connected) {
+            child.disconnect();
+          }
+        };
+
+        child.stdout.on('data', onStdout);
+        child.stderr.on('data', onStderr);
+        child.on('error', onError);
+        child.on('close', onClose);
+      });
+    } finally {
+      cleanupFunc?.();
+    }
 
     // if there is any error, non-zero exit code, signal, or stderr, return error details instead of stdout
     if (error || code !== 0 || signal || stderr) {
@@ -201,15 +231,30 @@ export class ToolRegistry {
   // and `isActive` to get only the active tools.
   private allKnownTools: Map<string, AnyDeclarativeTool> = new Map();
   private config: Config;
-  private messageBus: MessageBus;
+  readonly messageBus: MessageBus;
+  private isMainRegistry: boolean;
 
-  constructor(config: Config, messageBus: MessageBus) {
+  constructor(
+    config: Config,
+    messageBus: MessageBus,
+    isMainRegistry: boolean = false,
+  ) {
     this.config = config;
     this.messageBus = messageBus;
+    this.isMainRegistry = isMainRegistry;
   }
 
   getMessageBus(): MessageBus {
     return this.messageBus;
+  }
+
+  /**
+   * Creates a shallow clone of the registry and its current known tools.
+   */
+  clone(): ToolRegistry {
+    const clone = new ToolRegistry(this.config, this.messageBus);
+    clone.allKnownTools = new Map(this.allKnownTools);
+    return clone;
   }
 
   /**
@@ -322,115 +367,153 @@ export class ToolRegistry {
           'Tool discovery command is empty or contains only whitespace.',
         );
       }
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
-      const proc = spawn(cmdParts[0] as string, cmdParts.slice(1) as string[]);
-      let stdout = '';
-      const stdoutDecoder = new StringDecoder('utf8');
-      let stderr = '';
-      const stderrDecoder = new StringDecoder('utf8');
-      let sizeLimitExceeded = false;
-      const MAX_STDOUT_SIZE = 10 * 1024 * 1024; // 10MB limit
-      const MAX_STDERR_SIZE = 10 * 1024 * 1024; // 10MB limit
 
-      let stdoutByteLength = 0;
-      let stderrByteLength = 0;
-
-      proc.stdout.on('data', (data) => {
-        if (sizeLimitExceeded) return;
-        if (stdoutByteLength + data.length > MAX_STDOUT_SIZE) {
-          sizeLimitExceeded = true;
-          proc.kill();
-          return;
-        }
-        stdoutByteLength += data.length;
-        stdout += stdoutDecoder.write(data);
-      });
-
-      proc.stderr.on('data', (data) => {
-        if (sizeLimitExceeded) return;
-        if (stderrByteLength + data.length > MAX_STDERR_SIZE) {
-          sizeLimitExceeded = true;
-          proc.kill();
-          return;
-        }
-        stderrByteLength += data.length;
-        stderr += stderrDecoder.write(data);
-      });
-
-      await new Promise<void>((resolve, reject) => {
-        proc.on('error', reject);
-        proc.on('close', (code) => {
-          stdout += stdoutDecoder.end();
-          stderr += stderrDecoder.end();
-
-          if (sizeLimitExceeded) {
-            return reject(
-              new Error(
-                `Tool discovery command output exceeded size limit of ${MAX_STDOUT_SIZE} bytes.`,
-              ),
-            );
-          }
-
-          if (code !== 0) {
-            coreEvents.emitFeedback(
-              'error',
-              `Tool discovery command failed with code ${code}.`,
-              stderr,
-            );
-            return reject(
-              new Error(`Tool discovery command failed with exit code ${code}`),
-            );
-          }
-          resolve();
-        });
-      });
-
-      // execute discovery command and extract function declarations (w/ or w/o "tool" wrappers)
-      const functions: FunctionDeclaration[] = [];
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
-      const discoveredItems = JSON.parse(stdout.trim());
-
-      if (!discoveredItems || !Array.isArray(discoveredItems)) {
+      const firstPart = cmdParts[0];
+      if (typeof firstPart !== 'string') {
         throw new Error(
-          'Tool discovery command did not return a JSON array of tools.',
+          'Tool discovery command must start with a program name.',
         );
       }
 
-      for (const tool of discoveredItems) {
-        if (tool && typeof tool === 'object') {
-          if (Array.isArray(tool['function_declarations'])) {
-            functions.push(...tool['function_declarations']);
-          } else if (Array.isArray(tool['functionDeclarations'])) {
-            functions.push(...tool['functionDeclarations']);
-          } else if (tool['name']) {
-            // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
-            functions.push(tool as FunctionDeclaration);
+      let finalCommand: string = firstPart;
+      let finalArgs: string[] = cmdParts
+        .slice(1)
+        .filter((p): p is string => typeof p === 'string');
+      let finalEnv = process.env;
+      let cleanupFunc: (() => void) | undefined;
+
+      const sandboxManager = this.config.sandboxManager;
+      if (sandboxManager) {
+        const prepared = await sandboxManager.prepareCommand({
+          command: finalCommand,
+          args: finalArgs,
+          cwd: process.cwd(),
+          env: process.env,
+        });
+        finalCommand = prepared.program;
+        finalArgs = prepared.args;
+        finalEnv = prepared.env;
+        cleanupFunc = prepared.cleanup;
+      }
+
+      try {
+        const proc = spawn(finalCommand, finalArgs, {
+          env: finalEnv,
+        });
+        let stdout = '';
+        const stdoutDecoder = new StringDecoder('utf8');
+        let stderr = '';
+        const stderrDecoder = new StringDecoder('utf8');
+        let sizeLimitExceeded = false;
+        const MAX_STDOUT_SIZE = 10 * 1024 * 1024; // 10MB limit
+        const MAX_STDERR_SIZE = 10 * 1024 * 1024; // 10MB limit
+
+        let stdoutByteLength = 0;
+        let stderrByteLength = 0;
+
+        proc.stdout.on('data', (data) => {
+          if (sizeLimitExceeded) return;
+          if (stdoutByteLength + data.length > MAX_STDOUT_SIZE) {
+            sizeLimitExceeded = true;
+            proc.kill();
+            return;
+          }
+          stdoutByteLength += data.length;
+          stdout += stdoutDecoder.write(data);
+        });
+
+        proc.stderr.on('data', (data) => {
+          if (sizeLimitExceeded) return;
+          if (stderrByteLength + data.length > MAX_STDERR_SIZE) {
+            sizeLimitExceeded = true;
+            proc.kill();
+            return;
+          }
+          stderrByteLength += data.length;
+          stderr += stderrDecoder.write(data);
+        });
+
+        await new Promise<void>((resolve, reject) => {
+          proc.on('error', (err) => {
+            reject(err);
+          });
+          proc.on('close', (code) => {
+            stdout += stdoutDecoder.end();
+            stderr += stderrDecoder.end();
+
+            if (sizeLimitExceeded) {
+              return reject(
+                new Error(
+                  `Tool discovery command output exceeded size limit of ${MAX_STDOUT_SIZE} bytes.`,
+                ),
+              );
+            }
+
+            if (code !== 0) {
+              coreEvents.emitFeedback(
+                'error',
+                `Tool discovery command failed with code ${code}.`,
+                stderr,
+              );
+              return reject(
+                new Error(
+                  `Tool discovery command failed with exit code ${code}`,
+                ),
+              );
+            }
+            resolve();
+          });
+        });
+
+        // execute discovery command and extract function declarations (w/ or w/o "tool" wrappers)
+        const functions: FunctionDeclaration[] = [];
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
+        const discoveredItems = JSON.parse(stdout.trim());
+
+        if (!discoveredItems || !Array.isArray(discoveredItems)) {
+          throw new Error(
+            'Tool discovery command did not return a JSON array of tools.',
+          );
+        }
+
+        for (const tool of discoveredItems) {
+          if (tool && typeof tool === 'object') {
+            if (Array.isArray(tool['function_declarations'])) {
+              functions.push(...tool['function_declarations']);
+            } else if (Array.isArray(tool['functionDeclarations'])) {
+              functions.push(...tool['functionDeclarations']);
+            } else if (tool['name']) {
+              // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
+              functions.push(tool as FunctionDeclaration);
+            }
           }
         }
-      }
-      // register each function as a tool
-      for (const func of functions) {
-        if (!func.name) {
-          debugLogger.warn('Discovered a tool with no name. Skipping.');
-          continue;
+        // register each function as a tool
+        for (const func of functions) {
+          if (!func.name) {
+            debugLogger.warn('Discovered a tool with no name. Skipping.');
+            continue;
+          }
+          const parameters =
+            func.parametersJsonSchema &&
+            typeof func.parametersJsonSchema === 'object' &&
+            !Array.isArray(func.parametersJsonSchema)
+              ? func.parametersJsonSchema
+              : {};
+          this.registerTool(
+            new DiscoveredTool(
+              this.config,
+              func.name,
+              DISCOVERED_TOOL_PREFIX + func.name,
+              func.description ?? '',
+              // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
+              parameters as Record<string, unknown>,
+              this.messageBus,
+            ),
+          );
         }
-        const parameters =
-          func.parametersJsonSchema &&
-          typeof func.parametersJsonSchema === 'object' &&
-          !Array.isArray(func.parametersJsonSchema)
-            ? func.parametersJsonSchema
-            : {};
-        this.registerTool(
-          new DiscoveredTool(
-            this.config,
-            func.name,
-            DISCOVERED_TOOL_PREFIX + func.name,
-            func.description ?? '',
-            // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
-            parameters as Record<string, unknown>,
-            this.messageBus,
-          ),
-        );
+      } finally {
+        cleanupFunc?.();
       }
     } catch (e) {
       debugLogger.error(`Tool discovery command "${discoveryCmd}" failed:`, e);
@@ -512,6 +595,20 @@ export class ToolRegistry {
         ),
       ) ?? new Set([]);
 
+    if (tool.name === UPDATE_TOPIC_TOOL_NAME) {
+      if (!this.config.isTopicUpdateNarrationEnabled()) {
+        return false;
+      }
+    }
+
+    const isPlanMode = this.config.getApprovalMode() === ApprovalMode.PLAN;
+    if (
+      (tool.name === ENTER_PLAN_MODE_TOOL_NAME && isPlanMode) ||
+      (tool.name === EXIT_PLAN_MODE_TOOL_NAME && !isPlanMode)
+    ) {
+      return false;
+    }
+
     const normalizedClassName = tool.constructor.name.replace(/^_+/, '');
     const possibleNames = [tool.name, normalizedClassName];
     if (tool instanceof DiscoveredMCPTool) {
@@ -541,6 +638,10 @@ export class ToolRegistry {
     const declarations: FunctionDeclaration[] = [];
     const seenNames = new Set<string>();
 
+    const mainAgentTools = this.isMainRegistry
+      ? this.config.getMainAgentTools()
+      : undefined;
+
     this.getActiveTools().forEach((tool) => {
       const toolName =
         tool instanceof DiscoveredMCPTool
@@ -550,6 +651,16 @@ export class ToolRegistry {
       if (seenNames.has(toolName)) {
         return;
       }
+
+      if (
+        mainAgentTools &&
+        !mainAgentTools.includes(toolName) &&
+        !mainAgentTools.includes(tool.constructor.name) &&
+        !mainAgentTools.some((t) => t.startsWith(`${tool.constructor.name}(`))
+      ) {
+        return;
+      }
+
       seenNames.add(toolName);
 
       let schema = tool.getSchema(modelId);

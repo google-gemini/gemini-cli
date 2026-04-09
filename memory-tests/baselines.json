@@ -1,0 +1,30 @@
+{
+  "version": 1,
+  "updatedAt": "2026-04-08T01:21:58.770Z",
+  "scenarios": {
+    "multi-turn-conversation": {
+      "heapUsedBytes": 120082704,
+      "heapTotalBytes": 177586176,
+      "rssBytes": 269172736,
+      "timestamp": "2026-04-08T01:21:57.127Z"
+    },
+    "multi-function-call-repo-search": {
+      "heapUsedBytes": 104644984,
+      "heapTotalBytes": 111575040,
+      "rssBytes": 204079104,
+      "timestamp": "2026-04-08T01:21:58.770Z"
+    },
+    "idle-session-startup": {
+      "heapUsedBytes": 119813672,
+      "heapTotalBytes": 177061888,
+      "rssBytes": 267943936,
+      "timestamp": "2026-04-08T01:21:53.855Z"
+    },
+    "simple-prompt-response": {
+      "heapUsedBytes": 119722064,
+      "heapTotalBytes": 177324032,
+      "rssBytes": 268812288,
+      "timestamp": "2026-04-08T01:21:55.491Z"
+    }
+  }
+}

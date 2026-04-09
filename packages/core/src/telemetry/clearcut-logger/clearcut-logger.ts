@@ -51,6 +51,8 @@ import type {
   KeychainAvailabilityEvent,
   TokenStorageInitializationEvent,
   StartupStatsEvent,
+  OnboardingStartEvent,
+  OnboardingSuccessEvent,
 } from '../types.js';
 import type {
   CreditsUsedEvent,
@@ -124,6 +126,8 @@ export enum EventNames {
   TOOL_OUTPUT_MASKING = 'tool_output_masking',
   KEYCHAIN_AVAILABILITY = 'keychain_availability',
   TOKEN_STORAGE_INITIALIZATION = 'token_storage_initialization',
+  ONBOARDING_START = 'onboarding_start',
+  ONBOARDING_SUCCESS = 'onboarding_success',
   CONSECA_POLICY_GENERATION = 'conseca_policy_generation',
   CONSECA_VERDICT = 'conseca_verdict',
   STARTUP_STATS = 'startup_stats',
@@ -131,6 +135,10 @@ export enum EventNames {
   OVERAGE_OPTION_SELECTED = 'overage_option_selected',
   EMPTY_WALLET_MENU_SHOWN = 'empty_wallet_menu_shown',
   CREDIT_PURCHASE_CLICK = 'credit_purchase_click',
+  BROWSER_AGENT_CONNECTION = 'browser_agent_connection',
+  BROWSER_AGENT_VISION_STATUS = 'browser_agent_vision_status',
+  BROWSER_AGENT_TASK_OUTCOME = 'browser_agent_task_outcome',
+  BROWSER_AGENT_CLEANUP = 'browser_agent_cleanup',
 }
 
 export interface LogResponse {
@@ -686,6 +694,11 @@ export class ClearcutLogger {
       {
         gemini_cli_key: EventMetadataKey.GEMINI_CLI_START_SESSION_EXTENSION_IDS,
         value: event.extension_ids.toString(),
+      },
+      {
+        gemini_cli_key:
+          EventMetadataKey.GEMINI_CLI_START_SESSION_WORKTREE_ACTIVE,
+        value: event.worktree_active.toString(),
       },
     ];
 
@@ -1791,6 +1804,39 @@ export class ClearcutLogger {
     this.flushIfNeeded();
   }
 
+  logOnboardingStartEvent(_event: OnboardingStartEvent): void {
+    const data: EventValue[] = [
+      {
+        gemini_cli_key: EventMetadataKey.GEMINI_CLI_ONBOARDING_START,
+        value: 'true',
+      },
+    ];
+    this.enqueueLogEvent(
+      this.createLogEvent(EventNames.ONBOARDING_START, data),
+    );
+    this.flushIfNeeded();
+  }
+
+  logOnboardingSuccessEvent(event: OnboardingSuccessEvent): void {
+    const data: EventValue[] = [];
+    if (event.userTier) {
+      data.push({
+        gemini_cli_key: EventMetadataKey.GEMINI_CLI_ONBOARDING_USER_TIER,
+        value: event.userTier,
+      });
+    }
+    if (event.duration_ms !== undefined) {
+      data.push({
+        gemini_cli_key: EventMetadataKey.GEMINI_CLI_ONBOARDING_DURATION_MS,
+        value: event.duration_ms.toString(),
+      });
+    }
+    this.enqueueLogEvent(
+      this.createLogEvent(EventNames.ONBOARDING_SUCCESS, data),
+    );
+    this.flushIfNeeded();
+  }
+
   logStartupStatsEvent(event: StartupStatsEvent): void {
     const data: EventValue[] = [
       {
@@ -1889,6 +1935,146 @@ export class ClearcutLogger {
 
     this.enqueueLogEvent(
       this.createLogEvent(EventNames.CREDIT_PURCHASE_CLICK, data),
+    );
+    this.flushIfNeeded();
+  }
+
+  // ==========================================================================
+  // Browser Agent Events
+  // ==========================================================================
+
+  logBrowserAgentConnectionEvent(attrs: {
+    session_mode: string;
+    headless: boolean;
+    success: boolean;
+    duration_ms: number;
+    error_type?: string;
+    tool_count?: number;
+  }): void {
+    const data: EventValue[] = [
+      {
+        gemini_cli_key: EventMetadataKey.GEMINI_CLI_BROWSER_AGENT_SESSION_MODE,
+        value: attrs.session_mode,
+      },
+      {
+        gemini_cli_key: EventMetadataKey.GEMINI_CLI_BROWSER_AGENT_HEADLESS,
+        value: attrs.headless.toString(),
+      },
+      {
+        gemini_cli_key: EventMetadataKey.GEMINI_CLI_BROWSER_AGENT_SUCCESS,
+        value: attrs.success.toString(),
+      },
+      {
+        gemini_cli_key: EventMetadataKey.GEMINI_CLI_BROWSER_AGENT_DURATION_MS,
+        value: attrs.duration_ms.toString(),
+      },
+    ];
+
+    if (attrs.error_type) {
+      data.push({
+        gemini_cli_key: EventMetadataKey.GEMINI_CLI_BROWSER_AGENT_ERROR_TYPE,
+        value: attrs.error_type,
+      });
+    }
+
+    if (attrs.tool_count !== undefined) {
+      data.push({
+        gemini_cli_key: EventMetadataKey.GEMINI_CLI_BROWSER_AGENT_TOOL_COUNT,
+        value: attrs.tool_count.toString(),
+      });
+    }
+
+    this.enqueueLogEvent(
+      this.createLogEvent(EventNames.BROWSER_AGENT_CONNECTION, data),
+    );
+    this.flushIfNeeded();
+  }
+
+  logBrowserAgentVisionStatusEvent(attrs: {
+    enabled: boolean;
+    disabled_reason?: string;
+  }): void {
+    const data: EventValue[] = [
+      {
+        gemini_cli_key:
+          EventMetadataKey.GEMINI_CLI_BROWSER_AGENT_VISION_ENABLED,
+        value: attrs.enabled.toString(),
+      },
+    ];
+
+    if (attrs.disabled_reason) {
+      data.push({
+        gemini_cli_key:
+          EventMetadataKey.GEMINI_CLI_BROWSER_AGENT_VISION_DISABLED_REASON,
+        value: attrs.disabled_reason,
+      });
+    }
+
+    this.enqueueLogEvent(
+      this.createLogEvent(EventNames.BROWSER_AGENT_VISION_STATUS, data),
+    );
+    this.flushIfNeeded();
+  }
+
+  logBrowserAgentTaskOutcomeEvent(attrs: {
+    success: boolean;
+    session_mode: string;
+    vision_enabled: boolean;
+    headless: boolean;
+    duration_ms: number;
+  }): void {
+    const data: EventValue[] = [
+      {
+        gemini_cli_key: EventMetadataKey.GEMINI_CLI_BROWSER_AGENT_SUCCESS,
+        value: attrs.success.toString(),
+      },
+      {
+        gemini_cli_key: EventMetadataKey.GEMINI_CLI_BROWSER_AGENT_SESSION_MODE,
+        value: attrs.session_mode,
+      },
+      {
+        gemini_cli_key:
+          EventMetadataKey.GEMINI_CLI_BROWSER_AGENT_VISION_ENABLED,
+        value: attrs.vision_enabled.toString(),
+      },
+      {
+        gemini_cli_key: EventMetadataKey.GEMINI_CLI_BROWSER_AGENT_HEADLESS,
+        value: attrs.headless.toString(),
+      },
+      {
+        gemini_cli_key: EventMetadataKey.GEMINI_CLI_BROWSER_AGENT_DURATION_MS,
+        value: attrs.duration_ms.toString(),
+      },
+    ];
+
+    this.enqueueLogEvent(
+      this.createLogEvent(EventNames.BROWSER_AGENT_TASK_OUTCOME, data),
+    );
+    this.flushIfNeeded();
+  }
+
+  logBrowserAgentCleanupEvent(attrs: {
+    session_mode: string;
+    success: boolean;
+    duration_ms: number;
+  }): void {
+    const data: EventValue[] = [
+      {
+        gemini_cli_key: EventMetadataKey.GEMINI_CLI_BROWSER_AGENT_SESSION_MODE,
+        value: attrs.session_mode,
+      },
+      {
+        gemini_cli_key: EventMetadataKey.GEMINI_CLI_BROWSER_AGENT_SUCCESS,
+        value: attrs.success.toString(),
+      },
+      {
+        gemini_cli_key: EventMetadataKey.GEMINI_CLI_BROWSER_AGENT_DURATION_MS,
+        value: attrs.duration_ms.toString(),
+      },
+    ];
+
+    this.enqueueLogEvent(
+      this.createLogEvent(EventNames.BROWSER_AGENT_CLEANUP, data),
     );
     this.flushIfNeeded();
   }
