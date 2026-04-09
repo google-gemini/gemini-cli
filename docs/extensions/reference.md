@@ -123,6 +123,8 @@ The manifest file defines the extension's behavior and configuration.
     }
   },
   "contextFileName": "GEMINI.md",
+  "hooksDir": "claude-hooks",
+  "skillsDir": "claude-skills",
   "excludeTools": ["run_shell_command"],
   "migratedTo": "https://github.com/new-owner/new-extension-repo",
   "plan": {
@@ -159,6 +161,11 @@ The manifest file defines the extension's behavior and configuration.
   extension. This will be used to load the context from the extension directory.
   If this property is not used but a `GEMINI.md` file is present in your
   extension directory, then that file will be loaded.
+- `hooksDir`: The relative directory that contains your extension hooks file.
+  Gemini CLI looks for `hooks.json` inside this directory. If omitted, Gemini
+  CLI uses the default `hooks/` directory.
+- `skillsDir`: The relative directory that contains your extension's agent
+  skills. If omitted, Gemini CLI uses the default `skills/` directory.
 - `excludeTools`: An array of tool names to exclude from the model. You can also
   specify command-specific restrictions for tools that support it, like the
   `run_shell_command` tool. For example,
@@ -224,14 +231,18 @@ For an extension named `gcp`:
 ### Hooks
 
 Intercept and customize CLI behavior using [hooks](../hooks/index.md). Define
-hooks in a `hooks/hooks.json` file within your extension directory. Note that
-hooks are not defined in the `gemini-extension.json` manifest.
+hooks in `hooks/hooks.json` by default, or set `hooksDir` in
+`gemini-extension.json` to point Gemini CLI at a different relative directory.
+For example, `"hooksDir": "claude-hooks"` makes Gemini CLI load
+`claude-hooks/hooks.json`.
 
 ### Agent skills
 
 Bundle [agent skills](../cli/skills.md) to provide specialized workflows. Place
-skill definitions in a `skills/` directory. For example,
-`skills/security-audit/SKILL.md` exposes a `security-audit` skill.
+skill definitions in `skills/` by default, or set `skillsDir` in
+`gemini-extension.json` to point Gemini CLI at a different relative directory.
+For example, `"skillsDir": "claude-skills"` makes Gemini CLI load
+`claude-skills/security-audit/SKILL.md` as the `security-audit` skill.
 
 ### Sub-agents
 
