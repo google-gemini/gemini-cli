@@ -188,7 +188,12 @@ def main():
                 is_failing = rollup and rollup.get('state') in ['FAILURE', 'ERROR']
                 
                 if not is_conflicting and not is_failing:
-                    status_action = "Ready for initial review. **Needs Reviewer.**" if not latest_reviewer_activity else "Author responded to feedback. **Reviewer follow-up required.**"
+                    # CONCISE STATUS & ACTION
+                    if not latest_reviewer_activity:
+                        status_action = "New PR. **Reviewer Needed.**"
+                    else:
+                        status_action = "Updated. **Reviewer Follow-up.**"
+                        
                     review_needed_list.append({
                         "issue_md": f"[#{issue_no} {issue_title}]({issue_url})",
                         "pr_no": pr['number'], "pr_url": pr['url'],
@@ -241,7 +246,7 @@ def main():
 
     md += "\n---\n*Dashboard maintained by automated triage script.*"
     with open("REVIEWS.md", "w") as f: f.write(md)
-    print("Generated dashboard with combined status column.")
+    print("Generated dashboard with concise status.")
 
 if __name__ == "__main__":
     main()
