@@ -102,6 +102,7 @@ import { useQuotaAndFallback } from './hooks/useQuotaAndFallback.js';
 import { useEditorSettings } from './hooks/useEditorSettings.js';
 import { useSettingsCommand } from './hooks/useSettingsCommand.js';
 import { useModelCommand } from './hooks/useModelCommand.js';
+import { useModelCycling } from './hooks/useModelCycling.js';
 import { useSlashCommandProcessor } from './hooks/slashCommandProcessor.js';
 import { useVimMode } from './contexts/VimModeContext.js';
 import {
@@ -931,6 +932,8 @@ Logging in with Google... Restarting Gemini CLI to continue.
 
   const { isModelDialogOpen, openModelDialog, closeModelDialog } =
     useModelCommand();
+
+  useModelCycling();
 
   const { toggleVimEnabled } = useVimMode();
 

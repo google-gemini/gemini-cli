@@ -30,7 +30,8 @@ import { useKeypress } from '../hooks/useKeypress.js';
 import { theme } from '../semantic-colors.js';
 import { DescriptiveRadioButtonSelect } from './shared/DescriptiveRadioButtonSelect.js';
 import { ConfigContext } from '../contexts/ConfigContext.js';
-import { useSettings } from '../contexts/SettingsContext.js';
+import { useSettingsStore } from '../contexts/SettingsContext.js';
+import { SettingScope } from '../../config/settings.js';
 
 interface ModelDialogProps {
   onClose: () => void;
@@ -38,7 +39,7 @@ interface ModelDialogProps {
 
 export function ModelDialog({ onClose }: ModelDialogProps): React.JSX.Element {
   const config = useContext(ConfigContext);
-  const settings = useSettings();
+  const { settings, setSetting } = useSettingsStore();
   const { terminalWidth } = useUIState();
   const [hasAccessToProModel, setHasAccessToProModel] = useState<boolean>(
     () => !(config?.getProModelNoAccessSync() ?? false),
@@ -47,6 +48,14 @@ export function ModelDialog({ onClose }: ModelDialogProps): React.JSX.Element {
     config?.getProModelNoAccessSync() ? 'manual' : 'main',
   );
   const [persistMode, setPersistMode] = useState(false);
+  const [highlightedModel, setHighlightedModel] = useState<string>(
+    config?.getModel() || DEFAULT_GEMINI_MODEL_AUTO,
+  );
+
+  const favoriteModels = useMemo(
+    () => new Set(settings.merged.model.favorites || []),
+    [settings.merged.model.favorites],
+  );
 
   useEffect(() => {
     async function checkAccess() {
@@ -101,6 +110,24 @@ export function ModelDialog({ onClose }: ModelDialogProps): React.JSX.Element {
     return '';
   }, [preferredModel, config]);
 
+  const toggleFavorite = useCallback(
+    (modelId: string) => {
+      if (!modelId || modelId === 'Manual') return;
+      const newFavorites = new Set(favoriteModels);
+      if (newFavorites.has(modelId)) {
+        newFavorites.delete(modelId);
+      } else {
+        newFavorites.add(modelId);
+      }
+      setSetting(
+        SettingScope.User,
+        'model.favorites',
+        Array.from(newFavorites),
+      );
+    },
+    [favoriteModels, setSetting],
+  );
+
   useKeypress(
     (key) => {
       if (key.name === 'escape') {
@@ -113,6 +140,10 @@ export function ModelDialog({ onClose }: ModelDialogProps): React.JSX.Element {
       }
       if (key.name === 'tab') {
         setPersistMode((prev) => !prev);
+        return true;
+      }
+      if (key.sequence === 'f') {
+        toggleFavorite(highlightedModel);
         return true;
       }
       return false;
@@ -140,7 +171,7 @@ export function ModelDialog({ onClose }: ModelDialogProps): React.JSX.Element {
         .filter((o) => o.tier === 'auto')
         .map((o) => ({
           value: o.modelId,
-          title: o.name,
+          title: `${o.name}${favoriteModels.has(o.modelId) ? ' ★' : ''}`,
           description: o.description,
           key: o.modelId,
         }));
@@ -148,7 +179,7 @@ export function ModelDialog({ onClose }: ModelDialogProps): React.JSX.Element {
       list.push({
         value: 'Manual',
         title: manualModelSelected
-          ? `Manual (${getDisplayString(manualModelSelected, config ?? undefined)})`
+          ? `Manual (${getDisplayString(manualModelSelected, config ?? undefined)})${favoriteModels.has(manualModelSelected) ? ' ★' : ''}`
           : 'Manual',
         description: 'Manually select a model',
         key: 'Manual',
@@ -160,7 +191,7 @@ export function ModelDialog({ onClose }: ModelDialogProps): React.JSX.Element {
     const list = [
       {
         value: DEFAULT_GEMINI_MODEL_AUTO,
-        title: getDisplayString(DEFAULT_GEMINI_MODEL_AUTO),
+        title: `${getDisplayString(DEFAULT_GEMINI_MODEL_AUTO)}${favoriteModels.has(DEFAULT_GEMINI_MODEL_AUTO) ? ' ★' : ''}`,
         description:
           'Let Gemini CLI decide the best model for the task: gemini-2.5-pro, gemini-2.5-flash',
         key: DEFAULT_GEMINI_MODEL_AUTO,
@@ -168,7 +199,7 @@ export function ModelDialog({ onClose }: ModelDialogProps): React.JSX.Element {
       {
         value: 'Manual',
         title: manualModelSelected
-          ? `Manual (${getDisplayString(manualModelSelected)})`
+          ? `Manual (${getDisplayString(manualModelSelected)})${favoriteModels.has(manualModelSelected) ? ' ★' : ''}`
           : 'Manual',
         description: 'Manually select a model',
         key: 'Manual',
@@ -178,7 +209,7 @@ export function ModelDialog({ onClose }: ModelDialogProps): React.JSX.Element {
     if (shouldShowPreviewModels) {
       list.unshift({
         value: PREVIEW_GEMINI_MODEL_AUTO,
-        title: getDisplayString(PREVIEW_GEMINI_MODEL_AUTO),
+        title: `${getDisplayString(PREVIEW_GEMINI_MODEL_AUTO)}${favoriteModels.has(PREVIEW_GEMINI_MODEL_AUTO) ? ' ★' : ''}`,
         description: useGemini31
           ? 'Let Gemini CLI decide the best model for the task: gemini-3.1-pro, gemini-3-flash'
           : 'Let Gemini CLI decide the best model for the task: gemini-3-pro, gemini-3-flash',
@@ -194,6 +225,7 @@ export function ModelDialog({ onClose }: ModelDialogProps): React.JSX.Element {
     useGemini31FlashLite,
     useCustomToolModel,
     hasAccessToProModel,
+    favoriteModels,
   ]);
 
   const manualOptions = useMemo(() => {
@@ -216,7 +248,7 @@ export function ModelDialog({ onClose }: ModelDialogProps): React.JSX.Element {
         .filter((o) => o.tier !== 'auto')
         .map((o) => ({
           value: o.modelId,
-          title: o.name,
+          title: `${o.name}${favoriteModels.has(o.modelId) ? ' ★' : ''}`,
           key: o.modelId,
         }));
     }
@@ -225,17 +257,17 @@ export function ModelDialog({ onClose }: ModelDialogProps): React.JSX.Element {
     const list = [
       {
         value: DEFAULT_GEMINI_MODEL,
-        title: getDisplayString(DEFAULT_GEMINI_MODEL),
+        title: `${getDisplayString(DEFAULT_GEMINI_MODEL)}${favoriteModels.has(DEFAULT_GEMINI_MODEL) ? ' ★' : ''}`,
         key: DEFAULT_GEMINI_MODEL,
       },
       {
         value: DEFAULT_GEMINI_FLASH_MODEL,
-        title: getDisplayString(DEFAULT_GEMINI_FLASH_MODEL),
+        title: `${getDisplayString(DEFAULT_GEMINI_FLASH_MODEL)}${favoriteModels.has(DEFAULT_GEMINI_FLASH_MODEL) ? ' ★' : ''}`,
         key: DEFAULT_GEMINI_FLASH_MODEL,
       },
       {
         value: DEFAULT_GEMINI_FLASH_LITE_MODEL,
-        title: getDisplayString(DEFAULT_GEMINI_FLASH_LITE_MODEL),
+        title: `${getDisplayString(DEFAULT_GEMINI_FLASH_LITE_MODEL)}${favoriteModels.has(DEFAULT_GEMINI_FLASH_LITE_MODEL) ? ' ★' : ''}`,
         key: DEFAULT_GEMINI_FLASH_LITE_MODEL,
       },
     ];
@@ -252,12 +284,12 @@ export function ModelDialog({ onClose }: ModelDialogProps): React.JSX.Element {
       const previewOptions = [
         {
           value: previewProValue,
-          title: getDisplayString(previewProModel),
+          title: `${getDisplayString(previewProModel)}${favoriteModels.has(previewProValue) ? ' ★' : ''}`,
           key: previewProModel,
         },
         {
           value: PREVIEW_GEMINI_FLASH_MODEL,
-          title: getDisplayString(PREVIEW_GEMINI_FLASH_MODEL),
+          title: `${getDisplayString(PREVIEW_GEMINI_FLASH_MODEL)}${favoriteModels.has(PREVIEW_GEMINI_FLASH_MODEL) ? ' ★' : ''}`,
           key: PREVIEW_GEMINI_FLASH_MODEL,
         },
       ];
@@ -265,7 +297,7 @@ export function ModelDialog({ onClose }: ModelDialogProps): React.JSX.Element {
       if (useGemini31FlashLite) {
         previewOptions.push({
           value: PREVIEW_GEMINI_3_1_FLASH_LITE_MODEL,
-          title: getDisplayString(PREVIEW_GEMINI_3_1_FLASH_LITE_MODEL),
+          title: `${getDisplayString(PREVIEW_GEMINI_3_1_FLASH_LITE_MODEL)}${favoriteModels.has(PREVIEW_GEMINI_3_1_FLASH_LITE_MODEL) ? ' ★' : ''}`,
           key: PREVIEW_GEMINI_3_1_FLASH_LITE_MODEL,
         });
       }
@@ -286,6 +318,7 @@ export function ModelDialog({ onClose }: ModelDialogProps): React.JSX.Element {
     useCustomToolModel,
     hasAccessToProModel,
     config,
+    favoriteModels,
   ]);
 
   const options = view === 'main' ? mainOptions : manualOptions;
@@ -335,6 +368,7 @@ export function ModelDialog({ onClose }: ModelDialogProps): React.JSX.Element {
         <DescriptiveRadioButtonSelect
           items={options}
           onSelect={handleSelect}
+          onHighlight={setHighlightedModel}
           initialIndex={initialIndex}
           showNumbers={true}
         />
@@ -348,6 +382,12 @@ export function ModelDialog({ onClose }: ModelDialogProps): React.JSX.Element {
             {persistMode ? 'true' : 'false'}
           </Text>
           <Text color={theme.text.secondary}> (Press Tab to toggle)</Text>
+        </Box>
+        <Box>
+          <Text color={theme.text.secondary}>
+            Press <Text bold>f</Text> to favorite/unfavorite the highlighted
+            model.
+          </Text>
         </Box>
       </Box>
       <Box flexDirection="column">
