@@ -210,7 +210,7 @@ describe('Memory Usage Tests', () => {
       sharedGrowthResponsesPath = growthResponsesPath;
       sharedResumeResponsesPath = resumeResponsesPath;
       sharedHistoryPath = historyPath;
-    });
+    }, 60000);
 
     afterAll(() => {
       if (existsSync(tempDir)) {
@@ -394,21 +394,25 @@ async function generateSharedLargeChatData(tempDir: string) {
     const prompt = `prompt ${i}`;
     const response = `${baseString} - response ${i}`;
 
-    historyStream.write(`    {
-      "id": "msg-user-${i}",
-      "role": "user",
-      "parts": [{"text": "${prompt}"}],
-      "timestamp": "${new Date().toISOString()}",
-      "type": "user"
-    },\n`);
+    historyStream.write(
+      JSON.stringify({
+        id: `msg-user-${i}`,
+        role: 'user',
+        parts: [{ text: prompt }],
+        timestamp: new Date().toISOString(),
+        type: 'user',
+      }) + '\n',
+    );
 
-    historyStream.write(`    {
-      "id": "msg-model-${i}",
-      "role": "model",
-      "parts": [{"text": "${response}"}],
-      "timestamp": "${new Date().toISOString()}",
-      "type": "gemini"
-    }${i === LARGE_CHAT_MSG_NUM - 1 ? '' : ','}\n`);
+    historyStream.write(
+      JSON.stringify({
+        id: `msg-model-${i}`,
+        role: 'model',
+        parts: [{ text: response }],
+        timestamp: new Date().toISOString(),
+        type: 'gemini',
+      }) + '\n',
+    );
 
     growthResponsesStream.write(
       `{"method":"generateContent","response":{"candidates":[{"content":{"parts":[{"text":"{\\"complexity_reasoning\\":\\"simple\\",\\"complexity_score\\":1}"}],"role":"model"},"finishReason":"STOP","index":0}]}}\n`,
@@ -438,19 +442,15 @@ async function generateSharedLargeChatData(tempDir: string) {
   growthResponsesStream.end();
   historyStream.end();
 
-  // Wait for stream to finish writing
-  await new Promise((resolve) => {
-    let finished = 0;
-    resumeResponsesStream.on('finish', () => {
-      if (++finished === 3) resolve(null);
-    });
-    growthResponsesStream.on('finish', () => {
-      if (++finished === 3) resolve(null);
-    });
-    historyStream.on('finish', () => {
-      if (++finished === 3) resolve(null);
-    });
-  });
+  await Promise.all(
+    [resumeResponsesStream, growthResponsesStream, historyStream].map(
+      (stream) =>
+        new Promise((resolve, reject) => {
+          stream.on('finish', resolve);
+          stream.on('error', reject);
+        }),
+    ),
+  );
 
   return { resumeResponsesPath, growthResponsesPath, historyPath };
 }
