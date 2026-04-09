@@ -104,13 +104,15 @@
       "packages/core/src/prompts/**",
       "evals/answer-vs-act.eval.ts",
       "evals/model_steering.eval.ts",
-      "evals/redundant_casts.eval.ts"
+      "evals/redundant_casts.eval.ts",
+      "evals/failing_steering.eval.ts"
     ],
     "evals": [
       "ALL_ALWAYS_PASSING",
       "evals/answer-vs-act.eval.ts",
       "evals/model_steering.eval.ts",
-      "evals/redundant_casts.eval.ts"
+      "evals/redundant_casts.eval.ts",
+      "evals/failing_steering.eval.ts"
     ]
   },
   "edit_fidelity": {
