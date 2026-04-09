@@ -201,7 +201,7 @@ export class FolderTrustDiscoveryService {
             }
           }
         }
-        results.hooks = Array.from(hooks);
+        this.addUniqueItems(results.hooks, Array.from(hooks));
       }
     } catch (e) {
       results.discoveryErrors.push(
@@ -385,6 +385,16 @@ export class FolderTrustDiscoveryService {
 
   private static capitalize(value: string): string {
     return value.charAt(0).toUpperCase() + value.slice(1);
+  }
+
+  private static addUniqueItems(target: string[], items: string[]) {
+    const existing = new Set(target);
+    for (const item of items) {
+      if (!existing.has(item)) {
+        target.push(item);
+        existing.add(item);
+      }
+    }
   }
 
   private static getStringProperty(

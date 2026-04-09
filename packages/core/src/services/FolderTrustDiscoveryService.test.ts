@@ -254,4 +254,52 @@ describe('FolderTrustDiscoveryService', () => {
     expect(results.skills).toContain('test-skill');
     expect(results.hooks).toContain('custom-hook');
   });
+
+  it('should preserve hooks discovered from settings and extension manifests', async () => {
+    const geminiDir = path.join(tempDir, GEMINI_DIR);
+    await fs.mkdir(geminiDir, { recursive: true });
+    await fs.writeFile(
+      path.join(geminiDir, 'settings.json'),
+      JSON.stringify({
+        hooks: {
+          BeforeTool: [{ command: 'project-hook' }],
+        },
+        // Keep settings parsing noticeably slower than extension hook discovery
+        // to consistently exercise concurrent merge behavior.
+        metadata: 'x'.repeat(5_000_000),
+      }),
+    );
+
+    await fs.writeFile(
+      path.join(tempDir, 'gemini-extension.json'),
+      JSON.stringify({
+        name: 'combined-hooks-extension',
+        version: '1.0.0',
+      }),
+    );
+    const hooksDir = path.join(tempDir, 'hooks');
+    await fs.mkdir(hooksDir, { recursive: true });
+    await fs.writeFile(
+      path.join(hooksDir, 'hooks.json'),
+      JSON.stringify({
+        hooks: {
+          BeforeTool: [
+            {
+              hooks: [
+                {
+                  type: 'command',
+                  command: 'extension-hook',
+                },
+              ],
+            },
+          ],
+        },
+      }),
+    );
+
+    const results = await FolderTrustDiscoveryService.discover(tempDir);
+
+    expect(results.hooks).toContain('project-hook');
+    expect(results.hooks).toContain('extension-hook');
+  });
 });
