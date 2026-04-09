@@ -24,6 +24,7 @@ Conversely, do **NOT** use the `help wanted` label for issues such as:
     *   Changes touching key workflows (like the core stream or execution workflows) that affect all users and require careful architectural consideration.
     *   Changes touching sensitive business logic, telemetry, or API usage statistics/tracking.
     *   Proposals affecting community guidelines, contributor frameworks, or project governance that require significant maintainer discretion and alignment.
+    *   Complex new subsystems, such as background LLM integration tasks, AI-driven automation, or new agentic behaviors that require significant design validation.
 
 ## Step 1: Resolution Check
 **CRITICAL MISTAKE PREVENTION**: You MUST thoroughly read every single comment. Look explicitly for phrases like "appears to fix", "fixes this", "might be fixed", "resolved by", "no longer an issue", or links to other PRs/issues that suggest a resolution. Do not skim. If a user (even a non-maintainer) suggests a fix or PR exists, and the original reporter has not contradicted them, you MUST treat the issue as resolved.
