@@ -622,7 +622,9 @@ describe('KeypressContext', () => {
 
     it('should handle slow split OSC 52 response across ESC timeouts', async () => {
       const keyHandler = vi.fn();
-      const { result } = renderHook(() => useKeypressContext(), { wrapper });
+      const { result } = await renderHookWithProviders(() =>
+        useKeypressContext(),
+      );
 
       act(() => result.current.subscribe(keyHandler));
 
@@ -708,7 +710,9 @@ describe('KeypressContext', () => {
 
     it('should ignore slow split OSC 11 terminal background responses', async () => {
       const keyHandler = vi.fn();
-      const { result } = renderHook(() => useKeypressContext(), { wrapper });
+      const { result } = await renderHookWithProviders(() =>
+        useKeypressContext(),
+      );
 
       act(() => result.current.subscribe(keyHandler));
 
@@ -731,7 +735,9 @@ describe('KeypressContext', () => {
 
     it('should preserve user keystrokes around slow split OSC 11 responses', async () => {
       const keyHandler = vi.fn();
-      const { result } = renderHook(() => useKeypressContext(), { wrapper });
+      const { result } = await renderHookWithProviders(() =>
+        useKeypressContext(),
+      );
 
       act(() => result.current.subscribe(keyHandler));
 
@@ -767,7 +773,9 @@ describe('KeypressContext', () => {
 
     it('should ignore repeated fragmented OSC 11 responses', async () => {
       const keyHandler = vi.fn();
-      const { result } = renderHook(() => useKeypressContext(), { wrapper });
+      const { result } = await renderHookWithProviders(() =>
+        useKeypressContext(),
+      );
 
       act(() => result.current.subscribe(keyHandler));
 
@@ -788,7 +796,9 @@ describe('KeypressContext', () => {
 
     it('should preserve user keystrokes around repeated black-background OSC 11 responses', async () => {
       const keyHandler = vi.fn();
-      const { result } = renderHook(() => useKeypressContext(), { wrapper });
+      const { result } = await renderHookWithProviders(() =>
+        useKeypressContext(),
+      );
 
       act(() => result.current.subscribe(keyHandler));
 
@@ -828,7 +838,9 @@ describe('KeypressContext', () => {
 
     it('should ignore bursty black-background OSC 11 responses in a single write', async () => {
       const keyHandler = vi.fn();
-      const { result } = renderHook(() => useKeypressContext(), { wrapper });
+      const { result } = await renderHookWithProviders(() =>
+        useKeypressContext(),
+      );
 
       act(() => result.current.subscribe(keyHandler));
 
@@ -858,7 +870,9 @@ describe('KeypressContext', () => {
 
     it('should ignore highly fragmented OSC 11 responses across repeated ESC timeouts', async () => {
       const keyHandler = vi.fn();
-      const { result } = renderHook(() => useKeypressContext(), { wrapper });
+      const { result } = await renderHookWithProviders(() =>
+        useKeypressContext(),
+      );
 
       act(() => result.current.subscribe(keyHandler));
 
@@ -915,7 +929,9 @@ describe('KeypressContext', () => {
 
     it('should ignore highly fragmented black-background OSC 11 responses terminated by BEL', async () => {
       const keyHandler = vi.fn();
-      const { result } = renderHook(() => useKeypressContext(), { wrapper });
+      const { result } = await renderHookWithProviders(() =>
+        useKeypressContext(),
+      );
 
       act(() => result.current.subscribe(keyHandler));
 
@@ -972,7 +988,9 @@ describe('KeypressContext', () => {
     it('should recover after discarding oversized OSC sequences terminated by BEL after a timeout', async () => {
       const keyHandler = vi.fn();
       const logSpy = vi.spyOn(debugLogger, 'log').mockImplementation(() => {});
-      const { result } = renderHook(() => useKeypressContext(), { wrapper });
+      const { result } = await renderHookWithProviders(() =>
+        useKeypressContext(),
+      );
 
       try {
         act(() => result.current.subscribe(keyHandler));
@@ -1004,7 +1022,9 @@ describe('KeypressContext', () => {
     it('should keep discarding oversized OSC sequences across timeouts until terminated', async () => {
       const keyHandler = vi.fn();
       const logSpy = vi.spyOn(debugLogger, 'log').mockImplementation(() => {});
-      const { result } = renderHook(() => useKeypressContext(), { wrapper });
+      const { result } = await renderHookWithProviders(() =>
+        useKeypressContext(),
+      );
 
       try {
         act(() => result.current.subscribe(keyHandler));
@@ -1040,7 +1060,9 @@ describe('KeypressContext', () => {
     it('should recover after discarding oversized OSC sequences terminated by ESC \\', async () => {
       const keyHandler = vi.fn();
       const logSpy = vi.spyOn(debugLogger, 'log').mockImplementation(() => {});
-      const { result } = renderHook(() => useKeypressContext(), { wrapper });
+      const { result } = await renderHookWithProviders(() =>
+        useKeypressContext(),
+      );
 
       try {
         act(() => result.current.subscribe(keyHandler));
@@ -1069,7 +1091,9 @@ describe('KeypressContext', () => {
 
     it('should ignore slow split OSC 11 terminal background responses terminated by BEL', async () => {
       const keyHandler = vi.fn();
-      const { result } = renderHook(() => useKeypressContext(), { wrapper });
+      const { result } = await renderHookWithProviders(() =>
+        useKeypressContext(),
+      );
 
       act(() => result.current.subscribe(keyHandler));
 

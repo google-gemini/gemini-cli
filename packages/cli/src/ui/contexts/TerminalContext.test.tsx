@@ -95,7 +95,7 @@ describe('TerminalContext', () => {
 
   it('should handle highly fragmented black-background OSC 11 responses terminated by BEL', async () => {
     const handleColor = vi.fn();
-    const { waitUntilReady, unmount } = render(
+    const { waitUntilReady, unmount } = await render(
       <TerminalProvider>
         <TestComponent onColor={handleColor} />
       </TerminalProvider>,
@@ -143,7 +143,7 @@ describe('TerminalContext', () => {
 
   it('should trim oversized noise and still parse a later OSC 11 response', async () => {
     const handleColor = vi.fn();
-    const { waitUntilReady, unmount } = render(
+    const { waitUntilReady, unmount } = await render(
       <TerminalProvider>
         <TestComponent onColor={handleColor} />
       </TerminalProvider>,
