@@ -188,13 +188,12 @@ def main():
                 is_failing = rollup and rollup.get('state') in ['FAILURE', 'ERROR']
                 
                 if not is_conflicting and not is_failing:
-                    status = "Ready for initial review" if not latest_reviewer_activity else "Author responded to feedback"
-                    action = "Needs Reviewer" if not latest_reviewer_activity else "Reviewer follow-up"
+                    status_action = "Ready for initial review. **Needs Reviewer.**" if not latest_reviewer_activity else "Author responded to feedback. **Reviewer follow-up required.**"
                     review_needed_list.append({
                         "issue_md": f"[#{issue_no} {issue_title}]({issue_url})",
                         "pr_no": pr['number'], "pr_url": pr['url'],
                         "reviewers": reviewers, "updated_at": issue['updatedAt'][:10],
-                        "status": status, "action": action
+                        "status_action": status_action
                     })
                     valid_pr_found = True
                     break
@@ -211,22 +210,22 @@ def main():
                         "reason": reason, "author": pr['author']['login'], "days_stale": (now - pr_updated_at).days
                     })
 
-        if not valid_pr_found and not found_open_pr and (now - updated_at).days > STALE_ASSIGNMENT_DAYS:
-            stale_assignments.append({
-                "issue_md": f"[#{issue_no} {issue_title}]({issue_url})",
-                "assignees": assignees, "days_stale": (now - updated_at).days
-            })
+    if not valid_pr_found and not found_open_pr and (now - updated_at).days > STALE_ASSIGNMENT_DAYS:
+        stale_assignments.append({
+            "issue_md": f"[#{issue_no} {issue_title}]({issue_url})",
+            "assignees": assignees, "days_stale": (now - updated_at).days
+        })
 
     # Generate Markdown
     ts = now.strftime("%Y-%m-%d %H:%M")
     md = f"# 🔎 Gemini CLI Triage Dashboard\n\n*Last Synchronized: {ts} (UTC)*\n\n"
     
     md += "## ✅ Needs Review\nPull Requests that are passing tests, have no conflicts, and are waiting for reviewer action.\n\n"
-    md += "| Issue | Linked PR | Reviewers | Status | Action |\n| :--- | :--- | :--- | :--- | :--- |\n"
+    md += "| Issue | Linked PR | Reviewers | Status & Action |\n| :--- | :--- | :--- | :--- |\n"
     for i in review_needed_list:
         revs = ", ".join([f"@{r}" for r in i['reviewers']]) if i['reviewers'] else "_None_"
-        md += f"| {i['issue_md']} | [#{i['pr_no']}]({i['pr_url']}) | {revs} | {i['status']} | **{i['action']}** |\n"
-    if not review_needed_list: md += "| - | _No issues needing review found._ | - | - | - |\n"
+        md += f"| {i['issue_md']} | [#{i['pr_no']}]({i['pr_url']}) | {revs} | {i['status_action']} |\n"
+    if not review_needed_list: md += "| - | _No issues needing review found._ | - | - |\n"
 
     md += "\n## 🚩 Stale Assignments (No PR)\nAssigned for >{STALE_ASSIGNMENT_DAYS} days with no open Pull Request.\n\n"
     md += "| Issue | Assignee | Days Stale |\n| :--- | :--- | :--- |\n"
@@ -242,7 +241,7 @@ def main():
 
     md += "\n---\n*Dashboard maintained by automated triage script.*"
     with open("REVIEWS.md", "w") as f: f.write(md)
-    print("Generated dashboard with merged columns.")
+    print("Generated dashboard with combined status column.")
 
 if __name__ == "__main__":
     main()
