@@ -70,17 +70,6 @@ export async function buildBwrapArgs(
     bwrapArgs.push(bindFlag, workspace.resolved, workspace.resolved);
   }
 
-  if (resolvedPaths.gitWorktree) {
-    const { worktreeGitDir, mainGitDir } = resolvedPaths.gitWorktree;
-    // Support git worktrees/submodules; read-only to prevent malicious hook/config modification (RCE).
-    if (worktreeGitDir) {
-      bwrapArgs.push('--ro-bind-try', worktreeGitDir, worktreeGitDir);
-    }
-    if (mainGitDir) {
-      bwrapArgs.push('--ro-bind-try', mainGitDir, mainGitDir);
-    }
-  }
-
   for (const includeDir of resolvedPaths.globalIncludes) {
     bwrapArgs.push('--ro-bind-try', includeDir, includeDir);
   }
@@ -111,6 +100,18 @@ export async function buildBwrapArgs(
     bwrapArgs.push('--ro-bind', filePath, filePath);
     if (realPath !== filePath) {
       bwrapArgs.push('--ro-bind', realPath, realPath);
+    }
+  }
+
+  // Grant read-only access to git worktrees/submodules. We do this last in order to
+  // ensure that these rules aren't overwritten by broader write policies.
+  if (resolvedPaths.gitWorktree) {
+    const { worktreeGitDir, mainGitDir } = resolvedPaths.gitWorktree;
+    if (worktreeGitDir) {
+      bwrapArgs.push('--ro-bind-try', worktreeGitDir, worktreeGitDir);
+    }
+    if (mainGitDir) {
+      bwrapArgs.push('--ro-bind-try', mainGitDir, mainGitDir);
     }
   }
 

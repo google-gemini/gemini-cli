@@ -375,4 +375,25 @@ describe.skipIf(os.platform() === 'win32')('buildBwrapArgs', () => {
 
     expect(args[args.indexOf(worktreeGitDir) - 1]).toBe('--ro-bind-try');
   });
+
+  it('git worktree read-only bindings should override previous policyWrite bindings', async () => {
+    const worktreeGitDir = '/custom/worktree/.git';
+
+    const args = await buildBwrapArgs({
+      ...defaultOptions,
+      resolvedPaths: createResolvedPaths({
+        policyWrite: ['/custom/worktree'],
+        gitWorktree: {
+          worktreeGitDir,
+        },
+      }),
+    });
+
+    const writeBindIndex = args.indexOf('/custom/worktree');
+    const worktreeBindIndex = args.lastIndexOf(worktreeGitDir);
+
+    expect(writeBindIndex).toBeGreaterThan(-1);
+    expect(worktreeBindIndex).toBeGreaterThan(-1);
+    expect(worktreeBindIndex).toBeGreaterThan(writeBindIndex);
+  });
 });

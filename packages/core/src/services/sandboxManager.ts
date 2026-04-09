@@ -399,15 +399,11 @@ export async function resolveSandboxPaths(
   );
   const forbiddenIdentities = new Set(forbidden.map(getPathIdentity));
 
-  const gitWorktreePaths = await resolveGitWorktreePaths(resolvedWorkspace);
-  const gitWorktree = gitWorktreePaths.worktreeGitDir
-    ? {
-        gitWorktree: {
-          worktreeGitDir: gitWorktreePaths.worktreeGitDir,
-          mainGitDir: gitWorktreePaths.mainGitDir,
-        },
-      }
-    : {};
+  const { worktreeGitDir, mainGitDir } =
+    await resolveGitWorktreePaths(resolvedWorkspace);
+  const gitWorktree = worktreeGitDir
+    ? { gitWorktree: { worktreeGitDir, mainGitDir } }
+    : undefined;
 
   /**
    * Filters out any paths that are explicitly forbidden or match the workspace root (original or resolved).

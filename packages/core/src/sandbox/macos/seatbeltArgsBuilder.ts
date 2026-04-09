@@ -170,6 +170,18 @@ export function buildSeatbeltProfile(options: SeatbeltArgsOptions): string {
     }
   }
 
+  // Grant read-only access to git worktrees/submodules. We do this last in order to
+  // ensure that these rules aren't overwritten by broader write policies.
+  if (resolvedPaths.gitWorktree) {
+    const { worktreeGitDir, mainGitDir } = resolvedPaths.gitWorktree;
+    if (worktreeGitDir) {
+      profile += `(deny file-write* (subpath "${escapeSchemeString(worktreeGitDir)}"))\n`;
+    }
+    if (mainGitDir) {
+      profile += `(deny file-write* (subpath "${escapeSchemeString(mainGitDir)}"))\n`;
+    }
+  }
+
   // Add explicit deny rules for secret files (.env, .env.*) in the workspace and allowed paths.
   // We use regex rules to avoid expensive file discovery scans.
   // Anchoring to workspace/allowed paths to avoid over-blocking.
