@@ -48,6 +48,10 @@ vi.mock('node:fs', () => {
     writeFileSync: vi.fn((path: string, data: string) => {
       mockFileSystem.set(path, data);
     }),
+    appendFileSync: vi.fn((path: string, data: string) => {
+      const current = mockFileSystem.get(path) || '';
+      mockFileSystem.set(path, current + data);
+    }),
     readFileSync: vi.fn((path: string) => {
       if (mockFileSystem.has(path)) {
         return mockFileSystem.get(path);
@@ -1082,8 +1086,10 @@ describe('GeminiChat', () => {
       );
 
       const { default: fs } = await import('node:fs');
-      const writeFileSync = vi.mocked(fs.writeFileSync);
-      const writeCountBefore = writeFileSync.mock.calls.length;
+      const appendFileSync = vi.mocked(fs.appendFileSync);
+      const writeCountBefore = appendFileSync.mock.calls.length;
+
+      await chat.initialize();
 
       const stream = await chat.sendMessageStream(
         { model: 'test-model' },
@@ -1096,17 +1102,19 @@ describe('GeminiChat', () => {
         // consume
       }
 
-      const newWrites = writeFileSync.mock.calls.slice(writeCountBefore);
+      const newWrites = appendFileSync.mock.calls.slice(writeCountBefore);
       expect(newWrites.length).toBeGreaterThan(0);
 
-      const lastWriteData = JSON.parse(
-        newWrites[newWrites.length - 1][1] as string,
-      ) as { messages: Array<{ type: string }> };
+      const geminiWrite = newWrites.find((w) => {
+        try {
+          const data = JSON.parse(w[1] as string);
+          return data.type === 'gemini';
+        } catch {
+          return false;
+        }
+      });
 
-      const geminiMessages = lastWriteData.messages.filter(
-        (m) => m.type === 'gemini',
-      );
-      expect(geminiMessages.length).toBeGreaterThan(0);
+      expect(geminiWrite).toBeDefined();
     });
   });
 

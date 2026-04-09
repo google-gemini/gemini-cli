@@ -63,6 +63,10 @@ vi.mock('node:fs', () => {
     writeFileSync: vi.fn((path: string, data: string) => {
       mockFileSystem.set(path, data);
     }),
+    appendFileSync: vi.fn((path: string, data: string) => {
+      const current = mockFileSystem.get(path) || '';
+      mockFileSystem.set(path, current + data);
+    }),
     readFileSync: vi.fn((path: string) => {
       if (mockFileSystem.has(path)) {
         return mockFileSystem.get(path);
