@@ -20,7 +20,6 @@
 
 import { execSync } from 'node:child_process';
 import fs from 'node:fs';
-import { minimatch } from 'minimatch';
 
 const CORE_STEERING_PATHS = [
   'packages/core/src/prompts/',
@@ -36,6 +35,24 @@ const STEERING_SIGNATURES = [
   'inputSchema',
   "kind: 'local'",
 ];
+
+/**
+ * Simple dependency-free glob matcher for suites.json patterns.
+ * Supports: path/to/file.ts, path/to/*.ts, and path/to/**
+ */
+function matchesPattern(file, pattern) {
+  if (pattern.endsWith('/**')) {
+    return file.startsWith(pattern.slice(0, -3));
+  }
+  if (pattern.includes('*')) {
+    // Escape regex special characters except '*'
+    const escaped = pattern.replace(/[.+^${}()|[\]\\]/g, '\\$&');
+    // Convert glob '*' to regex '[^/]*'
+    const regex = new RegExp('^' + escaped.replace(/\\\*/g, '[^/]*') + '$');
+    return regex.test(file);
+  }
+  return file === pattern;
+}
 
 function main() {
   const targetBranch = process.env.GITHUB_BASE_REF || 'main';
@@ -139,7 +156,7 @@ function main() {
         for (const [suiteName, suite] of Object.entries(suitesConfig)) {
           if (suiteName === 'allowedOverlaps' || !suite.patterns) continue;
 
-          if (suite.patterns.some((pattern) => minimatch(file, pattern))) {
+          if (suite.patterns.some((pattern) => matchesPattern(file, pattern))) {
             affectedSuites.add(suiteName);
             const isTestFile = file.endsWith('.eval.ts');
             const rationale = isTestFile
