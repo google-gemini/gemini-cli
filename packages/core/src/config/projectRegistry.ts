@@ -83,17 +83,30 @@ export class ProjectRegistry {
       await fs.promises.mkdir(dir, { recursive: true });
     }
 
-    try {
-      const content = JSON.stringify(data, null, 2);
-      // Use a randomized tmp path to avoid ENOENT crashes when save() is called concurrently
-      const tmpPath = this.registryPath + '.' + randomUUID() + '.tmp';
-      await fs.promises.writeFile(tmpPath, content, 'utf8');
-      await fs.promises.rename(tmpPath, this.registryPath);
-    } catch (error) {
-      debugLogger.error(
-        `Failed to save project registry to ${this.registryPath}:`,
-        error,
-      );
+    let attempt = 0;
+    const maxAttempts = 5;
+    const retryDelayMs = 100;
+
+    while (attempt < maxAttempts) {
+      try {
+        const content = JSON.stringify(data, null, 2);
+        // Use a randomized tmp path to avoid ENOENT crashes when save() is called concurrently
+        const tmpPath = this.registryPath + '.' + randomUUID() + '.tmp';
+        await fs.promises.writeFile(tmpPath, content, 'utf8');
+        await fs.promises.rename(tmpPath, this.registryPath);
+        return; // Success
+      } catch (error) {
+        attempt++;
+        if (attempt >= maxAttempts) {
+          debugLogger.error(
+            `Failed to save project registry to ${this.registryPath} after ${maxAttempts} attempts:`,
+            error,
+          );
+        } else {
+          // Wait before retrying (exponential backoff could be used here too)
+          await new Promise((resolve) => setTimeout(resolve, retryDelayMs));
+        }
+      }
     }
   }
 
