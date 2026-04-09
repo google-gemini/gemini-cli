@@ -145,7 +145,7 @@ Search for duplicates using `gh issue list --search "<keywords>" --repo <owner/r
 Review the issue comments to see if a community member has already identified the root cause.
 - Determine if it should be **Help-wanted** (using the Categorization Guide) and explain why in your summary. 
 - If you categorized the issue as **Help-wanted**, run `gh issue edit <issue_url> --remove-label "status/need-triage" --add-label "help wanted"`. 
-- If it does not fit **Help-wanted**, simply run `gh issue edit <issue_url> --remove-label "status/need-triage"` to mark it triaged without a specific whitelist label.
+- If it does not fit **Help-wanted**, you must still explain *why* it requires maintainer attention or why it's not a good fit for community contribution (e.g., "This issue touches core architecture and requires significant maintainer review time"). Simply run `gh issue edit <issue_url> --remove-label "status/need-triage"` to mark it triaged without a specific whitelist label.
 - Action: `gh issue comment <issue_url> --body "### Triage Summary\n\n<your summary>"`
 - **STOP EXECUTION**.
 
