@@ -37,6 +37,7 @@ export class HistoryTruncationProcessor implements ContextProcessor {
     },
   };
 
+  readonly componentType = 'processor';
   readonly id = 'HistoryTruncationProcessor';
   readonly name = 'HistoryTruncationProcessor';
   private readonly env: ContextEnvironment;

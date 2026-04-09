@@ -11,7 +11,7 @@ import { SchemaValidator } from '../../utils/schemaValidator.js';
 import { getSidecarConfigSchema } from './schema.js';
 import type { IFileSystem } from '../system/IFileSystem.js';
 import { NodeFileSystem } from '../system/NodeFileSystem.js';
-import type { ProcessorRegistry } from './registry.js';
+import type { SidecarRegistry } from './registry.js';
 
 export class SidecarLoader {
   /**
@@ -20,7 +20,7 @@ export class SidecarLoader {
    */
   static loadFromFile(
     sidecarPath: string,
-    registry: ProcessorRegistry,
+    registry: SidecarRegistry,
     fileSystem: IFileSystem = new NodeFileSystem(),
   ): SidecarConfig {
     const fileContent = fileSystem.readFileSync(sidecarPath, 'utf8');
@@ -66,7 +66,7 @@ export class SidecarLoader {
    */
   static fromConfig(
     config: Config,
-    registry: ProcessorRegistry,
+    registry: SidecarRegistry,
     fileSystem: IFileSystem = new NodeFileSystem(),
   ): SidecarConfig {
     const sidecarPath = config.getExperimentalContextSidecarConfig();

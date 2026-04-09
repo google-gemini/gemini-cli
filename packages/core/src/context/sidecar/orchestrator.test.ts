@@ -6,7 +6,7 @@
 
 import { describe, it, expect, beforeEach, vi, afterEach } from 'vitest';
 import { PipelineOrchestrator } from './orchestrator.js';
-import { ProcessorRegistry } from './registry.js';
+import { SidecarRegistry } from './registry.js';
 import {
   createMockEnvironment,
   createDummyNode,
@@ -67,26 +67,26 @@ class ThrowingProcessor implements ContextProcessor {
 describe('PipelineOrchestrator (Component)', () => {
   let env: ContextEnvironment;
   let eventBus: ContextEventBus;
-  let registry: ProcessorRegistry;
+  let registry: SidecarRegistry;
 
   beforeEach(() => {
     vi.resetAllMocks();
     env = createMockEnvironment();
     eventBus = env.eventBus;
-    registry = new ProcessorRegistry();
+    registry = new SidecarRegistry();
 
     // Register our test processors
-    registry.register({
+    registry.registerProcessor({
       id: 'DummySyncProcessor',
       schema: {},
       create: () => new DummySyncProcessor(),
     });
-    registry.register({
+    registry.registerProcessor({
       id: 'DummyAsyncProcessor',
       schema: {},
       create: () => new DummyAsyncProcessor(),
     });
-    registry.register({
+    registry.registerProcessor({
       id: 'ThrowingProcessor',
       schema: {},
       create: () => new ThrowingProcessor(),

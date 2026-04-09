@@ -32,6 +32,7 @@ export class StateSnapshotProcessor implements ContextProcessor {
     return new StateSnapshotProcessor(env, options);
   }
 
+  readonly componentType = 'processor';
   readonly id = 'StateSnapshotProcessor';
   readonly name = 'StateSnapshotProcessor';
   readonly options: StateSnapshotProcessorOptions;

@@ -15,7 +15,7 @@ import type {
   ContextEventBus,
   ContextTracer,
 } from './environment.js';
-import type { ProcessorRegistry } from './registry.js';
+import type { SidecarRegistry } from './registry.js';
 import { debugLogger } from '../../utils/debugLogger.js';
 import { InboxSnapshotImpl } from './inbox.js';
 import type { ContextWorkingBuffer } from '../pipeline.js';
@@ -63,7 +63,7 @@ export class PipelineOrchestrator {
     private readonly env: ContextEnvironment,
     private readonly eventBus: ContextEventBus,
     private readonly tracer: ContextTracer,
-    private readonly registry: ProcessorRegistry,
+    private readonly registry: SidecarRegistry,
   ) {
     this.instantiateProcessors();
     this.instantiateWorkers();
@@ -71,7 +71,7 @@ export class PipelineOrchestrator {
   }
 
   private isNodeAllowed(
-    node: import('../ir/types.js').ConcreteNode,
+    node: ConcreteNode,
     triggerTargets: ReadonlySet<string>,
     protectedLogicalIds: ReadonlySet<string> = new Set(),
   ): boolean {
@@ -87,7 +87,7 @@ export class PipelineOrchestrator {
     for (const pipeline of this.config.pipelines) {
       for (const procDef of pipeline.processors) {
         if (!this.instantiatedProcessors.has(procDef.processorId)) {
-          const factory = this.registry.get(procDef.processorId);
+          const factory = this.registry.getProcessor(procDef.processorId);
           const instance = factory.create(
             this.env,
             procDef.options || {},
@@ -102,11 +102,11 @@ export class PipelineOrchestrator {
     if (!this.config.workers) return;
     for (const workerDef of this.config.workers) {
       if (!this.instantiatedWorkers.has(workerDef.workerId)) {
-        const factory = this.registry.get(workerDef.workerId);
+        const factory = this.registry.getWorker(workerDef.workerId);
         const instance = factory.create(
           this.env,
           workerDef.options || {},
-        ) as unknown as ContextWorker;
+        );
         this.instantiatedWorkers.set(workerDef.workerId, instance);
       }
     }
@@ -149,7 +149,7 @@ export class PipelineOrchestrator {
       for (const worker of this.instantiatedWorkers.values()) {
         if (worker.triggers.onNodesAdded) {
           const inboxSnapshot = new InboxSnapshotImpl(
-            this.env.inbox?.getMessages() || [],
+            this.env.inbox.getMessages() || [],
           );
           const targets = event.nodes.filter(n => event.targetNodeIds.has(n.id));
           // Fire and forget
@@ -165,7 +165,7 @@ export class PipelineOrchestrator {
       for (const worker of this.instantiatedWorkers.values()) {
         if (worker.triggers.onNodesAgedOut) {
           const inboxSnapshot = new InboxSnapshotImpl(
-            this.env.inbox?.getMessages() || [],
+            this.env.inbox.getMessages() || [],
           );
           const targets = event.nodes.filter(n => event.targetNodeIds.has(n.id));
           // Fire and forget
@@ -249,7 +249,7 @@ export class PipelineOrchestrator {
 
     // Freeze the inbox for this pipeline run
     const inboxSnapshot = new InboxSnapshotImpl(
-      this.env.inbox?.getMessages() || [],
+      this.env.inbox.getMessages() || [],
     );
 
     for (const pipeline of pipelines) {
@@ -288,7 +288,7 @@ export class PipelineOrchestrator {
     }
 
     // Success! Drain consumed messages
-    this.env.inbox?.drainConsumed(inboxSnapshot.getConsumedIds());
+    this.env.inbox.drainConsumed(inboxSnapshot.getConsumedIds());
 
     return currentNodes;
   }
@@ -307,7 +307,7 @@ export class PipelineOrchestrator {
 
     let currentNodes = nodes;
     const inboxSnapshot = new InboxSnapshotImpl(
-      this.env.inbox?.getMessages() || [],
+      this.env.inbox.getMessages() || [],
     );
 
     for (const procDef of pipeline.processors) {
@@ -344,6 +344,6 @@ export class PipelineOrchestrator {
       }
     }
 
-    this.env.inbox?.drainConsumed(inboxSnapshot.getConsumedIds());
+    this.env.inbox.drainConsumed(inboxSnapshot.getConsumedIds());
   }
 }

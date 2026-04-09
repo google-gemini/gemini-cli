@@ -14,7 +14,7 @@ import { ContextEventBus } from '../eventBus.js';
 import { PipelineOrchestrator } from '../sidecar/orchestrator.js';
 import { registerBuiltInProcessors } from '../sidecar/builtins.js';
 import { debugLogger } from '../../utils/debugLogger.js';
-import { ProcessorRegistry } from '../sidecar/registry.js';
+import { SidecarRegistry } from '../sidecar/registry.js';
 import { DeterministicIdGenerator } from '../system/DeterministicIdGenerator.js';
 import { InMemoryFileSystem } from '../system/InMemoryFileSystem.js';
 import type { BaseLlmClient } from '../../core/baseLlmClient.js';
@@ -57,7 +57,7 @@ export class SimulationHarness {
     mockTempDir: string,
   ) {
     this.config = config;
-    const registry = new ProcessorRegistry();
+    const registry = new SidecarRegistry();
     // Register all standard processors
     registerBuiltInProcessors(registry);
 

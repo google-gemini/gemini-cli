@@ -16,7 +16,7 @@ import { PipelineOrchestrator } from './sidecar/orchestrator.js';
 import { HistoryObserver } from './historyObserver.js';
 import { IrProjector } from './ir/projector.js';
 import { registerBuiltInProcessors } from './sidecar/builtins.js';
-import { ProcessorRegistry } from './sidecar/registry.js';
+import { SidecarRegistry } from './sidecar/registry.js';
 
 export class ContextManager {
   // The stateful, pristine flat graph.
@@ -33,10 +33,10 @@ export class ContextManager {
     env: ContextEnvironment,
     tracer: ContextTracer,
     orchestrator?: PipelineOrchestrator,
-    registry?: ProcessorRegistry,
+    registry?: SidecarRegistry,
   ): ContextManager {
     if (!registry) {
-      registry = new ProcessorRegistry();
+      registry = new SidecarRegistry();
       registerBuiltInProcessors(registry);
     }
     const orch =

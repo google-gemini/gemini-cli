@@ -82,6 +82,7 @@ export class ToolMaskingProcessor implements ContextProcessor {
     required: ['stringLengthThresholdTokens'],
   };
 
+  readonly componentType = 'processor';
   readonly id = 'ToolMaskingProcessor';
   readonly name = 'ToolMaskingProcessor';
   readonly options: ToolMaskingProcessorOptions;
@@ -147,130 +148,128 @@ export class ToolMaskingProcessor implements ContextProcessor {
     const returnedNodes: ConcreteNode[] = [];
 
     for (const node of targets) {
-      if (node.type !== 'TOOL_EXECUTION') {
-        returnedNodes.push(node);
-        continue;
-      }
-
-      const step = node;
-      const toolName = step.toolName;
-      if (toolName && UNMASKABLE_TOOLS.has(toolName)) {
-        returnedNodes.push(node);
-        continue;
-      }
-
-      const callId = step.id || Date.now().toString();
-
-      const maskAsync = async (
-        obj: MaskableValue,
-        nodeType: string,
-      ): Promise<{ masked: MaskableValue; changed: boolean }> => {
-        if (typeof obj === 'string') {
-          if (obj.length > limitChars && !this.isAlreadyMasked(obj)) {
-            const newString = await handleMasking(
-              obj,
-              toolName || 'unknown',
-              callId,
-              nodeType,
-            );
-            return { masked: newString, changed: true };
+      switch (node.type) {
+        case 'TOOL_EXECUTION': {
+          const toolName = node.toolName;
+          if (toolName && UNMASKABLE_TOOLS.has(toolName)) {
+            returnedNodes.push(node);
+            break;
           }
-          return { masked: obj, changed: false };
-        }
-        if (Array.isArray(obj)) {
-          let changed = false;
-          const masked: MaskableValue[] = [];
-          for (const item of obj) {
-            const res = await maskAsync(item, nodeType);
-            if (res.changed) changed = true;
-            masked.push(res.masked);
-          }
-          return { masked, changed };
-        }
-        if (typeof obj === 'object' && obj !== null) {
-          let changed = false;
-          const masked: Record<string, MaskableValue> = {};
-          for (const [key, value] of Object.entries(obj)) {
-            const res = await maskAsync(value, nodeType);
-            if (res.changed) changed = true;
-            masked[key] = res.masked;
-          }
-          return { masked, changed };
-        }
-        return { masked: obj, changed: false };
-      };
 
-      const rawIntent = step.intent;
-      const rawObs = step.observation;
+          const callId = node.id || Date.now().toString();
 
-      if (!isMaskableRecord(rawIntent)) {
-        returnedNodes.push(node);
-        continue;
-      }
-      if (!isMaskableValue(rawObs)) {
-        returnedNodes.push(node);
-        continue;
-      }
-
-      const intentRes = await maskAsync(rawIntent, 'intent');
-      const obsRes = await maskAsync(rawObs, 'observation');
-
-      if (intentRes.changed || obsRes.changed) {
-        const maskedIntent = isMaskableRecord(intentRes.masked)
-          ? (intentRes.masked as Record<string, unknown>)
-          : undefined;
-        // Handle observation explicitly as string vs object
-        const maskedObs = typeof obsRes.masked === 'string'
-          ? { message: obsRes.masked } as Record<string, unknown>
-          : isMaskableRecord(obsRes.masked) 
-             ? (obsRes.masked as Record<string, unknown>) 
-             : undefined;
-
-        const newIntentTokens = this.env.tokenCalculator.estimateTokensForParts([
-          {
-            functionCall: {
-              name: toolName || 'unknown',
-              args: maskedIntent,
-              id: callId,
-            },
-          },
-        ]);
-        
-        let obsPart: any = {};
-        if (maskedObs) {
-           obsPart = {
-              functionResponse: {
-                name: toolName || 'unknown',
-                response: maskedObs,
-                id: callId
+          const maskAsync = async (
+            obj: MaskableValue,
+            nodeType: string,
+          ): Promise<{ masked: MaskableValue; changed: boolean }> => {
+            if (typeof obj === 'string') {
+              if (obj.length > limitChars && !this.isAlreadyMasked(obj)) {
+                const newString = await handleMasking(
+                  obj,
+                  toolName || 'unknown',
+                  callId,
+                  nodeType,
+                );
+                return { masked: newString, changed: true };
               }
-           };
-        }
-        
-        const newObsTokens = this.env.tokenCalculator.estimateTokensForParts([obsPart]);
-
-        const tokensSaved =
-          this.env.tokenCalculator.getTokenCost(step) -
-          (newIntentTokens + newObsTokens);
-
-        if (tokensSaved > 0) {
-          const maskedNode: ToolExecution = {
-            ...step,
-            id: this.env.idGenerator.generateId(), // Modified, so generate new ID
-            intent: maskedIntent ?? step.intent,
-            observation: maskedObs ?? step.observation,
-            tokens: {
-              intent: newIntentTokens,
-              observation: newObsTokens,
-            },
+              return { masked: obj, changed: false };
+            }
+            if (Array.isArray(obj)) {
+              let changed = false;
+              const masked: MaskableValue[] = [];
+              for (const item of obj) {
+                const res = await maskAsync(item, nodeType);
+                if (res.changed) changed = true;
+                masked.push(res.masked);
+              }
+              return { masked, changed };
+            }
+            if (typeof obj === 'object' && obj !== null) {
+              let changed = false;
+              const masked: Record<string, MaskableValue> = {};
+              for (const [key, value] of Object.entries(obj)) {
+                const res = await maskAsync(value, nodeType);
+                if (res.changed) changed = true;
+                masked[key] = res.masked;
+              }
+              return { masked, changed };
+            }
+            return { masked: obj, changed: false };
           };
 
-          returnedNodes.push(maskedNode);
-        } else {
-          returnedNodes.push(node);
+          const rawIntent = node.intent;
+          const rawObs = node.observation;
+
+          if (!isMaskableRecord(rawIntent) || !isMaskableValue(rawObs)) {
+            returnedNodes.push(node);
+            break;
+          }
+
+          const intentRes = await maskAsync(rawIntent, 'intent');
+          const obsRes = await maskAsync(rawObs, 'observation');
+
+          if (intentRes.changed || obsRes.changed) {
+            const maskedIntent = isMaskableRecord(intentRes.masked)
+              ? (intentRes.masked as Record<string, unknown>)
+              : undefined;
+            // Handle observation explicitly as string vs object
+            const maskedObs = typeof obsRes.masked === 'string'
+              ? { message: obsRes.masked } as Record<string, unknown>
+              : isMaskableRecord(obsRes.masked) 
+                 ? (obsRes.masked as Record<string, unknown>) 
+                 : undefined;
+
+            const newIntentTokens = this.env.tokenCalculator.estimateTokensForParts([
+              {
+                functionCall: {
+                  name: toolName || 'unknown',
+                  args: maskedIntent,
+                  id: callId,
+                },
+              },
+            ]);
+            
+            let obsPart: any = {};
+            if (maskedObs) {
+               obsPart = {
+                  functionResponse: {
+                    name: toolName || 'unknown',
+                    response: maskedObs,
+                    id: callId
+                  }
+               };
+            }
+            
+            const newObsTokens = this.env.tokenCalculator.estimateTokensForParts([obsPart]);
+
+            const tokensSaved =
+              this.env.tokenCalculator.getTokenCost(node) -
+              (newIntentTokens + newObsTokens);
+
+            if (tokensSaved > 0) {
+              const maskedNode: ToolExecution = {
+                ...node,
+                id: this.env.idGenerator.generateId(), // Modified, so generate new ID
+                intent: maskedIntent ?? node.intent,
+                observation: maskedObs ?? node.observation,
+                tokens: {
+                  intent: newIntentTokens,
+                  observation: newObsTokens,
+                },
+              };
+
+              returnedNodes.push(maskedNode);
+            } else {
+              returnedNodes.push(node);
+            }
+          } else {
+            returnedNodes.push(node);
+          }
+          break;
         }
-      } else {
-        returnedNodes.push(node);
+        default:
+          returnedNodes.push(node);
+          break;
       }
     }
 

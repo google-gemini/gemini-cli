@@ -46,7 +46,7 @@ describe('NodeDistillationProcessor', () => {
     const targets = [prompt, thought, tool];
 
     const result = await processor.process({
-      buffer: {} as unknown as import('../pipeline.js').ContextWorkingBuffer,
+      buffer: {} as any as any,
       targets,
       inbox: {} as any,
     });
@@ -99,7 +99,7 @@ describe('NodeDistillationProcessor', () => {
     const targets = [prompt, thought];
 
     const result = await processor.process({
-      buffer: {} as unknown as import('../pipeline.js').ContextWorkingBuffer,
+      buffer: {} as any as any,
       targets,
       inbox: {} as any,
     });

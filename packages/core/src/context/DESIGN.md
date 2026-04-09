@@ -20,7 +20,7 @@ The architecture is built upon seven core principles that distinguish it from th
 4.  **Configurability:** Driven by a typed JSON "Sidecar" configuration. Token ceilings, fallback strategies, and processing pipelines are entirely data-driven.
 5.  **Pluggability:** `ContextProcessor`s are isolated plugins with typed schemas. They are registered via Dependency Injection and can be arranged into arbitrary pipelines.
 6.  **Debuggability:** A built-in `ContextTracer` tracks every step of the pipeline, providing full audit trails of exactly when, why, and how a message was altered.
-7.  **Testability:** Global state has been eliminated. The system uses strict Dependency Injection (`ProcessorRegistry`, `ContextEnvironment`, `ContextEventBus`), making every layer easily unit-testable.
+7.  **Testability:** Global state has been eliminated. The system uses strict Dependency Injection (`SidecarRegistry`, `ContextEnvironment`, `ContextEventBus`), making every layer easily unit-testable.
 8.  **Orthogonality via Targets:** Processors do not implicitly scan the entire history graph. The `ContextManager` computes exact Deltas (e.g., new nodes just added, or specific nodes that just aged out of the retained buffer). Processors are sandboxed by the `EpisodeEditor` to only iterate over and mutate these specific `targetNodes`, ensuring surgical and highly efficient reductions.
 
 ---

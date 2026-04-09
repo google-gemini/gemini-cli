@@ -14,10 +14,10 @@ export class ContextManager {
     env: ContextEnvironment,
     tracer: ContextTracer,
     orchestrator?: PipelineOrchestrator,
-    registry?: ProcessorRegistry,
+    registry?: SidecarRegistry,
   ): ContextManager {
     if (!registry) {
-      registry = new ProcessorRegistry();
+      registry = new SidecarRegistry();
       registerBuiltInProcessors(registry);
     }
     const orch =

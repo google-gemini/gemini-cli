@@ -1,5 +1,5 @@
 import type { Part } from '@google/genai';
-import type { IrNodeBehavior } from './behaviorRegistry.js';
+import type { IrNodeBehavior, IrNodeBehaviorRegistry } from './behaviorRegistry.js';
 import type {
   UserPrompt,
   AgentThought,
@@ -110,7 +110,7 @@ export const RollingSummaryBehavior: IrNodeBehavior<RollingSummary> = {
   }
 };
 
-export function registerBuiltInBehaviors(registry: import('./behaviorRegistry.js').IrNodeBehaviorRegistry) {
+export function registerBuiltInBehaviors(registry: IrNodeBehaviorRegistry) {
   registry.register(UserPromptBehavior);
   registry.register(AgentThoughtBehavior);
   registry.register(ToolExecutionBehavior);

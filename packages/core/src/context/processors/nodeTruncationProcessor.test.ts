@@ -48,7 +48,7 @@ describe('NodeTruncationProcessor', () => {
     const targets = [prompt, thought, yieldNode];
 
     const result = await processor.process({
-      buffer: {} as unknown as import('../pipeline.js').ContextWorkingBuffer,
+      buffer: {} as any as any,
       targets,
       inbox: {} as any,
     });
@@ -106,7 +106,7 @@ describe('NodeTruncationProcessor', () => {
     const targets = [prompt, thought];
 
     const result = await processor.process({
-      buffer: {} as unknown as import('../pipeline.js').ContextWorkingBuffer,
+      buffer: {} as any as any,
       targets,
       inbox: {} as any,
     });

@@ -30,6 +30,7 @@ export class RollingSummaryProcessor implements ContextProcessor {
     return new RollingSummaryProcessor(env, options);
   }
 
+  readonly componentType = 'processor';
   readonly id = 'RollingSummaryProcessor';
   readonly name = 'RollingSummaryProcessor';
   readonly options: RollingSummaryProcessorOptions;

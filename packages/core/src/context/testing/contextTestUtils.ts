@@ -18,7 +18,7 @@ import { ContextTokenCalculator } from '../utils/contextTokenCalculator.js';
 import { IrNodeBehaviorRegistry } from '../ir/behaviorRegistry.js';
 import { registerBuiltInBehaviors } from '../ir/builtinBehaviors.js';
 import { IrMapper } from '../ir/mapper.js';
-import { ProcessorRegistry } from '../sidecar/registry.js';
+import { SidecarRegistry } from '../sidecar/registry.js';
 import { registerBuiltInProcessors } from '../sidecar/builtins.js';
 import type { ConcreteNode, ToolExecution } from '../ir/types.js';
 import type { ContextEnvironment } from '../sidecar/environment.js';
@@ -191,7 +191,7 @@ export function setupContextComponentTest(
   sidecarOverride?: import('../sidecar/types.js').SidecarConfig,
 ) {
   const chatHistory = new AgentChatHistory();
-  const registry = new ProcessorRegistry();
+  const registry = new SidecarRegistry();
   registerBuiltInProcessors(registry);
   const sidecar = sidecarOverride || SidecarLoader.fromConfig(config, registry);
   const tracer = new ContextTracer({

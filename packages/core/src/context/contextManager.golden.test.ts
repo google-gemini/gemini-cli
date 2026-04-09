@@ -22,7 +22,7 @@ import type { Content } from '@google/genai';
 import type { BaseLlmClient } from '../core/baseLlmClient.js';
 import type { Episode } from './ir/types.js';
 import type { SidecarConfig } from './sidecar/types.js';
-import { ProcessorRegistry } from './sidecar/registry.js';
+import { SidecarRegistry } from './sidecar/registry.js';
 import { registerBuiltInProcessors } from './sidecar/builtins.js';
 import { createMockContextConfig, setupContextComponentTest } from './testing/contextTestUtils.js';
 
@@ -74,7 +74,7 @@ describe('ContextManager Golden Tests', () => {
       }),
     };
 
-    const registry = new ProcessorRegistry();
+    const registry = new SidecarRegistry();
     registerBuiltInProcessors(registry);
 
     const sidecar = SidecarLoader.fromConfig(mockConfig, registry);

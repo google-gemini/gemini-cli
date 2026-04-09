@@ -30,6 +30,7 @@ export class StateSnapshotWorker implements ContextWorker {
     return new StateSnapshotWorker(env, options);
   }
 
+  readonly componentType = 'worker';
   readonly id = 'StateSnapshotWorker';
   readonly name = 'StateSnapshotWorker';
   readonly options: StateSnapshotWorkerOptions;
@@ -79,7 +80,7 @@ export class StateSnapshotWorker implements ContextWorker {
             type: 'SNAPSHOT',
             timestamp: latest.timestamp,
             text: latest.payload.newText,
-          } as import('../ir/types.js').Snapshot;
+          };
 
           nodesToSummarize = [previousStateNode, ...targets];
         }

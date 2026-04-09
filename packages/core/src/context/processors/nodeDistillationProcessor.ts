@@ -9,6 +9,8 @@ import type { ContextEnvironment } from '../sidecar/environment.js';
 import { debugLogger } from '../../utils/debugLogger.js';
 import { getResponseText } from '../../utils/partUtils.js';
 
+import { LlmRole } from '../../telemetry/llmRole.js';
+
 export interface NodeDistillationProcessorOptions {
   nodeThresholdTokens: number;
 }
@@ -32,6 +34,7 @@ export class NodeDistillationProcessor implements ContextProcessor {
     required: ['nodeThresholdTokens'],
   };
 
+  readonly componentType = 'processor';
   readonly id = 'NodeDistillationProcessor';
   readonly name = 'NodeDistillationProcessor';
   readonly options: NodeDistillationProcessorOptions;
@@ -52,7 +55,7 @@ export class NodeDistillationProcessor implements ContextProcessor {
     try {
       const response = await this.env.llmClient.generateContent(
         {
-          role: 'utility_compressor' as import('../../telemetry/llmRole.js').LlmRole,
+          role: LlmRole.UTILITY_COMPRESSOR,
           modelConfigKey: { model: 'default' },
           promptId: this.env.promptId,
           abortSignal: new AbortController().signal,
@@ -88,117 +91,110 @@ export class NodeDistillationProcessor implements ContextProcessor {
 
     // Scan the target working buffer and unconditionally apply the configured hyperparameter threshold
     for (const node of targets) {
-      // 1. Compress User Prompts
-      if (node.type === 'USER_PROMPT') {
-        const prompt = node;
-        let modified = false;
-        const newParts = [...prompt.semanticParts];
+      switch (node.type) {
+        case 'USER_PROMPT': {
+          let modified = false;
+          const newParts = [...node.semanticParts];
 
-        for (let j = 0; j < prompt.semanticParts.length; j++) {
-          const part = prompt.semanticParts[j];
-          if (part.type !== 'text') continue;
+          for (let j = 0; j < node.semanticParts.length; j++) {
+            const part = node.semanticParts[j];
+            if (part.type !== 'text') continue;
 
-          if (part.text.length > thresholdChars) {
-            const summary = await this.generateSummary(part.text, 'User Prompt');
-            const newTokens = this.env.tokenCalculator.estimateTokensForParts([{ text: summary }]);
-            const oldTokens = this.env.tokenCalculator.estimateTokensForParts([{ text: part.text }]);
-            
-            console.log(`SMOKING GUN (User Prompt): text.length=${part.text.length}, threshold=${thresholdChars}, newTokens=${newTokens}, oldTokens=${oldTokens}, summary='${summary}'`);
+            if (part.text.length > thresholdChars) {
+              const summary = await this.generateSummary(part.text, 'User Prompt');
+              const newTokens = this.env.tokenCalculator.estimateTokensForParts([{ text: summary }]);
+              const oldTokens = this.env.tokenCalculator.estimateTokensForParts([{ text: part.text }]);
 
-            if (newTokens < oldTokens) {
-              newParts[j] = { type: 'text', text: summary };
-              modified = true;
-              console.log('SMOKING GUN (User Prompt): modified=true');
-            } else {
-              console.log('SMOKING GUN (User Prompt): modified=false');
+              if (newTokens < oldTokens) {
+                newParts[j] = { type: 'text', text: summary };
+                modified = true;
+              }
             }
           }
+
+          if (modified) {
+            returnedNodes.push({
+              ...node,
+              id: this.env.idGenerator.generateId(),
+              semanticParts: newParts,
+            });
+          } else {
+            returnedNodes.push(node);
+          }
+          break;
         }
 
-        if (modified) {
-           returnedNodes.push({
-             ...prompt,
-             id: this.env.idGenerator.generateId(),
-             semanticParts: newParts,
-           });
-        } else {
-           returnedNodes.push(node);
-        }
-        continue;
-      }
+        case 'AGENT_THOUGHT': {
+          if (node.text.length > thresholdChars) {
+            const summary = await this.generateSummary(node.text, 'Agent Thought');
+            const newTokens = this.env.tokenCalculator.estimateTokensForParts([{ text: summary }]);
+            const oldTokens = this.env.tokenCalculator.getTokenCost(node);
 
-      // 2. Compress Model Thoughts
-      if (node.type === 'AGENT_THOUGHT') {
-        const thought = node;
-        if (thought.text.length > thresholdChars) {
-           const summary = await this.generateSummary(thought.text, 'Agent Thought');
-           const newTokens = this.env.tokenCalculator.estimateTokensForParts([{ text: summary }]);
-           const oldTokens = this.env.tokenCalculator.getTokenCost(thought);
-
-           if (newTokens < oldTokens) {
-             returnedNodes.push({
-                ...thought,
+            if (newTokens < oldTokens) {
+              returnedNodes.push({
+                ...node,
                 id: this.env.idGenerator.generateId(),
                 text: summary,
-             });
-             continue;
-           }
+              });
+              break;
+            }
+          }
+          returnedNodes.push(node);
+          break;
         }
-        returnedNodes.push(node);
-        continue;
-      }
 
-      // 3. Compress Tool Observations
-      if (node.type === 'TOOL_EXECUTION') {
-         const tool = node;
-         const rawObs = tool.observation;
+        case 'TOOL_EXECUTION': {
+          const rawObs = node.observation;
 
-         let stringifiedObs = '';
-         if (typeof rawObs === 'string') {
+          let stringifiedObs = '';
+          if (typeof rawObs === 'string') {
             stringifiedObs = rawObs;
-         } else {
+          } else {
             try {
               stringifiedObs = JSON.stringify(rawObs);
             } catch {
               stringifiedObs = String(rawObs);
             }
-         }
+          }
 
-         if (stringifiedObs.length > thresholdChars) {
-            const summary = await this.generateSummary(stringifiedObs, tool.toolName || 'unknown');
+          if (stringifiedObs.length > thresholdChars) {
+            const summary = await this.generateSummary(stringifiedObs, node.toolName || 'unknown');
             const newObsObject = { summary };
 
             const newObsTokens = this.env.tokenCalculator.estimateTokensForParts([
               {
                 functionResponse: {
-                  name: tool.toolName || 'unknown',
+                  name: node.toolName || 'unknown',
                   response: newObsObject,
-                  id: tool.id,
+                  id: node.id,
                 },
               },
             ]);
 
-            const oldObsTokens = tool.tokens?.observation ?? this.env.tokenCalculator.getTokenCost(tool);
-            const intentTokens = tool.tokens?.intent ?? 0;
+            const oldObsTokens = node.tokens?.observation ?? this.env.tokenCalculator.getTokenCost(node);
+            const intentTokens = node.tokens?.intent ?? 0;
 
             if (newObsTokens < oldObsTokens) {
-               returnedNodes.push({
-                 ...tool,
-                 id: this.env.idGenerator.generateId(),
-                 observation: newObsObject as Record<string, unknown>,
-                 tokens: {
-                   intent: intentTokens,
-                   observation: newObsTokens,
-                 },
-               });
-               continue;
+              returnedNodes.push({
+                ...node,
+                id: this.env.idGenerator.generateId(),
+                observation: newObsObject as Record<string, unknown>,
+                tokens: {
+                  intent: intentTokens,
+                  observation: newObsTokens,
+                },
+              });
+              break;
             }
-         }
-         returnedNodes.push(node);
-         continue;
-      }
+          }
+          returnedNodes.push(node);
+          break;
+        }
 
-      returnedNodes.push(node);
+        default:
+          returnedNodes.push(node);
+          break;
+      }
     }
 
     return returnedNodes;

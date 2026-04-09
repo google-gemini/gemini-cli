@@ -15,7 +15,7 @@ describe('BlobDegradationProcessor', () => {
   it('should ignore text parts and only target inline_data and file_data', async () => {
     const env = createMockEnvironment();
     // Simulate each part costing 100 tokens, but text costing 10 tokens
-    env.tokenCalculator.estimateTokensForParts = vi.fn((parts: import('@google/genai').Part[]) => {
+    env.tokenCalculator.estimateTokensForParts = vi.fn((parts: any[]) => {
        if (parts[0].text) return 10;
        return 100;
     });
@@ -37,9 +37,9 @@ describe('BlobDegradationProcessor', () => {
     const targets = [prompt];
 
     const result = await processor.process({
-      buffer: {} as unknown as import('../pipeline.js').ContextWorkingBuffer,
+      buffer: {} as any as any,
       targets,
-      inbox: {} as unknown as import('../pipeline.js').InboxSnapshot,
+      inbox: {} as any,
     });
 
     // We modified it, so the ID should change and it should have new metadata
@@ -65,7 +65,7 @@ describe('BlobDegradationProcessor', () => {
   it('should degrade all blobs unconditionally', async () => {
     const env = createMockEnvironment();
 
-    env.tokenCalculator.estimateTokensForParts = vi.fn((parts: import('@google/genai').Part[]) => {
+    env.tokenCalculator.estimateTokensForParts = vi.fn((parts: any[]) => {
        if (parts[0].text) return 10;
        return 100; // saving 90 tokens per degradation
     });
@@ -82,9 +82,9 @@ describe('BlobDegradationProcessor', () => {
     const targets = [prompt];
 
     const result = await processor.process({
-      buffer: {} as unknown as import('../pipeline.js').ContextWorkingBuffer,
+      buffer: {} as any as any,
       targets,
-      inbox: {} as unknown as import('../pipeline.js').InboxSnapshot,
+      inbox: {} as any,
     });
 
     const modifiedPrompt = result[0] as UserPrompt;
@@ -99,12 +99,12 @@ describe('BlobDegradationProcessor', () => {
     const env = createMockEnvironment();
 
     const processor = BlobDegradationProcessor.create(env, {});
-    const targets: import("../ir/types.js").ConcreteNode[] = [];
+    const targets: any[] = [];
 
     const result = await processor.process({
-      buffer: {} as unknown as import('../pipeline.js').ContextWorkingBuffer,
+      buffer: {} as any as any,
       targets,
-      inbox: {} as unknown as import('../pipeline.js').InboxSnapshot,
+      inbox: {} as any,
     });
 
     // Should return the exact array ref

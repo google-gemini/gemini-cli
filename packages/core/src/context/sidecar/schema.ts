@@ -4,10 +4,10 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import type { ProcessorRegistry } from './registry.js';
+import type { SidecarRegistry } from './registry.js';
 import './builtins.js';
 
-export function getSidecarConfigSchema(registry: ProcessorRegistry) {
+export function getSidecarConfigSchema(registry: SidecarRegistry) {
   return {
     $schema: 'http://json-schema.org/draft-07/schema#',
     title: 'SidecarConfig',

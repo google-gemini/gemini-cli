@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { ProcessorRegistry } from './registry.js';
+import { SidecarRegistry } from './registry.js';
 import { registerBuiltInProcessors } from './builtins.js';
 import { describe, it, expect, beforeEach } from 'vitest';
 import { SidecarLoader } from './SidecarLoader.js';
@@ -14,11 +14,11 @@ import type { Config } from 'src/config/config.js';
 
 describe('SidecarLoader (Fake FS)', () => {
   let fileSystem: InMemoryFileSystem;
-  let registry: ProcessorRegistry;
+  let registry: SidecarRegistry;
 
   beforeEach(() => {
     fileSystem = new InMemoryFileSystem();
-    registry = new ProcessorRegistry();
+    registry = new SidecarRegistry();
     registerBuiltInProcessors(registry);
   });
 
