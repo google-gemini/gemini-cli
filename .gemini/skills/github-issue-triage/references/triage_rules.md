@@ -125,6 +125,8 @@ Use the JSON output from `analyze_issue.cjs` to determine necessary actions.
    - If neither condition is met, proceed to Step 3.
 
 ## Step 3: Vagueness Check
+**CRITICAL MISTAKE PREVENTION**: You MUST NOT skip this step just because you recognize the problem domain as complex or requiring maintainer attention. No matter how obvious the problem domain might seem, a bug report without explicit, step-by-step reproduction instructions must be halted and marked as vague first.
+
 Is the issue fundamentally missing context AND no one has asked for more information yet?
 - **For bugs**: Explicit reproduction steps are **REQUIRED**. Even if the user provides logs, error traces, or screenshots, if they do not provide clear, step-by-step instructions on how to reproduce the bug, it MUST be considered vague.
 - **For feature requests**: If it is just a vague statement without clear use cases or details, it is considered vague.
