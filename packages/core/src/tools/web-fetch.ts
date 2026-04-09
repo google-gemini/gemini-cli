@@ -310,6 +310,7 @@ class WebFetchToolInvocation extends BaseToolInvocation<
       },
       {
         retryFetchErrors: this.context.config.getRetryFetchErrors(),
+        logErrorDetails: this.context.config.getDebugMode(),
         onRetry: (attempt, error, delayMs) =>
           this.handleRetry(attempt, error, delayMs),
         signal,
@@ -644,6 +645,7 @@ ${aggregatedContent}
         },
         {
           retryFetchErrors: this.context.config.getRetryFetchErrors(),
+          logErrorDetails: this.context.config.getDebugMode(),
           onRetry: (attempt, error, delayMs) =>
             this.handleRetry(attempt, error, delayMs),
           signal,

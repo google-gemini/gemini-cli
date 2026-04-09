@@ -1135,6 +1135,7 @@ export class GeminiClient {
         authType: this.config.getContentGeneratorConfig()?.authType,
         maxAttempts: availabilityMaxAttempts,
         retryFetchErrors: this.config.getRetryFetchErrors(),
+        logErrorDetails: this.config.getDebugMode(),
         getAvailabilityContext,
         onRetry: (attempt, error, delayMs) => {
           coreEvents.emitRetryAttempt({

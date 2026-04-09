@@ -687,6 +687,7 @@ export class GeminiChat {
       onValidationRequired: onValidationRequiredCallback,
       authType: this.context.config.getContentGeneratorConfig()?.authType,
       retryFetchErrors: this.context.config.getRetryFetchErrors(),
+      logErrorDetails: this.context.config.getDebugMode(),
       signal: abortSignal,
       maxAttempts:
         availabilityMaxAttempts ?? this.context.config.getMaxAttempts(),
