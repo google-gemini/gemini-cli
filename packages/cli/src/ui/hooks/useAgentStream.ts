@@ -279,7 +279,19 @@ export const useAgentStream = ({
             userMessageTimestampRef.current,
           );
           break;
+
+        case 'initialize':
+        case 'session_update':
+        case 'elicitation_request':
+        case 'elicitation_response':
+        case 'usage':
+        case 'custom':
+          // These events are currently not handled in the UI
+          break;
+
         default:
+          debugLogger.error('Unknown agent event type:', event);
+          event satisfies never;
           break;
       }
     },
