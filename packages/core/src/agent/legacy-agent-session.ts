@@ -76,7 +76,6 @@ export class LegacyAgentProtocol implements AgentProtocol {
     this._config = deps.config;
     this._client = deps.client ?? deps.config.getGeminiClient();
     this._promptId = deps.promptId ?? deps.config.promptId ?? '';
-
     if (deps.scheduler) {
       this._scheduler = deps.scheduler;
     } else {
