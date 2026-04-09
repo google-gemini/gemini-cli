@@ -35,7 +35,7 @@ import {
   TRACKER_UPDATE_TASK_TOOL_NAME,
 } from '../tools/tool-names.js';
 import type { HierarchicalMemory } from '../config/memory.js';
-import { DEFAULT_CONTEXT_FILENAMES } from '../tools/memoryTool.js';
+import { DEFAULT_CONTEXT_FILENAME } from '../tools/memoryTool.js';
 
 // --- Options Structs ---
 
@@ -178,7 +178,7 @@ export function renderCoreMandates(options?: CoreMandatesOptions): string {
   if (!options) return '';
   const filenames = options.contextFilenames?.length
     ? options.contextFilenames
-    : DEFAULT_CONTEXT_FILENAMES;
+    : [DEFAULT_CONTEXT_FILENAME];
   const formattedFilenames =
     filenames.length > 1
       ? filenames
@@ -495,7 +495,7 @@ export function renderUserMemory(
     if (trimmed.length === 0) return '';
     const filenames = contextFilenames?.length
       ? contextFilenames
-      : DEFAULT_CONTEXT_FILENAMES;
+      : [DEFAULT_CONTEXT_FILENAME];
     const formattedHeader = filenames.join(', ');
     return `
 # Contextual Instructions (${formattedHeader})
