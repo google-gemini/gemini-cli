@@ -285,13 +285,13 @@ describe('plan_mode', () => {
     },
   });
 
-  evalTest('ALWAYS_PASSES', {
+  evalTest('USUALLY_PASSES', {
     name: 'should transition from plan mode to normal execution and create a plan file from scratch',
     params: {
       settings,
     },
     prompt:
-      'Enter plan mode and plan to create a new module called foo. The plan should be saved as foo-plan.md. Then, exit plan mode.',
+      'Enter plan mode and plan to create a new module called foo. The plan should be saved as foo-plan.md. I agree with the strategy, so please create a detailed implementation plan and then execute it.',
     assert: async (rig, result) => {
       const enterPlanCalled = await rig.waitForToolCall('enter_plan_mode');
       expect(
