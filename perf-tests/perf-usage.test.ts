@@ -8,6 +8,7 @@ import { describe, it, beforeAll, afterAll } from 'vitest';
 import { TestRig, PerfTestHarness } from '@google/gemini-cli-test-utils';
 import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { existsSync, readFileSync } from 'node:fs';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const BASELINES_PATH = join(__dirname, 'baselines.json');
@@ -33,7 +34,7 @@ describe('CPU Performance Tests', () => {
   afterAll(async () => {
     // Generate the summary report after all tests
     await harness.generateReport();
-  });
+  }, 30000);
 
   it('cold-startup-time: startup completes within baseline', async () => {
     const result = await harness.runScenario('cold-startup-time', async () => {
@@ -143,6 +144,121 @@ describe('CPU Performance Tests', () => {
         await rig.cleanup();
       }
     });
+
+    if (UPDATE_BASELINES) {
+      harness.updateScenarioBaseline(result);
+    } else {
+      harness.assertWithinBaseline(result);
+    }
+  });
+
+  it('high-volume-shell-output: handles large output efficiently', async () => {
+    const result = await harness.runScenario(
+      'high-volume-shell-output',
+      async () => {
+        const rig = new TestRig();
+        try {
+          rig.setup('perf-high-volume-output', {
+            fakeResponsesPath: join(__dirname, 'perf.high-volume.responses'),
+          });
+
+          const snapshot = await harness.measureWithEventLoop(
+            'high-volume-output',
+            async () => {
+              const runResult = await rig.run({
+                args: ['Generate 1M lines of output'],
+                timeout: 120000,
+                env: {
+                  GEMINI_API_KEY: 'fake-perf-test-key',
+                  GEMINI_TELEMETRY_ENABLED: 'true',
+                  GEMINI_MEMORY_MONITOR_INTERVAL: '500',
+                  GEMINI_EVENT_LOOP_MONITOR_ENABLED: 'true',
+                  DEBUG: 'true',
+                },
+              });
+              console.log(`  Child Process Output:`, runResult);
+            },
+          );
+
+          // Query CLI's own performance metrics from telemetry logs
+          await rig.waitForTelemetryReady();
+
+          // Debug: Read and log the telemetry file content
+          try {
+            const logFilePath = join(rig.homeDir!, 'telemetry.log');
+            if (existsSync(logFilePath)) {
+              const content = readFileSync(logFilePath, 'utf-8');
+              console.log(`  Telemetry Log Content:\n`, content);
+            } else {
+              console.log(`  Telemetry log file not found at: ${logFilePath}`);
+            }
+          } catch (e) {
+            console.error(`  Failed to read telemetry log:`, e);
+          }
+
+          const memoryMetric = rig.readMetric('memory.usage');
+          const cpuMetric = rig.readMetric('cpu.usage');
+          const toolLatencyMetric = rig.readMetric('tool.call.latency');
+          const eventLoopMetric = rig.readMetric('event_loop.delay');
+
+          if (memoryMetric) {
+            console.log(
+              `  CLI Memory Metric found:`,
+              JSON.stringify(memoryMetric),
+            );
+          }
+          if (cpuMetric) {
+            console.log(`  CLI CPU Metric found:`, JSON.stringify(cpuMetric));
+          }
+          if (toolLatencyMetric) {
+            console.log(
+              `  CLI Tool Latency Metric found:`,
+              JSON.stringify(toolLatencyMetric),
+            );
+          }
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          const logs = (rig as any)._readAndParseTelemetryLog();
+          console.log(`  Total telemetry log entries: ${logs.length}`);
+          for (const logData of logs) {
+            if (logData.scopeMetrics) {
+              for (const scopeMetric of logData.scopeMetrics) {
+                for (const metric of scopeMetric.metrics) {
+                  if (metric.descriptor.name.includes('event_loop')) {
+                    console.log(
+                      `  Found event_loop metric in log:`,
+                      metric.descriptor.name,
+                    );
+                  }
+                }
+              }
+            }
+          }
+
+          if (eventLoopMetric) {
+            console.log(
+              `  CLI Event Loop Metric found:`,
+              JSON.stringify(eventLoopMetric),
+            );
+
+            const findValue = (percentile: string) => {
+              const dp = eventLoopMetric.dataPoints.find(
+                // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                (p: any) => p.attributes.percentile === percentile,
+              );
+              return dp ? dp.value.min : undefined;
+            };
+
+            snapshot.childEventLoopDelayP50Ms = findValue('p50');
+            snapshot.childEventLoopDelayP95Ms = findValue('p95');
+            snapshot.childEventLoopDelayMaxMs = findValue('max');
+          }
+
+          return snapshot;
+        } finally {
+          await rig.cleanup();
+        }
+      },
+    );
 
     if (UPDATE_BASELINES) {
       harness.updateScenarioBaseline(result);

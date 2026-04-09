@@ -23,7 +23,6 @@ type PlotFn = (series: number[], config?: PlotConfig) => string;
 export interface PerfBaseline {
   wallClockMs: number;
   cpuTotalUs: number;
-  eventLoopDelayP99Ms: number;
   timestamp: string;
 }
 
@@ -48,8 +47,10 @@ export interface PerfSnapshot {
   cpuTotalUs: number;
   eventLoopDelayP50Ms: number;
   eventLoopDelayP95Ms: number;
-  eventLoopDelayP99Ms: number;
   eventLoopDelayMaxMs: number;
+  childEventLoopDelayP50Ms?: number;
+  childEventLoopDelayP95Ms?: number;
+  childEventLoopDelayMaxMs?: number;
 }
 
 /**
@@ -159,7 +160,6 @@ export class PerfTestHarness {
       cpuTotalUs: cpuDelta.user + cpuDelta.system,
       eventLoopDelayP50Ms: 0,
       eventLoopDelayP95Ms: 0,
-      eventLoopDelayP99Ms: 0,
       eventLoopDelayMaxMs: 0,
     };
   }
@@ -196,7 +196,6 @@ export class PerfTestHarness {
     // Convert from nanoseconds to milliseconds
     snapshot.eventLoopDelayP50Ms = histogram.percentile(50) / 1e6;
     snapshot.eventLoopDelayP95Ms = histogram.percentile(95) / 1e6;
-    snapshot.eventLoopDelayP99Ms = histogram.percentile(99) / 1e6;
     snapshot.eventLoopDelayMaxMs = histogram.max / 1e6;
 
     return snapshot;
@@ -305,7 +304,6 @@ export class PerfTestHarness {
           `  Baseline:    ${result.baseline.wallClockMs.toFixed(1)} ms wall-clock\n` +
           `  Delta:       ${deltaPercent.toFixed(1)}% (tolerance: ${tolerance}%)\n` +
           `  CPU total:   ${formatUs(result.median.cpuTotalUs)}\n` +
-          `  EL p99:      ${result.median.eventLoopDelayP99Ms.toFixed(1)} ms\n` +
           `  Samples:     ${result.samples.length} (${result.filteredSamples.length} after IQR filter)`,
       );
     }
@@ -316,8 +314,7 @@ export class PerfTestHarness {
           `  Measured:    ${formatUs(result.median.cpuTotalUs)}\n` +
           `  Baseline:    ${formatUs(result.baseline.cpuTotalUs)}\n` +
           `  Delta:       ${result.cpuDeltaPercent.toFixed(1)}% (tolerance: ${cpuTolerance}%)\n` +
-          `  Wall-clock:  ${result.median.wallClockMs.toFixed(1)} ms\n` +
-          `  EL p99:      ${result.median.eventLoopDelayP99Ms.toFixed(1)} ms`,
+          `  Wall-clock:  ${result.median.wallClockMs.toFixed(1)} ms`,
       );
     }
   }
@@ -329,7 +326,6 @@ export class PerfTestHarness {
     updatePerfBaseline(this.baselinesPath, result.scenarioName, {
       wallClockMs: result.median.wallClockMs,
       cpuTotalUs: result.median.cpuTotalUs,
-      eventLoopDelayP99Ms: result.median.eventLoopDelayP99Ms,
     });
     // Reload baselines after update
     this.baselines = loadPerfBaselines(this.baselinesPath);
@@ -375,9 +371,18 @@ export class PerfTestHarness {
         `  CPU: ${cpuMs} (user: ${formatUs(result.median.cpuUserUs)}, system: ${formatUs(result.median.cpuSystemUs)})`,
       );
 
-      if (result.median.eventLoopDelayP99Ms > 0) {
+      if (result.median.eventLoopDelayMaxMs > 0) {
         lines.push(
-          `  Event loop: p50=${result.median.eventLoopDelayP50Ms.toFixed(1)}ms p95=${result.median.eventLoopDelayP95Ms.toFixed(1)}ms p99=${result.median.eventLoopDelayP99Ms.toFixed(1)}ms max=${result.median.eventLoopDelayMaxMs.toFixed(1)}ms`,
+          `  Event loop (runner): p50=${result.median.eventLoopDelayP50Ms.toFixed(1)}ms p95=${result.median.eventLoopDelayP95Ms.toFixed(1)}ms max=${result.median.eventLoopDelayMaxMs.toFixed(1)}ms`,
+        );
+      }
+
+      if (
+        result.median.childEventLoopDelayMaxMs !== undefined &&
+        result.median.childEventLoopDelayMaxMs > 0
+      ) {
+        lines.push(
+          `  Event loop (CLI):    p50=${result.median.childEventLoopDelayP50Ms!.toFixed(1)}ms p95=${result.median.childEventLoopDelayP95Ms!.toFixed(1)}ms max=${result.median.childEventLoopDelayMaxMs!.toFixed(1)}ms`,
         );
       }
 
@@ -517,14 +522,12 @@ export function updatePerfBaseline(
   measured: {
     wallClockMs: number;
     cpuTotalUs: number;
-    eventLoopDelayP99Ms: number;
   },
 ): void {
   const baselines = loadPerfBaselines(path);
   baselines.scenarios[scenarioName] = {
     wallClockMs: measured.wallClockMs,
     cpuTotalUs: measured.cpuTotalUs,
-    eventLoopDelayP99Ms: measured.eventLoopDelayP99Ms,
     timestamp: new Date().toISOString(),
   };
   savePerfBaselines(path, baselines);

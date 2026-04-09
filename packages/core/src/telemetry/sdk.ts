@@ -52,6 +52,11 @@ import {
 } from './gcp-exporters.js';
 import { TelemetryTarget } from './index.js';
 import { debugLogger } from '../utils/debugLogger.js';
+import {
+  startGlobalMemoryMonitoring,
+  getMemoryMonitor,
+} from './memory-monitor.js';
+import { startGlobalEventLoopMonitoring } from './event-loop-monitor.js';
 import { authEvents } from '../code_assist/oauth2.js';
 import { coreEvents, CoreEvent } from '../utils/events.js';
 import {
@@ -91,6 +96,7 @@ diag.setLogger(new DiagLoggerAdapter(), DiagLogLevel.INFO);
 let sdk: NodeSDK | undefined;
 let spanProcessor: BatchSpanProcessor | undefined;
 let logRecordProcessor: BatchLogRecordProcessor | undefined;
+let metricReader: PeriodicExportingMetricReader | undefined;
 let telemetryInitialized = false;
 let callbackRegistered = false;
 let authListener: ((newCredentials: JWTInput) => Promise<void>) | undefined =
@@ -258,7 +264,6 @@ export async function initializeTelemetry(
     | GcpLogExporter
     | FileLogExporter
     | ConsoleLogRecordExporter;
-  let metricReader: PeriodicExportingMetricReader;
 
   if (useDirectGcpExport) {
     debugLogger.log(
@@ -346,6 +351,26 @@ export async function initializeTelemetry(
     }
     activeTelemetryEmail = credentials?.client_email;
     initializeMetrics(config);
+
+    // Start memory monitoring if interval is specified via environment variable
+    const monitorInterval = process.env['GEMINI_MEMORY_MONITOR_INTERVAL'];
+    debugLogger.log(
+      `[TELEMETRY] GEMINI_MEMORY_MONITOR_INTERVAL: ${monitorInterval}`,
+    );
+    if (monitorInterval) {
+      const intervalMs = parseInt(monitorInterval, 10);
+      if (!isNaN(intervalMs) && intervalMs > 0) {
+        startGlobalMemoryMonitoring(config, intervalMs);
+        startGlobalEventLoopMonitoring(config, intervalMs);
+        // Disable enhanced monitoring (rate limiting/high water mark) in tests
+        // to ensure we get regular snapshots regardless of growth.
+        const monitor = getMemoryMonitor();
+        if (monitor) {
+          monitor.setEnhancedMonitoring(false);
+        }
+      }
+    }
+
     telemetryInitialized = true;
     void flushTelemetryBuffer();
   } catch (error) {
@@ -378,6 +403,7 @@ export async function flushTelemetry(config: Config): Promise<void> {
     await Promise.all([
       spanProcessor.forceFlush(),
       logRecordProcessor.forceFlush(),
+      metricReader ? metricReader.forceFlush() : Promise.resolve(),
     ]);
     if (config.getDebugMode()) {
       debugLogger.log('OpenTelemetry SDK flushed successfully.');
