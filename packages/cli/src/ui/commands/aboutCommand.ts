@@ -4,8 +4,11 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import type { CommandContext, SlashCommand } from './types.js';
-import { CommandKind } from './types.js';
+import {
+  CommandKind,
+  type CommandContext,
+  type SlashCommand,
+} from './types.js';
 import process from 'node:process';
 import { MessageType, type HistoryItemAbout } from '../types.js';
 import {
@@ -20,6 +23,7 @@ export const aboutCommand: SlashCommand = {
   description: 'Show version info',
   kind: CommandKind.BUILT_IN,
   autoExecute: true,
+  isSafeConcurrent: true,
   action: async (context) => {
     const osVersion = process.platform;
     let sandboxEnv = 'no sandbox';
@@ -30,7 +34,8 @@ export const aboutCommand: SlashCommand = {
         process.env['SEATBELT_PROFILE'] || 'unknown'
       })`;
     }
-    const modelVersion = context.services.config?.getModel() || 'Unknown';
+    const modelVersion =
+      context.services.agentContext?.config.getModel() || 'Unknown';
     const cliVersion = await getVersion();
     const selectedAuthType =
       context.services.settings.merged.security.auth.selectedType || '';
@@ -44,7 +49,7 @@ export const aboutCommand: SlashCommand = {
     });
     const userEmail = cachedAccount ?? undefined;
 
-    const tier = context.services.config?.getUserTierName();
+    const tier = context.services.agentContext?.config.getUserTierName();
 
     const aboutItem: Omit<HistoryItemAbout, 'id'> = {
       type: MessageType.ABOUT,
@@ -64,7 +69,7 @@ export const aboutCommand: SlashCommand = {
 };
 
 async function getIdeClientName(context: CommandContext) {
-  if (!context.services.config?.getIdeMode()) {
+  if (!context.services.agentContext?.config.getIdeMode()) {
     return '';
   }
   const ideClient = await IdeClient.getInstance();

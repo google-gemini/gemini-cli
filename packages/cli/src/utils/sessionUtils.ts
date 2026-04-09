@@ -9,7 +9,7 @@ import {
   partListUnionToString,
   SESSION_FILE_PREFIX,
   CoreToolCallStatus,
-  type Config,
+  type Storage,
   type ConversationRecord,
   type MessageRecord,
 } from '@google/gemini-cli-core';
@@ -108,9 +108,12 @@ export class SessionError extends Error {
       );
     }
 
+    chatsDir?: string,
+  ): SessionError {
+    const dirInfo = chatsDir ? ` in ${chatsDir}` : '';
     return new SessionError(
       'INVALID_SESSION_IDENTIFIER',
-      `Invalid session identifier "${identifier}".\n  Use --list-sessions to see available sessions, then use --resume {number}, --resume {uuid}, or --resume latest.`,
+      `Invalid session identifier "${identifier}".\n  Searched for sessions${dirInfo}.\n  Use --list-sessions to see available sessions, then use --resume {number}, --resume {uuid}, or --resume latest.`,
     );
   }
 }
@@ -445,17 +448,14 @@ export const getSessionFiles = async (
  * Utility class for session discovery and selection.
  */
 export class SessionSelector {
-  constructor(private config: Config) {}
+  constructor(private storage: Storage) {}
 
   /**
    * Lists all available sessions for the current project.
    */
   async listSessions(): Promise<SessionInfo[]> {
-    const chatsDir = path.join(
-      this.config.storage.getProjectTempDir(),
-      'chats',
-    );
-    return getSessionFiles(chatsDir, this.config.getSessionId());
+    const chatsDir = path.join(this.storage.getProjectTempDir(), 'chats');
+    return getSessionFiles(chatsDir);
   }
 
   /**
@@ -466,6 +466,7 @@ export class SessionSelector {
    * @throws Error if the session is not found or identifier is invalid
    */
   async findSession(identifier: string): Promise<SessionInfo> {
+    const trimmedIdentifier = identifier.trim();
     const sessions = await this.listSessions();
 
     if (sessions.length === 0) {
@@ -480,17 +481,17 @@ export class SessionSelector {
 
     // Try to find by UUID first
     const sessionByUuid = sortedSessions.find(
-      (session) => session.id === identifier,
+      (session) => session.id === trimmedIdentifier,
     );
     if (sessionByUuid) {
       return sessionByUuid;
     }
 
     // Parse as index number (1-based) - only allow numeric indexes
-    const index = parseInt(identifier, 10);
+    const index = parseInt(trimmedIdentifier, 10);
     if (
       !isNaN(index) &&
-      index.toString() === identifier &&
+      index.toString() === trimmedIdentifier &&
       index > 0 &&
       index <= sortedSessions.length
     ) {
@@ -498,6 +499,8 @@ export class SessionSelector {
     }
 
     throw SessionError.invalidSessionIdentifier(identifier, sortedSessions);
+    const chatsDir = path.join(this.storage.getProjectTempDir(), 'chats');
+    throw SessionError.invalidSessionIdentifier(trimmedIdentifier, chatsDir);
   }
 
   /**
@@ -508,8 +511,9 @@ export class SessionSelector {
    */
   async resolveSession(resumeArg: string): Promise<SessionSelectionResult> {
     let selectedSession: SessionInfo;
+    const trimmedResumeArg = resumeArg.trim();
 
-    if (resumeArg === RESUME_LATEST) {
+    if (trimmedResumeArg === RESUME_LATEST) {
       const sessions = await this.listSessions();
 
       if (sessions.length === 0) {
@@ -525,7 +529,7 @@ export class SessionSelector {
       selectedSession = sessions[sessions.length - 1];
     } else {
       try {
-        selectedSession = await this.findSession(resumeArg);
+        selectedSession = await this.findSession(trimmedResumeArg);
       } catch (error) {
         // SessionError already has detailed messages - just rethrow
         if (error instanceof SessionError) {
@@ -533,7 +537,7 @@ export class SessionSelector {
         }
         // Wrap unexpected errors with context
         throw new Error(
-          `Failed to find session "${resumeArg}": ${error instanceof Error ? error.message : String(error)}`,
+          `Failed to find session "${trimmedResumeArg}": ${error instanceof Error ? error.message : String(error)}`,
         );
       }
     }
@@ -547,10 +551,7 @@ export class SessionSelector {
   private async selectSession(
     sessionInfo: SessionInfo,
   ): Promise<SessionSelectionResult> {
-    const chatsDir = path.join(
-      this.config.storage.getProjectTempDir(),
-      'chats',
-    );
+    const chatsDir = path.join(this.storage.getProjectTempDir(), 'chats');
     const sessionPath = path.join(chatsDir, sessionInfo.fileName);
 
     try {
@@ -647,6 +648,7 @@ export function convertSessionToHistoryFormats(
         tools: msg.toolCalls.map((tool) => ({
           callId: tool.id,
           name: tool.displayName || tool.name,
+          args: tool.args,
           description: tool.description || '',
           renderOutputAsMarkdown: tool.renderOutputAsMarkdown ?? true,
           status:

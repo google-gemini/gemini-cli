@@ -272,6 +272,34 @@ describe('OAuthUtils', () => {
         OAuthUtils.discoverOAuthConfig('https://example.com/mcp'),
       ).rejects.toThrow(/does not match expected/);
     });
+
+    it('should accept equivalent root resources with and without trailing slash', async () => {
+      mockFetch
+        // fetchProtectedResourceMetadata
+        .mockResolvedValueOnce({
+          ok: true,
+          json: () =>
+            Promise.resolve({
+              resource: 'https://example.com',
+              authorization_servers: ['https://auth.example.com'],
+              bearer_methods_supported: ['header'],
+            }),
+        })
+        // discoverAuthorizationServerMetadata
+        .mockResolvedValueOnce({
+          ok: true,
+          json: () => Promise.resolve(mockAuthServerMetadata),
+        });
+
+      await expect(
+        OAuthUtils.discoverOAuthConfig('https://example.com'),
+      ).resolves.toEqual({
+        authorizationUrl: 'https://auth.example.com/authorize',
+        issuer: 'https://auth.example.com',
+        tokenUrl: 'https://auth.example.com/token',
+        scopes: ['read', 'write'],
+      });
+    });
   });
 
   describe('metadataToOAuthConfig', () => {
@@ -333,6 +361,45 @@ describe('OAuthUtils', () => {
       const header = 'Bearer realm="example"';
       const result = OAuthUtils.parseWWWAuthenticateHeader(header);
       expect(result).toBeNull();
+    });
+  });
+
+  describe('discoverOAuthFromWWWAuthenticate', () => {
+    const mockAuthServerMetadata: OAuthAuthorizationServerMetadata = {
+      issuer: 'https://auth.example.com',
+      authorization_endpoint: 'https://auth.example.com/authorize',
+      token_endpoint: 'https://auth.example.com/token',
+      scopes_supported: ['read', 'write'],
+    };
+
+    it('should accept equivalent root resources with and without trailing slash', async () => {
+      mockFetch
+        // fetchProtectedResourceMetadata(resource_metadata URL)
+        .mockResolvedValueOnce({
+          ok: true,
+          json: () =>
+            Promise.resolve({
+              resource: 'https://example.com',
+              authorization_servers: ['https://auth.example.com'],
+            }),
+        })
+        // discoverAuthorizationServerMetadata(auth server well-known URL)
+        .mockResolvedValueOnce({
+          ok: true,
+          json: () => Promise.resolve(mockAuthServerMetadata),
+        });
+
+      const result = await OAuthUtils.discoverOAuthFromWWWAuthenticate(
+        'Bearer realm="example", resource_metadata="https://example.com/.well-known/oauth-protected-resource"',
+        'https://example.com/',
+      );
+
+      expect(result).toEqual({
+        authorizationUrl: 'https://auth.example.com/authorize',
+        issuer: 'https://auth.example.com',
+        tokenUrl: 'https://auth.example.com/token',
+        scopes: ['read', 'write'],
+      });
     });
   });
 

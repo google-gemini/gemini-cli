@@ -344,9 +344,9 @@ export async function initializeTelemetry(
     if (config.getDebugMode()) {
       debugLogger.log('OpenTelemetry SDK started successfully.');
     }
-    telemetryInitialized = true;
     activeTelemetryEmail = credentials?.client_email;
     initializeMetrics(config);
+    telemetryInitialized = true;
     void flushTelemetryBuffer();
   } catch (error) {
     debugLogger.error('Error starting OpenTelemetry SDK:', error);

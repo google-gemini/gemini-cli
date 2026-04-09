@@ -15,6 +15,9 @@ import {
   type EditorType,
   type ToolCallsUpdateMessage,
   CoreToolCallStatus,
+  type SubagentActivityItem,
+  type SubagentActivityMessage,
+  AGENT_TOOL_NAME,
 } from '@google/gemini-cli-core';
 import { useCallback, useState, useMemo, useEffect, useRef } from 'react';
 
@@ -33,6 +36,7 @@ export type CancelAllFn = (signal: AbortSignal) => void;
  */
 export type TrackedToolCall = ToolCall & {
   responseSubmittedToGemini?: boolean;
+  subagentHistory?: SubagentActivityItem[];
 };
 
 // Narrowed types for specific statuses (used by useGeminiStream)
@@ -81,6 +85,9 @@ export function useToolScheduler(
     Record<string, TrackedToolCall[]>
   >({});
   const [lastToolOutputTime, setLastToolOutputTime] = useState<number>(0);
+  const [subagentHistoryMap, setSubagentHistoryMap] = useState<
+    Record<string, SubagentActivityItem[]>
+  >({});
 
   const messageBus = useMemo(() => config.getMessageBus(), [config]);
 
@@ -97,7 +104,7 @@ export function useToolScheduler(
   const scheduler = useMemo(
     () =>
       new Scheduler({
-        config,
+        context: config,
         messageBus,
         getPreferredEditor: () => getPreferredEditorRef.current(),
         schedulerId: ROOT_SCHEDULER_ID,
@@ -173,10 +180,37 @@ export function useToolScheduler(
     };
   }, [messageBus, internalAdaptToolCalls]);
 
+  useEffect(() => {
+    const handler = (event: SubagentActivityMessage) => {
+      setSubagentHistoryMap((prev) => {
+        const history = prev[event.subagentName] ?? [];
+        const index = history.findIndex(
+          (item) => item.id === event.activity.id,
+        );
+        const nextHistory = [...history];
+        if (index >= 0) {
+          nextHistory[index] = event.activity;
+        } else {
+          nextHistory.push(event.activity);
+        }
+        return {
+          ...prev,
+          [event.subagentName]: nextHistory,
+        };
+      });
+    };
+
+    messageBus.subscribe(MessageBusType.SUBAGENT_ACTIVITY, handler);
+    return () => {
+      messageBus.unsubscribe(MessageBusType.SUBAGENT_ACTIVITY, handler);
+    };
+  }, [messageBus]);
+
   const schedule: ScheduleFn = useCallback(
     async (request, signal) => {
       // Clear state for new run
       setToolCallsMap({});
+      setSubagentHistoryMap({});
 
       // 1. Await Core Scheduler directly
       const results = await scheduler.schedule(request, signal);
@@ -216,10 +250,38 @@ export function useToolScheduler(
   );
 
   // Flatten the map for the UI components that expect a single list of tools.
-  const toolCalls = useMemo(
-    () => Object.values(toolCallsMap).flat(),
-    [toolCallsMap],
-  );
+  const toolCalls = useMemo(() => {
+    const flattened = Object.values(toolCallsMap).flat();
+    return flattened.map((tc) => {
+      let subagentName = tc.request.name;
+      if (tc.request.name === AGENT_TOOL_NAME) {
+        const argsObj = tc.request.args;
+        let parsedArgs: unknown = argsObj;
+
+        if (typeof argsObj === 'string') {
+          try {
+            parsedArgs = JSON.parse(argsObj);
+          } catch {
+            parsedArgs = null;
+          }
+        }
+
+        if (typeof parsedArgs === 'object' && parsedArgs !== null) {
+          for (const [key, value] of Object.entries(parsedArgs)) {
+            if (key === 'agent_name' && typeof value === 'string') {
+              subagentName = value;
+              break;
+            }
+          }
+        }
+      }
+
+      return {
+        ...tc,
+        subagentHistory: subagentHistoryMap[subagentName] ?? tc.subagentHistory,
+      };
+    });
+  }, [toolCallsMap, subagentHistoryMap]);
 
   // Provide a setter that maintains compatibility with legacy [].
   const setToolCallsForDisplay = useCallback(
@@ -272,7 +334,6 @@ function adaptToolCalls(
   return coreCalls.map((coreCall): TrackedToolCall => {
     const prev = prevMap.get(coreCall.request.callId);
     const responseSubmittedToGemini = prev?.responseSubmittedToGemini ?? false;
-
     let status = coreCall.status;
     // If a tool call has completed but scheduled a tail call, it is in a transitional
     // state. Force the UI to render it as "executing".

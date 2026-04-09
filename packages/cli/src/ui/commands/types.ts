@@ -11,11 +11,11 @@ import type {
   ConfirmationRequest,
 } from '../types.js';
 import type {
-  Config,
   GitService,
   Logger,
   CommandActionReturn,
   AgentDefinition,
+  AgentLoopContext,
 } from '@google/gemini-cli-core';
 import type { LoadedSettings } from '../../config/settings.js';
 import type { UseHistoryManagerReturn } from '../hooks/useHistoryManager.js';
@@ -39,7 +39,7 @@ export interface CommandContext {
   // Core services and configuration
   services: {
     // TODO(abhipatel12): Ensure that config is never null.
-    config: Config | null;
+    agentContext: AgentLoopContext | null;
     settings: LoadedSettings;
     git: GitService | undefined;
     logger: Logger;
@@ -90,7 +90,7 @@ export interface CommandContext {
      */
     setConfirmationRequest: (value: ConfirmationRequest) => void;
     removeComponent: () => void;
-    toggleBackgroundShell: () => void;
+    toggleBackgroundTasks: () => void;
     toggleShortcutsHelp: () => void;
   };
   // Session-specific data
@@ -182,6 +182,7 @@ export enum CommandKind {
   EXTENSION_FILE = 'extension-file',
   MCP_PROMPT = 'mcp-prompt',
   AGENT = 'agent',
+  SKILL = 'skill',
 }
 
 // The standardized contract for any command in the system.
@@ -205,6 +206,11 @@ export interface SlashCommand {
    * If false or undefined, pressing Enter will autocomplete the command into the prompt window.
    */
   autoExecute?: boolean;
+
+  /**
+   * Whether this command can be safely executed while the agent is busy (e.g. streaming a response).
+   */
+  isSafeConcurrent?: boolean;
 
   // Optional metadata for extension commands
   extensionName?: string;
@@ -233,6 +239,15 @@ export interface SlashCommand {
    * Defaults to true. Set to false for fast completions to avoid flicker.
    */
   showCompletionLoading?: boolean;
+
+  /**
+   * Whether the command expects arguments.
+   * If false, and the command is a subcommand, the command parser may treat
+   * any following text as arguments for the parent command instead of this subcommand,
+   * provided the parent command has an action.
+   * Defaults to true.
+   */
+  takesArgs?: boolean;
 
   subCommands?: SlashCommand[];
 }

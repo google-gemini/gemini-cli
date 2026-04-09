@@ -23,9 +23,9 @@ export const isGitHubRepository = (): boolean => {
     const pattern = /github\.com/;
 
     return pattern.test(remotes);
-  } catch (_error) {
+  } catch (error) {
     // If any filesystem error occurs, assume not a git repo
-    debugLogger.debug(`Failed to get git remote:`, _error);
+    debugLogger.debug(`Failed to get git remote:`, error);
     return false;
   }
 };
@@ -61,7 +61,6 @@ export const getLatestGitHubRelease = async (
 
     const endpoint = `https://api.github.com/repos/google-github-actions/run-gemini-cli/releases/latest`;
 
-    // eslint-disable-next-line no-restricted-syntax -- TODO: Migrate to safeFetch for SSRF protection
     const response = await fetch(endpoint, {
       method: 'GET',
       headers: {
@@ -86,10 +85,10 @@ export const getLatestGitHubRelease = async (
     }
     // eslint-disable-next-line @typescript-eslint/no-unsafe-return
     return releaseTag;
-  } catch (_error) {
+  } catch (error) {
     debugLogger.debug(
       `Failed to determine latest run-gemini-cli release:`,
-      _error,
+      error,
     );
     throw new Error(
       `Unable to determine the latest run-gemini-cli release on GitHub.`,

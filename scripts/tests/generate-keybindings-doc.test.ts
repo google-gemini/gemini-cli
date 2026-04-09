@@ -10,6 +10,7 @@ import {
   renderDocumentation,
   type KeybindingDocSection,
 } from '../generate-keybindings-doc.ts';
+import { KeyBinding } from '../../packages/cli/src/ui/key/keyBindings.js';
 
 describe('generate-keybindings-doc', () => {
   it('keeps keyboard shortcut documentation in sync in check mode', async () => {
@@ -31,12 +32,14 @@ describe('generate-keybindings-doc', () => {
         title: 'Custom Controls',
         commands: [
           {
+            command: 'custom.trigger',
             description: 'Trigger custom action.',
-            bindings: [{ key: 'x', ctrl: true }],
+            bindings: [new KeyBinding('ctrl+x')],
           },
           {
+            command: 'custom.submit',
             description: 'Submit with Enter if no modifiers are held.',
-            bindings: [{ key: 'enter', shift: false, ctrl: false }],
+            bindings: [new KeyBinding('enter')],
           },
         ],
       },
@@ -44,11 +47,9 @@ describe('generate-keybindings-doc', () => {
         title: 'Navigation',
         commands: [
           {
+            command: 'nav.up',
             description: 'Move up through results.',
-            bindings: [
-              { key: 'up', shift: false },
-              { key: 'p', shift: false, ctrl: true },
-            ],
+            bindings: [new KeyBinding('up'), new KeyBinding('ctrl+p')],
           },
         ],
       },
@@ -56,11 +57,14 @@ describe('generate-keybindings-doc', () => {
 
     const markdown = renderDocumentation(sections);
     expect(markdown).toContain('#### Custom Controls');
+    expect(markdown).toContain('`custom.trigger`');
     expect(markdown).toContain('Trigger custom action.');
     expect(markdown).toContain('`Ctrl+X`');
+    expect(markdown).toContain('`custom.submit`');
     expect(markdown).toContain('Submit with Enter if no modifiers are held.');
     expect(markdown).toContain('`Enter`');
     expect(markdown).toContain('#### Navigation');
+    expect(markdown).toContain('`nav.up`');
     expect(markdown).toContain('Move up through results.');
     expect(markdown).toContain('`Up`<br />`Ctrl+P`');
   });

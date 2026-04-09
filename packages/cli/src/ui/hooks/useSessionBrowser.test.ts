@@ -23,6 +23,7 @@ import {
 import {
   coreEvents,
   convertSessionToClientHistory,
+  uiTelemetryService,
 } from '@google/gemini-cli-core';
 
 // Mock modules
@@ -34,6 +35,17 @@ vi.mock('../../utils/sessionUtils.js', async (importOriginal) => {
   return {
     ...actual,
     getSessionFiles: vi.fn(),
+  };
+});
+vi.mock('@google/gemini-cli-core', async (importOriginal) => {
+  const actual =
+    await importOriginal<typeof import('@google/gemini-cli-core')>();
+  return {
+    ...actual,
+    uiTelemetryService: {
+      clear: vi.fn(),
+      hydrate: vi.fn(),
+    },
   };
 });
 
@@ -88,7 +100,7 @@ describe('useSessionBrowser', () => {
     mockedGetSessionFiles.mockResolvedValue([mockSession]);
     mockedFs.readFile.mockResolvedValue(JSON.stringify(mockConversation));
 
-    const { result } = renderHook(() =>
+    const { result } = await renderHook(() =>
       useSessionBrowser(mockConfig, mockOnLoadHistory),
     );
 
@@ -102,6 +114,7 @@ describe('useSessionBrowser', () => {
     expect(mockConfig.setSessionId).toHaveBeenCalledWith(
       'existing-session-456',
     );
+    expect(uiTelemetryService.hydrate).toHaveBeenCalledWith(mockConversation);
     expect(result.current.isSessionBrowserOpen).toBe(false);
     expect(mockOnLoadHistory).toHaveBeenCalled();
   });
@@ -114,7 +127,7 @@ describe('useSessionBrowser', () => {
     } as SessionInfo;
     mockedFs.readFile.mockRejectedValue(new Error('File not found'));
 
-    const { result } = renderHook(() =>
+    const { result } = await renderHook(() =>
       useSessionBrowser(mockConfig, mockOnLoadHistory),
     );
 
@@ -138,7 +151,7 @@ describe('useSessionBrowser', () => {
     } as SessionInfo;
     mockedFs.readFile.mockResolvedValue('invalid json');
 
-    const { result } = renderHook(() =>
+    const { result } = await renderHook(() =>
       useSessionBrowser(mockConfig, mockOnLoadHistory),
     );
 

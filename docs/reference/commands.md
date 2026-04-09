@@ -14,6 +14,29 @@ Slash commands provide meta-level control over the CLI itself.
 
 - **Description:** Show version info. Share this information when filing issues.
 
+### `/agents`
+
+- **Description:** Manage local and remote subagents.
+- **Sub-commands:**
+  - **`list`**:
+    - **Description:** Lists all discovered agents, including built-in, local,
+      and remote agents.
+    - **Usage:** `/agents list`
+  - **`reload`** (alias: `refresh`):
+    - **Description:** Rescans agent directories (`~/.gemini/agents` and
+      `.gemini/agents`) and reloads the registry.
+    - **Usage:** `/agents reload`
+  - **`enable`**:
+    - **Description:** Enables a specific subagent.
+    - **Usage:** `/agents enable <agent-name>`
+  - **`disable`**:
+    - **Description:** Disables a specific subagent.
+    - **Usage:** `/agents disable <agent-name>`
+  - **`config`**:
+    - **Description:** Opens a configuration dialog for the specified agent to
+      adjust its model, temperature, or execution limits.
+    - **Usage:** `/agents config <agent-name>`
+
 ### `/auth`
 
 - **Description:** Open a dialog that lets you change the authentication method.
@@ -35,8 +58,8 @@ Slash commands provide meta-level control over the CLI itself.
     - `list` (selecting this opens the auto-saved session browser)
   - `-- checkpoints --`
     - `list`, `save`, `resume`, `delete`, `share` (manual tagged checkpoints)
-  - **Note:** Unique prefixes (for example `/cha` or `/resum`) resolve to the
-    same grouped menu.
+  - Unique prefixes (for example `/cha` or `/resu`) resolve to the same grouped
+    menu.
 - **Sub-commands:**
   - **`debug`**
     - **Description:** Export the most recent API request as a JSON payload.
@@ -225,8 +248,8 @@ Slash commands provide meta-level control over the CLI itself.
   - **`list`** or **`ls`**:
     - **Description:** List configured MCP servers and tools. This is the
       default action if no subcommand is specified.
-  - **`refresh`**:
-    - **Description:** Restarts all MCP servers and re-discovers their available
+  - **`reload`**:
+    - **Description:** Reloads all MCP servers and re-discovers their available
       tools.
   - **`schema`**:
     - **Description:** List configured MCP servers and tools with descriptions
@@ -280,7 +303,7 @@ Slash commands provide meta-level control over the CLI itself.
 - **Description:** Switch to Plan Mode (read-only) and view the current plan if
   one has been generated.
   - **Note:** This feature is enabled by default. It can be disabled via the
-    `experimental.plan` setting in your configuration.
+    `general.plan.enabled` setting in your configuration.
 - **Sub-commands:**
   - **`copy`**:
     - **Description:** Copy the currently approved plan to your clipboard.
