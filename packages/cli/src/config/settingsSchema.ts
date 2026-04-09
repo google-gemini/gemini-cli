@@ -1907,7 +1907,8 @@ const SETTINGS_SCHEMA = {
         category: 'Advanced',
         requiresRestart: true,
         default: true,
-        description: 'Automatically configure Node.js memory limits',
+        description:
+          'Automatically configure Node.js memory limits. Note: Because memory is allocated during the initial process boot, this setting is only read from the global user settings file and ignores workspace-level overrides.',
         showInDialog: true,
       },
       dnsResolutionOrder: {

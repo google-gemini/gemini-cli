@@ -81,10 +81,7 @@ import { validateNonInteractiveAuth } from './validateNonInterActiveAuth.js';
 import { appEvents, AppEvent } from './utils/events.js';
 import { SessionError, SessionSelector } from './utils/sessionUtils.js';
 
-import {
-  relaunchAppInChildProcess,
-  relaunchOnExitCode,
-} from './utils/relaunch.js';
+import { relaunchOnExitCode } from './utils/relaunch.js';
 import { loadSandboxConfig } from './config/sandboxConfig.js';
 import { deleteSession, listSessions } from './utils/sessions.js';
 import { createPolicyUpdater } from './config/policy.js';
@@ -439,6 +436,12 @@ export async function main() {
   // Set remote admin settings if returned from CCPA.
   if (remoteAdminSettings) {
     settings.setRemoteAdminSettings(remoteAdminSettings);
+    if (process.send) {
+      process.send({
+        type: 'admin-settings-update',
+        settings: remoteAdminSettings,
+      });
+    }
   }
 
   // Run deferred command now that we have admin settings.
@@ -496,10 +499,6 @@ export async function main() {
       );
       await runExitCleanup();
       process.exit(ExitCodes.SUCCESS);
-    } else {
-      // Relaunch app so we always have a child process that can be internally
-      // restarted if needed.
-      await relaunchAppInChildProcess(memoryArgs, [], remoteAdminSettings);
     }
   }
 
