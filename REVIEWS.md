@@ -1,6 +1,6 @@
 # 🔎 Gemini CLI Triage Dashboard
 
-*Last Synchronized: 2026-04-09 20:40 (UTC)*
+*Last Synchronized: 2026-04-09 20:49 (UTC)*
 
 ## ✅ Ready for Review
 Assigned, officially linked, no conflicts, tests passing, and author has responded to all feedback.
@@ -10,19 +10,14 @@ Assigned, officially linked, no conflicts, tests passing, and author has respond
 | 18895 | [CLI cannot use fresh token in MCP OAuth](https://github.com/google-gemini/gemini-cli/issues/18895) | [#23493](https://github.com/google-gemini/gemini-cli/pull/23493) | _None_ | `2026-03-21` |
 | 19710 | [Fix unsafe type assertions in Core Utilities (Phase 1.2: JSON & Config)](https://github.com/google-gemini/gemini-cli/issues/19710) | [#23628](https://github.com/google-gemini/gemini-cli/pull/23628) | _None_ | `2026-03-29` |
 | 20385 | [Terminal output flooded with repeated '0c/' string](https://github.com/google-gemini/gemini-cli/issues/20385) | [#24596](https://github.com/google-gemini/gemini-cli/pull/24596) | _None_ | `2026-04-06` |
+| 19713 | [Fix unsafe type assertions in CLI Config (Phase 3.1)](https://github.com/google-gemini/gemini-cli/issues/19713) | [#24905](https://github.com/google-gemini/gemini-cli/pull/24905) | _None_ | `2026-04-08` |
 
 ## 🚩 Stale Assignments (No PR)
 Assigned for >14 days with no open Pull Request. Consider unassigning.
 
 | Issue | Assignee | Days Stale |
 | :--- | :--- | :--- |
-| [#11438 The ripgrep tool should prefer the system ripgrep, when possible.](https://github.com/google-gemini/gemini-cli/issues/11438) | @Jatin24062005 | 39 |
-| [#16530 Robust WSL Support](https://github.com/google-gemini/gemini-cli/issues/16530) | @aswinashok44 | 38 |
-| [#14940 Auto-completion keeps requesting gemini-2.5-flash-lite even when using gemini-3.0, causing infinite "usage limit reached" warnings](https://github.com/google-gemini/gemini-cli/issues/14940) | @krishdef7 | 33 |
-| [#16550 Command line recall doesn't remember in-flight edits if you accidentally scroll up too far](https://github.com/google-gemini/gemini-cli/issues/16550) | @seekskyworld | 33 |
-| [#16391 Bug: Clickable URLs in inline Markdown include trailing punctuation especially Chinese punctuations,   leading to broken navigation](https://github.com/google-gemini/gemini-cli/issues/16391) | @yuvrajangadsingh | 32 |
-| [#18612 [VSCode Plugin] Unable to change root directory](https://github.com/google-gemini/gemini-cli/issues/18612) | @sakshisemalti | 31 |
-| [#18165 Termux Bug](https://github.com/google-gemini/gemini-cli/issues/18165) | @MohammadGhorayeb | 26 |
+| - | _No stale assignments._ | - |
 
 ## 🚧 Blocked & Stale PRs
 PRs with conflicts or failures untouched for >14 days.
