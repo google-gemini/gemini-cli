@@ -123,8 +123,8 @@ The manifest file defines the extension's behavior and configuration.
     }
   },
   "contextFileName": "GEMINI.md",
-  "hooksDir": "claude-hooks",
-  "skillsDir": "claude-skills",
+  "hooksDir": "gemini-hooks",
+  "skillsDir": "gemini-skills",
   "excludeTools": ["run_shell_command"],
   "migratedTo": "https://github.com/new-owner/new-extension-repo",
   "plan": {
@@ -233,16 +233,16 @@ For an extension named `gcp`:
 Intercept and customize CLI behavior using [hooks](../hooks/index.md). Define
 hooks in `hooks/hooks.json` by default, or set `hooksDir` in
 `gemini-extension.json` to point Gemini CLI at a different relative directory.
-For example, `"hooksDir": "claude-hooks"` makes Gemini CLI load
-`claude-hooks/hooks.json`.
+For example, `"hooksDir": "gemini-hooks"` makes Gemini CLI load
+`gemini-hooks/hooks.json`.
 
 ### Agent skills
 
 Bundle [agent skills](../cli/skills.md) to provide specialized workflows. Place
 skill definitions in `skills/` by default, or set `skillsDir` in
 `gemini-extension.json` to point Gemini CLI at a different relative directory.
-For example, `"skillsDir": "claude-skills"` makes Gemini CLI load
-`claude-skills/security-audit/SKILL.md` as the `security-audit` skill.
+For example, `"skillsDir": "gemini-skills"` makes Gemini CLI load
+`gemini-skills/security-audit/SKILL.md` as the `security-audit` skill.
 
 ### Sub-agents
 
