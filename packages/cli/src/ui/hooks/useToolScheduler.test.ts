@@ -381,7 +381,7 @@ describe('useToolScheduler', () => {
     expect(toolCalls2.every((t) => t.responseSubmittedToGemini)).toBe(true);
   });
 
-  it('ignores TOOL_CALLS_UPDATE from non-root schedulers when no tools await approval', async () => {
+  it('shows Executing tool calls from non-root schedulers for subagent visibility', async () => {
     const { result } = await renderHook(() =>
       useToolScheduler(
         vi.fn().mockResolvedValue(undefined),
@@ -412,7 +412,11 @@ describe('useToolScheduler', () => {
       } as ToolCallsUpdateMessage);
     });
 
-    expect(result.current[0]).toHaveLength(0);
+    // Executing calls from non-root schedulers are now visible so the
+    // task-tree can build the full parentCallId hierarchy for subagent work.
+    expect(result.current[0]).toHaveLength(1);
+    expect(result.current[0][0].request.callId).toBe('call-sub');
+    expect(result.current[0][0].status).toBe(CoreToolCallStatus.Executing);
   });
 
   it('allows TOOL_CALLS_UPDATE from non-root schedulers when tools are awaiting approval', async () => {
@@ -503,7 +507,8 @@ describe('useToolScheduler', () => {
     expect(result.current[0]).toHaveLength(1);
     expect(result.current[0][0].status).toBe(CoreToolCallStatus.Executing);
 
-    // Background tool should not be shown
+    // New executing tool from the same subagent — now visible so the
+    // task-tree can display the full hierarchy of subagent work.
     const backgroundTool = {
       status: CoreToolCallStatus.Executing as const,
       request: {
@@ -526,9 +531,11 @@ describe('useToolScheduler', () => {
       } as ToolCallsUpdateMessage);
     });
 
-    // The subagent list should now be empty because the previously approved tool
-    // is gone from the current list, and the new tool doesn't need approval.
-    expect(result.current[0]).toHaveLength(0);
+    // The previously approved tool (call-sub) is gone from the update, but the
+    // new Executing tool (call-background) is now shown for subagent visibility.
+    expect(result.current[0]).toHaveLength(1);
+    expect(result.current[0][0].request.callId).toBe('call-background');
+    expect(result.current[0][0].status).toBe(CoreToolCallStatus.Executing);
   });
 
   it('adapts success/error status to executing when a tail call is present', async () => {
