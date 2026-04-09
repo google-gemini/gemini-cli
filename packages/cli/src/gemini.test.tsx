@@ -304,6 +304,25 @@ describe('gemini.tsx main function', () => {
     vi.restoreAllMocks();
   });
 
+  it('should suppress AbortError and not open debug console', async () => {
+    const debugLoggerErrorSpy = vi.spyOn(debugLogger, 'error');
+    const debugLoggerLogSpy = vi.spyOn(debugLogger, 'log');
+    const abortError = new DOMException(
+      'The operation was aborted.',
+      'AbortError',
+    );
+
+    setupUnhandledRejectionHandler();
+    process.emit('unhandledRejection', abortError, Promise.resolve());
+
+    await new Promise(process.nextTick);
+
+    expect(debugLoggerErrorSpy).not.toHaveBeenCalled();
+    expect(debugLoggerLogSpy).toHaveBeenCalledWith(
+      expect.stringContaining('Suppressed unhandled AbortError'),
+    );
+  });
+
   it('should log unhandled promise rejections and open debug console on first error', async () => {
     const processExitSpy = vi
       .spyOn(process, 'exit')
