@@ -124,9 +124,9 @@ export const ToolGroupMessage: React.FC<ToolGroupMessageProps> = ({
   // Filter out tool calls that should be hidden (e.g. in-progress Ask User, or Plan Mode operations).
   const visibleToolCalls = useMemo(
     () =>
-      allToolCalls.filter((t) => 
+      allToolCalls.filter((t) =>
         // Use the unified visibility utility
-         isVisibleInToolGroup(
+        isVisibleInToolGroup(
           {
             name: t.name,
             displayName: t.name, // Usually the same for now, core deals with resolving display vs raw
@@ -137,7 +137,7 @@ export const ToolGroupMessage: React.FC<ToolGroupMessageProps> = ({
             isClientInitiated: !!t.isClientInitiated,
           },
           isLowErrorVerbosity ? 'low' : 'full',
-        )
+        ),
       ),
     [allToolCalls, isLowErrorVerbosity],
   );
