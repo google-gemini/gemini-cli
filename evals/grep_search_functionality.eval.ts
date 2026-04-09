@@ -15,6 +15,8 @@ describe('grep_search_functionality', () => {
   const TEST_PREFIX = 'Grep Search Functionality: ';
 
   evalTest('USUALLY_PASSES', {
+    suiteName: 'default',
+    suiteType: 'behavioral',
     name: 'should find a simple string in a file',
     files: {
       'test.txt': `hello
@@ -33,6 +35,8 @@ describe('grep_search_functionality', () => {
   });
 
   evalTest('USUALLY_PASSES', {
+    suiteName: 'default',
+    suiteType: 'behavioral',
     name: 'should perform a case-sensitive search',
     files: {
       'test.txt': `Hello
@@ -63,6 +67,8 @@ describe('grep_search_functionality', () => {
   });
 
   evalTest('USUALLY_PASSES', {
+    suiteName: 'default',
+    suiteType: 'behavioral',
     name: 'should return only file names when names_only is used',
     files: {
       'file1.txt': 'match me',
@@ -93,7 +99,9 @@ describe('grep_search_functionality', () => {
   });
 
   evalTest('USUALLY_PASSES', {
-    name: 'should search only within the specified include glob',
+    suiteName: 'default',
+    suiteType: 'behavioral',
+    name: 'should search only within the specified include_pattern glob',
     files: {
       'file.js': 'my_function();',
       'file.ts': 'my_function();',
@@ -105,24 +113,26 @@ describe('grep_search_functionality', () => {
         undefined,
         (args) => {
           const params = JSON.parse(args);
-          return params.include === '*.js';
+          return params.include_pattern === '*.js';
         },
       );
       expect(
         wasToolCalled,
-        'Expected grep_search to be called with include: "*.js"',
+        'Expected grep_search to be called with include_pattern: "*.js"',
       ).toBe(true);
 
       assertModelHasOutput(result);
       checkModelOutputContent(result, {
         expectedContent: [/file.js/],
         forbiddenContent: [/file.ts/],
-        testName: `${TEST_PREFIX}include glob search`,
+        testName: `${TEST_PREFIX}include_pattern glob search`,
       });
     },
   });
 
   evalTest('USUALLY_PASSES', {
+    suiteName: 'default',
+    suiteType: 'behavioral',
     name: 'should search within a specific subdirectory',
     files: {
       'src/main.js': 'unique_string_1',
@@ -153,6 +163,8 @@ describe('grep_search_functionality', () => {
   });
 
   evalTest('USUALLY_PASSES', {
+    suiteName: 'default',
+    suiteType: 'behavioral',
     name: 'should report no matches correctly',
     files: {
       'file.txt': 'nothing to see here',

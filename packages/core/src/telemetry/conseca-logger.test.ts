@@ -39,6 +39,7 @@ describe('conseca-logger', () => {
       getTelemetryLogPromptsEnabled: vi.fn().mockReturnValue(true),
       isInteractive: vi.fn().mockReturnValue(true),
       getExperiments: vi.fn().mockReturnValue({ experimentIds: [] }),
+      getContentGeneratorConfig: vi.fn().mockReturnValue({ authType: 'oauth' }),
     } as unknown as Config;
 
     mockLogger = {
@@ -111,7 +112,7 @@ describe('conseca-logger', () => {
       'user prompt',
       'policy',
       'tool call',
-      'ALLOW',
+      'allow',
       'rationale',
     );
 
@@ -121,7 +122,7 @@ describe('conseca-logger', () => {
     expect(logs.getLogger).toHaveBeenCalled();
     expect(mockLogger.emit).toHaveBeenCalledWith(
       expect.objectContaining({
-        body: 'Conseca Verdict: ALLOW.',
+        body: 'Conseca Verdict: allow.',
         attributes: expect.objectContaining({
           'event.name': EVENT_CONSECA_VERDICT,
         }),

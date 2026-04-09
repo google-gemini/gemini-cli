@@ -7,14 +7,14 @@
 import type React from 'react';
 import { useState, useCallback, useMemo, useEffect, useRef } from 'react';
 import { Box, Text } from 'ink';
+import { theme } from '../semantic-colors.js';
 import { Colors } from '../colors.js';
 import { useTerminalSize } from '../hooks/useTerminalSize.js';
 import { useKeypress } from '../hooks/useKeypress.js';
 import path from 'node:path';
 import type { Config } from '@google/gemini-cli-core';
-import type { SessionInfo, TextMatch } from '../../utils/sessionUtils.js';
+import type { SessionInfo } from '../../utils/sessionUtils.js';
 import {
-  cleanMessage,
   formatRelativeTime,
   getSessionFiles,
 } from '../../utils/sessionUtils.js';
@@ -110,223 +110,16 @@ const SESSIONS_PER_PAGE = 20;
 // If the SessionItem layout changes, update this accordingly.
 const FIXED_SESSION_COLUMNS_WIDTH = 30;
 
-const Kbd = ({ name, shortcut }: { name: string; shortcut: string }) => (
-  <>
-    {name}: <Text bold>{shortcut}</Text>
-  </>
-);
-
-/**
- * Loading state component displayed while sessions are being loaded.
- */
-const SessionBrowserLoading = (): React.JSX.Element => (
-  <Box flexDirection="column" paddingX={1}>
-    <Text color={Colors.Gray}>Loading sessions…</Text>
-  </Box>
-);
-
-/**
- * Error state component displayed when session loading fails.
- */
-const SessionBrowserError = ({
-  state,
-}: {
-  state: SessionBrowserState;
-}): React.JSX.Element => (
-  <Box flexDirection="column" paddingX={1}>
-    <Text color={Colors.AccentRed}>Error: {state.error}</Text>
-    <Text color={Colors.Gray}>Press q to exit</Text>
-  </Box>
-);
-
-/**
- * Empty state component displayed when no sessions are found.
- */
-const SessionBrowserEmpty = (): React.JSX.Element => (
-  <Box flexDirection="column" paddingX={1}>
-    <Text color={Colors.Gray}>No auto-saved conversations found.</Text>
-    <Text color={Colors.Gray}>Press q to exit</Text>
-  </Box>
-);
-
-/**
- * Sorts an array of sessions by the specified criteria.
- * @param sessions - Array of sessions to sort
- * @param sortBy - Sort criteria: 'date' (lastUpdated), 'messages' (messageCount), or 'name' (displayName)
- * @param reverse - Whether to reverse the sort order (ascending instead of descending)
- * @returns New sorted array of sessions
- */
-const sortSessions = (
-  sessions: SessionInfo[],
-  sortBy: 'date' | 'messages' | 'name',
-  reverse: boolean,
-): SessionInfo[] => {
-  const sorted = [...sessions].sort((a, b) => {
-    switch (sortBy) {
-      case 'date':
-        return (
-          new Date(b.lastUpdated).getTime() - new Date(a.lastUpdated).getTime()
-        );
-      case 'messages':
-        return b.messageCount - a.messageCount;
-      case 'name':
-        return a.displayName.localeCompare(b.displayName);
-      default:
-        return 0;
-    }
-  });
-
-  return reverse ? sorted.reverse() : sorted;
-};
-
-/**
- * Finds all text matches for a search query within conversation messages.
- * Creates TextMatch objects with context (10 chars before/after) and role information.
- * @param messages - Array of messages to search through
- * @param query - Search query string (case-insensitive)
- * @returns Array of TextMatch objects containing match context and metadata
- */
-const findTextMatches = (
-  messages: Array<{ role: 'user' | 'assistant'; content: string }>,
-  query: string,
-): TextMatch[] => {
-  if (!query.trim()) return [];
-
-  const lowerQuery = query.toLowerCase();
-  const matches: TextMatch[] = [];
-
-  for (const message of messages) {
-    const m = cleanMessage(message.content);
-    const lowerContent = m.toLowerCase();
-    let startIndex = 0;
-
-    while (true) {
-      const matchIndex = lowerContent.indexOf(lowerQuery, startIndex);
-      if (matchIndex === -1) break;
-
-      const contextStart = Math.max(0, matchIndex - 10);
-      const contextEnd = Math.min(m.length, matchIndex + query.length + 10);
-
-      const snippet = m.slice(contextStart, contextEnd);
-      const relativeMatchStart = matchIndex - contextStart;
-      const relativeMatchEnd = relativeMatchStart + query.length;
-
-      let before = snippet.slice(0, relativeMatchStart);
-      const match = snippet.slice(relativeMatchStart, relativeMatchEnd);
-      let after = snippet.slice(relativeMatchEnd);
-
-      if (contextStart > 0) before = '…' + before;
-      if (contextEnd < m.length) after = after + '…';
-
-      matches.push({ before, match, after, role: message.role });
-      startIndex = matchIndex + 1;
-    }
-  }
-
-  return matches;
-};
-
-/**
- * Filters sessions based on a search query, checking titles, IDs, and full content.
- * Also populates matchSnippets and matchCount for sessions with content matches.
- * @param sessions - Array of sessions to filter
- * @param query - Search query string (case-insensitive)
- * @returns Filtered array of sessions that match the query
- */
-const filterSessions = (
-  sessions: SessionInfo[],
-  query: string,
-): SessionInfo[] => {
-  if (!query.trim()) {
-    return sessions.map((session) => ({
-      ...session,
-      matchSnippets: undefined,
-      matchCount: undefined,
-    }));
-  }
-
-  const lowerQuery = query.toLowerCase();
-  return sessions.filter((session) => {
-    const titleMatch =
-      session.displayName.toLowerCase().includes(lowerQuery) ||
-      session.id.toLowerCase().includes(lowerQuery) ||
-      session.firstUserMessage.toLowerCase().includes(lowerQuery);
-
-    const contentMatch = session.fullContent
-      ?.toLowerCase()
-      .includes(lowerQuery);
-
-    if (titleMatch || contentMatch) {
-      if (session.messages) {
-        session.matchSnippets = findTextMatches(session.messages, query);
-        session.matchCount = session.matchSnippets.length;
-      }
-      return true;
-    }
-
-    return false;
-  });
-};
-
-/**
- * Search input display component.
- */
-const SearchModeDisplay = ({
-  state,
-}: {
-  state: SessionBrowserState;
-}): React.JSX.Element => (
-  <Box marginTop={1}>
-    <Text color={Colors.Gray}>Search: </Text>
-    <Text color={Colors.AccentPurple}>{state.searchQuery}</Text>
-    <Text color={Colors.Gray}> (Esc to cancel)</Text>
-  </Box>
-);
-
-/**
- * Header component showing session count and sort information.
- */
-const SessionListHeader = ({
-  state,
-}: {
-  state: SessionBrowserState;
-}): React.JSX.Element => (
-  <Box flexDirection="row" justifyContent="space-between">
-    <Text color={Colors.AccentPurple}>
-      Chat Sessions ({state.totalSessions} total
-      {state.searchQuery ? `, filtered` : ''})
-    </Text>
-    <Text color={Colors.Gray}>
-      sorted by {state.sortOrder} {state.sortReverse ? 'asc' : 'desc'}
-    </Text>
-  </Box>
-);
-
-/**
- * Navigation help component showing keyboard shortcuts.
- */
-const NavigationHelp = (): React.JSX.Element => (
-  <Box flexDirection="column">
-    <Text color={Colors.Gray}>
-      <Kbd name="Navigate" shortcut="↑/↓" />
-      {'   '}
-      <Kbd name="Resume" shortcut="Enter" />
-      {'   '}
-      <Kbd name="Search" shortcut="/" />
-      {'   '}
-      <Kbd name="Delete" shortcut="x" />
-      {'   '}
-      <Kbd name="Quit" shortcut="q" />
-    </Text>
-    <Text color={Colors.Gray}>
-      <Kbd name="Sort" shortcut="s" />
-      {'         '}
-      <Kbd name="Reverse" shortcut="r" />
-      {'      '}
-      <Kbd name="First/Last" shortcut="g/G" />
-    </Text>
-  </Box>
-);
+import {
+  SearchModeDisplay,
+  NavigationHelpDisplay,
+  NoResultsDisplay,
+} from './SessionBrowser/SessionBrowserNav.js';
+import { SessionListHeader } from './SessionBrowser/SessionListHeader.js';
+import { SessionBrowserLoading } from './SessionBrowser/SessionBrowserLoading.js';
+import { SessionBrowserError } from './SessionBrowser/SessionBrowserError.js';
+import { SessionBrowserEmpty } from './SessionBrowser/SessionBrowserEmpty.js';
+import { sortSessions, filterSessions } from './SessionBrowser/utils.js';
 
 /**
  * Table header component with column labels and scroll indicators.
@@ -362,21 +155,6 @@ const SessionTableHeader = ({
         {state.searchQuery ? 'Match' : 'Name'}
       </Text>
     </Box>
-  </Box>
-);
-
-/**
- * No results display component for empty search results.
- */
-const NoResultsDisplay = ({
-  state,
-}: {
-  state: SessionBrowserState;
-}): React.JSX.Element => (
-  <Box marginTop={1}>
-    <Text color={Colors.Gray} dimColor>
-      No sessions found matching &apos;{state.searchQuery}&apos;.
-    </Text>
   </Box>
 );
 
@@ -436,7 +214,7 @@ const SessionItem = ({
     if (isDisabled) {
       return Colors.Gray;
     }
-    return isActive ? Colors.AccentPurple : c;
+    return isActive ? theme.ui.focus : c;
   };
 
   const prefix = isActive ? '❯ ' : '  ';
@@ -483,7 +261,10 @@ const SessionItem = ({
     ));
 
   return (
-    <Box flexDirection="row">
+    <Box
+      flexDirection="row"
+      backgroundColor={isActive ? theme.background.focus : undefined}
+    >
       <Text color={textColor()} dimColor={isDisabled}>
         {prefix}
       </Text>
@@ -541,7 +322,7 @@ const SessionList = ({
   <Box flexDirection="column">
     {/* Table Header */}
     <Box flexDirection="column">
-      {!state.isSearchMode && <NavigationHelp />}
+      {!state.isSearchMode && <NavigationHelpDisplay />}
       <SessionTableHeader state={state} />
     </Box>
 
@@ -869,7 +650,7 @@ export const useSessionBrowserInput = (
 
       // Handling regardless of search mode.
       if (
-        key.name === 'return' &&
+        key.name === 'enter' &&
         state.filteredAndSortedSessions[state.activeIndex]
       ) {
         const selectedSession =

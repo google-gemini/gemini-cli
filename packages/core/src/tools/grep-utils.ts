@@ -6,6 +6,8 @@
 
 import fsPromises from 'node:fs/promises';
 import { debugLogger } from '../utils/debugLogger.js';
+import { MAX_LINE_LENGTH_TEXT_FILE } from '../utils/constants.js';
+import type { GrepResult } from './tools.js';
 
 /**
  * Result object for a single grep match
@@ -139,7 +141,7 @@ export async function formatGrepResults(
   params: {
     pattern: string;
     names_only?: boolean;
-    include?: string;
+    include_pattern?: string;
     // Context params to determine if auto-context should be skipped
     context?: number;
     before?: number;
@@ -147,12 +149,18 @@ export async function formatGrepResults(
   },
   searchLocationDescription: string,
   totalMaxMatches: number,
-): Promise<{ llmContent: string; returnDisplay: string }> {
-  const { pattern, names_only, include } = params;
+): Promise<{ llmContent: string; returnDisplay: GrepResult }> {
+  const { pattern, names_only, include_pattern } = params;
 
   if (allMatches.length === 0) {
-    const noMatchMsg = `No matches found for pattern "${pattern}" ${searchLocationDescription}${include ? ` (filter: "${include}")` : ''}.`;
-    return { llmContent: noMatchMsg, returnDisplay: `No matches found` };
+    const noMatchMsg = `No matches found for pattern "${pattern}" ${searchLocationDescription}${include_pattern ? ` (filter: "${include_pattern}")` : ''}.`;
+    return {
+      llmContent: noMatchMsg,
+      returnDisplay: {
+        summary: 'No matches found',
+        matches: [],
+      },
+    };
   }
 
   const matchesByFile = groupMatchesByFile(allMatches);
@@ -171,7 +179,7 @@ export async function formatGrepResults(
   if (names_only) {
     const filePaths = Object.keys(matchesByFile).sort();
     let llmContent = `Found ${filePaths.length} files with matches for pattern "${pattern}" ${searchLocationDescription}${
-      include ? ` (filter: "${include}")` : ''
+      include_pattern ? ` (filter: "${include_pattern}")` : ''
     }${
       wasTruncated
         ? ` (results limited to ${totalMaxMatches} matches for performance)`
@@ -180,11 +188,14 @@ export async function formatGrepResults(
     llmContent += filePaths.join('\n');
     return {
       llmContent: llmContent.trim(),
-      returnDisplay: `Found ${filePaths.length} files${wasTruncated ? ' (limited)' : ''}`,
+      returnDisplay: {
+        summary: `Found ${filePaths.length} files${wasTruncated ? ' (limited)' : ''}`,
+        matches: [],
+      },
     };
   }
 
-  let llmContent = `Found ${matchCount} ${matchTerm} for pattern "${pattern}" ${searchLocationDescription}${include ? ` (filter: "${include}")` : ''}`;
+  let llmContent = `Found ${matchCount} ${matchTerm} for pattern "${pattern}" ${searchLocationDescription}${include_pattern ? ` (filter: "${include_pattern}")` : ''}`;
 
   if (wasTruncated) {
     llmContent += ` (results limited to ${totalMaxMatches} matches for performance)`;
@@ -198,15 +209,30 @@ export async function formatGrepResults(
       // If isContext is undefined, assume it's a match (false)
       const separator = match.isContext ? '-' : ':';
       // trimEnd to avoid double newlines if line has them, but we want to preserve indentation
-      llmContent += `L${match.lineNumber}${separator} ${match.line.trimEnd()}\n`;
+      let lineContent = match.line.trimEnd();
+      const graphemes = Array.from(lineContent);
+      if (graphemes.length > MAX_LINE_LENGTH_TEXT_FILE) {
+        lineContent =
+          graphemes.slice(0, MAX_LINE_LENGTH_TEXT_FILE).join('') +
+          '... [truncated]';
+      }
+      llmContent += `L${match.lineNumber}${separator} ${lineContent}\n`;
     });
     llmContent += '---\n';
   }
 
   return {
     llmContent: llmContent.trim(),
-    returnDisplay: `Found ${matchCount} ${matchTerm}${
-      wasTruncated ? ' (limited)' : ''
-    }`,
+    returnDisplay: {
+      summary: `Found ${matchCount} ${matchTerm}${wasTruncated ? ' (limited)' : ''}`,
+      matches: allMatches
+        .filter((m) => !m.isContext)
+        .map((m) => ({
+          filePath: m.filePath,
+          absolutePath: m.absolutePath,
+          lineNumber: m.lineNumber,
+          line: m.line,
+        })),
+    },
   };
 }

@@ -158,6 +158,30 @@ describe('retryWithBackoff', () => {
     expect(mockFn).not.toHaveBeenCalled();
   });
 
+  it('should retry on HTTP 499 (Client Closed Request) error', async () => {
+    let attempts = 0;
+    const mockFn = vi.fn(async () => {
+      attempts++;
+      if (attempts === 1) {
+        const error: HttpError = new Error('Simulated 499 error');
+        error.status = 499;
+        throw error;
+      }
+      return 'success';
+    });
+
+    const promise = retryWithBackoff(mockFn, {
+      maxAttempts: 2,
+      initialDelayMs: 10,
+    });
+
+    await vi.runAllTimersAsync();
+
+    const result = await promise;
+    expect(result).toBe('success');
+    expect(mockFn).toHaveBeenCalledTimes(2);
+  });
+
   it('should use default shouldRetry if not provided, retrying on ApiError 429', async () => {
     const mockFn = vi.fn(async () => {
       throw new ApiError({ message: 'Too Many Requests', status: 429 });
@@ -312,6 +336,25 @@ describe('retryWithBackoff', () => {
     it("should retry on 'fetch failed' when retryFetchErrors is true", async () => {
       const mockFn = vi.fn();
       mockFn.mockRejectedValueOnce(new TypeError('fetch failed'));
+      mockFn.mockResolvedValueOnce('success');
+
+      const promise = retryWithBackoff(mockFn, {
+        retryFetchErrors: true,
+        initialDelayMs: 10,
+      });
+
+      await vi.runAllTimersAsync();
+
+      const result = await promise;
+      expect(result).toBe('success');
+      expect(mockFn).toHaveBeenCalledTimes(2);
+    });
+
+    it("should retry on 'Incomplete JSON segment' when retryFetchErrors is true", async () => {
+      const mockFn = vi.fn();
+      mockFn.mockRejectedValueOnce(
+        new Error('Incomplete JSON segment at the end'),
+      );
       mockFn.mockResolvedValueOnce('success');
 
       const promise = retryWithBackoff(mockFn, {
@@ -591,6 +634,58 @@ describe('retryWithBackoff', () => {
     );
     expect(mockFn).toHaveBeenCalledTimes(1);
   });
+
+  it('should not emit onRetry when aborted before catch retry handling', async () => {
+    const abortController = new AbortController();
+    const onRetry = vi.fn();
+    const mockFn = vi.fn().mockImplementation(async () => {
+      const error = new Error('Server error') as HttpError;
+      error.status = 500;
+      abortController.abort();
+      throw error;
+    });
+
+    const promise = retryWithBackoff(mockFn, {
+      maxAttempts: 3,
+      initialDelayMs: 100,
+      signal: abortController.signal,
+      onRetry,
+    });
+
+    await expect(promise).rejects.toThrow(
+      expect.objectContaining({ name: 'AbortError' }),
+    );
+    expect(onRetry).not.toHaveBeenCalled();
+    expect(debugLogger.warn).not.toHaveBeenCalled();
+    expect(mockFn).toHaveBeenCalledTimes(1);
+  });
+
+  it('should not emit onRetry when aborted before content retry handling', async () => {
+    const abortController = new AbortController();
+    const onRetry = vi.fn();
+    const shouldRetryOnContent = vi.fn().mockImplementation(() => {
+      abortController.abort();
+      return true;
+    });
+    const mockFn = vi.fn().mockResolvedValue({});
+
+    const promise = retryWithBackoff(mockFn, {
+      maxAttempts: 3,
+      initialDelayMs: 100,
+      signal: abortController.signal,
+      onRetry,
+      shouldRetryOnContent,
+    });
+
+    await expect(promise).rejects.toThrow(
+      expect.objectContaining({ name: 'AbortError' }),
+    );
+    expect(onRetry).not.toHaveBeenCalled();
+    expect(debugLogger.warn).not.toHaveBeenCalled();
+    expect(shouldRetryOnContent).toHaveBeenCalledTimes(1);
+    expect(mockFn).toHaveBeenCalledTimes(1);
+  });
+
   it('should trigger fallback for OAuth personal users on persistent 500 errors', async () => {
     const fallbackCallback = vi.fn().mockResolvedValue('gemini-2.5-flash');
 

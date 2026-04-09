@@ -7,7 +7,7 @@
 import React, { useState, useEffect } from 'react';
 import { Box, Text } from 'ink';
 import { ToolCallStatus, mapCoreStatusToDisplayStatus } from '../../types.js';
-import { GeminiRespondingSpinner } from '../GeminiRespondingSpinner.js';
+import { CliSpinner } from '../CliSpinner.js';
 import {
   SHELL_COMMAND_NAME,
   SHELL_NAME,
@@ -23,8 +23,8 @@ import {
   CoreToolCallStatus,
 } from '@google/gemini-cli-core';
 import { useInactivityTimer } from '../../hooks/useInactivityTimer.js';
-import { formatCommand } from '../../utils/keybindingUtils.js';
-import { Command } from '../../../config/keyBindings.js';
+import { formatCommand } from '../../key/keybindingUtils.js';
+import { Command } from '../../key/keyBindings.js';
 
 export const STATUS_INDICATOR_WIDTH = 3;
 
@@ -123,7 +123,7 @@ export const FocusHint: React.FC<{
 
   return (
     <Box marginLeft={1} flexShrink={0}>
-      <Text color={theme.text.accent}>
+      <Text color={isThisShellFocused ? theme.ui.focus : theme.ui.active}>
         {isThisShellFocused
           ? `(${formatCommand(Command.UNFOCUS_SHELL_INPUT)} to unfocus)`
           : `(${formatCommand(Command.FOCUS_SHELL_INPUT)} to focus)`}
@@ -137,15 +137,21 @@ export type TextEmphasis = 'high' | 'medium' | 'low';
 type ToolStatusIndicatorProps = {
   status: CoreToolCallStatus;
   name: string;
+  isFocused?: boolean;
 };
 
 export const ToolStatusIndicator: React.FC<ToolStatusIndicatorProps> = ({
   status: coreStatus,
   name,
+  isFocused,
 }) => {
   const status = mapCoreStatusToDisplayStatus(coreStatus);
   const isShell = isShellTool(name);
-  const statusColor = isShell ? theme.ui.symbol : theme.status.warning;
+  const statusColor = isFocused
+    ? theme.ui.focus
+    : isShell
+      ? theme.ui.active
+      : theme.status.warning;
 
   return (
     <Box minWidth={STATUS_INDICATOR_WIDTH}>
@@ -153,10 +159,9 @@ export const ToolStatusIndicator: React.FC<ToolStatusIndicatorProps> = ({
         <Text color={theme.status.success}>{TOOL_STATUS.PENDING}</Text>
       )}
       {status === ToolCallStatus.Executing && (
-        <GeminiRespondingSpinner
-          spinnerType="toggle"
-          nonRespondingDisplay={TOOL_STATUS.EXECUTING}
-        />
+        <Text color={statusColor}>
+          <CliSpinner type="toggle" />
+        </Text>
       )}
       {status === ToolCallStatus.Success && (
         <Text color={theme.status.success} aria-label={'Success:'}>
@@ -188,7 +193,7 @@ type ToolInfoProps = {
   status: CoreToolCallStatus;
   emphasis: TextEmphasis;
   progressMessage?: string;
-  progressPercent?: number;
+  originalRequestName?: string;
 };
 
 export const ToolInfo: React.FC<ToolInfoProps> = ({
@@ -196,8 +201,8 @@ export const ToolInfo: React.FC<ToolInfoProps> = ({
   description,
   status: coreStatus,
   emphasis,
-  progressMessage,
-  progressPercent,
+  progressMessage: _progressMessage,
+  originalRequestName,
 }) => {
   const status = mapCoreStatusToDisplayStatus(coreStatus);
   const nameColor = React.useMemo<string>(() => {
@@ -218,37 +223,73 @@ export const ToolInfo: React.FC<ToolInfoProps> = ({
   // Hide description for completed Ask User tools (the result display speaks for itself)
   const isCompletedAskUser = isCompletedAskUserTool(name, status);
 
-  let displayDescription = description;
-  if (status === ToolCallStatus.Executing) {
-    const parts: string[] = [];
-    if (progressMessage) {
-      parts.push(progressMessage);
-    }
-    if (progressPercent !== undefined) {
-      parts.push(`${Math.round(progressPercent)}%`);
-    }
-
-    if (parts.length > 0) {
-      const progressInfo = parts.join(' - ');
-      displayDescription = description
-        ? `${description} (${progressInfo})`
-        : progressInfo;
-    }
-  }
-
   return (
     <Box overflow="hidden" height={1} flexGrow={1} flexShrink={1}>
       <Text strikethrough={status === ToolCallStatus.Canceled} wrap="truncate">
         <Text color={nameColor} bold>
           {name}
         </Text>
+        {originalRequestName && originalRequestName !== name && (
+          <Text color={theme.text.secondary} italic>
+            {' '}
+            (redirection from {originalRequestName})
+          </Text>
+        )}
         {!isCompletedAskUser && (
           <>
             {' '}
-            <Text color={theme.text.secondary}>{displayDescription}</Text>
+            <Text color={theme.text.secondary}>{description}</Text>
           </>
         )}
       </Text>
+    </Box>
+  );
+};
+
+export interface McpProgressIndicatorProps {
+  progress: number;
+  total?: number;
+  message?: string;
+  barWidth: number;
+}
+
+export const McpProgressIndicator: React.FC<McpProgressIndicatorProps> = ({
+  progress,
+  total,
+  message,
+  barWidth,
+}) => {
+  const percentage =
+    total && total > 0
+      ? Math.min(100, Math.round((progress / total) * 100))
+      : null;
+
+  let rawFilled: number;
+  if (total && total > 0) {
+    rawFilled = Math.round((progress / total) * barWidth);
+  } else {
+    rawFilled = Math.floor(progress) % (barWidth + 1);
+  }
+
+  const filled = Math.max(
+    0,
+    Math.min(Number.isFinite(rawFilled) ? rawFilled : 0, barWidth),
+  );
+  const empty = Math.max(0, barWidth - filled);
+  const progressBar = '\u2588'.repeat(filled) + '\u2591'.repeat(empty);
+
+  return (
+    <Box flexDirection="column">
+      <Box>
+        <Text color={theme.text.accent}>
+          {progressBar} {percentage !== null ? `${percentage}%` : `${progress}`}
+        </Text>
+      </Box>
+      {message && (
+        <Text color={theme.text.secondary} wrap="truncate">
+          {message}
+        </Text>
+      )}
     </Box>
   );
 };
