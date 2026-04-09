@@ -11,7 +11,7 @@ TARGET_REPO = 'google-gemini/gemini-cli'
 SEARCH_QUERY = f'repo:{TARGET_REPO} is:issue state:open label:area/core,area/extensions,area/site label:"help wanted" sort:updated-asc'
 
 # Thresholds
-STALE_ASSIGNMENT_DAYS = 30
+STALE_ASSIGNMENT_DAYS = 14
 STALE_BLOCKED_PR_DAYS = 14
 
 # Common bots to exclude from the reviewer list
