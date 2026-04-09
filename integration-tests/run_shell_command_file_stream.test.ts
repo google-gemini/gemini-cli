@@ -50,24 +50,26 @@ describe('run_shell_command streaming to file regression', () => {
     let savedFilePath = '';
     const tmpdir = path.join(rig.homeDir!, '.gemini', 'tmp');
     if (fs.existsSync(tmpdir)) {
-      const files = fs.readdirSync(tmpdir, {
-        recursive: true,
-        withFileTypes: true,
-      });
-      for (const file of files) {
-        if (file.isFile() && file.name.endsWith('.txt')) {
-          // In Node 20+, recursive readdir returns Dirent objects where `parentPath` is the directory path,
-          // but sometimes `path` is used in older Node. fallback:
-          const parentDir =
-            (file as { parentPath?: string }).parentPath ??
-            (file as { path?: string }).path ??
-            tmpdir;
-          const p = path.join(parentDir, file.name);
-          const stat = fs.statSync(p);
-          if (Date.now() - stat.mtimeMs < 60000 && stat.size >= 20000000) {
-            savedFilePath = p;
-            break;
+      const findFiles = (dir: string): string[] => {
+        let results: string[] = [];
+        const list = fs.readdirSync(dir, { withFileTypes: true });
+        for (const file of list) {
+          const fullPath = path.join(dir, file.name);
+          if (file.isDirectory()) {
+            results = results.concat(findFiles(fullPath));
+          } else if (file.isFile() && file.name.endsWith('.txt')) {
+            results.push(fullPath);
           }
+        }
+        return results;
+      };
+
+      const files = findFiles(tmpdir);
+      for (const p of files) {
+        const stat = fs.statSync(p);
+        if (Date.now() - stat.mtimeMs < 60000 && stat.size >= 20000000) {
+          savedFilePath = p;
+          break;
         }
       }
     }
@@ -117,24 +119,36 @@ describe('run_shell_command streaming to file regression', () => {
     let savedFilePath = '';
     const tmpdir = path.join(rig.homeDir!, '.gemini', 'tmp');
     if (fs.existsSync(tmpdir)) {
-      const files = fs.readdirSync(tmpdir, {
-        recursive: true,
-        withFileTypes: true,
-      });
-      for (const file of files) {
-        if (file.isFile() && file.name.endsWith('.txt')) {
-          const parentDir =
-            (file as { parentPath?: string }).parentPath ??
-            (file as { path?: string }).path ??
-            tmpdir;
-          const p = path.join(parentDir, file.name);
-          const stat = fs.statSync(p);
-          // Look for file >= 20MB (since we expect 50MB, but allowing margin for the bug)
-          if (Date.now() - stat.mtimeMs < 60000 && stat.size >= 20000000) {
-            savedFilePath = p;
-            break;
+      const findFiles = (dir: string): string[] => {
+        let results: string[] = [];
+        const list = fs.readdirSync(dir, { withFileTypes: true });
+        for (const file of list) {
+          const fullPath = path.join(dir, file.name);
+          if (file.isDirectory()) {
+            results = results.concat(findFiles(fullPath));
+          } else if (file.isFile() && file.name.endsWith('.txt')) {
+            results.push(fullPath);
           }
         }
+        return results;
+      };
+
+      const files = findFiles(tmpdir);
+      const fileStats = files.map((p) => ({
+        p,
+        size: fs.statSync(p).size,
+        age: Date.now() - fs.statSync(p).mtimeMs,
+      }));
+      for (const p of files) {
+        const stat = fs.statSync(p);
+        // Look for file >= 20MB (since we expect 50MB, but allowing margin for the bug)
+        if (Date.now() - stat.mtimeMs < 60000 && stat.size >= 20000000) {
+          savedFilePath = p;
+          break;
+        }
+      }
+      if (!savedFilePath) {
+        console.error('Available files:', JSON.stringify(fileStats, null, 2));
       }
     }
 
