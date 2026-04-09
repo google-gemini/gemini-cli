@@ -111,7 +111,9 @@ def gh_api_graphql(query, variables):
             cmd.extend(['-F', f'{k}={v}'])
     cmd.extend(['-f', f'query={query}'])
     result = subprocess.run(cmd, capture_output=True, text=True)
-    return json.loads(result.stdout) if result.returncode == 0 else None
+    if result.returncode != 0:
+        return None
+    return json.loads(result.stdout)
 
 def get_reviewer_info(pr):
     author = pr.get('author', {}).get('login')
@@ -136,12 +138,15 @@ def get_reviewer_info(pr):
             latest_reviewer_activity = max(latest_reviewer_activity, c['publishedAt'])
     return sorted(list(human_reviewers)), latest_reviewer_activity
 
-def get_author_activity(pr):
+def get_latest_activity(pr):
     author = pr.get('author', {}).get('login')
     latest = pr['commits']['nodes'][0]['commit']['committedDate']
+    # Check all comments
     for c in pr.get('comments', {}).get('nodes', []):
-        if c.get('author', {}).get('login') == author:
-            latest = max(latest, c['publishedAt'])
+        latest = max(latest, c['publishedAt'])
+    # Check all reviews
+    for r in pr.get('latestReviews', {}).get('nodes', []):
+        latest = max(latest, r['updatedAt'])
     return latest
 
 def main():
@@ -193,27 +198,30 @@ def main():
             
             found_open_pr = True
             reviewers, latest_rev_act = get_reviewer_info(pr)
-            author_activity = get_author_activity(pr)
+            latest_pr_activity_iso = get_latest_activity(pr)
+            latest_pr_activity = datetime.datetime.fromisoformat(latest_pr_activity_iso.replace('Z', '+00:00'))
             
             # Check for Blockers
-            pr_updated_at = datetime.datetime.fromisoformat(pr['updatedAt'].replace('Z', '+00:00'))
             rollup = pr.get('statusCheckRollup')
             reason = ""
             if pr['mergeable'] == 'CONFLICTING': reason = "Merge Conflict"
             elif rollup and rollup.get('state') == 'FAILURE': reason = "Test Failure"
             
             if reason:
-                if (now - pr_updated_at).days >= STALE_BLOCKED_PR_DAYS:
-                    blocked_stale_prs.append({"issue_md": f"[#{issue_no} {issue_title}]({issue_url})", "pr_no": pr['number'], "pr_url": pr['url'], "reason": reason, "author": pr['author']['login'], "days_stale": (now - pr_updated_at).days})
+                if (now - latest_pr_activity).days >= STALE_BLOCKED_PR_DAYS:
+                    blocked_stale_prs.append({"issue_md": f"[#{issue_no} {issue_title}]({issue_url})", "pr_no": pr['number'], "pr_url": pr['url'], "reason": reason, "author": pr['author']['login'], "days_stale": (now - latest_pr_activity).days})
                 else:
                     # Blocked but ACTIVE -> Move to Active Development
-                    active_development.append({"issue_md": f"[#{issue_no} {issue_title}]({issue_url})", "assignees": assignees if assignees else [pr['author']['login']], "last_update": pr['updatedAt'][:10], "status": f"Active PR ({reason})"})
+                    active_development.append({"issue_md": f"[#{issue_no} {issue_title}]({issue_url})", "assignees": assignees if assignees else [pr['author']['login']], "last_update": latest_pr_activity_iso[:10], "status": f"Active PR ({reason})"})
                 categorized = True
                 break
 
             # Normal Review Flow
-            if not latest_rev_act or author_activity > latest_rev_act:
-                item = {"issue_md": f"[#{issue_no} {issue_title}]({issue_url})", "pr_no": pr['number'], "pr_url": pr['url'], "updated_at": pr['updatedAt'][:10]}
+            # Author activity is determined by latest activity if it was the author who spoke last
+            author_acted_last = not latest_rev_act or latest_pr_activity_iso > latest_rev_act
+            
+            if author_acted_last:
+                item = {"issue_md": f"[#{issue_no} {issue_title}]({issue_url})", "pr_no": pr['number'], "pr_url": pr['url'], "updated_at": latest_pr_activity_iso[:10]}
                 if not reviewers:
                     initial_pickup.append(item)
                 else:
@@ -227,6 +235,10 @@ def main():
                 categorized = True
                 break
 
+    # Re-calculate available and stale for no-PR cases
+    # (Existing logic is fine, it uses issue updatedAt)
+    # ... (rest of main same as before)
+
         if categorized: continue
 
         if not found_open_pr:
@@ -238,14 +250,9 @@ def main():
                     stale_assignments.append({"issue_md": f"[#{issue_no} {issue_title}]({issue_url})", "assignees": assignees, "days_stale": days_idle})
                 else:
                     active_development.append({"issue_md": f"[#{issue_no} {issue_title}]({issue_url})", "assignees": assignees, "last_update": issue['updatedAt'][:10], "status": "Assigned (No PR)"})
-        else:
-            # Should be impossible with current logic, but for safety:
-            other_issues.append({"issue_md": f"[#{issue_no} {issue_title}]({issue_url})", "reason": "Edge case PR"})
 
-    # Verify Counts
-    sum_categories = len(initial_pickup) + len(followup_needed) + len(waiting_for_author) + len(available_pickup) + len(active_development) + len(stale_assignments) + len(blocked_stale_prs) + len(other_issues)
+    sum_categories = len(initial_pickup) + len(followup_needed) + len(waiting_for_author) + len(available_pickup) + len(active_development) + len(stale_assignments) + len(blocked_stale_prs)
     
-    # Generate Markdown
     ts = now.strftime("%Y-%m-%d %H:%M")
     md = f"# 🔎 Gemini CLI Triage Dashboard\n\n*Last Synchronized: {ts} (UTC)*\n\n"
     md += f"**Total Issues Tracked: {len(all_issues)}** | **Categorized: {sum_categories}**\n\n"
@@ -284,11 +291,6 @@ def main():
     md += "| Issue | PR | Reason | Author | Days Stale |\n| :--- | :--- | :--- | :--- | :--- |\n"
     for i in blocked_stale_prs: md += f"| {i['issue_md']} | [#{i['pr_no']}]({i['pr_url']}) | {i['reason']} | @{i['author']} | {i['days_stale']} |\n"
     if not blocked_stale_prs: md += "| - | _None_ | - | - | - |\n"
-
-    if other_issues:
-        md += f"\n## ❓ Other / Uncategorized ({len(other_issues)})\n\n"
-        md += "| Issue | Reason |\n| :--- | :--- |\n"
-        for i in other_issues: md += f"| {i['issue_md']} | {i['reason']} |\n"
 
     md += "\n---\n*Dashboard maintained by automated triage script.*"
     with open("REVIEWS.md", "w") as f: f.write(md)
