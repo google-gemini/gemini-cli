@@ -13,7 +13,9 @@ BOT_BLACKLIST = {
     'google-allstar',
     'renovate',
     'dependabot',
-    'google-gemini-bot'
+    'google-gemini-bot',
+    'google-cla',
+    'googlebot'
 }
 
 ISSUES_QUERY = """
