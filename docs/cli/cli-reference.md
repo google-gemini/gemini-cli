@@ -1,7 +1,7 @@
 # Gemini CLI cheatsheet
 
-This page provides a reference for commonly used Gemini CLI commands, options,
-and parameters.
+Use this page as a reference for commonly used Gemini CLI commands, options, and
+parameters.
 
 ## CLI commands
 
@@ -18,6 +18,11 @@ and parameters.
 | `gemini update`                    | Update to latest version           | `gemini update`                                              |
 | `gemini extensions`                | Manage extensions                  | See [Extensions Management](#extensions-management)          |
 | `gemini mcp`                       | Configure MCP servers              | See [MCP Server Management](#mcp-server-management)          |
+| `gemini rewind`                    | Manage session checkpoints         | `gemini rewind --list`                                       |
+| `gemini sandbox`                   | Manage sandbox environments        | `gemini sandbox --status`                                    |
+| `gemini settings`                  | Manage configuration               | `gemini settings --list`                                     |
+| `gemini telemetry`                 | Manage telemetry data              | `gemini telemetry --status`                                  |
+| `gemini token-caching`             | Manage token caches                | `gemini token-caching --list`                                |
 
 ### Positional arguments
 
@@ -37,6 +42,11 @@ These commands are available within the interactive REPL.
 | `/memory reload`     | Reload context files (for example, `GEMINI.md`) |
 | `/mcp reload`        | Restart and reload MCP servers                  |
 | `/extensions reload` | Reload all active extensions                    |
+| `/rewind`            | Rewind the current session to a previous state  |
+| `/sandbox`           | Manage the current sandbox environment          |
+| `/settings`          | View or modify settings interactively           |
+| `/telemetry`         | View telemetry status                           |
+| `/token-caching`     | Manage token caching for the current session    |
 | `/help`              | Show help for all commands                      |
 | `/quit`              | Exit the interactive session                    |
 
@@ -50,7 +60,7 @@ These commands are available within the interactive REPL.
 | `--model`                        | `-m`  | string  | `auto`    | Model to use. See [Model Selection](#model-selection) for available values.                                                                                            |
 | `--prompt`                       | `-p`  | string  | -         | Prompt text. Appended to stdin input if provided. Forces non-interactive mode.                                                                                         |
 | `--prompt-interactive`           | `-i`  | string  | -         | Execute prompt and continue in interactive mode                                                                                                                        |
-| `--worktree`                     | `-w`  | string  | -         | Start Gemini in a new git worktree. If no name is provided, one is generated automatically. Requires `experimental.worktrees: true` in settings.                       |
+| `--worktree`                     | `-w`  | string  | -         | Start Gemini in a new git worktree. If you don't provide a name, Gemini CLI generates one automatically. Requires `experimental.worktrees: true` in settings.          |
 | `--sandbox`                      | `-s`  | boolean | `false`   | Run in a sandboxed environment for safer execution                                                                                                                     |
 | `--approval-mode`                | -     | string  | `default` | Approval mode for tool execution. Choices: `default`, `auto_edit`, `yolo`, `plan`                                                                                      |
 | `--yolo`                         | `-y`  | boolean | `false`   | **Deprecated.** Auto-approve all actions. Use `--approval-mode=yolo` instead.                                                                                          |
@@ -58,9 +68,9 @@ These commands are available within the interactive REPL.
 | `--experimental-zed-integration` | -     | boolean | -         | Run in Zed editor integration mode. **Experimental feature.**                                                                                                          |
 | `--allowed-mcp-server-names`     | -     | array   | -         | Allowed MCP server names (comma-separated or multiple flags)                                                                                                           |
 | `--allowed-tools`                | -     | array   | -         | **Deprecated.** Use the [Policy Engine](../reference/policy-engine.md) instead. Tools that are allowed to run without confirmation (comma-separated or multiple flags) |
-| `--extensions`                   | `-e`  | array   | -         | List of extensions to use. If not provided, all extensions are enabled (comma-separated or multiple flags)                                                             |
+| `--extensions`                   | `-e`  | array   | -         | List of extensions to use. If you don't provide this, all extensions are enabled (comma-separated or multiple flags)                                                   |
 | `--list-extensions`              | `-l`  | boolean | -         | List all available extensions and exit                                                                                                                                 |
-| `--resume`                       | `-r`  | string  | -         | Resume a previous session. Use `"latest"` for most recent or index number (for example `--resume 5`)                                                                   |
+| `--resume`                       | `-r`  | string  | -         | Resume a previous session. Use `"latest"` for most recent or an index number (for example, `--resume 5`).                                                              |
 | `--list-sessions`                | -     | boolean | -         | List available sessions for the current project and exit                                                                                                               |
 | `--delete-session`               | -     | string  | -         | Delete a session by index number (use `--list-sessions` to see available sessions)                                                                                     |
 | `--include-directories`          | -     | array   | -         | Additional directories to include in the workspace (comma-separated or multiple flags)                                                                                 |
@@ -78,8 +88,8 @@ These are convenient shortcuts that map to specific models:
 
 | Alias        | Resolves To                                | Description                                                                                                               |
 | ------------ | ------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------- |
-| `auto`       | `gemini-2.5-pro` or `gemini-3-pro-preview` | **Default.** Resolves to the preview model if preview features are enabled, otherwise resolves to the standard pro model. |
-| `pro`        | `gemini-2.5-pro` or `gemini-3-pro-preview` | For complex reasoning tasks. Uses preview model if enabled.                                                               |
+| `auto`       | `gemini-3-pro-preview` or `gemini-2.5-pro` | **Default.** Resolves to the preview model if preview features are enabled, otherwise resolves to the standard pro model. |
+| `pro`        | `gemini-3-pro-preview` or `gemini-2.5-pro` | For complex reasoning tasks. Uses preview model if enabled.                                                               |
 | `flash`      | `gemini-2.5-flash`                         | Fast, balanced model for most tasks.                                                                                      |
 | `flash-lite` | `gemini-2.5-flash-lite`                    | Fastest model for simple tasks.                                                                                           |
 
