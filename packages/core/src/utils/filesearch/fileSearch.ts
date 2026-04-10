@@ -123,19 +123,34 @@ export interface SearchOptions {
   maxResults?: number;
 }
 
+function mergeCandidates(
+  primary: string[],
+  secondary: string[],
+): string[] {
+  if (secondary.length === 0) {
+    return primary;
+  }
+
+  const merged = [...primary];
+  const seen = new Set(primary);
+  for (const candidate of secondary) {
+    if (!seen.has(candidate)) {
+      seen.add(candidate);
+      merged.push(candidate);
+    }
+  }
+  return merged;
+}
+
 function normalizeLiveResults(
   results: string[],
   rootRelativeDir: string,
-  filterDir?: (candidate: string) => boolean,
 ): string[] {
   return results.map((entry) => {
     if (entry.endsWith('/')) {
       return entry;
     }
     if (entry === rootRelativeDir) {
-      return `${entry}/`;
-    }
-    if (filterDir?.(entry)) {
       return `${entry}/`;
     }
     return entry;
@@ -221,10 +236,14 @@ class RecursiveFileSearch implements FileSearch {
       pattern !== '*' &&
       (filteredCandidates.length === 0 || pattern.endsWith('/'))
     ) {
-      filteredCandidates = await this.searchFreshCandidates(
+      const freshCandidates = await this.searchFreshCandidates(
         pattern,
         options.signal,
       );
+      filteredCandidates =
+        pattern.endsWith('/') && filteredCandidates.length > 0
+          ? mergeCandidates(filteredCandidates, freshCandidates)
+          : freshCandidates;
     }
 
     const fileFilter = this.ignore.getFileFilter();
@@ -280,7 +299,6 @@ class RecursiveFileSearch implements FileSearch {
     const rootRelativeDir = relativeToProjectRoot
       .split(path.sep)
       .join(path.posix.sep);
-    const dirFilter = this.ignore.getDirectoryFilter();
     const results = normalizeLiveResults(
       await crawl({
         crawlDirectory,
@@ -292,11 +310,6 @@ class RecursiveFileSearch implements FileSearch {
         cacheTtl: 0,
       }),
       rootRelativeDir,
-      (entry) =>
-        entry !== '.' &&
-        entry !== './' &&
-        entry !== '' &&
-        dirFilter(`${entry}/`),
     );
 
     return filter(results, pattern, signal);

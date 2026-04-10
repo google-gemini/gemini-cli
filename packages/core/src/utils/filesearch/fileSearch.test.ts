@@ -818,6 +818,9 @@ describe('FileSearch', () => {
     tmpDir = await createTmpDir({
       src: {
         'existing.ts': '',
+        nested: {
+          'deep.ts': '',
+        },
       },
     });
 
@@ -838,14 +841,18 @@ describe('FileSearch', () => {
 
     expect(await fileSearch.search('src/')).toEqual([
       'src/',
+      'src/nested/',
       'src/existing.ts',
+      'src/nested/deep.ts',
     ]);
 
     await fs.writeFile(path.join(tmpDir, 'src', 'new.ts'), '');
 
     expect(await fileSearch.search('src/')).toEqual([
       'src/',
+      'src/nested/',
       'src/existing.ts',
+      'src/nested/deep.ts',
       'src/new.ts',
     ]);
   });
