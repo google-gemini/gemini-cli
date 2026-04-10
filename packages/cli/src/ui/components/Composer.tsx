@@ -154,6 +154,8 @@ export const Composer = ({ isFocused = true }: { isFocused?: boolean }) => {
           onEscapePromptChange={uiActions.onEscapePromptChange}
           focus={isFocused}
           vimHandleInput={uiActions.vimHandleInput}
+          vimEnabled={vimEnabled}
+          vimMode={vimMode}
           isEmbeddedShellFocused={uiState.embeddedShellFocused}
           popAllMessages={uiActions.popAllMessages}
           onQueueMessage={uiActions.addMessage}
