@@ -26,6 +26,7 @@ import type { Config } from '../config/config.js';
 function createMockConfig(logPromptsEnabled: boolean): Config {
   return {
     getTelemetryLogPromptsEnabled: () => logPromptsEnabled,
+    getTelemetryTracesEnabled: () => false,
     getSessionId: () => 'test-session-id',
     getExperiments: () => undefined,
     getExperimentsAsync: async () => undefined,

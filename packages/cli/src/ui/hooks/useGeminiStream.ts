@@ -1559,6 +1559,8 @@ export const useGeminiStream = (
           operation: options?.isContinuation
             ? GeminiCliOperation.SystemPrompt
             : GeminiCliOperation.UserPrompt,
+          logPrompts: config.getTelemetryLogPromptsEnabled(),
+          tracesEnabled: config.getTelemetryTracesEnabled(),
           sessionId: config.getSessionId(),
         },
         async ({ metadata: spanMetadata }) => {

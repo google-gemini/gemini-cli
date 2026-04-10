@@ -308,6 +308,8 @@ describe('useGeminiStream', () => {
     sandbox: false,
     targetDir: '/test/dir',
     debugMode: false,
+    getTelemetryLogPromptsEnabled: vi.fn().mockReturnValue(false),
+    getTelemetryTracesEnabled: vi.fn().mockReturnValue(false),
     question: undefined,
     coreTools: [],
     toolDiscoveryCommand: undefined,
