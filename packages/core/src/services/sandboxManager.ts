@@ -15,7 +15,6 @@ import {
   isKnownSafeCommand as isWindowsSafeCommand,
   isDangerousCommand as isWindowsDangerousCommand,
 } from '../sandbox/windows/commandSafety.js';
-import { isNodeError } from '../utils/errors.js';
 import {
   sanitizeEnvironment,
   getSecureSanitizationConfig,
@@ -24,6 +23,7 @@ import {
 import type { ShellExecutionResult } from './shellExecutionService.js';
 import type { SandboxPolicyManager } from '../policy/sandboxPolicyManager.js';
 import { resolveToRealPath } from '../utils/paths.js';
+import { resolveGitWorktreePaths } from '../sandbox/utils/fsUtils.js';
 
 /**
  * A structured result of fully resolved sandbox paths.
@@ -48,6 +48,13 @@ export interface ResolvedSandboxPaths {
   policyRead: string[];
   /** Paths granted temporary write access by the current command's dynamic permissions. */
   policyWrite: string[];
+  /** Auto-detected paths for git worktrees/submodules. */
+  gitWorktree?: {
+    /** The actual .git directory for this worktree. */
+    worktreeGitDir: string;
+    /** The main repository's .git directory (if applicable). */
+    mainGitDir?: string;
+  };
 }
 
 export interface SandboxPermissions {
@@ -392,6 +399,12 @@ export async function resolveSandboxPaths(
   );
   const forbiddenIdentities = new Set(forbidden.map(getPathIdentity));
 
+  const { worktreeGitDir, mainGitDir } =
+    await resolveGitWorktreePaths(resolvedWorkspace);
+  const gitWorktree = worktreeGitDir
+    ? { gitWorktree: { worktreeGitDir, mainGitDir } }
+    : undefined;
+
   /**
    * Filters out any paths that are explicitly forbidden or match the workspace root (original or resolved).
    */
@@ -413,8 +426,10 @@ export async function resolveSandboxPaths(
     policyAllowed: filter(policyAllowed),
     policyRead: filter(policyRead),
     policyWrite: filter(policyWrite),
+    ...gitWorktree,
   };
 }
+
 /**
  * Sanitizes an array of paths by deduplicating them and ensuring they are absolute.
  * Always returns an array (empty if input is null/undefined).
@@ -449,26 +464,6 @@ export function getPathIdentity(p: string): string {
   const platform = os.platform();
   const isCaseInsensitive = platform === 'win32' || platform === 'darwin';
   return isCaseInsensitive ? norm.toLowerCase() : norm;
-}
-
-/**
- * Resolves symlinks for a given path to prevent sandbox escapes.
- * If a file does not exist (ENOENT), it recursively resolves the parent directory.
- * Other errors (e.g. EACCES) are re-thrown.
- */
-export async function tryRealpath(p: string): Promise<string> {
-  try {
-    return await fs.realpath(p);
-  } catch (e) {
-    if (isNodeError(e) && e.code === 'ENOENT') {
-      const parentDir = path.dirname(p);
-      if (parentDir === p) {
-        return p;
-      }
-      return path.join(await tryRealpath(parentDir), path.basename(p));
-    }
-    throw e;
-  }
 }
 
 export { createSandboxManager } from './sandboxManagerFactory.js';

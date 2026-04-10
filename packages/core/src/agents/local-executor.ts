@@ -1021,15 +1021,16 @@ export class LocalAgentExecutor<TOutput extends z.ZodTypeAny> {
       : undefined;
 
     try {
-      return new GeminiChat(
+      const chat = new GeminiChat(
         this.executionContext,
         systemInstruction,
         [{ functionDeclarations: tools }],
         startHistory,
         undefined,
         undefined,
-        'subagent',
       );
+      await chat.initialize(undefined, 'subagent');
+      return chat;
     } catch (e: unknown) {
       await reportError(
         e,

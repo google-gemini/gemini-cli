@@ -89,6 +89,7 @@ import {
   buildUserSteeringHintPrompt,
   logBillingEvent,
   ApiKeyUpdatedEvent,
+  LegacyAgentProtocol,
   type InjectionSource,
   startMemoryService,
 } from '@google/gemini-cli-core';
@@ -119,6 +120,7 @@ import { computeTerminalTitle } from '../utils/windowTitle.js';
 import { useTextBuffer } from './components/shared/text-buffer.js';
 import { useLogger } from './hooks/useLogger.js';
 import { useGeminiStream } from './hooks/useGeminiStream.js';
+import { useAgentStream } from './hooks/useAgentStream.js';
 import { type BackgroundTask } from './hooks/useExecutionLifecycle.js';
 import { useVim } from './hooks/vim.js';
 import { type LoadableSettingScope, SettingScope } from '../config/settings.js';
@@ -135,7 +137,11 @@ import { type IdeIntegrationNudgeResult } from './IdeIntegrationNudge.js';
 import { appEvents, AppEvent, TransientMessageType } from '../utils/events.js';
 import { type UpdateObject } from './utils/updateCheck.js';
 import { setUpdateHandler } from '../utils/handleAutoUpdate.js';
-import { registerCleanup, runExitCleanup } from '../utils/cleanup.js';
+import {
+  registerCleanup,
+  removeCleanup,
+  runExitCleanup,
+} from '../utils/cleanup.js';
 import { relaunchApp } from '../utils/processUtils.js';
 import type { SessionInfo } from '../utils/sessionUtils.js';
 import { useMessageQueue } from './hooks/useMessageQueue.js';
@@ -518,7 +524,7 @@ export const AppContainer = (props: AppContainerProps) => {
         debugLogger.warn('Background summary generation failed:', e);
       });
     })();
-    registerCleanup(async () => {
+    const cleanupFn = async () => {
       // Turn off mouse scroll.
       disableMouseEvents();
 
@@ -534,7 +540,15 @@ export const AppContainer = (props: AppContainerProps) => {
 
       // Fire SessionEnd hook on cleanup (only if hooks are enabled)
       await config?.getHookSystem()?.fireSessionEndEvent(SessionEndReason.Exit);
-    });
+    };
+    registerCleanup(cleanupFn);
+
+    return () => {
+      removeCleanup(cleanupFn);
+      cleanupFn().catch((e: unknown) =>
+        debugLogger.error('Error during cleanup:', e),
+      );
+    };
     // Disable the dependencies check here. historyManager gets flagged
     // but we don't want to react to changes to it because each new history
     // item, including the ones from the start session hook will cause a
@@ -1164,6 +1178,46 @@ Logging in with Google... Restarting Gemini CLI to continue.
     };
   }, [config]);
 
+  const streamAgent = useMemo(
+    () =>
+      config?.getAgentSessionInteractiveEnabled()
+        ? new LegacyAgentProtocol({ config, getPreferredEditor })
+        : undefined,
+    [config, getPreferredEditor],
+  );
+
+  const activeStream = streamAgent
+    ? // eslint-disable-next-line react-hooks/rules-of-hooks
+      useAgentStream({
+        agent: streamAgent,
+        addItem: historyManager.addItem,
+        onCancelSubmit,
+        isShellFocused: embeddedShellFocused,
+        logger,
+      })
+    : // eslint-disable-next-line react-hooks/rules-of-hooks
+      useGeminiStream(
+        config.getGeminiClient(),
+        historyManager.history,
+        historyManager.addItem,
+        config,
+        settings,
+        setDebugMessage,
+        handleSlashCommand,
+        shellModeActive,
+        getPreferredEditor,
+        onAuthError,
+        performMemoryRefresh,
+        modelSwitchedFromQuotaError,
+        setModelSwitchedFromQuotaError,
+        onCancelSubmit,
+        setEmbeddedShellFocused,
+        terminalWidth,
+        terminalHeight,
+        embeddedShellFocused,
+        consumePendingHints,
+      );
+
   const {
     streamingState,
     submitQuery,
@@ -1183,27 +1237,7 @@ Logging in with Google... Restarting Gemini CLI to continue.
     backgroundTasks,
     dismissBackgroundTask,
     retryStatus,
-  } = useGeminiStream(
-    config.getGeminiClient(),
-    historyManager.history,
-    historyManager.addItem,
-    config,
-    settings,
-    setDebugMessage,
-    handleSlashCommand,
-    shellModeActive,
-    getPreferredEditor,
-    onAuthError,
-    performMemoryRefresh,
-    modelSwitchedFromQuotaError,
-    setModelSwitchedFromQuotaError,
-    onCancelSubmit,
-    setEmbeddedShellFocused,
-    terminalWidth,
-    terminalHeight,
-    embeddedShellFocused,
-    consumePendingHints,
-  );
+  } = activeStream;
 
   const pendingHistoryItems = useMemo(
     () => [...pendingSlashCommandHistoryItems, ...pendingGeminiHistoryItems],
@@ -1786,7 +1820,7 @@ Logging in with Google... Restarting Gemini CLI to continue.
       if (keyMatchers[Command.QUIT](key)) {
         // If the user presses Ctrl+C, we want to cancel any ongoing requests.
         // This should happen regardless of the count.
-        cancelOngoingRequest?.();
+        void cancelOngoingRequest?.();
 
         handleCtrlCPress();
         return true;
