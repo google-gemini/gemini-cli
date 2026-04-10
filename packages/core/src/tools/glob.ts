@@ -16,6 +16,7 @@ import {
   type ToolResult,
   type PolicyUpdateOptions,
   type ToolConfirmationOutcome,
+  type ExecuteOptions,
 } from './tools.js';
 import { shortenPath, makeRelative } from '../utils/paths.js';
 import { type Config } from '../config/config.js';
@@ -129,7 +130,7 @@ class GlobToolInvocation extends BaseToolInvocation<
     };
   }
 
-  async execute(signal: AbortSignal): Promise<ToolResult> {
+  async execute({ abortSignal: signal }: ExecuteOptions): Promise<ToolResult> {
     try {
       const workspaceContext = this.config.getWorkspaceContext();
       const workspaceDirectories = workspaceContext.getDirectories();
