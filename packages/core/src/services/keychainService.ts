@@ -22,7 +22,7 @@ import { FileKeychain } from './fileKeychain.js';
 export const FORCE_FILE_STORAGE_ENV_VAR = 'GEMINI_FORCE_FILE_STORAGE';
 
 /**
- * Service for interacting with OS-level secure storage (e.g. keytar).
+ * Service for interacting with OS-level secure storage (e.g. @github/keytar).
  */
 export class KeychainService {
   // Track an ongoing initialization attempt to avoid race conditions.
@@ -119,7 +119,7 @@ export class KeychainService {
   }
 
   /**
-   * Attempts to load and verify the native keychain module (keytar).
+   * Attempts to load and verify the native keychain module (@github/keytar).
    */
   private async getNativeKeychain(): Promise<Keychain | null> {
     try {
@@ -152,7 +152,7 @@ export class KeychainService {
 
   // Low-level dynamic loading and structural validation.
   private async loadKeychainModule(): Promise<Keychain | null> {
-    const moduleName = 'keytar';
+    const moduleName = '@github/keytar';
     const module: unknown = await import(moduleName);
     const potential = (isRecord(module) && module['default']) || module;
 
@@ -189,7 +189,7 @@ export class KeychainService {
    */
   private isMacOSKeychainAvailable(): boolean {
     // Probing via the `security` CLI avoids a blocking OS-level popup that
-    // occurs when calling keytar without a configured keychain.
+    // occurs when calling @github/keytar without a configured keychain.
     const result = spawnSync('security', ['default-keychain'], {
       encoding: 'utf8',
       // We pipe stdout to read the path, but ignore stderr to suppress
