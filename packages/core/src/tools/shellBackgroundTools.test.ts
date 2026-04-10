@@ -36,7 +36,9 @@ describe('Background Tools', () => {
     const invocation = listTool.build({});
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     (invocation as any).context = { config: { getSessionId: () => 'default' } };
-    const result = await invocation.execute(new AbortController().signal);
+    const result = await invocation.execute({
+      abortSignal: new AbortController().signal,
+    });
     expect(result.llmContent).toBe('No background processes found.');
   });
 
@@ -64,7 +66,9 @@ describe('Background Tools', () => {
     const invocation = listTool.build({});
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     (invocation as any).context = { config: { getSessionId: () => 'default' } };
-    const result = await invocation.execute(new AbortController().signal);
+    const result = await invocation.execute({
+      abortSignal: new AbortController().signal,
+    });
 
     expect(result.llmContent).toContain(
       `[PID ${pid}] RUNNING: \`unknown command\``,
@@ -89,7 +93,9 @@ describe('Background Tools', () => {
     const invocation = listTool.build({});
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     (invocation as any).context = { config: { getSessionId: () => 'default' } };
-    const result = await invocation.execute(new AbortController().signal);
+    const result = await invocation.execute({
+      abortSignal: new AbortController().signal,
+    });
 
     expect(result.llmContent).toContain(
       `- [PID ${pid}] EXITED: \`exited command\` (Exit Code: 1)`,
@@ -113,7 +119,9 @@ describe('Background Tools', () => {
     const invocation = readTool.build({ pid });
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     (invocation as any).context = { config: { getSessionId: () => 'default' } };
-    const result = await invocation.execute(new AbortController().signal);
+    const result = await invocation.execute({
+      abortSignal: new AbortController().signal,
+    });
     expect(result.error).toBeDefined();
     expect(result.llmContent).toContain('No output log found');
   });
@@ -146,7 +154,9 @@ describe('Background Tools', () => {
     const invocation = readTool.build({ pid, lines: 2 });
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     (invocation as any).context = { config: { getSessionId: () => 'default' } };
-    const result = await invocation.execute(new AbortController().signal);
+    const result = await invocation.execute({
+      abortSignal: new AbortController().signal,
+    });
 
     expect(result.llmContent).toContain('Showing last 2 of 3 lines');
     expect(result.llmContent).toContain('line 2\nline 3');
@@ -172,7 +182,9 @@ describe('Background Tools', () => {
     const invocation = readTool.build({ pid });
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     (invocation as any).context = { config: { getSessionId: () => 'default' } }; // Asking for PID from another session
-    const result = await invocation.execute(new AbortController().signal);
+    const result = await invocation.execute({
+      abortSignal: new AbortController().signal,
+    });
 
     expect(result.error).toBeDefined();
     expect(result.llmContent).toContain('Access denied');
@@ -201,7 +213,9 @@ describe('Background Tools', () => {
     const invocation = readTool.build({ pid });
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     (invocation as any).context = { config: { getSessionId: () => 'default' } };
-    const result = await invocation.execute(new AbortController().signal);
+    const result = await invocation.execute({
+      abortSignal: new AbortController().signal,
+    });
 
     expect(result.llmContent).toContain('Log is empty');
 
@@ -236,7 +250,9 @@ describe('Background Tools', () => {
     const invocation = readTool.build({ pid });
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     (invocation as any).context = { config: { getSessionId: () => 'default' } };
-    const result = await invocation.execute(new AbortController().signal);
+    const result = await invocation.execute({
+      abortSignal: new AbortController().signal,
+    });
 
     expect(result.error).toBeDefined();
     expect(result.llmContent).toContain('Error reading background log');
@@ -272,7 +288,9 @@ describe('Background Tools', () => {
     const invocation = readTool.build({ pid });
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     (invocation as any).context = { config: { getSessionId: () => 'default' } };
-    const result = await invocation.execute(new AbortController().signal);
+    const result = await invocation.execute({
+      abortSignal: new AbortController().signal,
+    });
 
     expect(result.llmContent).toContain('Access is denied');
     expect(result.error?.message).toContain('Symbolic link detected');
@@ -304,7 +322,9 @@ describe('Background Tools', () => {
     const invocation = readTool.build({ pid, lines: 2 });
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     (invocation as any).context = { config: { getSessionId: () => 'default' } };
-    const result = await invocation.execute(new AbortController().signal);
+    const result = await invocation.execute({
+      abortSignal: new AbortController().signal,
+    });
 
     expect(result.llmContent).toContain('line4\nline5');
     expect(result.llmContent).not.toContain('line1');

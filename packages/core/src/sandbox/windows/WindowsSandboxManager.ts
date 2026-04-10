@@ -15,7 +15,6 @@ import {
   GOVERNANCE_FILES,
   findSecretFiles,
   type GlobalSandboxOptions,
-  sanitizePaths,
   type SandboxPermissions,
   type ParsedSandboxDenial,
   resolveSandboxPaths,
@@ -50,6 +49,10 @@ const __dirname = path.dirname(__filename);
 
 // S-1-16-4096 is the SID for "Low Mandatory Level" (Low Integrity)
 const LOW_INTEGRITY_SID = '*S-1-16-4096';
+
+// icacls flags: (OI) Object Inherit, (CI) Container Inherits.
+// Omit /T (recursive) for performance; (OI)(CI) ensures inheritance for new items.
+const DIRECTORY_FLAGS = '(OI)(CI)';
 
 /**
  * A SandboxManager implementation for Windows that uses Restricted Tokens,
@@ -277,8 +280,11 @@ export class WindowsSandboxManager implements SandboxManager {
       this.options.modeConfig?.network ?? req.policy?.networkAccess ?? false;
     const networkAccess = defaultNetwork || mergedAdditional.network;
 
-    const { allowed: allowedPaths, forbidden: forbiddenPaths } =
-      await resolveSandboxPaths(this.options, req);
+    const resolvedPaths = await resolveSandboxPaths(
+      this.options,
+      req,
+      mergedAdditional,
+    );
 
     // Track all roots where Low Integrity write access has been granted.
     // New files created within these roots will inherit the Low label.
@@ -293,56 +299,58 @@ export class WindowsSandboxManager implements SandboxManager {
         )
       : false;
 
-    if (!isReadonlyMode || isApproved) {
-      await this.grantLowIntegrityAccess(this.options.workspace);
-      writableRoots.push(this.options.workspace);
+    const workspaceWrite = !isReadonlyMode || isApproved || isYolo;
+
+    if (workspaceWrite) {
+      await this.grantLowIntegrityAccess(resolvedPaths.workspace.resolved);
+      writableRoots.push(resolvedPaths.workspace.resolved);
     }
 
     // 2. Globally included directories
-    const includeDirs = sanitizePaths(this.options.includeDirectories);
-    for (const includeDir of includeDirs) {
+    for (const includeDir of resolvedPaths.globalIncludes) {
       await this.grantLowIntegrityAccess(includeDir);
       writableRoots.push(includeDir);
     }
 
     // 3. Explicitly allowed paths from the request policy
-    for (const allowedPath of allowedPaths) {
-      const resolved = resolveToRealPath(allowedPath);
+    for (const allowedPath of resolvedPaths.policyAllowed) {
       try {
-        await fs.promises.access(resolved, fs.constants.F_OK);
+        await fs.promises.access(allowedPath, fs.constants.F_OK);
       } catch {
         throw new Error(
-          `Sandbox request rejected: Allowed path does not exist: ${resolved}. ` +
+          `Sandbox request rejected: Allowed path does not exist: ${allowedPath}. ` +
             'On Windows, granular sandbox access can only be granted to existing paths to avoid broad parent directory permissions.',
         );
       }
-      await this.grantLowIntegrityAccess(resolved);
-      writableRoots.push(resolved);
+      await this.grantLowIntegrityAccess(allowedPath);
+      writableRoots.push(allowedPath);
     }
 
     // 4. Additional write paths (e.g. from internal __write command)
-    const additionalWritePaths = sanitizePaths(
-      mergedAdditional.fileSystem?.write,
-    );
-    for (const writePath of additionalWritePaths) {
-      const resolved = resolveToRealPath(writePath);
+    for (const writePath of resolvedPaths.policyWrite) {
       try {
-        await fs.promises.access(resolved, fs.constants.F_OK);
-        await this.grantLowIntegrityAccess(resolved);
+        await fs.promises.access(writePath, fs.constants.F_OK);
+        await this.grantLowIntegrityAccess(writePath);
         continue;
       } catch {
         // If the file doesn't exist, it's only allowed if it resides within a granted root.
         const isInherited = writableRoots.some((root) =>
-          isSubpath(root, resolved),
+          isSubpath(root, writePath),
         );
 
         if (!isInherited) {
           throw new Error(
-            `Sandbox request rejected: Additional write path does not exist and its parent directory is not allowed: ${resolved}. ` +
+            `Sandbox request rejected: Additional write path does not exist and its parent directory is not allowed: ${writePath}. ` +
               'On Windows, granular sandbox access can only be granted to existing paths to avoid broad parent directory permissions.',
           );
         }
       }
+    }
+
+    // Support git worktrees/submodules; read-only to prevent malicious hook/config modification (RCE).
+    // Read access is inherited; skip grantLowIntegrityAccess to ensure write protection.
+    if (resolvedPaths.gitWorktree) {
+      // No-op for read access.
     }
 
     // 2. Collect secret files and apply protective ACLs
@@ -350,9 +358,9 @@ export class WindowsSandboxManager implements SandboxManager {
     // processes to ensure they cannot be read or written.
     const secretsToBlock: string[] = [];
     const searchDirs = new Set([
-      this.options.workspace,
-      ...allowedPaths,
-      ...includeDirs,
+      resolvedPaths.workspace.resolved,
+      ...resolvedPaths.policyAllowed,
+      ...resolvedPaths.globalIncludes,
     ]);
     for (const dir of searchDirs) {
       try {
@@ -382,7 +390,7 @@ export class WindowsSandboxManager implements SandboxManager {
     // is restricted to avoid host corruption. External commands rely on
     // Low Integrity read/write restrictions, while internal commands
     // use the manifest for enforcement.
-    for (const forbiddenPath of forbiddenPaths) {
+    for (const forbiddenPath of resolvedPaths.forbidden) {
       try {
         await this.denyLowIntegrityAccess(forbiddenPath);
       } catch (e) {
@@ -398,14 +406,14 @@ export class WindowsSandboxManager implements SandboxManager {
     // the sandboxed process from creating them with Low integrity.
     // By being created as Medium integrity, they are write-protected from Low processes.
     for (const file of GOVERNANCE_FILES) {
-      const filePath = path.join(this.options.workspace, file.path);
+      const filePath = path.join(resolvedPaths.workspace.resolved, file.path);
       this.touch(filePath, file.isDirectory);
     }
 
     // 4. Forbidden paths manifest
     // We use a manifest file to avoid command-line length limits.
     const allForbidden = Array.from(
-      new Set([...secretsToBlock, ...forbiddenPaths]),
+      new Set([...secretsToBlock, ...resolvedPaths.forbidden]),
     );
     const tempDir = fs.mkdtempSync(
       path.join(os.tmpdir(), 'gemini-cli-forbidden-'),
@@ -475,14 +483,19 @@ export class WindowsSandboxManager implements SandboxManager {
     }
 
     try {
+      const stats = await fs.promises.stat(resolvedPath);
+      const isDirectory = stats.isDirectory();
+
+      const flags = isDirectory ? DIRECTORY_FLAGS : '';
+
       // 1. Grant explicit Modify access to the Low Integrity SID
       // 2. Set the Mandatory Label to Low to allow "Write Up" from Low processes
       await spawnAsync('icacls', [
         resolvedPath,
         '/grant',
-        `${LOW_INTEGRITY_SID}:(OI)(CI)(M)`,
+        `${LOW_INTEGRITY_SID}:${flags}(M)`,
         '/setintegritylevel',
-        '(OI)(CI)Low',
+        `${flags}Low`,
       ]);
       this.allowedCache.add(resolvedPath);
     } catch (e) {
@@ -512,29 +525,26 @@ export class WindowsSandboxManager implements SandboxManager {
       return;
     }
 
-    // icacls flags: (OI) Object Inherit, (CI) Container Inherit, (F) Full Access Deny.
-    // Omit /T (recursive) for performance; (OI)(CI) ensures inheritance for new items.
-    // Windows dynamically evaluates existing items, though deep explicit Allow ACEs
-    // could potentially bypass this inherited Deny rule.
-    const DENY_ALL_INHERIT = '(OI)(CI)(F)';
-
     // icacls fails on non-existent paths, so we cannot explicitly deny
     // paths that do not yet exist (unlike macOS/Linux).
     // Skip to prevent sandbox initialization failure.
+    let isDirectory = false;
     try {
-      await fs.promises.stat(resolvedPath);
+      const stats = await fs.promises.stat(resolvedPath);
+      isDirectory = stats.isDirectory();
     } catch (e: unknown) {
       if (isNodeError(e) && e.code === 'ENOENT') {
         return;
       }
       throw e;
     }
+    const flags = isDirectory ? DIRECTORY_FLAGS : '';
 
     try {
       await spawnAsync('icacls', [
         resolvedPath,
         '/deny',
-        `${LOW_INTEGRITY_SID}:${DENY_ALL_INHERIT}`,
+        `${LOW_INTEGRITY_SID}:${flags}(F)`,
       ]);
       this.deniedCache.add(resolvedPath);
     } catch (e) {

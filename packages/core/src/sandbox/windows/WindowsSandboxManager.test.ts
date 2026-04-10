@@ -10,6 +10,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { WindowsSandboxManager } from './WindowsSandboxManager.js';
 import * as sandboxManager from '../../services/sandboxManager.js';
+import * as paths from '../../utils/paths.js';
 import type { SandboxRequest } from '../../services/sandboxManager.js';
 import { spawnAsync } from '../../utils/shell-utils.js';
 import type { SandboxPolicyManager } from '../../policy/sandboxPolicyManager.js';
@@ -44,9 +45,7 @@ describe('WindowsSandboxManager', () => {
 
   beforeEach(() => {
     vi.spyOn(os, 'platform').mockReturnValue('win32');
-    vi.spyOn(sandboxManager, 'tryRealpath').mockImplementation(async (p) =>
-      p.toString(),
-    );
+    vi.spyOn(paths, 'resolveToRealPath').mockImplementation((p) => p);
 
     // Mock existsSync to skip the csc.exe auto-compilation of helper during unit tests.
     const originalExistsSync = fs.existsSync;
@@ -299,6 +298,60 @@ describe('WindowsSandboxManager', () => {
     }
   });
 
+  it('should NOT grant Low Integrity access to git worktree paths (enforce read-only)', async () => {
+    const worktreeGitDir = createTempDir('worktree-git');
+    const mainGitDir = createTempDir('main-git');
+
+    try {
+      vi.spyOn(sandboxManager, 'resolveSandboxPaths').mockResolvedValue({
+        workspace: { original: testCwd, resolved: testCwd },
+        forbidden: [],
+        globalIncludes: [],
+        policyAllowed: [],
+        policyRead: [],
+        policyWrite: [],
+        gitWorktree: {
+          worktreeGitDir,
+          mainGitDir,
+        },
+      });
+
+      const req: SandboxRequest = {
+        command: 'test',
+        args: [],
+        cwd: testCwd,
+        env: {},
+      };
+
+      await manager.prepareCommand(req);
+
+      const icaclsArgs = vi
+        .mocked(spawnAsync)
+        .mock.calls.filter((c) => c[0] === 'icacls')
+        .map((c) => c[1]);
+
+      // Verify that no icacls grants were issued for the git directories
+      expect(icaclsArgs).not.toContainEqual([
+        worktreeGitDir,
+        '/grant',
+        '*S-1-16-4096:(OI)(CI)(M)',
+        '/setintegritylevel',
+        '(OI)(CI)Low',
+      ]);
+
+      expect(icaclsArgs).not.toContainEqual([
+        mainGitDir,
+        '/grant',
+        '*S-1-16-4096:(OI)(CI)(M)',
+        '/setintegritylevel',
+        '(OI)(CI)Low',
+      ]);
+    } finally {
+      fs.rmSync(worktreeGitDir, { recursive: true, force: true });
+      fs.rmSync(mainGitDir, { recursive: true, force: true });
+    }
+  });
+
   it('should grant Low Integrity access to additional write paths', async () => {
     const extraWritePath = createTempDir('extra-write');
     try {
@@ -398,16 +451,16 @@ describe('WindowsSandboxManager', () => {
       expect(icaclsArgs).toContainEqual([
         path.resolve(longPath),
         '/grant',
-        '*S-1-16-4096:(OI)(CI)(M)',
+        '*S-1-16-4096:(M)',
         '/setintegritylevel',
-        '(OI)(CI)Low',
+        'Low',
       ]);
       expect(icaclsArgs).toContainEqual([
         path.resolve(devicePath),
         '/grant',
-        '*S-1-16-4096:(OI)(CI)(M)',
+        '*S-1-16-4096:(M)',
         '/setintegritylevel',
-        '(OI)(CI)Low',
+        'Low',
       ]);
     },
   );

@@ -13,6 +13,7 @@ import {
   type ToolExitPlanModeConfirmationDetails,
   type ToolExitPlanModeConfirmationPayload,
   type ToolResult,
+  type ExecuteOptions,
 } from './tools.js';
 import type { MessageBus } from '../confirmation-bus/message-bus.js';
 import path from 'node:path';
@@ -179,7 +180,7 @@ export class ExitPlanModeInvocation extends BaseToolInvocation<
     return path.join(this.config.getPlansDir(), safeFilename);
   }
 
-  async execute(_signal: AbortSignal): Promise<ToolResult> {
+  async execute({ abortSignal: _signal }: ExecuteOptions): Promise<ToolResult> {
     const resolvedPlanPath = this.getResolvedPlanPath();
 
     if (this.planValidationError) {

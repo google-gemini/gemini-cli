@@ -376,7 +376,10 @@ export const defaultKeyBindingConfig: KeyBindingConfig = new Map([
       new KeyBinding('ctrl+j'),
     ],
   ],
-  [Command.OPEN_EXTERNAL_EDITOR, [new KeyBinding('ctrl+g')]],
+  [
+    Command.OPEN_EXTERNAL_EDITOR,
+    [new KeyBinding('ctrl+g'), new KeyBinding('ctrl+shift+g')],
+  ],
   [Command.DEPRECATED_OPEN_EXTERNAL_EDITOR, [new KeyBinding('ctrl+x')]],
   [
     Command.PASTE_CLIPBOARD,
@@ -634,7 +637,8 @@ export const commandDescriptions: Readonly<Record<Command, string>> = {
   [Command.PASTE_CLIPBOARD]: 'Paste from the clipboard.',
 
   // App Controls
-  [Command.SHOW_ERROR_DETAILS]: 'Toggle detailed error information.',
+  [Command.SHOW_ERROR_DETAILS]:
+    'Toggle the debug console for detailed error information.',
   [Command.SHOW_FULL_TODOS]: 'Toggle the full TODO list.',
   [Command.SHOW_IDE_CONTEXT_DETAIL]: 'Show IDE context details.',
   [Command.TOGGLE_MARKDOWN]: 'Toggle Markdown rendering.',

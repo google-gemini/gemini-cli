@@ -19,6 +19,7 @@ import { ResourceRegistry } from '../resources/resource-registry.js';
 import {
   type AnyDeclarativeTool,
   ToolConfirmationOutcome,
+  Kind,
 } from '../tools/tools.js';
 import {
   DiscoveredMCPTool,
@@ -113,7 +114,7 @@ export function createUnauthorizedToolError(toolName: string): string {
 export class LocalAgentExecutor<TOutput extends z.ZodTypeAny> {
   readonly definition: LocalAgentDefinition<TOutput>;
 
-  private readonly agentId: string;
+  readonly agentId: string;
   private readonly toolRegistry: ToolRegistry;
   private readonly promptRegistry: PromptRegistry;
   private readonly resourceRegistry: ResourceRegistry;
@@ -180,17 +181,11 @@ export class LocalAgentExecutor<TOutput extends z.ZodTypeAny> {
     }
 
     const parentToolRegistry = context.toolRegistry;
-    const allAgentNames = new Set(
-      context.config.getAgentRegistry().getAllAgentNames(),
-    );
 
     const registerToolInstance = (tool: AnyDeclarativeTool) => {
-      // Check if the tool is a subagent to prevent recursion.
+      // Check if the tool is an agent tool to prevent recursion.
       // We do not allow agents to call other agents.
-      if (allAgentNames.has(tool.name)) {
-        debugLogger.warn(
-          `[LocalAgentExecutor] Skipping subagent tool '${tool.name}' for agent '${definition.name}' to prevent recursion.`,
-        );
+      if (tool.kind === Kind.Agent) {
         return;
       }
 
@@ -1026,15 +1021,16 @@ export class LocalAgentExecutor<TOutput extends z.ZodTypeAny> {
       : undefined;
 
     try {
-      return new GeminiChat(
+      const chat = new GeminiChat(
         this.executionContext,
         systemInstruction,
         [{ functionDeclarations: tools }],
         startHistory,
         undefined,
         undefined,
-        'subagent',
       );
+      await chat.initialize(undefined, 'subagent');
+      return chat;
     } catch (e: unknown) {
       await reportError(
         e,

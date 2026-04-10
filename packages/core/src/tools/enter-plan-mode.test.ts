@@ -120,7 +120,9 @@ describe('EnterPlanModeTool', () => {
     it('should set approval mode to PLAN and return message', async () => {
       const invocation = tool.build({});
 
-      const result = await invocation.execute(new AbortController().signal);
+      const result = await invocation.execute({
+        abortSignal: new AbortController().signal,
+      });
 
       expect(mockConfig.setApprovalMode).toHaveBeenCalledWith(
         ApprovalMode.PLAN,
@@ -133,7 +135,9 @@ describe('EnterPlanModeTool', () => {
       const reason = 'Design new database schema';
       const invocation = tool.build({ reason });
 
-      const result = await invocation.execute(new AbortController().signal);
+      const result = await invocation.execute({
+        abortSignal: new AbortController().signal,
+      });
 
       expect(mockConfig.setApprovalMode).toHaveBeenCalledWith(
         ApprovalMode.PLAN,
@@ -164,7 +168,9 @@ describe('EnterPlanModeTool', () => {
         await details.onConfirm(ToolConfirmationOutcome.Cancel);
       }
 
-      const result = await invocation.execute(new AbortController().signal);
+      const result = await invocation.execute({
+        abortSignal: new AbortController().signal,
+      });
 
       expect(mockConfig.setApprovalMode).not.toHaveBeenCalled();
       expect(result.returnDisplay).toBe('Cancelled');
