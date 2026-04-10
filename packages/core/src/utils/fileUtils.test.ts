@@ -55,6 +55,7 @@ describe('fileUtils', () => {
   let testImageFilePath: string;
   let testPdfFilePath: string;
   let testAudioFilePath: string;
+  let testVideoFilePath: string;
   let testBinaryFilePath: string;
   let nonexistentFilePath: string;
   let directoryPath: string;
@@ -71,6 +72,7 @@ describe('fileUtils', () => {
     testImageFilePath = path.join(tempRootDir, 'image.png');
     testPdfFilePath = path.join(tempRootDir, 'document.pdf');
     testAudioFilePath = path.join(tempRootDir, 'audio.mp3');
+    testVideoFilePath = path.join(tempRootDir, 'video.mp4');
     testBinaryFilePath = path.join(tempRootDir, 'app.exe');
     nonexistentFilePath = path.join(tempRootDir, 'nonexistent.txt');
     directoryPath = path.join(tempRootDir, 'subdir');
@@ -769,6 +771,8 @@ describe('fileUtils', () => {
         actualNodeFs.unlinkSync(testPdfFilePath);
       if (actualNodeFs.existsSync(testAudioFilePath))
         actualNodeFs.unlinkSync(testAudioFilePath);
+      if (actualNodeFs.existsSync(testVideoFilePath))
+        actualNodeFs.unlinkSync(testVideoFilePath);
       if (actualNodeFs.existsSync(testBinaryFilePath))
         actualNodeFs.unlinkSync(testBinaryFilePath);
     });
@@ -931,6 +935,31 @@ describe('fileUtils', () => {
       expect(result.errorType).toBe(ToolErrorType.READ_CONTENT_FAILURE);
       expect(result.error).toContain('Unsupported audio file format');
       expect(result.returnDisplay).toContain('Unsupported audio file format');
+    });
+
+    it('should process a video file', async () => {
+      const fakeMp4Data = Buffer.from([
+        0x00, 0x00, 0x00, 0x1c, 0x66, 0x74, 0x79, 0x70, 0x69, 0x73, 0x6f, 0x6d,
+        0x00, 0x00, 0x02, 0x00,
+      ]);
+      actualNodeFs.writeFileSync(testVideoFilePath, fakeMp4Data);
+      mockMimeGetType.mockReturnValue('video/mp4');
+      const result = await processSingleFileContent(
+        testVideoFilePath,
+        tempRootDir,
+        new StandardFileSystemService(),
+      );
+      expect(
+        (result.llmContent as { inlineData: unknown }).inlineData,
+      ).toBeDefined();
+      expect(
+        (result.llmContent as { inlineData: { mimeType: string } }).inlineData
+          .mimeType,
+      ).toBe('video/mp4');
+      expect(
+        (result.llmContent as { inlineData: { data: string } }).inlineData.data,
+      ).toBe(fakeMp4Data.toString('base64'));
+      expect(result.returnDisplay).toContain('Read video file: video.mp4');
     });
 
     it('should read an SVG file as text when under 1MB', async () => {
