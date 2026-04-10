@@ -36,7 +36,6 @@ ONCALLER_TEAMS = {
 
 SEARCH_QUERY = f'repo:{TARGET_REPO} is:issue label:area/core,area/extensions,area/site label:"help wanted" updated:>=2026-03-10 sort:updated-desc'
 
-# Step 1: Lightweight query to get issues and PR numbers
 ISSUES_QUERY = """
 query($searchQuery: String!, $cursor: String) {
   search(query: $searchQuery, type: ISSUE, first: 100, after: $cursor) {
@@ -46,6 +45,8 @@ query($searchQuery: String!, $cursor: String) {
         number
         title
         url
+        updatedAt
+        assignees(first: 10) { nodes { login } }
         timelineItems(itemTypes: CROSS_REFERENCED_EVENT, last: 20) {
           nodes {
             ... on CrossReferencedEvent {
@@ -61,18 +62,11 @@ query($searchQuery: String!, $cursor: String) {
 }
 """
 
-# Step 2: Query for PR details
 PR_DETAILS_QUERY = """
 query($repoOwner: String!, $repoName: String!, $prNumber: Int!) {
   repository(owner: $repoOwner, name: $repoName) {
     pullRequest(number: $prNumber) {
-      number
-      url
-      title
-      state
-      createdAt
-      updatedAt
-      mergedAt
+      number url title state createdAt updatedAt mergedAt
       author { login }
       mergeable
       statusCheckRollup { state }
@@ -107,7 +101,7 @@ query($repoOwner: String!, $repoName: String!, $prNumber: Int!) {
           }
         }
       }
-      timelineItems(last: 5, itemTypes: [REOPENED_EVENT, READY_FOR_REVIEW_EVENT]) {
+      timelineItems(last: 10, itemTypes: [REOPENED_EVENT, READY_FOR_REVIEW_EVENT]) {
         nodes { __typename ... on ReopenedEvent { createdAt } ... on ReadyForReviewEvent { createdAt } }
       }
     }
@@ -119,13 +113,10 @@ def gh_api_graphql(query, variables=None):
     cmd = ['gh', 'api', 'graphql']
     if variables:
         for k, v in variables.items():
-            if v is not None:
-                cmd.extend(['-F', f'{k}={v}'])
+            if v is not None: cmd.extend(['-F', f'{k}={v}'])
     cmd.extend(['-f', f'query={query}'])
     result = subprocess.run(cmd, capture_output=True, text=True)
-    if result.returncode != 0:
-        return None
-    return json.loads(result.stdout)
+    return json.loads(result.stdout) if result.returncode == 0 else None
 
 def parse_date(date_str):
     if not date_str: return None
@@ -133,7 +124,6 @@ def parse_date(date_str):
 
 def sanitize(text):
     if not text: return ""
-    # Replace all whitespace (newlines, tabs, etc) and pipe characters with a single space
     return re.sub(r'[\s|]+', ' ', text).strip()
 
 def get_author_activity(pr):
@@ -141,9 +131,8 @@ def get_author_activity(pr):
     latest = pr.get('createdAt', "")
     commits = pr.get('commits', {}).get('nodes', [])
     for c_node in commits:
-        auth_data = c_node.get('commit', {}).get('author', {})
-        user_data = auth_data.get('user') if auth_data else None
-        commit_author = user_data.get('login') if user_data else None
+        u = c_node.get('commit', {}).get('author', {}).get('user')
+        commit_author = u.get('login') if u else None
         if commit_author == author:
             latest = max(latest, c_node['commit']['committedDate'])
     for c in pr.get('comments', {}).get('nodes', []):
@@ -167,9 +156,8 @@ def get_reviewer_activity(pr):
             latest = max(latest, c['publishedAt'])
     commits = pr.get('commits', {}).get('nodes', [])
     for c_node in commits:
-        auth_data = c_node.get('commit', {}).get('author', {})
-        user_data = auth_data.get('user') if auth_data else None
-        commit_author = user_data.get('login') if user_data else None
+        u = c_node.get('commit', {}).get('author', {}).get('user')
+        commit_author = u.get('login') if u else None
         if commit_author and commit_author != author and commit_author not in BOT_BLACKLIST:
             latest = max(latest, c_node['commit']['committedDate'])
     return latest
@@ -223,7 +211,6 @@ def main():
         if not search_data['pageInfo']['hasNextPage']: break
         cursor = search_data['pageInfo']['endCursor']
 
-    # Map issue info correctly
     issue_to_info = {i['number']: {"title": sanitize(i['title']), "url": i['url']} for i in all_issue_nodes}
     issue_to_prs = {}
     all_pr_numbers = set()
@@ -260,6 +247,9 @@ def main():
             if pr.get('baseRepository', {}).get('nameWithOwner', TARGET_REPO) != TARGET_REPO: continue
             
             pr_title = sanitize(pr['title'])
+            latest_author_act_iso = get_author_activity(pr)
+            latest_rev_act_iso = get_reviewer_activity(pr)
+            status_label = get_status_label(pr)
             
             if pr.get('state') != 'OPEN':
                 if pr_no not in processed_prs_for_history:
@@ -280,53 +270,42 @@ def main():
                             stats[r_login]["weekly_closed"] += 1
                             stats[r_login]["history"].append({
                                 "number": pr['number'], "title": pr_title, "url": pr['url'],
-                                "state": pr['state'],
-                                "issue_no": issue_no, "updated": pr['updatedAt'][:10]
+                                "state": pr['state'], "issue_no": issue_no, "updated": pr['updatedAt'][:10]
                             })
                     processed_prs_for_history.add(pr_no)
                 continue
 
-            # OPEN PRs
+            # OPEN PR Logic
             human_reviewers = set()
-            requested_special_teams = False
-            author = pr['author']['login']
-            
             for req in pr.get('reviewRequests', {}).get('nodes', []):
                 rr = req.get('requestedReviewer')
-                if rr:
-                    if rr['__typename'] == 'User':
-                        login = rr.get('login')
-                        if login and login != author and login not in BOT_BLACKLIST:
-                            human_reviewers.add(login)
-                    elif rr['__typename'] == 'Team':
-                        slug = rr.get('slug', '').split('/')[-1]
-                        if slug in ONCALLER_TEAMS: requested_special_teams = True
-            
+                if rr and rr.get('__typename') == 'User':
+                    login = rr.get('login')
+                    if login and login != pr['author']['login'] and login not in BOT_BLACKLIST:
+                        human_reviewers.add(login)
             for rev in pr.get('latestReviews', {}).get('nodes', []):
                 if rev.get('author'):
                     login = rev['author']['login']
-                    if login != author and login not in BOT_BLACKLIST:
+                    if login != pr['author']['login'] and login not in BOT_BLACKLIST:
                         human_reviewers.add(login)
             
-            latest_author_act = get_author_activity(pr)
-            latest_rev_act = get_reviewer_activity(pr)
-            status_label = get_status_label(pr)
-            
-            # Pickup logic
-            if not human_reviewers and not requested_special_teams and "Blocked" not in status_label and (not latest_rev_act or latest_author_act > latest_rev_act):
+            # Pickup logic aligned with Dashboard: Author updated AFTER any human or no human at all.
+            # (Matches dashboard's check for conflicts/failures too)
+            author_acted_last = not latest_rev_act_iso or latest_author_act_iso > latest_rev_act_iso
+            if author_acted_last and "Blocked" not in status_label and not human_reviewers:
                 if pr_no not in [p['number'] for p in pickup_list]:
                     pickup_list.append({
                         "number": pr['number'], "url": pr['url'], "title": pr_title,
                         "issue_no": issue_no, "issue_url": issue_to_info[issue_no]['url'],
                         "issue_title": issue_to_info[issue_no]['title'],
-                        "updated": pr['updatedAt'][:10]
+                        "updated": latest_author_act_iso[:10]
                     })
 
             for reviewer in human_reviewers:
                 if reviewer in stats:
                     stats[reviewer]["open_queue"].append({
                         "number": pr['number'], "title": pr_title, "url": pr['url'],
-                        "state": pr['state'], "updated": pr['updatedAt'][:10], "issue_no": issue_no,
+                        "state": pr['state'], "updated": latest_author_act_iso[:10], "issue_no": issue_no,
                         "status_label": status_label,
                         "priority": get_status_priority(status_label)
                     })
@@ -365,7 +344,7 @@ def main():
 
     md += "\n---\n*Report generated by automated triage script.*"
     with open("TEAM_STATS.md", "w") as f: f.write(md)
-    print("Successfully generated TEAM_STATS.md (Sanitized and Formatted).")
+    print(f"Sync complete. Pickup count: {len(pickup_list)}")
 
 if __name__ == "__main__":
     main()

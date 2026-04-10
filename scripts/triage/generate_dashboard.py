@@ -38,8 +38,7 @@ ONCALLER_TEAMS = {
     'gemini-cli-docs'
 }
 
-# Exact search query from user request
-SEARCH_QUERY = f'repo:{TARGET_REPO} is:issue state:open label:area/core,area/extensions,area/site label:"help wanted" sort:updated-desc'
+SEARCH_QUERY = f'repo:{TARGET_REPO} is:issue label:area/core,area/extensions,area/site label:"help wanted" updated:>=2026-03-10 sort:updated-desc'
 
 ISSUES_QUERY = """
 query($searchQuery: String!, $cursor: String) {
@@ -52,7 +51,14 @@ query($searchQuery: String!, $cursor: String) {
         timelineItems(itemTypes: CROSS_REFERENCED_EVENT, last: 50) {
           nodes {
             ... on CrossReferencedEvent {
-              source { ... on PullRequest { number } }
+              source {
+                ... on PullRequest {
+                  number state mergedAt updatedAt url title
+                  author { login }
+                  repository { nameWithOwner }
+                  latestReviews(last: 10) { nodes { author { login } state } }
+                }
+              }
             }
           }
         }
@@ -162,18 +168,26 @@ def main():
 
     print(f"Total issues fetched: {len(all_issue_nodes)}")
 
-    # Map issue info
+    # Map issue info and collect PRs for detailed fetching
     issue_to_info = {i['number']: i for i in all_issue_nodes}
-    all_pr_numbers = set()
-    issue_to_pr_nums = {}
+    issue_to_pr_info = {} # Maps issue_no to list of PR info from ISSUES_QUERY
+    pr_to_fetch = set()
+    
     for i in all_issue_nodes:
-        nums = [e['source']['number'] for e in i['timelineItems']['nodes'] if e.get('source') and 'number' in e['source']]
-        all_pr_numbers.update(nums)
-        issue_to_pr_nums[i['number']] = nums
+        pr_infos = []
+        for e in i['timelineItems']['nodes']:
+            if not e.get('source'): continue
+            s = e['source']
+            if 'number' in s and s.get('repository', {}).get('nameWithOwner') == TARGET_REPO:
+                pr_infos.append(s)
+                # Only fetch full details for OPEN PRs on OPEN issues
+                if i['state'] == 'OPEN' and s['state'] == 'OPEN':
+                    pr_to_fetch.add(s['number'])
+        issue_to_pr_info[i['number']] = pr_infos
 
-    print(f"Fetching details for {len(all_pr_numbers)} unique PRs...")
+    print(f"Fetching details for {len(pr_to_fetch)} OPEN PRs...")
     pr_details = {}
-    pr_list = sorted(list(all_pr_numbers))
+    pr_list = sorted(list(pr_to_fetch))
     for i in range(0, len(pr_list), 20):
         batch = pr_list[i:i+20]
         res = gh_api_graphql(get_pr_batch_query(batch))
@@ -195,13 +209,15 @@ def main():
     initial_pickup = []
     followup_needed = []
     waiting_for_author = []
-    active_development = []
+    recently_assigned = []
+    active_blocked_prs = []
     available_pickup = []
 
     # Member stats for TEAM_STATS.md
     member_stats = {login: {"name": name, "weekly_closed": 0, "open_queue": [], "history": []} for login, name in MAINTAINERS.items()}
+    processed_prs_for_history = set()
 
-    for issue_no, pr_nums in issue_to_pr_nums.items():
+    for issue_no, pr_infos in issue_to_pr_info.items():
         issue = issue_to_info[issue_no]
         issue_title = sanitize(issue['title'])
         issue_url = issue['url']
@@ -211,49 +227,60 @@ def main():
         found_open_pr = False
         has_active_work = False
         
-        for pr_no in reversed(pr_nums):
-            pr = pr_details.get(pr_no)
-            if not pr: continue
-            
-            # Check if officially linked to THIS issue
-            linked_nums = [n['number'] for n in pr['closingIssuesReferences']['nodes']]
-            if issue_no not in linked_nums: continue
-            
-            # Check target repo
-            if pr.get('baseRepository', {}).get('nameWithOwner') != TARGET_REPO: continue
-            
-            pr_title = sanitize(pr['title'])
-            latest_author_act_iso = get_author_activity(pr)
-            latest_rev_act_iso = get_reviewer_activity(pr)
-            status_label = get_status_label(pr)
+        for s in pr_infos:
+            pr_no = s['number']
+            # Get full details if we fetched them (for OPEN PRs on OPEN issues)
+            # Otherwise use pre-fetched basic info (for stats)
+            pr = pr_details.get(pr_no, s)
             
             # Identify human reviewers and special teams
             human_reviewers = set()
             special_teams = set()
-            for req in pr.get('reviewRequests', {}).get('nodes', []):
-                rr = req.get('requestedReviewer')
-                if rr:
-                    if rr['__typename'] == 'User':
-                        if rr.get('login') != pr['author']['login']: human_reviewers.add(rr['login'])
-                    elif rr['__typename'] == 'Team':
-                        slug = rr.get('slug', '').split('/')[-1]
-                        if slug in ONCALLER_TEAMS: special_teams.add(slug)
+            author = pr['author']['login']
+            
+            # Extract reviewers from whatever source we have
+            if 'reviewRequests' in pr:
+                for req in pr.get('reviewRequests', {}).get('nodes', []):
+                    rr = req.get('requestedReviewer')
+                    if rr:
+                        if rr['__typename'] == 'User':
+                            login = rr.get('login')
+                            if login and login != author and login not in BOT_BLACKLIST: human_reviewers.add(login)
+                        elif rr['__typename'] == 'Team':
+                            slug = rr.get('slug', '').split('/')[-1]
+                            if slug in ONCALLER_TEAMS: special_teams.add(slug)
+            
+            # latestReviews is available in both batch detail and ISSUES_QUERY PullRequest fragment
             for rev in pr.get('latestReviews', {}).get('nodes', []):
                 if rev.get('author'):
                     login = rev['author']['login']
-                    if login != pr['author']['login'] and login not in BOT_BLACKLIST: human_reviewers.add(login)
+                    if login != author and login not in BOT_BLACKLIST: human_reviewers.add(login)
 
             if pr['state'] != 'OPEN':
-                # History for TEAM_STATS
-                updated_at = parse_date(pr['updatedAt'])
-                for r_login in human_reviewers:
-                    if r_login in member_stats and updated_at >= report_start:
-                        member_stats[r_login]["weekly_closed"] += 1
-                        member_stats[r_login]["history"].append({"number": pr['number'], "title": pr_title, "url": pr['url'], "state": pr['state'], "issue_no": issue_no, "updated": pr['updatedAt'][:10]})
+                # History for TEAM_STATS based on REVIEWERS
+                if pr_no not in processed_prs_for_history:
+                    updated_at = parse_date(pr.get('mergedAt') or pr.get('updatedAt'))
+                    for r_login in human_reviewers:
+                        if r_login in member_stats and updated_at and updated_at >= report_start:
+                            member_stats[r_login]["weekly_closed"] += 1
+                            member_stats[r_login]["history"].append({"number": pr['number'], "title": sanitize(pr.get('title', 'PR')), "url": pr.get('url', f"https://github.com/{TARGET_REPO}/pull/{pr['number']}"), "state": pr['state'], "issue_no": issue_no, "updated": pr.get('updatedAt', '')[:10]})
+                    processed_prs_for_history.add(pr_no)
                 continue
 
             # --- OPEN PR logic ---
+            if issue['state'] != 'OPEN': continue # Skip PRs for closed issues in REVIEWS.md
+            
+            # Since we only fetch details for OPEN PRs, we'll have full info here
+            # Ensure it's officially linked to THIS issue (if we have details)
+            if 'closingIssuesReferences' in pr:
+                linked_nums = [n['number'] for n in pr['closingIssuesReferences']['nodes']]
+                if issue_no not in linked_nums: continue
+            
             found_open_pr = True
+            pr_title = sanitize(pr['title'])
+            latest_author_act_iso = get_author_activity(pr)
+            latest_rev_act_iso = get_reviewer_activity(pr)
+            status_label = get_status_label(pr)
             
             if special_teams:
                 oncaller_attention.append({"issue_md": f"[#{issue_no} {issue_title}]({issue_url})", "pr_no": pr['number'], "pr_url": pr['url'], "pr_title": pr_title, "teams": sorted(list(special_teams)), "reviewers": sorted(list(human_reviewers)), "last_update": latest_author_act_iso[:10], "issue_no": issue_no})
@@ -265,11 +292,11 @@ def main():
                 if (now - datetime.datetime.fromisoformat(latest_author_act_iso.replace('Z', '+00:00'))).days >= STALE_BLOCKED_PR_DAYS:
                     blocked_stale_prs.append({"issue_md": f"[#{issue_no} {issue_title}]({issue_url})", "pr_no": pr['number'], "pr_url": pr['url'], "pr_title": pr_title, "reason": status_label.split(': ')[1], "author": pr['author']['login'], "days_stale": (now - datetime.datetime.fromisoformat(latest_author_act_iso.replace('Z', '+00:00'))).days})
                 else:
-                    active_development.append({"issue_md": f"[#{issue_no} {issue_title}]({issue_url})", "assignees": assignees if assignees else [pr['author']['login']], "last_update": latest_author_act_iso[:10], "status": f"Active PR ({status_label})"})
+                    active_blocked_prs.append({"issue_md": f"[#{issue_no} {issue_title}]({issue_url})", "pr_no": pr['number'], "pr_url": pr['url'], "pr_title": pr_title, "author": pr['author']['login'], "reason": status_label.split(': ')[1], "last_update": latest_author_act_iso[:10]})
                 has_active_work = True
             elif author_acted_last:
                 item = {"issue_md": f"[#{issue_no} {issue_title}]({issue_url})", "pr_no": pr['number'], "pr_url": pr['url'], "pr_title": pr_title, "updated_at": latest_author_act_iso[:10], "reviewers": sorted(list(human_reviewers))}
-                if not human_reviewers and not special_teams:
+                if not human_reviewers:
                     initial_pickup.append(item)
                 else:
                     item["status"] = "Review Requested" if not latest_rev_act_iso else "Author Updated"
@@ -293,7 +320,7 @@ def main():
                 if days_idle >= STALE_ASSIGNMENT_DAYS:
                     stale_assignments.append({"issue_md": f"[#{issue_no} {issue_title}]({issue_url})", "assignees": assignees, "days_stale": days_idle})
                 else:
-                    active_development.append({"issue_md": f"[#{issue_no} {issue_title}]({issue_url})", "assignees": assignees, "last_update": issue['updatedAt'][:10], "status": "Assigned (No PR)"})
+                    recently_assigned.append({"issue_md": f"[#{issue_no} {issue_title}]({issue_url})", "assignees": assignees, "last_update": issue['updatedAt'][:10]})
 
     # Sorting
     oncaller_attention.sort(key=lambda x: (", ".join(x['teams']), x['issue_no']))
@@ -303,7 +330,7 @@ def main():
     md_rev = f"# 🔎 Gemini CLI Triage Dashboard\n\n*Last Synchronized: {now.strftime('%Y-%m-%d %H:%M')} (UTC)*\n\n"
     md_rev += f"**Total Issues Tracked: {len(all_issue_nodes)}**\n\n"
     
-    md_rev += f"## 🚨 Needs Oncaller Attention ({len(oncaller_attention)})\n**Action: Specialized approval required.**\n\n| Issue | Linked PR | Required Teams | Human Reviewers |\n| :--- | :--- | :--- | :--- |\n"
+    md_rev += f"## 🚨 Needs Oncaller Attention ({len(oncaller_attention)})\n**Action: Specialized approval required.** These PRs are waiting for specific teams.\n\n| Issue | Linked PR | Required Teams | Human Reviewers |\n| :--- | :--- | :--- | :--- |\n"
     for i in oncaller_attention: md_rev += f"| {i['issue_md']} | [#{i['pr_no']}]({i['pr_url']}) | {', '.join([f'`{t}`' for t in i['teams']])} | {', '.join(['@'+r for r in i['reviewers']]) if i['reviewers'] else '_None_'} |\n"
     if not oncaller_attention: md_rev += "| - | - | - | - |\n"
 
@@ -327,9 +354,13 @@ def main():
     for i in waiting_for_author: md_rev += f"| {i['issue_md']} | [#{i['pr_no']}]({i['pr_url']}) | {', '.join(['@'+r for r in i['reviewers']]) if i['reviewers'] else '_None (Team only)_'} | `{i['last_action'][:10]}` |\n"
     if not waiting_for_author: md_rev += "| - | - | - | - |\n"
 
-    md_rev += f"\n## 🛠️ Active Development ({len(active_development)})\n**Status: Recent activity or active blocked PR.**\n\n| Issue | Assignee | Last Update | Status |\n| :--- | :--- | :--- | :--- |\n"
-    for i in active_development: md_rev += f"| {i['issue_md']} | @{', @'.join(i['assignees'])} | `{i['last_update']}` | {i['status']} |\n"
-    if not active_development: md_rev += "| - | - | - | - |\n"
+    md_rev += f"\n## 🛠️ Active Development: Recently Assigned ({len(recently_assigned)})\n**Status: Assigned < 14 days ago.**\n\n| Issue | Assignee | Last Update |\n| :--- | :--- | :--- |\n"
+    for i in recently_assigned: md_rev += f"| {i['issue_md']} | @{', @'.join(i['assignees'])} | `{i['last_update']}` |\n"
+    if not recently_assigned: md_rev += "| - | - | - |\n"
+
+    md_rev += f"\n## 🛠️ Active Development: Blocked PRs ({len(active_blocked_prs)})\n**Status: Active work with blockers.**\n\n| Issue | Linked PR | Author | Reason | Last Update |\n| :--- | :--- | :--- | :--- | :--- |\n"
+    for i in active_blocked_prs: md_rev += f"| {i['issue_md']} | [#{i['pr_no']}]({i['pr_url']}) | @{i['author']} | {i['reason']} | `{i['last_update']}` |\n"
+    if not active_blocked_prs: md_rev += "| - | - | - | - | - |\n"
 
     md_rev += f"\n## 🌱 Available for Pickup ({len(available_pickup)})\n**Action: Open for contributors.**\n\n| Issue | Days Idle |\n| :--- | :--- |\n"
     for i in available_pickup: md_rev += f"| {i['issue_md']} | {i['days_idle']} |\n"
