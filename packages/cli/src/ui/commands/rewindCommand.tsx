@@ -20,11 +20,26 @@ import {
   coreEvents,
   debugLogger,
   logRewind,
+  partToString,
   RewindEvent,
   type ChatRecordingService,
   type GeminiClient,
+  type MessageRecord,
   convertSessionToClientHistory,
 } from '@google/gemini-cli-core';
+import { stripReferenceContent } from '../utils/formatters.js';
+
+/**
+ * Extracts the cleaned prompt text from a user message, matching the logic
+ * used by the RewindViewer TUI to restore the input buffer after a rewind.
+ */
+function getCleanedRewindText(userMessage: MessageRecord): string {
+  const contentToUse = userMessage.displayContent || userMessage.content;
+  const originalUserText = contentToUse ? partToString(contentToUse) : '';
+  return userMessage.displayContent
+    ? originalUserText
+    : stripReferenceContent(originalUserText);
+}
 
 /**
  * Helper function to handle the core logic of rewinding a conversation.
@@ -36,6 +51,7 @@ import {
  * @param recordingService The chat recording service.
  * @param messageId The ID of the message to rewind to.
  * @param newText The new text for the input field after rewinding.
+ * @returns true if the rewind was successful, false otherwise.
  */
 async function rewindConversation(
   context: CommandContext,
@@ -43,7 +59,7 @@ async function rewindConversation(
   recordingService: ChatRecordingService,
   messageId: string,
   newText: string,
-) {
+): Promise<boolean> {
   try {
     const conversation = recordingService.rewindTo(messageId);
     if (!conversation) {
@@ -51,7 +67,7 @@ async function rewindConversation(
       debugLogger.error(errorMsg);
       context.ui.removeComponent();
       coreEvents.emitFeedback('error', errorMsg);
-      return;
+      return false;
     }
 
     // Convert to UI and Client formats
@@ -81,6 +97,7 @@ async function rewindConversation(
 
     // 2. Load the rewound history and set the input
     context.ui.loadHistory(historyWithIds, newText);
+    return true;
   } catch (error) {
     // If an error occurs, we still want to remove the component if possible
     context.ui.removeComponent();
@@ -88,6 +105,7 @@ async function rewindConversation(
       'error',
       error instanceof Error ? error.message : 'Unknown error during rewind',
     );
+    return false;
   }
 }
 
@@ -95,7 +113,7 @@ export const rewindCommand: SlashCommand = {
   name: 'rewind',
   description: 'Jump back to a specific message and restart the conversation',
   kind: CommandKind.BUILT_IN,
-  action: (context) => {
+  action: async (context, args) => {
     const agentContext = context.services.agentContext;
     const config = agentContext?.config;
     if (!config)
@@ -138,6 +156,60 @@ export const rewindCommand: SlashCommand = {
         messageType: 'info',
         content: 'Nothing to rewind to.',
       };
+    }
+
+    // Non-interactive index-based rewind: /rewind <N>
+    const argTrimmed = args?.trim() ?? '';
+    if (argTrimmed) {
+      if (!/^-?\d+$/.test(argTrimmed)) {
+        return {
+          type: 'message',
+          messageType: 'error',
+          content:
+            'Invalid argument. Usage: /rewind <index> (integer, supports negative indexing)',
+        };
+      }
+
+      const userMessages = conversation.messages.filter(
+        (msg) => msg.type === 'user',
+      );
+      let index = parseInt(argTrimmed, 10);
+
+      // Resolve negative index (Python-style: -1 = last)
+      if (index < 0) {
+        index += userMessages.length;
+      }
+
+      if (index < 0 || index >= userMessages.length) {
+        return {
+          type: 'message',
+          messageType: 'error',
+          content: `Invalid index. Valid range: 0 to ${userMessages.length - 1} (or -${userMessages.length} to -1).`,
+        };
+      }
+
+      const targetMessage = userMessages[index];
+      const cleanedText = getCleanedRewindText(targetMessage);
+
+      logRewind(config, new RewindEvent(RewindOutcome.RewindOnly));
+
+      const success = await rewindConversation(
+        context,
+        client,
+        recordingService,
+        targetMessage.id,
+        cleanedText,
+      );
+
+      if (success) {
+        return {
+          type: 'message',
+          messageType: 'info',
+          content: `Rewound to before user message ${index}.`,
+        };
+      }
+      // Error already emitted by rewindConversation via coreEvents
+      return;
     }
 
     return {

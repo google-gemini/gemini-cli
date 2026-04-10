@@ -281,10 +281,10 @@ describe('rewindCommand', () => {
     });
   });
 
-  it('should fail if config is missing', () => {
+  it('should fail if config is missing', async () => {
     const context = { services: {} } as CommandContext;
 
-    const result = rewindCommand.action!(context, '');
+    const result = await rewindCommand.action!(context, '');
 
     expect(result).toEqual({
       type: 'message',
@@ -293,7 +293,7 @@ describe('rewindCommand', () => {
     });
   });
 
-  it('should fail if client is not initialized', () => {
+  it('should fail if client is not initialized', async () => {
     const context = createMockCommandContext({
       services: {
         agentContext: {
@@ -305,7 +305,7 @@ describe('rewindCommand', () => {
       },
     }) as unknown as CommandContext;
 
-    const result = rewindCommand.action!(context, '');
+    const result = await rewindCommand.action!(context, '');
 
     expect(result).toEqual({
       type: 'message',
@@ -314,7 +314,7 @@ describe('rewindCommand', () => {
     });
   });
 
-  it('should fail if recording service is unavailable', () => {
+  it('should fail if recording service is unavailable', async () => {
     const context = createMockCommandContext({
       services: {
         agentContext: {
@@ -326,7 +326,7 @@ describe('rewindCommand', () => {
       },
     }) as unknown as CommandContext;
 
-    const result = rewindCommand.action!(context, '');
+    const result = await rewindCommand.action!(context, '');
 
     expect(result).toEqual({
       type: 'message',
@@ -335,10 +335,10 @@ describe('rewindCommand', () => {
     });
   });
 
-  it('should return info if no conversation found', () => {
+  it('should return info if no conversation found', async () => {
     mockGetConversation.mockReturnValue(null);
 
-    const result = rewindCommand.action!(mockContext, '');
+    const result = await rewindCommand.action!(mockContext, '');
 
     expect(result).toEqual({
       type: 'message',
@@ -347,18 +347,126 @@ describe('rewindCommand', () => {
     });
   });
 
-  it('should return info if no user interactions found', () => {
+  it('should return info if no user interactions found', async () => {
     mockGetConversation.mockReturnValue({
       messages: [{ id: 'msg-1', type: 'gemini', content: 'hello' }],
       sessionId: 'test-session',
     });
 
-    const result = rewindCommand.action!(mockContext, '');
+    const result = await rewindCommand.action!(mockContext, '');
 
     expect(result).toEqual({
       type: 'message',
       messageType: 'info',
       content: 'Nothing to rewind to.',
+    });
+  });
+
+  describe('index-based rewind (/rewind <N>)', () => {
+    beforeEach(() => {
+      mockGetConversation.mockReturnValue({
+        messages: [
+          { id: 'msg-u1', type: 'user', content: 'first prompt' },
+          { id: 'msg-g1', type: 'gemini', content: 'response 1' },
+          { id: 'msg-u2', type: 'user', content: 'second prompt' },
+          { id: 'msg-g2', type: 'gemini', content: 'response 2' },
+          { id: 'msg-u3', type: 'user', content: 'third prompt' },
+          { id: 'msg-g3', type: 'gemini', content: 'response 3' },
+        ],
+        sessionId: 'test-session',
+      });
+    });
+
+    it('should rewind to the first user message with /rewind 0', async () => {
+      const result = await rewindCommand.action!(mockContext, '0');
+
+      expect(mockRewindTo).toHaveBeenCalledWith('msg-u1');
+      expect(mockSetHistory).toHaveBeenCalled();
+      expect(mockLoadHistory).toHaveBeenCalled();
+      expect(result).toEqual({
+        type: 'message',
+        messageType: 'info',
+        content: 'Rewound to before user message 0.',
+      });
+    });
+
+    it('should rewind to the second user message with /rewind 1', async () => {
+      const result = await rewindCommand.action!(mockContext, '1');
+
+      expect(mockRewindTo).toHaveBeenCalledWith('msg-u2');
+      expect(result).toEqual({
+        type: 'message',
+        messageType: 'info',
+        content: 'Rewound to before user message 1.',
+      });
+    });
+
+    it('should resolve negative index: /rewind -1 targets last user message', async () => {
+      const result = await rewindCommand.action!(mockContext, '-1');
+
+      expect(mockRewindTo).toHaveBeenCalledWith('msg-u3');
+      expect(result).toEqual({
+        type: 'message',
+        messageType: 'info',
+        content: 'Rewound to before user message 2.',
+      });
+    });
+
+    it('should resolve negative index: /rewind -2 targets second-to-last', async () => {
+      const result = await rewindCommand.action!(mockContext, '-2');
+
+      expect(mockRewindTo).toHaveBeenCalledWith('msg-u2');
+      expect(result).toEqual({
+        type: 'message',
+        messageType: 'info',
+        content: 'Rewound to before user message 1.',
+      });
+    });
+
+    it('should return error for non-integer argument', async () => {
+      const result = await rewindCommand.action!(mockContext, 'abc');
+
+      expect(mockRewindTo).not.toHaveBeenCalled();
+      expect(result).toEqual({
+        type: 'message',
+        messageType: 'error',
+        content:
+          'Invalid argument. Usage: /rewind <index> (integer, supports negative indexing)',
+      });
+    });
+
+    it('should return error for out-of-range positive index', async () => {
+      const result = await rewindCommand.action!(mockContext, '999');
+
+      expect(mockRewindTo).not.toHaveBeenCalled();
+      expect(result).toEqual({
+        type: 'message',
+        messageType: 'error',
+        content: 'Invalid index. Valid range: 0 to 2 (or -3 to -1).',
+      });
+    });
+
+    it('should return error for out-of-range negative index', async () => {
+      const result = await rewindCommand.action!(mockContext, '-999');
+
+      expect(mockRewindTo).not.toHaveBeenCalled();
+      expect(result).toEqual({
+        type: 'message',
+        messageType: 'error',
+        content: 'Invalid index. Valid range: 0 to 2 (or -3 to -1).',
+      });
+    });
+
+    it('should not return success message when rewind fails', async () => {
+      mockRewindTo.mockReturnValue(null);
+
+      const result = await rewindCommand.action!(mockContext, '0');
+
+      expect(coreEvents.emitFeedback).toHaveBeenCalledWith(
+        'error',
+        'Could not fetch conversation file',
+      );
+      expect(result).toBeUndefined();
     });
   });
 });
