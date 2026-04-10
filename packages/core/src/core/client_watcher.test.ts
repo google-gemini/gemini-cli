@@ -137,7 +137,7 @@ describe('GeminiClient Watcher Integration', () => {
       'gemini-pro',
     );
 
-    clientAccess.sessionTurnCount = 0; // Will become 1 inside processTurn
+    clientAccess.sessionTurnCount = 1;
 
     const promptId = 'test-prompt';
     const signal = new AbortController().signal;
@@ -214,7 +214,7 @@ describe('GeminiClient Watcher Integration', () => {
       'gemini-pro',
     );
 
-    clientAccess.sessionTurnCount = 0; // Will become 1 inside processTurn
+    clientAccess.sessionTurnCount = 1;
 
     const promptId = 'test-prompt';
     const signal = new AbortController().signal;
@@ -323,7 +323,7 @@ describe('GeminiClient Watcher Integration', () => {
 
     // Simulate 11 turns
     for (let i = 1; i <= 11; i++) {
-      clientAccess.sessionTurnCount = i - 1; // Will become i inside processTurn
+      clientAccess.sessionTurnCount = i;
 
       const generator = clientAccess.processTurn(
         [{ text: `turn ${i}` }],

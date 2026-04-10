@@ -618,8 +618,6 @@ export class GeminiClient {
   ): AsyncGenerator<ServerGeminiStreamEvent, Turn> {
     let turn = new Turn(this.getChat(), prompt_id);
 
-    this.sessionTurnCount++;
-
     const watcherInterval = this.config.getExperimentalWatcherInterval();
     if (
       this.config.isExperimentalWatcherEnabled() &&
@@ -928,6 +926,7 @@ export class GeminiClient {
   ): AsyncGenerator<ServerGeminiStreamEvent, Turn> {
     if (!isInvalidStreamRetry) {
       this.config.resetTurn();
+      this.sessionTurnCount++;
     }
 
     const hooksEnabled = this.config.getEnableHooks();
@@ -1327,6 +1326,22 @@ export class GeminiClient {
     }
 
     const interval = this.config.getExperimentalWatcherInterval();
+
+    const projectTempDir = this.config.storage.getProjectTempDir();
+    const statusFilePath = path.join(projectTempDir, 'watcher_status.md');
+
+    // Ensure the file exists before the subagent tries to read it
+    if (!fs.existsSync(statusFilePath)) {
+      try {
+        if (!fs.existsSync(projectTempDir)) {
+          fs.mkdirSync(projectTempDir, { recursive: true });
+        }
+        fs.writeFileSync(statusFilePath, 'EMPTY', 'utf-8');
+      } catch (e) {
+        debugLogger.warn('Failed to initialize watcher status file', e);
+      }
+    }
+
     const history = this.getHistory();
     // Get last N turns (approx)
     const recentHistory = history
