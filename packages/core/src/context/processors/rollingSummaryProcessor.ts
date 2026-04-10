@@ -10,8 +10,8 @@ import type {
 } from '../pipeline.js';
 import type { ContextEnvironment } from '../pipeline/environment.js';
 import type { ConcreteNode, RollingSummary } from '../ir/types.js';
-import { SnapshotGenerator } from '../utils/snapshotGenerator.js';
 import { debugLogger } from '../../utils/debugLogger.js';
+import { LlmRole } from '../../telemetry/llmRole.js';
 
 export interface RollingSummaryProcessorOptions extends BackstopTargetOptions {
   systemInstruction?: string;
@@ -22,7 +22,42 @@ export function createRollingSummaryProcessor(
   env: ContextEnvironment,
   options: RollingSummaryProcessorOptions,
 ): ContextProcessor {
-  const generator = new SnapshotGenerator(env);
+  const generateRollingSummary = async (
+    nodes: ConcreteNode[],
+  ): Promise<string> => {
+    let transcript = '';
+    for (const node of nodes) {
+      let nodeContent = '';
+      if ('text' in node && typeof node.text === 'string') {
+        nodeContent = node.text;
+      } else if ('semanticParts' in node) {
+        nodeContent = JSON.stringify(node.semanticParts);
+      } else if ('observation' in node) {
+        nodeContent =
+          typeof node.observation === 'string'
+            ? node.observation
+            : JSON.stringify(node.observation);
+      }
+      transcript += `[${node.type}]: ${nodeContent}\n`;
+    }
+
+    const systemPrompt =
+      options.systemInstruction ??
+      `You are an expert context compressor. Your job is to drastically shorten the provided conversational transcript while preserving the absolute core semantic meaning, facts, and intent. Omit all conversational filler, pleasantries, or redundant information. Return ONLY the compressed summary.`;
+
+    const response = await env.llmClient.generateContent({
+      role: LlmRole.UTILITY_COMPRESSOR,
+      modelConfigKey: { model: 'gemini-3-flash-base' },
+      promptId: env.promptId,
+      abortSignal: new AbortController().signal,
+      contents: [{ role: 'user', parts: [{ text: transcript }] }],
+      systemInstruction: { role: 'system', parts: [{ text: systemPrompt }] },
+    });
+
+    const candidate = response.candidates?.[0];
+    const textPart = candidate?.content?.parts?.[0];
+    return textPart?.text || '';
+  };
 
   return {
     id,
@@ -66,10 +101,7 @@ export function createRollingSummaryProcessor(
 
       try {
         // Synthesize the rolling summary synchronously
-        const snapshotText = await generator.synthesizeSnapshot(
-          nodesToSummarize,
-          options.systemInstruction,
-        );
+        const snapshotText = await generateRollingSummary(nodesToSummarize);
         const newId = env.idGenerator.generateId();
 
         const summaryNode: RollingSummary = {
