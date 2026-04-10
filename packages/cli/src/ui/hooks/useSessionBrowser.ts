@@ -6,14 +6,13 @@
 
 import { useState, useCallback } from 'react';
 import type { HistoryItemWithoutId } from '../types.js';
-import * as fs from 'node:fs/promises';
 import path from 'node:path';
 import {
   coreEvents,
   convertSessionToClientHistory,
   uiTelemetryService,
+  loadConversationRecord,
   type Config,
-  type ConversationRecord,
   type ResumedSessionData,
 } from '@google/gemini-cli-core';
 import {
@@ -61,10 +60,12 @@ export const useSessionBrowser = (
           const originalFilePath = path.join(chatsDir, fileName);
 
           // Load up the conversation.
-          // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
-          const conversation: ConversationRecord = JSON.parse(
-            await fs.readFile(originalFilePath, 'utf8'),
-          );
+          const conversation = await loadConversationRecord(originalFilePath);
+          if (!conversation) {
+            throw new Error(
+              `Failed to parse conversation from ${originalFilePath}`,
+            );
+          }
 
           // Use the old session's ID to continue it.
           const existingSessionId = conversation.sessionId;

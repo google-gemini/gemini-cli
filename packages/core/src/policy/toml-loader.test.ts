@@ -1007,7 +1007,8 @@ priority = 100
 
         // 3. Simulate an unknown Subagent being registered (Dynamic Rule)
         engine.addRule({
-          toolName: 'unknown_subagent',
+          toolName: 'invoke_agent',
+          argsPattern: /"agent_name":\s*"unknown_subagent"/,
           decision: PolicyDecision.ALLOW,
           priority: PRIORITY_SUBAGENT_TOOL,
           source: 'AgentRegistry (Dynamic)',
@@ -1017,7 +1018,7 @@ priority = 100
         // The Plan Mode "Catch-All Deny" (from plan.toml) should override the Subagent Allow
         // Plan Mode Deny (1.04) > Subagent Allow (1.03)
         const checkResult = await engine.check(
-          { name: 'unknown_subagent' },
+          { name: 'invoke_agent', args: { agent_name: 'unknown_subagent' } },
           undefined,
         );
 
@@ -1037,7 +1038,10 @@ priority = 100
         // 6. Verify Built-in Research Subagents are ALLOWED
         // codebase_investigator is priority 50 in read-only.toml
         const codebaseResult = await engine.check(
-          { name: 'codebase_investigator' },
+          {
+            name: 'invoke_agent',
+            args: { agent_name: 'codebase_investigator' },
+          },
           undefined,
         );
         expect(
@@ -1046,7 +1050,7 @@ priority = 100
         ).toBe(PolicyDecision.ALLOW);
 
         const cliHelpResult = await engine.check(
-          { name: 'cli_help' },
+          { name: 'invoke_agent', args: { agent_name: 'cli_help' } },
           undefined,
         );
         expect(
