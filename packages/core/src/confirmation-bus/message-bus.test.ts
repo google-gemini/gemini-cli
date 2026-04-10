@@ -236,9 +236,10 @@ describe('MessageBus', () => {
   });
 
   describe('request', () => {
-    it('should reject when publish() rejects instead of hanging until timeout', async () => {
-      const publishError = new Error('publish failed');
-      vi.spyOn(messageBus, 'publish').mockRejectedValue(publishError);
+    it('should reject when publish emits an error event', async () => {
+      vi.spyOn(policyEngine, 'check').mockRejectedValue(
+        new Error('Policy check failed'),
+      );
 
       await expect(
         messageBus.request<ToolConfirmationRequest, ToolConfirmationResponse>(
@@ -247,9 +248,49 @@ describe('MessageBus', () => {
             toolCall: { name: 'test-tool', args: {} },
           },
           MessageBusType.TOOL_CONFIRMATION_RESPONSE,
-          1000,
         ),
-      ).rejects.toThrow('publish failed');
+      ).rejects.toThrow('Policy check failed');
+    });
+
+    it('should reject immediately when signal is already aborted', async () => {
+      const controller = new AbortController();
+      controller.abort();
+
+      await expect(
+        messageBus.request<ToolConfirmationRequest, ToolConfirmationResponse>(
+          {
+            type: MessageBusType.TOOL_CONFIRMATION_REQUEST,
+            toolCall: { name: 'test-tool', args: {} },
+          },
+          MessageBusType.TOOL_CONFIRMATION_RESPONSE,
+          { signal: controller.signal },
+        ),
+      ).rejects.toThrow('Request aborted');
+    });
+
+    it('should reject when signal is aborted while waiting', async () => {
+      vi.spyOn(policyEngine, 'check').mockResolvedValue({
+        decision: PolicyDecision.ASK_USER,
+      });
+
+      messageBus.subscribe(MessageBusType.TOOL_CONFIRMATION_REQUEST, () => {});
+
+      const controller = new AbortController();
+      const requestPromise = messageBus.request<
+        ToolConfirmationRequest,
+        ToolConfirmationResponse
+      >(
+        {
+          type: MessageBusType.TOOL_CONFIRMATION_REQUEST,
+          toolCall: { name: 'test-tool', args: {} },
+        },
+        MessageBusType.TOOL_CONFIRMATION_RESPONSE,
+        { signal: controller.signal },
+      );
+
+      controller.abort();
+
+      await expect(requestPromise).rejects.toThrow('Request aborted');
     });
   });
 
@@ -295,12 +336,14 @@ describe('MessageBus', () => {
         toolCall: { name: 'test-tool', args: {} },
       };
 
+      const controller = new AbortController();
       const requestPromise = subagentBus.request<
         ToolConfirmationRequest,
         ToolConfirmationResponse
-      >(request, MessageBusType.TOOL_CONFIRMATION_RESPONSE, 2000);
+      >(request, MessageBusType.TOOL_CONFIRMATION_RESPONSE, {
+        signal: controller.signal,
+      });
 
-      // Wait for request on root bus and respond
       await new Promise<void>((resolve) => {
         messageBus.subscribe<ToolConfirmationRequest>(
           MessageBusType.TOOL_CONFIRMATION_REQUEST,
@@ -338,10 +381,13 @@ describe('MessageBus', () => {
         toolCall: { name: 'test-tool', args: {} },
       };
 
+      const controller = new AbortController();
       const requestPromise = subagentBus2.request<
         ToolConfirmationRequest,
         ToolConfirmationResponse
-      >(request, MessageBusType.TOOL_CONFIRMATION_RESPONSE, 2000);
+      >(request, MessageBusType.TOOL_CONFIRMATION_RESPONSE, {
+        signal: controller.signal,
+      });
 
       await new Promise<void>((resolve) => {
         messageBus.subscribe<ToolConfirmationRequest>(
