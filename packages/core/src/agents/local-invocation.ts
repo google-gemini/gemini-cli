@@ -319,6 +319,7 @@ ${output.result}`;
       return {
         llmContent: [{ text: resultContent }],
         returnDisplay: progress,
+        data: { agentId: executor.agentId },
       };
     } catch (error) {
       const errorMessage =
