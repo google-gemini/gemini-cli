@@ -1,6 +1,6 @@
-# Latest stable release: v0.37.0
+# Latest stable release: v0.37.1
 
-Released: April 08, 2026
+Released: April 09, 2026
 
 For most users, our latest stable release is the recommended release. Install
 the latest stable version with:
@@ -26,6 +26,12 @@ npm install -g @google/gemini-cli
 
 ## What's Changed
 
+- fix(acp): handle all InvalidStreamError types gracefully in prompt
+  [#24540](https://github.com/google-gemini/gemini-cli/pull/24540)
+- feat(acp): add support for /about command
+  [#24649](https://github.com/google-gemini/gemini-cli/pull/24649)
+- feat(acp): add /help command
+  [#24839](https://github.com/google-gemini/gemini-cli/pull/24839)
 - feat(evals): centralize test agents into test-utils for reuse by @Samee24 in
   [#23616](https://github.com/google-gemini/gemini-cli/pull/23616)
 - revert: chore(config): disable agents by default by @abhipatel12 in
@@ -416,4 +422,4 @@ npm install -g @google/gemini-cli
   [#24842](https://github.com/google-gemini/gemini-cli/pull/24842)
 
 **Full Changelog**:
-https://github.com/google-gemini/gemini-cli/compare/v0.36.0...v0.37.0
+https://github.com/google-gemini/gemini-cli/compare/v0.36.0...v0.37.1
