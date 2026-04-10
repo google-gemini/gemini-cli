@@ -3,23 +3,23 @@
   "updatedAt": "2026-04-10T15:36:04.547Z",
   "scenarios": {
     "multi-turn-conversation": {
-      "heapUsedBytes": 106207400,
-      "heapTotalBytes": 115441664,
-      "rssBytes": 273575936,
+      "heapUsedBytes": 120082704,
+      "heapTotalBytes": 177586176,
+      "rssBytes": 269172736,
       "externalBytes": 4304053,
       "timestamp": "2026-04-10T15:35:17.603Z"
     },
     "multi-function-call-repo-search": {
-      "heapUsedBytes": 106233056,
-      "heapTotalBytes": 115441664,
-      "rssBytes": 273707008,
+      "heapUsedBytes": 104644984,
+      "heapTotalBytes": 111575040,
+      "rssBytes": 204079104,
       "externalBytes": 4304053,
       "timestamp": "2026-04-10T15:35:22.480Z"
     },
     "idle-session-startup": {
-      "heapUsedBytes": 106063096,
-      "heapTotalBytes": 115441664,
-      "rssBytes": 273182720,
+      "heapUsedBytes": 119813672,
+      "heapTotalBytes": 177061888,
+      "rssBytes": 267943936,
       "externalBytes": 4304053,
       "timestamp": "2026-04-10T15:35:08.035Z"
     },
@@ -31,9 +31,9 @@
       "timestamp": "2026-04-10T15:35:12.770Z"
     },
     "resume-large-chat-with-messages": {
-      "heapUsedBytes": 106545568,
-      "heapTotalBytes": 111509504,
-      "rssBytes": 202596352,
+      "heapUsedBytes": 119722064,
+      "heapTotalBytes": 177324032,
+      "rssBytes": 268812288,
       "externalBytes": 4306101,
       "timestamp": "2026-04-10T15:36:04.547Z"
     },

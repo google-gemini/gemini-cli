@@ -232,7 +232,7 @@ describe('Memory Usage Tests', () => {
         async (recordSnapshot) => {
           await rig.run({
             stdin: sharedPrompts,
-            timeout: 600000, // 10 minutes
+            timeout: 600000,
             env: TEST_ENV,
           });
 
