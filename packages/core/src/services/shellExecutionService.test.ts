@@ -1610,6 +1610,22 @@ describe('ShellExecutionService child_process fallback', () => {
         'exit',
       ]);
     });
+
+    it('should correctly measure sniffedBytes with >20 small chunks to prevent OOM (regression #22170)', async () => {
+      mockIsBinary.mockReturnValue(false);
+
+      await simulateExecution('cat lots_of_chunks', (cp) => {
+        for (let i = 0; i < 25; i++) {
+          cp.stdout?.emit('data', Buffer.alloc(10, 'a'));
+        }
+        cp.emit('exit', 0, null);
+        cp.emit('close', 0, null);
+      });
+
+      const lastCallBuffer =
+        mockIsBinary.mock.calls[mockIsBinary.mock.calls.length - 1][0];
+      expect(lastCallBuffer.length).toBe(250);
+    });
   });
 
   describe('Platform-Specific Behavior', () => {
