@@ -77,6 +77,7 @@ export enum Command {
   NEWLINE = 'input.newline',
   OPEN_EXTERNAL_EDITOR = 'input.openExternalEditor',
   PASTE_CLIPBOARD = 'input.paste',
+  ENHANCE_PROMPT = 'input.enhancePrompt',
 
   // App Controls
   SHOW_ERROR_DETAILS = 'app.showErrorDetails',
@@ -365,6 +366,7 @@ export const defaultKeyBindingConfig: KeyBindingConfig = new Map([
     ],
   ],
   [Command.OPEN_EXTERNAL_EDITOR, [new KeyBinding('ctrl+x')]],
+  [Command.ENHANCE_PROMPT, [new KeyBinding('alt+e')]],
   [
     Command.PASTE_CLIPBOARD,
     [
@@ -491,6 +493,7 @@ export const commandCategories: readonly CommandCategory[] = [
       Command.NEWLINE,
       Command.OPEN_EXTERNAL_EDITOR,
       Command.PASTE_CLIPBOARD,
+      Command.ENHANCE_PROMPT,
     ],
   },
   {
@@ -597,6 +600,7 @@ export const commandDescriptions: Readonly<Record<Command, string>> = {
   [Command.OPEN_EXTERNAL_EDITOR]:
     'Open the current prompt or the plan in an external editor.',
   [Command.PASTE_CLIPBOARD]: 'Paste from the clipboard.',
+  [Command.ENHANCE_PROMPT]: 'Enhance the current prompt using an LLM.',
 
   // App Controls
   [Command.SHOW_ERROR_DETAILS]: 'Toggle detailed error information.',

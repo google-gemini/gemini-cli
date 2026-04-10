@@ -1217,6 +1217,16 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
         return true;
       }
 
+      // Alt+E for enhance prompt
+      if (keyMatchers[Command.ENHANCE_PROMPT](key)) {
+        const enhanceCmd = slashCommands.find((cmd) => cmd.name === 'enhance');
+        if (enhanceCmd && enhanceCmd.action) {
+          // eslint-disable-next-line @typescript-eslint/no-floating-promises
+          enhanceCmd.action(commandContext, buffer.text);
+        }
+        return true;
+      }
+
       // Ctrl+V for clipboard paste
       if (keyMatchers[Command.PASTE_CLIPBOARD](key)) {
         // eslint-disable-next-line @typescript-eslint/no-floating-promises
@@ -1273,6 +1283,8 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
       inputHistory,
       handleSubmit,
       shellHistory,
+      slashCommands,
+      commandContext,
       reverseSearchCompletion,
       handleClipboardPaste,
       resetCompletionState,
