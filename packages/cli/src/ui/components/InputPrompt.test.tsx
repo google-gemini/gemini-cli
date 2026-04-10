@@ -289,7 +289,7 @@ describe('InputPrompt', () => {
       navigateUp: vi.fn(),
       navigateDown: vi.fn(),
       handleSubmit: vi.fn(),
-      saveDraft: vi.fn(),
+      checkpointCurrentInput: vi.fn(),
     };
     mockedUseInputHistory.mockImplementation(({ onSubmit }) => {
       mockInputHistory.handleSubmit = vi.fn((val) => onSubmit(val));
@@ -2548,6 +2548,10 @@ describe('InputPrompt', () => {
         stdin.write('\x03');
         vi.advanceTimersByTime(100);
 
+        expect(mockInputHistory.checkpointCurrentInput).toHaveBeenCalledWith(
+          'text to clear',
+          0,
+        );
         expect(props.buffer.setText).toHaveBeenCalledWith('');
         expect(mockCommandCompletion.resetCompletionState).toHaveBeenCalled();
       });
@@ -2594,10 +2598,106 @@ describe('InputPrompt', () => {
         stdin.write('\x1B\x1B');
         vi.advanceTimersByTime(100);
 
+        expect(mockInputHistory.checkpointCurrentInput).toHaveBeenCalledWith(
+          'some text',
+          0,
+        );
         expect(props.buffer.setText).toHaveBeenCalledWith('');
         expect(props.onSubmit).not.toHaveBeenCalledWith('/rewind');
       });
       unmount();
+    });
+
+    describe('unsent draft checkpoint and Up restore', () => {
+      let storedCheckpoint: { text: string; offset: number } | null;
+
+      beforeEach(() => {
+        storedCheckpoint = null;
+        mockedUseInputHistory.mockImplementation(
+          ({ onChange, currentQuery, userMessages, onSubmit, isActive }) => ({
+            checkpointCurrentInput: (text: string, offset: number) => {
+              if (text.trim()) {
+                storedCheckpoint = { text, offset };
+              }
+            },
+            navigateUp: () => {
+              if (!isActive) return false;
+              if (
+                storedCheckpoint &&
+                (!currentQuery.trim() || currentQuery === storedCheckpoint.text)
+              ) {
+                onChange(storedCheckpoint.text, storedCheckpoint.offset);
+                storedCheckpoint = null;
+                return true;
+              }
+              if (userMessages.length > 0) {
+                onChange(userMessages[userMessages.length - 1], 'start');
+                return true;
+              }
+              return false;
+            },
+            navigateDown: vi.fn(() => false),
+            handleSubmit: vi.fn((val: string) => {
+              if (val.trim()) {
+                onSubmit(val);
+              }
+              storedCheckpoint = null;
+            }),
+          }),
+        );
+      });
+
+      it('should restore checkpointed text on Up after Ctrl-C clear', async () => {
+        props.buffer.setText('recover me');
+        vi.mocked(props.buffer.setText).mockClear();
+
+        const { stdin, unmount } = renderWithProviders(
+          <InputPrompt {...props} />,
+        );
+
+        await act(async () => {
+          stdin.write('\x03');
+          vi.advanceTimersByTime(100);
+        });
+
+        expect(storedCheckpoint).toEqual({ text: 'recover me', offset: 0 });
+
+        await act(async () => {
+          stdin.write('\u001B[A');
+          vi.advanceTimersByTime(100);
+        });
+
+        await waitFor(() => {
+          expect(mockBuffer.setText).toHaveBeenCalledWith('recover me', 0);
+        });
+        unmount();
+      });
+
+      it('should restore checkpointed text on Up after double-Esc clear', async () => {
+        props.buffer.setText('recover esc');
+        vi.mocked(props.buffer.setText).mockClear();
+
+        const { stdin, unmount } = renderWithProviders(
+          <InputPrompt {...props} />,
+        );
+
+        await act(async () => {
+          stdin.write('\x1B\x1B');
+          vi.advanceTimersByTime(100);
+        });
+
+        expect(storedCheckpoint).toEqual({ text: 'recover esc', offset: 0 });
+
+        await act(async () => {
+          stdin.write('\u001B[A');
+          vi.advanceTimersByTime(100);
+        });
+
+        await waitFor(() => {
+          expect(mockBuffer.setText).toHaveBeenCalledWith('recover esc', 0);
+        });
+        unmount();
+      });
     });
 
     it('should reset escape state on any non-ESC key', async () => {
@@ -4421,7 +4521,7 @@ describe('InputPrompt', () => {
           return true;
         },
         handleSubmit: vi.fn((val) => onSubmit(val)),
-        saveDraft: vi.fn(),
+        checkpointCurrentInput: vi.fn(),
       }));
     });
 

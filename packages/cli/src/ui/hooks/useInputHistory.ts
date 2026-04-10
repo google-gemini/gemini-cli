@@ -20,7 +20,7 @@ export interface UseInputHistoryReturn {
   handleSubmit: (value: string) => void;
   navigateUp: () => boolean;
   navigateDown: () => boolean;
-  saveDraft: (text: string, offset: number) => void;
+  checkpointCurrentInput: (text: string, offset: number) => void;
 }
 
 export function useInputHistory({
@@ -43,13 +43,10 @@ export function useInputHistory({
     Record<number, { text: string; offset: number }>
   >({});
 
-  const draftRef = useRef<{ text: string; offset: number } | null>(null);
-
   const resetHistoryNav = useCallback(() => {
     setHistoryIndex(-1);
     previousHistoryIndexRef.current = undefined;
     historyCacheRef.current = {};
-    draftRef.current = null;
   }, []);
 
   const handleSubmit = useCallback(
@@ -111,28 +108,30 @@ export function useInputHistory({
     [historyIndex, currentQuery, currentCursorOffset, userMessages, onChange],
   );
 
-  const saveDraft = useCallback((text: string, offset: number) => {
-    if (text.trim()) {
-      draftRef.current = { text, offset };
+  const checkpointCurrentInput = useCallback((text: string, offset: number) => {
+    if (!text.trim()) {
+      return;
     }
+    historyCacheRef.current[-1] = { text, offset };
   }, []);
 
   const navigateUp = useCallback(() => {
     if (!isActive) return false;
 
-    const shouldRestoreDraft =
-      historyIndex === -1 &&
-      draftRef.current &&
-      (!currentQuery.trim() || currentQuery === draftRef.current.text);
+    const cache = historyCacheRef.current;
+    const unsentDraft = cache[-1];
 
-    if (shouldRestoreDraft) {
-      const draft = draftRef.current;
-      if (!draft) {
-        return false;
+    if (historyIndex === -1 && unsentDraft !== undefined) {
+      const trimmedSaved = unsentDraft.text.trim();
+      if (trimmedSaved) {
+        const shouldRestoreDraft =
+          !currentQuery.trim() || currentQuery === unsentDraft.text;
+        if (shouldRestoreDraft) {
+          delete cache[-1];
+          onChange(unsentDraft.text, unsentDraft.offset);
+          return true;
+        }
       }
-      draftRef.current = null;
-      onChange(draft.text, draft.offset);
-      return true;
     }
 
     if (userMessages.length === 0) return false;
@@ -163,6 +162,6 @@ export function useInputHistory({
     handleSubmit,
     navigateUp,
     navigateDown,
-    saveDraft,
+    checkpointCurrentInput,
   };
 }
