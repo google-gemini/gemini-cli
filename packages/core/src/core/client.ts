@@ -618,25 +618,6 @@ export class GeminiClient {
   ): AsyncGenerator<ServerGeminiStreamEvent, Turn> {
     let turn = new Turn(this.getChat(), prompt_id);
 
-    const watcherInterval = this.config.getExperimentalWatcherInterval();
-    if (
-      this.config.isExperimentalWatcherEnabled() &&
-      (this.sessionTurnCount === 1 ||
-        this.sessionTurnCount % watcherInterval === 0)
-    ) {
-      const watcherResult = await this.tryRunWatcher(prompt_id, signal);
-      if (watcherResult?.feedback) {
-        const feedback = watcherResult.feedback;
-        const feedbackRequest = [
-          {
-            text: `System: Feedback from Watcher Sub Agent based on recent progress (Review of last ${this.config.getExperimentalWatcherInterval()} turns):\n\n${feedback}`,
-          },
-        ];
-        // Inject feedback into the conversation
-        this.getChat().addHistory(createUserContent(feedbackRequest));
-      }
-    }
-
     if (
       this.config.getMaxSessionTurns() > 0 &&
       this.sessionTurnCount > this.config.getMaxSessionTurns()
@@ -912,6 +893,7 @@ export class GeminiClient {
         }
       }
     }
+
     return turn;
   }
 
@@ -1066,6 +1048,30 @@ export class GeminiClient {
             if (!isPendingTools || isAborted) {
               this.hookStateMap.delete(prompt_id);
             }
+          }
+        }
+      }
+
+      // Trigger Watcher after the full interaction (including tool recursions) is complete.
+      // But only if we are at the top-level sendMessageStream (not a continuation).
+      if (!continuationHandled && !isInvalidStreamRetry && !stopHookActive) {
+        const watcherInterval = this.config.getExperimentalWatcherInterval();
+        const currentTurn = this.sessionTurnCount;
+        if (
+          this.config.isExperimentalWatcherEnabled() &&
+          currentTurn > 0 &&
+          (currentTurn === 1 || currentTurn % watcherInterval === 0)
+        ) {
+          const watcherResult = await this.tryRunWatcher(prompt_id, signal);
+          if (watcherResult?.feedback) {
+            const feedback = watcherResult.feedback;
+            const feedbackRequest = [
+              {
+                text: `System: Feedback from Watcher Sub Agent based on recent progress (Review of last ${watcherInterval} turns):\n\n${feedback}`,
+              },
+            ];
+            // Inject feedback into the conversation for the NEXT turn
+            this.getChat().addHistory(createUserContent(feedbackRequest));
           }
         }
       }

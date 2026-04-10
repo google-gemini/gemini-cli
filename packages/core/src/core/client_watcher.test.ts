@@ -104,16 +104,6 @@ describe('GeminiClient Watcher Integration', () => {
     // Use type assertion for testing purposes to access protected members
     const clientAccess = client as unknown as {
       context: AgentLoopContext;
-      sessionTurnCount: number;
-      tryCompressChat: () => Promise<{ compressionStatus: string }>;
-      _getActiveModelForCurrentTurn: () => string;
-      processTurn: (
-        request: unknown,
-        signal: AbortSignal,
-        promptId: string,
-        maxTokens: number,
-        forceFullContext: boolean,
-      ) => AsyncGenerator;
     };
 
     Object.defineProperty(clientAccess.context, 'toolRegistry', {
@@ -125,29 +115,19 @@ describe('GeminiClient Watcher Integration', () => {
       clientAccess.context as unknown as { agentRegistry: unknown }
     ).agentRegistry = {
       getAllDefinitions: vi.fn().mockReturnValue([]),
+      initialize: vi.fn().mockResolvedValue(undefined),
     };
 
     await config.storage.initialize();
     await client.initialize();
 
-    vi.spyOn(clientAccess, 'tryCompressChat').mockResolvedValue({
-      compressionStatus: 'skipped',
-    });
-    vi.spyOn(clientAccess, '_getActiveModelForCurrentTurn').mockReturnValue(
-      'gemini-pro',
-    );
-
-    clientAccess.sessionTurnCount = 1;
-
     const promptId = 'test-prompt';
     const signal = new AbortController().signal;
 
-    const generator = clientAccess.processTurn(
+    const generator = client.sendMessageStream(
       [{ text: 'test' }],
       signal,
       promptId,
-      10,
-      false,
     );
     for await (const _ of generator) {
       // Intentionally consume
@@ -181,16 +161,6 @@ describe('GeminiClient Watcher Integration', () => {
     // Use type assertion for testing purposes to access protected members
     const clientAccess = client as unknown as {
       context: AgentLoopContext;
-      sessionTurnCount: number;
-      tryCompressChat: () => Promise<{ compressionStatus: string }>;
-      _getActiveModelForCurrentTurn: () => string;
-      processTurn: (
-        request: unknown,
-        signal: AbortSignal,
-        promptId: string,
-        maxTokens: number,
-        forceFullContext: boolean,
-      ) => AsyncGenerator;
     };
 
     Object.defineProperty(clientAccess.context, 'toolRegistry', {
@@ -202,29 +172,19 @@ describe('GeminiClient Watcher Integration', () => {
       clientAccess.context as unknown as { agentRegistry: unknown }
     ).agentRegistry = {
       getAllDefinitions: vi.fn().mockReturnValue([]),
+      initialize: vi.fn().mockResolvedValue(undefined),
     };
 
     await config.storage.initialize();
     await client.initialize();
 
-    vi.spyOn(clientAccess, 'tryCompressChat').mockResolvedValue({
-      compressionStatus: 'skipped',
-    });
-    vi.spyOn(clientAccess, '_getActiveModelForCurrentTurn').mockReturnValue(
-      'gemini-pro',
-    );
-
-    clientAccess.sessionTurnCount = 1;
-
     const promptId = 'test-prompt';
     const signal = new AbortController().signal;
 
-    const generator = clientAccess.processTurn(
+    const generator = client.sendMessageStream(
       [{ text: 'test' }],
       signal,
       promptId,
-      10,
-      false,
     );
     for await (const _ of generator) {
       // Intentionally consume
@@ -285,16 +245,6 @@ describe('GeminiClient Watcher Integration', () => {
     // Use type assertion for testing purposes to access protected members
     const clientAccess = client as unknown as {
       context: AgentLoopContext;
-      sessionTurnCount: number;
-      tryCompressChat: () => Promise<{ compressionStatus: string }>;
-      _getActiveModelForCurrentTurn: () => string;
-      processTurn: (
-        request: unknown,
-        signal: AbortSignal,
-        promptId: string,
-        maxTokens: number,
-        forceFullContext: boolean,
-      ) => AsyncGenerator;
     };
 
     Object.defineProperty(clientAccess.context, 'toolRegistry', {
@@ -306,31 +256,21 @@ describe('GeminiClient Watcher Integration', () => {
       clientAccess.context as unknown as { agentRegistry: unknown }
     ).agentRegistry = {
       getAllDefinitions: vi.fn().mockReturnValue([]),
+      initialize: vi.fn().mockResolvedValue(undefined),
     };
 
     await config.storage.initialize();
     await client.initialize();
 
-    vi.spyOn(clientAccess, 'tryCompressChat').mockResolvedValue({
-      compressionStatus: 'skipped',
-    });
-    vi.spyOn(clientAccess, '_getActiveModelForCurrentTurn').mockReturnValue(
-      'gemini-pro',
-    );
-
-    const promptId = 'test-prompt';
     const signal = new AbortController().signal;
 
     // Simulate 11 turns
     for (let i = 1; i <= 11; i++) {
-      clientAccess.sessionTurnCount = i;
-
-      const generator = clientAccess.processTurn(
+      const promptId = `test-prompt-${i}`;
+      const generator = client.sendMessageStream(
         [{ text: `turn ${i}` }],
         signal,
         promptId,
-        10,
-        false,
       );
       for await (const _ of generator) {
         // consume
