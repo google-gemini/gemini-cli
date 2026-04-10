@@ -49,6 +49,7 @@ import { resolveConfirmation } from './confirmation.js';
 import { checkPolicy, updatePolicy } from './policy.js';
 import { ToolExecutor } from './tool-executor.js';
 import { ToolModificationHandler } from './tool-modifier.js';
+import { MessageBusType, type Message } from '../confirmation-bus/types.js';
 
 vi.mock('./state-manager.js');
 vi.mock('./confirmation.js');
@@ -1299,6 +1300,64 @@ describe('Scheduler (Orchestrator)', () => {
     });
   });
 
+  describe('Fallback Handlers', () => {
+    it('should respond to TOOL_CONFIRMATION_REQUEST with requiresUserConfirmation: true', async () => {
+      const listeners: Record<
+        string,
+        Array<(message: Message) => void | Promise<void>>
+      > = {};
+
+      const mockBus = {
+        subscribe: vi.fn(
+          (
+            type: string,
+            handler: (message: Message) => void | Promise<void>,
+          ) => {
+            listeners[type] = listeners[type] || [];
+            listeners[type].push(handler);
+          },
+        ),
+        publish: vi.fn(async (message: Message) => {
+          const type = message.type as string;
+          if (listeners[type]) {
+            for (const handler of listeners[type]) {
+              await handler(message);
+            }
+          }
+        }),
+      } as unknown as MessageBus;
+
+      const scheduler = new Scheduler({
+        context: mockConfig,
+        messageBus: mockBus,
+        getPreferredEditor,
+        schedulerId: 'fallback-test',
+      });
+
+      const handler = vi.fn();
+      mockBus.subscribe(MessageBusType.TOOL_CONFIRMATION_RESPONSE, handler);
+
+      await mockBus.publish({
+        type: MessageBusType.TOOL_CONFIRMATION_REQUEST,
+        correlationId: 'test-correlation-id',
+        toolCall: { name: 'test-tool' },
+      });
+
+      // Wait for async handler to fire
+      await new Promise((resolve) => setTimeout(resolve, 10));
+
+      expect(handler).toHaveBeenCalledWith(
+        expect.objectContaining({
+          correlationId: 'test-correlation-id',
+          confirmed: false,
+          requiresUserConfirmation: true,
+        }),
+      );
+
+      scheduler.dispose();
+    });
+  });
+
   describe('Cleanup', () => {
     it('should unregister McpProgress listener on dispose()', () => {
       const onSpy = vi.spyOn(coreEvents, 'on');
@@ -1322,6 +1381,40 @@ describe('Scheduler (Orchestrator)', () => {
         CoreEvent.McpProgress,
         expect.any(Function),
       );
+    });
+
+    it('should abort disposeController signal on dispose()', () => {
+      const mockSubscribe =
+        vi.fn<
+          (
+            type: unknown,
+            listener: unknown,
+            options?: { signal?: AbortSignal },
+          ) => void
+        >();
+      const mockBus = {
+        subscribe: mockSubscribe,
+        publish: vi.fn(),
+      } as unknown as MessageBus;
+
+      let capturedSignal: AbortSignal | undefined;
+      mockSubscribe.mockImplementation((type, listener, options) => {
+        capturedSignal = options?.signal;
+      });
+
+      const s = new Scheduler({
+        context: mockConfig,
+        messageBus: mockBus,
+        getPreferredEditor,
+        schedulerId: 'cleanup-test-2',
+      });
+
+      expect(capturedSignal).toBeDefined();
+      expect(capturedSignal?.aborted).toBe(false);
+
+      s.dispose();
+
+      expect(capturedSignal?.aborted).toBe(true);
     });
   });
 });
