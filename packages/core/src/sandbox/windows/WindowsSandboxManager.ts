@@ -411,18 +411,18 @@ export class WindowsSandboxManager implements SandboxManager {
     }
 
     // 5. Generate Manifests
-    const tempDir = fs.mkdtempSync(
+    const tempDir = await fs.promises.mkdtemp(
       path.join(os.tmpdir(), 'gemini-cli-sandbox-'),
     );
 
     const forbiddenManifestPath = path.join(tempDir, 'forbidden.txt');
-    fs.writeFileSync(
+    await fs.promises.writeFile(
       forbiddenManifestPath,
       Array.from(forbiddenManifest).join('\n'),
     );
 
     const allowedManifestPath = path.join(tempDir, 'allowed.txt');
-    fs.writeFileSync(
+    await fs.promises.writeFile(
       allowedManifestPath,
       Array.from(allowedManifest).join('\n'),
     );

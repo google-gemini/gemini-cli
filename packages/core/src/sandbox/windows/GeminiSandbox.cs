@@ -412,7 +412,7 @@ public class GeminiSandbox {
 
     private static void ParseManifest(string manifestPath, HashSet<string> paths) {
         if (!File.Exists(manifestPath)) return;
-        foreach (string line in File.ReadAllLines(manifestPath)) {
+        foreach (string line in File.ReadAllLines(manifestPath, Encoding.UTF8)) {
             if (!string.IsNullOrWhiteSpace(line)) {
                 paths.Add(GetNormalizedPath(line.Trim()));
             }
