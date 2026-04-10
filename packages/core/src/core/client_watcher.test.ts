@@ -57,29 +57,29 @@ describe('GeminiClient Watcher Integration', () => {
   });
 
   const createMockWatcherTool = (resultData: unknown) => ({
-      build: vi.fn().mockReturnValue({
-        execute: vi.fn().mockResolvedValue({
-          llmContent: [{ text: 'Subagent finished' }],
-          returnDisplay: {
-            isSubagentProgress: true,
-            agentName: 'watcher',
-            recentActivity: [],
-            state: 'completed',
-            result: resultData ? JSON.stringify(resultData) : undefined,
-          },
-        }),
+    build: vi.fn().mockReturnValue({
+      execute: vi.fn().mockResolvedValue({
+        llmContent: [{ text: 'Subagent finished' }],
+        returnDisplay: {
+          isSubagentProgress: true,
+          agentName: 'watcher',
+          recentActivity: [],
+          state: 'completed',
+          result: resultData ? JSON.stringify(resultData) : undefined,
+        },
       }),
-      name: 'watcher',
-      displayName: 'Watcher',
-      description: 'Watcher tool',
-      inputConfig: {
-        inputSchema: {},
-      },
-      outputConfig: {
-        outputName: 'report',
-        schema: {},
-      },
-    });
+    }),
+    name: 'watcher',
+    displayName: 'Watcher',
+    description: 'Watcher tool',
+    inputConfig: {
+      inputSchema: {},
+    },
+    outputConfig: {
+      outputName: 'report',
+      schema: {},
+    },
+  });
 
   it('should trigger watcher periodically when enabled', async () => {
     vi.spyOn(config, 'isExperimentalWatcherEnabled').mockReturnValue(true);
@@ -117,6 +117,7 @@ describe('GeminiClient Watcher Integration', () => {
       clientAccess.context as unknown as { agentRegistry: unknown }
     ).agentRegistry = {
       getAllDefinitions: vi.fn().mockReturnValue([]),
+      getDefinition: vi.fn().mockReturnValue(undefined),
       initialize: vi.fn().mockResolvedValue(undefined),
     };
 
@@ -172,6 +173,7 @@ describe('GeminiClient Watcher Integration', () => {
       clientAccess.context as unknown as { agentRegistry: unknown }
     ).agentRegistry = {
       getAllDefinitions: vi.fn().mockReturnValue([]),
+      getDefinition: vi.fn().mockReturnValue(undefined),
       initialize: vi.fn().mockResolvedValue(undefined),
     };
 
@@ -232,6 +234,7 @@ describe('GeminiClient Watcher Integration', () => {
       clientAccess.context as unknown as { agentRegistry: unknown }
     ).agentRegistry = {
       getAllDefinitions: vi.fn().mockReturnValue([]),
+      getDefinition: vi.fn().mockReturnValue(undefined),
       initialize: vi.fn().mockResolvedValue(undefined),
     };
 

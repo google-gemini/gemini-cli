@@ -1057,13 +1057,22 @@ export class GeminiClient {
       if (!continuationHandled && !isInvalidStreamRetry && !stopHookActive) {
         const watcherInterval = this.config.getExperimentalWatcherInterval();
         const currentTurn = this.sessionTurnCount;
+        debugLogger.log(
+          `[Watcher] Checking if trigger is needed at turn ${currentTurn}`,
+        );
         if (
           this.config.isExperimentalWatcherEnabled() &&
           currentTurn > 0 &&
           (currentTurn === 1 || currentTurn % watcherInterval === 0)
         ) {
+          debugLogger.log(
+            `[Watcher] Triggering subagent at turn ${currentTurn}`,
+          );
           const watcherResult = await this.tryRunWatcher(prompt_id, signal);
           if (watcherResult?.feedback) {
+            debugLogger.log(
+              `[Watcher] Feedback provided: ${watcherResult.feedback}`,
+            );
             const feedback = watcherResult.feedback;
             const feedbackRequest = [
               {
@@ -1072,6 +1081,8 @@ export class GeminiClient {
             ];
             // Inject feedback into the conversation for the NEXT turn
             this.getChat().addHistory(createUserContent(feedbackRequest));
+          } else {
+            debugLogger.log('[Watcher] No feedback provided.');
           }
         }
       }
@@ -1387,8 +1398,9 @@ export class GeminiClient {
       .join('\n\n');
 
     try {
+      debugLogger.log('[Watcher] Executing subagent...');
       const invocation = watcherTool.build({ recentHistory });
-      const result = await invocation.execute(signal);
+      const result = await invocation.execute({ abortSignal: signal });
 
       if (
         isSubagentProgress(result.returnDisplay) &&
@@ -1396,11 +1408,15 @@ export class GeminiClient {
       ) {
         try {
           const rawOutput = result.returnDisplay.result;
+          debugLogger.log(`[Watcher] Raw content response: ${rawOutput}`);
           const parsed = WatcherReportSchema.parse(JSON.parse(rawOutput));
 
           // Internally write the status report to avoid requiring user permission
           const projectTempDir = this.config.storage.getProjectTempDir();
           const statusFilePath = path.join(projectTempDir, 'watcher_status.md');
+          debugLogger.log(
+            `[Watcher] Writing status report to ${statusFilePath}`,
+          );
           const reportLines = [
             '# Watcher Memory State',
             '',
@@ -1418,11 +1434,16 @@ export class GeminiClient {
           ];
           fs.writeFileSync(statusFilePath, reportLines.join('\n'), 'utf-8');
 
+          debugLogger.log('[Watcher] Subagent execution complete.');
           return parsed as WatcherProgress;
         } catch (e) {
           debugLogger.warn('Failed to parse watcher output', e);
           return undefined;
         }
+      } else {
+        debugLogger.warn(
+          '[Watcher] Subagent did not return structured result in returnDisplay',
+        );
       }
     } catch (e) {
       debugLogger.warn('Error running watcher subagent', e);
