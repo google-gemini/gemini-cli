@@ -126,14 +126,20 @@ export interface SearchOptions {
 function normalizeLiveResults(
   results: string[],
   rootRelativeDir: string,
+  filterDir?: (candidate: string) => boolean,
 ): string[] {
-  if (!rootRelativeDir || rootRelativeDir === '.') {
-    return results;
-  }
-
-  return results.map((entry) =>
-    entry === rootRelativeDir && !entry.endsWith('/') ? `${entry}/` : entry,
-  );
+  return results.map((entry) => {
+    if (entry.endsWith('/')) {
+      return entry;
+    }
+    if (entry === rootRelativeDir) {
+      return `${entry}/`;
+    }
+    if (filterDir?.(entry)) {
+      return `${entry}/`;
+    }
+    return entry;
+  });
 }
 
 export interface FileSearch {
@@ -211,7 +217,10 @@ class RecursiveFileSearch implements FileSearch {
       }
     }
 
-    if (filteredCandidates.length === 0 && pattern !== '*') {
+    if (
+      pattern !== '*' &&
+      (filteredCandidates.length === 0 || pattern.endsWith('/'))
+    ) {
       filteredCandidates = await this.searchFreshCandidates(
         pattern,
         options.signal,
@@ -271,6 +280,7 @@ class RecursiveFileSearch implements FileSearch {
     const rootRelativeDir = relativeToProjectRoot
       .split(path.sep)
       .join(path.posix.sep);
+    const dirFilter = this.ignore.getDirectoryFilter();
     const results = normalizeLiveResults(
       await crawl({
         crawlDirectory,
@@ -282,6 +292,11 @@ class RecursiveFileSearch implements FileSearch {
         cacheTtl: 0,
       }),
       rootRelativeDir,
+      (entry) =>
+        entry !== '.' &&
+        entry !== './' &&
+        entry !== '' &&
+        dirFilter(`${entry}/`),
     );
 
     return filter(results, pattern, signal);
