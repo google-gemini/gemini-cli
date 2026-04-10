@@ -1,21 +1,21 @@
 # 📊 Gemini CLI Weekly Team Review Stats
 
 *Reporting Period: **Monday 2026-04-06** to Today*
-*Last Updated: 2026-04-10 00:22 (UTC)*
+*Last Updated: 2026-04-10 00:24 (UTC)*
 
 ## 📈 Weekly Summary
-| Maintainer | New PRs (Week) | Closed/Merged (Week) | Current Open Queue |
-| :--- | :--- | :--- | :--- |
-| **Coco Sheng** (@cocosheng-g) | 2 | **4** | 6 |
-| **Tommaso Sciortino** (@scidomino) | 1 | **2** | 3 |
-| **Dev Randalpura** (@devr0306) | 0 | **1** | 0 |
-| **A.K.M. Adib** (@Adib234) | 0 | **0** | 1 |
-| **Cynthia Long** (@cynthialong0-0) | 0 | **0** | 0 |
-| **Ivan Port** (@ivanporty) | 0 | **0** | 0 |
-| **Keith Schaab** (@kschaab) | 0 | **0** | 1 |
-| **Ruomeng Zhang** (@ruomengz) | 0 | **0** | 0 |
-| **Spencer Tang** (@spencer426) | 0 | **0** | 1 |
-| **Sri Pasumarthi** (@sripasg) | 0 | **0** | 0 |
+| Maintainer | Closed/Merged (Week) | Current Open Queue |
+| :--- | :--- | :--- |
+| **Coco Sheng** (@cocosheng-g) | **4** | 6 |
+| **Tommaso Sciortino** (@scidomino) | **2** | 3 |
+| **Dev Randalpura** (@devr0306) | **1** | 0 |
+| **A.K.M. Adib** (@Adib234) | **0** | 1 |
+| **Cynthia Long** (@cynthialong0-0) | **0** | 0 |
+| **Ivan Port** (@ivanporty) | **0** | 0 |
+| **Keith Schaab** (@kschaab) | **0** | 1 |
+| **Ruomeng Zhang** (@ruomengz) | **0** | 0 |
+| **Spencer Tang** (@spencer426) | **0** | 1 |
+| **Sri Pasumarthi** (@sripasg) | **0** | 0 |
 
 ---
 ## 👤 Individual Review Queues
