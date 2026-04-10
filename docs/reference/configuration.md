@@ -202,6 +202,12 @@ their corresponding top-level category object in your `settings.json` file.
 
 #### `ui`
 
+- **`ui.debugRainbow`** (boolean):
+  - **Description:** Enable debug rainbow rendering. Only useful for debugging
+    rendering bugs and performance issues.
+  - **Default:** `false`
+  - **Requires restart:** Yes
+
 - **`ui.theme`** (string):
   - **Description:** The color theme for the UI. See the CLI themes guide for
     available options.
