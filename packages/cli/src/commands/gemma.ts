@@ -11,6 +11,7 @@ import { setupCommand } from './gemma/setup.js';
 import { startCommand } from './gemma/start.js';
 import { stopCommand } from './gemma/stop.js';
 import { statusCommand } from './gemma/status.js';
+import { logsCommand } from './gemma/logs.js';
 
 export const gemmaCommand: CommandModule = {
   command: 'gemma',
@@ -25,6 +26,7 @@ export const gemmaCommand: CommandModule = {
       .command(defer(startCommand, 'gemma'))
       .command(defer(stopCommand, 'gemma'))
       .command(defer(statusCommand, 'gemma'))
+      .command(defer(logsCommand, 'gemma'))
       .demandCommand(1, 'You need at least one command before continuing.')
       .version(false),
   handler: () => {
