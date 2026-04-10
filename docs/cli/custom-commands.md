@@ -32,8 +32,8 @@ separator (`/` or `\`) being converted to a colon (`:`).
 
 <!-- prettier-ignore -->
 > [!TIP]
-> To see all available command files, run `/commands list`.
 > After creating or modifying `.toml` command files, run
+> To see all available command files, run `/commands list`.
 > `/commands reload` to pick up your changes without restarting the CLI.
 
 ## TOML file format (v1)
