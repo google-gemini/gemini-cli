@@ -504,7 +504,7 @@ export class WriteFileTool
       try {
         resolvedPath = resolveAndValidatePlanPath(
           filePath,
-          this.config.getPlansDir(),
+          this.config.storage.getPlansDir(),
         );
       } catch (err) {
         return err instanceof Error ? err.message : String(err);

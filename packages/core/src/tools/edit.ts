@@ -1058,7 +1058,7 @@ export class EditTool
       try {
         resolvedPath = resolveAndValidatePlanPath(
           params.file_path,
-          this.config.getPlansDir(),
+          this.config.storage.getPlansDir(),
         );
       } catch (err) {
         return err instanceof Error ? err.message : String(err);
