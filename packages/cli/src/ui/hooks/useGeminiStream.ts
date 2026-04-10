@@ -2024,17 +2024,25 @@ export const useGeminiStream = (
           responsesToSend.unshift({
             text: buildUserSteeringHintPrompt(hintText),
           });
-          void generateSteeringAckMessage(config.getBaseLlmClient(), hintText)
+          const ackTimestamp = Date.now();
+          const signal = abortControllerRef.current?.signal;
+          void generateSteeringAckMessage(config.getBaseLlmClient(), hintText, {
+            signal,
+          })
             .then((ackText) => {
-              addItem({
-                type: MessageType.INFO,
-                icon: '· ',
-                color: theme.text.secondary,
-                marginBottom: 1,
-                text: ackText,
-              } as HistoryItemInfo);
+              addItem(
+                {
+                  type: MessageType.INFO,
+                  icon: '· ',
+                  color: theme.text.secondary,
+                  marginBottom: 1,
+                  text: ackText,
+                } as HistoryItemInfo,
+                ackTimestamp,
+              );
             })
-            .catch(() => {
+            .catch((err) => {
+              if (err?.name === 'AbortError') return;
               // Silently ignore — steering ack is non-critical UI feedback.
             });
         }

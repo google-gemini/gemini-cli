@@ -113,6 +113,7 @@ function buildSteeringFallbackMessage(hintText: string): string {
 export async function generateSteeringAckMessage(
   llmClient: BaseLlmClient,
   hintText: string,
+  options?: { signal?: AbortSignal },
 ): Promise<string> {
   const fallbackText = buildSteeringFallbackMessage(hintText);
 
@@ -121,6 +122,13 @@ export async function generateSteeringAckMessage(
     () => abortController.abort(),
     STEERING_ACK_TIMEOUT_MS,
   );
+
+  // Link the user-provided signal to our abort controller
+  if (options?.signal) {
+    options.signal.addEventListener('abort', () => abortController.abort(), {
+      once: true,
+    });
+  }
 
   try {
     return await generateFastAckText(llmClient, {
