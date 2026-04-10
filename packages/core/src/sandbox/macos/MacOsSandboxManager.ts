@@ -133,28 +133,26 @@ export class MacOsSandboxManager implements SandboxManager {
         false,
     };
 
+    const { command: finalCommand, args: finalArgs } = handleReadWriteCommands(
+      req,
+      mergedAdditional,
+      this.options.workspace,
+      [
+        ...(req.policy?.allowedPaths || []),
+        ...(this.options.includeDirectories || []),
+      ],
+    );
+
     const resolvedPaths = await resolveSandboxPaths(
       this.options,
       req,
       mergedAdditional,
     );
-    const { command: finalCommand, args: finalArgs } = handleReadWriteCommands(
-      req,
-      mergedAdditional,
-      this.options.workspace,
-      req.policy?.allowedPaths,
-    );
 
     const sandboxArgs = buildSeatbeltProfile({
-      workspace: this.options.workspace,
-      allowedPaths: [
-        ...resolvedPaths.policyAllowed,
-        ...(this.options.includeDirectories || []),
-      ],
-      forbiddenPaths: resolvedPaths.forbidden,
+      resolvedPaths,
       networkAccess: mergedAdditional.network,
       workspaceWrite,
-      additionalPermissions: mergedAdditional,
     });
 
     const tempFile = this.writeProfileToTempFile(sandboxArgs);

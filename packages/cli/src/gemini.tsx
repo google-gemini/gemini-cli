@@ -81,10 +81,7 @@ import { validateNonInteractiveAuth } from './validateNonInterActiveAuth.js';
 import { appEvents, AppEvent } from './utils/events.js';
 import { SessionError, SessionSelector } from './utils/sessionUtils.js';
 
-import {
-  relaunchAppInChildProcess,
-  relaunchOnExitCode,
-} from './utils/relaunch.js';
+import { relaunchOnExitCode } from './utils/relaunch.js';
 import { loadSandboxConfig } from './config/sandboxConfig.js';
 import { deleteSession, listSessions } from './utils/sessions.js';
 import { createPolicyUpdater } from './config/policy.js';
@@ -167,6 +164,14 @@ export function getNodeMemoryArgs(isDebugMode: boolean): string[] {
 export function setupUnhandledRejectionHandler() {
   let unhandledRejectionOccurred = false;
   process.on('unhandledRejection', (reason, _promise) => {
+    // AbortError is expected when the user cancels a request (e.g. pressing ESC).
+    // It may surface as an unhandled rejection due to async timing in the
+    // streaming pipeline, but it is not a bug.
+    if (reason instanceof Error && reason.name === 'AbortError') {
+      debugLogger.log(`Suppressed unhandled AbortError: ${reason.message}`);
+      return;
+    }
+
     const errorMessage = `=========================================
 This is an unexpected error. Please file a bug report using the /bug tool.
 CRITICAL: Unhandled Promise Rejection!
@@ -439,6 +444,12 @@ export async function main() {
   // Set remote admin settings if returned from CCPA.
   if (remoteAdminSettings) {
     settings.setRemoteAdminSettings(remoteAdminSettings);
+    if (process.send) {
+      process.send({
+        type: 'admin-settings-update',
+        settings: remoteAdminSettings,
+      });
+    }
   }
 
   // Run deferred command now that we have admin settings.
@@ -496,10 +507,6 @@ export async function main() {
       );
       await runExitCleanup();
       process.exit(ExitCodes.SUCCESS);
-    } else {
-      // Relaunch app so we always have a child process that can be internally
-      // restarted if needed.
-      await relaunchAppInChildProcess(memoryArgs, [], remoteAdminSettings);
     }
   }
 
