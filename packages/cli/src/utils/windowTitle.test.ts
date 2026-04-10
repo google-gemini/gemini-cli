@@ -237,4 +237,24 @@ describe('computeTerminalTitle', () => {
     expect(title).toContain('Gemini CLI (CCCCC');
     expect(title).toContain('…)');
   });
+
+  it('should safely truncate strings containing emojis and surrogate pairs without splitting them', () => {
+    // 💥 is a surrogate pair (UTF-16 length 2). 50 of them = 100 UTF-16 code units.
+    const emojiThought = '💥'.repeat(50);
+    const title = computeTerminalTitle({
+      streamingState: StreamingState.Responding,
+      thoughtSubject: emojiThought,
+      isConfirming: false,
+      isSilentWorking: false,
+      folderName: 'my-project',
+      showThoughts: true,
+      useDynamicTitle: true,
+    });
+
+    // Array.from slices by code points, so we measure by code points.
+    expect(Array.from(title).length).toBeLessThanOrEqual(80);
+    expect(title).toContain('…');
+    // Ensure we actually retained emojis and didn't mangle them
+    expect(title).toContain('💥');
+  });
 });

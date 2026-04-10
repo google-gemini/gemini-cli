@@ -17,10 +17,11 @@ export interface TerminalTitleOptions {
 }
 
 function truncate(text: string, maxLen: number): string {
-  if (text.length <= maxLen) {
+  const chars = Array.from(text);
+  if (chars.length <= maxLen) {
     return text;
   }
-  return text.substring(0, maxLen - 1) + '…';
+  return chars.slice(0, maxLen - 1).join('') + '…';
 }
 
 /**
@@ -48,7 +49,7 @@ export function computeTerminalTitle({
     // Max context length is 80 - base.length - 2 (for brackets)
     const maxContextLen = MAX_LEN - base.length - 2;
     displayContext = truncate(displayContext, maxContextLen);
-    return `${base}(${displayContext})`.substring(0, MAX_LEN);
+    return Array.from(`${base}(${displayContext})`).slice(0, MAX_LEN).join('');
   }
 
   // Pre-calculate suffix but keep it flexible
@@ -110,5 +111,5 @@ export function computeTerminalTitle({
   const safeTitle = title.replace(/[\x00-\x1F\x7F]/g, '');
 
   // Truncate to ensure it NEVER exceeds MAX_LEN.
-  return safeTitle.substring(0, MAX_LEN);
+  return Array.from(safeTitle).slice(0, MAX_LEN).join('');
 }
