@@ -439,6 +439,16 @@ const SETTINGS_SCHEMA = {
     description: 'User interface settings.',
     showInDialog: false,
     properties: {
+      debugRainbow: {
+        type: 'boolean',
+        label: 'Debug Rainbow',
+        category: 'UI',
+        requiresRestart: true,
+        default: false,
+        description:
+          'Enable debug rainbow rendering. Only useful for debugging rendering bugs and performance issues.',
+        showInDialog: false,
+      },
       theme: {
         type: 'string',
         label: 'Theme',
