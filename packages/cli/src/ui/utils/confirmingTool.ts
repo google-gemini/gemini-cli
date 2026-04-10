@@ -6,13 +6,16 @@
 
 import {
   CoreToolCallStatus,
-  requiresUserConfirmation,
+  belongsInConfirmationQueue,
 } from '@google/gemini-cli-core';
 import {
   type HistoryItemWithoutId,
   type IndividualToolCallDisplay,
 } from '../types.js';
-import { getAllToolCalls } from './historyUtils.js';
+import {
+  getAllToolCalls,
+  buildToolVisibilityContextFromDisplay,
+} from './historyUtils.js';
 
 export interface ConfirmingToolState {
   tool: IndividualToolCallDisplay;
@@ -37,15 +40,7 @@ export function getConfirmingToolState(
   }
 
   const actionablePendingTools = allPendingTools.filter((tool) =>
-    requiresUserConfirmation({
-      name: tool.name,
-      displayName: tool.name,
-      status: tool.status,
-      approvalMode: tool.approvalMode,
-      hasResult: !!tool.resultDisplay,
-      hasParent: !!tool.parentCallId,
-      isClientInitiated: !!tool.isClientInitiated,
-    }),
+    belongsInConfirmationQueue(buildToolVisibilityContextFromDisplay(tool)),
   );
 
   const head = confirmingTools[0];

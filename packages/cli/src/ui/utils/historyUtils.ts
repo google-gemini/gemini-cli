@@ -4,7 +4,10 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { isRenderedInHistory } from '@google/gemini-cli-core';
+import {
+  isRenderedInHistory,
+  type ToolVisibilityContext,
+} from '@google/gemini-cli-core';
 import { CoreToolCallStatus } from '../types.js';
 import type {
   HistoryItem,
@@ -12,6 +15,23 @@ import type {
   HistoryItemToolGroup,
   IndividualToolCallDisplay,
 } from '../types.js';
+
+/**
+ * Maps an IndividualToolCallDisplay from the CLI to a ToolVisibilityContext for core logic.
+ */
+export function buildToolVisibilityContextFromDisplay(
+  tool: IndividualToolCallDisplay,
+): ToolVisibilityContext {
+  return {
+    name: tool.name,
+    displayName: tool.name, // In CLI, 'name' is usually the resolved display name
+    status: tool.status,
+    hasResult: !!tool.resultDisplay,
+    parentCallId: tool.parentCallId,
+    isClientInitiated: tool.isClientInitiated,
+    approvalMode: tool.approvalMode,
+  };
+}
 
 export function getLastTurnToolCallIds(
   history: HistoryItem[],
@@ -82,14 +102,6 @@ export function getAllToolCalls(
     .filter((item): item is HistoryItemToolGroup => item.type === 'tool_group')
     .flatMap((group) => group.tools)
     .filter((tool) =>
-      isRenderedInHistory({
-        name: tool.name,
-        displayName: tool.name,
-        status: tool.status,
-        approvalMode: tool.approvalMode,
-        hasResult: !!tool.resultDisplay,
-        hasParent: !!tool.parentCallId,
-        isClientInitiated: !!tool.isClientInitiated,
-      }),
+      isRenderedInHistory(buildToolVisibilityContextFromDisplay(tool)),
     );
 }

@@ -5,7 +5,7 @@
  */
 
 import { ApprovalMode } from '../policy/types.js';
-import { CoreToolCallStatus } from '../scheduler/types.js';
+import { CoreToolCallStatus, type ToolCall } from '../scheduler/types.js';
 import {
   ASK_USER_DISPLAY_NAME,
   WRITE_FILE_DISPLAY_NAME,
@@ -18,28 +18,58 @@ export interface ToolVisibilityContext {
   /** The internal name of the tool. */
   name: string;
   /** The display name of the tool. */
-  displayName: string;
+  displayName?: string;
   /** The current status of the tool call. */
   status: CoreToolCallStatus;
   /** The approval mode active when the tool was called. */
   approvalMode?: ApprovalMode;
   /** Whether the tool has produced a result for display (e.g., resultDisplay or liveOutput). */
   hasResult: boolean;
-  /** True if the tool was called by another tool (e.g., a subagent). */
-  hasParent: boolean;
+  /** The ID of the parent tool call, if any. */
+  parentCallId?: string;
   /** True if the tool was initiated directly by the user via a slash command. */
-  isClientInitiated: boolean;
+  isClientInitiated?: boolean;
+}
+
+/**
+ * Maps a core ToolCall to a ToolVisibilityContext.
+ */
+export function buildToolVisibilityContext(
+  tc: ToolCall,
+): ToolVisibilityContext {
+  let hasResult = false;
+  if (
+    tc.status === CoreToolCallStatus.Success ||
+    tc.status === CoreToolCallStatus.Error ||
+    tc.status === CoreToolCallStatus.Cancelled
+  ) {
+    hasResult = !!tc.response.resultDisplay;
+  } else if (tc.status === CoreToolCallStatus.Executing) {
+    hasResult = !!tc.liveOutput;
+  }
+
+  return {
+    name: tc.request.name,
+    displayName: tc.tool?.displayName ?? tc.request.name,
+    status: tc.status,
+    approvalMode: tc.approvalMode,
+    hasResult,
+    parentCallId: tc.request.parentCallId,
+    isClientInitiated: tc.request.isClientInitiated,
+  };
 }
 
 /**
  * Determines if a tool should ever appear as a completed block in the main chat log.
  */
 export function isRenderedInHistory(ctx: ToolVisibilityContext): boolean {
-  if (ctx.hasParent) {
+  if (ctx.parentCallId) {
     return false;
   }
 
-  switch (ctx.displayName) {
+  const displayName = ctx.displayName ?? ctx.name;
+
+  switch (displayName) {
     case ASK_USER_DISPLAY_NAME:
       // We only render AskUser in history if it errored with a result or succeeded.
       // If it errored without a result, it was an internal validation failure.
@@ -61,11 +91,15 @@ export function isRenderedInHistory(ctx: ToolVisibilityContext): boolean {
 /**
  * Determines if a tool belongs in the Awaiting Approval confirmation queue.
  */
-export function requiresUserConfirmation(ctx: ToolVisibilityContext): boolean {
+export function belongsInConfirmationQueue(
+  ctx: ToolVisibilityContext,
+): boolean {
+  const displayName = ctx.displayName ?? ctx.name;
+
   // Narrative background tools auto-execute and never require confirmation
   if (
     ctx.name === UPDATE_TOPIC_TOOL_NAME ||
-    ctx.displayName === UPDATE_TOPIC_DISPLAY_NAME
+    displayName === UPDATE_TOPIC_DISPLAY_NAME
   ) {
     return false;
   }
@@ -96,8 +130,10 @@ export function isVisibleInToolGroup(
     return false;
   }
 
+  const displayName = ctx.displayName ?? ctx.name;
+
   // We hide AskUser while it's in progress because it renders in its own modal
-  if (ctx.displayName === ASK_USER_DISPLAY_NAME) {
+  if (displayName === ASK_USER_DISPLAY_NAME) {
     switch (ctx.status) {
       case CoreToolCallStatus.Scheduled:
       case CoreToolCallStatus.Validating:

@@ -35,6 +35,7 @@ import {
   READ_MANY_FILES_DISPLAY_NAME,
   isFileDiff,
 } from '@google/gemini-cli-core';
+import { buildToolVisibilityContextFromDisplay } from '../../utils/historyUtils.js';
 import { useUIState } from '../../contexts/UIStateContext.js';
 import { getToolGroupBorderAppearance } from '../../utils/borderStyles.js';
 import { useSettings } from '../../contexts/SettingsContext.js';
@@ -127,15 +128,7 @@ export const ToolGroupMessage: React.FC<ToolGroupMessageProps> = ({
       allToolCalls.filter((t) =>
         // Use the unified visibility utility
         isVisibleInToolGroup(
-          {
-            name: t.name,
-            displayName: t.name, // Usually the same for now, core deals with resolving display vs raw
-            status: t.status,
-            approvalMode: t.approvalMode,
-            hasResult: !!t.resultDisplay,
-            hasParent: !!t.parentCallId,
-            isClientInitiated: !!t.isClientInitiated,
-          },
+          buildToolVisibilityContextFromDisplay(t),
           isLowErrorVerbosity ? 'low' : 'full',
         ),
       ),

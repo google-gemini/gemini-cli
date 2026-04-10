@@ -7,7 +7,7 @@
 import { expect, describe, it } from 'vitest';
 import {
   isRenderedInHistory,
-  requiresUserConfirmation,
+  belongsInConfirmationQueue,
   isVisibleInToolGroup,
 } from './tool-visibility.js';
 import { CoreToolCallStatus } from '../scheduler/types.js';
@@ -26,14 +26,16 @@ describe('ToolVisibility Rules', () => {
     displayName: 'Some Tool',
     status: CoreToolCallStatus.Success,
     hasResult: true,
-    hasParent: false,
+    parentCallId: undefined,
     isClientInitiated: false,
     ...overrides,
   });
 
   describe('isRenderedInHistory', () => {
     it('hides tools with parents', () => {
-      expect(isRenderedInHistory(createCtx({ hasParent: true }))).toBe(false);
+      expect(
+        isRenderedInHistory(createCtx({ parentCallId: 'parent-123' })),
+      ).toBe(false);
     });
 
     it('hides AskUser errors without results', () => {
@@ -90,25 +92,25 @@ describe('ToolVisibility Rules', () => {
     });
   });
 
-  describe('requiresUserConfirmation', () => {
+  describe('belongsInConfirmationQueue', () => {
     it('returns false for update_topic', () => {
       expect(
-        requiresUserConfirmation(createCtx({ name: UPDATE_TOPIC_TOOL_NAME })),
+        belongsInConfirmationQueue(createCtx({ name: UPDATE_TOPIC_TOOL_NAME })),
       ).toBe(false);
     });
 
     it('returns true for standard tools', () => {
-      expect(requiresUserConfirmation(createCtx({ name: 'write_file' }))).toBe(
-        true,
-      );
+      expect(
+        belongsInConfirmationQueue(createCtx({ name: 'write_file' })),
+      ).toBe(true);
     });
   });
 
   describe('isVisibleInToolGroup', () => {
     it('returns false if not rendered in history', () => {
-      expect(isVisibleInToolGroup(createCtx({ hasParent: true }), 'full')).toBe(
-        false,
-      );
+      expect(
+        isVisibleInToolGroup(createCtx({ parentCallId: 'parent-123' }), 'full'),
+      ).toBe(false);
     });
 
     it('hides non-client-initiated errors on low verbosity', () => {
