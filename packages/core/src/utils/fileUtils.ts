@@ -201,6 +201,72 @@ export function getSpecificMimeType(filePath: string): string | undefined {
   return typeof lookedUpMime === 'string' ? lookedUpMime : undefined;
 }
 
+const SUPPORTED_AUDIO_MIME_TYPES_BY_EXTENSION = new Map<string, string>([
+  ['.mp3', 'audio/mpeg'],
+  ['.wav', 'audio/wav'],
+  ['.aiff', 'audio/aiff'],
+  ['.aif', 'audio/aiff'],
+  ['.aac', 'audio/aac'],
+  ['.ogg', 'audio/ogg'],
+  ['.flac', 'audio/flac'],
+]);
+
+const AUDIO_MIME_TYPE_NORMALIZATION: Record<string, string> = {
+  'audio/mp3': 'audio/mpeg',
+  'audio/x-mp3': 'audio/mpeg',
+  'audio/wave': 'audio/wav',
+  'audio/x-wav': 'audio/wav',
+  'audio/vnd.wave': 'audio/wav',
+  'audio/x-pn-wav': 'audio/wav',
+  'audio/x-aiff': 'audio/aiff',
+  'audio/aif': 'audio/aiff',
+  'audio/x-aac': 'audio/aac',
+};
+
+function formatSupportedAudioFormats(): string {
+  const displayNames = Array.from(
+    new Set(
+      Array.from(SUPPORTED_AUDIO_MIME_TYPES_BY_EXTENSION.keys()).map((ext) => {
+        if (ext === '.aif' || ext === '.aiff') {
+          return 'AIFF';
+        }
+        return ext.slice(1).toUpperCase();
+      }),
+    ),
+  );
+
+  if (displayNames.length <= 1) {
+    return displayNames[0] ?? '';
+  }
+
+  return `${displayNames.slice(0, -1).join(', ')}, and ${displayNames.at(-1)}`;
+}
+
+const SUPPORTED_AUDIO_FORMATS_DISPLAY = formatSupportedAudioFormats();
+
+function getSupportedAudioMimeTypeForFile(
+  filePath: string,
+): string | undefined {
+  const extension = path.extname(filePath).toLowerCase();
+  const extensionMimeType =
+    SUPPORTED_AUDIO_MIME_TYPES_BY_EXTENSION.get(extension);
+  const lookedUpMimeType = getSpecificMimeType(filePath)?.toLowerCase();
+  const normalizedMimeType = lookedUpMimeType
+    ? (AUDIO_MIME_TYPE_NORMALIZATION[lookedUpMimeType] ?? lookedUpMimeType)
+    : undefined;
+
+  if (
+    normalizedMimeType &&
+    [...SUPPORTED_AUDIO_MIME_TYPES_BY_EXTENSION.values()].includes(
+      normalizedMimeType,
+    )
+  ) {
+    return normalizedMimeType;
+  }
+
+  return extensionMimeType;
+}
+
 /**
  * Checks if a path is within a given root directory.
  * @param pathToCheck The absolute path to check.
@@ -370,6 +436,14 @@ export async function detectFileType(
     }
   }
 
+  const supportedAudioMimeType = getSupportedAudioMimeTypeForFile(filePath);
+  if (supportedAudioMimeType) {
+    if (!(await isBinaryFile(filePath))) {
+      return 'text';
+    }
+    return 'audio';
+  }
+
   // Stricter binary check for common non-text extensions before content check
   // These are often not well-covered by mime-types or might be misidentified.
   if (BINARY_EXTENSIONS.includes(ext)) {
@@ -532,17 +606,40 @@ export async function processSingleFileContent(
           linesShown: [actualStart + 1, sliceEnd],
         };
       }
-      case 'image':
-      case 'pdf':
-      case 'audio':
-      case 'video': {
+      case 'audio': {
+        const mimeType = getSupportedAudioMimeTypeForFile(filePath);
+        if (!mimeType) {
+          return {
+            llmContent: `Could not read audio file because its format is not supported. Supported audio formats are ${SUPPORTED_AUDIO_FORMATS_DISPLAY}.`,
+            returnDisplay: `Unsupported audio file format: ${relativePathForDisplay}`,
+            error: `Unsupported audio file format for ${filePath}. Supported audio formats are ${SUPPORTED_AUDIO_FORMATS_DISPLAY}.`,
+            errorType: ToolErrorType.READ_CONTENT_FAILURE,
+          };
+        }
         const contentBuffer = await fs.promises.readFile(filePath);
         const base64Data = contentBuffer.toString('base64');
         return {
           llmContent: {
             inlineData: {
               data: base64Data,
-              mimeType: mime.getType(filePath) || 'application/octet-stream',
+              mimeType,
+            },
+          },
+          returnDisplay: `Read audio file: ${relativePathForDisplay}`,
+        };
+      }
+      case 'image':
+      case 'pdf':
+      case 'video': {
+        const mimeType =
+          getSpecificMimeType(filePath) ?? 'application/octet-stream';
+        const contentBuffer = await fs.promises.readFile(filePath);
+        const base64Data = contentBuffer.toString('base64');
+        return {
+          llmContent: {
+            inlineData: {
+              data: base64Data,
+              mimeType,
             },
           },
           returnDisplay: `Read ${fileType} file: ${relativePathForDisplay}`,
