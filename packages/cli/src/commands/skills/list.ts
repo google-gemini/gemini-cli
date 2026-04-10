@@ -9,18 +9,57 @@ import { loadSettings } from '../../config/settings.js';
 import { loadCliConfig, type CliArgs } from '../../config/config.js';
 import { exitCli } from '../utils.js';
 import chalk from 'chalk';
+import { z } from 'zod';
+
+const listArgsSchema = z.object({
+  all: z.boolean().default(false),
+});
+
+const configArgsSchema = z.object({
+  debug: z.boolean().default(false),
+});
 
 export async function handleList(args: { all?: boolean }) {
   const workspaceDir = process.cwd();
   const settings = loadSettings(workspaceDir);
 
+  const parsedConfigArgs = configArgsSchema.parse({ debug: false });
+  const configArgs: CliArgs = {
+    query: undefined,
+    model: undefined,
+    sandbox: undefined,
+    debug: parsedConfigArgs.debug,
+    prompt: undefined,
+    promptInteractive: undefined,
+    yolo: undefined,
+    approvalMode: undefined,
+    policy: undefined,
+    adminPolicy: undefined,
+    allowedMcpServerNames: undefined,
+    allowedTools: undefined,
+    acp: undefined,
+    experimentalAcp: undefined,
+    extensions: undefined,
+    listExtensions: undefined,
+    resume: undefined,
+    listSessions: undefined,
+    deleteSession: undefined,
+    includeDirectories: undefined,
+    screenReader: undefined,
+    useWriteTodos: undefined,
+    outputFormat: undefined,
+    fakeResponses: undefined,
+    recordResponses: undefined,
+    startupMessages: undefined,
+    rawOutput: undefined,
+    acceptRawOutputRisk: undefined,
+    isCommand: undefined,
+  };
+
   const config = await loadCliConfig(
     settings.merged,
     'skills-list-session',
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
-    {
-      debug: false,
-    } as Partial<CliArgs> as CliArgs,
+    configArgs,
     { cwd: workspaceDir },
   );
 
@@ -72,8 +111,8 @@ export const listCommand: CommandModule = {
       default: false,
     }),
   handler: async (argv) => {
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
-    await handleList({ all: argv['all'] as boolean });
+    const parsedArgs = listArgsSchema.parse(argv);
+    await handleList(parsedArgs);
     await exitCli();
   },
 };

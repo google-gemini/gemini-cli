@@ -11,11 +11,69 @@ import Ajv2020Pkg from 'ajv/dist/2020.js';
 import * as addFormats from 'ajv-formats';
 import { debugLogger } from './debugLogger.js';
 
-// Ajv's ESM/CJS interop: use 'any' for compatibility as recommended by Ajv docs
-// eslint-disable-next-line @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-type-assertion, @typescript-eslint/no-unsafe-assignment
-const AjvClass = (AjvPkg as any).default || AjvPkg;
-// eslint-disable-next-line @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-type-assertion, @typescript-eslint/no-unsafe-assignment
-const Ajv2020Class = (Ajv2020Pkg as any).default || Ajv2020Pkg;
+type AjvConstructor = new (options?: unknown) => Ajv;
+type AddFormatsFunction = (validator: Ajv) => void;
+
+function getOwnPropertyValue(obj: object, key: string): unknown {
+  return Object.getOwnPropertyDescriptor(obj, key)?.value;
+}
+
+function isAjvConstructor(value: unknown): value is AjvConstructor {
+  return typeof value === 'function';
+}
+
+function resolveAjvConstructor(moduleValue: unknown): AjvConstructor {
+  if (isAjvConstructor(moduleValue)) {
+    return moduleValue;
+  }
+
+  if (typeof moduleValue === 'object' && moduleValue !== null) {
+    const defaultExport = getOwnPropertyValue(moduleValue, 'default');
+    if (isAjvConstructor(defaultExport)) {
+      return defaultExport;
+    }
+  }
+
+  throw new Error('Unable to resolve AJV constructor export.');
+}
+
+function isAddFormatsFunction(value: unknown): value is AddFormatsFunction {
+  return typeof value === 'function';
+}
+
+function resolveAddFormatsFunction(moduleValue: unknown): AddFormatsFunction {
+  if (isAddFormatsFunction(moduleValue)) {
+    return moduleValue;
+  }
+
+  if (typeof moduleValue === 'object' && moduleValue !== null) {
+    const defaultExport = getOwnPropertyValue(moduleValue, 'default');
+    if (isAddFormatsFunction(defaultExport)) {
+      return defaultExport;
+    }
+  }
+
+  throw new Error('Unable to resolve ajv-formats export.');
+}
+
+function isCompileableSchema(schema: unknown): schema is AnySchema {
+  return (
+    typeof schema === 'boolean' ||
+    (typeof schema === 'object' && schema !== null)
+  );
+}
+
+function getSchemaUri(schema: unknown): string {
+  if (typeof schema !== 'object' || schema === null) {
+    return '<no $schema>';
+  }
+
+  const schemaValue = getOwnPropertyValue(schema, '$schema');
+  return typeof schemaValue === 'string' ? schemaValue : '<no $schema>';
+}
+
+const AjvClass = resolveAjvConstructor(AjvPkg);
+const Ajv2020Class = resolveAjvConstructor(Ajv2020Pkg);
 
 const ajvOptions = {
   // See: https://ajv.js.org/options.html#strict-mode-options
@@ -28,16 +86,12 @@ const ajvOptions = {
   strictSchema: false,
 };
 
-// Draft-07 validator (default)
-// eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
 const ajvDefault: Ajv = new AjvClass(ajvOptions);
 
 // Draft-2020-12 validator for MCP servers using rmcp
-// eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
 const ajv2020: Ajv = new Ajv2020Class(ajvOptions);
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-type-assertion, @typescript-eslint/no-unsafe-assignment
-const addFormatsFunc = (addFormats as any).default || addFormats;
+const addFormatsFunc = resolveAddFormatsFunction(addFormats);
 addFormatsFunc(ajvDefault);
 addFormatsFunc(ajv2020);
 
@@ -76,8 +130,11 @@ export class SchemaValidator {
       return 'Value of params must be an object';
     }
 
-    const anySchema = schema as AnySchema;
-    const validator = getValidator(anySchema);
+    if (!isCompileableSchema(schema)) {
+      return null;
+    }
+
+    const validator = getValidator(schema);
 
     // Try to compile and validate; skip validation if schema can't be compiled.
     // This handles schemas using JSON Schema versions AJV doesn't support
@@ -85,17 +142,15 @@ export class SchemaValidator {
     // This matches LenientJsonSchemaValidator behavior in mcp-client.ts.
     let validate;
     try {
-      validate = validator.compile(anySchema);
+      validate = validator.compile(schema);
     } catch (error) {
       // Schema compilation failed (unsupported version, invalid $ref, etc.)
       // Skip validation rather than blocking tool usage.
       // This matches LenientJsonSchemaValidator behavior in mcp-client.ts.
       debugLogger.warn(
-        `Failed to compile schema (${
-          // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
-          (schema as Record<string, unknown>)?.['$schema'] ?? '<no $schema>'
-        }): ${error instanceof Error ? error.message : String(error)}. ` +
-          'Skipping parameter validation.',
+        `Failed to compile schema (${getSchemaUri(schema)}): ${
+          error instanceof Error ? error.message : String(error)
+        }. ` + 'Skipping parameter validation.',
       );
       return null;
     }
@@ -123,11 +178,9 @@ export class SchemaValidator {
       // Schema validation failed (unsupported version, etc.)
       // Skip validation rather than blocking tool usage.
       debugLogger.warn(
-        `Failed to validate schema (${
-          // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
-          (schema as Record<string, unknown>)?.['$schema'] ?? '<no $schema>'
-        }): ${error instanceof Error ? error.message : String(error)}. ` +
-          'Skipping schema validation.',
+        `Failed to validate schema (${getSchemaUri(schema)}): ${
+          error instanceof Error ? error.message : String(error)
+        }. ` + 'Skipping schema validation.',
       );
       return null;
     }
