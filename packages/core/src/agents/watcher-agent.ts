@@ -70,7 +70,7 @@ export const WatcherAgent = (
     modelConfig: {
       model: GEMINI_MODEL_ALIAS_FLASH,
       generateContentConfig: {
-        temperature: 0.1,
+        temperature: 1.0,
         topP: 0.95,
       },
     },
