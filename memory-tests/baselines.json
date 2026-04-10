@@ -24,16 +24,16 @@
       "timestamp": "2026-04-10T15:35:08.035Z"
     },
     "simple-prompt-response": {
-      "heapUsedBytes": 106149536,
-      "heapTotalBytes": 115441664,
-      "rssBytes": 273575936,
+      "heapUsedBytes": 119722064,
+      "heapTotalBytes": 177324032,
+      "rssBytes": 268812288,
       "externalBytes": 4304053,
       "timestamp": "2026-04-10T15:35:12.770Z"
     },
     "resume-large-chat-with-messages": {
-      "heapUsedBytes": 119722064,
-      "heapTotalBytes": 177324032,
-      "rssBytes": 268812288,
+      "heapUsedBytes": 106545568,
+      "heapTotalBytes": 111509504,
+      "rssBytes": 202596352,
       "externalBytes": 4306101,
       "timestamp": "2026-04-10T15:36:04.547Z"
     },
