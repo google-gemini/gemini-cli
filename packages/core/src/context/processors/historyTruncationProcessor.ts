@@ -23,13 +23,24 @@ export function createHistoryTruncationProcessor(
     id,
     name: 'HistoryTruncationProcessor',
     process: async ({ targets }: ProcessArgs) => {
-      // Calculate how many tokens we need to remove based on the configured knob
-      let targetTokensToRemove = 0;
       const strategy = options.target ?? 'max';
+      const keptNodes: ConcreteNode[] = [];
 
       if (strategy === 'incremental') {
-        targetTokensToRemove = Infinity;
-      } else if (strategy === 'freeNTokens') {
+        // 'incremental' simply drops the single oldest node in the targets, ignoring tokens.
+        let removedNodes = 0;
+        for (const node of targets) {
+          if (removedNodes < 1) {
+            removedNodes++;
+            continue;
+          }
+          keptNodes.push(node);
+        }
+        return keptNodes;
+      }
+
+      let targetTokensToRemove = 0;
+      if (strategy === 'freeNTokens') {
         targetTokensToRemove = options.freeTokensTarget ?? 0;
         if (targetTokensToRemove <= 0) return targets;
       } else if (strategy === 'max') {
@@ -38,7 +49,6 @@ export function createHistoryTruncationProcessor(
       }
 
       let removedTokens = 0;
-      const keptNodes: ConcreteNode[] = [];
 
       // The targets are sequentially ordered from oldest to newest.
       // We want to delete the oldest targets first.

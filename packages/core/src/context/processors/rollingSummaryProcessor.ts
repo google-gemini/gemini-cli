@@ -66,35 +66,36 @@ export function createRollingSummaryProcessor(
       if (targets.length === 0) return targets;
 
       const strategy = options.target ?? 'max';
-      let targetTokensToRemove = 0;
-
-      if (strategy === 'incremental') {
-        // A rolling summary should target a small chunk. For now, since state isn't passed,
-        // we'll default to a fixed threshold, like 10000 tokens, to avoid eating the whole history.
-        // Ideally, the orchestrator should pass `tokensToRemove` explicitly.
-        targetTokensToRemove = 10000;
-      } else if (strategy === 'freeNTokens') {
-        targetTokensToRemove = options.freeTokensTarget ?? Infinity;
-      } else if (strategy === 'max') {
-        targetTokensToRemove = Infinity;
-      }
-
-      if (targetTokensToRemove <= 0) return targets;
-
-      let deficitAccumulator = 0;
       const nodesToSummarize: ConcreteNode[] = [];
 
-      // Scan oldest to newest to find the oldest block that exceeds the token requirement
-      for (const node of targets) {
-        if (node.id === targets[0].id && node.type === 'USER_PROMPT') {
-          // Keep system prompt if it's the very first node
-          continue;
+      if (strategy === 'incremental') {
+        // 'incremental' simply summarizes the minimum viable chunk (the oldest 2 nodes), ignoring token math.
+        for (const node of targets) {
+          if (node.id === targets[0].id && node.type === 'USER_PROMPT') {
+            continue; // Keep system prompt
+          }
+          nodesToSummarize.push(node);
+          if (nodesToSummarize.length >= 2) break; // We have enough for a minimum rolling summary
+        }
+      } else {
+        let targetTokensToRemove = 0;
+        if (strategy === 'freeNTokens') {
+          targetTokensToRemove = options.freeTokensTarget ?? Infinity;
+        } else if (strategy === 'max') {
+          targetTokensToRemove = Infinity;
         }
 
-        nodesToSummarize.push(node);
-        deficitAccumulator += env.tokenCalculator.getTokenCost(node);
-
-        if (deficitAccumulator >= targetTokensToRemove) break;
+        if (targetTokensToRemove > 0) {
+          let deficitAccumulator = 0;
+          for (const node of targets) {
+            if (node.id === targets[0].id && node.type === 'USER_PROMPT') {
+              continue; // Keep system prompt
+            }
+            nodesToSummarize.push(node);
+            deficitAccumulator += env.tokenCalculator.getTokenCost(node);
+            if (deficitAccumulator >= targetTokensToRemove) break;
+          }
+        }
       }
 
       if (nodesToSummarize.length < 2) return targets; // Not enough context to summarize
