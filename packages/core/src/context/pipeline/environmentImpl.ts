@@ -47,6 +47,6 @@ export class ContextEnvironmentImpl implements ContextEnvironment {
     this.fileSystem = fileSystem || new NodeFileSystem();
     this.idGenerator = idGenerator || new NodeIdGenerator();
     this.inbox = new LiveInbox();
-    this.irMapper = new IrMapper(this.behaviorRegistry);
+    this.irMapper = new IrMapper(this.behaviorRegistry, this.idGenerator);
   }
 }
