@@ -11,6 +11,7 @@ import type { StructuredPatch } from 'diff';
 import type { Config } from '../config/config.js';
 import { Storage } from '../config/storage.js';
 import { isNodeError } from '../utils/errors.js';
+import { debugLogger } from '../utils/debugLogger.js';
 import { isSubpath } from '../utils/paths.js';
 
 export function getAllowedSkillPatchRoots(config: Config): string[] {
@@ -98,6 +99,23 @@ function isAbsoluteSkillPatchPath(targetPath: string): boolean {
   return targetPath !== '/dev/null' && path.isAbsolute(targetPath);
 }
 
+const GIT_DIFF_PREFIX_RE = /^[ab]\//;
+
+/**
+ * Strips git-style `a/` or `b/` prefixes from a patch filename.
+ * Logs a warning when stripping occurs so we can track LLM formatting issues.
+ */
+function stripGitDiffPrefix(fileName: string): string {
+  if (GIT_DIFF_PREFIX_RE.test(fileName)) {
+    const stripped = fileName.replace(GIT_DIFF_PREFIX_RE, '');
+    debugLogger.warn(
+      `[memoryPatchUtils] Stripped git diff prefix from patch header: "${fileName}" → "${stripped}"`,
+    );
+    return stripped;
+  }
+  return fileName;
+}
+
 interface ValidatedSkillPatchHeader {
   targetPath: string;
   isNewFile: boolean;
@@ -120,8 +138,12 @@ export function validateParsedSkillPatchHeaders(
   const validatedPatches: ValidatedSkillPatchHeader[] = [];
 
   for (const patch of parsedPatches) {
-    const oldFileName = patch.oldFileName;
-    const newFileName = patch.newFileName;
+    const oldFileName = patch.oldFileName
+      ? stripGitDiffPrefix(patch.oldFileName)
+      : patch.oldFileName;
+    const newFileName = patch.newFileName
+      ? stripGitDiffPrefix(patch.newFileName)
+      : patch.newFileName;
 
     if (!oldFileName || !newFileName) {
       return {

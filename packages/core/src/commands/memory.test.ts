@@ -1078,6 +1078,35 @@ describe('memory commands', () => {
       await expect(fs.access(patchPath)).resolves.toBeUndefined();
     });
 
+    it('should strip git-style a/ and b/ prefixes and apply successfully', async () => {
+      const targetFile = path.join(projectSkillsDir, 'prefixed.md');
+      await fs.writeFile(targetFile, 'line1\nline2\nline3\n');
+
+      const patchPath = path.join(skillsDir, 'git-prefix.patch');
+      await fs.writeFile(
+        patchPath,
+        [
+          `--- a/${targetFile}`,
+          `+++ b/${targetFile}`,
+          '@@ -1,3 +1,4 @@',
+          ' line1',
+          ' line2',
+          '+line2.5',
+          ' line3',
+          '',
+        ].join('\n'),
+      );
+
+      const result = await applyInboxPatch(applyConfig, 'git-prefix.patch');
+
+      expect(result.success).toBe(true);
+      expect(result.message).toContain('Applied patch to 1 file');
+      expect(await fs.readFile(targetFile, 'utf-8')).toBe(
+        'line1\nline2\nline2.5\nline3\n',
+      );
+      await expect(fs.access(patchPath)).rejects.toThrow();
+    });
+
     it('should not write any files if one patch in a multi-file set fails', async () => {
       const file1 = path.join(projectSkillsDir, 'file1.md');
       await fs.writeFile(file1, 'aaa\nbbb\nccc\n');
