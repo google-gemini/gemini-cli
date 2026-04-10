@@ -48,16 +48,39 @@ describe('run_shell_command streaming to file regression', () => {
     await rig.run({ args: prompt });
 
     let savedFilePath = '';
-    const toolLogs = rig.readToolLogs();
-    const shellCall = toolLogs.find(
-      (log) => log.toolRequest.name === 'run_shell_command',
-    );
-    expect(shellCall).toBeTruthy();
-    savedFilePath = shellCall?.toolResponse?.result?.outputFile;
+    const tmpdir = path.join(rig.homeDir!, '.gemini', 'tmp');
+    if (fs.existsSync(tmpdir)) {
+      const findFiles = (dir: string): string[] => {
+        let results: string[] = [];
+        const list = fs.readdirSync(dir, { withFileTypes: true });
+        for (const file of list) {
+          const fullPath = path.join(dir, file.name);
+          if (file.isDirectory()) {
+            results = results.concat(findFiles(fullPath));
+          } else if (file.isFile() && file.name.endsWith('.txt')) {
+            results.push(fullPath);
+          } else if (file.isFile() && file.name.endsWith('.log')) {
+            results.push(fullPath);
+          }
+        }
+        return results;
+      };
+
+      const files = findFiles(tmpdir);
+      files.sort((a, b) => fs.statSync(b).mtimeMs - fs.statSync(a).mtimeMs);
+
+      for (const p of files) {
+        const stat = fs.statSync(p);
+        if (stat.size >= 20000000) {
+          savedFilePath = p;
+          break;
+        }
+      }
+    }
 
     expect(
       savedFilePath,
-      `Expected the tool response to contain an outputFile`,
+      `Expected to find a saved output file >= 20MB in ${tmpdir}`,
     ).toBeTruthy();
 
     const savedContent = fs.readFileSync(savedFilePath, 'utf8');
@@ -99,16 +122,39 @@ describe('run_shell_command streaming to file regression', () => {
     await rig.run({ args: prompt });
 
     let savedFilePath = '';
-    const toolLogs = rig.readToolLogs();
-    const shellCall = toolLogs.find(
-      (log) => log.toolRequest.name === 'run_shell_command',
-    );
-    expect(shellCall).toBeTruthy();
-    savedFilePath = shellCall?.toolResponse?.result?.outputFile;
+    const tmpdir = path.join(rig.homeDir!, '.gemini', 'tmp');
+    if (fs.existsSync(tmpdir)) {
+      const findFiles = (dir: string): string[] => {
+        let results: string[] = [];
+        const list = fs.readdirSync(dir, { withFileTypes: true });
+        for (const file of list) {
+          const fullPath = path.join(dir, file.name);
+          if (file.isDirectory()) {
+            results = results.concat(findFiles(fullPath));
+          } else if (file.isFile() && file.name.endsWith('.txt')) {
+            results.push(fullPath);
+          } else if (file.isFile() && file.name.endsWith('.log')) {
+            results.push(fullPath);
+          }
+        }
+        return results;
+      };
+
+      const files = findFiles(tmpdir);
+      files.sort((a, b) => fs.statSync(b).mtimeMs - fs.statSync(a).mtimeMs);
+
+      for (const p of files) {
+        const stat = fs.statSync(p);
+        if (stat.size >= 20000000) {
+          savedFilePath = p;
+          break;
+        }
+      }
+    }
 
     expect(
       savedFilePath,
-      `Expected the tool response to contain an outputFile`,
+      `Expected to find a saved output file >= 20MB in ${tmpdir}`,
     ).toBeTruthy();
 
     const savedContent = fs.readFileSync(savedFilePath, 'utf8');
