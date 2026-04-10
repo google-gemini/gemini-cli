@@ -676,8 +676,6 @@ export const renderWithProviders = async (
     validationRequest: null,
     overageMenuRequest: null,
     emptyWalletRequest: null,
-    ...(providedUiState as Partial<UIState> & { quota?: Partial<QuotaState> })
-      ?.quota, // Fallback for old tests passing quota in uiState
     ...providedQuotaState,
   };
 

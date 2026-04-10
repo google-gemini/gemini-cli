@@ -11,9 +11,10 @@ import {
   CoreToolCallStatus,
   ApprovalMode,
   makeFakeConfig,
+  type UserTierId,
+  type SerializableConfirmationDetails,
 } from '@google/gemini-cli-core';
 import { type UIState } from './contexts/UIStateContext.js';
-import type { SerializableConfirmationDetails } from '@google/gemini-cli-core';
 import { act } from 'react';
 import { StreamingState } from './types.js';
 
@@ -107,15 +108,6 @@ describe('Full Terminal Tool Confirmation Snapshot', () => {
       constrainHeight: true,
       isConfigInitialized: true,
       cleanUiDetailsVisible: true,
-      quota: {
-        userTier: 'PRO',
-        stats: {
-          limits: {},
-          usage: {},
-        },
-        proQuotaRequest: null,
-        validationRequest: null,
-      },
       pendingHistoryItems: [
         {
           id: 2,
@@ -145,6 +137,13 @@ describe('Full Terminal Tool Confirmation Snapshot', () => {
     const { waitUntilReady, lastFrame, generateSvg, unmount } =
       await renderWithProviders(<App />, {
         uiState: mockUIState,
+        quotaState: {
+          userTier: 'PRO' as unknown as UserTierId,
+          stats: {
+            remaining: 100,
+            limit: 1000,
+          },
+        },
         config: mockConfig,
         settings: createMockSettings({
           merged: {
