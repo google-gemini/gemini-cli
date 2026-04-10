@@ -7,11 +7,11 @@
 import { ContextManager } from '../contextManager.js';
 import { AgentChatHistory } from '../../core/agentChatHistory.js';
 import type { Content } from '@google/genai';
-import type { ContextProfile } from '../sidecar/profiles.js';
-import { ContextEnvironmentImpl } from '../sidecar/environmentImpl.js';
+import type { ContextProfile } from '../config/profiles.js';
+import { ContextEnvironmentImpl } from '../pipeline/environmentImpl.js';
 import { ContextTracer } from '../tracer.js';
 import { ContextEventBus } from '../eventBus.js';
-import { PipelineOrchestrator } from '../sidecar/orchestrator.js';
+import { PipelineOrchestrator } from '../pipeline/orchestrator.js';
 import { debugLogger } from '../../utils/debugLogger.js';
 import { DeterministicIdGenerator } from '../system/DeterministicIdGenerator.js';
 import { InMemoryFileSystem } from '../system/InMemoryFileSystem.js';

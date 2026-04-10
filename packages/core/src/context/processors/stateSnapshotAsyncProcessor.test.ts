@@ -11,15 +11,15 @@ import {
   createMockProcessArgs,
 } from '../testing/contextTestUtils.js';
 import type { InboxMessage } from '../pipeline.js';
-import type { InboxSnapshotImpl } from '../sidecar/inbox.js';
+import type { InboxSnapshotImpl } from '../pipeline/inbox.js';
 
-describe('StateSnapshotWorker', () => {
+describe('StateSnapshotAsyncProcessor', () => {
   it('should generate a snapshot and publish it to the inbox', async () => {
     const env = createMockEnvironment();
     // Spy on the publish method
     const publishSpy = vi.spyOn(env.inbox, 'publish');
 
-    const worker = createStateSnapshotAsyncProcessor('StateSnapshotWorker', env, { type: 'point-in-time' });
+    const worker = createStateSnapshotAsyncProcessor('StateSnapshotAsyncProcessor', env, { type: 'point-in-time' });
     
     const nodeA = createDummyNode('ep1', 'USER_PROMPT', 50, {}, 'node-A');
     const nodeB = createDummyNode('ep1', 'AGENT_THOUGHT', 60, {}, 'node-B');
@@ -47,7 +47,7 @@ describe('StateSnapshotWorker', () => {
     const publishSpy = vi.spyOn(env.inbox, 'publish');
     const drainSpy = vi.spyOn(env.inbox, 'drainConsumed');
 
-    const worker = createStateSnapshotAsyncProcessor('StateSnapshotWorker', env, { type: 'accumulate' });
+    const worker = createStateSnapshotAsyncProcessor('StateSnapshotAsyncProcessor', env, { type: 'accumulate' });
     
     const nodeC = createDummyNode('ep2', 'USER_PROMPT', 50, {}, 'node-C');
     const targets = [nodeC];
@@ -103,7 +103,7 @@ describe('StateSnapshotWorker', () => {
   it('should ignore empty targets', async () => {
     const env = createMockEnvironment();
     const publishSpy = vi.spyOn(env.inbox, 'publish');
-    const worker = createStateSnapshotAsyncProcessor('StateSnapshotWorker', env, { type: 'accumulate' });
+    const worker = createStateSnapshotAsyncProcessor('StateSnapshotAsyncProcessor', env, { type: 'accumulate' });
     
     await worker.process(createMockProcessArgs([], [], []));
 

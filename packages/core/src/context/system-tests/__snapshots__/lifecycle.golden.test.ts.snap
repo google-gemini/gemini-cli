@@ -218,7 +218,7 @@ exports[`System Lifecycle Golden Tests > Scenario 2: Under Budget (No Modificati
 }
 `;
 
-exports[`System Lifecycle Golden Tests > Scenario 3: Worker-Driven Background GC 1`] = `
+exports[`System Lifecycle Golden Tests > Scenario 3: Async-Driven Background GC 1`] = `
 {
   "finalProjection": [
     {

@@ -17,7 +17,7 @@ import type {
   AsyncContextProcessor,
   ProcessArgs,
 } from '../pipeline.js';
-import type { PipelineDef, AsyncPipelineDef } from './types.js';
+import type { PipelineDef, AsyncPipelineDef } from '../config/types.js';
 import type { ContextEventBus } from '../eventBus.js';
 import type { ConcreteNode, UserPrompt } from '../ir/types.js';
 
@@ -180,10 +180,10 @@ describe('PipelineOrchestrator (Component)', () => {
     });
   });
 
-  describe('Asynchronous Worker Events', () => {
+  describe('Asynchronous async pipeline Events', () => {
     it('routes emitChunkReceived to async pipelines with nodes_added trigger', async () => {
       const executeSpy = vi.fn();
-      const asyncProcessor = createMockAsyncProcessor('MyWorker', executeSpy);
+      const asyncProcessor = createMockAsyncProcessor('MyAsyncProcessor', executeSpy);
       
       setupOrchestrator([], [{
         name: 'TestAsync',
@@ -204,7 +204,7 @@ describe('PipelineOrchestrator (Component)', () => {
 
       expect(executeSpy).toHaveBeenCalledTimes(1);
       const callArgs = executeSpy.mock.calls[0][0];
-      expect(callArgs.targets).toEqual([node2]); // Workers only get the target nodes
+      expect(callArgs.targets).toEqual([node2]); // AsyncProcessors only get the target nodes
     });
   });
 });

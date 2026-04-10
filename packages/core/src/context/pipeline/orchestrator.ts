@@ -5,7 +5,7 @@
  */
 
 import type { ConcreteNode } from '../ir/types.js';
-import type { AsyncPipelineDef, PipelineDef, PipelineTrigger } from './types.js';
+import type { AsyncPipelineDef, PipelineDef, PipelineTrigger } from '../config/types.js';
 import type {
   ContextEnvironment,
   ContextEventBus,

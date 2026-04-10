@@ -10,7 +10,7 @@ import {
   createDummyNode,
   createMockProcessArgs,
 } from '../testing/contextTestUtils.js';
-import type { InboxSnapshotImpl } from '../sidecar/inbox.js';
+import type { InboxSnapshotImpl } from '../pipeline/inbox.js';
 
 describe('StateSnapshotProcessor', () => {
   it('should ignore if budget is satisfied', async () => {
@@ -35,7 +35,7 @@ describe('StateSnapshotProcessor', () => {
 
     const targets = [nodeA, nodeB, nodeC];
 
-    // The background worker created a snapshot of A and B
+    // The async background pipeline created a snapshot of A and B
     const messages = [
       {
         id: 'msg-1',

@@ -10,9 +10,9 @@ import { debugLogger } from '../../utils/debugLogger.js';
 import type {
   ContextEnvironment,
   ContextTracer,
-} from '../sidecar/environment.js';
-import type { PipelineOrchestrator } from '../sidecar/orchestrator.js';
-import type { ContextProfile } from '../sidecar/profiles.js';
+} from '../pipeline/environment.js';
+import type { PipelineOrchestrator } from '../pipeline/orchestrator.js';
+import type { ContextProfile } from '../config/profiles.js';
 
 export class IrProjector {
   /**

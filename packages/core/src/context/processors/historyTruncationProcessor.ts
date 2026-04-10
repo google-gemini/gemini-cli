@@ -10,7 +10,7 @@ import type {
   ProcessArgs,
 } from '../pipeline.js';
 import type { ConcreteNode } from '../ir/types.js';
-import type { ContextEnvironment } from '../sidecar/environment.js';
+import type { ContextEnvironment } from '../pipeline/environment.js';
 
 export type HistoryTruncationProcessorOptions = BackstopTargetOptions;
 

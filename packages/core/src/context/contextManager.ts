@@ -9,12 +9,12 @@ import type { AgentChatHistory } from '../core/agentChatHistory.js';
 import type { ConcreteNode } from './ir/types.js';
 import type { ContextEventBus } from './eventBus.js';
 import type { ContextTracer } from './tracer.js';
-import type { ContextEnvironment } from './sidecar/environment.js';
-import type { ContextProfile } from './sidecar/profiles.js';
-import type { PipelineOrchestrator } from './sidecar/orchestrator.js';
+import type { ContextEnvironment } from './pipeline/environment.js';
+import type { ContextProfile } from './config/profiles.js';
+import type { PipelineOrchestrator } from './pipeline/orchestrator.js';
 import { HistoryObserver } from './historyObserver.js';
 import { IrProjector } from './ir/projector.js';
-import { ContextWorkingBufferImpl } from './sidecar/contextWorkingBuffer.js';
+import { ContextWorkingBufferImpl } from './pipeline/contextWorkingBuffer.js';
 
 export class ContextManager {
   // The master state containing the pristine graph and current active graph.
@@ -62,7 +62,7 @@ export class ContextManager {
   }
 
   /**
-   * Safely stops background workers and clears event listeners.
+   * Safely stops background async pipelines and clears event listeners.
    */
   shutdown() {
     this.orchestrator.shutdown();

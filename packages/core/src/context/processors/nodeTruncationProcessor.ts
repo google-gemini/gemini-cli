@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 import type { ContextProcessor, ProcessArgs } from '../pipeline.js';
-import type { ContextEnvironment } from '../sidecar/environment.js';
+import type { ContextEnvironment } from '../pipeline/environment.js';
 import { truncateProportionally } from '../truncation.js';
 import type { ConcreteNode } from '../ir/types.js';
 

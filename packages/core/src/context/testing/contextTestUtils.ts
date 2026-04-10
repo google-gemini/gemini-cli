@@ -11,19 +11,19 @@ import { InMemoryFileSystem } from '../system/InMemoryFileSystem.js';
 import { DeterministicIdGenerator } from '../system/DeterministicIdGenerator.js';
 import { randomUUID } from 'node:crypto';
 import { ContextTracer } from '../tracer.js';
-import { ContextEnvironmentImpl } from '../sidecar/environmentImpl.js';
-import { SidecarLoader } from '../sidecar/SidecarLoader.js';
-import { SidecarRegistry } from '../sidecar/registry.js';
+import { ContextEnvironmentImpl } from '../pipeline/environmentImpl.js';
+import { SidecarLoader } from '../config/SidecarLoader.js';
+import { SidecarRegistry } from '../config/registry.js';
 import { ContextEventBus } from '../eventBus.js';
-import { PipelineOrchestrator } from '../sidecar/orchestrator.js';
+import { PipelineOrchestrator } from '../pipeline/orchestrator.js';
 import type { ConcreteNode, ToolExecution } from '../ir/types.js';
-import type { ContextEnvironment } from '../sidecar/environment.js';
+import type { ContextEnvironment } from '../pipeline/environment.js';
 import type { Config } from '../../config/config.js';
 import type { BaseLlmClient } from '../../core/baseLlmClient.js';
 import type { Content, GenerateContentResponse } from '@google/genai';
-import { InboxSnapshotImpl } from '../sidecar/inbox.js';
+import { InboxSnapshotImpl } from '../pipeline/inbox.js';
 import type { InboxMessage, ProcessArgs } from '../pipeline.js';
-import type { ContextProfile } from '../sidecar/profiles.js';
+import type { ContextProfile } from '../config/profiles.js';
 
 /**
  * Creates a valid mock GenerateContentResponse with the provided text.
@@ -172,7 +172,7 @@ export function createMockEnvironment(
  * Creates a block of synthetic conversation history designed to consume a specific number of tokens.
  * Assumes roughly 4 characters per token for standard English text.
  */
-import { ContextWorkingBufferImpl } from '../sidecar/contextWorkingBuffer.js';
+import { ContextWorkingBufferImpl } from '../pipeline/contextWorkingBuffer.js';
 
 export function createMockProcessArgs(
   targets: ConcreteNode[],
@@ -239,7 +239,7 @@ export function createMockContextConfig(
 }
 
 /**
- * Wires up a full ContextManager component with an AgentChatHistory and active background workers.
+ * Wires up a full ContextManager component with an AgentChatHistory and active background async pipelines.
  */
 
 export function setupContextComponentTest(
@@ -281,6 +281,6 @@ export function setupContextComponentTest(
     chatHistory,
   );
 
-  // The async worker is now internally managed by ContextManager
+  // The async async pipeline is now internally managed by ContextManager
   return { chatHistory, contextManager };
 }

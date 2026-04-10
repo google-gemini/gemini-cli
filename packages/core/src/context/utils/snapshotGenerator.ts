@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 import type { ConcreteNode } from '../ir/types.js';
-import type { ContextEnvironment } from '../sidecar/environment.js';
+import type { ContextEnvironment } from '../pipeline/environment.js';
 import { LlmRole } from '../../telemetry/llmRole.js';
 
 export class SnapshotGenerator {

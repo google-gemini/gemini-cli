@@ -4,9 +4,8 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import type { SidecarConfig, PipelineDef } from './types.js';
-import type { ContextEnvironment } from './environment.js';
-import type { AsyncPipelineDef } from './types.js';
+import type { AsyncPipelineDef, SidecarConfig, PipelineDef } from './types.js';
+import type { ContextEnvironment } from '../pipeline/environment.js';
 
 // Import factories
 import { createToolMaskingProcessor } from '../processors/toolMaskingProcessor.js';

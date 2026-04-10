@@ -8,7 +8,7 @@ import type {
   ProcessArgs,
   BackstopTargetOptions,
 } from '../pipeline.js';
-import type { ContextEnvironment } from '../sidecar/environment.js';
+import type { ContextEnvironment } from '../pipeline/environment.js';
 import type { ConcreteNode, RollingSummary } from '../ir/types.js';
 import { SnapshotGenerator } from '../utils/snapshotGenerator.js';
 import { debugLogger } from '../../utils/debugLogger.js';

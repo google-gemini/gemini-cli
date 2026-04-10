@@ -5,7 +5,7 @@
  */
 import type { ContextProcessor, ProcessArgs } from '../pipeline.js';
 import type { ConcreteNode, ToolExecution } from '../ir/types.js';
-import type { ContextEnvironment } from '../sidecar/environment.js';
+import type { ContextEnvironment } from '../pipeline/environment.js';
 import { sanitizeFilenamePart } from '../../utils/fileUtils.js';
 import {
   ACTIVATE_SKILL_TOOL_NAME,

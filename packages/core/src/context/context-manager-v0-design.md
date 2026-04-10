@@ -70,20 +70,20 @@ all mutations through a synchronous, blocking pipeline of pure functions, we
 guarantee that the context is always modified in a sane, predictable, and
 mathematically sound sequence.
 
-### The "Open" Extensions: Processors, Workers, and Inboxes (The Actor Model)
+### The "Open" Extensions: Processors, AsyncProcessors, and Inboxes (The Actor Model)
 
 To extend the system, developers author two types of plugins:
 
 1. **Context Processors:** Pure, fast, synchronous functions that take an input
    graph and return an immutable mutated graph. They run inside Pipelines.
-2. **Context Workers:** Inspired by the **Actor Model**, these are
+2. **Context AsyncProcessors:** Inspired by the **Actor Model**, these are
    event-triggered background jobs designed for isolated, long-running async
    computations (e.g., asking an LLM to distill 50 turns of history).
-3. **Inboxes:** Because the graph can only be mutated synchronously, Workers
+3. **Inboxes:** Because the graph can only be mutated synchronously, AsyncProcessors
    cannot touch the graph directly (preventing race conditions). Instead, they
    drop their results via message-passing into point-in-time snapshots called
    _Inboxes_. Processors later read from these Inboxes during a synchronous
-   pipeline run to safely apply the worker's findings.
+   pipeline run to safely apply the async processor's findings.
 
 ## 4. Proofs of Construction
 
@@ -119,7 +119,7 @@ class ToolMaskingProcessor implements ContextProcessor {
 }
 ```
 
-### Example B: Long-Running Summarization (Worker + Inbox + Processor)
+### Example B: Long-Running Summarization (async pipeline + Inbox + Processor)
 
 _Scenario: The user has exceeded their token budget. We need to use an LLM to
 summarize the oldest 20 turns of conversation, but we cannot block the user from
@@ -127,10 +127,10 @@ continuing to chat while the LLM generates the summary._
 
 This requires our async-to-sync bridge.
 
-**Step 1: The Worker (Async Analysis)**
+**Step 1: The async pipeline (Async Analysis)**
 
 ```typescript
-class StateSnapshotWorker implements ContextWorker {
+class StateSnapshotasync pipeline implements Contextasync pipeline {
   // Triggers automatically in the background when the budget is exceeded
   async onBudgetExceeded(event: BudgetEvent, inbox: Inbox) {
     const agedOutNodes = event.getAgedOutNodes();
@@ -138,7 +138,7 @@ class StateSnapshotWorker implements ContextWorker {
     // Slow, async LLM call
     const summaryText = await llm.summarize(agedOutNodes);
 
-    // The worker CANNOT mutate the graph. It leaves a message in the Inbox.
+    // The async pipeline CANNOT mutate the graph. It leaves a message in the Inbox.
     inbox.deliver('SUMMARY_READY', {
       targetNodes: agedOutNodes,
       summary: summaryText,
@@ -153,7 +153,7 @@ class StateSnapshotWorker implements ContextWorker {
 class StateSnapshotProcessor implements ContextProcessor {
   // Runs fast and synchronously during the next Pipeline execution
   apply(graph: ContextGraph, inbox: InboxSnapshot): ContextGraph {
-    // Check if the background worker finished its job
+    // Check if the async background pipeline finished its job
     const messages = inbox.read('SUMMARY_READY');
     if (messages.isEmpty()) return graph;
 
@@ -227,7 +227,7 @@ class MemoryExtractionProcessor implements ContextProcessor {
 
 By treating the Context Graph as an immutable ledger updated only via functional
 Pipelines, we have eliminated race conditions and untraceable graph corruption.
-By utilizing Workers and Inboxes, we have safely bridged the gap between slow
+By utilizing AsyncProcessors and Inboxes, we have safely bridged the gap between slow
 LLM analysis and fast, synchronous terminal UI updates.
 
 We recognize this is not the final form—future iterations may require strict

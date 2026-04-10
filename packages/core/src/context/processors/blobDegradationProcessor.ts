@@ -5,7 +5,7 @@
  */
 import type { ProcessArgs, ContextProcessor } from '../pipeline.js';
 import type { ConcreteNode, UserPrompt } from '../ir/types.js';
-import type { ContextEnvironment } from '../sidecar/environment.js';
+import type { ContextEnvironment } from '../pipeline/environment.js';
 import { sanitizeFilenamePart } from '../../utils/fileUtils.js';
 
 export function createBlobDegradationProcessor(

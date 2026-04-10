@@ -55,7 +55,7 @@ export function getSidecarConfigSchema(registry?: SidecarRegistry) {
       },
       processorOptions: {
         type: 'object',
-        description: 'Named hyperparameter configurations for ContextProcessors and Workers.',
+        description: 'Named hyperparameter configurations for ContextProcessors and AsyncProcessors.',
         additionalProperties: processorOptionsMapping
       }
     },

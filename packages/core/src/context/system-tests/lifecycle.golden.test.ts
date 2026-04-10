@@ -7,7 +7,7 @@
 import { describe, it, expect, vi, beforeAll, afterAll } from 'vitest';
 import { SimulationHarness } from './SimulationHarness.js';
 import { createMockLlmClient } from '../testing/contextTestUtils.js';
-import type { ContextProfile } from '../sidecar/profiles.js';
+import type { ContextProfile } from '../config/profiles.js';
 import { createToolMaskingProcessor } from '../processors/toolMaskingProcessor.js';
 import { createBlobDegradationProcessor } from '../processors/blobDegradationProcessor.js';
 import { createStateSnapshotProcessor } from '../processors/stateSnapshotProcessor.js';
@@ -61,7 +61,7 @@ describe('System Lifecycle Golden Tests', () => {
     buildAsyncPipelines: (env) => [{
       name: 'Async',
       triggers: ['nodes_aged_out'],
-      processors: [createStateSnapshotAsyncProcessor('StateSnapshotWorker', env, {})]
+      processors: [createStateSnapshotAsyncProcessor('StateSnapshotAsyncProcessor', env, {})]
     }],
   });
 
@@ -180,7 +180,7 @@ describe('System Lifecycle Golden Tests', () => {
     expect(goldenState).toMatchSnapshot();
   });
 
-  it('Scenario 3: Worker-Driven Background GC', async () => {
+  it('Scenario 3: Async-Driven Background GC', async () => {
     const gcConfig: ContextProfile = {
       config: {
         budget: { maxTokens: 200, retainedTokens: 100 },
@@ -189,7 +189,7 @@ describe('System Lifecycle Golden Tests', () => {
       buildAsyncPipelines: (env) => [{
       name: 'Async',
       triggers: ['nodes_aged_out'],
-      processors: [createStateSnapshotAsyncProcessor('StateSnapshotWorker', env, {})]
+      processors: [createStateSnapshotAsyncProcessor('StateSnapshotAsyncProcessor', env, {})]
     }],
     };
 
@@ -201,13 +201,13 @@ describe('System Lifecycle Golden Tests', () => {
       { role: 'model', parts: [{ text: 'B'.repeat(50) }] },
     ]);
 
-    // Turn 1 (Should trigger StateSnapshotWorker because we exceed 100 retainedTokens)
+    // Turn 1 (Should trigger StateSnapshotasync pipeline because we exceed 100 retainedTokens)
     await harness.simulateTurn([
       { role: 'user', parts: [{ text: 'C'.repeat(50) }] },
       { role: 'model', parts: [{ text: 'D'.repeat(50) }] },
     ]);
 
-    // Give the background worker an extra beat to complete its async execution and emit variants
+    // Give the async background pipeline an extra beat to complete its async execution and emit variants
     await new Promise((resolve) => setTimeout(resolve, 50));
 
     // Turn 2
@@ -218,7 +218,7 @@ describe('System Lifecycle Golden Tests', () => {
 
     const goldenState = await harness.getGoldenState();
 
-    // We should see ROLLING_SUMMARY nodes injected into the graph, proving the worker ran in the background
+    // We should see ROLLING_SUMMARY nodes injected into the graph, proving the async pipeline ran in the background
     expect(goldenState).toMatchSnapshot();
   });
 });

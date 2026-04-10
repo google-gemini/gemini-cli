@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 import type { AsyncContextProcessor, ProcessArgs } from '../pipeline.js';
-import type { ContextEnvironment } from '../sidecar/environment.js';
+import type { ContextEnvironment } from '../pipeline/environment.js';
 import type { ConcreteNode } from '../ir/types.js';
 import { SnapshotGenerator } from '../utils/snapshotGenerator.js';
 import { debugLogger } from '../../utils/debugLogger.js';
@@ -30,9 +30,9 @@ export function createStateSnapshotAsyncProcessor(
     try {
       let nodesToSummarize = [...targets];
       let previousConsumedIds: string[] = [];
-      const workerType = options.type ?? 'point-in-time';
+      const processorType = options.type ?? 'point-in-time';
 
-      if (workerType === 'accumulate') {
+      if (processorType === 'accumulate') {
         // Look for the most recent unconsumed accumulate snapshot in the inbox
         const proposedSnapshots = inbox.getMessages<{
           newText: string;
@@ -80,13 +80,13 @@ export function createStateSnapshotAsyncProcessor(
         ...targets.map((t) => t.id),
       ];
 
-      // In V2, workers communicate their work to the inbox, and the processor picks it up.
+      // In V2, async pipelines communicate their work to the inbox, and the processor picks it up.
       env.inbox.publish(
         'PROPOSED_SNAPSHOT',
         {
           newText: snapshotText,
           consumedIds: newConsumedIds,
-          type: workerType,
+          type: processorType,
         },
         env.idGenerator,
       );

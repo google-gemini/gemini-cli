@@ -47,7 +47,7 @@ export class InboxSnapshotImpl implements InboxSnapshot {
      * completely erases generic type information (<T>) at runtime, the central array
      * can only hold `unknown` payloads. To enforce strict type safety without a central
      * registry (which would break decoupling) or heavy runtime validation (Zod schemas),
-     * we must assert the type boundary here. The contract relies on the Worker and Processor
+     * we must assert the type boundary here. The contract relies on the async pipeline and Processor
      * agreeing on the payload structure associated with the configured topic string.
      */
     // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
