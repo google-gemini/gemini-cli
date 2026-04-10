@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { promises as fs } from 'node:fs';
+import fs, { promises as fsPromises } from 'node:fs';
 import * as path from 'node:path';
 import * as os from 'node:os';
 import * as crypto from 'node:crypto';
@@ -63,12 +63,12 @@ export class FileKeychain implements Keychain {
 
   private async ensureDirectoryExists(): Promise<void> {
     const dir = path.dirname(this.tokenFilePath);
-    await fs.mkdir(dir, { recursive: true, mode: 0o700 });
+    await fsPromises.mkdir(dir, { recursive: true, mode: 0o700 });
   }
 
   private async loadData(): Promise<Record<string, Record<string, string>>> {
     try {
-      const data = await fs.readFile(this.tokenFilePath, 'utf-8');
+      const data = await fsPromises.readFile(this.tokenFilePath, 'utf-8');
       const decrypted = this.decrypt(data);
       // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
       return JSON.parse(decrypted) as Record<string, Record<string, string>>;
@@ -85,15 +85,17 @@ export class FileKeychain implements Keychain {
         )
       ) {
         // Corrupted credentials file detected. Attempt to recover by moving the bad file aside.
+        const corruptSuffix = `.corrupt-${Date.now()}`;
+        const corruptPath = `${this.tokenFilePath}${corruptSuffix}`;
         try {
-          await fs.rename(this.tokenFilePath, `${this.tokenFilePath}.corrupt`);
+          fs.renameSync(this.tokenFilePath, corruptPath);
         } catch {
           // Ignore rename failures; we'll still return empty data.
         }
         // Return empty credentials; user can re-enter their API key.
         // eslint-disable-next-line no-console
         console.error(
-          `Warning: Corrupted credentials file was detected and has been moved to ${this.tokenFilePath}.corrupt. ` +
+          `Warning: Corrupted credentials file was detected and has been moved to ${corruptPath}. ` +
             'Please re-authenticate if needed.',
         );
         return {};
@@ -108,7 +110,7 @@ export class FileKeychain implements Keychain {
     await this.ensureDirectoryExists();
     const json = JSON.stringify(data, null, 2);
     const encrypted = this.encrypt(json);
-    await fs.writeFile(this.tokenFilePath, encrypted, { mode: 0o600 });
+    await fsPromises.writeFile(this.tokenFilePath, encrypted, { mode: 0o600 });
   }
 
   async getPassword(service: string, account: string): Promise<string | null> {
@@ -140,7 +142,7 @@ export class FileKeychain implements Keychain {
 
       if (Object.keys(data).length === 0) {
         try {
-          await fs.unlink(this.tokenFilePath);
+          await fsPromises.unlink(this.tokenFilePath);
         } catch (error: unknown) {
           // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
           const err = error as NodeJS.ErrnoException;
