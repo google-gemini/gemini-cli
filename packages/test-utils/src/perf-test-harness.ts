@@ -367,13 +367,17 @@ export class PerfTestHarness {
 
       // Show CPU breakdown
       const cpuMs = `${(result.median.cpuTotalUs / 1000).toFixed(1)} ms`;
+      const utilization = (
+        (result.median.cpuTotalUs / 1000 / result.median.wallClockMs) *
+        100
+      ).toFixed(1);
       lines.push(
-        `  CPU: ${cpuMs} (user: ${formatUs(result.median.cpuUserUs)}, system: ${formatUs(result.median.cpuSystemUs)})`,
+        `  CPU: ${cpuMs} (${utilization}%) (user: ${formatUs(result.median.cpuUserUs)}, system: ${formatUs(result.median.cpuSystemUs)})`,
       );
 
       if (result.median.eventLoopDelayMaxMs > 0) {
         lines.push(
-          `  Event loop (runner): p50=${result.median.eventLoopDelayP50Ms.toFixed(1)}ms p95=${result.median.eventLoopDelayP95Ms.toFixed(1)}ms max=${result.median.eventLoopDelayMaxMs.toFixed(1)}ms`,
+          `  Event loop: p50=${result.median.eventLoopDelayP50Ms.toFixed(1)}ms p95=${result.median.eventLoopDelayP95Ms.toFixed(1)}ms max=${result.median.eventLoopDelayMaxMs.toFixed(1)}ms`,
         );
       }
 
