@@ -47,19 +47,19 @@ function constantTimeEquals(a: string, b: string): boolean {
  *   CODER_AGENT_BASIC_PASSWORD - optional basic auth password
  */
 export function loadAgentServerCredentials(): AgentServerCredentials {
-  const envBearer = process.env['CODER_AGENT_BEARER_TOKEN'];
+  const envBearer = process.env['CODER_AGENT_BEARER_TOKEN']?.trim();
   const bearerToken =
     envBearer && envBearer.length > 0 ? envBearer : generateRandomToken();
 
-  if (!envBearer) {
+  if (!envBearer || envBearer.length === 0) {
     logger.info(
       '[a2a-server] Generated ephemeral bearer token for this process. ' +
         'Set CODER_AGENT_BEARER_TOKEN to supply a stable value.',
     );
   }
 
-  const basicUsername = process.env['CODER_AGENT_BASIC_USERNAME'];
-  const basicPassword = process.env['CODER_AGENT_BASIC_PASSWORD'];
+  const basicUsername = process.env['CODER_AGENT_BASIC_USERNAME']?.trim();
+  const basicPassword = process.env['CODER_AGENT_BASIC_PASSWORD']?.trim();
   const hasBasic =
     !!basicUsername &&
     basicUsername.length > 0 &&

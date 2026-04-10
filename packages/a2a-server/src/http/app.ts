@@ -307,6 +307,7 @@ export async function createApp() {
           error:
             'Listing all task metadata is only supported when using InMemoryTaskStore.',
         });
+        return;
       }
       try {
         const wrappers = agentExecutor.getAllTasks();
