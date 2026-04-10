@@ -1,7 +1,7 @@
 # 📊 Gemini CLI Weekly Team Review Stats
 
 *Reporting Period: **Monday 2026-04-06** to Today*
-*Last Updated: 2026-04-10 00:46 (UTC)*
+*Last Updated: 2026-04-10 00:59 (UTC)*
 
 ## 📈 Weekly Summary
 | Maintainer | Closed/Merged (Week) | Current Open Queue |
@@ -28,8 +28,7 @@
 | [#19868 "context.fileFiltering.customIgnoreFilePaths" setting breaks file completion when using @](https://github.com/google-gemini/gemini-cli/issues/19868) | [#19898](https://github.com/google-gemini/gemini-cli/pull/19898) | `2026-04-09` |
 | [#18023 Auto update with pnpm installation doesn't work well](https://github.com/google-gemini/gemini-cli/issues/18023) | [#22748](https://github.com/google-gemini/gemini-cli/pull/22748) | `2026-04-09` |
 | [#22612 bug: Bun runtime fails to keep child processes alive due to 'detached: true'](https://github.com/google-gemini/gemini-cli/issues/22612) | [#22620](https://github.com/google-gemini/gemini-cli/pull/22620) | `2026-04-09` |
-| [#22589 fix(cli): all Executing subagent tool calls dropped from UI state, breaking task-tree
-  hierarchy](https://github.com/google-gemini/gemini-cli/issues/22589) | [#22590](https://github.com/google-gemini/gemini-cli/pull/22590) | `2026-04-09` |
+| [#22589 fix(cli): all Executing subagent tool calls dropped from UI state, breaking task-tree hierarchy](https://github.com/google-gemini/gemini-cli/issues/22589) | [#22590](https://github.com/google-gemini/gemini-cli/pull/22590) | `2026-04-09` |
 | [#22610 bug: ui.loadingPhrases: 'off' is ignored by the UI](https://github.com/google-gemini/gemini-cli/issues/22610) | [#22618](https://github.com/google-gemini/gemini-cli/pull/22618) | `2026-04-09` |
 | [#22417 CLI accepts positional prompt with --prompt-interactive and handles the conflict inconsistently](https://github.com/google-gemini/gemini-cli/issues/22417) | [#22418](https://github.com/google-gemini/gemini-cli/pull/22418) | `2026-04-09` |
 | [#22130 [UI] Refactor Hardcoded Layout Constants in ThemeDialog](https://github.com/google-gemini/gemini-cli/issues/22130) | [#22134](https://github.com/google-gemini/gemini-cli/pull/22134) | `2026-04-09` |
@@ -62,12 +61,12 @@
 | [#22619](https://github.com/google-gemini/gemini-cli/pull/22619) | [#22611](https://github.com/google-gemini/gemini-cli/issues/22611) | fix(cli): clear thought state on response completion to prevent UI ghosting | 🔴 Blocked: Test Failure | `2026-04-09` |
 
 #### 🔴 Recently Closed (Since Monday)
-| PR | Issue | Title | Closed Date |
-| :--- | :--- | :--- |
-| [#22621](https://github.com/google-gemini/gemini-cli/pull/22621) | [#22613](https://github.com/google-gemini/gemini-cli/issues/22613) | fix(cli): suppress unhandled AbortError logs during request cancellation | `2026-04-09` |
-| [#24773](https://github.com/google-gemini/gemini-cli/pull/24773) | [#14864](https://github.com/google-gemini/gemini-cli/issues/14864) | fix: respect hideContextPercentage when FooterConfigDialog is closed without changes | `2026-04-09` |
-| [#21447](https://github.com/google-gemini/gemini-cli/pull/21447) | [#21445](https://github.com/google-gemini/gemini-cli/issues/21445) | fix(cli-ui): enable Ctrl+Backspace for word deletion in Windows Terminal | `2026-04-09` |
-| [#22128](https://github.com/google-gemini/gemini-cli/pull/22128) | [#22127](https://github.com/google-gemini/gemini-cli/issues/22127) | chore: ignore conductor directory | `2026-04-08` |
+| PR | Issue | Title | Status | Closed Date |
+| :--- | :--- | :--- | :--- | :--- |
+| [#22621](https://github.com/google-gemini/gemini-cli/pull/22621) | [#22613](https://github.com/google-gemini/gemini-cli/issues/22613) | fix(cli): suppress unhandled AbortError logs during request cancellation | `MERGED` | `2026-04-09` |
+| [#24773](https://github.com/google-gemini/gemini-cli/pull/24773) | [#14864](https://github.com/google-gemini/gemini-cli/issues/14864) | fix: respect hideContextPercentage when FooterConfigDialog is closed without changes | `MERGED` | `2026-04-09` |
+| [#21447](https://github.com/google-gemini/gemini-cli/pull/21447) | [#21445](https://github.com/google-gemini/gemini-cli/issues/21445) | fix(cli-ui): enable Ctrl+Backspace for word deletion in Windows Terminal | `MERGED` | `2026-04-09` |
+| [#22128](https://github.com/google-gemini/gemini-cli/pull/22128) | [#22127](https://github.com/google-gemini/gemini-cli/issues/22127) | chore: ignore conductor directory | `MERGED` | `2026-04-08` |
 
 ### Cynthia Long (@cynthialong0-0)
 #### 🟢 Active Queue
@@ -82,9 +81,9 @@
 | - | - | _No active reviews._ | - | - |
 
 #### 🔴 Recently Closed (Since Monday)
-| PR | Issue | Title | Closed Date |
-| :--- | :--- | :--- |
-| [#20546](https://github.com/google-gemini/gemini-cli/pull/20546) | [#19940](https://github.com/google-gemini/gemini-cli/issues/19940) | test(core): add missing tests for prompts/utils.ts | `2026-04-10` |
+| PR | Issue | Title | Status | Closed Date |
+| :--- | :--- | :--- | :--- | :--- |
+| [#20546](https://github.com/google-gemini/gemini-cli/pull/20546) | [#19940](https://github.com/google-gemini/gemini-cli/issues/19940) | test(core): add missing tests for prompts/utils.ts | `CLOSED` | `2026-04-10` |
 
 ### Ivan Port (@ivanporty)
 #### 🟢 Active Queue
@@ -125,10 +124,10 @@
 | [#18499](https://github.com/google-gemini/gemini-cli/pull/18499) | [#18067](https://github.com/google-gemini/gemini-cli/issues/18067) | feat: Add voice input with pluggable backend (Gemini zero-install + Whisper) | 🔴 Blocked: Merge Conflict | `2026-04-04` |
 
 #### 🔴 Recently Closed (Since Monday)
-| PR | Issue | Title | Closed Date |
-| :--- | :--- | :--- |
-| [#19025](https://github.com/google-gemini/gemini-cli/pull/19025) | [#18388](https://github.com/google-gemini/gemini-cli/issues/18388) | feat(cli): add /mcp remove slash command for interactive server removal | `2026-04-09` |
-| [#24870](https://github.com/google-gemini/gemini-cli/pull/24870) | [#21006](https://github.com/google-gemini/gemini-cli/issues/21006) | fix(core): dispose Scheduler to prevent McpProgress listener leak | `2026-04-08` |
+| PR | Issue | Title | Status | Closed Date |
+| :--- | :--- | :--- | :--- | :--- |
+| [#19025](https://github.com/google-gemini/gemini-cli/pull/19025) | [#18388](https://github.com/google-gemini/gemini-cli/issues/18388) | feat(cli): add /mcp remove slash command for interactive server removal | `CLOSED` | `2026-04-09` |
+| [#24870](https://github.com/google-gemini/gemini-cli/pull/24870) | [#21006](https://github.com/google-gemini/gemini-cli/issues/21006) | fix(core): dispose Scheduler to prevent McpProgress listener leak | `MERGED` | `2026-04-08` |
 
 ---
 *Report generated by automated triage script.*

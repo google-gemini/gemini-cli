@@ -2,6 +2,7 @@ import subprocess
 import json
 import datetime
 import sys
+import re
 
 # Target repository
 TARGET_REPO = 'google-gemini/gemini-cli'
@@ -23,7 +24,7 @@ MAINTAINERS = {
 # Common bots to exclude
 BOT_BLACKLIST = {
     'gemini-code-assist', 'github-actions', 'google-allstar', 'renovate',
-    'dependabot', 'google-gemini-bot', 'google-cla', 'googlebot'
+    'dependabot', 'google-gemini-bot', 'google-cla', 'googlebot', 'gemini-cli'
 }
 
 # Teams that require specialized approval
@@ -118,7 +119,8 @@ def gh_api_graphql(query, variables=None):
     cmd = ['gh', 'api', 'graphql']
     if variables:
         for k, v in variables.items():
-            if v: cmd.extend(['-F', f'{k}={v}'])
+            if v is not None:
+                cmd.extend(['-F', f'{k}={v}'])
     cmd.extend(['-f', f'query={query}'])
     result = subprocess.run(cmd, capture_output=True, text=True)
     if result.returncode != 0:
@@ -128,6 +130,11 @@ def gh_api_graphql(query, variables=None):
 def parse_date(date_str):
     if not date_str: return None
     return datetime.datetime.fromisoformat(date_str.replace('Z', '+00:00'))
+
+def sanitize(text):
+    if not text: return ""
+    # Replace all whitespace (newlines, tabs, etc) and pipe characters with a single space
+    return re.sub(r'[\s|]+', ' ', text).strip()
 
 def get_author_activity(pr):
     author = pr.get('author', {}).get('login')
@@ -216,7 +223,8 @@ def main():
         if not search_data['pageInfo']['hasNextPage']: break
         cursor = search_data['pageInfo']['endCursor']
 
-    issue_to_info = {i['number']: {"title": i['title'], "url": i['url']} for i in all_issue_nodes}
+    # Map issue info correctly
+    issue_to_info = {i['number']: {"title": sanitize(i['title']), "url": i['url']} for i in all_issue_nodes}
     issue_to_prs = {}
     all_pr_numbers = set()
     for issue in all_issue_nodes:
@@ -251,6 +259,8 @@ def main():
             if issue_no not in [n['number'] for n in pr['closingIssuesReferences']['nodes']]: continue
             if pr.get('baseRepository', {}).get('nameWithOwner', TARGET_REPO) != TARGET_REPO: continue
             
+            pr_title = sanitize(pr['title'])
+            
             if pr.get('state') != 'OPEN':
                 if pr_no not in processed_prs_for_history:
                     updated_at = parse_date(pr['updatedAt'])
@@ -269,7 +279,8 @@ def main():
                         if r_login in stats and updated_at and updated_at >= report_start:
                             stats[r_login]["weekly_closed"] += 1
                             stats[r_login]["history"].append({
-                                "number": pr['number'], "title": pr['title'], "url": pr['url'],
+                                "number": pr['number'], "title": pr_title, "url": pr['url'],
+                                "state": pr['state'],
                                 "issue_no": issue_no, "updated": pr['updatedAt'][:10]
                             })
                     processed_prs_for_history.add(pr_no)
@@ -305,7 +316,7 @@ def main():
             if not human_reviewers and not requested_special_teams and "Blocked" not in status_label and (not latest_rev_act or latest_author_act > latest_rev_act):
                 if pr_no not in [p['number'] for p in pickup_list]:
                     pickup_list.append({
-                        "number": pr['number'], "url": pr['url'], "title": pr['title'],
+                        "number": pr['number'], "url": pr['url'], "title": pr_title,
                         "issue_no": issue_no, "issue_url": issue_to_info[issue_no]['url'],
                         "issue_title": issue_to_info[issue_no]['title'],
                         "updated": pr['updatedAt'][:10]
@@ -314,7 +325,7 @@ def main():
             for reviewer in human_reviewers:
                 if reviewer in stats:
                     stats[reviewer]["open_queue"].append({
-                        "number": pr['number'], "title": pr['title'], "url": pr['url'],
+                        "number": pr['number'], "title": pr_title, "url": pr['url'],
                         "state": pr['state'], "updated": pr['updatedAt'][:10], "issue_no": issue_no,
                         "status_label": status_label,
                         "priority": get_status_priority(status_label)
@@ -334,7 +345,6 @@ def main():
     md += f"\n### 🆕 Awaiting Reviewer Pickup ({len(pickup_list)})\n"
     md += "**Action: Pick up one of these new PRs.** These have no human reviewers assigned yet, but **all tests are passing and there are no conflicts.**\n\n"
     md += "| Issue | Linked PR | Last Update |\n| :--- | :--- | :--- |\n"
-    # Sort pickup list by date desc
     for i in sorted(pickup_list, key=lambda x: x['updated'], reverse=True):
         md += f"| [#{i['issue_no']} {i['issue_title']}]({i['issue_url']}) | [#{i['number']}]({i['url']}) | `{i['updated']}` |\n"
     if not pickup_list: md += "| - | - | - |\\n"
@@ -348,15 +358,14 @@ def main():
             md += f"| [#{p['number']}]({p['url']}) | [#{p['issue_no']}](https://github.com/{TARGET_REPO}/issues/{p['issue_no']}) | {p['title']} | {p['status_label']} | `{p['updated']}` |\n"
         if not data['open_queue']: md += "| - | - | _No active reviews._ | - | - |\n"
 
-        recent_closed = [p for p in data['history']]
-        if recent_closed:
-            md += "\n#### 🔴 Recently Closed (Since Monday)\n| PR | Issue | Title | Closed Date |\n| :--- | :--- | :--- |\n"
-            for p in sorted(recent_closed, key=lambda x: x['updated'], reverse=True):
-                md += f"| [#{p['number']}]({p['url']}) | [#{p['issue_no']}](https://github.com/{TARGET_REPO}/issues/{p['issue_no']}) | {p['title']} | `{p['updated']}` |\n"
+        if data['history']:
+            md += "\n#### 🔴 Recently Closed (Since Monday)\n| PR | Issue | Title | Status | Closed Date |\n| :--- | :--- | :--- | :--- | :--- |\n"
+            for p in sorted(data['history'], key=lambda x: x['updated'], reverse=True):
+                md += f"| [#{p['number']}]({p['url']}) | [#{p['issue_no']}](https://github.com/{TARGET_REPO}/issues/{p['issue_no']}) | {p['title']} | `{p['state']}` | `{p['updated']}` |\n"
 
     md += "\n---\n*Report generated by automated triage script.*"
     with open("TEAM_STATS.md", "w") as f: f.write(md)
-    print(f"Verified generated TEAM_STATS.md with {len(pickup_list)} pickup items.")
+    print("Successfully generated TEAM_STATS.md (Sanitized and Formatted).")
 
 if __name__ == "__main__":
     main()
