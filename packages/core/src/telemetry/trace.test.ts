@@ -52,14 +52,13 @@ describe('truncateForTelemetry', () => {
   });
 
   it('should correctly truncate strings with multi-byte unicode characters (emojis)', () => {
-    // 5 emojis, each is multiple bytes in UTF-16
+    // 5 emojis, each is a single grapheme cluster
     const emojis = '👋🌍🚀🔥🎉';
 
-    // Truncating to length 5 (which is 2.5 emojis in UTF-16 length terms)
-    // truncateString will stop after the full grapheme clusters that fit within 5
-    const result = truncateForTelemetry(emojis, 5);
+    // Truncating to 2 graphemes
+    const result = truncateForTelemetry(emojis, 2);
 
-    expect(result).toBe('👋🌍...[TRUNCATED: original length 10]');
+    expect(result).toBe('👋🌍...[TRUNCATED: original length 5]');
   });
 
   it('should stringify and structurally truncate objects if exceeding limits', () => {
