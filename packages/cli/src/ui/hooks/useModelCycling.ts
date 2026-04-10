@@ -67,11 +67,13 @@ export function useModelCycling() {
       if (nextModel !== currentModel) {
         config.setModel(nextModel, true);
         const cycleHint = formatCommand(Command.CYCLE_MODELS_FORWARD);
-        const nextModelDisplayName =
-          getDisplayString(nextModel, config)?.trim() || 'Unknown Model';
         coreEvents.emitFeedback(
           'info',
-          `Switched to model: ${nextModelDisplayName} (Press ${cycleHint} to cycle)`,
+          'Switched to model: ' +
+            (getDisplayString(nextModel, config)?.trim() || 'Unknown Model') +
+            ' (Press ' +
+            cycleHint +
+            ' to cycle)',
         );
       }
     },
