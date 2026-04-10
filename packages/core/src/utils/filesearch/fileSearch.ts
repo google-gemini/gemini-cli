@@ -4,6 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+import { stat } from 'node:fs/promises';
 import path from 'node:path';
 import picomatch from 'picomatch';
 import { loadIgnoreRules, type Ignore } from './ignore.js';
@@ -123,6 +124,31 @@ export interface SearchOptions {
   maxResults?: number;
 }
 
+async function searchCandidates(
+  candidates: string[],
+  pattern: string,
+  options: {
+    signal?: AbortSignal;
+    enableFuzzySearch: boolean;
+  },
+): Promise<string[]> {
+  if (pattern.includes('*') || !options.enableFuzzySearch) {
+    return filter(candidates, pattern, options.signal);
+  }
+
+  const fzf = new AsyncFzf(candidates, {
+    fuzzy: candidates.length > 20000 ? 'v1' : 'v2',
+    forward: false,
+    tiebreakers: [byBasenamePrefix, byMatchPosFromEnd, byLengthAsc],
+  });
+
+  return fzf
+    .find(pattern)
+    .then((results: Array<FzfResultItem<string>>) =>
+      results.map((entry: FzfResultItem<string>) => entry.item),
+    );
+}
+
 function mergeCandidates(
   primary: string[],
   secondary: string[],
@@ -167,6 +193,10 @@ class RecursiveFileSearch implements FileSearch {
   private resultCache: ResultCache | undefined;
   private allFiles: string[] = [];
   private fzf: AsyncFzf<string[]> | undefined;
+  private liveDirectoryCache = new Map<
+    string,
+    { mtimeNs: bigint; results: string[] }
+  >();
 
   constructor(private readonly options: FileSearchOptions) {}
 
@@ -212,38 +242,25 @@ class RecursiveFileSearch implements FileSearch {
       filteredCandidates = candidates;
     } else {
       let shouldCache = true;
-      if (pattern.includes('*') || !this.fzf) {
-        filteredCandidates = await filter(candidates, pattern, options.signal);
-      } else {
-        // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
-        filteredCandidates = await this.fzf
-          .find(pattern)
-          .then((results: Array<FzfResultItem<string>>) =>
-            results.map((entry: FzfResultItem<string>) => entry.item),
-          )
-          .catch((error: unknown) => {
-            shouldCache = false;
-            throw error;
-          });
-      }
+      filteredCandidates = await searchCandidates(candidates, pattern, {
+        signal: options.signal,
+        enableFuzzySearch: this.options.enableFuzzySearch && !!this.fzf,
+      }).catch((error: unknown) => {
+        shouldCache = false;
+        throw error;
+      });
 
       if (shouldCache) {
         this.resultCache.set(pattern, filteredCandidates);
       }
     }
 
-    if (
-      pattern !== '*' &&
-      (filteredCandidates.length === 0 || pattern.endsWith('/'))
-    ) {
+    if (pattern !== '*') {
       const freshCandidates = await this.searchFreshCandidates(
         pattern,
         options.signal,
       );
-      filteredCandidates =
-        pattern.endsWith('/') && filteredCandidates.length > 0
-          ? mergeCandidates(filteredCandidates, freshCandidates)
-          : freshCandidates;
+      filteredCandidates = mergeCandidates(filteredCandidates, freshCandidates);
     }
 
     const fileFilter = this.ignore.getFileFilter();
@@ -273,7 +290,7 @@ class RecursiveFileSearch implements FileSearch {
     pattern: string,
     signal: AbortSignal | undefined,
   ): Promise<string[]> {
-    if (!this.ignore) {
+    if (!this.ignore || signal?.aborted) {
       return [];
     }
 
@@ -299,20 +316,60 @@ class RecursiveFileSearch implements FileSearch {
     const rootRelativeDir = relativeToProjectRoot
       .split(path.sep)
       .join(path.posix.sep);
-    const results = normalizeLiveResults(
-      await crawl({
-        crawlDirectory,
-        cwd: this.options.projectRoot,
-        maxDepth: 0,
-        maxFiles: this.options.maxFiles ?? 20000,
-        ignore: this.ignore,
-        cache: false,
-        cacheTtl: 0,
-      }),
-      rootRelativeDir,
-    );
+    const maxDepth = pattern.endsWith('/') ? this.options.maxDepth : 0;
+    const cacheKey = `${crawlDirectory}:${maxDepth ?? 'recursive'}`;
 
-    return filter(results, pattern, signal);
+    let results: string[];
+    if (maxDepth === 0) {
+      try {
+        const stats = await stat(crawlDirectory, { bigint: true });
+        const cachedEntry = this.liveDirectoryCache.get(cacheKey);
+        if (cachedEntry?.mtimeNs === stats.mtimeNs) {
+          results = cachedEntry.results;
+        } else {
+          results = normalizeLiveResults(
+            await crawl({
+              crawlDirectory,
+              cwd: this.options.projectRoot,
+              maxDepth,
+              maxFiles: this.options.maxFiles ?? 20000,
+              ignore: this.ignore,
+              cache: false,
+              cacheTtl: 0,
+            }),
+            rootRelativeDir,
+          );
+          this.liveDirectoryCache.set(cacheKey, {
+            mtimeNs: stats.mtimeNs,
+            results,
+          });
+        }
+      } catch {
+        return [];
+      }
+    } else {
+      results = normalizeLiveResults(
+        await crawl({
+          crawlDirectory,
+          cwd: this.options.projectRoot,
+          maxDepth,
+          maxFiles: this.options.maxFiles ?? 20000,
+          ignore: this.ignore,
+          cache: false,
+          cacheTtl: 0,
+        }),
+        rootRelativeDir,
+      );
+    }
+
+    if (signal?.aborted) {
+      throw new AbortError();
+    }
+
+    return searchCandidates(results, pattern, {
+      signal,
+      enableFuzzySearch: this.options.enableFuzzySearch,
+    });
   }
 
   private buildResultCache(): void {

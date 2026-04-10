@@ -6,6 +6,7 @@
 
 import { describe, it, expect, beforeEach, vi, afterEach } from 'vitest';
 import { act, useState } from 'react';
+import fs from 'node:fs/promises';
 import * as path from 'node:path';
 import { renderHook } from '../../test-utils/render.js';
 import { waitFor } from '../../test-utils/async.js';
@@ -184,6 +185,58 @@ describe('useAtCompletion', () => {
         expect(result.current.suggestions.map((s) => s.value)).toEqual([
           'cRaZycAsE.txt',
         ]);
+      });
+    });
+
+    it('should surface newly created files in later at-completion searches', async () => {
+      testRootDir = await createTmpDir({
+        src: {
+          'existing.ts': '',
+          nested: {
+            'deep.ts': '',
+          },
+        },
+      });
+
+      const { result, rerender } = await renderHook(
+        ({ pattern }) =>
+          useTestHarnessForAtCompletion(true, pattern, mockConfig, testRootDir),
+        { initialProps: { pattern: 'src/e' } },
+      );
+
+      await waitFor(() => {
+        expect(result.current.suggestions.map((s) => s.value)).toContain(
+          'src/existing.ts',
+        );
+      });
+
+      await fs.writeFile(path.join(testRootDir, 'src', 'example.ts'), '');
+      act(() => {
+        rerender({ pattern: 'src/ex' });
+      });
+
+      await waitFor(() => {
+        expect(result.current.suggestions.map((s) => s.value)).toEqual(
+          expect.arrayContaining(['src/example.ts', 'src/existing.ts']),
+        );
+      });
+
+      await fs.writeFile(path.join(testRootDir, 'src', 'nested', 'new.ts'), '');
+      act(() => {
+        rerender({ pattern: 'src/' });
+      });
+
+      await waitFor(() => {
+        expect(result.current.suggestions.map((s) => s.value)).toEqual(
+          expect.arrayContaining([
+            'src/',
+            'src/example.ts',
+            'src/existing.ts',
+            'src/nested/',
+            'src/nested/deep.ts',
+            'src/nested/new.ts',
+          ]),
+        );
       });
     });
   });
