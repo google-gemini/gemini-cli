@@ -282,11 +282,7 @@ export const useSlashCommandProcessor = (
       reloadCommands();
     };
     let isActive = true;
-    let activeIdeClient:
-      | {
-          removeStatusChangeListener: (listener: () => void) => void;
-        }
-      | undefined;
+    let activeIdeClient: IdeClient | undefined;
 
     // eslint-disable-next-line @typescript-eslint/no-floating-promises
     (async () => {
