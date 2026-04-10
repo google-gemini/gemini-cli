@@ -1,11 +1,11 @@
-# Sandboxing in the Gemini CLI
+# Sandboxing in Gemini CLI
 
-This document provides a guide to sandboxing in the Gemini CLI, including
+This document provides a guide to sandboxing in Gemini CLI, including
 prerequisites, quickstart, and configuration.
 
 ## Prerequisites
 
-Before using sandboxing, you need to install and set up the Gemini CLI:
+Before using sandboxing, you need to install and set up Gemini CLI:
 
 ```bash
 npm install -g @google/gemini-cli
@@ -229,7 +229,7 @@ gemini -p "run the test suite"
 2. **Environment variable**:
    `GEMINI_SANDBOX=true|docker|podman|sandbox-exec|runsc|lxc`
 3. **Settings file**: `"sandbox": true` in the `tools` object of your
-   `settings.json` file (e.g., `{"tools": {"sandbox": true}}`).
+   `settings.json` file (for example, `{"tools": {"sandbox": true}}`).
 
 ### macOS Seatbelt profiles
 
