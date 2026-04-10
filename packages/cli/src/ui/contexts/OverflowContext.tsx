@@ -14,7 +14,6 @@ import {
   useRef,
   useEffect,
 } from 'react';
-import { debugLogger } from '@google/gemini-cli-core';
 
 export interface OverflowState {
   overflowingIds: ReadonlySet<string>;
@@ -86,7 +85,6 @@ export const OverflowProvider: React.FC<{ children: React.ReactNode }> = ({
   const addOverflowingId = useCallback(
     (id: string) => {
       if (!idsRef.current.has(id)) {
-        debugLogger.debug('[DEBUG_LOOP] OverflowContext: addOverflowingId', id);
         idsRef.current.add(id);
         syncState();
       }
@@ -97,7 +95,6 @@ export const OverflowProvider: React.FC<{ children: React.ReactNode }> = ({
   const removeOverflowingId = useCallback(
     (id: string) => {
       if (idsRef.current.has(id)) {
-        debugLogger.debug('[DEBUG_LOOP] OverflowContext: removeOverflowingId', id);
         idsRef.current.delete(id);
         syncState();
       }

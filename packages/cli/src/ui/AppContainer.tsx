@@ -25,6 +25,7 @@ import {
 import { App } from './App.js';
 import { AppContext } from './contexts/AppContext.js';
 import { UIStateContext, type UIState } from './contexts/UIStateContext.js';
+import { QuotaContext } from './contexts/QuotaContext.js';
 import {
   UIActionsContext,
   type UIActions,
@@ -2367,6 +2368,26 @@ Logging in with Google... Restarting Gemini CLI to continue.
     ],
   );
 
+  const quotaState = useMemo(
+    () => ({
+      userTier,
+      stats: quotaStats,
+      proQuotaRequest,
+      validationRequest,
+      // G1 AI Credits dialog state
+      overageMenuRequest,
+      emptyWalletRequest,
+    }),
+    [
+      userTier,
+      quotaStats,
+      proQuotaRequest,
+      validationRequest,
+      overageMenuRequest,
+      emptyWalletRequest,
+    ],
+  );
+
   const uiState: UIState = useMemo(
     () => ({
       history: historyManager.history,
@@ -2439,15 +2460,7 @@ Logging in with Google... Restarting Gemini CLI to continue.
       showApprovalModeIndicator,
       allowPlanMode,
       currentModel,
-      quota: {
-        userTier,
-        stats: quotaStats,
-        proQuotaRequest,
-        validationRequest,
-        // G1 AI Credits dialog state
-        overageMenuRequest,
-        emptyWalletRequest,
-      },
+      quota: quotaState,
       contextFileNames,
       errorCount,
       availableTerminalHeight,
@@ -2558,12 +2571,7 @@ Logging in with Google... Restarting Gemini CLI to continue.
       queueErrorMessage,
       showApprovalModeIndicator,
       allowPlanMode,
-      userTier,
-      quotaStats,
-      proQuotaRequest,
-      validationRequest,
-      overageMenuRequest,
-      emptyWalletRequest,
+      quotaState,
       contextFileNames,
       errorCount,
       availableTerminalHeight,
@@ -2616,19 +2624,6 @@ Logging in with Google... Restarting Gemini CLI to continue.
     [setShowPrivacyNotice],
   );
 
-  const prevUiStateRef = useRef<UIState>(uiState);
-  useEffect(() => {
-    const prev = prevUiStateRef.current;
-    const current = uiState;
-    const changedKeys = Object.keys(current).filter(
-      (key) => (current as any)[key] !== (prev as any)[key],
-    );
-    if (changedKeys.length > 0) {
-      debugLogger.debug('[DEBUG_LOOP] UIStateContext changed:', changedKeys);
-    }
-    prevUiStateRef.current = current;
-  });
-
   const uiActions: UIActions = useMemo(
     () => ({
       handleThemeSelect,
@@ -2651,10 +2646,7 @@ Logging in with Google... Restarting Gemini CLI to continue.
       handleIdePromptComplete,
       handleFolderTrustSelect,
       setIsPolicyUpdateDialogOpen,
-      setConstrainHeight: (value: boolean) => {
-        debugLogger.debug('[DEBUG_LOOP] setConstrainHeight:', value);
-        setConstrainHeight(value);
-      },
+      setConstrainHeight,
       onEscapePromptChange: handleEscapePromptChange,
       refreshStatic,
       handleFinalSubmit,
@@ -2679,10 +2671,7 @@ Logging in with Google... Restarting Gemini CLI to continue.
       toggleCleanUiDetailsVisible,
       revealCleanUiDetailsTemporarily,
       handleWarning,
-      setEmbeddedShellFocused: (value: boolean) => {
-        debugLogger.debug('[DEBUG_LOOP] setEmbeddedShellFocused:', value);
-        setEmbeddedShellFocused(value);
-      },
+      setEmbeddedShellFocused,
       dismissBackgroundTask,
       setActiveBackgroundTaskPid,
       setIsBackgroundTaskListOpen,
@@ -2801,34 +2790,36 @@ Logging in with Google... Restarting Gemini CLI to continue.
 
   return (
     <UIStateContext.Provider value={uiState}>
-      <InputContext.Provider value={inputState}>
-        <UIActionsContext.Provider value={uiActions}>
-          <ConfigContext.Provider value={config}>
-            <AppContext.Provider
-              value={{
-                version: props.version,
-                startupWarnings: props.startupWarnings || [],
-              }}
-            >
-              <ToolActionsProvider
-                config={config}
-                toolCalls={allToolCalls}
-                isExpanded={isExpanded}
-                toggleExpansion={toggleExpansion}
-                toggleAllExpansion={toggleAllExpansion}
+      <QuotaContext.Provider value={quotaState}>
+        <InputContext.Provider value={inputState}>
+          <UIActionsContext.Provider value={uiActions}>
+            <ConfigContext.Provider value={config}>
+              <AppContext.Provider
+                value={{
+                  version: props.version,
+                  startupWarnings: props.startupWarnings || [],
+                }}
               >
-                <ShellFocusContext.Provider value={isFocused}>
-                  <MouseProvider mouseEventsEnabled={mouseMode}>
-                    <ScrollProvider>
-                      <App key={`app-${forceRerenderKey}`} />
-                    </ScrollProvider>
-                  </MouseProvider>
-                </ShellFocusContext.Provider>
-              </ToolActionsProvider>
-            </AppContext.Provider>
-          </ConfigContext.Provider>
-        </UIActionsContext.Provider>
-      </InputContext.Provider>
+                <ToolActionsProvider
+                  config={config}
+                  toolCalls={allToolCalls}
+                  isExpanded={isExpanded}
+                  toggleExpansion={toggleExpansion}
+                  toggleAllExpansion={toggleAllExpansion}
+                >
+                  <ShellFocusContext.Provider value={isFocused}>
+                    <MouseProvider mouseEventsEnabled={mouseMode}>
+                      <ScrollProvider>
+                        <App key={`app-${forceRerenderKey}`} />
+                      </ScrollProvider>
+                    </MouseProvider>
+                  </ShellFocusContext.Provider>
+                </ToolActionsProvider>
+              </AppContext.Provider>
+            </ConfigContext.Provider>
+          </UIActionsContext.Provider>
+        </InputContext.Provider>
+      </QuotaContext.Provider>
     </UIStateContext.Provider>
   );
 };

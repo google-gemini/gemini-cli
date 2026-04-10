@@ -17,7 +17,6 @@ import {
 import type React from 'react';
 import { theme } from '../../semantic-colors.js';
 import { useBatchedScroll } from '../../hooks/useBatchedScroll.js';
-import { debugLogger } from '@google/gemini-cli-core';
 
 import { type DOMElement, Box, ResizeObserver, StaticRender } from 'ink';
 
@@ -357,7 +356,6 @@ function VirtualizedList<T>(
 
     if (wasAtBottom && actualScrollTop >= prevScrollTop.current) {
       if (!isStickingToBottom) {
-        debugLogger.debug('[DEBUG_LOOP] VirtualizedList: setIsStickingToBottom', true);
         setIsStickingToBottom(true);
       }
     }
@@ -380,14 +378,12 @@ function VirtualizedList<T>(
         scrollAnchor.index !== newIndex ||
         scrollAnchor.offset !== SCROLL_TO_ITEM_END
       ) {
-        debugLogger.debug('[DEBUG_LOOP] VirtualizedList: setScrollAnchor (auto-scroll)', { index: newIndex, offset: SCROLL_TO_ITEM_END });
         setScrollAnchor({
           index: newIndex,
           offset: SCROLL_TO_ITEM_END,
         });
       }
       if (!isStickingToBottom) {
-        debugLogger.debug('[DEBUG_LOOP] VirtualizedList: setIsStickingToBottom (auto-scroll)', true);
         setIsStickingToBottom(true);
       }
     } else if (
@@ -402,12 +398,10 @@ function VirtualizedList<T>(
         scrollAnchor.index !== newAnchor.index ||
         scrollAnchor.offset !== newAnchor.offset
       ) {
-        debugLogger.debug('[DEBUG_LOOP] VirtualizedList: setScrollAnchor (clamp)', newAnchor);
         setScrollAnchor(newAnchor);
       }
     } else if (data.length === 0) {
       if (scrollAnchor.index !== 0 || scrollAnchor.offset !== 0) {
-        debugLogger.debug('[DEBUG_LOOP] VirtualizedList: setScrollAnchor (empty)', { index: 0, offset: 0 });
         setScrollAnchor({ index: 0, offset: 0 });
       }
     }

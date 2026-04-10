@@ -169,8 +169,6 @@ export interface UIState {
   queueErrorMessage: string | null;
   showApprovalModeIndicator: ApprovalMode;
   allowPlanMode: boolean;
-  // Quota-related state
-  quota: QuotaState;
   currentModel: string;
   contextFileNames: string[];
   errorCount: number;

@@ -215,18 +215,6 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
   setBannerVisible,
 }) => {
   const inputState = useInputState();
-  const prevInputStateRef = useRef<any>(inputState);
-  useEffect(() => {
-    const prev = prevInputStateRef.current;
-    const current = inputState;
-    const changedKeys = Object.keys(current).filter(
-      (key) => (current as any)[key] !== (prev as any)[key],
-    );
-    if (changedKeys.length > 0) {
-      debugLogger.debug('[DEBUG_LOOP] InputContext changed:', changedKeys);
-    }
-    prevInputStateRef.current = current;
-  });
 
   const {
     buffer,
