@@ -73,8 +73,10 @@ describe('ExitPlanModeTool', () => {
 
   const createPlanFile = (name: string, content: string) => {
     const filePath = path.join(mockPlansDir, name);
+    // Ensure parent directory exists for nested tests
+    fs.mkdirSync(path.dirname(filePath), { recursive: true });
     fs.writeFileSync(filePath, content);
-    return path.join('plans', name);
+    return name;
   };
 
   describe('shouldConfirmExecute', () => {

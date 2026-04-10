@@ -19,9 +19,13 @@ import type { MessageBus } from '../confirmation-bus/message-bus.js';
 import path from 'node:path';
 import type { Config } from '../config/config.js';
 import { EXIT_PLAN_MODE_TOOL_NAME } from './tool-names.js';
-import { validatePlanPath, validatePlanContent } from '../utils/planUtils.js';
+import {
+  validatePlanPath,
+  validatePlanContent,
+  resolveAndValidatePlanPath,
+} from '../utils/planUtils.js';
 import { ApprovalMode } from '../policy/types.js';
-import { resolveToRealPath, isSubpath } from '../utils/paths.js';
+// Remove unused imports
 import { logPlanExecution } from '../telemetry/loggers.js';
 import { PlanExecutionEvent } from '../telemetry/types.js';
 import { getExitPlanModeDefinition } from './definitions/coreTools.js';
@@ -59,16 +63,20 @@ export class ExitPlanModeTool extends BaseDeclarativeTool<
     if (!params.plan_filename || params.plan_filename.trim() === '') {
       return 'plan_filename is required.';
     }
-
-    const safeFilename = path.basename(params.plan_filename);
-    const plansDir = resolveToRealPath(this.config.getPlansDir());
-    const resolvedPath = path.join(this.config.getPlansDir(), safeFilename);
-
-    const realPath = resolveToRealPath(resolvedPath);
-
-    if (!isSubpath(plansDir, realPath)) {
-      return `Access denied: plan path (${resolvedPath}) must be within the designated plans directory (${plansDir}).`;
-    }
+try {
+  resolveAndValidatePlanPath(
+    params.plan_filename,
+    this.config.getPlansDir(),
+  );
+} catch (e) {
+  if (e instanceof Error && e.message.startsWith('Security violation')) {
+    return `Access denied: plan path (${path.join(
+      this.config.getPlansDir(),
+      params.plan_filename,
+    )}) must be within the designated plans directory (${this.config.getPlansDir()}).`;
+  }
+  return e instanceof Error ? e.message : String(e);
+}
 
     return null;
   }
