@@ -41,11 +41,14 @@ export class SlashCommandConflictHandler {
   }
 
   private handleConflicts(payload: SlashCommandConflictsPayload) {
-    const nextActiveConflicts = new Set(
-      payload.conflicts.map((c) => this.getConflictKey(c)),
-    );
-
-    const newConflicts = payload.conflicts.filter((c) => !this.activeConflicts.has(this.getConflictKey(c)));
+    const nextActiveConflicts = new Set<string>();
+    const newConflicts = payload.conflicts.filter((c) => {
+      const key = this.getConflictKey(c);
+      const isNew =
+        !this.activeConflicts.has(key) && !nextActiveConflicts.has(key);
+      nextActiveConflicts.add(key);
+      return isNew;
+    });
     this.activeConflicts = nextActiveConflicts;
 
     if (newConflicts.length > 0) {
