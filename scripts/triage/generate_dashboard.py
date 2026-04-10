@@ -38,8 +38,8 @@ ONCALLER_TEAMS = {
     'gemini-cli-docs'
 }
 
-# Broad search to include all open issues and recently closed ones for weekly history
-SEARCH_QUERY = f'repo:{TARGET_REPO} is:issue label:area/core,area/extensions,area/site label:"help wanted" updated:>=2026-03-10 sort:updated-desc'
+# Exact search query from user request
+SEARCH_QUERY = f'repo:{TARGET_REPO} is:issue state:open label:area/core,area/extensions,area/site label:"help wanted" sort:updated-desc'
 
 ISSUES_QUERY = """
 query($searchQuery: String!, $cursor: String) {
@@ -49,7 +49,7 @@ query($searchQuery: String!, $cursor: String) {
       ... on Issue {
         number title url updatedAt state
         assignees(first: 10) { nodes { login } }
-        timelineItems(itemTypes: CROSS_REFERENCED_EVENT, last: 20) {
+        timelineItems(itemTypes: CROSS_REFERENCED_EVENT, last: 50) {
           nodes {
             ... on CrossReferencedEvent {
               source { ... on PullRequest { number } }
@@ -72,7 +72,7 @@ def get_pr_batch_query(pr_numbers):
                 author {{ login }}
                 mergeable
                 statusCheckRollup {{ state }}
-                closingIssuesReferences(first: 5) {{ nodes {{ number }} }}
+                closingIssuesReferences(first: 10) {{ nodes {{ number }} }}
                 reviewRequests(first: 10) {{ nodes {{ requestedReviewer {{ __typename ... on User {{ login }} ... on Team {{ slug }} }} }} }}
                 latestReviews(last: 10) {{ nodes {{ author {{ login }} state updatedAt }} }}
                 comments(last: 20) {{ nodes {{ author {{ login }} publishedAt }} }}
@@ -91,7 +91,10 @@ def gh_api_graphql(query, variables=None):
             if v is not None: cmd.extend(['-F', f'{k}={v}'])
     cmd.extend(['-f', f'query={query}'])
     result = subprocess.run(cmd, capture_output=True, text=True)
-    return json.loads(result.stdout) if result.returncode == 0 else None
+    if result.returncode != 0:
+        print(f"ERROR: gh api graphql failed: {result.stderr}")
+        return None
+    return json.loads(result.stdout)
 
 def parse_date(date_str):
     if not date_str: return None
@@ -157,6 +160,8 @@ def main():
         if not search_data['pageInfo']['hasNextPage']: break
         cursor = search_data['pageInfo']['endCursor']
 
+    print(f"Total issues fetched: {len(all_issue_nodes)}")
+
     # Map issue info
     issue_to_info = {i['number']: i for i in all_issue_nodes}
     all_pr_numbers = set()
@@ -166,7 +171,7 @@ def main():
         all_pr_numbers.update(nums)
         issue_to_pr_nums[i['number']] = nums
 
-    print(f"Fetching details for {len(all_pr_numbers)} PRs...")
+    print(f"Fetching details for {len(all_pr_numbers)} unique PRs...")
     pr_details = {}
     pr_list = sorted(list(all_pr_numbers))
     for i in range(0, len(pr_list), 20):
@@ -177,6 +182,8 @@ def main():
             for j in range(len(batch)):
                 pr_obj = repo_data.get(f'pr{j}')
                 if pr_obj: pr_details[pr_obj['number']] = pr_obj
+    
+    print(f"Successfully loaded details for {len(pr_details)} PRs.")
 
     now = datetime.datetime.now(datetime.timezone.utc)
     report_start = (now - datetime.timedelta(days=now.weekday())).replace(hour=0, minute=0, second=0, microsecond=0)
@@ -206,7 +213,13 @@ def main():
         
         for pr_no in reversed(pr_nums):
             pr = pr_details.get(pr_no)
-            if not pr or issue_no not in [n['number'] for n in pr['closingIssuesReferences']['nodes']]: continue
+            if not pr: continue
+            
+            # Check if officially linked to THIS issue
+            linked_nums = [n['number'] for n in pr['closingIssuesReferences']['nodes']]
+            if issue_no not in linked_nums: continue
+            
+            # Check target repo
             if pr.get('baseRepository', {}).get('nameWithOwner') != TARGET_REPO: continue
             
             pr_title = sanitize(pr['title'])
@@ -231,7 +244,7 @@ def main():
                     if login != pr['author']['login'] and login not in BOT_BLACKLIST: human_reviewers.add(login)
 
             if pr['state'] != 'OPEN':
-                # Track history for TEAM_STATS
+                # History for TEAM_STATS
                 updated_at = parse_date(pr['updatedAt'])
                 for r_login in human_reviewers:
                     if r_login in member_stats and updated_at >= report_start:
@@ -239,7 +252,7 @@ def main():
                         member_stats[r_login]["history"].append({"number": pr['number'], "title": pr_title, "url": pr['url'], "state": pr['state'], "issue_no": issue_no, "updated": pr['updatedAt'][:10]})
                 continue
 
-            # --- Categorization for REVIEWS.md ---
+            # --- OPEN PR logic ---
             found_open_pr = True
             
             if special_teams:
@@ -266,7 +279,7 @@ def main():
                 waiting_for_author.append({"issue_md": f"[#{issue_no} {issue_title}]({issue_url})", "pr_no": pr['number'], "pr_url": pr['url'], "pr_title": pr_title, "reviewers": sorted(list(human_reviewers)), "last_action": latest_rev_act_iso[:10]})
                 has_active_work = True
 
-            # --- Add to Individual Queues for TEAM_STATS ---
+            # --- Individual Queues for TEAM_STATS ---
             for r_login in human_reviewers:
                 if r_login in member_stats:
                     member_stats[r_login]["open_queue"].append({"number": pr['number'], "title": pr_title, "url": pr['url'], "state": pr['state'], "updated": latest_author_act_iso[:10], "issue_no": issue_no, "status_label": status_label, "priority": get_status_priority(status_label)})
@@ -287,9 +300,8 @@ def main():
     initial_pickup.sort(key=lambda x: x['updated_at'], reverse=True)
 
     # --- Write REVIEWS.md ---
-    total_open_issues = len([i for i in all_issue_nodes if i['state'] == 'OPEN'])
     md_rev = f"# 🔎 Gemini CLI Triage Dashboard\n\n*Last Synchronized: {now.strftime('%Y-%m-%d %H:%M')} (UTC)*\n\n"
-    md_rev += f"**Total Open 'Help Wanted' Issues: {total_open_issues}**\n\n"
+    md_rev += f"**Total Issues Tracked: {len(all_issue_nodes)}**\n\n"
     
     md_rev += f"## 🚨 Needs Oncaller Attention ({len(oncaller_attention)})\n**Action: Specialized approval required.**\n\n| Issue | Linked PR | Required Teams | Human Reviewers |\n| :--- | :--- | :--- | :--- |\n"
     for i in oncaller_attention: md_rev += f"| {i['issue_md']} | [#{i['pr_no']}]({i['pr_url']}) | {', '.join([f'`{t}`' for t in i['teams']])} | {', '.join(['@'+r for r in i['reviewers']]) if i['reviewers'] else '_None_'} |\n"
@@ -299,7 +311,7 @@ def main():
     for i in stale_assignments: md_rev += f"| {i['issue_md']} | @{', @'.join(i['assignees'])} | {i['days_stale']} |\n"
     if not stale_assignments: md_rev += "| - | - | - |\n"
 
-    md_rev += f"\n## 🚧 Blocked & Stale PRs ({len(blocked_stale_prs)})\n**Action: Auto-cleanup.** PRs with conflicts or failures untouched for >14 days.\n\n| Issue | PR | Reason | Author | Days Stale |\n| :--- | :--- | :--- | :--- | :--- |\n"
+    md_rev += f"\n## 🚧 Blocked & Stale PRs ({len(blocked_stale_prs)})\n**Action: Auto-cleanup.**\n\n| Issue | PR | Reason | Author | Days Stale |\n| :--- | :--- | :--- | :--- | :--- |\n"
     for i in blocked_stale_prs: md_rev += f"| {i['issue_md']} | [#{i['pr_no']}]({i['pr_url']}) | {i['reason']} | @{i['author']} | {i['days_stale']} |\n"
     if not blocked_stale_prs: md_rev += "| - | - | - | - | - |\n"
 
@@ -311,9 +323,17 @@ def main():
     for i in followup_needed: md_rev += f"| {i['issue_md']} | [#{i['pr_no']}]({i['pr_url']}) | {', '.join(['@'+r for r in i['reviewers']])} | {i['status']} |\n"
     if not followup_needed: md_rev += "| - | - | - | - |\n"
 
-    md_rev += f"\n## ✍️ Awaiting Author Action ({len(waiting_for_author)})\n**Status: Waiting for contributor to address feedback.**\n\n| Issue | Linked PR | Reviewers | Last Feedback |\n| :--- | :--- | :--- | :--- |\n"
+    md_rev += f"\n## ✍️ Awaiting Author Action ({len(waiting_for_author)})\n**Status: Waiting for contributor.**\n\n| Issue | Linked PR | Reviewers | Last Feedback |\n| :--- | :--- | :--- | :--- |\n"
     for i in waiting_for_author: md_rev += f"| {i['issue_md']} | [#{i['pr_no']}]({i['pr_url']}) | {', '.join(['@'+r for r in i['reviewers']]) if i['reviewers'] else '_None (Team only)_'} | `{i['last_action'][:10]}` |\n"
     if not waiting_for_author: md_rev += "| - | - | - | - |\n"
+
+    md_rev += f"\n## 🛠️ Active Development ({len(active_development)})\n**Status: Recent activity or active blocked PR.**\n\n| Issue | Assignee | Last Update | Status |\n| :--- | :--- | :--- | :--- |\n"
+    for i in active_development: md_rev += f"| {i['issue_md']} | @{', @'.join(i['assignees'])} | `{i['last_update']}` | {i['status']} |\n"
+    if not active_development: md_rev += "| - | - | - | - |\n"
+
+    md_rev += f"\n## 🌱 Available for Pickup ({len(available_pickup)})\n**Action: Open for contributors.**\n\n| Issue | Days Idle |\n| :--- | :--- |\n"
+    for i in available_pickup: md_rev += f"| {i['issue_md']} | {i['days_idle']} |\n"
+    if not available_pickup: md_rev += "| - | _None_ |\n"
 
     md_rev += "\n---\n*Dashboard maintained by automated triage script.*"
     with open("REVIEWS.md", "w") as f: f.write(md_rev)
