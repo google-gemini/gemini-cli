@@ -62,7 +62,7 @@ def get_pr_batch_query(pr_numbers):
                 mergeable
                 statusCheckRollup {{ state }}
                 closingIssuesReferences(first: 5) {{ nodes {{ number }} }}
-                reviewRequests(first: 10) {{ nodes {{ requestedReviewer {{ __typename ... on User {{ login }} }} }} }}
+                reviewRequests(first: 10) {{ nodes {{ requestedReviewer {{ __typename ... on User {{ login }} ... on Team {{ slug }} }} }} }}
                 latestReviews(last: 10) {{ nodes {{ author {{ login }} state updatedAt }} }}
                 comments(last: 20) {{ nodes {{ author {{ login }} publishedAt }} }}
                 commits(last: 10) {{ nodes {{ commit {{ committedDate author {{ user {{ login }} }} }} }} }}

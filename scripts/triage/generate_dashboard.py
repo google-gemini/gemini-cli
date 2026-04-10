@@ -83,6 +83,7 @@ query($repoOwner: String!, $repoName: String!, $prNumber: Int!) {
           requestedReviewer {
             __typename
             ... on User { login }
+            ... on Team { slug }
           }
         }
       }
