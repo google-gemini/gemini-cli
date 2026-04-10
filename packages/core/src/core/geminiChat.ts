@@ -25,14 +25,10 @@ import {
   getRetryErrorType,
 } from '../utils/retry.js';
 import type { ValidationRequiredError } from '../utils/googleQuotaErrors.js';
-import {
-  resolveModel,
-  isGemini2Model,
-  supportsModernFeatures,
-} from '../config/models.js';
+import { resolveModel, supportsModernFeatures } from '../config/models.js';
 import { hasCycleInSchema } from '../tools/tools.js';
 import type { StructuredError } from './turn.js';
-import type { CompletedToolCall } from './coreToolScheduler.js';
+import type { CompletedToolCall } from '../scheduler/types.js';
 import {
   logContentRetry,
   logContentRetryFailure,
@@ -84,13 +80,16 @@ export type StreamEvent =
 interface MidStreamRetryOptions {
   /** Total number of attempts to make (1 initial + N retries). */
   maxAttempts: number;
-  /** The base delay in milliseconds for linear backoff. */
+  /** The base delay in milliseconds for backoff. */
   initialDelayMs: number;
+  /** Whether to use exponential backoff instead of linear. */
+  useExponentialBackoff: boolean;
 }
 
 const MID_STREAM_RETRY_OPTIONS: MidStreamRetryOptions = {
   maxAttempts: 4, // 1 initial call + 3 retries mid-stream
-  initialDelayMs: 500,
+  initialDelayMs: 1000,
+  useExponentialBackoff: true,
 };
 
 export const SYNTHETIC_THOUGHT_SIGNATURE = 'skip_thought_signature_validator';
@@ -257,14 +256,19 @@ export class GeminiChat {
     private history: Content[] = [],
     resumedSessionData?: ResumedSessionData,
     private readonly onModelChanged?: (modelId: string) => Promise<Tool[]>,
-    kind: 'main' | 'subagent' = 'main',
   ) {
     validateHistory(history);
     this.chatRecordingService = new ChatRecordingService(context);
-    this.chatRecordingService.initialize(resumedSessionData, kind);
     this.lastPromptTokenCount = estimateTokenCountSync(
       this.history.flatMap((c) => c.parts || []),
     );
+  }
+
+  async initialize(
+    resumedSessionData?: ResumedSessionData,
+    kind: 'main' | 'subagent' = 'main',
+  ) {
+    await this.chatRecordingService.initialize(resumedSessionData, kind);
   }
 
   setSystemInstruction(sysInstr: string) {
@@ -420,10 +424,7 @@ export class GeminiChat {
               ? error.type
               : getRetryErrorType(error);
 
-            if (
-              (isContentError && isGemini2Model(model)) ||
-              (isRetryable && !signal.aborted)
-            ) {
+            if (isContentError || (isRetryable && !signal.aborted)) {
               // The issue requests exactly 3 retries (4 attempts) for API errors during stream iteration.
               // Regardless of the global maxAttempts (e.g. 10), we only want to retry these mid-stream API errors
               // up to 3 times before finally throwing the error to the user.
@@ -433,7 +434,10 @@ export class GeminiChat {
                 attempt < maxAttempts - 1 &&
                 attempt < maxMidStreamAttempts - 1
               ) {
-                const delayMs = MID_STREAM_RETRY_OPTIONS.initialDelayMs;
+                const delayMs = MID_STREAM_RETRY_OPTIONS.useExponentialBackoff
+                  ? MID_STREAM_RETRY_OPTIONS.initialDelayMs *
+                    Math.pow(2, attempt)
+                  : MID_STREAM_RETRY_OPTIONS.initialDelayMs * (attempt + 1);
 
                 if (isContentError) {
                   logContentRetry(
@@ -447,7 +451,7 @@ export class GeminiChat {
                       attempt + 1,
                       maxAttempts,
                       errorType,
-                      delayMs * (attempt + 1),
+                      delayMs,
                       model,
                     ),
                   );
@@ -455,13 +459,11 @@ export class GeminiChat {
                 coreEvents.emitRetryAttempt({
                   attempt: attempt + 1,
                   maxAttempts: Math.min(maxAttempts, maxMidStreamAttempts),
-                  delayMs: delayMs * (attempt + 1),
+                  delayMs,
                   error: errorType,
                   model,
                 });
-                await new Promise((res) =>
-                  setTimeout(res, delayMs * (attempt + 1)),
-                );
+                await new Promise((res) => setTimeout(res, delayMs));
                 continue;
               }
             }
@@ -520,8 +522,20 @@ export class GeminiChat {
     const apiCall = async () => {
       const useGemini3_1 =
         (await this.context.config.getGemini31Launched?.()) ?? false;
+      const useGemini3_1FlashLite =
+        (await this.context.config.getGemini31FlashLiteLaunched?.()) ?? false;
+      const hasAccessToPreview =
+        this.context.config.getHasAccessToPreviewModel?.() ?? true;
+
       // Default to the last used model (which respects arguments/availability selection)
-      let modelToUse = resolveModel(lastModelToUse, useGemini3_1);
+      let modelToUse = resolveModel(
+        lastModelToUse,
+        useGemini3_1,
+        useGemini3_1FlashLite,
+        false,
+        hasAccessToPreview,
+        this.context.config,
+      );
 
       // If the active model has changed (e.g. due to a fallback updating the config),
       // we switch to the new active model.
@@ -529,6 +543,10 @@ export class GeminiChat {
         modelToUse = resolveModel(
           this.context.config.getActiveModel(),
           useGemini3_1,
+          useGemini3_1FlashLite,
+          false,
+          hasAccessToPreview,
+          this.context.config,
         );
       }
 
@@ -584,6 +602,21 @@ export class GeminiChat {
           );
         }
 
+        if (beforeModelResult.modifiedModel) {
+          modelToUse = resolveModel(
+            beforeModelResult.modifiedModel,
+            useGemini3_1,
+            useGemini3_1FlashLite,
+            false,
+            hasAccessToPreview,
+            this.context.config,
+          );
+          lastModelToUse = modelToUse;
+          // Re-evaluate contentsToUse based on the new model's feature support
+          contentsToUse = supportsModernFeatures(modelToUse)
+            ? [...contentsForPreviewModel]
+            : [...requestContents];
+        }
         if (beforeModelResult.modifiedConfig) {
           Object.assign(config, beforeModelResult.modifiedConfig);
         }
@@ -1012,8 +1045,8 @@ export class GeminiChat {
 
       return {
         id: call.request.callId,
-        name: call.request.name,
-        args: call.request.args,
+        name: call.request.originalRequestName ?? call.request.name,
+        args: call.request.originalRequestArgs ?? call.request.args,
         result: call.response?.responseParts || null,
         status: call.status,
         timestamp: new Date().toISOString(),

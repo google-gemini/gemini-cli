@@ -37,6 +37,7 @@ interface InstallArgs {
   autoUpdate?: boolean;
   allowPreRelease?: boolean;
   consent?: boolean;
+  skipSettings?: boolean;
 }
 
 export async function handleInstall(args: InstallArgs) {
@@ -99,11 +100,15 @@ export async function handleInstall(args: InstallArgs) {
         if (hasDiscovery) {
           promptLines.push(chalk.bold('This folder contains:'));
           const groups = [
-            { label: 'Commands', items: discoveryResults.commands },
-            { label: 'MCP Servers', items: discoveryResults.mcps },
-            { label: 'Hooks', items: discoveryResults.hooks },
-            { label: 'Skills', items: discoveryResults.skills },
-            { label: 'Setting overrides', items: discoveryResults.settings },
+            { label: 'Commands', items: discoveryResults.commands ?? [] },
+            { label: 'MCP Servers', items: discoveryResults.mcps ?? [] },
+            { label: 'Hooks', items: discoveryResults.hooks ?? [] },
+            { label: 'Skills', items: discoveryResults.skills ?? [] },
+            { label: 'Agents', items: discoveryResults.agents ?? [] },
+            {
+              label: 'Setting overrides',
+              items: discoveryResults.settings ?? [],
+            },
           ].filter((g) => g.items.length > 0);
 
           for (const group of groups) {
@@ -149,7 +154,7 @@ export async function handleInstall(args: InstallArgs) {
     const extensionManager = new ExtensionManager({
       workspaceDir,
       requestConsent,
-      requestSetting: promptForSetting,
+      requestSetting: args.skipSettings ? null : promptForSetting,
       settings,
     });
     await extensionManager.loadExtensions();
@@ -192,6 +197,11 @@ export const installCommand: CommandModule = {
         type: 'boolean',
         default: false,
       })
+      .option('skip-settings', {
+        describe: 'Skip the configuration on install process.',
+        type: 'boolean',
+        default: false,
+      })
       .check((argv) => {
         if (!argv.source) {
           throw new Error('The source argument must be provided.');
@@ -210,6 +220,8 @@ export const installCommand: CommandModule = {
       allowPreRelease: argv['pre-release'] as boolean | undefined,
       // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
       consent: argv['consent'] as boolean | undefined,
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
+      skipSettings: argv['skip-settings'] as boolean | undefined,
     });
     await exitCli();
   },

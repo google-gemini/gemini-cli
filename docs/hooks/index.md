@@ -22,11 +22,11 @@ With hooks, you can:
 
 ### Getting started
 
-- **[Writing hooks guide](../hooks/writing-hooks)**: A tutorial on creating your
-  first hook with comprehensive examples.
-- **[Best practices](../hooks/best-practices)**: Guidelines on security,
+- **[Writing hooks guide](../hooks/writing-hooks.md)**: A tutorial on creating
+  your first hook with comprehensive examples.
+- **[Best practices](../hooks/best-practices.md)**: Guidelines on security,
   performance, and debugging.
-- **[Hooks reference](../hooks/reference)**: The definitive technical
+- **[Hooks reference](../hooks/reference.md)**: The definitive technical
   specification of I/O schemas and exit codes.
 
 ## Core concepts
@@ -63,9 +63,9 @@ Hooks communicate via `stdin` (Input) and `stdout` (Output).
 2. **Pollution = Failure**: If `stdout` contains non-JSON text, parsing will
    fail. The CLI will default to "Allow" and treat the entire output as a
    `systemMessage`.
-3. **Debug via Stderr**: Use `stderr` for **all** logging and debugging (e.g.,
-   `echo "debug" >&2`). Gemini CLI captures `stderr` but never attempts to parse
-   it as JSON.
+3. **Debug via Stderr**: Use `stderr` for **all** logging and debugging (for
+   example, `echo "debug" >&2`). Gemini CLI captures `stderr` but never attempts
+   to parse it as JSON.
 
 #### Exit codes
 
@@ -74,7 +74,7 @@ execution:
 
 | Exit Code | Label            | Behavioral Impact                                                                                                                                                            |
 | --------- | ---------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **0**     | **Success**      | The `stdout` is parsed as JSON. **Preferred code** for all logic, including intentional blocks (e.g., `{"decision": "deny"}`).                                               |
+| **0**     | **Success**      | The `stdout` is parsed as JSON. **Preferred code** for all logic, including intentional blocks (for example, `{"decision": "deny"}`).                                        |
 | **2**     | **System Block** | **Critical Block**. The target action (tool, turn, or stop) is aborted. `stderr` is used as the rejection reason. High severity; used for security stops or script failures. |
 | **Other** | **Warning**      | Non-fatal failure. A warning is shown, but the interaction proceeds using original parameters.                                                                               |
 
@@ -84,8 +84,9 @@ You can filter which specific tools or triggers fire your hook using the
 `matcher` field.
 
 - **Tool events** (`BeforeTool`, `AfterTool`): Matchers are **Regular
-  Expressions**. (e.g., `"write_.*"`).
-- **Lifecycle events**: Matchers are **Exact Strings**. (e.g., `"startup"`).
+  Expressions**. (for example, `"write_.*"`).
+- **Lifecycle events**: Matchers are **Exact Strings**. (for example,
+  `"startup"`).
 - **Wildcards**: `"*"` or `""` (empty string) matches all occurrences.
 
 ## Configuration
@@ -143,17 +144,19 @@ Hooks are executed with a sanitized environment.
 
 ## Security and risks
 
-> **Warning: Hooks execute arbitrary code with your user privileges.** By
+<!-- prettier-ignore -->
+> [!WARNING]
+> Hooks execute arbitrary code with your user privileges. By
 > configuring hooks, you are allowing scripts to run shell commands on your
 > machine.
 
 **Project-level hooks** are particularly risky when opening untrusted projects.
 Gemini CLI **fingerprints** project hooks. If a hook's name or command changes
-(e.g., via `git pull`), it is treated as a **new, untrusted hook** and you will
-be warned before it executes.
+(for example, via `git pull`), it is treated as a **new, untrusted hook** and
+you will be warned before it executes.
 
-See [Security Considerations](../hooks/best-practices#using-hooks-securely) for
-a detailed threat model.
+See [Security Considerations](../hooks/best-practices.md#using-hooks-securely)
+for a detailed threat model.
 
 ## Managing hooks
 

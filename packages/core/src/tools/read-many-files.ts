@@ -13,6 +13,7 @@ import {
   type ToolResult,
   type PolicyUpdateOptions,
   type ToolConfirmationOutcome,
+  type ReadManyFilesResult,
 } from './tools.js';
 import { getErrorMessage } from '../utils/errors.js';
 import * as fsPromises from 'node:fs/promises';
@@ -36,7 +37,10 @@ import { getProgrammingLanguage } from '../telemetry/telemetry-utils.js';
 import { logFileOperation } from '../telemetry/loggers.js';
 import { FileOperationEvent } from '../telemetry/types.js';
 import { ToolErrorType } from './tool-error.js';
-import { READ_MANY_FILES_TOOL_NAME } from './tool-names.js';
+import {
+  READ_MANY_FILES_TOOL_NAME,
+  READ_MANY_FILES_DISPLAY_NAME,
+} from './tool-names.js';
 import { READ_MANY_FILES_DEFINITION } from './definitions/coreTools.js';
 import { resolveToolDeclaration } from './definitions/resolver.js';
 
@@ -269,7 +273,7 @@ ${finalExclusionPatternsForDescription
       const errorMessage = `Error during file search: ${getErrorMessage(error)}`;
       return {
         llmContent: errorMessage,
-        returnDisplay: `## File Search Error\n\nAn error occurred while searching for files:\n\`\`\`\n${getErrorMessage(error)}\n\`\`\``,
+        returnDisplay: `Error: ${getErrorMessage(error)}`,
         error: {
           message: errorMessage,
           type: ToolErrorType.READ_MANY_FILES_SEARCH_ERROR,
@@ -416,14 +420,19 @@ ${finalExclusionPatternsForDescription
       }
     }
 
-    // Discover JIT subdirectory context for all unique directories of processed files
+    // Discover JIT subdirectory context for all unique directories of processed files.
+    // Run sequentially so each call sees paths marked as loaded by the previous
+    // one, preventing shared parent GEMINI.md files from being injected twice.
     const uniqueDirs = new Set(
       Array.from(filesToConsider).map((f) => path.dirname(f)),
     );
-    const jitResults = await Promise.all(
-      Array.from(uniqueDirs).map((dir) => discoverJitContext(this.config, dir)),
-    );
-    const jitParts = jitResults.filter(Boolean);
+    const jitParts: string[] = [];
+    for (const dir of uniqueDirs) {
+      const ctx = await discoverJitContext(this.config, dir);
+      if (ctx) {
+        jitParts.push(ctx);
+      }
+    }
     if (jitParts.length > 0) {
       contentParts.push(
         `${JIT_CONTEXT_PREFIX}${jitParts.join('\n')}${JIT_CONTEXT_SUFFIX}`,
@@ -478,9 +487,19 @@ ${finalExclusionPatternsForDescription
         'No files matching the criteria were found or all were skipped.',
       );
     }
+
+    const returnDisplay: ReadManyFilesResult = {
+      summary: displayMessage.trim(),
+      files: processedFilesRelativePaths,
+      skipped: skippedFiles,
+      include: this.params.include,
+      excludes: effectiveExcludes,
+      targetDir: this.config.getTargetDir(),
+    };
+
     return {
       llmContent: contentParts,
-      returnDisplay: displayMessage.trim(),
+      returnDisplay,
     };
   }
 }
@@ -502,7 +521,7 @@ export class ReadManyFilesTool extends BaseDeclarativeTool<
   ) {
     super(
       ReadManyFilesTool.Name,
-      'ReadManyFiles',
+      READ_MANY_FILES_DISPLAY_NAME,
       READ_MANY_FILES_DEFINITION.base.description!,
       Kind.Read,
       READ_MANY_FILES_DEFINITION.base.parametersJsonSchema,

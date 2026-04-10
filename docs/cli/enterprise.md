@@ -5,9 +5,11 @@ and managing Gemini CLI in an enterprise environment. By leveraging system-level
 settings, administrators can enforce security policies, manage tool access, and
 ensure a consistent experience for all users.
 
-> **A note on security:** The patterns described in this document are intended
-> to help administrators create a more controlled and secure environment for
-> using Gemini CLI. However, they should not be considered a foolproof security
+<!-- prettier-ignore -->
+> [!WARNING]
+> The patterns described in this document are intended to help
+> administrators create a more controlled and secure environment for using
+> Gemini CLI. However, they should not be considered a foolproof security
 > boundary. A determined user with sufficient privileges on their local machine
 > may still be able to circumvent these configurations. These measures are
 > designed to prevent accidental misuse and enforce corporate policy in a
@@ -173,8 +175,8 @@ the enterprise settings are always loaded with the highest precedence.
 **Example wrapper script:**
 
 Administrators can create a script named `gemini` and place it in a directory
-that appears earlier in the user's `PATH` than the actual Gemini CLI binary
-(e.g., `/usr/local/bin/gemini`).
+that appears earlier in the user's `PATH` than the actual Gemini CLI binary (for
+example, `/usr/local/bin/gemini`).
 
 ```bash
 #!/bin/bash
@@ -280,10 +282,12 @@ environment to a blocklist.
 }
 ```
 
-**Security note:** Blocklisting with `excludeTools` is less secure than
-allowlisting with `coreTools`, as it relies on blocking known-bad commands, and
-clever users may find ways to bypass simple string-based blocks. **Allowlisting
-is the recommended approach.**
+<!-- prettier-ignore -->
+> [!WARNING]
+> Blocklisting with `excludeTools` is less secure than
+> allowlisting with `coreTools`, as it relies on blocking known-bad commands,
+> and clever users may find ways to bypass simple string-based blocks.
+> **Allowlisting is the recommended approach.**
 
 ### Disabling YOLO mode
 
@@ -321,9 +325,9 @@ User. When it comes to the `mcpServers` object, these configurations are
 1.  **Merging:** The lists of servers from all three levels are combined into a
     single list.
 2.  **Precedence:** If a server with the **same name** is defined at multiple
-    levels (e.g., a server named `corp-api` exists in both system and user
-    settings), the definition from the highest-precedence level is used. The
-    order of precedence is: **System > Workspace > User**.
+    levels (for example, a server named `corp-api` exists in both system and
+    user settings), the definition from the highest-precedence level is used.
+    The order of precedence is: **System > Workspace > User**.
 
 This means a user **cannot** override the definition of a server that is already
 defined in the system-level settings. However, they **can** add new servers with
@@ -339,8 +343,8 @@ canonical servers and adding their names to an allowlist.
 For even greater security, especially when dealing with third-party MCP servers,
 you can restrict which specific tools from a server are exposed to the model.
 This is done using the `includeTools` and `excludeTools` properties within a
-server's definition. This allows you to use a subset of tools from a server
-without allowing potentially dangerous ones.
+server's definition. This lets you use a subset of tools from a server without
+allowing potentially dangerous ones.
 
 Following the principle of least privilege, it is highly recommended to use
 `includeTools` to create an allowlist of only the necessary tools.
@@ -477,9 +481,8 @@ an environment variable, but it can also be enforced for custom tools via the
 ## Telemetry and auditing
 
 For auditing and monitoring purposes, you can configure Gemini CLI to send
-telemetry data to a central location. This allows you to track tool usage and
-other events. For more information, see the
-[telemetry documentation](./telemetry.md).
+telemetry data to a central location. This lets you track tool usage and other
+events. For more information, see the [telemetry documentation](./telemetry.md).
 
 **Example:** Enable telemetry and send it to a local OTLP collector. If
 `otlpEndpoint` is not specified, it defaults to `http://localhost:4317`.
@@ -494,8 +497,10 @@ other events. For more information, see the
 }
 ```
 
-**Note:** Ensure that `logPrompts` is set to `false` in an enterprise setting to
-avoid collecting potentially sensitive information from user prompts.
+<!-- prettier-ignore -->
+> [!NOTE]
+> Ensure that `logPrompts` is set to `false` in an enterprise setting to
+> avoid collecting potentially sensitive information from user prompts.
 
 ## Authentication
 
