@@ -15,9 +15,13 @@ import type { InboxSnapshotImpl } from '../pipeline/inbox.js';
 describe('StateSnapshotProcessor', () => {
   it('should ignore if budget is satisfied', async () => {
     const env = createMockEnvironment();
-    const processor = createStateSnapshotProcessor('StateSnapshotProcessor', env, {
-      target: 'incremental',
-    });
+    const processor = createStateSnapshotProcessor(
+      'StateSnapshotProcessor',
+      env,
+      {
+        target: 'incremental',
+      },
+    );
     const targets = [createDummyNode('ep1', 'USER_PROMPT')];
     const result = await processor.process(createMockProcessArgs(targets));
     expect(result).toBe(targets); // Strict equality
@@ -25,9 +29,13 @@ describe('StateSnapshotProcessor', () => {
 
   it('should apply a valid snapshot from the Inbox (Fast Path)', async () => {
     const env = createMockEnvironment();
-    const processor = createStateSnapshotProcessor('StateSnapshotProcessor', env, {
-      target: 'incremental',
-    });
+    const processor = createStateSnapshotProcessor(
+      'StateSnapshotProcessor',
+      env,
+      {
+        target: 'incremental',
+      },
+    );
 
     const nodeA = createDummyNode('ep1', 'USER_PROMPT', 50, {}, 'node-A');
     const nodeB = createDummyNode('ep1', 'AGENT_THOUGHT', 60, {}, 'node-B');
@@ -65,9 +73,13 @@ describe('StateSnapshotProcessor', () => {
 
   it('should reject a snapshot if the nodes were modified/deleted (Cache Invalidated)', async () => {
     const env = createMockEnvironment();
-    const processor = createStateSnapshotProcessor('StateSnapshotProcessor', env, {
-      target: 'incremental',
-    });
+    const processor = createStateSnapshotProcessor(
+      'StateSnapshotProcessor',
+      env,
+      {
+        target: 'incremental',
+      },
+    );
     // Make deficit 0 so we don't fall through to the sync backstop and fail the test that way
 
     // node-A is MISSING (user deleted it)
@@ -99,7 +111,11 @@ describe('StateSnapshotProcessor', () => {
 
   it('should fall back to sync backstop if inbox is empty', async () => {
     const env = createMockEnvironment();
-    const processor = createStateSnapshotProcessor('StateSnapshotProcessor', env, { target: 'max' }); // Summarize all
+    const processor = createStateSnapshotProcessor(
+      'StateSnapshotProcessor',
+      env,
+      { target: 'max' },
+    ); // Summarize all
 
     const nodeA = createDummyNode('ep1', 'USER_PROMPT', 50, {}, 'node-A');
     const nodeB = createDummyNode('ep1', 'AGENT_THOUGHT', 60, {}, 'node-B');

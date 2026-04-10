@@ -45,7 +45,7 @@ export class SidecarLoader {
       getSidecarConfigSchema(registry),
       parsed,
     );
-    
+
     if (validationError) {
       throw new Error(
         `Invalid sidecar configuration in ${sidecarPath}. Validation error: ${validationError}`,
@@ -64,7 +64,9 @@ export class SidecarLoader {
       config: {
         ...defaultSidecarProfile.config,
         ...(validConfig.budget ? { budget: validConfig.budget } : {}),
-        ...(validConfig.processorOptions ? { processorOptions: validConfig.processorOptions } : {})
+        ...(validConfig.processorOptions
+          ? { processorOptions: validConfig.processorOptions }
+          : {}),
       },
     };
   }
@@ -78,7 +80,7 @@ export class SidecarLoader {
     registry: SidecarRegistry,
     fileSystem: IFileSystem = new NodeFileSystem(),
   ): ContextProfile {
-    const sidecarPath = config.getExperimentalContextSidecarConfig();
+    const sidecarPath = config.getExperimentalContextManagementConfig();
 
     if (sidecarPath && fileSystem.existsSync(sidecarPath)) {
       const size = fileSystem.statSyncSize(sidecarPath);

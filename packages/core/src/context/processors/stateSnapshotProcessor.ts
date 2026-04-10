@@ -28,141 +28,140 @@ export function createStateSnapshotProcessor(
   return {
     id,
     name: 'StateSnapshotProcessor',
-    process: async ({
-    targets,
-    inbox,
-  }: ProcessArgs) => {
-    if (targets.length === 0) {
-      return targets;
-    }
+    process: async ({ targets, inbox }: ProcessArgs) => {
+      if (targets.length === 0) {
+        return targets;
+      }
 
-    // Determine what mode we are looking for: 'incremental' -> 'point-in-time', 'max' -> 'accumulate'
-    const strategy = options.target ?? 'max';
-    const expectedType =
-      strategy === 'incremental' ? 'point-in-time' : 'accumulate';
+      // Determine what mode we are looking for: 'incremental' -> 'point-in-time', 'max' -> 'accumulate'
+      const strategy = options.target ?? 'max';
+      const expectedType =
+        strategy === 'incremental' ? 'point-in-time' : 'accumulate';
 
-    // 1. Check Inbox for a completed Snapshot (The Fast Path)
-    const proposedSnapshots = inbox.getMessages<{
-      newText: string;
-      consumedIds: string[];
-      type: string;
-    }>('PROPOSED_SNAPSHOT');
+      // 1. Check Inbox for a completed Snapshot (The Fast Path)
+      const proposedSnapshots = inbox.getMessages<{
+        newText: string;
+        consumedIds: string[];
+        type: string;
+      }>('PROPOSED_SNAPSHOT');
 
-    if (proposedSnapshots.length > 0) {
-      // Filter for the snapshot type that matches our processor mode
-      const matchingSnapshots = proposedSnapshots.filter(
-        (s) => s.payload.type === expectedType,
-      );
+      if (proposedSnapshots.length > 0) {
+        // Filter for the snapshot type that matches our processor mode
+        const matchingSnapshots = proposedSnapshots.filter(
+          (s) => s.payload.type === expectedType,
+        );
 
-      // Sort by newest timestamp first (we want the most accumulated snapshot)
-      const sorted = [...matchingSnapshots].sort(
-        (a, b) => b.timestamp - a.timestamp,
-      );
+        // Sort by newest timestamp first (we want the most accumulated snapshot)
+        const sorted = [...matchingSnapshots].sort(
+          (a, b) => b.timestamp - a.timestamp,
+        );
 
-      for (const proposed of sorted) {
-        const { consumedIds, newText } = proposed.payload;
+        for (const proposed of sorted) {
+          const { consumedIds, newText } = proposed.payload;
 
-        // Verify all consumed IDs still exist sequentially in targets
-        const targetIds = new Set(targets.map((t) => t.id));
-        const isValid = consumedIds.every((id) => targetIds.has(id));
+          // Verify all consumed IDs still exist sequentially in targets
+          const targetIds = new Set(targets.map((t) => t.id));
+          const isValid = consumedIds.every((id) => targetIds.has(id));
 
-        if (isValid) {
-          // If valid, apply it!
-          const newId = env.idGenerator.generateId();
+          if (isValid) {
+            // If valid, apply it!
+            const newId = env.idGenerator.generateId();
 
-          const snapshotNode: Snapshot = {
-            id: newId,
-            logicalParentId: newId,
-            type: 'SNAPSHOT',
-            timestamp: Date.now(),
-            text: newText,
-            abstractsIds: consumedIds,
-          };
+            const snapshotNode: Snapshot = {
+              id: newId,
+              logicalParentId: newId,
+              type: 'SNAPSHOT',
+              timestamp: Date.now(),
+              text: newText,
+              abstractsIds: consumedIds,
+            };
 
-          // Remove the consumed nodes and insert the snapshot at the earliest index
-          const returnedNodes = targets.filter(
-            (t) => !consumedIds.includes(t.id),
-          );
-          const firstRemovedIdx = targets.findIndex((t) =>
-            consumedIds.includes(t.id),
-          );
+            // Remove the consumed nodes and insert the snapshot at the earliest index
+            const returnedNodes = targets.filter(
+              (t) => !consumedIds.includes(t.id),
+            );
+            const firstRemovedIdx = targets.findIndex((t) =>
+              consumedIds.includes(t.id),
+            );
 
-          if (firstRemovedIdx !== -1) {
-            const idx = Math.max(0, firstRemovedIdx);
-            returnedNodes.splice(idx, 0, snapshotNode);
-          } else {
-            returnedNodes.unshift(snapshotNode);
+            if (firstRemovedIdx !== -1) {
+              const idx = Math.max(0, firstRemovedIdx);
+              returnedNodes.splice(idx, 0, snapshotNode);
+            } else {
+              returnedNodes.unshift(snapshotNode);
+            }
+
+            inbox.consume(proposed.id);
+            return returnedNodes;
           }
-
-          inbox.consume(proposed.id);
-          return returnedNodes;
         }
       }
-    }
 
-    // 2. The Synchronous Backstop (The Slow Path)
-    let targetTokensToRemove = 0;
+      // 2. The Synchronous Backstop (The Slow Path)
+      let targetTokensToRemove = 0;
 
-    if (strategy === 'incremental') {
-      targetTokensToRemove = Infinity; // incremental implies removing as much as possible if no state is passed
-    } else if (strategy === 'freeNTokens') {
-      targetTokensToRemove = options.freeTokensTarget ?? Infinity;
-    } else if (strategy === 'max') {
-      targetTokensToRemove = Infinity;
-    }
-
-    let deficitAccumulator = 0;
-    const nodesToSummarize: ConcreteNode[] = [];
-
-    // Scan oldest to newest
-    for (const node of targets) {
-      if (node.id === targets[0].id && node.type === 'USER_PROMPT') {
-        // Keep system prompt if it's the very first node
-        // In a real system, system prompt is protected, but we double check
-        continue;
+      if (strategy === 'incremental') {
+        targetTokensToRemove = Infinity; // incremental implies removing as much as possible if no state is passed
+      } else if (strategy === 'freeNTokens') {
+        targetTokensToRemove = options.freeTokensTarget ?? Infinity;
+      } else if (strategy === 'max') {
+        targetTokensToRemove = Infinity;
       }
 
-      nodesToSummarize.push(node);
-      deficitAccumulator += env.tokenCalculator.getTokenCost(node);
+      let deficitAccumulator = 0;
+      const nodesToSummarize: ConcreteNode[] = [];
 
-      if (deficitAccumulator >= targetTokensToRemove) break;
-    }
+      // Scan oldest to newest
+      for (const node of targets) {
+        if (node.id === targets[0].id && node.type === 'USER_PROMPT') {
+          // Keep system prompt if it's the very first node
+          // In a real system, system prompt is protected, but we double check
+          continue;
+        }
 
-    if (nodesToSummarize.length < 2) return targets; // Not enough context
+        nodesToSummarize.push(node);
+        deficitAccumulator += env.tokenCalculator.getTokenCost(node);
 
-    try {
-      const snapshotText = await generator.synthesizeSnapshot(
-        nodesToSummarize,
-        options.systemInstruction,
-      );
-      const newId = env.idGenerator.generateId();
-      const snapshotNode: Snapshot = {
-        id: newId,
-        logicalParentId: newId,
-        type: 'SNAPSHOT',
-        timestamp: Date.now(),
-        text: snapshotText,
-        abstractsIds: nodesToSummarize.map((n) => n.id),
-      };
-
-      const consumedIds = nodesToSummarize.map((n) => n.id);
-      const returnedNodes = targets.filter((t) => !consumedIds.includes(t.id));
-      const firstRemovedIdx = targets.findIndex((t) =>
-        consumedIds.includes(t.id),
-      );
-
-      if (firstRemovedIdx !== -1) {
-        const idx = Math.max(0, firstRemovedIdx);
-        returnedNodes.splice(idx, 0, snapshotNode);
-      } else {
-        returnedNodes.unshift(snapshotNode);
+        if (deficitAccumulator >= targetTokensToRemove) break;
       }
 
-      return returnedNodes;
-    } catch (e) {
-      debugLogger.error('StateSnapshotProcessor failed sync backstop', e);
-      return targets;
-    }
-    }
+      if (nodesToSummarize.length < 2) return targets; // Not enough context
+
+      try {
+        const snapshotText = await generator.synthesizeSnapshot(
+          nodesToSummarize,
+          options.systemInstruction,
+        );
+        const newId = env.idGenerator.generateId();
+        const snapshotNode: Snapshot = {
+          id: newId,
+          logicalParentId: newId,
+          type: 'SNAPSHOT',
+          timestamp: Date.now(),
+          text: snapshotText,
+          abstractsIds: nodesToSummarize.map((n) => n.id),
+        };
+
+        const consumedIds = nodesToSummarize.map((n) => n.id);
+        const returnedNodes = targets.filter(
+          (t) => !consumedIds.includes(t.id),
+        );
+        const firstRemovedIdx = targets.findIndex((t) =>
+          consumedIds.includes(t.id),
+        );
+
+        if (firstRemovedIdx !== -1) {
+          const idx = Math.max(0, firstRemovedIdx);
+          returnedNodes.splice(idx, 0, snapshotNode);
+        } else {
+          returnedNodes.unshift(snapshotNode);
+        }
+
+        return returnedNodes;
+      } catch (e) {
+        debugLogger.error('StateSnapshotProcessor failed sync backstop', e);
+        return targets;
+      }
+    },
   };
 }

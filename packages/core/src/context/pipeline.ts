@@ -40,7 +40,7 @@ export interface ProcessArgs {
 
 /**
  * A ContextProcessor is a pure, closure-based object that returns a modified subset of nodes
- * (or the original targets if no changes are needed). 
+ * (or the original targets if no changes are needed).
  * The Orchestrator will use this to generate a new graph delta.
  */
 export interface ContextProcessor {

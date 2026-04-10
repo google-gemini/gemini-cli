@@ -59,103 +59,96 @@ export function createNodeDistillationProcessor(
     id,
     name: 'NodeDistillationProcessor',
     process: async ({ targets }: ProcessArgs) => {
-    const semanticConfig = options;
-    const limitTokens = semanticConfig.nodeThresholdTokens;
-    const thresholdChars = env.tokenCalculator.tokensToChars(limitTokens);
+      const semanticConfig = options;
+      const limitTokens = semanticConfig.nodeThresholdTokens;
+      const thresholdChars = env.tokenCalculator.tokensToChars(limitTokens);
 
-    const returnedNodes: ConcreteNode[] = [];
+      const returnedNodes: ConcreteNode[] = [];
 
-    // Scan the target working buffer and unconditionally apply the configured hyperparameter threshold
-    for (const node of targets) {
-      switch (node.type) {
-        case 'USER_PROMPT': {
-          let modified = false;
-          const newParts = [...node.semanticParts];
+      // Scan the target working buffer and unconditionally apply the configured hyperparameter threshold
+      for (const node of targets) {
+        switch (node.type) {
+          case 'USER_PROMPT': {
+            let modified = false;
+            const newParts = [...node.semanticParts];
 
-          for (let j = 0; j < node.semanticParts.length; j++) {
-            const part = node.semanticParts[j];
-            if (part.type !== 'text') continue;
+            for (let j = 0; j < node.semanticParts.length; j++) {
+              const part = node.semanticParts[j];
+              if (part.type !== 'text') continue;
 
-            if (part.text.length > thresholdChars) {
-              const summary = await generateSummary(
-                part.text,
-                'User Prompt',
-              );
-              const newTokens = env.tokenCalculator.estimateTokensForParts(
-                [{ text: summary }],
-              );
-              const oldTokens = env.tokenCalculator.estimateTokensForParts(
-                [{ text: part.text }],
-              );
+              if (part.text.length > thresholdChars) {
+                const summary = await generateSummary(part.text, 'User Prompt');
+                const newTokens = env.tokenCalculator.estimateTokensForParts([
+                  { text: summary },
+                ]);
+                const oldTokens = env.tokenCalculator.estimateTokensForParts([
+                  { text: part.text },
+                ]);
 
-              if (newTokens < oldTokens) {
-                newParts[j] = { type: 'text', text: summary };
-                modified = true;
+                if (newTokens < oldTokens) {
+                  newParts[j] = { type: 'text', text: summary };
+                  modified = true;
+                }
               }
             }
-          }
 
-          if (modified) {
-            returnedNodes.push({
-              ...node,
-              id: env.idGenerator.generateId(),
-              semanticParts: newParts,
-              replacesId: node.id,
-            });
-          } else {
-            returnedNodes.push(node);
-          }
-          break;
-        }
-
-        case 'AGENT_THOUGHT': {
-          if (node.text.length > thresholdChars) {
-            const summary = await generateSummary(
-              node.text,
-              'Agent Thought',
-            );
-            const newTokens = env.tokenCalculator.estimateTokensForParts([
-              { text: summary },
-            ]);
-            const oldTokens = env.tokenCalculator.getTokenCost(node);
-
-            if (newTokens < oldTokens) {
+            if (modified) {
               returnedNodes.push({
                 ...node,
                 id: env.idGenerator.generateId(),
-                text: summary,
+                semanticParts: newParts,
                 replacesId: node.id,
               });
-              break;
+            } else {
+              returnedNodes.push(node);
             }
-          }
-          returnedNodes.push(node);
-          break;
-        }
-
-        case 'TOOL_EXECUTION': {
-          const rawObs = node.observation;
-
-          let stringifiedObs = '';
-          if (typeof rawObs === 'string') {
-            stringifiedObs = rawObs;
-          } else {
-            try {
-              stringifiedObs = JSON.stringify(rawObs);
-            } catch {
-              stringifiedObs = String(rawObs);
-            }
+            break;
           }
 
-          if (stringifiedObs.length > thresholdChars) {
-            const summary = await generateSummary(
-              stringifiedObs,
-              node.toolName || 'unknown',
-            );
-            const newObsObject = { summary };
+          case 'AGENT_THOUGHT': {
+            if (node.text.length > thresholdChars) {
+              const summary = await generateSummary(node.text, 'Agent Thought');
+              const newTokens = env.tokenCalculator.estimateTokensForParts([
+                { text: summary },
+              ]);
+              const oldTokens = env.tokenCalculator.getTokenCost(node);
 
-            const newObsTokens =
-              env.tokenCalculator.estimateTokensForParts([
+              if (newTokens < oldTokens) {
+                returnedNodes.push({
+                  ...node,
+                  id: env.idGenerator.generateId(),
+                  text: summary,
+                  replacesId: node.id,
+                });
+                break;
+              }
+            }
+            returnedNodes.push(node);
+            break;
+          }
+
+          case 'TOOL_EXECUTION': {
+            const rawObs = node.observation;
+
+            let stringifiedObs = '';
+            if (typeof rawObs === 'string') {
+              stringifiedObs = rawObs;
+            } else {
+              try {
+                stringifiedObs = JSON.stringify(rawObs);
+              } catch {
+                stringifiedObs = String(rawObs);
+              }
+            }
+
+            if (stringifiedObs.length > thresholdChars) {
+              const summary = await generateSummary(
+                stringifiedObs,
+                node.toolName || 'unknown',
+              );
+              const newObsObject = { summary };
+
+              const newObsTokens = env.tokenCalculator.estimateTokensForParts([
                 {
                   functionResponse: {
                     name: node.toolName || 'unknown',
@@ -165,36 +158,36 @@ export function createNodeDistillationProcessor(
                 },
               ]);
 
-            const oldObsTokens =
-              node.tokens?.observation ??
-              env.tokenCalculator.getTokenCost(node);
-            const intentTokens = node.tokens?.intent ?? 0;
+              const oldObsTokens =
+                node.tokens?.observation ??
+                env.tokenCalculator.getTokenCost(node);
+              const intentTokens = node.tokens?.intent ?? 0;
 
-            if (newObsTokens < oldObsTokens) {
-              returnedNodes.push({
-                ...node,
-                id: env.idGenerator.generateId(),
-                observation: newObsObject as Record<string, unknown>,
-                tokens: {
-                  intent: intentTokens,
-                  observation: newObsTokens,
-                },
-                replacesId: node.id,
-              });
-              break;
+              if (newObsTokens < oldObsTokens) {
+                returnedNodes.push({
+                  ...node,
+                  id: env.idGenerator.generateId(),
+                  observation: newObsObject as Record<string, unknown>,
+                  tokens: {
+                    intent: intentTokens,
+                    observation: newObsTokens,
+                  },
+                  replacesId: node.id,
+                });
+                break;
+              }
             }
+            returnedNodes.push(node);
+            break;
           }
-          returnedNodes.push(node);
-          break;
+
+          default:
+            returnedNodes.push(node);
+            break;
         }
-
-        default:
-          returnedNodes.push(node);
-          break;
       }
-    }
 
-    return returnedNodes;
-    }
+      return returnedNodes;
+    },
   };
 }

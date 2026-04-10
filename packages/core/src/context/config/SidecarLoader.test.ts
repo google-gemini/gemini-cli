@@ -18,11 +18,14 @@ describe('SidecarLoader (Fake FS)', () => {
   beforeEach(() => {
     fileSystem = new InMemoryFileSystem();
     registry = new SidecarRegistry();
-    registry.registerProcessor({ id: 'NodeTruncation', schema: { type: 'object', properties: { maxTokens: { type: 'number' } } }});
+    registry.registerProcessor({
+      id: 'NodeTruncation',
+      schema: { type: 'object', properties: { maxTokens: { type: 'number' } } },
+    });
   });
 
   const mockConfig = {
-    getExperimentalContextSidecarConfig: () => '/path/to/sidecar.json',
+    getExperimentalContextManagementConfig: () => '/path/to/sidecar.json',
   } as unknown as Config;
 
   it('returns default profile if file does not exist', () => {
@@ -49,9 +52,9 @@ describe('SidecarLoader (Fake FS)', () => {
       processorOptions: {
         myTruncation: {
           type: 'NodeTruncation',
-          options: { maxTokens: 500 }
-        }
-      }
+          options: { maxTokens: 500 },
+        },
+      },
     };
     fileSystem.setFile('/path/to/sidecar.json', JSON.stringify(validConfig));
     const result = SidecarLoader.fromConfig(mockConfig, registry, fileSystem);
@@ -65,9 +68,9 @@ describe('SidecarLoader (Fake FS)', () => {
       processorOptions: {
         myTruncation: {
           type: 'NodeTruncation',
-          options: { maxTokens: "this should be a number" }
-        }
-      }
+          options: { maxTokens: 'this should be a number' },
+        },
+      },
     };
     fileSystem.setFile('/path/to/sidecar.json', JSON.stringify(invalidConfig));
     expect(() =>

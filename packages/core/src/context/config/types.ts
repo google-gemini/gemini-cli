@@ -35,8 +35,8 @@ export interface SidecarConfig {
     retainedTokens: number;
     maxTokens: number;
   };
-  /** 
-   * Dynamic hyperparameter overrides for individual ContextProcessors and AsyncProcessors. 
+  /**
+   * Dynamic hyperparameter overrides for individual ContextProcessors and AsyncProcessors.
    * Keys are named identifiers (e.g. "gentleTruncation").
    */
   processorOptions?: Record<string, { type: string; options: unknown }>;

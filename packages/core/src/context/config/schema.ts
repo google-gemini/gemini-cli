@@ -10,25 +10,35 @@ export function getSidecarConfigSchema(registry?: SidecarRegistry) {
   // If a registry is provided, we can deeply validate processor overrides.
   // We do this by generating a `oneOf` list that matches the `type` discriminator
   // to the specific processor `options` schema.
-  const processorOptionSchemas = registry ? registry.getSchemaDefs().map(def => ({
-    type: 'object',
-    required: ['type', 'options'],
-    properties: {
-      type: { const: def.id },
-      options: def.schema
-    }
-  })) : [];
-
-  const processorOptionsMapping = processorOptionSchemas.length > 0 
-    ? { oneOf: processorOptionSchemas }
-    : {
+  const processorOptionSchemas = registry
+    ? registry.getSchemaDefs().map((def) => ({
         type: 'object',
         required: ['type', 'options'],
         properties: {
-          type: { type: 'string', description: 'The registry type of the processor (e.g. NodeTruncation)' },
-          options: { type: 'object', description: 'The hyperparameter overrides' }
-        }
-      };
+          type: { const: def.id },
+          options: def.schema,
+        },
+      }))
+    : [];
+
+  const processorOptionsMapping =
+    processorOptionSchemas.length > 0
+      ? { oneOf: processorOptionSchemas }
+      : {
+          type: 'object',
+          required: ['type', 'options'],
+          properties: {
+            type: {
+              type: 'string',
+              description:
+                'The registry type of the processor (e.g. NodeTruncation)',
+            },
+            options: {
+              type: 'object',
+              description: 'The hyperparameter overrides',
+            },
+          },
+        };
 
   return {
     $schema: 'http://json-schema.org/draft-07/schema#',
@@ -55,9 +65,10 @@ export function getSidecarConfigSchema(registry?: SidecarRegistry) {
       },
       processorOptions: {
         type: 'object',
-        description: 'Named hyperparameter configurations for ContextProcessors and AsyncProcessors.',
-        additionalProperties: processorOptionsMapping
-      }
+        description:
+          'Named hyperparameter configurations for ContextProcessors and AsyncProcessors.',
+        additionalProperties: processorOptionsMapping,
+      },
     },
   };
 }

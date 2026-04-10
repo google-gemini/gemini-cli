@@ -113,7 +113,10 @@ export class SimulationHarness {
     let currentView = this.contextManager.getNodes();
     const currentTokens =
       this.env.tokenCalculator.calculateConcreteListTokens(currentView);
-    if (this.config.config.budget && currentTokens > this.config.config.budget.maxTokens) {
+    if (
+      this.config.config.budget &&
+      currentTokens > this.config.config.budget.maxTokens
+    ) {
       debugLogger.log(
         `[Turn ${this.currentTurnIndex}] Sync panic triggered! ${currentTokens} > ${this.config.config.budget.maxTokens}`,
       );

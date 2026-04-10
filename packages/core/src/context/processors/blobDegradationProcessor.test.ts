@@ -23,7 +23,10 @@ describe('BlobDegradationProcessor', () => {
     // So we make the blob data 200 chars.
     const fakeData = 'A'.repeat(200);
 
-    const processor = createBlobDegradationProcessor('BlobDegradationProcessor', env);
+    const processor = createBlobDegradationProcessor(
+      'BlobDegradationProcessor',
+      env,
+    );
 
     const parts: SemanticPart[] = [
       { type: 'text', text: 'Hello' },
@@ -61,7 +64,10 @@ describe('BlobDegradationProcessor', () => {
   it('should degrade all blobs unconditionally', async () => {
     const env = createMockEnvironment();
 
-    const processor = createBlobDegradationProcessor('BlobDegradationProcessor', env);
+    const processor = createBlobDegradationProcessor(
+      'BlobDegradationProcessor',
+      env,
+    );
 
     // Tokens for fileData = 258.
     // Degraded text = "[File Reference (video/mp4) degraded to text to preserve context window. Original URI: gs://test1]"
@@ -91,7 +97,10 @@ describe('BlobDegradationProcessor', () => {
   it('should return exactly the targets array if targets are empty', async () => {
     const env = createMockEnvironment();
 
-    const processor = createBlobDegradationProcessor('BlobDegradationProcessor', env);
+    const processor = createBlobDegradationProcessor(
+      'BlobDegradationProcessor',
+      env,
+    );
     const targets: ConcreteNode[] = [];
 
     const result = await processor.process(createMockProcessArgs(targets));

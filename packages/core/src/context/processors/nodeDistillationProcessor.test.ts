@@ -25,9 +25,13 @@ describe('NodeDistillationProcessor', () => {
       llmClient: mockLlmClient,
     });
 
-    const processor = createNodeDistillationProcessor('NodeDistillationProcessor', env, {
-      nodeThresholdTokens: 10,
-    });
+    const processor = createNodeDistillationProcessor(
+      'NodeDistillationProcessor',
+      env,
+      {
+        nodeThresholdTokens: 10,
+      },
+    );
 
     const longText = 'A'.repeat(50); // 50 chars
 
@@ -94,9 +98,13 @@ describe('NodeDistillationProcessor', () => {
       llmClient: mockLlmClient,
     });
 
-    const processor = createNodeDistillationProcessor('NodeDistillationProcessor', env, {
-      nodeThresholdTokens: 100, // Very high threshold
-    });
+    const processor = createNodeDistillationProcessor(
+      'NodeDistillationProcessor',
+      env,
+      {
+        nodeThresholdTokens: 100, // Very high threshold
+      },
+    );
 
     const shortText = 'Short text'; // 10 chars
 

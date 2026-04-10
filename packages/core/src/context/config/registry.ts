@@ -24,8 +24,8 @@ export class SidecarRegistry {
     return this.processors.get(id)?.schema;
   }
 
-  getSchemaDefs(): Array<{ id: string; schema: object }> {
-    const defs: Array<{ id: string; schema: object }> = [];
+  getSchemaDefs(): ContextProcessorDef[] {
+    const defs = [];
     for (const def of this.processors.values()) {
       if (def.schema) defs.push({ id: def.id, schema: def.schema });
     }

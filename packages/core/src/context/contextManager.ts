@@ -104,7 +104,8 @@ export class ContextManager {
       if (agedOutNodes.size > 0) {
         this.eventBus.emitConsolidationNeeded({
           nodes: this.buffer.nodes,
-          targetDeficit: currentTokens - this.sidecar.config.budget.retainedTokens,
+          targetDeficit:
+            currentTokens - this.sidecar.config.budget.retainedTokens,
           targetNodeIds: agedOutNodes,
         });
       }

@@ -37,8 +37,7 @@ export function createNodeTruncationProcessor(
 
     if (newText !== text) {
       // Using accurate TokenCalculator instead of simple math
-      const newTokens =
-        env.tokenCalculator.estimateTokensForString(newText);
+      const newTokens = env.tokenCalculator.estimateTokensForString(newText);
       const oldTokens = env.tokenCalculator.estimateTokensForString(text);
       const tokensSaved = oldTokens - newTokens;
 
@@ -53,82 +52,82 @@ export function createNodeTruncationProcessor(
     id,
     name: 'NodeTruncationProcessor',
     process: async ({ targets }: ProcessArgs) => {
-    if (targets.length === 0) {
-      return targets;
-    }
+      if (targets.length === 0) {
+        return targets;
+      }
 
-    const { maxTokensPerNode } = options;
-    const limitChars = env.tokenCalculator.tokensToChars(maxTokensPerNode);
+      const { maxTokensPerNode } = options;
+      const limitChars = env.tokenCalculator.tokensToChars(maxTokensPerNode);
 
-    const returnedNodes: ConcreteNode[] = [];
+      const returnedNodes: ConcreteNode[] = [];
 
-    for (const node of targets) {
-      switch (node.type) {
-        case 'USER_PROMPT': {
-          let modified = false;
-          const newParts = [...node.semanticParts];
+      for (const node of targets) {
+        switch (node.type) {
+          case 'USER_PROMPT': {
+            let modified = false;
+            const newParts = [...node.semanticParts];
 
-          for (let j = 0; j < node.semanticParts.length; j++) {
-            const part = node.semanticParts[j];
-            if (part.type === 'text') {
-              const squashResult = tryApplySquash(part.text, limitChars);
-              if (squashResult) {
-                newParts[j] = { type: 'text', text: squashResult.text };
-                modified = true;
+            for (let j = 0; j < node.semanticParts.length; j++) {
+              const part = node.semanticParts[j];
+              if (part.type === 'text') {
+                const squashResult = tryApplySquash(part.text, limitChars);
+                if (squashResult) {
+                  newParts[j] = { type: 'text', text: squashResult.text };
+                  modified = true;
+                }
               }
             }
+
+            if (modified) {
+              returnedNodes.push({
+                ...node,
+                id: env.idGenerator.generateId(),
+                semanticParts: newParts,
+                replacesId: node.id,
+              });
+            } else {
+              returnedNodes.push(node);
+            }
+            break;
           }
 
-          if (modified) {
-            returnedNodes.push({
-              ...node,
-              id: env.idGenerator.generateId(),
-              semanticParts: newParts,
-              replacesId: node.id,
-            });
-          } else {
+          case 'AGENT_THOUGHT': {
+            const squashResult = tryApplySquash(node.text, limitChars);
+            if (squashResult) {
+              returnedNodes.push({
+                ...node,
+                id: env.idGenerator.generateId(),
+                text: squashResult.text,
+                replacesId: node.id,
+              });
+            } else {
+              returnedNodes.push(node);
+            }
+            break;
+          }
+
+          case 'AGENT_YIELD': {
+            const squashResult = tryApplySquash(node.text, limitChars);
+            if (squashResult) {
+              returnedNodes.push({
+                ...node,
+                id: env.idGenerator.generateId(),
+                text: squashResult.text,
+                replacesId: node.id,
+              });
+            } else {
+              returnedNodes.push(node);
+            }
+            break;
+          }
+
+          default:
             returnedNodes.push(node);
-          }
-          break;
+            break;
         }
-
-        case 'AGENT_THOUGHT': {
-          const squashResult = tryApplySquash(node.text, limitChars);
-          if (squashResult) {
-            returnedNodes.push({
-              ...node,
-              id: env.idGenerator.generateId(),
-              text: squashResult.text,
-              replacesId: node.id,
-            });
-          } else {
-            returnedNodes.push(node);
-          }
-          break;
-        }
-
-        case 'AGENT_YIELD': {
-          const squashResult = tryApplySquash(node.text, limitChars);
-          if (squashResult) {
-            returnedNodes.push({
-              ...node,
-              id: env.idGenerator.generateId(),
-              text: squashResult.text,
-              replacesId: node.id,
-            });
-          } else {
-            returnedNodes.push(node);
-          }
-          break;
-        }
-
-        default:
-          returnedNodes.push(node);
-          break;
       }
-    }
 
-    return returnedNodes;
-    }
+      return returnedNodes;
+    },
   };
 }

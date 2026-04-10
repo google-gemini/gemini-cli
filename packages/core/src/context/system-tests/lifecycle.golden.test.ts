@@ -46,7 +46,9 @@ describe('System Lifecycle Golden Tests', () => {
         triggers: ['retained_exceeded'],
         processors: [
           createBlobDegradationProcessor('BlobDegradationProcessor', env),
-          createToolMaskingProcessor('ToolMaskingProcessor', env, { stringLengthThresholdTokens: 50 }),
+          createToolMaskingProcessor('ToolMaskingProcessor', env, {
+            stringLengthThresholdTokens: 50,
+          }),
           createStateSnapshotProcessor('StateSnapshotProcessor', env, {}),
         ],
       },
@@ -54,15 +56,27 @@ describe('System Lifecycle Golden Tests', () => {
         name: 'Immediate Sanitization', // The magic string the projector is hardcoded to use
         triggers: ['retained_exceeded'],
         processors: [
-          createHistoryTruncationProcessor('HistoryTruncationProcessor', env, {}),
+          createHistoryTruncationProcessor(
+            'HistoryTruncationProcessor',
+            env,
+            {},
+          ),
         ],
       },
     ],
-    buildAsyncPipelines: (env) => [{
-      name: 'Async',
-      triggers: ['nodes_aged_out'],
-      processors: [createStateSnapshotAsyncProcessor('StateSnapshotAsyncProcessor', env, {})]
-    }],
+    buildAsyncPipelines: (env) => [
+      {
+        name: 'Async',
+        triggers: ['nodes_aged_out'],
+        processors: [
+          createStateSnapshotAsyncProcessor(
+            'StateSnapshotAsyncProcessor',
+            env,
+            {},
+          ),
+        ],
+      },
+    ],
   });
 
   const mockLlmClient = createMockLlmClient([
@@ -186,11 +200,19 @@ describe('System Lifecycle Golden Tests', () => {
         budget: { maxTokens: 200, retainedTokens: 100 },
       },
       buildPipelines: () => [],
-      buildAsyncPipelines: (env) => [{
-      name: 'Async',
-      triggers: ['nodes_aged_out'],
-      processors: [createStateSnapshotAsyncProcessor('StateSnapshotAsyncProcessor', env, {})]
-    }],
+      buildAsyncPipelines: (env) => [
+        {
+          name: 'Async',
+          triggers: ['nodes_aged_out'],
+          processors: [
+            createStateSnapshotAsyncProcessor(
+              'StateSnapshotAsyncProcessor',
+              env,
+              {},
+            ),
+          ],
+        },
+      ],
     };
 
     const harness = await SimulationHarness.create(gcConfig, mockLlmClient);

@@ -5,7 +5,11 @@
  */
 
 import type { ConcreteNode } from '../ir/types.js';
-import type { AsyncPipelineDef, PipelineDef, PipelineTrigger } from '../config/types.js';
+import type {
+  AsyncPipelineDef,
+  PipelineDef,
+  PipelineTrigger,
+} from '../config/types.js';
 import type {
   ContextEnvironment,
   ContextEventBus,
@@ -43,7 +47,12 @@ export class PipelineOrchestrator {
   private setupTriggers() {
     const bindTriggers = (
       pipelines: PipelineDef[] | AsyncPipelineDef[],
-      executeFn: (pipeline: PipelineDef | AsyncPipelineDef, nodes: readonly ConcreteNode[], targets: ReadonlySet<string>, protectedIds: ReadonlySet<string>) => void
+      executeFn: (
+        pipeline: PipelineDef | AsyncPipelineDef,
+        nodes: readonly ConcreteNode[],
+        targets: ReadonlySet<string>,
+        protectedIds: ReadonlySet<string>,
+      ) => void,
     ) => {
       for (const pipeline of pipelines) {
         for (const trigger of pipeline.triggers) {
@@ -52,7 +61,10 @@ export class PipelineOrchestrator {
               // Background timers not fully implemented in V1 yet
             }, trigger.intervalMs);
             this.activeTimers.push(timer);
-          } else if (trigger === 'retained_exceeded' || trigger === 'nodes_aged_out') {
+          } else if (
+            trigger === 'retained_exceeded' ||
+            trigger === 'nodes_aged_out'
+          ) {
             this.eventBus.onConsolidationNeeded((event) => {
               executeFn(pipeline, event.nodes, event.targetNodeIds, new Set());
             });
@@ -67,15 +79,29 @@ export class PipelineOrchestrator {
 
     bindTriggers(this.pipelines, (pipeline, nodes, targets, protectedIds) => {
       // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
-      void this.executePipelineAsync(pipeline as PipelineDef, nodes, new Set(targets), new Set(protectedIds));
+      void this.executePipelineAsync(
+        pipeline as PipelineDef,
+        nodes,
+        new Set(targets),
+        new Set(protectedIds),
+      );
     });
 
     bindTriggers(this.asyncPipelines, (pipeline, nodes, targetIds) => {
-      const inboxSnapshot = new InboxSnapshotImpl(this.env.inbox.getMessages() || []);
+      const inboxSnapshot = new InboxSnapshotImpl(
+        this.env.inbox.getMessages() || [],
+      );
       const targets = nodes.filter((n) => targetIds.has(n.id));
       for (const processor of pipeline.processors) {
-        processor.process({ targets, inbox: inboxSnapshot, buffer: ContextWorkingBufferImpl.initialize(nodes) })
-                 .catch((e: unknown) => debugLogger.error(`AsyncProcessor ${processor.name} failed:`, e));
+        processor
+          .process({
+            targets,
+            inbox: inboxSnapshot,
+            buffer: ContextWorkingBufferImpl.initialize(nodes),
+          })
+          .catch((e: unknown) =>
+            debugLogger.error(`AsyncProcessor ${processor.name} failed:`, e),
+          );
       }
     });
   }

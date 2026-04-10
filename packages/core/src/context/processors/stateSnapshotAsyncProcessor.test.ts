@@ -19,8 +19,12 @@ describe('StateSnapshotAsyncProcessor', () => {
     // Spy on the publish method
     const publishSpy = vi.spyOn(env.inbox, 'publish');
 
-    const worker = createStateSnapshotAsyncProcessor('StateSnapshotAsyncProcessor', env, { type: 'point-in-time' });
-    
+    const worker = createStateSnapshotAsyncProcessor(
+      'StateSnapshotAsyncProcessor',
+      env,
+      { type: 'point-in-time' },
+    );
+
     const nodeA = createDummyNode('ep1', 'USER_PROMPT', 50, {}, 'node-A');
     const nodeB = createDummyNode('ep1', 'AGENT_THOUGHT', 60, {}, 'node-B');
 
@@ -47,8 +51,12 @@ describe('StateSnapshotAsyncProcessor', () => {
     const publishSpy = vi.spyOn(env.inbox, 'publish');
     const drainSpy = vi.spyOn(env.inbox, 'drainConsumed');
 
-    const worker = createStateSnapshotAsyncProcessor('StateSnapshotAsyncProcessor', env, { type: 'accumulate' });
-    
+    const worker = createStateSnapshotAsyncProcessor(
+      'StateSnapshotAsyncProcessor',
+      env,
+      { type: 'accumulate' },
+    );
+
     const nodeC = createDummyNode('ep2', 'USER_PROMPT', 50, {}, 'node-C');
     const targets = [nodeC];
 
@@ -70,7 +78,9 @@ describe('StateSnapshotAsyncProcessor', () => {
     await worker.process(args);
 
     // The old draft should be consumed
-    expect((args.inbox as InboxSnapshotImpl).getConsumedIds().has('draft-1')).toBe(true);
+    expect(
+      (args.inbox as InboxSnapshotImpl).getConsumedIds().has('draft-1'),
+    ).toBe(true);
     expect(drainSpy).toHaveBeenCalledWith(expect.any(Set));
 
     // The new publish should contain ALL consumed IDs (old + new)
@@ -103,8 +113,12 @@ describe('StateSnapshotAsyncProcessor', () => {
   it('should ignore empty targets', async () => {
     const env = createMockEnvironment();
     const publishSpy = vi.spyOn(env.inbox, 'publish');
-    const worker = createStateSnapshotAsyncProcessor('StateSnapshotAsyncProcessor', env, { type: 'accumulate' });
-    
+    const worker = createStateSnapshotAsyncProcessor(
+      'StateSnapshotAsyncProcessor',
+      env,
+      { type: 'accumulate' },
+    );
+
     await worker.process(createMockProcessArgs([], [], []));
 
     expect(env.llmClient.generateContent).not.toHaveBeenCalled();

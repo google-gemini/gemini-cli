@@ -79,11 +79,11 @@ To extend the system, developers author two types of plugins:
 2. **Context AsyncProcessors:** Inspired by the **Actor Model**, these are
    event-triggered background jobs designed for isolated, long-running async
    computations (e.g., asking an LLM to distill 50 turns of history).
-3. **Inboxes:** Because the graph can only be mutated synchronously, AsyncProcessors
-   cannot touch the graph directly (preventing race conditions). Instead, they
-   drop their results via message-passing into point-in-time snapshots called
-   _Inboxes_. Processors later read from these Inboxes during a synchronous
-   pipeline run to safely apply the async processor's findings.
+3. **Inboxes:** Because the graph can only be mutated synchronously,
+   AsyncProcessors cannot touch the graph directly (preventing race conditions).
+   Instead, they drop their results via message-passing into point-in-time
+   snapshots called _Inboxes_. Processors later read from these Inboxes during a
+   synchronous pipeline run to safely apply the async processor's findings.
 
 ## 4. Proofs of Construction
 
@@ -227,8 +227,8 @@ class MemoryExtractionProcessor implements ContextProcessor {
 
 By treating the Context Graph as an immutable ledger updated only via functional
 Pipelines, we have eliminated race conditions and untraceable graph corruption.
-By utilizing AsyncProcessors and Inboxes, we have safely bridged the gap between slow
-LLM analysis and fast, synchronous terminal UI updates.
+By utilizing AsyncProcessors and Inboxes, we have safely bridged the gap between
+slow LLM analysis and fast, synchronous terminal UI updates.
 
 We recognize this is not the final form—future iterations may require strict
 simple priority to updates, or more advanced generational garbage collection.

@@ -96,7 +96,6 @@ export function createDummyToolNode(
 
 import type { Mock } from 'vitest';
 
-
 export interface MockLlmClient extends BaseLlmClient {
   generateContent: Mock;
 }
@@ -231,7 +230,7 @@ export function createMockContextConfig(
     getUsageStatisticsEnabled: vi.fn().mockReturnValue(false),
     getTargetDir: vi.fn().mockReturnValue('/tmp'),
     getSessionId: vi.fn().mockReturnValue('test-session'),
-    getExperimentalContextSidecarConfig: vi.fn().mockReturnValue(undefined),
+    getExperimentalContextManagementConfig: vi.fn().mockReturnValue(undefined),
   };
 
   // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion

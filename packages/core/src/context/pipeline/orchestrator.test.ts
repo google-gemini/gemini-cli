@@ -45,7 +45,7 @@ function createModifyingProcessor(id: string): ContextProcessor {
         };
       }
       return newTargets;
-    }
+    },
   };
 }
 
@@ -56,18 +56,21 @@ function createThrowingProcessor(id: string): ContextProcessor {
     name: 'Throwing',
     process: async (): Promise<readonly ConcreteNode[]> => {
       throw new Error('Processor failed intentionally');
-    }
+    },
   };
 }
 
 // A mock async processor that signals it ran
-function createMockAsyncProcessor(id: string, executeSpy: ReturnType<typeof vi.fn>): AsyncContextProcessor {
+function createMockAsyncProcessor(
+  id: string,
+  executeSpy: ReturnType<typeof vi.fn>,
+): AsyncContextProcessor {
   return {
     id,
     name: 'MockAsyncProcessor',
     process: async (args: ProcessArgs) => {
       executeSpy(args);
-    }
+    },
   };
 }
 
@@ -156,7 +159,10 @@ describe('PipelineOrchestrator (Component)', () => {
         {
           name: 'FailingPipeline',
           triggers: ['new_message'],
-          processors: [createThrowingProcessor('Thrower'), createModifyingProcessor('Mod')],
+          processors: [
+            createThrowingProcessor('Thrower'),
+            createModifyingProcessor('Mod'),
+          ],
         },
       ];
 
@@ -183,13 +189,21 @@ describe('PipelineOrchestrator (Component)', () => {
   describe('Asynchronous async pipeline Events', () => {
     it('routes emitChunkReceived to async pipelines with nodes_added trigger', async () => {
       const executeSpy = vi.fn();
-      const asyncProcessor = createMockAsyncProcessor('MyAsyncProcessor', executeSpy);
-      
-      setupOrchestrator([], [{
-        name: 'TestAsync',
-        triggers: ['nodes_added'],
-        processors: [asyncProcessor]
-      }]);
+      const asyncProcessor = createMockAsyncProcessor(
+        'MyAsyncProcessor',
+        executeSpy,
+      );
+
+      setupOrchestrator(
+        [],
+        [
+          {
+            name: 'TestAsync',
+            triggers: ['nodes_added'],
+            processors: [asyncProcessor],
+          },
+        ],
+      );
 
       const node1 = createDummyNode('ep1', 'USER_PROMPT', 10);
       const node2 = createDummyNode('ep1', 'AGENT_THOUGHT', 20);
@@ -200,7 +214,7 @@ describe('PipelineOrchestrator (Component)', () => {
       });
 
       // Yield event loop
-      await new Promise(resolve => setTimeout(resolve, 0));
+      await new Promise((resolve) => setTimeout(resolve, 0));
 
       expect(executeSpy).toHaveBeenCalledTimes(1);
       const callArgs = executeSpy.mock.calls[0][0];
