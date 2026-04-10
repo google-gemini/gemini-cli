@@ -8,7 +8,11 @@ import { describe, it, expect, vi, afterEach, beforeEach } from 'vitest';
 import { renderWithProviders } from '../../test-utils/render.js';
 import { Footer } from './Footer.js';
 import { createMockSettings } from '../../test-utils/settings.js';
-import { type Config } from '@google/gemini-cli-core';
+import {
+  type Config,
+  UserAccountManager,
+  AuthType,
+} from '@google/gemini-cli-core';
 import path from 'node:path';
 
 // Normalize paths to POSIX slashes for stable cross-platform snapshots.
@@ -69,14 +73,19 @@ const defaultProps = {
   branchName: 'main',
 };
 
-const mockConfig = {
+const mockConfigPlain = {
   getTargetDir: () => defaultProps.targetDir,
   getDebugMode: () => false,
   getModel: () => defaultProps.model,
   getIdeMode: () => false,
   isTrustedFolder: () => true,
   getExtensionRegistryURI: () => undefined,
-} as unknown as Config;
+  getContentGeneratorConfig: () => ({ authType: undefined }),
+  getSandboxEnabled: () => false,
+  getSessionId: () => 'test-session-id',
+};
+
+const mockConfig = mockConfigPlain as unknown as Config;
 
 const mockSessionStats = {
   sessionId: 'test-session-id',
@@ -357,7 +366,7 @@ describe('<Footer />', () => {
       unmount();
     });
 
-    it('should display custom sandbox info when SANDBOX env is set', async () => {
+    it('should display "current process" for custom sandbox when SANDBOX env is set', async () => {
       vi.stubEnv('SANDBOX', 'gemini-cli-test-sandbox');
       const { lastFrame, unmount } = await renderWithProviders(<Footer />, {
         config: mockConfig,
@@ -367,12 +376,12 @@ describe('<Footer />', () => {
           sessionStats: mockSessionStats,
         },
       });
-      expect(lastFrame()).toContain('test');
+      expect(lastFrame()).toContain('current process');
       vi.unstubAllEnvs();
       unmount();
     });
 
-    it('should display macOS Seatbelt info when SANDBOX is sandbox-exec', async () => {
+    it('should display "current process" for macOS Seatbelt when SANDBOX is sandbox-exec', async () => {
       vi.stubEnv('SANDBOX', 'sandbox-exec');
       vi.stubEnv('SEATBELT_PROFILE', 'test-profile');
       const { lastFrame, unmount } = await renderWithProviders(<Footer />, {
@@ -380,7 +389,7 @@ describe('<Footer />', () => {
         width: 120,
         uiState: { isTrustedFolder: true, sessionStats: mockSessionStats },
       });
-      expect(lastFrame()).toMatch(/macOS Seatbelt.*\(test-profile\)/s);
+      expect(lastFrame()).toContain('current process');
       vi.unstubAllEnvs();
       unmount();
     });
@@ -394,6 +403,24 @@ describe('<Footer />', () => {
         uiState: { isTrustedFolder: true, sessionStats: mockSessionStats },
       });
       expect(lastFrame()).toContain('no sandbox');
+      vi.unstubAllEnvs();
+      unmount();
+    });
+
+    it('should display "all tools" when tool sandboxing is enabled and agent is local', async () => {
+      vi.stubEnv('SANDBOX', '');
+      const { lastFrame, unmount } = await renderWithProviders(<Footer />, {
+        config: Object.assign(
+          Object.create(Object.getPrototypeOf(mockConfig)),
+          mockConfig,
+          {
+            getSandboxEnabled: () => true,
+          },
+        ),
+        width: 120,
+        uiState: { isTrustedFolder: true, sessionStats: mockSessionStats },
+      });
+      expect(lastFrame()).toContain('all tools');
       vi.unstubAllEnvs();
       unmount();
     });
@@ -434,6 +461,7 @@ describe('<Footer />', () => {
 
     it('renders footer with all optional sections hidden (minimal footer)', async () => {
       const { lastFrame, unmount } = await renderWithProviders(<Footer />, {
+        config: mockConfig,
         width: 120,
         uiState: { sessionStats: mockSessionStats },
         settings: createMockSettings({
@@ -551,6 +579,7 @@ describe('<Footer />', () => {
   describe('Footer Token Formatting', () => {
     const renderWithTokens = async (tokens: number) => {
       const result = await renderWithProviders(<Footer />, {
+        config: mockConfig,
         width: 120,
         uiState: {
           sessionStats: {
@@ -675,6 +704,75 @@ describe('<Footer />', () => {
   });
 
   describe('Footer Custom Items', () => {
+    it('renders auth item with email', async () => {
+      const authConfig = {
+        ...mockConfigPlain,
+        getContentGeneratorConfig: () => ({
+          authType: AuthType.LOGIN_WITH_GOOGLE,
+        }),
+      } as unknown as Config;
+      const getCachedAccountSpy = vi
+        .spyOn(UserAccountManager.prototype, 'getCachedGoogleAccount')
+        .mockReturnValue('test@example.com');
+
+      const { lastFrame, unmount } = await renderWithProviders(<Footer />, {
+        config: authConfig,
+        width: 120,
+        uiState: {
+          currentModel: 'gemini-pro',
+          sessionStats: mockSessionStats,
+        },
+        settings: createMockSettings({
+          ui: {
+            footer: {
+              items: ['auth'],
+            },
+          },
+        }),
+      });
+
+      expect(lastFrame()).toContain('auth');
+      expect(lastFrame()).toContain('test@example.com');
+      unmount();
+      getCachedAccountSpy.mockRestore();
+    });
+
+    it('does NOT render auth item when showUserIdentity is false', async () => {
+      const authConfig = {
+        ...mockConfigPlain,
+        getContentGeneratorConfig: () => ({
+          authType: AuthType.LOGIN_WITH_GOOGLE,
+        }),
+      } as unknown as Config;
+      const getCachedAccountSpy = vi
+        .spyOn(UserAccountManager.prototype, 'getCachedGoogleAccount')
+        .mockReturnValue('test@example.com');
+
+      const { lastFrame, unmount } = await renderWithProviders(<Footer />, {
+        config: authConfig,
+        width: 120,
+        uiState: {
+          currentModel: 'gemini-pro',
+          sessionStats: mockSessionStats,
+        },
+        settings: createMockSettings({
+          ui: {
+            showUserIdentity: false,
+            footer: {
+              items: ['workspace', 'auth'],
+            },
+          },
+        }),
+      });
+
+      const output = lastFrame();
+      expect(output).toContain('workspace');
+      expect(output).not.toContain('auth');
+      expect(output).not.toContain('test@example.com');
+      unmount();
+      getCachedAccountSpy.mockRestore();
+    });
+
     it('renders items in the specified order', async () => {
       const { lastFrame, unmount } = await renderWithProviders(<Footer />, {
         config: mockConfig,
@@ -734,6 +832,7 @@ describe('<Footer />', () => {
 
     it('handles empty items array', async () => {
       const { lastFrame, unmount } = await renderWithProviders(<Footer />, {
+        config: mockConfig,
         width: 120,
         uiState: { sessionStats: mockSessionStats },
         settings: createMockSettings({

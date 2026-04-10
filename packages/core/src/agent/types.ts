@@ -4,6 +4,8 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+import type { Kind } from '../tools/tools.js';
+
 export type WithMeta = { _meta?: Record<string, unknown> };
 
 export type Unsubscribe = () => void;
@@ -11,9 +13,10 @@ export type Unsubscribe = () => void;
 export interface AgentProtocol extends Trajectory {
   /**
    * Send data to the agent. Promise resolves when action is acknowledged.
-   * Returns the `streamId` of the stream the message was correlated to --
-   * this may be a new stream if idle, an existing stream, or null if no
-   * stream was triggered.
+   * Returns the agent-activity `streamId` affected by the send. This may be a
+   * new stream if idle, an existing stream, or null if the send was
+   * acknowledged without starting agent activity. Emitted events should still
+   * remain correlated to a stream via their `streamId`.
    *
    * When a new stream is created by a send, the streamId MUST be returned
    * before the `agent_start` event is emitted for the stream.
@@ -36,7 +39,7 @@ export interface AgentProtocol extends Trajectory {
   /**
    * AgentProtocol implements the Trajectory interface and can retrieve existing events.
    */
-  readonly events: AgentEvent[];
+  readonly events: readonly AgentEvent[];
 }
 
 type RequireExactlyOne<T> = {
@@ -45,7 +48,10 @@ type RequireExactlyOne<T> = {
 }[keyof T];
 
 interface AgentSendPayloads {
-  message: ContentPart[];
+  message: {
+    content: ContentPart[];
+    displayContent?: string;
+  };
   elicitations: ElicitationResponse[];
   update: { title?: string; model?: string; config?: Record<string, unknown> };
   action: { type: string; data: unknown };
@@ -54,7 +60,7 @@ interface AgentSendPayloads {
 export type AgentSend = RequireExactlyOne<AgentSendPayloads> & WithMeta;
 
 export interface Trajectory {
-  readonly events: AgentEvent[];
+  readonly events: readonly AgentEvent[];
 }
 
 export interface AgentEventCommon {
@@ -62,8 +68,8 @@ export interface AgentEventCommon {
   id: string;
   /** Identifies the subagent thread, omitted for "main thread" events. */
   threadId?: string;
-  /** Identifies a particular stream of a particular thread. */
-  streamId?: string | null;
+  /** Identifies the stream this event belongs to. */
+  streamId: string;
   /** ISO Timestamp for the time at which the event occurred. */
   timestamp: string;
   /** The concrete type of the event. */
@@ -81,9 +87,18 @@ export type AgentEventData<
   EventType extends keyof AgentEvents = keyof AgentEvents,
 > = AgentEvents[EventType] & { type: EventType };
 
+/**
+ * Mapped type that produces a proper discriminated union when `EventType` is
+ * the default (all keys), enabling `switch (event.type)` narrowing.
+ * When a specific EventType is provided, resolves to a single variant.
+ */
 export type AgentEvent<
   EventType extends keyof AgentEvents = keyof AgentEvents,
-> = AgentEventCommon & AgentEventData<EventType>;
+> = {
+  [K in EventType]: AgentEventCommon & AgentEvents[K] & { type: K };
+}[EventType];
+
+export type AgentEventType = keyof AgentEvents;
 
 export interface AgentEvents {
   /** MUST be the first event emitted in a session. */
@@ -167,6 +182,16 @@ export interface ToolRequest {
   name: string;
   /** The arguments for the tool. */
   args: Record<string, unknown>;
+  /** UI specific metadata */
+  _meta?: {
+    legacyState?: {
+      displayName?: string;
+      isOutputMarkdown?: boolean;
+      description?: string;
+      kind?: Kind;
+    };
+    [key: string]: unknown;
+  };
 }
 
 /**
@@ -179,6 +204,18 @@ export interface ToolUpdate {
   displayContent?: ContentPart[];
   content?: ContentPart[];
   data?: Record<string, unknown>;
+  /** UI specific metadata */
+  _meta?: {
+    legacyState?: {
+      status?: string;
+      progressMessage?: string;
+      progress?: number;
+      progressTotal?: number;
+      pid?: number;
+      description?: string;
+    };
+    [key: string]: unknown;
+  };
 }
 
 export interface ToolResponse {
@@ -192,6 +229,13 @@ export interface ToolResponse {
   data?: Record<string, unknown>;
   /** When true, the tool call encountered an error that will be sent to the model. */
   isError?: boolean;
+  /** UI specific metadata */
+  _meta?: {
+    legacyState?: {
+      outputFile?: string;
+    };
+    [key: string]: unknown;
+  };
 }
 
 export type ElicitationRequest = {
@@ -263,7 +307,7 @@ export interface AgentStart {
   streamId: string;
 }
 
-type StreamEndReason =
+export type StreamEndReason =
   | 'completed'
   | 'failed'
   | 'aborted'

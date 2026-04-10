@@ -528,6 +528,7 @@ describe('skillsCommand', () => {
       await actionPromise;
 
       expect(reloadSkillsMock).toHaveBeenCalled();
+      expect(context.ui.reloadCommands).toHaveBeenCalled();
       expect(context.ui.setPendingItem).toHaveBeenCalledWith(null);
       expect(context.ui.addItem).toHaveBeenCalledWith(
         expect.objectContaining({

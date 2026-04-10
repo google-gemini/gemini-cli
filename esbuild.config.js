@@ -13,7 +13,7 @@ import { wasmLoader } from 'esbuild-plugin-wasm';
 let esbuild;
 try {
   esbuild = (await import('esbuild')).default;
-} catch (_error) {
+} catch {
   console.error('esbuild not available - cannot build bundle');
   process.exit(1);
 }
@@ -94,6 +94,10 @@ const cliConfig = {
     'process.env.GEMINI_SANDBOX_IMAGE_DEFAULT': JSON.stringify(
       pkg.config?.sandboxImageUri,
     ),
+    'process.env.NODE_ENV': JSON.stringify(
+      process.env.NODE_ENV || 'production',
+    ),
+    'process.env.DEV': JSON.stringify(process.env.DEV || 'false'),
   },
   plugins: createWasmPlugins(),
   alias: {
@@ -114,6 +118,10 @@ const a2aServerConfig = {
     __filename: '__chunk_filename',
     __dirname: '__chunk_dirname',
     'process.env.CLI_VERSION': JSON.stringify(pkg.version),
+    'process.env.NODE_ENV': JSON.stringify(
+      process.env.NODE_ENV || 'production',
+    ),
+    'process.env.DEV': JSON.stringify(process.env.DEV || 'false'),
   },
   plugins: createWasmPlugins(),
   alias: commonAliases,
