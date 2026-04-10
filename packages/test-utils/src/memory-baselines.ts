@@ -13,6 +13,7 @@ export interface MemoryBaseline {
   heapUsedBytes: number;
   heapTotalBytes: number;
   rssBytes: number;
+  externalBytes: number;
   timestamp: string;
 }
 
@@ -63,6 +64,7 @@ export function updateBaseline(
     heapUsedBytes: number;
     heapTotalBytes: number;
     rssBytes: number;
+    externalBytes: number;
   },
 ): void {
   const baselines = loadBaselines(path);
@@ -70,6 +72,7 @@ export function updateBaseline(
     heapUsedBytes: measured.heapUsedBytes,
     heapTotalBytes: measured.heapTotalBytes,
     rssBytes: measured.rssBytes,
+    externalBytes: measured.externalBytes,
     timestamp: new Date().toISOString(),
   };
   saveBaselines(path, baselines);
