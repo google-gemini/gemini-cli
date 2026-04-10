@@ -7,6 +7,7 @@
 import type React from 'react';
 import { useCallback, useEffect, useId, useRef, useState } from 'react';
 import { Box, Text, ResizeObserver, type DOMElement } from 'ink';
+import { debugLogger } from '@google/gemini-cli-core';
 import { theme } from '../../semantic-colors.js';
 import { useOverflowActions } from '../../contexts/OverflowContext.js';
 import { isNarrowWidth } from '../../utils/isNarrowWidth.js';
@@ -65,7 +66,9 @@ export const MaxSizedBox: React.FC<MaxSizedBoxProps> = ({
         const observer = new ResizeObserver((entries) => {
           const entry = entries[0];
           if (entry) {
-            setContentHeight(Math.round(entry.contentRect.height));
+            const newHeight = Math.round(entry.contentRect.height);
+            debugLogger.debug('[DEBUG_LOOP] MaxSizedBox: ResizeObserver height=', newHeight);
+            setContentHeight(newHeight);
           }
         });
         observer.observe(node);

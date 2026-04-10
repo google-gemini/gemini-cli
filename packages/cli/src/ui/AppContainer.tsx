@@ -174,7 +174,6 @@ import { useTimedMessage } from './hooks/useTimedMessage.js';
 import { useIsHelpDismissKey } from './utils/shortcutsHelp.js';
 import { useSuspend } from './hooks/useSuspend.js';
 import { useRunEventNotifications } from './hooks/useRunEventNotifications.js';
-import { useTraceUpdate } from './hooks/useTraceUpdate.js';
 import { isNotificationsEnabled } from '../utils/terminalNotifications.js';
 import {
   getLastTurnToolCallIds,
@@ -219,10 +218,6 @@ export const AppContainer = (props: AppContainerProps) => {
   const settings = useSettings();
   const { reset } = useOverflowActions()!;
   const notificationsEnabled = isNotificationsEnabled(settings);
-
-  useTraceUpdate('AppContainer', {
-    props,
-  });
 
   const { setOptions, dumpCurrentFrame, startRecording, stopRecording } =
     useContext(InkAppContext);
@@ -319,14 +314,12 @@ export const AppContainer = (props: AppContainerProps) => {
   const [queueErrorMessage, setQueueErrorMessage] = useTimedMessage<string>(
     QUEUE_ERROR_DISPLAY_DURATION_MS,
   );
-  useTraceUpdate('AppContainer (queueErrorMessage)', { queueErrorMessage });
 
   const [newAgents, setNewAgents] = useState<AgentDefinition[] | null>(null);
   const [constrainHeight, setConstrainHeight] = useState<boolean>(true);
   const [expandHintTrigger, triggerExpandHint] = useTimedMessage<boolean>(
     EXPAND_HINT_DURATION_MS,
   );
-  useTraceUpdate('AppContainer (expandHintTrigger)', { expandHintTrigger });
   const showIsExpandableHint = Boolean(expandHintTrigger);
   const overflowState = useOverflowState();
   const overflowingIdsSize = overflowState?.overflowingIds.size ?? 0;
@@ -1628,7 +1621,6 @@ Logging in with Google... Restarting Gemini CLI to continue.
     text: string;
     type: TransientMessageType;
   }>(WARNING_PROMPT_DURATION_MS);
-  useTraceUpdate('AppContainer (transientMessage)', { transientMessage });
 
   const {
     isFolderTrustDialogOpen,
@@ -2624,6 +2616,19 @@ Logging in with Google... Restarting Gemini CLI to continue.
     [setShowPrivacyNotice],
   );
 
+  const prevUiStateRef = useRef<UIState>(uiState);
+  useEffect(() => {
+    const prev = prevUiStateRef.current;
+    const current = uiState;
+    const changedKeys = Object.keys(current).filter(
+      (key) => (current as any)[key] !== (prev as any)[key],
+    );
+    if (changedKeys.length > 0) {
+      debugLogger.debug('[DEBUG_LOOP] UIStateContext changed:', changedKeys);
+    }
+    prevUiStateRef.current = current;
+  });
+
   const uiActions: UIActions = useMemo(
     () => ({
       handleThemeSelect,
@@ -2646,7 +2651,10 @@ Logging in with Google... Restarting Gemini CLI to continue.
       handleIdePromptComplete,
       handleFolderTrustSelect,
       setIsPolicyUpdateDialogOpen,
-      setConstrainHeight,
+      setConstrainHeight: (value: boolean) => {
+        debugLogger.debug('[DEBUG_LOOP] setConstrainHeight:', value);
+        setConstrainHeight(value);
+      },
       onEscapePromptChange: handleEscapePromptChange,
       refreshStatic,
       handleFinalSubmit,
@@ -2671,7 +2679,10 @@ Logging in with Google... Restarting Gemini CLI to continue.
       toggleCleanUiDetailsVisible,
       revealCleanUiDetailsTemporarily,
       handleWarning,
-      setEmbeddedShellFocused,
+      setEmbeddedShellFocused: (value: boolean) => {
+        debugLogger.debug('[DEBUG_LOOP] setEmbeddedShellFocused:', value);
+        setEmbeddedShellFocused(value);
+      },
       dismissBackgroundTask,
       setActiveBackgroundTaskPid,
       setIsBackgroundTaskListOpen,

@@ -23,7 +23,6 @@ import {
   CoreToolCallStatus,
 } from '@google/gemini-cli-core';
 import { useInactivityTimer } from '../../hooks/useInactivityTimer.js';
-import { useTraceUpdate } from '../../hooks/useTraceUpdate.js';
 import { formatCommand } from '../../key/keybindingUtils.js';
 import { Command } from '../../key/keyBindings.js';
 
@@ -99,8 +98,6 @@ export function useFocusHint(
     SHELL_FOCUS_HINT_DELAY_MS,
   );
 
-  useTraceUpdate('useFocusHint', { isThisShellFocusable, resetKey, showFocusHint });
-
   useEffect(() => {
     if (isThisShellFocused) {
       setUserHasFocused(true);
@@ -120,7 +117,6 @@ export const FocusHint: React.FC<{
   shouldShowFocusHint: boolean;
   isThisShellFocused: boolean;
 }> = ({ shouldShowFocusHint, isThisShellFocused }) => {
-  useTraceUpdate('FocusHint', { shouldShowFocusHint, isThisShellFocused });
   if (!shouldShowFocusHint) {
     return null;
   }

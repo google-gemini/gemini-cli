@@ -98,7 +98,6 @@ import { getToolGroupBorderAppearance } from '../utils/borderStyles.js';
 import { promises as fs } from 'node:fs';
 import path from 'node:path';
 import { useSessionStats } from '../contexts/SessionContext.js';
-import { useTraceUpdate } from './useTraceUpdate.js';
 import { useKeypress } from './useKeypress.js';
 import type { LoadedSettings } from '../../config/settings.js';
 
@@ -413,13 +412,6 @@ export const useGeminiStream = (
     () => calculateStreamingState(isResponding, toolCalls),
     [isResponding, toolCalls],
   );
-
-  useTraceUpdate('useGeminiStream', {
-    isResponding,
-    streamingState,
-    toolCallsCount: toolCalls.length,
-    pushedToolCallIdsCount: pushedToolCallIds.size,
-  });
 
   // Reset tracking when a new batch of tools starts
   useEffect(() => {

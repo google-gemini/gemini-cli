@@ -5,7 +5,6 @@
  */
 
 import { useInactivityTimer } from './useInactivityTimer.js';
-import { useTraceUpdate } from './useTraceUpdate.js';
 import { useTurnActivityMonitor } from './useTurnActivityMonitor.js';
 import {
   SHELL_FOCUS_HINT_DELAY_MS,
@@ -91,18 +90,6 @@ export const useShellInactivityStatus = ({
   } else if (shouldShowSilentWorkingTitle) {
     inactivityStatus = 'silent_working';
   }
-
-  useTraceUpdate('useShellInactivityStatus', {
-    activePtyId,
-    lastOutputTime,
-    streamingState,
-    embeddedShellFocused,
-    isInteractiveShellEnabled,
-    shouldShowFocusHint,
-    shouldShowActionRequiredTitle,
-    shouldShowSilentWorkingTitle,
-    inactivityStatus,
-  });
 
   return {
     shouldShowFocusHint,
