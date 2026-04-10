@@ -14,7 +14,7 @@ skill. To use it, ask Gemini CLI to create a new skill for you.
 
 Gemini CLI will then use the `skill-creator` to generate the skill:
 
-1.  Generate a new directory for your skill (e.g., `my-new-skill/`).
+1.  Generate a new directory for your skill (for example, `my-new-skill/`).
 2.  Create a `SKILL.md` file with the necessary YAML frontmatter (`name` and
     `description`).
 3.  Create the standard resource directories: `scripts/`, `references/`, and
@@ -24,7 +24,7 @@ Gemini CLI will then use the `skill-creator` to generate the skill:
 
 If you prefer to create skills manually:
 
-1.  **Create a directory** for your skill (e.g., `my-new-skill/`).
+1.  **Create a directory** for your skill (for example, `my-new-skill/`).
 2.  **Create a `SKILL.md` file** inside the new directory.
 
 To add additional resources that support the skill, refer to the skill

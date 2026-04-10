@@ -32,7 +32,7 @@ The tool returns a JSON object containing:
 ## Configuration
 
 You can configure the behavior of the `run_shell_command` tool by modifying your
-`settings.json` file or by using the `/settings` command in the Gemini CLI.
+`settings.json` file or by using the `/settings` command in Gemini CLI.
 
 ### Enabling interactive commands
 
@@ -93,9 +93,9 @@ applies when `tools.shell.enableInteractiveShell` is enabled.
 ## Interactive commands
 
 The `run_shell_command` tool now supports interactive commands by integrating a
-pseudo-terminal (pty). This allows you to run commands that require real-time
-user input, such as text editors (`vim`, `nano`), terminal-based UIs (`htop`),
-and interactive version control operations (`git rebase -i`).
+pseudo-terminal (pty). This lets you run commands that require real-time user
+input, such as text editors (`vim`, `nano`), terminal-based UIs (`htop`), and
+interactive version control operations (`git rebase -i`).
 
 When an interactive command is running, you can send input to it from the Gemini
 CLI. To focus on the interactive shell, press `Tab`. The terminal output,
@@ -116,7 +116,7 @@ including complex TUIs, will be rendered correctly.
 
 When `run_shell_command` executes a command, it sets the `GEMINI_CLI=1`
 environment variable in the subprocess's environment. This allows scripts or
-tools to detect if they are being run from within the Gemini CLI.
+tools to detect if they are being run from within Gemini CLI.
 
 ## Command restrictions
 

@@ -314,8 +314,8 @@ Hooks such as `BeforeTool` or `AfterTool` can be configured to intercept the
 > [!WARNING] When hooks are triggered by **tool executions**, they do **not**
 > run when you manually toggle Plan Mode using the `/plan` command or the
 > `Shift+Tab` keyboard shortcut. If you need hooks to execute on mode changes,
-> ensure the transition is initiated by the agent (e.g., by asking "start a plan
-> for...").
+> ensure the transition is initiated by the agent (for example, by asking "start
+> a plan for...").
 
 #### Example: Archive approved plans to GCS (`AfterTool`)
 

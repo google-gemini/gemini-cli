@@ -35,7 +35,7 @@ browser.
 
 This opens a searchable list of all your past sessions. You'll see:
 
-- A timestamp (e.g., "2 hours ago").
+- A timestamp (for example, "2 hours ago").
 - The first user message (helping you identify the topic).
 - The number of turns in the conversation.
 

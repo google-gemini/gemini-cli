@@ -156,7 +156,7 @@ Slash commands provide meta-level control over the CLI itself.
 
 ### `/docs`
 
-- **Description:** Open the Gemini CLI documentation in your browser.
+- **Description:** Open Gemini CLI documentation in your browser.
 
 ### `/editor`
 
@@ -400,8 +400,8 @@ Slash commands provide meta-level control over the CLI itself.
 
 ### `/shells` (or `/bashes`)
 
-- **Description:** Toggle the background shells view. This allows you to view
-  and manage long-running processes that you've sent to the background.
+- **Description:** Toggle the background shells view. This lets you view and
+  manage long-running processes that you've sent to the background.
 
 ### `/setup-github`
 
@@ -474,7 +474,8 @@ Slash commands provide meta-level control over the CLI itself.
   input area supports vim-style navigation and editing commands in both NORMAL
   and INSERT modes.
 - **Features:**
-  - **Count support:** Prefix commands with numbers (e.g., `3h`, `5w`, `10G`)
+  - **Count support:** Prefix commands with numbers (for example, `3h`, `5w`,
+    `10G`)
   - **Editing commands:** Delete with `x`, change with `c`, insert with `i`,
     `a`, `o`, `O`; complex operations like `dd`, `cc`, `dw`, `cw`
   - **INSERT mode:** Standard text input with escape to return to NORMAL mode
@@ -490,9 +491,8 @@ Slash commands provide meta-level control over the CLI itself.
 ### Custom commands
 
 Custom commands allow you to create personalized shortcuts for your most-used
-prompts. For detailed instructions on how to create, manage, and use them,
-please see the dedicated
-[Custom Commands documentation](../cli/custom-commands.md).
+prompts. For detailed instructions on how to create, manage, and use them, see
+the dedicated [Custom Commands documentation](../cli/custom-commands.md).
 
 ## Input prompt shortcuts
 
@@ -523,7 +523,7 @@ your prompt to Gemini. These commands include git-aware filtering.
     - If a path to a single file is provided, the content of that file is read.
     - If a path to a directory is provided, the command attempts to read the
       content of files within that directory and any subdirectories.
-    - Spaces in paths should be escaped with a backslash (e.g.,
+    - Spaces in paths should be escaped with a backslash (for example,
       `@My\ Documents/file.txt`).
     - The command uses the `read_many_files` tool internally. The content is
       fetched and then inserted into your query before being sent to the Gemini
@@ -549,8 +549,8 @@ your prompt to Gemini. These commands include git-aware filtering.
 - If the path specified after `@` is not found or is invalid, an error message
   will be displayed, and the query might not be sent to the Gemini model, or it
   will be sent without the file content.
-- If the `read_many_files` tool encounters an error (e.g., permission issues),
-  this will also be reported.
+- If the `read_many_files` tool encounters an error (for example, permission
+  issues), this will also be reported.
 
 ## Shell mode and passthrough commands (`!`)
 
@@ -583,4 +583,4 @@ Gemini CLI.
 - **Environment variable:** When a command is executed via `!` or in shell mode,
   the `GEMINI_CLI=1` environment variable is set in the subprocess's
   environment. This allows scripts or tools to detect if they are being run from
-  within the Gemini CLI.
+  within Gemini CLI.
