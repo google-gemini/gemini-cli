@@ -2082,7 +2082,7 @@ Logging in with Google... Restarting Gemini CLI to continue.
     // Respect hideWindowTitle settings
     if (settings.merged.ui.hideWindowTitle) return;
 
-    const paddedTitle = computeTerminalTitle({
+    const terminalTitle = computeTerminalTitle({
       streamingState,
       thoughtSubject: thought?.subject,
       isConfirming:
@@ -2094,9 +2094,9 @@ Logging in with Google... Restarting Gemini CLI to continue.
     });
 
     // Only update the title if it's different from the last value we set
-    if (lastTitleRef.current !== paddedTitle) {
-      lastTitleRef.current = paddedTitle;
-      stdout.write(`\x1b]0;${paddedTitle}\x07`);
+    if (lastTitleRef.current !== terminalTitle) {
+      lastTitleRef.current = terminalTitle;
+      stdout.write(`\x1b]0;${terminalTitle}\x07`);
     }
     // Note: We don't need to reset the window title on exit because Gemini CLI is already doing that elsewhere
   }, [
