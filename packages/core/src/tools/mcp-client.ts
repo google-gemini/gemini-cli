@@ -812,7 +812,7 @@ type StatusChangeListener = (
   serverName: string,
   status: MCPServerStatus,
 ) => void;
-const statusChangeListeners: StatusChangeListener[] = [];
+const statusChangeListeners: Set<StatusChangeListener> = new Set();
 
 /**
  * Add a listener for MCP server status changes
@@ -820,7 +820,7 @@ const statusChangeListeners: StatusChangeListener[] = [];
 export function addMCPStatusChangeListener(
   listener: StatusChangeListener,
 ): void {
-  statusChangeListeners.push(listener);
+  statusChangeListeners.add(listener);
 }
 
 /**
@@ -829,10 +829,7 @@ export function addMCPStatusChangeListener(
 export function removeMCPStatusChangeListener(
   listener: StatusChangeListener,
 ): void {
-  const index = statusChangeListeners.indexOf(listener);
-  if (index !== -1) {
-    statusChangeListeners.splice(index, 1);
-  }
+  statusChangeListeners.delete(listener);
 }
 
 /**
