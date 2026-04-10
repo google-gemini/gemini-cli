@@ -2349,10 +2349,12 @@ describe('useGeminiStream', () => {
 
       it.each([
         {
-          name: 'NOT add a message when showContextWindowWarning is false',
+          name: 'add a message when remaining tokens overflow, regardless of showContextWindowWarning setting',
           requestTokens: 20,
           remainingTokens: 80,
-          shouldShow: false,
+          shouldShow: false, // The setting itself is false
+          expectedMessage:
+            'Context 20% full. Message may exceed window. Reduce size or /compress.',
         },
         {
           name: 'add a message when showContextWindowWarning is true',
@@ -2392,18 +2394,12 @@ describe('useGeminiStream', () => {
           });
 
           await waitFor(() => {
-            if (shouldShow) {
-              expect(mockAddItem).toHaveBeenCalledWith({
+            expect(mockAddItem).toHaveBeenCalledWith(
+              expect.objectContaining({
                 type: 'info',
                 text: expectedMessage,
-              });
-            } else {
-              expect(mockAddItem).not.toHaveBeenCalledWith(
-                expect.objectContaining({
-                  type: 'info',
-                }),
-              );
-            }
+              }),
+            );
           });
         },
       );
