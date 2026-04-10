@@ -16,6 +16,7 @@ import { CliHelpAgent } from './cli-help-agent.js';
 import { GeneralistAgent } from './generalist-agent.js';
 import { BrowserAgentDefinition } from './browser/browserAgentDefinition.js';
 import { MemoryManagerAgent } from './memory-manager-agent.js';
+import { AgentTool } from './agent-tool.js';
 import { A2AAuthProviderFactory } from './auth-provider/factory.js';
 import type { AuthenticationHandler } from '@a2a-js/sdk/client';
 import { type z } from 'zod';
@@ -37,6 +38,8 @@ export function getModelConfigAlias<TOutput extends z.ZodTypeAny>(
   return `${definition.name}-config`;
 }
 
+export const DYNAMIC_RULE_SOURCE = 'AgentRegistry (Dynamic)';
+
 /**
  * Manages the discovery, loading, validation, and registration of
  * AgentDefinitions.
@@ -47,12 +50,20 @@ export class AgentRegistry {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   private readonly allDefinitions = new Map<string, AgentDefinition<any>>();
 
+  private initialized = false;
+
   constructor(private readonly config: Config) {}
 
   /**
    * Discovers and loads agents.
    */
   async initialize(): Promise<void> {
+    if (this.initialized) {
+      await this.loadAgents();
+      return;
+    }
+    this.initialized = true;
+
     coreEvents.on(CoreEvent.ModelChanged, this.onModelChanged);
 
     await this.loadAgents();
@@ -107,6 +118,9 @@ export class AgentRegistry {
     this.agents.clear();
     this.allDefinitions.clear();
     this.loadBuiltInAgents();
+
+    // Clear old dynamic rules before reloading
+    this.config.getPolicyEngine()?.removeRulesBySource(DYNAMIC_RULE_SOURCE);
 
     if (!this.config.isAgentsEnabled()) {
       return;
@@ -377,19 +391,16 @@ export class AgentRegistry {
       return;
     }
 
-    // Clean up any old dynamic policy for this tool (e.g. if we are overwriting an agent)
-    policyEngine.removeRulesForTool(definition.name, 'AgentRegistry (Dynamic)');
-
-    // Add the new dynamic policy
-    policyEngine.addRule({
-      toolName: definition.name,
-      decision:
-        definition.kind === 'local'
-          ? PolicyDecision.ALLOW
-          : PolicyDecision.ASK_USER,
-      priority: PRIORITY_SUBAGENT_TOOL,
-      source: 'AgentRegistry (Dynamic)',
-    });
+    // Only add override for remote agents. Local agents are handled by blanket allow.
+    if (definition.kind === 'remote') {
+      policyEngine.addRule({
+        toolName: AgentTool.Name,
+        argsPattern: new RegExp(`"agent_name":\\s*"${definition.name}"`),
+        decision: PolicyDecision.ASK_USER,
+        priority: PRIORITY_SUBAGENT_TOOL + 0.1, // Higher priority to override blanket allow
+        source: DYNAMIC_RULE_SOURCE,
+      });
+    }
   }
 
   private isAgentEnabled<TOutput extends z.ZodTypeAny>(
