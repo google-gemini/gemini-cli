@@ -872,7 +872,8 @@ on GitHub.
   [@gsquared94](https://github.com/gsquared94))
 - **Enforced authentication:** System administrators can now mandate a specific
   authentication method via
-  `"enforcedAuthType": "oauth-personal|gemini-api-key|…"`in `settings.json`.
+  `"security": { "auth": { "enforcedType": "oauth-personal|gemini-api-key|…" } }`
+  in `settings.json`.
   ([pr](https://github.com/google-gemini/gemini-cli/pull/6564) by
   [@chrstnb](https://github.com/chrstnb))
 - **A2A development-tool extension:** An RFC for an Agent2Agent
