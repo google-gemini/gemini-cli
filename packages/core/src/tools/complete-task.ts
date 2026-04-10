@@ -142,7 +142,7 @@ export class CompleteTaskInvocation<
     return 'Completing task and submitting results.';
   }
 
-  async execute({ signal: _signal }: ExecuteOptions): Promise<ToolResult> {
+  async execute({ abortSignal: _signal }: ExecuteOptions): Promise<ToolResult> {
     let submittedOutput: string | null = null;
     let outputValue: unknown;
 

@@ -108,7 +108,7 @@ describe('ActivateSkillTool', () => {
     const params = { name: 'test-skill' };
     const invocation = tool.build(params);
     const result = await invocation.execute({
-      signal: new AbortController().signal,
+      abortSignal: new AbortController().signal,
     });
 
     expect(mockConfig.getSkillManager().activateSkill).toHaveBeenCalledWith(
@@ -139,7 +139,7 @@ describe('ActivateSkillTool', () => {
     const params = { name: 'test-skill' };
     const invocation = tool.build(params);
     const result = await invocation.execute({
-      signal: new AbortController().signal,
+      abortSignal: new AbortController().signal,
     });
 
     expect(result.llmContent).toContain('Error: Skill "test-skill" not found.');

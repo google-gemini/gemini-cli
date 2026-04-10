@@ -100,7 +100,7 @@ describe('analyzeScreenshot', () => {
         instruction: 'Find the blue submit button',
       });
       const result = await invocation.execute({
-        signal: new AbortController().signal,
+        abortSignal: new AbortController().signal,
       });
 
       // Verify screenshot was captured
@@ -167,7 +167,7 @@ describe('analyzeScreenshot', () => {
       const invocation = tool.build({
         instruction: 'Find the search bar',
       });
-      await invocation.execute({ signal: new AbortController().signal });
+      await invocation.execute({ abortSignal: new AbortController().signal });
 
       const contentGenerator = config.getContentGenerator();
       expect(contentGenerator.generateContent).toHaveBeenCalledWith(
@@ -197,7 +197,7 @@ describe('analyzeScreenshot', () => {
         instruction: 'Find the button',
       });
       const result = await invocation.execute({
-        signal: new AbortController().signal,
+        abortSignal: new AbortController().signal,
       });
 
       expect(result.error).toBeDefined();
@@ -222,7 +222,7 @@ describe('analyzeScreenshot', () => {
         instruction: 'Check the layout',
       });
       const result = await invocation.execute({
-        signal: new AbortController().signal,
+        abortSignal: new AbortController().signal,
       });
 
       expect(result.error).toBeDefined();
@@ -245,7 +245,7 @@ describe('analyzeScreenshot', () => {
         instruction: 'Find the red error',
       });
       const result = await invocation.execute({
-        signal: new AbortController().signal,
+        abortSignal: new AbortController().signal,
       });
 
       expect(result.error).toBeDefined();
@@ -270,7 +270,7 @@ describe('analyzeScreenshot', () => {
         instruction: 'Identify the element',
       });
       const result = await invocation.execute({
-        signal: new AbortController().signal,
+        abortSignal: new AbortController().signal,
       });
 
       expect(result.error).toBeDefined();
@@ -292,7 +292,7 @@ describe('analyzeScreenshot', () => {
         instruction: 'Find something',
       });
       const result = await invocation.execute({
-        signal: new AbortController().signal,
+        abortSignal: new AbortController().signal,
       });
 
       expect(result.error).toBeDefined();

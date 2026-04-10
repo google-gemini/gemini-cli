@@ -1130,7 +1130,7 @@ export class Session {
       }
 
       const toolResult: ToolResult = await invocation.execute({
-        signal: abortSignal,
+        abortSignal,
       });
       const content = toToolCallContent(toolResult);
 
@@ -1673,7 +1673,7 @@ export class Session {
           kind: toAcpToolKind(readManyFilesTool.kind),
         });
 
-        const result = await invocation.execute({ signal: abortSignal });
+        const result = await invocation.execute({ abortSignal });
         const content = toToolCallContent(result) || {
           type: 'content',
           content: {

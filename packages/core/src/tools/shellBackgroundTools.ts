@@ -42,7 +42,7 @@ class ListBackgroundProcessesInvocation extends BaseToolInvocation<
     return 'Lists all active and recently completed background processes for the current session.';
   }
 
-  async execute({ signal: _signal }: ExecuteOptions): Promise<ToolResult> {
+  async execute({ abortSignal: _signal }: ExecuteOptions): Promise<ToolResult> {
     const processes = ShellExecutionService.listBackgroundProcesses(
       this.context.config.getSessionId(),
     );
@@ -130,7 +130,7 @@ class ReadBackgroundOutputInvocation extends BaseToolInvocation<
     return `Reading output for background process ${this.params.pid}`;
   }
 
-  async execute({ signal: _signal }: ExecuteOptions): Promise<ToolResult> {
+  async execute({ abortSignal: _signal }: ExecuteOptions): Promise<ToolResult> {
     const pid = this.params.pid;
 
     if (this.params.delay_ms && this.params.delay_ms > 0) {

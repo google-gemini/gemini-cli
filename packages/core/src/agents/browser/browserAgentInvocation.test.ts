@@ -224,7 +224,7 @@ describe('BrowserAgentInvocation', () => {
       const updateOutput: (output: ToolLiveOutput) => void = vi.fn();
 
       const result = await invocation.execute({
-        signal: controller.signal,
+        abortSignal: controller.signal,
         updateOutput,
       });
 
@@ -245,7 +245,7 @@ describe('BrowserAgentInvocation', () => {
       const controller = new AbortController();
       // Should not throw even with no updateOutput
       await expect(
-        invocation.execute({ signal: controller.signal }),
+        invocation.execute({ abortSignal: controller.signal }),
       ).resolves.toBeDefined();
     });
 
@@ -259,7 +259,9 @@ describe('BrowserAgentInvocation', () => {
       );
 
       const controller = new AbortController();
-      const result = await invocation.execute({ signal: controller.signal });
+      const result = await invocation.execute({
+        abortSignal: controller.signal,
+      });
 
       expect(result.error).toBeDefined();
       expect(removeInputBlocker).toHaveBeenCalled();
@@ -302,7 +304,7 @@ describe('BrowserAgentInvocation', () => {
       );
 
       await invocation.execute({
-        signal: new AbortController().signal,
+        abortSignal: new AbortController().signal,
         updateOutput,
       });
 
@@ -322,7 +324,7 @@ describe('BrowserAgentInvocation', () => {
       );
 
       await invocation.execute({
-        signal: new AbortController().signal,
+        abortSignal: new AbortController().signal,
         updateOutput,
       });
 
@@ -344,7 +346,7 @@ describe('BrowserAgentInvocation', () => {
       );
 
       const executePromise = invocation.execute({
-        signal: new AbortController().signal,
+        abortSignal: new AbortController().signal,
         updateOutput,
       });
 
@@ -387,7 +389,7 @@ describe('BrowserAgentInvocation', () => {
       );
 
       const executePromise = invocation.execute({
-        signal: new AbortController().signal,
+        abortSignal: new AbortController().signal,
         updateOutput,
       });
 
@@ -434,7 +436,7 @@ describe('BrowserAgentInvocation', () => {
       );
 
       const executePromise = invocation.execute({
-        signal: new AbortController().signal,
+        abortSignal: new AbortController().signal,
         updateOutput,
       });
 
@@ -485,7 +487,7 @@ describe('BrowserAgentInvocation', () => {
       );
 
       const executePromise = invocation.execute({
-        signal: new AbortController().signal,
+        abortSignal: new AbortController().signal,
         updateOutput,
       });
 
@@ -529,7 +531,7 @@ describe('BrowserAgentInvocation', () => {
       );
 
       const executePromise = invocation.execute({
-        signal: new AbortController().signal,
+        abortSignal: new AbortController().signal,
         updateOutput,
       });
 
@@ -574,7 +576,7 @@ describe('BrowserAgentInvocation', () => {
       );
 
       const executePromise = invocation.execute({
-        signal: new AbortController().signal,
+        abortSignal: new AbortController().signal,
         updateOutput,
       });
 
@@ -614,7 +616,7 @@ describe('BrowserAgentInvocation', () => {
       );
 
       const executePromise = invocation.execute({
-        signal: new AbortController().signal,
+        abortSignal: new AbortController().signal,
         updateOutput,
       });
 
@@ -657,7 +659,7 @@ describe('BrowserAgentInvocation', () => {
       );
 
       const executePromise = invocation.execute({
-        signal: new AbortController().signal,
+        abortSignal: new AbortController().signal,
         updateOutput,
       });
 
@@ -713,7 +715,7 @@ describe('BrowserAgentInvocation', () => {
         mockMessageBus,
       );
       await invocation.execute({
-        signal: new AbortController().signal,
+        abortSignal: new AbortController().signal,
         updateOutput: vi.fn(),
       });
 
@@ -744,7 +746,7 @@ describe('BrowserAgentInvocation', () => {
       );
 
       await invocation.execute({
-        signal: new AbortController().signal,
+        abortSignal: new AbortController().signal,
         updateOutput,
       });
 
@@ -767,7 +769,7 @@ describe('BrowserAgentInvocation', () => {
         mockMessageBus,
       );
       await invocation.execute({
-        signal: new AbortController().signal,
+        abortSignal: new AbortController().signal,
         updateOutput: vi.fn(),
       });
 
@@ -825,7 +827,7 @@ describe('BrowserAgentInvocation', () => {
         mockMessageBus,
       );
 
-      await invocation.execute({ signal: new AbortController().signal });
+      await invocation.execute({ abortSignal: new AbortController().signal });
 
       // Verify list_pages was called
       expect(mockBrowserManager.callTool).toHaveBeenCalledWith(

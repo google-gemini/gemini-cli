@@ -265,7 +265,7 @@ export class DiscoveredMCPToolInvocation extends BaseToolInvocation<
     return false;
   }
 
-  async execute({ signal }: ExecuteOptions): Promise<ToolResult> {
+  async execute({ abortSignal: signal }: ExecuteOptions): Promise<ToolResult> {
     this.cliConfig?.setUserInteractedWithMcp?.();
     const functionCalls: FunctionCall[] = [
       {

@@ -108,7 +108,7 @@ export class BrowserAgentInvocation extends BaseToolInvocation<
    * 4. Cleans up browser resources
    */
   async execute(options: ExecuteOptions): Promise<ToolResult> {
-    const { signal, updateOutput } = options;
+    const { abortSignal: signal, updateOutput } = options;
     const invocationStartMs = Date.now();
     let browserManager;
     let recentActivity: SubagentActivityItem[] = [];

@@ -71,7 +71,7 @@ export async function executeToolWithHooks(
   signal: AbortSignal,
   tool: AnyDeclarativeTool,
   liveOutputCallback?: (outputChunk: ToolLiveOutput) => void,
-  options?: Omit<ExecuteOptions, 'signal' | 'updateOutput'>,
+  options?: Omit<ExecuteOptions, 'abortSignal' | 'updateOutput'>,
   config?: Config,
   originalRequestName?: string,
   skipBeforeHook?: boolean,
@@ -156,7 +156,7 @@ export async function executeToolWithHooks(
   // surface an execution ID via the callback.
   const toolResult: ToolResult = await invocation.execute({
     ...options,
-    signal,
+    abortSignal: signal,
     updateOutput: liveOutputCallback,
   });
 

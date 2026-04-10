@@ -696,7 +696,7 @@ function doIt() {
         });
 
       await expect(
-        invocation.execute({ signal: abortController.signal }),
+        invocation.execute({ abortSignal: abortController.signal }),
       ).rejects.toBe(abortError);
 
       calculateSpy.mockRestore();
@@ -715,7 +715,7 @@ function doIt() {
 
       const invocation = tool.build(params);
       const result = await invocation.execute({
-        signal: new AbortController().signal,
+        abortSignal: new AbortController().signal,
       });
 
       expect(result.llmContent).toMatch(/Successfully modified file/);
@@ -740,7 +740,7 @@ function doIt() {
       };
       const invocation = tool.build(params);
       const result = await invocation.execute({
-        signal: new AbortController().signal,
+        abortSignal: new AbortController().signal,
       });
       expect(result.llmContent).toMatch(/0 occurrences found for old_string/);
       expect(result.returnDisplay).toMatch(
@@ -773,7 +773,7 @@ function doIt() {
 
       const invocation = tool.build(params);
       const result = await invocation.execute({
-        signal: new AbortController().signal,
+        abortSignal: new AbortController().signal,
       });
 
       expect(result.error).toBeUndefined();
@@ -794,7 +794,7 @@ function doIt() {
       };
 
       const invocation = tool.build(params);
-      await invocation.execute({ signal: new AbortController().signal });
+      await invocation.execute({ abortSignal: new AbortController().signal });
 
       const finalContent = fs.readFileSync(filePath, 'utf8');
       expect(finalContent).toBe(newContent);
@@ -810,7 +810,7 @@ function doIt() {
       };
 
       const invocation = tool.build(params);
-      await invocation.execute({ signal: new AbortController().signal });
+      await invocation.execute({ abortSignal: new AbortController().signal });
 
       const finalContent = fs.readFileSync(filePath, 'utf8');
       expect(finalContent).toBe(newContentWithCRLF);
@@ -839,7 +839,7 @@ function doIt() {
 
       const invocation = tool.build(params);
       const result = await invocation.execute({
-        signal: new AbortController().signal,
+        abortSignal: new AbortController().signal,
       });
 
       expect(result.error?.type).toBe(
@@ -884,7 +884,7 @@ function doIt() {
         .mockResolvedValueOnce(externallyModifiedContent); // Second call in `attemptSelfCorrection`
 
       const invocation = tool.build(params);
-      await invocation.execute({ signal: new AbortController().signal });
+      await invocation.execute({ abortSignal: new AbortController().signal });
 
       // Assert that the file was read twice (initial read, then re-read for hash comparison).
       expect(readTextFileSpy).toHaveBeenCalledTimes(2);
@@ -947,7 +947,7 @@ function doIt() {
           ...params,
         });
         const result = await invocation.execute({
-          signal: new AbortController().signal,
+          abortSignal: new AbortController().signal,
         });
         expect(result.error?.type).toBe(expectedError);
       },
@@ -1031,7 +1031,7 @@ function doIt() {
         };
         const invocation = tool.build(params);
         const result = await invocation.execute({
-          signal: new AbortController().signal,
+          abortSignal: new AbortController().signal,
         });
 
         if (shouldSucceed) {
@@ -1175,7 +1175,7 @@ function doIt() {
         };
         const invocation = tool.build(params);
         const result = await invocation.execute({
-          signal: new AbortController().signal,
+          abortSignal: new AbortController().signal,
         });
 
         if (
@@ -1230,7 +1230,7 @@ function doIt() {
 
       const invocation = tool.build(params);
       const result = await invocation.execute({
-        signal: new AbortController().signal,
+        abortSignal: new AbortController().signal,
       });
 
       expect(result.error?.type).toBe(ToolErrorType.EDIT_NO_OCCURRENCE_FOUND);
@@ -1252,7 +1252,7 @@ function doIt() {
       };
 
       const invocation = tool.build(params);
-      await invocation.execute({ signal: new AbortController().signal });
+      await invocation.execute({ abortSignal: new AbortController().signal });
 
       expect(mockFixLLMEditWithInstruction).toHaveBeenCalled();
     });
@@ -1282,7 +1282,7 @@ function doIt() {
 
       const invocation = tool.build(params);
       const result = await invocation.execute({
-        signal: new AbortController().signal,
+        abortSignal: new AbortController().signal,
       });
 
       expect(discoverJitContext).toHaveBeenCalled();
@@ -1313,7 +1313,7 @@ function doIt() {
 
       const invocation = tool.build(params);
       const result = await invocation.execute({
-        signal: new AbortController().signal,
+        abortSignal: new AbortController().signal,
       });
 
       expect(result.llmContent).not.toContain(
@@ -1350,7 +1350,7 @@ function doIt() {
 
       const invocation = tool.build(params);
       const result = await invocation.execute({
-        signal: new AbortController().signal,
+        abortSignal: new AbortController().signal,
       });
 
       expect(result.llmContent).toMatch(/Successfully modified file/);

@@ -183,7 +183,7 @@ export class ExitPlanModeInvocation extends BaseToolInvocation<
     return path.join(this.config.storage.getPlansDir(), safeFilename);
   }
 
-  async execute({ signal: _signal }: ExecuteOptions): Promise<ToolResult> {
+  async execute({ abortSignal: _signal }: ExecuteOptions): Promise<ToolResult> {
     const resolvedPlanPath = this.getResolvedPlanPath();
 
     if (this.planValidationError) {

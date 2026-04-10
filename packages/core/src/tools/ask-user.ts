@@ -153,7 +153,7 @@ export class AskUserInvocation extends BaseToolInvocation<
     return `Asking user: ${this.params.questions.map((q) => q.question).join(', ')}`;
   }
 
-  async execute({ signal: _signal }: ExecuteOptions): Promise<ToolResult> {
+  async execute({ abortSignal: _signal }: ExecuteOptions): Promise<ToolResult> {
     const questionTypes = this.params.questions.map((q) => q.type);
 
     if (this.confirmationOutcome === ToolConfirmationOutcome.Cancel) {

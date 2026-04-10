@@ -60,7 +60,7 @@ class SdkToolInvocation<T extends z.ZodTypeAny> extends BaseToolInvocation<
   }
 
   async execute({
-    signal: _signal,
+    abortSignal: _abortSignal,
     updateOutput: _updateOutput,
   }: ExecuteOptions): Promise<ToolResult> {
     try {

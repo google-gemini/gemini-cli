@@ -81,7 +81,7 @@ class AnalyzeScreenshotInvocation extends BaseToolInvocation<
     return `Visual analysis: "${instruction}"`;
   }
 
-  async execute({ signal }: ExecuteOptions): Promise<ToolResult> {
+  async execute({ abortSignal: signal }: ExecuteOptions): Promise<ToolResult> {
     try {
       const instruction = String(this.params['instruction'] ?? '');
 

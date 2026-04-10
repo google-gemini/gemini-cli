@@ -130,7 +130,7 @@ class GlobToolInvocation extends BaseToolInvocation<
     };
   }
 
-  async execute({ signal }: ExecuteOptions): Promise<ToolResult> {
+  async execute({ abortSignal: signal }: ExecuteOptions): Promise<ToolResult> {
     try {
       const workspaceContext = this.config.getWorkspaceContext();
       const workspaceDirectories = workspaceContext.getDirectories();

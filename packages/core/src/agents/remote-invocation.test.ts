@@ -142,7 +142,7 @@ describe('RemoteAgentInvocation', () => {
         {},
         mockMessageBus,
       );
-      await invocation.execute({ signal: new AbortController().signal });
+      await invocation.execute({ abortSignal: new AbortController().signal });
 
       expect(mockClientManager.sendMessageStream).toHaveBeenCalledWith(
         'test-agent',
@@ -185,7 +185,7 @@ describe('RemoteAgentInvocation', () => {
         },
         mockMessageBus,
       );
-      await invocation.execute({ signal: new AbortController().signal });
+      await invocation.execute({ abortSignal: new AbortController().signal });
 
       expect(mockClientManager.loadAgent).toHaveBeenCalledWith(
         'test-agent',
@@ -230,7 +230,7 @@ describe('RemoteAgentInvocation', () => {
         { query: 'hi' },
         mockMessageBus,
       );
-      await invocation.execute({ signal: new AbortController().signal });
+      await invocation.execute({ abortSignal: new AbortController().signal });
 
       expect(A2AAuthProviderFactory.create).toHaveBeenCalledWith({
         authConfig: mockAuth,
@@ -265,7 +265,7 @@ describe('RemoteAgentInvocation', () => {
         mockMessageBus,
       );
       const result = await invocation.execute({
-        signal: new AbortController().signal,
+        abortSignal: new AbortController().signal,
       });
 
       expect(result.returnDisplay).toMatchObject({ state: 'error' });
@@ -295,7 +295,7 @@ describe('RemoteAgentInvocation', () => {
         },
         mockMessageBus,
       );
-      await invocation.execute({ signal: new AbortController().signal });
+      await invocation.execute({ abortSignal: new AbortController().signal });
 
       expect(mockClientManager.loadAgent).not.toHaveBeenCalled();
     });
@@ -328,7 +328,7 @@ describe('RemoteAgentInvocation', () => {
 
       // Execute first time
       const result1 = await invocation1.execute({
-        signal: new AbortController().signal,
+        abortSignal: new AbortController().signal,
       });
       expect(result1.returnDisplay).toMatchObject({
         result: 'Response 1',
@@ -362,7 +362,7 @@ describe('RemoteAgentInvocation', () => {
         mockMessageBus,
       );
       const result2 = await invocation2.execute({
-        signal: new AbortController().signal,
+        abortSignal: new AbortController().signal,
       });
       expect((result2.returnDisplay as SubagentProgress).result).toBe(
         'Response 2',
@@ -396,7 +396,7 @@ describe('RemoteAgentInvocation', () => {
         },
         mockMessageBus,
       );
-      await invocation3.execute({ signal: new AbortController().signal });
+      await invocation3.execute({ abortSignal: new AbortController().signal });
 
       // Fourth call: Should start new task (taskId undefined)
       mockClientManager.sendMessageStream.mockImplementationOnce(
@@ -418,7 +418,7 @@ describe('RemoteAgentInvocation', () => {
         },
         mockMessageBus,
       );
-      await invocation4.execute({ signal: new AbortController().signal });
+      await invocation4.execute({ abortSignal: new AbortController().signal });
 
       expect(mockClientManager.sendMessageStream).toHaveBeenLastCalledWith(
         'test-agent',
@@ -454,7 +454,7 @@ describe('RemoteAgentInvocation', () => {
         mockMessageBus,
       );
       await invocation.execute({
-        signal: new AbortController().signal,
+        abortSignal: new AbortController().signal,
         updateOutput,
       });
 
@@ -504,7 +504,9 @@ describe('RemoteAgentInvocation', () => {
         { query: 'hi' },
         mockMessageBus,
       );
-      const result = await invocation.execute({ signal: controller.signal });
+      const result = await invocation.execute({
+        abortSignal: controller.signal,
+      });
 
       expect(result.returnDisplay).toMatchObject({ state: 'error' });
     });
@@ -527,7 +529,7 @@ describe('RemoteAgentInvocation', () => {
         mockMessageBus,
       );
       const result = await invocation.execute({
-        signal: new AbortController().signal,
+        abortSignal: new AbortController().signal,
       });
 
       expect(result.returnDisplay).toMatchObject({
@@ -562,7 +564,7 @@ describe('RemoteAgentInvocation', () => {
         mockMessageBus,
       );
       const result = await invocation.execute({
-        signal: new AbortController().signal,
+        abortSignal: new AbortController().signal,
       });
 
       // Just check that text is present, exact formatting depends on helper
@@ -607,7 +609,7 @@ describe('RemoteAgentInvocation', () => {
         mockMessageBus,
       );
       const result = await invocation.execute({
-        signal: new AbortController().signal,
+        abortSignal: new AbortController().signal,
         updateOutput,
       });
 
@@ -684,7 +686,7 @@ describe('RemoteAgentInvocation', () => {
         mockMessageBus,
       );
       await invocation.execute({
-        signal: new AbortController().signal,
+        abortSignal: new AbortController().signal,
         updateOutput,
       });
 
@@ -755,7 +757,7 @@ describe('RemoteAgentInvocation', () => {
         mockMessageBus,
       );
       const result = await invocation.execute({
-        signal: new AbortController().signal,
+        abortSignal: new AbortController().signal,
       });
 
       expect(result.returnDisplay).toMatchObject({ state: 'error' });
@@ -777,7 +779,7 @@ describe('RemoteAgentInvocation', () => {
         mockMessageBus,
       );
       const result = await invocation.execute({
-        signal: new AbortController().signal,
+        abortSignal: new AbortController().signal,
       });
 
       expect(result.returnDisplay).toMatchObject({ state: 'error' });
@@ -808,7 +810,7 @@ describe('RemoteAgentInvocation', () => {
         mockMessageBus,
       );
       const result = await invocation.execute({
-        signal: new AbortController().signal,
+        abortSignal: new AbortController().signal,
       });
 
       expect(result.returnDisplay).toMatchObject({ state: 'error' });

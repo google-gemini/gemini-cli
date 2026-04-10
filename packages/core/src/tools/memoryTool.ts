@@ -227,7 +227,7 @@ class MemoryToolInvocation extends BaseToolInvocation<
     return confirmationDetails;
   }
 
-  async execute({ signal: _signal }: ExecuteOptions): Promise<ToolResult> {
+  async execute({ abortSignal: _signal }: ExecuteOptions): Promise<ToolResult> {
     const { fact, modified_by_user, modified_content } = this.params;
     const memoryFilePath = this.getMemoryFilePath();
 

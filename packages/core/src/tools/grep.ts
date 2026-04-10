@@ -139,7 +139,7 @@ class GrepToolInvocation extends BaseToolInvocation<
     return null;
   }
 
-  async execute({ signal }: ExecuteOptions): Promise<ToolResult> {
+  async execute({ abortSignal: signal }: ExecuteOptions): Promise<ToolResult> {
     try {
       const workspaceContext = this.config.getWorkspaceContext();
       const pathParam = this.params.dir_path;

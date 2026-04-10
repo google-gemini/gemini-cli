@@ -118,7 +118,7 @@ class McpToolInvocation extends BaseToolInvocation<
     return this.shouldDisableInput && INTERACTIVE_TOOLS.has(this.toolName);
   }
 
-  async execute({ signal }: ExecuteOptions): Promise<ToolResult> {
+  async execute({ abortSignal: signal }: ExecuteOptions): Promise<ToolResult> {
     try {
       // Hard block for file uploads if configured
       if (this.blockFileUploads && this.toolName === 'upload_file') {

@@ -57,7 +57,7 @@ class DiscoveredToolInvocation extends BaseToolInvocation<
   }
 
   async execute({
-    signal: _signal,
+    abortSignal: _signal,
     updateOutput: _updateOutput,
   }: ExecuteOptions): Promise<ToolResult> {
     const callCommand = this.config.getToolCallCommand()!;

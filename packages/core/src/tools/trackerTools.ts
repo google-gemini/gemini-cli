@@ -141,7 +141,7 @@ class TrackerCreateTaskInvocation extends BaseToolInvocation<
   }
 
   override async execute({
-    signal: _signal,
+    abortSignal: _signal,
   }: ExecuteOptions): Promise<ToolResult> {
     try {
       const task = await this.service.createTask({
@@ -233,7 +233,7 @@ class TrackerUpdateTaskInvocation extends BaseToolInvocation<
   }
 
   override async execute({
-    signal: _signal,
+    abortSignal: _signal,
   }: ExecuteOptions): Promise<ToolResult> {
     const { id, ...updates } = this.params;
     try {
@@ -315,7 +315,7 @@ class TrackerGetTaskInvocation extends BaseToolInvocation<
   }
 
   override async execute({
-    signal: _signal,
+    abortSignal: _signal,
   }: ExecuteOptions): Promise<ToolResult> {
     const task = await this.service.getTask(this.params.id);
     if (!task) {
@@ -391,7 +391,7 @@ class TrackerListTasksInvocation extends BaseToolInvocation<
   }
 
   override async execute({
-    signal: _signal,
+    abortSignal: _signal,
   }: ExecuteOptions): Promise<ToolResult> {
     let tasks = await this.service.listTasks();
     if (this.params.status) {
@@ -480,7 +480,7 @@ class TrackerAddDependencyInvocation extends BaseToolInvocation<
   }
 
   override async execute({
-    signal: _signal,
+    abortSignal: _signal,
   }: ExecuteOptions): Promise<ToolResult> {
     if (this.params.taskId === this.params.dependencyId) {
       return {
@@ -592,7 +592,7 @@ class TrackerVisualizeInvocation extends BaseToolInvocation<
   }
 
   override async execute({
-    signal: _signal,
+    abortSignal: _signal,
   }: ExecuteOptions): Promise<ToolResult> {
     const tasks = await this.service.listTasks();
     if (tasks.length === 0) {

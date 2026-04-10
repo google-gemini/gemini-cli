@@ -104,7 +104,7 @@ export class LocalSubagentInvocation extends BaseToolInvocation<
    * @returns A `Promise` that resolves with the final `ToolResult`.
    */
   async execute(options: ExecuteOptions): Promise<ToolResult> {
-    const { signal, updateOutput } = options;
+    const { abortSignal: signal, updateOutput } = options;
     const recentActivity: SubagentActivityItem[] = [];
 
     try {

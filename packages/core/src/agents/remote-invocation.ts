@@ -127,7 +127,7 @@ export class RemoteAgentInvocation extends BaseToolInvocation<
   }
 
   async execute(options: ExecuteOptions): Promise<ToolResult> {
-    const { signal: _signal, updateOutput } = options;
+    const { abortSignal: _signal, updateOutput } = options;
     // 1. Ensure the agent is loaded (cached by manager)
     // We assume the user has provided an access token via some mechanism (TODO),
     // or we rely on ADC.

@@ -37,7 +37,7 @@ describe('Background Tools', () => {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     (invocation as any).context = { config: { getSessionId: () => 'default' } };
     const result = await invocation.execute({
-      signal: new AbortController().signal,
+      abortSignal: new AbortController().signal,
     });
     expect(result.llmContent).toBe('No background processes found.');
   });
@@ -67,7 +67,7 @@ describe('Background Tools', () => {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     (invocation as any).context = { config: { getSessionId: () => 'default' } };
     const result = await invocation.execute({
-      signal: new AbortController().signal,
+      abortSignal: new AbortController().signal,
     });
 
     expect(result.llmContent).toContain(
@@ -94,7 +94,7 @@ describe('Background Tools', () => {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     (invocation as any).context = { config: { getSessionId: () => 'default' } };
     const result = await invocation.execute({
-      signal: new AbortController().signal,
+      abortSignal: new AbortController().signal,
     });
 
     expect(result.llmContent).toContain(
@@ -120,7 +120,7 @@ describe('Background Tools', () => {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     (invocation as any).context = { config: { getSessionId: () => 'default' } };
     const result = await invocation.execute({
-      signal: new AbortController().signal,
+      abortSignal: new AbortController().signal,
     });
     expect(result.error).toBeDefined();
     expect(result.llmContent).toContain('No output log found');
@@ -155,7 +155,7 @@ describe('Background Tools', () => {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     (invocation as any).context = { config: { getSessionId: () => 'default' } };
     const result = await invocation.execute({
-      signal: new AbortController().signal,
+      abortSignal: new AbortController().signal,
     });
 
     expect(result.llmContent).toContain('Showing last 2 of 3 lines');
@@ -183,7 +183,7 @@ describe('Background Tools', () => {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     (invocation as any).context = { config: { getSessionId: () => 'default' } }; // Asking for PID from another session
     const result = await invocation.execute({
-      signal: new AbortController().signal,
+      abortSignal: new AbortController().signal,
     });
 
     expect(result.error).toBeDefined();
@@ -214,7 +214,7 @@ describe('Background Tools', () => {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     (invocation as any).context = { config: { getSessionId: () => 'default' } };
     const result = await invocation.execute({
-      signal: new AbortController().signal,
+      abortSignal: new AbortController().signal,
     });
 
     expect(result.llmContent).toContain('Log is empty');
@@ -251,7 +251,7 @@ describe('Background Tools', () => {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     (invocation as any).context = { config: { getSessionId: () => 'default' } };
     const result = await invocation.execute({
-      signal: new AbortController().signal,
+      abortSignal: new AbortController().signal,
     });
 
     expect(result.error).toBeDefined();
@@ -289,7 +289,7 @@ describe('Background Tools', () => {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     (invocation as any).context = { config: { getSessionId: () => 'default' } };
     const result = await invocation.execute({
-      signal: new AbortController().signal,
+      abortSignal: new AbortController().signal,
     });
 
     expect(result.llmContent).toContain('Access is denied');
@@ -323,7 +323,7 @@ describe('Background Tools', () => {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     (invocation as any).context = { config: { getSessionId: () => 'default' } };
     const result = await invocation.execute({
-      signal: new AbortController().signal,
+      abortSignal: new AbortController().signal,
     });
 
     expect(result.llmContent).toContain('line4\nline5');

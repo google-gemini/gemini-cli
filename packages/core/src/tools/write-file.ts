@@ -262,7 +262,9 @@ class WriteFileToolInvocation extends BaseToolInvocation<
     return confirmationDetails;
   }
 
-  async execute({ signal: abortSignal }: ExecuteOptions): Promise<ToolResult> {
+  async execute({
+    abortSignal: abortSignal,
+  }: ExecuteOptions): Promise<ToolResult> {
     const validationError = this.config.validatePathAccess(this.resolvedPath);
     if (validationError) {
       return {

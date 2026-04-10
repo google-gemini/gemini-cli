@@ -762,7 +762,7 @@ Response: ${rawResponseText}`;
     }
   }
 
-  async execute({ signal }: ExecuteOptions): Promise<ToolResult> {
+  async execute({ abortSignal: signal }: ExecuteOptions): Promise<ToolResult> {
     if (this.context.config.getDirectWebFetch()) {
       return this.executeExperimental(signal);
     }

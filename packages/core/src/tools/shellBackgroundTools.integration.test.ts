@@ -93,7 +93,7 @@ describe('Background Tools Integration', () => {
       config: { getSessionId: () => 'default' },
     };
     const listResult = await listInvocation.execute({
-      signal: new AbortController().signal,
+      abortSignal: new AbortController().signal,
     });
 
     expect(listResult.llmContent).toContain(
@@ -110,7 +110,7 @@ describe('Background Tools Integration', () => {
       config: { getSessionId: () => 'default' },
     };
     const readResult = await readInvocation.execute({
-      signal: new AbortController().signal,
+      abortSignal: new AbortController().signal,
     });
 
     expect(readResult.llmContent).toContain('Showing last');

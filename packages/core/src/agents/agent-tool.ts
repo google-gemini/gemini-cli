@@ -186,7 +186,7 @@ class DelegateInvocation extends BaseToolInvocation<
   }
 
   async execute(options: ExecuteOptions): Promise<ToolResult> {
-    const { signal, updateOutput } = options;
+    const { abortSignal: signal, updateOutput } = options;
     const hintedParams = this.withUserHints(this.mappedInputs);
     const invocation = this.buildChildInvocation(hintedParams);
 
@@ -202,7 +202,10 @@ class DelegateInvocation extends BaseToolInvocation<
       },
       async ({ metadata }) => {
         metadata.input = this.params;
-        const result = await invocation.execute({ signal, updateOutput });
+        const result = await invocation.execute({
+          abortSignal: signal,
+          updateOutput,
+        });
         metadata.output = result;
         return result;
       },

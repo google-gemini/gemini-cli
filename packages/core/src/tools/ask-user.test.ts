@@ -411,7 +411,7 @@ describe('AskUserTool', () => {
       }
 
       const result = await invocation.execute({
-        signal: new AbortController().signal,
+        abortSignal: new AbortController().signal,
       });
       expect(result.returnDisplay).toContain('User answered:');
       expect(result.returnDisplay).toContain(
@@ -456,7 +456,7 @@ describe('AskUserTool', () => {
       }
 
       const result = await invocation.execute({
-        signal: new AbortController().signal,
+        abortSignal: new AbortController().signal,
       });
       expect(result.returnDisplay).toBe(
         'User submitted without answering questions.',
@@ -504,7 +504,7 @@ describe('AskUserTool', () => {
       }
 
       const result = await invocation.execute({
-        signal: new AbortController().signal,
+        abortSignal: new AbortController().signal,
       });
       expect(result.returnDisplay).toBe('User dismissed dialog');
       expect(result.llmContent).toBe(

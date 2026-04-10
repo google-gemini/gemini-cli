@@ -97,7 +97,7 @@ class GetInternalDocsInvocation extends BaseToolInvocation<
     return 'Listing all available internal documentation.';
   }
 
-  async execute({ signal: _signal }: ExecuteOptions): Promise<ToolResult> {
+  async execute({ abortSignal: _signal }: ExecuteOptions): Promise<ToolResult> {
     try {
       const docsRoot = await getDocsRoot();
 

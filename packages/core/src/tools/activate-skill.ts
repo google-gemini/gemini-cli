@@ -108,7 +108,7 @@ ${folderStructure}`,
     return confirmationDetails;
   }
 
-  async execute({ signal: _signal }: ExecuteOptions): Promise<ToolResult> {
+  async execute({ abortSignal: _signal }: ExecuteOptions): Promise<ToolResult> {
     const skillName = this.params.name;
     const skillManager = this.config.getSkillManager();
     const skill = skillManager.getSkill(skillName);

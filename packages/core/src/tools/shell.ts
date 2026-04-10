@@ -435,7 +435,7 @@ export class ShellToolInvocation extends BaseToolInvocation<
 
   async execute(options: ExecuteOptions): Promise<ToolResult> {
     const {
-      signal,
+      abortSignal: signal,
       updateOutput,
       shellExecutionConfig,
       setExecutionIdCallback,

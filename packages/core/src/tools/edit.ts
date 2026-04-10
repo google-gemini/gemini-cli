@@ -833,7 +833,7 @@ class EditToolInvocation
    * @param params Parameters for the edit operation
    * @returns Result of the edit operation
    */
-  async execute({ signal }: ExecuteOptions): Promise<ToolResult> {
+  async execute({ abortSignal: signal }: ExecuteOptions): Promise<ToolResult> {
     const validationError = this.config.validatePathAccess(this.resolvedPath);
     if (validationError) {
       return {

@@ -83,7 +83,7 @@ describe('UpdateTopicTool', () => {
       [TOPIC_PARAM_STRATEGIC_INTENT]: 'Initial Move',
     });
     const result = await invocation.execute({
-      signal: new AbortController().signal,
+      abortSignal: new AbortController().signal,
     });
 
     expect(result.llmContent).toContain('Current topic: "New Chapter"');
@@ -108,7 +108,7 @@ describe('UpdateTopicTool', () => {
       [TOPIC_PARAM_STRATEGIC_INTENT]: 'Subsequent Move',
     });
     const result = await invocation.execute({
-      signal: new AbortController().signal,
+      abortSignal: new AbortController().signal,
     });
 
     expect(result.returnDisplay).not.toContain('## 📂 Topic:');

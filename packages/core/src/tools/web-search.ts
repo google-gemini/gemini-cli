@@ -85,7 +85,9 @@ class WebSearchToolInvocation extends BaseToolInvocation<
     return `Searching the web for: "${this.params.query}"`;
   }
 
-  async execute({ signal }: ExecuteOptions): Promise<WebSearchToolResult> {
+  async execute({
+    abortSignal: signal,
+  }: ExecuteOptions): Promise<WebSearchToolResult> {
     const geminiClient = this.context.geminiClient;
 
     try {

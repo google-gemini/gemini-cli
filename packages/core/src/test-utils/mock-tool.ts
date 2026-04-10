@@ -54,7 +54,7 @@ class MockToolInvocation extends BaseToolInvocation<
   }
 
   execute(options: ExecuteOptions): Promise<ToolResult> {
-    const { signal, updateOutput } = options;
+    const { abortSignal: signal, updateOutput } = options;
     return this.tool.execute(
       this.params,
       signal,
@@ -155,7 +155,7 @@ export class MockModifiableToolInvocation extends BaseToolInvocation<
   }
 
   async execute({
-    signal: _signal,
+    abortSignal: _signal,
     updateOutput: _updateOutput,
   }: ExecuteOptions): Promise<ToolResult> {
     const result = this.tool.executeFn(this.params);

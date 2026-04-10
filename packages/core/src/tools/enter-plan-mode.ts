@@ -115,7 +115,7 @@ export class EnterPlanModeInvocation extends BaseToolInvocation<
     };
   }
 
-  async execute({ signal: _signal }: ExecuteOptions): Promise<ToolResult> {
+  async execute({ abortSignal: _signal }: ExecuteOptions): Promise<ToolResult> {
     if (this.confirmationOutcome === ToolConfirmationOutcome.Cancel) {
       return {
         llmContent: 'User cancelled entering Plan Mode.',

@@ -136,7 +136,7 @@ describe('ExitPlanModeTool', () => {
       expect(result).toBe(false);
       // Verify it auto-approved internally
       const executeResult = await invocation.execute({
-        signal: new AbortController().signal,
+        abortSignal: new AbortController().signal,
       });
       expect(executeResult.llmContent).toContain('Plan approved');
     });
@@ -165,7 +165,7 @@ describe('ExitPlanModeTool', () => {
 
       await invocation.shouldConfirmExecute(new AbortController().signal);
       const result = await invocation.execute({
-        signal: new AbortController().signal,
+        abortSignal: new AbortController().signal,
       });
 
       expect(result.llmContent).toContain('Plan file is empty');
@@ -178,7 +178,7 @@ describe('ExitPlanModeTool', () => {
 
       await invocation.shouldConfirmExecute(new AbortController().signal);
       const result = await invocation.execute({
-        signal: new AbortController().signal,
+        abortSignal: new AbortController().signal,
       });
 
       expect(result.llmContent).toContain('Plan file does not exist');
@@ -202,7 +202,7 @@ describe('ExitPlanModeTool', () => {
       });
 
       const result = await invocation.execute({
-        signal: new AbortController().signal,
+        abortSignal: new AbortController().signal,
       });
       const expectedPath = path.join(mockPlansDir, 'test.md');
 
@@ -232,7 +232,7 @@ Read and follow the plan strictly during implementation.`,
       });
 
       const result = await invocation.execute({
-        signal: new AbortController().signal,
+        abortSignal: new AbortController().signal,
       });
       const expectedPath = path.join(mockPlansDir, 'test.md');
 
@@ -265,7 +265,7 @@ Read and follow the plan strictly during implementation.`,
       });
 
       const result = await invocation.execute({
-        signal: new AbortController().signal,
+        abortSignal: new AbortController().signal,
       });
       const expectedPath = path.join(mockPlansDir, 'test.md');
 
@@ -293,7 +293,7 @@ Revise the plan based on the feedback.`,
       });
 
       const result = await invocation.execute({
-        signal: new AbortController().signal,
+        abortSignal: new AbortController().signal,
       });
       const expectedPath = path.join(mockPlansDir, 'test.md');
 
@@ -320,7 +320,7 @@ Ask the user for specific feedback on how to improve the plan.`,
         approvalMode: ApprovalMode.AUTO_EDIT,
       });
 
-      await invocation.execute({ signal: new AbortController().signal });
+      await invocation.execute({ abortSignal: new AbortController().signal });
 
       expect(loggers.logPlanExecution).toHaveBeenCalledWith(
         mockConfig,
@@ -343,7 +343,7 @@ Ask the user for specific feedback on how to improve the plan.`,
       await confirmDetails.onConfirm(ToolConfirmationOutcome.Cancel);
 
       const result = await invocation.execute({
-        signal: new AbortController().signal,
+        abortSignal: new AbortController().signal,
       });
 
       expect(result).toEqual({
@@ -363,7 +363,7 @@ Ask the user for specific feedback on how to improve the plan.`,
       // directly without ever calling shouldConfirmExecute(), leaving
       // approvalPayload null.
       const result = await invocation.execute({
-        signal: new AbortController().signal,
+        abortSignal: new AbortController().signal,
       });
       const expectedPath = path.join(mockPlansDir, 'test.md');
 
@@ -384,7 +384,7 @@ Ask the user for specific feedback on how to improve the plan.`,
 
       // Directly call execute to trigger the internal getAllowApprovalMode
       const result = await invocation.execute({
-        signal: new AbortController().signal,
+        abortSignal: new AbortController().signal,
       });
 
       expect(result.llmContent).toContain('YOLO mode');
@@ -400,7 +400,7 @@ Ask the user for specific feedback on how to improve the plan.`,
 
       // Directly call execute to trigger the internal getAllowApprovalMode
       const result = await invocation.execute({
-        signal: new AbortController().signal,
+        abortSignal: new AbortController().signal,
       });
 
       expect(result.llmContent).toContain('Default mode');
@@ -427,7 +427,7 @@ Ask the user for specific feedback on how to improve the plan.`,
         });
 
         const result = await invocation.execute({
-          signal: new AbortController().signal,
+          abortSignal: new AbortController().signal,
         });
         expect(result.llmContent).toContain(expected);
       };
@@ -462,7 +462,7 @@ Ask the user for specific feedback on how to improve the plan.`,
         });
 
         await expect(
-          invocation.execute({ signal: new AbortController().signal }),
+          invocation.execute({ abortSignal: new AbortController().signal }),
         ).rejects.toThrow(/Unexpected approval mode/);
       };
 

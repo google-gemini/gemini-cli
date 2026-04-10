@@ -386,12 +386,12 @@ describe('WebFetchTool', () => {
 
       // Execute 10 times to hit the limit
       for (let i = 0; i < 10; i++) {
-        await invocation.execute({ signal: new AbortController().signal });
+        await invocation.execute({ abortSignal: new AbortController().signal });
       }
 
       // The 11th time should fail due to rate limit
       const result = await invocation.execute({
-        signal: new AbortController().signal,
+        abortSignal: new AbortController().signal,
       });
       expect(result.error?.type).toBe(ToolErrorType.WEB_FETCH_PROCESSING_ERROR);
       expect(result.error?.message).toContain(
@@ -415,19 +415,19 @@ describe('WebFetchTool', () => {
         });
         await tool
           .build({ prompt: 'fetch https://ratelimit-multi.com' })
-          .execute({ signal: new AbortController().signal });
+          .execute({ abortSignal: new AbortController().signal });
       }
       // 11th call - should be rate limited and not use a mock
       await tool
         .build({ prompt: 'fetch https://ratelimit-multi.com' })
-        .execute({ signal: new AbortController().signal });
+        .execute({ abortSignal: new AbortController().signal });
 
       mockGenerateContent.mockResolvedValueOnce({
         candidates: [{ content: { parts: [{ text: 'healthy response' }] } }],
       });
 
       const result = await invocation.execute({
-        signal: new AbortController().signal,
+        abortSignal: new AbortController().signal,
       });
       expect(result.llmContent).toContain('healthy response');
       expect(result.llmContent).toContain(
@@ -455,7 +455,7 @@ describe('WebFetchTool', () => {
       });
 
       const result = await invocation.execute({
-        signal: new AbortController().signal,
+        abortSignal: new AbortController().signal,
       });
 
       expect(logWebFetchFallbackAttempt).toHaveBeenCalledTimes(2);
@@ -501,7 +501,7 @@ describe('WebFetchTool', () => {
       };
       const invocation = tool.build(params);
       const result = await invocation.execute({
-        signal: new AbortController().signal,
+        abortSignal: new AbortController().signal,
       });
 
       expect(result.llmContent).toBe('fallback processed response');
@@ -534,7 +534,7 @@ describe('WebFetchTool', () => {
       };
       const invocation = tool.build(params);
       const result = await invocation.execute({
-        signal: new AbortController().signal,
+        abortSignal: new AbortController().signal,
       });
 
       expect(result.llmContent).toBe('fallback response');
@@ -549,7 +549,7 @@ describe('WebFetchTool', () => {
       const params = { prompt: 'fetch https://public.ip' };
       const invocation = tool.build(params);
       const result = await invocation.execute({
-        signal: new AbortController().signal,
+        abortSignal: new AbortController().signal,
       });
       expect(result.error?.type).toBe(ToolErrorType.WEB_FETCH_FALLBACK_FAILED);
     });
@@ -572,7 +572,7 @@ describe('WebFetchTool', () => {
       const tool = new WebFetchTool(mockConfig, bus);
       const params = { prompt: 'fetch https://public.ip' };
       const invocation = tool.build(params);
-      await invocation.execute({ signal: new AbortController().signal });
+      await invocation.execute({ abortSignal: new AbortController().signal });
 
       expect(logWebFetchFallbackAttempt).toHaveBeenCalledWith(
         mockConfig,
@@ -641,7 +641,7 @@ describe('WebFetchTool', () => {
         const params = { prompt: 'fetch https://example.com' };
         const invocation = tool.build(params);
         const result = await invocation.execute({
-          signal: new AbortController().signal,
+          abortSignal: new AbortController().signal,
         });
 
         const sanitizeXml = (text: string) =>
@@ -949,7 +949,7 @@ describe('WebFetchTool', () => {
       await confirmationPromise;
 
       const result = await invocation.execute({
-        signal: new AbortController().signal,
+        abortSignal: new AbortController().signal,
       });
       expect(result.error).toBeUndefined();
       expect(result.llmContent).toContain('Fetched content');
@@ -974,7 +974,7 @@ describe('WebFetchTool', () => {
       const params = { url: 'https://example.com' };
       const invocation = tool.build(params);
       const result = await invocation.execute({
-        signal: new AbortController().signal,
+        abortSignal: new AbortController().signal,
       });
 
       expect(result.llmContent).toBe(content);
@@ -1002,7 +1002,7 @@ describe('WebFetchTool', () => {
       const tool = new WebFetchTool(mockConfig, bus);
       const params = { url: 'https://example.com' };
       const invocation = tool.build(params);
-      await invocation.execute({ signal: new AbortController().signal });
+      await invocation.execute({ abortSignal: new AbortController().signal });
 
       expect(convert).toHaveBeenCalledWith(
         content,
@@ -1035,7 +1035,7 @@ describe('WebFetchTool', () => {
       const params = { url: 'https://example.com/image.png' };
       const invocation = tool.build(params);
       const result = await invocation.execute({
-        signal: new AbortController().signal,
+        abortSignal: new AbortController().signal,
       });
 
       expect(result.llmContent).toEqual({
@@ -1058,7 +1058,7 @@ describe('WebFetchTool', () => {
       const params = { url: 'https://example.com/404' };
       const invocation = tool.build(params);
       const result = await invocation.execute({
-        signal: new AbortController().signal,
+        abortSignal: new AbortController().signal,
       });
 
       expect(result.llmContent).toContain('Request failed with status 404');
@@ -1077,7 +1077,7 @@ describe('WebFetchTool', () => {
       const tool = new WebFetchTool(mockConfig, bus);
       const invocation = tool.build({ url: 'https://example.com/large' });
       const result = await invocation.execute({
-        signal: new AbortController().signal,
+        abortSignal: new AbortController().signal,
       });
 
       expect(result.llmContent).toContain('Error');
@@ -1104,7 +1104,7 @@ describe('WebFetchTool', () => {
         url: 'https://example.com/large-stream',
       });
       const result = await invocation.execute({
-        signal: new AbortController().signal,
+        abortSignal: new AbortController().signal,
       });
 
       expect(result.llmContent).toContain('Error');
@@ -1116,7 +1116,7 @@ describe('WebFetchTool', () => {
       // Manually bypass build() validation to test executeExperimental safety check
       const invocation = tool['createInvocation']({}, bus);
       const result = await invocation.execute({
-        signal: new AbortController().signal,
+        abortSignal: new AbortController().signal,
       });
 
       expect(result.llmContent).toContain('Error: No URL provided.');
@@ -1128,7 +1128,7 @@ describe('WebFetchTool', () => {
       // Manually bypass build() validation to test executeExperimental safety check
       const invocation = tool['createInvocation']({ url: 'not-a-url' }, bus);
       const result = await invocation.execute({
-        signal: new AbortController().signal,
+        abortSignal: new AbortController().signal,
       });
 
       expect(result.llmContent).toContain('Error: Invalid URL "not-a-url"');
@@ -1143,7 +1143,7 @@ describe('WebFetchTool', () => {
         bus,
       );
       const result = await invocation.execute({
-        signal: new AbortController().signal,
+        abortSignal: new AbortController().signal,
       });
 
       expect(result.llmContent).toContain(
@@ -1164,7 +1164,7 @@ describe('WebFetchTool', () => {
       const tool = new WebFetchTool(mockConfig, bus);
       const invocation = tool.build({ url: 'https://example.com/large-text' });
       const result = await invocation.execute({
-        signal: new AbortController().signal,
+        abortSignal: new AbortController().signal,
       });
 
       expect((result.llmContent as string).length).toBe(300000); // No truncation
@@ -1182,7 +1182,7 @@ describe('WebFetchTool', () => {
       const tool = new WebFetchTool(mockConfig, bus);
       const invocation = tool.build({ url: 'https://example.com/large-text2' });
       const result = await invocation.execute({
-        signal: new AbortController().signal,
+        abortSignal: new AbortController().signal,
       });
 
       expect((result.llmContent as string).length).toBeLessThan(300000);

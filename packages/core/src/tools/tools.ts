@@ -34,7 +34,7 @@ export type ForcedToolDecision = 'allow' | 'deny' | 'ask_user';
  * only relevant to specific tool types.
  */
 export interface ExecuteOptions {
-  signal: AbortSignal;
+  abortSignal: AbortSignal;
   updateOutput?: (output: ToolLiveOutput) => void;
   shellExecutionConfig?: ShellExecutionConfig;
   setExecutionIdCallback?: (executionId: number) => void;
@@ -601,10 +601,14 @@ export abstract class DeclarativeTool<
     params: TParams,
     signal: AbortSignal,
     updateOutput?: (output: ToolLiveOutput) => void,
-    options?: Omit<ExecuteOptions, 'signal' | 'updateOutput'>,
+    options?: Omit<ExecuteOptions, 'abortSignal' | 'updateOutput'>,
   ): Promise<TResult> {
     const invocation = this.build(params);
-    return invocation.execute({ ...options, signal, updateOutput });
+    return invocation.execute({
+      ...options,
+      abortSignal: signal,
+      updateOutput,
+    });
   }
 
   /**
@@ -650,7 +654,7 @@ export abstract class DeclarativeTool<
     }
 
     try {
-      return await invocationOrError.execute({ signal: abortSignal });
+      return await invocationOrError.execute({ abortSignal });
     } catch (error) {
       const errorMessage =
         error instanceof Error ? error.message : String(error);

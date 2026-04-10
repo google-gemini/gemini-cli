@@ -186,7 +186,10 @@ describe('LocalSubagentInvocation', () => {
       };
       mockExecutorInstance.run.mockResolvedValue(mockOutput);
 
-      const result = await invocation.execute({ signal, updateOutput });
+      const result = await invocation.execute({
+        abortSignal: signal,
+        updateOutput,
+      });
 
       expect(MockLocalAgentExecutor.create).toHaveBeenCalledWith(
         testDefinition,
@@ -223,7 +226,10 @@ describe('LocalSubagentInvocation', () => {
       };
       mockExecutorInstance.run.mockResolvedValue(mockOutput);
 
-      const result = await invocation.execute({ signal, updateOutput });
+      const result = await invocation.execute({
+        abortSignal: signal,
+        updateOutput,
+      });
 
       const display = result.returnDisplay as SubagentProgress;
       expect(display.isSubagentProgress).toBe(true);
@@ -253,7 +259,7 @@ describe('LocalSubagentInvocation', () => {
         return { result: 'Done', terminate_reason: AgentTerminateMode.GOAL };
       });
 
-      await invocation.execute({ signal, updateOutput });
+      await invocation.execute({ abortSignal: signal, updateOutput });
 
       expect(updateOutput).toHaveBeenCalledTimes(4); // Initial + 2 updates + Final completion
       const lastCall = updateOutput.mock.calls[3][0] as SubagentProgress;
@@ -292,7 +298,7 @@ describe('LocalSubagentInvocation', () => {
         return { result: 'Done', terminate_reason: AgentTerminateMode.GOAL };
       });
 
-      await invocation.execute({ signal, updateOutput });
+      await invocation.execute({ abortSignal: signal, updateOutput });
 
       const calls = updateOutput.mock.calls;
       const lastCall = calls[calls.length - 1][0] as SubagentProgress;
@@ -325,7 +331,7 @@ describe('LocalSubagentInvocation', () => {
         return { result: 'Done', terminate_reason: AgentTerminateMode.GOAL };
       });
 
-      await invocation.execute({ signal, updateOutput });
+      await invocation.execute({ abortSignal: signal, updateOutput });
 
       expect(updateOutput).toHaveBeenCalledTimes(4); // Initial + 2 updates + Final completion
       const lastCall = updateOutput.mock.calls[3][0] as SubagentProgress;
@@ -359,7 +365,7 @@ describe('LocalSubagentInvocation', () => {
         return { result: 'Done', terminate_reason: AgentTerminateMode.GOAL };
       });
 
-      await invocation.execute({ signal, updateOutput });
+      await invocation.execute({ abortSignal: signal, updateOutput });
 
       expect(updateOutput).toHaveBeenCalled();
       const lastCall = updateOutput.mock.calls[
@@ -403,7 +409,7 @@ describe('LocalSubagentInvocation', () => {
         };
       });
 
-      await invocation.execute({ signal, updateOutput });
+      await invocation.execute({ abortSignal: signal, updateOutput });
 
       expect(updateOutput).toHaveBeenCalledTimes(4);
       const lastCall = updateOutput.mock.calls[3][0] as SubagentProgress;
@@ -432,7 +438,7 @@ describe('LocalSubagentInvocation', () => {
       });
 
       // Execute without the optional callback
-      const result = await invocation.execute({ signal });
+      const result = await invocation.execute({ abortSignal: signal });
       expect(result.error).toBeUndefined();
       const display = result.returnDisplay as SubagentProgress;
       expect(display.isSubagentProgress).toBe(true);
@@ -444,7 +450,10 @@ describe('LocalSubagentInvocation', () => {
       const error = new Error('Model failed during execution.');
       mockExecutorInstance.run.mockRejectedValue(error);
 
-      const result = await invocation.execute({ signal, updateOutput });
+      const result = await invocation.execute({
+        abortSignal: signal,
+        updateOutput,
+      });
 
       expect(result.error).toBeUndefined();
       expect(result.llmContent).toBe(
@@ -465,7 +474,10 @@ describe('LocalSubagentInvocation', () => {
       const creationError = new Error('Failed to initialize tools.');
       MockLocalAgentExecutor.create.mockRejectedValue(creationError);
 
-      const result = await invocation.execute({ signal, updateOutput });
+      const result = await invocation.execute({
+        abortSignal: signal,
+        updateOutput,
+      });
 
       expect(mockExecutorInstance.run).not.toHaveBeenCalled();
       expect(result.error).toBeUndefined();
@@ -487,7 +499,7 @@ describe('LocalSubagentInvocation', () => {
 
       const controller = new AbortController();
       const executePromise = invocation.execute({
-        signal: controller.signal,
+        abortSignal: controller.signal,
         updateOutput,
       });
       controller.abort();
@@ -507,7 +519,7 @@ describe('LocalSubagentInvocation', () => {
       mockExecutorInstance.run.mockResolvedValue(mockOutput);
 
       await expect(
-        invocation.execute({ signal, updateOutput }),
+        invocation.execute({ abortSignal: signal, updateOutput }),
       ).rejects.toThrow('Operation cancelled by user');
     });
 
@@ -528,7 +540,7 @@ describe('LocalSubagentInvocation', () => {
         return { result: 'Done', terminate_reason: AgentTerminateMode.GOAL };
       });
 
-      await invocation.execute({ signal, updateOutput });
+      await invocation.execute({ abortSignal: signal, updateOutput });
 
       expect(mockMessageBus.publish).toHaveBeenCalledWith(
         expect.objectContaining({

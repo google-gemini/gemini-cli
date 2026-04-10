@@ -156,7 +156,7 @@ class LSToolInvocation extends BaseToolInvocation<LSToolParams, ToolResult> {
    * Executes the LS operation with the given parameters
    * @returns Result of the LS operation
    */
-  async execute({ signal: _signal }: ExecuteOptions): Promise<ToolResult> {
+  async execute({ abortSignal: _signal }: ExecuteOptions): Promise<ToolResult> {
     const resolvedDirPath = path.resolve(
       this.config.getTargetDir(),
       this.params.dir_path,
