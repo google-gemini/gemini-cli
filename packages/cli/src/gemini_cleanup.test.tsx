@@ -73,6 +73,7 @@ vi.mock('./config/config.js', () => ({
     getSandbox: vi.fn(() => false),
     getQuestion: vi.fn(() => ''),
     isInteractive: () => false,
+    getSessionId: vi.fn().mockReturnValue('test-session-id'),
     storage: { initialize: vi.fn().mockResolvedValue(undefined) },
   } as unknown as Config),
   parseArguments: vi.fn().mockResolvedValue({}),
@@ -141,7 +142,9 @@ vi.mock('./utils/cleanup.js', async (importOriginal) => {
     ...actual,
     cleanupCheckpoints: vi.fn().mockResolvedValue(undefined),
     registerCleanup: vi.fn(),
+    removeCleanup: vi.fn(),
     registerSyncCleanup: vi.fn(),
+    removeSyncCleanup: vi.fn(),
     registerTelemetryConfig: vi.fn(),
     runExitCleanup: vi.fn().mockResolvedValue(undefined),
   };
@@ -213,6 +216,7 @@ describe('gemini.tsx main function cleanup', () => {
       getSandbox: vi.fn(() => false),
       getDebugMode: vi.fn(() => false),
       getPolicyEngine: vi.fn(),
+      getSessionId: vi.fn().mockReturnValue('test-session-id'),
       getMessageBus: () => ({ subscribe: vi.fn() }),
       getEnableHooks: vi.fn(() => false),
       getHookSystem: () => undefined,
@@ -273,6 +277,7 @@ describe('gemini.tsx main function cleanup', () => {
     vi.mocked(loadCliConfig).mockResolvedValue(
       buildMockConfig({
         getHookSystem: vi.fn(() => mockHookSystem),
+        getSessionId: vi.fn().mockReturnValue('test-session-id'),
       }),
     );
 
