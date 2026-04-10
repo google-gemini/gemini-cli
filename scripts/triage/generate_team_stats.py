@@ -121,7 +121,9 @@ def gh_api_graphql(query, variables=None):
             if v: cmd.extend(['-F', f'{k}={v}'])
     cmd.extend(['-f', f'query={query}'])
     result = subprocess.run(cmd, capture_output=True, text=True)
-    return json.loads(result.stdout) if result.returncode == 0 else None
+    if result.returncode != 0:
+        return None
+    return json.loads(result.stdout)
 
 def parse_date(date_str):
     if not date_str: return None
@@ -204,26 +206,24 @@ def get_pr_batch_query(pr_numbers):
 
 def main():
     print("Fetching issue list...")
-    all_issue_data = []
+    all_issue_nodes = []
     cursor = None
     while True:
         data = gh_api_graphql(ISSUES_QUERY, {"searchQuery": SEARCH_QUERY, "cursor": cursor})
         if not data: break
         search_data = data['data']['search']
-        all_issue_data.extend(search_data['nodes'])
+        all_issue_nodes.extend(search_data['nodes'])
         if not search_data['pageInfo']['hasNextPage']: break
         cursor = search_data['pageInfo']['endCursor']
 
-    # Collect unique PR numbers and issue mapping
-    issue_to_info = {i['number']: {"title": i['title'], "url": i['url']} for i in all_issue_data}
+    issue_to_info = {i['number']: {"title": i['title'], "url": i['url']} for i in all_issue_nodes}
     issue_to_prs = {}
     all_pr_numbers = set()
-    for issue in all_issue_data:
+    for issue in all_issue_nodes:
         nums = [e['source']['number'] for e in issue['timelineItems']['nodes'] if e.get('source') and 'number' in e['source']]
         issue_to_prs[issue['number']] = nums
         all_pr_numbers.update(nums)
 
-    # Fetch PR details in batches
     print(f"Fetching details for {len(all_pr_numbers)} PRs in batches...")
     pr_details = {}
     pr_list = sorted(list(all_pr_numbers))
@@ -242,7 +242,7 @@ def main():
 
     stats = {login: {"name": name, "weekly_closed": 0, "open_queue": [], "history": []} for login, name in MAINTAINERS.items()}
     pickup_list = []
-    processed_prs = set()
+    processed_prs_for_history = set()
     
     for issue_no, pr_nums in issue_to_prs.items():
         for pr_no in pr_nums:
@@ -250,17 +250,20 @@ def main():
             if not pr: continue
             if issue_no not in [n['number'] for n in pr['closingIssuesReferences']['nodes']]: continue
             if pr.get('baseRepository', {}).get('nameWithOwner', TARGET_REPO) != TARGET_REPO: continue
+            
             if pr.get('state') != 'OPEN':
-                # Track recently closed for maintainers
-                if pr_no not in processed_prs:
+                if pr_no not in processed_prs_for_history:
                     updated_at = parse_date(pr['updatedAt'])
-                    # Check who reviewed this closed PR
                     revs = set()
                     for req in pr.get('reviewRequests', {}).get('nodes', []):
                         rr = req.get('requestedReviewer')
-                        if rr and rr.get('__typename') == 'User': revs.add(rr.get('login'))
+                        if rr and rr.get('__typename') == 'User':
+                            login = rr.get('login')
+                            if login not in BOT_BLACKLIST: revs.add(login)
                     for r in pr.get('latestReviews', {}).get('nodes', []):
-                        if r.get('author'): revs.add(r['author']['login'])
+                        if r.get('author'):
+                            login = r['author']['login']
+                            if login not in BOT_BLACKLIST: revs.add(login)
                     
                     for r_login in revs:
                         if r_login in stats and updated_at and updated_at >= report_start:
@@ -269,28 +272,36 @@ def main():
                                 "number": pr['number'], "title": pr['title'], "url": pr['url'],
                                 "issue_no": issue_no, "updated": pr['updatedAt'][:10]
                             })
-                    processed_prs.add(pr_no)
+                    processed_prs_for_history.add(pr_no)
                 continue
 
-            # Open PR logic
+            # OPEN PRs
             human_reviewers = set()
             requested_special_teams = False
+            author = pr['author']['login']
+            
             for req in pr.get('reviewRequests', {}).get('nodes', []):
                 rr = req.get('requestedReviewer')
                 if rr:
                     if rr['__typename'] == 'User':
-                        human_reviewers.add(rr.get('login'))
+                        login = rr.get('login')
+                        if login and login != author and login not in BOT_BLACKLIST:
+                            human_reviewers.add(login)
                     elif rr['__typename'] == 'Team':
                         slug = rr.get('slug', '').split('/')[-1]
                         if slug in ONCALLER_TEAMS: requested_special_teams = True
+            
             for rev in pr.get('latestReviews', {}).get('nodes', []):
-                if rev.get('author'): human_reviewers.add(rev['author']['login'])
+                if rev.get('author'):
+                    login = rev['author']['login']
+                    if login != author and login not in BOT_BLACKLIST:
+                        human_reviewers.add(login)
             
             latest_author_act = get_author_activity(pr)
             latest_rev_act = get_reviewer_activity(pr)
             status_label = get_status_label(pr)
             
-            # Pickup List Logic (No human reviewers, not blocked, author updated last)
+            # Pickup logic
             if not human_reviewers and not requested_special_teams and "Blocked" not in status_label and (not latest_rev_act or latest_author_act > latest_rev_act):
                 if pr_no not in [p['number'] for p in pickup_list]:
                     pickup_list.append({
@@ -300,7 +311,6 @@ def main():
                         "updated": pr['updatedAt'][:10]
                     })
 
-            # Stats logic
             for reviewer in human_reviewers:
                 if reviewer in stats:
                     stats[reviewer]["open_queue"].append({
@@ -324,7 +334,8 @@ def main():
     md += f"\n### 🆕 Awaiting Reviewer Pickup ({len(pickup_list)})\n"
     md += "**Action: Pick up one of these new PRs.** These have no human reviewers assigned yet, but **all tests are passing and there are no conflicts.**\n\n"
     md += "| Issue | Linked PR | Last Update |\n| :--- | :--- | :--- |\n"
-    for i in pickup_list:
+    # Sort pickup list by date desc
+    for i in sorted(pickup_list, key=lambda x: x['updated'], reverse=True):
         md += f"| [#{i['issue_no']} {i['issue_title']}]({i['issue_url']}) | [#{i['number']}]({i['url']}) | `{i['updated']}` |\n"
     if not pickup_list: md += "| - | - | - |\\n"
 
@@ -332,23 +343,20 @@ def main():
     for login, data in sorted(stats.items(), key=lambda x: x[1]['name']):
         md += f"\n### {data['name']} (@{login})\n"
         md += "#### 🟢 Active Queue\n| PR | Issue | Title | Status & Next Step | Updated |\n| :--- | :--- | :--- | :--- | :--- |\n"
-        sorted_queue = sorted(data['open_queue'], key=lambda x: (x['priority'], x['updated']), reverse=True) # Priority 0 top, date desc
-        # Actually Priority 0 is best at top, so priority asc, date desc
         sorted_queue = sorted(data['open_queue'], key=lambda x: (x['priority'], datetime.datetime.fromisoformat(x['updated']).timestamp() * -1))
-        
         for p in sorted_queue:
             md += f"| [#{p['number']}]({p['url']}) | [#{p['issue_no']}](https://github.com/{TARGET_REPO}/issues/{p['issue_no']}) | {p['title']} | {p['status_label']} | `{p['updated']}` |\n"
         if not data['open_queue']: md += "| - | - | _No active reviews._ | - | - |\n"
 
         recent_closed = [p for p in data['history']]
         if recent_closed:
-            md += "\n#### 🔴 Recently Closed (Since Monday)\n| PR | Issue | Title | Closed Date |\n| :--- | :--- | :--- | :--- |\n"
+            md += "\n#### 🔴 Recently Closed (Since Monday)\n| PR | Issue | Title | Closed Date |\n| :--- | :--- | :--- |\n"
             for p in sorted(recent_closed, key=lambda x: x['updated'], reverse=True):
                 md += f"| [#{p['number']}]({p['url']}) | [#{p['issue_no']}](https://github.com/{TARGET_REPO}/issues/{p['issue_no']}) | {p['title']} | `{p['updated']}` |\n"
 
     md += "\n---\n*Report generated by automated triage script.*"
     with open("TEAM_STATS.md", "w") as f: f.write(md)
-    print("Successfully generated TEAM_STATS.md (Pickup table included).")
+    print(f"Verified generated TEAM_STATS.md with {len(pickup_list)} pickup items.")
 
 if __name__ == "__main__":
     main()
