@@ -203,12 +203,8 @@ describe('Memory Usage Tests', () => {
       tempDir = join(__dirname, `large-chat-tmp-${randomUUID()}`);
       mkdirSync(tempDir, { recursive: true });
 
-      const {
-        resumeResponsesPath,
-        activeResponsesPath,
-        historyPath,
-        prompts,
-      } = await generateSharedLargeChatData(tempDir);
+      const { resumeResponsesPath, activeResponsesPath, historyPath, prompts } =
+        await generateSharedLargeChatData(tempDir);
       sharedActiveResponsesPath = activeResponsesPath;
       sharedResumeResponsesPath = resumeResponsesPath;
       sharedHistoryPath = historyPath;
@@ -369,7 +365,9 @@ async function generateSharedLargeChatData(tempDir: string) {
         {
           content: {
             parts: [
-              { text: '{"complexity_reasoning":"simple","complexity_score":1}' },
+              {
+                text: '{"complexity_reasoning":"simple","complexity_score":1}',
+              },
             ],
             role: 'model',
           },
