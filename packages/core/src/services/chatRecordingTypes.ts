@@ -45,6 +45,7 @@ export interface ToolCallRecord {
   result?: PartListUnion | null;
   status: Status;
   timestamp: string;
+  agentId?: string;
   // UI-specific fields for display purposes
   displayName?: string;
   description?: string;

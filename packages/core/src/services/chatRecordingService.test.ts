@@ -536,6 +536,34 @@ describe('ChatRecordingService', () => {
           .toolCalls,
       ).toHaveLength(1);
     });
+
+    it('should record agentId when provided', async () => {
+      chatRecordingService.recordMessage({
+        type: 'gemini',
+        content: '',
+        model: 'gemini-pro',
+      });
+
+      const toolCall: ToolCallRecord = {
+        id: 'tool-1',
+        name: 'testTool',
+        args: {},
+        status: CoreToolCallStatus.Success,
+        timestamp: new Date().toISOString(),
+        agentId: 'test-agent-id',
+      };
+      chatRecordingService.recordToolCalls('gemini-pro', [toolCall]);
+
+      const sessionFile = chatRecordingService.getConversationFilePath()!;
+      const conversation = (await loadConversationRecord(
+        sessionFile,
+      )) as ConversationRecord;
+      const geminiMsg = conversation.messages[0] as MessageRecord & {
+        type: 'gemini';
+      };
+      expect(geminiMsg.toolCalls).toHaveLength(1);
+      expect(geminiMsg.toolCalls![0].agentId).toBe('test-agent-id');
+    });
   });
 
   describe('deleteSession', () => {
