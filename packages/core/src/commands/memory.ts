@@ -596,7 +596,15 @@ export async function applyInboxPatch(
     };
   }
 
-  const parsed = Diff.parsePatch(content);
+  let parsed: Diff.StructuredPatch[];
+  try {
+    parsed = Diff.parsePatch(content);
+  } catch (error) {
+    return {
+      success: false,
+      message: `Failed to parse patch "${fileName}": ${getErrorMessage(error)}`,
+    };
+  }
   if (!hasParsedPatchHunks(parsed)) {
     return {
       success: false,
