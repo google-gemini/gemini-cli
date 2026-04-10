@@ -17,18 +17,18 @@ Simply ask Gemini CLI to create a skill for you:
 
 Gemini will then:
 
-1.  **Draft instructions**: Generate a high-quality `SKILL.md` with the
-    appropriate metadata and triggers.
-2.  **Scaffold files**: Create the necessary directory structure and script
-    templates.
-3.  **Validate**: Ensure the skill's structure and configuration are correct.
+1.  Generate a new directory for your skill (for example, `my-new-skill/`).
+2.  Create a `SKILL.md` file with the necessary YAML frontmatter (`name` and
+    `description`).
+3.  Create the standard resource directories: `scripts/`, `references/`, and
+    `assets/`.
 
 Once created, you can find your new skill in `.gemini/skills/code-reviewer/`.
 
 ## Manual creation
 
-While `skill-creator` is recommended for most users, you can also build skills
-from scratch to have full control over every detail.
+1.  **Create a directory** for your skill (for example, `my-new-skill/`).
+2.  **Create a `SKILL.md` file** inside the new directory.
 
 ### 1. Create the directory structure
 

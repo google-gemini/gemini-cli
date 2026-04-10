@@ -247,15 +247,8 @@ export const useGeminiStream = (
   const previousApprovalModeRef = useRef<ApprovalMode>(
     config.getApprovalMode(),
   );
-  const [isResponding, setIsRespondingState] = useState<boolean>(false);
-  const isRespondingRef = useRef<boolean>(false);
-  const setIsResponding = useCallback(
-    (value: boolean) => {
-      setIsRespondingState(value);
-      isRespondingRef.current = value;
-    },
-    [setIsRespondingState],
-  );
+  const [isResponding, isRespondingRef, setIsResponding] =
+    useStateAndRef<boolean>(false);
   const [thought, thoughtRef, setThought] =
     useStateAndRef<ThoughtSummary | null>(null);
   const [pendingHistoryItem, pendingHistoryItemRef, setPendingHistoryItem] =
@@ -269,24 +262,26 @@ export const useGeminiStream = (
     useStateAndRef<boolean>(true);
   const processedMemoryToolsRef = useRef<Set<string>>(new Set());
   const { startNewPrompt, getPromptCount } = useSessionStats();
-  const storage = config.storage;
-  const logger = useLogger(storage);
+  const logger = useLogger(config);
   const gitService = useMemo(() => {
     if (!config.getProjectRoot()) {
       return;
     }
-    return new GitService(config.getProjectRoot(), storage);
-  }, [config, storage]);
+    return new GitService(config.getProjectRoot(), config.storage);
+  }, [config]);
 
   useEffect(() => {
     const handleRetryAttempt = (payload: RetryAttemptPayload) => {
+      if (turnCancelledRef.current || !isRespondingRef.current) {
+        return;
+      }
       setRetryStatus(payload);
     };
     coreEvents.on(CoreEvent.RetryAttempt, handleRetryAttempt);
     return () => {
       coreEvents.off(CoreEvent.RetryAttempt, handleRetryAttempt);
     };
-  }, []);
+  }, [isRespondingRef]);
 
   const [
     toolCalls,
@@ -839,6 +834,7 @@ export const useGeminiStream = (
       return;
     }
     turnCancelledRef.current = true;
+    setRetryStatus(null);
 
     // A full cancellation means no tools have produced a final result yet.
     // This determines if we show a generic "Request cancelled" message.
@@ -1583,6 +1579,7 @@ export const useGeminiStream = (
           operation: options?.isContinuation
             ? GeminiCliOperation.SystemPrompt
             : GeminiCliOperation.UserPrompt,
+          sessionId: config.getSessionId(),
         },
         async ({ metadata: spanMetadata }) => {
           spanMetadata.input = query;
@@ -1765,6 +1762,7 @@ export const useGeminiStream = (
       setThought,
       maybeAddSuppressedToolErrorNote,
       maybeAddLowVerbosityFailureNote,
+      isRespondingRef,
       settings.merged.billing?.overageStrategy,
       setIsResponding,
     ],
@@ -1968,11 +1966,20 @@ export const useGeminiStream = (
       }
 
       // If all the tools were cancelled, don't submit a response to Gemini.
-      const allToolsCancelled = geminiTools.every(
-        (tc) => tc.status === CoreToolCallStatus.Cancelled,
+      // Note: we ignore the topic tool because the user doesn't have a chance to decline it.
+      const declinableTools = geminiTools.filter(
+        (tc) => !isTopicTool(tc.request.name),
       );
+      const allDeclinableToolsCancelled =
+        declinableTools.length > 0 &&
+        declinableTools.every(
+          (tc) => tc.status === CoreToolCallStatus.Cancelled,
+        );
+      const allToolsCancelled =
+        geminiTools.length > 0 &&
+        geminiTools.every((tc) => tc.status === CoreToolCallStatus.Cancelled);
 
-      if (allToolsCancelled) {
+      if (allDeclinableToolsCancelled || allToolsCancelled) {
         // If the turn was cancelled via the imperative escape key flow,
         // the cancellation message is added there. We check the ref to avoid duplication.
         if (!turnCancelledRef.current) {
@@ -2098,7 +2105,7 @@ export const useGeminiStream = (
         }
 
         if (checkpointsToWrite.size > 0) {
-          const checkpointDir = storage.getProjectTempCheckpointsDir();
+          const checkpointDir = config.storage.getProjectTempCheckpointsDir();
           try {
             await fs.mkdir(checkpointDir, { recursive: true });
             for (const [fileName, content] of checkpointsToWrite) {
@@ -2115,15 +2122,7 @@ export const useGeminiStream = (
     };
     // eslint-disable-next-line @typescript-eslint/no-floating-promises
     saveRestorableToolCalls();
-  }, [
-    toolCalls,
-    config,
-    onDebugMessage,
-    gitService,
-    history,
-    geminiClient,
-    storage,
-  ]);
+  }, [toolCalls, config, onDebugMessage, gitService, history, geminiClient]);
 
   const lastOutputTime = Math.max(
     lastToolOutputTime,
