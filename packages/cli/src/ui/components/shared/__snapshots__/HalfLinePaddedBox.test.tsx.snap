@@ -18,8 +18,8 @@ exports[`<HalfLinePaddedBox /> > renders nothing when useBackgroundColor is fals
 `;
 
 exports[`<HalfLinePaddedBox /> > renders standard background and blocks when not iTerm2 1`] = `
-"▀▀▀▀▀▀▀▀▀▀
+"▄▄▄▄▄▄▄▄▄▄
 Content   
-▄▄▄▄▄▄▄▄▄▄
+▀▀▀▀▀▀▀▀▀▀
 "
 `;
