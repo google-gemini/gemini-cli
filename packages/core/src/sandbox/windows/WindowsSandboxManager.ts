@@ -299,7 +299,9 @@ export class WindowsSandboxManager implements SandboxManager {
         )
       : false;
 
-    if (!isReadonlyMode || isApproved) {
+    const workspaceWrite = !isReadonlyMode || isApproved || isYolo;
+
+    if (workspaceWrite) {
       await this.grantLowIntegrityAccess(resolvedPaths.workspace.resolved);
       writableRoots.push(resolvedPaths.workspace.resolved);
     }
@@ -343,6 +345,12 @@ export class WindowsSandboxManager implements SandboxManager {
           );
         }
       }
+    }
+
+    // Support git worktrees/submodules; read-only to prevent malicious hook/config modification (RCE).
+    // Read access is inherited; skip grantLowIntegrityAccess to ensure write protection.
+    if (resolvedPaths.gitWorktree) {
+      // No-op for read access.
     }
 
     // 2. Collect secret files and apply protective ACLs
