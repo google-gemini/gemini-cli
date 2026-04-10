@@ -33,15 +33,30 @@ jobs:
             Activate the 'docs-writer' skill.
 
             **Task:** Execute the docs audit procedure, as defined in your 'docs-auditing.md' reference.
+            Output a summary of what has been changed to `audit_changes.txt`.
+
+      - name: 'Read audit changes'
+        id: read_changes
+        run: |
+          if [ -f "audit_changes.txt" ]; then
+            echo "changes<<EOF" >> $GITHUB_OUTPUT
+            cat audit_changes.txt >> $GITHUB_OUTPUT
+            echo "EOF" >> $GITHUB_OUTPUT
+          else
+            echo "changes=No changes were made by the agent." >> $GITHUB_OUTPUT
+          fi
 
       - name: 'Create Pull Request with Audit Results'
         uses: 'peter-evans/create-pull-request@c5a7806660adbe173f04e3e038b0ccdcd758773c'
         with:
           token: '${{ secrets.GEMINI_CLI_ROBOT_GITHUB_PAT }}'
           commit-message: 'docs: weekly audit results for ${{ github.run_id }}'
-          title: 'Docs Audit for Week of ${{ github.event.schedule }}'
+          title: 'docs audit: ${{ github.event.schedule || github.run_started_at }}'
           body: |
             This PR contains the auto-generated documentation audit for the week. It includes a new `audit-results-*.md` file with findings and any direct fixes applied by the agent.
+
+            ### Changes Made:
+            ${{ steps.read_changes.outputs.changes }}
 
             Please review the suggestions and merge.
           branch: 'docs-audit-${{ github.run_id }}'
