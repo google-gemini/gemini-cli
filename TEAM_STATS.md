@@ -1,10 +1,10 @@
 # 📊 Gemini CLI Weekly Team Review Stats
 
 *Reporting Period: **Monday 2026-04-06** to Today*
-*Last Updated: 2026-04-10 00:30 (UTC)*
+*Last Updated: 2026-04-10 00:31 (UTC)*
 
 ## 📈 Weekly Summary
-| Maintainer | Closed/Merged (Week) | Current Open Queue |
+| Maintainer | Closed/Merged | Current Open Queue |
 | :--- | :--- | :--- |
 | **Coco Sheng** (@cocosheng-g) | **4** | 6 |
 | **Tommaso Sciortino** (@scidomino) | **2** | 3 |
@@ -30,12 +30,12 @@
 #### 🟢 Active Queue
 | PR | Issue | Title | Status & Next Step | Updated |
 | :--- | :--- | :--- | :--- | :--- |
-| [#15504](https://github.com/google-gemini/gemini-cli/pull/15504) | [#15503](https://github.com/google-gemini/gemini-cli/issues/15503) | feat: add github colorblind themes | 🔴 Blocked: Test Failure | `2026-04-09` |
-| [#23341](https://github.com/google-gemini/gemini-cli/pull/23341) | [#19851](https://github.com/google-gemini/gemini-cli/issues/19851) | fix: decode Uint8Array and multi-byte UTF-8 in API error messages | 🔴 Blocked: Test Failure | `2026-04-09` |
 | [#22624](https://github.com/google-gemini/gemini-cli/pull/22624) | [#22616](https://github.com/google-gemini/gemini-cli/issues/22616) | fix(cli): resolve text sanitization data loss due to C1 control characters | 🟢 Awaiting Reviewer | `2026-04-09` |
-| [#22619](https://github.com/google-gemini/gemini-cli/pull/22619) | [#22611](https://github.com/google-gemini/gemini-cli/issues/22611) | fix(cli): clear thought state on response completion to prevent UI ghosting | 🔴 Blocked: Test Failure | `2026-04-09` |
 | [#22324](https://github.com/google-gemini/gemini-cli/pull/22324) | [#22321](https://github.com/google-gemini/gemini-cli/issues/22321) | feat(cli): Add 'list' subcommand to '/commands' | ✍️ Awaiting Author | `2026-04-09` |
 | [#24847](https://github.com/google-gemini/gemini-cli/pull/24847) | [#24838](https://github.com/google-gemini/gemini-cli/issues/24838) | fix(mcp): treat GET 404 as 405 in StreamableHTTPClientTransport | ✍️ Awaiting Author | `2026-04-09` |
+| [#15504](https://github.com/google-gemini/gemini-cli/pull/15504) | [#15503](https://github.com/google-gemini/gemini-cli/issues/15503) | feat: add github colorblind themes | 🔴 Blocked: Test Failure | `2026-04-09` |
+| [#23341](https://github.com/google-gemini/gemini-cli/pull/23341) | [#19851](https://github.com/google-gemini/gemini-cli/issues/19851) | fix: decode Uint8Array and multi-byte UTF-8 in API error messages | 🔴 Blocked: Test Failure | `2026-04-09` |
+| [#22619](https://github.com/google-gemini/gemini-cli/pull/22619) | [#22611](https://github.com/google-gemini/gemini-cli/issues/22611) | fix(cli): clear thought state on response completion to prevent UI ghosting | 🔴 Blocked: Test Failure | `2026-04-09` |
 
 #### 🔴 Recently Closed (Since Monday)
 | PR | Issue | Title | Closed Date |
