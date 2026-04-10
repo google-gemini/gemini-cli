@@ -49,7 +49,7 @@ jobs:
           body: |
             This PR contains the auto-generated documentation audit for the week. It includes a new `audit-results-*.md` file with findings and any direct fixes applied by the agent.
 
-            ### Changes Made:
+            ### Audit Summary:
             ${{ steps.run_gemini.outputs.summary || 'No summary provided.' }}
 
             Please review the suggestions and merge.
