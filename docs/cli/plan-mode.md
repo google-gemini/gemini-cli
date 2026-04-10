@@ -327,7 +327,7 @@ Storage whenever Gemini CLI exits Plan Mode to start the implementation.
 
 ```bash
 #!/usr/bin/env bash
-# Extract the plan path from the tool input JSON
+# Extract the resolved plan path from the hook payload
 plan_path=$(jq -r '.tool_input.plan_path // empty')
 
 if [ -f "$plan_path" ]; then
@@ -341,6 +341,9 @@ fi
 # AfterTool hooks should generally allow the flow to continue
 echo '{"decision": "allow"}'
 ```
+
+For `exit_plan_mode` hooks, `tool_input` includes both the raw `plan_filename`
+and a runtime-resolved absolute `plan_path`.
 
 To register this `AfterTool` hook, add it to your `settings.json`:
 

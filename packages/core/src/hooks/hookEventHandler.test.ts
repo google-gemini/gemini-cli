@@ -8,6 +8,7 @@ import type {
   GenerateContentParameters,
   GenerateContentResponse,
 } from '@google/genai';
+import path from 'node:path';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { HookEventHandler } from './hookEventHandler.js';
 import type { Config } from '../config/config.js';
@@ -75,6 +76,9 @@ describe('HookEventHandler', () => {
     mockConfig = {
       get config() {
         return this;
+      },
+      storage: {
+        getPlansDir: vi.fn().mockReturnValue('/test/project/.gemini/tmp/plans'),
       },
       geminiClient: mockGeminiClient,
       getGeminiClient: vi.fn().mockReturnValue(mockGeminiClient),
@@ -384,6 +388,69 @@ describe('HookEventHandler', () => {
         .calls[0][2];
       expect(callArgs).not.toHaveProperty('mcp_context');
     });
+
+    it('should enrich exit_plan_mode BeforeTool input with resolved plan_path', async () => {
+      const mockPlan = [
+        {
+          hookConfig: {
+            type: HookType.Command,
+            command: './test.sh',
+          } as unknown as HookConfig,
+          eventName: HookEventName.BeforeTool,
+        },
+      ];
+      const mockResults: HookExecutionResult[] = [
+        {
+          success: true,
+          duration: 100,
+          hookConfig: {
+            type: HookType.Command,
+            command: './test.sh',
+            timeout: 30000,
+          },
+          eventName: HookEventName.BeforeTool,
+        },
+      ];
+      const mockAggregated = {
+        success: true,
+        allOutputs: [],
+        errors: [],
+        totalDuration: 100,
+      };
+
+      vi.mocked(mockHookPlanner.createExecutionPlan).mockReturnValue({
+        eventName: HookEventName.BeforeTool,
+        hookConfigs: mockPlan.map((p) => p.hookConfig),
+        sequential: false,
+      });
+      vi.mocked(mockHookRunner.executeHooksParallel).mockResolvedValue(
+        mockResults,
+      );
+      vi.mocked(mockHookAggregator.aggregateResults).mockReturnValue(
+        mockAggregated,
+      );
+
+      await hookEventHandler.fireBeforeToolEvent('exit_plan_mode', {
+        plan_filename: '../feature-x.md',
+      });
+
+      expect(mockHookRunner.executeHooksParallel).toHaveBeenCalledWith(
+        [mockPlan[0].hookConfig],
+        HookEventName.BeforeTool,
+        expect.objectContaining({
+          tool_name: 'exit_plan_mode',
+          tool_input: {
+            plan_filename: '../feature-x.md',
+            plan_path: path.join(
+              '/test/project/.gemini/tmp/plans',
+              'feature-x.md',
+            ),
+          },
+        }),
+        expect.any(Function),
+        expect.any(Function),
+      );
+    });
   });
 
   describe('fireAfterToolEvent', () => {
@@ -522,6 +589,132 @@ describe('HookEventHandler', () => {
       );
 
       expect(result).toBe(mockAggregated);
+    });
+
+    it('should enrich exit_plan_mode AfterTool input with resolved plan_path', async () => {
+      const mockPlan = [
+        {
+          hookConfig: {
+            type: HookType.Command,
+            command: './after.sh',
+          } as unknown as HookConfig,
+          eventName: HookEventName.AfterTool,
+        },
+      ];
+      const mockResults: HookExecutionResult[] = [
+        {
+          success: true,
+          duration: 100,
+          hookConfig: {
+            type: HookType.Command,
+            command: './after.sh',
+            timeout: 30000,
+          },
+          eventName: HookEventName.AfterTool,
+        },
+      ];
+      const mockAggregated = {
+        success: true,
+        allOutputs: [],
+        errors: [],
+        totalDuration: 100,
+      };
+
+      vi.mocked(mockHookPlanner.createExecutionPlan).mockReturnValue({
+        eventName: HookEventName.AfterTool,
+        hookConfigs: mockPlan.map((p) => p.hookConfig),
+        sequential: false,
+      });
+      vi.mocked(mockHookRunner.executeHooksParallel).mockResolvedValue(
+        mockResults,
+      );
+      vi.mocked(mockHookAggregator.aggregateResults).mockReturnValue(
+        mockAggregated,
+      );
+
+      const toolResponse = { approved: true };
+
+      await hookEventHandler.fireAfterToolEvent(
+        'exit_plan_mode',
+        { plan_filename: '../feature-x.md' },
+        toolResponse,
+      );
+
+      expect(mockHookRunner.executeHooksParallel).toHaveBeenCalledWith(
+        [mockPlan[0].hookConfig],
+        HookEventName.AfterTool,
+        expect.objectContaining({
+          tool_name: 'exit_plan_mode',
+          tool_input: {
+            plan_filename: '../feature-x.md',
+            plan_path: path.join(
+              '/test/project/.gemini/tmp/plans',
+              'feature-x.md',
+            ),
+          },
+          tool_response: toolResponse,
+        }),
+        expect.any(Function),
+        expect.any(Function),
+      );
+    });
+
+    it('should leave non-exit_plan_mode AfterTool input unchanged', async () => {
+      const mockPlan = [
+        {
+          hookConfig: {
+            type: HookType.Command,
+            command: './after.sh',
+          } as unknown as HookConfig,
+          eventName: HookEventName.AfterTool,
+        },
+      ];
+      const mockResults: HookExecutionResult[] = [
+        {
+          success: true,
+          duration: 100,
+          hookConfig: {
+            type: HookType.Command,
+            command: './after.sh',
+            timeout: 30000,
+          },
+          eventName: HookEventName.AfterTool,
+        },
+      ];
+      const mockAggregated = {
+        success: true,
+        allOutputs: [],
+        errors: [],
+        totalDuration: 100,
+      };
+
+      vi.mocked(mockHookPlanner.createExecutionPlan).mockReturnValue({
+        eventName: HookEventName.AfterTool,
+        hookConfigs: mockPlan.map((p) => p.hookConfig),
+        sequential: false,
+      });
+      vi.mocked(mockHookRunner.executeHooksParallel).mockResolvedValue(
+        mockResults,
+      );
+      vi.mocked(mockHookAggregator.aggregateResults).mockReturnValue(
+        mockAggregated,
+      );
+
+      const toolInput = { file: 'test.txt' };
+      await hookEventHandler.fireAfterToolEvent('EditTool', toolInput, {
+        success: true,
+      });
+
+      expect(mockHookRunner.executeHooksParallel).toHaveBeenCalledWith(
+        [mockPlan[0].hookConfig],
+        HookEventName.AfterTool,
+        expect.objectContaining({
+          tool_name: 'EditTool',
+          tool_input: toolInput,
+        }),
+        expect.any(Function),
+        expect.any(Function),
+      );
     });
   });
 

@@ -40,12 +40,13 @@ chat regarding the proposed strategy BEFORE calling this tool.
 - **Display name:** Exit Plan Mode
 - **File:** `exit-plan-mode.ts`
 - **Parameters:**
-  - `plan_path` (string, required): The path to the finalized Markdown plan
-    file. This file MUST be located within the project's temporary plans
-    directory (for example, `~/.gemini/tmp/<project>/plans/`).
+  - `plan_filename` (string, required): The filename of the finalized Markdown
+    plan file (for example, `feature-x.md`). The runtime resolves this to the
+    project's temporary plans directory (for example,
+    `~/.gemini/tmp/<project>/plans/feature-x.md`).
 - **Behavior:**
-  - Validates that the `plan_path` is within the allowed directory and that the
-    file exists and has content.
+  - Resolves the filename into the designated plans directory, validates that
+    the file exists there, and confirms it has content.
   - Presents the plan to the user for formal review.
   - If the user approves the plan:
     - Switches the CLI's approval mode to the user's chosen approval mode (

@@ -35,11 +35,16 @@ import type {
   GenerateContentParameters,
   GenerateContentResponse,
 } from '@google/genai';
+import path from 'node:path';
 import { logHookCall } from '../telemetry/loggers.js';
 import { HookCallEvent } from '../telemetry/types.js';
 import { debugLogger } from '../utils/debugLogger.js';
 import { coreEvents } from '../utils/events.js';
 import type { AgentLoopContext } from '../config/agent-loop-context.js';
+import {
+  EXIT_PLAN_MODE_TOOL_NAME,
+  EXIT_PLAN_PARAM_PLAN_FILENAME,
+} from '../tools/tool-names.js';
 
 /**
  * Hook event bus that coordinates hook execution across the system
@@ -79,10 +84,11 @@ export class HookEventHandler {
     mcpContext?: McpToolContext,
     originalRequestName?: string,
   ): Promise<AggregatedHookResult> {
+    const hookToolInput = this.getHookToolInput(toolName, toolInput);
     const input: BeforeToolInput = {
       ...this.createBaseInput(HookEventName.BeforeTool),
       tool_name: toolName,
-      tool_input: toolInput,
+      tool_input: hookToolInput,
       ...(mcpContext && { mcp_context: mcpContext }),
       ...(originalRequestName && {
         original_request_name: originalRequestName,
@@ -104,10 +110,11 @@ export class HookEventHandler {
     mcpContext?: McpToolContext,
     originalRequestName?: string,
   ): Promise<AggregatedHookResult> {
+    const hookToolInput = this.getHookToolInput(toolName, toolInput);
     const input: AfterToolInput = {
       ...this.createBaseInput(HookEventName.AfterTool),
       tool_name: toolName,
-      tool_input: toolInput,
+      tool_input: hookToolInput,
       tool_response: toolResponse,
       ...(mcpContext && { mcp_context: mcpContext }),
       ...(originalRequestName && {
@@ -381,6 +388,28 @@ export class HookEventHandler {
       cwd: this.context.config.getWorkingDir(),
       hook_event_name: eventName,
       timestamp: new Date().toISOString(),
+    };
+  }
+
+  private getHookToolInput(
+    toolName: string,
+    toolInput: Record<string, unknown>,
+  ): Record<string, unknown> {
+    if (toolName !== EXIT_PLAN_MODE_TOOL_NAME) {
+      return toolInput;
+    }
+
+    const planFilename = toolInput[EXIT_PLAN_PARAM_PLAN_FILENAME];
+    if (typeof planFilename !== 'string' || planFilename.trim() === '') {
+      return toolInput;
+    }
+
+    return {
+      ...toolInput,
+      plan_path: path.join(
+        this.context.config.storage.getPlansDir(),
+        path.basename(planFilename),
+      ),
     };
   }
 
