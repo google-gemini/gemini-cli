@@ -10,7 +10,7 @@ import { LocalAgentExecutor } from './local-executor.js';
 import {
   BaseToolInvocation,
   type ToolResult,
-  type ToolLiveOutput,
+  type ExecuteOptions,
 } from '../tools/tools.js';
 import {
   type LocalAgentDefinition,
@@ -103,10 +103,8 @@ export class LocalSubagentInvocation extends BaseToolInvocation<
    * agent's thoughts, to the user interface.
    * @returns A `Promise` that resolves with the final `ToolResult`.
    */
-  async execute(
-    signal: AbortSignal,
-    updateOutput?: (output: ToolLiveOutput) => void,
-  ): Promise<ToolResult> {
+  async execute(options: ExecuteOptions): Promise<ToolResult> {
+    const { signal, updateOutput } = options;
     const recentActivity: SubagentActivityItem[] = [];
 
     try {

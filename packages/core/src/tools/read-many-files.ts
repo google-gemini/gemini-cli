@@ -14,6 +14,7 @@ import {
   type PolicyUpdateOptions,
   type ToolConfirmationOutcome,
   type ReadManyFilesResult,
+  type ExecuteOptions,
 } from './tools.js';
 import { getErrorMessage } from '../utils/errors.js';
 import * as fsPromises from 'node:fs/promises';
@@ -175,7 +176,7 @@ ${finalExclusionPatternsForDescription
     };
   }
 
-  async execute(signal: AbortSignal): Promise<ToolResult> {
+  async execute({ signal }: ExecuteOptions): Promise<ToolResult> {
     const { include, exclude = [], useDefaultExcludes = true } = this.params;
 
     const filesToConsider = new Set<string>();
