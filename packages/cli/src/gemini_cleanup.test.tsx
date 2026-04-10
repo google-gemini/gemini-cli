@@ -142,7 +142,9 @@ vi.mock('./utils/cleanup.js', async (importOriginal) => {
     ...actual,
     cleanupCheckpoints: vi.fn().mockResolvedValue(undefined),
     registerCleanup: vi.fn(),
+    removeCleanup: vi.fn(),
     registerSyncCleanup: vi.fn(),
+    removeSyncCleanup: vi.fn(),
     registerTelemetryConfig: vi.fn(),
     runExitCleanup: vi.fn().mockResolvedValue(undefined),
   };

@@ -9,7 +9,11 @@ import { render } from 'ink';
 import { basename } from 'node:path';
 import { AppContainer } from './ui/AppContainer.js';
 import { ConsolePatcher } from './ui/utils/ConsolePatcher.js';
-import { registerCleanup, setupTtyCheck } from './utils/cleanup.js';
+import {
+  registerCleanup,
+  removeCleanup,
+  setupTtyCheck,
+} from './utils/cleanup.js';
 import {
   type StartupWarning,
   type Config,
@@ -89,7 +93,6 @@ export async function startInteractiveUI(
     debugMode: config.getDebugMode(),
   });
   consolePatcher.patch();
-  registerCleanup(consolePatcher.cleanup);
 
   const { stdout: inkStdout, stderr: inkStderr } = createWorkingStdio();
 
@@ -167,11 +170,11 @@ export async function startInteractiveUI(
     },
   );
 
+  let cleanupLineWrapping: (() => void) | undefined;
   if (useAlternateBuffer) {
     disableLineWrapping();
-    registerCleanup(() => {
-      enableLineWrapping();
-    });
+    cleanupLineWrapping = () => enableLineWrapping();
+    registerCleanup(cleanupLineWrapping);
   }
 
   checkForUpdates(settings)
@@ -185,9 +188,48 @@ export async function startInteractiveUI(
       }
     });
 
-  registerCleanup(() => instance.unmount());
+  const cleanupUnmount = () => instance.unmount();
+  registerCleanup(cleanupUnmount);
 
-  registerCleanup(setupTtyCheck());
+  const cleanupTtyCheck = setupTtyCheck();
+  registerCleanup(cleanupTtyCheck);
+
+  const cleanupConsolePatcher = () => consolePatcher.cleanup();
+  registerCleanup(cleanupConsolePatcher);
+
+  try {
+    await instance.waitUntilExit();
+  } finally {
+    try {
+      removeCleanup(cleanupConsolePatcher);
+      cleanupConsolePatcher();
+    } catch (e: unknown) {
+      debugLogger.error('Error cleaning up console patcher:', e);
+    }
+
+    try {
+      removeCleanup(cleanupUnmount);
+      instance.unmount();
+    } catch (e: unknown) {
+      debugLogger.error('Error unmounting Ink instance:', e);
+    }
+
+    try {
+      removeCleanup(cleanupTtyCheck);
+      cleanupTtyCheck();
+    } catch (e: unknown) {
+      debugLogger.error('Error in TTY cleanup:', e);
+    }
+
+    if (cleanupLineWrapping) {
+      try {
+        removeCleanup(cleanupLineWrapping);
+        cleanupLineWrapping();
+      } catch (e: unknown) {
+        debugLogger.error('Error restoring line wrapping:', e);
+      }
+    }
+  }
 }
 
 function setWindowTitle(title: string, settings: LoadedSettings) {
