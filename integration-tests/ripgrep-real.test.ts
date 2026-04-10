@@ -130,7 +130,9 @@ describe('ripgrep-real-direct', () => {
       pattern: 'match',
       context: 1,
     });
-    const result = await invocation.execute(new AbortController().signal);
+    const result = await invocation.execute({
+      abortSignal: new AbortController().signal,
+    });
 
     expect(result.llmContent).toContain('Found 1 match');
     expect(result.llmContent).toContain('context.txt');
