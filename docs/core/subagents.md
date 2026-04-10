@@ -358,7 +358,7 @@ it yourself; just report it.
 | `kind`         | string | No       | `local` (default) or `remote`.                                                                                                                                                                                |
 | `tools`        | array  | No       | List of tool names this agent can use. Supports wildcards: `*` (all tools), `mcp_*` (all MCP tools), `mcp_server_*` (all tools from a server). **If omitted, it inherits all tools from the parent session.** |
 | `mcpServers`   | object | No       | Configuration for inline Model Context Protocol (MCP) servers isolated to this specific agent.                                                                                                                |
-| `model`        | string | No       | Specific model to use (e.g., `gemini-3-preview`). Defaults to `inherit` (uses the main session model).                                                                                                        |
+| `model`        | string | No       | Specific model to use (for example, `gemini-3-preview`). Defaults to `inherit` (uses the main session model).                                                                                                 |
 | `temperature`  | number | No       | Model temperature (0.0 - 2.0). Defaults to `1`.                                                                                                                                                               |
 | `max_turns`    | number | No       | Maximum number of conversation turns allowed for this agent before it must return. Defaults to `30`.                                                                                                          |
 | `timeout_mins` | number | No       | Maximum execution time in minutes. Defaults to `10`.                                                                                                                                                          |
@@ -410,8 +410,8 @@ With this feature, you can:
 ### Configuring isolated tools and servers
 
 You can configure tool isolation for a subagent by updating its markdown
-frontmatter. This allows you to explicitly state which tools the subagent can
-use, rather than relying on the global registry.
+frontmatter. This lets you explicitly state which tools the subagent can use,
+rather than relying on the global registry.
 
 Add an `mcpServers` object to define inline MCP servers that are unique to the
 agent.

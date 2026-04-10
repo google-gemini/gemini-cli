@@ -14,6 +14,7 @@ import {
   type PolicyUpdateOptions,
   type ToolConfirmationOutcome,
   type ReadManyFilesResult,
+  type ExecuteOptions,
 } from './tools.js';
 import { getErrorMessage } from '../utils/errors.js';
 import * as fsPromises from 'node:fs/promises';
@@ -136,9 +137,9 @@ class ReadManyFilesToolInvocation extends BaseToolInvocation<
   }
 
   getDescription(): string {
-    const pathDesc = `using patterns: 
+    const pathDesc = `using patterns:
 ${this.params.include.join('`, `')}
- (within target directory: 
+ (within target directory:
 ${this.config.getTargetDir()}
 ) `;
 
@@ -152,7 +153,7 @@ ${this.config.getTargetDir()}
 
     const excludeDesc = `Excluding: ${
       finalExclusionPatternsForDescription.length > 0
-        ? `patterns like 
+        ? `patterns like
 ${finalExclusionPatternsForDescription
   .slice(0, 2)
   .join(
@@ -175,7 +176,7 @@ ${finalExclusionPatternsForDescription
     };
   }
 
-  async execute(signal: AbortSignal): Promise<ToolResult> {
+  async execute({ abortSignal: signal }: ExecuteOptions): Promise<ToolResult> {
     const { include, exclude = [], useDefaultExcludes = true } = this.params;
 
     const filesToConsider = new Set<string>();
