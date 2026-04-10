@@ -11,6 +11,7 @@ import {
   type ToolInvocation,
   type ToolResult,
   type ToolCallConfirmationDetails,
+  type ExecuteOptions,
 } from './tools.js';
 import { GET_INTERNAL_DOCS_TOOL_NAME } from './tool-names.js';
 import type { MessageBus } from '../confirmation-bus/message-bus.js';
@@ -96,7 +97,7 @@ class GetInternalDocsInvocation extends BaseToolInvocation<
     return 'Listing all available internal documentation.';
   }
 
-  async execute(_signal: AbortSignal): Promise<ToolResult> {
+  async execute({ abortSignal: _signal }: ExecuteOptions): Promise<ToolResult> {
     try {
       const docsRoot = await getDocsRoot();
 

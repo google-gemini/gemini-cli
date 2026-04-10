@@ -12,6 +12,7 @@ import {
   type AnyDeclarativeTool,
   type ToolResult,
   type ToolInvocation,
+  type ExecuteOptions,
 } from './tools.js';
 import type { Config } from '../config/config.js';
 import { ApprovalMode } from '../policy/types.js';
@@ -55,10 +56,10 @@ class DiscoveredToolInvocation extends BaseToolInvocation<
     return safeJsonStringify(this.params);
   }
 
-  async execute(
-    _signal: AbortSignal,
-    _updateOutput?: (output: string) => void,
-  ): Promise<ToolResult> {
+  async execute({
+    abortSignal: _signal,
+    updateOutput: _updateOutput,
+  }: ExecuteOptions): Promise<ToolResult> {
     const callCommand = this.config.getToolCallCommand()!;
     const args = [this.originalToolName];
 

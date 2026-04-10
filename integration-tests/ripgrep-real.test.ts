@@ -76,7 +76,9 @@ describe('ripgrep-real-direct', () => {
 
   it('should find matches using the real ripgrep binary', async () => {
     const invocation = tool.build({ pattern: 'hello' });
-    const result = await invocation.execute(new AbortController().signal);
+    const result = await invocation.execute({
+      abortSignal: new AbortController().signal,
+    });
 
     expect(result.llmContent).toContain('Found 2 matches');
     expect(result.llmContent).toContain('file1.txt');
@@ -90,7 +92,9 @@ describe('ripgrep-real-direct', () => {
 
   it('should handle no matches correctly', async () => {
     const invocation = tool.build({ pattern: 'nonexistent_pattern_123' });
-    const result = await invocation.execute(new AbortController().signal);
+    const result = await invocation.execute({
+      abortSignal: new AbortController().signal,
+    });
 
     expect(result.llmContent).toContain('No matches found');
   });
@@ -106,7 +110,9 @@ describe('ripgrep-real-direct', () => {
       pattern: 'hello',
       include_pattern: '*.js',
     });
-    const result = await invocation.execute(new AbortController().signal);
+    const result = await invocation.execute({
+      abortSignal: new AbortController().signal,
+    });
 
     expect(result.llmContent).toContain('Found 1 match');
     expect(result.llmContent).toContain('script.js');
@@ -124,7 +130,9 @@ describe('ripgrep-real-direct', () => {
       pattern: 'match',
       context: 1,
     });
-    const result = await invocation.execute(new AbortController().signal);
+    const result = await invocation.execute({
+      abortSignal: new AbortController().signal,
+    });
 
     expect(result.llmContent).toContain('Found 1 match');
     expect(result.llmContent).toContain('context.txt');

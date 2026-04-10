@@ -26,6 +26,7 @@ import {
   type ToolInvocation,
   type ToolCallConfirmationDetails,
   type PolicyUpdateOptions,
+  type ExecuteOptions,
 } from '../../tools/tools.js';
 import type { MessageBus } from '../../confirmation-bus/message-bus.js';
 import {
@@ -117,7 +118,7 @@ class McpToolInvocation extends BaseToolInvocation<
     return this.shouldDisableInput && INTERACTIVE_TOOLS.has(this.toolName);
   }
 
-  async execute(signal: AbortSignal): Promise<ToolResult> {
+  async execute({ abortSignal: signal }: ExecuteOptions): Promise<ToolResult> {
     try {
       // Hard block for file uploads if configured
       if (this.blockFileUploads && this.toolName === 'upload_file') {

@@ -11,7 +11,7 @@ import {
   BaseToolInvocation,
   type ToolResult,
   type AnyDeclarativeTool,
-  type ToolLiveOutput,
+  type ExecuteOptions,
 } from '../tools/tools.js';
 import type { MessageBus } from '../confirmation-bus/message-bus.js';
 import type { HookSystem } from '../hooks/hookSystem.js';
@@ -46,11 +46,7 @@ class MockBackgroundableInvocation extends BaseToolInvocation<
   getDescription() {
     return 'mock-pid';
   }
-  async execute(
-    _signal: AbortSignal,
-    _updateOutput?: (output: ToolLiveOutput) => void,
-    options?: { setExecutionIdCallback?: (executionId: number) => void },
-  ) {
+  async execute(options: ExecuteOptions) {
     options?.setExecutionIdCallback?.(4242);
     return {
       llmContent: 'pid',

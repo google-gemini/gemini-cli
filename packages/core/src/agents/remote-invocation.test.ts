@@ -142,7 +142,7 @@ describe('RemoteAgentInvocation', () => {
         {},
         mockMessageBus,
       );
-      await invocation.execute(new AbortController().signal);
+      await invocation.execute({ abortSignal: new AbortController().signal });
 
       expect(mockClientManager.sendMessageStream).toHaveBeenCalledWith(
         'test-agent',
@@ -185,7 +185,7 @@ describe('RemoteAgentInvocation', () => {
         },
         mockMessageBus,
       );
-      await invocation.execute(new AbortController().signal);
+      await invocation.execute({ abortSignal: new AbortController().signal });
 
       expect(mockClientManager.loadAgent).toHaveBeenCalledWith(
         'test-agent',
@@ -230,7 +230,7 @@ describe('RemoteAgentInvocation', () => {
         { query: 'hi' },
         mockMessageBus,
       );
-      await invocation.execute(new AbortController().signal);
+      await invocation.execute({ abortSignal: new AbortController().signal });
 
       expect(A2AAuthProviderFactory.create).toHaveBeenCalledWith({
         authConfig: mockAuth,
@@ -264,7 +264,9 @@ describe('RemoteAgentInvocation', () => {
         { query: 'hi' },
         mockMessageBus,
       );
-      const result = await invocation.execute(new AbortController().signal);
+      const result = await invocation.execute({
+        abortSignal: new AbortController().signal,
+      });
 
       expect(result.returnDisplay).toMatchObject({ state: 'error' });
       expect((result.returnDisplay as SubagentProgress).result).toContain(
@@ -293,7 +295,7 @@ describe('RemoteAgentInvocation', () => {
         },
         mockMessageBus,
       );
-      await invocation.execute(new AbortController().signal);
+      await invocation.execute({ abortSignal: new AbortController().signal });
 
       expect(mockClientManager.loadAgent).not.toHaveBeenCalled();
     });
@@ -325,7 +327,9 @@ describe('RemoteAgentInvocation', () => {
       );
 
       // Execute first time
-      const result1 = await invocation1.execute(new AbortController().signal);
+      const result1 = await invocation1.execute({
+        abortSignal: new AbortController().signal,
+      });
       expect(result1.returnDisplay).toMatchObject({
         result: 'Response 1',
       });
@@ -357,7 +361,9 @@ describe('RemoteAgentInvocation', () => {
         },
         mockMessageBus,
       );
-      const result2 = await invocation2.execute(new AbortController().signal);
+      const result2 = await invocation2.execute({
+        abortSignal: new AbortController().signal,
+      });
       expect((result2.returnDisplay as SubagentProgress).result).toBe(
         'Response 2',
       );
@@ -390,7 +396,7 @@ describe('RemoteAgentInvocation', () => {
         },
         mockMessageBus,
       );
-      await invocation3.execute(new AbortController().signal);
+      await invocation3.execute({ abortSignal: new AbortController().signal });
 
       // Fourth call: Should start new task (taskId undefined)
       mockClientManager.sendMessageStream.mockImplementationOnce(
@@ -412,7 +418,7 @@ describe('RemoteAgentInvocation', () => {
         },
         mockMessageBus,
       );
-      await invocation4.execute(new AbortController().signal);
+      await invocation4.execute({ abortSignal: new AbortController().signal });
 
       expect(mockClientManager.sendMessageStream).toHaveBeenLastCalledWith(
         'test-agent',
@@ -447,7 +453,10 @@ describe('RemoteAgentInvocation', () => {
         { query: 'hi' },
         mockMessageBus,
       );
-      await invocation.execute(new AbortController().signal, updateOutput);
+      await invocation.execute({
+        abortSignal: new AbortController().signal,
+        updateOutput,
+      });
 
       expect(updateOutput).toHaveBeenCalledWith(
         expect.objectContaining({
@@ -495,7 +504,9 @@ describe('RemoteAgentInvocation', () => {
         { query: 'hi' },
         mockMessageBus,
       );
-      const result = await invocation.execute(controller.signal);
+      const result = await invocation.execute({
+        abortSignal: controller.signal,
+      });
 
       expect(result.returnDisplay).toMatchObject({ state: 'error' });
     });
@@ -517,7 +528,9 @@ describe('RemoteAgentInvocation', () => {
         },
         mockMessageBus,
       );
-      const result = await invocation.execute(new AbortController().signal);
+      const result = await invocation.execute({
+        abortSignal: new AbortController().signal,
+      });
 
       expect(result.returnDisplay).toMatchObject({
         state: 'error',
@@ -550,7 +563,9 @@ describe('RemoteAgentInvocation', () => {
         },
         mockMessageBus,
       );
-      const result = await invocation.execute(new AbortController().signal);
+      const result = await invocation.execute({
+        abortSignal: new AbortController().signal,
+      });
 
       // Just check that text is present, exact formatting depends on helper
       expect((result.returnDisplay as SubagentProgress).result).toContain(
@@ -593,10 +608,10 @@ describe('RemoteAgentInvocation', () => {
         { query: 'hi' },
         mockMessageBus,
       );
-      const result = await invocation.execute(
-        new AbortController().signal,
+      const result = await invocation.execute({
+        abortSignal: new AbortController().signal,
         updateOutput,
-      );
+      });
 
       expect(updateOutput).toHaveBeenCalledWith(
         expect.objectContaining({
@@ -670,7 +685,10 @@ describe('RemoteAgentInvocation', () => {
         { query: 'hi' },
         mockMessageBus,
       );
-      await invocation.execute(new AbortController().signal, updateOutput);
+      await invocation.execute({
+        abortSignal: new AbortController().signal,
+        updateOutput,
+      });
 
       expect(updateOutput).toHaveBeenCalledWith(
         expect.objectContaining({
@@ -738,7 +756,9 @@ describe('RemoteAgentInvocation', () => {
         { query: 'hi' },
         mockMessageBus,
       );
-      const result = await invocation.execute(new AbortController().signal);
+      const result = await invocation.execute({
+        abortSignal: new AbortController().signal,
+      });
 
       expect(result.returnDisplay).toMatchObject({ state: 'error' });
       expect((result.returnDisplay as SubagentProgress).result).toContain(
@@ -758,7 +778,9 @@ describe('RemoteAgentInvocation', () => {
         { query: 'hi' },
         mockMessageBus,
       );
-      const result = await invocation.execute(new AbortController().signal);
+      const result = await invocation.execute({
+        abortSignal: new AbortController().signal,
+      });
 
       expect(result.returnDisplay).toMatchObject({ state: 'error' });
       expect((result.returnDisplay as SubagentProgress).result).toContain(
@@ -787,7 +809,9 @@ describe('RemoteAgentInvocation', () => {
         { query: 'hi' },
         mockMessageBus,
       );
-      const result = await invocation.execute(new AbortController().signal);
+      const result = await invocation.execute({
+        abortSignal: new AbortController().signal,
+      });
 
       expect(result.returnDisplay).toMatchObject({ state: 'error' });
       // Should contain both the partial output and the error message
