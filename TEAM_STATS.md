@@ -1,7 +1,7 @@
 # 📊 Gemini CLI Weekly Team Review Stats
 
 *Reporting Period: **Monday 2026-04-06** to Today*
-*Last Updated: 2026-04-10 00:24 (UTC)*
+*Last Updated: 2026-04-10 00:30 (UTC)*
 
 ## 📈 Weekly Summary
 | Maintainer | Closed/Merged (Week) | Current Open Queue |
@@ -96,7 +96,7 @@
 #### 🟢 Active Queue
 | PR | Issue | Title | Status & Next Step | Updated |
 | :--- | :--- | :--- | :--- | :--- |
-| [#24397](https://github.com/google-gemini/gemini-cli/pull/24397) | [#24337](https://github.com/google-gemini/gemini-cli/issues/24337) | fix(cli): clean up slash command IDE listeners | 🟢 Awaiting Reviewer | `2026-04-09` |
+| [#24397](https://github.com/google-gemini/gemini-cli/pull/24397) | [#24337](https://github.com/google-gemini/gemini-cli/issues/24337) | fix(cli): clean up slash command IDE listeners | ✍️ Awaiting Author | `2026-04-09` |
 | [#23347](https://github.com/google-gemini/gemini-cli/pull/23347) | [#16363](https://github.com/google-gemini/gemini-cli/issues/16363) | fix: use synchronous stderr write before exit to prevent silent failures | ✍️ Awaiting Author | `2026-04-08` |
 | [#18499](https://github.com/google-gemini/gemini-cli/pull/18499) | [#18067](https://github.com/google-gemini/gemini-cli/issues/18067) | feat: Add voice input with pluggable backend (Gemini zero-install + Whisper) | 🔴 Blocked: Merge Conflict | `2026-04-04` |
 
