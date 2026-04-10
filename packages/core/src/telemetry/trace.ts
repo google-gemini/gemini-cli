@@ -11,7 +11,10 @@ import {
   type AttributeValue,
   type SpanOptions,
 } from '@opentelemetry/api';
-import {safeJsonStringify} from '../utils/safeJsonStringify';
+
+import {debugLogger} from '../utils/debugLogger.js';
+import {safeJsonStringify} from '../utils/safeJsonStringify.js';
+import {truncateString} from '../utils/textUtils.js';
 import {
   GEN_AI_AGENT_DESCRIPTION,
   GEN_AI_AGENT_NAME,
@@ -22,9 +25,7 @@ import {
   SERVICE_DESCRIPTION,
   SERVICE_NAME,
   type GeminiCliOperation,
-} from './constants';
-
-import {truncateString} from '../utils/textUtils';
+} from './constants.js';
 
 const TRACER_NAME = 'gemini-cli';
 const TRACER_VERSION = 'v1';
@@ -60,7 +61,7 @@ export function truncateForTelemetry(
       value,
       maxLength,
       `...[TRUNCATED: original length ${value.length}]`,
-    );
+    ) as AttributeValue;
   }
   if (typeof value === 'object' && value !== null) {
     const stringified = safeJsonStringify(value);
@@ -68,10 +69,10 @@ export function truncateForTelemetry(
       stringified,
       maxLength,
       `...[TRUNCATED: original length ${stringified.length}]`,
-    );
+    ) as AttributeValue;
   }
   if (typeof value === 'number' || typeof value === 'boolean') {
-    return value;
+    return value as AttributeValue;
   }
   return undefined;
 }
@@ -104,12 +105,15 @@ export interface SpanMetadata {
  *
  * @example
  * ```typescript
- * runInDevTraceSpan({ name: 'my-operation' }, ({ metadata }) => {
- *   metadata.input = { foo: 'bar' };
- *   // ... do work ...
- *   metadata.output = { result: 'baz' };
- *   metadata.attributes['my.custom.attribute'] = 'some-value';
- * });
+ * await runInDevTraceSpan(
+ *   { operation: GeminiCliOperation.LLMCall, sessionId: 'my-session' },
+ *   async ({ metadata }) => {
+ *     metadata.input = { foo: 'bar' };
+ *     // ... do work ...
+ *     metadata.output = { result: 'baz' };
+ *     metadata.attributes['my.custom.attribute'] = 'some-value';
+ *   }
+ * );
  * ```
  *
  * @param opts The options for the span.
@@ -158,7 +162,10 @@ export async function runInDevTraceSpan<R>(
             }
           }
         }
-        for (const [key, value] of Object.entries(meta.attributes)) {
+        for (const [key, value] of Object.entries(meta.attributes) as [
+          string,
+          AttributeValue,
+        ][]) {
           const truncated = truncateForTelemetry(value);
           if (truncated !== undefined) {
             span.setAttribute(key, truncated);
@@ -196,7 +203,7 @@ export async function runInDevTraceSpan<R>(
         const streamWrapper = (async function* () {
           try {
             yield* result;
-          } catch (e) {
+          } catch (e: unknown) {
             meta.error = e;
             throw e;
           } finally {
@@ -209,7 +216,7 @@ export async function runInDevTraceSpan<R>(
         return finalResult;
       }
       return result;
-    } catch (e) {
+    } catch (e: unknown) {
       meta.error = e;
       throw e;
     } finally {
@@ -233,5 +240,5 @@ function getErrorMessage(e: unknown): string {
   if (typeof e === 'string') {
     return e;
   }
-  return safeJsonStringify(e);
+  return safeJsonStringify(e) as string;
 }

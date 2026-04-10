@@ -4,25 +4,26 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import * as api from '@opentelemetry/api';
-import {diag, SpanStatusCode, trace, type Tracer} from '@opentelemetry/api';
+import type * as api from '@opentelemetry/api';
+import {diag, SpanStatusCode, trace} from '@opentelemetry/api';
+import type {Tracer} from '@opentelemetry/api';
 import {afterEach, beforeEach, describe, expect, it, vi} from 'vitest';
 
 import {
-  GeminiCliOperation,
   GEN_AI_AGENT_DESCRIPTION,
   GEN_AI_AGENT_NAME,
   GEN_AI_CONVERSATION_ID,
   GEN_AI_INPUT_MESSAGES,
   GEN_AI_OPERATION_NAME,
   GEN_AI_OUTPUT_MESSAGES,
+  GeminiCliOperation,
   SERVICE_DESCRIPTION,
   SERVICE_NAME,
-} from './constants';
-import {runInDevTraceSpan, spanRegistry, truncateForTelemetry} from './trace';
+} from './constants.js';
+import {runInDevTraceSpan, spanRegistry, truncateForTelemetry} from './trace.js';
 
 vi.mock('@opentelemetry/api', async (importOriginal) => {
-  const original = (await importOriginal()) as typeof api;
+  const original = await importOriginal();
   return {
     ...original,
     trace: {
@@ -236,13 +237,13 @@ describe('runInDevTraceSpan', () => {
 
     // Simulate completion
     for await (const _ of resultStream) {
+      // iterate
     }
     expect(mockSpan.end).toHaveBeenCalledTimes(1);
 
     // Try to end again (simulating registry or double call)
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
-    const endSpanFn = vi.mocked(spanRegistry.register).mock
-      .calls[0][1] as () => void;
+    const endSpanFn = vi.mocked(spanRegistry.register).mock.calls[0][1] as () =>
+      void;
     endSpanFn();
 
     expect(mockSpan.end).toHaveBeenCalledTimes(1);
