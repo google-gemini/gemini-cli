@@ -139,7 +139,10 @@ export * from './services/sandboxedFileSystemService.js';
 export * from './services/modelConfigService.js';
 export * from './sandbox/windows/WindowsSandboxManager.js';
 export * from './services/sessionSummaryUtils.js';
-export { startMemoryService } from './services/memoryService.js';
+export {
+  startMemoryService,
+  validatePatches,
+} from './services/memoryService.js';
 export * from './context/memoryContextManager.js';
 export * from './services/trackerService.js';
 export * from './services/trackerTypes.js';
