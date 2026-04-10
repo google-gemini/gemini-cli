@@ -24,5 +24,5 @@ export const testTruncateProfile: ContextProfile = {
       ],
     },
   ],
-  buildWorkers: () => [],
+  buildAsyncPipelines: () => [],
 };

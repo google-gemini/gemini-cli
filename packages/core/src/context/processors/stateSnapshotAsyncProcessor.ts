@@ -3,35 +3,29 @@
  * Copyright 2026 Google LLC
  * SPDX-License-Identifier: Apache-2.0
  */
-import type { ContextWorker, InboxSnapshot } from '../pipeline.js';
+import type { AsyncContextProcessor, ProcessArgs } from '../pipeline.js';
 import type { ContextEnvironment } from '../sidecar/environment.js';
 import type { ConcreteNode } from '../ir/types.js';
 import { SnapshotGenerator } from '../utils/snapshotGenerator.js';
 import { debugLogger } from '../../utils/debugLogger.js';
 
-export interface StateSnapshotWorkerOptions {
+export interface StateSnapshotAsyncProcessorOptions {
   type?: 'accumulate' | 'point-in-time';
   systemInstruction?: string;
 }
 
-export function createStateSnapshotWorker(
+export function createStateSnapshotAsyncProcessor(
   id: string,
   env: ContextEnvironment,
-  options: StateSnapshotWorkerOptions,
-): ContextWorker {
+  options: StateSnapshotAsyncProcessorOptions,
+): AsyncContextProcessor {
   const generator = new SnapshotGenerator(env);
 
-  let isRunning = false;
-
-  const execute = async ({
-    targets,
-    inbox,
-  }: {
-    targets: readonly ConcreteNode[];
-    inbox: InboxSnapshot;
-  }): Promise<void> => {
-    if (!isRunning) return;
-    if (targets.length === 0) return;
+  return {
+    id,
+    name: 'StateSnapshotAsyncProcessor',
+    process: async ({ targets, inbox }: ProcessArgs): Promise<void> => {
+      if (targets.length === 0) return;
 
     try {
       let nodesToSummarize = [...targets];
@@ -97,22 +91,8 @@ export function createStateSnapshotWorker(
         env.idGenerator,
       );
     } catch (e) {
-      debugLogger.error('StateSnapshotWorker failed to generate snapshot', e);
+      debugLogger.error('StateSnapshotAsyncProcessor failed to generate snapshot', e);
     }
-  };
-
-  return {
-    id,
-    name: 'StateSnapshotWorker',
-    triggers: {
-      onNodesAgedOut: true,
-    },
-    start: () => {
-      isRunning = true;
-    },
-    stop: () => {
-      isRunning = false;
-    },
-    execute,
+    }
   };
 }

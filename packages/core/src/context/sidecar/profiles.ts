@@ -6,7 +6,7 @@
 
 import type { SidecarConfig, PipelineDef } from './types.js';
 import type { ContextEnvironment } from './environment.js';
-import type { ContextWorker } from '../pipeline.js';
+import type { AsyncPipelineDef } from './types.js';
 
 // Import factories
 import { createToolMaskingProcessor } from '../processors/toolMaskingProcessor.js';
@@ -14,12 +14,12 @@ import { createBlobDegradationProcessor } from '../processors/blobDegradationPro
 import { createNodeTruncationProcessor } from '../processors/nodeTruncationProcessor.js';
 import { createNodeDistillationProcessor } from '../processors/nodeDistillationProcessor.js';
 import { createStateSnapshotProcessor } from '../processors/stateSnapshotProcessor.js';
-import { createStateSnapshotWorker } from '../processors/stateSnapshotWorker.js';
+import { createStateSnapshotAsyncProcessor } from '../processors/stateSnapshotAsyncProcessor.js';
 
 export interface ContextProfile {
   config: SidecarConfig;
   buildPipelines: (env: ContextEnvironment, config?: SidecarConfig) => PipelineDef[];
-  buildWorkers: (env: ContextEnvironment, config?: SidecarConfig) => ContextWorker[];
+  buildAsyncPipelines: (env: ContextEnvironment, config?: SidecarConfig) => AsyncPipelineDef[];
 }
 
 /**
@@ -71,7 +71,7 @@ export const defaultSidecarProfile: ContextProfile = {
     ];
   },
 
-  buildWorkers: (env: ContextEnvironment, config?: SidecarConfig): ContextWorker[] => {
+  buildAsyncPipelines: (env: ContextEnvironment, config?: SidecarConfig): AsyncPipelineDef[] => {
     const getOptions = <T>(id: string, defaultOptions: T): T => {
       if (config?.processorOptions && config.processorOptions[id]) {
         // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
@@ -81,7 +81,13 @@ export const defaultSidecarProfile: ContextProfile = {
     };
 
     return [
-      createStateSnapshotWorker('StateSnapshotAsync', env, getOptions('StateSnapshotAsync', { type: 'accumulate' }))
+      {
+        name: 'Async Background GC',
+        triggers: ['nodes_aged_out'],
+        processors: [
+          createStateSnapshotAsyncProcessor('StateSnapshotAsync', env, getOptions('StateSnapshotAsync', { type: 'accumulate' }))
+        ]
+      }
     ];
   }
 };

@@ -4,18 +4,26 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import type { ContextProcessor } from '../pipeline.js';
+import type { ContextProcessor, AsyncContextProcessor } from '../pipeline.js';
 
 export type PipelineTrigger =
   | 'new_message'
   | 'retained_exceeded'
   | 'gc_backstop'
+  | 'nodes_added'
+  | 'nodes_aged_out'
   | { type: 'timer'; intervalMs: number };
 
 export interface PipelineDef {
   name: string;
   triggers: PipelineTrigger[];
   processors: ContextProcessor[];
+}
+
+export interface AsyncPipelineDef {
+  name: string;
+  triggers: PipelineTrigger[];
+  processors: AsyncContextProcessor[];
 }
 
 /**

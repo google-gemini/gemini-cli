@@ -267,7 +267,7 @@ export function setupContextComponentTest(
 
   const orchestrator = new PipelineOrchestrator(
     sidecar.buildPipelines(env),
-    sidecar.buildWorkers(env),
+    sidecar.buildAsyncPipelines(env),
     env,
     eventBus,
     tracer,

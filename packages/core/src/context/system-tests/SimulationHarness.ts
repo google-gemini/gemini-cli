@@ -75,7 +75,7 @@ export class SimulationHarness {
 
     this.orchestrator = new PipelineOrchestrator(
       config.buildPipelines(this.env),
-      config.buildWorkers(this.env),
+      config.buildAsyncPipelines(this.env),
       this.env,
       this.eventBus,
       this.tracer,

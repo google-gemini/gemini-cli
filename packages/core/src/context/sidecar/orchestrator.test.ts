@@ -14,11 +14,10 @@ import {
 import type { ContextEnvironment } from './environment.js';
 import type {
   ContextProcessor,
-  ContextWorker,
-  InboxSnapshot,
+  AsyncContextProcessor,
   ProcessArgs,
 } from '../pipeline.js';
-import type { PipelineDef } from './types.js';
+import type { PipelineDef, AsyncPipelineDef } from './types.js';
 import type { ContextEventBus } from '../eventBus.js';
 import type { ConcreteNode, UserPrompt } from '../ir/types.js';
 
@@ -61,19 +60,12 @@ function createThrowingProcessor(id: string): ContextProcessor {
   };
 }
 
-// A mock worker that signals it ran
-function createMockWorker(id: string, executeSpy: ReturnType<typeof vi.fn>): ContextWorker {
-  let isRunning = false;
+// A mock async processor that signals it ran
+function createMockAsyncProcessor(id: string, executeSpy: ReturnType<typeof vi.fn>): AsyncContextProcessor {
   return {
     id,
-    name: 'MockWorker',
-    triggers: {
-      onNodesAdded: true,
-    },
-    start: () => { isRunning = true; },
-    stop: () => { isRunning = false; },
-    execute: async (args: { targets: readonly ConcreteNode[]; inbox: InboxSnapshot }) => {
-      if (!isRunning) return;
+    name: 'MockAsyncProcessor',
+    process: async (args: ProcessArgs) => {
       executeSpy(args);
     }
   };
@@ -94,11 +86,11 @@ describe('PipelineOrchestrator (Component)', () => {
 
   const setupOrchestrator = (
     pipelines: PipelineDef[],
-    workers: ContextWorker[] = [],
+    asyncPipelines: AsyncPipelineDef[] = [],
   ) => {
     const orchestrator = new PipelineOrchestrator(
       pipelines,
-      workers,
+      asyncPipelines,
       env,
       eventBus,
       env.tracer,
@@ -189,11 +181,15 @@ describe('PipelineOrchestrator (Component)', () => {
   });
 
   describe('Asynchronous Worker Events', () => {
-    it('routes emitChunkReceived to workers with onNodesAdded trigger', async () => {
+    it('routes emitChunkReceived to async pipelines with nodes_added trigger', async () => {
       const executeSpy = vi.fn();
-      const worker = createMockWorker('MyWorker', executeSpy);
+      const asyncProcessor = createMockAsyncProcessor('MyWorker', executeSpy);
       
-      setupOrchestrator([], [worker]);
+      setupOrchestrator([], [{
+        name: 'TestAsync',
+        triggers: ['nodes_added'],
+        processors: [asyncProcessor]
+      }]);
 
       const node1 = createDummyNode('ep1', 'USER_PROMPT', 10);
       const node2 = createDummyNode('ep1', 'AGENT_THOUGHT', 20);

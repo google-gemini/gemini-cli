@@ -12,7 +12,7 @@ import { createToolMaskingProcessor } from '../processors/toolMaskingProcessor.j
 import { createBlobDegradationProcessor } from '../processors/blobDegradationProcessor.js';
 import { createStateSnapshotProcessor } from '../processors/stateSnapshotProcessor.js';
 import { createHistoryTruncationProcessor } from '../processors/historyTruncationProcessor.js';
-import { createStateSnapshotWorker } from '../processors/stateSnapshotWorker.js';
+import { createStateSnapshotAsyncProcessor } from '../processors/stateSnapshotAsyncProcessor.js';
 
 expect.addSnapshotSerializer({
   test: (val) =>
@@ -58,7 +58,11 @@ describe('System Lifecycle Golden Tests', () => {
         ],
       },
     ],
-    buildWorkers: (env) => [createStateSnapshotWorker('StateSnapshotWorker', env, {})],
+    buildAsyncPipelines: (env) => [{
+      name: 'Async',
+      triggers: ['nodes_aged_out'],
+      processors: [createStateSnapshotAsyncProcessor('StateSnapshotWorker', env, {})]
+    }],
   });
 
   const mockLlmClient = createMockLlmClient([
@@ -150,7 +154,7 @@ describe('System Lifecycle Golden Tests', () => {
         budget: { maxTokens: 100000, retainedTokens: 50000 },
       },
       buildPipelines: () => [],
-      buildWorkers: () => [],
+      buildAsyncPipelines: () => [],
     };
 
     const harness = await SimulationHarness.create(
@@ -182,7 +186,11 @@ describe('System Lifecycle Golden Tests', () => {
         budget: { maxTokens: 200, retainedTokens: 100 },
       },
       buildPipelines: () => [],
-      buildWorkers: (env) => [createStateSnapshotWorker('StateSnapshotWorker', env, {})],
+      buildAsyncPipelines: (env) => [{
+      name: 'Async',
+      triggers: ['nodes_aged_out'],
+      processors: [createStateSnapshotAsyncProcessor('StateSnapshotWorker', env, {})]
+    }],
     };
 
     const harness = await SimulationHarness.create(gcConfig, mockLlmClient);

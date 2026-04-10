@@ -5,8 +5,7 @@
  */
 
 import type { ConcreteNode } from '../ir/types.js';
-import type { ContextWorker } from '../pipeline.js';
-import type { PipelineDef, PipelineTrigger } from './types.js';
+import type { AsyncPipelineDef, PipelineDef, PipelineTrigger } from './types.js';
 import type {
   ContextEnvironment,
   ContextEventBus,
@@ -21,13 +20,12 @@ export class PipelineOrchestrator {
 
   constructor(
     private readonly pipelines: PipelineDef[],
-    private readonly workers: ContextWorker[],
+    private readonly asyncPipelines: AsyncPipelineDef[],
     private readonly env: ContextEnvironment,
     private readonly eventBus: ContextEventBus,
     private readonly tracer: ContextTracer,
   ) {
     this.setupTriggers();
-    this.startWorkers();
   }
 
   private isNodeAllowed(
@@ -42,84 +40,42 @@ export class PipelineOrchestrator {
     );
   }
 
-  private startWorkers() {
-    for (const worker of this.workers) {
-      try {
-        worker.start();
-      } catch (e) {
-        debugLogger.error(`Worker ${worker.name} failed to start:`, e);
-      }
-    }
-  }
-
   private setupTriggers() {
-    // 1. Pipeline Triggers
-    for (const pipeline of this.pipelines) {
-      for (const trigger of pipeline.triggers) {
-        if (typeof trigger === 'object' && trigger.type === 'timer') {
-          const timer = setInterval(() => {
-            // Background timers not fully implemented in V1 yet
-          }, trigger.intervalMs);
-          this.activeTimers.push(timer);
-        } else if (trigger === 'retained_exceeded') {
-          this.eventBus.onConsolidationNeeded((event) => {
-            void this.executePipelineAsync(
-              pipeline,
-              event.nodes,
-              event.targetNodeIds,
-              new Set(), // protected IDs
-            );
-          });
-        } else if (trigger === 'new_message') {
-          this.eventBus.onChunkReceived((event) => {
-            void this.executePipelineAsync(
-              pipeline,
-              event.nodes,
-              event.targetNodeIds,
-              new Set(), // protected IDs
-            );
-          });
+    const bindTriggers = (
+      pipelines: PipelineDef[] | AsyncPipelineDef[],
+      executeFn: (pipeline: PipelineDef | AsyncPipelineDef, nodes: readonly ConcreteNode[], targets: ReadonlySet<string>, protectedIds: ReadonlySet<string>) => void
+    ) => {
+      for (const pipeline of pipelines) {
+        for (const trigger of pipeline.triggers) {
+          if (typeof trigger === 'object' && trigger.type === 'timer') {
+            const timer = setInterval(() => {
+              // Background timers not fully implemented in V1 yet
+            }, trigger.intervalMs);
+            this.activeTimers.push(timer);
+          } else if (trigger === 'retained_exceeded' || trigger === 'nodes_aged_out') {
+            this.eventBus.onConsolidationNeeded((event) => {
+              executeFn(pipeline, event.nodes, event.targetNodeIds, new Set());
+            });
+          } else if (trigger === 'new_message' || trigger === 'nodes_added') {
+            this.eventBus.onChunkReceived((event) => {
+              executeFn(pipeline, event.nodes, event.targetNodeIds, new Set());
+            });
+          }
         }
       }
-    }
+    };
 
-    // 2. Worker Triggers (onNodesAdded / onNodesAgedOut)
-    this.eventBus.onChunkReceived((event) => {
-      // Fire all workers that care about new nodes
-      for (const worker of this.workers) {
-        if (worker.triggers.onNodesAdded) {
-          const inboxSnapshot = new InboxSnapshotImpl(
-            this.env.inbox.getMessages() || [],
-          );
-          const targets = event.nodes.filter((n) =>
-            event.targetNodeIds.has(n.id),
-          );
-          // Fire and forget
-          worker.execute({ targets, inbox: inboxSnapshot }).catch((e) => {
-            debugLogger.error(`Worker ${worker.name} failed onNodesAdded:`, e);
-          });
-        }
-      }
+    bindTriggers(this.pipelines, (pipeline, nodes, targets, protectedIds) => {
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
+      void this.executePipelineAsync(pipeline as PipelineDef, nodes, new Set(targets), new Set(protectedIds));
     });
 
-    this.eventBus.onConsolidationNeeded((event) => {
-      // Fire all workers that care about aged out nodes
-      for (const worker of this.workers) {
-        if (worker.triggers.onNodesAgedOut) {
-          const inboxSnapshot = new InboxSnapshotImpl(
-            this.env.inbox.getMessages() || [],
-          );
-          const targets = event.nodes.filter((n) =>
-            event.targetNodeIds.has(n.id),
-          );
-          // Fire and forget
-          worker.execute({ targets, inbox: inboxSnapshot }).catch((e) => {
-            debugLogger.error(
-              `Worker ${worker.name} failed onNodesAgedOut:`,
-              e,
-            );
-          });
-        }
+    bindTriggers(this.asyncPipelines, (pipeline, nodes, targetIds) => {
+      const inboxSnapshot = new InboxSnapshotImpl(this.env.inbox.getMessages() || []);
+      const targets = nodes.filter((n) => targetIds.has(n.id));
+      for (const processor of pipeline.processors) {
+        processor.process({ targets, inbox: inboxSnapshot, buffer: ContextWorkingBufferImpl.initialize(nodes) })
+                 .catch((e: unknown) => debugLogger.error(`AsyncProcessor ${processor.name} failed:`, e));
       }
     });
   }
@@ -127,13 +83,6 @@ export class PipelineOrchestrator {
   shutdown() {
     for (const timer of this.activeTimers) {
       clearInterval(timer);
-    }
-    for (const worker of this.workers) {
-      try {
-        worker.stop();
-      } catch (e) {
-        debugLogger.error(`Worker ${worker.name} failed to stop:`, e);
-      }
     }
   }
 

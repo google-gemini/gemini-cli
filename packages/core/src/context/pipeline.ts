@@ -49,20 +49,10 @@ export interface ContextProcessor {
   process(args: ProcessArgs): Promise<readonly ConcreteNode[]>;
 }
 
-export interface ContextWorker {
+export interface AsyncContextProcessor {
   readonly id: string;
   readonly name: string;
-  readonly triggers: {
-    onNodesAdded?: boolean;
-    onNodesAgedOut?: boolean;
-    onInboxTopics?: string[];
-  };
-  start(): void;
-  stop(): void;
-  execute(args: {
-    targets: readonly ConcreteNode[];
-    inbox: InboxSnapshot;
-  }): Promise<void>;
+  process(args: ProcessArgs): Promise<void>;
 }
 
 export interface BackstopTargetOptions {

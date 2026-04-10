@@ -4,12 +4,14 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 import { describe, it, expect, vi } from 'vitest';
-import { createStateSnapshotWorker } from './stateSnapshotWorker.js';
+import { createStateSnapshotAsyncProcessor } from './stateSnapshotAsyncProcessor.js';
 import {
   createMockEnvironment,
   createDummyNode,
+  createMockProcessArgs,
 } from '../testing/contextTestUtils.js';
-import { InboxSnapshotImpl } from '../sidecar/inbox.js';
+import type { InboxMessage } from '../pipeline.js';
+import type { InboxSnapshotImpl } from '../sidecar/inbox.js';
 
 describe('StateSnapshotWorker', () => {
   it('should generate a snapshot and publish it to the inbox', async () => {
@@ -17,16 +19,13 @@ describe('StateSnapshotWorker', () => {
     // Spy on the publish method
     const publishSpy = vi.spyOn(env.inbox, 'publish');
 
-    const worker = createStateSnapshotWorker('StateSnapshotWorker', env, { type: 'point-in-time' });
-    worker.start();
-
+    const worker = createStateSnapshotAsyncProcessor('StateSnapshotWorker', env, { type: 'point-in-time' });
+    
     const nodeA = createDummyNode('ep1', 'USER_PROMPT', 50, {}, 'node-A');
     const nodeB = createDummyNode('ep1', 'AGENT_THOUGHT', 60, {}, 'node-B');
 
     const targets = [nodeA, nodeB];
-    const inbox = new InboxSnapshotImpl([]);
-
-    await worker.execute({ targets, inbox });
+    await worker.process(createMockProcessArgs(targets, targets, []));
 
     // Ensure generateContent was called
     expect(env.llmClient.generateContent).toHaveBeenCalled();
@@ -48,14 +47,12 @@ describe('StateSnapshotWorker', () => {
     const publishSpy = vi.spyOn(env.inbox, 'publish');
     const drainSpy = vi.spyOn(env.inbox, 'drainConsumed');
 
-    const worker = createStateSnapshotWorker('StateSnapshotWorker', env, { type: 'accumulate' });
-    worker.start();
-
+    const worker = createStateSnapshotAsyncProcessor('StateSnapshotWorker', env, { type: 'accumulate' });
+    
     const nodeC = createDummyNode('ep2', 'USER_PROMPT', 50, {}, 'node-C');
     const targets = [nodeC];
 
-    // Simulate an existing accumulate draft in the inbox
-    const inbox = new InboxSnapshotImpl([
+    const inboxMessages: InboxMessage[] = [
       {
         id: 'draft-1',
         topic: 'PROPOSED_SNAPSHOT',
@@ -66,12 +63,14 @@ describe('StateSnapshotWorker', () => {
           type: 'accumulate',
         },
       },
-    ]);
+    ];
 
-    await worker.execute({ targets, inbox });
+    const args = createMockProcessArgs(targets, targets, inboxMessages);
+
+    await worker.process(args);
 
     // The old draft should be consumed
-    expect(inbox.getConsumedIds().has('draft-1')).toBe(true);
+    expect((args.inbox as InboxSnapshotImpl).getConsumedIds().has('draft-1')).toBe(true);
     expect(drainSpy).toHaveBeenCalledWith(expect.any(Set));
 
     // The new publish should contain ALL consumed IDs (old + new)
@@ -104,10 +103,9 @@ describe('StateSnapshotWorker', () => {
   it('should ignore empty targets', async () => {
     const env = createMockEnvironment();
     const publishSpy = vi.spyOn(env.inbox, 'publish');
-    const worker = createStateSnapshotWorker('StateSnapshotWorker', env, { type: 'accumulate' });
-    worker.start();
-
-    await worker.execute({ targets: [], inbox: new InboxSnapshotImpl([]) });
+    const worker = createStateSnapshotAsyncProcessor('StateSnapshotWorker', env, { type: 'accumulate' });
+    
+    await worker.process(createMockProcessArgs([], [], []));
 
     expect(env.llmClient.generateContent).not.toHaveBeenCalled();
     expect(publishSpy).not.toHaveBeenCalled();
