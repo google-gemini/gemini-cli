@@ -612,6 +612,16 @@ export async function main() {
     const initializationResult = await initializeApp(config, settings);
     initAppHandle?.end();
 
+    // Auto-start the LiteRT-LM server for Gemma local routing if configured.
+    // This is fire-and-forget — failures are logged but never block startup.
+    import('./services/liteRtServerManager.js')
+      .then(({ LiteRtServerManager }) =>
+        LiteRtServerManager.ensureRunning(
+          settings.merged.experimental?.gemmaModelRouter,
+        ),
+      )
+      .catch((e) => debugLogger.warn('LiteRT auto-start import failed:', e));
+
     if (
       settings.merged.security.auth.selectedType ===
         AuthType.LOGIN_WITH_GOOGLE &&
