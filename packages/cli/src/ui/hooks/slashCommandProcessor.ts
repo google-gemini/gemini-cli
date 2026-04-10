@@ -84,7 +84,7 @@ interface SlashCommandProcessorActions {
   toggleDebugProfiler: () => void;
   dispatchExtensionStateUpdate: (action: ExtensionUpdateAction) => void;
   addConfirmUpdateExtensionRequest: (request: ConfirmationRequest) => void;
-  toggleBackgroundShell: () => void;
+  toggleBackgroundTasks: () => void;
   toggleShortcutsHelp: () => void;
   setText: (text: string) => void;
 }
@@ -213,7 +213,7 @@ export const useSlashCommandProcessor = (
   const commandContext = useMemo(
     (): CommandContext => ({
       services: {
-        config,
+        agentContext: config,
         settings,
         git: gitService,
         logger,
@@ -246,7 +246,7 @@ export const useSlashCommandProcessor = (
           actions.addConfirmUpdateExtensionRequest,
         setConfirmationRequest,
         removeComponent: () => setCustomDialog(null),
-        toggleBackgroundShell: actions.toggleBackgroundShell,
+        toggleBackgroundTasks: actions.toggleBackgroundTasks,
         toggleShortcutsHelp: actions.toggleShortcutsHelp,
       },
       session: {
@@ -329,9 +329,9 @@ export const useSlashCommandProcessor = (
     (async () => {
       const commandService = await CommandService.create(
         [
+          new BuiltinCommandLoader(config),
           new SkillCommandLoader(config),
           new McpPromptLoader(config),
-          new BuiltinCommandLoader(config),
           new FileCommandLoader(config),
         ],
         controller.signal,

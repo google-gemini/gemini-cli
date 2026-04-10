@@ -111,7 +111,6 @@ export class MCPOAuthProvider {
       scope: config.scopes?.join(' ') || '',
     };
 
-    // eslint-disable-next-line no-restricted-syntax -- TODO: Migrate to safeFetch for SSRF protection
     const response = await fetch(registrationUrl, {
       method: 'POST',
       headers: {
@@ -301,7 +300,6 @@ export class MCPOAuthProvider {
           ? { Accept: 'text/event-stream' }
           : { Accept: 'application/json' };
 
-        // eslint-disable-next-line no-restricted-syntax -- TODO: Migrate to safeFetch for SSRF protection
         const response = await fetch(mcpServerUrl, {
           method: 'HEAD',
           headers,

@@ -29,7 +29,7 @@ describe('Model Steering Integration', () => {
       configOverrides: { modelSteering: true },
     });
     await rig.initialize();
-    rig.render();
+    await rig.render();
     await rig.waitForIdle();
 
     rig.setToolPolicy('list_directory', PolicyDecision.ASK_USER);
@@ -67,7 +67,7 @@ describe('Model Steering Integration', () => {
 
     // Then it should proceed with the next action
     await rig.waitForOutput(
-      /Since you want me to focus on .txt files,[\s\S]*I will read file1.txt/,
+      /Since you want me to focus on \.txt[\s\S]*files,[\s\S]*I will read file1\.txt/,
     );
     await rig.waitForOutput('ReadFile');
 

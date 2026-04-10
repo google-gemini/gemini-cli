@@ -311,6 +311,11 @@ describe('keyMatchers', () => {
     // External tools
     {
       command: Command.OPEN_EXTERNAL_EDITOR,
+      positive: [createKey('g', { ctrl: true })],
+      negative: [createKey('g'), createKey('c', { ctrl: true })],
+    },
+    {
+      command: Command.DEPRECATED_OPEN_EXTERNAL_EDITOR,
       positive: [createKey('x', { ctrl: true })],
       negative: [createKey('x'), createKey('c', { ctrl: true })],
     },
@@ -336,8 +341,8 @@ describe('keyMatchers', () => {
     },
     {
       command: Command.SHOW_IDE_CONTEXT_DETAIL,
-      positive: [createKey('g', { ctrl: true })],
-      negative: [createKey('g'), createKey('t', { ctrl: true })],
+      positive: [createKey('f4')],
+      negative: [createKey('f5'), createKey('t', { ctrl: true })],
     },
     {
       command: Command.TOGGLE_MARKDOWN,
@@ -346,6 +351,11 @@ describe('keyMatchers', () => {
     },
     {
       command: Command.TOGGLE_COPY_MODE,
+      positive: [createKey('f9')],
+      negative: [createKey('f8'), createKey('f10')],
+    },
+    {
+      command: Command.TOGGLE_MOUSE_MODE,
       positive: [createKey('s', { ctrl: true })],
       negative: [createKey('s'), createKey('s', { alt: true })],
     },
@@ -474,6 +484,22 @@ describe('keyMatchers', () => {
       const matchers = createKeyMatchers(config);
       expect(matchers[Command.QUIT](createKey('q', { ctrl: true }))).toBe(true);
       expect(matchers[Command.QUIT](createKey('q', { alt: true }))).toBe(true);
+    });
+    it('should support matching non-ASCII and CJK characters', () => {
+      const config = new Map(defaultKeyBindingConfig);
+      config.set(Command.QUIT, [new KeyBinding('Å'), new KeyBinding('가')]);
+
+      const matchers = createKeyMatchers(config);
+
+      // Å is normalized to å with shift=true by the parser
+      expect(matchers[Command.QUIT](createKey('å', { shift: true }))).toBe(
+        true,
+      );
+      expect(matchers[Command.QUIT](createKey('å'))).toBe(false);
+
+      // CJK characters do not have a lower/upper case
+      expect(matchers[Command.QUIT](createKey('가'))).toBe(true);
+      expect(matchers[Command.QUIT](createKey('나'))).toBe(false);
     });
   });
 
