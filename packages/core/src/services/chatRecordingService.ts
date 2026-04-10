@@ -72,6 +72,10 @@ export interface ToolCallRecord {
   description?: string;
   resultDisplay?: ToolResultDisplay;
   renderOutputAsMarkdown?: boolean;
+  /** Experimental: original name of the tool requested by the model before unwrapping */
+  originalRequestName?: string;
+  /** Experimental: original arguments of the tool requested by the model before unwrapping */
+  originalRequestArgs?: Record<string, unknown>;
 }
 
 /**
@@ -108,6 +112,8 @@ export interface ConversationRecord {
   directories?: string[];
   /** The kind of conversation (main agent or subagent) */
   kind?: 'main' | 'subagent';
+  /** Experimental: Whether dynamic tools documentation-injection was enabled */
+  experimentalDynamicTools?: boolean;
 }
 
 /**
@@ -235,6 +241,7 @@ export class ChatRecordingService {
           messages: [],
           directories,
           kind: this.kind,
+          experimentalDynamicTools: this.context.config.getExperimentalDynamicTools(),
         });
       }
 
@@ -487,7 +494,10 @@ export class ChatRecordingService {
       this.cachedLastConvData = fs.readFileSync(this.conversationFile!, 'utf8');
       // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
       this.cachedConversation = JSON.parse(this.cachedLastConvData);
-      if (!this.cachedConversation) {
+      if (this.cachedConversation) {
+        this.cachedConversation.experimentalDynamicTools =
+          this.context.config.getExperimentalDynamicTools();
+      } else {
         // File is corrupt or contains "null". Fallback to an empty conversation.
         this.cachedConversation = {
           sessionId: this.sessionId,
@@ -496,6 +506,7 @@ export class ChatRecordingService {
           lastUpdated: new Date().toISOString(),
           messages: [],
           kind: this.kind,
+          experimentalDynamicTools: this.context.config.getExperimentalDynamicTools(),
         };
       }
       return this.cachedConversation;
@@ -514,6 +525,7 @@ export class ChatRecordingService {
         lastUpdated: new Date().toISOString(),
         messages: [],
         kind: this.kind,
+        experimentalDynamicTools: this.context.config.getExperimentalDynamicTools(),
       };
       return this.cachedConversation;
     }

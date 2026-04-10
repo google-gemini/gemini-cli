@@ -32,6 +32,9 @@ import { resolveModel, supportsModernFeatures } from '../config/models.js';
 import { DiscoveredMCPTool } from '../tools/mcp-tool.js';
 import { getAllGeminiMdFilenames } from '../tools/memoryTool.js';
 import type { AgentLoopContext } from '../config/agent-loop-context.js';
+import {
+  getDynamicToolsDocumentation,
+} from '../utils/dynamicToolsUtils.js';
 
 /**
  * Orchestrates prompt generation by gathering context and building options.
@@ -96,6 +99,13 @@ export class PromptProvider {
         .join('\n');
     }
 
+    let dynamicToolsDocumentation: string | undefined;
+    if (context.config.getExperimentalDynamicTools()) {
+      dynamicToolsDocumentation = getDynamicToolsDocumentation(
+        context.toolRegistry.getFunctionDeclarations(),
+      );
+    }
+
     let basePrompt: string;
 
     // --- Template File Override ---
@@ -141,6 +151,7 @@ export class PromptProvider {
           contextFilenames,
           topicUpdateNarration: context.config.isTopicUpdateNarrationEnabled(),
         })),
+        dynamicToolsDocumentation,
         subAgents: this.withSection(
           'agentContexts',
           () =>
@@ -282,6 +293,7 @@ export class PromptProvider {
     );
     const isModernModel = supportsModernFeatures(desiredModel);
     const activeSnippets = isModernModel ? snippets : legacySnippets;
+
     return activeSnippets.getCompressionPrompt(
       context.config.getApprovedPlanPath(),
     );

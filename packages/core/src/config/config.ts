@@ -699,6 +699,7 @@ export interface ConfigParameters {
   experimentalJitContext?: boolean;
   autoDistillation?: boolean;
   experimentalMemoryManager?: boolean;
+  experimentalDynamicTools?: boolean;
   experimentalAgentHistoryTruncation?: boolean;
   experimentalAgentHistoryTruncationThreshold?: number;
   experimentalAgentHistoryRetainedMessages?: number;
@@ -941,6 +942,7 @@ export class Config implements McpContext, AgentLoopContext {
   private readonly adminSkillsEnabled: boolean;
   private readonly experimentalJitContext: boolean;
   private readonly experimentalMemoryManager: boolean;
+  private readonly experimentalDynamicTools: boolean;
   private readonly memoryBoundaryMarkers: readonly string[];
   private readonly topicUpdateNarration: boolean;
   private readonly disableLLMCorrection: boolean;
@@ -1152,6 +1154,12 @@ export class Config implements McpContext, AgentLoopContext {
 
     this.experimentalJitContext = params.experimentalJitContext ?? false;
     this.experimentalMemoryManager = params.experimentalMemoryManager ?? false;
+    this.experimentalDynamicTools =
+      params.experimentalDynamicTools === true ||
+      process.env['GEMINI_CLI_EXP_DYNAMIC_TOOLS'] === 'true';
+    if (this.experimentalDynamicTools) {
+      debugLogger.log('[Config] Experimental Dynamic Tools enabled.');
+    }
     this.memoryBoundaryMarkers = params.memoryBoundaryMarkers ?? ['.git'];
     this.contextManagement = {
       enabled: params.contextManagement?.enabled ?? false,
@@ -2424,6 +2432,10 @@ export class Config implements McpContext, AgentLoopContext {
 
   isMemoryManagerEnabled(): boolean {
     return this.experimentalMemoryManager;
+  }
+
+  getExperimentalDynamicTools(): boolean {
+    return this.experimentalDynamicTools;
   }
 
   getContextManagementConfig(): ContextManagementConfig {

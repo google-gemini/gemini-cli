@@ -2207,6 +2207,16 @@ const SETTINGS_SCHEMA = {
           'Enable the experimental Topic & Update communication model for reduced chattiness and structured progress reporting.',
         showInDialog: true,
       },
+      dynamicTools: {
+        type: 'boolean',
+        label: 'Dynamic Tools Documentation',
+        category: 'Experimental',
+        requiresRestart: true,
+        default: false,
+        description:
+          'Enable documentation-injected dynamic tools experiment. This hides native tools and exposes a single execute() function.',
+        showInDialog: true,
+      },
     },
   },
   extensions: {

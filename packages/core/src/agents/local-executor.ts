@@ -83,6 +83,12 @@ import {
   COMPLETE_TASK_TOOL_NAME,
   ACTIVATE_SKILL_TOOL_NAME,
 } from '../tools/definitions/base-declarations.js';
+import {
+  getDynamicToolsDocumentation,
+  EXECUTE_FUNCTION_DECLARATION,
+  unwrapExecuteArgs,
+  wrapAsExecute,
+} from '../utils/dynamicToolsUtils.js';
 
 /** A callback function to report on agent activity. */
 export type ActivityCallback = (activity: SubagentActivityEvent) => void;
@@ -1074,7 +1080,58 @@ export class LocalAgentExecutor<TOutput extends z.ZodTypeAny> {
 
     for (const [index, functionCall] of functionCalls.entries()) {
       const callId = functionCall.id ?? `${promptId}-${index}`;
-      const { args, error: parseError } = this.parseToolArguments(functionCall);
+      let { args, error: parseError } = this.parseToolArguments(functionCall);
+
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
+      let effectiveToolName = functionCall.name as string;
+      let effectiveArgs = args;
+      let originalRequestName: string | undefined;
+      let originalRequestArgs: Record<string, unknown> | undefined;
+
+      // Handle experimental dynamic tools
+      if (
+        !parseError &&
+        this.context.config.getExperimentalDynamicTools()
+      ) {
+        if (functionCall.name === 'execute') {
+          const unwrapped = unwrapExecuteArgs(functionCall.args);
+          if (unwrapped) {
+            debugLogger.log(
+              `[LocalAgentExecutor] Unwrapping execute call for tool: ${unwrapped.name}`,
+            );
+            effectiveToolName = unwrapped.name;
+            effectiveArgs = unwrapped.args;
+            args = unwrapped.args;
+            originalRequestName = 'execute';
+            // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
+            originalRequestArgs = functionCall.args as Record<string, unknown>;
+          } else {
+            parseError =
+              'Invalid execute arguments. Expected {name: string, args: object}';
+          }
+        } else if (functionCall.name) {
+          // Model called a tool directly despite documentation.
+          // Recovery: Wrap it as an execute call internally.
+          debugLogger.log(
+            `[LocalAgentExecutor] Model called tool '${functionCall.name}' directly. Wrapping as 'execute' for experiment compatibility.`,
+          );
+
+          const wrapped = wrapAsExecute(functionCall.name, args);
+          const unwrapped = unwrapExecuteArgs(wrapped.args); // Still unwrap to get resilient parameter mapping
+
+          if (unwrapped) {
+            // IMPORTANT: Rewrite the original functionCall so history recording sees it as "execute"
+            functionCall.name = wrapped.name;
+            functionCall.args = wrapped.args;
+
+            effectiveToolName = unwrapped.name;
+            effectiveArgs = unwrapped.args;
+            args = unwrapped.args;
+            originalRequestName = 'execute';
+            originalRequestArgs = wrapped.args as Record<string, unknown>;
+          }
+        }
+      }
 
       if (parseError) {
         debugLogger.warn(`[LocalAgentExecutor] ${parseError}`);
@@ -1097,8 +1154,7 @@ export class LocalAgentExecutor<TOutput extends z.ZodTypeAny> {
         continue;
       }
 
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
-      const toolName = functionCall.name as string;
+      const toolName = effectiveToolName;
 
       let displayName = toolName;
       let description: string | undefined = undefined;
@@ -1129,7 +1185,7 @@ export class LocalAgentExecutor<TOutput extends z.ZodTypeAny> {
 
         syncResults.set(callId, {
           functionResponse: {
-            name: toolName,
+            name: functionCall.name,
             id: callId,
             response: { error },
           },
@@ -1149,7 +1205,9 @@ export class LocalAgentExecutor<TOutput extends z.ZodTypeAny> {
       toolRequests.push({
         callId,
         name: toolName,
-        args,
+        args: effectiveArgs,
+        originalRequestName,
+        originalRequestArgs,
         isClientInitiated: false, // These are coming from the subagent (the "model")
         prompt_id: promptId,
       });
@@ -1285,6 +1343,9 @@ export class LocalAgentExecutor<TOutput extends z.ZodTypeAny> {
    * Prepares the list of tool function declarations to be sent to the model.
    */
   private prepareToolsList(): FunctionDeclaration[] {
+    if (this.context.config.getExperimentalDynamicTools()) {
+      return [EXECUTE_FUNCTION_DECLARATION];
+    }
     const toolsList: FunctionDeclaration[] = [];
     const { toolConfig } = this.definition;
 
@@ -1340,6 +1401,14 @@ export class LocalAgentExecutor<TOutput extends z.ZodTypeAny> {
     // Append environment context (CWD and folder structure).
     const dirContext = await getDirectoryContextString(this.context.config);
     finalPrompt += `\n\n# Environment Context\n${dirContext}`;
+
+    if (this.context.config.getExperimentalDynamicTools()) {
+      const toolDeclarations = this.toolRegistry.getFunctionDeclarations(
+        this.definition.modelConfig.model,
+      );
+      const toolDocumentation = getDynamicToolsDocumentation(toolDeclarations);
+      finalPrompt += `\n\n${toolDocumentation}`;
+    }
 
     // Append standard rules for non-interactive execution.
     finalPrompt += `
