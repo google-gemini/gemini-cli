@@ -331,7 +331,19 @@ export async function retryWithBackoff<T>(
           debugLogger.warn(
             `Attempt ${attempt} failed${errorMessage ? `: ${errorMessage}` : ''}. Max attempts reached`,
           );
-          if (onPersistent429) {
+          // For 500 errors, only trigger the fallback dialog for OAuth-based auth
+          // (LOGIN_WITH_GOOGLE / COMPUTE_ADC). API key users — including those routing
+          // through a custom base URL like LiteLLM — receive actual server errors
+          // that should be propagated rather than spawning an interactive dialog that
+          // will never resolve.
+          const is500FallbackEligible =
+            authType === 'oauth-personal' ||
+            authType === 'compute-default-credentials';
+          if (
+            onPersistent429 &&
+            (classifiedError instanceof RetryableQuotaError ||
+              is500FallbackEligible)
+          ) {
             try {
               const fallbackModel = await onPersistent429(
                 authType,
