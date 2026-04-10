@@ -6,6 +6,7 @@
 
 import { describe, it, expect, afterEach, vi } from 'vitest';
 import path from 'node:path';
+import fs from 'node:fs/promises';
 import { FileSearchFactory, AbortError, filter } from './fileSearch.js';
 import { createTmpDir, cleanupTmpDir } from '@google/gemini-cli-test-utils';
 import * as crawler from './crawler.js';
@@ -678,6 +679,73 @@ describe('FileSearch', () => {
     // Although we can't directly inspect ResultCache.hits/misses from here,
     // the correctness of specificResults after a broad search implicitly
     // verifies that the caching mechanism, including bestBaseQuery, is working.
+  });
+
+  it('should include new root-level paths created after initialization', async () => {
+    tmpDir = await createTmpDir({
+      src: {
+        'existing.ts': '',
+      },
+    });
+
+    const fileSearch = FileSearchFactory.create({
+      projectRoot: tmpDir,
+      fileDiscoveryService: new FileDiscoveryService(tmpDir, {
+        respectGitIgnore: false,
+        respectGeminiIgnore: false,
+      }),
+      ignoreDirs: [],
+      cache: true,
+      cacheTtl: 30,
+      enableRecursiveFileSearch: true,
+      enableFuzzySearch: true,
+    });
+
+    await fileSearch.initialize();
+
+    await fs.mkdir(path.join(tmpDir, 'new-folder'));
+    await fs.writeFile(path.join(tmpDir, 'new-folder', 'new-file.ts'), '');
+
+    expect(await fileSearch.search('new-fo')).toContain('new-folder/');
+    expect(await fileSearch.search('new-folder/')).toEqual([
+      'new-folder/',
+      'new-folder/new-file.ts',
+    ]);
+  });
+
+  it('should include new nested paths created after initialization', async () => {
+    tmpDir = await createTmpDir({
+      src: {
+        'existing.ts': '',
+      },
+    });
+
+    const fileSearch = FileSearchFactory.create({
+      projectRoot: tmpDir,
+      fileDiscoveryService: new FileDiscoveryService(tmpDir, {
+        respectGitIgnore: false,
+        respectGeminiIgnore: false,
+      }),
+      ignoreDirs: [],
+      cache: true,
+      cacheTtl: 30,
+      enableRecursiveFileSearch: true,
+      enableFuzzySearch: true,
+    });
+
+    await fileSearch.initialize();
+
+    await fs.mkdir(path.join(tmpDir, 'src', 'new-folder'));
+    await fs.writeFile(
+      path.join(tmpDir, 'src', 'new-folder', 'new-file.ts'),
+      '',
+    );
+
+    expect(await fileSearch.search('src/new-fo')).toContain('src/new-folder/');
+    expect(await fileSearch.search('src/new-folder/')).toEqual([
+      'src/new-folder/',
+      'src/new-folder/new-file.ts',
+    ]);
   });
 
   it('should be case-insensitive by default', async () => {
