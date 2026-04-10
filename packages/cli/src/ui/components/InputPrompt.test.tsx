@@ -3877,8 +3877,9 @@ describe('InputPrompt', () => {
 
       // 1. Verify initial placeholder
       await waitFor(() => {
-        expect(stdout.lastFrame()).toMatchSnapshot();
+        expect(stdout.lastFrame()).toContain('[Pasted Text: 10 lines]');
       });
+      expect(stdout.lastFrame()).toMatchSnapshot();
 
       // Simulate double-click to expand
       await simulateClick(5, 2);
@@ -3886,8 +3887,9 @@ describe('InputPrompt', () => {
 
       // 2. Verify expanded content is visible
       await waitFor(() => {
-        expect(stdout.lastFrame()).toMatchSnapshot();
+        expect(stdout.lastFrame()).toContain('line10');
       });
+      expect(stdout.lastFrame()).toMatchSnapshot();
 
       // Simulate double-click to collapse
       await simulateClick(5, 2);
@@ -3895,8 +3897,9 @@ describe('InputPrompt', () => {
 
       // 3. Verify placeholder is restored
       await waitFor(() => {
-        expect(stdout.lastFrame()).toMatchSnapshot();
+        expect(stdout.lastFrame()).toContain('[Pasted Text: 10 lines]');
       });
+      expect(stdout.lastFrame()).toMatchSnapshot();
 
       unmount();
     });
