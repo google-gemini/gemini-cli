@@ -48,36 +48,18 @@ describe('run_shell_command streaming to file regression', () => {
     await rig.run({ args: prompt });
 
     let savedFilePath = '';
-    const tmpdir = path.join(rig.homeDir!, '.gemini', 'tmp');
-    if (fs.existsSync(tmpdir)) {
-      const findFiles = (dir: string): string[] => {
-        let results: string[] = [];
-        const list = fs.readdirSync(dir, { withFileTypes: true });
-        for (const file of list) {
-          const fullPath = path.join(dir, file.name);
-          if (file.isDirectory()) {
-            results = results.concat(findFiles(fullPath));
-          } else if (file.isFile() && file.name.endsWith('.txt')) {
-            results.push(fullPath);
-          }
-        }
-        return results;
-      };
-
-      const files = findFiles(tmpdir);
-      for (const p of files) {
-        const stat = fs.statSync(p);
-        if (Date.now() - stat.mtimeMs < 60000 && stat.size >= 20000000) {
-          savedFilePath = p;
-          break;
-        }
-      }
-    }
+    const toolLogs = rig.readToolLogs();
+    const shellCall = toolLogs.find(
+      (log) => log.toolRequest.name === 'run_shell_command',
+    );
+    expect(shellCall).toBeTruthy();
+    savedFilePath = shellCall?.toolResponse?.result?.outputFile;
 
     expect(
       savedFilePath,
-      `Expected to find a saved output file >= 20MB in ${tmpdir}`,
+      `Expected the tool response to contain an outputFile`,
     ).toBeTruthy();
+
     const savedContent = fs.readFileSync(savedFilePath, 'utf8');
     expect(savedContent).toContain(startMarker);
     expect(savedContent).toContain(endMarker);
@@ -117,45 +99,18 @@ describe('run_shell_command streaming to file regression', () => {
     await rig.run({ args: prompt });
 
     let savedFilePath = '';
-    const tmpdir = path.join(rig.homeDir!, '.gemini', 'tmp');
-    if (fs.existsSync(tmpdir)) {
-      const findFiles = (dir: string): string[] => {
-        let results: string[] = [];
-        const list = fs.readdirSync(dir, { withFileTypes: true });
-        for (const file of list) {
-          const fullPath = path.join(dir, file.name);
-          if (file.isDirectory()) {
-            results = results.concat(findFiles(fullPath));
-          } else if (file.isFile() && file.name.endsWith('.txt')) {
-            results.push(fullPath);
-          }
-        }
-        return results;
-      };
-
-      const files = findFiles(tmpdir);
-      const fileStats = files.map((p) => ({
-        p,
-        size: fs.statSync(p).size,
-        age: Date.now() - fs.statSync(p).mtimeMs,
-      }));
-      for (const p of files) {
-        const stat = fs.statSync(p);
-        // Look for file >= 20MB (since we expect 50MB, but allowing margin for the bug)
-        if (Date.now() - stat.mtimeMs < 60000 && stat.size >= 20000000) {
-          savedFilePath = p;
-          break;
-        }
-      }
-      if (!savedFilePath) {
-        console.error('Available files:', JSON.stringify(fileStats, null, 2));
-      }
-    }
+    const toolLogs = rig.readToolLogs();
+    const shellCall = toolLogs.find(
+      (log) => log.toolRequest.name === 'run_shell_command',
+    );
+    expect(shellCall).toBeTruthy();
+    savedFilePath = shellCall?.toolResponse?.result?.outputFile;
 
     expect(
       savedFilePath,
-      `Expected to find a saved output file >= 20MB in ${tmpdir}`,
+      `Expected the tool response to contain an outputFile`,
     ).toBeTruthy();
+
     const savedContent = fs.readFileSync(savedFilePath, 'utf8');
     expect(savedContent).toContain(startMarker);
     expect(savedContent).toContain(endMarker);

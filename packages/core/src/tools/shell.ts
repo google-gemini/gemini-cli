@@ -466,7 +466,9 @@ export class ShellToolInvocation extends BaseToolInvocation<
     const onAbort = () => combinedController.abort();
 
     const outputFileName = `gemini_shell_output_${crypto.randomBytes(6).toString('hex')}.log`;
-    const outputFilePath = path.join(os.tmpdir(), outputFileName);
+    const projectTempDir = this.context.config.storage.getProjectTempDir();
+    fs.mkdirSync(projectTempDir, { recursive: true });
+    const outputFilePath = path.join(projectTempDir, outputFileName);
     const outputStream = fs.createWriteStream(outputFilePath);
 
     let fullOutputReturned = false;
@@ -669,7 +671,8 @@ export class ShellToolInvocation extends BaseToolInvocation<
       }
 
       const result = await resultPromise;
-      await new Promise<void>((resolve) => {
+      await new Promise<void>((resolve, reject) => {
+        outputStream.on('error', reject);
         outputStream.end(resolve);
       });
 
