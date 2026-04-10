@@ -123,51 +123,6 @@ export interface SearchOptions {
   maxResults?: number;
 }
 
-async function searchCandidates(
-  candidates: string[],
-  pattern: string,
-  options: {
-    signal?: AbortSignal;
-    enableFuzzySearch: boolean;
-  },
-): Promise<string[]> {
-  if (pattern.includes('*') || !options.enableFuzzySearch) {
-    return filter(candidates, pattern, options.signal);
-  }
-
-  const fzf = new AsyncFzf(candidates, {
-    fuzzy: candidates.length > 20000 ? 'v1' : 'v2',
-    forward: false,
-    tiebreakers: [byBasenamePrefix, byMatchPosFromEnd, byLengthAsc],
-  });
-
-  return fzf
-    .find(pattern)
-    .then((results: Array<FzfResultItem<string>>) =>
-      results.map((entry: FzfResultItem<string>) => entry.item),
-    )
-    .catch(() => []);
-}
-
-function mergeCandidates(
-  primary: string[],
-  secondary: string[],
-): string[] {
-  if (secondary.length === 0) {
-    return primary;
-  }
-
-  const merged = [...primary];
-  const seen = new Set(primary);
-  for (const candidate of secondary) {
-    if (!seen.has(candidate)) {
-      seen.add(candidate);
-      merged.push(candidate);
-    }
-  }
-  return merged;
-}
-
 function normalizeLiveResults(
   results: string[],
   rootRelativeDir: string,
@@ -236,34 +191,30 @@ class RecursiveFileSearch implements FileSearch {
       filteredCandidates = candidates;
     } else {
       let shouldCache = true;
-      filteredCandidates = await searchCandidates(candidates, pattern, {
-        signal: options.signal,
-        enableFuzzySearch: this.options.enableFuzzySearch && !!this.fzf,
-      }).catch((error: unknown) => {
-        shouldCache = false;
-        throw error;
-      });
+      if (pattern.includes('*') || !this.fzf) {
+        filteredCandidates = await filter(candidates, pattern, options.signal);
+      } else {
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
+        filteredCandidates = await this.fzf
+          .find(pattern)
+          .then((results: Array<FzfResultItem<string>>) =>
+            results.map((entry: FzfResultItem<string>) => entry.item),
+          )
+          .catch((error: unknown) => {
+            shouldCache = false;
+            throw error;
+          });
+      }
 
       if (shouldCache) {
         this.resultCache.set(pattern, filteredCandidates);
       }
     }
 
-    const liveCandidates = await this.searchFreshCandidates(
-      pattern,
-      options.signal,
-    );
-    filteredCandidates = mergeCandidates(filteredCandidates, liveCandidates);
-
     if (filteredCandidates.length === 0 && pattern !== '*') {
-      const recursiveLiveCandidates = await this.searchFreshCandidates(
+      filteredCandidates = await this.searchFreshCandidates(
         pattern,
         options.signal,
-        true,
-      );
-      filteredCandidates = mergeCandidates(
-        filteredCandidates,
-        recursiveLiveCandidates,
       );
     }
 
@@ -293,32 +244,38 @@ class RecursiveFileSearch implements FileSearch {
   private async searchFreshCandidates(
     pattern: string,
     signal: AbortSignal | undefined,
-    recursive = false,
   ): Promise<string[]> {
     if (!this.ignore) {
       return [];
     }
 
     const dir =
-      !recursive && pattern !== '*' && !pattern.endsWith('/')
+      pattern !== '*' && !pattern.endsWith('/')
         ? path.dirname(pattern)
         : pattern.endsWith('/')
           ? pattern
           : '.';
-    const crawlDirectory = recursive
-      ? this.options.projectRoot
-      : path.join(this.options.projectRoot, dir);
-    const rootRelativeDir = recursive
-      ? '.'
-      : path
-          .relative(this.options.projectRoot, crawlDirectory)
-          .split(path.sep)
-          .join(path.posix.sep);
+    const crawlDirectory = path.resolve(this.options.projectRoot, dir);
+    const relativeToProjectRoot = path.relative(
+      this.options.projectRoot,
+      crawlDirectory,
+    );
+    if (
+      relativeToProjectRoot === '..' ||
+      relativeToProjectRoot.startsWith(`..${path.sep}`) ||
+      path.isAbsolute(relativeToProjectRoot)
+    ) {
+      return [];
+    }
+
+    const rootRelativeDir = relativeToProjectRoot
+      .split(path.sep)
+      .join(path.posix.sep);
     const results = normalizeLiveResults(
       await crawl({
         crawlDirectory,
         cwd: this.options.projectRoot,
-        maxDepth: recursive ? this.options.maxDepth : 0,
+        maxDepth: 0,
         maxFiles: this.options.maxFiles ?? 20000,
         ignore: this.ignore,
         cache: false,
@@ -327,10 +284,7 @@ class RecursiveFileSearch implements FileSearch {
       rootRelativeDir,
     );
 
-    return searchCandidates(results, pattern, {
-      signal,
-      enableFuzzySearch: this.options.enableFuzzySearch,
-    });
+    return filter(results, pattern, signal);
   }
 
   private buildResultCache(): void {

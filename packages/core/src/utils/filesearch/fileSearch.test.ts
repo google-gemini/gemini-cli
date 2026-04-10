@@ -748,6 +748,40 @@ describe('FileSearch', () => {
     ]);
   });
 
+  it('should not crawl outside the project root when refreshing live results', async () => {
+    const parentDir = await createTmpDir({
+      project: {
+        src: {
+          'existing.ts': '',
+        },
+      },
+      outside: {
+        'secret.txt': '',
+      },
+    });
+    tmpDir = path.join(parentDir, 'project');
+
+    const fileSearch = FileSearchFactory.create({
+      projectRoot: tmpDir,
+      fileDiscoveryService: new FileDiscoveryService(tmpDir, {
+        respectGitIgnore: false,
+        respectGeminiIgnore: false,
+      }),
+      ignoreDirs: [],
+      cache: true,
+      cacheTtl: 30,
+      enableRecursiveFileSearch: true,
+      enableFuzzySearch: true,
+    });
+
+    await fileSearch.initialize();
+
+    expect(await fileSearch.search('../outside')).toEqual([]);
+
+    await cleanupTmpDir(parentDir);
+    tmpDir = '';
+  });
+
   it('should be case-insensitive by default', async () => {
     tmpDir = await createTmpDir({
       'File1.Js': '',
