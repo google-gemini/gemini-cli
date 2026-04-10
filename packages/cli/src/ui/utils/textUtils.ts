@@ -98,6 +98,12 @@ export function cpSlice(str: string, start: number, end?: number): string {
 /**
  * Strip characters that can break terminal rendering.
  *
+ * This is a strict sanitization function intended for general display
+ * contexts. It strips all C1 control characters (0x80-0x9F) and VT
+ * control sequences. For list display contexts where a more lenient
+ * approach is needed (preserving C1 characters and only stripping ANSI
+ * codes and newlines/tabs), use a separate function instead.
+ *
  * Processing order:
  * 1. stripAnsi removes ANSI escape sequences (including 8-bit CSI 0x9B)
  * 2. Regex strips C0, C1, BiDi, and zero-width control characters
