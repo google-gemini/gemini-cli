@@ -163,6 +163,7 @@ export async function startInteractiveUI(
         settings.merged.ui.incrementalRendering !== false &&
         useAlternateBuffer &&
         !isShpool,
+      debugRainbow: settings.merged.ui.debugRainbow === true,
     },
   );
 
