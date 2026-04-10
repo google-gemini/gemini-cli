@@ -5,7 +5,6 @@
  */
 
 import { useState, useEffect } from 'react';
-import { debugLogger } from '@google/gemini-cli-core';
 
 /**
  * Returns true after a specified delay of inactivity.
@@ -28,17 +27,12 @@ export const useInactivityTimer = (
       return;
     }
 
-    debugLogger.debug(`[useInactivityTimer] Starting timer for ${delayMs}ms. Trigger:`, trigger);
     setIsInactive(false);
     const timer = setTimeout(() => {
-      debugLogger.debug(`[useInactivityTimer] Timer fired after ${delayMs}ms.`);
       setIsInactive(true);
     }, delayMs);
 
-    return () => {
-      debugLogger.debug(`[useInactivityTimer] Clearing timer.`);
-      clearTimeout(timer);
-    };
+    return () => clearTimeout(timer);
   }, [isActive, trigger, delayMs]);
 
   return isInactive;

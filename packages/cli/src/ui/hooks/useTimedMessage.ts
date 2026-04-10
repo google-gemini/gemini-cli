@@ -5,7 +5,6 @@
  */
 
 import { useState, useCallback, useRef, useEffect } from 'react';
-import { debugLogger } from '@google/gemini-cli-core';
 
 /**
  * A hook to manage a state value that automatically resets to null after a duration.
@@ -14,26 +13,15 @@ import { debugLogger } from '@google/gemini-cli-core';
 export function useTimedMessage<T>(durationMs: number) {
   const [message, setMessage] = useState<T | null>(null);
   const timeoutRef = useRef<NodeJS.Timeout | null>(null);
-  const currentMessageRef = useRef<T | null>(null);
 
   const showMessage = useCallback(
     (msg: T | null) => {
-      debugLogger.debug(`[useTimedMessage] showMessage called with:`, msg);
-      if (currentMessageRef.current !== msg) {
-        currentMessageRef.current = msg;
-        setMessage(msg);
-      }
-
+      setMessage(msg);
       if (timeoutRef.current) {
-        debugLogger.debug(`[useTimedMessage] Clearing existing timeout.`);
         clearTimeout(timeoutRef.current);
       }
-
       if (msg !== null) {
-        debugLogger.debug(`[useTimedMessage] Starting timeout for ${durationMs}ms.`);
         timeoutRef.current = setTimeout(() => {
-          debugLogger.debug(`[useTimedMessage] Timeout fired. Resetting message.`);
-          currentMessageRef.current = null;
           setMessage(null);
         }, durationMs);
       }
@@ -44,7 +32,6 @@ export function useTimedMessage<T>(durationMs: number) {
   useEffect(
     () => () => {
       if (timeoutRef.current) {
-        debugLogger.debug(`[useTimedMessage] Cleanup: Clearing timeout.`);
         clearTimeout(timeoutRef.current);
       }
     },
