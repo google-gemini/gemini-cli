@@ -110,8 +110,8 @@ export const CodebaseInvestigatorAgent = (
     },
 
     runConfig: {
-      maxTimeMinutes: 3,
-      maxTurns: 10,
+      maxTimeMinutes: 10,
+      maxTurns: 50,
     },
 
     toolConfig: {
