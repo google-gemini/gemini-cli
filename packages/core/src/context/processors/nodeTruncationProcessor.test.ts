@@ -57,7 +57,7 @@ describe('NodeTruncationProcessor', () => {
 
     const targets = [prompt, thought, yieldNode];
 
-    const result = await processor(createMockProcessArgs(targets));
+    const result = await processor.process(createMockProcessArgs(targets));
 
     expect(result.length).toBe(3);
 
@@ -110,7 +110,7 @@ describe('NodeTruncationProcessor', () => {
 
     const targets = [prompt, thought];
 
-    const result = await processor(createMockProcessArgs(targets));
+    const result = await processor.process(createMockProcessArgs(targets));
 
     expect(result.length).toBe(2);
 

@@ -37,7 +37,7 @@ describe('BlobDegradationProcessor', () => {
 
     const targets = [prompt];
 
-    const result = await processor(createMockProcessArgs(targets));
+    const result = await processor.process(createMockProcessArgs(targets));
 
     expect(result.length).toBe(1);
     const modifiedPrompt = result[0] as UserPrompt;
@@ -78,7 +78,7 @@ describe('BlobDegradationProcessor', () => {
 
     const targets = [prompt];
 
-    const result = await processor(createMockProcessArgs(targets));
+    const result = await processor.process(createMockProcessArgs(targets));
 
     const modifiedPrompt = result[0] as UserPrompt;
     expect(modifiedPrompt.semanticParts.length).toBe(2);
@@ -94,7 +94,7 @@ describe('BlobDegradationProcessor', () => {
     const processor = createBlobDegradationProcessor('BlobDegradationProcessor', env);
     const targets: ConcreteNode[] = [];
 
-    const result = await processor(createMockProcessArgs(targets));
+    const result = await processor.process(createMockProcessArgs(targets));
 
     expect(result).toBe(targets);
   });

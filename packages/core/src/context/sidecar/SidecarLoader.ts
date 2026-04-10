@@ -7,6 +7,9 @@
 import type { Config } from '../../config/config.js';
 import type { SidecarConfig } from './types.js';
 import { defaultSidecarProfile, type ContextProfile } from './profiles.js';
+import { SchemaValidator } from '../../utils/schemaValidator.js';
+import { getSidecarConfigSchema } from './schema.js';
+import type { SidecarRegistry } from './registry.js';
 import type { IFileSystem } from '../system/IFileSystem.js';
 import { NodeFileSystem } from '../system/NodeFileSystem.js';
 
@@ -17,6 +20,7 @@ export class SidecarLoader {
    */
   static loadFromFile(
     sidecarPath: string,
+    registry: SidecarRegistry,
     fileSystem: IFileSystem = new NodeFileSystem(),
   ): ContextProfile {
     const fileContent = fileSystem.readFileSync(sidecarPath, 'utf8');
@@ -36,14 +40,32 @@ export class SidecarLoader {
       );
     }
 
-    const customConfig = parsed as Partial<SidecarConfig>;
+    // Validate the complete structure, including deep options
+    const validationError = SchemaValidator.validate(
+      getSidecarConfigSchema(registry),
+      parsed,
+    );
     
+    if (validationError) {
+      throw new Error(
+        `Invalid sidecar configuration in ${sidecarPath}. Validation error: ${validationError}`,
+      );
+    }
+
+    // Extract strictly what we need since we just validated it.
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
+    const validConfig = parsed as {
+      budget?: SidecarConfig['budget'];
+      processorOptions?: SidecarConfig['processorOptions'];
+    };
+
     return {
       ...defaultSidecarProfile,
       config: {
         ...defaultSidecarProfile.config,
-        ...(customConfig.budget ? { budget: customConfig.budget } : {})
-      }
+        ...(validConfig.budget ? { budget: validConfig.budget } : {}),
+        ...(validConfig.processorOptions ? { processorOptions: validConfig.processorOptions } : {})
+      },
     };
   }
 
@@ -53,6 +75,7 @@ export class SidecarLoader {
    */
   static fromConfig(
     config: Config,
+    registry: SidecarRegistry,
     fileSystem: IFileSystem = new NodeFileSystem(),
   ): ContextProfile {
     const sidecarPath = config.getExperimentalContextSidecarConfig();
@@ -65,7 +88,7 @@ export class SidecarLoader {
       }
 
       // If the file has content, enforce strict validation and throw on failure.
-      return this.loadFromFile(sidecarPath, fileSystem);
+      return this.loadFromFile(sidecarPath, registry, fileSystem);
     }
 
     return defaultSidecarProfile;

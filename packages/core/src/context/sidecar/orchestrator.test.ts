@@ -13,7 +13,7 @@ import {
 } from '../testing/contextTestUtils.js';
 import type { ContextEnvironment } from './environment.js';
 import type {
-  ContextProcessorFn,
+  ContextProcessor,
   ContextWorker,
   InboxSnapshot,
   ProcessArgs,
@@ -23,38 +23,42 @@ import type { ContextEventBus } from '../eventBus.js';
 import type { ConcreteNode, UserPrompt } from '../ir/types.js';
 
 // A realistic mock processor that modifies the text of the first target node
-function createModifyingProcessor(id: string): ContextProcessorFn {
-  const processorFn = async (args: ProcessArgs) => {
-    const newTargets = [...args.targets];
-    if (newTargets.length > 0 && newTargets[0].type === 'USER_PROMPT') {
-      const prompt = newTargets[0] as UserPrompt;
-      const newParts = [...prompt.semanticParts];
-      if (newParts.length > 0 && newParts[0].type === 'text') {
-        newParts[0] = {
-          ...newParts[0],
-          text: newParts[0].text + ' [modified]',
+function createModifyingProcessor(id: string): ContextProcessor {
+  return {
+    id,
+    name: 'ModifyingProcessor',
+    process: async (args: ProcessArgs) => {
+      const newTargets = [...args.targets];
+      if (newTargets.length > 0 && newTargets[0].type === 'USER_PROMPT') {
+        const prompt = newTargets[0];
+        const newParts = [...prompt.semanticParts];
+        if (newParts.length > 0 && newParts[0].type === 'text') {
+          newParts[0] = {
+            ...newParts[0],
+            text: newParts[0].text + ' [modified]',
+          };
+        }
+        newTargets[0] = {
+          ...prompt,
+          id: prompt.id + '-modified',
+          replacesId: prompt.id,
+          semanticParts: newParts,
         };
       }
-      newTargets[0] = {
-        ...prompt,
-        id: prompt.id + '-modified',
-        replacesId: prompt.id,
-        semanticParts: newParts,
-      };
+      return newTargets;
     }
-    return newTargets;
   };
-  Object.defineProperty(processorFn, 'name', { value: 'ModifyingProcessor' });
-  return Object.assign(processorFn, { id });
 }
 
 // A processor that just throws an error
-function createThrowingProcessor(id: string): ContextProcessorFn {
-  const processorFn = async (): Promise<readonly ConcreteNode[]> => {
-    throw new Error('Processor failed intentionally');
+function createThrowingProcessor(id: string): ContextProcessor {
+  return {
+    id,
+    name: 'Throwing',
+    process: async (): Promise<readonly ConcreteNode[]> => {
+      throw new Error('Processor failed intentionally');
+    }
   };
-  Object.defineProperty(processorFn, 'name', { value: 'Throwing' });
-  return Object.assign(processorFn, { id });
 }
 
 // A mock worker that signals it ran

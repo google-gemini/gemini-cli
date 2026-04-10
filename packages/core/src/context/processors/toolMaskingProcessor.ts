@@ -3,7 +3,7 @@
  * Copyright 2026 Google LLC
  * SPDX-License-Identifier: Apache-2.0
  */
-import type { ContextProcessorFn, ProcessArgs } from '../pipeline.js';
+import type { ContextProcessor, ProcessArgs } from '../pipeline.js';
 import type { ConcreteNode, ToolExecution } from '../ir/types.js';
 import type { ContextEnvironment } from '../sidecar/environment.js';
 import { sanitizeFilenamePart } from '../../utils/fileUtils.js';
@@ -67,12 +67,13 @@ export function createToolMaskingProcessor(
   id: string,
   env: ContextEnvironment,
   options: ToolMaskingProcessorOptions,
-): ContextProcessorFn {
-  const isAlreadyMasked = (text: string): boolean => {
-    return text.includes('<tool_output_masked>');
-  };
+): ContextProcessor {
+  const isAlreadyMasked = (text: string): boolean => text.includes('<tool_output_masked>');
 
-  const processor: any = async ({ targets }: ProcessArgs) => {
+  return {
+    id,
+    name: 'ToolMaskingProcessor',
+    process: async ({ targets }: ProcessArgs) => {
     const maskingConfig = options;
     if (!maskingConfig) return targets;
     if (targets.length === 0) return targets;
@@ -255,10 +256,6 @@ export function createToolMaskingProcessor(
     }
 
     return returnedNodes;
+    }
   };
-
-  processor.id = id;
-  Object.defineProperty(processor, 'name', { value: 'ToolMaskingProcessor' });
-
-  return processor;
 }

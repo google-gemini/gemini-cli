@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 import type {
-  ContextProcessorFn,
+  ContextProcessor,
   ProcessArgs,
   BackstopTargetOptions,
 } from '../pipeline.js';
@@ -22,10 +22,13 @@ export function createStateSnapshotProcessor(
   id: string,
   env: ContextEnvironment,
   options: StateSnapshotProcessorOptions,
-): ContextProcessorFn {
+): ContextProcessor {
   const generator = new SnapshotGenerator(env);
 
-  const processor: any = async ({
+  return {
+    id,
+    name: 'StateSnapshotProcessor',
+    process: async ({
     targets,
     inbox,
   }: ProcessArgs) => {
@@ -160,10 +163,6 @@ export function createStateSnapshotProcessor(
       debugLogger.error('StateSnapshotProcessor failed sync backstop', e);
       return targets;
     }
+    }
   };
-
-  processor.id = id;
-  Object.defineProperty(processor, 'name', { value: 'StateSnapshotProcessor' });
-
-  return processor;
 }

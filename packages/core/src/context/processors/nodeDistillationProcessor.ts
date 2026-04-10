@@ -3,7 +3,7 @@
  * Copyright 2026 Google LLC
  * SPDX-License-Identifier: Apache-2.0
  */
-import type { ContextProcessorFn, ProcessArgs } from '../pipeline.js';
+import type { ContextProcessor, ProcessArgs } from '../pipeline.js';
 import type { ConcreteNode } from '../ir/types.js';
 import type { ContextEnvironment } from '../sidecar/environment.js';
 import { debugLogger } from '../../utils/debugLogger.js';
@@ -19,7 +19,7 @@ export function createNodeDistillationProcessor(
   id: string,
   env: ContextEnvironment,
   options: NodeDistillationProcessorOptions,
-): ContextProcessorFn {
+): ContextProcessor {
   const generateSummary = async (
     text: string,
     contextInfo: string,
@@ -55,7 +55,10 @@ export function createNodeDistillationProcessor(
     }
   };
 
-  const processor: any = async ({ targets }: ProcessArgs) => {
+  return {
+    id,
+    name: 'NodeDistillationProcessor',
+    process: async ({ targets }: ProcessArgs) => {
     const semanticConfig = options;
     const limitTokens = semanticConfig.nodeThresholdTokens;
     const thresholdChars = env.tokenCalculator.tokensToChars(limitTokens);
@@ -192,10 +195,6 @@ export function createNodeDistillationProcessor(
     }
 
     return returnedNodes;
+    }
   };
-
-  processor.id = id;
-  Object.defineProperty(processor, 'name', { value: 'NodeDistillationProcessor' });
-
-  return processor;
 }

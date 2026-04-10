@@ -3,7 +3,7 @@
  * Copyright 2026 Google LLC
  * SPDX-License-Identifier: Apache-2.0
  */
-import type { ProcessArgs, ContextProcessorFn } from '../pipeline.js';
+import type { ProcessArgs, ContextProcessor } from '../pipeline.js';
 import type { ConcreteNode, UserPrompt } from '../ir/types.js';
 import type { ContextEnvironment } from '../sidecar/environment.js';
 import { sanitizeFilenamePart } from '../../utils/fileUtils.js';
@@ -11,8 +11,11 @@ import { sanitizeFilenamePart } from '../../utils/fileUtils.js';
 export function createBlobDegradationProcessor(
   id: string,
   env: ContextEnvironment,
-): ContextProcessorFn {
-  const processor: any = async ({ targets }: ProcessArgs) => {
+): ContextProcessor {
+  return {
+    id,
+    name: 'BlobDegradationProcessor',
+    process: async ({ targets }: ProcessArgs) => {
     if (targets.length === 0) {
       return targets;
     }
@@ -142,10 +145,6 @@ export function createBlobDegradationProcessor(
     }
 
     return returnedNodes;
+    },
   };
-  
-  processor.id = id;
-  Object.defineProperty(processor, 'name', { value: 'BlobDegradationProcessor' });
-
-  return processor;
 }

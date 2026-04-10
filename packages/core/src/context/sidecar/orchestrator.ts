@@ -165,7 +165,7 @@ export class PipelineOrchestrator {
             this.isNodeAllowed(n, triggerTargets, protectedLogicalIds),
           );
 
-          const returnedNodes = await processor({
+          const returnedNodes = await processor.process({
             buffer: currentBuffer,
             targets: allowedTargets,
             inbox: inboxSnapshot,
@@ -219,7 +219,7 @@ export class PipelineOrchestrator {
           this.isNodeAllowed(n, triggerTargets, protectedLogicalIds),
         );
 
-        const returnedNodes = await processor({
+        const returnedNodes = await processor.process({
           buffer: currentBuffer,
           targets: allowedTargets,
           inbox: inboxSnapshot,

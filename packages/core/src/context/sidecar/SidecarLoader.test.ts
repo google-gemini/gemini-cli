@@ -7,14 +7,18 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import { SidecarLoader } from './SidecarLoader.js';
 import { defaultSidecarProfile } from './profiles.js';
+import { SidecarRegistry } from './registry.js';
 import { InMemoryFileSystem } from '../system/InMemoryFileSystem.js';
 import type { Config } from 'src/config/config.js';
 
 describe('SidecarLoader (Fake FS)', () => {
   let fileSystem: InMemoryFileSystem;
+  let registry: SidecarRegistry;
 
   beforeEach(() => {
     fileSystem = new InMemoryFileSystem();
+    registry = new SidecarRegistry();
+    registry.registerProcessor({ id: 'NodeTruncation', schema: { type: 'object', properties: { maxTokens: { type: 'number' } } }});
   });
 
   const mockConfig = {
@@ -22,36 +26,59 @@ describe('SidecarLoader (Fake FS)', () => {
   } as unknown as Config;
 
   it('returns default profile if file does not exist', () => {
-    const result = SidecarLoader.fromConfig(mockConfig, fileSystem);
+    const result = SidecarLoader.fromConfig(mockConfig, registry, fileSystem);
     expect(result).toBe(defaultSidecarProfile);
   });
 
   it('returns default profile if file exists but is 0 bytes', () => {
     fileSystem.setFile('/path/to/sidecar.json', '');
-    const result = SidecarLoader.fromConfig(mockConfig, fileSystem);
+    const result = SidecarLoader.fromConfig(mockConfig, registry, fileSystem);
     expect(result).toBe(defaultSidecarProfile);
   });
 
   it('throws an error if file is empty whitespace', () => {
     fileSystem.setFile('/path/to/sidecar.json', '   \n  ');
     expect(() =>
-      SidecarLoader.fromConfig(mockConfig, fileSystem),
+      SidecarLoader.fromConfig(mockConfig, registry, fileSystem),
     ).toThrow('is empty');
   });
 
   it('returns parsed config if file is valid', () => {
     const validConfig = {
       budget: { retainedTokens: 1000, maxTokens: 2000 },
+      processorOptions: {
+        myTruncation: {
+          type: 'NodeTruncation',
+          options: { maxTokens: 500 }
+        }
+      }
     };
     fileSystem.setFile('/path/to/sidecar.json', JSON.stringify(validConfig));
-    const result = SidecarLoader.fromConfig(mockConfig, fileSystem);
+    const result = SidecarLoader.fromConfig(mockConfig, registry, fileSystem);
     expect(result.config.budget?.maxTokens).toBe(2000);
+    expect(result.config.processorOptions?.['myTruncation']).toBeDefined();
+  });
+
+  it('throws validation error if processorOptions contains invalid data for the schema', () => {
+    const invalidConfig = {
+      budget: { retainedTokens: 1000, maxTokens: 2000 },
+      processorOptions: {
+        myTruncation: {
+          type: 'NodeTruncation',
+          options: { maxTokens: "this should be a number" }
+        }
+      }
+    };
+    fileSystem.setFile('/path/to/sidecar.json', JSON.stringify(invalidConfig));
+    expect(() =>
+      SidecarLoader.fromConfig(mockConfig, registry, fileSystem),
+    ).toThrow('Validation error');
   });
 
   it('throws validation error if file is empty whitespace', () => {
     fileSystem.setFile('/path/to/sidecar.json', '   \n  ');
     expect(() =>
-      SidecarLoader.fromConfig(mockConfig, fileSystem),
+      SidecarLoader.fromConfig(mockConfig, registry, fileSystem),
     ).toThrow('is empty');
   });
 });

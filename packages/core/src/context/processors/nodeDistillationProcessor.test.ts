@@ -63,7 +63,7 @@ describe('NodeDistillationProcessor', () => {
 
     const targets = [prompt, thought, tool];
 
-    const result = await processor(createMockProcessArgs(targets));
+    const result = await processor.process(createMockProcessArgs(targets));
 
     expect(result.length).toBe(3);
 
@@ -122,7 +122,7 @@ describe('NodeDistillationProcessor', () => {
 
     const targets = [prompt, thought];
 
-    const result = await processor(createMockProcessArgs(targets));
+    const result = await processor.process(createMockProcessArgs(targets));
 
     expect(result.length).toBe(2);
 

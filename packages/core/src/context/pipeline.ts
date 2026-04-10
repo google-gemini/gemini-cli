@@ -39,14 +39,14 @@ export interface ProcessArgs {
 }
 
 /**
- * A ContextProcessor is now a pure function that returns a modified subset of nodes
+ * A ContextProcessor is a pure, closure-based object that returns a modified subset of nodes
  * (or the original targets if no changes are needed). 
  * The Orchestrator will use this to generate a new graph delta.
  */
-export interface ContextProcessorFn {
+export interface ContextProcessor {
   readonly id: string;
   readonly name: string;
-  (args: ProcessArgs): Promise<readonly ConcreteNode[]>;
+  process(args: ProcessArgs): Promise<readonly ConcreteNode[]>;
 }
 
 export interface ContextWorker {

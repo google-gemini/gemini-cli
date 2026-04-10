@@ -31,7 +31,7 @@ describe('ToolMaskingProcessor', () => {
       },
     });
 
-    const result = await processor(createMockProcessArgs([toolStep]));
+    const result = await processor.process(createMockProcessArgs([toolStep]));
 
     expect(result.length).toBe(1);
     const masked = result[0] as ToolExecution;
@@ -60,7 +60,7 @@ describe('ToolMaskingProcessor', () => {
       },
     });
 
-    const result = await processor(createMockProcessArgs([toolStep]));
+    const result = await processor.process(createMockProcessArgs([toolStep]));
 
     // Returned the exact same object reference
     expect(result[0]).toBe(toolStep);

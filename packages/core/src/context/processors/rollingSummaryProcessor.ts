@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 import type {
-  ContextProcessorFn,
+  ContextProcessor,
   ProcessArgs,
   BackstopTargetOptions,
 } from '../pipeline.js';
@@ -21,10 +21,13 @@ export function createRollingSummaryProcessor(
   id: string,
   env: ContextEnvironment,
   options: RollingSummaryProcessorOptions,
-): ContextProcessorFn {
+): ContextProcessor {
   const generator = new SnapshotGenerator(env);
 
-  const processor: any = async ({ targets }: ProcessArgs) => {
+  return {
+    id,
+    name: 'RollingSummaryProcessor',
+    process: async ({ targets }: ProcessArgs) => {
     if (targets.length === 0) return targets;
 
     const strategy = options.target ?? 'max';
@@ -96,10 +99,6 @@ export function createRollingSummaryProcessor(
       debugLogger.error('RollingSummaryProcessor failed sync backstop', e);
       return targets;
     }
+    }
   };
-
-  processor.id = id;
-  Object.defineProperty(processor, 'name', { value: 'RollingSummaryProcessor' });
-
-  return processor;
 }

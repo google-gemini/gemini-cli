@@ -3,7 +3,7 @@
  * Copyright 2026 Google LLC
  * SPDX-License-Identifier: Apache-2.0
  */
-import type { ContextProcessorFn, ProcessArgs } from '../pipeline.js';
+import type { ContextProcessor, ProcessArgs } from '../pipeline.js';
 import type { ContextEnvironment } from '../sidecar/environment.js';
 import { truncateProportionally } from '../truncation.js';
 import type { ConcreteNode } from '../ir/types.js';
@@ -16,7 +16,7 @@ export function createNodeTruncationProcessor(
   id: string,
   env: ContextEnvironment,
   options: NodeTruncationProcessorOptions,
-): ContextProcessorFn {
+): ContextProcessor {
   const tryApplySquash = (
     text: string,
     limitChars: number,
@@ -49,7 +49,10 @@ export function createNodeTruncationProcessor(
     return null;
   };
 
-  const processor: any = async ({ targets }: ProcessArgs) => {
+  return {
+    id,
+    name: 'NodeTruncationProcessor',
+    process: async ({ targets }: ProcessArgs) => {
     if (targets.length === 0) {
       return targets;
     }
@@ -126,10 +129,6 @@ export function createNodeTruncationProcessor(
     }
 
     return returnedNodes;
+    }
   };
-
-  processor.id = id;
-  Object.defineProperty(processor, 'name', { value: 'NodeTruncationProcessor' });
-
-  return processor;
 }

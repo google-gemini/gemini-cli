@@ -5,7 +5,7 @@
  */
 
 import type {
-  ContextProcessorFn,
+  ContextProcessor,
   BackstopTargetOptions,
   ProcessArgs,
 } from '../pipeline.js';
@@ -18,8 +18,11 @@ export function createHistoryTruncationProcessor(
   id: string,
   env: ContextEnvironment,
   options: HistoryTruncationProcessorOptions,
-): ContextProcessorFn {
-  const processor: any = async ({ targets }: ProcessArgs) => {
+): ContextProcessor {
+  return {
+    id,
+    name: 'HistoryTruncationProcessor',
+    process: async ({ targets }: ProcessArgs) => {
     // Calculate how many tokens we need to remove based on the configured knob
     let targetTokensToRemove = 0;
     const strategy = options.target ?? 'max';
@@ -49,10 +52,6 @@ export function createHistoryTruncationProcessor(
     }
 
     return keptNodes;
+    },
   };
-  
-  processor.id = id;
-  Object.defineProperty(processor, 'name', { value: 'HistoryTruncationProcessor' });
-
-  return processor;
 }

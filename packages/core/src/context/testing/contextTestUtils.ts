@@ -13,6 +13,7 @@ import { randomUUID } from 'node:crypto';
 import { ContextTracer } from '../tracer.js';
 import { ContextEnvironmentImpl } from '../sidecar/environmentImpl.js';
 import { SidecarLoader } from '../sidecar/SidecarLoader.js';
+import { SidecarRegistry } from '../sidecar/registry.js';
 import { ContextEventBus } from '../eventBus.js';
 import { PipelineOrchestrator } from '../sidecar/orchestrator.js';
 import type { ConcreteNode, ToolExecution } from '../ir/types.js';
@@ -246,7 +247,8 @@ export function setupContextComponentTest(
   sidecarOverride?: ContextProfile,
 ): { chatHistory: AgentChatHistory; contextManager: ContextManager } {
   const chatHistory = new AgentChatHistory();
-  const sidecar = sidecarOverride || SidecarLoader.fromConfig(config);
+  const registry = new SidecarRegistry(); // Provide an empty registry for tests, or one pre-filled by the caller if needed later
+  const sidecar = sidecarOverride || SidecarLoader.fromConfig(config, registry);
   const tracer = new ContextTracer({
     targetDir: '/tmp',
     sessionId: 'test-session',

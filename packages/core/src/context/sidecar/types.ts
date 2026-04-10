@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import type { ContextProcessorFn } from '../pipeline.js';
+import type { ContextProcessor } from '../pipeline.js';
 
 export type PipelineTrigger =
   | 'new_message'
@@ -15,7 +15,7 @@ export type PipelineTrigger =
 export interface PipelineDef {
   name: string;
   triggers: PipelineTrigger[];
-  processors: ContextProcessorFn[];
+  processors: ContextProcessor[];
 }
 
 /**
@@ -27,4 +27,9 @@ export interface SidecarConfig {
     retainedTokens: number;
     maxTokens: number;
   };
+  /** 
+   * Dynamic hyperparameter overrides for individual ContextProcessors and Workers. 
+   * Keys are named identifiers (e.g. "gentleTruncation").
+   */
+  processorOptions?: Record<string, { type: string; options: unknown }>;
 }
