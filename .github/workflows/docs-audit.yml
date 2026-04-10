@@ -1,4 +1,4 @@
-name: 'Weekly Docs Audit'
+name: 'Automated Documentation Audit'
 
 on:
   schedule:
@@ -53,6 +53,8 @@ jobs:
             ${{ steps.run_gemini.outputs.summary || 'No summary provided.' }}
 
             Please review the suggestions and merge.
+
+            Related to #25152
           branch: 'docs-audit-${{ github.run_id }}'
           base: 'main'
           team-reviewers: 'gemini-cli-docs, gemini-cli-maintainers'
