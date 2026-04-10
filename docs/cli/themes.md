@@ -117,8 +117,8 @@ least `background.primary`, `text.primary`, `text.secondary`, and the various
 accent colors via `text.link`, `text.accent`, and `status` to ensure a cohesive
 UI.
 
-You can use either hex codes (e.g., `#FF0000`) **or** standard CSS color names
-(e.g., `coral`, `teal`, `blue`) for any color value. See
+You can use either hex codes (for example, `#FF0000`) **or** standard CSS color
+names (for example, `coral`, `teal`, `blue`) for any color value. See
 [CSS color names](https://developer.mozilla.org/en-US/docs/Web/CSS/color_value#color_keywords)
 for a full list of supported names.
 
