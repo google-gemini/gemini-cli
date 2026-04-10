@@ -192,10 +192,6 @@ vi.mock('../agents/registry.js', () => {
   return { AgentRegistry: AgentRegistryMock };
 });
 
-vi.mock('../agents/subagent-tool.js', () => ({
-  SubagentTool: vi.fn(),
-}));
-
 vi.mock('../resources/resource-registry.js', () => ({
   ResourceRegistry: vi.fn(),
 }));
