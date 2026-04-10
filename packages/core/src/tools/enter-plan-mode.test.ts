@@ -131,6 +131,17 @@ describe('EnterPlanModeTool', () => {
       expect(result.returnDisplay).toBe('Switching to Plan mode');
     });
 
+    it('should call getPlansDir immediately after setting ApprovalMode.PLAN to ensure JIT directory creation', async () => {
+      const invocation = tool.build({});
+
+      await invocation.execute({ abortSignal: new AbortController().signal });
+
+      expect(mockConfig.setApprovalMode).toHaveBeenCalledWith(
+        ApprovalMode.PLAN,
+      );
+      expect(mockConfig.getPlansDir).toHaveBeenCalled();
+    });
+
     it('should include optional reason in output display but not in llmContent', async () => {
       const reason = 'Design new database schema';
       const invocation = tool.build({ reason });

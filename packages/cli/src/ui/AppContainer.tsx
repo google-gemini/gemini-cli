@@ -1384,12 +1384,19 @@ Logging in with Google... Restarting Gemini CLI to continue.
 
       if (config) {
         if (parsedCommand.extensionContext) {
+          // Explicit extension invocation sets the "sticky" context to that extension,
+          // allowing subsequent multi-turn conversational replies (e.g. "yes, do that")
+          // to continue interacting with the extension's isolated plan directory.
           if (config.hasExtensionPlanDir(parsedCommand.extensionContext)) {
             config.setActiveExtensionContext(parsedCommand.extensionContext);
           } else {
+            // Extension doesn't have a plan dir registered, so fallback to default workspace context
             config.setActiveExtensionContext(undefined);
           }
         } else if (parsedCommand.commandToExecute?.name === 'plan') {
+          // If the user explicitly runs the native global /plan command (e.g., "/plan copy"),
+          // they are signaling an intent to manage their standard workspace plans,
+          // so we clear the sticky extension context to avoid misdirecting the operation.
           config.setActiveExtensionContext(undefined);
         }
       }

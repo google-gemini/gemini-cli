@@ -19,6 +19,7 @@ import { ENTER_PLAN_MODE_TOOL_NAME } from './tool-names.js';
 import { ApprovalMode } from '../policy/types.js';
 import { ENTER_PLAN_MODE_DEFINITION } from './definitions/coreTools.js';
 import { resolveToolDeclaration } from './definitions/resolver.js';
+import { debugLogger } from '../utils/debugLogger.js';
 
 export interface EnterPlanModeParams {
   reason?: string;
@@ -122,6 +123,18 @@ export class EnterPlanModeInvocation extends BaseToolInvocation<
     }
 
     this.config.setApprovalMode(ApprovalMode.PLAN);
+
+    // Trigger JIT provisioning immediately. In sandboxed environments,
+    // the plans directory must exist on the host before it can be bound/allowed.
+    try {
+      this.config.getPlansDir();
+    } catch (e) {
+      // Log error but don't fail; write_file will try again later if possible
+      debugLogger.error(
+        'Failed to create plans directory during initialization.',
+        e,
+      );
+    }
 
     return {
       llmContent: 'Switching to Plan mode.',
