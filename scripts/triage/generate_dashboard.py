@@ -83,7 +83,6 @@ query($repoOwner: String!, $repoName: String!, $prNumber: Int!) {
           requestedReviewer {
             __typename
             ... on User { login }
-            ... on Team { slug }
           }
         }
       }
@@ -100,10 +99,11 @@ query($repoOwner: String!, $repoName: String!, $prNumber: Int!) {
           publishedAt
         }
       }
-      commits(last: 1) {
+      commits(last: 10) {
         nodes {
           commit {
             committedDate
+            author { user { login } }
           }
         }
       }
@@ -137,19 +137,23 @@ def get_reviewer_info(pr):
     human_reviewers = set()
     requested_special_teams = set()
     
+    # 1. Collect from requested reviewers
     for req in pr.get('reviewRequests', {}).get('nodes', []):
         rr = req.get('requestedReviewer')
         if rr:
             if rr['__typename'] == 'User':
-                login = rr['login']
+                login = rr.get('login')
                 if login and login != author and login not in BOT_BLACKLIST:
                     human_reviewers.add(login)
             elif rr['__typename'] == 'Team':
-                slug = rr['slug']
-                simple_slug = slug.split('/')[-1]
-                if simple_slug in ONCALLER_TEAMS:
-                    requested_special_teams.add(simple_slug)
+                slug = rr.get('slug')
+                if slug:
+                    # Strip repo name if present in slug
+                    simple_slug = slug.split('/')[-1]
+                    if simple_slug in ONCALLER_TEAMS:
+                        requested_special_teams.add(simple_slug)
                 
+    # 2. Collect from formal reviews
     reviews = pr.get('latestReviews', {}).get('nodes', [])
     for r in reviews:
         login = r.get('author', {}).get('login') if r.get('author') else None
@@ -157,23 +161,44 @@ def get_reviewer_info(pr):
             human_reviewers.add(login)
             latest_reviewer_activity = max(latest_reviewer_activity, r['updatedAt'])
             
+    # 3. Track latest activity from ANYONE who isn't the author
     all_comments = pr.get('comments', {}).get('nodes', [])
     for c in all_comments:
         login = c.get('author', {}).get('login') if c.get('author') else None
         if login and login != author and login not in BOT_BLACKLIST:
             latest_reviewer_activity = max(latest_reviewer_activity, c['publishedAt'])
             
+    # 4. Check for commits by non-authors (like maintainer merges)
+    commits = pr.get('commits', {}).get('nodes', [])
+    for c_node in commits:
+        commit_author = c_node.get('commit', {}).get('author', {}).get('user', {}).get('login')
+        if commit_author and commit_author != author and commit_author not in BOT_BLACKLIST:
+            latest_reviewer_activity = max(latest_reviewer_activity, c_node['commit']['committedDate'])
+            
     return sorted(list(human_reviewers)), latest_reviewer_activity, sorted(list(requested_special_teams))
 
-def get_latest_activity(pr):
-    latest = pr['commits']['nodes'][0]['commit']['committedDate']
+def get_author_activity(pr):
+    author = pr.get('author', {}).get('login')
+    # Use updatedAt as a sensible fallback baseline
+    latest = pr.get('createdAt', "")
+    
+    # Author commits
+    commits = pr.get('commits', {}).get('nodes', [])
+    for c_node in commits:
+        commit_author = c_node.get('commit', {}).get('author', {}).get('user', {}).get('login')
+        if commit_author == author:
+            latest = max(latest, c_node['commit']['committedDate'])
+    
+    # Author comments
     for c in pr.get('comments', {}).get('nodes', []):
-        latest = max(latest, c['publishedAt'])
-    for r in pr.get('latestReviews', {}).get('nodes', []):
-        latest = max(latest, r['updatedAt'])
+        if c.get('author', {}).get('login') == author:
+            latest = max(latest, c['publishedAt'])
+            
+    # Timeline events (reopen, etc)
     for event in pr.get('timelineItems', {}).get('nodes', []):
         if 'createdAt' in event:
             latest = max(latest, event['createdAt'])
+            
     return latest
 
 def main():
@@ -226,20 +251,20 @@ def main():
             
             found_open_pr = True
             reviewers, latest_rev_act, special_teams = get_reviewer_info(pr)
-            latest_pr_activity_iso = get_latest_activity(pr)
-            latest_pr_activity = datetime.datetime.fromisoformat(latest_pr_activity_iso.replace('Z', '+00:00'))
+            author_activity = get_author_activity(pr)
             
             # Check for Blockers
+            pr_updated_at = datetime.datetime.fromisoformat(pr['updatedAt'].replace('Z', '+00:00'))
             rollup = pr.get('statusCheckRollup')
             reason = ""
             if pr['mergeable'] == 'CONFLICTING': reason = "Merge Conflict"
             elif rollup and rollup.get('state') == 'FAILURE': reason = "Test Failure"
             
             if reason:
-                if (now - latest_pr_activity).days >= STALE_BLOCKED_PR_DAYS:
-                    blocked_stale_prs.append({"issue_md": f"[#{issue_no} {issue_title}]({issue_url})", "pr_no": pr['number'], "pr_url": pr['url'], "reason": reason, "author": pr['author']['login'], "days_stale": (now - latest_pr_activity).days})
+                if (now - pr_updated_at).days >= STALE_BLOCKED_PR_DAYS:
+                    blocked_stale_prs.append({"issue_md": f"[#{issue_no} {issue_title}]({issue_url})", "pr_no": pr['number'], "pr_url": pr['url'], "reason": reason, "author": pr['author']['login'], "days_stale": (now - pr_updated_at).days})
                 else:
-                    active_blocked_prs.append({"issue_md": f"[#{issue_no} {issue_title}]({issue_url})", "pr_no": pr['number'], "pr_url": pr['url'], "reason": reason, "author": pr['author']['login'], "last_update": latest_pr_activity_iso[:10]})
+                    active_blocked_prs.append({"issue_md": f"[#{issue_no} {issue_title}]({issue_url})", "pr_no": pr['number'], "pr_url": pr['url'], "reason": reason, "author": pr['author']['login'], "last_update": pr['updatedAt'][:10]})
                 categorized = True
                 break
 
@@ -248,16 +273,16 @@ def main():
                 oncaller_attention.append({
                     "issue_md": f"[#{issue_no} {issue_title}]({issue_url})",
                     "pr_no": pr['number'], "pr_url": pr['url'],
-                    "teams": special_teams, "reviewers": reviewers, "last_update": latest_pr_activity_iso[:10],
+                    "teams": special_teams, "reviewers": reviewers, "last_update": pr['updatedAt'][:10],
                     "issue_no": issue_no
                 })
                 categorized = True
                 break
 
             # 2. Normal Review Flow
-            author_acted_last = not latest_rev_act or latest_pr_activity_iso > latest_rev_act
+            author_acted_last = not latest_rev_act or author_activity > latest_rev_act
             if author_acted_last:
-                item = {"issue_md": f"[#{issue_no} {issue_title}]({issue_url})", "pr_no": pr['number'], "pr_url": pr['url'], "updated_at": latest_pr_activity_iso[:10]}
+                item = {"issue_md": f"[#{issue_no} {issue_title}]({issue_url})", "pr_no": pr['number'], "pr_url": pr['url'], "updated_at": author_activity[:10]}
                 if not reviewers:
                     initial_pickup.append(item)
                 else:
@@ -293,7 +318,7 @@ def main():
     md = f"# 🔎 Gemini CLI Triage Dashboard\n\n*Last Synchronized: {ts} (UTC)*\n\n"
     md += f"**Total Issues Tracked: {len(all_issues)}** | **Categorized: {sum_categories}**\n\n"
     
-    md += f"## 🚨 Needs Oncaller Attention ({len(oncaller_attention)})\n**Action: Specialized approval required.** These PRs are waiting for specific teams (e.g. Prompt Approvers).\n\n"
+    md += f"## 🚨 Needs Oncaller Attention ({len(oncaller_attention)})\n**Action: Specialized approval required.**\n\n"
     md += "| Issue | Linked PR | Required Teams | Human Reviewers |\n| :--- | :--- | :--- | :--- |\n"
     for i in oncaller_attention:
         revs = ", ".join([f"@{r}" for r in i['reviewers']]) if i['reviewers'] else "_None_"
@@ -305,13 +330,13 @@ def main():
     md += "| Issue | Assignee | Days Stale |\n| :--- | :--- | :--- |\n"
     for i in stale_assignments:
         md += f"| {i['issue_md']} | @{', @'.join(i['assignees'])} | {i['days_stale']} |\n"
-    if not stale_assignments: md += "| - | _No stale assignments._ | - |\n"
+    if not stale_assignments: md += "| - | _None_ |\n"
 
-    md += f"\n## 🚧 Blocked & Stale PRs ({len(blocked_stale_prs)})\n**Action: Maintainers, please close.** PRs with conflicts or failures untouched for >{STALE_BLOCKED_PR_DAYS} days. Associated issues will be unassigned.\n\n"
+    md += f"\n## 🚧 Blocked & Stale PRs ({len(blocked_stale_prs)})\n**Action: Maintainers, please close.** PRs with conflicts or failures untouched for >{STALE_BLOCKED_PR_DAYS} days.\n\n"
     md += "| Issue | PR | Reason | Author | Days Stale |\n| :--- | :--- | :--- | :--- | :--- |\n"
     for i in blocked_stale_prs:
         md += f"| {i['issue_md']} | [#{i['pr_no']}]({i['pr_url']}) | {i['reason']} | @{i['author']} | {i['days_stale']} |\n"
-    if not blocked_stale_prs: md += "| - | _No stale blocked PRs._ | - | - | - |\n"
+    if not blocked_stale_prs: md += "| - | _None_ | - | - | - |\n"
 
     md += f"\n## 🆕 Awaiting Reviewer Pickup ({len(initial_pickup)})\n**Action: Pick up one of these new PRs.** All tests passing, no conflicts.\n\n"
     md += "| Issue | Linked PR | Last Update |\n| :--- | :--- | :--- |\n"
