@@ -240,7 +240,7 @@ describe('computeTerminalTitle', () => {
 
   it('should safely truncate strings containing emojis and surrogate pairs without splitting them', () => {
     // 💥 is a surrogate pair (UTF-16 length 2). 50 of them = 100 UTF-16 code units.
-    const emojiThought = '💥'.repeat(50);
+    const emojiThought = '💥'.repeat(100);
     const title = computeTerminalTitle({
       streamingState: StreamingState.Responding,
       thoughtSubject: emojiThought,
