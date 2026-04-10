@@ -17,6 +17,7 @@ import {
   isGrepResult,
   isListResult,
   isReadManyFilesResult,
+  type ToolDisplay,
 } from '@google/gemini-cli-core';
 import {
   type IndividualToolCallDisplay,
@@ -46,6 +47,7 @@ const PAYLOAD_SCROLL_GUTTER = 4;
 const PAYLOAD_MAX_WIDTH = 120 + PAYLOAD_SCROLL_GUTTER;
 
 interface DenseToolMessageProps extends IndividualToolCallDisplay {
+  display?: ToolDisplay;
   terminalWidth: number;
   availableTerminalHeight?: number;
 }
@@ -269,6 +271,7 @@ export const DenseToolMessage: React.FC<DenseToolMessageProps> = (props) => {
     terminalWidth,
     availableTerminalHeight,
     description: originalDescription,
+    display,
   } = props;
 
   const settings = useSettings();
@@ -322,6 +325,58 @@ export const DenseToolMessage: React.FC<DenseToolMessageProps> = (props) => {
 
   // State-to-View Coordination
   const viewParts = useMemo((): ViewParts => {
+    if (display) {
+      const descriptionText = (
+        <Text color={theme.text.secondary} wrap="truncate-end">
+          {display.description || originalDescription}
+        </Text>
+      );
+
+      const summaryText = display.resultSummary ? (
+        <Text color={theme.text.accent} wrap="truncate-end">
+          → {display.resultSummary}
+        </Text>
+      ) : status === CoreToolCallStatus.Error ? (
+        <Text color={theme.status.error} wrap="truncate-end">
+          → {typeof resultDisplay === 'string' ? resultDisplay : 'Failed'}
+        </Text>
+      ) : undefined;
+
+      // For now, DenseToolMessage still handles complex resultDisplay types
+      // like FileDiff or ListResult manually if display.result is not provided
+      // or doesn't cover them.
+      if (!display.result) {
+        if (diff) {
+          return {
+            ...getFileOpData(
+              diff,
+              status,
+              resultDisplay,
+              terminalWidth,
+              availableTerminalHeight,
+              isAlternateBuffer,
+            ),
+            description: descriptionText,
+            summary: summaryText,
+          };
+        }
+        if (isListResult(resultDisplay)) {
+          return {
+            ...getListResultData(resultDisplay, originalDescription),
+            description: descriptionText,
+            summary: summaryText,
+          };
+        }
+      }
+
+      // If we have a display.result or a simple success, use it
+      return {
+        description: descriptionText,
+        summary: summaryText,
+        payload: undefined, // Payload rendering will be updated in Step 5
+      };
+    }
+
     if (diff) {
       return getFileOpData(
         diff,
@@ -383,6 +438,7 @@ export const DenseToolMessage: React.FC<DenseToolMessageProps> = (props) => {
     availableTerminalHeight,
     originalDescription,
     isAlternateBuffer,
+    display,
   ]);
 
   const { description, summary } = viewParts;

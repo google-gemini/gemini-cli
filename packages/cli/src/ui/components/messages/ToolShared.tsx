@@ -21,6 +21,7 @@ import {
   isCompletedAskUserTool,
   type ToolResultDisplay,
   CoreToolCallStatus,
+  type ToolDisplay,
 } from '@google/gemini-cli-core';
 import { useInactivityTimer } from '../../hooks/useInactivityTimer.js';
 import { formatCommand } from '../../key/keybindingUtils.js';
@@ -192,6 +193,7 @@ type ToolInfoProps = {
   description: string;
   status: CoreToolCallStatus;
   emphasis: TextEmphasis;
+  display?: ToolDisplay;
   progressMessage?: string;
   originalRequestName?: string;
 };
@@ -201,6 +203,7 @@ export const ToolInfo: React.FC<ToolInfoProps> = ({
   description,
   status: coreStatus,
   emphasis,
+  display,
   progressMessage: _progressMessage,
   originalRequestName,
 }) => {
@@ -223,11 +226,15 @@ export const ToolInfo: React.FC<ToolInfoProps> = ({
   // Hide description for completed Ask User tools (the result display speaks for itself)
   const isCompletedAskUser = isCompletedAskUserTool(name, status);
 
+  const displayName = display?.name || name;
+  const displayDescription = display?.description || description;
+  const displaySummary = display?.resultSummary;
+
   return (
     <Box overflow="hidden" height={1} flexGrow={1} flexShrink={1}>
       <Text strikethrough={status === ToolCallStatus.Canceled} wrap="truncate">
         <Text color={nameColor} bold>
-          {name}
+          {displayName}
         </Text>
         {originalRequestName && originalRequestName !== name && (
           <Text color={theme.text.secondary} italic>
@@ -238,7 +245,13 @@ export const ToolInfo: React.FC<ToolInfoProps> = ({
         {!isCompletedAskUser && (
           <>
             {' '}
-            <Text color={theme.text.secondary}>{description}</Text>
+            <Text color={theme.text.secondary}>{displayDescription}</Text>
+          </>
+        )}
+        {displaySummary && (
+          <>
+            <Text color={theme.text.accent}> → </Text>
+            <Text color={theme.text.accent}>{displaySummary}</Text>
           </>
         )}
       </Text>

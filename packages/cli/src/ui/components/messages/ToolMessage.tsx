@@ -21,13 +21,20 @@ import {
   useFocusHint,
   FocusHint,
 } from './ToolShared.js';
-import { type Config, CoreToolCallStatus, Kind } from '@google/gemini-cli-core';
+import {
+  type Config,
+  CoreToolCallStatus,
+  Kind,
+  type ToolDisplay,
+} from '@google/gemini-cli-core';
 import { ShellInputPrompt } from '../ShellInputPrompt.js';
 import { SUBAGENT_MAX_LINES } from '../../constants.js';
 
 export type { TextEmphasis };
 
 export interface ToolMessageProps extends IndividualToolCallDisplay {
+  description: string;
+  display?: ToolDisplay;
   availableTerminalHeight?: number;
   terminalWidth: number;
   emphasis?: TextEmphasis;
@@ -44,6 +51,7 @@ export interface ToolMessageProps extends IndividualToolCallDisplay {
 export const ToolMessage: React.FC<ToolMessageProps> = ({
   name,
   description,
+  display,
   resultDisplay,
   status,
   kind,
@@ -99,6 +107,7 @@ export const ToolMessage: React.FC<ToolMessageProps> = ({
           name={name}
           status={status}
           description={description}
+          display={display}
           emphasis={emphasis}
           progressMessage={progressMessage}
           originalRequestName={originalRequestName}
