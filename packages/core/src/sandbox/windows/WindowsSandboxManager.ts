@@ -290,7 +290,7 @@ export class WindowsSandboxManager implements SandboxManager {
       ...resolvedPaths.globalIncludes,
     ]);
 
-    for (const dir of searchDirs) {
+    const secretFilesPromises = Array.from(searchDirs).map(async (dir) => {
       try {
         // We use maxDepth 3 to catch common nested secrets while keeping performance high.
         const secretFiles = await findSecretFiles(dir, 3);
@@ -303,7 +303,9 @@ export class WindowsSandboxManager implements SandboxManager {
           e,
         );
       }
-    }
+    });
+
+    await Promise.all(secretFilesPromises);
 
     // 2. Track paths that will be granted write access.
     // 'allowedManifest' contains resolved paths for the C# helper to apply ACLs.
