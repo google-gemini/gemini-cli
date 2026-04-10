@@ -16,7 +16,7 @@ import {
   SECRET_FILES,
   type ResolvedSandboxPaths,
 } from '../../services/sandboxManager.js';
-import { tryRealpath, resolveGitWorktreePaths } from '../utils/fsUtils.js';
+import { resolveToRealPath } from '../../utils/paths.js';
 
 /**
  * Options for building macOS Seatbelt profile.
@@ -52,21 +52,21 @@ export function buildSeatbeltProfile(options: SeatbeltArgsOptions): string {
     profile += `(allow file-write* (subpath "${escapeSchemeString(resolvedPaths.workspace.resolved)}"))\n`;
   }
 
-  const tmpPath = tryRealpath(os.tmpdir());
+  const tmpPath = resolveToRealPath(os.tmpdir());
   profile += `(allow file-read* file-write* (subpath "${escapeSchemeString(tmpPath)}"))\n`;
 
-  // Auto-detect and support git worktrees by granting read and write access to the underlying git directory
-  const { worktreeGitDir, mainGitDir } = resolveGitWorktreePaths(
-    resolvedPaths.workspace.resolved,
-  );
-  if (worktreeGitDir) {
-    profile += `(allow file-read* file-write* (subpath "${escapeSchemeString(worktreeGitDir)}"))\n`;
-  }
-  if (mainGitDir) {
-    profile += `(allow file-read* file-write* (subpath "${escapeSchemeString(mainGitDir)}"))\n`;
+  // Support git worktrees/submodules; read-only to prevent malicious hook/config modification (RCE).
+  if (resolvedPaths.gitWorktree) {
+    const { worktreeGitDir, mainGitDir } = resolvedPaths.gitWorktree;
+    if (worktreeGitDir) {
+      profile += `(allow file-read* (subpath "${escapeSchemeString(worktreeGitDir)}"))\n`;
+    }
+    if (mainGitDir) {
+      profile += `(allow file-read* (subpath "${escapeSchemeString(mainGitDir)}"))\n`;
+    }
   }
 
-  const nodeRootPath = tryRealpath(
+  const nodeRootPath = resolveToRealPath(
     path.dirname(path.dirname(process.execPath)),
   );
   profile += `(allow file-read* (subpath "${escapeSchemeString(nodeRootPath)}"))\n`;
@@ -79,7 +79,7 @@ export function buildSeatbeltProfile(options: SeatbeltArgsOptions): string {
     for (const p of paths) {
       if (!p.trim()) continue;
       try {
-        let resolved = tryRealpath(p);
+        let resolved = resolveToRealPath(p);
 
         // If this is a 'bin' directory (like /usr/local/bin or homebrew/bin),
         // also grant read access to its parent directory so that symlinked
@@ -148,7 +148,7 @@ export function buildSeatbeltProfile(options: SeatbeltArgsOptions): string {
       resolvedPaths.workspace.resolved,
       GOVERNANCE_FILES[i].path,
     );
-    const realGovernanceFile = tryRealpath(governanceFile);
+    const realGovernanceFile = resolveToRealPath(governanceFile);
 
     // Determine if it should be treated as a directory (subpath) or a file (literal).
     // .git is generally a directory, while ignore files are literals.
@@ -167,6 +167,18 @@ export function buildSeatbeltProfile(options: SeatbeltArgsOptions): string {
 
     if (realGovernanceFile !== governanceFile) {
       profile += `(deny file-write* (${ruleType} "${escapeSchemeString(realGovernanceFile)}"))\n`;
+    }
+  }
+
+  // Grant read-only access to git worktrees/submodules. We do this last in order to
+  // ensure that these rules aren't overwritten by broader write policies.
+  if (resolvedPaths.gitWorktree) {
+    const { worktreeGitDir, mainGitDir } = resolvedPaths.gitWorktree;
+    if (worktreeGitDir) {
+      profile += `(deny file-write* (subpath "${escapeSchemeString(worktreeGitDir)}"))\n`;
+    }
+    if (mainGitDir) {
+      profile += `(deny file-write* (subpath "${escapeSchemeString(mainGitDir)}"))\n`;
     }
   }
 
