@@ -29,5 +29,8 @@ describe('CommandHandler', () => {
 
     const about = parse('/about');
     expect(about.commandToExecute?.name).toBe('about');
+
+    const help = parse('/help');
+    expect(help.commandToExecute?.name).toBe('help');
   });
 });

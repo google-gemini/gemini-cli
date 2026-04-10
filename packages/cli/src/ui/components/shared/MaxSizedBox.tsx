@@ -116,7 +116,7 @@ export const MaxSizedBox: React.FC<MaxSizedBoxProps> = ({
     [id, removeOverflowingId],
   );
 
-  if (effectiveMaxHeight === undefined) {
+  if (effectiveMaxHeight === undefined && totalHiddenLines === 0) {
     return (
       <Box flexDirection="column" width={maxWidth}>
         {children}

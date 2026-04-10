@@ -742,30 +742,35 @@ export const renderWithProviders = async (
     <AppContext.Provider value={appState}>
       <ConfigContext.Provider value={config}>
         <SettingsContext.Provider value={settings}>
-          <QuotaContext.Provider value={quotaState}>
-            <InputContext.Provider value={inputState}>
-              <UIStateContext.Provider value={finalUiState}>
-                <VimModeProvider>
-                  <ShellFocusContext.Provider value={shellFocus}>
-                    <SessionStatsProvider>
-                      <StreamingContext.Provider
-                        value={finalUiState.streamingState}
-                      >
-                        <UIActionsContext.Provider value={finalUIActions}>
-                          <OverflowProvider>
-                            <ToolActionsProvider
-                              config={config}
-                              toolCalls={allToolCalls}
-                              isExpanded={
-                                toolActions?.isExpanded ??
-                                vi.fn().mockReturnValue(false)
-                              }
-                              toggleExpansion={
-                                toolActions?.toggleExpansion ?? vi.fn()
-                              }
-                              toggleAllExpansion={
-                                toolActions?.toggleAllExpansion ?? vi.fn()
-                              }
+         <QuotaContext.Provider value={quotaState}>
+          <InputContext.Provider value={inputState}>
+            <UIStateContext.Provider value={finalUiState}>
+              <VimModeProvider>
+                <ShellFocusContext.Provider value={shellFocus}>
+                  <SessionStatsProvider sessionId={config.getSessionId()}>
+                    <StreamingContext.Provider
+                      value={finalUiState.streamingState}
+                    >
+                      <UIActionsContext.Provider value={finalUIActions}>
+                        <OverflowProvider>
+                          <ToolActionsProvider
+                            config={config}
+                            toolCalls={allToolCalls}
+                            isExpanded={
+                              toolActions?.isExpanded ??
+                              vi.fn().mockReturnValue(false)
+                            }
+                            toggleExpansion={
+                              toolActions?.toggleExpansion ?? vi.fn()
+                            }
+                            toggleAllExpansion={
+                              toolActions?.toggleAllExpansion ?? vi.fn()
+                            }
+                          >
+                            <AskUserActionsProvider
+                              request={null}
+                              onSubmit={vi.fn()}
+                              onCancel={vi.fn()}
                             >
                               <AskUserActionsProvider
                                 request={null}

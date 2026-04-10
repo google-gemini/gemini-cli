@@ -98,7 +98,9 @@ describe.skipIf(!chromeAvailable)('browser-agent', () => {
 
     const toolLogs = rig.readToolLogs();
     const browserAgentCall = toolLogs.find(
-      (t) => t.toolRequest.name === 'browser_agent',
+      (t) =>
+        t.toolRequest.name === 'invoke_agent' &&
+        JSON.parse(t.toolRequest.args).agent_name === 'browser_agent',
     );
     expect(
       browserAgentCall,
@@ -130,7 +132,9 @@ describe.skipIf(!chromeAvailable)('browser-agent', () => {
 
     const toolLogs = rig.readToolLogs();
     const browserCalls = toolLogs.filter(
-      (t) => t.toolRequest.name === 'browser_agent',
+      (t) =>
+        t.toolRequest.name === 'invoke_agent' &&
+        JSON.parse(t.toolRequest.args).agent_name === 'browser_agent',
     );
     expect(browserCalls.length).toBeGreaterThan(0);
 
@@ -161,7 +165,9 @@ describe.skipIf(!chromeAvailable)('browser-agent', () => {
 
     const toolLogs = rig.readToolLogs();
     const browserAgentCall = toolLogs.find(
-      (t) => t.toolRequest.name === 'browser_agent',
+      (t) =>
+        t.toolRequest.name === 'invoke_agent' &&
+        JSON.parse(t.toolRequest.args).agent_name === 'browser_agent',
     );
     expect(
       browserAgentCall,
@@ -221,7 +227,9 @@ describe.skipIf(!chromeAvailable)('browser-agent', () => {
 
     const toolLogs = rig.readToolLogs();
     const browserCalls = toolLogs.filter(
-      (t) => t.toolRequest.name === 'browser_agent',
+      (t) =>
+        t.toolRequest.name === 'invoke_agent' &&
+        JSON.parse(t.toolRequest.args).agent_name === 'browser_agent',
     );
     expect(browserCalls.length).toBeGreaterThan(0);
 
@@ -245,18 +253,21 @@ describe.skipIf(!chromeAvailable)('browser-agent', () => {
           browser: {
             headless: true,
             sessionMode: 'isolated',
+            allowedDomains: ['example.com'],
           },
         },
       },
     });
 
     const result = await rig.run({
-      args: 'Browse to example.com twice: first get the page title, then check for links.',
+      args: 'First, ask the browser agent to get the page title of example.com. After you receive that response, you MUST invoke the browser agent a second time to check for links on the page.',
     });
 
     const toolLogs = rig.readToolLogs();
     const browserCalls = toolLogs.filter(
-      (t) => t.toolRequest.name === 'browser_agent',
+      (t) =>
+        t.toolRequest.name === 'invoke_agent' &&
+        JSON.parse(t.toolRequest.args).agent_name === 'browser_agent',
     );
 
     // Both browser_agent invocations must succeed — if the browser was
@@ -306,5 +317,51 @@ describe.skipIf(!chromeAvailable)('browser-agent', () => {
     await run.type('\r');
 
     await run.expectText('successfully written', 15000);
+  });
+
+  it('should handle concurrent browser agents with isolated session mode', async () => {
+    rig.setup('browser-concurrent', {
+      fakeResponsesPath: join(__dirname, 'browser-agent.concurrent.responses'),
+      settings: {
+        agents: {
+          overrides: {
+            browser_agent: {
+              enabled: true,
+            },
+          },
+          browser: {
+            headless: true,
+            // Isolated mode supports concurrent browser agents.
+            // Persistent/existing modes reject concurrent calls to prevent
+            // Chrome profile lock conflicts.
+            sessionMode: 'isolated',
+          },
+        },
+      },
+    });
+
+    const result = await rig.run({
+      args: 'Launch two browser agents concurrently to check example.com',
+    });
+
+    assertModelHasOutput(result);
+
+    const toolLogs = rig.readToolLogs();
+    const browserCalls = toolLogs.filter(
+      (t) =>
+        t.toolRequest.name === 'invoke_agent' &&
+        JSON.parse(t.toolRequest.args).agent_name === 'browser_agent',
+    );
+
+    // Both browser_agent invocations should have been called
+    expect(browserCalls.length).toBe(2);
+
+    // Both should complete successfully (no errors)
+    for (const call of browserCalls) {
+      expect(
+        call.toolRequest.success,
+        `browser_agent call failed: ${JSON.stringify(call.toolRequest)}`,
+      ).toBe(true);
+    }
   });
 });
