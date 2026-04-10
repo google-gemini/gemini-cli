@@ -407,7 +407,7 @@ async function generateSharedLargeChatData(tempDir: string) {
       let j = i + 1;
       while (j < messages.length && messages[j].type === 'gemini') {
         const geminiMsg = messages[j];
-        const parts: any[] = [];
+        const parts = [];
         if (geminiMsg.content) {
           parts.push({ text: geminiMsg.content });
         }
