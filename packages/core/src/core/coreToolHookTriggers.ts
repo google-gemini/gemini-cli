@@ -71,7 +71,7 @@ export async function executeToolWithHooks(
   signal: AbortSignal,
   tool: AnyDeclarativeTool,
   liveOutputCallback?: (outputChunk: ToolLiveOutput) => void,
-  options?: ExecuteOptions,
+  options?: Omit<ExecuteOptions, 'abortSignal' | 'updateOutput'>,
   config?: Config,
   originalRequestName?: string,
   skipBeforeHook?: boolean,
@@ -154,11 +154,11 @@ export async function executeToolWithHooks(
 
   // Execute the actual tool. Tools that support backgrounding can optionally
   // surface an execution ID via the callback.
-  const toolResult: ToolResult = await invocation.execute(
-    signal,
-    liveOutputCallback,
-    options,
-  );
+  const toolResult: ToolResult = await invocation.execute({
+    ...options,
+    abortSignal: signal,
+    updateOutput: liveOutputCallback,
+  });
 
   // Append notification if parameters were modified
   if (inputWasModified) {

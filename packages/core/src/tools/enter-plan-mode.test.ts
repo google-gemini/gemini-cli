@@ -121,7 +121,9 @@ describe('EnterPlanModeTool', () => {
       const invocation = tool.build({});
       vi.mocked(fs.existsSync).mockReturnValue(true);
 
-      const result = await invocation.execute(new AbortController().signal);
+      const result = await invocation.execute({
+        abortSignal: new AbortController().signal,
+      });
 
       expect(mockConfig.setApprovalMode).toHaveBeenCalledWith(
         ApprovalMode.PLAN,
@@ -134,7 +136,7 @@ describe('EnterPlanModeTool', () => {
       const invocation = tool.build({});
       vi.mocked(fs.existsSync).mockReturnValue(false);
 
-      await invocation.execute(new AbortController().signal);
+      await invocation.execute({ abortSignal: new AbortController().signal });
 
       expect(fs.mkdirSync).toHaveBeenCalledWith('/mock/plans/dir', {
         recursive: true,
@@ -146,7 +148,9 @@ describe('EnterPlanModeTool', () => {
       const invocation = tool.build({ reason });
       vi.mocked(fs.existsSync).mockReturnValue(true);
 
-      const result = await invocation.execute(new AbortController().signal);
+      const result = await invocation.execute({
+        abortSignal: new AbortController().signal,
+      });
 
       expect(mockConfig.setApprovalMode).toHaveBeenCalledWith(
         ApprovalMode.PLAN,
@@ -177,7 +181,9 @@ describe('EnterPlanModeTool', () => {
         await details.onConfirm(ToolConfirmationOutcome.Cancel);
       }
 
-      const result = await invocation.execute(new AbortController().signal);
+      const result = await invocation.execute({
+        abortSignal: new AbortController().signal,
+      });
 
       expect(mockConfig.setApprovalMode).not.toHaveBeenCalled();
       expect(result.returnDisplay).toBe('Cancelled');

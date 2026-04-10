@@ -11,6 +11,7 @@ import {
   ToolConfirmationOutcome,
   type ToolEditConfirmationDetails,
   type ToolResult,
+  type ExecuteOptions,
 } from './tools.js';
 import * as fs from 'node:fs/promises';
 import * as path from 'node:path';
@@ -226,7 +227,7 @@ class MemoryToolInvocation extends BaseToolInvocation<
     return confirmationDetails;
   }
 
-  async execute(_signal: AbortSignal): Promise<ToolResult> {
+  async execute({ abortSignal: _signal }: ExecuteOptions): Promise<ToolResult> {
     const { fact, modified_by_user, modified_content } = this.params;
     const memoryFilePath = this.getMemoryFilePath();
 
