@@ -43,39 +43,58 @@ import {
 const execAsync = promisify(exec);
 const execFileAsync = promisify(execFile);
 const PROCESS_EXIT_SIGNALS = ['exit', 'SIGINT', 'SIGTERM'] as const;
+const activeProcessExitHandlers = new Set<() => void>();
+let processExitDispatcherInstalled = false;
 
-let activeProxyStopHandler: (() => void) | undefined;
-let activeProxyContainerStopHandler: (() => void) | undefined;
+function runProcessExitHandlers() {
+  for (const handler of [...activeProcessExitHandlers]) {
+    handler();
+  }
+}
 
-function replaceProcessExitHandlers(
-  currentHandler: (() => void) | undefined,
-  nextHandler: () => void,
-): () => void {
-  if (currentHandler) {
-    for (const signal of PROCESS_EXIT_SIGNALS) {
-      process.off(signal, currentHandler);
-    }
+function ensureProcessExitDispatcher() {
+  if (processExitDispatcherInstalled) {
+    return;
   }
 
   for (const signal of PROCESS_EXIT_SIGNALS) {
-    process.on(signal, nextHandler);
+    process.on(signal, runProcessExitHandlers);
   }
-
-  return nextHandler;
+  processExitDispatcherInstalled = true;
 }
 
-function removeProcessExitHandlers(
+function maybeRemoveProcessExitDispatcher() {
+  if (processExitDispatcherInstalled && activeProcessExitHandlers.size === 0) {
+    for (const signal of PROCESS_EXIT_SIGNALS) {
+      process.off(signal, runProcessExitHandlers);
+    }
+    processExitDispatcherInstalled = false;
+  }
+}
+
+function addProcessExitHandler(handler: () => void): () => void {
+  ensureProcessExitDispatcher();
+  activeProcessExitHandlers.add(handler);
+  return handler;
+}
+
+function removeProcessExitHandler(
   currentHandler: (() => void) | undefined,
 ): undefined {
   if (!currentHandler) {
     return undefined;
   }
 
-  for (const signal of PROCESS_EXIT_SIGNALS) {
-    process.off(signal, currentHandler);
-  }
-
+  activeProcessExitHandlers.delete(currentHandler);
+  maybeRemoveProcessExitDispatcher();
   return undefined;
+}
+
+function runAndRemoveProcessExitHandler(
+  currentHandler: (() => void) | undefined,
+): undefined {
+  currentHandler?.();
+  return removeProcessExitHandler(currentHandler);
 }
 
 export async function start_sandbox(
@@ -192,6 +211,7 @@ export async function start_sandbox(
       const proxyCommand = process.env['GEMINI_SANDBOX_PROXY_COMMAND'];
       let proxyProcess: ChildProcess | undefined = undefined;
       let sandboxProcess: ChildProcess | undefined = undefined;
+      let proxyStopHandler: (() => void) | undefined;
       const sandboxEnv = { ...process.env };
       if (proxyCommand) {
         const proxy =
@@ -221,10 +241,7 @@ export async function start_sandbox(
             process.kill(-proxyProcess.pid, 'SIGTERM');
           }
         };
-        activeProxyStopHandler = replaceProcessExitHandlers(
-          activeProxyStopHandler,
-          stopProxy,
-        );
+        proxyStopHandler = addProcessExitHandler(stopProxy);
 
         // commented out as it disrupts ink rendering
         // proxyProcess.stdout?.on('data', (data) => {
@@ -234,9 +251,7 @@ export async function start_sandbox(
           debugLogger.debug(`[PROXY STDERR]: ${data.toString().trim()}`);
         });
         proxyProcess.on('close', (code, signal) => {
-          activeProxyStopHandler = removeProcessExitHandlers(
-            activeProxyStopHandler,
-          );
+          removeProcessExitHandler(proxyStopHandler);
           if (sandboxProcess?.pid) {
             process.kill(-sandboxProcess.pid, 'SIGTERM');
           }
@@ -257,9 +272,7 @@ export async function start_sandbox(
       return await new Promise((resolve, reject) => {
         sandboxProcess?.on('error', reject);
         sandboxProcess?.on('close', (code) => {
-          activeProxyStopHandler = removeProcessExitHandlers(
-            activeProxyStopHandler,
-          );
+          runAndRemoveProcessExitHandler(proxyStopHandler);
           process.stdin.resume();
           resolve(code ?? 1);
         });
@@ -745,6 +758,7 @@ export async function start_sandbox(
     // start and set up proxy if GEMINI_SANDBOX_PROXY_COMMAND is set
     let proxyProcess: ChildProcess | undefined = undefined;
     let sandboxProcess: ChildProcess | undefined = undefined;
+    let proxyContainerStopHandler: (() => void) | undefined;
 
     if (proxyCommand) {
       // run proxyCommand in its own container
@@ -781,10 +795,7 @@ export async function start_sandbox(
         debugLogger.log('stopping proxy container ...');
         execSync(`${command} rm -f ${SANDBOX_PROXY_NAME}`);
       };
-      activeProxyContainerStopHandler = replaceProcessExitHandlers(
-        activeProxyContainerStopHandler,
-        stopProxy,
-      );
+      proxyContainerStopHandler = addProcessExitHandler(stopProxy);
 
       // commented out as it disrupts ink rendering
       // proxyProcess.stdout?.on('data', (data) => {
@@ -794,9 +805,7 @@ export async function start_sandbox(
         debugLogger.debug(`[PROXY STDERR]: ${data.toString().trim()}`);
       });
       proxyProcess.on('close', (code, signal) => {
-        activeProxyContainerStopHandler = removeProcessExitHandlers(
-          activeProxyContainerStopHandler,
-        );
+        removeProcessExitHandler(proxyContainerStopHandler);
         if (sandboxProcess?.pid) {
           process.kill(-sandboxProcess.pid, 'SIGTERM');
         }
@@ -828,9 +837,7 @@ export async function start_sandbox(
       });
 
       sandboxProcess?.on('close', (code, signal) => {
-        activeProxyContainerStopHandler = removeProcessExitHandlers(
-          activeProxyContainerStopHandler,
-        );
+        runAndRemoveProcessExitHandler(proxyContainerStopHandler);
         process.stdin.resume();
         if (code !== 0 && code !== null) {
           debugLogger.log(

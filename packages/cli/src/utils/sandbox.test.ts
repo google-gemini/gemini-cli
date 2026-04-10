@@ -131,6 +131,7 @@ describe('sandbox', () => {
   });
 
   afterEach(() => {
+    vi.unstubAllEnvs();
     process.env = originalEnv;
     process.argv = originalArgv;
   });
@@ -339,8 +340,11 @@ describe('sandbox', () => {
     });
 
     it('removes proxy exit handlers after the sandbox process closes', async () => {
-      process.env['GEMINI_SANDBOX_PROXY_COMMAND'] = 'proxy-cmd';
+      vi.stubEnv('GEMINI_SANDBOX_PROXY_COMMAND', 'proxy-cmd');
       vi.mocked(os.platform).mockReturnValue('darwin');
+      const killSpy = vi
+        .spyOn(process, 'kill')
+        .mockImplementation(() => true as never);
 
       const config: SandboxConfig = createMockSandboxConfig({
         command: 'sandbox-exec',
@@ -380,6 +384,58 @@ describe('sandbox', () => {
       ).resolves.toBe(0);
 
       expect(process.listeners('exit')).toHaveLength(initialExitListenerCount);
+      expect(killSpy).toHaveBeenCalledWith(-1, 'SIGTERM');
+      killSpy.mockRestore();
+    });
+
+    it('stops the proxy container after the sandbox process closes', async () => {
+      vi.stubEnv('GEMINI_SANDBOX_PROXY_COMMAND', 'proxy-cmd --flag');
+      const config: SandboxConfig = createMockSandboxConfig({
+        command: 'docker',
+        image: 'gemini-cli-sandbox',
+      });
+
+      const createMockProcess = (autoClose: boolean, pid?: number) => {
+        const proc = new EventEmitter() as unknown as ReturnType<
+          typeof spawn
+        > & {
+          pid?: number;
+          stdout: ReturnType<typeof spawn>['stdout'];
+          stderr: ReturnType<typeof spawn>['stderr'];
+        };
+        proc.pid = pid;
+        proc.stdout = new EventEmitter() as unknown as ReturnType<
+          typeof spawn
+        >['stdout'];
+        proc.stderr = new EventEmitter() as unknown as ReturnType<
+          typeof spawn
+        >['stderr'];
+        proc.on = vi.fn().mockImplementation((event, cb) => {
+          if (autoClose && event === 'close') {
+            setTimeout(() => cb(0), 0);
+          }
+          return proc;
+        });
+        return proc;
+      };
+
+      vi.mocked(spawn)
+        .mockImplementationOnce(() => {
+          const imageCheckProcess = createMockProcess(false);
+          setTimeout(() => {
+            imageCheckProcess.stdout?.emit('data', Buffer.from('image-id'));
+            imageCheckProcess.emit('close', 0);
+          }, 0);
+          return imageCheckProcess;
+        })
+        .mockImplementationOnce(() => createMockProcess(false))
+        .mockImplementationOnce(() => createMockProcess(true, 2));
+
+      await expect(
+        start_sandbox(config, [], undefined, ['arg1']),
+      ).resolves.toBe(0);
+
+      expect(execSync).toHaveBeenCalledWith(expect.stringContaining('rm -f'));
     });
 
     it('should mount volumes correctly', async () => {
