@@ -26,6 +26,7 @@ jobs:
           node-version: '20'
 
       - name: 'Run Docs Audit with Gemini'
+        id: run_gemini
         uses: 'google-github-actions/run-gemini-cli@a3bf79042542528e91937b3a3a6fbc4967ee3c31'
         with:
           gemini_api_key: '${{ secrets.GEMINI_API_KEY }}'
@@ -33,18 +34,7 @@ jobs:
             Activate the 'docs-writer' skill.
 
             **Task:** Execute the docs audit procedure, as defined in your 'docs-auditing.md' reference.
-            Output a summary of what has been changed to `audit_changes.txt`.
-
-      - name: 'Read audit changes'
-        id: read_changes
-        run: |
-          if [ -f "audit_changes.txt" ]; then
-            echo "changes<<EOF" >> $GITHUB_OUTPUT
-            cat audit_changes.txt >> $GITHUB_OUTPUT
-            echo "EOF" >> $GITHUB_OUTPUT
-          else
-            echo "changes=No changes were made by the agent." >> $GITHUB_OUTPUT
-          fi
+            Provide a detailed summary of the changes you make.
 
       - name: 'Create Pull Request with Audit Results'
         uses: 'peter-evans/create-pull-request@c5a7806660adbe173f04e3e038b0ccdcd758773c'
@@ -56,7 +46,7 @@ jobs:
             This PR contains the auto-generated documentation audit for the week. It includes a new `audit-results-*.md` file with findings and any direct fixes applied by the agent.
 
             ### Changes Made:
-            ${{ steps.read_changes.outputs.changes }}
+            ${{ steps.run_gemini.outputs.summary || 'No summary provided.' }}
 
             Please review the suggestions and merge.
           branch: 'docs-audit-${{ github.run_id }}'
