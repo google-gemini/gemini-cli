@@ -99,7 +99,7 @@ available combinations.
 
 | Command                       | Action                                                                                                                                             | Keys               |
 | ----------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------ |
-| `app.showErrorDetails`        | Toggle detailed error information.                                                                                                                 | `F12`              |
+| `app.showErrorDetails`        | Toggle the debug console for detailed error information.                                                                                           | `F12`              |
 | `app.showFullTodos`           | Toggle the full TODO list.                                                                                                                         | `Ctrl+T`           |
 | `app.showIdeContextDetail`    | Show IDE context details.                                                                                                                          | `F4`               |
 | `app.toggleMarkdown`          | Toggle Markdown rendering.                                                                                                                         | `Alt+M`            |
