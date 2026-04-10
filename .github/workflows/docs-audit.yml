@@ -38,7 +38,7 @@ jobs:
 
       - name: 'Get current date'
         id: date
-        run: echo "date=$(date +'%Y-%m-%d')" >> $GITHUB_OUTPUT
+        run: echo "date=$(date +'%Y-%m-%d')" >> "$GITHUB_OUTPUT"
 
       - name: 'Create Pull Request with Audit Results'
         uses: 'peter-evans/create-pull-request@c5a7806660adbe173f04e3e038b0ccdcd758773c'
