@@ -10,6 +10,7 @@ import * as path from 'node:path';
 import * as os from 'node:os';
 import { lock } from 'proper-lockfile';
 import { debugLogger } from '../utils/debugLogger.js';
+import { isNodeError, getErrorMessage } from '../utils/errors.js';
 
 export interface RegistryData {
   projects: Record<string, string>;
@@ -62,7 +63,7 @@ export class ProjectRegistry {
       const content = await fs.promises.readFile(this.registryPath, 'utf8');
       // eslint-disable-next-line @typescript-eslint/no-unsafe-return
       return JSON.parse(content);
-    } catch (e) {
+    } catch (e: unknown) {
       debugLogger.debug('Failed to load registry: ', e);
       // If the registry is corrupted, we'll start fresh to avoid blocking the CLI
       return { projects: {} };
@@ -95,13 +96,20 @@ export class ProjectRegistry {
         await fs.promises.writeFile(tmpPath, content, 'utf8');
         await fs.promises.rename(tmpPath, this.registryPath);
         return; // Success
-      } catch (error) {
+      } catch (error: unknown) {
         attempt++;
-        if (attempt >= maxAttempts) {
+        const isRetryable =
+          isNodeError(error) &&
+          (error.code === 'EPERM' ||
+            error.code === 'EBUSY' ||
+            error.code === 'EACCES');
+
+        if (attempt >= maxAttempts || !isRetryable) {
           debugLogger.error(
-            `Failed to save project registry to ${this.registryPath} after ${maxAttempts} attempts:`,
-            error,
+            `Failed to save project registry to ${this.registryPath} after ${attempt} attempts:`,
+            getErrorMessage(error),
           );
+          return; // Stop trying
         } else {
           // Wait before retrying (exponential backoff could be used here too)
           await new Promise((resolve) => setTimeout(resolve, retryDelayMs));
@@ -190,7 +198,7 @@ export class ProjectRegistry {
           if (this.normalizePath(owner) !== this.normalizePath(projectPath)) {
             return false;
           }
-        } catch (e) {
+        } catch (e: unknown) {
           debugLogger.debug(
             `Failed to read ownership marker ${markerPath}:`,
             e,
@@ -233,7 +241,7 @@ export class ProjectRegistry {
             }
           }
         }
-      } catch (e) {
+      } catch (e: unknown) {
         debugLogger.debug(`Failed to scan base dir ${baseDir}:`, e);
       }
     }
@@ -252,6 +260,12 @@ export class ProjectRegistry {
     const existingIds = new Set(Object.values(existingMappings));
 
     while (true) {
+      if (counter > 1000) {
+        throw new Error(
+          'Failed to generate a unique project short ID after 1000 attempts. Check for fs mocks or filesystem permission issues.',
+        );
+      }
+
       const candidate = counter === 0 ? slug : `${slug}-${counter}`;
       counter++;
 
