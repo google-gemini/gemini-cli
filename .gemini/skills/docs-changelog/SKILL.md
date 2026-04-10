@@ -162,5 +162,7 @@ instructions for the other section.
 
 ## Finalize
 
-- After making changes, run `npm run format` ONLY to ensure consistency.
+- After making changes, if `npm run format` fails, it may be necessary to run
+  `npm install` first to ensure all formatting dependencies are available.
+  Then, run `npm run format` to ensure consistency.
 - Delete any temporary files created during the process.

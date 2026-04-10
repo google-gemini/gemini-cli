@@ -630,7 +630,7 @@ export class ShellExecutionService {
         }
 
         if (isStreamingRawContent && sniffedBytes < MAX_SNIFF_SIZE) {
-          const sniffBuffer = Buffer.concat(state.sniffChunks.slice(0, 20));
+          const sniffBuffer = Buffer.concat(state.sniffChunks);
           sniffedBytes = sniffBuffer.length;
 
           if (isBinary(sniffBuffer)) {
@@ -704,7 +704,10 @@ export class ShellExecutionService {
 
         const finalStrippedOutput = stripAnsi(combinedOutput).trim();
         const exitCode = code;
-        const exitSignal = signal ? os.constants.signals[signal] : null;
+        const exitSignal =
+          signal && os.constants.signals
+            ? (os.constants.signals[signal] ?? null)
+            : null;
 
         const resultPayload: ShellExecutionResult = {
           rawOutput: Buffer.from(''),
@@ -1091,7 +1094,7 @@ export class ShellExecutionService {
               }
 
               if (isStreamingRawContent && sniffedBytes < MAX_SNIFF_SIZE) {
-                const sniffBuffer = Buffer.concat(sniffChunks.slice(0, 20));
+                const sniffBuffer = Buffer.concat(sniffChunks);
                 sniffedBytes = sniffBuffer.length;
 
                 if (isBinary(sniffBuffer)) {
@@ -1502,5 +1505,17 @@ export class ShellExecutionService {
       exitCode: info.exitCode,
       signal: info.signal,
     }));
+  }
+
+  /**
+   * Resets the internal state of the ShellExecutionService.
+   * This is intended for use in tests to ensure isolation.
+   */
+  static resetForTest(): void {
+    this.activePtys.clear();
+    this.activeChildProcesses.clear();
+    this.backgroundLogPids.clear();
+    this.backgroundLogStreams.clear();
+    this.backgroundProcessHistory.clear();
   }
 }
