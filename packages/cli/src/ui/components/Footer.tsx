@@ -355,7 +355,7 @@ export const Footer: React.FC = () => {
                 lowercase={true}
               />
             ),
-            10, // "100% used" is 9 chars
+            9, // "100% used" is 9 chars
           );
         }
         break;
