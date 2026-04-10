@@ -284,11 +284,7 @@ describe('parseArguments', () => {
       argv: ['node', 'script.js', '--workspace', '/path/to/workspace'],
       expected: { workspace: '/path/to/workspace' },
     },
-    {
-      description: 'should parse -w flag correctly',
-      argv: ['node', 'script.js', '-w', '/another/path'],
-      expected: { workspace: '/another/path' },
-    },
+
     {
       description: 'should parse workspace flag with space separation',
       argv: [

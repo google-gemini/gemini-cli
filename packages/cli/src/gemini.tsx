@@ -274,7 +274,7 @@ export async function main() {
 
   const bootstrapArgs = yargs(hideBin(process.argv))
     .options({
-      w: { type: 'string', alias: 'workspace' },
+      workspace: { type: 'string' },
     })
     .help(false)
     .version(false)
@@ -286,11 +286,7 @@ export async function main() {
       const resolvedPath = bootstrapWorkspace(workspace);
 
       const wsIndex = process.argv.findIndex(
-        (arg) =>
-          arg.startsWith('--workspace=') ||
-          arg.startsWith('-w=') ||
-          arg === '-w' ||
-          arg === '--workspace',
+        (arg) => arg.startsWith('--workspace=') || arg === '--workspace',
       );
       if (wsIndex !== -1) {
         if (process.argv[wsIndex].includes('=')) {

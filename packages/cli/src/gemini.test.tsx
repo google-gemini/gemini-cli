@@ -615,6 +615,7 @@ describe('gemini.tsx main function kitty protocol', () => {
       outputFormat: undefined,
       fakeResponses: undefined,
       recordResponses: undefined,
+      workspace: undefined,
       rawOutput: undefined,
       acceptRawOutputRisk: undefined,
       isCommand: undefined,
@@ -1691,7 +1692,7 @@ describe('Workspace argument validation', () => {
 
   it('should exit with code 42 if workspace is a file', async () => {
     const originalArgv = process.argv;
-    process.argv = ['node', 'gemini', '-w=/fake/file.txt'];
+    process.argv = ['node', 'gemini', '--workspace=/fake/file.txt'];
     vi.mocked(bootstrapWorkspace).mockImplementation(() => {
       throw new Error('Workspace path "/fake/file.txt" is not a directory.');
     });

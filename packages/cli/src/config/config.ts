@@ -290,7 +290,6 @@ export async function parseArguments(
             'Execute the provided prompt and continue in interactive mode',
         })
         .option('workspace', {
-          alias: 'w',
           type: 'string',
           nargs: 1,
           description: 'The workspace directory to operate in',
