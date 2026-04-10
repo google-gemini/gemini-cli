@@ -7,7 +7,7 @@
 import { useCallback } from 'react';
 import {
   DEFAULT_GEMINI_MODEL_AUTO,
-  AuthType,
+  getDisplayString,
   coreEvents,
 } from '@google/gemini-cli-core';
 import { useConfig } from '../contexts/ConfigContext.js';
@@ -16,39 +16,28 @@ import { useKeypress } from './useKeypress.js';
 import { Command } from '../key/keyMatchers.js';
 import { useKeyMatchers } from './useKeyMatchers.js';
 import { formatCommand } from '../key/keybindingUtils.js';
+import { getAvailableModelIds } from '../utils/modelSelection.js';
 
 export function useModelCycling() {
   const config = useConfig();
   const { merged: settings } = useSettings();
   const keyMatchers = useKeyMatchers();
 
-  const getAvailableModels = useCallback(() => {
-    if (!config || !config.getModelConfigService) return [];
-
-    const shouldShowPreviewModels = config.getHasAccessToPreviewModel();
-    const useGemini31 = config.getGemini31LaunchedSync?.() ?? false;
-    const useGemini31FlashLite =
-      config.getGemini31FlashLiteLaunchedSync?.() ?? false;
-    const selectedAuthType = settings.security.auth.selectedType;
-    const useCustomToolModel =
-      useGemini31 && selectedAuthType === AuthType.USE_GEMINI;
-    const hasAccessToProModel = !(config.getProModelNoAccessSync() ?? false);
-
-    const allOptions = config.getModelConfigService().getAvailableModelOptions({
-      useGemini3_1: useGemini31,
-      useGemini3_1FlashLite: useGemini31FlashLite,
-      useCustomTools: useCustomToolModel,
-      hasAccessToPreview: shouldShowPreviewModels,
-      hasAccessToProModel,
-    });
-
-    return allOptions.map((o) => o.modelId);
-  }, [config, settings.security.auth.selectedType]);
+  const getAvailableModels = useCallback(
+    () =>
+      getAvailableModelIds({
+        config,
+        selectedAuthType: settings.security.auth.selectedType,
+        hasAccessToProModel: !(config?.getProModelNoAccessSync() ?? false),
+      }),
+    [config, settings.security.auth.selectedType],
+  );
 
   const cycleModels = useCallback(
     (direction: 'forward' | 'backward') => {
       const availableModels = getAvailableModels();
       if (availableModels.length === 0) return;
+      if (!config) return;
 
       const favoriteModels = settings.model.favorites || [];
       const cycleList =
@@ -78,9 +67,11 @@ export function useModelCycling() {
       if (nextModel !== currentModel) {
         config.setModel(nextModel, true);
         const cycleHint = formatCommand(Command.CYCLE_MODELS_FORWARD);
+        const nextModelDisplayName =
+          getDisplayString(nextModel, config)?.trim() || 'Unknown Model';
         coreEvents.emitFeedback(
           'info',
-          `Switched to model: ${nextModel} (Press ${cycleHint} to cycle)`,
+          `Switched to model: ${nextModelDisplayName} (Press ${cycleHint} to cycle)`,
         );
       }
     },

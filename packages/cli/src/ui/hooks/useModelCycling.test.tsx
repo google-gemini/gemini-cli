@@ -9,7 +9,11 @@ import { act } from 'react';
 import { renderWithProviders } from '../../test-utils/render.js';
 import { createMockSettings } from '../../test-utils/settings.js';
 import { useModelCycling } from './useModelCycling.js';
-import { makeFakeConfig } from '@google/gemini-cli-core';
+import {
+  DEFAULT_GEMINI_FLASH_MODEL,
+  DEFAULT_GEMINI_MODEL_AUTO,
+  makeFakeConfig,
+} from '@google/gemini-cli-core';
 
 describe('useModelCycling', () => {
   let cycleModelsFn: (direction: 'forward' | 'backward') => void;
@@ -25,6 +29,9 @@ describe('useModelCycling', () => {
     const config = makeFakeConfig();
     config.setModel = mockSetModel;
     config.getModel = vi.fn().mockReturnValue('model-1');
+    config.getExperimentalDynamicModelConfiguration = vi
+      .fn()
+      .mockReturnValue(true);
     config.getModelConfigService = vi.fn().mockReturnValue({
       getAvailableModelOptions: vi.fn().mockReturnValue([
         { modelId: 'model-1', name: 'Model 1' },
@@ -63,6 +70,9 @@ describe('useModelCycling', () => {
     const config = makeFakeConfig();
     config.setModel = mockSetModel;
     config.getModel = vi.fn().mockReturnValue('model-1');
+    config.getExperimentalDynamicModelConfiguration = vi
+      .fn()
+      .mockReturnValue(true);
     config.getModelConfigService = vi.fn().mockReturnValue({
       getAvailableModelOptions: vi.fn().mockReturnValue([
         { modelId: 'model-1', name: 'Model 1' },
@@ -95,6 +105,37 @@ describe('useModelCycling', () => {
 
     // Next favorite after model-3 is model-1
     expect(mockSetModel).toHaveBeenCalledWith('model-1', true);
+
+    unmount();
+  });
+
+  it('should fall back to the legacy model list when dynamic config is unavailable', async () => {
+    const mockSetModel = vi.fn();
+    const config = makeFakeConfig();
+    config.setModel = mockSetModel;
+    config.getModel = vi.fn().mockReturnValue(DEFAULT_GEMINI_MODEL_AUTO);
+    config.getExperimentalDynamicModelConfiguration = vi
+      .fn()
+      .mockReturnValue(false);
+    config.getHasAccessToPreviewModel = vi.fn().mockReturnValue(false);
+    config.getProModelNoAccessSync = vi.fn().mockReturnValue(false);
+
+    const settings = createMockSettings({
+      model: {
+        favorites: [DEFAULT_GEMINI_MODEL_AUTO, DEFAULT_GEMINI_FLASH_MODEL],
+      },
+    });
+
+    const { unmount } = await renderWithProviders(<TestComponent />, {
+      config,
+      settings,
+    });
+
+    await act(async () => {
+      cycleModelsFn('forward');
+    });
+
+    expect(mockSetModel).toHaveBeenCalledWith(DEFAULT_GEMINI_FLASH_MODEL, true);
 
     unmount();
   });
