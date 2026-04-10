@@ -70,6 +70,7 @@ import {
 } from './models.js';
 import { Storage } from './storage.js';
 import type { AgentLoopContext } from './agent-loop-context.js';
+import type { ShellExecutionConfig } from '../services/shellExecutionService.js';
 
 vi.mock('fs', async (importOriginal) => {
   const actual = await importOriginal<typeof import('fs')>();
@@ -304,6 +305,42 @@ describe('Server Config (config.ts)', () => {
         maxAttempts: 20,
       });
       expect(config.getMaxAttempts()).toBe(DEFAULT_MAX_ATTEMPTS);
+    });
+  });
+
+  describe('shell execution config', () => {
+    it('should preserve existing sandbox and background fields when updated', () => {
+      const config = new Config({
+        ...baseParams,
+        shellBackgroundCompletionBehavior: 'notify',
+      });
+
+      const shellExecutionConfig = config.getShellExecutionConfig();
+
+      config.setShellExecutionConfig({
+        terminalWidth: 123,
+        terminalHeight: 45,
+        pager: 'less',
+        showColor: true,
+        sanitizationConfig: shellExecutionConfig.sanitizationConfig,
+        sandboxManager: shellExecutionConfig.sandboxManager,
+      } as ShellExecutionConfig);
+
+      const updatedShellExecutionConfig = config.getShellExecutionConfig();
+
+      expect(updatedShellExecutionConfig.terminalWidth).toBe(123);
+      expect(updatedShellExecutionConfig.terminalHeight).toBe(45);
+      expect(updatedShellExecutionConfig.pager).toBe('less');
+      expect(updatedShellExecutionConfig.showColor).toBe(true);
+      expect(updatedShellExecutionConfig.sandboxConfig).toMatchObject({
+        enabled: true,
+        command: 'docker',
+        image: 'gemini-cli-sandbox',
+        networkAccess: false,
+      });
+      expect(updatedShellExecutionConfig.backgroundCompletionBehavior).toBe(
+        'notify',
+      );
     });
   });
 

@@ -3306,17 +3306,38 @@ export class Config implements McpContext, AgentLoopContext {
 
   setShellExecutionConfig(config: ShellExecutionConfig): void {
     this.shellExecutionConfig = {
+      ...this.shellExecutionConfig,
       terminalWidth:
         config.terminalWidth ?? this.shellExecutionConfig.terminalWidth,
       terminalHeight:
         config.terminalHeight ?? this.shellExecutionConfig.terminalHeight,
       showColor: config.showColor ?? this.shellExecutionConfig.showColor,
       pager: config.pager ?? this.shellExecutionConfig.pager,
+      defaultFg: config.defaultFg ?? this.shellExecutionConfig.defaultFg,
+      defaultBg: config.defaultBg ?? this.shellExecutionConfig.defaultBg,
       sanitizationConfig:
         config.sanitizationConfig ??
         this.shellExecutionConfig.sanitizationConfig,
       sandboxManager:
         config.sandboxManager ?? this.shellExecutionConfig.sandboxManager,
+      sandboxConfig:
+        config.sandboxConfig ?? this.shellExecutionConfig.sandboxConfig,
+      backgroundCompletionBehavior:
+        config.backgroundCompletionBehavior ??
+        this.shellExecutionConfig.backgroundCompletionBehavior,
+      additionalPermissions:
+        config.additionalPermissions ??
+        this.shellExecutionConfig.additionalPermissions,
+      disableDynamicLineTrimming:
+        config.disableDynamicLineTrimming ??
+        this.shellExecutionConfig.disableDynamicLineTrimming,
+      scrollback: config.scrollback ?? this.shellExecutionConfig.scrollback,
+      maxSerializedLines:
+        config.maxSerializedLines ??
+        this.shellExecutionConfig.maxSerializedLines,
+      originalCommand:
+        config.originalCommand ?? this.shellExecutionConfig.originalCommand,
+      sessionId: config.sessionId ?? this.shellExecutionConfig.sessionId,
     };
   }
   getScreenReader(): boolean {
