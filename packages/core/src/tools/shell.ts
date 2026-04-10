@@ -26,7 +26,6 @@ import {
   type ToolCallConfirmationDetails,
   type ToolExecuteConfirmationDetails,
   type PolicyUpdateOptions,
-  type ToolLiveOutput,
   type ExecuteOptions,
   type ForcedToolDecision,
 } from './tools.js';
@@ -63,6 +62,7 @@ export const OUTPUT_UPDATE_INTERVAL_MS = 1000;
 
 // Delay so user does not see the output of the process before the process is moved to the background.
 const BACKGROUND_DELAY_MS = 200;
+const SHOW_NL_DESCRIPTION_THRESHOLD = 150;
 
 export interface ShellToolParams {
   command: string;
@@ -136,9 +136,12 @@ export class ShellToolInvocation extends BaseToolInvocation<
   }
 
   getDescription(): string {
-    return this.params.description?.trim()
-      ? this.params.description
-      : this.params.command;
+    const descStr = this.params.description?.trim();
+    const commandStr = this.params.command;
+    return Array.from(commandStr).length <= SHOW_NL_DESCRIPTION_THRESHOLD ||
+      !descStr
+      ? commandStr
+      : descStr;
   }
 
   private simplifyPaths(paths: Set<string>): string[] {
@@ -430,12 +433,13 @@ export class ShellToolInvocation extends BaseToolInvocation<
     return confirmationDetails;
   }
 
-  async execute(
-    signal: AbortSignal,
-    updateOutput?: (output: ToolLiveOutput) => void,
-    options?: ExecuteOptions,
-  ): Promise<ToolResult> {
-    const { shellExecutionConfig, setExecutionIdCallback } = options ?? {};
+  async execute(options: ExecuteOptions): Promise<ToolResult> {
+    const {
+      abortSignal: signal,
+      updateOutput,
+      shellExecutionConfig,
+      setExecutionIdCallback,
+    } = options;
     const strippedCommand = stripShellWrapper(this.params.command);
 
     if (signal.aborted) {

@@ -24,6 +24,7 @@ import {
   type ToolResult,
   type ToolConfirmationOutcome,
   type PolicyUpdateOptions,
+  type ExecuteOptions,
 } from './tools.js';
 import { buildFilePathArgsPattern } from '../policy/utils.js';
 import { ToolErrorType } from './tool-error.js';
@@ -261,7 +262,9 @@ class WriteFileToolInvocation extends BaseToolInvocation<
     return confirmationDetails;
   }
 
-  async execute(abortSignal: AbortSignal): Promise<ToolResult> {
+  async execute({
+    abortSignal: abortSignal,
+  }: ExecuteOptions): Promise<ToolResult> {
     const validationError = this.config.validatePathAccess(this.resolvedPath);
     if (validationError) {
       return {

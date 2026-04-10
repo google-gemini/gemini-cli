@@ -33,6 +33,7 @@ import {
   TRACKER_CREATE_TASK_TOOL_NAME,
   TRACKER_LIST_TASKS_TOOL_NAME,
   TRACKER_UPDATE_TASK_TOOL_NAME,
+  AGENT_TOOL_NAME,
 } from '../tools/tool-names.js';
 import type { HierarchicalMemory } from '../config/memory.js';
 import { DEFAULT_CONTEXT_FILENAME } from '../tools/memoryTool.js';
@@ -262,7 +263,7 @@ export function renderSubAgents(subAgents?: SubAgentOptions[]): string {
   return `
 # Available Sub-Agents
 
-Sub-agents are specialized expert agents. Each sub-agent is available as a tool of the same name. You MUST delegate tasks to the sub-agent with the most relevant expertise.
+Sub-agents are specialized expert agents. You can invoke them using the ${formatToolName(AGENT_TOOL_NAME)} tool by passing their name to the \`agent_name\` parameter. You MUST delegate tasks to the sub-agent with the most relevant expertise.
 
 ### Strategic Orchestration & Delegation
 Operate as a **strategic orchestrator**. Your own context window is your most precious resource. Every turn you take adds to the permanent session history. To keep the session fast and efficient, use sub-agents to "compress" complex or repetitive work.
@@ -345,6 +346,11 @@ ${workflowStepStrategy(options)}
    - **Validate:** Run tests and workspace standards to confirm the success of the specific change and ensure no regressions were introduced. After making code changes, execute the project-specific build, linting and type-checking commands (e.g., 'tsc', 'npm run lint', 'ruff check .') that you have identified for this project.${workflowVerifyStandardsSuffix(options.interactive)}
 
 **Validation is the only path to finality.** Never assume success or settle for unverified changes. Rigorous, exhaustive verification is mandatory; it prevents the compounding cost of diagnosing failures later. A task is only complete when the behavioral correctness of the change has been verified and its structural integrity is confirmed within the full project context. Prioritize comprehensive validation above all else, utilizing redirection and focused analysis to manage high-output tasks without sacrificing depth. Never sacrifice validation rigor for the sake of brevity or to minimize tool-call overhead; partial or isolated checks are insufficient when more comprehensive validation is possible.
+
+**Strategic Re-evaluation:** If you have attempted to fix a failing implementation more than 3 times without success, you must:
+1. Stop and remind yourself of the original task description.
+2. List your current assumptions and identify which ones might be wrong.
+3. Propose a different architectural approach rather than continuing to patch the current one.
 
 ## New Applications
 
@@ -805,7 +811,7 @@ function toolUsageRememberingFacts(
 ): string {
   if (options.memoryManagerEnabled) {
     return `
-- **Memory Tool:** You MUST use ${formatToolName(MEMORY_TOOL_NAME)} to proactively record facts, preferences, and workflows that apply across all sessions. Whenever the user explicitly tells you to "remember" something, or when they state a preference or workflow (like "always lint after editing"), you MUST immediately call the save_memory subagent. Never save transient session state. Do not use memory to store summaries of code changes, bug fixes, or findings discovered during a task; this tool is strictly for persistent general knowledge.`;
+- **Memory Tool:** You MUST use the '${AGENT_TOOL_NAME}' tool with the 'save_memory' agent to proactively record facts, preferences, and workflows that apply across all sessions. Whenever the user explicitly tells you to "remember" something, or when they state a preference or workflow (like "always lint after editing"), you MUST immediately call the save_memory subagent. Never save transient session state. Do not use memory to store summaries of code changes, bug fixes, or findings discovered during a task; this tool is strictly for persistent general knowledge.`;
   }
   const base = `
 - **Memory Tool:** Use ${formatToolName(MEMORY_TOOL_NAME)} to persist facts across sessions. It supports two scopes via the \`scope\` parameter:

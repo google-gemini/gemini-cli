@@ -98,8 +98,11 @@ export async function deleteSubagentSessionDirAndArtifactsAsync(
       });
 
     for (const file of files) {
-      if (file.isFile() && file.name.endsWith('.json')) {
-        const agentId = path.basename(file.name, '.json');
+      if (
+        file.isFile() &&
+        (file.name.endsWith('.json') || file.name.endsWith('.jsonl'))
+      ) {
+        const agentId = path.basename(file.name, path.extname(file.name));
         await deleteSessionArtifactsAsync(agentId, tempDir);
       }
     }
