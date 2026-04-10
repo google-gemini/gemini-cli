@@ -606,14 +606,8 @@ export async function processSingleFileContent(
           linesShown: [actualStart + 1, sliceEnd],
         };
       }
-      case 'image':
-      case 'pdf':
-      case 'audio':
-      case 'video': {
-        const mimeType =
-          fileType === 'audio'
-            ? getSupportedAudioMimeTypeForFile(filePath)
-            : (getSpecificMimeType(filePath) ?? 'application/octet-stream');
+      case 'audio': {
+        const mimeType = getSupportedAudioMimeTypeForFile(filePath);
         if (!mimeType) {
           return {
             llmContent: `Could not read audio file because its format is not supported. Supported audio formats are ${SUPPORTED_AUDIO_FORMATS_DISPLAY}.`,
@@ -622,6 +616,23 @@ export async function processSingleFileContent(
             errorType: ToolErrorType.READ_CONTENT_FAILURE,
           };
         }
+        const contentBuffer = await fs.promises.readFile(filePath);
+        const base64Data = contentBuffer.toString('base64');
+        return {
+          llmContent: {
+            inlineData: {
+              data: base64Data,
+              mimeType,
+            },
+          },
+          returnDisplay: `Read audio file: ${relativePathForDisplay}`,
+        };
+      }
+      case 'image':
+      case 'pdf':
+      case 'video': {
+        const mimeType =
+          getSpecificMimeType(filePath) ?? 'application/octet-stream';
         const contentBuffer = await fs.promises.readFile(filePath);
         const base64Data = contentBuffer.toString('base64');
         return {
