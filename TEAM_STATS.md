@@ -1,7 +1,7 @@
 # 📊 Gemini CLI Weekly Team Review Stats
 
 *Reporting Period: **Monday 2026-04-06** to Today*
-*Last Updated: 2026-04-10 00:40 (UTC)*
+*Last Updated: 2026-04-10 00:43 (UTC)*
 
 ## 📈 Weekly Summary
 | Maintainer | Closed/Merged (Week) | Current Open Queue |
@@ -45,7 +45,7 @@
 
 #### 🔴 Recently Closed (Since Monday)
 | PR | Issue | Title | Closed Date |
-| :--- | :--- | :--- | :--- |
+| :--- | :--- | :--- |
 | [#22621](https://github.com/google-gemini/gemini-cli/pull/22621) | [#22613](https://github.com/google-gemini/gemini-cli/issues/22613) | fix(cli): suppress unhandled AbortError logs during request cancellation | `2026-04-09` |
 | [#24773](https://github.com/google-gemini/gemini-cli/pull/24773) | [#14864](https://github.com/google-gemini/gemini-cli/issues/14864) | fix: respect hideContextPercentage when FooterConfigDialog is closed without changes | `2026-04-09` |
 | [#21447](https://github.com/google-gemini/gemini-cli/pull/21447) | [#21445](https://github.com/google-gemini/gemini-cli/issues/21445) | fix(cli-ui): enable Ctrl+Backspace for word deletion in Windows Terminal | `2026-04-09` |
@@ -65,7 +65,7 @@
 
 #### 🔴 Recently Closed (Since Monday)
 | PR | Issue | Title | Closed Date |
-| :--- | :--- | :--- | :--- |
+| :--- | :--- | :--- |
 | [#20546](https://github.com/google-gemini/gemini-cli/pull/20546) | [#19940](https://github.com/google-gemini/gemini-cli/issues/19940) | test(core): add missing tests for prompts/utils.ts | `2026-04-10` |
 
 ### Ivan Port (@ivanporty)
@@ -108,7 +108,7 @@
 
 #### 🔴 Recently Closed (Since Monday)
 | PR | Issue | Title | Closed Date |
-| :--- | :--- | :--- | :--- |
+| :--- | :--- | :--- |
 | [#19025](https://github.com/google-gemini/gemini-cli/pull/19025) | [#18388](https://github.com/google-gemini/gemini-cli/issues/18388) | feat(cli): add /mcp remove slash command for interactive server removal | `2026-04-09` |
 | [#24870](https://github.com/google-gemini/gemini-cli/pull/24870) | [#21006](https://github.com/google-gemini/gemini-cli/issues/21006) | fix(core): dispose Scheduler to prevent McpProgress listener leak | `2026-04-08` |
 
