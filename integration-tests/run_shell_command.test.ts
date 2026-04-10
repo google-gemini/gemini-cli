@@ -4,6 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+import { join } from 'node:path';
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import {
   TestRig,
@@ -14,6 +15,7 @@ import {
 import { getShellConfiguration } from '../packages/core/src/utils/shell-utils.js';
 
 const { shell } = getShellConfiguration();
+const itBashOnly = shell === 'bash' ? it : it.skip;
 
 function getLineCountCommand(): { command: string; tool: string } {
   switch (shell) {
@@ -165,6 +167,59 @@ describe('run_shell_command', () => {
       testName: 'Shell command stdin test',
     });
   });
+
+  itBashOnly(
+    'should preserve trailing newlines for heredoc shell commands',
+    async () => {
+      await rig.setup(
+        'should preserve trailing newlines for heredoc shell commands',
+        {
+          fakeResponsesPath: join(
+            import.meta.dirname,
+            'shell-trailing-newline.responses',
+          ),
+          settings: { tools: { core: ['run_shell_command'] } },
+        },
+      );
+
+      const result = await rig.run({
+        stdin: 'Run the heredoc command exactly as provided.',
+        approvalMode: 'yolo',
+      });
+
+      const foundToolCall = await rig.waitForToolCall(
+        'run_shell_command',
+        15000,
+        (args) => JSON.parse(args).command.includes('TRAILING_NEWLINE_20755'),
+      );
+
+      if (!foundToolCall || !result.includes('TRAILING_NEWLINE_20755')) {
+        printDebugInfo(rig, result, {
+          'Found tool call': foundToolCall,
+          ToolLogs: rig.readToolLogs(),
+        });
+      }
+
+      expect(foundToolCall).toBe(true);
+
+      const toolCall = rig
+        .readToolLogs()
+        .find((toolCall) => toolCall.toolRequest.name === 'run_shell_command');
+
+      expect(toolCall).toBeDefined();
+      expect(toolCall!.toolRequest.success).toBe(true);
+
+      const parsedArgs = JSON.parse(toolCall!.toolRequest.args) as {
+        command: string;
+      };
+      expect(parsedArgs.command.endsWith('\n')).toBe(true);
+
+      expect(result).toContain('TRAILING_NEWLINE_20755');
+      expect(result).not.toMatch(
+        /here-document delimited by end-of-file|syntax error: unexpected end of file/i,
+      );
+    },
+  );
 
   it.skip('should run allowed sub-command in non-interactive mode', async () => {
     await rig.setup('should run allowed sub-command in non-interactive mode');

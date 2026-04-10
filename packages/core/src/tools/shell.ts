@@ -40,6 +40,7 @@ import {
 import { formatBytes } from '../utils/formatters.js';
 import type { AnsiOutput } from '../utils/terminalSerializer.js';
 import {
+  escapeShellArg,
   getCommandRoots,
   initializeShellParsers,
   stripShellWrapper,
@@ -107,14 +108,21 @@ export class ShellToolInvocation extends BaseToolInvocation<
     if (isWindows) {
       return command;
     }
-    let trimmed = command.trim();
-    if (!trimmed) {
+    if (!command.trim()) {
       return '';
     }
-    if (trimmed.endsWith('\\')) {
-      trimmed += ' ';
+
+    let wrappedCommand = command;
+    const hasTrailingLineTerminator = /\r?\n$/.test(wrappedCommand);
+
+    if (!hasTrailingLineTerminator && /\\[^\S\r\n]*$/.test(wrappedCommand)) {
+      wrappedCommand += ' ';
     }
-    return `(\n${trimmed}\n); __code=$?; pgrep -g 0 >${tempFilePath} 2>&1; exit $__code;`;
+
+    const closingNewline = hasTrailingLineTerminator ? '' : '\n';
+    const escapedTempFilePath = escapeShellArg(tempFilePath, 'bash');
+
+    return `(\n${wrappedCommand}${closingNewline}); __code=$?; pgrep -g 0 >${escapedTempFilePath} 2>&1; exit $__code;`;
   }
 
   private getContextualDetails(): string {
@@ -440,7 +448,9 @@ export class ShellToolInvocation extends BaseToolInvocation<
     options?: ExecuteOptions,
   ): Promise<ToolResult> {
     const { shellExecutionConfig, setExecutionIdCallback } = options ?? {};
-    const strippedCommand = stripShellWrapper(this.params.command);
+    const strippedCommand = stripShellWrapper(this.params.command, {
+      preserveTrailingWhitespace: true,
+    });
 
     if (signal.aborted) {
       return {

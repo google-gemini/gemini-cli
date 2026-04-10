@@ -1,0 +1,2 @@
+{"method":"generateContentStream","response":[{"candidates":[{"content":{"parts":[{"functionCall":{"name":"run_shell_command","args":{"command":"cat <<'EOF'\nTRAILING_NEWLINE_20755\nEOF\n","description":"Run a heredoc command to verify trailing newline preservation."}}}],"role":"model"},"finishReason":"STOP","index":0}]}]}
+{"method":"generateContentStream","response":[{"candidates":[{"content":{"parts":[{"text":"TRAILING_NEWLINE_20755"}],"role":"model"},"finishReason":"STOP","index":0}]}]}
