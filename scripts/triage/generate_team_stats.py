@@ -26,8 +26,16 @@ BOT_BLACKLIST = {
     'dependabot', 'google-gemini-bot', 'google-cla', 'googlebot'
 }
 
+# Teams that require specialized approval
+ONCALLER_TEAMS = {
+    'gemini-cli-prompt-approvers',
+    'gemini-cli-askmode-approvers',
+    'gemini-cli-docs'
+}
+
 SEARCH_QUERY = f'repo:{TARGET_REPO} is:issue label:area/core,area/extensions,area/site label:"help wanted" updated:>=2026-03-10 sort:updated-desc'
 
+# Step 1: Lightweight query to get issues and PR numbers
 ISSUES_QUERY = """
 query($searchQuery: String!, $cursor: String) {
   search(query: $searchQuery, type: ISSUE, first: 100, after: $cursor) {
@@ -35,6 +43,7 @@ query($searchQuery: String!, $cursor: String) {
     nodes {
       ... on Issue {
         number
+        title
         url
         timelineItems(itemTypes: CROSS_REFERENCED_EVENT, last: 20) {
           nodes {
@@ -51,27 +60,59 @@ query($searchQuery: String!, $cursor: String) {
 }
 """
 
-def get_pr_batch_query(pr_numbers):
-    owner, repo = TARGET_REPO.split('/')
-    fragments = []
-    for i, num in enumerate(pr_numbers):
-        fragments.append(f"""
-            pr{i}: pullRequest(number: {num}) {{
-                number url title state createdAt updatedAt mergedAt
-                author {{ login }}
-                mergeable
-                statusCheckRollup {{ state }}
-                closingIssuesReferences(first: 5) {{ nodes {{ number }} }}
-                reviewRequests(first: 10) {{ nodes {{ requestedReviewer {{ __typename ... on User {{ login }} ... on Team {{ slug }} }} }} }}
-                latestReviews(last: 10) {{ nodes {{ author {{ login }} state updatedAt }} }}
-                comments(last: 20) {{ nodes {{ author {{ login }} publishedAt }} }}
-                commits(last: 10) {{ nodes {{ commit {{ committedDate author {{ user {{ login }} }} }} }} }}
-                timelineItems(last: 5, itemTypes: [REOPENED_EVENT, READY_FOR_REVIEW_EVENT]) {{
-                    nodes {{ __typename ... on ReopenedEvent {{ createdAt }} ... on ReadyForReviewEvent {{ createdAt }} }}
-                }}
-            }}
-        """)
-    return f"query {{ repository(owner: \"{owner}\", name: \"{repo}\") {{ {' '.join(fragments)} }} }}"
+# Step 2: Query for PR details
+PR_DETAILS_QUERY = """
+query($repoOwner: String!, $repoName: String!, $prNumber: Int!) {
+  repository(owner: $repoOwner, name: $repoName) {
+    pullRequest(number: $prNumber) {
+      number
+      url
+      title
+      state
+      createdAt
+      updatedAt
+      mergedAt
+      author { login }
+      mergeable
+      statusCheckRollup { state }
+      closingIssuesReferences(first: 5) { nodes { number } }
+      reviewRequests(first: 10) {
+        nodes {
+          requestedReviewer {
+            __typename
+            ... on User { login }
+            ... on Team { slug }
+          }
+        }
+      }
+      latestReviews(last: 10) {
+        nodes {
+          author { login }
+          state
+          updatedAt
+        }
+      }
+      comments(last: 20) {
+        nodes {
+          author { login }
+          publishedAt
+        }
+      }
+      commits(last: 10) {
+        nodes {
+          commit {
+            committedDate
+            author { user { login } }
+          }
+        }
+      }
+      timelineItems(last: 5, itemTypes: [REOPENED_EVENT, READY_FOR_REVIEW_EVENT]) {
+        nodes { __typename ... on ReopenedEvent { createdAt } ... on ReadyForReviewEvent { createdAt } }
+      }
+    }
+  }
+}
+"""
 
 def gh_api_graphql(query, variables=None):
     cmd = ['gh', 'api', 'graphql']
@@ -91,8 +132,8 @@ def get_author_activity(pr):
     latest = pr.get('createdAt', "")
     commits = pr.get('commits', {}).get('nodes', [])
     for c_node in commits:
-        author_data = c_node.get('commit', {}).get('author', {})
-        user_data = author_data.get('user') if author_data else None
+        auth_data = c_node.get('commit', {}).get('author', {})
+        user_data = auth_data.get('user') if auth_data else None
         commit_author = user_data.get('login') if user_data else None
         if commit_author == author:
             latest = max(latest, c_node['commit']['committedDate'])
@@ -117,8 +158,8 @@ def get_reviewer_activity(pr):
             latest = max(latest, c['publishedAt'])
     commits = pr.get('commits', {}).get('nodes', [])
     for c_node in commits:
-        author_data = c_node.get('commit', {}).get('author', {})
-        user_data = author_data.get('user') if author_data else None
+        auth_data = c_node.get('commit', {}).get('author', {})
+        user_data = auth_data.get('user') if auth_data else None
         commit_author = user_data.get('login') if user_data else None
         if commit_author and commit_author != author and commit_author not in BOT_BLACKLIST:
             latest = max(latest, c_node['commit']['committedDate'])
@@ -139,6 +180,28 @@ def get_status_priority(label):
     if "Blocked" in label: return 2
     return 3
 
+def get_pr_batch_query(pr_numbers):
+    owner, repo = TARGET_REPO.split('/')
+    fragments = []
+    for i, num in enumerate(pr_numbers):
+        fragments.append(f"""
+            pr{i}: pullRequest(number: {num}) {{
+                number url title state createdAt updatedAt mergedAt
+                author {{ login }}
+                mergeable
+                statusCheckRollup {{ state }}
+                closingIssuesReferences(first: 5) {{ nodes {{ number }} }}
+                reviewRequests(first: 10) {{ nodes {{ requestedReviewer {{ __typename ... on User {{ login }} ... on Team {{ slug }} }} }} }}
+                latestReviews(last: 10) {{ nodes {{ author {{ login }} state updatedAt }} }}
+                comments(last: 20) {{ nodes {{ author {{ login }} publishedAt }} }}
+                commits(last: 10) {{ nodes {{ commit {{ committedDate author {{ user {{ login }} }} }} }} }}
+                timelineItems(last: 5, itemTypes: [REOPENED_EVENT, READY_FOR_REVIEW_EVENT]) {{
+                    nodes {{ __typename ... on ReopenedEvent {{ createdAt }} ... on ReadyForReviewEvent {{ createdAt }} }}
+                }}
+            }}
+        """)
+    return f"query {{ repository(owner: \"{owner}\", name: \"{repo}\") {{ {' '.join(fragments)} }} }}"
+
 def main():
     print("Fetching issue list...")
     all_issue_data = []
@@ -151,6 +214,8 @@ def main():
         if not search_data['pageInfo']['hasNextPage']: break
         cursor = search_data['pageInfo']['endCursor']
 
+    # Collect unique PR numbers and issue mapping
+    issue_to_info = {i['number']: {"title": i['title'], "url": i['url']} for i in all_issue_data}
     issue_to_prs = {}
     all_pr_numbers = set()
     for issue in all_issue_data:
@@ -158,6 +223,7 @@ def main():
         issue_to_prs[issue['number']] = nums
         all_pr_numbers.update(nums)
 
+    # Fetch PR details in batches
     print(f"Fetching details for {len(all_pr_numbers)} PRs in batches...")
     pr_details = {}
     pr_list = sorted(list(all_pr_numbers))
@@ -175,70 +241,114 @@ def main():
     report_start = (now - datetime.timedelta(days=days_since_monday)).replace(hour=0, minute=0, second=0, microsecond=0)
 
     stats = {login: {"name": name, "weekly_closed": 0, "open_queue": [], "history": []} for login, name in MAINTAINERS.items()}
+    pickup_list = []
+    processed_prs = set()
     
     for issue_no, pr_nums in issue_to_prs.items():
         for pr_no in pr_nums:
             pr = pr_details.get(pr_no)
             if not pr: continue
             if issue_no not in [n['number'] for n in pr['closingIssuesReferences']['nodes']]: continue
-            
-            reviewers = set()
+            if pr.get('baseRepository', {}).get('nameWithOwner', TARGET_REPO) != TARGET_REPO: continue
+            if pr.get('state') != 'OPEN':
+                # Track recently closed for maintainers
+                if pr_no not in processed_prs:
+                    updated_at = parse_date(pr['updatedAt'])
+                    # Check who reviewed this closed PR
+                    revs = set()
+                    for req in pr.get('reviewRequests', {}).get('nodes', []):
+                        rr = req.get('requestedReviewer')
+                        if rr and rr.get('__typename') == 'User': revs.add(rr.get('login'))
+                    for r in pr.get('latestReviews', {}).get('nodes', []):
+                        if r.get('author'): revs.add(r['author']['login'])
+                    
+                    for r_login in revs:
+                        if r_login in stats and updated_at and updated_at >= report_start:
+                            stats[r_login]["weekly_closed"] += 1
+                            stats[r_login]["history"].append({
+                                "number": pr['number'], "title": pr['title'], "url": pr['url'],
+                                "issue_no": issue_no, "updated": pr['updatedAt'][:10]
+                            })
+                    processed_prs.add(pr_no)
+                continue
+
+            # Open PR logic
+            human_reviewers = set()
+            requested_special_teams = False
             for req in pr.get('reviewRequests', {}).get('nodes', []):
                 rr = req.get('requestedReviewer')
-                if rr and rr.get('__typename') == 'User': reviewers.add(rr.get('login'))
+                if rr:
+                    if rr['__typename'] == 'User':
+                        human_reviewers.add(rr.get('login'))
+                    elif rr['__typename'] == 'Team':
+                        slug = rr.get('slug', '').split('/')[-1]
+                        if slug in ONCALLER_TEAMS: requested_special_teams = True
             for rev in pr.get('latestReviews', {}).get('nodes', []):
-                if rev.get('author'): reviewers.add(rev['author']['login'])
+                if rev.get('author'): human_reviewers.add(rev['author']['login'])
             
-            for reviewer in reviewers:
+            latest_author_act = get_author_activity(pr)
+            latest_rev_act = get_reviewer_activity(pr)
+            status_label = get_status_label(pr)
+            
+            # Pickup List Logic (No human reviewers, not blocked, author updated last)
+            if not human_reviewers and not requested_special_teams and "Blocked" not in status_label and (not latest_rev_act or latest_author_act > latest_rev_act):
+                if pr_no not in [p['number'] for p in pickup_list]:
+                    pickup_list.append({
+                        "number": pr['number'], "url": pr['url'], "title": pr['title'],
+                        "issue_no": issue_no, "issue_url": issue_to_info[issue_no]['url'],
+                        "issue_title": issue_to_info[issue_no]['title'],
+                        "updated": pr['updatedAt'][:10]
+                    })
+
+            # Stats logic
+            for reviewer in human_reviewers:
                 if reviewer in stats:
-                    updated_at = parse_date(pr['updatedAt'])
-                    status_label = get_status_label(pr)
-                    pr_info = {
+                    stats[reviewer]["open_queue"].append({
                         "number": pr['number'], "title": pr['title'], "url": pr['url'],
                         "state": pr['state'], "updated": pr['updatedAt'][:10], "issue_no": issue_no,
                         "status_label": status_label,
                         "priority": get_status_priority(status_label)
-                    }
-                    if pr['state'] != 'OPEN':
-                        if updated_at and updated_at >= report_start:
-                            stats[reviewer]["weekly_closed"] += 1
-                        stats[reviewer]["history"].append(pr_info)
-                    else:
-                        stats[reviewer]["open_queue"].append(pr_info)
+                    })
 
     # Generate Markdown
     ts = now.strftime("%Y-%m-%d %H:%M")
     md = f"# 📊 Gemini CLI Weekly Team Review Stats\n\n"
     md += f"*Reporting Period: **Monday {report_start.strftime('%Y-%m-%d')}** to Today*\n"
     md += f"*Last Updated: {ts} (UTC)*\n\n"
+    
     md += "## 📈 Weekly Summary\n"
-    md += "| Maintainer | Closed/Merged | Current Open Queue |\n| :--- | :--- | :--- |\n"
+    md += "| Maintainer | Closed/Merged (Week) | Current Open Queue |\n| :--- | :--- | :--- |\n"
     for login, data in sorted(stats.items(), key=lambda x: x[1]['weekly_closed'], reverse=True):
         md += f"| **{data['name']}** (@{login}) | **{data['weekly_closed']}** | {len(data['open_queue'])} |\n"
+
+    md += f"\n### 🆕 Awaiting Reviewer Pickup ({len(pickup_list)})\n"
+    md += "**Action: Pick up one of these new PRs.** These have no human reviewers assigned yet, but **all tests are passing and there are no conflicts.**\n\n"
+    md += "| Issue | Linked PR | Last Update |\n| :--- | :--- | :--- |\n"
+    for i in pickup_list:
+        md += f"| [#{i['issue_no']} {i['issue_title']}]({i['issue_url']}) | [#{i['number']}]({i['url']}) | `{i['updated']}` |\n"
+    if not pickup_list: md += "| - | - | - |\\n"
 
     md += "\n---\n## 👤 Individual Review Queues\n"
     for login, data in sorted(stats.items(), key=lambda x: x[1]['name']):
         md += f"\n### {data['name']} (@{login})\n"
         md += "#### 🟢 Active Queue\n| PR | Issue | Title | Status & Next Step | Updated |\n| :--- | :--- | :--- | :--- | :--- |\n"
-        # SORTING: Priority first, then updated date descending
-        sorted_queue = sorted(data['open_queue'], key=lambda x: (x['priority'], x['updated']), reverse=False)
-        # Note: reverse=False keeps priority 0, 1, 2 in order. 
-        # But for date we usually want newest first. Let's adjust sorting.
+        sorted_queue = sorted(data['open_queue'], key=lambda x: (x['priority'], x['updated']), reverse=True) # Priority 0 top, date desc
+        # Actually Priority 0 is best at top, so priority asc, date desc
         sorted_queue = sorted(data['open_queue'], key=lambda x: (x['priority'], datetime.datetime.fromisoformat(x['updated']).timestamp() * -1))
         
         for p in sorted_queue:
             md += f"| [#{p['number']}]({p['url']}) | [#{p['issue_no']}](https://github.com/{TARGET_REPO}/issues/{p['issue_no']}) | {p['title']} | {p['status_label']} | `{p['updated']}` |\n"
         if not data['open_queue']: md += "| - | - | _No active reviews._ | - | - |\n"
-        
-        recent_closed = [p for p in data['history'] if parse_date(p['updated']+'T00:00:00Z') >= report_start]
+
+        recent_closed = [p for p in data['history']]
         if recent_closed:
             md += "\n#### 🔴 Recently Closed (Since Monday)\n| PR | Issue | Title | Closed Date |\n| :--- | :--- | :--- | :--- |\n"
-            for p in recent_closed:
+            for p in sorted(recent_closed, key=lambda x: x['updated'], reverse=True):
                 md += f"| [#{p['number']}]({p['url']}) | [#{p['issue_no']}](https://github.com/{TARGET_REPO}/issues/{p['issue_no']}) | {p['title']} | `{p['updated']}` |\n"
 
     md += "\n---\n*Report generated by automated triage script.*"
     with open("TEAM_STATS.md", "w") as f: f.write(md)
-    print("Successfully generated TEAM_STATS.md (Prioritized Sorting).")
+    print("Successfully generated TEAM_STATS.md (Pickup table included).")
 
 if __name__ == "__main__":
     main()

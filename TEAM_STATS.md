@@ -1,10 +1,10 @@
 # 📊 Gemini CLI Weekly Team Review Stats
 
 *Reporting Period: **Monday 2026-04-06** to Today*
-*Last Updated: 2026-04-10 00:36 (UTC)*
+*Last Updated: 2026-04-10 00:39 (UTC)*
 
 ## 📈 Weekly Summary
-| Maintainer | Closed/Merged | Current Open Queue |
+| Maintainer | Closed/Merged (Week) | Current Open Queue |
 | :--- | :--- | :--- |
 | **Coco Sheng** (@cocosheng-g) | **4** | 6 |
 | **Tommaso Sciortino** (@scidomino) | **2** | 3 |
@@ -17,6 +17,12 @@
 | **Spencer Tang** (@spencer426) | **0** | 1 |
 | **Sri Pasumarthi** (@sripasg) | **0** | 0 |
 
+### 🆕 Awaiting Reviewer Pickup (0)
+**Action: Pick up one of these new PRs.** These have no human reviewers assigned yet, but **all tests are passing and there are no conflicts.**
+
+| Issue | Linked PR | Last Update |
+| :--- | :--- | :--- |
+| - | - | - |\n
 ---
 ## 👤 Individual Review Queues
 
