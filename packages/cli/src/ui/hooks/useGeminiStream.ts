@@ -39,7 +39,8 @@ import {
   isBackgroundExecutionData,
   Kind,
   ACTIVATE_SKILL_TOOL_NAME,
-  shouldHideToolCall,
+  isRenderedInHistory,
+  buildToolVisibilityContext,
   UPDATE_TOPIC_TOOL_NAME,
   UPDATE_TOPIC_DISPLAY_NAME,
 } from '@google/gemini-cli-core';
@@ -647,29 +648,8 @@ export const useGeminiStream = (
       toolCalls.every((tc) => pushedToolCallIds.has(tc.request.callId));
 
     const isToolVisible = (tc: TrackedToolCall) => {
-      const displayName = tc.tool?.displayName ?? tc.request.name;
-
-      let hasResultDisplay = false;
-      if (
-        tc.status === CoreToolCallStatus.Success ||
-        tc.status === CoreToolCallStatus.Error ||
-        tc.status === CoreToolCallStatus.Cancelled
-      ) {
-        hasResultDisplay = !!tc.response?.resultDisplay;
-      } else if (tc.status === CoreToolCallStatus.Executing) {
-        hasResultDisplay = !!tc.liveOutput;
-      }
-
       // AskUser tools and Plan Mode write/edit are handled by this logic
-      if (
-        shouldHideToolCall({
-          displayName,
-          status: tc.status,
-          approvalMode: tc.approvalMode,
-          hasResultDisplay,
-          parentCallId: tc.request.parentCallId,
-        })
-      ) {
+      if (!isRenderedInHistory(buildToolVisibilityContext(tc))) {
         return false;
       }
 

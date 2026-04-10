@@ -4,6 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+import { type ToolVisibilityContext } from '@google/gemini-cli-core';
 import { CoreToolCallStatus } from '../types.js';
 import type {
   HistoryItem,
@@ -11,6 +12,23 @@ import type {
   HistoryItemToolGroup,
   IndividualToolCallDisplay,
 } from '../types.js';
+
+/**
+ * Maps an IndividualToolCallDisplay from the CLI to a ToolVisibilityContext for core logic.
+ */
+export function buildToolVisibilityContextFromDisplay(
+  tool: IndividualToolCallDisplay,
+): ToolVisibilityContext {
+  return {
+    name: tool.originalRequestName ?? tool.name,
+    displayName: tool.name, // In CLI, 'name' is usually the resolved display name
+    status: tool.status,
+    hasResult: !!tool.resultDisplay,
+    approvalMode: tool.approvalMode,
+    isClientInitiated: tool.isClientInitiated,
+    parentCallId: tool.parentCallId,
+  };
+}
 
 export function getLastTurnToolCallIds(
   history: HistoryItem[],
