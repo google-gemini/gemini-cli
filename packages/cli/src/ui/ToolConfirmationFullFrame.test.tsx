@@ -11,7 +11,6 @@ import {
   CoreToolCallStatus,
   ApprovalMode,
   makeFakeConfig,
-  type UserTierId,
   type SerializableConfirmationDetails,
 } from '@google/gemini-cli-core';
 import { type UIState } from './contexts/UIStateContext.js';
@@ -138,7 +137,7 @@ describe('Full Terminal Tool Confirmation Snapshot', () => {
       await renderWithProviders(<App />, {
         uiState: mockUIState,
         quotaState: {
-          userTier: 'PRO' as unknown as UserTierId,
+          userTier: 'PRO',
           stats: {
             remaining: 100,
             limit: 1000,
