@@ -70,11 +70,26 @@ describe('run_shell_command streaming to file regression', () => {
       files.sort((a, b) => fs.statSync(b).mtimeMs - fs.statSync(a).mtimeMs);
 
       for (const p of files) {
-        const stat = fs.statSync(p);
-        if (stat.size >= 20000000) {
-          savedFilePath = p;
-          break;
+        try {
+          const stat = fs.statSync(p);
+          if (stat.size >= 20000000) {
+            savedFilePath = p;
+            break;
+          }
+        } catch {
+          // ignore
         }
+      }
+
+      if (!savedFilePath) {
+        const fileStats = files.map((p) => {
+          try {
+            return { p, size: fs.statSync(p).size };
+          } catch {
+            return { p, size: 'error' };
+          }
+        });
+        console.error('Available files:', JSON.stringify(fileStats, null, 2));
       }
     }
 
@@ -144,11 +159,26 @@ describe('run_shell_command streaming to file regression', () => {
       files.sort((a, b) => fs.statSync(b).mtimeMs - fs.statSync(a).mtimeMs);
 
       for (const p of files) {
-        const stat = fs.statSync(p);
-        if (stat.size >= 20000000) {
-          savedFilePath = p;
-          break;
+        try {
+          const stat = fs.statSync(p);
+          if (stat.size >= 20000000) {
+            savedFilePath = p;
+            break;
+          }
+        } catch {
+          // ignore
         }
+      }
+
+      if (!savedFilePath) {
+        const fileStats = files.map((p) => {
+          try {
+            return { p, size: fs.statSync(p).size };
+          } catch {
+            return { p, size: 'error' };
+          }
+        });
+        console.error('Available files:', JSON.stringify(fileStats, null, 2));
       }
     }
 

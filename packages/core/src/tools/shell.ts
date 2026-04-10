@@ -532,10 +532,8 @@ export class ShellToolInvocation extends BaseToolInvocation<
                 // We rely on 'file_data' for the clean output stream.
                 break;
               case 'file_data':
-                if (!isBinaryStream) {
-                  totalBytesWritten += Buffer.byteLength(event.chunk);
-                  outputStream.write(event.chunk);
-                }
+                totalBytesWritten += Buffer.byteLength(event.chunk);
+                outputStream.write(event.chunk);
                 break;
               case 'data':
                 if (isBinaryStream) break;
@@ -675,6 +673,11 @@ export class ShellToolInvocation extends BaseToolInvocation<
         outputStream.on('error', reject);
         outputStream.end(resolve);
       });
+
+      // Ensure the stream is fully closed before we proceed
+      if (!outputStream.closed) {
+        await new Promise<void>((resolve) => outputStream.on('close', resolve));
+      }
 
       const backgroundPIDs: number[] = [];
       if (os.platform() !== 'win32') {
