@@ -35,9 +35,8 @@ export function getDynamicToolsDocumentation(
         // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
         const prop = propRaw as Schema;
         const isRequired = tool.parameters.required?.includes(name);
-        // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
-        const typeStr = (prop.type as string) || 'any';
-        doc += `- ${name} (${typeStr}${isRequired ? ', REQUIRED' : ', OPTIONAL'}): ${prop.description ?? ''}\n`;
+        const typeStr = schemaToTypeScript(prop, '').trim();
+        doc += `- ${name} (${typeStr}${isRequired ? '' : ', optional'}): ${prop.description ?? ''}\n`;
       }
       doc += '\n```ts\n';
       doc += `interface ${argsName} ${schemaToTypeScript(tool.parameters)}\n`;
@@ -53,14 +52,30 @@ export function getDynamicToolsDocumentation(
  */
 export function schemaToTypeScript(schema: Schema, indent = ''): string {
   // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
-  const type = (schema.type as string) || 'any';
+  const rawType = (schema.type as string) || 'any';
+  const typeMap: Record<string, string> = {
+    [Type.STRING]: 'string',
+    [Type.NUMBER]: 'number',
+    [Type.INTEGER]: 'number',
+    [Type.BOOLEAN]: 'boolean',
+    [Type.OBJECT]: 'object',
+    [Type.ARRAY]: 'array',
+    string: 'string',
+    number: 'number',
+    integer: 'number',
+    boolean: 'boolean',
+    object: 'object',
+    array: 'array',
+  };
+
+  const tsType = typeMap[rawType] || rawType;
+
   if (
     // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
     schema.type === (Type.OBJECT as unknown as string) ||
     schema.type === Type.OBJECT
   ) {
     let ts = '{\n';
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
     const properties =
       ((schema.properties as unknown) as Record<string, unknown>) || {};
     for (const [name, propRaw] of Object.entries(properties)) {
@@ -70,11 +85,11 @@ export function schemaToTypeScript(schema: Schema, indent = ''): string {
       if (prop.description) {
         ts += `${indent}  /** ${prop.description.replace(/\n/g, ' ')} */\n`;
       }
-      const optional = isRequired ? '' : '?';
-      ts += `${indent}  ${name}${optional}: ${schemaToTypeScript(
+      const optionalSuffix = isRequired ? '' : '?';
+      ts += `${indent}  ${name}${optionalSuffix}: ${schemaToTypeScript(
         prop,
         indent + '  ',
-      )};${isRequired ? ' // REQUIRED' : ''}\n`;
+      )};\n`;
     }
     ts += `${indent}}`;
     return ts;
@@ -87,7 +102,7 @@ export function schemaToTypeScript(schema: Schema, indent = ''): string {
     const items = schema.items as Schema;
     return `${schemaToTypeScript(items, indent)}[]`;
   } else {
-    return type;
+    return tsType;
   }
 }
 
