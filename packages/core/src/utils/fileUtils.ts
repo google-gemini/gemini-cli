@@ -412,6 +412,15 @@ export async function processSingleFileContent(
   endLine?: number,
 ): Promise<ProcessedFileReadResult> {
   try {
+    if (!isWithinRoot(filePath, rootDirectory)) {
+      return {
+        llmContent: `Could not read file because it is outside the project root: ${filePath}`,
+        returnDisplay: 'Path outside project root.',
+        error: `Path outside project root: ${filePath}`,
+        errorType: ToolErrorType.PATH_NOT_IN_WORKSPACE,
+      };
+    }
+
     if (!fs.existsSync(filePath)) {
       // Sync check is acceptable before async read
       return {
@@ -549,20 +558,27 @@ export async function processSingleFileContent(
             'image/heif',
           ];
           if (!supportedImageTypes.includes(detectedMime)) {
-            throw new Error(
-              `Unsupported image format: ${detectedMime}. ` +
+            return {
+              llmContent: `Unsupported image format: ${detectedMime}.`,
+              returnDisplay: `Unsupported image format: ${detectedMime}.`,
+              error:
+                `Unsupported image format: ${detectedMime}. ` +
                 `Supported formats: PNG, JPEG, WEBP, HEIC, HEIF.`,
-            );
+              errorType: ToolErrorType.READ_CONTENT_FAILURE,
+            };
           }
 
           // Check file size to prevent excessively large uploads
-          const stats = await fs.promises.stat(filePath);
+          const imageStats = await fs.promises.stat(filePath);
           const maxSize = 20 * 1024 * 1024; // 20MB
-          if (stats.size > maxSize) {
-            const sizeMB = (stats.size / (1024 * 1024)).toFixed(1);
-            throw new Error(
-              `Image file too large (${sizeMB} MB). Maximum allowed size is 20MB.`,
-            );
+          if (imageStats.size > maxSize) {
+            const sizeMB = (imageStats.size / (1024 * 1024)).toFixed(1);
+            return {
+              llmContent: `Image file too large (${sizeMB} MB).`,
+              returnDisplay: `Image file too large (${sizeMB} MB).`,
+              error: `Image file too large (${sizeMB} MB). Maximum allowed size is 20MB.`,
+              errorType: ToolErrorType.FILE_TOO_LARGE,
+            };
           }
         }
 
