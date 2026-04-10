@@ -20,27 +20,12 @@ import {
   coreEvents,
   debugLogger,
   logRewind,
-  partToString,
   RewindEvent,
   type ChatRecordingService,
   type GeminiClient,
-  type MessageRecord,
   convertSessionToClientHistory,
 } from '@google/gemini-cli-core';
-import { stripReferenceContent } from '../utils/formatters.js';
-
-/**
- * Extracts the cleaned prompt text from a user message, matching the logic
- * used by the RewindViewer TUI to restore the input buffer after a rewind.
- */
-function getCleanedRewindText(userMessage: MessageRecord): string {
-  const contentToUse = userMessage.displayContent || userMessage.content;
-  const originalUserText = contentToUse ? partToString(contentToUse) : '';
-  return userMessage.displayContent
-    ? originalUserText
-    : stripReferenceContent(originalUserText);
-}
-
+import { getCleanedRewindText } from '../utils/formatters.js';
 /**
  * Helper function to handle the core logic of rewinding a conversation.
  * This function encapsulates the steps needed to rewind the conversation,
