@@ -164,7 +164,6 @@ describe('useExecutionLifecycle', () => {
       storage: {
         getProjectTempDir: () => '/tmp/project',
       },
-      getSessionId: () => 'test-session',
     } as unknown as Config;
     mockGeminiClient = { addHistory: vi.fn() } as unknown as GeminiClient;
 
