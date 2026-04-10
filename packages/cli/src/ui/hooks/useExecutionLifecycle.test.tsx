@@ -133,6 +133,7 @@ describe('useExecutionLifecycle', () => {
     mockConfig = {
       getTargetDir: () => '/test/dir',
       getEnableInteractiveShell: () => false,
+      getSessionId: () => 'test-session-id',
       getShellExecutionConfig: () => ({
         terminalHeight: 20,
         terminalWidth: 80,
@@ -338,7 +339,9 @@ describe('useExecutionLifecycle', () => {
         expect.any(Function),
         expect.any(Object),
         false, // enableInteractiveShell
-        expect.any(Object),
+        expect.objectContaining({
+          sessionId: 'test-session-id',
+        }),
       );
 
       // Wait for the async PID update to happen.
