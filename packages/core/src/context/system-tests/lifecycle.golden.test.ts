@@ -5,7 +5,7 @@
  */
 
 import { describe, it, expect, vi, beforeAll, afterAll } from 'vitest';
-import { SimulationHarness } from './SimulationHarness.js';
+import { SimulationHarness } from './simulationHarness.js';
 import { createMockLlmClient } from '../testing/contextTestUtils.js';
 import type { ContextProfile } from '../config/profiles.js';
 import { createToolMaskingProcessor } from '../processors/toolMaskingProcessor.js';

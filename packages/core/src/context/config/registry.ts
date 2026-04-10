@@ -14,7 +14,7 @@ export interface ContextProcessorDef {
  * (Dynamic instantiation has been replaced by static ContextProfiles)
  */
 export class SidecarRegistry {
-  private processors = new Map<string, ContextProcessorDef>();
+  private readonly processors = new Map<string, ContextProcessorDef>();
 
   registerProcessor(def: ContextProcessorDef) {
     this.processors.set(def.id, def);

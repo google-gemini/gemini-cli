@@ -12,7 +12,7 @@ import { DeterministicIdGenerator } from '../system/DeterministicIdGenerator.js'
 import { randomUUID } from 'node:crypto';
 import { ContextTracer } from '../tracer.js';
 import { ContextEnvironmentImpl } from '../pipeline/environmentImpl.js';
-import { SidecarLoader } from '../config/SidecarLoader.js';
+import { SidecarLoader } from '../config/configLoader.js';
 import { SidecarRegistry } from '../config/registry.js';
 import { ContextEventBus } from '../eventBus.js';
 import { PipelineOrchestrator } from '../pipeline/orchestrator.js';
@@ -24,6 +24,7 @@ import type { Content, GenerateContentResponse } from '@google/genai';
 import { InboxSnapshotImpl } from '../pipeline/inbox.js';
 import type { InboxMessage, ProcessArgs } from '../pipeline.js';
 import type { ContextProfile } from '../config/profiles.js';
+import type { Mock } from 'vitest';
 
 /**
  * Creates a valid mock GenerateContentResponse with the provided text.
@@ -93,8 +94,6 @@ export function createDummyToolNode(
     ...overrides,
   } as unknown as ToolExecution;
 }
-
-import type { Mock } from 'vitest';
 
 export interface MockLlmClient extends BaseLlmClient {
   generateContent: Mock;

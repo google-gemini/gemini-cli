@@ -12,6 +12,7 @@ import { getSidecarConfigSchema } from './schema.js';
 import type { SidecarRegistry } from './registry.js';
 import type { IFileSystem } from '../system/IFileSystem.js';
 import { NodeFileSystem } from '../system/NodeFileSystem.js';
+import { getErrorMessage } from '../../utils/errors.js';
 
 export class SidecarLoader {
   /**
@@ -24,18 +25,13 @@ export class SidecarLoader {
     fileSystem: IFileSystem = new NodeFileSystem(),
   ): ContextProfile {
     const fileContent = fileSystem.readFileSync(sidecarPath, 'utf8');
-
-    if (!fileContent.trim()) {
-      throw new Error(`Sidecar configuration file at ${sidecarPath} is empty.`);
-    }
-
     let parsed: unknown;
     try {
       parsed = JSON.parse(fileContent);
     } catch (error) {
       throw new Error(
         `Failed to parse Sidecar configuration file at ${sidecarPath}: ${
-          error instanceof Error ? error.message : String(error)
+          getErrorMessage(error)
         }`,
       );
     }
@@ -58,11 +54,7 @@ export class SidecarLoader {
     // That function dynamically maps the \`processorOptions\` to strict JSON schema definitions,
     // so we know with absolute certainty at runtime that \`parsed\` conforms to this shape.
     // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
-    const validConfig = parsed as {
-      budget?: SidecarConfig['budget'];
-      processorOptions?: SidecarConfig['processorOptions'];
-    };
-
+    const validConfig = parsed as SidecarConfig;
     return {
       ...defaultSidecarProfile,
       config: {

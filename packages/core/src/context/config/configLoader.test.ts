@@ -5,7 +5,7 @@
  */
 
 import { describe, it, expect, beforeEach } from 'vitest';
-import { SidecarLoader } from './SidecarLoader.js';
+import { SidecarLoader } from './configLoader.js';
 import { defaultSidecarProfile } from './profiles.js';
 import { SidecarRegistry } from './registry.js';
 import { InMemoryFileSystem } from '../system/InMemoryFileSystem.js';
