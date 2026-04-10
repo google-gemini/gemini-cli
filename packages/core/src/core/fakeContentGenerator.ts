@@ -12,8 +12,7 @@ import {
   EmbedContentResponse,
   type EmbedContentParameters,
 } from '@google/genai';
-import { createReadStream } from 'node:fs';
-import { createInterface } from 'node:readline';
+import { promises } from 'node:fs';
 import type { ContentGenerator } from './contentGenerator.js';
 import type { UserTierId, GeminiUserTier } from '../code_assist/types.js';
 import { safeJsonStringify } from '../utils/safeJsonStringify.js';
@@ -37,23 +36,6 @@ export type FakeResponse =
       response: EmbedContentResponse;
     };
 
-function isFakeResponse(value: unknown): value is FakeResponse {
-  if (typeof value !== 'object' || value === null) {
-    return false;
-  }
-  const candidate = value as Partial<FakeResponse>;
-  return (
-    typeof candidate.method === 'string' &&
-    [
-      'generateContent',
-      'generateContentStream',
-      'countTokens',
-      'embedContent',
-    ].includes(candidate.method) &&
-    'response' in candidate
-  );
-}
-
 // A ContentGenerator that responds with canned responses.
 //
 // Typically these would come from a file, provided by the `--fake-responses`
@@ -67,23 +49,12 @@ export class FakeContentGenerator implements ContentGenerator {
   constructor(private readonly responses: FakeResponse[]) {}
 
   static async fromFile(filePath: string): Promise<FakeContentGenerator> {
-    const responses: FakeResponse[] = [];
-    const fileStream = createReadStream(filePath);
-    const rl = createInterface({
-      input: fileStream,
-      crlfDelay: Infinity,
-    });
-
-    for await (const line of rl) {
-      if (line.trim() !== '') {
-        const parsed = JSON.parse(line) as unknown;
-        if (isFakeResponse(parsed)) {
-          responses.push(parsed);
-        } else {
-          throw new Error(`Invalid fake response: ${line}`);
-        }
-      }
-    }
+    const fileContent = await promises.readFile(filePath, 'utf-8');
+    const responses = fileContent
+      .split('\n')
+      .filter((line) => line.trim() !== '')
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
+      .map((line) => JSON.parse(line) as FakeResponse);
     return new FakeContentGenerator(responses);
   }
 

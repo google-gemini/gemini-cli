@@ -9,8 +9,7 @@ import {
   FakeContentGenerator,
   type FakeResponse,
 } from './fakeContentGenerator.js';
-import { createReadStream } from 'node:fs';
-import { Readable } from 'node:stream';
+import { promises } from 'node:fs';
 import {
   GenerateContentResponse,
   type CountTokensResponse,
@@ -19,18 +18,20 @@ import {
   type CountTokensParameters,
   type EmbedContentParameters,
 } from '@google/genai';
-import type { ReadStream } from 'node:fs';
 import { LlmRole } from '../telemetry/types.js';
 
 vi.mock('node:fs', async (importOriginal) => {
   const actual = await importOriginal<typeof import('node:fs')>();
   return {
     ...actual,
-    createReadStream: vi.fn(),
+    promises: {
+      ...actual.promises,
+      readFile: vi.fn(),
+    },
   };
 });
 
-const mockCreateReadStream = vi.mocked(createReadStream);
+const mockReadFile = vi.mocked(promises.readFile);
 
 describe('FakeContentGenerator', () => {
   const fakeGenerateContentResponse: FakeResponse = {
@@ -173,9 +174,7 @@ describe('FakeContentGenerator', () => {
   describe('fromFile', () => {
     it('should create a generator from a file', async () => {
       const fileContent = JSON.stringify(fakeGenerateContentResponse) + '\n';
-      mockCreateReadStream.mockReturnValue(
-        Readable.from([fileContent]) as unknown as ReadStream,
-      );
+      mockReadFile.mockResolvedValue(fileContent);
 
       const generator = await FakeContentGenerator.fromFile('fake-path.json');
       const response = await generator.generateContent(

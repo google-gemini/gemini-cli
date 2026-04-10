@@ -260,7 +260,8 @@ export class MemoryTestHarness {
           `  Baseline:  ${formatMB(result.baseline.heapUsedBytes)} heap used\n` +
           `  Delta:     ${deltaPercent.toFixed(1)}% (tolerance: ${tolerance}%)\n` +
           `  Peak heap: ${formatMB(result.peakHeapUsed)}\n` +
-          `  Peak RSS:  ${formatMB(result.peakRss)}`,
+          `  Peak RSS:  ${formatMB(result.peakRss)}\n` +
+          `  Peak External:  ${formatMB(result.peakExternal)}`,
       );
     }
   }

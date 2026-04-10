@@ -11,11 +11,12 @@ import { fileURLToPath } from 'node:url';
 import {
   createWriteStream,
   copyFileSync,
+  readFileSync,
   existsSync,
   mkdirSync,
   rmSync,
 } from 'node:fs';
-import { randomBytes, randomUUID } from 'node:crypto';
+import { randomUUID } from 'node:crypto';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const BASELINES_PATH = join(__dirname, 'baselines.json');
@@ -24,10 +25,6 @@ const TOLERANCE_PERCENT = 10;
 
 // Fake API key for tests using fake responses
 const TEST_ENV = { GEMINI_API_KEY: 'fake-memory-test-key' };
-
-// Numbers for the large chat scenarios
-const MSG_PAYLOAD_SIZE = 1.15 * 1024 * 1024; // 1.15MB
-const LARGE_CHAT_MSG_NUM = 1400; // 1400 turns * ~1.15 MB per response = ~1.61GB
 
 describe('Memory Usage Tests', () => {
   let harness: MemoryTestHarness;
@@ -199,17 +196,23 @@ describe('Memory Usage Tests', () => {
     let sharedResumeResponsesPath: string;
     let sharedActiveResponsesPath: string;
     let sharedHistoryPath: string;
+    let sharedPrompts: string;
     let tempDir: string;
 
     beforeAll(async () => {
       tempDir = join(__dirname, `large-chat-tmp-${randomUUID()}`);
       mkdirSync(tempDir, { recursive: true });
 
-      const { resumeResponsesPath, activeResponsesPath, historyPath } =
-        await generateSharedLargeChatData(tempDir);
+      const {
+        resumeResponsesPath,
+        activeResponsesPath,
+        historyPath,
+        prompts,
+      } = await generateSharedLargeChatData(tempDir);
       sharedActiveResponsesPath = activeResponsesPath;
       sharedResumeResponsesPath = resumeResponsesPath;
       sharedHistoryPath = historyPath;
+      sharedPrompts = prompts;
     }, 60000);
 
     afterAll(() => {
@@ -231,14 +234,8 @@ describe('Memory Usage Tests', () => {
       const result = await harness.runScenario(
         'large-chat',
         async (recordSnapshot) => {
-          const prompts = Array.from(
-            { length: LARGE_CHAT_MSG_NUM },
-            (_, i) => `prompt ${i}`,
-          );
-          const stdinContent = prompts.join('\n');
-
           await rig.run({
-            stdin: stdinContent,
+            stdin: sharedPrompts,
             timeout: 600000, // 10 minutes
             env: TEST_ENV,
           });
@@ -355,93 +352,153 @@ async function generateSharedLargeChatData(tempDir: string) {
   const resumeResponsesPath = join(tempDir, 'large-chat-resume-chat.responses');
   const activeResponsesPath = join(tempDir, 'large-chat-active-chat.responses');
   const historyPath = join(tempDir, 'large-chat-history.json');
+  const sourceSessionPath = join(__dirname, 'large-chat-session.json');
 
-  if (
-    existsSync(resumeResponsesPath) &&
-    existsSync(activeResponsesPath) &&
-    existsSync(historyPath)
-  ) {
-    return { resumeResponsesPath, activeResponsesPath, historyPath };
-  }
+  const session = JSON.parse(readFileSync(sourceSessionPath, 'utf8'));
+  const messages = session.messages;
 
-  const baseString = randomBytes(Math.ceil(MSG_PAYLOAD_SIZE * 0.75))
-    .toString('base64')
-    .slice(0, MSG_PAYLOAD_SIZE);
+  copyFileSync(sourceSessionPath, historyPath);
 
-  const resumeResponsesStream = createWriteStream(resumeResponsesPath);
+  // Generate fake responses for active chat
+  const promptsList: string[] = [];
   const activeResponsesStream = createWriteStream(activeResponsesPath);
-  const historyStream = createWriteStream(historyPath);
+  const complexityResponse = {
+    method: 'generateContent',
+    response: {
+      candidates: [
+        {
+          content: {
+            parts: [
+              { text: '{"complexity_reasoning":"simple","complexity_score":1}' },
+            ],
+            role: 'model',
+          },
+          finishReason: 'STOP',
+          index: 0,
+        },
+      ],
+    },
+  };
+  const summaryResponse = {
+    method: 'generateContent',
+    response: {
+      candidates: [
+        {
+          content: {
+            parts: [
+              { text: '{"originalSummary":"large chat summary","events":[]}' },
+            ],
+            role: 'model',
+          },
+          finishReason: 'STOP',
+          index: 0,
+        },
+      ],
+    },
+  };
 
-  historyStream.write(`{
-  "sessionId": "large-chat-session",
-  "projectHash": "test-project-hash",
-  "startTime": "${new Date().toISOString()}",
-  "lastUpdated": "${new Date().toISOString()}",
-  "summary": "A very large chat session",
-  "kind": "main",
-  "messages": [\n`);
+  for (let i = 0; i < messages.length; i++) {
+    const msg = messages[i];
+    if (msg.type === 'user') {
+      promptsList.push(msg.content[0].text);
 
-  for (let i = 0; i < LARGE_CHAT_MSG_NUM; i++) {
-    const prompt = `prompt ${i}`;
-    const response = `${baseString} - response ${i}`;
+      // Start of a new turn
+      activeResponsesStream.write(JSON.stringify(complexityResponse) + '\n');
 
-    historyStream.write(
-      JSON.stringify({
-        id: `msg-user-${i}`,
-        role: 'user',
-        parts: [{ text: prompt }],
-        timestamp: new Date().toISOString(),
-        type: 'user',
-      }) + '\n',
-    );
+      // Find all subsequent gemini messages until the next user message
+      let j = i + 1;
+      while (j < messages.length && messages[j].type === 'gemini') {
+        const geminiMsg = messages[j];
+        const parts: any[] = [];
+        if (geminiMsg.content) {
+          parts.push({ text: geminiMsg.content });
+        }
+        if (geminiMsg.toolCalls) {
+          for (const tc of geminiMsg.toolCalls) {
+            parts.push({
+              functionCall: {
+                name: tc.name,
+                args: tc.args,
+              },
+            });
+          }
+        }
 
-    historyStream.write(
-      JSON.stringify({
-        id: `msg-model-${i}`,
-        role: 'model',
-        parts: [{ text: response }],
-        timestamp: new Date().toISOString(),
-        type: 'gemini',
-      }) + '\n',
-    );
-
-    historyStream.write(`  ]\n}\n`);
-
-    activeResponsesStream.write(
-      `{"method":"generateContent","response":{"candidates":[{"content":{"parts":[{"text":"{\\"complexity_reasoning\\":\\"simple\\",\\"complexity_score\\":1}"}],"role":"model"},"finishReason":"STOP","index":0}]}}\n`,
-    );
-    activeResponsesStream.write(
-      `{"method":"generateContentStream","response":[{"candidates":[{"content":{"parts":[{"text":"${response}"}],"role":"model"},"finishReason":"STOP","index":0}],"usageMetadata":{"promptTokenCount":5,"candidatesTokenCount":10,"totalTokenCount":15,"promptTokensDetails":[{"modality":"TEXT","tokenCount":5}]}}]}\n`,
-    );
-    activeResponsesStream.write(
-      `{"method":"generateContent","response":{"candidates":[{"content":{"parts":[{"text":"{\\"originalSummary\\":\\"large chat summary\\",\\"events\\":[]}"}],"role":"model"},"finishReason":"STOP","index":0}]}}\n`,
-    );
+        activeResponsesStream.write(
+          JSON.stringify({
+            method: 'generateContentStream',
+            response: [
+              {
+                candidates: [
+                  {
+                    content: { parts, role: 'model' },
+                    finishReason: 'STOP',
+                    index: 0,
+                  },
+                ],
+                usageMetadata: {
+                  promptTokenCount: 100,
+                  candidatesTokenCount: 100,
+                  totalTokenCount: 200,
+                  promptTokensDetails: [{ modality: 'TEXT', tokenCount: 100 }],
+                },
+              },
+            ],
+          }) + '\n',
+        );
+        j++;
+      }
+      // End of turn
+      activeResponsesStream.write(JSON.stringify(summaryResponse) + '\n');
+      // Skip the gemini messages we just processed
+      i = j - 1;
+    }
   }
-
-  // Generate a few short responses for the resume tests
-  resumeResponsesStream.write(
-    `{"method":"generateContent","response":{"candidates":[{"content":{"parts":[{"text":"{\\"complexity_reasoning\\":\\"simple\\",\\"complexity_score\\":1}"}],"role":"model"},"finishReason":"STOP","index":0}]}}\n`,
-  );
-  resumeResponsesStream.write(
-    `{"method":"generateContentStream","response":[{"candidates":[{"content":{"parts":[{"text":"Hello!"}],"role":"model"},"finishReason":"STOP","index":0}],"usageMetadata":{"promptTokenCount":5,"candidatesTokenCount":10,"totalTokenCount":15,"promptTokensDetails":[{"modality":"TEXT","tokenCount":5}]}}]}\n`,
-  );
-  resumeResponsesStream.write(
-    `{"method":"generateContent","response":{"candidates":[{"content":{"parts":[{"text":"{\\"originalSummary\\":\\"large chat summary\\",\\"events\\":[]}"}],"role":"model"},"finishReason":"STOP","index":0}]}}\n`,
-  );
-
-  resumeResponsesStream.end();
   activeResponsesStream.end();
-  historyStream.end();
 
-  await Promise.all(
-    [resumeResponsesStream, activeResponsesStream, historyStream].map(
-      (stream) =>
-        new Promise((resolve, reject) => {
-          stream.on('finish', resolve);
-          stream.on('error', reject);
-        }),
-    ),
-  );
+  // Generate responses for resumed chat
+  const resumeResponsesStream = createWriteStream(resumeResponsesPath);
+  for (let i = 0; i < 5; i++) {
+    resumeResponsesStream.write(JSON.stringify(complexityResponse) + '\n');
+    resumeResponsesStream.write(
+      JSON.stringify({
+        method: 'generateContentStream',
+        response: [
+          {
+            candidates: [
+              {
+                content: {
+                  parts: [{ text: `Resume response ${i}` }],
+                  role: 'model',
+                },
+                finishReason: 'STOP',
+                index: 0,
+              },
+            ],
+            usageMetadata: {
+              promptTokenCount: 10,
+              candidatesTokenCount: 10,
+              totalTokenCount: 20,
+              promptTokensDetails: [{ modality: 'TEXT', tokenCount: 10 }],
+            },
+          },
+        ],
+      }) + '\n',
+    );
+    resumeResponsesStream.write(JSON.stringify(summaryResponse) + '\n');
+  }
+  resumeResponsesStream.end();
 
-  return { resumeResponsesPath, activeResponsesPath, historyPath };
+  // Wait for streams to finish
+  await Promise.all([
+    new Promise((res) => activeResponsesStream.on('finish', res)),
+    new Promise((res) => resumeResponsesStream.on('finish', res)),
+  ]);
+
+  return {
+    resumeResponsesPath,
+    activeResponsesPath,
+    historyPath,
+    prompts: promptsList.join('\n'),
+  };
 }
