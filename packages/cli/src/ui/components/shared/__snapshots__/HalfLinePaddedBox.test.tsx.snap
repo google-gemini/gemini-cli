@@ -1,9 +1,9 @@
 // Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
 
-exports[`<HalfLinePaddedBox /> > renders iTerm2-specific blocks when iTerm2 is detected 1`] = `
-"▄▄▄▄▄▄▄▄▄▄
+exports[`<HalfLinePaddedBox /> > renders Apple Terminal-specific blocks when detected 1`] = `
+"▀▀▀▀▀▀▀▀▀▀
 Content   
-▀▀▀▀▀▀▀▀▀▀
+▄▄▄▄▄▄▄▄▄▄
 "
 `;
 
@@ -17,7 +17,7 @@ exports[`<HalfLinePaddedBox /> > renders nothing when useBackgroundColor is fals
 "
 `;
 
-exports[`<HalfLinePaddedBox /> > renders standard background and blocks when not iTerm2 1`] = `
+exports[`<HalfLinePaddedBox /> > renders standard background and blocks when not Apple Terminal 1`] = `
 "▄▄▄▄▄▄▄▄▄▄
 Content   
 ▀▀▀▀▀▀▀▀▀▀

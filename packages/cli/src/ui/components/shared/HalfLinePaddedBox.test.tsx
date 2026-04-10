@@ -8,7 +8,7 @@ import { renderWithProviders } from '../../../test-utils/render.js';
 import { HalfLinePaddedBox } from './HalfLinePaddedBox.js';
 import { Text, useIsScreenReaderEnabled } from 'ink';
 import { describe, it, expect, vi, afterEach } from 'vitest';
-import { isITerm2 } from '../../utils/terminalUtils.js';
+import { isAppleTerminal } from '@google/gemini-cli-core';
 
 vi.mock('ink', async () => {
   const actual = await vi.importActual('ink');
@@ -18,15 +18,24 @@ vi.mock('ink', async () => {
   };
 });
 
+vi.mock('@google/gemini-cli-core', async () => {
+  const actual = await vi.importActual('@google/gemini-cli-core');
+  return {
+    ...actual,
+    isAppleTerminal: vi.fn(() => false),
+  };
+});
+
 describe('<HalfLinePaddedBox />', () => {
   const mockUseIsScreenReaderEnabled = vi.mocked(useIsScreenReaderEnabled);
+  const mockIsAppleTerminal = vi.mocked(isAppleTerminal);
 
   afterEach(() => {
     vi.restoreAllMocks();
   });
 
-  it('renders standard background and blocks when not iTerm2', async () => {
-    vi.mocked(isITerm2).mockReturnValue(false);
+  it('renders standard background and blocks when not Apple Terminal', async () => {
+    mockIsAppleTerminal.mockReturnValue(false);
 
     const { lastFrame, unmount } = await renderWithProviders(
       <HalfLinePaddedBox backgroundBaseColor="blue" backgroundOpacity={0.5}>
@@ -40,8 +49,8 @@ describe('<HalfLinePaddedBox />', () => {
     unmount();
   });
 
-  it('renders iTerm2-specific blocks when iTerm2 is detected', async () => {
-    vi.mocked(isITerm2).mockReturnValue(true);
+  it('renders Apple Terminal-specific blocks when detected', async () => {
+    mockIsAppleTerminal.mockReturnValue(true);
 
     const { lastFrame, unmount } = await renderWithProviders(
       <HalfLinePaddedBox backgroundBaseColor="blue" backgroundOpacity={0.5}>

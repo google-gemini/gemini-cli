@@ -67,7 +67,11 @@ export function isDumbTerminal(): boolean {
  * Detects if the current terminal is the default Apple Terminal.app.
  */
 export function isAppleTerminal(): boolean {
-  return process.env['TERM_PROGRAM'] === 'Apple_Terminal';
+  return (
+    process.env['TERM_PROGRAM'] === 'Apple_Terminal' ||
+    process.env['LC_TERMINAL'] === 'Apple_Terminal' ||
+    process.env['LC_TERM_PROGRAM'] === 'Apple_Terminal'
+  );
 }
 
 /**

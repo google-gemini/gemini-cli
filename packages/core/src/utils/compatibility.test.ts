@@ -13,6 +13,7 @@ import {
   isGnuScreen,
   isLowColorTmux,
   isDumbTerminal,
+  isAppleTerminal,
   supports256Colors,
   supportsTrueColor,
   getCompatibilityWarnings,
@@ -166,6 +167,30 @@ describe('compatibility', () => {
     it('should return false when TERM=xterm', () => {
       vi.stubEnv('TERM', 'xterm');
       expect(isDumbTerminal()).toBe(false);
+    });
+  });
+
+  describe('isAppleTerminal', () => {
+    it('should return true when TERM_PROGRAM=Apple_Terminal', () => {
+      vi.stubEnv('TERM_PROGRAM', 'Apple_Terminal');
+      expect(isAppleTerminal()).toBe(true);
+    });
+
+    it('should return true when LC_TERMINAL=Apple_Terminal', () => {
+      vi.stubEnv('LC_TERMINAL', 'Apple_Terminal');
+      expect(isAppleTerminal()).toBe(true);
+    });
+
+    it('should return true when LC_TERM_PROGRAM=Apple_Terminal', () => {
+      vi.stubEnv('LC_TERM_PROGRAM', 'Apple_Terminal');
+      expect(isAppleTerminal()).toBe(true);
+    });
+
+    it('should return false when no Apple Terminal env vars are set', () => {
+      vi.stubEnv('TERM_PROGRAM', 'xterm');
+      vi.stubEnv('LC_TERMINAL', '');
+      vi.stubEnv('LC_TERM_PROGRAM', '');
+      expect(isAppleTerminal()).toBe(false);
     });
   });
 
