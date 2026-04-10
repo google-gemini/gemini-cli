@@ -80,7 +80,6 @@
     },
     "glob": "^12.0.0",
     "node-domexception": "npm:empty@^0.10.1",
-    "prebuild-install": "npm:nop@1.0.0",
     "cross-spawn": "^7.0.6",
     "minimatch": "^10.2.2"
   },
@@ -150,13 +149,13 @@
     "simple-git": "^3.28.0"
   },
   "optionalDependencies": {
+    "@github/keytar": "^7.9.0",
     "@lydell/node-pty": "1.1.0",
     "@lydell/node-pty-darwin-arm64": "1.1.0",
     "@lydell/node-pty-darwin-x64": "1.1.0",
     "@lydell/node-pty-linux-x64": "1.1.0",
     "@lydell/node-pty-win32-arm64": "1.1.0",
     "@lydell/node-pty-win32-x64": "1.1.0",
-    "keytar": "^7.9.0",
     "node-pty": "^1.0.0"
   },
   "lint-staged": {
