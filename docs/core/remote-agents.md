@@ -430,7 +430,7 @@ both behind auth.
 
 ## Managing Subagents
 
-Users can manage subagents using the following commands within the Gemini CLI:
+Users can manage subagents using the following commands within Gemini CLI:
 
 - `/agents list`: Displays all available local and remote subagents.
 - `/agents reload`: Reloads the agent registry. Use this after adding or
