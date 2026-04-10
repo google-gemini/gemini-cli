@@ -158,12 +158,28 @@ export function renderFinalShell(
   basePrompt: string,
   userMemory?: string | HierarchicalMemory,
   contextFilenames?: string[],
+  persistentMemory?: string,
 ): string {
   return `
 ${basePrompt.trim()}
 
 ${renderUserMemory(userMemory, contextFilenames)}
+
+${renderPersistentMemory(persistentMemory)}
 `.trim();
+}
+
+/**
+ * Renders the persistent memory section.
+ * This is separate from GEMINI.md and contains user preferences, feedback, and project context.
+ */
+export function renderPersistentMemory(memory?: string): string {
+  if (!memory || memory.trim().length === 0) return '';
+  return `
+# auto memory
+
+${memory.trim()}
+`;
 }
 
 // --- Subsection Renderers ---

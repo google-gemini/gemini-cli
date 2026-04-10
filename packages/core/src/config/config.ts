@@ -135,6 +135,7 @@ import type { AnyToolInvocation, AnyDeclarativeTool } from '../tools/tools.js';
 import { WorkspaceContext } from '../utils/workspaceContext.js';
 import { getWorkspaceContextOverride } from './scoped-config.js';
 import { Storage } from './storage.js';
+import { SessionLogger } from '../services/sessionLogger.js';
 import type { ShellExecutionConfig } from '../services/shellExecutionService.js';
 import { FileExclusions } from '../utils/ignorePatterns.js';
 import { MessageBus } from '../confirmation-bus/message-bus.js';
@@ -774,6 +775,7 @@ export class Config implements McpContext, AgentLoopContext {
   private mcpServers: Record<string, MCPServerConfig> | undefined;
   private readonly mcpEnablementCallbacks?: McpEnablementCallbacks;
   private userMemory: string | HierarchicalMemory;
+  private persistentMemory: string | undefined;
   private geminiMdFileCount: number;
   private geminiMdFilePaths: string[];
   private readonly showMemoryUsage: boolean;
@@ -1390,6 +1392,17 @@ export class Config implements McpContext, AgentLoopContext {
    * Dedups initialization requests using a shared promise that is only resolved
    * once.
    */
+  private _sessionLogger?: SessionLogger;
+
+  getSessionLogger(): SessionLogger {
+    if (!this._sessionLogger) {
+      this._sessionLogger = SessionLogger.create(
+        this.storage.getSessionLogDir(),
+      );
+    }
+    return this._sessionLogger;
+  }
+
   async initialize(): Promise<void> {
     if (this.initPromise) {
       return this.initPromise;
@@ -2351,6 +2364,45 @@ export class Config implements McpContext, AgentLoopContext {
 
   setUserMemory(newUserMemory: string | HierarchicalMemory): void {
     this.userMemory = newUserMemory;
+  }
+
+  /**
+   * Gets the persistent memory content.
+   * Persistent memory is separate from GEMINI.md and contains user preferences,
+   * feedback, project context, and reference information.
+   */
+  getPersistentMemory(): string | undefined {
+    return this.persistentMemory;
+  }
+
+  /**
+   * Sets the persistent memory content.
+   */
+  setPersistentMemory(memory: string | undefined): void {
+    this.persistentMemory = memory;
+  }
+
+  /**
+   * Loads the persistent memory from the memory directory.
+   * This should be called during initialization.
+   */
+  async loadPersistentMemory(): Promise<void> {
+    const { loadMemoryDirectory, buildMemoryPrompt } = await import(
+      '../memory/index.js'
+    );
+    try {
+      const result = await loadMemoryDirectory(this.getWorkingDir());
+      if (result.files.length > 0 || result.indexContent) {
+        this.persistentMemory = buildMemoryPrompt(
+          result.memoryDir,
+          result.files,
+          result.indexContent,
+        );
+      }
+    } catch {
+      // Memory directory may not exist yet, that's fine
+      this.persistentMemory = undefined;
+    }
   }
 
   /**

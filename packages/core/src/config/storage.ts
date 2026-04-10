@@ -414,6 +414,14 @@ export class Storage {
     return path.join(this.getExtensionsDir(), 'gemini-extension.json');
   }
 
+  /**
+   * Returns the directory for session log files (JSONL daily logs).
+   * Used by the SessionLogger for persistent turn-level logging.
+   */
+  getSessionLogDir(): string {
+    return path.join(this.getProjectTempDir(), 'session-logs');
+  }
+
   getHistoryFilePath(): string {
     return path.join(this.getProjectTempDir(), 'shell_history');
   }

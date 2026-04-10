@@ -894,7 +894,7 @@ export async function loadCliConfig(
     enabled: useContextManagement || useGeneralistProfile,
   };
 
-  return new Config({
+  const configObj = new Config({
     acpMode: isAcpMode,
     clientName,
     sessionId,
@@ -1049,6 +1049,11 @@ export async function loadCliConfig(
     },
     enableConseca: settings.security?.enableConseca,
   });
+
+  // Load persistent memory after config is created
+  await configObj.loadPersistentMemory();
+
+  return configObj;
 }
 
 function mergeExcludeTools(
