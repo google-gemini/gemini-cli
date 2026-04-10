@@ -79,6 +79,7 @@ describe('LocalSubagentInvocation', () => {
     mockExecutorInstance = {
       run: vi.fn(),
       definition: testDefinition,
+      agentId: 'test-agent-id',
     } as unknown as Mocked<LocalAgentExecutor<z.ZodUnknown>>;
 
     MockLocalAgentExecutor.create.mockResolvedValue(
