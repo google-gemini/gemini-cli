@@ -13,6 +13,7 @@ import { RewindViewer } from '../components/RewindViewer.js';
 import { type HistoryItem } from '../types.js';
 import { convertSessionToHistoryFormats } from '../hooks/useSessionBrowser.js';
 import { revertFileChanges } from '../utils/rewindFileOps.js';
+import { stripReferenceContent } from '../utils/formatters.js';
 import { RewindOutcome } from '../components/RewindConfirmation.js';
 import type { Content } from '@google/genai';
 import {
@@ -21,6 +22,7 @@ import {
   debugLogger,
   logRewind,
   RewindEvent,
+  partToString,
   type ChatRecordingService,
   type GeminiClient,
   convertSessionToClientHistory,
@@ -36,6 +38,7 @@ import {
  * @param recordingService The chat recording service.
  * @param messageId The ID of the message to rewind to.
  * @param newText The new text for the input field after rewinding.
+ * @returns True if the rewind succeeded, false otherwise.
  */
 async function rewindConversation(
   context: CommandContext,
@@ -43,7 +46,7 @@ async function rewindConversation(
   recordingService: ChatRecordingService,
   messageId: string,
   newText: string,
-) {
+): Promise<boolean> {
   try {
     const conversation = recordingService.rewindTo(messageId);
     if (!conversation) {
@@ -51,7 +54,7 @@ async function rewindConversation(
       debugLogger.error(errorMsg);
       context.ui.removeComponent();
       coreEvents.emitFeedback('error', errorMsg);
-      return;
+      return false;
     }
 
     // Convert to UI and Client formats
@@ -81,6 +84,7 @@ async function rewindConversation(
 
     // 2. Load the rewound history and set the input
     context.ui.loadHistory(historyWithIds, newText);
+    return true;
   } catch (error) {
     // If an error occurs, we still want to remove the component if possible
     context.ui.removeComponent();
@@ -88,6 +92,7 @@ async function rewindConversation(
       'error',
       error instanceof Error ? error.message : 'Unknown error during rewind',
     );
+    return false;
   }
 }
 
@@ -168,14 +173,29 @@ export const rewindCommand: SlashCommand = {
         };
       }
 
+      // Extract prompt text to restore in input buffer (matching TUI behavior)
+      const userPrompt = userMessages[resolvedIndex];
+      const contentToUse = userPrompt.displayContent || userPrompt.content;
+      const originalUserText = contentToUse ? partToString(contentToUse) : '';
+      const cleanedText = userPrompt.displayContent
+        ? originalUserText
+        : stripReferenceContent(originalUserText);
+
       logRewind(config, new RewindEvent(RewindOutcome.RewindOnly));
-      await rewindConversation(
+      const success = await rewindConversation(
         context,
         client,
         recordingService,
         userMessages[resolvedIndex].id,
-        '',
+        cleanedText,
       );
+      if (!success) {
+        return {
+          type: 'message',
+          messageType: 'error',
+          content: 'Rewind failed. Check the debug console for details.',
+        };
+      }
       return {
         type: 'message',
         messageType: 'info',

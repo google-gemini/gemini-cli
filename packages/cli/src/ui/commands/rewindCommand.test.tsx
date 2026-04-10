@@ -419,6 +419,13 @@ describe('rewindCommand', () => {
       expect(result).toHaveProperty('messageType', 'error');
     });
 
+    it('should return error when rewind fails', async () => {
+      mockRewindTo.mockReturnValue(null);
+      const result = await rewindCommand.action!(mockContext, '1');
+      expect(mockRewindTo).toHaveBeenCalledWith('user-1');
+      expect(result).toHaveProperty('messageType', 'error');
+    });
+
     it('should open TUI when no argument is provided', async () => {
       const result = await rewindCommand.action!(mockContext, '');
       expect(mockRewindTo).not.toHaveBeenCalled();
