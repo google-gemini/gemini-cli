@@ -920,7 +920,7 @@ export const ToolConfirmationMessage: React.FC<
     ) => {
       if (item.value === ToolConfirmationOutcome.ProceedAlwaysAndSave) {
         return (
-          <Text color={titleColor} wrap="truncate">
+          <Text color={titleColor} wrap="wrap">
             {item.label}{' '}
             <Text color={theme.text.secondary}>
               ~/.gemini/policies/auto-saved.toml
@@ -929,7 +929,7 @@ export const ToolConfirmationMessage: React.FC<
         );
       }
       return (
-        <Text color={titleColor} wrap="truncate">
+        <Text color={titleColor} wrap="wrap">
           {item.label}
         </Text>
       );
