@@ -41,6 +41,19 @@ function isFileDiffResult(value: unknown): value is FileDiffResult {
   );
 }
 
+function isAnsiOutput(value: unknown): value is AnsiOutput {
+  return Array.isArray(value) && value.every(Array.isArray);
+}
+
+function isFileDiffResult(value: unknown): value is FileDiffResult {
+  return (
+    typeof value === 'object' &&
+    value !== null &&
+    'fileDiff' in value &&
+    'fileName' in value
+  );
+}
+
 export interface ToolResultDisplayProps {
   resultDisplay: string | object | undefined;
   availableTerminalHeight?: number;
@@ -164,6 +177,8 @@ export const ToolResultDisplay: React.FC<ToolResultDisplayProps> = ({
         <DiffRenderer
           diffContent={contentData.fileDiff}
           filename={contentData.fileName}
+          diffContent={contentData.fileDiff}
+          filename={contentData.fileName}
           availableTerminalHeight={availableHeight}
           terminalWidth={childWidth}
         />
@@ -175,6 +190,7 @@ export const ToolResultDisplay: React.FC<ToolResultDisplayProps> = ({
 
       content = (
         <AnsiOutputText
+          data={contentData}
           data={contentData}
           availableTerminalHeight={
             isAlternateBuffer ? undefined : availableHeight

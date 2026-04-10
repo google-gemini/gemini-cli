@@ -754,5 +754,6 @@ function VirtualizedList<T>(
 }
 
 export { VirtualizedList };
+export { VirtualizedList };
 
 VirtualizedList.displayName = 'VirtualizedList';

@@ -43,9 +43,11 @@ interface ScrollableListProps<T> extends VirtualizedListProps<T> {
 export type ScrollableListRef<T> = VirtualizedListRef<T>;
 
 function ScrollableList<T>(props: ScrollableListProps<T>) {
+function ScrollableList<T>(props: ScrollableListProps<T>) {
   const keyMatchers = useKeyMatchers();
   const { hasFocus, width, scrollbar = true, stableScrollback } = props;
   const virtualizedListRef = useRef<VirtualizedListRef<T>>(null);
+  const containerRef = useRef<DOMElement | null>(null);
   const containerRef = useRef<DOMElement | null>(null);
 
   useImperativeHandle(
@@ -235,6 +237,7 @@ function ScrollableList<T>(props: ScrollableListProps<T>) {
   const scrollableEntry = useMemo(
     () => ({
       ref: containerRef,
+      ref: containerRef,
       getScrollState,
       scrollBy: scrollByWithAnimation,
       scrollTo: smoothScrollTo,
@@ -265,4 +268,5 @@ function ScrollableList<T>(props: ScrollableListProps<T>) {
   );
 }
 
+export { ScrollableList };
 export { ScrollableList };
