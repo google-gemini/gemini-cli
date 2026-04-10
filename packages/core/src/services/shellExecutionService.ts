@@ -630,7 +630,7 @@ export class ShellExecutionService {
         }
 
         if (isStreamingRawContent && sniffedBytes < MAX_SNIFF_SIZE) {
-          const sniffBuffer = Buffer.concat(state.sniffChunks.slice(0, 20));
+          const sniffBuffer = Buffer.concat(state.sniffChunks);
           sniffedBytes = sniffBuffer.length;
 
           if (isBinary(sniffBuffer)) {
@@ -1094,7 +1094,7 @@ export class ShellExecutionService {
               }
 
               if (isStreamingRawContent && sniffedBytes < MAX_SNIFF_SIZE) {
-                const sniffBuffer = Buffer.concat(sniffChunks.slice(0, 20));
+                const sniffBuffer = Buffer.concat(sniffChunks);
                 sniffedBytes = sniffBuffer.length;
 
                 if (isBinary(sniffBuffer)) {
