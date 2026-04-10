@@ -45,10 +45,10 @@ export class PipelineOrchestrator {
   }
 
   private setupTriggers() {
-    const bindTriggers = (
-      pipelines: PipelineDef[] | AsyncPipelineDef[],
+    const bindTriggers = <P extends PipelineDef | AsyncPipelineDef>(
+      pipelines: P[],
       executeFn: (
-        pipeline: PipelineDef | AsyncPipelineDef,
+        pipeline: P,
         nodes: readonly ConcreteNode[],
         targets: ReadonlySet<string>,
         protectedIds: ReadonlySet<string>,
@@ -78,9 +78,8 @@ export class PipelineOrchestrator {
     };
 
     bindTriggers(this.pipelines, (pipeline, nodes, targets, protectedIds) => {
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
       void this.executePipelineAsync(
-        pipeline as PipelineDef,
+        pipeline,
         nodes,
         new Set(targets),
         new Set(protectedIds),

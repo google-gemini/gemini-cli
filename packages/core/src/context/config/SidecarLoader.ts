@@ -52,7 +52,11 @@ export class SidecarLoader {
       );
     }
 
-    // Extract strictly what we need since we just validated it.
+    // Extract strictly what we need.
+    // Why this unsafe cast is acceptable:
+    // SchemaValidator just ran \`getSidecarConfigSchema(registry)\` against \`parsed\`.
+    // That function dynamically maps the \`processorOptions\` to strict JSON schema definitions,
+    // so we know with absolute certainty at runtime that \`parsed\` conforms to this shape.
     // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
     const validConfig = parsed as {
       budget?: SidecarConfig['budget'];
