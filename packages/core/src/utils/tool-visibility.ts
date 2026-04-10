@@ -116,10 +116,7 @@ export function isVisibleInToolGroup(
   ctx: ToolVisibilityContext,
   errorVerbosity: 'full' | 'low',
 ): boolean {
-  // If it's never rendered in history, it shouldn't be rendered in the group
-  if (!isRenderedInHistory(ctx)) {
-    return false;
-  }
+  const displayName = ctx.displayName ?? ctx.name;
 
   // Hide internal errors unless the user explicitly requested full verbosity
   if (
@@ -130,9 +127,8 @@ export function isVisibleInToolGroup(
     return false;
   }
 
-  const displayName = ctx.displayName ?? ctx.name;
-
-  // We hide AskUser while it's in progress because it renders in its own modal
+  // We hide AskUser while it's in progress because it renders in its own modal.
+  // We also hide terminal states that don't meet history rendering criteria (e.g. errors without results).
   if (displayName === ASK_USER_DISPLAY_NAME) {
     switch (ctx.status) {
       case CoreToolCallStatus.Scheduled:
@@ -140,9 +136,22 @@ export function isVisibleInToolGroup(
       case CoreToolCallStatus.Executing:
       case CoreToolCallStatus.AwaitingApproval:
         return false;
+      case CoreToolCallStatus.Error:
+        return ctx.hasResult;
+      case CoreToolCallStatus.Success:
+        return true;
       default:
-        break;
+        return false;
     }
+  }
+
+  // In Plan Mode, edits are redundant because the plan shows the diffs.
+  if (
+    (displayName === WRITE_FILE_DISPLAY_NAME ||
+      displayName === EDIT_DISPLAY_NAME) &&
+    ctx.approvalMode === ApprovalMode.PLAN
+  ) {
+    return false;
   }
 
   // We hide confirming tools from the active group because they render in the

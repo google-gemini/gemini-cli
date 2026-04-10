@@ -107,9 +107,21 @@ describe('ToolVisibility Rules', () => {
   });
 
   describe('isVisibleInToolGroup', () => {
-    it('returns false if not rendered in history', () => {
+    it('shows tools with parents (agent tools)', () => {
       expect(
         isVisibleInToolGroup(createCtx({ parentCallId: 'parent-123' }), 'full'),
+      ).toBe(true);
+    });
+
+    it('hides WriteFile/Edit in Plan Mode', () => {
+      expect(
+        isVisibleInToolGroup(
+          createCtx({
+            displayName: WRITE_FILE_DISPLAY_NAME,
+            approvalMode: ApprovalMode.PLAN,
+          }),
+          'full',
+        ),
       ).toBe(false);
     });
 
