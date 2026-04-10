@@ -1336,6 +1336,10 @@ export class TestRig {
     return logs;
   }
 
+  readTelemetryLogs(): ParsedLog[] {
+    return this._readAndParseTelemetryLog();
+  }
+
   readToolLogs() {
     // For Podman, first check if telemetry file exists and has content
     // If not, fall back to parsing from stdout
