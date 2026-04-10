@@ -47,7 +47,7 @@ import type { ContentGenerator } from './contentGenerator.js';
 import { LoopDetectionService } from '../services/loopDetectionService.js';
 import { ChatCompressionService } from '../context/chatCompressionService.js';
 import { AgentHistoryProvider } from '../context/agentHistoryProvider.js';
-import type { WatcherProgress } from '../agents/types.js';
+import { isSubagentProgress, type WatcherProgress } from '../agents/types.js';
 import { WatcherReportSchema } from '../agents/watcher-agent.js';
 import { ideContextStore } from '../ide/ideContext.js';
 import {
@@ -1390,10 +1390,13 @@ export class GeminiClient {
       const invocation = watcherTool.build({ recentHistory });
       const result = await invocation.execute(signal);
 
-      if (result.llmContent) {
+      if (
+        isSubagentProgress(result.returnDisplay) &&
+        result.returnDisplay.result
+      ) {
         try {
-          const contentString = partListUnionToString(result.llmContent);
-          const parsed = WatcherReportSchema.parse(JSON.parse(contentString));
+          const rawOutput = result.returnDisplay.result;
+          const parsed = WatcherReportSchema.parse(JSON.parse(rawOutput));
 
           // Internally write the status report to avoid requiring user permission
           const projectTempDir = this.config.storage.getProjectTempDir();

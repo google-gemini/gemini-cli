@@ -11,7 +11,6 @@ import { GeminiClient } from './client.js';
 import { type AgentLoopContext } from '../config/agent-loop-context.js';
 import { makeFakeConfig } from '../test-utils/config.js';
 import { ApprovalMode } from '../policy/types.js';
-import type { WatcherProgress } from '../agents/types.js';
 import type { Config } from '../config/config.js';
 
 describe('GeminiClient Watcher Integration', () => {
@@ -57,25 +56,17 @@ describe('GeminiClient Watcher Integration', () => {
     }
   });
 
-  it('should trigger watcher periodically when enabled', async () => {
-    vi.spyOn(config, 'isExperimentalWatcherEnabled').mockReturnValue(true);
-    vi.spyOn(config, 'getExperimentalWatcherInterval').mockReturnValue(2);
-    vi.spyOn(config, 'getApprovalMode').mockReturnValue(ApprovalMode.DEFAULT);
-
-    // Mock toolRegistry before initialize calls startChat
-    const mockWatcherTool = {
+  const createMockWatcherTool = (resultData: unknown) => ({
       build: vi.fn().mockReturnValue({
         execute: vi.fn().mockResolvedValue({
-          llmContent: [
-            {
-              text: JSON.stringify({
-                userDirections: 'Keep testing',
-                progressSummary: 'Test in progress',
-                evaluation: 'Good',
-                feedback: 'Keep going',
-              } as WatcherProgress),
-            },
-          ],
+          llmContent: [{ text: 'Subagent finished' }],
+          returnDisplay: {
+            isSubagentProgress: true,
+            agentName: 'watcher',
+            recentActivity: [],
+            state: 'completed',
+            result: resultData ? JSON.stringify(resultData) : undefined,
+          },
         }),
       }),
       name: 'watcher',
@@ -88,7 +79,19 @@ describe('GeminiClient Watcher Integration', () => {
         outputName: 'report',
         schema: {},
       },
-    };
+    });
+
+  it('should trigger watcher periodically when enabled', async () => {
+    vi.spyOn(config, 'isExperimentalWatcherEnabled').mockReturnValue(true);
+    vi.spyOn(config, 'getExperimentalWatcherInterval').mockReturnValue(2);
+    vi.spyOn(config, 'getApprovalMode').mockReturnValue(ApprovalMode.DEFAULT);
+
+    const mockWatcherTool = createMockWatcherTool({
+      userDirections: 'Keep testing',
+      progressSummary: 'Test in progress',
+      evaluation: 'Good',
+      feedback: 'Keep going',
+    });
 
     const mockToolRegistry = {
       getFunctionDeclarations: vi.fn().mockReturnValue([]),
@@ -101,7 +104,6 @@ describe('GeminiClient Watcher Integration', () => {
       discoverAllTools: vi.fn(),
     };
 
-    // Use type assertion for testing purposes to access protected members
     const clientAccess = client as unknown as {
       context: AgentLoopContext;
     };
@@ -130,7 +132,7 @@ describe('GeminiClient Watcher Integration', () => {
       promptId,
     );
     for await (const _ of generator) {
-      // Intentionally consume
+      // consume
     }
 
     expect(mockWatcherTool.build).toHaveBeenCalled();
@@ -141,7 +143,6 @@ describe('GeminiClient Watcher Integration', () => {
     vi.spyOn(config, 'getExperimentalWatcherInterval').mockReturnValue(2);
     vi.spyOn(config, 'getApprovalMode').mockReturnValue(ApprovalMode.DEFAULT);
 
-    // Mock toolRegistry before initialize calls startChat
     const mockWatcherTool = {
       build: vi.fn(),
       name: 'watcher',
@@ -158,7 +159,6 @@ describe('GeminiClient Watcher Integration', () => {
       discoverAllTools: vi.fn(),
     };
 
-    // Use type assertion for testing purposes to access protected members
     const clientAccess = client as unknown as {
       context: AgentLoopContext;
     };
@@ -187,7 +187,7 @@ describe('GeminiClient Watcher Integration', () => {
       promptId,
     );
     for await (const _ of generator) {
-      // Intentionally consume
+      // consume
     }
 
     expect(mockWatcherTool.build).not.toHaveBeenCalled();
@@ -201,35 +201,12 @@ describe('GeminiClient Watcher Integration', () => {
     );
     vi.spyOn(config, 'getApprovalMode').mockReturnValue(ApprovalMode.DEFAULT);
 
-    const mockWatcherTool = {
-      build: vi.fn().mockReturnValue({
-        execute: vi.fn().mockResolvedValue({
-          llmContent: [
-            {
-              text: JSON.stringify({
-                userDirections: 'Keep testing',
-                progressSummary: 'Test in progress',
-                evaluation: 'Good',
-                feedback: 'Keep going',
-              } as WatcherProgress),
-            },
-          ],
-        }),
-      }),
-      name: 'watcher',
-      displayName: 'Watcher',
-      description: 'Watcher tool',
-      inputConfig: {
-        inputName: 'history',
-        description: 'history',
-        schema: {},
-      },
-      outputConfig: {
-        outputName: 'report',
-        description: 'report',
-        schema: {},
-      },
-    };
+    const mockWatcherTool = createMockWatcherTool({
+      userDirections: 'Keep testing',
+      progressSummary: 'Test in progress',
+      evaluation: 'Good',
+      feedback: 'Keep going',
+    });
 
     const mockToolRegistry = {
       getFunctionDeclarations: vi.fn().mockReturnValue([]),
@@ -242,7 +219,6 @@ describe('GeminiClient Watcher Integration', () => {
       discoverAllTools: vi.fn(),
     };
 
-    // Use type assertion for testing purposes to access protected members
     const clientAccess = client as unknown as {
       context: AgentLoopContext;
     };
