@@ -150,4 +150,11 @@ describe('MemoryManagerAgent', () => {
     const agent = MemoryManagerAgent(createMockConfig());
     expect(agent.modelConfig.model).toBe('flash');
   });
+
+  it('should declare workspaceDirectories containing the global .gemini directory', () => {
+    const agent = MemoryManagerAgent(createMockConfig());
+    const globalGeminiDir = Storage.getGlobalGeminiDir();
+    expect(agent.workspaceDirectories).toBeDefined();
+    expect(agent.workspaceDirectories).toContain(globalGeminiDir);
+  });
 });
