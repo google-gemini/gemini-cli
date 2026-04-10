@@ -72,7 +72,7 @@ organization.
 **Supported Fields:**
 
 - `url`: (Required) The full URL of the MCP server endpoint.
-- `type`: (Required) The connection type (e.g., `sse` or `http`).
+- `type`: (Required) The connection type (for example, `sse` or `http`).
 - `trust`: (Optional) If set to `true`, the server is trusted and tool execution
   will not require user approval.
 - `includeTools`: (Optional) An explicit list of tool names to allow. If
