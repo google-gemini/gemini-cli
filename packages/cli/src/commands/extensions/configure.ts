@@ -19,11 +19,12 @@ import { exitCli } from '../utils.js';
 interface ConfigureArgs {
   name?: string;
   setting?: string;
+  value?: string;
   scope: string;
 }
 
 export const configureCommand: CommandModule<object, ConfigureArgs> = {
-  command: 'config [name] [setting]',
+  command: 'config [name] [setting] [value]',
   describe: 'Configure extension settings.',
   builder: (yargs) =>
     yargs
@@ -35,6 +36,11 @@ export const configureCommand: CommandModule<object, ConfigureArgs> = {
         describe: 'The specific setting to configure (name or env var).',
         type: 'string',
       })
+      .positional('value', {
+        describe:
+          'The value to set for the setting. Bypasses the interactive prompt.',
+        type: 'string',
+      })
       .option('scope', {
         describe: 'The scope to set the setting in.',
         type: 'string',
@@ -42,7 +48,7 @@ export const configureCommand: CommandModule<object, ConfigureArgs> = {
         default: 'user',
       }),
   handler: async (args) => {
-    const { name, setting, scope } = args;
+    const { name, setting, value, scope } = args;
     const settings = loadSettings(process.cwd()).merged;
 
     if (!(settings.experimental?.extensionConfig ?? true)) {
@@ -73,6 +79,9 @@ export const configureCommand: CommandModule<object, ConfigureArgs> = {
         setting,
         // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
         scope as ExtensionSettingScope,
+        undefined,
+        undefined,
+        value,
       );
     }
     // Case 2: Configure all settings for an extension

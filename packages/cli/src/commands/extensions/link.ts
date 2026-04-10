@@ -24,6 +24,7 @@ import { exitCli } from '../utils.js';
 interface InstallArgs {
   path: string;
   consent?: boolean;
+  skipSettings?: boolean;
 }
 
 export async function handleLink(args: InstallArgs) {
@@ -43,7 +44,7 @@ export async function handleLink(args: InstallArgs) {
     const extensionManager = new ExtensionManager({
       workspaceDir,
       requestConsent,
-      requestSetting: promptForSetting,
+      requestSetting: args.skipSettings ? null : promptForSetting,
       settings: loadSettings(workspaceDir).merged,
     });
     await extensionManager.loadExtensions();
@@ -76,6 +77,11 @@ export const linkCommand: CommandModule = {
         type: 'boolean',
         default: false,
       })
+      .option('skip-settings', {
+        describe: 'Skip the configuration on install process.',
+        type: 'boolean',
+        default: false,
+      })
       .check((_) => true),
   handler: async (argv) => {
     await handleLink({
@@ -83,6 +89,8 @@ export const linkCommand: CommandModule = {
       path: argv['path'] as string,
       // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
       consent: argv['consent'] as boolean | undefined,
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
+      skipSettings: argv['skip-settings'] as boolean | undefined,
     });
     await exitCli();
   },
