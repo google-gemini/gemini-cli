@@ -22,7 +22,6 @@ import {
   type EditorType,
   isEditorAvailable,
   EDITOR_DISPLAY_NAMES,
-  coreEvents,
 } from '@google/gemini-cli-core';
 import { useKeypress } from '../hooks/useKeypress.js';
 
@@ -128,8 +127,7 @@ export function EditorSettingsDialog({
   ) {
     mergedEditorName =
       EDITOR_DISPLAY_NAMES[
-        // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
-        settings.merged.general.preferredEditor as EditorType
+        settings.merged.general.preferredEditor
       ];
   }
 
