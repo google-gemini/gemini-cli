@@ -14,7 +14,7 @@ import { ContextEventBus } from '../eventBus.js';
 import { PipelineOrchestrator } from '../sidecar/orchestrator.js';
 import { registerBuiltInProcessors } from '../sidecar/builtins.js';
 import { debugLogger } from '../../utils/debugLogger.js';
-import { ProcessorRegistry } from '../sidecar/registry.js';
+import { SidecarRegistry } from '../sidecar/registry.js';
 import { DeterministicIdGenerator } from '../system/DeterministicIdGenerator.js';
 import { InMemoryFileSystem } from '../system/InMemoryFileSystem.js';
 import type { BaseLlmClient } from '../../core/baseLlmClient.js';
@@ -57,7 +57,7 @@ export class SimulationHarness {
     mockTempDir: string,
   ) {
     this.config = config;
-    const registry = new ProcessorRegistry();
+    const registry = new SidecarRegistry();
     // Register all standard processors
     registerBuiltInProcessors(registry);
 
@@ -72,7 +72,7 @@ export class SimulationHarness {
       mockTempDir,
       mockTempDir,
       this.tracer,
-      4, // 4 chars per token average
+      1, // 1 char per token average
       this.eventBus,
       new InMemoryFileSystem(),
       new DeterministicIdGenerator(),
@@ -85,14 +85,13 @@ export class SimulationHarness {
       this.tracer,
       registry,
     );
-    this.contextManager = ContextManager.create(
+    this.contextManager = new ContextManager(
       config,
       this.env,
       this.tracer,
       this.orchestrator,
-      registry,
+      this.chatHistory,
     );
-    this.contextManager.subscribeToHistory(this.chatHistory);
   }
 
   /**
@@ -105,8 +104,8 @@ export class SimulationHarness {
     this.chatHistory.set([...currentHistory, ...messages]);
 
     // 2. Measure tokens immediately after append (Before background processing)
-    const tokensBefore = this.env.tokenCalculator.calculateEpisodeListTokens(
-      this.contextManager.getWorkingBufferView(),
+    const tokensBefore = this.env.tokenCalculator.calculateConcreteListTokens(
+      this.contextManager.getNodes(),
     );
     debugLogger.log(
       `[Turn ${this.currentTurnIndex}] Tokens BEFORE: ${tokensBefore}`,
@@ -116,56 +115,32 @@ export class SimulationHarness {
     await new Promise((resolve) => setTimeout(resolve, 50));
 
     // 3.1 Simulate what projectCompressedHistory does with the sync handlers
-    let currentView = this.contextManager.getWorkingBufferView();
+    let currentView = this.contextManager.getNodes();
     const currentTokens =
-      this.env.tokenCalculator.calculateEpisodeListTokens(currentView);
+      this.env.tokenCalculator.calculateConcreteListTokens(currentView);
     if (this.config.budget && currentTokens > this.config.budget.maxTokens) {
       debugLogger.log(
         `[Turn ${this.currentTurnIndex}] Sync panic triggered! ${currentTokens} > ${this.config.budget.maxTokens}`,
       );
-      const syncPipelines = this.config.pipelines.filter(
-        (p) => p.execution === 'blocking',
-      );
       const orchestrator = this.orchestrator;
-      for (const pipe of syncPipelines) {
-        await orchestrator.executePipeline(pipe.name, currentView, {
-          currentTokens,
-          maxTokens: this.config.budget.maxTokens,
-          retainedTokens: this.config.budget.retainedTokens,
-          isBudgetSatisfied: false,
-          deficitTokens: currentTokens - this.config.budget.maxTokens,
-          protectedEpisodeIds: new Set(),
-        });
-        currentView = this.contextManager.getWorkingBufferView();
-      }
+      // In the V2 simulation, we trigger the 'gc_backstop' to simulate emergency pressure.
+      // Since contextManager owns its buffer natively, the simulation now properly matches reality
+      // where the manager runs the orchestrator and keeps the resulting modified view.
+      const modifiedView = await orchestrator.executeTriggerSync(
+        'gc_backstop',
+        currentView,
+        new Set(currentView.map((e) => e.id)),
+        new Set<string>(),
+      );
 
-      // Inject the truncated view back into the graph
-      for (let i = 0; i < currentView.length; i++) {
-        const ep = currentView[i];
-        if (
-          !this.contextManager
-            .getWorkingBufferView()
-            .find((c) => c.id === ep.id)
-        ) {
-          this.eventBus.emitVariantReady({
-            targetId: ep.id,
-            variantId: 'v-emergency',
-            variant: {
-              status: 'ready',
-              type: 'masked', // Truncation is technically a mask
-              text: ep.yield?.text || '',
-              recoveredTokens: 0,
-            },
-          });
-        }
-      }
-      // Wait for variant propagation
-      await new Promise((resolve) => setTimeout(resolve, 50));
+      // In the real system, ContextManager triggers this and retains it.
+      // We will emulate that behavior internally in the test loop for token counting.
+      currentView = modifiedView;
     }
 
-    // 4. Measure tokens after background processors have (hopefully) emitted variants
-    const tokensAfter = this.env.tokenCalculator.calculateEpisodeListTokens(
-      this.contextManager.getWorkingBufferView(),
+    // 4. Measure tokens after background processors have processed inboxes
+    const tokensAfter = this.env.tokenCalculator.calculateConcreteListTokens(
+      this.contextManager.getNodes(),
     );
     debugLogger.log(
       `[Turn ${this.currentTurnIndex}] Tokens AFTER: ${tokensAfter}`,

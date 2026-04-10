@@ -8,10 +8,12 @@ import type {
   AgentChatHistory,
   HistoryEvent,
 } from '../core/agentChatHistory.js';
-import { IrMapper } from './ir/mapper.js';
+import type { IrMapper } from './ir/mapper.js';
 import type { ContextTokenCalculator } from './utils/contextTokenCalculator.js';
 import type { ContextEventBus } from './eventBus.js';
 import type { ContextTracer } from './tracer.js';
+
+import type { ConcreteNode } from './ir/types.js';
 
 /**
  * Connects the raw AgentChatHistory to the ContextManager.
@@ -21,11 +23,14 @@ import type { ContextTracer } from './tracer.js';
 export class HistoryObserver {
   private unsubscribeHistory?: () => void;
 
+  private seenNodeIds = new Set<string>();
+
   constructor(
     private readonly chatHistory: AgentChatHistory,
     private readonly eventBus: ContextEventBus,
     private readonly tracer: ContextTracer,
     private readonly tokenCalculator: ContextTokenCalculator,
+    private readonly irMapper: IrMapper,
   ) {}
 
   start() {
@@ -36,18 +41,39 @@ export class HistoryObserver {
     this.unsubscribeHistory = this.chatHistory.subscribe(
       (_event: HistoryEvent) => {
         // Rebuild the pristine IR graph from the full source history on every change.
-        const pristineEpisodes = IrMapper.toIr(
+        // Wait, toIr still returns an Episode[].
+        // We actually need to map the Episode[] to a flat ConcreteNode[] here to form the 'nodes'.
+        const pristineEpisodes = this.irMapper.toIr(
           this.chatHistory.get(),
           this.tokenCalculator,
         );
+
+        const nodes: ConcreteNode[] = [];
+        for (const ep of pristineEpisodes) {
+          if (ep.concreteNodes) {
+            for (const child of ep.concreteNodes) {
+              nodes.push(child);
+            }
+          }
+        }
+
+        const newNodes = new Set<string>();
+        for (const node of nodes) {
+          if (!this.seenNodeIds.has(node.id)) {
+            newNodes.add(node.id);
+            this.seenNodeIds.add(node.id);
+          }
+        }
+
         this.tracer.logEvent(
           'HistoryObserver',
           'Rebuilt pristine graph from chat history update',
-          { episodeCount: pristineEpisodes.length },
+          { nodesSize: nodes.length, newNodesCount: newNodes.size },
         );
 
         this.eventBus.emitPristineHistoryUpdated({
-          episodes: pristineEpisodes,
+          nodes,
+          newNodes,
         });
       },
     );

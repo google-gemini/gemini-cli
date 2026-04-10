@@ -3,180 +3,185 @@
  * Copyright 2026 Google LLC
  * SPDX-License-Identifier: Apache-2.0
  */
-
-import type { ContextProcessor, ContextAccountingState } from '../pipeline.js';
-import type { Episode } from '../ir/types.js';
 import type {
-  ContextEnvironment,
-  ContextEventBus,
-} from '../sidecar/environment.js';
-import { v4 as uuidv4 } from 'uuid';
-import { LlmRole } from '../../telemetry/llmRole.js';
-import { debugLogger } from 'src/utils/debugLogger.js';
-import type { EpisodeEditor } from '../ir/episodeEditor.js';
+  ContextProcessor,
+  ProcessArgs,
+  BackstopTargetOptions,
+} from '../pipeline.js';
+import type { ContextEnvironment } from '../sidecar/environment.js';
+import type { ConcreteNode, Snapshot } from '../ir/types.js';
+import { SnapshotGenerator } from '../utils/snapshotGenerator.js';
+import { debugLogger } from '../../utils/debugLogger.js';
 
-export interface StateSnapshotProcessorOptions {
+export interface StateSnapshotProcessorOptions extends BackstopTargetOptions {
   model?: string;
   systemInstruction?: string;
-  triggerDeficitTokens?: number;
 }
 
 export class StateSnapshotProcessor implements ContextProcessor {
+  static readonly schema = {
+    type: 'object',
+    properties: {
+      target: { type: 'string', enum: ['incremental', 'freeNTokens', 'max'] },
+      freeTokensTarget: { type: 'number' },
+      model: { type: 'string' },
+      systemInstruction: { type: 'string' },
+    },
+  };
+
   static create(
     env: ContextEnvironment,
     options: StateSnapshotProcessorOptions,
   ): StateSnapshotProcessor {
-    return new StateSnapshotProcessor(env, options, env.eventBus);
+    return new StateSnapshotProcessor(env, options);
   }
+
+  readonly componentType = 'processor';
   readonly id = 'StateSnapshotProcessor';
   readonly name = 'StateSnapshotProcessor';
   readonly options: StateSnapshotProcessorOptions;
   private readonly env: ContextEnvironment;
-  private isSynthesizing = false;
+  private readonly generator: SnapshotGenerator;
 
-  constructor(
-    env: ContextEnvironment,
-    options: StateSnapshotProcessorOptions,
-    _eventBus: ContextEventBus,
-  ) {
+  constructor(env: ContextEnvironment, options: StateSnapshotProcessorOptions) {
     this.env = env;
     this.options = options;
+    this.generator = new SnapshotGenerator(env);
   }
 
-  async process(
-    editor: EpisodeEditor,
-    state: ContextAccountingState,
-  ): Promise<void> {
-    const targetDeficit = Math.max(
-      0,
-      state.currentTokens - state.retainedTokens,
-    );
-    if (this.isSynthesizing || targetDeficit <= 0) return;
+  // --- ContextProcessor Interface (Sync Backstop / Cache Application) ---
+  async process({
+    targets,
+    inbox,
+  }: ProcessArgs): Promise<readonly ConcreteNode[]> {
+    if (targets.length === 0) {
+      return targets;
+    }
 
-    this.isSynthesizing = true;
-    try {
-      let deficitAccumulator = 0;
-      const selectedEpisodes: Episode[] = [];
+    // Determine what mode we are looking for: 'incremental' -> 'point-in-time', 'max' -> 'accumulate'
+    const strategy = this.options.target ?? 'max';
+    const expectedType =
+      strategy === 'incremental' ? 'point-in-time' : 'accumulate';
 
-      for (let i = 1; i < editor.episodes.length - 1; i++) {
-        const ep = editor.episodes[i];
-        selectedEpisodes.push(ep);
-        let triggerText = '';
-        if (ep.trigger?.type === 'USER_PROMPT') {
-          const firstPart = ep.trigger.semanticParts?.[0];
-          if (firstPart) {
-            triggerText =
-              firstPart.type === 'text'
-                ? firstPart.text
-                : (firstPart.presentation?.text ?? '');
+    // 1. Check Inbox for a completed Snapshot (The Fast Path)
+    const proposedSnapshots = inbox.getMessages<{
+      newText: string;
+      consumedIds: string[];
+      type: string;
+    }>('PROPOSED_SNAPSHOT');
+
+    if (proposedSnapshots.length > 0) {
+      // Filter for the snapshot type that matches our processor mode
+      const matchingSnapshots = proposedSnapshots.filter(
+        (s) => s.payload.type === expectedType,
+      );
+
+      // Sort by newest timestamp first (we want the most accumulated snapshot)
+      const sorted = [...matchingSnapshots].sort(
+        (a, b) => b.timestamp - a.timestamp,
+      );
+
+      for (const proposed of sorted) {
+        const { consumedIds, newText } = proposed.payload;
+
+        // Verify all consumed IDs still exist sequentially in targets
+        const targetIds = new Set(targets.map((t) => t.id));
+        const isValid = consumedIds.every((id) => targetIds.has(id));
+
+        if (isValid) {
+          // If valid, apply it!
+          const newId = this.env.idGenerator.generateId();
+
+          const snapshotNode: Snapshot = {
+            id: newId,
+            logicalParentId: newId,
+            type: 'SNAPSHOT',
+            timestamp: Date.now(),
+            text: newText,
+          };
+
+          // Remove the consumed nodes and insert the snapshot at the earliest index
+          const returnedNodes = targets.filter(
+            (t) => !consumedIds.includes(t.id),
+          );
+          const firstRemovedIdx = targets.findIndex((t) =>
+            consumedIds.includes(t.id),
+          );
+
+          if (firstRemovedIdx !== -1) {
+            const idx = Math.max(0, firstRemovedIdx);
+            returnedNodes.splice(idx, 0, snapshotNode);
+          } else {
+            returnedNodes.unshift(snapshotNode);
           }
-        }
-        deficitAccumulator += this.env.tokenCalculator.estimateTokensForParts([
-          { text: triggerText },
-          { text: ep.yield?.text ?? '' },
-        ]);
-        if (deficitAccumulator >= targetDeficit) break;
-      }
 
-      if (selectedEpisodes.length < 2) return; // Not enough context to summarize
-
-      // Optimization: Do NOT emit VariantComputing, let the Orchestrator handle caching the final result.
-      const snapshotEp: Episode =
-        await this.synthesizeSnapshot(selectedEpisodes);
-
-      const oldIds = selectedEpisodes.map((ep) => ep.id);
-      editor.replaceEpisodes(oldIds, snapshotEp, 'STATE_SNAPSHOT');
-    } finally {
-      this.isSynthesizing = false;
-    }
-  }
-
-  private async synthesizeSnapshot(episodes: Episode[]): Promise<Episode> {
-    const client = this.env.llmClient;
-    const systemPrompt =
-      this.options.systemInstruction ??
-      `You are an expert Context Memory Manager. You will be provided with a raw transcript of older conversation turns between a user and an AI assistant.
-Your task is to synthesize these turns into a single, dense, factual snapshot that preserves all critical context, preferences, active tasks, and factual knowledge, but discards conversational filler, pleasantries, and redundant back-and-forth iterations.
-
-Output ONLY the raw factual snapshot, formatted compactly. Do not include markdown wrappers, prefixes like "Here is the snapshot", or conversational elements.`;
-
-    let userPromptText = 'TRANSCRIPT TO SNAPSHOT:\n\n';
-    for (const ep of episodes) {
-      if (ep.trigger?.type === 'USER_PROMPT') {
-        const partsText = ep.trigger.semanticParts
-          .map((p) => {
-            if (p.type === 'text') return p.text;
-            if (p.presentation) return p.presentation.text;
-            return '';
-          })
-          .join('');
-        userPromptText += `USER: ${partsText}\n`;
-      } else if (ep.trigger?.type === 'SYSTEM_EVENT') {
-        userPromptText += `[SYSTEM EVENT: ${ep.trigger.name}]\n`;
-      }
-      for (const step of ep.steps) {
-        if (step.type === 'TOOL_EXECUTION') {
-          userPromptText += `[Tool Called: ${step.toolName}]\n`;
+          inbox.consume(proposed.id);
+          return returnedNodes;
         }
       }
-      if (ep.yield) {
-        userPromptText += `ASSISTANT: ${ep.yield.text}\n`;
-      }
-      userPromptText += '\n';
     }
+
+    // 2. The Synchronous Backstop (The Slow Path)
+    let targetTokensToRemove = 0;
+
+    if (strategy === 'incremental') {
+      targetTokensToRemove = Infinity; // incremental implies removing as much as possible if no state is passed
+    } else if (strategy === 'freeNTokens') {
+      targetTokensToRemove = this.options.freeTokensTarget ?? Infinity;
+    } else if (strategy === 'max') {
+      targetTokensToRemove = Infinity;
+    }
+
+    let deficitAccumulator = 0;
+    const nodesToSummarize: ConcreteNode[] = [];
+
+    // Scan oldest to newest
+    for (const node of targets) {
+      if (node.id === targets[0].id && node.type === 'USER_PROMPT') {
+        // Keep system prompt if it's the very first node
+        // In a real system, system prompt is protected, but we double check
+        continue;
+      }
+
+      nodesToSummarize.push(node);
+      deficitAccumulator += this.env.tokenCalculator.getTokenCost(node);
+
+      if (deficitAccumulator >= targetTokensToRemove) break;
+    }
+
+    if (nodesToSummarize.length < 2) return targets; // Not enough context
 
     try {
-      const response = await client.generateContent({
-        modelConfigKey: { model: 'state-snapshot-processor' },
-        contents: [{ role: 'user', parts: [{ text: userPromptText }] }],
-        systemInstruction: { role: 'system', parts: [{ text: systemPrompt }] },
-        promptId: this.env.promptId,
-        role: LlmRole.UTILITY_STATE_SNAPSHOT_PROCESSOR,
-        abortSignal: new AbortController().signal,
-      });
-
-      const snapshotText = response.text;
-
-      // Synthesize a new "Episode" representing this compressed block
-      const newId = uuidv4();
-      const contentTokens = this.env.tokenCalculator.estimateTokensForParts([
-        { text: snapshotText },
-      ]);
-
-      return {
+      const snapshotText = await this.generator.synthesizeSnapshot(
+        nodesToSummarize,
+        this.options.systemInstruction,
+      );
+      const newId = this.env.idGenerator.generateId();
+      const snapshotNode: Snapshot = {
         id: newId,
+        logicalParentId: newId,
+        type: 'SNAPSHOT',
         timestamp: Date.now(),
-        trigger: {
-          id: `${newId}-t`,
-          type: 'USER_PROMPT',
-          semanticParts: [],
-          metadata: {
-            originalTokens: 0,
-            currentTokens: 0,
-            transformations: [],
-          },
-        },
-        steps: [],
-        yield: {
-          id: `${newId}-y`,
-          type: 'AGENT_YIELD',
-          text: `<CONTEXT_SNAPSHOT>\n${snapshotText}\n</CONTEXT_SNAPSHOT>`,
-          metadata: {
-            originalTokens: contentTokens,
-            currentTokens: contentTokens,
-            transformations: [
-              {
-                processorName: 'StateSnapshotProcessor',
-                action: 'SYNTHESIZED',
-                timestamp: Date.now(),
-              },
-            ],
-          },
-        },
+        text: snapshotText,
       };
-    } catch (error) {
-      debugLogger.error('Failed to synthesize snapshot:', error);
-      throw error;
+
+      const consumedIds = nodesToSummarize.map((n) => n.id);
+      const returnedNodes = targets.filter((t) => !consumedIds.includes(t.id));
+      const firstRemovedIdx = targets.findIndex((t) =>
+        consumedIds.includes(t.id),
+      );
+
+      if (firstRemovedIdx !== -1) {
+        const idx = Math.max(0, firstRemovedIdx);
+        returnedNodes.splice(idx, 0, snapshotNode);
+      } else {
+        returnedNodes.unshift(snapshotNode);
+      }
+
+      return returnedNodes;
+    } catch (e) {
+      debugLogger.error('StateSnapshotProcessor failed sync backstop', e);
+      return targets;
     }
   }
 }

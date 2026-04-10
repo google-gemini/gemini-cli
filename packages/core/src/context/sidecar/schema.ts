@@ -4,16 +4,16 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import type { ProcessorRegistry } from './registry.js';
+import type { SidecarRegistry } from './registry.js';
 import './builtins.js';
 
-export function getSidecarConfigSchema(registry: ProcessorRegistry) {
+export function getSidecarConfigSchema(registry: SidecarRegistry) {
   return {
     $schema: 'http://json-schema.org/draft-07/schema#',
     title: 'SidecarConfig',
     description: 'The Data-Driven Schema for the Context Manager.',
     type: 'object',
-    required: ['budget', 'gcBackstop', 'pipelines'],
+    required: ['budget', 'pipelines'],
     properties: {
       budget: {
         type: 'object',
@@ -32,22 +32,15 @@ export function getSidecarConfigSchema(registry: ProcessorRegistry) {
           },
         },
       },
-      gcBackstop: {
-        type: 'object',
-        description:
-          "Defines what happens when the pipeline fails to compress under 'maxTokens'",
-        required: ['strategy', 'target'],
-        properties: {
-          strategy: {
-            type: 'string',
-            enum: ['truncate', 'compress', 'rollingSummarizer'],
-          },
-          target: {
-            type: 'string',
-            enum: ['incremental', 'freeNTokens', 'max'],
-          },
-          freeTokensTarget: {
-            type: 'number',
+      workers: {
+        type: 'array',
+        description: 'Background workers that proactively accumulate context.',
+        items: {
+          type: 'object',
+          required: ['workerId'],
+          properties: {
+            workerId: { type: 'string' },
+            options: { type: 'object' },
           },
         },
       },
@@ -67,7 +60,7 @@ export function getSidecarConfigSchema(registry: ProcessorRegistry) {
                 anyOf: [
                   {
                     type: 'string',
-                    enum: ['on_turn', 'post_turn', 'budget_exceeded'],
+                    enum: ['new_message', 'retained_exceeded', 'gc_backstop'],
                   },
                   {
                     type: 'object',
@@ -84,10 +77,6 @@ export function getSidecarConfigSchema(registry: ProcessorRegistry) {
                   },
                 ],
               },
-            },
-            execution: {
-              type: 'string',
-              enum: ['blocking', 'background'],
             },
             processors: {
               type: 'array',

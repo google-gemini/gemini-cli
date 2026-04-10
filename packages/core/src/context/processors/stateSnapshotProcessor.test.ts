@@ -3,116 +3,113 @@
  * Copyright 2026 Google LLC
  * SPDX-License-Identifier: Apache-2.0
  */
-
+import { describe, it, expect } from 'vitest';
+import { StateSnapshotProcessor } from './stateSnapshotProcessor.js';
 import {
   createMockEnvironment,
-  createDummyState,
-  createDummyEpisode,
+  createDummyNode,
+  createMockProcessArgs,
 } from '../testing/contextTestUtils.js';
-import { describe, it, expect, beforeEach, vi } from 'vitest';
-import { StateSnapshotProcessor } from './stateSnapshotProcessor.js';
-import { EpisodeEditor } from '../ir/episodeEditor.js';
-import type { ContextEnvironment } from '../sidecar/environment.js';
-import type { BaseLlmClient } from '../../core/baseLlmClient.js';
+import type { InboxSnapshotImpl } from '../sidecar/inbox.js';
 
 describe('StateSnapshotProcessor', () => {
-  let processor: StateSnapshotProcessor;
-  let env: ContextEnvironment;
-  let generateContentMock: ReturnType<typeof vi.fn>;
-
-  beforeEach(() => {
-    vi.resetAllMocks();
-    env = createMockEnvironment();
-
-    generateContentMock = vi.fn().mockResolvedValue({
-      text: 'Mocked Compressed State Snapshot!',
+  it('should ignore if budget is satisfied', async () => {
+    const env = createMockEnvironment();
+    const processor = StateSnapshotProcessor.create(env, {
+      target: 'incremental',
     });
-    vi.spyOn(env, 'llmClient', 'get').mockReturnValue({
-      generateContent: generateContentMock,
-    } as unknown as BaseLlmClient);
-
-    // Override token calc for testing
-    vi.spyOn(env.tokenCalculator, 'estimateTokensForParts').mockReturnValue(
-      100,
-    );
-
-    processor = new StateSnapshotProcessor(env, {}, env.eventBus);
+    const targets = [createDummyNode('ep1', 'USER_PROMPT')];
+    const result = await processor.process(createMockProcessArgs(targets));
+    expect(result).toBe(targets); // Strict equality
   });
 
-  it('bypasses processing if deficit is <= 0', async () => {
-    const episodes = [
-      createDummyEpisode('ep-1', 'USER_PROMPT', [
-        { type: 'text', text: 'hello' },
-      ]),
-    ];
-    // current: 100, max: 1000, retained: 200 (deficit 0)
-    const state = createDummyState(false, 0, new Set(), 100, 1000, 200);
+  it('should apply a valid snapshot from the Inbox (Fast Path)', async () => {
+    const env = createMockEnvironment();
+    const processor = StateSnapshotProcessor.create(env, {
+      target: 'incremental',
+    });
 
-    const editor = new EpisodeEditor(episodes);
-    await processor.process(editor, state);
-    const result = editor.getFinalEpisodes();
-    expect(result).toStrictEqual(episodes);
-    expect(generateContentMock).not.toHaveBeenCalled();
+    const nodeA = createDummyNode('ep1', 'USER_PROMPT', 50, {}, 'node-A');
+    const nodeB = createDummyNode('ep1', 'AGENT_THOUGHT', 60, {}, 'node-B');
+    const nodeC = createDummyNode('ep2', 'USER_PROMPT', 50, {}, 'node-C');
+
+    const targets = [nodeA, nodeB, nodeC];
+
+    // The background worker created a snapshot of A and B
+    const messages = [
+      {
+        id: 'msg-1',
+        topic: 'PROPOSED_SNAPSHOT',
+        timestamp: Date.now(),
+        payload: {
+          consumedIds: ['node-A', 'node-B'],
+          newText: '<compressed A and B>',
+          type: 'point-in-time',
+        },
+      },
+    ];
+
+    const processArgs = createMockProcessArgs(targets, [], messages);
+    const result = await processor.process(processArgs);
+
+    // Should remove A and B, insert Snapshot, keep C
+    expect(result.length).toBe(2);
+    expect(result[0].type).toBe('SNAPSHOT');
+    expect(result[1].id).toBe('node-C');
+
+    // Should consume the message
+    expect(
+      (processArgs.inbox as InboxSnapshotImpl).getConsumedIds().has('msg-1'),
+    ).toBe(true);
   });
 
-  it('bypasses processing if not enough episodes to summarize (needs at least 2 inner episodes)', async () => {
-    const episodes = [
-      createDummyEpisode('ep-sys', 'SYSTEM_EVENT', []),
-      createDummyEpisode('ep-active', 'USER_PROMPT', [
-        { type: 'text', text: 'help' },
-      ]),
+  it('should reject a snapshot if the nodes were modified/deleted (Cache Invalidated)', async () => {
+    const env = createMockEnvironment();
+    const processor = StateSnapshotProcessor.create(env, {
+      target: 'incremental',
+    });
+    // Make deficit 0 so we don't fall through to the sync backstop and fail the test that way
+
+    // node-A is MISSING (user deleted it)
+    const nodeB = createDummyNode('ep1', 'AGENT_THOUGHT', 60, {}, 'node-B');
+    const targets = [nodeB];
+
+    const messages = [
+      {
+        id: 'msg-1',
+        topic: 'PROPOSED_SNAPSHOT',
+        timestamp: Date.now(),
+        payload: {
+          consumedIds: ['node-A', 'node-B'],
+          newText: '<compressed A and B>',
+        },
+      },
     ];
 
-    // current: 1000, max: 10000, retained: 500. Target deficit = 500
-    const state = createDummyState(false, 500, new Set(), 1000, 10000, 500);
+    const processArgs = createMockProcessArgs(targets, [], messages);
+    const result = await processor.process(processArgs);
 
-    const editor = new EpisodeEditor(episodes);
-    await processor.process(editor, state);
-    const result = editor.getFinalEpisodes();
-    expect(result).toStrictEqual(episodes);
-    expect(generateContentMock).not.toHaveBeenCalled();
+    // Because deficit is 0, and Inbox was rejected, nothing should change
+    expect(result.length).toBe(1);
+    expect(result[0].id).toBe('node-B');
+    expect(
+      (processArgs.inbox as InboxSnapshotImpl).getConsumedIds().has('msg-1'),
+    ).toBe(false);
   });
 
-  it('summarizes intermediate episodes into a single snapshot episode', async () => {
-    const episodes = [
-      createDummyEpisode('ep-0', 'SYSTEM_EVENT', []),
-      createDummyEpisode('ep-1', 'USER_PROMPT', [
-        { type: 'text', text: 'old 1' },
-      ]),
-      createDummyEpisode('ep-2', 'USER_PROMPT', [
-        { type: 'text', text: 'old 2' },
-      ]),
-      createDummyEpisode('ep-3', 'USER_PROMPT', [
-        { type: 'text', text: 'current' },
-      ]),
-    ];
+  it('should fall back to sync backstop if inbox is empty', async () => {
+    const env = createMockEnvironment();
+    const processor = StateSnapshotProcessor.create(env, { target: 'max' }); // Summarize all
 
-    // Target deficit = 200
-    const state = createDummyState(false, 200, new Set(), 1000, 10000, 800);
+    const nodeA = createDummyNode('ep1', 'USER_PROMPT', 50, {}, 'node-A');
+    const nodeB = createDummyNode('ep1', 'AGENT_THOUGHT', 60, {}, 'node-B');
+    const nodeC = createDummyNode('ep2', 'USER_PROMPT', 50, {}, 'node-C');
+    const targets = [nodeA, nodeB, nodeC];
+    const result = await processor.process(createMockProcessArgs(targets));
 
-    const editor = new EpisodeEditor(episodes);
-    await processor.process(editor, state);
-    const result = editor.getFinalEpisodes();
-
-    // We started with 4 episodes.
-    // Episodes [1, 2] were synthesized into a single new Snapshot episode.
-    // Final array should be: [0, SNAPSHOT, 3] = length 3.
-    expect(result.length).toBe(3);
-    expect(result[0].id).toBe('ep-0');
-
-    const snapshotEp = result[1];
-    expect(snapshotEp.yield).toBeDefined();
-    expect(snapshotEp.yield!.text).toContain('<CONTEXT_SNAPSHOT>');
-    expect(snapshotEp.yield!.text).toContain(
-      'Mocked Compressed State Snapshot!',
-    );
-
-    expect(result[2].id).toBe('ep-3');
-
-    expect(generateContentMock).toHaveBeenCalledTimes(1);
-
-    const llmArgs = generateContentMock.mock.calls[0][0];
-    expect(llmArgs.contents[0].parts[0].text).toContain('old 1');
-    expect(llmArgs.contents[0].parts[0].text).toContain('old 2');
+    // Should synthesize a new snapshot synchronously
+    expect(env.llmClient.generateContent).toHaveBeenCalled();
+    expect(result.length).toBe(2); // nodeA is skipped as "system prompt", snapshot + nodeA
+    expect(result[1].type).toBe('SNAPSHOT');
   });
 });

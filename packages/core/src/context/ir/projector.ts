@@ -5,8 +5,7 @@
  */
 
 import type { Content } from '@google/genai';
-import { IrMapper } from './mapper.js';
-import type { Episode } from './types.js';
+import type { ConcreteNode } from './types.js';
 import { debugLogger } from '../../utils/debugLogger.js';
 import type {
   ContextEnvironment,
@@ -17,11 +16,11 @@ import type { SidecarConfig } from '../sidecar/types.js';
 
 export class IrProjector {
   /**
-   * Orchestrates the final projection: takes a working buffer view,
+   * Orchestrates the final projection: takes a working buffer view (The Nodes),
    * applies the Immediate Sanitization pipeline, and enforces token boundaries.
    */
   static async project(
-    workingBuffer: Episode[],
+    nodes: readonly ConcreteNode[],
     orchestrator: PipelineOrchestrator,
     sidecar: SidecarConfig,
     tracer: ContextTracer,
@@ -29,7 +28,7 @@ export class IrProjector {
     protectedIds: Set<string>,
   ): Promise<Content[]> {
     if (!sidecar.budget) {
-      const contents = IrMapper.fromIr(workingBuffer);
+      const contents = env.irMapper.fromIr(nodes);
       tracer.logEvent('IrProjector', 'Projected Context to LLM (No Budget)', {
         projectedContext: contents,
       });
@@ -38,14 +37,24 @@ export class IrProjector {
 
     const maxTokens = sidecar.budget.maxTokens;
     const currentTokens =
-      env.tokenCalculator.calculateEpisodeListTokens(workingBuffer);
+      env.tokenCalculator.calculateConcreteListTokens(nodes);
+
+    // V0: Always protect the first node (System Prompt) and the last turn
+    if (nodes.length > 0) {
+      protectedIds.add(nodes[0].id);
+      if (nodes[0].logicalParentId) protectedIds.add(nodes[0].logicalParentId);
+
+      const lastNode = nodes[nodes.length - 1];
+      protectedIds.add(lastNode.id);
+      if (lastNode.logicalParentId) protectedIds.add(lastNode.logicalParentId);
+    }
 
     if (currentTokens <= maxTokens) {
       tracer.logEvent(
         'IrProjector',
         `View is within maxTokens (${currentTokens} <= ${maxTokens}). Returning view.`,
       );
-      const contents = IrMapper.fromIr(workingBuffer);
+      const contents = env.irMapper.fromIr(nodes);
       tracer.logEvent('IrProjector', 'Projected Context to LLM', {
         projectedContext: contents,
       });
@@ -60,21 +69,30 @@ export class IrProjector {
       `Context Manager Synchronous Barrier triggered: View at ${currentTokens} tokens (limit: ${maxTokens}).`,
     );
 
-    const processedEpisodes = await orchestrator.executePipeline(
-      'Immediate Sanitization',
-      workingBuffer,
-      {
-        currentTokens,
-        maxTokens: sidecar.budget.maxTokens,
-        retainedTokens: sidecar.budget.retainedTokens,
-        deficitTokens: Math.max(0, currentTokens - sidecar.budget.maxTokens),
-        protectedEpisodeIds: protectedIds,
-        isBudgetSatisfied: currentTokens <= sidecar.budget.maxTokens,
-      },
+    // Calculate exactly which nodes aged out of the retainedTokens budget to form our target delta
+    const agedOutNodes = new Set<string>();
+    let rollingTokens = 0;
+    // Start from newest and count backwards
+    for (let i = nodes.length - 1; i >= 0; i--) {
+      const node = nodes[i];
+      const nodeTokens = env.tokenCalculator.calculateConcreteListTokens([
+        node,
+      ]);
+      rollingTokens += nodeTokens;
+      if (rollingTokens > sidecar.budget.retainedTokens) {
+        agedOutNodes.add(node.id);
+      }
+    }
+
+    const processedNodes = await orchestrator.executeTriggerSync(
+      'gc_backstop',
+      nodes,
+      agedOutNodes,
+      protectedIds,
     );
 
     const finalTokens =
-      env.tokenCalculator.calculateEpisodeListTokens(processedEpisodes);
+      env.tokenCalculator.calculateConcreteListTokens(processedNodes);
     tracer.logEvent(
       'IrProjector',
       `Finished projection. Final token count: ${finalTokens}.`,
@@ -83,7 +101,17 @@ export class IrProjector {
       `Context Manager finished. Final actual token count: ${finalTokens}.`,
     );
 
-    const contents = IrMapper.fromIr(processedEpisodes);
+    // Apply skipList logic to abstract over summarized nodes
+    const skipList = new Set<string>();
+    for (const node of processedNodes) {
+      if (node.abstractsIds) {
+        for (const id of node.abstractsIds) skipList.add(id);
+      }
+    }
+
+    const visibleNodes = processedNodes.filter((n) => !skipList.has(n.id));
+
+    const contents = env.irMapper.fromIr(visibleNodes);
     tracer.logEvent('IrProjector', 'Projected Sanitized Context to LLM', {
       projectedContextSanitized: contents,
     });

@@ -8,20 +8,19 @@ import type { Content, Part } from '@google/genai';
 import { randomUUID } from 'node:crypto';
 import type {
   Episode,
-  IrMetadata,
   SemanticPart,
   ToolExecution,
   AgentThought,
   AgentYield,
   UserPrompt,
-  SystemEvent,
 } from './types.js';
 import type { ContextTokenCalculator } from '../utils/contextTokenCalculator.js';
 
-// WeakMap to provide stable, deterministic identity across parses for the exact same Content/Part references
-const nodeIdentityMap = new WeakMap<object, string>();
-
-export function getStableId(obj: object): string {
+// We remove the global nodeIdentityMap and instead rely on one passed from IrMapper
+export function getStableId(
+  obj: object,
+  nodeIdentityMap: WeakMap<object, string>,
+): string {
   let id = nodeIdentityMap.get(obj);
   if (!id) {
     id = randomUUID();
@@ -38,27 +37,19 @@ function isCompleteEpisode(ep: Partial<Episode>): ep is Episode {
   return (
     typeof ep.id === 'string' &&
     typeof ep.timestamp === 'number' &&
-    !!ep.trigger &&
-    Array.isArray(ep.steps)
+    Array.isArray(ep.concreteNodes) &&
+    ep.concreteNodes.length > 0
   );
 }
 
 export function toIr(
   history: readonly Content[],
   tokenCalculator: ContextTokenCalculator,
+  nodeIdentityMap: WeakMap<object, string>,
 ): Episode[] {
   const episodes: Episode[] = [];
   let currentEpisode: Partial<Episode> | null = null;
   const pendingCallParts: Map<string, Part> = new Map();
-
-  const createMetadata = (parts: Part[]): IrMetadata => {
-    const tokens = tokenCalculator.estimateTokensForParts(parts, 0);
-    return {
-      originalTokens: tokens,
-      currentTokens: tokens,
-      transformations: [],
-    };
-  };
 
   const finalizeEpisode = () => {
     if (currentEpisode && isCompleteEpisode(currentEpisode)) {
@@ -82,20 +73,20 @@ export function toIr(
           currentEpisode,
           pendingCallParts,
           tokenCalculator,
-          createMetadata,
+          nodeIdentityMap,
         );
       }
 
       if (hasUserParts) {
         finalizeEpisode();
-        currentEpisode = parseUserParts(msg, createMetadata);
+        currentEpisode = parseUserParts(msg, nodeIdentityMap);
       }
     } else if (msg.role === 'model') {
       currentEpisode = parseModelParts(
         msg,
         currentEpisode,
         pendingCallParts,
-        createMetadata,
+        nodeIdentityMap,
       );
     }
   }
@@ -113,24 +104,18 @@ function parseToolResponses(
   currentEpisode: Partial<Episode> | null,
   pendingCallParts: Map<string, Part>,
   tokenCalculator: ContextTokenCalculator,
-  createMetadata: (parts: Part[]) => IrMetadata,
+  nodeIdentityMap: WeakMap<object, string>,
 ): Partial<Episode> {
   if (!currentEpisode) {
     currentEpisode = {
-      id: getStableId(msg),
+      id: getStableId(msg, nodeIdentityMap),
       timestamp: Date.now(),
-      trigger: {
-        id: getStableId(msg.parts![0] || msg),
-        type: 'SYSTEM_EVENT',
-        name: 'history_resume',
-        payload: {},
-        metadata: createMetadata([]),
-      } as SystemEvent,
-      steps: [],
+      concreteNodes: [],
     };
   }
 
-  for (const part of msg.parts!) {
+  const parts = msg.parts || [];
+  for (const part of parts) {
     if (part.functionResponse) {
       const callId = part.functionResponse.id || '';
       const matchingCall = pendingCallParts.get(callId);
@@ -141,7 +126,7 @@ function parseToolResponses(
       const obsTokens = tokenCalculator.estimateTokensForParts([part]);
 
       const step: ToolExecution = {
-        id: getStableId(part),
+        id: getStableId(part, nodeIdentityMap),
         type: 'TOOL_EXECUTION',
         toolName: part.functionResponse.name || 'unknown',
         intent: isRecord(matchingCall?.functionCall?.args)
@@ -154,13 +139,11 @@ function parseToolResponses(
           intent: intentTokens,
           observation: obsTokens,
         },
-        metadata: {
-          originalTokens: intentTokens + obsTokens,
-          currentTokens: intentTokens + obsTokens,
-          transformations: [],
-        },
       };
-      currentEpisode.steps!.push(step);
+      currentEpisode.concreteNodes = [
+        ...(currentEpisode.concreteNodes || []),
+        step,
+      ];
       if (callId) pendingCallParts.delete(callId);
     }
   }
@@ -169,10 +152,11 @@ function parseToolResponses(
 
 function parseUserParts(
   msg: Content,
-  createMetadata: (parts: Part[]) => IrMetadata,
+  nodeIdentityMap: WeakMap<object, string>,
 ): Partial<Episode> {
   const semanticParts: SemanticPart[] = [];
-  for (const p of msg.parts!) {
+  const parts = msg.parts || [];
+  for (const p of parts) {
     if (p.text !== undefined)
       semanticParts.push({ type: 'text', text: p.text });
     else if (p.inlineData)
@@ -191,18 +175,16 @@ function parseUserParts(
       semanticParts.push({ type: 'raw_part', part: p }); // Preserve unknowns
   }
 
+  const baseObj = parts.length > 0 ? parts[0] : msg;
   const trigger: UserPrompt = {
-    id: getStableId(msg.parts![0] || msg),
+    id: getStableId(baseObj, nodeIdentityMap),
     type: 'USER_PROMPT',
     semanticParts,
-    metadata: createMetadata(msg.parts!.filter((p) => !p.functionResponse)),
   };
-
   return {
-    id: getStableId(msg),
+    id: getStableId(msg, nodeIdentityMap),
     timestamp: Date.now(),
-    trigger,
-    steps: [],
+    concreteNodes: [trigger],
   };
 }
 
@@ -210,52 +192,45 @@ function parseModelParts(
   msg: Content,
   currentEpisode: Partial<Episode> | null,
   pendingCallParts: Map<string, Part>,
-  createMetadata: (parts: Part[]) => IrMetadata,
+  nodeIdentityMap: WeakMap<object, string>,
 ): Partial<Episode> {
   if (!currentEpisode) {
     currentEpisode = {
-      id: getStableId(msg),
+      id: getStableId(msg, nodeIdentityMap),
       timestamp: Date.now(),
-      trigger: {
-        id: getStableId(msg.parts![0] || msg),
-        type: 'SYSTEM_EVENT',
-        name: 'model_init',
-        payload: {},
-        metadata: createMetadata([]),
-      } as SystemEvent,
-      steps: [],
+      concreteNodes: [],
     };
   }
 
-  for (const part of msg.parts!) {
+  const parts = msg.parts || [];
+  for (const part of parts) {
     if (part.functionCall) {
       const callId = part.functionCall.id || '';
       if (callId) pendingCallParts.set(callId, part);
     } else if (part.text) {
       const thought: AgentThought = {
-        id: getStableId(part),
+        id: getStableId(part, nodeIdentityMap),
         type: 'AGENT_THOUGHT',
         text: part.text,
-        metadata: createMetadata([part]),
       };
-      currentEpisode.steps!.push(thought);
+
+      currentEpisode.concreteNodes = [
+        ...(currentEpisode.concreteNodes || []),
+        thought,
+      ];
     }
   }
   return currentEpisode;
 }
 
 function finalizeYield(currentEpisode: Partial<Episode>) {
-  if (currentEpisode.steps && currentEpisode.steps.length > 0) {
-    const lastStep = currentEpisode.steps[currentEpisode.steps.length - 1];
-    if (lastStep.type === 'AGENT_THOUGHT') {
-      const yieldNode: AgentYield = {
-        id: lastStep.id,
-        type: 'AGENT_YIELD',
-        text: lastStep.text,
-        metadata: lastStep.metadata,
-      };
-      currentEpisode.steps.pop();
-      currentEpisode.yield = yieldNode;
-    }
+  if (currentEpisode.concreteNodes && currentEpisode.concreteNodes.length > 0) {
+    const yieldNode: AgentYield = {
+      id: randomUUID(),
+      type: 'AGENT_YIELD',
+      text: 'Yield', // Synthesized yield since we don't have the original concrete node
+    };
+    const existingNodes = currentEpisode.concreteNodes || [];
+    currentEpisode.concreteNodes = [...existingNodes, yieldNode];
   }
 }

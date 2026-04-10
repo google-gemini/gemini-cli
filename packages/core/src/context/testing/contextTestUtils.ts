@@ -5,123 +5,189 @@
  */
 
 import { vi } from 'vitest';
-import type { Config } from '../../config/config.js';
-import type { ContextEnvironment } from '../sidecar/environment.js';
-import type { Content } from '@google/genai';
 import { AgentChatHistory } from '../../core/agentChatHistory.js';
 import { ContextManager } from '../contextManager.js';
 import { InMemoryFileSystem } from '../system/InMemoryFileSystem.js';
 import { DeterministicIdGenerator } from '../system/DeterministicIdGenerator.js';
-import type {
-  Episode,
-  UserPrompt,
-  SystemEvent,
-  SemanticPart,
-} from '../ir/types.js';
-import type { ContextAccountingState } from '../pipeline.js';
 import { randomUUID } from 'node:crypto';
+import { ContextTracer } from '../tracer.js';
+import { ContextEnvironmentImpl } from '../sidecar/environmentImpl.js';
+import { SidecarLoader } from '../sidecar/SidecarLoader.js';
+import { ContextEventBus } from '../eventBus.js';
+import { SidecarRegistry } from '../sidecar/registry.js';
+import { registerBuiltInProcessors } from '../sidecar/builtins.js';
+import { PipelineOrchestrator } from '../sidecar/orchestrator.js';
+import type { ConcreteNode, ToolExecution } from '../ir/types.js';
+import type { ContextEnvironment } from '../sidecar/environment.js';
+import type { Config } from '../../config/config.js';
+import type { BaseLlmClient } from '../../core/baseLlmClient.js';
+import type { Content, GenerateContentResponse } from '@google/genai';
+import { InboxSnapshotImpl } from '../sidecar/inbox.js';
+import type { InboxMessage, ProcessArgs } from '../pipeline.js';
 
-export function createDummyState(
-  isSatisfied = false,
-  deficit = 0,
-  protectedIds = new Set<string>(),
-  currentTokens = 5000,
-  maxTokens = 10000,
-  retainedTokens = 4000,
-): ContextAccountingState {
+/**
+ * Creates a valid mock GenerateContentResponse with the provided text.
+ * Used to avoid having to manually construct the deeply nested candidate/content/part structure.
+ */
+export const createMockGenerateContentResponse = (
+  text: string,
+): GenerateContentResponse =>
+  // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
+  ({
+    candidates: [{ content: { role: 'model', parts: [{ text }] }, index: 0 }],
+  }) as GenerateContentResponse;
+
+export function createDummyNode(
+  logicalParentId: string,
+  type: ConcreteNode['type'],
+  tokens = 100,
+  overrides?: Partial<ConcreteNode>,
+  id?: string,
+): ConcreteNode {
+  // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
   return {
-    currentTokens,
-    maxTokens,
-    retainedTokens,
-    deficitTokens: deficit,
-    protectedEpisodeIds: protectedIds,
-    isBudgetSatisfied: isSatisfied,
-  };
+    id: id || randomUUID(),
+    episodeId: logicalParentId,
+    logicalParentId,
+    type,
+    timestamp: Date.now(),
+    text: `Dummy ${type}`,
+    name: type === 'SYSTEM_EVENT' ? 'dummy_event' : undefined,
+    payload: type === 'SYSTEM_EVENT' ? {} : undefined,
+    semanticParts: [],
+    metadata: {
+      originalTokens: tokens,
+      currentTokens: tokens,
+      transformations: [],
+    },
+    ...overrides,
+  } as unknown as ConcreteNode;
 }
 
-export function createDummyEpisode(
-  id: string,
-  type: 'USER_PROMPT' | 'SYSTEM_EVENT',
-  parts: SemanticPart[] = [],
-  toolSteps: Array<{
-    intent: Record<string, unknown>;
-    observation: Record<string, unknown>;
-    toolName?: string;
-    tokens?: { intent: number; observation: number };
-  }> = [],
-): Episode {
-  let trigger: UserPrompt | SystemEvent;
+export function createDummyToolNode(
+  logicalParentId: string,
+  intentTokens = 100,
+  obsTokens = 200,
+  overrides?: Partial<ToolExecution>,
+  id?: string,
+): ToolExecution {
+  // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
+  return {
+    id: id || randomUUID(),
+    episodeId: logicalParentId,
+    logicalParentId,
+    type: 'TOOL_EXECUTION',
+    timestamp: Date.now(),
+    toolName: 'dummy_tool',
+    intent: { action: 'test' },
+    observation: { result: 'ok' },
+    tokens: {
+      intent: intentTokens,
+      observation: obsTokens,
+    },
+    metadata: {
+      originalTokens: intentTokens + obsTokens,
+      currentTokens: intentTokens + obsTokens,
+      transformations: [],
+    },
+    ...overrides,
+  } as unknown as ToolExecution;
+}
 
-  if (type === 'USER_PROMPT') {
-    trigger = {
-      id: randomUUID(),
-      type: 'USER_PROMPT',
-      semanticParts: parts,
-      metadata: {
-        originalTokens: 100,
-        currentTokens: 100,
-        transformations: [],
-      },
-    };
+import type { Mock } from 'vitest';
+import type { SidecarConfig } from '../sidecar/types.js';
+
+export interface MockLlmClient extends BaseLlmClient {
+  generateContent: Mock;
+}
+
+export function createMockLlmClient(
+  responses?: Array<string | GenerateContentResponse>,
+): MockLlmClient {
+  const generateContentMock = vi.fn();
+
+  if (responses && responses.length > 0) {
+    for (const response of responses) {
+      if (typeof response === 'string') {
+        generateContentMock.mockResolvedValueOnce(
+          createMockGenerateContentResponse(response),
+        );
+      } else {
+        generateContentMock.mockResolvedValueOnce(response);
+      }
+    }
+    // Fallback to the last response for any subsequent calls
+    const lastResponse = responses[responses.length - 1];
+    if (typeof lastResponse === 'string') {
+      generateContentMock.mockResolvedValue(
+        createMockGenerateContentResponse(lastResponse),
+      );
+    } else {
+      generateContentMock.mockResolvedValue(lastResponse);
+    }
   } else {
-    trigger = {
-      id: randomUUID(),
-      type: 'SYSTEM_EVENT',
-      name: 'dummy_event',
-      payload: {},
-      metadata: {
-        originalTokens: 100,
-        currentTokens: 100,
-        transformations: [],
-      },
-    };
+    // Default fallback
+    generateContentMock.mockResolvedValue(
+      createMockGenerateContentResponse('Mock LLM response'),
+    );
   }
 
+  // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
   return {
-    id,
-    timestamp: Date.now(),
-    trigger,
-    steps: toolSteps.map((step) => ({
-      id: randomUUID(),
-      type: 'TOOL_EXECUTION',
-      toolName: step.toolName || 'test_tool',
-      intent: step.intent,
-      observation: step.observation,
-      tokens: step.tokens || { intent: 50, observation: 50 },
-      metadata: {
-        originalTokens: 100,
-        currentTokens: 100,
-        transformations: [],
-      },
-    })),
-  };
+    generateContent: generateContentMock,
+  } as unknown as MockLlmClient;
 }
 
-export function createMockEnvironment(): ContextEnvironment {
-  return {
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
-    llmClient: vi.fn().mockReturnValue({
-      generateContent: vi.fn().mockResolvedValue({
-        text: 'Mock LLM summary response',
-      }),
-    })() as unknown as BaseLlmClient,
-    promptId: 'mock-prompt-id',
+export function createMockEnvironment(
+  overrides?: Partial<ContextEnvironment>,
+): ContextEnvironment {
+  const llmClient = createMockLlmClient(['Mock LLM summary response']);
+
+  const tracer = new ContextTracer({
+    targetDir: '/tmp',
     sessionId: 'mock-session',
-    traceDir: '/tmp/.gemini/trace',
-    projectTempDir: '/tmp/.gemini/tool-outputs',
-    eventBus: new ContextEventBus(),
-    tracer: new ContextTracer({ targetDir: '/tmp', sessionId: 'mock-session' }),
-    charsPerToken: 1,
-    tokenCalculator: new ContextTokenCalculator(1),
-    fileSystem: new InMemoryFileSystem(),
-    idGenerator: new DeterministicIdGenerator('mock-uuid-'),
-  };
+  });
+  const eventBus = new ContextEventBus();
+
+  const env = new ContextEnvironmentImpl(
+    llmClient,
+    'mock-session',
+    'mock-prompt-id',
+    '/tmp/.gemini/trace',
+    '/tmp/.gemini/tool-outputs',
+    tracer,
+    1,
+    eventBus,
+    new InMemoryFileSystem(),
+    new DeterministicIdGenerator('mock-uuid-'),
+  );
+
+  if (overrides) {
+    Object.assign(env, overrides);
+  }
+  return env;
 }
 
 /**
  * Creates a block of synthetic conversation history designed to consume a specific number of tokens.
  * Assumes roughly 4 characters per token for standard English text.
  */
+import { ContextWorkingBufferImpl } from '../sidecar/contextWorkingBuffer.js';
+
+export function createMockProcessArgs(
+  targets: ConcreteNode[],
+  bufferNodes: ConcreteNode[] = [],
+  inboxMessages: InboxMessage[] = [],
+): ProcessArgs {
+  return {
+    targets,
+    buffer: ContextWorkingBufferImpl.initialize(
+      bufferNodes.length ? bufferNodes : targets,
+    ),
+    inbox: new InboxSnapshotImpl(inboxMessages),
+  };
+}
+
 export function createSyntheticHistory(
   numTurns: number,
   tokensPerTurn: number,
@@ -175,20 +241,15 @@ export function createMockContextConfig(
 /**
  * Wires up a full ContextManager component with an AgentChatHistory and active background workers.
  */
-import { ContextTracer } from '../tracer.js';
-import { ContextEnvironmentImpl } from '../sidecar/environmentImpl.js';
-import { SidecarLoader } from '../sidecar/SidecarLoader.js';
-import { ContextEventBus } from '../eventBus.js';
-import { ContextTokenCalculator } from '../utils/contextTokenCalculator.js';
-import type { BaseLlmClient } from 'src/core/baseLlmClient.js';
-import { ProcessorRegistry } from '../sidecar/registry.js';
-import { registerBuiltInProcessors } from '../sidecar/builtins.js';
 
-export function setupContextComponentTest(config: Config) {
+export function setupContextComponentTest(
+  config: Config,
+  sidecarOverride?: SidecarConfig,
+): { chatHistory: AgentChatHistory; contextManager: ContextManager } {
   const chatHistory = new AgentChatHistory();
-  const registry = new ProcessorRegistry();
+  const registry = new SidecarRegistry();
   registerBuiltInProcessors(registry);
-  const sidecar = SidecarLoader.fromConfig(config, registry);
+  const sidecar = sidecarOverride || SidecarLoader.fromConfig(config, registry);
   const tracer = new ContextTracer({
     targetDir: '/tmp',
     sessionId: 'test-session',
@@ -204,18 +265,23 @@ export function setupContextComponentTest(config: Config) {
     1,
     eventBus,
   );
-  const contextManager = ContextManager.create(
+
+  const orchestrator = new PipelineOrchestrator(
     sidecar,
     env,
+    eventBus,
     tracer,
-    undefined,
     registry,
   );
 
+  const contextManager = new ContextManager(
+    sidecar,
+    env,
+    tracer,
+    orchestrator,
+    chatHistory,
+  );
+
   // The async worker is now internally managed by ContextManager
-
-  // Subscribe to history to enable the Eager/Opportunistic triggers
-  contextManager.subscribeToHistory(chatHistory);
-
   return { chatHistory, contextManager };
 }

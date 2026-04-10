@@ -5,7 +5,7 @@
  */
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-
+import { testTruncateProfile } from './testing/testProfile.js';
 import {
   createSyntheticHistory,
   createMockContextConfig,
@@ -25,7 +25,10 @@ describe('ContextManager Sync Pressure Barrier Tests', () => {
   it('should instantly truncate history when maxTokens is exceeded using truncate strategy', async () => {
     // 1. Setup
     const config = createMockContextConfig();
-    const { chatHistory, contextManager } = setupContextComponentTest(config);
+    const { chatHistory, contextManager } = setupContextComponentTest(
+      config,
+      testTruncateProfile,
+    );
 
     // 2. Add System Prompt (Episode 0 - Protected)
     chatHistory.set([
@@ -60,9 +63,15 @@ describe('ContextManager Sync Pressure Barrier Tests', () => {
     expect(projection[0].role).toBe('user');
     expect(projection[0].parts![0].text).toBe('System prompt');
 
+    // Filter out synthetic Yield nodes (they are model responses without actual tool/text bodies)
+    const contentNodes = projection.filter(
+      (p) =>
+        p.parts && p.parts.some((part) => part.text && part.text !== 'Yield'),
+    );
+
     // Verify the latest turn is perfectly preserved at the back
-    const lastUser = projection[projection.length - 2];
-    const lastModel = projection[projection.length - 1];
+    const lastUser = contentNodes[contentNodes.length - 2];
+    const lastModel = contentNodes[contentNodes.length - 1];
 
     expect(lastUser.role).toBe('user');
     expect(lastUser.parts![0].text).toBe('Final question.');

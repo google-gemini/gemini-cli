@@ -6,80 +6,58 @@
 
 import type { Content } from '@google/genai';
 import type { AgentChatHistory } from '../core/agentChatHistory.js';
-import { debugLogger } from '../utils/debugLogger.js';
-import type { Episode } from './ir/types.js';
+import type { ConcreteNode } from './ir/types.js';
 import type { ContextEventBus } from './eventBus.js';
 import type { ContextTracer } from './tracer.js';
 import type { ContextEnvironment } from './sidecar/environment.js';
 import type { SidecarConfig } from './sidecar/types.js';
-import { PipelineOrchestrator } from './sidecar/orchestrator.js';
+import type { PipelineOrchestrator } from './sidecar/orchestrator.js';
 import { HistoryObserver } from './historyObserver.js';
-import { generateWorkingBufferView } from './ir/graphUtils.js';
 import { IrProjector } from './ir/projector.js';
-import { registerBuiltInProcessors } from './sidecar/builtins.js';
-import { ProcessorRegistry } from './sidecar/registry.js';
+import { ContextWorkingBufferImpl } from './sidecar/contextWorkingBuffer.js';
 
 export class ContextManager {
-  // The stateful, pristine Episodic Intermediate Representation graph.
-  // This allows the agent to remember and summarize continuously without losing data across turns.
-  private pristineEpisodes: Episode[] = [];
+  // The master state containing the pristine graph and current active graph.
+  private buffer: ContextWorkingBufferImpl =
+    ContextWorkingBufferImpl.initialize([]);
+  private pristineNodes: readonly ConcreteNode[] = [];
+
   private readonly eventBus: ContextEventBus;
 
   // Internal sub-components
-  // Synchronous processors are instantiated but effectively used as singletons within this class
-  private orchestrator: PipelineOrchestrator;
-  private historyObserver?: HistoryObserver;
+  private readonly orchestrator: PipelineOrchestrator;
+  private readonly historyObserver: HistoryObserver;
 
-  static create(
-    sidecar: SidecarConfig,
-    env: ContextEnvironment,
-    tracer: ContextTracer,
-    orchestrator?: PipelineOrchestrator,
-    registry?: ProcessorRegistry,
-  ): ContextManager {
-    if (!registry) {
-      registry = new ProcessorRegistry();
-      registerBuiltInProcessors(registry);
-    }
-    const orch =
-      orchestrator ||
-      new PipelineOrchestrator(sidecar, env, env.eventBus, tracer, registry);
-    return new ContextManager(sidecar, env, tracer, orch);
-  }
-
-  // Use ContextManager.create() instead
-  private constructor(
-    private sidecar: SidecarConfig,
-    private env: ContextEnvironment,
+  constructor(
+    private readonly sidecar: SidecarConfig,
+    private readonly env: ContextEnvironment,
     private readonly tracer: ContextTracer,
     orchestrator: PipelineOrchestrator,
+    chatHistory: AgentChatHistory,
   ) {
     this.eventBus = env.eventBus;
     this.orchestrator = orchestrator;
 
-    this.eventBus.onPristineHistoryUpdated((event) => {
-      this.pristineEpisodes = event.episodes;
-      this.evaluateTriggers();
-    });
+    this.historyObserver = new HistoryObserver(
+      chatHistory,
+      this.env.eventBus,
+      this.tracer,
+      this.env.tokenCalculator,
+      this.env.irMapper,
+    );
+    this.historyObserver.start();
 
-    this.eventBus.onVariantReady((event) => {
-      // Find the target episode in the pristine graph
-      const targetEp = this.pristineEpisodes.find(
-        (ep) => ep.id === event.targetId,
-      );
-      if (targetEp) {
-        if (!targetEp.variants) {
-          targetEp.variants = {};
-        }
-        targetEp.variants[event.variantId] = event.variant;
-        this.tracer.logEvent(
-          'ContextManager',
-          `Received async variant [${event.variantId}] for Episode ${event.targetId}`,
-        );
-        debugLogger.log(
-          `ContextManager: Received async variant [${event.variantId}] for Episode ${event.targetId}.`,
-        );
+    this.eventBus.onPristineHistoryUpdated((event) => {
+      this.pristineNodes = event.nodes;
+
+      const existingIds = new Set(this.buffer.nodes.map((n) => n.id));
+      const addedNodes = event.nodes.filter((n) => !existingIds.has(n.id));
+
+      if (addedNodes.length > 0) {
+        this.buffer = this.buffer.appendPristineNodes(addedNodes);
       }
+
+      this.evaluateTriggers(event.newNodes);
     });
   }
 
@@ -88,97 +66,93 @@ export class ContextManager {
    */
   shutdown() {
     this.orchestrator.shutdown();
-    if (this.historyObserver) {
-      this.historyObserver.stop();
-    }
+    this.historyObserver.stop();
   }
 
   /**
    * Evaluates if the current working buffer exceeds configured budget thresholds,
    * firing consolidation events if necessary.
    */
-  private evaluateTriggers() {
+  private evaluateTriggers(newNodes: Set<string>) {
     if (!this.sidecar.budget) return;
 
-    const workingBuffer = this.getWorkingBufferView();
-    const currentTokens =
-      this.env.tokenCalculator.calculateEpisodeListTokens(workingBuffer);
-
-    this.tracer.logEvent('ContextManager', 'Evaluated triggers', {
-      currentTokens,
-      retainedTokens: this.sidecar.budget.retainedTokens,
-    });
-
-    // 1. Eager Compute Trigger
-    this.eventBus.emitChunkReceived({ episodes: this.pristineEpisodes });
-
-    // 2. Budget Crossed Trigger
-    if (currentTokens > this.sidecar.budget.retainedTokens) {
-      const deficit = currentTokens - this.sidecar.budget.retainedTokens;
-      this.tracer.logEvent(
-        'ContextManager',
-        'Budget crossed. Emitting ConsolidationNeeded',
-        { deficit },
-      );
-      this.eventBus.emitConsolidationNeeded({
-        episodes: workingBuffer,
-        targetDeficit: deficit,
+    if (newNodes.size > 0) {
+      this.eventBus.emitChunkReceived({
+        nodes: this.buffer.nodes,
+        targetNodeIds: newNodes,
       });
     }
-  }
 
-  /**
-   * Subscribes to the core AgentChatHistory to natively track all message events,
-   * converting them seamlessly into pristine Episodes.
-   */
-  subscribeToHistory(chatHistory: AgentChatHistory) {
-    if (this.historyObserver) {
-      this.historyObserver.stop();
-    }
-
-    this.historyObserver = new HistoryObserver(
-      chatHistory,
-      this.eventBus,
-      this.tracer,
-      this.env.tokenCalculator,
+    const currentTokens = this.env.tokenCalculator.calculateConcreteListTokens(
+      this.buffer.nodes,
     );
-    this.historyObserver.start();
-  }
 
-  /**
-   * Generates a computed view of the pristine log.
-   * Sweeps backwards (newest to oldest), tracking rolling tokens.
-   * When rollingTokens > retainedTokens, it injects the "best" available ready variant
-   * (snapshot > summary > masked) instead of the raw text.
-   * Handles N-to-1 variant skipping automatically.
-   */
-  getWorkingBufferView(): Episode[] {
-    return generateWorkingBufferView(
-      this.pristineEpisodes,
-      this.sidecar.budget.retainedTokens,
-      this.tracer,
-      this.env,
-    );
-  }
+    if (currentTokens > this.sidecar.budget.retainedTokens) {
+      const agedOutNodes = new Set<string>();
+      let rollingTokens = 0;
+      // Walk backwards finding nodes that fall out of the retained budget
+      for (let i = this.buffer.nodes.length - 1; i >= 0; i--) {
+        const node = this.buffer.nodes[i];
+        rollingTokens += this.env.tokenCalculator.calculateConcreteListTokens([
+          node,
+        ]);
+        if (rollingTokens > this.sidecar.budget.retainedTokens) {
+          agedOutNodes.add(node.id);
+        }
+      }
 
-  /**
-   * Returns a temporary, compressed Content[] array to be used exclusively for the LLM request.
-   * This does NOT mutate the pristine episodic graph.
-   */
-  async projectCompressedHistory(): Promise<Content[]> {
-    this.tracer.logEvent('ContextManager', 'Projection requested.');
-    const protectedIds = new Set<string>();
-    if (this.pristineEpisodes.length > 0) {
-      protectedIds.add(this.pristineEpisodes[0].id); // Structural invariant
+      if (agedOutNodes.size > 0) {
+        this.eventBus.emitConsolidationNeeded({
+          nodes: this.buffer.nodes,
+          targetDeficit: currentTokens - this.sidecar.budget.retainedTokens,
+          targetNodeIds: agedOutNodes,
+        });
+      }
     }
+  }
 
-    return IrProjector.project(
-      this.getWorkingBufferView(),
+  /**
+   * Retrieves the raw, uncompressed Episodic IR graph.
+   * Useful for internal tool rendering (like the trace viewer).
+   * Note: This is an expensive, deep clone operation.
+   */
+  getPristineGraph(): readonly ConcreteNode[] {
+    return [...this.pristineNodes];
+  }
+
+  /**
+   * Generates a virtual view of the pristine graph, substituting in variants
+   * up to the configured token budget.
+   * This is the view that will eventually be projected back to the LLM.
+   */
+  getNodes(): readonly ConcreteNode[] {
+    return [...this.buffer.nodes];
+  }
+
+  /**
+   * Executes the final 'gc_backstop' pipeline if necessary, enforcing the token budget,
+   * and maps the Episodic IR back into a raw Gemini Content[] array for transmission.
+   * This is the primary method called by the agent framework before sending a request.
+   */
+  async projectCompressedHistory(
+    activeTaskIds: Set<string> = new Set(),
+  ): Promise<Content[]> {
+    this.tracer.logEvent(
+      'ContextManager',
+      'Starting projection to LLM context',
+    );
+    // Apply final GC Backstop pressure barrier synchronously before mapping
+    const finalHistory = await IrProjector.project(
+      this.buffer.nodes,
       this.orchestrator,
       this.sidecar,
       this.tracer,
       this.env,
-      protectedIds,
+      activeTaskIds,
     );
+
+    this.tracer.logEvent('ContextManager', 'Finished projection');
+
+    return finalHistory;
   }
 }

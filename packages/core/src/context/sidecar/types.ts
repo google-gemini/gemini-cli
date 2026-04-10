@@ -4,8 +4,6 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import type { StateSnapshotProcessorOptions } from '../processors/stateSnapshotProcessor.js';
-
 /**
  * Definition of a processor or worker to be instantiated in the graph.
  */
@@ -16,32 +14,36 @@ export type ProcessorConfig =
     }
   | { processorId: 'BlobDegradationProcessor'; options?: object }
   | {
-      processorId: 'SemanticCompressionProcessor';
+      processorId: 'NodeDistillationProcessor';
       options: { nodeThresholdTokens: number };
     }
   | {
-      processorId: 'HistorySquashingProcessor';
+      processorId: 'NodeTruncationProcessor';
       options: { maxTokensPerNode: number };
     }
   | {
       processorId: 'StateSnapshotProcessor';
-      options: StateSnapshotProcessorOptions;
+      options?: Record<string, unknown>;
     }
   | {
-      processorId: 'EmergencyTruncationProcessor';
+      processorId: 'HistoryTruncationProcessor';
       options?: Record<string, unknown>;
     };
 
+export interface WorkerConfig {
+  workerId: string;
+  options?: Record<string, unknown>;
+}
+
 export type PipelineTrigger =
-  | 'on_turn'
-  | 'post_turn'
-  | 'budget_exceeded'
+  | 'new_message'
+  | 'retained_exceeded'
+  | 'gc_backstop'
   | { type: 'timer'; intervalMs: number };
 
 export interface PipelineDef {
   name: string;
   triggers: PipelineTrigger[];
-  execution: 'blocking' | 'background';
   processors: ProcessorConfig[];
 }
 
@@ -55,13 +57,9 @@ export interface SidecarConfig {
     maxTokens: number;
   };
 
-  /** Defines what happens when the pipeline fails to compress under 'maxTokens' */
-  gcBackstop: {
-    strategy: 'truncate' | 'compress' | 'rollingSummarizer';
-    target: 'incremental' | 'freeNTokens' | 'max';
-    freeTokensTarget?: number;
-  };
-
   /** The execution graphs for context manipulation */
   pipelines: PipelineDef[];
+
+  /** Background actors that generate data for pipelines */
+  workers?: WorkerConfig[];
 }

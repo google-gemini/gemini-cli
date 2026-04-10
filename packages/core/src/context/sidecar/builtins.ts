@@ -3,125 +3,83 @@
  * Copyright 2026 Google LLC
  * SPDX-License-Identifier: Apache-2.0
  */
-
-import type { ProcessorRegistry } from './registry.js';
+import type { SidecarRegistry } from './registry.js';
+import {
+  HistoryTruncationProcessor,
+  type HistoryTruncationProcessorOptions,
+} from '../processors/historyTruncationProcessor.js';
+import { BlobDegradationProcessor } from '../processors/blobDegradationProcessor.js';
+import {
+  NodeTruncationProcessor,
+  type NodeTruncationProcessorOptions,
+} from '../processors/nodeTruncationProcessor.js';
+import {
+  NodeDistillationProcessor,
+  type NodeDistillationProcessorOptions,
+} from '../processors/nodeDistillationProcessor.js';
 import {
   ToolMaskingProcessor,
   type ToolMaskingProcessorOptions,
 } from '../processors/toolMaskingProcessor.js';
-import { BlobDegradationProcessor } from '../processors/blobDegradationProcessor.js';
-import {
-  SemanticCompressionProcessor,
-  type SemanticCompressionProcessorOptions,
-} from '../processors/semanticCompressionProcessor.js';
-import {
-  HistorySquashingProcessor,
-  type HistorySquashingProcessorOptions,
-} from '../processors/historySquashingProcessor.js';
 import {
   StateSnapshotProcessor,
   type StateSnapshotProcessorOptions,
 } from '../processors/stateSnapshotProcessor.js';
 import {
-  EmergencyTruncationProcessor,
-  type EmergencyTruncationProcessorOptions,
-} from '../processors/emergencyTruncationProcessor.js';
+  StateSnapshotWorker,
+  type StateSnapshotWorkerOptions,
+} from '../processors/stateSnapshotWorker.js';
+import {
+  RollingSummaryProcessor,
+  type RollingSummaryProcessorOptions,
+} from '../processors/rollingSummaryProcessor.js';
 
-export function registerBuiltInProcessors(registry: ProcessorRegistry) {
-  registry.register<ToolMaskingProcessorOptions>({
-    id: 'ToolMaskingProcessor',
-    schema: {
-      type: 'object',
-      properties: {
-        processorId: { const: 'ToolMaskingProcessor' },
-        options: {
-          type: 'object',
-          properties: { stringLengthThresholdTokens: { type: 'number' } },
-          required: ['stringLengthThresholdTokens'],
-        },
-      },
-      required: ['processorId', 'options'],
-    },
-    create: (env, opts) => new ToolMaskingProcessor(env, opts),
-  });
-
-  registry.register<Record<string, never>>({
+export function registerBuiltInProcessors(registry: SidecarRegistry) {
+  registry.registerProcessor<Record<string, never>>({
     id: 'BlobDegradationProcessor',
-    schema: {
-      type: 'object',
-      properties: {
-        processorId: { const: 'BlobDegradationProcessor' },
-        options: { type: 'object' },
-      },
-      required: ['processorId'],
-    },
+    schema: { type: 'object', properties: {} },
     create: (env) => new BlobDegradationProcessor(env),
   });
 
-  registry.register<SemanticCompressionProcessorOptions>({
-    id: 'SemanticCompressionProcessor',
-    schema: {
-      type: 'object',
-      properties: {
-        processorId: { const: 'SemanticCompressionProcessor' },
-        options: {
-          type: 'object',
-          properties: { nodeThresholdTokens: { type: 'number' } },
-          required: ['nodeThresholdTokens'],
-        },
-      },
-      required: ['processorId', 'options'],
-    },
-    create: (env, opts) => new SemanticCompressionProcessor(env, opts),
+  registry.registerProcessor<HistoryTruncationProcessorOptions>({
+    id: 'HistoryTruncationProcessor',
+    schema: HistoryTruncationProcessor.schema,
+    create: (env, options) => HistoryTruncationProcessor.create(env, options),
   });
 
-  registry.register<HistorySquashingProcessorOptions>({
-    id: 'HistorySquashingProcessor',
-    schema: {
-      type: 'object',
-      properties: {
-        processorId: { const: 'HistorySquashingProcessor' },
-        options: {
-          type: 'object',
-          properties: { maxTokensPerNode: { type: 'number' } },
-          required: ['maxTokensPerNode'],
-        },
-      },
-      required: ['processorId', 'options'],
-    },
-    create: (env, opts) => new HistorySquashingProcessor(env, opts),
+  registry.registerProcessor<NodeTruncationProcessorOptions>({
+    id: 'NodeTruncationProcessor',
+    schema: NodeTruncationProcessor.schema,
+    create: (env, options) => NodeTruncationProcessor.create(env, options),
   });
 
-  registry.register<StateSnapshotProcessorOptions>({
+  registry.registerProcessor<NodeDistillationProcessorOptions>({
+    id: 'NodeDistillationProcessor',
+    schema: NodeDistillationProcessor.schema,
+    create: (env, options) => NodeDistillationProcessor.create(env, options),
+  });
+
+  registry.registerProcessor<ToolMaskingProcessorOptions>({
+    id: 'ToolMaskingProcessor',
+    schema: ToolMaskingProcessor.schema,
+    create: (env, options) => ToolMaskingProcessor.create(env, options),
+  });
+
+  registry.registerProcessor<StateSnapshotProcessorOptions>({
     id: 'StateSnapshotProcessor',
-    schema: {
-      type: 'object',
-      properties: {
-        processorId: { const: 'StateSnapshotProcessor' },
-        options: {
-          type: 'object',
-          properties: {
-            model: { type: 'string' },
-            systemInstruction: { type: 'string' },
-            triggerDeficitTokens: { type: 'number' },
-          },
-        },
-      },
-      required: ['processorId'],
-    },
-    create: (env, opts) => StateSnapshotProcessor.create(env, opts),
+    schema: StateSnapshotProcessor.schema,
+    create: (env, options) => StateSnapshotProcessor.create(env, options),
   });
 
-  registry.register<EmergencyTruncationProcessorOptions>({
-    id: 'EmergencyTruncationProcessor',
-    schema: {
-      type: 'object',
-      properties: {
-        processorId: { const: 'EmergencyTruncationProcessor' },
-        options: { type: 'object' },
-      },
-      required: ['processorId'],
-    },
-    create: (env, opts) => EmergencyTruncationProcessor.create(env, opts),
+  registry.registerWorker<StateSnapshotWorkerOptions>({
+    id: 'StateSnapshotWorker',
+    schema: StateSnapshotWorker.schema,
+    create: (env, options) => StateSnapshotWorker.create(env, options),
+  });
+
+  registry.registerProcessor<RollingSummaryProcessorOptions>({
+    id: 'RollingSummaryProcessor',
+    schema: RollingSummaryProcessor.schema,
+    create: (env, options) => RollingSummaryProcessor.create(env, options),
   });
 }

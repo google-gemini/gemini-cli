@@ -6,8 +6,8 @@
 
 import { describe, it, expect, vi, beforeAll, afterAll } from 'vitest';
 import { SimulationHarness } from './SimulationHarness.js';
+import { createMockLlmClient } from '../testing/contextTestUtils.js';
 import type { SidecarConfig } from '../sidecar/types.js';
-import type { BaseLlmClient } from '../../core/baseLlmClient.js';
 
 expect.addSnapshotSerializer({
   test: (val) =>
@@ -32,38 +32,34 @@ describe('System Lifecycle Golden Tests', () => {
   });
 
   const getAggressiveConfig = (): SidecarConfig => ({
-    budget: { maxTokens: 4000, retainedTokens: 2000 }, // Extremely tight limits
-    gcBackstop: { strategy: 'truncate', target: 'max' },
+    budget: { maxTokens: 1000, retainedTokens: 500 }, // Extremely tight limits
     pipelines: [
       {
-        name: 'Pressure Relief', // Emits from eventBus 'budget_exceeded'
-        execution: 'background',
-        triggers: ['budget_exceeded'],
+        name: 'Pressure Relief', // Emits from eventBus 'retained_exceeded'
+        triggers: ['retained_exceeded'],
         processors: [
           { processorId: 'BlobDegradationProcessor' },
           {
             processorId: 'ToolMaskingProcessor',
             options: { stringLengthThresholdTokens: 50 },
-          }, // Mask any tool string > 200 chars
+          }, // Mask any tool string > 50 chars
           { processorId: 'StateSnapshotProcessor', options: {} }, // Squash old history
         ],
       },
       {
         name: 'Immediate Sanitization', // The magic string the projector is hardcoded to use
-        execution: 'blocking',
-        triggers: ['budget_exceeded'],
+        triggers: ['retained_exceeded'],
         processors: [
-          { processorId: 'EmergencyTruncationProcessor', options: {} },
+          { processorId: 'HistoryTruncationProcessor', options: {} },
         ],
       },
     ],
+    workers: [{ workerId: 'StateSnapshotWorker' }],
   });
 
-  const mockLlmClient = {
-    generateContent: vi.fn().mockResolvedValue({
-      text: '<MOCKED_STATE_SNAPSHOT_SUMMARY>',
-    }),
-  } as unknown as BaseLlmClient;
+  const mockLlmClient = createMockLlmClient([
+    '<MOCKED_STATE_SNAPSHOT_SUMMARY>',
+  ]);
 
   it('Scenario 1: Organic Growth with Huge Tool Output & Images', async () => {
     const harness = await SimulationHarness.create(
@@ -141,6 +137,74 @@ describe('System Lifecycle Golden Tests', () => {
     // the massive spikes in Turn 2 and 3 being immediately resolved by the background tasks.
     // The final projection should fit neatly under the Max Tokens limit.
 
+    expect(goldenState).toMatchSnapshot();
+  });
+
+  it('Scenario 2: Under Budget (No Modifications)', async () => {
+    const generousConfig: SidecarConfig = {
+      budget: { maxTokens: 100000, retainedTokens: 50000 },
+      pipelines: [], // No triggers
+      workers: [],
+    };
+
+    const harness = await SimulationHarness.create(
+      generousConfig,
+      mockLlmClient,
+    );
+
+    // Turn 0: System Prompt
+    await harness.simulateTurn([
+      { role: 'user', parts: [{ text: 'System Instructions' }] },
+      { role: 'model', parts: [{ text: 'Ack.' }] },
+    ]);
+
+    // Turn 1: Normal conversation
+    await harness.simulateTurn([
+      { role: 'user', parts: [{ text: 'Hello!' }] },
+      { role: 'model', parts: [{ text: 'Hi, how can I help?' }] },
+    ]);
+
+    const goldenState = await harness.getGoldenState();
+
+    // Total tokens should cleanly match character count with no synthetic nodes
+    expect(goldenState).toMatchSnapshot();
+  });
+
+  it('Scenario 3: Worker-Driven Background GC', async () => {
+    const gcConfig: SidecarConfig = {
+      budget: { maxTokens: 200, retainedTokens: 100 },
+      pipelines: [], // No standard pipelines
+      workers: [
+        { workerId: 'StateSnapshotWorker' }, // This should fire on chunk events
+      ],
+    };
+
+    const harness = await SimulationHarness.create(gcConfig, mockLlmClient);
+
+    // Turn 0
+    await harness.simulateTurn([
+      { role: 'user', parts: [{ text: 'A'.repeat(50) }] },
+      { role: 'model', parts: [{ text: 'B'.repeat(50) }] },
+    ]);
+
+    // Turn 1 (Should trigger StateSnapshotWorker because we exceed 100 retainedTokens)
+    await harness.simulateTurn([
+      { role: 'user', parts: [{ text: 'C'.repeat(50) }] },
+      { role: 'model', parts: [{ text: 'D'.repeat(50) }] },
+    ]);
+
+    // Give the background worker an extra beat to complete its async execution and emit variants
+    await new Promise((resolve) => setTimeout(resolve, 50));
+
+    // Turn 2
+    await harness.simulateTurn([
+      { role: 'user', parts: [{ text: 'E'.repeat(50) }] },
+      { role: 'model', parts: [{ text: 'F'.repeat(50) }] },
+    ]);
+
+    const goldenState = await harness.getGoldenState();
+
+    // We should see ROLLING_SUMMARY nodes injected into the graph, proving the worker ran in the background
     expect(goldenState).toMatchSnapshot();
   });
 });

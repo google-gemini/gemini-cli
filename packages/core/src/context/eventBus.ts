@@ -5,25 +5,22 @@
  */
 
 import { EventEmitter } from 'node:events';
-import type { Episode, Variant } from './ir/types.js';
+import type { ConcreteNode } from './ir/types.js';
 
 export interface PristineHistoryUpdatedEvent {
-  episodes: Episode[];
+  nodes: readonly ConcreteNode[];
+  newNodes: Set<string>;
 }
 
 export interface ContextConsolidationEvent {
-  episodes: Episode[];
+  nodes: readonly ConcreteNode[];
   targetDeficit: number;
+  targetNodeIds: Set<string>;
 }
 
 export interface IrChunkReceivedEvent {
-  episodes: Episode[];
-}
-
-export interface VariantReadyEvent {
-  targetId: string; // The Episode or Step ID this variant attaches to
-  variantId: string; // A unique ID for the variant itself
-  variant: Variant;
+  nodes: readonly ConcreteNode[];
+  targetNodeIds: Set<string>;
 }
 
 export class ContextEventBus extends EventEmitter {
@@ -51,13 +48,5 @@ export class ContextEventBus extends EventEmitter {
 
   onConsolidationNeeded(listener: (event: ContextConsolidationEvent) => void) {
     this.on('BUDGET_RETAINED_CROSSED', listener);
-  }
-
-  emitVariantReady(event: VariantReadyEvent) {
-    this.emit('VARIANT_READY', event);
-  }
-
-  onVariantReady(listener: (event: VariantReadyEvent) => void) {
-    this.on('VARIANT_READY', listener);
   }
 }

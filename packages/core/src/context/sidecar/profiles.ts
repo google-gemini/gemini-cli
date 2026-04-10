@@ -15,39 +15,48 @@ export const defaultSidecarProfile: SidecarConfig = {
     retainedTokens: 65000,
     maxTokens: 150000,
   },
-  gcBackstop: {
-    strategy: 'truncate',
-    target: 'incremental',
-    freeTokensTarget: 10000,
-  },
+  workers: [
+    {
+      workerId: 'StateSnapshotWorker',
+      options: {
+        type: 'accumulate',
+      },
+    },
+  ],
   pipelines: [
     {
       name: 'Immediate Sanitization',
-      triggers: ['on_turn'],
-      execution: 'blocking',
+      triggers: ['new_message'],
       processors: [
         {
           processorId: 'ToolMaskingProcessor',
           options: { stringLengthThresholdTokens: 8000 },
         },
         { processorId: 'BlobDegradationProcessor', options: {} },
-        {
-          processorId: 'SemanticCompressionProcessor',
-          options: { nodeThresholdTokens: 5000 },
-        },
-        { processorId: 'EmergencyTruncationProcessor', options: {} },
       ],
     },
     {
-      name: 'Deep Background Compression',
-      triggers: [{ type: 'timer', intervalMs: 5000 }, 'budget_exceeded'],
-      execution: 'background',
+      name: 'Normalization',
+      triggers: ['retained_exceeded'],
       processors: [
         {
-          processorId: 'HistorySquashingProcessor',
+          processorId: 'NodeTruncationProcessor',
           options: { maxTokensPerNode: 3000 },
         },
-        { processorId: 'StateSnapshotProcessor', options: {} },
+        {
+          processorId: 'NodeDistillationProcessor',
+          options: { nodeThresholdTokens: 5000 },
+        },
+      ],
+    },
+    {
+      name: 'Emergency Backstop',
+      triggers: ['gc_backstop'],
+      processors: [
+        {
+          processorId: 'StateSnapshotProcessor',
+          options: { target: 'max' },
+        },
       ],
     },
   ],
