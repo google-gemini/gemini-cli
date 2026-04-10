@@ -93,8 +93,7 @@ const createErrorResponse = (
  * Coordinates execution via state updates and event listening.
  */
 export class Scheduler {
-  // Tracks which MessageBus instances have the legacy listener attached to prevent duplicates.
-  private static subscribedMessageBuses = new WeakSet<MessageBus>();
+  private readonly disposeController = new AbortController();
 
   private readonly state: SchedulerStateManager;
   private readonly executor: ToolExecutor;
@@ -136,6 +135,7 @@ export class Scheduler {
 
   dispose(): void {
     coreEvents.off(CoreEvent.McpProgress, this.handleMcpProgress);
+    this.disposeController.abort();
   }
 
   private readonly handleMcpProgress = (payload: McpProgressPayload) => {
@@ -163,26 +163,25 @@ export class Scheduler {
     });
   };
 
-  private setupMessageBusListener(messageBus: MessageBus): void {
-    if (Scheduler.subscribedMessageBuses.has(messageBus)) {
-      return;
-    }
+  private readonly handleToolConfirmationRequest = async (
+    request: ToolConfirmationRequest,
+  ) => {
+    await this.messageBus.publish({
+      type: MessageBusType.TOOL_CONFIRMATION_RESPONSE,
+      correlationId: request.correlationId,
+      confirmed: false,
+      requiresUserConfirmation: true,
+    });
+  };
 
+  private setupMessageBusListener(messageBus: MessageBus): void {
     // TODO: Optimize policy checks. Currently, tools check policy via
     // MessageBus even though the Scheduler already checked it.
     messageBus.subscribe(
       MessageBusType.TOOL_CONFIRMATION_REQUEST,
-      async (request: ToolConfirmationRequest) => {
-        await messageBus.publish({
-          type: MessageBusType.TOOL_CONFIRMATION_RESPONSE,
-          correlationId: request.correlationId,
-          confirmed: false,
-          requiresUserConfirmation: true,
-        });
-      },
+      this.handleToolConfirmationRequest,
+      { signal: this.disposeController.signal },
     );
-
-    Scheduler.subscribedMessageBuses.add(messageBus);
   }
 
   /**
@@ -197,6 +196,7 @@ export class Scheduler {
       {
         operation: GeminiCliOperation.ScheduleToolCalls,
         logPrompts: this.context.config.getTelemetryLogPromptsEnabled(),
+        sessionId: this.context.config.getSessionId(),
       },
       async ({ metadata: spanMetadata }) => {
         const requests = Array.isArray(request) ? request : [request];
