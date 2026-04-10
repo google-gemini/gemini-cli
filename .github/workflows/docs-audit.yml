@@ -26,7 +26,7 @@ jobs:
           node-version: '20'
 
       - name: 'Run Docs Audit with Gemini'
-        id: run_gemini
+        id: 'run_gemini'
         uses: 'google-github-actions/run-gemini-cli@a3bf79042542528e91937b3a3a6fbc4967ee3c31'
         with:
           gemini_api_key: '${{ secrets.GEMINI_API_KEY }}'
@@ -37,8 +37,9 @@ jobs:
             Provide a detailed summary of the changes you make.
 
       - name: 'Get current date'
-        id: date
-        run: echo "date=$(date +'%Y-%m-%d')" >> "$GITHUB_OUTPUT"
+        id: 'date'
+        run: |
+          echo "date=$(date +'%Y-%m-%d')" >> "$GITHUB_OUTPUT"
 
       - name: 'Create Pull Request with Audit Results'
         uses: 'peter-evans/create-pull-request@c5a7806660adbe173f04e3e038b0ccdcd758773c'
