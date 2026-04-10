@@ -113,12 +113,24 @@ each tool.
 | :-------------- | :------ | :----------------------------------------------------------------------------------------------------------------- |
 | `complete_task` | `Other` | Finalizes a subagent's mission and returns the result to the parent agent. This tool is not available to the user. |
 
+### Task Tracking
+
+| Tool                     | Kind    | Description                                                                 |
+| :----------------------- | :------ | :-------------------------------------------------------------------------- |
+| `tracker_add_dependency` | `Think` | Adds a dependency between two existing tasks in the tracker.                |
+| `tracker_create_task`    | `Think` | Creates a new task in the internal tracker to monitor progress.             |
+| `tracker_get_task`       | `Think` | Retrieves the details and current status of a specific tracked task.        |
+| `tracker_list_tasks`     | `Think` | Lists all tasks currently being tracked.                                    |
+| `tracker_update_task`    | `Think` | Updates the status or details of an existing task.                          |
+| `tracker_visualize`      | `Think` | Generates a visual representation of the current task dependency graph.     |
+| `update_topic`           | `Think` | Updates the current topic and status to keep the user informed of progress. |
+
 ### Web
 
-| Tool                                          | Kind     | Description                                                                                                                                                                                                                                                              |
-| :-------------------------------------------- | :------- | :----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| [`google_web_search`](../tools/web-search.md) | `Search` | Performs a Google Search to find up-to-date information.                                                                                                                                                                                                                 |
-| [`web_fetch`](../tools/web-fetch.md)          | `Fetch`  | Retrieves and processes content from specific URLs. **Warning:** This tool can access local and private network addresses (e.g., localhost), which may pose a security risk if used with untrusted prompts. In Plan Mode, this tool requires explicit user confirmation. |
+| Tool                                          | Kind     | Description                                                                                                                                                                                                                                                                     |
+| :-------------------------------------------- | :------- | :------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| [`google_web_search`](../tools/web-search.md) | `Search` | Performs a Google Search to find up-to-date information.                                                                                                                                                                                                                        |
+| [`web_fetch`](../tools/web-fetch.md)          | `Fetch`  | Retrieves and processes content from specific URLs. **Warning:** This tool can access local and private network addresses (for example, localhost), which may pose a security risk if used with untrusted prompts. In Plan Mode, this tool requires explicit user confirmation. |
 
 ## Under the hood
 

@@ -80,9 +80,9 @@ topics on:
       directory is in your `PATH`. You can update Gemini CLI using the command
       `npm install -g @google/gemini-cli@latest`.
     - If you are running `gemini` from source, ensure you are using the correct
-      command to invoke it (e.g., `node packages/cli/dist/index.js ...`). To
-      update Gemini CLI, pull the latest changes from the repository, and then
-      rebuild using the command `npm run build`.
+      command to invoke it (for example, `node packages/cli/dist/index.js ...`).
+      To update Gemini CLI, pull the latest changes from the repository, and
+      then rebuild using the command `npm run build`.
 
 - **Error: `MODULE_NOT_FOUND` or import errors.**
   - **Cause:** Dependencies are not installed correctly, or the project hasn't
@@ -101,18 +101,18 @@ topics on:
     configuration.
 
 - **Gemini CLI is not running in interactive mode in "CI" environments**
-  - **Issue:** The Gemini CLI does not enter interactive mode (no prompt
-    appears) if an environment variable starting with `CI_` (e.g., `CI_TOKEN`)
-    is set. This is because the `is-in-ci` package, used by the underlying UI
+  - **Issue:** Gemini CLI does not enter interactive mode (no prompt appears) if
+    an environment variable starting with `CI_` (for example, `CI_TOKEN`) is
+    set. This is because the `is-in-ci` package, used by the underlying UI
     framework, detects these variables and assumes a non-interactive CI
     environment.
   - **Cause:** The `is-in-ci` package checks for the presence of `CI`,
     `CONTINUOUS_INTEGRATION`, or any environment variable with a `CI_` prefix.
     When any of these are found, it signals that the environment is
-    non-interactive, which prevents the Gemini CLI from starting in its
-    interactive mode.
+    non-interactive, which prevents Gemini CLI from starting in its interactive
+    mode.
   - **Solution:** If the `CI_` prefixed variable is not needed for the CLI to
-    function, you can temporarily unset it for the command. e.g.,
+    function, you can temporarily unset it for the command. For example,
     `env -u CI_TOKEN gemini`
 
 - **DEBUG mode not working from project .env file**
@@ -126,7 +126,7 @@ topics on:
 
 - **Warning: `npm WARN deprecated node-domexception@1.0.0` or
   `npm WARN deprecated glob` during install/update**
-  - **Issue:** When installing or updating the Gemini CLI globally via
+  - **Issue:** When installing or updating Gemini CLI globally via
     `npm install -g @google/gemini-cli` or `npm update -g @google/gemini-cli`,
     you might see deprecation warnings regarding `node-domexception` or old
     versions of `glob`.
@@ -141,14 +141,14 @@ topics on:
 
 ## Exit codes
 
-The Gemini CLI uses specific exit codes to indicate the reason for termination.
-This is especially useful for scripting and automation.
+Gemini CLI uses specific exit codes to indicate the reason for termination. This
+is especially useful for scripting and automation.
 
 | Exit Code | Error Type                 | Description                                                                                         |
 | --------- | -------------------------- | --------------------------------------------------------------------------------------------------- |
 | 41        | `FatalAuthenticationError` | An error occurred during the authentication process.                                                |
 | 42        | `FatalInputError`          | Invalid or missing input was provided to the CLI. (non-interactive mode only)                       |
-| 44        | `FatalSandboxError`        | An error occurred with the sandboxing environment (e.g., Docker, Podman, or Seatbelt).              |
+| 44        | `FatalSandboxError`        | An error occurred with the sandboxing environment (for example, Docker, Podman, or Seatbelt).       |
 | 52        | `FatalConfigError`         | A configuration file (`settings.json`) is invalid or contains errors.                               |
 | 53        | `FatalTurnLimitedError`    | The maximum number of conversational turns for the session was reached. (non-interactive mode only) |
 
@@ -164,8 +164,8 @@ This is especially useful for scripting and automation.
   - Check the server console output for error messages or stack traces.
   - Increase log verbosity if configurable. For example, set the `DEBUG_MODE`
     environment variable to `true` or `1`.
-  - Use Node.js debugging tools (e.g., `node --inspect`) if you need to step
-    through server-side code.
+  - Use Node.js debugging tools (for example, `node --inspect`) if you need to
+    step through server-side code.
 
 - **Tool issues:**
   - If a specific tool is failing, try to isolate the issue by running the
@@ -182,7 +182,7 @@ This is especially useful for scripting and automation.
 ## Existing GitHub issues similar to yours or creating new issues
 
 If you encounter an issue that was not covered here in this _Troubleshooting
-guide_, consider searching the Gemini CLI
+guide_, consider searching Gemini CLI
 [Issue tracker on GitHub](https://github.com/google-gemini/gemini-cli/issues).
 If you can't find an issue similar to yours, consider creating a new GitHub
 Issue with a detailed description. Pull requests are also welcome!
