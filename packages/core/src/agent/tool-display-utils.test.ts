@@ -10,7 +10,12 @@ import type {
   ToolResult,
   ToolResultDisplay,
 } from '../tools/tools.js';
-import { populateToolDisplay } from './tool-display-utils.js';
+import type { DisplayContent } from './types.js';
+import {
+  populateToolDisplay,
+  renderDisplayDiff,
+  displayContentToString,
+} from './tool-display-utils.js';
 
 describe('tool-display-utils', () => {
   describe('populateToolDisplay', () => {
@@ -66,6 +71,54 @@ describe('tool-display-utils', () => {
         beforeText: 'old',
         afterText: 'new',
       });
+    });
+  });
+
+  describe('renderDisplayDiff', () => {
+    it('renders a universal diff', () => {
+      const diff = {
+        type: 'diff' as const,
+        path: 'test.ts',
+        beforeText: 'line 1\nline 2',
+        afterText: 'line 1\nline 2 modified',
+      };
+      const rendered = renderDisplayDiff(diff);
+      expect(rendered).toContain('--- test.ts\tOriginal');
+      expect(rendered).toContain('+++ test.ts\tModified');
+      expect(rendered).toContain('-line 2');
+      expect(rendered).toContain('+line 2 modified');
+    });
+  });
+
+  describe('displayContentToString', () => {
+    it('returns undefined for undefined input', () => {
+      expect(displayContentToString(undefined)).toBeUndefined();
+    });
+
+    it('returns text for text input', () => {
+      expect(displayContentToString({ type: 'text', text: 'hello' })).toBe(
+        'hello',
+      );
+    });
+
+    it('renders a diff for diff input', () => {
+      const diff = {
+        type: 'diff' as const,
+        path: 'test.ts',
+        beforeText: 'old',
+        afterText: 'new',
+      };
+      const rendered = displayContentToString(diff);
+      expect(rendered).toContain('--- test.ts\tOriginal');
+      expect(rendered).toContain('+++ test.ts\tModified');
+    });
+
+    it('stringifies unknown structured objects', () => {
+      const unknown = {
+        type: 'something_else',
+        data: 123,
+      } as unknown as DisplayContent;
+      expect(displayContentToString(unknown)).toBe(JSON.stringify(unknown));
     });
   });
 });

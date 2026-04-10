@@ -4,12 +4,13 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+import * as Diff from 'diff';
 import type {
   ToolInvocation,
   ToolResult,
   ToolResultDisplay,
 } from '../tools/tools.js';
-import type { ToolDisplay, DisplayContent } from './types.js';
+import type { ToolDisplay, DisplayContent, DisplayDiff } from './types.js';
 
 /**
  * Populates a ToolDisplay object from a tool invocation and its result.
@@ -69,4 +70,37 @@ export function toolResultDisplayToDisplayContent(
     type: 'text',
     text: JSON.stringify(resultDisplay),
   };
+}
+
+/**
+ * Renders a universal diff string from a DisplayDiff object.
+ */
+export function renderDisplayDiff(diff: DisplayDiff): string {
+  return Diff.createPatch(
+    diff.path || 'file',
+    diff.beforeText,
+    diff.afterText,
+    'Original',
+    'Modified',
+    { context: 3 },
+  );
+}
+
+/**
+ * Converts a DisplayContent object into a string representation.
+ * Useful for fallback displays or non-interactive environments.
+ */
+export function displayContentToString(
+  display: DisplayContent | undefined,
+): string | undefined {
+  if (!display) {
+    return undefined;
+  }
+  if (display.type === 'text') {
+    return display.text;
+  }
+  if (display.type === 'diff') {
+    return renderDisplayDiff(display);
+  }
+  return JSON.stringify(display);
 }

@@ -10,6 +10,7 @@ import {
   MessageSenderType,
   debugLogger,
   geminiPartsToContentParts,
+  displayContentToString,
   parseThought,
   CoreToolCallStatus,
   type ApprovalMode,
@@ -223,10 +224,9 @@ export const useAgentStream = ({
               else if (evtStatus === 'success')
                 status = CoreToolCallStatus.Success;
 
+              const display = event.display?.result;
               const liveOutput =
-                event.display?.result?.type === 'text'
-                  ? event.display.result.text
-                  : tc.resultDisplay;
+                displayContentToString(display) ?? tc.resultDisplay;
               const progressMessage =
                 legacyState?.progressMessage ?? tc.progressMessage;
               const progress = legacyState?.progress ?? tc.progress;
@@ -238,7 +238,9 @@ export const useAgentStream = ({
               return {
                 ...tc,
                 status,
-                display: event.display ?? tc.display,
+                display: event.display
+                  ? { ...tc.display, ...event.display }
+                  : tc.display,
                 resultDisplay: liveOutput,
                 progressMessage,
                 progress,
@@ -257,17 +259,18 @@ export const useAgentStream = ({
 
               const legacyState = event._meta?.legacyState;
               const outputFile = legacyState?.outputFile;
+              const display = event.display?.result;
               const resultDisplay =
-                event.display?.result?.type === 'text'
-                  ? event.display.result.text
-                  : tc.resultDisplay;
+                displayContentToString(display) ?? tc.resultDisplay;
 
               return {
                 ...tc,
                 status: event.isError
                   ? CoreToolCallStatus.Error
                   : CoreToolCallStatus.Success,
-                display: event.display ?? tc.display,
+                display: event.display
+                  ? { ...tc.display, ...event.display }
+                  : tc.display,
                 resultDisplay,
                 outputFile,
               };
