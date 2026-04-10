@@ -26,6 +26,7 @@ import {
   ENTER_PLAN_MODE_TOOL_NAME,
   GLOB_TOOL_NAME,
   GREP_TOOL_NAME,
+  AGENT_TOOL_NAME,
 } from '../tools/tool-names.js';
 import { resolveModel, supportsModernFeatures } from '../config/models.js';
 import { DiscoveredMCPTool } from '../tools/mcp-tool.js';
@@ -140,14 +141,17 @@ export class PromptProvider {
           contextFilenames,
           topicUpdateNarration: context.config.isTopicUpdateNarrationEnabled(),
         })),
-        subAgents: this.withSection('agentContexts', () =>
-          context.config
-            .getAgentRegistry()
-            .getAllDefinitions()
-            .map((d) => ({
-              name: d.name,
-              description: d.description,
-            })),
+        subAgents: this.withSection(
+          'agentContexts',
+          () =>
+            context.config
+              .getAgentRegistry()
+              .getAllDefinitions()
+              .map((d) => ({
+                name: d.name,
+                description: d.description,
+              })),
+          enabledToolNames.has(AGENT_TOOL_NAME),
         ),
         agentSkills: this.withSection(
           'agentSkills',
@@ -163,24 +167,27 @@ export class PromptProvider {
         hookContext: isSectionEnabled('hookContext') || undefined,
         primaryWorkflows: this.withSection(
           'primaryWorkflows',
-          () => ({
-            interactive: interactiveMode,
-            enableCodebaseInvestigator: enabledToolNames.has(
-              CodebaseInvestigatorAgent.name,
-            ),
-            enableWriteTodosTool: enabledToolNames.has(WRITE_TODOS_TOOL_NAME),
-            enableEnterPlanModeTool: enabledToolNames.has(
-              ENTER_PLAN_MODE_TOOL_NAME,
-            ),
-            enableGrep: enabledToolNames.has(GREP_TOOL_NAME),
-            enableGlob: enabledToolNames.has(GLOB_TOOL_NAME),
-            approvedPlan: approvedPlanPath
-              ? { path: approvedPlanPath }
-              : undefined,
-            taskTracker: trackerDir,
-            topicUpdateNarration:
-              context.config.isTopicUpdateNarrationEnabled(),
-          }),
+          () => {
+            const agentRegistry = context.config.getAgentRegistry();
+            return {
+              interactive: interactiveMode,
+              enableCodebaseInvestigator:
+                agentRegistry.getDefinition(CodebaseInvestigatorAgent.name) !==
+                undefined,
+              enableWriteTodosTool: enabledToolNames.has(WRITE_TODOS_TOOL_NAME),
+              enableEnterPlanModeTool: enabledToolNames.has(
+                ENTER_PLAN_MODE_TOOL_NAME,
+              ),
+              enableGrep: enabledToolNames.has(GREP_TOOL_NAME),
+              enableGlob: enabledToolNames.has(GLOB_TOOL_NAME),
+              approvedPlan: approvedPlanPath
+                ? { path: approvedPlanPath }
+                : undefined,
+              taskTracker: trackerDir,
+              topicUpdateNarration:
+                context.config.isTopicUpdateNarrationEnabled(),
+            };
+          },
           !isPlanMode,
         ),
         planningWorkflow: this.withSection(
