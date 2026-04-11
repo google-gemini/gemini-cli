@@ -79,7 +79,12 @@ import { validateAuthMethod } from './config/auth.js';
 import { runAcpClient } from './acp/acpClient.js';
 import { validateNonInteractiveAuth } from './validateNonInterActiveAuth.js';
 import { appEvents, AppEvent } from './utils/events.js';
-import { SessionError, SessionSelector } from './utils/sessionUtils.js';
+import {
+  isCustomSessionIdCandidate,
+  isValidCustomSessionId,
+  SessionError,
+  SessionSelector,
+} from './utils/sessionUtils.js';
 
 import { relaunchOnExitCode } from './utils/relaunch.js';
 import { loadSandboxConfig } from './config/sandboxConfig.js';
@@ -193,6 +198,7 @@ ${reason.stack}`
 
 export async function resolveSessionId(resumeArg: string | undefined): Promise<{
   sessionId: string;
+  sessionName?: string;
   resumedSessionData?: ResumedSessionData;
 }> {
   if (!resumeArg) {
@@ -201,6 +207,7 @@ export async function resolveSessionId(resumeArg: string | undefined): Promise<{
 
   const storage = new Storage(process.cwd());
   await storage.initialize();
+  const trimmedResumeArg = resumeArg.trim();
 
   try {
     const { sessionData, sessionPath } = await new SessionSelector(
@@ -211,7 +218,34 @@ export async function resolveSessionId(resumeArg: string | undefined): Promise<{
       resumedSessionData: { conversation: sessionData, filePath: sessionPath },
     };
   } catch (error) {
+    if (
+      error instanceof SessionError &&
+      (error.code === 'NO_SESSIONS_FOUND' ||
+        error.code === 'INVALID_SESSION_IDENTIFIER') &&
+      isValidCustomSessionId(trimmedResumeArg)
+    ) {
+      return { sessionId: createSessionId(), sessionName: trimmedResumeArg };
+    }
+
     if (error instanceof SessionError && error.code === 'NO_SESSIONS_FOUND') {
+      if (isCustomSessionIdCandidate(trimmedResumeArg)) {
+        if (isValidCustomSessionId(trimmedResumeArg)) {
+          return {
+            sessionId: createSessionId(),
+            sessionName: trimmedResumeArg,
+          };
+        }
+
+        coreEvents.emitFeedback(
+          'error',
+          `Error resuming session: ${
+            SessionError.invalidSessionIdentifier(trimmedResumeArg).message
+          }`,
+        );
+        await runExitCleanup();
+        process.exit(ExitCodes.FATAL_INPUT_ERROR);
+      }
+
       coreEvents.emitFeedback('warning', error.message);
       return { sessionId: createSessionId() };
     }
@@ -319,7 +353,9 @@ export async function main() {
 
   const argv = await argvPromise;
 
-  const { sessionId, resumedSessionData } = await resolveSessionId(argv.resume);
+  const { sessionId, sessionName, resumedSessionData } = await resolveSessionId(
+    argv.resume,
+  );
 
   if (
     (argv.allowedTools && argv.allowedTools.length > 0) ||
@@ -390,6 +426,7 @@ export async function main() {
   }
 
   const partialConfig = await loadCliConfig(settings.merged, sessionId, argv, {
+    sessionName,
     projectHooks: settings.workspace.settings.hooks,
   });
   adminControlsListner.setConfig(partialConfig);
@@ -516,6 +553,7 @@ export async function main() {
   {
     const loadConfigHandle = startupProfiler.start('load_cli_config');
     const config = await loadCliConfig(settings.merged, sessionId, argv, {
+      sessionName,
       projectHooks: settings.workspace.settings.hooks,
       worktreeSettings: worktreeInfo,
     });

@@ -47,9 +47,17 @@ sessions.
   gemini --resume 1
   ```
 
-- **Resume by ID:** You can also provide the full session UUID:
+- **Resume by ID:** You can also provide a session ID:
+
   ```bash
   gemini --resume a1b2c3d4-e5f6-7890-abcd-ef1234567890
+  ```
+
+- **Resume or create by custom name:** If the named session exists, Gemini
+  resumes it. Otherwise it starts a new session and stores that name for later
+  `--resume` lookups. Names may contain letters, numbers, `_`, and `-`.
+  ```bash
+  gemini --resume release-notes
   ```
 
 ### From the interactive interface

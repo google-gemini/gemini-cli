@@ -10,6 +10,8 @@ import {
   extractFirstUserMessage,
   formatRelativeTime,
   hasUserOrAssistantMessage,
+  isCustomSessionIdCandidate,
+  isValidCustomSessionId,
   SessionError,
   convertSessionToHistoryFormats,
 } from './sessionUtils.js';
@@ -22,6 +24,10 @@ import {
 import * as fs from 'node:fs/promises';
 import path from 'node:path';
 import { randomUUID } from 'node:crypto';
+
+function getSessionFileKey(sessionId: string): string {
+  return sessionId.slice(0, 8);
+}
 
 describe('SessionSelector', () => {
   let tmpDir: string;
@@ -88,7 +94,7 @@ describe('SessionSelector', () => {
     await fs.writeFile(
       path.join(
         chatsDir,
-        `${SESSION_FILE_PREFIX}2024-01-01T10-00-${sessionId1.slice(0, 8)}.json`,
+        `${SESSION_FILE_PREFIX}2024-01-01T10-00-${getSessionFileKey(sessionId1)}.json`,
       ),
       JSON.stringify(session1, null, 2),
     );
@@ -96,7 +102,7 @@ describe('SessionSelector', () => {
     await fs.writeFile(
       path.join(
         chatsDir,
-        `${SESSION_FILE_PREFIX}2024-01-01T11-00-${sessionId2.slice(0, 8)}.json`,
+        `${SESSION_FILE_PREFIX}2024-01-01T11-00-${getSessionFileKey(sessionId2)}.json`,
       ),
       JSON.stringify(session2, null, 2),
     );
@@ -154,7 +160,7 @@ describe('SessionSelector', () => {
     await fs.writeFile(
       path.join(
         chatsDir,
-        `${SESSION_FILE_PREFIX}2024-01-01T10-00-${sessionId1.slice(0, 8)}.json`,
+        `${SESSION_FILE_PREFIX}2024-01-01T10-00-${getSessionFileKey(sessionId1)}.json`,
       ),
       JSON.stringify(session1, null, 2),
     );
@@ -162,7 +168,7 @@ describe('SessionSelector', () => {
     await fs.writeFile(
       path.join(
         chatsDir,
-        `${SESSION_FILE_PREFIX}2024-01-01T11-00-${sessionId2.slice(0, 8)}.json`,
+        `${SESSION_FILE_PREFIX}2024-01-01T11-00-${getSessionFileKey(sessionId2)}.json`,
       ),
       JSON.stringify(session2, null, 2),
     );
@@ -218,7 +224,7 @@ describe('SessionSelector', () => {
     await fs.writeFile(
       path.join(
         chatsDir,
-        `${SESSION_FILE_PREFIX}2024-01-01T10-00-${sessionId1.slice(0, 8)}.json`,
+        `${SESSION_FILE_PREFIX}2024-01-01T10-00-${getSessionFileKey(sessionId1)}.json`,
       ),
       JSON.stringify(session1, null, 2),
     );
@@ -226,7 +232,7 @@ describe('SessionSelector', () => {
     await fs.writeFile(
       path.join(
         chatsDir,
-        `${SESSION_FILE_PREFIX}2024-01-01T11-00-${sessionId2.slice(0, 8)}.json`,
+        `${SESSION_FILE_PREFIX}2024-01-01T11-00-${getSessionFileKey(sessionId2)}.json`,
       ),
       JSON.stringify(session2, null, 2),
     );
@@ -263,7 +269,7 @@ describe('SessionSelector', () => {
     await fs.writeFile(
       path.join(
         chatsDir,
-        `${SESSION_FILE_PREFIX}2024-01-01T10-00-${sessionId.slice(0, 8)}.json`,
+        `${SESSION_FILE_PREFIX}2024-01-01T10-00-${getSessionFileKey(sessionId)}.json`,
       ),
       JSON.stringify(session, null, 2),
     );
@@ -274,6 +280,45 @@ describe('SessionSelector', () => {
     const result = await sessionSelector.resolveSession(`  ${sessionId}  `);
     expect(result.sessionData.sessionId).toBe(sessionId);
     expect(result.sessionData.messages[0].content).toBe('Test message');
+  });
+
+  it('should resolve session by custom session name', async () => {
+    const sessionId = randomUUID();
+    const sessionName = 'release-notes';
+
+    const chatsDir = path.join(tmpDir, 'chats');
+    await fs.mkdir(chatsDir, { recursive: true });
+
+    const session = {
+      sessionId,
+      sessionName,
+      projectHash: 'test-hash',
+      startTime: '2024-01-01T10:00:00.000Z',
+      lastUpdated: '2024-01-01T10:30:00.000Z',
+      messages: [
+        {
+          type: 'user',
+          content: 'Draft release notes',
+          id: 'msg1',
+          timestamp: '2024-01-01T10:00:00.000Z',
+        },
+      ],
+    };
+
+    await fs.writeFile(
+      path.join(
+        chatsDir,
+        `${SESSION_FILE_PREFIX}2024-01-01T10-00-${getSessionFileKey(sessionId)}.json`,
+      ),
+      JSON.stringify(session, null, 2),
+    );
+
+    const sessionSelector = new SessionSelector(storage);
+    const result = await sessionSelector.resolveSession(sessionName);
+
+    expect(result.sessionData.sessionId).toBe(sessionId);
+    expect(result.sessionData.sessionName).toBe(sessionName);
+    expect(result.sessionData.messages[0].content).toBe('Draft release notes');
   });
 
   it('should deduplicate sessions by ID', async () => {
@@ -317,7 +362,7 @@ describe('SessionSelector', () => {
     await fs.writeFile(
       path.join(
         chatsDir,
-        `${SESSION_FILE_PREFIX}2024-01-01T10-00-${sessionId.slice(0, 8)}.json`,
+        `${SESSION_FILE_PREFIX}2024-01-01T10-00-${getSessionFileKey(sessionId)}.json`,
       ),
       JSON.stringify(sessionOriginal, null, 2),
     );
@@ -326,7 +371,7 @@ describe('SessionSelector', () => {
     await fs.writeFile(
       path.join(
         chatsDir,
-        `${SESSION_FILE_PREFIX}2024-01-01T11-00-${sessionId.slice(0, 8)}.json`,
+        `${SESSION_FILE_PREFIX}2024-01-01T11-00-${getSessionFileKey(sessionId)}.json`,
       ),
       JSON.stringify(sessionDuplicate, null, 2),
     );
@@ -365,7 +410,7 @@ describe('SessionSelector', () => {
     await fs.writeFile(
       path.join(
         chatsDir,
-        `${SESSION_FILE_PREFIX}2024-01-01T10-00-${sessionId1.slice(0, 8)}.json`,
+        `${SESSION_FILE_PREFIX}2024-01-01T10-00-${getSessionFileKey(sessionId1)}.json`,
       ),
       JSON.stringify(session1, null, 2),
     );
@@ -399,6 +444,20 @@ describe('SessionSelector', () => {
         return true;
       },
     );
+  });
+
+  it('should validate custom session IDs used for creation', () => {
+    expect(isCustomSessionIdCandidate('release-notes')).toBe(true);
+    expect(isValidCustomSessionId('release-notes')).toBe(true);
+
+    expect(isCustomSessionIdCandidate('latest')).toBe(false);
+    expect(isValidCustomSessionId('latest')).toBe(false);
+
+    expect(isCustomSessionIdCandidate('123')).toBe(false);
+    expect(isValidCustomSessionId('123')).toBe(false);
+
+    expect(isCustomSessionIdCandidate('feature/foo')).toBe(true);
+    expect(isValidCustomSessionId('feature/foo')).toBe(false);
   });
 
   it('should not list sessions with only system messages', async () => {
@@ -450,7 +509,7 @@ describe('SessionSelector', () => {
     await fs.writeFile(
       path.join(
         chatsDir,
-        `${SESSION_FILE_PREFIX}2024-01-01T10-00-${sessionIdWithUser.slice(0, 8)}.json`,
+        `${SESSION_FILE_PREFIX}2024-01-01T10-00-${getSessionFileKey(sessionIdWithUser)}.json`,
       ),
       JSON.stringify(sessionWithUser, null, 2),
     );
@@ -458,7 +517,7 @@ describe('SessionSelector', () => {
     await fs.writeFile(
       path.join(
         chatsDir,
-        `${SESSION_FILE_PREFIX}2024-01-01T11-00-${sessionIdSystemOnly.slice(0, 8)}.json`,
+        `${SESSION_FILE_PREFIX}2024-01-01T11-00-${getSessionFileKey(sessionIdSystemOnly)}.json`,
       ),
       JSON.stringify(sessionSystemOnly, null, 2),
     );
@@ -497,7 +556,7 @@ describe('SessionSelector', () => {
     await fs.writeFile(
       path.join(
         chatsDir,
-        `${SESSION_FILE_PREFIX}2024-01-01T10-00-${sessionIdGeminiOnly.slice(0, 8)}.json`,
+        `${SESSION_FILE_PREFIX}2024-01-01T10-00-${getSessionFileKey(sessionIdGeminiOnly)}.json`,
       ),
       JSON.stringify(sessionGeminiOnly, null, 2),
     );
@@ -555,7 +614,7 @@ describe('SessionSelector', () => {
     await fs.writeFile(
       path.join(
         chatsDir,
-        `${SESSION_FILE_PREFIX}2024-01-01T10-00-${mainSessionId.slice(0, 8)}.json`,
+        `${SESSION_FILE_PREFIX}2024-01-01T10-00-${getSessionFileKey(mainSessionId)}.json`,
       ),
       JSON.stringify(mainSession, null, 2),
     );
@@ -563,7 +622,7 @@ describe('SessionSelector', () => {
     await fs.writeFile(
       path.join(
         chatsDir,
-        `${SESSION_FILE_PREFIX}2024-01-01T11-00-${subagentSessionId.slice(0, 8)}.json`,
+        `${SESSION_FILE_PREFIX}2024-01-01T11-00-${getSessionFileKey(subagentSessionId)}.json`,
       ),
       JSON.stringify(subagentSession, null, 2),
     );

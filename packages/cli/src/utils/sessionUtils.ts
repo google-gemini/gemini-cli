@@ -26,6 +26,40 @@ import { MessageType, type HistoryItemWithoutId } from '../ui/types.js';
 export const RESUME_LATEST = 'latest';
 
 /**
+ * Safe character set for user-provided session names.
+ * These names are accepted by `--resume <name>`.
+ */
+export const CUSTOM_SESSION_ID_PATTERN = /^[A-Za-z0-9_-]+$/;
+
+/**
+ * Returns true when the identifier is reserved for built-in resume semantics.
+ */
+export const isReservedResumeIdentifier = (identifier: string): boolean =>
+  identifier === RESUME_LATEST;
+
+/**
+ * Returns true when the identifier is numeric and therefore interpreted as a
+ * session index by `--resume`.
+ */
+export const isNumericSessionIdentifier = (identifier: string): boolean =>
+  /^\d+$/.test(identifier);
+
+/**
+ * Returns true when the identifier is a non-reserved string that may be used as
+ * a custom session name.
+ */
+export const isCustomSessionIdCandidate = (identifier: string): boolean =>
+  !isReservedResumeIdentifier(identifier) &&
+  !isNumericSessionIdentifier(identifier);
+
+/**
+ * Returns true when the identifier can safely be used as a new custom session name.
+ */
+export const isValidCustomSessionId = (identifier: string): boolean =>
+  isCustomSessionIdCandidate(identifier) &&
+  CUSTOM_SESSION_ID_PATTERN.test(identifier);
+
+/**
  * Error codes for session-related errors.
  */
 export type SessionErrorCode =
@@ -65,7 +99,7 @@ export class SessionError extends Error {
     const dirInfo = chatsDir ? ` in ${chatsDir}` : '';
     return new SessionError(
       'INVALID_SESSION_IDENTIFIER',
-      `Invalid session identifier "${identifier}".\n  Searched for sessions${dirInfo}.\n  Use --list-sessions to see available sessions, then use --resume {number}, --resume {uuid}, or --resume latest.`,
+      `Invalid session identifier "${identifier}".\n  Searched for sessions${dirInfo}.\n  Use --list-sessions to see available sessions, then use --resume {number}, --resume {session-id}, or --resume latest.`,
     );
   }
 }
@@ -90,6 +124,8 @@ export interface TextMatch {
 export interface SessionInfo {
   /** Unique session identifier (filename without .json) */
   id: string;
+  /** Optional user-provided session name for --resume <name> */
+  sessionName?: string;
   /** Filename without extension */
   file: string;
   /** Full filename including .json extension */
@@ -294,7 +330,7 @@ export const getAllSessionFiles = async (
             ? cleanMessage(content.firstUserMessage)
             : extractFirstUserMessage(content.messages);
           const isCurrentSession = currentSessionId
-            ? file.includes(currentSessionId.slice(0, 8))
+            ? content.sessionId === currentSessionId
             : false;
 
           let fullContent: string | undefined;
@@ -317,6 +353,7 @@ export const getAllSessionFiles = async (
 
           const sessionInfo: SessionInfo = {
             id: content.sessionId,
+            sessionName: content.sessionName,
             file: file.replace(/\.jsonl?$/, ''),
             fileName: file,
             startTime: content.startTime,
@@ -417,9 +454,9 @@ export class SessionSelector {
   }
 
   /**
-   * Finds a session by identifier (UUID or numeric index).
+   * Finds a session by identifier (session ID, session name, or numeric index).
    *
-   * @param identifier - Can be a full UUID or an index number (1-based)
+   * @param identifier - Can be a full session ID, session name, or index number (1-based)
    * @returns Promise resolving to the found SessionInfo
    * @throws Error if the session is not found or identifier is invalid
    */
@@ -437,12 +474,20 @@ export class SessionSelector {
         new Date(a.startTime).getTime() - new Date(b.startTime).getTime(),
     );
 
-    // Try to find by UUID first
-    const sessionByUuid = sortedSessions.find(
+    // Try to find by exact session ID first.
+    const sessionById = sortedSessions.find(
       (session) => session.id === trimmedIdentifier,
     );
-    if (sessionByUuid) {
-      return sessionByUuid;
+    if (sessionById) {
+      return sessionById;
+    }
+
+    // Then try custom session name.
+    const sessionByName = sortedSessions.find(
+      (session) => session.sessionName === trimmedIdentifier,
+    );
+    if (sessionByName) {
+      return sessionByName;
     }
 
     // Parse as index number (1-based) - only allow numeric indexes
@@ -463,7 +508,7 @@ export class SessionSelector {
   /**
    * Resolves a resume argument to a specific session.
    *
-   * @param resumeArg - Can be "latest", a full UUID, or an index number (1-based)
+   * @param resumeArg - Can be "latest", a full session ID/name, or an index number (1-based)
    * @returns Promise resolving to session selection result
    */
   async resolveSession(resumeArg: string): Promise<SessionSelectionResult> {

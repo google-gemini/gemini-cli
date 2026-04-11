@@ -58,11 +58,6 @@ vi.mock('node:crypto', async (importOriginal) => {
   return {
     ...actual,
     randomUUID: vi.fn(() => `test-uuid-${count++}`),
-    createHash: vi.fn(() => ({
-      update: vi.fn(() => ({
-        digest: vi.fn(() => 'mocked-hash'),
-      })),
-    })),
   };
 });
 
@@ -87,6 +82,7 @@ describe('ChatRecordingService', () => {
         getTool: vi.fn(),
       },
       promptId: 'test-session-id',
+      getSessionName: vi.fn().mockReturnValue(undefined),
       getSessionId: vi.fn().mockReturnValue('test-session-id'),
       getProjectRoot: vi.fn().mockReturnValue('/test/project/root'),
       storage: {
@@ -569,7 +565,6 @@ describe('ChatRecordingService', () => {
   describe('deleteSession', () => {
     it('should delete the session file, tool outputs, session directory, and logs if they exist', async () => {
       const sessionId = 'test-session-id';
-      const shortId = '12345678';
       const chatsDir = path.join(testTempDir, 'chats');
       const logsDir = path.join(testTempDir, 'logs');
       const toolOutputsDir = path.join(testTempDir, 'tool-outputs');
@@ -583,7 +578,7 @@ describe('ChatRecordingService', () => {
       // Create main session file with timestamp
       const sessionFile = path.join(
         chatsDir,
-        `session-2023-01-01T00-00-${shortId}.jsonl`,
+        'session-2023-01-01T00-00-test-ses.jsonl',
       );
       fs.writeFileSync(sessionFile, JSON.stringify({ sessionId }) + '\n');
 
@@ -593,8 +588,7 @@ describe('ChatRecordingService', () => {
       const toolOutputDir = path.join(toolOutputsDir, `session-${sessionId}`);
       fs.mkdirSync(toolOutputDir, { recursive: true });
 
-      // Call with shortId
-      await chatRecordingService.deleteSession(shortId);
+      await chatRecordingService.deleteSession(sessionId);
 
       expect(fs.existsSync(sessionFile)).toBe(false);
       expect(fs.existsSync(logFile)).toBe(false);
@@ -602,9 +596,26 @@ describe('ChatRecordingService', () => {
       expect(fs.existsSync(sessionDir)).toBe(false);
     });
 
+    it('should delete prefix-keyed session files', async () => {
+      const sessionId = '12345678-session-id';
+      const legacyShortId = '12345678';
+      const chatsDir = path.join(testTempDir, 'chats');
+
+      fs.mkdirSync(chatsDir, { recursive: true });
+
+      const sessionFile = path.join(
+        chatsDir,
+        `session-2023-01-01T00-00-${legacyShortId}.jsonl`,
+      );
+      fs.writeFileSync(sessionFile, JSON.stringify({ sessionId }) + '\n');
+
+      await chatRecordingService.deleteSession(sessionId);
+
+      expect(fs.existsSync(sessionFile)).toBe(false);
+    });
+
     it('should delete subagent files and their logs when parent is deleted', async () => {
       const parentSessionId = '12345678-session-id';
-      const shortId = '12345678';
       const subagentSessionId = 'subagent-session-id';
       const chatsDir = path.join(testTempDir, 'chats');
       const logsDir = path.join(testTempDir, 'logs');
@@ -617,7 +628,7 @@ describe('ChatRecordingService', () => {
       // Create parent session file
       const parentFile = path.join(
         chatsDir,
-        `session-2023-01-01T00-00-${shortId}.jsonl`,
+        'session-2023-01-01T00-00-12345678.jsonl',
       );
       fs.writeFileSync(
         parentFile,
@@ -669,7 +680,7 @@ describe('ChatRecordingService', () => {
 
     it('should delete subagent files and their logs when parent is deleted (legacy flat structure)', async () => {
       const parentSessionId = '12345678-session-id';
-      const shortId = '12345678';
+      const legacyShortId = '12345678';
       const subagentSessionId = 'subagent-session-id';
       const chatsDir = path.join(testTempDir, 'chats');
       const logsDir = path.join(testTempDir, 'logs');
@@ -680,7 +691,7 @@ describe('ChatRecordingService', () => {
       // Create parent session file
       const parentFile = path.join(
         chatsDir,
-        `session-2023-01-01T00-00-${shortId}.jsonl`,
+        `session-2023-01-01T00-00-${legacyShortId}.jsonl`,
       );
       fs.writeFileSync(
         parentFile,
@@ -690,7 +701,7 @@ describe('ChatRecordingService', () => {
       // Create legacy subagent session file (flat in chatsDir)
       const subagentFile = path.join(
         chatsDir,
-        `session-2023-01-01T00-01-${shortId}.jsonl`,
+        `session-2023-01-01T00-01-${legacyShortId}.jsonl`,
       );
       fs.writeFileSync(
         subagentFile,
@@ -706,15 +717,14 @@ describe('ChatRecordingService', () => {
     });
 
     it('should delete by basename', async () => {
-      const sessionId = 'test-session-id';
-      const shortId = '12345678';
+      const sessionId = 'testsessionid';
       const chatsDir = path.join(testTempDir, 'chats');
       const logsDir = path.join(testTempDir, 'logs');
 
       fs.mkdirSync(chatsDir, { recursive: true });
       fs.mkdirSync(logsDir, { recursive: true });
 
-      const basename = `session-2023-01-01T00-00-${shortId}`;
+      const basename = 'session-2023-01-01T00-00-testsess';
       const sessionFile = path.join(chatsDir, `${basename}.jsonl`);
       fs.writeFileSync(sessionFile, JSON.stringify({ sessionId }) + '\n');
 
