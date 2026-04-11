@@ -38,6 +38,7 @@ import {
   isEmpty,
 } from './fileUtils.js';
 import { StandardFileSystemService } from '../services/fileSystemService.js';
+import { ToolErrorType } from '../tools/tool-error.js';
 
 vi.mock('mime/lite', () => ({
   default: { getType: vi.fn() },
@@ -54,6 +55,7 @@ describe('fileUtils', () => {
   let testImageFilePath: string;
   let testPdfFilePath: string;
   let testAudioFilePath: string;
+  let testVideoFilePath: string;
   let testBinaryFilePath: string;
   let nonexistentFilePath: string;
   let directoryPath: string;
@@ -70,6 +72,7 @@ describe('fileUtils', () => {
     testImageFilePath = path.join(tempRootDir, 'image.png');
     testPdfFilePath = path.join(tempRootDir, 'document.pdf');
     testAudioFilePath = path.join(tempRootDir, 'audio.mp3');
+    testVideoFilePath = path.join(tempRootDir, 'video.mp4');
     testBinaryFilePath = path.join(tempRootDir, 'app.exe');
     nonexistentFilePath = path.join(tempRootDir, 'nonexistent.txt');
     directoryPath = path.join(tempRootDir, 'subdir');
@@ -704,6 +707,19 @@ describe('fileUtils', () => {
       },
     );
 
+    it('should detect supported audio files by extension when mime lookup is missing', async () => {
+      const filePath = path.join(tempRootDir, 'fallback.flac');
+      actualNodeFs.writeFileSync(
+        filePath,
+        Buffer.from([0x66, 0x4c, 0x61, 0x43, 0x00, 0x00, 0x00, 0x22]),
+      );
+      mockMimeGetType.mockReturnValueOnce(false);
+
+      expect(await detectFileType(filePath)).toBe('audio');
+
+      actualNodeFs.unlinkSync(filePath);
+    });
+
     it('should detect svg type by extension', async () => {
       expect(await detectFileType('image.svg')).toBe('svg');
       expect(await detectFileType('image.icon.svg')).toBe('svg');
@@ -755,6 +771,8 @@ describe('fileUtils', () => {
         actualNodeFs.unlinkSync(testPdfFilePath);
       if (actualNodeFs.existsSync(testAudioFilePath))
         actualNodeFs.unlinkSync(testAudioFilePath);
+      if (actualNodeFs.existsSync(testVideoFilePath))
+        actualNodeFs.unlinkSync(testVideoFilePath);
       if (actualNodeFs.existsSync(testBinaryFilePath))
         actualNodeFs.unlinkSync(testBinaryFilePath);
     });
@@ -878,6 +896,70 @@ describe('fileUtils', () => {
         (result.llmContent as { inlineData: { data: string } }).inlineData.data,
       ).toBe(fakeMp3Data.toString('base64'));
       expect(result.returnDisplay).toContain('Read audio file: audio.mp3');
+    });
+
+    it('should normalize supported audio mime types before returning inline data', async () => {
+      const fakeWavData = Buffer.from([
+        0x52, 0x49, 0x46, 0x46, 0x24, 0x00, 0x00, 0x00,
+      ]);
+      const wavFilePath = path.join(tempRootDir, 'voice.wav');
+      actualNodeFs.writeFileSync(wavFilePath, fakeWavData);
+      mockMimeGetType.mockReturnValue('audio/x-wav');
+
+      const result = await processSingleFileContent(
+        wavFilePath,
+        tempRootDir,
+        new StandardFileSystemService(),
+      );
+
+      expect(
+        (result.llmContent as { inlineData: { mimeType: string } }).inlineData
+          .mimeType,
+      ).toBe('audio/wav');
+    });
+
+    it('should reject unsupported audio mime types with a clear error', async () => {
+      const unsupportedAudioPath = path.join(tempRootDir, 'legacy.adp');
+      actualNodeFs.writeFileSync(
+        unsupportedAudioPath,
+        Buffer.from([0x00, 0x01, 0x02, 0x03]),
+      );
+      mockMimeGetType.mockReturnValue('audio/adpcm');
+
+      const result = await processSingleFileContent(
+        unsupportedAudioPath,
+        tempRootDir,
+        new StandardFileSystemService(),
+      );
+
+      expect(result.errorType).toBe(ToolErrorType.READ_CONTENT_FAILURE);
+      expect(result.error).toContain('Unsupported audio file format');
+      expect(result.returnDisplay).toContain('Unsupported audio file format');
+    });
+
+    it('should process a video file', async () => {
+      const fakeMp4Data = Buffer.from([
+        0x00, 0x00, 0x00, 0x1c, 0x66, 0x74, 0x79, 0x70, 0x69, 0x73, 0x6f, 0x6d,
+        0x00, 0x00, 0x02, 0x00,
+      ]);
+      actualNodeFs.writeFileSync(testVideoFilePath, fakeMp4Data);
+      mockMimeGetType.mockReturnValue('video/mp4');
+      const result = await processSingleFileContent(
+        testVideoFilePath,
+        tempRootDir,
+        new StandardFileSystemService(),
+      );
+      expect(
+        (result.llmContent as { inlineData: unknown }).inlineData,
+      ).toBeDefined();
+      expect(
+        (result.llmContent as { inlineData: { mimeType: string } }).inlineData
+          .mimeType,
+      ).toBe('video/mp4');
+      expect(
+        (result.llmContent as { inlineData: { data: string } }).inlineData.data,
+      ).toBe(fakeMp4Data.toString('base64'));
+      expect(result.returnDisplay).toContain('Read video file: video.mp4');
     });
 
     it('should read an SVG file as text when under 1MB', async () => {
