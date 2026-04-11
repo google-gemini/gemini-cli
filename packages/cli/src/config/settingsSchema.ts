@@ -877,7 +877,7 @@ const SETTINGS_SCHEMA = {
         type: 'array',
         label: 'Hidden Slash Commands',
         category: 'UI',
-        requiresRestart: false,
+        requiresRestart: true,
         default: [] as string[],
         description: oneLine`
           List of slash command names to hide from the completion menu.

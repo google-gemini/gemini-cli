@@ -404,6 +404,7 @@ their corresponding top-level category object in your `settings.json` file.
     menu. Commands remain functional when invoked directly. Use the command name
     without the leading slash (e.g., "skills", "mcp").
   - **Default:** `[]`
+  - **Requires restart:** Yes
 
 #### `ide`
 

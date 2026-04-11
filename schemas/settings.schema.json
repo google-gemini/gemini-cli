@@ -550,7 +550,7 @@
         "hiddenSlashCommands": {
           "title": "Hidden Slash Commands",
           "description": "List of slash command names to hide from the completion menu. Commands remain functional when invoked directly. Use the command name without the leading slash (e.g., \"skills\", \"mcp\").",
-          "markdownDescription": "List of slash command names to hide from the completion menu. Commands remain functional when invoked directly. Use the command name without the leading slash (e.g., \"skills\", \"mcp\").\n\n- Category: `UI`\n- Requires restart: `no`\n- Default: `[]`",
+          "markdownDescription": "List of slash command names to hide from the completion menu. Commands remain functional when invoked directly. Use the command name without the leading slash (e.g., \"skills\", \"mcp\").\n\n- Category: `UI`\n- Requires restart: `yes`\n- Default: `[]`",
           "default": [],
           "type": "array",
           "items": {
