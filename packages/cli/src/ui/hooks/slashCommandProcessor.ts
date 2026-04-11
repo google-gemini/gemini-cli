@@ -371,7 +371,10 @@ export const useSlashCommandProcessor = (
     return () => {
       controller.abort();
     };
-  }, [config, reloadTrigger, isConfigInitialized, settings]);
+    // hiddenSlashCommands is read from settings.merged once per load; it is
+    // intentionally excluded from deps because it requires a CLI restart.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [config, reloadTrigger, isConfigInitialized]);
 
   const handleSlashCommand = useCallback(
     async (
