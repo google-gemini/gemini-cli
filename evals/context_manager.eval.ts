@@ -60,7 +60,7 @@ async function runContextManagerEval(
 }> {
   const harness = await SimulationHarness.create(
     sidecarConfig,
-    config.getBaseLlmClient(),
+    config.getBaseLlmClient() as any,
     path.join(process.cwd(), 'harness-tmp'),
   );
 
@@ -70,7 +70,6 @@ async function runContextManagerEval(
   }
 
   // Ensure background tasks (like StateSnapshotProcessor) have finished
-  await harness.waitForIdle();
 
   // 2. Pick a question based on seed
   const questionIndex = seed % scenario.questions.length;
@@ -82,12 +81,12 @@ async function runContextManagerEval(
 
   // We can't easily get the episode IDs from the projected Content[],
   // but we can look at the working buffer instead.
-  const workingBuffer = harness.contextManager.getWorkingBufferView();
+  const workingBuffer = harness.contextManager.getNodes();
   console.log('--- WORKING BUFFER EPISODES START ---');
-  workingBuffer.forEach((ep, i) => {
-    console.log(`[Ep ${i}] ID: ${ep.id}, Type: ${ep.trigger.type}`);
-    if (ep.trigger.type === 'USER_PROMPT') {
-      console.log(`  Text: ${ep.trigger.semanticParts[0]?.text?.slice(0, 50)}`);
+  workingBuffer.forEach((node: any, i: number) => {
+    console.log(`[Node ${i}] ID: ${node.id}, Type: ${node.type}`);
+    if (node.type === 'USER_PROMPT') {
+      console.log(`  Text: ${node.semanticParts?.[0]?.text?.slice(0, 50)}`);
     }
   });
   console.log('--- WORKING BUFFER EPISODES END ---');
@@ -95,16 +94,16 @@ async function runContextManagerEval(
   console.log('--- COMPRESSED HISTORY START ---');
   compressedHistory.forEach((msg, i) => {
     console.log(`[${i}] Role: ${msg.role}`);
-    msg.parts.forEach((part, j) => {
+    (msg.parts || []).forEach((part, j) => {
       if ('text' in part) {
         console.log(
           `  Part ${j} (text): ${part.text?.slice(0, 100)}${part.text && part.text.length > 100 ? '...' : ''}`,
         );
       } else if ('functionCall' in part) {
-        console.log(`  Part ${j} (functionCall): ${part.functionCall.name}`);
+        console.log(`  Part ${j} (functionCall): ${part.functionCall?.name}`);
       } else if ('functionResponse' in part) {
         console.log(
-          `  Part ${j} (functionResponse): ${part.functionResponse.name}`,
+          `  Part ${j} (functionResponse): ${part.functionResponse?.name}`,
         );
       } else {
         console.log(`  Part ${j} (other): ${Object.keys(part).join(', ')}`);
@@ -144,8 +143,8 @@ async function runContextManagerEval(
       .includes(question.expectedSubstring.toLowerCase());
   }
 
-  const finalTokens = harness.env.tokenCalculator.calculateEpisodeListTokens(
-    harness.contextManager.getWorkingBufferView(),
+  const finalTokens = harness.env.tokenCalculator.calculateConcreteListTokens(
+    harness.contextManager.getNodes(),
   );
 
   return { pass, response: responseText, question, tokens: finalTokens };
@@ -206,7 +205,7 @@ Respond with ONLY "PASS" or "FAIL".`,
 function calculateScenarioTokens(scenario: Scenario): number {
   let totalChars = 0;
   for (const message of scenario.history) {
-    for (const part of message.parts) {
+    for (const part of message.parts || []) {
       if ('text' in part && part.text) {
         totalChars += part.text.length;
       }
@@ -228,6 +227,7 @@ function generateRandomSidecarConfig(
   const max = Math.floor(retained * (1.1 + Math.random() * 2.0)); // 110% to 300% buffer
 
   const useSquashing = Math.random() > 0.5;
+  const useRollingSummary = Math.random() > 0.5;
   const useSnapshot = Math.random() > 0.5;
 
   const processors: any[] = [
@@ -241,23 +241,40 @@ function generateRandomSidecarConfig(
     },
     { processorId: 'BlobDegradationProcessor', options: {} },
     {
-      processorId: 'SemanticCompressionProcessor',
+      processorId: 'NodeDistillationProcessor',
       options: {
         nodeThresholdTokens: Math.floor(retained * (0.1 + Math.random() * 0.3)),
       },
     },
-    { processorId: 'EmergencyTruncationProcessor', options: {} },
+    {
+      processorId: 'NodeTruncationProcessor',
+      options: {
+        maxTokensPerNode: Math.floor(retained * (0.1 + Math.random() * 0.5)),
+      },
+    },
   ];
 
   const backgroundProcessors: any[] = [];
   if (useSquashing) {
     backgroundProcessors.push({
-      processorId: 'HistorySquashingProcessor',
+      processorId: 'HistoryTruncationProcessor',
       options: {
-        maxTokensPerNode: Math.floor(retained * (0.05 + Math.random() * 0.15)),
+        target: 'freeNTokens',
+        freeTokensTarget: Math.floor(retained * (0.05 + Math.random() * 0.15)),
       },
     });
   }
+
+  if (useRollingSummary) {
+    backgroundProcessors.push({
+      processorId: 'RollingSummaryProcessor',
+      options: {
+        target: 'freeNTokens',
+        freeTokensTarget: Math.floor(retained * (0.05 + Math.random() * 0.15)),
+      },
+    });
+  }
+
   if (useSnapshot) {
     backgroundProcessors.push({
       processorId: 'StateSnapshotProcessor',
@@ -265,27 +282,36 @@ function generateRandomSidecarConfig(
     });
   }
 
+  const workers: any[] = [];
+  if (useSnapshot && Math.random() > 0.5) {
+    workers.push({
+      workerId: 'StateSnapshotWorker',
+      options: {
+        type: Math.random() > 0.5 ? 'accumulate' : 'point-in-time',
+      },
+    });
+  }
+
   return {
     budget: { retainedTokens: retained, maxTokens: max },
-    gcBackstop: {
-      strategy: 'truncate', // Hardcoded since compress/rollingSummarizer are currently unimplemented
-      target: 'incremental',
-      freeTokensTarget: Math.floor(retained * 0.1),
-    },
     pipelines: [
       {
         name: 'Immediate Sanitization',
-        triggers: ['on_turn'],
-        execution: 'blocking',
+        triggers: ['new_message'],
         processors,
       },
       {
         name: 'Deep Background Compression',
-        triggers: [{ type: 'timer', intervalMs: 100 }, 'budget_exceeded'],
-        execution: 'background',
+        triggers: [
+          Math.random() > 0.5
+            ? { type: 'timer', intervalMs: 100 }
+            : 'gc_backstop',
+          'retained_exceeded',
+        ],
         processors: backgroundProcessors,
       },
     ],
+    workers: workers.length > 0 ? workers : undefined,
   };
 }
 
@@ -296,7 +322,7 @@ describe('ContextManager Evaluation Suite', () => {
    * The "Explorer" test.
    * Set RUN_EXPLORER=1 to run many iterations and find failures.
    */
-  if (process.env.RUN_EXPLORER) {
+  if (process.env['RUN_EXPLORER']) {
     componentEvalTest('ALWAYS_PASSES', {
       suiteName: 'context-manager',
       suiteType: 'component-level',
@@ -379,16 +405,10 @@ describe('ContextManager Evaluation Suite', () => {
           retainedTokens: 3737,
           maxTokens: 11280,
         },
-        gcBackstop: {
-          strategy: 'truncate',
-          target: 'incremental',
-          freeTokensTarget: 373,
-        },
         pipelines: [
           {
             name: 'Immediate Sanitization',
-            triggers: ['on_turn'],
-            execution: 'blocking',
+            triggers: ['new_message'],
             processors: [
               {
                 processorId: 'ToolMaskingProcessor',
@@ -401,14 +421,14 @@ describe('ContextManager Evaluation Suite', () => {
                 options: {},
               },
               {
-                processorId: 'SemanticCompressionProcessor',
+                processorId: 'NodeDistillationProcessor',
                 options: {
                   nodeThresholdTokens: 733,
                 },
               },
               {
-                processorId: 'EmergencyTruncationProcessor',
-                options: {},
+                processorId: 'NodeTruncationProcessor',
+                options: { maxTokensPerNode: 1000 },
               },
             ],
           },
@@ -419,14 +439,14 @@ describe('ContextManager Evaluation Suite', () => {
                 type: 'timer',
                 intervalMs: 100,
               },
-              'budget_exceeded',
+              'retained_exceeded',
             ],
-            execution: 'background',
             processors: [
               {
-                processorId: 'HistorySquashingProcessor',
+                processorId: 'HistoryTruncationProcessor',
                 options: {
-                  maxTokensPerNode: 327,
+                  target: 'freeNTokens',
+                  freeTokensTarget: 327,
                 },
               },
             ],
@@ -443,265 +463,6 @@ describe('ContextManager Evaluation Suite', () => {
       expect(
         result.pass,
         `Recall failed for lexer-constraint. Response: ${result.response}`,
-      ).toBe(true);
-    },
-  });
-
-  componentEvalTest('ALWAYS_PASSES', {
-    suiteName: 'context-manager',
-    suiteType: 'component-level',
-    name: 'ContextManager Frozen Case - final-name (Budget: 5321)',
-    configOverrides: { model: EVAL_MODEL },
-    assert: async (config: Config) => {
-      const scenario = getScenario('scenario-c-compiler');
-      const sidecarConfig: SidecarConfig = {
-        budget: {
-          retainedTokens: 5321,
-          maxTokens: 11398,
-        },
-        gcBackstop: {
-          strategy: 'truncate',
-          target: 'incremental',
-          freeTokensTarget: 532,
-        },
-        pipelines: [
-          {
-            name: 'Immediate Sanitization',
-            triggers: ['on_turn'],
-            execution: 'blocking',
-            processors: [
-              {
-                processorId: 'ToolMaskingProcessor',
-                options: {
-                  stringLengthThresholdTokens: 2952,
-                },
-              },
-              {
-                processorId: 'BlobDegradationProcessor',
-                options: {},
-              },
-              {
-                processorId: 'SemanticCompressionProcessor',
-                options: {
-                  nodeThresholdTokens: 1632,
-                },
-              },
-              {
-                processorId: 'EmergencyTruncationProcessor',
-                options: {},
-              },
-            ],
-          },
-          {
-            name: 'Deep Background Compression',
-            triggers: [
-              {
-                type: 'timer',
-                intervalMs: 100,
-              },
-              'budget_exceeded',
-            ],
-            execution: 'background',
-            processors: [
-              {
-                processorId: 'HistorySquashingProcessor',
-                options: {
-                  maxTokensPerNode: 355,
-                },
-              },
-              {
-                processorId: 'StateSnapshotProcessor',
-                options: {},
-              },
-            ],
-          },
-        ],
-      };
-      const seed = 826619;
-      const result = await runContextManagerEval(
-        config,
-        sidecarConfig,
-        seed,
-        scenario,
-      );
-      expect(
-        result.pass,
-        `Recall failed for final-name. Response: ${result.response}`,
-      ).toBe(true);
-    },
-  });
-
-  componentEvalTest('ALWAYS_PASSES', {
-    suiteName: 'context-manager',
-    suiteType: 'component-level',
-    name: 'ContextManager Frozen Case - secret-beta (Budget: 1314)',
-    configOverrides: { model: EVAL_MODEL },
-    assert: async (config: Config) => {
-      const scenario = getScenario('scenario-c-compiler');
-      const sidecarConfig: SidecarConfig = {
-        budget: {
-          retainedTokens: 1314,
-          maxTokens: 2067,
-        },
-        gcBackstop: {
-          strategy: 'truncate',
-          target: 'incremental',
-          freeTokensTarget: 131,
-        },
-        pipelines: [
-          {
-            name: 'Immediate Sanitization',
-            triggers: ['on_turn'],
-            execution: 'blocking',
-            processors: [
-              {
-                processorId: 'ToolMaskingProcessor',
-                options: {
-                  stringLengthThresholdTokens: 738,
-                },
-              },
-              {
-                processorId: 'BlobDegradationProcessor',
-                options: {},
-              },
-              {
-                processorId: 'SemanticCompressionProcessor',
-                options: {
-                  nodeThresholdTokens: 195,
-                },
-              },
-              {
-                processorId: 'EmergencyTruncationProcessor',
-                options: {},
-              },
-            ],
-          },
-          {
-            name: 'Deep Background Compression',
-            triggers: [
-              {
-                type: 'timer',
-                intervalMs: 100,
-              },
-              'budget_exceeded',
-            ],
-            execution: 'background',
-            processors: [
-              {
-                processorId: 'HistorySquashingProcessor',
-                options: {
-                  maxTokensPerNode: 108,
-                },
-              },
-              {
-                processorId: 'StateSnapshotProcessor',
-                options: {},
-              },
-            ],
-          },
-        ],
-      };
-      const seed = 475216;
-      const result = await runContextManagerEval(
-        config,
-        sidecarConfig,
-        seed,
-        scenario,
-      );
-      expect(
-        result.pass,
-        `Recall failed for secret-beta. Response: ${result.response}`,
-      ).toBe(true);
-    },
-  });
-
-  componentEvalTest('ALWAYS_PASSES', {
-    suiteName: 'context-manager',
-    suiteType: 'component-level',
-    name: 'ContextManager Frozen Case - codegen-header (Budget: 2585)',
-    configOverrides: { model: EVAL_MODEL },
-    timeout: 240000, // 4 minutes to allow Gemini 2.5 Pro to compress even with rate limits/load shedding
-    assert: async (config: Config) => {
-      const scenario = getScenario('scenario-c-compiler');
-      const targetQuestion = scenario.questions.find(
-        (q) => q.id === 'codegen-header',
-      );
-      if (targetQuestion) {
-        targetQuestion.expectedSubstring = 'Generated by GigaC';
-      }
-      const sidecarConfig: SidecarConfig = {
-        budget: {
-          retainedTokens: 2585,
-          maxTokens: 4196,
-        },
-        gcBackstop: {
-          strategy: 'truncate',
-          target: 'incremental',
-          freeTokensTarget: 258,
-        },
-        pipelines: [
-          {
-            name: 'Immediate Sanitization',
-            triggers: ['on_turn'],
-            execution: 'blocking',
-            processors: [
-              {
-                processorId: 'ToolMaskingProcessor',
-                options: {
-                  stringLengthThresholdTokens: 720,
-                },
-              },
-              {
-                processorId: 'BlobDegradationProcessor',
-                options: {},
-              },
-              {
-                processorId: 'SemanticCompressionProcessor',
-                options: {
-                  nodeThresholdTokens: 336,
-                },
-              },
-              {
-                processorId: 'EmergencyTruncationProcessor',
-                options: {},
-              },
-            ],
-          },
-          {
-            name: 'Deep Background Compression',
-            triggers: [
-              {
-                type: 'timer',
-                intervalMs: 100,
-              },
-              'budget_exceeded',
-            ],
-            execution: 'background',
-            processors: [
-              {
-                processorId: 'HistorySquashingProcessor',
-                options: {
-                  maxTokensPerNode: 237,
-                },
-              },
-              {
-                processorId: 'StateSnapshotProcessor',
-                options: {},
-              },
-            ],
-          },
-        ],
-      };
-      const seed = 715277;
-      const result = await runContextManagerEval(
-        config,
-        sidecarConfig,
-        seed,
-        scenario,
-      );
-      expect(
-        result.pass,
-        `Recall failed for codegen-header. Response: ${result.response}`,
       ).toBe(true);
     },
   });

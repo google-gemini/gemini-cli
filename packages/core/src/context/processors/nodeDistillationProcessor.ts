@@ -55,7 +55,7 @@ export class NodeDistillationProcessor implements ContextProcessor {
     try {
       const response = await this.env.llmClient.generateContent({
         role: LlmRole.UTILITY_COMPRESSOR,
-        modelConfigKey: { model: 'default' },
+        modelConfigKey: { model: 'summarizer-default' },
         promptId: this.env.promptId,
         abortSignal: new AbortController().signal,
         contents: [
