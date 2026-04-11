@@ -41,6 +41,7 @@ export type VirtualizedListProps<T> = {
   copyModeEnabled?: boolean;
   fixedItemHeight?: boolean;
   containerHeight?: number;
+  ref?: React.Ref<VirtualizedListRef<T>>;
 };
 
 export type VirtualizedListRef<T> = {
@@ -125,10 +126,7 @@ const VirtualizedListItem = memo(
 
 VirtualizedListItem.displayName = 'VirtualizedListItem';
 
-function VirtualizedList<T>(
-  props: VirtualizedListProps<T>,
-  ref: React.Ref<VirtualizedListRef<T>>,
-) {
+function VirtualizedList<T>(props: VirtualizedListProps<T>) {
   const {
     data,
     renderItem,
@@ -145,6 +143,7 @@ function VirtualizedList<T>(
     stableScrollback,
     copyModeEnabled = false,
     fixedItemHeight = false,
+    ref,
   } = props;
   const dataRef = useRef(data);
   useLayoutEffect(() => {

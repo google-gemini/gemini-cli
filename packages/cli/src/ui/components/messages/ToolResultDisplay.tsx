@@ -155,11 +155,7 @@ export const ToolResultDisplay: React.FC<ToolResultDisplayProps> = ({
           </Text>
         );
       }
-    } else if (
-      typeof contentData === 'object' &&
-      contentData !== null &&
-      'fileDiff' in contentData
-    ) {
+    } else if (isFileDiffResult(contentData)) {
       content = (
         <DiffRenderer
           diffContent={contentData.fileDiff}
@@ -168,7 +164,7 @@ export const ToolResultDisplay: React.FC<ToolResultDisplayProps> = ({
           terminalWidth={childWidth}
         />
       );
-    } else if (Array.isArray(contentData)) {
+    } else if (isAnsiOutput(contentData)) {
       const shouldDisableTruncation =
         isAlternateBuffer ||
         (availableTerminalHeight === undefined && maxLines === undefined);
@@ -216,10 +212,9 @@ export const ToolResultDisplay: React.FC<ToolResultDisplayProps> = ({
     return content;
   };
 
-  if (Array.isArray(resultDisplay)) {
+  if (isAnsiOutput(resultDisplay)) {
     const limit = maxLines ?? availableHeight ?? ACTIVE_SHELL_MAX_LINES;
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
-    const data = resultDisplay as AnsiOutput;
+    const data = resultDisplay;
 
     // Calculate list height: if not constrained, use full data length.
     // If constrained (e.g. alternate buffer), limit to available height

@@ -38,13 +38,21 @@ interface ScrollableListProps<T> extends VirtualizedListProps<T> {
   targetScrollIndex?: number;
   containerHeight?: number;
   scrollbarThumbColor?: string;
+  ref?: React.Ref<ScrollableListRef<T>>; // ref as a normal prop
 }
 
 export type ScrollableListRef<T> = VirtualizedListRef<T>;
 
 function ScrollableList<T>(props: ScrollableListProps<T>) {
   const keyMatchers = useKeyMatchers();
-  const { hasFocus, width, scrollbar = true, stableScrollback } = props;
+  const {
+    hasFocus,
+    width,
+    scrollbar = true,
+    stableScrollback,
+    ref,
+    ...restProps
+  } = props;
   const virtualizedListRef = useRef<VirtualizedListRef<T>>(null);
   const containerRef = useRef<DOMElement | null>(null);
 
@@ -256,7 +264,7 @@ function ScrollableList<T>(props: ScrollableListProps<T>) {
     <Box ref={containerRef} flexGrow={1} flexDirection="column" width={width}>
       <VirtualizedList
         ref={virtualizedListRef}
-        {...props}
+        {...restProps}
         scrollbar={scrollbar}
         scrollbarThumbColor={scrollbarColor}
         stableScrollback={stableScrollback}
