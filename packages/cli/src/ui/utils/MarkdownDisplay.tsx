@@ -5,7 +5,7 @@
  */
 
 import React from 'react';
-import { Text, Box } from 'ink';
+import { Text, Box, useIsScreenReaderEnabled } from 'ink';
 import { theme } from '../semantic-colors.js';
 import { colorizeCode } from './CodeColorizer.js';
 import { TableRenderer } from './TableRenderer.js';
@@ -447,9 +447,30 @@ const RenderTableInternal: React.FC<RenderTableProps> = ({
   headers,
   rows,
   terminalWidth,
-}) => (
-  <TableRenderer headers={headers} rows={rows} terminalWidth={terminalWidth} />
-);
+}) => {
+  const isScreenReaderEnabled = useIsScreenReaderEnabled();
+
+  if (isScreenReaderEnabled) {
+    const separator = headers.map(() => '---').join(' | ');
+    return (
+      <Box flexDirection="column">
+        <Text>{headers.join(' | ')}</Text>
+        <Text>{separator}</Text>
+        {rows.map((row, index) => (
+          <Text key={index}>{row.join(' | ')}</Text>
+        ))}
+      </Box>
+    );
+  }
+
+  return (
+    <TableRenderer
+      headers={headers}
+      rows={rows}
+      terminalWidth={terminalWidth}
+    />
+  );
+};
 
 const RenderTable = React.memo(RenderTableInternal);
 
