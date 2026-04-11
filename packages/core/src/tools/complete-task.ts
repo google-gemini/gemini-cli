@@ -9,7 +9,9 @@ import {
   BaseToolInvocation,
   type ToolResult,
   Kind,
+  type ExecuteOptions,
 } from './tools.js';
+
 import {
   COMPLETE_TASK_TOOL_NAME,
   COMPLETE_TASK_DISPLAY_NAME,
@@ -140,7 +142,7 @@ export class CompleteTaskInvocation<
     return 'Completing task and submitting results.';
   }
 
-  async execute(_signal: AbortSignal): Promise<ToolResult> {
+  async execute({ abortSignal: _signal }: ExecuteOptions): Promise<ToolResult> {
     let submittedOutput: string | null = null;
     let outputValue: unknown;
 

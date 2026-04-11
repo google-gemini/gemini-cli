@@ -56,7 +56,7 @@ export const TEST_AGENTS = {
   DOCS_AGENT: createAgent({
     name: 'docs-agent',
     description: 'An agent with expertise in updating documentation.',
-    tools: ['read_file', 'write_file'],
+    tools: ['read_file', 'write_file', 'list_directory', 'grep_search', 'glob'],
     body: 'You are the docs agent. Update documentation clearly and accurately.',
   }),
 
@@ -66,7 +66,7 @@ export const TEST_AGENTS = {
   TESTING_AGENT: createAgent({
     name: 'testing-agent',
     description: 'An agent with expertise in writing and updating tests.',
-    tools: ['read_file', 'write_file'],
+    tools: ['read_file', 'write_file', 'list_directory', 'grep_search', 'glob'],
     body: 'You are the test agent. Add or update tests.',
   }),
   /**
@@ -76,7 +76,7 @@ export const TEST_AGENTS = {
     name: 'database-agent',
     description:
       'An expert in database schemas, SQL, and creating database migrations.',
-    tools: ['read_file', 'write_file'],
+    tools: ['read_file', 'write_file', 'list_directory', 'grep_search', 'glob'],
     body: 'You are the database agent. Create and update SQL migrations.',
   }),
 
@@ -86,7 +86,7 @@ export const TEST_AGENTS = {
   CSS_AGENT: createAgent({
     name: 'css-agent',
     description: 'An expert in CSS, styling, and UI design.',
-    tools: ['read_file', 'write_file'],
+    tools: ['read_file', 'write_file', 'list_directory', 'grep_search', 'glob'],
     body: 'You are the CSS agent.',
   }),
 
@@ -96,7 +96,7 @@ export const TEST_AGENTS = {
   I18N_AGENT: createAgent({
     name: 'i18n-agent',
     description: 'An expert in internationalization and translations.',
-    tools: ['read_file', 'write_file'],
+    tools: ['read_file', 'write_file', 'list_directory', 'grep_search', 'glob'],
     body: 'You are the i18n agent.',
   }),
 
@@ -106,7 +106,7 @@ export const TEST_AGENTS = {
   SECURITY_AGENT: createAgent({
     name: 'security-agent',
     description: 'An expert in security audits and vulnerability patches.',
-    tools: ['read_file', 'write_file'],
+    tools: ['read_file', 'write_file', 'list_directory', 'grep_search', 'glob'],
     body: 'You are the security agent.',
   }),
 
@@ -116,7 +116,7 @@ export const TEST_AGENTS = {
   DEVOPS_AGENT: createAgent({
     name: 'devops-agent',
     description: 'An expert in CI/CD, Docker, and deployment scripts.',
-    tools: ['read_file', 'write_file'],
+    tools: ['read_file', 'write_file', 'list_directory', 'grep_search', 'glob'],
     body: 'You are the devops agent.',
   }),
 
@@ -126,7 +126,7 @@ export const TEST_AGENTS = {
   ANALYTICS_AGENT: createAgent({
     name: 'analytics-agent',
     description: 'An expert in tracking, analytics, and metrics.',
-    tools: ['read_file', 'write_file'],
+    tools: ['read_file', 'write_file', 'list_directory', 'grep_search', 'glob'],
     body: 'You are the analytics agent.',
   }),
 
@@ -136,7 +136,7 @@ export const TEST_AGENTS = {
   ACCESSIBILITY_AGENT: createAgent({
     name: 'accessibility-agent',
     description: 'An expert in web accessibility and ARIA roles.',
-    tools: ['read_file', 'write_file'],
+    tools: ['read_file', 'write_file', 'list_directory', 'grep_search', 'glob'],
     body: 'You are the accessibility agent.',
   }),
 
@@ -146,7 +146,7 @@ export const TEST_AGENTS = {
   MOBILE_AGENT: createAgent({
     name: 'mobile-agent',
     description: 'An expert in React Native and mobile app development.',
-    tools: ['read_file', 'write_file'],
+    tools: ['read_file', 'write_file', 'list_directory', 'grep_search', 'glob'],
     body: 'You are the mobile agent.',
   }),
 } as const;
