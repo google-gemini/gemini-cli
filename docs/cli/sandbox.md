@@ -309,7 +309,9 @@ $env:SANDBOX_SET_UID_GID="false"  # Disable UID/GID mapping
 
 **Missing commands**
 
-- Add to custom Dockerfile.
+- Add to a custom Dockerfile. Automatic `BUILD_SANDBOX` builds are only
+  available when running Gemini CLI from source; npm installs need a prebuilt
+  image instead.
 - Install via `sandbox.bashrc`.
 
 **Network issues**
