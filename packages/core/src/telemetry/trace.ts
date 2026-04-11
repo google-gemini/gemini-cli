@@ -12,9 +12,9 @@ import {
   type SpanOptions,
 } from '@opentelemetry/api';
 
-import {debugLogger} from '../utils/debugLogger.js';
-import {safeJsonStringify} from '../utils/safeJsonStringify.js';
-import {truncateString} from '../utils/textUtils.js';
+import { debugLogger } from '../utils/debugLogger.js';
+import { safeJsonStringify } from '../utils/safeJsonStringify.js';
+import { truncateString } from '../utils/textUtils.js';
 import {
   GEN_AI_AGENT_DESCRIPTION,
   GEN_AI_AGENT_NAME,
@@ -126,9 +126,9 @@ export async function runInDevTraceSpan<R>(
     logPrompts?: boolean;
     sessionId: string;
   },
-  fn: ({metadata}: {metadata: SpanMetadata}) => Promise<R>,
+  fn: ({ metadata }: { metadata: SpanMetadata }) => Promise<R>,
 ): Promise<R> {
-  const {operation, logPrompts, sessionId, ...restOfSpanOpts} = opts;
+  const { operation, logPrompts, sessionId, ...restOfSpanOpts } = opts;
 
   const tracer = trace.getTracer(TRACER_NAME, TRACER_VERSION);
   return tracer.startActiveSpan(operation, restOfSpanOpts, async (span) => {
@@ -162,10 +162,7 @@ export async function runInDevTraceSpan<R>(
             }
           }
         }
-        for (const [key, value] of Object.entries(meta.attributes) as [
-          string,
-          AttributeValue,
-        ][]) {
+        for (const [key, value] of Object.entries(meta.attributes)) {
           const truncated = truncateForTelemetry(value);
           if (truncated !== undefined) {
             span.setAttribute(key, truncated);
@@ -180,7 +177,7 @@ export async function runInDevTraceSpan<R>(
             span.recordException(meta.error);
           }
         } else {
-          span.setStatus({code: SpanStatusCode.OK});
+          span.setStatus({ code: SpanStatusCode.OK });
         }
       } catch (e) {
         // Log the error but don't rethrow, to ensure span.end() is called.
@@ -196,7 +193,7 @@ export async function runInDevTraceSpan<R>(
 
     let isStream = false;
     try {
-      const result = await fn({metadata: meta});
+      const result = await fn({ metadata: meta });
 
       if (isAsyncIterable(result)) {
         isStream = true;
@@ -240,5 +237,5 @@ function getErrorMessage(e: unknown): string {
   if (typeof e === 'string') {
     return e;
   }
-  return safeJsonStringify(e) as string;
+  return safeJsonStringify(e);
 }

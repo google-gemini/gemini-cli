@@ -4,10 +4,9 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import type * as api from '@opentelemetry/api';
-import {diag, SpanStatusCode, trace} from '@opentelemetry/api';
-import type {Tracer} from '@opentelemetry/api';
-import {afterEach, beforeEach, describe, expect, it, vi} from 'vitest';
+import { diag, SpanStatusCode, trace } from '@opentelemetry/api';
+import type { Tracer } from '@opentelemetry/api';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import {
   GEN_AI_AGENT_DESCRIPTION,
@@ -20,19 +19,22 @@ import {
   SERVICE_DESCRIPTION,
   SERVICE_NAME,
 } from './constants.js';
-import {runInDevTraceSpan, spanRegistry, truncateForTelemetry} from './trace.js';
+import {
+  runInDevTraceSpan,
+  spanRegistry,
+  truncateForTelemetry,
+} from './trace.js';
 
 vi.mock('@opentelemetry/api', async (importOriginal) => {
   const original = await importOriginal();
-  return {
-    ...original,
+  return Object.assign({}, original, {
     trace: {
       getTracer: vi.fn(),
     },
     diag: {
       error: vi.fn(),
     },
-  };
+  });
 });
 
 vi.mock('../utils/session.js', () => ({
@@ -61,7 +63,7 @@ describe('truncateForTelemetry', () => {
   });
 
   it('should stringify and truncate objects if exceeding maxLength', () => {
-    const obj = {message: 'hello world', nested: {a: 1}};
+    const obj = { message: 'hello world', nested: { a: 1 } };
     const stringified = JSON.stringify(obj);
     const result = truncateForTelemetry(obj, 10);
     expect(result).toBe(
@@ -71,7 +73,7 @@ describe('truncateForTelemetry', () => {
   });
 
   it('should stringify objects unchanged if within maxLength', () => {
-    const obj = {a: 1};
+    const obj = { a: 1 };
     expect(truncateForTelemetry(obj, 100)).toBe(JSON.stringify(obj));
   });
 
@@ -113,7 +115,7 @@ describe('runInDevTraceSpan', () => {
     const fn = vi.fn(async () => 'result');
 
     const result = await runInDevTraceSpan(
-      {operation: GeminiCliOperation.LLMCall, sessionId: 'test-session-id'},
+      { operation: GeminiCliOperation.LLMCall, sessionId: 'test-session-id' },
       fn,
     );
 
@@ -128,8 +130,8 @@ describe('runInDevTraceSpan', () => {
 
   it('should set default attributes on the span metadata', async () => {
     await runInDevTraceSpan(
-      {operation: GeminiCliOperation.LLMCall, sessionId: 'test-session-id'},
-      async ({metadata}) => {
+      { operation: GeminiCliOperation.LLMCall, sessionId: 'test-session-id' },
+      async ({ metadata }) => {
         expect(metadata.attributes[GEN_AI_OPERATION_NAME]).toBe(
           GeminiCliOperation.LLMCall,
         );
@@ -146,21 +148,21 @@ describe('runInDevTraceSpan', () => {
 
   it('should set span attributes from metadata on completion', async () => {
     await runInDevTraceSpan(
-      {operation: GeminiCliOperation.LLMCall, sessionId: 'test-session-id'},
-      async ({metadata}) => {
-        metadata.input = {query: 'hello'};
-        metadata.output = {response: 'world'};
+      { operation: GeminiCliOperation.LLMCall, sessionId: 'test-session-id' },
+      async ({ metadata }) => {
+        metadata.input = { query: 'hello' };
+        metadata.output = { response: 'world' };
         metadata.attributes['custom.attr'] = 'value';
       },
     );
 
     expect(mockSpan.setAttribute).toHaveBeenCalledWith(
       GEN_AI_INPUT_MESSAGES,
-      JSON.stringify({query: 'hello'}),
+      JSON.stringify({ query: 'hello' }),
     );
     expect(mockSpan.setAttribute).toHaveBeenCalledWith(
       GEN_AI_OUTPUT_MESSAGES,
-      JSON.stringify({response: 'world'}),
+      JSON.stringify({ response: 'world' }),
     );
     expect(mockSpan.setAttribute).toHaveBeenCalledWith('custom.attr', 'value');
     expect(mockSpan.setStatus).toHaveBeenCalledWith({
@@ -173,7 +175,7 @@ describe('runInDevTraceSpan', () => {
     const error = new Error('test error');
     await expect(
       runInDevTraceSpan(
-        {operation: GeminiCliOperation.LLMCall, sessionId: 'test-session-id'},
+        { operation: GeminiCliOperation.LLMCall, sessionId: 'test-session-id' },
         async () => {
           throw error;
         },
@@ -195,7 +197,7 @@ describe('runInDevTraceSpan', () => {
     }
 
     const resultStream = await runInDevTraceSpan(
-      {operation: GeminiCliOperation.LLMCall, sessionId: 'test-session-id'},
+      { operation: GeminiCliOperation.LLMCall, sessionId: 'test-session-id' },
       async () => testStream(),
     );
 
@@ -217,7 +219,7 @@ describe('runInDevTraceSpan', () => {
     }
 
     const resultStream = await runInDevTraceSpan(
-      {operation: GeminiCliOperation.LLMCall, sessionId: 'test-session-id'},
+      { operation: GeminiCliOperation.LLMCall, sessionId: 'test-session-id' },
       async () => testStream(),
     );
 
@@ -231,7 +233,7 @@ describe('runInDevTraceSpan', () => {
     }
 
     const resultStream = await runInDevTraceSpan(
-      {operation: GeminiCliOperation.LLMCall, sessionId: 'test-session-id'},
+      { operation: GeminiCliOperation.LLMCall, sessionId: 'test-session-id' },
       async () => testStream(),
     );
 
@@ -242,8 +244,8 @@ describe('runInDevTraceSpan', () => {
     expect(mockSpan.end).toHaveBeenCalledTimes(1);
 
     // Try to end again (simulating registry or double call)
-    const endSpanFn = vi.mocked(spanRegistry.register).mock.calls[0][1] as () =>
-      void;
+    const endSpanFn = vi.mocked(spanRegistry.register).mock
+      .calls[0][1] as () => void;
     endSpanFn();
 
     expect(mockSpan.end).toHaveBeenCalledTimes(1);
@@ -257,7 +259,7 @@ describe('runInDevTraceSpan', () => {
     }
 
     const resultStream = await runInDevTraceSpan(
-      {operation: GeminiCliOperation.LLMCall, sessionId: 'test-session-id'},
+      { operation: GeminiCliOperation.LLMCall, sessionId: 'test-session-id' },
       async () => errorStream(),
     );
 
@@ -276,8 +278,8 @@ describe('runInDevTraceSpan', () => {
     });
 
     await runInDevTraceSpan(
-      {operation: GeminiCliOperation.LLMCall, sessionId: 'test-session-id'},
-      async ({metadata}) => {
+      { operation: GeminiCliOperation.LLMCall, sessionId: 'test-session-id' },
+      async ({ metadata }) => {
         metadata.input = 'trigger error';
       },
     );
