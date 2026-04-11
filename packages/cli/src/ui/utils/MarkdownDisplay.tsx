@@ -451,13 +451,24 @@ const RenderTableInternal: React.FC<RenderTableProps> = ({
   const isScreenReaderEnabled = useIsScreenReaderEnabled();
 
   if (isScreenReaderEnabled) {
-    const separator = headers.map(() => '---').join(' | ');
+    // Strip ANSI escape sequences (ESC + '[' + params + letter) and markdown markers.
+    // eslint-disable-next-line no-control-regex
+    const ansiRegex = /\u001b\[[0-9;]*[a-zA-Z]/g;
+    const sanitizeCell = (cell: string): string =>
+      cell
+        .replace(ansiRegex, '')
+        .replace(/(\*\*|__)(.*?)\1/g, '$2')
+        .replace(/([*_`~])(.*?)\1/g, '$2')
+        .trim();
+
+    const sanitizedHeaders = headers.map(sanitizeCell);
+    const separator = sanitizedHeaders.map(() => '---').join(' | ');
     return (
       <Box flexDirection="column">
-        <Text>{headers.join(' | ')}</Text>
+        <Text>{sanitizedHeaders.join(' | ')}</Text>
         <Text>{separator}</Text>
         {rows.map((row, index) => (
-          <Text key={index}>{row.join(' | ')}</Text>
+          <Text key={index}>{row.map(sanitizeCell).join(' | ')}</Text>
         ))}
       </Box>
     );

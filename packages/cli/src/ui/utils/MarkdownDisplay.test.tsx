@@ -265,5 +265,27 @@ Another paragraph.
       expect(frame).not.toContain('┬');
       unmount();
     });
+
+    it('sanitizes ANSI escapes and markdown markers in screenReader table cells', async () => {
+      (useIsScreenReaderEnabled as Mock).mockReturnValue(true);
+      const ansiRed = '\u001b[31m';
+      const ansiReset = '\u001b[0m';
+      const text = [
+        `| **Header** | _Status_ |`,
+        `|------------|----------|`,
+        `| ${ansiRed}injected${ansiReset} | \`code\` |`,
+      ].join(eol);
+      const { lastFrame, unmount } = await renderWithProviders(
+        <MarkdownDisplay {...baseProps} text={text} />,
+      );
+      const frame = lastFrame();
+      expect(frame).toContain('Header | Status');
+      expect(frame).toContain('injected | code');
+      expect(frame).not.toContain('\u001b[');
+      expect(frame).not.toContain('**');
+      expect(frame).not.toContain('_');
+      expect(frame).not.toContain('`');
+      unmount();
+    });
   });
 });
