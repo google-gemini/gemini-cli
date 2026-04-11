@@ -41,8 +41,10 @@ export interface MemoryTestResult {
   snapshots: MemorySnapshot[];
   peakHeapUsed: number;
   peakRss: number;
+  peakExternal: number;
   finalHeapUsed: number;
   finalRss: number;
+  finalExternal: number;
   baseline: MemoryBaseline | undefined;
   withinTolerance: boolean;
   deltaPercent: number;
@@ -207,13 +209,17 @@ export class MemoryTestHarness {
       withinTolerance = deltaPercent <= tolerance;
     }
 
+    const peakExternal = Math.max(...snapshots.map((s) => s.external));
+
     const result: MemoryTestResult = {
       scenarioName: name,
       snapshots,
       peakHeapUsed,
       peakRss,
+      peakExternal,
       finalHeapUsed: afterSnap.heapUsed,
       finalRss: afterSnap.rss,
+      finalExternal: afterSnap.external,
       baseline,
       withinTolerance,
       deltaPercent,
@@ -254,7 +260,8 @@ export class MemoryTestHarness {
           `  Baseline:  ${formatMB(result.baseline.heapUsedBytes)} heap used\n` +
           `  Delta:     ${deltaPercent.toFixed(1)}% (tolerance: ${tolerance}%)\n` +
           `  Peak heap: ${formatMB(result.peakHeapUsed)}\n` +
-          `  Peak RSS:  ${formatMB(result.peakRss)}`,
+          `  Peak RSS:  ${formatMB(result.peakRss)}\n` +
+          `  Peak External:  ${formatMB(result.peakExternal)}`,
       );
     }
   }
@@ -268,6 +275,7 @@ export class MemoryTestHarness {
       heapTotalBytes:
         result.snapshots[result.snapshots.length - 1]?.heapTotal ?? 0,
       rssBytes: result.finalRss,
+      externalBytes: result.finalExternal,
     });
     // Reload baselines after update
     this.baselines = loadBaselines(this.baselinesPath);
