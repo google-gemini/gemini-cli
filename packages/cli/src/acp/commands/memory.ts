@@ -6,6 +6,7 @@
 
 import {
   addMemory,
+  listInboxSkills,
   listMemoryFiles,
   refreshMemory,
   showMemory,
@@ -30,6 +31,7 @@ export class MemoryCommand implements Command {
     new RefreshMemoryCommand(),
     new ListMemoryCommand(),
     new AddMemoryCommand(),
+    new InboxMemoryCommand(),
   ];
   readonly requiresWorkspace = true;
 
@@ -120,5 +122,41 @@ export class AddMemoryCommand implements Command {
         data: `Error: Tool ${result.toolName} not found.`,
       };
     }
+  }
+}
+
+export class InboxMemoryCommand implements Command {
+  readonly name = 'memory inbox';
+  readonly description =
+    'Lists skills extracted from past sessions that are pending review.';
+
+  async execute(
+    context: CommandContext,
+    _: string[],
+  ): Promise<CommandExecutionResponse> {
+    if (!context.agentContext.config.isMemoryManagerEnabled()) {
+      return {
+        name: this.name,
+        data: 'The memory inbox requires the experimental memory manager. Enable it with: experimental.memoryManager = true in settings.',
+      };
+    }
+
+    const skills = await listInboxSkills(context.agentContext.config);
+
+    if (skills.length === 0) {
+      return { name: this.name, data: 'No extracted skills in inbox.' };
+    }
+
+    const lines = skills.map((s) => {
+      const date = s.extractedAt
+        ? ` (extracted: ${new Date(s.extractedAt).toLocaleDateString()})`
+        : '';
+      return `- **${s.name}**: ${s.description}${date}`;
+    });
+
+    return {
+      name: this.name,
+      data: `Skill inbox (${skills.length}):\n${lines.join('\n')}`,
+    };
   }
 }

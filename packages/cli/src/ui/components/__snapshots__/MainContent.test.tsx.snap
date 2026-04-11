@@ -3,16 +3,15 @@
 exports[`MainContent > MainContent Tool Output Height Logic > 'ASB mode - Focused shell should expand' 1`] = `
 "ScrollableList
 AppHeader(full)
+
 ╭──────────────────────────────────────────────────────────────────────────────────────────────╮
-│ ⊶  Shell Command Running a long command...                                                   │
+│ ⠋  Shell Command Running a long command...                                                   │
 │                                                                                              │
-│ Line 9                                                                                       │
-│ Line 10                                                                                      │
 │ Line 11                                                                                      │
 │ Line 12                                                                                      │
 │ Line 13                                                                                      │
-│ Line 14                                                                                    █ │
-│ Line 15                                                                                    █ │
+│ Line 14                                                                                      │
+│ Line 15                                                                                      │
 │ Line 16                                                                                    █ │
 │ Line 17                                                                                    █ │
 │ Line 18                                                                                    █ │
@@ -25,16 +24,15 @@ AppHeader(full)
 exports[`MainContent > MainContent Tool Output Height Logic > 'ASB mode - Unfocused shell' 1`] = `
 "ScrollableList
 AppHeader(full)
+
 ╭──────────────────────────────────────────────────────────────────────────────────────────────╮
-│ ⊶  Shell Command Running a long command...                                                   │
+│ ⠋  Shell Command Running a long command...                                                   │
 │                                                                                              │
-│ Line 9                                                                                       │
-│ Line 10                                                                                      │
 │ Line 11                                                                                      │
 │ Line 12                                                                                      │
 │ Line 13                                                                                      │
-│ Line 14                                                                                    █ │
-│ Line 15                                                                                    █ │
+│ Line 14                                                                                      │
+│ Line 15                                                                                      │
 │ Line 16                                                                                    █ │
 │ Line 17                                                                                    █ │
 │ Line 18                                                                                    █ │
@@ -46,12 +44,11 @@ AppHeader(full)
 
 exports[`MainContent > MainContent Tool Output Height Logic > 'Normal mode - Constrained height' 1`] = `
 "AppHeader(full)
+
 ╭──────────────────────────────────────────────────────────────────────────────────────────────╮
-│ ⊶  Shell Command Running a long command...                                                   │
+│ ⠋  Shell Command Running a long command...                                                   │
 │                                                                                              │
-│ ... first 9 lines hidden (Ctrl+O to show) ...                                                │
-│ Line 10                                                                                      │
-│ Line 11                                                                                      │
+│ ... first 11 lines hidden (Ctrl+O to show) ...                                               │
 │ Line 12                                                                                      │
 │ Line 13                                                                                      │
 │ Line 14                                                                                      │
@@ -67,8 +64,9 @@ exports[`MainContent > MainContent Tool Output Height Logic > 'Normal mode - Con
 
 exports[`MainContent > MainContent Tool Output Height Logic > 'Normal mode - Unconstrained height' 1`] = `
 "AppHeader(full)
+
 ╭──────────────────────────────────────────────────────────────────────────────────────────────╮
-│ ⊶  Shell Command Running a long command...                                                   │
+│ ⠋  Shell Command Running a long command...                                                   │
 │                                                                                              │
 │ Line 1                                                                                       │
 │ Line 2                                                                                       │
@@ -94,63 +92,165 @@ exports[`MainContent > MainContent Tool Output Height Logic > 'Normal mode - Unc
 "
 `;
 
+exports[`MainContent > renders a ToolConfirmationQueue without an extra line when preceded by hidden tools 1`] = `
+"AppHeader(full)
+▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀
+ > Apply plan                                                                   
+▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄
+
+╭──────────────────────────────────────────────────────────────────────────────╮
+│ Ready to start implementation?                                               │
+│                                                                              │
+│  Error reading plan: Storage must be initialized before use                  │
+╰──────────────────────────────────────────────────────────────────────────────╯
+"
+`;
+
 exports[`MainContent > renders a split tool group without a gap between static and pending areas 1`] = `
 "AppHeader(full)
-╭──────────────────────────────────────────────────────────────────────────────────────────────╮
-│ ✓  test-tool A tool for testing                                                              │
-│                                                                                              │
-│ Part 1                                                                                       │
-│                                                                                              │
-│ ✓  test-tool A tool for testing                                                              │
-│                                                                                              │
-│ Part 2                                                                                       │
-╰──────────────────────────────────────────────────────────────────────────────────────────────╯
+
+╭──────────────────────────────────────────────────────────────────────────╮
+│ ✓  test-tool A tool for testing                                          │
+│                                                                          │
+│ Part 1                                                                   │
+│                                                                          │
+│ ✓  test-tool A tool for testing                                          │
+│                                                                          │
+│ Part 2                                                                   │
+╰──────────────────────────────────────────────────────────────────────────╯
+"
+`;
+
+exports[`MainContent > renders a spurious line when a tool group has only hidden tools and borderBottom true 1`] = `
+"AppHeader(full)
+▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀
+ > Apply plan                                                                   
+▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄
+"
+`;
+
+exports[`MainContent > renders a subagent with a complete box including bottom border 1`] = `
+"AppHeader(full)
+▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀
+ > Investigate                                                                  
+▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄
+
+╭──────────────────────────────────────────────────────────────────────────╮
+│ ≡ Running Agent... (ctrl+o to collapse)                                  │
+│                                                                          │
+│ Running subagent codebase_investigator...                                │
+│                                                                          │
+│ ⠋  run_shell_command echo hello                                          │
+│                                                                          │
+╰──────────────────────────────────────────────────────────────────────────╯
 "
 `;
 
 exports[`MainContent > renders mixed history items (user + gemini) with single line padding between them 1`] = `
-"ScrollableList
-AppHeader(full)
-▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀
- > User message                                                                                     
-▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄
-✦ Gemini response
-  Gemini response
-  Gemini response
-  Gemini response
-  Gemini response
-  Gemini response
-  Gemini response
-  Gemini response
-  Gemini response
-  Gemini response
+"
+  ERROR  config.getUseTerminalBuffer is not a function
+
+ src/ui/components/MainContent.tsx:40:36
+
+ 37:   const uiState = useUIState();
+ 38:   const isAlternateBufferOrTerminalBuffer = useAlternateBuffer();
+ 39:   const config = useConfig();
+ 40:   const useTerminalBuffer = config.getUseTerminalBuffer();
+ 41:   const isAlternateBuffer = config.getUseAlternateBuffer();
+ 42:
+ 43:   const confirmingTool = useConfirmingTool();
+
+ - MainContent (src/ui/components/MainContent.tsx:40:36)
+ -Object.react-stack-bott 
+  m-frame                (/usr/local/google/home/akkr/Documents/kilo_code_gemini_cli/gemini-cli-kil
+                         o-code-grep-only2/gemini-cli/node_modules/react-reconciler/cjs/react-recon
+                         ciler.development.js:15859:20)
+ -renderWithHoo 
+  s            (/usr/local/google/home/akkr/Documents/kilo_code_gemini_cli/gemini-cli-kilo-code-gre
+               p-only2/gemini-cli/node_modules/react-reconciler/cjs/react-reconciler.development.js
+               :3221:22)
+ -updateFunctionComp 
+  nent              (/usr/local/google/home/akkr/Documents/kilo_code_gemini_cli/gemini-cli-kilo-cod
+                    e-grep-only2/gemini-cli/node_modules/react-reconciler/cjs/react-reconciler.deve
+                    lopment.js:6475:19)
+ -beginWor 
+          (/usr/local/google/home/akkr/Documents/kilo_code_gemini_cli/gemini-cli-kilo-code-grep-onl
+          y2/gemini-cli/node_modules/react-reconciler/cjs/react-reconciler.development.js:8009:18)
+
+ -runWithFiberIn 
+  EV            (/usr/local/google/home/akkr/Documents/kilo_code_gemini_cli/gemini-cli-kilo-code-gr
+                ep-only2/gemini-cli/node_modules/react-reconciler/cjs/react-reconciler.development.
+                js:1738:13)
+ -performUnitOfW 
+  rk            (/usr/local/google/home/akkr/Documents/kilo_code_gemini_cli/gemini-cli-kilo-code-gr
+                ep-only2/gemini-cli/node_modules/react-reconciler/cjs/react-reconciler.development.
+                js:12834:22)
+ -workLoopSyn 
+             (/usr/local/google/home/akkr/Documents/kilo_code_gemini_cli/gemini-cli-kilo-code-grep-
+             only2/gemini-cli/node_modules/react-reconciler/cjs/react-reconciler.development.js:126
+             44:41)
+ -renderRootSy 
+  c           (/usr/local/google/home/akkr/Documents/kilo_code_gemini_cli/gemini-cli-kilo-code-grep
+              -only2/gemini-cli/node_modules/react-reconciler/cjs/react-reconciler.development.js:1
+              2624:11)
+ -performWorkOnR 
+  ot            (/usr/local/google/home/akkr/Documents/kilo_code_gemini_cli/gemini-cli-kilo-code-gr
+                ep-only2/gemini-cli/node_modules/react-reconciler/cjs/react-reconciler.development.
+                js:12135:44)
 "
 `;
 
 exports[`MainContent > renders multiple history items with single line padding between them 1`] = `
-"ScrollableList
-AppHeader(full)
-✦ Gemini message 1
-  Gemini message 1
-  Gemini message 1
-  Gemini message 1
-  Gemini message 1
-  Gemini message 1
-  Gemini message 1
-  Gemini message 1
-  Gemini message 1
-  Gemini message 1
+"
+  ERROR  config.getUseTerminalBuffer is not a function
 
-✦ Gemini message 2
-  Gemini message 2
-  Gemini message 2
-  Gemini message 2
-  Gemini message 2
-  Gemini message 2
-  Gemini message 2
-  Gemini message 2
-  Gemini message 2
-  Gemini message 2
+ src/ui/components/MainContent.tsx:40:36
+
+ 37:   const uiState = useUIState();
+ 38:   const isAlternateBufferOrTerminalBuffer = useAlternateBuffer();
+ 39:   const config = useConfig();
+ 40:   const useTerminalBuffer = config.getUseTerminalBuffer();
+ 41:   const isAlternateBuffer = config.getUseAlternateBuffer();
+ 42:
+ 43:   const confirmingTool = useConfirmingTool();
+
+ - MainContent (src/ui/components/MainContent.tsx:40:36)
+ -Object.react-stack-bott 
+  m-frame                (/usr/local/google/home/akkr/Documents/kilo_code_gemini_cli/gemini-cli-kil
+                         o-code-grep-only2/gemini-cli/node_modules/react-reconciler/cjs/react-recon
+                         ciler.development.js:15859:20)
+ -renderWithHoo 
+  s            (/usr/local/google/home/akkr/Documents/kilo_code_gemini_cli/gemini-cli-kilo-code-gre
+               p-only2/gemini-cli/node_modules/react-reconciler/cjs/react-reconciler.development.js
+               :3221:22)
+ -updateFunctionComp 
+  nent              (/usr/local/google/home/akkr/Documents/kilo_code_gemini_cli/gemini-cli-kilo-cod
+                    e-grep-only2/gemini-cli/node_modules/react-reconciler/cjs/react-reconciler.deve
+                    lopment.js:6475:19)
+ -beginWor 
+          (/usr/local/google/home/akkr/Documents/kilo_code_gemini_cli/gemini-cli-kilo-code-grep-onl
+          y2/gemini-cli/node_modules/react-reconciler/cjs/react-reconciler.development.js:8009:18)
+
+ -runWithFiberIn 
+  EV            (/usr/local/google/home/akkr/Documents/kilo_code_gemini_cli/gemini-cli-kilo-code-gr
+                ep-only2/gemini-cli/node_modules/react-reconciler/cjs/react-reconciler.development.
+                js:1738:13)
+ -performUnitOfW 
+  rk            (/usr/local/google/home/akkr/Documents/kilo_code_gemini_cli/gemini-cli-kilo-code-gr
+                ep-only2/gemini-cli/node_modules/react-reconciler/cjs/react-reconciler.development.
+                js:12834:22)
+ -workLoopSyn 
+             (/usr/local/google/home/akkr/Documents/kilo_code_gemini_cli/gemini-cli-kilo-code-grep-
+             only2/gemini-cli/node_modules/react-reconciler/cjs/react-reconciler.development.js:126
+             44:41)
+ -renderRootSy 
+  c           (/usr/local/google/home/akkr/Documents/kilo_code_gemini_cli/gemini-cli-kilo-code-grep
+              -only2/gemini-cli/node_modules/react-reconciler/cjs/react-reconciler.development.js:1
+              2624:11)
+ -performWorkOnR 
+  ot            (/usr/local/google/home/akkr/Documents/kilo_code_gemini_cli/gemini-cli-kilo-code-gr
+                ep-only2/gemini-cli/node_modules/react-reconciler/cjs/react-reconciler.development.
+                js:12135:44)
 "
 `;
 
@@ -163,16 +263,16 @@ AppHeader(full)
  Thinking... 
  │
  │ Initial analysis
- │ This is a multiple line paragraph for the first thinking message of how the model analyzes the
- │ problem.
+ │ This is a multiple line paragraph for the first thinking message of how the
+ │ model analyzes the problem.
  │
  │ Planning execution
- │ This a second multiple line paragraph for the second thinking message explaining the plan in
- │ detail so that it wraps around the terminal display.
+ │ This a second multiple line paragraph for the second thinking message
+ │ explaining the plan in detail so that it wraps around the terminal display.
  │
  │ Refining approach
- │ And finally a third multiple line paragraph for the third thinking message to refine the
- │ solution.
+ │ And finally a third multiple line paragraph for the third thinking message to
+ │ refine the solution.
 "
 `;
 
@@ -185,14 +285,14 @@ AppHeader(full)
  Thinking... 
  │
  │ Initial analysis
- │ This is a multiple line paragraph for the first thinking message of how the model analyzes the
- │ problem.
+ │ This is a multiple line paragraph for the first thinking message of how the
+ │ model analyzes the problem.
  │
  │ Planning execution
- │ This a second multiple line paragraph for the second thinking message explaining the plan in
- │ detail so that it wraps around the terminal display.
+ │ This a second multiple line paragraph for the second thinking message
+ │ explaining the plan in detail so that it wraps around the terminal display.
  │
  │ Refining approach
- │ And finally a third multiple line paragraph for the third thinking message to refine the
- │ solution."
+ │ And finally a third multiple line paragraph for the third thinking message to
+ │ refine the solution."
 `;

@@ -105,6 +105,7 @@ const mockConfigInternal = {
     }) as unknown as ToolRegistry,
   isInteractive: () => false,
   getDisableLLMCorrection: vi.fn(() => true),
+  isPlanMode: vi.fn(() => false),
   getActiveModel: () => 'test-model',
   storage: {
     getProjectTempDir: vi.fn().mockReturnValue('/tmp/project'),
@@ -671,7 +672,7 @@ describe('WriteFileTool', () => {
       const params = { file_path: relativePath, content };
       const invocation = tool.build(params);
 
-      const result = await invocation.execute(abortSignal);
+      const result = await invocation.execute({ abortSignal });
 
       expect(result.llmContent).toMatch(
         /Successfully created and wrote to new file/,
@@ -692,7 +693,7 @@ describe('WriteFileTool', () => {
       });
 
       const invocation = tool.build(params);
-      const result = await invocation.execute(abortSignal);
+      const result = await invocation.execute({ abortSignal });
       expect(result.llmContent).toContain('Error checking existing file');
       expect(result.returnDisplay).toMatch(
         /Error checking existing file: Simulated read error for execute/,
@@ -717,7 +718,7 @@ describe('WriteFileTool', () => {
 
       await confirmExecution(invocation);
 
-      const result = await invocation.execute(abortSignal);
+      const result = await invocation.execute({ abortSignal });
 
       expect(mockEnsureCorrectFileContent).toHaveBeenCalledWith(
         proposedContent,
@@ -762,7 +763,7 @@ describe('WriteFileTool', () => {
 
       await confirmExecution(invocation);
 
-      const result = await invocation.execute(abortSignal);
+      const result = await invocation.execute({ abortSignal });
 
       expect(mockEnsureCorrectFileContent).toHaveBeenCalledWith(
         proposedContent,
@@ -795,7 +796,7 @@ describe('WriteFileTool', () => {
 
       await confirmExecution(invocation);
 
-      await invocation.execute(abortSignal);
+      await invocation.execute({ abortSignal });
 
       expect(fs.existsSync(dirPath)).toBe(true);
       expect(fs.statSync(dirPath).isDirectory()).toBe(true);
@@ -832,7 +833,7 @@ describe('WriteFileTool', () => {
           ...(modified_by_user !== undefined && { modified_by_user }),
         };
         const invocation = tool.build(params);
-        const result = await invocation.execute(abortSignal);
+        const result = await invocation.execute({ abortSignal });
 
         if (shouldIncludeMessage) {
           expect(result.llmContent).toMatch(/User modified the `content`/);
@@ -850,7 +851,7 @@ describe('WriteFileTool', () => {
       const params = { file_path: filePath, content };
       const invocation = tool.build(params);
 
-      const result = await invocation.execute(abortSignal);
+      const result = await invocation.execute({ abortSignal });
 
       expect(result.llmContent).toContain('Here is the updated code:');
       expect(result.llmContent).toContain(content);
@@ -877,7 +878,7 @@ describe('WriteFileTool', () => {
         await confirmDetails.onConfirm(ToolConfirmationOutcome.ProceedOnce);
       }
 
-      const result = await invocation.execute(abortSignal);
+      const result = await invocation.execute({ abortSignal });
 
       expect(result.llmContent).toContain('Here is the updated code:');
       // Should contain the modified line
@@ -998,7 +999,7 @@ describe('WriteFileTool', () => {
 
           const params = { file_path: filePath, content };
           const invocation = tool.build(params);
-          const result = await invocation.execute(abortSignal);
+          const result = await invocation.execute({ abortSignal });
 
           expect(result.error?.type).toBe(errorType);
           const errorSuffix = errorCode ? ` (${errorCode})` : '';
@@ -1088,7 +1089,7 @@ describe('WriteFileTool', () => {
 
       const params = { file_path: filePath, content };
       const invocation = tool.build(params);
-      const result = await invocation.execute(abortSignal);
+      const result = await invocation.execute({ abortSignal });
 
       expect(discoverJitContext).toHaveBeenCalled();
       expect(result.llmContent).toContain('Newly Discovered Project Context');
@@ -1105,7 +1106,7 @@ describe('WriteFileTool', () => {
 
       const params = { file_path: filePath, content };
       const invocation = tool.build(params);
-      const result = await invocation.execute(abortSignal);
+      const result = await invocation.execute({ abortSignal });
 
       expect(result.llmContent).not.toContain(
         'Newly Discovered Project Context',

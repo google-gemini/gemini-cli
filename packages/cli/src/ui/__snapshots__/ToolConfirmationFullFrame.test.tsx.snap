@@ -1,0 +1,55 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`Full Terminal Tool Confirmation Snapshot > renders tool confirmation box in the frame of the entire terminal 1`] = `
+"
+  ERROR  config.getUseTerminalBuffer is not a function
+
+ src/ui/components/MainContent.tsx:40:36
+
+ 37:   const uiState = useUIState();
+ 38:   const isAlternateBufferOrTerminalBuffer = useAlternateBuffer();
+ 39:   const config = useConfig();
+ 40:   const useTerminalBuffer = config.getUseTerminalBuffer();
+ 41:   const isAlternateBuffer = config.getUseAlternateBuffer();
+ 42:
+ 43:   const confirmingTool = useConfirmingTool();
+
+ - MainContent (src/ui/components/MainContent.tsx:40:36)
+ -Object.react-stack-bott 
+  m-frame                (/usr/local/google/home/akkr/Documents/kilo_code_gemini_cli/gemini-cli-kil
+                         o-code-grep-only2/gemini-cli/node_modules/react-reconciler/cjs/react-recon
+                         ciler.development.js:15859:20)
+ -renderWithHoo 
+  s            (/usr/local/google/home/akkr/Documents/kilo_code_gemini_cli/gemini-cli-kilo-code-gre
+               p-only2/gemini-cli/node_modules/react-reconciler/cjs/react-reconciler.development.js
+               :3221:22)
+ -updateFunctionComp 
+  nent              (/usr/local/google/home/akkr/Documents/kilo_code_gemini_cli/gemini-cli-kilo-cod
+                    e-grep-only2/gemini-cli/node_modules/react-reconciler/cjs/react-reconciler.deve
+                    lopment.js:6475:19)
+ -beginWor 
+          (/usr/local/google/home/akkr/Documents/kilo_code_gemini_cli/gemini-cli-kilo-code-grep-onl
+          y2/gemini-cli/node_modules/react-reconciler/cjs/react-reconciler.development.js:8009:18)
+
+ -runWithFiberIn 
+  EV            (/usr/local/google/home/akkr/Documents/kilo_code_gemini_cli/gemini-cli-kilo-code-gr
+                ep-only2/gemini-cli/node_modules/react-reconciler/cjs/react-reconciler.development.
+                js:1738:13)
+ -performUnitOfW 
+  rk            (/usr/local/google/home/akkr/Documents/kilo_code_gemini_cli/gemini-cli-kilo-code-gr
+                ep-only2/gemini-cli/node_modules/react-reconciler/cjs/react-reconciler.development.
+                js:12834:22)
+ -workLoopSyn 
+             (/usr/local/google/home/akkr/Documents/kilo_code_gemini_cli/gemini-cli-kilo-code-grep-
+             only2/gemini-cli/node_modules/react-reconciler/cjs/react-reconciler.development.js:126
+             44:41)
+ -renderRootSy 
+  c           (/usr/local/google/home/akkr/Documents/kilo_code_gemini_cli/gemini-cli-kilo-code-grep
+              -only2/gemini-cli/node_modules/react-reconciler/cjs/react-reconciler.development.js:1
+              2624:11)
+ -performWorkOnR 
+  ot            (/usr/local/google/home/akkr/Documents/kilo_code_gemini_cli/gemini-cli-kilo-code-gr
+                ep-only2/gemini-cli/node_modules/react-reconciler/cjs/react-reconciler.development.
+                js:12135:44)
+"
+`;

@@ -14,6 +14,7 @@ import path from 'node:path';
 import type { Config } from '../config/config.js';
 import type { AgentDefinition } from '../agents/types.js';
 import { CodebaseInvestigatorAgent } from '../agents/codebase-investigator.js';
+import { AGENT_TOOL_NAME } from '../tools/tool-names.js';
 import { GEMINI_DIR } from '../utils/paths.js';
 import { debugLogger } from '../utils/debugLogger.js';
 import {
@@ -83,15 +84,21 @@ describe('Core System Prompt (prompts.ts)', () => {
     vi.stubEnv('GEMINI_SYSTEM_MD', undefined);
     vi.stubEnv('GEMINI_WRITE_SYSTEM_MD', undefined);
     const mockRegistry = {
-      getAllToolNames: vi.fn().mockReturnValue(['grep_search', 'glob']),
+      getAllToolNames: vi
+        .fn()
+        .mockReturnValue(['grep_search', 'glob', 'invoke_agent']),
       getAllTools: vi.fn().mockReturnValue([]),
     };
     mockConfig = {
       getToolRegistry: vi.fn().mockReturnValue(mockRegistry),
       getEnableShellOutputEfficiency: vi.fn().mockReturnValue(true),
+      getSandboxEnabled: vi.fn().mockReturnValue(false),
       storage: {
         getProjectTempDir: vi.fn().mockReturnValue('/tmp/project-temp'),
         getPlansDir: vi.fn().mockReturnValue('/tmp/project-temp/plans'),
+        getProjectTempTrackerDir: vi
+          .fn()
+          .mockReturnValue('/mock/.gemini/tmp/session/tracker'),
       },
       isInteractive: vi.fn().mockReturnValue(true),
       isInteractiveShellEnabled: vi.fn().mockReturnValue(true),
@@ -110,6 +117,7 @@ describe('Core System Prompt (prompts.ts)', () => {
             description: 'Mock Agent Description',
           },
         ]),
+        getDefinition: vi.fn().mockReturnValue(undefined),
       }),
       getSkillManager: vi.fn().mockReturnValue({
         getSkills: vi.fn().mockReturnValue([]),
@@ -190,7 +198,10 @@ describe('Core System Prompt (prompts.ts)', () => {
     expect(prompt).not.toContain('activate_skill');
   });
 
-  it('should include sub-agents in XML for preview models', () => {
+  it('should include sub-agents in XML for preview models when invoke_agent tool is enabled', () => {
+    vi.mocked(mockConfig.toolRegistry.getAllToolNames).mockReturnValue([
+      AGENT_TOOL_NAME,
+    ]);
     vi.mocked(mockConfig.getActiveModel).mockReturnValue(PREVIEW_GEMINI_MODEL);
     const agents = [
       {
@@ -214,6 +225,27 @@ describe('Core System Prompt (prompts.ts)', () => {
     expect(prompt).toContain('</subagent>');
     expect(prompt).toContain('</available_subagents>');
     expect(prompt).toMatchSnapshot();
+  });
+
+  it('should NOT include sub-agents when the invoke_agent tool is disabled', () => {
+    vi.mocked(mockConfig.toolRegistry.getAllToolNames).mockReturnValue([]);
+    vi.mocked(mockConfig.getActiveModel).mockReturnValue(PREVIEW_GEMINI_MODEL);
+    const agents = [
+      {
+        name: 'test-agent',
+        displayName: 'Test Agent',
+        description: 'A test agent description',
+      },
+    ];
+    vi.mocked(mockConfig.getAgentRegistry().getAllDefinitions).mockReturnValue(
+      agents as unknown as AgentDefinition[],
+    );
+    const prompt = getCoreSystemPrompt(mockConfig);
+
+    expect(prompt).not.toContain('# Available Sub-Agents');
+    expect(prompt).not.toContain('<available_subagents>');
+    expect(prompt).not.toContain('<subagent>');
+    expect(prompt).not.toContain('<name>test-agent</name>');
   });
 
   it('should use legacy system prompt for non-preview model', () => {
@@ -407,17 +439,18 @@ describe('Core System Prompt (prompts.ts)', () => {
   });
 
   it.each([
-    [[CodebaseInvestigatorAgent.name, 'grep_search', 'glob'], true],
-    [['grep_search', 'glob'], false],
+    [true, true],
+    [false, false],
   ])(
-    'should handle CodebaseInvestigator with tools=%s',
-    (toolNames, expectCodebaseInvestigator) => {
+    'should handle CodebaseInvestigator (enabled=%s)',
+    (enableCodebaseInvestigator, expectCodebaseInvestigator) => {
       const mockToolRegistry = {
-        getAllToolNames: vi.fn().mockReturnValue(toolNames),
+        getAllToolNames: vi.fn().mockReturnValue(['grep_search', 'glob']),
       };
       const testConfig = {
         getToolRegistry: vi.fn().mockReturnValue(mockToolRegistry),
         getEnableShellOutputEfficiency: vi.fn().mockReturnValue(true),
+        getSandboxEnabled: vi.fn().mockReturnValue(false),
         storage: {
           getProjectTempDir: vi.fn().mockReturnValue('/tmp/project-temp'),
         },
@@ -432,6 +465,14 @@ describe('Core System Prompt (prompts.ts)', () => {
         getAgentRegistry: vi.fn().mockReturnValue({
           getDirectoryContext: vi.fn().mockReturnValue('Mock Agent Directory'),
           getAllDefinitions: vi.fn().mockReturnValue([]),
+          getDefinition: vi.fn().mockImplementation((name) => {
+            if (
+              enableCodebaseInvestigator &&
+              name === CodebaseInvestigatorAgent.name
+            )
+              return { name };
+            return undefined;
+          }),
         }),
         getSkillManager: vi.fn().mockReturnValue({
           getSkills: vi.fn().mockReturnValue([]),

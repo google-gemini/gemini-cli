@@ -1,0 +1,271 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`DenseToolMessage > Toggleable Diff View (Alternate Buffer) > hides diff content by default when in alternate buffer mode 1`] = `
+"  ✓  test-tool  test.ts → Accepted
+"
+`;
+
+exports[`DenseToolMessage > Toggleable Diff View (Alternate Buffer) > shows diff content by default when NOT in alternate buffer mode 1`] = `
+"  ✓  test-tool  test.ts → Accepted
+
+      1 - old line
+      1 + new line
+"
+`;
+
+exports[`DenseToolMessage > Visual Regression > matches SVG snapshot for a Rejected tool call 1`] = `
+"
+  ERROR  config.getUseTerminalBuffer is not a function
+
+ src/ui/hooks/useAlternateBuffer.ts:16:44
+
+ 13: // Right now this is convenient as it allows us to special case terminalBuffer
+ 14: // rendering like we special case alternateBuffer rendering.
+ 15: export const isAlternateBufferEnabled = (config: Config): boolean =>
+ 16:   config.getUseAlternateBuffer() || config.getUseTerminalBuffer();
+ 17:
+ 18: // This is read from Config so that the UI reads the same value per application session
+ 19: export const useAlternateBuffer = (): boolean => {
+
+ - isAlternateBufferEnabled (src/ui/hooks/useAlternateBuffer.ts:16:44)
+ - useAlternateBuffer (src/ui/hooks/useAlternateBuffer.ts:21:10)
+ - DenseToolMessage (src/ui/components/messages/DenseToolMessage.tsx:275:29)
+ -Object.react-stack-bott 
+  m-frame                (/usr/local/google/home/akkr/Documents/kilo_code_gemini_cli/gemini-cli-kil
+                         o-code-grep-only2/gemini-cli/node_modules/react-reconciler/cjs/react-recon
+                         ciler.development.js:15859:20)
+ -renderWithHoo 
+  s            (/usr/local/google/home/akkr/Documents/kilo_code_gemini_cli/gemini-cli-kilo-code-gre
+               p-only2/gemini-cli/node_modules/react-reconciler/cjs/react-reconciler.development.js
+               :3221:22)
+ -updateFunctionComp 
+  nent              (/usr/local/google/home/akkr/Documents/kilo_code_gemini_cli/gemini-cli-kilo-cod
+                    e-grep-only2/gemini-cli/node_modules/react-reconciler/cjs/react-reconciler.deve
+                    lopment.js:6475:19)
+ -beginWor 
+          (/usr/local/google/home/akkr/Documents/kilo_code_gemini_cli/gemini-cli-kilo-code-grep-onl
+          y2/gemini-cli/node_modules/react-reconciler/cjs/react-reconciler.development.js:8009:18)
+
+ -runWithFiberIn 
+  EV            (/usr/local/google/home/akkr/Documents/kilo_code_gemini_cli/gemini-cli-kilo-code-gr
+                ep-only2/gemini-cli/node_modules/react-reconciler/cjs/react-reconciler.development.
+                js:1738:13)
+ -performUnitOfW 
+  rk            (/usr/local/google/home/akkr/Documents/kilo_code_gemini_cli/gemini-cli-kilo-code-gr
+                ep-only2/gemini-cli/node_modules/react-reconciler/cjs/react-reconciler.development.
+                js:12834:22)
+ -workLoopSyn 
+             (/usr/local/google/home/akkr/Documents/kilo_code_gemini_cli/gemini-cli-kilo-code-grep-
+             only2/gemini-cli/node_modules/react-reconciler/cjs/react-reconciler.development.js:126
+             44:41)
+"
+`;
+
+exports[`DenseToolMessage > Visual Regression > matches SVG snapshot for an Accepted file edit with diff stats 1`] = `
+"
+  ERROR  config.getUseTerminalBuffer is not a function
+
+ src/ui/hooks/useAlternateBuffer.ts:16:44
+
+ 13: // Right now this is convenient as it allows us to special case terminalBuffer
+ 14: // rendering like we special case alternateBuffer rendering.
+ 15: export const isAlternateBufferEnabled = (config: Config): boolean =>
+ 16:   config.getUseAlternateBuffer() || config.getUseTerminalBuffer();
+ 17:
+ 18: // This is read from Config so that the UI reads the same value per application session
+ 19: export const useAlternateBuffer = (): boolean => {
+
+ - isAlternateBufferEnabled (src/ui/hooks/useAlternateBuffer.ts:16:44)
+ - useAlternateBuffer (src/ui/hooks/useAlternateBuffer.ts:21:10)
+ - DenseToolMessage (src/ui/components/messages/DenseToolMessage.tsx:275:29)
+ -Object.react-stack-bott 
+  m-frame                (/usr/local/google/home/akkr/Documents/kilo_code_gemini_cli/gemini-cli-kil
+                         o-code-grep-only2/gemini-cli/node_modules/react-reconciler/cjs/react-recon
+                         ciler.development.js:15859:20)
+ -renderWithHoo 
+  s            (/usr/local/google/home/akkr/Documents/kilo_code_gemini_cli/gemini-cli-kilo-code-gre
+               p-only2/gemini-cli/node_modules/react-reconciler/cjs/react-reconciler.development.js
+               :3221:22)
+ -updateFunctionComp 
+  nent              (/usr/local/google/home/akkr/Documents/kilo_code_gemini_cli/gemini-cli-kilo-cod
+                    e-grep-only2/gemini-cli/node_modules/react-reconciler/cjs/react-reconciler.deve
+                    lopment.js:6475:19)
+ -beginWor 
+          (/usr/local/google/home/akkr/Documents/kilo_code_gemini_cli/gemini-cli-kilo-code-grep-onl
+          y2/gemini-cli/node_modules/react-reconciler/cjs/react-reconciler.development.js:8009:18)
+
+ -runWithFiberIn 
+  EV            (/usr/local/google/home/akkr/Documents/kilo_code_gemini_cli/gemini-cli-kilo-code-gr
+                ep-only2/gemini-cli/node_modules/react-reconciler/cjs/react-reconciler.development.
+                js:1738:13)
+ -performUnitOfW 
+  rk            (/usr/local/google/home/akkr/Documents/kilo_code_gemini_cli/gemini-cli-kilo-code-gr
+                ep-only2/gemini-cli/node_modules/react-reconciler/cjs/react-reconciler.development.
+                js:12834:22)
+ -workLoopSyn 
+             (/usr/local/google/home/akkr/Documents/kilo_code_gemini_cli/gemini-cli-kilo-code-grep-
+             only2/gemini-cli/node_modules/react-reconciler/cjs/react-reconciler.development.js:126
+             44:41)
+"
+`;
+
+exports[`DenseToolMessage > does not render result arrow if resultDisplay is missing 1`] = `
+"
+  ERROR  config.getUseTerminalBuffer is not a function
+
+ src/ui/hooks/useAlternateBuffer.ts:16:44
+
+ 13: // Right now this is convenient as it allows us to special case terminalBuffer
+ 14: // rendering like we special case alternateBuffer rendering.
+ 15: export const isAlternateBufferEnabled = (config: Config): boolean =>
+ 16:   config.getUseAlternateBuffer() || config.getUseTerminalBuffer();
+ 17:
+ 18: // This is read from Config so that the UI reads the same value per application session
+ 19: export const useAlternateBuffer = (): boolean => {
+
+ - isAlternateBufferEnabled (src/ui/hooks/useAlternateBuffer.ts:16:44)
+ - useAlternateBuffer (src/ui/hooks/useAlternateBuffer.ts:21:10)
+ - DenseToolMessage (src/ui/components/messages/DenseToolMessage.tsx:275:29)
+ -Object.react-stack-bott 
+  m-frame                (/usr/local/google/home/akkr/Documents/kilo_code_gemini_cli/gemini-cli-kil
+                         o-code-grep-only2/gemini-cli/node_modules/react-reconciler/cjs/react-recon
+                         ciler.development.js:15859:20)
+ -renderWithHoo 
+  s            (/usr/local/google/home/akkr/Documents/kilo_code_gemini_cli/gemini-cli-kilo-code-gre
+               p-only2/gemini-cli/node_modules/react-reconciler/cjs/react-reconciler.development.js
+               :3221:22)
+ -updateFunctionComp 
+  nent              (/usr/local/google/home/akkr/Documents/kilo_code_gemini_cli/gemini-cli-kilo-cod
+                    e-grep-only2/gemini-cli/node_modules/react-reconciler/cjs/react-reconciler.deve
+                    lopment.js:6475:19)
+ -beginWor 
+          (/usr/local/google/home/akkr/Documents/kilo_code_gemini_cli/gemini-cli-kilo-code-grep-onl
+          y2/gemini-cli/node_modules/react-reconciler/cjs/react-reconciler.development.js:8009:18)
+
+ -runWithFiberIn 
+  EV            (/usr/local/google/home/akkr/Documents/kilo_code_gemini_cli/gemini-cli-kilo-code-gr
+                ep-only2/gemini-cli/node_modules/react-reconciler/cjs/react-reconciler.development.
+                js:1738:13)
+ -performUnitOfW 
+  rk            (/usr/local/google/home/akkr/Documents/kilo_code_gemini_cli/gemini-cli-kilo-code-gr
+                ep-only2/gemini-cli/node_modules/react-reconciler/cjs/react-reconciler.development.
+                js:12834:22)
+ -workLoopSyn 
+             (/usr/local/google/home/akkr/Documents/kilo_code_gemini_cli/gemini-cli-kilo-code-grep-
+             only2/gemini-cli/node_modules/react-reconciler/cjs/react-reconciler.development.js:126
+             44:41)
+"
+`;
+
+exports[`DenseToolMessage > flattens newlines in string results 1`] = `
+"  ✓  test-tool  Test description → Line 1 Line 2
+"
+`;
+
+exports[`DenseToolMessage > renders correctly for Edit tool using confirmationDetails 1`] = `
+"  ?  Edit  styles.scss → Confirming
+
+      1 - body { color: blue; }
+      1 + body { color: red; }
+"
+`;
+
+exports[`DenseToolMessage > renders correctly for Errored Edit tool 1`] = `
+"  x  Edit  styles.scss → Failed (+1, -1)
+
+      1 - old line
+      1 + new line
+"
+`;
+
+exports[`DenseToolMessage > renders correctly for ReadManyFiles results 1`] = `
+"  ✓  test-tool  Attempting to read files from **/*.ts → Read 3 file(s) (1 ignored)
+"
+`;
+
+exports[`DenseToolMessage > renders correctly for Rejected Edit tool 1`] = `
+"  -  Edit  styles.scss → Rejected (+1, -1)
+
+      1 - old line
+      1 + new line
+"
+`;
+
+exports[`DenseToolMessage > renders correctly for Rejected Edit tool with confirmationDetails and diffStat 1`] = `
+"  -  Edit  styles.scss → Rejected (+1, -1)
+
+      1 - body { color: blue; }
+      1 + body { color: red; }
+"
+`;
+
+exports[`DenseToolMessage > renders correctly for Rejected WriteFile tool 1`] = `
+"  -  WriteFile  config.json → Rejected
+
+      1 - old content
+      1 + new content
+"
+`;
+
+exports[`DenseToolMessage > renders correctly for WriteFile tool 1`] = `
+"  ✓  WriteFile  config.json → Accepted (+1, -1)
+
+      1 - old content
+      1 + new content
+"
+`;
+
+exports[`DenseToolMessage > renders correctly for a successful string result 1`] = `
+"  ✓  test-tool  Test description → Success result
+"
+`;
+
+exports[`DenseToolMessage > renders correctly for error status with string message 1`] = `
+"  x  test-tool  Test description → Error occurred
+"
+`;
+
+exports[`DenseToolMessage > renders correctly for file diff results with stats 1`] = `
+"  ✓  test-tool  test.ts → Accepted (+15, -6)
+
+      1 - old line
+      1 + diff content
+"
+`;
+
+exports[`DenseToolMessage > renders correctly for grep results 1`] = `
+"  ✓  test-tool  Test description → Found 2 matches
+"
+`;
+
+exports[`DenseToolMessage > renders correctly for ls results 1`] = `
+"  ✓  test-tool  Test description → Listed 2 files. (1 ignored)
+"
+`;
+
+exports[`DenseToolMessage > renders correctly for todo updates 1`] = `
+"  ✓  test-tool  Test description → Todos updated
+"
+`;
+
+exports[`DenseToolMessage > renders generic failure message for error status without string message 1`] = `
+"  x  test-tool  Test description → Failed
+"
+`;
+
+exports[`DenseToolMessage > renders generic output message for unknown object results 1`] = `
+"  ✓  test-tool  Test description → Returned (possible empty result)
+"
+`;
+
+exports[`DenseToolMessage > truncates long description but preserves tool name (< 25 chars) 1`] = `
+"  ✓  tool-name-is-24-chars-!!  This is a very long description that should definitely be truncated …
+   → Success result
+"
+`;
+
+exports[`DenseToolMessage > truncates long string results 1`] = `
+"  ✓  test-tool  Test description
+   → AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA…
+"
+`;

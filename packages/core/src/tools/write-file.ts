@@ -24,6 +24,7 @@ import {
   type ToolResult,
   type ToolConfirmationOutcome,
   type PolicyUpdateOptions,
+  type ExecuteOptions,
 } from './tools.js';
 import { buildFilePathArgsPattern } from '../policy/utils.js';
 import { ToolErrorType } from './tool-error.js';
@@ -165,10 +166,19 @@ class WriteFileToolInvocation extends BaseToolInvocation<
       true,
       () => this.config.getApprovalMode(),
     );
-    this.resolvedPath = path.resolve(
-      this.config.getTargetDir(),
-      this.params.file_path,
-    );
+
+    if (this.config.isPlanMode()) {
+      const safeFilename = path.basename(this.params.file_path);
+      this.resolvedPath = path.join(
+        this.config.storage.getPlansDir(),
+        safeFilename,
+      );
+    } else {
+      this.resolvedPath = path.resolve(
+        this.config.getTargetDir(),
+        this.params.file_path,
+      );
+    }
   }
 
   override toolLocations(): ToolLocation[] {
@@ -252,7 +262,9 @@ class WriteFileToolInvocation extends BaseToolInvocation<
     return confirmationDetails;
   }
 
-  async execute(abortSignal: AbortSignal): Promise<ToolResult> {
+  async execute({
+    abortSignal: abortSignal,
+  }: ExecuteOptions): Promise<ToolResult> {
     const validationError = this.config.validatePathAccess(this.resolvedPath);
     if (validationError) {
       return {

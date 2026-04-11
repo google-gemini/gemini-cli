@@ -13,7 +13,7 @@ import {
   type OutputPayload,
   type ConsoleLogPayload,
   type UserFeedbackPayload,
-  sessionId,
+  createSessionId,
   logUserPrompt,
   AuthType,
   UserPromptEvent,
@@ -32,6 +32,8 @@ import {
   ValidationRequiredError,
   type AdminControlsSettings,
   debugLogger,
+  isHeadlessMode,
+  Storage,
 } from '@google/gemini-cli-core';
 
 import { loadCliConfig, parseArguments } from './config/config.js';
@@ -79,10 +81,7 @@ import { validateNonInteractiveAuth } from './validateNonInterActiveAuth.js';
 import { appEvents, AppEvent } from './utils/events.js';
 import { SessionError, SessionSelector } from './utils/sessionUtils.js';
 
-import {
-  relaunchAppInChildProcess,
-  relaunchOnExitCode,
-} from './utils/relaunch.js';
+import { relaunchOnExitCode } from './utils/relaunch.js';
 import { loadSandboxConfig } from './config/sandboxConfig.js';
 import { deleteSession, listSessions } from './utils/sessions.js';
 import { createPolicyUpdater } from './config/policy.js';
@@ -110,6 +109,8 @@ export function validateDnsResolutionOrder(
   return defaultValue;
 }
 
+const DEFAULT_EPT_SIZE = (256 * 1024 * 1024).toString();
+
 export function getNodeMemoryArgs(isDebugMode: boolean): string[] {
   const totalMemoryMB = os.totalmem() / (1024 * 1024);
   const heapStats = v8.getHeapStatistics();
@@ -129,21 +130,48 @@ export function getNodeMemoryArgs(isDebugMode: boolean): string[] {
     return [];
   }
 
+  const args: string[] = [];
+
+  // Automatically expand the V8 External Pointer Table to 256MB to prevent
+  // out-of-memory crashes during high native-handle concurrency.
+  // Note: Only supported in specific Node.js versions compiled with V8 Sandbox enabled.
+  const eptFlag = `--max-external-pointer-table-size=${DEFAULT_EPT_SIZE}`;
+  const isV8SandboxEnabled =
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-type-assertion
+    (process.config?.variables as any)?.v8_enable_sandbox === 1;
+
+  if (
+    isV8SandboxEnabled &&
+    !process.execArgv.some((arg) =>
+      arg.startsWith('--max-external-pointer-table-size'),
+    )
+  ) {
+    args.push(eptFlag);
+  }
+
   if (targetMaxOldSpaceSizeInMB > currentMaxOldSpaceSizeMb) {
     if (isDebugMode) {
       debugLogger.debug(
         `Need to relaunch with more memory: ${targetMaxOldSpaceSizeInMB.toFixed(2)} MB`,
       );
     }
-    return [`--max-old-space-size=${targetMaxOldSpaceSizeInMB}`];
+    args.push(`--max-old-space-size=${targetMaxOldSpaceSizeInMB}`);
   }
 
-  return [];
+  return args;
 }
 
 export function setupUnhandledRejectionHandler() {
   let unhandledRejectionOccurred = false;
   process.on('unhandledRejection', (reason, _promise) => {
+    // AbortError is expected when the user cancels a request (e.g. pressing ESC).
+    // It may surface as an unhandled rejection due to async timing in the
+    // streaming pipeline, but it is not a bug.
+    if (reason instanceof Error && reason.name === 'AbortError') {
+      debugLogger.log(`Suppressed unhandled AbortError: ${reason.message}`);
+      return;
+    }
+
     const errorMessage = `=========================================
 This is an unexpected error. Please file a bug report using the /bug tool.
 CRITICAL: Unhandled Promise Rejection!
@@ -161,6 +189,39 @@ ${reason.stack}`
       appEvents.emit(AppEvent.OpenDebugConsole);
     }
   });
+}
+
+export async function resolveSessionId(resumeArg: string | undefined): Promise<{
+  sessionId: string;
+  resumedSessionData?: ResumedSessionData;
+}> {
+  if (!resumeArg) {
+    return { sessionId: createSessionId() };
+  }
+
+  const storage = new Storage(process.cwd());
+  await storage.initialize();
+
+  try {
+    const { sessionData, sessionPath } = await new SessionSelector(
+      storage,
+    ).resolveSession(resumeArg);
+    return {
+      sessionId: sessionData.sessionId,
+      resumedSessionData: { conversation: sessionData, filePath: sessionPath },
+    };
+  } catch (error) {
+    if (error instanceof SessionError && error.code === 'NO_SESSIONS_FOUND') {
+      coreEvents.emitFeedback('warning', error.message);
+      return { sessionId: createSessionId() };
+    }
+    coreEvents.emitFeedback(
+      'error',
+      `Error resuming session: ${error instanceof Error ? error.message : 'Unknown error'}`,
+    );
+    await runExitCleanup();
+    process.exit(ExitCodes.FATAL_INPUT_ERROR);
+  }
 }
 
 export async function startInteractiveUI(
@@ -258,6 +319,8 @@ export async function main() {
 
   const argv = await argvPromise;
 
+  const { sessionId, resumedSessionData } = await resolveSessionId(argv.resume);
+
   if (
     (argv.allowedTools && argv.allowedTools.length > 0) ||
     (settings.merged.tools?.allowed && settings.merged.tools.allowed.length > 0)
@@ -296,6 +359,7 @@ export async function main() {
   const isDebugMode = cliConfig.isDebugMode(argv);
   const consolePatcher = new ConsolePatcher({
     stderr: true,
+    interactive: isHeadlessMode() ? false : true,
     debugMode: isDebugMode,
     onNewMessage: (msg) => {
       coreEvents.emitConsoleLog(msg.type, msg.content);
@@ -334,7 +398,7 @@ export async function main() {
   // the sandbox because the sandbox will interfere with the Oauth2 web
   // redirect.
   let initialAuthFailed = false;
-  if (!settings.merged.security.auth.useExternal) {
+  if (!settings.merged.security.auth.useExternal && !argv.isCommand) {
     try {
       if (
         partialConfig.isInteractive() &&
@@ -380,13 +444,19 @@ export async function main() {
   // Set remote admin settings if returned from CCPA.
   if (remoteAdminSettings) {
     settings.setRemoteAdminSettings(remoteAdminSettings);
+    if (process.send) {
+      process.send({
+        type: 'admin-settings-update',
+        settings: remoteAdminSettings,
+      });
+    }
   }
 
   // Run deferred command now that we have admin settings.
   await runDeferredCommand(settings.merged);
 
   // hop into sandbox if we are outside and sandboxing is enabled
-  if (!process.env['SANDBOX']) {
+  if (!process.env['SANDBOX'] && !argv.isCommand) {
     const memoryArgs = settings.merged.advanced.autoConfigureMemory
       ? getNodeMemoryArgs(isDebugMode)
       : [];
@@ -437,10 +507,6 @@ export async function main() {
       );
       await runExitCleanup();
       process.exit(ExitCodes.SUCCESS);
-    } else {
-      // Relaunch app so we always have a child process that can be internally
-      // restarted if needed.
-      await relaunchAppInChildProcess(memoryArgs, [], remoteAdminSettings);
     }
   }
 
@@ -576,43 +642,18 @@ export async function main() {
       })),
     ];
 
-    // Handle --resume flag
-    let resumedSessionData: ResumedSessionData | undefined = undefined;
-    if (argv.resume) {
-      const sessionSelector = new SessionSelector(config);
-      try {
-        const result = await sessionSelector.resolveSession(argv.resume);
-        resumedSessionData = {
-          conversation: result.sessionData,
-          filePath: result.sessionPath,
-        };
-        // Use the existing session ID to continue recording to the same session
-        config.setSessionId(resumedSessionData.conversation.sessionId);
-      } catch (error) {
-        if (
-          error instanceof SessionError &&
-          error.code === 'NO_SESSIONS_FOUND'
-        ) {
-          // No sessions to resume — start a fresh session with a warning
-          startupWarnings.push({
-            id: 'resume-no-sessions',
-            message: error.message,
-            priority: WarningPriority.High,
-          });
-        } else {
-          coreEvents.emitFeedback(
-            'error',
-            `Error resuming session: ${error instanceof Error ? error.message : 'Unknown error'}`,
-          );
-          await runExitCleanup();
-          process.exit(ExitCodes.FATAL_INPUT_ERROR);
-        }
-      }
-    }
-
     cliStartupHandle?.end();
+
     // Render UI, passing necessary config values. Check that there is no command line question.
     if (config.isInteractive()) {
+      // Earlier initialization phases (like TerminalCapabilityManager resolving
+      // or authWithWeb) may have added and removed 'data' listeners on process.stdin.
+      // When the listener count drops to 0, Node.js implicitly pauses the stream buffer.
+      // React Ink's useInput hooks will silently fail to receive keystrokes if the stream remains paused.
+      if (process.stdin.isTTY) {
+        process.stdin.resume();
+      }
+
       await startInteractiveUI(
         config,
         settings,
@@ -659,11 +700,6 @@ export async function main() {
         }
       }
     }
-
-    // Register SessionEnd hook for graceful exit
-    registerCleanup(async () => {
-      await config.getHookSystem()?.fireSessionEndEvent(SessionEndReason.Exit);
-    });
 
     if (!input) {
       debugLogger.error(

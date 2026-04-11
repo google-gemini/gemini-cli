@@ -19,6 +19,7 @@ import {
   ensureRgPath,
   type RipGrepToolParams,
 } from './ripGrep.js';
+import type { GrepResult } from './tools.js';
 import path from 'node:path';
 import { isSubpath } from '../utils/paths.js';
 import fs from 'node:fs/promises';
@@ -436,7 +437,7 @@ describe('RipGrepTool', () => {
 
       const params: RipGrepToolParams = { pattern: 'world' };
       const invocation = grepTool.build(params);
-      const result = await invocation.execute(abortSignal);
+      const result = await invocation.execute({ abortSignal });
       expect(result.llmContent).toContain(
         'Found 3 matches for pattern "world" in path "."',
       );
@@ -447,7 +448,9 @@ describe('RipGrepTool', () => {
         `File: ${path.join('sub', 'fileC.txt')}`,
       );
       expect(result.llmContent).toContain('L1: another world in sub dir');
-      expect(result.returnDisplay).toBe('Found 3 matches');
+      expect((result.returnDisplay as GrepResult).summary).toBe(
+        'Found 3 matches',
+      );
     });
 
     it('should ignore matches that escape the base path', async () => {
@@ -478,7 +481,7 @@ describe('RipGrepTool', () => {
 
       const params: RipGrepToolParams = { pattern: 'world' };
       const invocation = grepTool.build(params);
-      const result = await invocation.execute(abortSignal);
+      const result = await invocation.execute({ abortSignal });
       expect(result.llmContent).toContain('File: ..env');
       expect(result.llmContent).toContain('L1: world in ..env');
       expect(result.llmContent).not.toContain('secret.txt');
@@ -503,13 +506,15 @@ describe('RipGrepTool', () => {
 
       const params: RipGrepToolParams = { pattern: 'world', dir_path: 'sub' };
       const invocation = grepTool.build(params);
-      const result = await invocation.execute(abortSignal);
+      const result = await invocation.execute({ abortSignal });
       expect(result.llmContent).toContain(
         'Found 1 match for pattern "world" in path "sub"',
       );
       expect(result.llmContent).toContain('File: fileC.txt'); // Path relative to 'sub'
       expect(result.llmContent).toContain('L1: another world in sub dir');
-      expect(result.returnDisplay).toBe('Found 1 match');
+      expect((result.returnDisplay as GrepResult).summary).toBe(
+        'Found 1 match',
+      );
     });
 
     it('should find matches with an include glob', async () => {
@@ -534,7 +539,7 @@ describe('RipGrepTool', () => {
         include_pattern: '*.js',
       };
       const invocation = grepTool.build(params);
-      const result = await invocation.execute(abortSignal);
+      const result = await invocation.execute({ abortSignal });
       expect(result.llmContent).toContain(
         'Found 1 match for pattern "hello" in path "." (filter: "*.js"):',
       );
@@ -542,7 +547,9 @@ describe('RipGrepTool', () => {
       expect(result.llmContent).toContain(
         'L2: function baz() { return "hello"; }',
       );
-      expect(result.returnDisplay).toBe('Found 1 match');
+      expect((result.returnDisplay as GrepResult).summary).toBe(
+        'Found 1 match',
+      );
     });
 
     it('should find matches with an include glob and path', async () => {
@@ -573,13 +580,15 @@ describe('RipGrepTool', () => {
         include_pattern: '*.js',
       };
       const invocation = grepTool.build(params);
-      const result = await invocation.execute(abortSignal);
+      const result = await invocation.execute({ abortSignal });
       expect(result.llmContent).toContain(
         'Found 1 match for pattern "hello" in path "sub" (filter: "*.js")',
       );
       expect(result.llmContent).toContain('File: another.js');
       expect(result.llmContent).toContain('L1: const greeting = "hello";');
-      expect(result.returnDisplay).toBe('Found 1 match');
+      expect((result.returnDisplay as GrepResult).summary).toBe(
+        'Found 1 match',
+      );
     });
 
     it('should return "No matches found" when pattern does not exist', async () => {
@@ -592,11 +601,13 @@ describe('RipGrepTool', () => {
 
       const params: RipGrepToolParams = { pattern: 'nonexistentpattern' };
       const invocation = grepTool.build(params);
-      const result = await invocation.execute(abortSignal);
+      const result = await invocation.execute({ abortSignal });
       expect(result.llmContent).toContain(
         'No matches found for pattern "nonexistentpattern" in path ".".',
       );
-      expect(result.returnDisplay).toBe('No matches found');
+      expect((result.returnDisplay as GrepResult).summary).toBe(
+        'No matches found',
+      );
     });
 
     it('should throw error for invalid regex pattern during build', async () => {
@@ -620,7 +631,7 @@ describe('RipGrepTool', () => {
         dir_path: tempRootDir,
       });
 
-      const result = await invocation.execute(abortSignal);
+      const result = await invocation.execute({ abortSignal });
       expect(result.llmContent).toContain('Process exited with code 2');
       expect(result.returnDisplay).toContain(
         'Error: Process exited with code 2',
@@ -667,7 +678,7 @@ describe('RipGrepTool', () => {
               stdout.write(match + '\n');
               linesPushed++;
             }
-          } catch (_e) {
+          } catch {
             clearInterval(pushInterval);
           }
         }, 1);
@@ -687,9 +698,11 @@ describe('RipGrepTool', () => {
         pattern: 'test',
         dir_path: tempRootDir,
       });
-      const result = await invocation.execute(abortSignal);
+      const result = await invocation.execute({ abortSignal });
 
-      expect(result.returnDisplay).toContain('(limited)');
+      expect((result.returnDisplay as GrepResult).summary).toContain(
+        '(limited)',
+      );
     }, 10000);
 
     it('should filter out files based on FileDiscoveryService even if ripgrep returns them', async () => {
@@ -733,14 +746,16 @@ describe('RipGrepTool', () => {
 
       const params: RipGrepToolParams = { pattern: 'should' };
       const invocation = toolWithIgnore.build(params);
-      const result = await invocation.execute(abortSignal);
+      const result = await invocation.execute({ abortSignal });
 
       // Verify ignored file is filtered out
       expect(result.llmContent).toContain('allowed.txt');
       expect(result.llmContent).toContain('should be kept');
       expect(result.llmContent).not.toContain('ignored.txt');
       expect(result.llmContent).not.toContain('should be ignored');
-      expect(result.returnDisplay).toContain('Found 1 match');
+      expect((result.returnDisplay as GrepResult).summary).toContain(
+        'Found 1 match',
+      );
     });
 
     it('should handle regex special characters correctly', async () => {
@@ -762,7 +777,7 @@ describe('RipGrepTool', () => {
 
       const params: RipGrepToolParams = { pattern: 'foo.*bar' }; // Matches 'const foo = "bar";'
       const invocation = grepTool.build(params);
-      const result = await invocation.execute(abortSignal);
+      const result = await invocation.execute({ abortSignal });
       expect(result.llmContent).toContain(
         'Found 1 match for pattern "foo.*bar" in path ".":',
       );
@@ -799,7 +814,7 @@ describe('RipGrepTool', () => {
 
       const params: RipGrepToolParams = { pattern: 'HELLO' };
       const invocation = grepTool.build(params);
-      const result = await invocation.execute(abortSignal);
+      const result = await invocation.execute({ abortSignal });
       expect(result.llmContent).toContain(
         'Found 2 matches for pattern "HELLO" in path ".":',
       );
@@ -825,7 +840,7 @@ describe('RipGrepTool', () => {
       const params: RipGrepToolParams = { pattern: 'world' };
       const invocation = grepTool.build(params);
 
-      expect(await invocation.execute(abortSignal)).toStrictEqual({
+      expect(await invocation.execute({ abortSignal })).toStrictEqual({
         llmContent: 'Error during grep search operation: Cannot use ripgrep.',
         returnDisplay: 'Error: Cannot use ripgrep.',
       });
@@ -924,7 +939,7 @@ describe('RipGrepTool', () => {
       );
       const params: RipGrepToolParams = { pattern: 'world' };
       const invocation = multiDirGrepTool.build(params);
-      const result = await invocation.execute(abortSignal);
+      const result = await invocation.execute({ abortSignal });
 
       // Should find matches in CWD only (default behavior now)
       expect(result.llmContent).toContain(
@@ -1018,7 +1033,7 @@ describe('RipGrepTool', () => {
       // Search only in the 'sub' directory of the first workspace
       const params: RipGrepToolParams = { pattern: 'world', dir_path: 'sub' };
       const invocation = multiDirGrepTool.build(params);
-      const result = await invocation.execute(abortSignal);
+      const result = await invocation.execute({ abortSignal });
 
       // Should only find matches in the specified sub directory
       expect(result.llmContent).toContain(
@@ -1043,7 +1058,9 @@ describe('RipGrepTool', () => {
 
       controller.abort();
 
-      const result = await invocation.execute(controller.signal);
+      const result = await invocation.execute({
+        abortSignal: controller.signal,
+      });
       expect(result).toBeDefined();
     });
 
@@ -1063,8 +1080,12 @@ describe('RipGrepTool', () => {
       // Abort immediately before starting the search
       controller.abort();
 
-      const result = await invocation.execute(controller.signal);
-      expect(result.returnDisplay).toContain('No matches found');
+      const result = await invocation.execute({
+        abortSignal: controller.signal,
+      });
+      expect((result.returnDisplay as GrepResult).summary).toContain(
+        'No matches found',
+      );
     });
   });
 
@@ -1098,7 +1119,7 @@ describe('RipGrepTool', () => {
 
       const params = await setup();
       const invocation = grepTool.build(params);
-      const result = await invocation.execute(abortSignal);
+      const result = await invocation.execute({ abortSignal });
 
       expect(result.llmContent).toContain('No matches found');
     });
@@ -1127,7 +1148,7 @@ describe('RipGrepTool', () => {
 
       const params: RipGrepToolParams = { pattern: 'world' };
       const invocation = grepTool.build(params);
-      const result = await invocation.execute(abortSignal);
+      const result = await invocation.execute({ abortSignal });
 
       expect(result.llmContent).toContain(specialFileName);
       expect(result.llmContent).toContain('hello world with special chars');
@@ -1158,7 +1179,7 @@ describe('RipGrepTool', () => {
 
       const params: RipGrepToolParams = { pattern: 'deep' };
       const invocation = grepTool.build(params);
-      const result = await invocation.execute(abortSignal);
+      const result = await invocation.execute({ abortSignal });
 
       expect(result.llmContent).toContain('deep.txt');
       expect(result.llmContent).toContain('content in deep directory');
@@ -1192,7 +1213,7 @@ describe('RipGrepTool', () => {
         context: 0,
       };
       const invocation = grepTool.build(params);
-      const result = await invocation.execute(abortSignal);
+      const result = await invocation.execute({ abortSignal });
 
       expect(result.llmContent).toContain('function getName()');
       expect(result.llmContent).not.toContain('const getValue');
@@ -1240,7 +1261,7 @@ describe('RipGrepTool', () => {
 
       const params: RipGrepToolParams = { pattern: 'hello' };
       const invocation = grepTool.build(params);
-      const result = await invocation.execute(abortSignal);
+      const result = await invocation.execute({ abortSignal });
 
       expect(result.llmContent).toContain('Hello World');
       expect(result.llmContent).toContain('hello world');
@@ -1273,7 +1294,7 @@ describe('RipGrepTool', () => {
         context: 0,
       };
       const invocation = grepTool.build(params);
-      const result = await invocation.execute(abortSignal);
+      const result = await invocation.execute({ abortSignal });
 
       expect(result.llmContent).toContain('Price: $19.99');
       expect(result.llmContent).not.toContain('Email: test@example.com');
@@ -1323,7 +1344,7 @@ describe('RipGrepTool', () => {
         include_pattern: '*.{ts,tsx}',
       };
       const invocation = grepTool.build(params);
-      const result = await invocation.execute(abortSignal);
+      const result = await invocation.execute({ abortSignal });
 
       expect(result.llmContent).toContain('test.ts');
       expect(result.llmContent).toContain('test.tsx');
@@ -1359,7 +1380,7 @@ describe('RipGrepTool', () => {
         include_pattern: 'src/**',
       };
       const invocation = grepTool.build(params);
-      const result = await invocation.execute(abortSignal);
+      const result = await invocation.execute({ abortSignal });
 
       expect(result.llmContent).toContain('main.ts');
       expect(result.llmContent).not.toContain('other.ts');
@@ -1385,7 +1406,7 @@ describe('RipGrepTool', () => {
       );
       let params: RipGrepToolParams = { pattern: 'HELLO', context: 0 };
       let invocation = grepTool.build(params);
-      let result = await invocation.execute(abortSignal);
+      let result = await invocation.execute({ abortSignal });
       expect(mockSpawn).toHaveBeenLastCalledWith(
         expect.anything(),
         expect.arrayContaining(['--ignore-case']),
@@ -1411,7 +1432,7 @@ describe('RipGrepTool', () => {
       );
       params = { pattern: 'HELLO', case_sensitive: true, context: 0 };
       invocation = grepTool.build(params);
-      result = await invocation.execute(abortSignal);
+      result = await invocation.execute({ abortSignal });
       expect(mockSpawn).toHaveBeenLastCalledWith(
         expect.anything(),
         expect.not.arrayContaining(['--ignore-case']),
@@ -1441,7 +1462,7 @@ describe('RipGrepTool', () => {
         pattern: 'hello.world',
         fixed_strings: true,
       });
-      const result = await invocation.execute(abortSignal);
+      const result = await invocation.execute({ abortSignal });
 
       const spawnArgs = mockSpawn.mock.calls[0][1];
       expect(spawnArgs).toContain('--fixed-strings');
@@ -1483,7 +1504,7 @@ describe('RipGrepTool', () => {
 
       const params: RipGrepToolParams = { pattern: 'secret', no_ignore: true };
       const invocation = grepTool.build(params);
-      const result = await invocation.execute(abortSignal);
+      const result = await invocation.execute({ abortSignal });
 
       expect(mockSpawn).toHaveBeenLastCalledWith(
         expect.anything(),
@@ -1556,7 +1577,7 @@ describe('RipGrepTool', () => {
 
       const params: RipGrepToolParams = { pattern: 'secret' };
       const invocation = gitIgnoreDisabledTool.build(params);
-      await invocation.execute(abortSignal);
+      await invocation.execute({ abortSignal });
 
       expect(mockSpawn).toHaveBeenLastCalledWith(
         expect.anything(),
@@ -1622,7 +1643,7 @@ describe('RipGrepTool', () => {
 
       const params: RipGrepToolParams = { pattern: 'secret' };
       const invocation = geminiIgnoreTool.build(params);
-      await invocation.execute(abortSignal);
+      await invocation.execute({ abortSignal });
 
       expect(mockSpawn).toHaveBeenLastCalledWith(
         expect.anything(),
@@ -1688,7 +1709,7 @@ describe('RipGrepTool', () => {
 
       const params: RipGrepToolParams = { pattern: 'secret' };
       const invocation = geminiIgnoreTool.build(params);
-      await invocation.execute(abortSignal);
+      await invocation.execute({ abortSignal });
 
       expect(mockSpawn).toHaveBeenLastCalledWith(
         expect.anything(),
@@ -1748,7 +1769,7 @@ describe('RipGrepTool', () => {
         before: 1,
       };
       const invocation = grepTool.build(params);
-      const result = await invocation.execute(abortSignal);
+      const result = await invocation.execute({ abortSignal });
 
       expect(mockSpawn).toHaveBeenLastCalledWith(
         expect.anything(),
@@ -1888,7 +1909,7 @@ describe('RipGrepTool', () => {
         max_matches_per_file: 1,
       };
       const invocation = grepTool.build(params);
-      await invocation.execute(abortSignal);
+      await invocation.execute({ abortSignal });
 
       const spawnArgs = mockSpawn.mock.calls[0][1];
       expect(spawnArgs).toContain('--max-count');
@@ -1937,7 +1958,7 @@ describe('RipGrepTool', () => {
         context: 0,
       };
       const invocation = grepTool.build(params);
-      const result = await invocation.execute(abortSignal);
+      const result = await invocation.execute({ abortSignal });
 
       expect(result.llmContent).toContain('Found 2 matches');
       expect(result.llmContent).toContain(
@@ -1946,7 +1967,9 @@ describe('RipGrepTool', () => {
       expect(result.llmContent).toContain('L1: match 1');
       expect(result.llmContent).toContain('L2: match 2');
       expect(result.llmContent).not.toContain('L3: match 3');
-      expect(result.returnDisplay).toBe('Found 2 matches (limited)');
+      expect((result.returnDisplay as GrepResult).summary).toBe(
+        'Found 2 matches (limited)',
+      );
     });
 
     it('should return only file paths when names_only is true', async () => {
@@ -1980,7 +2003,7 @@ describe('RipGrepTool', () => {
         names_only: true,
       };
       const invocation = grepTool.build(params);
-      const result = await invocation.execute(abortSignal);
+      const result = await invocation.execute({ abortSignal });
 
       expect(result.llmContent).toContain('Found 2 files with matches');
       expect(result.llmContent).toContain('fileA.txt');
@@ -2021,7 +2044,7 @@ describe('RipGrepTool', () => {
         context: 0,
       };
       const invocation = grepTool.build(params);
-      const result = await invocation.execute(abortSignal);
+      const result = await invocation.execute({ abortSignal });
 
       expect(result.llmContent).toContain('Found 1 match');
       expect(result.llmContent).toContain('fileA.txt');
@@ -2048,7 +2071,7 @@ describe('RipGrepTool', () => {
 
       const params: RipGrepToolParams = { pattern: 'Target match', context: 0 };
       const invocation = grepTool.build(params);
-      const result = await invocation.execute(abortSignal);
+      const result = await invocation.execute({ abortSignal });
 
       // MAX_LINE_LENGTH_TEXT_FILE is 2000. It should be truncated.
       expect(result.llmContent).toContain('... [truncated]');

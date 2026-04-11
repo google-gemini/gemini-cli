@@ -22,6 +22,7 @@ describe('ToolConfirmationMessage Redirection', () => {
     isTrustedFolder: () => true,
     getIdeMode: () => false,
     getDisableAlwaysAllow: () => false,
+    getApprovalMode: () => 'default',
   } as unknown as Config;
 
   it('should display redirection warning and tip for redirected commands', async () => {
@@ -41,6 +42,7 @@ describe('ToolConfirmationMessage Redirection', () => {
         getPreferredEditor={vi.fn()}
         availableTerminalHeight={30}
         terminalWidth={100}
+        toolName="shell"
       />,
     );
 

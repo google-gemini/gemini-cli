@@ -1,11 +1,11 @@
-# Sandboxing in the Gemini CLI
+# Sandboxing in Gemini CLI
 
-This document provides a guide to sandboxing in the Gemini CLI, including
+This document provides a guide to sandboxing in Gemini CLI, including
 prerequisites, quickstart, and configuration.
 
 ## Prerequisites
 
-Before using sandboxing, you need to install and set up the Gemini CLI:
+Before using sandboxing, you need to install and set up Gemini CLI:
 
 ```bash
 npm install -g @google/gemini-cli
@@ -92,7 +92,7 @@ To set up runsc:
 2.  Configure the Docker daemon to use the runsc runtime.
 3.  Verify the installation.
 
-### 4. LXC/LXD (Linux only, experimental)
+### 5. LXC/LXD (Linux only, experimental)
 
 Full-system container sandboxing using LXC/LXD. Unlike Docker/Podman, LXC
 containers run a complete Linux system with `systemd`, `snapd`, and other system
@@ -136,6 +136,58 @@ gemini -p "build the snap"
   absolute path — the path must be writable inside the container.
 - Used with tools like Snapcraft or Rockcraft that require a full system.
 
+## Tool sandboxing
+
+Tool-level sandboxing provides granular isolation for individual tool executions
+(like `shell_exec` and `write_file`) instead of sandboxing the entire Gemini CLI
+process.
+
+This approach offers better integration with your local environment for non-tool
+tasks (like UI rendering and configuration loading) while still providing
+security for tool-driven operations.
+
+### How to turn off tool sandboxing
+
+If you experience issues with tool sandboxing or prefer full-process isolation,
+you can disable it by setting `security.toolSandboxing` to `false` in your
+`settings.json` file.
+
+```json
+{
+  "security": {
+    "toolSandboxing": false
+  }
+}
+```
+
+<!-- prettier-ignore -->
+> [!NOTE]
+> Changing the `security.toolSandboxing` setting requires a restart of Gemini
+> CLI to take effect.
+
+## Sandbox expansion
+
+Sandbox expansion is a dynamic permission system that lets Gemini CLI request
+additional permissions for a command when needed.
+
+When a sandboxed command fails due to permission restrictions (like restricted
+file paths or network access), or when a command is proactively identified as
+requiring extra permissions (like `npm install`), Gemini CLI will present you
+with a "Sandbox Expansion Request."
+
+### How sandbox expansion works
+
+1.  **Detection**: Gemini CLI detects a sandbox denial or proactively identifies
+    a command that requires extra permissions.
+2.  **Request**: A modal dialog is shown, explaining which additional
+    permissions (e.g., specific directories or network access) are required.
+3.  **Approval**: If you approve the expansion, the command is executed with the
+    extended permissions for that specific run.
+
+This mechanism ensures you don't have to manually re-run commands with more
+permissive sandbox settings, while still maintaining control over what the AI
+can access.
+
 ## Quickstart
 
 ```bash
@@ -177,7 +229,7 @@ gemini -p "run the test suite"
 2. **Environment variable**:
    `GEMINI_SANDBOX=true|docker|podman|sandbox-exec|runsc|lxc`
 3. **Settings file**: `"sandbox": true` in the `tools` object of your
-   `settings.json` file (e.g., `{"tools": {"sandbox": true}}`).
+   `settings.json` file (for example, `{"tools": {"sandbox": true}}`).
 
 ### macOS Seatbelt profiles
 
@@ -257,7 +309,9 @@ $env:SANDBOX_SET_UID_GID="false"  # Disable UID/GID mapping
 
 **Missing commands**
 
-- Add to custom Dockerfile.
+- Add to a custom Dockerfile. Automatic `BUILD_SANDBOX` builds are only
+  available when running Gemini CLI from source; npm installs need a prebuilt
+  image instead.
 - Install via `sandbox.bashrc`.
 
 **Network issues**

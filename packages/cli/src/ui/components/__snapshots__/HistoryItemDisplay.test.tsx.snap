@@ -1,140 +1,194 @@
 // Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
 
 exports[`<HistoryItemDisplay /> > gemini items (alternateBuffer=false) > should render a full gemini item when using availableTerminalHeightGemini 1`] = `
-"✦ Example code block:
-    1 Line 1
-    2 Line 2
-    3 Line 3
-    4 Line 4
-    5 Line 5
-    6 Line 6
-    7 Line 7
-    8 Line 8
-    9 Line 9
-   10 Line 10
-   11 Line 11
-   12 Line 12
-   13 Line 13
-   14 Line 14
-   15 Line 15
-   16 Line 16
-   17 Line 17
-   18 Line 18
-   19 Line 19
-   20 Line 20
-   21 Line 21
-   22 Line 22
-   23 Line 23
-   24 Line 24
-   25 Line 25
-   26 Line 26
-   27 Line 27
-   28 Line 28
-   29 Line 29
-   30 Line 30
-   31 Line 31
-   32 Line 32
-   33 Line 33
-   34 Line 34
-   35 Line 35
-   36 Line 36
-   37 Line 37
-   38 Line 38
-   39 Line 39
-   40 Line 40
-   41 Line 41
-   42 Line 42
-   43 Line 43
-   44 Line 44
-   45 Line 45
-   46 Line 46
-   47 Line 47
-   48 Line 48
-   49 Line 49
-   50 Line 50
+"
+  ERROR  config.getUseTerminalBuffer is not a function
+
+ src/ui/hooks/useAlternateBuffer.ts:16:44
+
+ 13: // Right now this is convenient as it allows us to special case terminalBuffer
+ 14: // rendering like we special case alternateBuffer rendering.
+ 15: export const isAlternateBufferEnabled = (config: Config): boolean =>
+ 16:   config.getUseAlternateBuffer() || config.getUseTerminalBuffer();
+ 17:
+ 18: // This is read from Config so that the UI reads the same value per application session
+ 19: export const useAlternateBuffer = (): boolean => {
+
+ - isAlternateBufferEnabled (src/ui/hooks/useAlternateBuffer.ts:16:44)
+ - useAlternateBuffer (src/ui/hooks/useAlternateBuffer.ts:21:10)
+ - MarkdownDisplayInternal (src/ui/utils/MarkdownDisplay.tsx:39:29)
+ -Object.react-stack-bott 
+  m-frame                (/usr/local/google/home/akkr/Documents/kilo_code_gemini_cli/gemini-cli-kil
+                         o-code-grep-only2/gemini-cli/node_modules/react-reconciler/cjs/react-recon
+                         ciler.development.js:15859:20)
+ -renderWithHoo 
+  s            (/usr/local/google/home/akkr/Documents/kilo_code_gemini_cli/gemini-cli-kilo-code-gre
+               p-only2/gemini-cli/node_modules/react-reconciler/cjs/react-reconciler.development.js
+               :3221:22)
+ -updateFunctionComp 
+  nent              (/usr/local/google/home/akkr/Documents/kilo_code_gemini_cli/gemini-cli-kilo-cod
+                    e-grep-only2/gemini-cli/node_modules/react-reconciler/cjs/react-reconciler.deve
+                    lopment.js:6475:19)
+ -updateSimpleMemoComp 
+  nent                (/usr/local/google/home/akkr/Documents/kilo_code_gemini_cli/gemini-cli-kilo-c
+                      ode-grep-only2/gemini-cli/node_modules/react-reconciler/cjs/react-reconciler.
+                      development.js:6328:14)
+ -updateMemoCompon 
+  nt              (/usr/local/google/home/akkr/Documents/kilo_code_gemini_cli/gemini-cli-kilo-code-
+                  grep-only2/gemini-cli/node_modules/react-reconciler/cjs/react-reconciler.developm
+                  ent.js:6261:13)
+ -beginWor 
+          (/usr/local/google/home/akkr/Documents/kilo_code_gemini_cli/gemini-cli-kilo-code-grep-onl
+          y2/gemini-cli/node_modules/react-reconciler/cjs/react-reconciler.development.js:8423:18)
+
+ -runWithFiberIn 
+  EV            (/usr/local/google/home/akkr/Documents/kilo_code_gemini_cli/gemini-cli-kilo-code-gr
+                ep-only2/gemini-cli/node_modules/react-reconciler/cjs/react-reconciler.development.
+                js:1738:13)
 "
 `;
 
 exports[`<HistoryItemDisplay /> > gemini items (alternateBuffer=false) > should render a full gemini_content item when using availableTerminalHeightGemini 1`] = `
-"  Example code block:
-    1 Line 1
-    2 Line 2
-    3 Line 3
-    4 Line 4
-    5 Line 5
-    6 Line 6
-    7 Line 7
-    8 Line 8
-    9 Line 9
-   10 Line 10
-   11 Line 11
-   12 Line 12
-   13 Line 13
-   14 Line 14
-   15 Line 15
-   16 Line 16
-   17 Line 17
-   18 Line 18
-   19 Line 19
-   20 Line 20
-   21 Line 21
-   22 Line 22
-   23 Line 23
-   24 Line 24
-   25 Line 25
-   26 Line 26
-   27 Line 27
-   28 Line 28
-   29 Line 29
-   30 Line 30
-   31 Line 31
-   32 Line 32
-   33 Line 33
-   34 Line 34
-   35 Line 35
-   36 Line 36
-   37 Line 37
-   38 Line 38
-   39 Line 39
-   40 Line 40
-   41 Line 41
-   42 Line 42
-   43 Line 43
-   44 Line 44
-   45 Line 45
-   46 Line 46
-   47 Line 47
-   48 Line 48
-   49 Line 49
-   50 Line 50
+"
+  ERROR  config.getUseTerminalBuffer is not a function
+
+ src/ui/hooks/useAlternateBuffer.ts:16:44
+
+ 13: // Right now this is convenient as it allows us to special case terminalBuffer
+ 14: // rendering like we special case alternateBuffer rendering.
+ 15: export const isAlternateBufferEnabled = (config: Config): boolean =>
+ 16:   config.getUseAlternateBuffer() || config.getUseTerminalBuffer();
+ 17:
+ 18: // This is read from Config so that the UI reads the same value per application session
+ 19: export const useAlternateBuffer = (): boolean => {
+
+ - isAlternateBufferEnabled (src/ui/hooks/useAlternateBuffer.ts:16:44)
+ - useAlternateBuffer (src/ui/hooks/useAlternateBuffer.ts:21:10)
+ - MarkdownDisplayInternal (src/ui/utils/MarkdownDisplay.tsx:39:29)
+ -Object.react-stack-bott 
+  m-frame                (/usr/local/google/home/akkr/Documents/kilo_code_gemini_cli/gemini-cli-kil
+                         o-code-grep-only2/gemini-cli/node_modules/react-reconciler/cjs/react-recon
+                         ciler.development.js:15859:20)
+ -renderWithHoo 
+  s            (/usr/local/google/home/akkr/Documents/kilo_code_gemini_cli/gemini-cli-kilo-code-gre
+               p-only2/gemini-cli/node_modules/react-reconciler/cjs/react-reconciler.development.js
+               :3221:22)
+ -updateFunctionComp 
+  nent              (/usr/local/google/home/akkr/Documents/kilo_code_gemini_cli/gemini-cli-kilo-cod
+                    e-grep-only2/gemini-cli/node_modules/react-reconciler/cjs/react-reconciler.deve
+                    lopment.js:6475:19)
+ -updateSimpleMemoComp 
+  nent                (/usr/local/google/home/akkr/Documents/kilo_code_gemini_cli/gemini-cli-kilo-c
+                      ode-grep-only2/gemini-cli/node_modules/react-reconciler/cjs/react-reconciler.
+                      development.js:6328:14)
+ -updateMemoCompon 
+  nt              (/usr/local/google/home/akkr/Documents/kilo_code_gemini_cli/gemini-cli-kilo-code-
+                  grep-only2/gemini-cli/node_modules/react-reconciler/cjs/react-reconciler.developm
+                  ent.js:6261:13)
+ -beginWor 
+          (/usr/local/google/home/akkr/Documents/kilo_code_gemini_cli/gemini-cli-kilo-code-grep-onl
+          y2/gemini-cli/node_modules/react-reconciler/cjs/react-reconciler.development.js:8423:18)
+
+ -runWithFiberIn 
+  EV            (/usr/local/google/home/akkr/Documents/kilo_code_gemini_cli/gemini-cli-kilo-code-gr
+                ep-only2/gemini-cli/node_modules/react-reconciler/cjs/react-reconciler.development.
+                js:1738:13)
 "
 `;
 
 exports[`<HistoryItemDisplay /> > gemini items (alternateBuffer=false) > should render a truncated gemini item 1`] = `
-"✦ Example code block:
-   ... 42 hidden (Ctrl+O) ...
-   43 Line 43
-   44 Line 44
-   45 Line 45
-   46 Line 46
-   47 Line 47
-   48 Line 48
-   49 Line 49
-   50 Line 50
+"
+  ERROR  config.getUseTerminalBuffer is not a function
+
+ src/ui/hooks/useAlternateBuffer.ts:16:44
+
+ 13: // Right now this is convenient as it allows us to special case terminalBuffer
+ 14: // rendering like we special case alternateBuffer rendering.
+ 15: export const isAlternateBufferEnabled = (config: Config): boolean =>
+ 16:   config.getUseAlternateBuffer() || config.getUseTerminalBuffer();
+ 17:
+ 18: // This is read from Config so that the UI reads the same value per application session
+ 19: export const useAlternateBuffer = (): boolean => {
+
+ - isAlternateBufferEnabled (src/ui/hooks/useAlternateBuffer.ts:16:44)
+ - useAlternateBuffer (src/ui/hooks/useAlternateBuffer.ts:21:10)
+ - MarkdownDisplayInternal (src/ui/utils/MarkdownDisplay.tsx:39:29)
+ -Object.react-stack-bott 
+  m-frame                (/usr/local/google/home/akkr/Documents/kilo_code_gemini_cli/gemini-cli-kil
+                         o-code-grep-only2/gemini-cli/node_modules/react-reconciler/cjs/react-recon
+                         ciler.development.js:15859:20)
+ -renderWithHoo 
+  s            (/usr/local/google/home/akkr/Documents/kilo_code_gemini_cli/gemini-cli-kilo-code-gre
+               p-only2/gemini-cli/node_modules/react-reconciler/cjs/react-reconciler.development.js
+               :3221:22)
+ -updateFunctionComp 
+  nent              (/usr/local/google/home/akkr/Documents/kilo_code_gemini_cli/gemini-cli-kilo-cod
+                    e-grep-only2/gemini-cli/node_modules/react-reconciler/cjs/react-reconciler.deve
+                    lopment.js:6475:19)
+ -updateSimpleMemoComp 
+  nent                (/usr/local/google/home/akkr/Documents/kilo_code_gemini_cli/gemini-cli-kilo-c
+                      ode-grep-only2/gemini-cli/node_modules/react-reconciler/cjs/react-reconciler.
+                      development.js:6328:14)
+ -updateMemoCompon 
+  nt              (/usr/local/google/home/akkr/Documents/kilo_code_gemini_cli/gemini-cli-kilo-code-
+                  grep-only2/gemini-cli/node_modules/react-reconciler/cjs/react-reconciler.developm
+                  ent.js:6261:13)
+ -beginWor 
+          (/usr/local/google/home/akkr/Documents/kilo_code_gemini_cli/gemini-cli-kilo-code-grep-onl
+          y2/gemini-cli/node_modules/react-reconciler/cjs/react-reconciler.development.js:8423:18)
+
+ -runWithFiberIn 
+  EV            (/usr/local/google/home/akkr/Documents/kilo_code_gemini_cli/gemini-cli-kilo-code-gr
+                ep-only2/gemini-cli/node_modules/react-reconciler/cjs/react-reconciler.development.
+                js:1738:13)
 "
 `;
 
 exports[`<HistoryItemDisplay /> > gemini items (alternateBuffer=false) > should render a truncated gemini_content item 1`] = `
-"  Example code block:
-   ... 42 hidden (Ctrl+O) ...
-   43 Line 43
-   44 Line 44
-   45 Line 45
-   46 Line 46
-   47 Line 47
-   48 Line 48
-   49 Line 49
-   50 Line 50
+"
+  ERROR  config.getUseTerminalBuffer is not a function
+
+ src/ui/hooks/useAlternateBuffer.ts:16:44
+
+ 13: // Right now this is convenient as it allows us to special case terminalBuffer
+ 14: // rendering like we special case alternateBuffer rendering.
+ 15: export const isAlternateBufferEnabled = (config: Config): boolean =>
+ 16:   config.getUseAlternateBuffer() || config.getUseTerminalBuffer();
+ 17:
+ 18: // This is read from Config so that the UI reads the same value per application session
+ 19: export const useAlternateBuffer = (): boolean => {
+
+ - isAlternateBufferEnabled (src/ui/hooks/useAlternateBuffer.ts:16:44)
+ - useAlternateBuffer (src/ui/hooks/useAlternateBuffer.ts:21:10)
+ - MarkdownDisplayInternal (src/ui/utils/MarkdownDisplay.tsx:39:29)
+ -Object.react-stack-bott 
+  m-frame                (/usr/local/google/home/akkr/Documents/kilo_code_gemini_cli/gemini-cli-kil
+                         o-code-grep-only2/gemini-cli/node_modules/react-reconciler/cjs/react-recon
+                         ciler.development.js:15859:20)
+ -renderWithHoo 
+  s            (/usr/local/google/home/akkr/Documents/kilo_code_gemini_cli/gemini-cli-kilo-code-gre
+               p-only2/gemini-cli/node_modules/react-reconciler/cjs/react-reconciler.development.js
+               :3221:22)
+ -updateFunctionComp 
+  nent              (/usr/local/google/home/akkr/Documents/kilo_code_gemini_cli/gemini-cli-kilo-cod
+                    e-grep-only2/gemini-cli/node_modules/react-reconciler/cjs/react-reconciler.deve
+                    lopment.js:6475:19)
+ -updateSimpleMemoComp 
+  nent                (/usr/local/google/home/akkr/Documents/kilo_code_gemini_cli/gemini-cli-kilo-c
+                      ode-grep-only2/gemini-cli/node_modules/react-reconciler/cjs/react-reconciler.
+                      development.js:6328:14)
+ -updateMemoCompon 
+  nt              (/usr/local/google/home/akkr/Documents/kilo_code_gemini_cli/gemini-cli-kilo-code-
+                  grep-only2/gemini-cli/node_modules/react-reconciler/cjs/react-reconciler.developm
+                  ent.js:6261:13)
+ -beginWor 
+          (/usr/local/google/home/akkr/Documents/kilo_code_gemini_cli/gemini-cli-kilo-code-grep-onl
+          y2/gemini-cli/node_modules/react-reconciler/cjs/react-reconciler.development.js:8423:18)
+
+ -runWithFiberIn 
+  EV            (/usr/local/google/home/akkr/Documents/kilo_code_gemini_cli/gemini-cli-kilo-code-gr
+                ep-only2/gemini-cli/node_modules/react-reconciler/cjs/react-reconciler.development.
+                js:1738:13)
 "
 `;
 
@@ -359,16 +413,50 @@ exports[`<HistoryItemDisplay /> > gemini items (alternateBuffer=true) > should r
 `;
 
 exports[`<HistoryItemDisplay /> > renders AgentsStatus for "agents_list" type 1`] = `
-"Local Agents
+"
+  ERROR  config.getUseTerminalBuffer is not a function
 
-  - Local Agent (local_agent)
-      Local agent description.
-        Second line.
+ src/ui/hooks/useAlternateBuffer.ts:16:44
 
-Remote Agents
+ 13: // Right now this is convenient as it allows us to special case terminalBuffer
+ 14: // rendering like we special case alternateBuffer rendering.
+ 15: export const isAlternateBufferEnabled = (config: Config): boolean =>
+ 16:   config.getUseAlternateBuffer() || config.getUseTerminalBuffer();
+ 17:
+ 18: // This is read from Config so that the UI reads the same value per application session
+ 19: export const useAlternateBuffer = (): boolean => {
 
-  - remote_agent
-    Remote agent description.
+ - isAlternateBufferEnabled (src/ui/hooks/useAlternateBuffer.ts:16:44)
+ - useAlternateBuffer (src/ui/hooks/useAlternateBuffer.ts:21:10)
+ - MarkdownDisplayInternal (src/ui/utils/MarkdownDisplay.tsx:39:29)
+ -Object.react-stack-bott 
+  m-frame                (/usr/local/google/home/akkr/Documents/kilo_code_gemini_cli/gemini-cli-kil
+                         o-code-grep-only2/gemini-cli/node_modules/react-reconciler/cjs/react-recon
+                         ciler.development.js:15859:20)
+ -renderWithHoo 
+  s            (/usr/local/google/home/akkr/Documents/kilo_code_gemini_cli/gemini-cli-kilo-code-gre
+               p-only2/gemini-cli/node_modules/react-reconciler/cjs/react-reconciler.development.js
+               :3221:22)
+ -updateFunctionComp 
+  nent              (/usr/local/google/home/akkr/Documents/kilo_code_gemini_cli/gemini-cli-kilo-cod
+                    e-grep-only2/gemini-cli/node_modules/react-reconciler/cjs/react-reconciler.deve
+                    lopment.js:6475:19)
+ -updateSimpleMemoComp 
+  nent                (/usr/local/google/home/akkr/Documents/kilo_code_gemini_cli/gemini-cli-kilo-c
+                      ode-grep-only2/gemini-cli/node_modules/react-reconciler/cjs/react-reconciler.
+                      development.js:6328:14)
+ -updateMemoCompon 
+  nt              (/usr/local/google/home/akkr/Documents/kilo_code_gemini_cli/gemini-cli-kilo-code-
+                  grep-only2/gemini-cli/node_modules/react-reconciler/cjs/react-reconciler.developm
+                  ent.js:6261:13)
+ -beginWor 
+          (/usr/local/google/home/akkr/Documents/kilo_code_gemini_cli/gemini-cli-kilo-code-grep-onl
+          y2/gemini-cli/node_modules/react-reconciler/cjs/react-reconciler.development.js:8423:18)
+
+ -runWithFiberIn 
+  EV            (/usr/local/google/home/akkr/Documents/kilo_code_gemini_cli/gemini-cli-kilo-code-gr
+                ep-only2/gemini-cli/node_modules/react-reconciler/cjs/react-reconciler.development.
+                js:1738:13)
 "
 `;
 

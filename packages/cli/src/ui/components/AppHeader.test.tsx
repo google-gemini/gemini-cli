@@ -8,16 +8,22 @@ import {
   renderWithProviders,
   persistentStateMock,
 } from '../../test-utils/render.js';
+import type { LoadedSettings } from '../../config/settings.js';
 import { AppHeader } from './AppHeader.js';
-import { describe, it, expect, vi } from 'vitest';
+import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { makeFakeConfig } from '@google/gemini-cli-core';
 import crypto from 'node:crypto';
+import { _clearSessionBannersForTest } from '../hooks/useBanner.js';
 
 vi.mock('../utils/terminalSetup.js', () => ({
   getTerminalProgram: () => null,
 }));
 
 describe('<AppHeader />', () => {
+  beforeEach(() => {
+    _clearSessionBannersForTest();
+  });
+
   it('should render the banner with default text', async () => {
     const uiState = {
       history: [],
@@ -262,6 +268,25 @@ describe('<AppHeader />', () => {
     // Check for block characters from the logo
     expect(lastFrame()).toContain('▗█▀▀▜▙');
     expect(lastFrame()).toMatchSnapshot();
+    unmount();
+  });
+
+  it('should NOT render Tips when ui.hideTips is true', async () => {
+    const mockConfig = makeFakeConfig();
+    const { lastFrame, waitUntilReady, unmount } = await renderWithProviders(
+      <AppHeader version="1.0.0" />,
+      {
+        config: mockConfig,
+        settings: {
+          merged: {
+            ui: { hideTips: true },
+          },
+        } as unknown as LoadedSettings,
+      },
+    );
+    await waitUntilReady();
+
+    expect(lastFrame()).not.toContain('Tips');
     unmount();
   });
 });

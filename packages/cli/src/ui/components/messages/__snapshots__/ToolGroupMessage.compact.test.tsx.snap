@@ -1,0 +1,181 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`ToolGroupMessage Compact Rendering > does not add an extra empty line between a compact tool and a standard tool 1`] = `
+"
+  ERROR  (0 , __vite_ssr_import_12__.isVisibleInToolGroup) is not a function
+
+ src/ui/components/messages/ToolGroupMessage.tsx:130:9
+
+ 127:     () =>
+ 128:       allToolCalls.filter((t) =>
+ 129:         // Use the unified visibility utility
+ 130:         isVisibleInToolGroup(
+ 131:           buildToolVisibilityContextFromDisplay(t),
+ 132:           isLowErrorVerbosity ? 'low' : 'full',
+ 133:         ),
+
+ -  (src/ui/components/messages/ToolGroupMessage.tsx:130:9)
+ -     at Array.filter (<anonymous>)\\t 
+ -  (src/ui/components/messages/ToolGroupMessage.tsx:128:20)
+ -mountMem 
+          (/usr/local/google/home/akkr/Documents/kilo_code_gemini_cli/gemini-cli-kilo-code-grep-onl
+          y2/gemini-cli/node_modules/react-reconciler/cjs/react-reconciler.development.js:4272:23)
+
+ -Object.useMe 
+  o           (/usr/local/google/home/akkr/Documents/kilo_code_gemini_cli/gemini-cli-kilo-code-grep
+              -only2/gemini-cli/node_modules/react-reconciler/cjs/react-reconciler.development.js:1
+              4920:18)
+ -process.env.NODE_ENV.expor 
+  s.useMemo                 (/usr/local/google/home/akkr/Documents/kilo_code_gemini_cli/gemini-cli-
+                            kilo-code-grep-only2/gemini-cli/node_modules/react/cjs/react.developmen
+                            t.js:1251:34)
+ - ToolGroupMessage (src/ui/components/messages/ToolGroupMessage.tsx:126:28)
+ -Object.react-stack-bott 
+  m-frame                (/usr/local/google/home/akkr/Documents/kilo_code_gemini_cli/gemini-cli-kil
+                         o-code-grep-only2/gemini-cli/node_modules/react-reconciler/cjs/react-recon
+                         ciler.development.js:15859:20)
+ -renderWithHoo 
+  s            (/usr/local/google/home/akkr/Documents/kilo_code_gemini_cli/gemini-cli-kilo-code-gre
+               p-only2/gemini-cli/node_modules/react-reconciler/cjs/react-reconciler.development.js
+               :3221:22)
+ -updateFunctionComp 
+  nent              (/usr/local/google/home/akkr/Documents/kilo_code_gemini_cli/gemini-cli-kilo-cod
+                    e-grep-only2/gemini-cli/node_modules/react-reconciler/cjs/react-reconciler.deve
+                    lopment.js:6475:19)
+"
+`;
+
+exports[`ToolGroupMessage Compact Rendering > does not add an extra empty line between a standard tool and a compact tool 1`] = `
+"
+  ERROR  (0 , __vite_ssr_import_12__.isVisibleInToolGroup) is not a function
+
+ src/ui/components/messages/ToolGroupMessage.tsx:130:9
+
+ 127:     () =>
+ 128:       allToolCalls.filter((t) =>
+ 129:         // Use the unified visibility utility
+ 130:         isVisibleInToolGroup(
+ 131:           buildToolVisibilityContextFromDisplay(t),
+ 132:           isLowErrorVerbosity ? 'low' : 'full',
+ 133:         ),
+
+ -  (src/ui/components/messages/ToolGroupMessage.tsx:130:9)
+ -     at Array.filter (<anonymous>)\\t 
+ -  (src/ui/components/messages/ToolGroupMessage.tsx:128:20)
+ -mountMem 
+          (/usr/local/google/home/akkr/Documents/kilo_code_gemini_cli/gemini-cli-kilo-code-grep-onl
+          y2/gemini-cli/node_modules/react-reconciler/cjs/react-reconciler.development.js:4272:23)
+
+ -Object.useMe 
+  o           (/usr/local/google/home/akkr/Documents/kilo_code_gemini_cli/gemini-cli-kilo-code-grep
+              -only2/gemini-cli/node_modules/react-reconciler/cjs/react-reconciler.development.js:1
+              4920:18)
+ -process.env.NODE_ENV.expor 
+  s.useMemo                 (/usr/local/google/home/akkr/Documents/kilo_code_gemini_cli/gemini-cli-
+                            kilo-code-grep-only2/gemini-cli/node_modules/react/cjs/react.developmen
+                            t.js:1251:34)
+ - ToolGroupMessage (src/ui/components/messages/ToolGroupMessage.tsx:126:28)
+ -Object.react-stack-bott 
+  m-frame                (/usr/local/google/home/akkr/Documents/kilo_code_gemini_cli/gemini-cli-kil
+                         o-code-grep-only2/gemini-cli/node_modules/react-reconciler/cjs/react-recon
+                         ciler.development.js:15859:20)
+ -renderWithHoo 
+  s            (/usr/local/google/home/akkr/Documents/kilo_code_gemini_cli/gemini-cli-kilo-code-gre
+               p-only2/gemini-cli/node_modules/react-reconciler/cjs/react-reconciler.development.js
+               :3221:22)
+ -updateFunctionComp 
+  nent              (/usr/local/google/home/akkr/Documents/kilo_code_gemini_cli/gemini-cli-kilo-cod
+                    e-grep-only2/gemini-cli/node_modules/react-reconciler/cjs/react-reconciler.deve
+                    lopment.js:6475:19)
+"
+`;
+
+exports[`ToolGroupMessage Compact Rendering > does not add an extra empty line if a compact tool has a dense payload 1`] = `
+"
+  ERROR  (0 , __vite_ssr_import_12__.isVisibleInToolGroup) is not a function
+
+ src/ui/components/messages/ToolGroupMessage.tsx:130:9
+
+ 127:     () =>
+ 128:       allToolCalls.filter((t) =>
+ 129:         // Use the unified visibility utility
+ 130:         isVisibleInToolGroup(
+ 131:           buildToolVisibilityContextFromDisplay(t),
+ 132:           isLowErrorVerbosity ? 'low' : 'full',
+ 133:         ),
+
+ -  (src/ui/components/messages/ToolGroupMessage.tsx:130:9)
+ -     at Array.filter (<anonymous>)\\t 
+ -  (src/ui/components/messages/ToolGroupMessage.tsx:128:20)
+ -mountMem 
+          (/usr/local/google/home/akkr/Documents/kilo_code_gemini_cli/gemini-cli-kilo-code-grep-onl
+          y2/gemini-cli/node_modules/react-reconciler/cjs/react-reconciler.development.js:4272:23)
+
+ -Object.useMe 
+  o           (/usr/local/google/home/akkr/Documents/kilo_code_gemini_cli/gemini-cli-kilo-code-grep
+              -only2/gemini-cli/node_modules/react-reconciler/cjs/react-reconciler.development.js:1
+              4920:18)
+ -process.env.NODE_ENV.expor 
+  s.useMemo                 (/usr/local/google/home/akkr/Documents/kilo_code_gemini_cli/gemini-cli-
+                            kilo-code-grep-only2/gemini-cli/node_modules/react/cjs/react.developmen
+                            t.js:1251:34)
+ - ToolGroupMessage (src/ui/components/messages/ToolGroupMessage.tsx:126:28)
+ -Object.react-stack-bott 
+  m-frame                (/usr/local/google/home/akkr/Documents/kilo_code_gemini_cli/gemini-cli-kil
+                         o-code-grep-only2/gemini-cli/node_modules/react-reconciler/cjs/react-recon
+                         ciler.development.js:15859:20)
+ -renderWithHoo 
+  s            (/usr/local/google/home/akkr/Documents/kilo_code_gemini_cli/gemini-cli-kilo-code-gre
+               p-only2/gemini-cli/node_modules/react-reconciler/cjs/react-reconciler.development.js
+               :3221:22)
+ -updateFunctionComp 
+  nent              (/usr/local/google/home/akkr/Documents/kilo_code_gemini_cli/gemini-cli-kilo-cod
+                    e-grep-only2/gemini-cli/node_modules/react-reconciler/cjs/react-reconciler.deve
+                    lopment.js:6475:19)
+"
+`;
+
+exports[`ToolGroupMessage Compact Rendering > renders consecutive compact tools without empty lines between them 1`] = `
+"
+  ERROR  (0 , __vite_ssr_import_12__.isVisibleInToolGroup) is not a function
+
+ src/ui/components/messages/ToolGroupMessage.tsx:130:9
+
+ 127:     () =>
+ 128:       allToolCalls.filter((t) =>
+ 129:         // Use the unified visibility utility
+ 130:         isVisibleInToolGroup(
+ 131:           buildToolVisibilityContextFromDisplay(t),
+ 132:           isLowErrorVerbosity ? 'low' : 'full',
+ 133:         ),
+
+ -  (src/ui/components/messages/ToolGroupMessage.tsx:130:9)
+ -     at Array.filter (<anonymous>)\\t 
+ -  (src/ui/components/messages/ToolGroupMessage.tsx:128:20)
+ -mountMem 
+          (/usr/local/google/home/akkr/Documents/kilo_code_gemini_cli/gemini-cli-kilo-code-grep-onl
+          y2/gemini-cli/node_modules/react-reconciler/cjs/react-reconciler.development.js:4272:23)
+
+ -Object.useMe 
+  o           (/usr/local/google/home/akkr/Documents/kilo_code_gemini_cli/gemini-cli-kilo-code-grep
+              -only2/gemini-cli/node_modules/react-reconciler/cjs/react-reconciler.development.js:1
+              4920:18)
+ -process.env.NODE_ENV.expor 
+  s.useMemo                 (/usr/local/google/home/akkr/Documents/kilo_code_gemini_cli/gemini-cli-
+                            kilo-code-grep-only2/gemini-cli/node_modules/react/cjs/react.developmen
+                            t.js:1251:34)
+ - ToolGroupMessage (src/ui/components/messages/ToolGroupMessage.tsx:126:28)
+ -Object.react-stack-bott 
+  m-frame                (/usr/local/google/home/akkr/Documents/kilo_code_gemini_cli/gemini-cli-kil
+                         o-code-grep-only2/gemini-cli/node_modules/react-reconciler/cjs/react-recon
+                         ciler.development.js:15859:20)
+ -renderWithHoo 
+  s            (/usr/local/google/home/akkr/Documents/kilo_code_gemini_cli/gemini-cli-kilo-code-gre
+               p-only2/gemini-cli/node_modules/react-reconciler/cjs/react-reconciler.development.js
+               :3221:22)
+ -updateFunctionComp 
+  nent              (/usr/local/google/home/akkr/Documents/kilo_code_gemini_cli/gemini-cli-kilo-cod
+                    e-grep-only2/gemini-cli/node_modules/react-reconciler/cjs/react-reconciler.deve
+                    lopment.js:6475:19)
+"
+`;

@@ -6,6 +6,7 @@
 
 import type { FunctionDeclaration, PartListUnion } from '@google/genai';
 import { ToolErrorType } from './tool-error.js';
+import type { GrepMatch } from './grep-utils.js';
 import type { DiffUpdateResult } from '../ide/ide-client.js';
 import type { ShellExecutionConfig } from '../services/shellExecutionService.js';
 import { SchemaValidator } from '../utils/schemaValidator.js';
@@ -33,6 +34,8 @@ export type ForcedToolDecision = 'allow' | 'deny' | 'ask_user';
  * only relevant to specific tool types.
  */
 export interface ExecuteOptions {
+  abortSignal: AbortSignal;
+  updateOutput?: (output: ToolLiveOutput) => void;
   shellExecutionConfig?: ShellExecutionConfig;
   setExecutionIdCallback?: (executionId: number) => void;
 }
@@ -58,6 +61,19 @@ export interface ToolInvocation<
   getDescription(): string;
 
   /**
+   * Gets a clean title for display in the UI (e.g. the raw command without metadata).
+   * If not implemented, the UI may fall back to getDescription().
+   * @returns A string representing the tool call title.
+   */
+  getDisplayTitle?(): string;
+
+  /**
+   * Gets conversational explanation or secondary metadata.
+   * @returns A string representing the explanation, or undefined.
+   */
+  getExplanation?(): string;
+
+  /**
    * Determines what file system paths the tool will affect.
    * @returns A list of such paths.
    */
@@ -76,16 +92,10 @@ export interface ToolInvocation<
 
   /**
    * Executes the tool with the validated parameters.
-   * @param signal AbortSignal for tool cancellation.
-   * @param updateOutput Optional callback to stream output.
-   * @param setExecutionIdCallback Optional callback for tools that expose a background execution handle.
+   * @param options Options for tool execution including signal and output updates.
    * @returns Result of the tool execution.
    */
-  execute(
-    signal: AbortSignal,
-    updateOutput?: (output: ToolLiveOutput) => void,
-    options?: ExecuteOptions,
-  ): Promise<TResult>;
+  execute(options: ExecuteOptions): Promise<TResult>;
 
   /**
    * Returns tool-specific options for policy updates.
@@ -138,6 +148,7 @@ export interface PolicyUpdateOptions {
   commandPrefix?: string | string[];
   mcpName?: string;
   toolName?: string;
+  allowRedirection?: boolean;
 }
 
 /**
@@ -160,6 +171,14 @@ export abstract class BaseToolInvocation<
   ) {}
 
   abstract getDescription(): string;
+
+  getDisplayTitle(): string {
+    return this.getDescription();
+  }
+
+  getExplanation(): string {
+    return '';
+  }
 
   toolLocations(): ToolLocation[] {
     return [];
@@ -344,18 +363,20 @@ export abstract class BaseToolInvocation<
 
       try {
         void this.messageBus.publish(request);
-      } catch (_error) {
+      } catch {
         cleanup();
         resolve('allow');
       }
     });
   }
 
-  abstract execute(
-    signal: AbortSignal,
-    updateOutput?: (output: ToolLiveOutput) => void,
-    options?: ExecuteOptions,
-  ): Promise<TResult>;
+  abstract execute(options: ExecuteOptions): Promise<TResult>;
+
+  toJSON() {
+    return {
+      params: this.params,
+    };
+  }
 }
 
 /**
@@ -475,6 +496,16 @@ export abstract class DeclarativeTool<
     return cloned;
   }
 
+  toJSON() {
+    return {
+      name: this.name,
+      displayName: this.displayName,
+      description: this.description,
+      kind: this.kind,
+      parameterSchema: this.parameterSchema,
+    };
+  }
+
   get isReadOnly(): boolean {
     return READ_ONLY_KINDS.includes(this.kind);
   }
@@ -570,10 +601,14 @@ export abstract class DeclarativeTool<
     params: TParams,
     signal: AbortSignal,
     updateOutput?: (output: ToolLiveOutput) => void,
-    options?: ExecuteOptions,
+    options?: Omit<ExecuteOptions, 'abortSignal' | 'updateOutput'>,
   ): Promise<TResult> {
     const invocation = this.build(params);
-    return invocation.execute(signal, updateOutput, options);
+    return invocation.execute({
+      ...options,
+      abortSignal: signal,
+      updateOutput,
+    });
   }
 
   /**
@@ -619,7 +654,7 @@ export abstract class DeclarativeTool<
     }
 
     try {
-      return await invocationOrError.execute(abortSignal);
+      return await invocationOrError.execute({ abortSignal });
     } catch (error) {
       const errorMessage =
         error instanceof Error ? error.message : String(error);
@@ -837,12 +872,63 @@ export interface TodoList {
 
 export type ToolLiveOutput = string | AnsiOutput | SubagentProgress;
 
+export interface StructuredToolResult {
+  summary: string;
+}
+
+export function isStructuredToolResult(
+  obj: unknown,
+): obj is StructuredToolResult {
+  return (
+    typeof obj === 'object' &&
+    obj !== null &&
+    'summary' in obj &&
+    typeof obj.summary === 'string'
+  );
+}
+
+export const hasSummary = (res: unknown): res is { summary: string } =>
+  isStructuredToolResult(res);
+
+export interface GrepResult extends StructuredToolResult {
+  matches: GrepMatch[];
+  payload?: string;
+}
+
+export interface ListDirectoryResult extends StructuredToolResult {
+  files: string[];
+  payload?: string;
+}
+
+export interface ReadManyFilesResult extends StructuredToolResult {
+  files: string[];
+  skipped?: Array<{ path: string; reason: string }>;
+  include?: string[];
+  excludes?: string[];
+  targetDir?: string;
+  payload?: string;
+}
+
+export const isGrepResult = (res: unknown): res is GrepResult =>
+  isStructuredToolResult(res) && 'matches' in res && Array.isArray(res.matches);
+
+export const isListResult = (
+  res: unknown,
+): res is ListDirectoryResult | ReadManyFilesResult =>
+  isStructuredToolResult(res) && 'files' in res && Array.isArray(res.files);
+
+export const isReadManyFilesResult = (
+  res: unknown,
+): res is ReadManyFilesResult => isListResult(res) && 'include' in res;
 export type ToolResultDisplay =
   | string
   | FileDiff
   | AnsiOutput
   | TodoList
-  | SubagentProgress;
+  | SubagentProgress
+  | GrepResult
+  | ListDirectoryResult
+  | ReadManyFilesResult;
 
 export type TodoStatus =
   | 'pending'
@@ -865,6 +951,13 @@ export interface FileDiff {
   diffStat?: DiffStat;
   isNewFile?: boolean;
 }
+
+export const isFileDiff = (res: unknown): res is FileDiff =>
+  typeof res === 'object' &&
+  res !== null &&
+  'fileDiff' in res &&
+  'fileName' in res &&
+  'filePath' in res;
 
 export interface DiffStat {
   model_added_lines: number;
@@ -891,6 +984,7 @@ export interface ToolEditConfirmationDetails {
   originalContent: string | null;
   newContent: string;
   isModifying?: boolean;
+  diffStat?: DiffStat;
   ideConfirmation?: Promise<DiffUpdateResult>;
 }
 
@@ -915,6 +1009,16 @@ export type ToolConfirmationPayload =
   | ToolEditConfirmationPayload
   | ToolAskUserConfirmationPayload
   | ToolExitPlanModeConfirmationPayload;
+
+export interface ToolSandboxExpansionConfirmationDetails {
+  type: 'sandbox_expansion';
+  systemMessage?: string;
+  title: string;
+  command: string;
+  rootCommand: string;
+  additionalPermissions: import('../services/sandboxManager.js').SandboxPermissions;
+  onConfirm: (outcome: ToolConfirmationOutcome) => Promise<void>;
+}
 
 export interface ToolExecuteConfirmationDetails {
   type: 'exec';
@@ -972,6 +1076,7 @@ export interface ToolExitPlanModeConfirmationDetails {
 }
 
 export type ToolCallConfirmationDetails =
+  | ToolSandboxExpansionConfirmationDetails
   | ToolEditConfirmationDetails
   | ToolExecuteConfirmationDetails
   | ToolMcpConfirmationDetails

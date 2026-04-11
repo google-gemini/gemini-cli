@@ -1,202 +1,289 @@
 // Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
 
 exports[`Initial Theme Selection > should default to a dark theme when terminal background is dark and no theme is set 1`] = `
-"╭──────────────────────────────────────────────────────────────────────────────────────────────────╮
-│                                                                                                  │
-│ > Select Theme                               Preview                                             │
-│ ▲                                            ┌─────────────────────────────────────────────────┐ │
-│    1. ANSI Dark                              │                                                 │ │
-│    2. Atom One Dark                          │ 1 # function                                    │ │
-│    3. Ayu Dark                               │ 2 def fibonacci(n):                             │ │
-│ ●  4. Default Dark (Matches terminal)        │ 3     a, b = 0, 1                               │ │
-│    5. Dracula Dark                           │ 4     for _ in range(n):                        │ │
-│    6. GitHub Dark                            │ 5         a, b = b, a + b                       │ │
-│    7. Holiday Dark                           │ 6     return a                                  │ │
-│    8. Shades Of Purple Dark                  │                                                 │ │
-│    9. Solarized Dark                         │ 1 - print("Hello, " + name)                     │ │
-│   10. ANSI Light                             │ 1 + print(f"Hello, {name}!")                    │ │
-│   11. Ayu Light                              │                                                 │ │
-│   12. Default Light                          └─────────────────────────────────────────────────┘ │
-│ ▼                                                                                                │
-│                                                                                                  │
-│ (Use Enter to select, Tab to configure scope, Esc to close)                                      │
-│                                                                                                  │
-╰──────────────────────────────────────────────────────────────────────────────────────────────────╯
+"
+  ERROR  config.getUseTerminalBuffer is not a function
+
+ src/ui/hooks/useAlternateBuffer.ts:16:44
+
+ 13: // Right now this is convenient as it allows us to special case terminalBuffer
+ 14: // rendering like we special case alternateBuffer rendering.
+ 15: export const isAlternateBufferEnabled = (config: Config): boolean =>
+ 16:   config.getUseAlternateBuffer() || config.getUseTerminalBuffer();
+ 17:
+ 18: // This is read from Config so that the UI reads the same value per application session
+ 19: export const useAlternateBuffer = (): boolean => {
+
+ - isAlternateBufferEnabled (src/ui/hooks/useAlternateBuffer.ts:16:44)
+ - useAlternateBuffer (src/ui/hooks/useAlternateBuffer.ts:21:10)
+ - ThemeDialog (src/ui/components/ThemeDialog.tsx:88:29)
+ -Object.react-stack-bott 
+  m-frame                (/usr/local/google/home/akkr/Documents/kilo_code_gemini_cli/gemini-cli-kil
+                         o-code-grep-only2/gemini-cli/node_modules/react-reconciler/cjs/react-recon
+                         ciler.development.js:15859:20)
+ -renderWithHoo 
+  s            (/usr/local/google/home/akkr/Documents/kilo_code_gemini_cli/gemini-cli-kilo-code-gre
+               p-only2/gemini-cli/node_modules/react-reconciler/cjs/react-reconciler.development.js
+               :3221:22)
+ -updateFunctionComp 
+  nent              (/usr/local/google/home/akkr/Documents/kilo_code_gemini_cli/gemini-cli-kilo-cod
+                    e-grep-only2/gemini-cli/node_modules/react-reconciler/cjs/react-reconciler.deve
+                    lopment.js:6475:19)
+ -beginWor 
+          (/usr/local/google/home/akkr/Documents/kilo_code_gemini_cli/gemini-cli-kilo-code-grep-onl
+          y2/gemini-cli/node_modules/react-reconciler/cjs/react-reconciler.development.js:8009:18)
+
+ -runWithFiberIn 
+  EV            (/usr/local/google/home/akkr/Documents/kilo_code_gemini_cli/gemini-cli-kilo-code-gr
+                ep-only2/gemini-cli/node_modules/react-reconciler/cjs/react-reconciler.development.
+                js:1738:13)
+ -performUnitOfW 
+  rk            (/usr/local/google/home/akkr/Documents/kilo_code_gemini_cli/gemini-cli-kilo-code-gr
+                ep-only2/gemini-cli/node_modules/react-reconciler/cjs/react-reconciler.development.
+                js:12834:22)
+ -workLoopSyn 
+             (/usr/local/google/home/akkr/Documents/kilo_code_gemini_cli/gemini-cli-kilo-code-grep-
+             only2/gemini-cli/node_modules/react-reconciler/cjs/react-reconciler.development.js:126
+             44:41)
 "
 `;
 
 exports[`Initial Theme Selection > should default to a light theme when terminal background is light and no theme is set 1`] = `
-"╭──────────────────────────────────────────────────────────────────────────────────────────────────╮
-│                                                                                                  │
-│ > Select Theme                               Preview                                             │
-│ ▲                                            ┌─────────────────────────────────────────────────┐ │
-│    1. ANSI Light                             │                                                 │ │
-│    2. Ayu Light                              │ 1 # function                                    │ │
-│ ●  3. Default Light                          │ 2 def fibonacci(n):                             │ │
-│    4. GitHub Light                           │ 3     a, b = 0, 1                               │ │
-│    5. Google Code Light                      │ 4     for _ in range(n):                        │ │
-│    6. Solarized Light                        │ 5         a, b = b, a + b                       │ │
-│    7. Xcode Light                            │ 6     return a                                  │ │
-│    8. ANSI Dark (Incompatible)               │                                                 │ │
-│    9. Atom One Dark (Incompatible)           │ 1 - print("Hello, " + name)                     │ │
-│   10. Ayu Dark (Incompatible)                │ 1 + print(f"Hello, {name}!")                    │ │
-│   11. Default Dark (Incompatible)            │                                                 │ │
-│   12. Dracula Dark (Incompatible)            └─────────────────────────────────────────────────┘ │
-│ ▼                                                                                                │
-│                                                                                                  │
-│ (Use Enter to select, Tab to configure scope, Esc to close)                                      │
-│                                                                                                  │
-╰──────────────────────────────────────────────────────────────────────────────────────────────────╯
+"
+  ERROR  config.getUseTerminalBuffer is not a function
+
+ src/ui/hooks/useAlternateBuffer.ts:16:44
+
+ 13: // Right now this is convenient as it allows us to special case terminalBuffer
+ 14: // rendering like we special case alternateBuffer rendering.
+ 15: export const isAlternateBufferEnabled = (config: Config): boolean =>
+ 16:   config.getUseAlternateBuffer() || config.getUseTerminalBuffer();
+ 17:
+ 18: // This is read from Config so that the UI reads the same value per application session
+ 19: export const useAlternateBuffer = (): boolean => {
+
+ - isAlternateBufferEnabled (src/ui/hooks/useAlternateBuffer.ts:16:44)
+ - useAlternateBuffer (src/ui/hooks/useAlternateBuffer.ts:21:10)
+ - ThemeDialog (src/ui/components/ThemeDialog.tsx:88:29)
+ -Object.react-stack-bott 
+  m-frame                (/usr/local/google/home/akkr/Documents/kilo_code_gemini_cli/gemini-cli-kil
+                         o-code-grep-only2/gemini-cli/node_modules/react-reconciler/cjs/react-recon
+                         ciler.development.js:15859:20)
+ -renderWithHoo 
+  s            (/usr/local/google/home/akkr/Documents/kilo_code_gemini_cli/gemini-cli-kilo-code-gre
+               p-only2/gemini-cli/node_modules/react-reconciler/cjs/react-reconciler.development.js
+               :3221:22)
+ -updateFunctionComp 
+  nent              (/usr/local/google/home/akkr/Documents/kilo_code_gemini_cli/gemini-cli-kilo-cod
+                    e-grep-only2/gemini-cli/node_modules/react-reconciler/cjs/react-reconciler.deve
+                    lopment.js:6475:19)
+ -beginWor 
+          (/usr/local/google/home/akkr/Documents/kilo_code_gemini_cli/gemini-cli-kilo-code-grep-onl
+          y2/gemini-cli/node_modules/react-reconciler/cjs/react-reconciler.development.js:8009:18)
+
+ -runWithFiberIn 
+  EV            (/usr/local/google/home/akkr/Documents/kilo_code_gemini_cli/gemini-cli-kilo-code-gr
+                ep-only2/gemini-cli/node_modules/react-reconciler/cjs/react-reconciler.development.
+                js:1738:13)
+ -performUnitOfW 
+  rk            (/usr/local/google/home/akkr/Documents/kilo_code_gemini_cli/gemini-cli-kilo-code-gr
+                ep-only2/gemini-cli/node_modules/react-reconciler/cjs/react-reconciler.development.
+                js:12834:22)
+ -workLoopSyn 
+             (/usr/local/google/home/akkr/Documents/kilo_code_gemini_cli/gemini-cli-kilo-code-grep-
+             only2/gemini-cli/node_modules/react-reconciler/cjs/react-reconciler.development.js:126
+             44:41)
 "
 `;
 
 exports[`Initial Theme Selection > should use the theme from settings even if terminal background suggests a different theme type 1`] = `
-"╭──────────────────────────────────────────────────────────────────────────────────────────────────╮
-│                                                                                                  │
-│ > Select Theme                               Preview                                             │
-│ ▲                                            ┌─────────────────────────────────────────────────┐ │
-│ ●  1. ANSI Dark                              │                                                 │ │
-│    2. Atom One Dark                          │ 1 # function                                    │ │
-│    3. Ayu Dark                               │ 2 def fibonacci(n):                             │ │
-│    4. Default Dark (Matches terminal)        │ 3     a, b = 0, 1                               │ │
-│    5. Dracula Dark                           │ 4     for _ in range(n):                        │ │
-│    6. GitHub Dark                            │ 5         a, b = b, a + b                       │ │
-│    7. Holiday Dark                           │ 6     return a                                  │ │
-│    8. Shades Of Purple Dark                  │                                                 │ │
-│    9. Solarized Dark                         │ 1 - print("Hello, " + name)                     │ │
-│   10. ANSI Light                             │ 1 + print(f"Hello, {name}!")                    │ │
-│   11. Ayu Light                              │                                                 │ │
-│   12. Default Light                          └─────────────────────────────────────────────────┘ │
-│ ▼                                                                                                │
-│                                                                                                  │
-│ (Use Enter to select, Tab to configure scope, Esc to close)                                      │
-│                                                                                                  │
-╰──────────────────────────────────────────────────────────────────────────────────────────────────╯
+"
+  ERROR  config.getUseTerminalBuffer is not a function
+
+ src/ui/hooks/useAlternateBuffer.ts:16:44
+
+ 13: // Right now this is convenient as it allows us to special case terminalBuffer
+ 14: // rendering like we special case alternateBuffer rendering.
+ 15: export const isAlternateBufferEnabled = (config: Config): boolean =>
+ 16:   config.getUseAlternateBuffer() || config.getUseTerminalBuffer();
+ 17:
+ 18: // This is read from Config so that the UI reads the same value per application session
+ 19: export const useAlternateBuffer = (): boolean => {
+
+ - isAlternateBufferEnabled (src/ui/hooks/useAlternateBuffer.ts:16:44)
+ - useAlternateBuffer (src/ui/hooks/useAlternateBuffer.ts:21:10)
+ - ThemeDialog (src/ui/components/ThemeDialog.tsx:88:29)
+ -Object.react-stack-bott 
+  m-frame                (/usr/local/google/home/akkr/Documents/kilo_code_gemini_cli/gemini-cli-kil
+                         o-code-grep-only2/gemini-cli/node_modules/react-reconciler/cjs/react-recon
+                         ciler.development.js:15859:20)
+ -renderWithHoo 
+  s            (/usr/local/google/home/akkr/Documents/kilo_code_gemini_cli/gemini-cli-kilo-code-gre
+               p-only2/gemini-cli/node_modules/react-reconciler/cjs/react-reconciler.development.js
+               :3221:22)
+ -updateFunctionComp 
+  nent              (/usr/local/google/home/akkr/Documents/kilo_code_gemini_cli/gemini-cli-kilo-cod
+                    e-grep-only2/gemini-cli/node_modules/react-reconciler/cjs/react-reconciler.deve
+                    lopment.js:6475:19)
+ -beginWor 
+          (/usr/local/google/home/akkr/Documents/kilo_code_gemini_cli/gemini-cli-kilo-code-grep-onl
+          y2/gemini-cli/node_modules/react-reconciler/cjs/react-reconciler.development.js:8009:18)
+
+ -runWithFiberIn 
+  EV            (/usr/local/google/home/akkr/Documents/kilo_code_gemini_cli/gemini-cli-kilo-code-gr
+                ep-only2/gemini-cli/node_modules/react-reconciler/cjs/react-reconciler.development.
+                js:1738:13)
+ -performUnitOfW 
+  rk            (/usr/local/google/home/akkr/Documents/kilo_code_gemini_cli/gemini-cli-kilo-code-gr
+                ep-only2/gemini-cli/node_modules/react-reconciler/cjs/react-reconciler.development.
+                js:12834:22)
+ -workLoopSyn 
+             (/usr/local/google/home/akkr/Documents/kilo_code_gemini_cli/gemini-cli-kilo-code-grep-
+             only2/gemini-cli/node_modules/react-reconciler/cjs/react-reconciler.development.js:126
+             44:41)
 "
 `;
 
 exports[`ThemeDialog Snapshots > should render correctly in scope selector mode 1`] = `
-"╭──────────────────────────────────────────────────────────────────────────────────────────────────╮
-│                                                                                                  │
-│ > Apply To                                                                                       │
-│ ● 1. User Settings                                                                               │
-│   2. Workspace Settings                                                                          │
-│   3. System Settings                                                                             │
-│                                                                                                  │
-│ (Use Enter to apply scope, Tab to select theme, Esc to close)                                    │
-│                                                                                                  │
-╰──────────────────────────────────────────────────────────────────────────────────────────────────╯
+"
+  ERROR  config.getUseTerminalBuffer is not a function
+
+ src/ui/hooks/useAlternateBuffer.ts:16:44
+
+ 13: // Right now this is convenient as it allows us to special case terminalBuffer
+ 14: // rendering like we special case alternateBuffer rendering.
+ 15: export const isAlternateBufferEnabled = (config: Config): boolean =>
+ 16:   config.getUseAlternateBuffer() || config.getUseTerminalBuffer();
+ 17:
+ 18: // This is read from Config so that the UI reads the same value per application session
+ 19: export const useAlternateBuffer = (): boolean => {
+
+ - isAlternateBufferEnabled (src/ui/hooks/useAlternateBuffer.ts:16:44)
+ - useAlternateBuffer (src/ui/hooks/useAlternateBuffer.ts:21:10)
+ - ThemeDialog (src/ui/components/ThemeDialog.tsx:88:29)
+ -Object.react-stack-bott 
+  m-frame                (/usr/local/google/home/akkr/Documents/kilo_code_gemini_cli/gemini-cli-kil
+                         o-code-grep-only2/gemini-cli/node_modules/react-reconciler/cjs/react-recon
+                         ciler.development.js:15859:20)
+ -renderWithHoo 
+  s            (/usr/local/google/home/akkr/Documents/kilo_code_gemini_cli/gemini-cli-kilo-code-gre
+               p-only2/gemini-cli/node_modules/react-reconciler/cjs/react-reconciler.development.js
+               :3221:22)
+ -updateFunctionComp 
+  nent              (/usr/local/google/home/akkr/Documents/kilo_code_gemini_cli/gemini-cli-kilo-cod
+                    e-grep-only2/gemini-cli/node_modules/react-reconciler/cjs/react-reconciler.deve
+                    lopment.js:6475:19)
+ -beginWor 
+          (/usr/local/google/home/akkr/Documents/kilo_code_gemini_cli/gemini-cli-kilo-code-grep-onl
+          y2/gemini-cli/node_modules/react-reconciler/cjs/react-reconciler.development.js:8009:18)
+
+ -runWithFiberIn 
+  EV            (/usr/local/google/home/akkr/Documents/kilo_code_gemini_cli/gemini-cli-kilo-code-gr
+                ep-only2/gemini-cli/node_modules/react-reconciler/cjs/react-reconciler.development.
+                js:1738:13)
+ -performUnitOfW 
+  rk            (/usr/local/google/home/akkr/Documents/kilo_code_gemini_cli/gemini-cli-kilo-code-gr
+                ep-only2/gemini-cli/node_modules/react-reconciler/cjs/react-reconciler.development.
+                js:12834:22)
+ -workLoopSyn 
+             (/usr/local/google/home/akkr/Documents/kilo_code_gemini_cli/gemini-cli-kilo-code-grep-
+             only2/gemini-cli/node_modules/react-reconciler/cjs/react-reconciler.development.js:126
+             44:41)
 "
 `;
 
 exports[`ThemeDialog Snapshots > should render correctly in theme selection mode (isDevelopment: false) 1`] = `
-"╭──────────────────────────────────────────────────────────────────────────────────────────────────╮
-│                                                                                                  │
-│ > Select Theme                               Preview                                             │
-│ ▲                                            ┌─────────────────────────────────────────────────┐ │
-│ ●  1. ANSI Dark (Matches terminal)           │                                                 │ │
-│    2. Atom One Dark                          │ 1 # function                                    │ │
-│    3. Ayu Dark                               │ 2 def fibonacci(n):                             │ │
-│    4. Default Dark                           │ 3     a, b = 0, 1                               │ │
-│    5. Dracula Dark                           │ 4     for _ in range(n):                        │ │
-│    6. GitHub Dark                            │ 5         a, b = b, a + b                       │ │
-│    7. Holiday Dark                           │ 6     return a                                  │ │
-│    8. Shades Of Purple Dark                  │                                                 │ │
-│    9. Solarized Dark                         │ 1 - print("Hello, " + name)                     │ │
-│   10. ANSI Light                             │ 1 + print(f"Hello, {name}!")                    │ │
-│   11. Ayu Light                              │                                                 │ │
-│   12. Default Light                          └─────────────────────────────────────────────────┘ │
-│ ▼                                                                                                │
-│                                                                                                  │
-│ (Use Enter to select, Tab to configure scope, Esc to close)                                      │
-│                                                                                                  │
-╰──────────────────────────────────────────────────────────────────────────────────────────────────╯
+"
+  ERROR  config.getUseTerminalBuffer is not a function
+
+ src/ui/hooks/useAlternateBuffer.ts:16:44
+
+ 13: // Right now this is convenient as it allows us to special case terminalBuffer
+ 14: // rendering like we special case alternateBuffer rendering.
+ 15: export const isAlternateBufferEnabled = (config: Config): boolean =>
+ 16:   config.getUseAlternateBuffer() || config.getUseTerminalBuffer();
+ 17:
+ 18: // This is read from Config so that the UI reads the same value per application session
+ 19: export const useAlternateBuffer = (): boolean => {
+
+ - isAlternateBufferEnabled (src/ui/hooks/useAlternateBuffer.ts:16:44)
+ - useAlternateBuffer (src/ui/hooks/useAlternateBuffer.ts:21:10)
+ - ThemeDialog (src/ui/components/ThemeDialog.tsx:88:29)
+ -Object.react-stack-bott 
+  m-frame                (/usr/local/google/home/akkr/Documents/kilo_code_gemini_cli/gemini-cli-kil
+                         o-code-grep-only2/gemini-cli/node_modules/react-reconciler/cjs/react-recon
+                         ciler.development.js:15859:20)
+ -renderWithHoo 
+  s            (/usr/local/google/home/akkr/Documents/kilo_code_gemini_cli/gemini-cli-kilo-code-gre
+               p-only2/gemini-cli/node_modules/react-reconciler/cjs/react-reconciler.development.js
+               :3221:22)
+ -updateFunctionComp 
+  nent              (/usr/local/google/home/akkr/Documents/kilo_code_gemini_cli/gemini-cli-kilo-cod
+                    e-grep-only2/gemini-cli/node_modules/react-reconciler/cjs/react-reconciler.deve
+                    lopment.js:6475:19)
+ -beginWor 
+          (/usr/local/google/home/akkr/Documents/kilo_code_gemini_cli/gemini-cli-kilo-code-grep-onl
+          y2/gemini-cli/node_modules/react-reconciler/cjs/react-reconciler.development.js:8009:18)
+
+ -runWithFiberIn 
+  EV            (/usr/local/google/home/akkr/Documents/kilo_code_gemini_cli/gemini-cli-kilo-code-gr
+                ep-only2/gemini-cli/node_modules/react-reconciler/cjs/react-reconciler.development.
+                js:1738:13)
+ -performUnitOfW 
+  rk            (/usr/local/google/home/akkr/Documents/kilo_code_gemini_cli/gemini-cli-kilo-code-gr
+                ep-only2/gemini-cli/node_modules/react-reconciler/cjs/react-reconciler.development.
+                js:12834:22)
+ -workLoopSyn 
+             (/usr/local/google/home/akkr/Documents/kilo_code_gemini_cli/gemini-cli-kilo-code-grep-
+             only2/gemini-cli/node_modules/react-reconciler/cjs/react-reconciler.development.js:126
+             44:41)
 "
 `;
 
 exports[`ThemeDialog Snapshots > should render correctly in theme selection mode (isDevelopment: true) 1`] = `
-"╭──────────────────────────────────────────────────────────────────────────────────────────────────╮
-│                                                                                                  │
-│ > Select Theme                               Preview                                             │
-│ ▲                                            ┌─────────────────────────────────────────────────┐ │
-│ ●  1. ANSI Dark (Matches terminal)           │                                                 │ │
-│    2. Atom One Dark                          │ 1 # function                                    │ │
-│    3. Ayu Dark                               │ 2 def fibonacci(n):                             │ │
-│    4. Default Dark                           │ 3     a, b = 0, 1                               │ │
-│    5. Dracula Dark                           │ 4     for _ in range(n):                        │ │
-│    6. GitHub Dark                            │ 5         a, b = b, a + b                       │ │
-│    7. Holiday Dark                           │ 6     return a                                  │ │
-│    8. Shades Of Purple Dark                  │                                                 │ │
-│    9. Solarized Dark                         │ 1 - print("Hello, " + name)                     │ │
-│   10. ANSI Light                             │ 1 + print(f"Hello, {name}!")                    │ │
-│   11. Ayu Light                              │                                                 │ │
-│   12. Default Light                          └─────────────────────────────────────────────────┘ │
-│ ▼                                                                                                │
-│                                              ╭─────────────────────────────────────────────────╮ │
-│                                              │ DEVELOPER TOOLS (Not visible to users)          │ │
-│                                              │                                                 │ │
-│                                              │ How do colors get applied?                      │ │
-│                                              │   • Hex: Rendered exactly by modern terminals.  │ │
-│                                              │   Not overridden by app themes.                 │ │
-│                                              │   • Blank: Uses your terminal's default         │ │
-│                                              │   foreground/background.                        │ │
-│                                              │   • Compatibility: On older terminals, hex is   │ │
-│                                              │   approximated to the nearest ANSI color.       │ │
-│                                              │   • ANSI Names: 'red', 'green', etc. are mapped │ │
-│                                              │   to your terminal app's palette.               │ │
-│                                              │                                                 │ │
-│                                              │  Value     Name                                 │ │
-│                                              │   #0000…  backgroun Main terminal background    │ │
-│                                              │           d.primary color                       │ │
-│                                              │   #5F5…  backgroun  Subtle background for       │ │
-│                                              │          d.message  message blocks              │ │
-│                                              │   #5F5…   backgroun Background for the input    │ │
-│                                              │           d.input   prompt                      │ │
-│                                              │   #00…   background. Background highlight for   │ │
-│                                              │          focus       selected/focused items     │ │
-│                                              │   #005…  backgrou Background for added lines    │ │
-│                                              │          nd.diff. in diffs                      │ │
-│                                              │          added                                  │ │
-│                                              │   #5F0…  backgroun Background for removed       │ │
-│                                              │          d.diff.re lines in diffs               │ │
-│                                              │          moved                                  │ │
-│                                              │  #FFFFF text.prim  Primary text color (uses     │ │
-│                                              │  F      ary        terminal default if blank)   │ │
-│                                              │  #AFAFAF  text.secon Secondary/dimmed text      │ │
-│                                              │           dary       color                      │ │
-│                                              │  #87AFFF text.link Hyperlink and highlighting   │ │
-│                                              │                    color                        │ │
-│                                              │  #D7AFFF  text.accen Accent color for           │ │
-│                                              │           t          emphasis                   │ │
-│                                              │  #FFFFFF text.res  Color for model response     │ │
-│                                              │          ponse     text (uses terminal default  │ │
-│                                              │                    if blank)                    │ │
-│                                              │  #878787   border.def Standard border color     │ │
-│                                              │            ault                                 │ │
-│                                              │  #AFAFAFui.comme  Color for code comments and   │ │
-│                                              │         nt        metadata                      │ │
-│                                              │  #AFAFA ui.symbol Color for technical symbols   │ │
-│                                              │  F                and UI icons                  │ │
-│                                              │  #87AFF ui.active Border color for active or    │ │
-│                                              │  F                running elements              │ │
-│                                              │  #87878 ui.dark    Deeply dimmed color for      │ │
-│                                              │  7                 subtle UI elements           │ │
-│                                              │  #D7FFD ui.focus   Color for focused elements   │ │
-│                                              │  7                 (e.g. selected menu items,   │ │
-│                                              │                    focused borders)             │ │
-│                                              │  #FF87AFstatus.err Color for error messages     │ │
-│                                              │         or         and critical status          │ │
-│                                              │  #D7FFD7status.suc Color for success messages   │ │
-│                                              │         cess       and positive status          │ │
-│                                              │  #FFFFA status.wa Color for warnings and        │ │
-│                                              │  F      rning     cautionary status             │ │
-│                                              │  #4796E4   ui.gradien                           │ │
-│                                              │  #847ACE   t                                    │ │
-│                                              │  #C3677F                                        │ │
-│                                              ╰─────────────────────────────────────────────────╯ │
-│                                                                                                  │
-│ (Use Enter to select, Tab to configure scope, Esc to close)                                      │
-│                                                                                                  │
-╰──────────────────────────────────────────────────────────────────────────────────────────────────╯
+"
+  ERROR  config.getUseTerminalBuffer is not a function
+
+ src/ui/hooks/useAlternateBuffer.ts:16:44
+
+ 13: // Right now this is convenient as it allows us to special case terminalBuffer
+ 14: // rendering like we special case alternateBuffer rendering.
+ 15: export const isAlternateBufferEnabled = (config: Config): boolean =>
+ 16:   config.getUseAlternateBuffer() || config.getUseTerminalBuffer();
+ 17:
+ 18: // This is read from Config so that the UI reads the same value per application session
+ 19: export const useAlternateBuffer = (): boolean => {
+
+ - isAlternateBufferEnabled (src/ui/hooks/useAlternateBuffer.ts:16:44)
+ - useAlternateBuffer (src/ui/hooks/useAlternateBuffer.ts:21:10)
+ - ThemeDialog (src/ui/components/ThemeDialog.tsx:88:29)
+ -Object.react-stack-bott 
+  m-frame                (/usr/local/google/home/akkr/Documents/kilo_code_gemini_cli/gemini-cli-kil
+                         o-code-grep-only2/gemini-cli/node_modules/react-reconciler/cjs/react-recon
+                         ciler.development.js:15859:20)
+ -renderWithHoo 
+  s            (/usr/local/google/home/akkr/Documents/kilo_code_gemini_cli/gemini-cli-kilo-code-gre
+               p-only2/gemini-cli/node_modules/react-reconciler/cjs/react-reconciler.development.js
+               :3221:22)
+ -updateFunctionComp 
+  nent              (/usr/local/google/home/akkr/Documents/kilo_code_gemini_cli/gemini-cli-kilo-cod
+                    e-grep-only2/gemini-cli/node_modules/react-reconciler/cjs/react-reconciler.deve
+                    lopment.js:6475:19)
+ -beginWor 
+          (/usr/local/google/home/akkr/Documents/kilo_code_gemini_cli/gemini-cli-kilo-code-grep-onl
+          y2/gemini-cli/node_modules/react-reconciler/cjs/react-reconciler.development.js:8009:18)
+
+ -runWithFiberIn 
+  EV            (/usr/local/google/home/akkr/Documents/kilo_code_gemini_cli/gemini-cli-kilo-code-gr
+                ep-only2/gemini-cli/node_modules/react-reconciler/cjs/react-reconciler.development.
+                js:1738:13)
+ -performUnitOfW 
+  rk            (/usr/local/google/home/akkr/Documents/kilo_code_gemini_cli/gemini-cli-kilo-code-gr
+                ep-only2/gemini-cli/node_modules/react-reconciler/cjs/react-reconciler.development.
+                js:12834:22)
+ -workLoopSyn 
+             (/usr/local/google/home/akkr/Documents/kilo_code_gemini_cli/gemini-cli-kilo-code-grep-
+             only2/gemini-cli/node_modules/react-reconciler/cjs/react-reconciler.development.js:126
+             44:41)
 "
 `;

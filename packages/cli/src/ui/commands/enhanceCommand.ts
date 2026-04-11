@@ -49,6 +49,7 @@ export const enhanceCommand: SlashCommand = {
       config.getModel(),
       config.getGemini31LaunchedSync?.() ?? false,
       false,
+      false,
       config.getHasAccessToPreviewModel?.() ?? true,
       config,
     );
